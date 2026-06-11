@@ -17,5 +17,15 @@
     "BaseDeadBallTurnover": 0.03,
     "PhysicalityFoulNudge": 0.10,
     "Epsilon": 1e-9
+  },
+
+  "RollC": {
+    "BaseBadPassDeadBall": 0.30,
+    "BaseBadPassIntercepted": 0.22,
+    "BaseLostBallDeadBall": 0.18,
+    "BaseLostBallLiveBall": 0.20,
+    "BaseOffensiveFoul": 0.10,
+    "PressureLostBallLiveBallNudge": 0.10,
+    "Epsilon": 1e-9
   }
 }

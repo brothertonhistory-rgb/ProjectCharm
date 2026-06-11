@@ -9,17 +9,20 @@ internal static class Program
         var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
+        var cfgC = RollCConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
         var rollBGenerator = new RollBStubPieGenerator(cfgB);
+        var rollCGenerator = new RollCStubPieGenerator(cfgC);
+        var game = new GameState();  // arrow starts Off — first jump ball is the tip
 
         var resolver = new Resolver(
             rollBGenerator,
+            rollCGenerator,
+            game,
             rng,
-            new TurnoverTypeResolverStub(),
             new FoulTypeResolverStub(),
-            new JumpBallResolverStub(),
             new PlayerSelectionStub());
 
         var state = new PossessionState(
@@ -28,22 +31,25 @@ internal static class Program
             Defense: "AWAY",
             Entry: EntryType.DeadBallInbound);
 
-        Console.WriteLine("=== Project Charm :: Roll A -> Roll B Chain ===\n");
+        Console.WriteLine("=== Project Charm :: Roll A -> Roll B -> Roll C Chain ===\n");
 
         ShowSamples(cfg, rollAGenerator, resolver, state, rng);
         var ok = BatchCheck(cfg, cfgB, rollAGenerator, rollBGenerator, resolver, state);
+        ok &= RollCBatchCheck(cfg, cfgC, rollCGenerator, state);
         ok &= PhysicalitySignalCheck(cfgB, rollBGenerator, state);
+        ok &= PressureSignalCheck(cfgC, rollCGenerator, state);
+        ok &= JumpBallCheck(cfg);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
     }
 
-    // --- Observability: print a few full A->B chains. ---
+    // --- Observability: print a few full A->...->terminal chains. ---
     private static void ShowSamples(
         RollAConfig cfg, StubPieGenerator genA, Resolver resolver,
         PossessionState state, IRng rng)
     {
-        Console.WriteLine("--- Observability: sample possessions (seeded, A->B chain) ---");
+        Console.WriteLine("--- Observability: sample possessions (seeded, full chain) ---");
         const double pressure = 0.5;
 
         for (var i = 0; i < 8; i++)
@@ -55,8 +61,24 @@ internal static class Program
             var kind = result is Terminal ? "TERMINAL" : "CONTINUE";
             var elapsed = result.ElapsedSeconds is { } s ? $"{s:0}s" : "deferred";
             Console.WriteLine(
-                $"  result={kind,-8} | elapsed={elapsed,-8} | route -> {routing.Destination}" +
+                $"  rollA={kind,-8} | elapsed={elapsed,-8} | final -> {routing.Destination}" +
                 (routing.PossessionEnded ? " (possession ended)" : ""));
+        }
+        Console.WriteLine();
+
+        // Roll C observability: print its pie, an input, and a resolved outcome.
+        Console.WriteLine("--- Observability: Roll C (turnover classification) ---");
+        var genC = new RollCStubPieGenerator(RollCConfig.Load(
+            Path.Combine(AppContext.BaseDirectory, "config.json")));
+        var pieC = genC.Generate(state, pressure: 0.0);
+        Console.WriteLine($"  pie: {pieC}");
+        var sampleRng = new SystemRng(cfg.Seed);
+        for (var i = 0; i < 5; i++)
+        {
+            var r = RollC.Execute(state, pieC, sampleRng);
+            var term = (Terminal)r;
+            var elapsed = r.ElapsedSeconds is { } s ? $"{s:0}s" : "deferred";
+            Console.WriteLine($"  input=turnover | result=TERMINAL | reason={term.Reason,-18} | elapsed={elapsed}");
         }
         Console.WriteLine();
     }
@@ -67,16 +89,14 @@ internal static class Program
         StubPieGenerator genA, RollBStubPieGenerator genB,
         Resolver resolver, PossessionState state)
     {
-        Console.WriteLine($"--- Batch: {cfg.BatchSize:N0} possessions (A->B chain, physicality=0.00) ---");
+        Console.WriteLine($"--- Batch: {cfg.BatchSize:N0} possessions (full chain, physicality=0.00) ---");
         var rng = new SystemRng(cfg.Seed);
         const double pressure = 0.0;
         var pieA = genA.Generate(state, pressure);
 
-        // Count Roll A outcomes.
         var aCounts = new Dictionary<EntryOutcome, int>();
         foreach (var o in Enum.GetValues<EntryOutcome>()) aCounts[o] = 0;
 
-        // Count Roll B outcomes (only possessions that reached B).
         var bCounts = new Dictionary<HalfcourtOutcome, int>();
         foreach (var o in Enum.GetValues<HalfcourtOutcome>()) bCounts[o] = 0;
 
@@ -88,7 +108,6 @@ internal static class Program
         {
             var result = RollA.Execute(state, pieA, rng, cfg);
 
-            // Classify Roll A outcome before handing to resolver.
             var aOutcome = result switch
             {
                 Terminal => EntryOutcome.ShotClockViolation,
@@ -100,7 +119,6 @@ internal static class Program
             };
             aCounts[aOutcome]++;
 
-            // For clean entries, Run Roll B independently to count its outcomes.
             if (aOutcome == EntryOutcome.CleanEntry)
             {
                 var pieBSample = genB.Generate(state, physicality: 0.0);
@@ -115,7 +133,6 @@ internal static class Program
                 bCounts[bOutcome]++;
             }
 
-            // Walk the full chain through the resolver.
             var routing = resolver.Route(result);
             if (routing.PossessionEnded) ended++;
             else if (routing.Destination.StartsWith("STUB:")) routedToStub++;
@@ -147,10 +164,63 @@ internal static class Program
             Console.WriteLine($"    {outcome,-18} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
         }
 
+        // Note: with Roll C live, turnovers now end the possession (terminal)
+        // instead of routing to a stub. So "ended" now includes them.
         var handoffOk = unrouted == 0 && (ended + routedToStub) == cfg.BatchSize;
         Console.WriteLine($"\n  handoff: ended={ended:N0}, routed-to-stub={routedToStub:N0}, unrouted={unrouted} -> {(handoffOk ? "ok" : "FAIL")}");
 
         return ratesOk && handoffOk;
+    }
+
+    // --- Batch: Roll C's five rates match its pie, and every exit is a clean terminal. ---
+    private static bool RollCBatchCheck(
+        RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} turnovers through Roll C (pressure=0.00) ---");
+        var rng = new SystemRng(cfg.Seed);
+        var pieC = genC.Generate(state, pressure: 0.0);
+
+        var counts = new Dictionary<TurnoverOutcome, int>();
+        foreach (var o in Enum.GetValues<TurnoverOutcome>()) counts[o] = 0;
+
+        var nonTerminal = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var result = RollC.Execute(state, pieC, rng);
+            if (result is not Terminal t)
+            {
+                nonTerminal++;
+                continue;
+            }
+            var outcome = t.Reason switch
+            {
+                "BadPassDeadBall" => TurnoverOutcome.BadPassDeadBall,
+                "BadPassIntercepted" => TurnoverOutcome.BadPassIntercepted,
+                "LostBallDeadBall" => TurnoverOutcome.LostBallDeadBall,
+                "LostBallLiveBall" => TurnoverOutcome.LostBallLiveBall,
+                "OffensiveFoul" => TurnoverOutcome.OffensiveFoul,
+                _ => throw new InvalidOperationException($"Unmapped Roll C reason '{t.Reason}'.")
+            };
+            counts[outcome]++;
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll C outcomes:");
+        foreach (var (outcome, weight) in pieC.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-20} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        var terminalOk = nonTerminal == 0;
+        Console.WriteLine($"\n  every exit is a clean terminal: non-terminal={nonTerminal} -> {(terminalOk ? "ok" : "FAIL")}");
+
+        return ratesOk && terminalOk;
     }
 
     // --- Prove Roll B's seam carries signal: foul rate must rise with physicality. ---
@@ -158,9 +228,9 @@ internal static class Program
     {
         Console.WriteLine("\n--- Seam signal: Roll B foul rate vs. physicality ---");
         var rng = new SystemRng(42);
-        var low = FoulRate(cfgB, genB, state, rng, physicality: 0.0);
+        var low = RollBFoulRate(cfgB, genB, state, rng, physicality: 0.0);
         rng = new SystemRng(42);
-        var high = FoulRate(cfgB, genB, state, rng, physicality: 1.0);
+        var high = RollBFoulRate(cfgB, genB, state, rng, physicality: 1.0);
 
         Console.WriteLine($"  foul rate @ physicality 0.00 = {low:P3}");
         Console.WriteLine($"  foul rate @ physicality 1.00 = {high:P3}");
@@ -170,7 +240,7 @@ internal static class Program
         return moved;
     }
 
-    private static double FoulRate(
+    private static double RollBFoulRate(
         RollBConfig cfgB, RollBStubPieGenerator genB,
         PossessionState state, IRng rng, double physicality)
     {
@@ -178,10 +248,96 @@ internal static class Program
         var fouls = 0;
         const int n = 100_000;
         for (var i = 0; i < n; i++)
-        {
             if (RollB.Execute(state, pie, rng) is Continue { Next: ContinuationKind.ResolveFoulType })
                 fouls++;
-        }
         return fouls / (double)n;
+    }
+
+    // --- Prove Roll C's seam carries signal: live-strip rate must rise with pressure. ---
+    private static bool PressureSignalCheck(RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
+    {
+        Console.WriteLine("\n--- Seam signal: Roll C live-strip rate vs. pressure ---");
+        var rng = new SystemRng(42);
+        var low = RollCLiveStripRate(genC, state, rng, pressure: 0.0);
+        rng = new SystemRng(42);
+        var high = RollCLiveStripRate(genC, state, rng, pressure: 1.0);
+
+        Console.WriteLine($"  live-strip rate @ pressure 0.00 = {low:P3}");
+        Console.WriteLine($"  live-strip rate @ pressure 1.00 = {high:P3}");
+
+        var moved = high > low;
+        Console.WriteLine($"  signal is live (high > low): {(moved ? "ok" : "FAIL")}");
+        return moved;
+    }
+
+    private static double RollCLiveStripRate(
+        RollCStubPieGenerator genC, PossessionState state, IRng rng, double pressure)
+    {
+        var pie = genC.Generate(state, pressure);
+        var strips = 0;
+        const int n = 100_000;
+        for (var i = 0; i < n; i++)
+            if (RollC.Execute(state, pie, rng) is Terminal { Reason: "LostBallLiveBall" })
+                strips++;
+        return strips / (double)n;
+    }
+
+    // --- Jump ball: verify the three arrow behaviors directly. ---
+    private static bool JumpBallCheck(RollAConfig cfg)
+    {
+        Console.WriteLine("\n--- Jump ball: possession arrow behavior ---");
+        var allOk = true;
+
+        // (1) Opening tip is ~50/50, and the arrow is set to the tip LOSER.
+        var rng = new SystemRng(cfg.Seed);
+        var homeWins = 0;
+        var arrowToLoser = 0;
+        const int tips = 100_000;
+        for (var i = 0; i < tips; i++)
+        {
+            var g = new GameState();  // Off -> tip
+            var award = JumpBall.Resolve(g, rng);
+            if (award.AwardedTo == TeamSide.Home) homeWins++;
+
+            // Arrow must point at the loser (the team NOT awarded the ball).
+            var arrowTeam = g.PossessionArrow == ArrowState.Home ? TeamSide.Home : TeamSide.Away;
+            if (arrowTeam != award.AwardedTo) arrowToLoser++;
+
+            // Every tip must be flagged a contest and must turn the arrow ON.
+            if (!award.WasTipContest || g.PossessionArrow == ArrowState.Off) allOk = false;
+        }
+        var homeRate = homeWins / (double)tips;
+        var tipFair = Math.Abs(homeRate - 0.5) <= cfg.RateTolerance;
+        var loserOk = arrowToLoser == tips;
+        allOk &= tipFair && loserOk;
+        Console.WriteLine($"  tip coin-flip: home wins {homeRate:P3} (expected 50.000%) -> {(tipFair ? "ok" : "FAIL")}");
+        Console.WriteLine($"  arrow set to tip-loser every time: {arrowToLoser:N0}/{tips:N0} -> {(loserOk ? "ok" : "FAIL")}");
+
+        // (2) On-arrow jump ball awards the pointed-at team, then flips.
+        var g2 = new GameState(ArrowState.Home);
+        var a2 = JumpBall.Resolve(g2, rng);
+        var awardOk = a2.AwardedTo == TeamSide.Home && !a2.WasTipContest;
+        var flipOk = g2.PossessionArrow == ArrowState.Away;
+        allOk &= awardOk && flipOk;
+        Console.WriteLine($"  on-arrow(Home): awarded={a2.AwardedTo} contest={a2.WasTipContest} -> {(awardOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  arrow flipped Home->{g2.PossessionArrow}: {(flipOk ? "ok" : "FAIL")}");
+
+        // (3) A run of alternating-possession situations strictly alternates.
+        var g3 = new GameState(ArrowState.Home);
+        var expected = new[] { TeamSide.Home, TeamSide.Away, TeamSide.Home, TeamSide.Away, TeamSide.Home };
+        var alternates = true;
+        foreach (var exp in expected)
+            if (JumpBall.Resolve(g3, rng).AwardedTo != exp) alternates = false;
+        allOk &= alternates;
+        Console.WriteLine($"  five awards strictly alternate from Home: {(alternates ? "ok" : "FAIL")}");
+
+        // (4) Flipping an Off arrow must throw (guard against silent misuse).
+        var threw = false;
+        try { new GameState().FlipPossessionArrow(); }
+        catch (InvalidOperationException) { threw = true; }
+        allOk &= threw;
+        Console.WriteLine($"  flipping an Off arrow throws: {(threw ? "ok" : "FAIL")}");
+
+        return allOk;
     }
 }

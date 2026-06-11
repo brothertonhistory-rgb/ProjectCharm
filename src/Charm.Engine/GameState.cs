@@ -1,9 +1,24 @@
 namespace Charm.Engine;
 
-/// <summary>Which side a team is on. Used by the possession arrow and, later,
-/// by score/foul/timeout tracking.</summary>
+/// <summary>Which team — a stable identity that does NOT rotate with
+/// offense/defense. The possession arrow points at one of these.</summary>
 public enum TeamSide
 {
+    Home,
+    Away
+}
+
+/// <summary>
+/// The possession arrow's state. Three-valued because of the opening tip: the
+/// arrow is <see cref="Off"/> until the first jump ball turns it on. After that
+/// it always points at a team (<see cref="Home"/> / <see cref="Away"/>).
+/// </summary>
+public enum ArrowState
+{
+    /// <summary>Not yet set — before the opening tip is resolved (and reset each
+    /// overtime). A jump ball in this state is a real contest (a coin flip for
+    /// now), not an arrow read.</summary>
+    Off,
     Home,
     Away
 }
@@ -14,22 +29,41 @@ public enum TeamSide
 /// possession arrow has to live, because a jump ball in one possession sets who
 /// gets the ball in a later one.
 ///
-/// SKELETON ONLY this session. The possession arrow has real behavior (it
-/// flips). Score, fouls, and timeouts are placeholder fields — typed and named
-/// so the shape is defined, but NOT yet read or written during possession
-/// resolution. They are future infrastructure, deliberately inert for now.
+/// The arrow now has real, complete behavior. Score, fouls, and timeouts remain
+/// placeholder fields — typed and named so the shape is defined, but NOT yet
+/// read or written during possession resolution.
 /// </summary>
 public sealed class GameState
 {
-    /// <summary>Who is awarded the ball on the next arrow-decided jump ball.</summary>
-    public TeamSide PossessionArrow { get; private set; }
+    /// <summary>The arrow's current state: Off (pre-tip), or pointing at a team.</summary>
+    public ArrowState PossessionArrow { get; private set; }
 
-    public GameState(TeamSide initialArrow) => PossessionArrow = initialArrow;
+    /// <param name="initialArrow">Start state. A fresh game / overtime starts
+    /// <see cref="ArrowState.Off"/> so the first jump ball is a contest.</param>
+    public GameState(ArrowState initialArrow = ArrowState.Off) =>
+        PossessionArrow = initialArrow;
 
-    /// <summary>Flip the arrow to the other team. A future jump-ball resolver
-    /// calls this when the arrow is consumed; nothing in Roll A touches it.</summary>
-    public void FlipPossessionArrow() =>
-        PossessionArrow = PossessionArrow == TeamSide.Home ? TeamSide.Away : TeamSide.Home;
+    /// <summary>Turn the arrow ON, pointing at <paramref name="team"/>. Used by
+    /// the jump-ball node after the opening tip is decided: per NCAA the arrow
+    /// points at the team that LOST the tip (they are owed the next award).</summary>
+    public void SetPossessionArrow(TeamSide team) =>
+        PossessionArrow = team == TeamSide.Home ? ArrowState.Home : ArrowState.Away;
+
+    /// <summary>Flip the arrow to the other team. Called when an on-arrow jump
+    /// ball is consumed (the pointed-at team is awarded the ball, then the arrow
+    /// flips away from them).</summary>
+    public void FlipPossessionArrow() => PossessionArrow = PossessionArrow switch
+    {
+        ArrowState.Home => ArrowState.Away,
+        ArrowState.Away => ArrowState.Home,
+        _ => throw new InvalidOperationException(
+            "Cannot flip the possession arrow while it is Off — it must be set by a tip first.")
+    };
+
+    /// <summary>Reset the arrow to Off. Called at the start of each overtime so
+    /// the OT tip is a fresh contest (NCAA: arrow resets, OT begins with a jump
+    /// ball).</summary>
+    public void ResetPossessionArrow() => PossessionArrow = ArrowState.Off;
 
     // --- Placeholder fields: defined shape, not yet wired to anything. ---
     public int HomeScore { get; set; }

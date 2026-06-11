@@ -15,25 +15,25 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
 public sealed class Resolver
 {
     private readonly RollBStubPieGenerator _rollBGenerator;
+    private readonly RollCStubPieGenerator _rollCGenerator;
+    private readonly GameState _game;
     private readonly IRng _rng;
-    private readonly IContinuationNode _resolveTurnoverType;
     private readonly IContinuationNode _resolveFoulType;
-    private readonly IContinuationNode _resolveJumpBall;
     private readonly IContinuationNode _intoPlayerSelection;
 
     public Resolver(
         RollBStubPieGenerator rollBGenerator,
+        RollCStubPieGenerator rollCGenerator,
+        GameState game,
         IRng rng,
-        IContinuationNode resolveTurnoverType,
         IContinuationNode resolveFoulType,
-        IContinuationNode resolveJumpBall,
         IContinuationNode intoPlayerSelection)
     {
         _rollBGenerator = rollBGenerator;
+        _rollCGenerator = rollCGenerator;
+        _game = game;
         _rng = rng;
-        _resolveTurnoverType = resolveTurnoverType;
         _resolveFoulType = resolveFoulType;
-        _resolveJumpBall = resolveJumpBall;
         _intoPlayerSelection = intoPlayerSelection;
     }
 
@@ -53,22 +53,41 @@ public sealed class Resolver
                     {
                         // Roll A's clean entry -> execute Roll B, loop.
                         case ContinuationKind.IntoHalfcourtSet:
-                            var pie = _rollBGenerator.Generate(c.State, physicality: 0.0);
-                            result = RollB.Execute(c.State, pie, _rng);
+                            var pieB = _rollBGenerator.Generate(c.State, physicality: 0.0);
+                            result = RollB.Execute(c.State, pieB, _rng);
+                            continue;
+
+                        // Turnover (from any feeder) -> execute Roll C, loop.
+                        // Roll C always returns a Terminal, so the loop's Terminal
+                        // case ends the possession on the next pass. Roll C is the
+                        // first terminal-producing roll; it integrates exactly like
+                        // Roll B (execute + feed result back), not like a stub that
+                        // returns a destination string.
+                        case ContinuationKind.ResolveTurnoverType:
+                            var pieC = _rollCGenerator.Generate(c.State, pressure: 0.0);
+                            result = RollC.Execute(c.State, pieC, _rng);
                             continue;
 
                         // Roll B's proceed -> player selection stub (chain ends here for now).
                         case ContinuationKind.IntoPlayerSelection:
                             return new RoutingOutcome(false, _intoPlayerSelection.Receive(c));
 
-                        case ContinuationKind.ResolveTurnoverType:
-                            return new RoutingOutcome(false, _resolveTurnoverType.Receive(c));
-
                         case ContinuationKind.ResolveFoulType:
                             return new RoutingOutcome(false, _resolveFoulType.Receive(c));
 
+                        // Jump ball (from any feeder) -> resolve against the
+                        // possession arrow, then END the possession. A held ball
+                        // ends the current possession; the awarded team's ensuing
+                        // possession is a NEW possession (future work), not a
+                        // continuation of this one. Mutates the arrow as a side
+                        // effect (sets it on the opening tip, flips it otherwise).
                         case ContinuationKind.ResolveJumpBall:
-                            return new RoutingOutcome(false, _resolveJumpBall.Receive(c));
+                            var award = JumpBall.Resolve(_game, _rng);
+                            var reason = award.WasTipContest
+                                ? $"JumpBallTip:{award.AwardedTo}"
+                                : $"JumpBallArrow:{award.AwardedTo}";
+                            result = new Terminal(reason, c.State);
+                            continue;
 
                         default:
                             throw new InvalidOperationException($"No route for continuation '{c.Next}'.");
