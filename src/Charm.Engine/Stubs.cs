@@ -12,11 +12,21 @@ public interface IContinuationNode
     string Receive(Continue continuation);
 }
 
-/// <summary>STUB for the player-selection roll (the next station after Roll B's
-/// Proceed outcome).</summary>
-public sealed class PlayerSelectionStub : IContinuationNode
+/// <summary>STUB for the player-action sequence — where Roll E's selection lands
+/// (the future shot-creation / shot-quality / make-miss / rebound / shooting-foul
+/// rolls that resolve what happens TO the selected player). The selected slot
+/// rides on <see cref="Continue"/>'s <see cref="PossessionState"/>, so the stub
+/// records WHICH slot arrived, letting the harness confirm a real slot was named.
+/// A real node replaces this without Roll E changing.</summary>
+public sealed class PlayerActionStub : IContinuationNode
 {
-    public string Receive(Continue continuation) => "STUB:PlayerSelection";
+    public string Receive(Continue continuation)
+    {
+        var slot = continuation.State.SelectedSlot;
+        return slot is { } s
+            ? $"STUB:PlayerAction:{s.Side}slot{s.Number}"
+            : "STUB:PlayerAction:NO_SLOT";   // should never happen; surfaces a bug loud
+    }
 }
 
 /// <summary>STUB for the turnover-type resolver.</summary>

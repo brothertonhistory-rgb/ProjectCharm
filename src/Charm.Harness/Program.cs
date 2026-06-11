@@ -11,12 +11,14 @@ internal static class Program
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
         var cfgD = RollDConfig.Load(configPath);
+        var cfgE = RollEConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
         var rollBGenerator = new RollBStubPieGenerator(cfgB);
         var rollCGenerator = new RollCStubPieGenerator(cfgC);
         var rollDGenerator = new RollDStubPieGenerator(cfgD);
+        var rollEGenerator = new RollEStubPieGenerator(cfgE);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -26,9 +28,10 @@ internal static class Program
             rollBGenerator,
             rollCGenerator,
             rollDGenerator,
+            rollEGenerator,
             game,
             rng,
-            new PlayerSelectionStub(),
+            new PlayerActionStub(),
             new ResumeInboundStub(),
             new ResolveFreeThrowsStub());
 
@@ -38,9 +41,9 @@ internal static class Program
             Defense: TeamSide.Away,
             Entry: EntryType.DeadBallInbound);
 
-        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D Chain ===\n");
+        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E Chain ===\n");
 
-        ShowSamples(cfg, rollAGenerator, resolver, state, rng);
+        ShowSamples(cfg, cfgE, rollAGenerator, rollEGenerator, resolver, game, state, rng);
         var ok = BatchCheck(cfg, cfgB, rollAGenerator, rollBGenerator, resolver, state);
         ok &= RollCBatchCheck(cfg, cfgC, rollCGenerator, state);
         ok &= RollDFlavorBatchCheck(cfg, cfgD, rollDGenerator, state);
@@ -49,6 +52,7 @@ internal static class Program
         ok &= PressureSignalCheck(cfgC, rollCGenerator, state);
         ok &= JumpBallCheck(cfg);
         ok &= SlotLayerCheck(game);
+        ok &= RollESelectionBatchCheck(cfg, cfgE, rollEGenerator, game, state);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -56,8 +60,9 @@ internal static class Program
 
     // --- Observability: print a few full A->...->terminal chains. ---
     private static void ShowSamples(
-        RollAConfig cfg, StubPieGenerator genA, Resolver resolver,
-        PossessionState state, IRng rng)
+        RollAConfig cfg, RollEConfig cfgE, StubPieGenerator genA,
+        RollEStubPieGenerator genE, Resolver resolver,
+        GameState game, PossessionState state, IRng rng)
     {
         Console.WriteLine("--- Observability: sample possessions (seeded, full chain) ---");
         const double pressure = 0.5;
@@ -115,6 +120,23 @@ internal static class Program
                 : "ResumeInbound";
             Console.WriteLine(
                 $"  foul#{after,2}: {before}->{after} | flavor={r.Flavor,-8} | bonus={r.Bonus,-9} | route={route}");
+        }
+        Console.WriteLine();
+
+        // Roll E observability: the flat selection pie, then a few sample
+        // selections showing a real named slot stamped on the possession and the
+        // full chain landing on the player-action stub. This is the seam Session 7
+        // left being walked for the first time: Proceed -> Roll E -> a named slot.
+        Console.WriteLine("--- Observability: Roll E (player selection) ---");
+        var pieE = genE.Generate(state);
+        Console.WriteLine($"  selection pie (flat, no signal yet): {pieE}");
+        var selRng = new SystemRng(cfg.Seed);
+        for (var i = 0; i < 8; i++)
+        {
+            var r = (Continue)RollE.Execute(state, pieE, game, selRng);
+            var s = r.State.SelectedSlot!.Value;
+            Console.WriteLine(
+                $"  proceed -> selected {s.Side} slot {s.Number} | next={r.Next}");
         }
         Console.WriteLine();
     }
@@ -519,5 +541,61 @@ internal static class Program
             $"(a stat would credit here; nothing fills it yet) -> {(nameOk ? "ok" : "FAIL")}");
 
         return allOk;
+    }
+
+    // --- Batch: Roll E's five-way selection converges to a flat 20% per slot,
+    //     every selected slot is a real slot on the OFFENSE's lineup numbered
+    //     1–5, and every exit is a clean IntoPlayerAction continue carrying a
+    //     stamped slot. The flat distribution is the whole point this session:
+    //     with no signal, each of the five slots is equally likely. A future
+    //     generator tilts these odds without this check's roll changing. ---
+    private static bool RollESelectionBatchCheck(
+        RollAConfig cfg, RollEConfig cfgE, RollEStubPieGenerator genE,
+        GameState game, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} selections through Roll E (flat pie) ---");
+        var rng = new SystemRng(cfg.Seed);
+        var pieE = genE.Generate(state);
+
+        var counts = new Dictionary<SelectionOutcome, int>();
+        foreach (var o in Enum.GetValues<SelectionOutcome>()) counts[o] = 0;
+
+        var anomalies = 0;   // anything that isn't a clean, slot-stamped continue
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var result = RollE.Execute(state, pieE, game, rng);
+
+            // Must be a Continue, into the player-action sequence, carrying a
+            // selected slot that belongs to the offense and is numbered 1–5.
+            if (result is not Continue { Next: ContinuationKind.IntoPlayerAction } c
+                || c.State.SelectedSlot is not { } slot
+                || slot.Side != state.Offense
+                || slot.Number < 1 || slot.Number > Lineup.Size)
+            {
+                anomalies++;
+                continue;
+            }
+
+            // Map the named slot back to its outcome bucket for the rate tally.
+            counts[(SelectionOutcome)(slot.Number - 1)]++;
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll E selections (expected 20.000% each):");
+        foreach (var (outcome, weight) in pieE.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-8} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        var cleanOk = anomalies == 0;
+        Console.WriteLine($"\n  every exit a clean slot-stamped IntoPlayerAction: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
+
+        return ratesOk && cleanOk;
     }
 }

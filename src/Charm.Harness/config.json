@@ -36,5 +36,14 @@
     "BonusThreshold": 7,
     "DoubleBonusThreshold": 10,
     "Epsilon": 1e-9
+  },
+
+  "RollE": {
+    "BaseSlot1": 0.20,
+    "BaseSlot2": 0.20,
+    "BaseSlot3": 0.20,
+    "BaseSlot4": 0.20,
+    "BaseSlot5": 0.20,
+    "Epsilon": 1e-9
   }
 }

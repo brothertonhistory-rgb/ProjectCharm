@@ -4,6 +4,82 @@ Newest entries first. What was built, decided, and left stubbed each session.
 
 ---
 
+## Session 8 — Roll E (player selection)
+
+**Built**
+- `SelectionOutcomes.cs` — `SelectionOutcome` enum, five members `Slot1`–`Slot5`.
+  These are slot NUMBERS, not roles; each member maps to a slot number 1–5 by its
+  declaration position. Walked in declaration order by `Pie`, like every other
+  roll's outcome enum.
+- `RollEConfig.cs` — loads the `"RollE"` section. Five explicit base weights
+  (0.20 each) plus `Epsilon`. No live-wire scalar (see Decided).
+- `RollEStubPieGenerator.cs` — builds the flat five-way pie. No signal argument
+  (mirrors Roll D's flavor generator, not B/C's signal-carrying generators). The
+  real usage/attribute-driven generator replaces this later without touching the
+  roll or resolver.
+- `RollE.cs` — rolls the pie, maps the outcome to a slot number, names the real
+  slot on the OFFENSE's lineup via `game.LineupFor(state.Offense).SlotAt(n)`,
+  stamps it onto the possession with `state with { SelectedSlot = slot }`, and
+  returns `Continue(IntoPlayerAction)`. Takes `GameState` (like Roll D) to reach
+  the lineup — not to mutate it. Walks, for the first time, the seam Session 7
+  left: possession role -> `LineupFor` -> `SlotAt` -> a named slot.
+
+**Edited**
+- `PossessionState.cs` — added `Slot? SelectedSlot` (nullable, defaults null). The
+  per-possession fact "this slot has the action," a slot REFERENCE into the
+  game-scoped lineup, same shape as `Offense`/`Defense`. Null until Roll E runs
+  and on possessions that end/divert before selection.
+- `EntryOutcomes.cs` — added `ContinuationKind.IntoPlayerAction`; refreshed the
+  `IntoPlayerSelection` doc (now a real roll, not a stub).
+- `Resolver.cs` — `IntoPlayerSelection` converted from stub-receive to
+  execute-and-loop (generate pie -> `RollE.Execute` -> feed result back), exactly
+  like the Roll C/D cases. Added `RollEStubPieGenerator` field + ctor param. Added
+  the `IntoPlayerAction` case routing to the new player-action stub. Retired the
+  `_intoPlayerSelection` stub-node field.
+- `Stubs.cs` — retired `PlayerSelectionStub`; added `PlayerActionStub`, which
+  reads `continuation.State.SelectedSlot` and reports the named slot.
+- `config.json` — added the `"RollE"` section (flat 0.20 ×5 + Epsilon).
+- `Program.cs` — load `RollEConfig`, build the generator, updated the `Resolver`
+  construction (new param + `PlayerActionStub`). Added a Roll E sample-selection
+  printout to `ShowSamples` and a `RollESelectionBatchCheck` proving the flat 20%
+  convergence and that every exit is a clean slot-stamped `IntoPlayerAction`.
+
+**Decided**
+- The selected slot lands on `PossessionState` (a durable per-possession fact read
+  across many future chain hops), NOT as a `Continue` payload. Roll D's `Bonus`
+  rides the Continue because it is transient input for the very next node; the
+  selected slot is the opposite — same reasoning, opposite conclusion.
+- The pie ranges over an enum (`SelectionOutcome`), not an int index, because
+  `Pie<TOutcome>` is enum-constrained and an enum keeps the contract identical to
+  B/C/D with no special-casing.
+- Flat odds are written as five explicit 0.20 weights in config (not a computed
+  "uniform default"), so the seam is visibly real and tunable, and a future
+  generator overwrites numbers rather than flipping a mode.
+- No live-wire signal this session: selection's first real signal is usage, part
+  of the deferred attribute model — nothing functional for a signal to move yet.
+- The continuation after selection is `IntoPlayerAction` (not "shot sequence"):
+  what comes next is whatever happens TO the player — shot, turnover, drawn foul —
+  not only a shot.
+
+**Stubbed / deferred**
+- `PlayerActionStub` is the new chain dead-end. `STUB:PlayerSelection` is gone from
+  sample output, replaced by a named selected slot — the seam is live. The chain
+  now dead-ends at the player-action sequence (the future shot-creation /
+  shot-quality / make-miss / rebound / shooting-foul rolls), which is the next
+  frontier.
+- What tilts the selection pie (usage, hierarchy, ball-dominance, attributes,
+  coaching) is the player/attribute model — its own design conversation, untouched.
+- The husk/fill object (the rated player occupying a slot) is still not needed:
+  selection points at the SLOT, which is nameable on its own.
+
+**Open flag for next session**
+- `RollEConfig.Load` was written using `System.Text.Json` (`JsonDocument` +
+  `GetProperty`). If the other `*Config.Load` methods parse a different way, match
+  their style so the codebase stays consistent — functionally equivalent, but
+  worth aligning.
+
+---
+
 ## Session 7 — The on-court slot (identity) layer
 
 **Built**

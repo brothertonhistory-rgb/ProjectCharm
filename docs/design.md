@@ -438,12 +438,98 @@ name no successor) holds; the extra argument is simply the state it must touch.
 thresholds (NCAA classic 7 / 10, tunable) — live in the `"RollD"` section of
 `config.json`, loaded by `RollDConfig`.
 
+---
+
+## Roll E — Player Selection
+
+**Simulates:** which of the five on-court offensive players the possession runs
+through this time. Roll B's `Proceed` exit lands here. It is the first roll whose
+output is *an identity to attribute to* rather than *a branch in the chain* — it
+names a player, it does not classify an event.
+
+**Pie shape:** five slices over `SelectionOutcome` — `Slot1`–`Slot5`. Each member
+is a slot NUMBER (its declaration position + 1), not a role. **Flat this session:
+20% each.**
+
+**What it does — four steps.**
+1. Rolls the flat pie to a `SelectionOutcome`.
+2. Maps it to a slot number 1–5 and names the real slot on the *offense's* lineup
+   via `game.LineupFor(state.Offense).SlotAt(n)`.
+3. Stamps the chosen slot onto the possession: `state with { SelectedSlot = slot }`.
+4. Returns `Continue(IntoPlayerAction)` carrying that updated state.
+
+**Why the slot lands on `PossessionState`, not on the `Continue`.** The selected
+slot is a *durable per-possession fact* that several future rolls (shot creation,
+shot quality, make-miss, rebound, shooting foul) and the attribution layer all
+read, across multiple chain hops. That is exactly `PossessionState`'s job — the
+slot sits beside `Offense`/`Defense` as another per-possession identity reference
+(a reference into the game-scoped lineup, never an owned or attribute-bearing
+thing). This is the deliberate contrast with Roll D's `BonusType`, which rides on
+the `Continue` *because* it is transient input consumed by the very next node and
+never persists. Same reasoning about lifetime, opposite conclusion: persistent
+fact → state; transient routing input → continuation. Putting the slot on the
+continuation would force every downstream roll to fish it out of a transient
+envelope instead of reading state.
+
+**`PossessionState` is immutable, so selection is a `with`, not a mutation.**
+Stamping the slot produces a *new* record, which is exactly how the resolver
+already threads `c.State` forward through its loop. No mutation, no friction.
+
+**Why an enum pie, not an int index.** `Pie<TOutcome>` is constrained to enums, so
+a `SelectionOutcome` enum keeps the contract identical to B/C/D with zero
+special-casing. The enum↔number map is the trivial `(int)outcome + 1`.
+
+**The flat pie is the whole job; tilting it is not.** What makes one slot more
+likely than another — usage, hierarchy, ball-dominance, the filling players'
+attributes, coach tendencies — is the deferred player/attribute model. That
+arrives later as a smarter *generator* that hands Roll E a non-flat pie over the
+same enum; the roll, the resolver, and the slot never change. This is the same
+stub-to-real generator swap every other roll already promises, and it is the
+specific discipline this roll demanded: selection sits one inch from the player
+model, and tilting the pie now would be the premature-crystallization failure mode
+the project has twice hit. The flat pie is the honest statement that there is no
+signal yet.
+
+**No live-wire signal (unlike B/C).** Roll B's physicality and Roll C's pressure
+each nudge a slice to prove the seam carries signal. Roll E has none, because its
+first real signal (usage) is part of the deferred attribute model — there is
+nothing functional for a wire to move yet, so, like Roll D's flavor generator,
+the generator takes no signal argument. Adding one would falsely imply selection
+already had a signal.
+
+**Roll E takes `GameState`; so did Roll D, for a different reason.** Roll D takes
+it to *mutate* the foul count; Roll E takes it to *read* the offense's lineup and
+name a real slot. Either way the uniform shape holds — receive state + pie, roll,
+name no successor — and the extra argument is just the state the roll must touch.
+
+**Integration: execute-and-loop, like C and D.** The resolver executes Roll E
+inside the `IntoPlayerSelection` case and feeds the returned `Continue` back
+through its loop, which re-routes it by its `IntoPlayerAction` kind to the
+player-action stub. The retired `PlayerSelectionStub` is dropped; `Proceed` still
+emits the same `IntoPlayerSelection` kind — only its destination moved from a stub
+to a real roll. The new dead-end is `PlayerActionStub`.
+
+**Why the next kind is `IntoPlayerAction`.** What follows selection is whatever
+happens *to* the selected player — a shot attempt, a turnover, a drawn foul — not
+only a shot. The kind names the player-centric beat, not one of its outcomes.
+
+**No player fill yet.** Selection points at the *slot*, which Session 7 proved is
+nameable on its own. A fill object (the rated player occupying a slot) is only
+needed when something reads a player's attributes — not yet. Roll E names; it
+reads nothing off the slot.
+
+**Config lives separately.** Roll E's five flat weights live in the `"RollE"`
+section of `config.json`, loaded by `RollEConfig` — written as five explicit 0.20
+values (not a computed uniform), so the weights are visible and tunable and a
+future generator overwrites numbers rather than flipping a mode.
+
 | Roll | Name | Status |
 |---|---|---|
 | A | Entry — Inbounds (Dead Ball) | Built (stubbed generator + stubbed successors) |
 | B | Halfcourt Initiation | Built (stubbed generator + stubbed successors) |
 | C | Turnover Classification | Built (stubbed generator; terminal — no successors) |
 | D | Non-Shooting Defensive Foul | Built (stubbed flavor generator + stubbed successors) |
+| E | Player Selection | Built (flat stubbed generator + stubbed successor) |
 | — | Jump ball (arrow node) | Built (50/50 tip placeholder; arrow complete) |
 
 ## Known required infrastructure (not yet built)
@@ -465,8 +551,14 @@ thresholds (NCAA classic 7 / 10, tunable) — live in the `"RollD"` section of
 - **Time roll** — apportions game-clock seconds for non-invariant outcomes. Every
   terminal except the shot-clock violation defers its time here — including all
   of Roll C's and the jump-ball terminals.
-- **Player-selection roll** — decides which player the possession runs through;
-  Roll B's `Proceed` exit lands here.
+- **Player-selection roll** — BUILT (Session 8, Roll E). Picks which on-court
+  offensive slot the possession runs through and stamps it on `PossessionState`.
+  Roll B's `Proceed` exit lands here. Flat odds for now; the attribute model tilts
+  them later via a smarter generator.
+- **Player-action sequence** — where Roll E's selection lands: the shot-creation /
+  shot-quality / make-miss / rebound / shooting-foul rolls that resolve what
+  happens TO the selected player. Currently the `PlayerActionStub` dead-end; the
+  next frontier. Consumes `PossessionState.SelectedSlot`.
 - **Player/steal attribution layer** — runs over outcomes whenever a counting
   stat is generated; assigns the offensive turnover and (on live-ball slices) the
   defensive steal to specific players. Orthogonal to the possession chain; reads,

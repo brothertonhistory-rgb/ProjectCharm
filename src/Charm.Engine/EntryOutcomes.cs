@@ -54,9 +54,16 @@ public enum ContinuationKind
     /// <summary>Jump ball: hand off to the (stubbed) jump-ball resolver.</summary>
     ResolveJumpBall,
 
-    /// <summary>Halfcourt possession proceeds: hand off to the (stubbed)
-    /// player-selection roll.</summary>
+    /// <summary>Halfcourt possession proceeds: hand off to Roll E (player
+    /// selection), which picks which on-court offensive slot gets the action.</summary>
     IntoPlayerSelection,
+
+    /// <summary>A player (slot) has been selected: hand off to the (stubbed)
+    /// player-action sequence — the future shot-creation / shot-quality /
+    /// make-miss / rebound / shooting-foul rolls that resolve what happens TO the
+    /// selected player. The selected slot rides on <see cref="PossessionState"/>,
+    /// not on the continuation.</summary>
+    IntoPlayerAction,
 
     /// <summary>A non-shooting defensive foul with the opponent NOT in the bonus:
     /// the offense keeps the ball and inbounds. Hand off to the (stubbed)

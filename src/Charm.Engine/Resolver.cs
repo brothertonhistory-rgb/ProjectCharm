@@ -17,9 +17,10 @@ public sealed class Resolver
     private readonly RollBStubPieGenerator _rollBGenerator;
     private readonly RollCStubPieGenerator _rollCGenerator;
     private readonly RollDStubPieGenerator _rollDGenerator;
+    private readonly RollEStubPieGenerator _rollEGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
-    private readonly IContinuationNode _intoPlayerSelection;
+    private readonly IContinuationNode _intoPlayerAction;
     private readonly IContinuationNode _resumeInbound;
     private readonly IContinuationNode _resolveFreeThrows;
 
@@ -27,18 +28,20 @@ public sealed class Resolver
         RollBStubPieGenerator rollBGenerator,
         RollCStubPieGenerator rollCGenerator,
         RollDStubPieGenerator rollDGenerator,
+        RollEStubPieGenerator rollEGenerator,
         GameState game,
         IRng rng,
-        IContinuationNode intoPlayerSelection,
+        IContinuationNode intoPlayerAction,
         IContinuationNode resumeInbound,
         IContinuationNode resolveFreeThrows)
     {
         _rollBGenerator = rollBGenerator;
         _rollCGenerator = rollCGenerator;
         _rollDGenerator = rollDGenerator;
+        _rollEGenerator = rollEGenerator;
         _game = game;
         _rng = rng;
-        _intoPlayerSelection = intoPlayerSelection;
+        _intoPlayerAction = intoPlayerAction;
         _resumeInbound = resumeInbound;
         _resolveFreeThrows = resolveFreeThrows;
     }
@@ -74,9 +77,25 @@ public sealed class Resolver
                             result = RollC.Execute(c.State, pieC, _rng);
                             continue;
 
-                        // Roll B's proceed -> player selection stub (chain ends here for now).
+                        // Roll B's proceed -> execute Roll E (player selection),
+                        // loop. Roll E returns a CONTINUE (IntoPlayerAction)
+                        // carrying the selected slot stamped on its state — so
+                        // feeding it back re-enters this switch and lands on the
+                        // IntoPlayerAction stub below. Roll E reaches GameState to
+                        // name a real slot on the offense's lineup (like Roll D
+                        // takes _game), hence it takes _game. Same integration as
+                        // Roll C/D: execute + feed result back, not a stub that
+                        // returns a destination string.
                         case ContinuationKind.IntoPlayerSelection:
-                            return new RoutingOutcome(false, _intoPlayerSelection.Receive(c));
+                            var pieE = _rollEGenerator.Generate(c.State);
+                            result = RollE.Execute(c.State, pieE, _game, _rng);
+                            continue;
+
+                        // Roll E's selection -> player-action sequence (stub). The
+                        // selected slot rides on c.State (PossessionState), not on
+                        // the continuation. Chain ends here for now.
+                        case ContinuationKind.IntoPlayerAction:
+                            return new RoutingOutcome(false, _intoPlayerAction.Receive(c));
 
                         // Foul (from any feeder: Roll A entry, Roll B halfcourt)
                         // -> execute Roll D, loop. Roll D returns a CONTINUE
