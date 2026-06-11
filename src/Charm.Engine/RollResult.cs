@@ -25,4 +25,26 @@ public sealed record Terminal(string Reason, PossessionState State) : RollResult
 /// <summary>The possession continues. The resolver routes by <paramref name="Next"/>.</summary>
 /// <param name="Next">Which kind of continuation this is (not which node).</param>
 /// <param name="State">The state carried forward.</param>
-public sealed record Continue(ContinuationKind Next, PossessionState State) : RollResult;
+public sealed record Continue(ContinuationKind Next, PossessionState State) : RollResult
+{
+    /// <summary>
+    /// The bonus state a foul continuation carries to the (future) free-throw
+    /// node — FUNCTIONAL payload, not theater. It is the complete contract for
+    /// free-throw resolution: shot count, and whether a missed front end is
+    /// reboundable, are all derivable from this one value, so nothing upstream
+    /// encodes free-throw rules.
+    /// <para>Null on every non-foul continuation (clean entry, turnover, jump
+    /// ball, player selection): they have no bonus dimension. Set only by Roll D,
+    /// and only meaningful when <see cref="Next"/> is <see cref="ContinuationKind.ResolveFreeThrows"/>
+    /// (where it is OneAndOne or Double) — on a <see cref="ContinuationKind.ResumeInbound"/>
+    /// it is <see cref="BonusType.None"/>, recorded for observability.</para>
+    /// </summary>
+    public BonusType? Bonus { get; init; }
+
+    /// <summary>
+    /// The descriptive flavor a foul continuation carries — THEATER, never read
+    /// for routing. Logged like turnover-type for observability and future
+    /// play-by-play. Null on every non-foul continuation; set only by Roll D.
+    /// </summary>
+    public FoulFlavor? Flavor { get; init; }
+}

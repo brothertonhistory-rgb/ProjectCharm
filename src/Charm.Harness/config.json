@@ -27,5 +27,14 @@
     "BaseOffensiveFoul": 0.10,
     "PressureLostBallLiveBallNudge": 0.10,
     "Epsilon": 1e-9
+  },
+
+  "RollD": {
+    "FlavorReachIn": 0.60,
+    "FlavorBlocking": 0.30,
+    "FlavorOffBall": 0.10,
+    "BonusThreshold": 7,
+    "DoubleBonusThreshold": 10,
+    "Epsilon": 1e-9
   }
 }

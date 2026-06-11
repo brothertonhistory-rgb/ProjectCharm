@@ -57,4 +57,14 @@ public enum ContinuationKind
     /// <summary>Halfcourt possession proceeds: hand off to the (stubbed)
     /// player-selection roll.</summary>
     IntoPlayerSelection,
+
+    /// <summary>A non-shooting defensive foul with the opponent NOT in the bonus:
+    /// the offense keeps the ball and inbounds. Hand off to the (stubbed)
+    /// resumed-inbound / possession-continues node.</summary>
+    ResumeInbound,
+
+    /// <summary>A non-shooting defensive foul with the opponent in the bonus
+    /// (1-and-1 or double): hand off to the (stubbed) free-throw node. The
+    /// <see cref="BonusType"/> rides on the continuation as the FT node's input.</summary>
+    ResolveFreeThrows,
 }

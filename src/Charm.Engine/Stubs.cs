@@ -25,10 +25,22 @@ public sealed class TurnoverTypeResolverStub : IContinuationNode
     public string Receive(Continue continuation) => "STUB:TurnoverTypeResolver";
 }
 
-/// <summary>STUB for the foul-type resolver (defensive non-shooting vs. offensive).</summary>
-public sealed class FoulTypeResolverStub : IContinuationNode
+/// <summary>STUB for the resumed-inbound / possession-continues node — where a
+/// non-shooting foul with the opponent NOT in the bonus lands: the offense keeps
+/// the ball and inbounds. A real node replaces this without Roll D changing.</summary>
+public sealed class ResumeInboundStub : IContinuationNode
 {
-    public string Receive(Continue continuation) => "STUB:FoulTypeResolver";
+    public string Receive(Continue continuation) => "STUB:ResumeInbound";
+}
+
+/// <summary>STUB for the free-throw node — where a non-shooting foul with the
+/// opponent in the bonus lands. The <see cref="Continue.Bonus"/> payload
+/// (OneAndOne / Double) is this node's input; the stub records the bonus so the
+/// harness can confirm the right branch arrived.</summary>
+public sealed class ResolveFreeThrowsStub : IContinuationNode
+{
+    public string Receive(Continue continuation) =>
+        $"STUB:ResolveFreeThrows:{continuation.Bonus}";
 }
 
 /// <summary>STUB for the jump-ball resolver (consults the possession arrow).</summary>

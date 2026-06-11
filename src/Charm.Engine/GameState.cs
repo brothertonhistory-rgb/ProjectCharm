@@ -29,9 +29,10 @@ public enum ArrowState
 /// possession arrow has to live, because a jump ball in one possession sets who
 /// gets the ball in a later one.
 ///
-/// The arrow now has real, complete behavior. Score, fouls, and timeouts remain
-/// placeholder fields — typed and named so the shape is defined, but NOT yet
-/// read or written during possession resolution.
+/// The arrow now has real, complete behavior. Team fouls now have real behavior
+/// too, via <see cref="Fouls"/> (a <see cref="FoulTracker"/>). Score and timeouts
+/// remain placeholder fields — typed and named so the shape is defined, but NOT
+/// yet read or written during possession resolution.
 /// </summary>
 public sealed class GameState
 {
@@ -40,8 +41,14 @@ public sealed class GameState
 
     /// <param name="initialArrow">Start state. A fresh game / overtime starts
     /// <see cref="ArrowState.Off"/> so the first jump ball is a contest.</param>
-    public GameState(ArrowState initialArrow = ArrowState.Off) =>
+    /// <param name="fouls">The half's foul tracker (owns both teams' counts and
+    /// the bonus read). Required: the bonus thresholds are config-driven, so the
+    /// tracker is constructed with them and handed in rather than defaulted here.</param>
+    public GameState(FoulTracker fouls, ArrowState initialArrow = ArrowState.Off)
+    {
+        Fouls = fouls ?? throw new ArgumentNullException(nameof(fouls));
         PossessionArrow = initialArrow;
+    }
 
     /// <summary>Turn the arrow ON, pointing at <paramref name="team"/>. Used by
     /// the jump-ball node after the opening tip is decided: per NCAA the arrow
@@ -65,11 +72,14 @@ public sealed class GameState
     /// ball).</summary>
     public void ResetPossessionArrow() => PossessionArrow = ArrowState.Off;
 
+    /// <summary>The half's team-foul accumulation and bonus read — now live,
+    /// incremented by Roll D and read for bonus routing. Per-half: a future
+    /// half-reset replaces this tracker (or resets it) at the break.</summary>
+    public FoulTracker Fouls { get; }
+
     // --- Placeholder fields: defined shape, not yet wired to anything. ---
     public int HomeScore { get; set; }
     public int AwayScore { get; set; }
-    public int HomeTeamFouls { get; set; }
-    public int AwayTeamFouls { get; set; }
     public int HomeTimeouts { get; set; }
     public int AwayTimeouts { get; set; }
 }

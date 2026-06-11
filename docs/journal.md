@@ -4,6 +4,96 @@ Newest entries first. What was built, decided, and left stubbed each session.
 
 ---
 
+## Session 6 — Roll D: non-shooting defensive foul + the foul/bonus layer
+
+**Built**
+- `FoulOutcomes.cs` — two enums. `FoulFlavor` (ReachIn / Blocking / OffBall):
+  Roll D's pie, descriptive theater only, does NOT route. `BonusType` (None /
+  OneAndOne / Double): the COMPLETE interface to the future free-throw node —
+  every FT rule (shot count, front-end reboundability) is derivable from this
+  single value, so nothing upstream encodes FT mechanics.
+- `FoulTracker.cs` — the half-scoped object that owns both teams' foul counts and
+  answers the only question asked of it: `BonusFor(team)`. Constructed with
+  config-driven thresholds; validates `0 < bonus < double` on construction.
+  Banding on the post-increment count: `< bonus` = None; `[bonus, double)` =
+  OneAndOne; `>= double` = Double. Deliberately ignorant of free throws.
+- `RollD.cs` — the shared foul-type node (many feeders, one node). Rolls flavor
+  (theater), increments the fouling = defensive team's count, reads the bonus,
+  returns a CONTINUE routed on the bonus: None -> `ResumeInbound`; OneAndOne /
+  Double -> `ResolveFreeThrows`. Takes `GameState` (unlike A/B/C) because it
+  mutates persistent state. Carries `Bonus` (functional) and `Flavor` (theater)
+  on the result.
+- `RollDConfig.cs` — flavor weights + `BonusThreshold` (7) + `DoubleBonusThreshold`
+  (10) + epsilon, from the `"RollD"` section of `config.json`.
+- `RollDStubPieGenerator.cs` — builds the flavor pie from config. NO live signal
+  wire (unlike B/C): flavor does not route, so there's nothing functional for a
+  signal to move; adding one would imply flavor mattered. Pie still validates.
+
+**Edited**
+- `PossessionState.cs` — `Offense` / `Defense` changed from `string` to `TeamSide`.
+  Kills the stringly-typed seam at the foul path (wrong counter = wrong bonus =
+  wrong game). See Decided: identity vs. role.
+- `RollResult.cs` — `Continue` gained optional `Bonus` (`BonusType?`) and
+  `Flavor` (`FoulFlavor?`), null on every non-foul continuation, set only by
+  Roll D. Property named `Flavor` (not `FoulFlavor`) to avoid a type/name
+  collision for future legibility.
+- `GameState.cs` — inert `HomeTeamFouls` / `AwayTeamFouls` ints replaced by a
+  live `FoulTracker Fouls` (ctor now takes one). Score / timeouts still inert.
+- `EntryOutcomes.cs` — added `ResumeInbound` and `ResolveFreeThrows` kinds.
+- `Resolver.cs` — `ResolveFoulType` now executes Roll D inline and feeds its
+  Continue back through the loop (Roll C integration pattern); the two new kinds
+  route to stubs. `FoulTypeResolverStub` retired from the constructor. Both
+  Roll A and Roll B foul feeders now light up at once.
+- `Stubs.cs` — `FoulTypeResolverStub` retired; `ResumeInboundStub` and
+  `ResolveFreeThrowsStub` added (the latter echoes the bonus payload).
+- `Program.cs` / `config.json` — `"RollD"` section; Roll D observability (flavor
+  pie + a foul-count walk showing the 7 and 10 crossings); two batch checks.
+
+**Verified (by static contract audit + logic mirror in Python; SDK unavailable)**
+- Threshold banding: fouls 1–6 None, 7–9 OneAndOne, 10+ Double — exact.
+- Flavor pie sums to 1, validates, converges to 60/30/10 within tolerance.
+- Routing-check control-flow mirror: route flips at exactly 7 and 10; fouls land
+  on the defense only (offense stays 0); ends at 12 fouls / Double.
+- Handoff invariant `ended + routed-to-stub == BatchSize` preserved: both Roll D
+  routes end at `STUB:` destinations, so the full-chain batch (where Roll A's
+  ~3% foul exits now flow live through Roll D) still balances. The accumulating
+  shared-game foul count naturally exercises both branches mid-batch.
+- All retired symbols (`FoulTypeResolverStub`, `HomeTeamFouls`/`AwayTeamFouls`,
+  `"HOME"`/`"AWAY"` literals) fully gone.
+
+**Decided**
+- **Team identity is fixed per game; offense/defense is a per-possession role
+  over it.** Every game — neutral court included — stamps both teams Home/Away up
+  front (arbitrary but stable on a neutral floor). `PossessionState` now speaks
+  `TeamSide` natively, so Roll D increments the right half-counter with zero
+  string mapping. The wrong-counter failure mode is now unrepresentable. Actual
+  neutral-court label assignment is game-setup, deferred.
+- **The bonus type is the entire FT contract.** OneAndOne vs. Double is all the
+  free-throw node needs to derive: 1-and-1 front-end miss = live ball -> rebound
+  roll; double-bonus first miss = dead ball -> immediate second attempt. Roll D
+  and the tracker encode NONE of that — it would leak FT logic upstream.
+- **Flavor is theater, bonus is functional — two different kinds of rider** on
+  the same result. Flavor is logged and never read; bonus is logged AND consumed
+  downstream. The flavor generator gets no signal wire for exactly this reason.
+- **Roll D takes `GameState`; A/B/C did not.** It is the first roll to mutate
+  persistent cross-possession state (the team foul). That's inherent to what a
+  foul is, not a contract break — the uniform roll shape (receive state + pie,
+  roll, name no successor) holds; the extra arg is the state it must touch.
+- **Bonus thresholds 7 / 10 (classic NCAA 1-and-1 then double).** Picked for the
+  clean three-state shape that the FT reboundability rule keys off. Tunable; FT
+  resolution is stubbed, so the numbers can be revisited when it's real.
+
+**Left stubbed (out of scope, untouched)**
+- Free-throw resolution (`ResolveFreeThrowsStub` only) — incl. the 1-and-1 vs.
+  double reboundability logic, which lives there and reads `BonusType`.
+- The resumed-inbound / possession-continues node (`ResumeInboundStub`).
+- Per-player foul attribution (which defender) — future counting-stat layer.
+- Half-reset of team fouls — future; clears/replaces the one `FoulTracker`.
+- Shooting fouls (future post-player-selection roll); offensive fouls (Roll C's).
+- Real attribute -> flavor-pie generator.
+
+---
+
 ## Session 5 — The possession arrow and the jump-ball node
 
 **Built**

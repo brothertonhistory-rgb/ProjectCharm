@@ -77,8 +77,22 @@ opening tip is a genuine contest with no prior arrow to read: the arrow is `Off`
 until the first jump ball turns it on. `SetPossessionArrow` turns it on (the tip
 points it at the loser), `FlipPossessionArrow` reverses it (and throws if Off —
 you cannot flip what a tip has not yet set), `ResetPossessionArrow` returns it to
-Off for overtime. Score, fouls, and timeouts remain placeholder fields — typed
-and named, not yet read or written during possession resolution.
+Off for overtime. **Team fouls are now real too** (Session 6), via a
+`FoulTracker` (see Roll D) — incremented on each foul and read for bonus routing.
+Score and timeouts remain placeholder fields — typed and named, not yet read or
+written during possession resolution.
+
+**Team identity vs. role (Session 6).** `TeamSide` (`Home` / `Away`) is a team's
+*identity* — fixed for the whole game. Offense/defense is a per-possession *role*
+layered over identity. These are different facts, and earlier `PossessionState`
+conflated them by storing `Offense`/`Defense` as strings. They are now
+`TeamSide`, so the foul lands on the correct half-counter with no string mapping —
+the wrong-counter failure mode (wrong counter → wrong bonus → wrong game) is now
+unrepresentable. Every game, neutral court included, stamps both teams Home/Away
+up front; on a neutral floor the label is arbitrary but stable, which is all the
+engine needs. Team fouls accumulate against *identity*, correctly independent of
+who holds the ball moment to moment. (Actual neutral-court label assignment is
+game-setup, deferred.)
 
 **Why the arrow stayed simple.** Real NCAA alternating-possession rules carry
 edge cases — a throw-in violation flips the arrow anyway, a foul during the
@@ -275,19 +289,110 @@ this in too.
 
 ---
 
-## Roll table of contents
+## Roll D — Non-Shooting Defensive Foul
+
+**Simulates:** the shared foul-type node. Every roll that produces a generic
+`Foul` (Roll A's entry foul, Roll B's halfcourt foul) routes here via
+`ResolveFoulType`. Many feeders, one node — Roll D never knows who fed it.
+
+**Why it only ever sees non-shooting defensive fouls.** By position in the chain
+every foul reaching Roll D is *pre-shot*: no player is selected, no shot is up.
+So shooting fouls cannot occur yet (a future post-player-selection roll owns
+them), and offensive fouls are already Roll C's (as turnovers). Roll D therefore
+never classifies offensive-vs-defensive or shooting-vs-non-shooting — by
+construction every foul it sees is a non-shooting defensive foul. There are no
+such branches, by settled design.
+
+**What it does — three steps.**
+
+1. **Rolls a flavor** against its pie: `ReachIn` / `Blocking` / `OffBall`. This
+   is *descriptive theater only* — logged like turnover-type, it does NOT route.
+2. **Increments the fouling team's foul count** for the half. The fouling team is
+   the defense this possession (`state.Defense`).
+3. **Reads the bonus and routes on it** — a state check, not a roll. Not in
+   bonus → `Continue(ResumeInbound)` (the offense keeps the ball, inbounds). In
+   bonus → `Continue(ResolveFreeThrows)`.
+
+| Outcome (route) | Result | Meaning |
+|---|---|---|
+| Not in bonus | `Continue(ResumeInbound)` | offense keeps the ball *(stub)* |
+| In bonus | `Continue(ResolveFreeThrows)` | free throws, carrying `BonusType` *(stub)* |
+
+**Flavor is theater; the route is a deterministic state read.** The flavor draw
+changes nothing functional — the same draw routes identically. Routing is
+entirely the bonus read against the foul count. Because flavor never routes, its
+stub generator has *no live signal wire* (unlike B's physicality and C's
+pressure): there is nothing functional for a signal to move, and adding one would
+falsely imply flavor mattered.
+
+**Continues, not terminals.** Unlike Roll C, a foul does not end the possession —
+the offense either retains the ball or goes to the line. So Roll D's exits are
+both `Continue`. It integrates like Roll C otherwise: the resolver executes it
+inside the `ResolveFoulType` case and feeds the returned `Continue` back through
+the loop, which re-routes it to the matching stub. The retired
+`FoulTypeResolverStub` is dropped from the constructor, and both Roll A and Roll B
+foul feeders light up at once.
+
+**The bonus type is the entire free-throw contract.** Roll D tags its result with
+a `BonusType` — `None` / `OneAndOne` / `Double` — that rides on the `Continue` as
+*functional payload* (distinct from flavor's theater). This single value is
+everything the future free-throw node needs to derive its behavior:
+
+- **OneAndOne** (the 7th–9th team foul): the FT node shoots a front end; a *miss*
+  is a live ball → rebound roll. Reboundable.
+- **Double** (the 10th team foul onward): two guaranteed attempts; a missed
+  *first* is **not** reboundable (dead ball → immediate second attempt), only a
+  missed final attempt is live.
+
+Crucially, Roll D and the foul tracker encode *none* of that reboundability
+logic — it lives in the FT node, derived from the bonus type. Letting it leak
+upstream would couple the foul layer to a node it must not know about.
+
+**Team fouls, not player fouls.** Roll D charges the *team* (which is all the
+bonus needs). *Which* defender committed the foul is a counting-stat concern for
+the future attribution layer — same as turnover/steal credit. Deferred.
+
+**The FoulTracker.** Team-foul accumulation lives in a dedicated `FoulTracker` on
+`GameState`, not as loose ints. It owns both teams' counts, the two thresholds,
+and the bonus read — the half-scoped concern as one unit, so the future half-reset
+clears one object. It validates `0 < bonus < double` on construction and bands the
+post-increment count: `< bonus` = None; `[bonus, double)` = OneAndOne; `>= double`
+= Double. It is deliberately ignorant of free throws; it reports bonus state and
+stops.
+
+**Roll D takes `GameState`; A/B/C did not.** It is the first roll to mutate
+persistent cross-possession state (the team foul). That is inherent to what a
+foul *is*, not a contract break — the uniform shape (receive state + pie, roll,
+name no successor) holds; the extra argument is simply the state it must touch.
+
+**Config lives separately.** Roll D's numbers — flavor weights and both bonus
+thresholds (NCAA classic 7 / 10, tunable) — live in the `"RollD"` section of
+`config.json`, loaded by `RollDConfig`.
 
 | Roll | Name | Status |
 |---|---|---|
 | A | Entry — Inbounds (Dead Ball) | Built (stubbed generator + stubbed successors) |
 | B | Halfcourt Initiation | Built (stubbed generator + stubbed successors) |
 | C | Turnover Classification | Built (stubbed generator; terminal — no successors) |
+| D | Non-Shooting Defensive Foul | Built (stubbed flavor generator + stubbed successors) |
 | — | Jump ball (arrow node) | Built (50/50 tip placeholder; arrow complete) |
 
 ## Known required infrastructure (not yet built)
 
-- **Foul-type resolver** — decides defensive non-shooting vs. offensive and what
-  roll / possession change it triggers.
+- **Free-throw node** — consumes the `BonusType` from Roll D. Resolves a 1-and-1
+  (front-end miss → live ball → rebound roll) or a double bonus (two guaranteed;
+  first miss is dead, only a missed final attempt is live). Currently a stub; the
+  reboundability logic lives here, derived from the bonus type — not upstream.
+- **Resumed-inbound / possession-continues node** — where a non-shooting foul
+  with the opponent not in the bonus lands (offense keeps the ball, inbounds).
+  Currently a stub.
+- **Per-player foul attribution** — which defender committed the foul, for the
+  personal/team foul accumulation. A counting-stat concern like turnover/steal
+  credit; Roll D charges only the team. Future.
+- **Half-reset of team fouls** — resets/replaces the `FoulTracker` at the half
+  (the bonus resets with it). Future; clears the one object.
+- **Shooting-foul roll** — a future post-player-selection roll; the only foul
+  path Roll D does not cover (Roll D is pre-shot by construction).
 - **Time roll** — apportions game-clock seconds for non-invariant outcomes. Every
   terminal except the shot-clock violation defers its time here — including all
   of Roll C's and the jump-ball terminals.

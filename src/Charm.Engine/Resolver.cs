@@ -16,25 +16,31 @@ public sealed class Resolver
 {
     private readonly RollBStubPieGenerator _rollBGenerator;
     private readonly RollCStubPieGenerator _rollCGenerator;
+    private readonly RollDStubPieGenerator _rollDGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
-    private readonly IContinuationNode _resolveFoulType;
     private readonly IContinuationNode _intoPlayerSelection;
+    private readonly IContinuationNode _resumeInbound;
+    private readonly IContinuationNode _resolveFreeThrows;
 
     public Resolver(
         RollBStubPieGenerator rollBGenerator,
         RollCStubPieGenerator rollCGenerator,
+        RollDStubPieGenerator rollDGenerator,
         GameState game,
         IRng rng,
-        IContinuationNode resolveFoulType,
-        IContinuationNode intoPlayerSelection)
+        IContinuationNode intoPlayerSelection,
+        IContinuationNode resumeInbound,
+        IContinuationNode resolveFreeThrows)
     {
         _rollBGenerator = rollBGenerator;
         _rollCGenerator = rollCGenerator;
+        _rollDGenerator = rollDGenerator;
         _game = game;
         _rng = rng;
-        _resolveFoulType = resolveFoulType;
         _intoPlayerSelection = intoPlayerSelection;
+        _resumeInbound = resumeInbound;
+        _resolveFreeThrows = resolveFreeThrows;
     }
 
     /// <summary>Walk the chain from <paramref name="result"/> until a terminal
@@ -72,8 +78,29 @@ public sealed class Resolver
                         case ContinuationKind.IntoPlayerSelection:
                             return new RoutingOutcome(false, _intoPlayerSelection.Receive(c));
 
+                        // Foul (from any feeder: Roll A entry, Roll B halfcourt)
+                        // -> execute Roll D, loop. Roll D returns a CONTINUE
+                        // (ResumeInbound or ResolveFreeThrows), not a terminal —
+                        // so feeding it back re-enters this switch and lands on
+                        // the matching stub below. Roll D mutates GameState (it
+                        // charges the team foul), hence it takes _game. This is
+                        // the "many feeders, one node" payoff: both Roll A and
+                        // Roll B foul exits light up here at once.
                         case ContinuationKind.ResolveFoulType:
-                            return new RoutingOutcome(false, _resolveFoulType.Receive(c));
+                            var pieD = _rollDGenerator.Generate(c.State);
+                            result = RollD.Execute(c.State, pieD, _game, _rng);
+                            continue;
+
+                        // Roll D, opponent not in bonus -> offense keeps the ball
+                        // and inbounds (stub). Chain ends here for now.
+                        case ContinuationKind.ResumeInbound:
+                            return new RoutingOutcome(false, _resumeInbound.Receive(c));
+
+                        // Roll D, opponent in bonus -> free-throw node (stub). The
+                        // Bonus payload on c is the FT node's input. Chain ends
+                        // here for now.
+                        case ContinuationKind.ResolveFreeThrows:
+                            return new RoutingOutcome(false, _resolveFreeThrows.Receive(c));
 
                         // Jump ball (from any feeder) -> resolve against the
                         // possession arrow, then END the possession. A held ball

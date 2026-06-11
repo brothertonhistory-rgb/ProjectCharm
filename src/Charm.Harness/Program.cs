@@ -10,32 +10,41 @@ internal static class Program
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
         var rollBGenerator = new RollBStubPieGenerator(cfgB);
         var rollCGenerator = new RollCStubPieGenerator(cfgC);
-        var game = new GameState();  // arrow starts Off — first jump ball is the tip
+        var rollDGenerator = new RollDStubPieGenerator(cfgD);
+
+        // The half's foul tracker carries the config-driven bonus thresholds.
+        var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
+        var game = new GameState(fouls);  // arrow starts Off — first jump ball is the tip
 
         var resolver = new Resolver(
             rollBGenerator,
             rollCGenerator,
+            rollDGenerator,
             game,
             rng,
-            new FoulTypeResolverStub(),
-            new PlayerSelectionStub());
+            new PlayerSelectionStub(),
+            new ResumeInboundStub(),
+            new ResolveFreeThrowsStub());
 
         var state = new PossessionState(
             PossessionNumber: 1,
-            Offense: "HOME",
-            Defense: "AWAY",
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
             Entry: EntryType.DeadBallInbound);
 
-        Console.WriteLine("=== Project Charm :: Roll A -> Roll B -> Roll C Chain ===\n");
+        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D Chain ===\n");
 
         ShowSamples(cfg, rollAGenerator, resolver, state, rng);
         var ok = BatchCheck(cfg, cfgB, rollAGenerator, rollBGenerator, resolver, state);
         ok &= RollCBatchCheck(cfg, cfgC, rollCGenerator, state);
+        ok &= RollDFlavorBatchCheck(cfg, cfgD, rollDGenerator, state);
+        ok &= RollDBonusRoutingCheck(cfgD, rollDGenerator, state);
         ok &= PhysicalitySignalCheck(cfgB, rollBGenerator, state);
         ok &= PressureSignalCheck(cfgC, rollCGenerator, state);
         ok &= JumpBallCheck(cfg);
@@ -79,6 +88,32 @@ internal static class Program
             var term = (Terminal)r;
             var elapsed = r.ElapsedSeconds is { } s ? $"{s:0}s" : "deferred";
             Console.WriteLine($"  input=turnover | result=TERMINAL | reason={term.Reason,-18} | elapsed={elapsed}");
+        }
+        Console.WriteLine();
+
+        // Roll D observability: the flavor pie (theater), then a walk of the
+        // foul count climbing on one team so the bonus crossings at 7 and 10 are
+        // visible — count before/after, bonus state, and the resulting route.
+        Console.WriteLine("--- Observability: Roll D (non-shooting defensive foul) ---");
+        var cfgD = RollDConfig.Load(Path.Combine(AppContext.BaseDirectory, "config.json"));
+        var genD = new RollDStubPieGenerator(cfgD);
+        var pieD = genD.Generate(state);
+        Console.WriteLine($"  flavor pie (theater, does not route): {pieD}");
+        Console.WriteLine($"  thresholds: bonus>={cfgD.BonusThreshold}, double>={cfgD.DoubleBonusThreshold}");
+
+        // A fresh game whose AWAY team (the defense in `state`) keeps fouling.
+        var obsGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var obsRng = new SystemRng(cfg.Seed);
+        for (var i = 1; i <= cfgD.DoubleBonusThreshold + 1; i++)
+        {
+            var before = obsGame.Fouls.FoulsFor(state.Defense);
+            var r = (Continue)RollD.Execute(state, pieD, obsGame, obsRng);
+            var after = obsGame.Fouls.FoulsFor(state.Defense);
+            var route = r.Next == ContinuationKind.ResolveFreeThrows
+                ? $"ResolveFreeThrows({r.Bonus})"
+                : "ResumeInbound";
+            Console.WriteLine(
+                $"  foul#{after,2}: {before}->{after} | flavor={r.Flavor,-8} | bonus={r.Bonus,-9} | route={route}");
         }
         Console.WriteLine();
     }
@@ -223,6 +258,104 @@ internal static class Program
         return ratesOk && terminalOk;
     }
 
+    // --- Batch: Roll D's three flavor rates match its pie, and every exit is a
+    //     clean Continue (ResumeInbound or ResolveFreeThrows). Uses a fresh game
+    //     per iteration so the foul count never climbs into the bonus — this
+    //     check isolates FLAVOR conformance; routing is checked separately. ---
+    private static bool RollDFlavorBatchCheck(
+        RollAConfig cfg, RollDConfig cfgD, RollDStubPieGenerator genD, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} fouls through Roll D (flavor rates) ---");
+        var rng = new SystemRng(cfg.Seed);
+        var pieD = genD.Generate(state);
+
+        var counts = new Dictionary<FoulFlavor, int>();
+        foreach (var f in Enum.GetValues<FoulFlavor>()) counts[f] = 0;
+
+        var unrouted = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            // Fresh single-foul game each time: stays below the bonus threshold,
+            // so the route is always ResumeInbound and we measure flavor cleanly.
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var result = RollD.Execute(state, pieD, g, rng);
+
+            if (result is not Continue c || c.Flavor is not { } flavor)
+            {
+                unrouted++;
+                continue;
+            }
+            counts[flavor]++;
+
+            // A single foul can never reach the bonus, so it must ResumeInbound.
+            if (c.Next != ContinuationKind.ResumeInbound || c.Bonus != BonusType.None)
+                unrouted++;
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll D flavors:");
+        foreach (var (flavor, weight) in pieD.Slices)
+        {
+            var observed = counts[flavor] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {flavor,-10} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        var routedOk = unrouted == 0;
+        Console.WriteLine($"\n  every exit a clean below-bonus Continue: anomalies={unrouted} -> {(routedOk ? "ok" : "FAIL")}");
+        return ratesOk && routedOk;
+    }
+
+    // --- Bonus routing: drive one team's foul count from 1 upward and confirm
+    //     the route flips at exactly the configured thresholds: None below the
+    //     bonus, OneAndOne on [bonus, double), Double at/above double. Also
+    //     confirms the increment lands on the FOULING (defense) team only. ---
+    private static bool RollDBonusRoutingCheck(
+        RollDConfig cfgD, RollDStubPieGenerator genD, PossessionState state)
+    {
+        Console.WriteLine("\n--- Bonus routing: Roll D route vs. foul count ---");
+        var rng = new SystemRng(42);
+        var pieD = genD.Generate(state);
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+
+        var allOk = true;
+        var offenseFoulsLeaked = false;
+
+        for (var foul = 1; foul <= cfgD.DoubleBonusThreshold + 2; foul++)
+        {
+            var c = (Continue)RollD.Execute(state, pieD, game, rng);
+
+            // Expected bonus for this post-increment count.
+            var expectedBonus =
+                foul >= cfgD.DoubleBonusThreshold ? BonusType.Double
+                : foul >= cfgD.BonusThreshold ? BonusType.OneAndOne
+                : BonusType.None;
+            var expectedKind = expectedBonus == BonusType.None
+                ? ContinuationKind.ResumeInbound
+                : ContinuationKind.ResolveFreeThrows;
+
+            var bonusOk = c.Bonus == expectedBonus;
+            var kindOk = c.Next == expectedKind;
+            allOk &= bonusOk && kindOk;
+
+            // The foul must land on the defense (fouling team), never the offense.
+            if (game.Fouls.FoulsFor(state.Offense) != 0) offenseFoulsLeaked = true;
+
+            if (!bonusOk || !kindOk)
+                Console.WriteLine($"    foul#{foul,2}: bonus={c.Bonus} (exp {expectedBonus}), kind={c.Next} (exp {expectedKind}) -> FAIL");
+        }
+
+        Console.WriteLine($"  routes match thresholds {cfgD.BonusThreshold}/{cfgD.DoubleBonusThreshold} across the climb -> {(allOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  fouls charged to defense only (offense stayed 0): {(!offenseFoulsLeaked ? "ok" : "FAIL")}");
+        Console.WriteLine($"  final: defense fouls={game.Fouls.FoulsFor(state.Defense)}, bonus={game.Fouls.BonusFor(state.Defense)}");
+
+        return allOk && !offenseFoulsLeaked;
+    }
+
     // --- Prove Roll B's seam carries signal: foul rate must rise with physicality. ---
     private static bool PhysicalitySignalCheck(RollBConfig cfgB, RollBStubPieGenerator genB, PossessionState state)
     {
@@ -288,6 +421,11 @@ internal static class Program
         Console.WriteLine("\n--- Jump ball: possession arrow behavior ---");
         var allOk = true;
 
+        // Jump-ball behavior is independent of fouls; supply any valid tracker.
+        // A local factory keeps the four constructions below readable.
+        static GameState NewGame(ArrowState arrow = ArrowState.Off) =>
+            new(new FoulTracker(bonusThreshold: 7, doubleBonusThreshold: 10), arrow);
+
         // (1) Opening tip is ~50/50, and the arrow is set to the tip LOSER.
         var rng = new SystemRng(cfg.Seed);
         var homeWins = 0;
@@ -295,7 +433,7 @@ internal static class Program
         const int tips = 100_000;
         for (var i = 0; i < tips; i++)
         {
-            var g = new GameState();  // Off -> tip
+            var g = NewGame();  // Off -> tip
             var award = JumpBall.Resolve(g, rng);
             if (award.AwardedTo == TeamSide.Home) homeWins++;
 
@@ -314,7 +452,7 @@ internal static class Program
         Console.WriteLine($"  arrow set to tip-loser every time: {arrowToLoser:N0}/{tips:N0} -> {(loserOk ? "ok" : "FAIL")}");
 
         // (2) On-arrow jump ball awards the pointed-at team, then flips.
-        var g2 = new GameState(ArrowState.Home);
+        var g2 = NewGame(ArrowState.Home);
         var a2 = JumpBall.Resolve(g2, rng);
         var awardOk = a2.AwardedTo == TeamSide.Home && !a2.WasTipContest;
         var flipOk = g2.PossessionArrow == ArrowState.Away;
@@ -323,7 +461,7 @@ internal static class Program
         Console.WriteLine($"  arrow flipped Home->{g2.PossessionArrow}: {(flipOk ? "ok" : "FAIL")}");
 
         // (3) A run of alternating-possession situations strictly alternates.
-        var g3 = new GameState(ArrowState.Home);
+        var g3 = NewGame(ArrowState.Home);
         var expected = new[] { TeamSide.Home, TeamSide.Away, TeamSide.Home, TeamSide.Away, TeamSide.Home };
         var alternates = true;
         foreach (var exp in expected)
@@ -333,7 +471,7 @@ internal static class Program
 
         // (4) Flipping an Off arrow must throw (guard against silent misuse).
         var threw = false;
-        try { new GameState().FlipPossessionArrow(); }
+        try { NewGame().FlipPossessionArrow(); }
         catch (InvalidOperationException) { threw = true; }
         allOk &= threw;
         Console.WriteLine($"  flipping an Off arrow throws: {(threw ? "ok" : "FAIL")}");
