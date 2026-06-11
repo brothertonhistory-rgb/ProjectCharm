@@ -17,6 +17,13 @@ public sealed class RollAConfig
     public double BaseFoul { get; set; } = 0.03;
     public double BaseJumpBall { get; set; } = 0.01;
 
+    /// <summary>Weight for the 5-second inbound violation slice. Rare. The
+    /// generator renormalizes, so the full set need not sum to exactly 1.</summary>
+    public double BaseFiveSecondInbound { get; set; } = 0.003;
+
+    /// <summary>Weight for the 10-second backcourt violation slice. Rare.</summary>
+    public double BaseTenSecondBackcourt { get; set; } = 0.005;
+
     /// <summary>The single live wire proving the seam carries signal: how much
     /// a pressure of 1.0 adds to the turnover weight before renormalization.
     /// Placeholder, not basketball logic.</summary>
@@ -25,6 +32,11 @@ public sealed class RollAConfig
     /// <summary>Invariant elapsed time stamped on a shot-clock-violation
     /// terminal: the full shot clock (NCAA men's = 30s).</summary>
     public double ViolationElapsedSeconds { get; set; } = 30.0;
+
+    /// <summary>Invariant elapsed time stamped on a 10-second backcourt
+    /// violation: the fixed 10s the count ran before the whistle. (The 5-second
+    /// inbound stamps zero — the clock never started — so it needs no config.)</summary>
+    public double TenSecondElapsedSeconds { get; set; } = 10.0;
 
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;

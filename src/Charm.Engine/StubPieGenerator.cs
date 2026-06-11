@@ -29,13 +29,17 @@ public sealed class StubPieGenerator
         var violation = _cfg.BaseViolation;
         var foul = _cfg.BaseFoul;
         var jumpBall = _cfg.BaseJumpBall;
+        var fiveSecond = _cfg.BaseFiveSecondInbound;
+        var tenSecond = _cfg.BaseTenSecondBackcourt;
 
-        var total = clean + turnover + violation + foul + jumpBall;
+        var total = clean + turnover + violation + foul + jumpBall + fiveSecond + tenSecond;
         var weights = new Dictionary<EntryOutcome, double>
         {
             [EntryOutcome.CleanEntry] = clean / total,
             [EntryOutcome.Turnover] = turnover / total,
             [EntryOutcome.ShotClockViolation] = violation / total,
+            [EntryOutcome.FiveSecondInbound] = fiveSecond / total,
+            [EntryOutcome.TenSecondBackcourt] = tenSecond / total,
             [EntryOutcome.Foul] = foul / total,
             [EntryOutcome.JumpBall] = jumpBall / total,
         };

@@ -30,6 +30,16 @@ public static class RollA
             EntryOutcome.ShotClockViolation =>
                 new Terminal("ShotClockViolation", state) { ElapsedSeconds = cfg.ViolationElapsedSeconds },
 
+            // 5-second inbound violation -> TERMINAL. The inbound never came in,
+            // so the clock never started: elapsed time is ZERO, stamped here.
+            EntryOutcome.FiveSecondInbound =>
+                new Terminal("FiveSecondInbound", state) { ElapsedSeconds = 0.0 },
+
+            // 10-second backcourt violation -> TERMINAL. The count ran before the
+            // whistle, so a fixed 10 seconds elapsed, stamped here.
+            EntryOutcome.TenSecondBackcourt =>
+                new Terminal("TenSecondBackcourt", state) { ElapsedSeconds = cfg.TenSecondElapsedSeconds },
+
             // Foul -> CONTINUE. A future foul-type resolver decides defensive vs.
             // offensive and what it triggers. Real variance, never resolved here.
             EntryOutcome.Foul =>

@@ -15,11 +15,24 @@ public enum EntryOutcome
     Turnover,
 
     /// <summary>
-    /// No shot, full shot clock burned. -> TERMINAL. Invariant: a shot-clock
-    /// violation is always the full clock off, never more or less, so its
-    /// elapsed time is known here and needs no separate time roll.
+    /// Shot clock expires in the backcourt — they never got it across in 30s.
+    /// -> TERMINAL. Invariant: always the full clock off, so its elapsed time is
+    /// known here and needs no separate time roll. (The 30s case; contrast the
+    /// 5s and 10s violations below, which burn different fixed amounts.)
     /// </summary>
     ShotClockViolation,
+
+    /// <summary>Failure to inbound within 5 seconds. -> TERMINAL. The clock never
+    /// started (the entry pass never came in), so elapsed time is ZERO. A
+    /// backcourt-phase violation; like the shot-clock case it is zero-variance and
+    /// ends the possession here.</summary>
+    FiveSecondInbound,
+
+    /// <summary>Failure to advance the ball past the division line within 10
+    /// seconds of a successful inbound. -> TERMINAL. Burns a fixed 10 seconds
+    /// (the count ran before the whistle). A backcourt-phase violation; the ball
+    /// was inbounded but never cleared the backcourt.</summary>
+    TenSecondBackcourt,
 
     /// <summary>A foul on the inbound/entry. -> CONTINUE (to foul-type resolver,
     /// which will decide defensive non-shooting vs. offensive and what it

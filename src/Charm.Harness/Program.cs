@@ -168,7 +168,9 @@ internal static class Program
 
             var aOutcome = result switch
             {
-                Terminal => EntryOutcome.ShotClockViolation,
+                Terminal { Reason: "ShotClockViolation" } => EntryOutcome.ShotClockViolation,
+                Terminal { Reason: "FiveSecondInbound" } => EntryOutcome.FiveSecondInbound,
+                Terminal { Reason: "TenSecondBackcourt" } => EntryOutcome.TenSecondBackcourt,
                 Continue { Next: ContinuationKind.IntoHalfcourtSet } => EntryOutcome.CleanEntry,
                 Continue { Next: ContinuationKind.ResolveTurnoverType } => EntryOutcome.Turnover,
                 Continue { Next: ContinuationKind.ResolveFoulType } => EntryOutcome.Foul,

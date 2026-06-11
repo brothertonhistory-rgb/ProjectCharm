@@ -4,6 +4,73 @@ Newest entries first. What was built, decided, and left stubbed each session.
 
 ---
 
+## Session 8.a — Routing audit, backcourt framing, Roll A violations
+
+(Same session as Roll E below; continued work after the roll landed.)
+
+**Audited (verified from source, not memory)**
+- Read every roll's outcomes and the resolver's routing switch to build an
+  accurate map. Key finding: the engine is NOT a single chain — it's a spine of
+  action rolls draining into shared SINK nodes. Rolls A and B both feed Roll C
+  (turnover) and Roll D (foul); "many feeders, one node" is the real wiring.
+- Corrected an earlier mental model: Roll A is the busiest node (5 exits, now 7),
+  and jump ball was reachable only from Roll A (Roll B had no jump-ball exit).
+- The verified routing table is now recorded in design.md as its own section.
+
+**Decided — backcourt / frontcourt division (organizing principle)**
+- Roll A is the ENTIRE backcourt phase of an offensive possession: inbound,
+  advance, get set in the halfcourt. Everything that can interrupt a possession
+  before it's set lives in Roll A. `CleanEntry` is the single success path.
+- Everything after Roll A is frontcourt (B = halfcourt initiation; E/F/G/H =
+  player gets the action and it resolves). This explains why A is busy and B is a
+  near-pure gate. Roll A is also where backcourt TIME will be apportioned later.
+
+**Built — two new Roll A violation terminals**
+- `FiveSecondInbound` — failure to inbound in 5s. Zero elapsed (clock never
+  started). Terminal. Weight ~0.30%.
+- `TenSecondBackcourt` — failure to clear the division line in 10s after a
+  successful inbound. Stamps a fixed 10s. Terminal. Weight ~0.50%.
+- Both are zero-variance terminals, like the existing shot-clock violation; each
+  stamps its own invariant elapsed time, no time roll needed. A backcourt TURNOVER
+  (bad pass OOB, stepping on the line) is NOT a new slice — it rides the existing
+  `Turnover → ResolveTurnoverType` path; Roll C classifies it by ball-state.
+
+**Edited (files)**
+- `EntryOutcomes.cs` — added the two new enum members (after `ShotClockViolation`).
+- `RollA.cs` — two new terminal switch arms.
+- `Config.cs` → RENAMED to `RollAConfig.cs` (held `class RollAConfig` all along;
+  the generic filename caused a 20-minute hunt this session — fixed for
+  consistency with the other `Roll?Config.cs` files. Class name unchanged.)
+- `RollAConfig.cs` — added `BaseFiveSecondInbound`, `BaseTenSecondBackcourt`,
+  `TenSecondElapsedSeconds`.
+- `StubPieGenerator.cs` — two new slices in the pie + the renormalize total.
+- `config.json` — two new top-level Roll A weights + `TenSecondElapsedSeconds`.
+- `Program.cs` — FIXED a latent bug: the batch check mapped every `Terminal` to
+  `ShotClockViolation`. With three terminals now it switches on the `Reason`
+  string, so each violation tallies to its own bucket.
+
+**Verified (harness run)**
+- Seven Roll A outcomes, all within tolerance; the two new violations land at
+  0.315% / 0.467%. Nothing downstream regressed. ALL CHECKS PASSED.
+
+**Decided — jump ball, intended vs. built (NOT yet built)**
+- Held balls should be reachable from every live-ball ACTION beat: Roll A (has
+  it), Roll B, and Roll F — NOT Roll E (selection isn't a physical contest) nor
+  the shot-resolution rolls (a held ball there is a block or foul). Adding the
+  `JumpBall` slice to B and F is folded into the Roll F build prompt.
+- The arrow read IS a branch (settled, NOT buildable yet): DEFENSE holds the
+  arrow → terminal → awarded team's new possession from Roll A; OFFENSE holds it →
+  retains → sideline inbound with different weights. Both destinations need
+  unbuilt infrastructure (next-possession-entry layer; a sideline-inbound node),
+  so the current terminal-on-resolve stands as the honest placeholder. Full
+  writeup in design.md's Jump ball section.
+
+**Also produced**
+- A verified routing-map diagram and a Roll F insertion diagram (in-chat).
+- The Roll F session prompt, updated to include the B/F jump-ball slivers.
+
+---
+
 ## Session 8 — Roll E (player selection)
 
 **Built**

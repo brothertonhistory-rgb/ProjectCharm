@@ -133,6 +133,37 @@ changes. Rolls never call each other and never know what comes next.
 
 ---
 
+## Verified routing map (audited from source, post Roll E)
+
+The engine is NOT a single chain — it is a spine of action rolls draining into a
+small set of SHARED sink nodes. "Many feeders, one node" is the actual wiring, not
+a slogan: Rolls A and B both feed the turnover node (C) and the foul node (D), and
+Roll F will make each a third feeder. This table is the authoritative map; it was
+reconstructed by reading each roll's outcomes and the resolver's routing switch.
+
+| Roll | Outcomes (from source) | Routes to |
+|---|---|---|
+| **A** Entry | CleanEntry / Turnover / ShotClockViolation / Foul / JumpBall | B / C / **TERMINAL** / D / jump-ball node |
+| **B** Halfcourt | Proceed / Foul / DeadBallTurnover | E / D / C |
+| **C** Turnover | 5 slices, all terminal | **TERMINAL** ×5 |
+| **D** Foul | (bonus state read) None / OneAndOne / Double | ResumeInbound stub / ResolveFreeThrows stub |
+| **E** Selection | one slot (flat 5-way) | IntoPlayerAction stub |
+| **jump-ball node** | arrow read (or `Off` tip coin-flip) | **TERMINAL** (resolves + flips arrow) |
+
+Shared sinks and their feeders (current):
+- **Roll C (turnover):** fed by A (Turnover) and B (DeadBallTurnover). Roll F adds a third.
+- **Roll D (foul):** fed by A (Foul) and B (Foul). Roll F adds a third.
+- **Jump-ball node:** fed by A only today. INTENDED: also B and F (see Jump ball section).
+
+True terminals today: A's ShotClockViolation, all five Roll C slices, and the
+jump-ball resolution. Everything else is a Continue that currently ends at a stub
+(`IntoPlayerAction`, `ResumeInbound`, `ResolveFreeThrows`).
+
+The live spine A → B → E currently dead-ends at the `IntoPlayerAction` stub. Roll F
+replaces that stub and becomes the third feeder into C and D.
+
+---
+
 ## GameState — persistent infrastructure
 
 `GameState` holds state that survives ACROSS possessions, unlike
@@ -189,11 +220,50 @@ operation on the possession arrow.
 | `Off` (opening / OT tip) | A real contest. 50/50 coin flip; winner gets the ball; arrow turned ON pointing at the LOSER (they are owed the next award). |
 | `Home` / `Away` | Routine alternating possession. The pointed-at team is awarded the ball; the arrow flips away from them. Deterministic. |
 
-**Why it ends the possession.** A held ball ends the current possession by
-definition. The awarded team's ensuing possession is a *new* possession (future
-work), so the resolver's `ResolveJumpBall` case resolves the arrow and emits a
-`Terminal` — it does not chain into an inbound here. It integrates like the
-turnover route: resolve, then terminate.
+**Feeders (verified from source).** As of the Roll E audit the only feeder is
+Roll A's `JumpBall` entry outcome — Roll B and the player-action beat do NOT yet
+emit it. INTENT (settled Session 9 design talk, not yet built): a held ball is a
+live-ball event, so it should be reachable from every live-ball ACTION beat —
+Roll A (have it), Roll B (ball being advanced), and Roll F (the player-action
+beat: trapped handler, gang rebound). NOT from Roll E (selection is not a physical
+contest) nor from the shot-resolution rolls (a held ball there is already a block
+or a foul). Adding the `JumpBall` slice to Roll B and Roll F is cheap — they emit
+the existing `ResolveJumpBall` kind into the existing node; "many feeders, one
+node," exactly like C and D.
+
+**The arrow read IS the branch (INTENDED — partially built).** A held ball is
+NOT uniformly terminal. The arrow decides both who gets the ball AND which of two
+routes fires:
+
+| Arrow holder at the tie-up | Outcome | Route |
+|---|---|---|
+| **Defense** holds the arrow | defense is awarded the ball | TERMINAL for this possession → the awarded team's NEW possession begins from Roll A |
+| **Offense** holds the arrow | offense RETAINS | NOT terminal → a sideline inbound on the offense's side, with different inbound weights than Roll A (a future sideline-inbound node) |
+
+In both cases the arrow still flips after the award (alternating possession). The
+opening/OT tip (arrow `Off`) is the only coin-flip; once the arrow is set, the
+read is deterministic and so is the branch.
+
+**What is actually built today vs. intended.** The current `ResolveJumpBall` case
+collapses BOTH outcomes into a single `Terminal` (resolve arrow, end possession).
+That is:
+- CORRECT-for-now for the defense-retains case (possession ends; the new-possession
+  entry that should follow is the deferred next-possession-entry layer).
+- A TEMPORARY oversimplification for the offense-retains case (it terminates
+  instead of routing to a sideline inbound, because that node does not exist yet).
+
+Both correct routes depend on infrastructure that is NOT yet built (see below), so
+the terminal-collapse stands as the honest placeholder until then. Adding the B/F
+slivers does not require fixing this first — they resolve the arrow exactly as A
+does today.
+
+**Two deferred nodes this implies (NOT built):**
+- **Next-possession entry** — starts the awarded team's possession after a tie-up
+  the defense wins (and after any other possession-ending event). Likely a sibling
+  of Roll A. The "defense retains → Roll A" route lands here.
+- **Sideline-inbound node** — a Roll A variant with its OWN pie (sideline weights
+  differ from baseline/dead-ball entry). The "offense retains → sideline inbound"
+  route lands here. Until it exists, offense-retains terminates as a placeholder.
 
 **Why no config.** The coin flip is 50/50 *by rule* — there is no basketball
 knob to tune at this stage, so nothing lives in config. The one place real
