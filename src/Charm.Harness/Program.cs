@@ -8,124 +8,180 @@ internal static class Program
     {
         var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
         var cfg = RollAConfig.Load(configPath);
+        var cfgB = RollBConfig.Load(configPath);
 
-        var generator = new StubPieGenerator(cfg);
-        var resolver = new Resolver(new HalfcourtSetStub(), new TurnoverTypeResolverStub());
-        var state = new PossessionState(PossessionNumber: 1, Offense: "HOME", Defense: "AWAY", Entry: EntryType.DeadBallInbound);
+        var rng = new SystemRng(cfg.Seed);
+        var rollAGenerator = new StubPieGenerator(cfg);
+        var rollBGenerator = new RollBStubPieGenerator(cfgB);
 
-        Console.WriteLine("=== Project Charm :: Roll A — Entry: Inbounds (Dead Ball) ===\n");
+        var resolver = new Resolver(
+            rollBGenerator,
+            rng,
+            new TurnoverTypeResolverStub(),
+            new FoulTypeResolverStub(),
+            new JumpBallResolverStub(),
+            new PlayerSelectionStub());
 
-        ShowSamples(cfg, generator, resolver, state);
-        var ok = BatchCheck(cfg, generator, resolver, state);
-        ok &= PressureSignalCheck(cfg, generator, resolver, state);
+        var state = new PossessionState(
+            PossessionNumber: 1,
+            Offense: "HOME",
+            Defense: "AWAY",
+            Entry: EntryType.DeadBallInbound);
+
+        Console.WriteLine("=== Project Charm :: Roll A -> Roll B Chain ===\n");
+
+        ShowSamples(cfg, rollAGenerator, resolver, state, rng);
+        var ok = BatchCheck(cfg, cfgB, rollAGenerator, rollBGenerator, resolver, state);
+        ok &= PhysicalitySignalCheck(cfgB, rollBGenerator, state);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
     }
 
-    // --- Observability: print a few pies with their inputs and outcomes. ---
-    private static void ShowSamples(RollAConfig cfg, StubPieGenerator gen, Resolver resolver, PossessionState state)
+    // --- Observability: print a few full A->B chains. ---
+    private static void ShowSamples(
+        RollAConfig cfg, StubPieGenerator genA, Resolver resolver,
+        PossessionState state, IRng rng)
     {
-        Console.WriteLine("--- Observability: sample possessions (seeded) ---");
-        var rng = new SystemRng(cfg.Seed);
+        Console.WriteLine("--- Observability: sample possessions (seeded, A->B chain) ---");
         const double pressure = 0.5;
 
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 8; i++)
         {
-            var pie = gen.Generate(state, pressure);
+            var pie = genA.Generate(state, pressure);
             var result = RollA.Execute(state, pie, rng, cfg);
             var routing = resolver.Route(result);
 
             var kind = result is Terminal ? "TERMINAL" : "CONTINUE";
             var elapsed = result.ElapsedSeconds is { } s ? $"{s:0}s" : "deferred";
             Console.WriteLine(
-                $"  pressure={pressure:0.00} | pie[{pie}] | result={kind} " +
-                $"| elapsed={elapsed} | route -> {routing.Destination}" +
+                $"  result={kind,-8} | elapsed={elapsed,-8} | route -> {routing.Destination}" +
                 (routing.PossessionEnded ? " (possession ended)" : ""));
         }
         Console.WriteLine();
     }
 
-    // --- Batch: fire BatchSize times, confirm rates match the pie and every
-    //     exit hands off cleanly (terminals end, continues route to a stub). ---
-    private static bool BatchCheck(RollAConfig cfg, StubPieGenerator gen, Resolver resolver, PossessionState state)
+    // --- Batch: confirm A->B rates and clean hand-offs throughout. ---
+    private static bool BatchCheck(
+        RollAConfig cfg, RollBConfig cfgB,
+        StubPieGenerator genA, RollBStubPieGenerator genB,
+        Resolver resolver, PossessionState state)
     {
-        Console.WriteLine($"--- Batch: {cfg.BatchSize:N0} possessions (pressure=0.00, pure base pie) ---");
+        Console.WriteLine($"--- Batch: {cfg.BatchSize:N0} possessions (A->B chain, physicality=0.00) ---");
         var rng = new SystemRng(cfg.Seed);
         const double pressure = 0.0;
-        var pie = gen.Generate(state, pressure);
+        var pieA = genA.Generate(state, pressure);
 
-        var counts = new Dictionary<string, int> { ["clean"] = 0, ["turnover"] = 0, ["violation"] = 0 };
-        var routedToStub = 0;
+        // Count Roll A outcomes.
+        var aCounts = new Dictionary<EntryOutcome, int>();
+        foreach (var o in Enum.GetValues<EntryOutcome>()) aCounts[o] = 0;
+
+        // Count Roll B outcomes (only possessions that reached B).
+        var bCounts = new Dictionary<HalfcourtOutcome, int>();
+        foreach (var o in Enum.GetValues<HalfcourtOutcome>()) bCounts[o] = 0;
+
         var ended = 0;
+        var routedToStub = 0;
         var unrouted = 0;
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var result = RollA.Execute(state, pie, rng, cfg);
-            var routing = resolver.Route(result);
+            var result = RollA.Execute(state, pieA, rng, cfg);
 
-            switch (result)
+            // Classify Roll A outcome before handing to resolver.
+            var aOutcome = result switch
             {
-                case Continue { Next: ContinuationKind.IntoHalfcourtSet }: counts["clean"]++; break;
-                case Continue { Next: ContinuationKind.ResolveTurnoverType }: counts["turnover"]++; break;
-                case Terminal: counts["violation"]++; break;
+                Terminal => EntryOutcome.ShotClockViolation,
+                Continue { Next: ContinuationKind.IntoHalfcourtSet } => EntryOutcome.CleanEntry,
+                Continue { Next: ContinuationKind.ResolveTurnoverType } => EntryOutcome.Turnover,
+                Continue { Next: ContinuationKind.ResolveFoulType } => EntryOutcome.Foul,
+                Continue { Next: ContinuationKind.ResolveJumpBall } => EntryOutcome.JumpBall,
+                _ => throw new InvalidOperationException("Unmapped Roll A result.")
+            };
+            aCounts[aOutcome]++;
+
+            // For clean entries, Run Roll B independently to count its outcomes.
+            if (aOutcome == EntryOutcome.CleanEntry)
+            {
+                var pieBSample = genB.Generate(state, physicality: 0.0);
+                var bResult = RollB.Execute(state, pieBSample, rng);
+                var bOutcome = bResult switch
+                {
+                    Continue { Next: ContinuationKind.IntoPlayerSelection } => HalfcourtOutcome.Proceed,
+                    Continue { Next: ContinuationKind.ResolveFoulType } => HalfcourtOutcome.Foul,
+                    Continue { Next: ContinuationKind.ResolveTurnoverType } => HalfcourtOutcome.DeadBallTurnover,
+                    _ => throw new InvalidOperationException("Unmapped Roll B result.")
+                };
+                bCounts[bOutcome]++;
             }
 
+            // Walk the full chain through the resolver.
+            var routing = resolver.Route(result);
             if (routing.PossessionEnded) ended++;
             else if (routing.Destination.StartsWith("STUB:")) routedToStub++;
             else unrouted++;
         }
 
         var n = (double)cfg.BatchSize;
-        var expected = new Dictionary<string, double>
-        {
-            ["clean"] = pie.Slices.First(s => s.Outcome == EntryOutcome.CleanEntry).Weight,
-            ["turnover"] = pie.Slices.First(s => s.Outcome == EntryOutcome.Turnover).Weight,
-            ["violation"] = pie.Slices.First(s => s.Outcome == EntryOutcome.ShotClockViolation).Weight,
-        };
-
         var ratesOk = true;
-        foreach (var key in counts.Keys)
+
+        Console.WriteLine("  Roll A outcomes:");
+        foreach (var (outcome, weight) in pieA.Slices)
         {
-            var observed = counts[key] / n;
-            var gap = Math.Abs(observed - expected[key]);
+            var observed = aCounts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
             var pass = gap <= cfg.RateTolerance;
             ratesOk &= pass;
-            Console.WriteLine($"  {key,-10} observed={observed:P3}  expected={expected[key]:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+            Console.WriteLine($"    {outcome,-18} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        var cleanEntries = aCounts[EntryOutcome.CleanEntry];
+        var pieB = genB.Generate(state, physicality: 0.0);
+        Console.WriteLine($"\n  Roll B outcomes (of {cleanEntries:N0} clean entries):");
+        foreach (var (outcome, weight) in pieB.Slices)
+        {
+            var observed = bCounts[outcome] / (double)cleanEntries;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfgB.Epsilon + cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-18} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
         }
 
         var handoffOk = unrouted == 0 && (ended + routedToStub) == cfg.BatchSize;
-        Console.WriteLine($"  handoff: ended={ended:N0}, routed-to-stub={routedToStub:N0}, unrouted={unrouted} -> {(handoffOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"\n  handoff: ended={ended:N0}, routed-to-stub={routedToStub:N0}, unrouted={unrouted} -> {(handoffOk ? "ok" : "FAIL")}");
 
         return ratesOk && handoffOk;
     }
 
-    // --- Prove the seam carries signal: turnover rate must rise with pressure. ---
-    private static bool PressureSignalCheck(RollAConfig cfg, StubPieGenerator gen, Resolver resolver, PossessionState state)
+    // --- Prove Roll B's seam carries signal: foul rate must rise with physicality. ---
+    private static bool PhysicalitySignalCheck(RollBConfig cfgB, RollBStubPieGenerator genB, PossessionState state)
     {
-        Console.WriteLine("\n--- Seam signal: turnover rate vs. pressure ---");
-        var low = TurnoverRate(cfg, gen, state, pressure: 0.0);
-        var high = TurnoverRate(cfg, gen, state, pressure: 1.0);
+        Console.WriteLine("\n--- Seam signal: Roll B foul rate vs. physicality ---");
+        var rng = new SystemRng(42);
+        var low = FoulRate(cfgB, genB, state, rng, physicality: 0.0);
+        rng = new SystemRng(42);
+        var high = FoulRate(cfgB, genB, state, rng, physicality: 1.0);
 
-        Console.WriteLine($"  turnover rate @ pressure 0.00 = {low:P3}");
-        Console.WriteLine($"  turnover rate @ pressure 1.00 = {high:P3}");
+        Console.WriteLine($"  foul rate @ physicality 0.00 = {low:P3}");
+        Console.WriteLine($"  foul rate @ physicality 1.00 = {high:P3}");
 
         var moved = high > low;
         Console.WriteLine($"  signal is live (high > low): {(moved ? "ok" : "FAIL")}");
         return moved;
     }
 
-    private static double TurnoverRate(RollAConfig cfg, StubPieGenerator gen, PossessionState state, double pressure)
+    private static double FoulRate(
+        RollBConfig cfgB, RollBStubPieGenerator genB,
+        PossessionState state, IRng rng, double physicality)
     {
-        var rng = new SystemRng(cfg.Seed);
-        var pie = gen.Generate(state, pressure);
-        var turnovers = 0;
-        for (var i = 0; i < cfg.BatchSize; i++)
+        var pie = genB.Generate(state, physicality);
+        var fouls = 0;
+        const int n = 100_000;
+        for (var i = 0; i < n; i++)
         {
-            if (RollA.Execute(state, pie, rng, cfg) is Continue { Next: ContinuationKind.ResolveTurnoverType })
-                turnovers++;
+            if (RollB.Execute(state, pie, rng) is Continue { Next: ContinuationKind.ResolveFoulType })
+                fouls++;
         }
-        return turnovers / (double)cfg.BatchSize;
+        return fouls / (double)n;
     }
 }

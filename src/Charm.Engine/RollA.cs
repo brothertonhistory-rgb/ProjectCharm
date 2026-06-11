@@ -30,6 +30,16 @@ public static class RollA
             EntryOutcome.ShotClockViolation =>
                 new Terminal("ShotClockViolation", state) { ElapsedSeconds = cfg.ViolationElapsedSeconds },
 
+            // Foul -> CONTINUE. A future foul-type resolver decides defensive vs.
+            // offensive and what it triggers. Real variance, never resolved here.
+            EntryOutcome.Foul =>
+                new Continue(ContinuationKind.ResolveFoulType, state),
+
+            // Jump ball -> CONTINUE. A future jump-ball resolver consults the
+            // possession arrow on GameState.
+            EntryOutcome.JumpBall =>
+                new Continue(ContinuationKind.ResolveJumpBall, state),
+
             _ => throw new InvalidOperationException($"Unhandled entry outcome '{outcome}'.")
         };
     }

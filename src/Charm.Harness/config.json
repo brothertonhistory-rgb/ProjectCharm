@@ -1,11 +1,21 @@
 {
-  "BaseClean": 0.90,
-  "BaseTurnover": 0.08,
+  "BaseClean": 0.88,
+  "BaseTurnover": 0.06,
   "BaseViolation": 0.02,
+  "BaseFoul": 0.03,
+  "BaseJumpBall": 0.01,
   "PressureTurnoverNudge": 0.10,
   "ViolationElapsedSeconds": 30.0,
   "Epsilon": 1e-9,
   "BatchSize": 100000,
   "RateTolerance": 0.005,
-  "Seed": 20260610
+  "Seed": 20260610,
+
+  "RollB": {
+    "BaseProceed": 0.85,
+    "BaseFoul": 0.12,
+    "BaseDeadBallTurnover": 0.03,
+    "PhysicalityFoulNudge": 0.10,
+    "Epsilon": 1e-9
+  }
 }

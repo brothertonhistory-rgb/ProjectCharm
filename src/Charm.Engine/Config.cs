@@ -9,10 +9,13 @@ namespace Charm.Engine;
 public sealed class RollAConfig
 {
     // --- Stub pie base weights (placeholders; the real attribute-driven
-    //     generator will replace these). Must sum to 1 within Epsilon. ---
-    public double BaseClean { get; set; } = 0.90;
-    public double BaseTurnover { get; set; } = 0.08;
+    //     generator will replace these). The generator renormalizes, but these
+    //     are kept summing to 1 for clarity. ---
+    public double BaseClean { get; set; } = 0.88;
+    public double BaseTurnover { get; set; } = 0.06;
     public double BaseViolation { get; set; } = 0.02;
+    public double BaseFoul { get; set; } = 0.03;
+    public double BaseJumpBall { get; set; } = 0.01;
 
     /// <summary>The single live wire proving the seam carries signal: how much
     /// a pressure of 1.0 adds to the turnover weight before renormalization.

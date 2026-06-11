@@ -27,13 +27,17 @@ public sealed class StubPieGenerator
         var clean = _cfg.BaseClean;
         var turnover = _cfg.BaseTurnover + pressure * _cfg.PressureTurnoverNudge;
         var violation = _cfg.BaseViolation;
+        var foul = _cfg.BaseFoul;
+        var jumpBall = _cfg.BaseJumpBall;
 
-        var total = clean + turnover + violation;
+        var total = clean + turnover + violation + foul + jumpBall;
         var weights = new Dictionary<EntryOutcome, double>
         {
             [EntryOutcome.CleanEntry] = clean / total,
             [EntryOutcome.Turnover] = turnover / total,
             [EntryOutcome.ShotClockViolation] = violation / total,
+            [EntryOutcome.Foul] = foul / total,
+            [EntryOutcome.JumpBall] = jumpBall / total,
         };
 
         return new Pie<EntryOutcome>(weights, _cfg.Epsilon);
