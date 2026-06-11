@@ -4,6 +4,63 @@ Newest entries first. What was built, decided, and left stubbed each session.
 
 ---
 
+## Session 7 — The on-court slot (identity) layer
+
+**Built**
+- `Slot.cs` — a bare on-court identity: `readonly record struct Slot(TeamSide Side,
+  int Number)`. Numbered 1–5 to mimic basketball addressing, but the number is
+  IDENTITY, not ROLE — slot 1 is not "the point guard." No attributes, no fill,
+  no rating, no modifier hook (not even an inert one). Mirrors `TeamSide`: pure
+  identity, owned by nothing, named by everything. The number is intrinsic and
+  stable, so a stat attributed to "Home slot 3" stays coherent across future
+  substitutions (a sub swaps who fills the slot, never what the slot is).
+- `Lineup.cs` — one team's on-court five. Per-team (NOT a shared both-sides
+  bundle like `FoulTracker`), because this is the attachment point every heavy
+  per-team/per-player system hangs off later (stat lines, the rated players that
+  fill slots, the selection roll); each team's machinery grows independently.
+  Stands up holding five empty numbered slots. `OnCourt` is read-only (subs go
+  through a future method, never by reaching into the five); `SlotAt(1..5)` names
+  one slot — the entity a future stat attributes to and the selection roll picks
+  among.
+
+**Edited**
+- `GameState.cs` — added `HomeLineup` / `AwayLineup` (one `Lineup` each,
+  constructed in the ctor) plus `LineupFor(TeamSide)`. This is the seam the future
+  attribute generator walks: possession role -> `LineupFor` -> `SlotAt` ->
+  (later) the filling player -> attributes. Mirrors how `state.Defense` indexes
+  the foul counter. Score / timeouts still inert.
+- `Program.cs` — added `SlotLayerCheck`: prints the ten slots, asserts five per
+  team numbered 1–5 on the correct side, and proves "Home slot 3" resolves as a
+  named attribution target. Wired into the run tally.
+
+**Verified (full harness run, all checks green)**
+- Ten slots print on the correct sides, numbered 1–5; naming a slot resolves.
+- The slots are fully inert: every prior rate (Roll A/B/C/D, seam signals, jump
+  ball) is unchanged, confirming the layer influences no roll.
+
+**Decided** — see design doc: *The on-court slot layer*. Slot = fixed numbered
+identity; role, position, and matchup pairing are all deferred to assignment
+layers ABOVE this one, chosen on purpose so management nodes (lineup-setting,
+subs, rotations, matchup assignment) stack as clean consumers. Three scopes
+collapsed to the right two: the roster + on-court five is one owned `Lineup` per
+team (persistent, mutates via subs, like the foul count); "which slot has the
+ball this possession" is deferred to `PossessionState` when selection is built.
+
+**Left stubbed / deferred (next session and beyond)**
+- The husk/fill object and the player-selection roll — NEXT session. The
+  `IntoPlayerSelection` stub stays a stub; ~75% of possessions still wall there.
+  The selection roll will reach into a lineup via the `LineupFor` -> `SlotAt`
+  seam built this session.
+- The player/attribute model (height, skill, athleticism, usage, hierarchy) — its
+  own later design conversation; the heart of the sim, not smuggled in here.
+- Substitution mechanism (the five are mutable; the swap logic is future work).
+- Counting-stat attribution layer (this session only proved a slot is *nameable*
+  as a target; it builds no attribution).
+- Lineup-setting / matchup-assignment layer (who fills which slot; who guards
+  whom) — sits above the slot, consumes both lineups.
+
+---
+
 ## Session 6 — Roll D: non-shooting defensive foul + the foul/bonus layer
 
 **Built**

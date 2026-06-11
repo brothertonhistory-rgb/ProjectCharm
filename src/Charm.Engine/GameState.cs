@@ -30,9 +30,12 @@ public enum ArrowState
 /// gets the ball in a later one.
 ///
 /// The arrow now has real, complete behavior. Team fouls now have real behavior
-/// too, via <see cref="Fouls"/> (a <see cref="FoulTracker"/>). Score and timeouts
-/// remain placeholder fields — typed and named so the shape is defined, but NOT
-/// yet read or written during possession resolution.
+/// too, via <see cref="Fouls"/> (a <see cref="FoulTracker"/>). The on-court five
+/// per team now lives here too, via <see cref="HomeLineup"/> / <see cref="AwayLineup"/>
+/// (each a <see cref="Lineup"/>) — persistent game-scoped state that will mutate
+/// via future subs, like the foul count, not fixed like team identity. Score and
+/// timeouts remain placeholder fields — typed and named so the shape is defined,
+/// but NOT yet read or written during possession resolution.
 /// </summary>
 public sealed class GameState
 {
@@ -48,6 +51,8 @@ public sealed class GameState
     {
         Fouls = fouls ?? throw new ArgumentNullException(nameof(fouls));
         PossessionArrow = initialArrow;
+        HomeLineup = new Lineup(TeamSide.Home);
+        AwayLineup = new Lineup(TeamSide.Away);
     }
 
     /// <summary>Turn the arrow ON, pointing at <paramref name="team"/>. Used by
@@ -76,6 +81,20 @@ public sealed class GameState
     /// incremented by Roll D and read for bonus routing. Per-half: a future
     /// half-reset replaces this tracker (or resets it) at the break.</summary>
     public FoulTracker Fouls { get; }
+
+    /// <summary>Each team's on-court five. Persistent game-scoped state (will
+    /// mutate via future subs), one per team. The attachment point the
+    /// player/attribute model and the selection roll consume later; five empty
+    /// numbered slots for now, reading nothing and influencing no roll.</summary>
+    public Lineup HomeLineup { get; }
+    public Lineup AwayLineup { get; }
+
+    /// <summary>The lineup for a given identity — lets a slot-aware path get from
+    /// a <see cref="TeamSide"/> to its five, the way <c>state.Defense</c> indexes
+    /// the foul counter. This is the seam the future attribute generator walks:
+    /// possession role -> LineupFor -> SlotAt -> (later) the filling player.</summary>
+    public Lineup LineupFor(TeamSide side) =>
+        side == TeamSide.Home ? HomeLineup : AwayLineup;
 
     // --- Placeholder fields: defined shape, not yet wired to anything. ---
     public int HomeScore { get; set; }

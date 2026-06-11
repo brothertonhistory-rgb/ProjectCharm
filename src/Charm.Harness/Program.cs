@@ -48,6 +48,7 @@ internal static class Program
         ok &= PhysicalitySignalCheck(cfgB, rollBGenerator, state);
         ok &= PressureSignalCheck(cfgC, rollCGenerator, state);
         ok &= JumpBallCheck(cfg);
+        ok &= SlotLayerCheck(game);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -475,6 +476,47 @@ internal static class Program
         catch (InvalidOperationException) { threw = true; }
         allOk &= threw;
         Console.WriteLine($"  flipping an Off arrow throws: {(threw ? "ok" : "FAIL")}");
+
+        return allOk;
+    }
+
+    // --- Slot layer: print the ten on-court slots and prove one can be NAMED
+    //     as a future attribution target. The slots are empty identities — they
+    //     fill nothing and influence no roll. This check only confirms they
+    //     exist on the correct side and are addressable 1–5. ---
+    private static bool SlotLayerCheck(GameState game)
+    {
+        Console.WriteLine("\n--- Slot layer: on-court identities ---");
+        var allOk = true;
+
+        foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
+        {
+            var lineup = game.LineupFor(side);
+
+            // Each lineup must hold exactly five slots, numbered 1–5, all on its side.
+            var countOk = lineup.OnCourt.Count == Lineup.Size;
+            var numbersOk = true;
+            var sideOk = true;
+            for (var i = 0; i < lineup.OnCourt.Count; i++)
+            {
+                var slot = lineup.OnCourt[i];
+                Console.WriteLine($"  {slot.Side} slot {slot.Number}");
+                if (slot.Number != i + 1) numbersOk = false;
+                if (slot.Side != side) sideOk = false;
+            }
+
+            var lineupOk = countOk && numbersOk && sideOk;
+            allOk &= lineupOk;
+            Console.WriteLine($"  {side}: five slots, numbered 1–5, all on {side} -> {(lineupOk ? "ok" : "FAIL")}");
+        }
+
+        // Prove a single slot can be NAMED — the entity a future stat attributes to.
+        var target = game.LineupFor(TeamSide.Home).SlotAt(3);
+        var nameOk = target.Side == TeamSide.Home && target.Number == 3;
+        allOk &= nameOk;
+        Console.WriteLine(
+            $"  named attribution target: {target.Side} slot {target.Number} " +
+            $"(a stat would credit here; nothing fills it yet) -> {(nameOk ? "ok" : "FAIL")}");
 
         return allOk;
     }

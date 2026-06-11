@@ -5,6 +5,75 @@ task lists (those live in the journal). It is updated every session.
 
 ---
 
+## The on-court slot layer
+
+The slot layer is the set of ten on-court identities — five per team — that
+selection and attribution both need to exist before they can be built. Selection
+chooses *which* on-court player gets the possession; attribution credits a stat
+*to* one. Neither can point at anything until there is a set of nameable on-court
+identities. So the slot layer is their shared dependency, built once as its own
+unit rather than smuggled in as a side effect of the selection roll.
+
+### A slot is identity, not substance
+A `Slot` is `(TeamSide Side, int Number)` and nothing more — a stable on-court
+position that can be *named*, carrying no attributes, no fill, no rating, not even
+an inert modifier hook. It mirrors `TeamSide`: the cleanest identity in the
+codebase, owned by nothing and referenced by everything. The rated player that
+fills a slot is data that flows in later and attaches *to* the slot; the slot
+does not pre-carry anything for it. This is deliberate discipline — the moment a
+slot holds a rate-touching field, it has become a player model, which is the
+premature-crystallization failure mode the project has hit before. The slot stays
+empty so it stays safe.
+
+### Numbered 1–5, but the number is identity, not role
+Slots are numbered 1–5 to mimic basketball's addressing, but the number carries
+no positional meaning: slot 1 is not structurally "the point guard." *What kind
+of player belongs in a slot* is a lineup-assignment decision made later, in a
+layer above this one. Keeping role out of the slot is what lets management nodes
+(lineup-setting, substitution, rotation, matchup assignment) stack on top as
+clean consumers — none of them has to fight a meaning baked into the slot, and a
+positionless or small-ball lineup is no special case. The fixed number gives the
+stability subs/rotations need (slot 3 is a stable address all game); role lives
+above it as assignment.
+
+### The number is intrinsic and stable
+"Home slot 3" is the same position for the whole game. A substitution swaps *who
+fills* slot 3, never what slot 3 *is*, so a stat attributed to a slot stays
+coherent across subs. This is the same move Roll D makes when it charges a fouls
+to the fixed `TeamSide` identity rather than to a moving ball-handler:
+attribution rides on a stable identity by design. Making the slot travel with the
+player instead (slot ≈ proto-player) would make attribution chase a moving
+target, and would invite attributes onto the slot — both rejected.
+
+### Scope: one Lineup per team on GameState
+There appeared to be three scopes — the roster, the on-court five, and which slot
+has the ball this possession — but they collapse to the right two. The roster and
+the on-court five are one owned object: a `Lineup` per team, living on
+`GameState`. It is persistent game-scoped state that *mutates* within a game via
+substitutions — the same shape as the foul count (persistent and changing), not
+team identity (fixed). Crucially it is **per-team**, not a shared both-sides
+bundle like `FoulTracker`: team fouls are a thin shared concern with nothing
+per-team to grow, whereas a lineup is the attachment point every heavy
+per-team/per-player system hangs off later (stat lines, the rated players, the
+selection roll), so each team owns its own and grows independently. This mirrors
+how `PossessionState` carries `Offense`/`Defense` as two parallel-but-independent
+identities. The third scope — which slot has the ball *this* possession — is
+per-possession and deferred to `PossessionState`, added as a slot *reference*
+(into the game-scoped lineup) when the selection roll is built; `PossessionState`
+references a slot the way it already references a `TeamSide`, never owning it.
+
+### The seam selection and attributes will consume
+`GameState.LineupFor(TeamSide)` is the road the future attribute generator walks:
+possession role → `LineupFor` → `SlotAt(n)` → (later) the player filling that slot
+→ that player's attributes → a pie with shifted weights. The roll, the resolver,
+and the slot never change; only the generator gets smarter — the same
+stub-to-real swap the pie generators already promise. Adding attributes later is
+*architecturally* non-disruptive for this reason, even though the attribute model
+itself is a large design effort. The slot being empty now is precisely what makes
+that later add a clean plug-in rather than a teardown.
+
+---
+
 ## The uniform roll contract
 
 Every roll follows the same shape:
