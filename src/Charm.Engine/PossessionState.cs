@@ -39,14 +39,27 @@ public enum EntryType
 /// <para>Null until Roll G runs (and on every possession that ends or diverts
 /// before a clean shot attempt — a turnover, a foul, a block, a held ball: those
 /// never reach shot location, so no zone is ever stamped). Non-null means "the
-/// shot is from this zone," the durable fact the future make/miss roll (Roll H)
-/// reads ALONGSIDE <see cref="SelectedSlot"/> to resolve the matchup into points.
-/// Named ShotType (not ShotLocation) to read cleanly at the call sites; its type
-/// is <see cref="ShotLocation"/>.</para></param>
+/// shot is from this zone," the durable fact the make/miss roll (Roll H) and the
+/// downstream scoring layer read ALONGSIDE <see cref="SelectedSlot"/> to resolve
+/// the matchup into points. Named ShotType (not ShotLocation) to read cleanly at
+/// the call sites; its type is <see cref="ShotLocation"/>.</para></param>
+/// <param name="Result">How the located shot resolved this possession, stamped by
+/// Roll H (make/miss) as one of six outcomes (Made / MadeAndFouled / Miss /
+/// MissFouled / MissOutOfBoundsLost / MissOutOfBoundsRetained). The THIRD
+/// per-possession fact, layered after <see cref="ShotType"/> — a plain enum value.
+/// <para>Null until Roll H runs (and on every possession that ends or diverts
+/// before the shot resolves — a turnover, a foul, a block, a held ball, or a shot
+/// that never got off: those never reach make/miss, so no result is ever stamped).
+/// Non-null means "the shot resolved this way," the durable fact the future
+/// scoring layer reads ALONGSIDE <see cref="ShotType"/> to DERIVE the point value
+/// (2 vs. 3) and the free-throw count (1 / 2 / 3) — neither is stored here. Roll H
+/// stamps the outcome; the derivations are downstream. Its type is <see
+/// cref="ShotResult"/>.</para></param>
 public sealed record PossessionState(
     int PossessionNumber,
     TeamSide Offense,
     TeamSide Defense,
     EntryType Entry,
     Slot? SelectedSlot = null,
-    ShotLocation? ShotType = null);
+    ShotLocation? ShotType = null,
+    ShotResult? Result = null);

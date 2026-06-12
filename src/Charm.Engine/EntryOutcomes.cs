@@ -84,7 +84,11 @@ public enum ContinuationKind
 
     /// <summary>A non-shooting defensive foul with the opponent in the bonus
     /// (1-and-1 or double): hand off to the (stubbed) free-throw node. The
-    /// <see cref="BonusType"/> rides on the continuation as the FT node's input.</summary>
+    /// <see cref="BonusType"/> rides on the continuation as the FT node's input.
+    /// <para>NOTE: this is Roll D's (non-shooting / bonus) free-throw path. Roll H's
+    /// SHOOTING fouls route to a SEPARATE node (<see cref="ResolveShootingFreeThrows"/>)
+    /// because the shot-count rules differ. Whether the two unify into one FT
+    /// resolution node later is an open fork — kept separate for now.</para></summary>
     ResolveFreeThrows,
 
     /// <summary>A shot attempt was blocked: hand off to the (stubbed)
@@ -97,14 +101,39 @@ public enum ContinuationKind
     /// which stamps a <see cref="ShotLocation"/> onto <see cref="PossessionState"/>
     /// (the second per-possession fact after SelectedSlot) that the make/miss roll
     /// will read. The one Roll F outcome that proceeds DEEPER into the shot
-    /// sequence. (Was the chain's dead-end stub before Roll G; now live.)</summary>
+    /// sequence.</summary>
     IntoShotType,
 
-    /// <summary>A shot location has been stamped: hand off to the (stubbed)
-    /// make/miss node — the future Roll H, the first roll that reads BOTH
-    /// SelectedSlot AND ShotType to resolve the matchup into points. The stamped
-    /// ShotType rides on <see cref="PossessionState"/>, not on the continuation.
-    /// Emitted by all five of Roll G's zones — like Roll E, every outcome stamps a
-    /// fact and continues to the same next beat.</summary>
+    /// <summary>A shot location has been stamped: hand off to Roll H (make/miss),
+    /// which resolves the located shot into one of six outcomes and stamps a
+    /// <see cref="ShotResult"/> onto <see cref="PossessionState"/> (the third
+    /// per-possession fact after ShotType). Emitted by all five of Roll G's zones —
+    /// like Roll E, every Roll G outcome stamps a fact and continues to the same
+    /// next beat. (Was the chain's dead-end stub before Roll H; now live.)</summary>
     IntoShotResolution,
+
+    /// <summary>A shot missed, live: hand off to the (stubbed) rebound node. The
+    /// big dependency several stubs now wait on (block recovery, OOB-retain, the
+    /// offensive-rebound-same-possession branch, the Governor's "same team
+    /// continues"). An offensive board keeps the SAME possession — the ~67–70
+    /// accounting anchor — which the rebound roll, not Roll H, will resolve. The
+    /// stamped <see cref="ShotResult"/> rides on <see cref="PossessionState"/>.</summary>
+    ResolveRebound,
+
+    /// <summary>A SHOOTING foul was drawn (an and-1 on a make, or a foul on a miss):
+    /// hand off to the (stubbed) shooting-free-throw node. The free-throw COUNT
+    /// (and-1 = 1; fouled miss = 2; fouled miss on a three = 3) is derived later
+    /// from the stamped (<see cref="ShotResult"/>, <see cref="ShotLocation"/>) pair —
+    /// that is the future FT roll's job, not encoded here. Kept SEPARATE from
+    /// <see cref="ResolveFreeThrows"/> (Roll D's bonus path) for now; possible
+    /// future unification is an open fork.</summary>
+    ResolveShootingFreeThrows,
+
+    /// <summary>A missed shot deflected out of bounds off the defender and the
+    /// offense retained it: hand off to the (stubbed) sideline-inbound node, where
+    /// the offense inbounds from the side. MAY eventually share a loose-ball /
+    /// inbound node with <see cref="ResolveBlock"/> (block recovery) — flagged, not
+    /// merged. The stamped <see cref="ShotResult"/> rides on
+    /// <see cref="PossessionState"/>.</summary>
+    ResolveSidelineInbound,
 }

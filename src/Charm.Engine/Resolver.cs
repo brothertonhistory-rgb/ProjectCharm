@@ -20,12 +20,15 @@ public sealed class Resolver
     private readonly RollEStubPieGenerator _rollEGenerator;
     private readonly RollFStubPieGenerator _rollFGenerator;
     private readonly RollGStubPieGenerator _rollGGenerator;
+    private readonly RollHStubPieGenerator _rollHGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
     private readonly IContinuationNode _resumeInbound;
     private readonly IContinuationNode _resolveFreeThrows;
     private readonly IContinuationNode _resolveBlock;
-    private readonly IContinuationNode _shotResolution;
+    private readonly IContinuationNode _rebound;
+    private readonly IContinuationNode _resolveShootingFreeThrows;
+    private readonly IContinuationNode _sidelineInbound;
 
     public Resolver(
         RollBStubPieGenerator rollBGenerator,
@@ -34,12 +37,15 @@ public sealed class Resolver
         RollEStubPieGenerator rollEGenerator,
         RollFStubPieGenerator rollFGenerator,
         RollGStubPieGenerator rollGGenerator,
+        RollHStubPieGenerator rollHGenerator,
         GameState game,
         IRng rng,
         IContinuationNode resumeInbound,
         IContinuationNode resolveFreeThrows,
         IContinuationNode resolveBlock,
-        IContinuationNode shotResolution)
+        IContinuationNode rebound,
+        IContinuationNode resolveShootingFreeThrows,
+        IContinuationNode sidelineInbound)
     {
         _rollBGenerator = rollBGenerator;
         _rollCGenerator = rollCGenerator;
@@ -47,12 +53,15 @@ public sealed class Resolver
         _rollEGenerator = rollEGenerator;
         _rollFGenerator = rollFGenerator;
         _rollGGenerator = rollGGenerator;
+        _rollHGenerator = rollHGenerator;
         _game = game;
         _rng = rng;
         _resumeInbound = resumeInbound;
         _resolveFreeThrows = resolveFreeThrows;
         _resolveBlock = resolveBlock;
-        _shotResolution = shotResolution;
+        _rebound = rebound;
+        _resolveShootingFreeThrows = resolveShootingFreeThrows;
+        _sidelineInbound = sidelineInbound;
     }
 
     /// <summary>Walk the chain from <paramref name="result"/> until a terminal
@@ -152,11 +161,40 @@ public sealed class Resolver
                             result = RollG.Execute(c.State, pieG, _rng);
                             continue;
 
-                        // Roll G's stamped shot -> make/miss node (stub), the future
-                        // Roll H. The ShotType rides on the carried state. Chain ends
-                        // here for now (the new frontier).
+                        // Roll G's stamped shot -> execute Roll H (make/miss), loop.
+                        // Roll H is a GATE with mixed ends: it stamps a ShotResult
+                        // onto its state and returns EITHER a Terminal (Made,
+                        // MissOutOfBoundsLost — the loop ends it on the next pass)
+                        // OR a CONTINUE (ResolveShootingFreeThrows / ResolveRebound /
+                        // ResolveSidelineInbound) that re-enters this switch and
+                        // lands on the matching stub below. Roll H reads nothing off
+                        // GameState and only its pie, so it takes (state, pie, rng) —
+                        // like Roll F and Roll G. (Was the chain's dead-end stub
+                        // before Roll H; now live.)
                         case ContinuationKind.IntoShotResolution:
-                            return new RoutingOutcome(false, _shotResolution.Receive(c));
+                            var pieH = _rollHGenerator.Generate(c.State);
+                            result = RollH.Execute(c.State, pieH, _rng);
+                            continue;
+
+                        // Roll H, missed shot (live) -> rebound node (stub). The big
+                        // dependency: an offensive board keeps the SAME possession,
+                        // a defensive board flips it. The stamped Result + ShotType
+                        // ride on the carried state. Chain ends here for now.
+                        case ContinuationKind.ResolveRebound:
+                            return new RoutingOutcome(false, _rebound.Receive(c));
+
+                        // Roll H, shooting foul (and-1 or fouled miss) -> shooting-
+                        // free-throw node (stub), SEPARATE from Roll D's bonus FT
+                        // path. The FT count is a downstream derivation from
+                        // (Result, ShotType). Chain ends here for now.
+                        case ContinuationKind.ResolveShootingFreeThrows:
+                            return new RoutingOutcome(false, _resolveShootingFreeThrows.Receive(c));
+
+                        // Roll H, miss deflected OOB off the defender -> sideline-
+                        // inbound node (stub); offense retains and inbounds. Chain
+                        // ends here for now.
+                        case ContinuationKind.ResolveSidelineInbound:
+                            return new RoutingOutcome(false, _sidelineInbound.Receive(c));
 
                         // Jump ball (from any feeder: Roll A, Roll B, Roll F) ->
                         // resolve against the possession arrow, then END the

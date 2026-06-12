@@ -4,6 +4,101 @@ Newest entries first. What was built, decided, and left stubbed each session.
 
 ---
 
+## Session 11 — Roll H (make/miss)
+
+**Built**
+- `ShotResult.cs` — `ShotResult` enum, six members in declaration order: `Made`,
+  `MadeAndFouled`, `Miss`, `MissFouled`, `MissOutOfBoundsLost`,
+  `MissOutOfBoundsRetained`. The THIRD durable per-possession fact's type, after
+  `SelectedSlot` (E) and `ShotType` (G). Shot quality is deliberately NOT a slice —
+  it is a make/miss percentage, folded into the deferred generator.
+- `RollH.cs` — the make/miss roll, a WELD of three earlier patterns: Roll F's gate
+  skeleton (switch over the rolled outcome), Roll A's MIXED ends (some Terminal,
+  some Continue — the first roll since A to mix them), and Roll G's stamp-a-fact
+  (`state with { Result = outcome }` before routing). Signature `(state, pie, rng)`
+  — reads nothing off `GameState` and no stamps either. Both terminals carry the
+  stamped state so the future Governor reads `Result` + `ShotType` off them.
+- `RollHConfig.cs` — loads the `"RollH"` section (`System.Text.Json`, cloned from
+  `RollGConfig`). Six base weights + Epsilon. No live-wire scalar.
+- `RollHStubPieGenerator.cs` — builds the flat-ish six-way pie from config. NO live
+  wire and location-BLIND (does not read `ShotType`); mirrors Roll E/F/G. The real
+  attribute-driven generator (shooter-vs-defender matchup, gravity, skill/ath gates,
+  logistic make-%) replaces it later without touching Roll H or the resolver.
+
+**Edited**
+- `PossessionState.cs` — added the nullable `ShotResult? Result` field (the THIRD
+  per-possession fact, after `ShotType`), mirroring the `ShotType` record +
+  `with`-expression pattern.
+- `EntryOutcomes.cs` — added three `ContinuationKind`s: `ResolveRebound`,
+  `ResolveShootingFreeThrows`, `ResolveSidelineInbound`. Refreshed the
+  `IntoShotResolution` doc (now triggers the live Roll H, not a dead-end stub).
+  Noted the FT-node-sharing open fork on `ResolveFreeThrows` /
+  `ResolveShootingFreeThrows`.
+- `Resolver.cs` — `IntoShotResolution` converted from stub-receive to
+  execute-and-loop (generate pie → `RollH.Execute` → feed result back), exactly like
+  the C/D/E/F/G swaps. Added `RollHStubPieGenerator` field + ctor param. Retired the
+  single `_shotResolution` stub-node field; added three new stub-node fields
+  (`_rebound`, `_resolveShootingFreeThrows`, `_sidelineInbound`) and their three
+  routing cases. Ctor is now 15 args (7 generators + game + rng + 6 stub nodes).
+- `Stubs.cs` — RETIRED `ShotResolutionStub`; added `ReboundStub`,
+  `ShootingFreeThrowsStub`, `SidelineInboundStub`, plus a shared
+  `ShotFacts.Describe` helper that echoes all three facts
+  (`STUB:{node}:{Side}slot{N}:{Zone}:{Result}`), surfacing `NO_SLOT` / `NO_ZONE` /
+  `NO_RESULT` loud if any is missing.
+- `Program.cs` — load `RollHConfig`, build the generator, threaded it + the three
+  new stubs through all four `Resolver` constructions (Main + three handoff checks).
+  Added `RollHResolutionBatchCheck` (direct six-way) and `RollHHandoffCheck` (feeds
+  `IntoShotResolution` to isolate H). REPURPOSED the old `RollGHandoffCheck` into a
+  G→H integration check (`IntoShotType` now flows through both rolls). FIXED
+  `RollFHandoffCheck`'s shot bucket (a shot now flows F→G→H to terminals/new stubs,
+  no longer the retired shot-resolution stub). Added Roll H observability. Banner now
+  reads A → B → … → G → H.
+- `config.json` — added the `"RollH"` section (Made 0.43 / MadeAndFouled 0.03 / Miss
+  0.47 / MissFouled 0.04 / MissOutOfBoundsLost 0.02 / MissOutOfBoundsRetained 0.01,
+  sums to 1; Epsilon 1e-9).
+
+**Decided**
+- **Make/miss is one roll, mixed ends.** Made and MissOutOfBoundsLost are TERMINAL
+  (the possession's two cleanest endings); the other four CONTINUE. First roll since
+  A to mix terminal and continue arms — confirmed not to need splitting.
+- **Point value and FT count are DOWNSTREAM derivations, not stored.** Roll H records
+  only which of the six outcomes happened; 2-vs-3 and the 1/2/3 free-throw count are
+  derived later from the `(Result, ShotType)` pair. Roll H stays pure: no points, no
+  fouls, no stats, no `GameState`.
+- **Roll H reads no stamps yet.** The "make/miss reads both stamps" intuition is
+  correct but belongs to H's deferred GENERATOR (the matchup tilt), not the roll. The
+  roll reads only its pie; the stub is location-blind.
+- **Shooting free throws kept SEPARATE from Roll D's bonus free throws** (different
+  shot-count rules). Whether the two FT paths unify into one node later is an OPEN
+  FORK — flagged, not decided. `SidelineInbound` may likewise later share a
+  loose-ball / inbound node with block recovery — also flagged, not merged.
+
+**Left stubbed / deferred**
+- `ReboundStub` (the big dependency — offensive board keeps the SAME possession,
+  defensive board flips it; rebound system designed but unbuilt — DESIGN before
+  build).
+- `ShootingFreeThrowsStub` (free-throw success roll, the next obvious frontier).
+- `SidelineInboundStub` (offense-retained OOB inbound).
+- `BlockRecoveryStub` (unchanged — loose-ball resolution, built next to rebounds).
+- Roll H's real attribute-driven pie generator (the deferred "90% of the work":
+  shooter-vs-defender matchup, gravity, skill/athleticism gates, logistic make-%).
+
+**Verified (by pie/routing mirror in Python, then the live harness on Emmett's
+machine — SDK-less sandbox, same as prior sessions)**
+- Six-way make/miss distribution converges within tolerance over 1M draws (Made
+  43.0 / Miss 47.0 / MissFouled 4.0 / MadeAndFouled 3.0 / MissOOBLost 2.0 /
+  MissOOBRetained 1.0).
+- Every Roll H exit carries a stamped `Result` matching the rolled outcome and the
+  routing arm (terminal vs. continue); anomalies = 0. All three facts (slot, zone,
+  result) ride through every exit.
+- Clean handoff `IntoShotResolution` → Roll H: zero unrouted, all five destinations
+  reached (2 terminals + 3 stubs), slot+zone+result intact on every stub landing,
+  both FT-foul outcomes land at the shooting-FT stub.
+- G→H integration (`IntoShotType` routed through both): zero unrouted, all five
+  destinations reached, all five zones ride through to the stub landings.
+
+---
+
 ## Session 10 — Roll G (shot location)
 
 **Built**

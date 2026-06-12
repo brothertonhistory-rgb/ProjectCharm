@@ -54,29 +54,71 @@ public sealed class BlockRecoveryStub : IContinuationNode
     }
 }
 
-/// <summary>STUB for the make/miss node (the future Roll H) — where Roll G's
-/// stamped shot lands, after a location has been chosen. Roll H will read BOTH
-/// <see cref="PossessionState.SelectedSlot"/> AND <see cref="PossessionState.ShotType"/>
-/// to resolve the matchup into points. The stub echoes WHICH slot is shooting and
-/// from WHICH zone, letting the harness confirm both per-possession facts rode
-/// through. A real node replaces this without Roll G changing — this is the chain's
-/// new dead-end / next frontier.</summary>
-public sealed class ShotResolutionStub : IContinuationNode
+/// <summary>STUB for the rebound node — where Roll H's MISS lands. The big
+/// dependency several stubs now wait on: an offensive board keeps the SAME
+/// possession (the ~67–70 accounting anchor), a defensive board flips it, and the
+/// Governor's "same team continues" branch hangs off this. No rebound logic lives
+/// here yet — it is a holding pen. Echoes the carried slot, zone, AND the stamped
+/// result so the harness confirms all three per-possession facts rode through. A
+/// real node replaces this without Roll H changing.</summary>
+public sealed class ReboundStub : IContinuationNode
 {
-    public string Receive(Continue continuation)
-    {
-        var slot = continuation.State.SelectedSlot;
-        var zone = continuation.State.ShotType;
-        if (slot is not { } s)
-            return "STUB:ShotResolution:NO_SLOT";   // should never happen; surfaces a bug loud
-        if (zone is not { } z)
-            return $"STUB:ShotResolution:{s.Side}slot{s.Number}:NO_ZONE";   // ditto
-        return $"STUB:ShotResolution:{s.Side}slot{s.Number}:{z}";
-    }
+    public string Receive(Continue continuation) =>
+        ShotFacts.Describe("Rebound", continuation.State);
+}
+
+/// <summary>STUB for the shooting-free-throw node — where Roll H's two foul arms
+/// land (an and-1 on a make, or a shooting foul on a miss). The free-throw COUNT
+/// (and-1 = 1; fouled miss = 2; fouled miss on a three = 3) is DERIVED later from
+/// the stamped (Result, ShotType) pair by the future FT-success roll — this stub
+/// resolves nothing. Kept SEPARATE from <see cref="ResolveFreeThrowsStub"/> (Roll
+/// D's bonus path) for now; possible future unification is an open fork. Echoes
+/// slot, zone, AND result so the harness confirms all three facts rode through.</summary>
+public sealed class ShootingFreeThrowsStub : IContinuationNode
+{
+    public string Receive(Continue continuation) =>
+        ShotFacts.Describe("ShootingFreeThrows", continuation.State);
+}
+
+/// <summary>STUB for the sideline-inbound node — where Roll H's
+/// MissOutOfBoundsRetained lands: the missed shot deflected OOB off the defender,
+/// the offense keeps it and inbounds from the side. MAY eventually share a
+/// loose-ball / inbound node with <see cref="BlockRecoveryStub"/> — flagged, not
+/// merged. Echoes slot, zone, AND result so the harness confirms all three facts
+/// rode through. A real node replaces this without Roll H changing.</summary>
+public sealed class SidelineInboundStub : IContinuationNode
+{
+    public string Receive(Continue continuation) =>
+        ShotFacts.Describe("SidelineInbound", continuation.State);
 }
 
 /// <summary>STUB for the jump-ball resolver (consults the possession arrow).</summary>
 public sealed class JumpBallResolverStub : IContinuationNode
 {
     public string Receive(Continue continuation) => "STUB:JumpBallResolver";
+}
+
+/// <summary>
+/// Shared label-builder for the three post-Roll-H stubs (rebound, shooting free
+/// throws, sideline inbound). Each lands AFTER all three per-possession facts are
+/// stamped (slot by Roll E, zone by Roll G, result by Roll H), so each echoes all
+/// three in the form <c>STUB:{node}:{Side}slot{N}:{Zone}:{Result}</c>, surfacing
+/// any missing fact loud so the harness catches a dropped stamp. Centralized so
+/// the three stubs stay identical in shape.
+/// </summary>
+internal static class ShotFacts
+{
+    public static string Describe(string node, PossessionState state)
+    {
+        var slot = state.SelectedSlot;
+        var zone = state.ShotType;
+        var result = state.Result;
+        if (slot is not { } s)
+            return $"STUB:{node}:NO_SLOT";                          // should never happen; surfaces a bug loud
+        if (zone is not { } z)
+            return $"STUB:{node}:{s.Side}slot{s.Number}:NO_ZONE";   // ditto
+        if (result is not { } r)
+            return $"STUB:{node}:{s.Side}slot{s.Number}:{z}:NO_RESULT"; // ditto
+        return $"STUB:{node}:{s.Side}slot{s.Number}:{z}:{r}";
+    }
 }

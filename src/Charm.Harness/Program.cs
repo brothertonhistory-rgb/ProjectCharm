@@ -14,6 +14,7 @@ internal static class Program
         var cfgE = RollEConfig.Load(configPath);
         var cfgF = RollFConfig.Load(configPath);
         var cfgG = RollGConfig.Load(configPath);
+        var cfgH = RollHConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
@@ -23,6 +24,7 @@ internal static class Program
         var rollEGenerator = new RollEStubPieGenerator(cfgE);
         var rollFGenerator = new RollFStubPieGenerator(cfgF);
         var rollGGenerator = new RollGStubPieGenerator(cfgG);
+        var rollHGenerator = new RollHStubPieGenerator(cfgH);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -35,12 +37,15 @@ internal static class Program
             rollEGenerator,
             rollFGenerator,
             rollGGenerator,
+            rollHGenerator,
             game,
             rng,
             new ResumeInboundStub(),
             new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShotResolutionStub());
+            new ReboundStub(),
+            new ShootingFreeThrowsStub(),
+            new SidelineInboundStub());
 
         var state = new PossessionState(
             PossessionNumber: 1,
@@ -48,7 +53,7 @@ internal static class Program
             Defense: TeamSide.Away,
             Entry: EntryType.DeadBallInbound);
 
-        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E -> F -> G Chain ===\n");
+        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E -> F -> G -> H Chain ===\n");
 
         ShowSamples(cfg, cfgE, rollAGenerator, rollEGenerator, resolver, game, state, rng);
         var ok = BatchCheck(cfg, cfgB, rollAGenerator, rollBGenerator, resolver, state);
@@ -64,6 +69,8 @@ internal static class Program
         ok &= RollFHandoffCheck(cfg, game, state);
         ok &= RollGLocationBatchCheck(cfg, cfgG, rollGGenerator, state);
         ok &= RollGHandoffCheck(cfg, state);
+        ok &= RollHResolutionBatchCheck(cfg, cfgH, rollHGenerator, state);
+        ok &= RollHHandoffCheck(cfg, state);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -171,6 +178,36 @@ internal static class Program
             var s = r.State.SelectedSlot!.Value;
             Console.WriteLine(
                 $"  {s.Side} slot {s.Number} action -> {r.Next}");
+        }
+        Console.WriteLine();
+
+        // Roll H observability: the flat-ish six-way make/miss pie, then a few
+        // sample shots. Each is rolled through the live chain up to H — select a
+        // slot (Roll E), stamp a zone (Roll G) — so each resolved shot carries a
+        // real slot AND zone, and H stamps the result. Shows the six-way outcome,
+        // the zone it resolved against, and where it routes (terminal vs. one of
+        // the three new stubs). This is the first roll that turns a located shot
+        // into a scored/missed outcome.
+        Console.WriteLine("--- Observability: Roll H (make/miss) ---");
+        var configPathH = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var genGForH = new RollGStubPieGenerator(RollGConfig.Load(configPathH));
+        var genH = new RollHStubPieGenerator(RollHConfig.Load(configPathH));
+        var pieH = genH.Generate(state);
+        Console.WriteLine($"  make/miss pie (flat-ish, location-blind, no signal yet): {pieH}");
+        var shotRng = new SystemRng(cfg.Seed);
+        for (var i = 0; i < 8; i++)
+        {
+            // Walk E -> G to deliver a fully-stamped pre-H state, then resolve H.
+            var selectedH = ((Continue)RollE.Execute(state, pieE, game, shotRng)).State;
+            var withZone = ((Continue)RollG.Execute(selectedH, genGForH.Generate(selectedH), shotRng)).State;
+            var hr = RollH.Execute(withZone, pieH, shotRng);
+            var carried = hr switch { Terminal t => t.State, Continue c => c.State, _ => withZone };
+            var s2 = carried.SelectedSlot!.Value;
+            var ending = hr is Terminal term
+                ? $"TERMINAL ({term.Reason})"
+                : $"CONTINUE -> {((Continue)hr).Next}";
+            Console.WriteLine(
+                $"  {s2.Side} slot {s2.Number} {carried.ShotType} shot -> {carried.Result} -> {ending}");
         }
         Console.WriteLine();
     }
@@ -728,12 +765,15 @@ internal static class Program
             genE,
             genF,
             new RollGStubPieGenerator(cfgG),
+            new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
             new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShotResolutionStub());
+            new ReboundStub(),
+            new ShootingFreeThrowsStub(),
+            new SidelineInboundStub());
 
         var pieE = genE.Generate(state);
         var pieF = genF.Generate(state);
@@ -743,7 +783,7 @@ internal static class Program
             ["turnover -> Roll C terminal"] = 0,
             ["foul -> Roll D stub"] = 0,
             ["blocked -> block stub"] = 0,
-            ["shot -> Roll G -> shot-resolution stub"] = 0,
+            ["shot -> Roll G -> Roll H -> resolved"] = 0,
             ["jump ball -> terminal"] = 0,
         };
         var unrecognized = 0;
@@ -757,10 +797,17 @@ internal static class Program
             var d = routing.Destination;
 
             if (d.StartsWith("END:JumpBall")) destClasses["jump ball -> terminal"]++;
+            // Roll H's resolved shot landings (checked BEFORE the generic END:
+            // catch, since Made / MissOutOfBoundsLost are also END: terminals):
+            // a shot now flows F -> G -> H to one of five make/miss destinations.
+            else if (d == "END:Made" || d == "END:MissOutOfBoundsLost"
+                     || d.StartsWith("STUB:Rebound")
+                     || d.StartsWith("STUB:ShootingFreeThrows")
+                     || d.StartsWith("STUB:SidelineInbound"))
+                destClasses["shot -> Roll G -> Roll H -> resolved"]++;
             else if (d.StartsWith("END:")) destClasses["turnover -> Roll C terminal"]++;
             else if (d.StartsWith("STUB:ResumeInbound") || d.StartsWith("STUB:ResolveFreeThrows")) destClasses["foul -> Roll D stub"]++;
             else if (d.StartsWith("STUB:BlockRecovery")) destClasses["blocked -> block stub"]++;
-            else if (d.StartsWith("STUB:ShotResolution")) destClasses["shot -> Roll G -> shot-resolution stub"]++;
             else unrecognized++;
         }
 
@@ -833,16 +880,20 @@ internal static class Program
         return ratesOk && cleanOk;
     }
 
-    // --- Clean handoff: route a batch of IntoShotType exits through the resolver
-    //     and confirm every one lands at the shot-resolution stub with a stamped
-    //     zone AND the carried slot intact, zero unrouted. Isolates the Roll G hop
-    //     exactly as RollFHandoffCheck isolates Roll F: the resolver executes Roll G
-    //     on an IntoShotType continuation, loops on the emitted IntoShotResolution,
-    //     and lands at the stub. A fresh local game + resolver keeps it
-    //     self-contained. ---
+    // --- G->H integration: route a batch of IntoShotType exits through the
+    //     resolver. With Roll H now live, an IntoShotType ticket flows G (stamps a
+    //     zone) -> H (stamps a result) and lands at one of Roll H's five make/miss
+    //     destinations. This check confirms the WHOLE post-shot chain routes:
+    //     zero unrouted, all five destinations reached, and on the three stub
+    //     landings the zone Roll G stamped still rides through (parsed from the
+    //     STUB:{node}:{Side}slot{N}:{Zone}:{Result} label). The two terminal
+    //     landings (Made / MissOutOfBoundsLost) carry no zone in their END: label
+    //     and are counted as terminal landings. (Roll H in isolation is checked by
+    //     RollHHandoffCheck, which feeds IntoShotResolution directly.) A fresh
+    //     local game + resolver keeps it self-contained. ---
     private static bool RollGHandoffCheck(RollAConfig cfg, PossessionState state)
     {
-        Console.WriteLine($"\n--- Clean handoff: {cfg.BatchSize:N0} IntoShotType exits routed through Roll G ---");
+        Console.WriteLine($"\n--- G->H integration: {cfg.BatchSize:N0} IntoShotType exits routed through Roll G then Roll H ---");
         var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
 
         var cfgB = RollBConfig.Load(configPath);
@@ -863,21 +914,34 @@ internal static class Program
             genE,
             new RollFStubPieGenerator(cfgF),
             new RollGStubPieGenerator(cfgG),
+            new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
             new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShotResolutionStub());
+            new ReboundStub(),
+            new ShootingFreeThrowsStub(),
+            new SidelineInboundStub());
 
         var pieE = genE.Generate(state);
 
-        var zonesSeen = new Dictionary<ShotLocation, int>();
-        foreach (var z in Enum.GetValues<ShotLocation>()) zonesSeen[z] = 0;
-        var landed = 0;
+        // The five destinations a shot can land at after G -> H.
+        var destHits = new Dictionary<string, int>
+        {
+            ["END:Made"] = 0,
+            ["END:MissOutOfBoundsLost"] = 0,
+            ["STUB:Rebound"] = 0,
+            ["STUB:ShootingFreeThrows"] = 0,
+            ["STUB:SidelineInbound"] = 0,
+        };
+        // Zone seen on the stub landings (the labels that carry it). Terminals
+        // omit the zone, so they don't contribute here.
+        var zonesSeenOnStubs = new Dictionary<ShotLocation, int>();
+        foreach (var z in Enum.GetValues<ShotLocation>()) zonesSeenOnStubs[z] = 0;
+
         var unrecognized = 0;
-        var missingZone = 0;
-        var missingSlot = 0;
+        var missingFact = 0;   // any NO_SLOT / NO_ZONE / NO_RESULT on a stub landing
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
@@ -885,37 +949,266 @@ internal static class Program
             // IntoShotType continuation — exactly what Roll F emits on a ShotAttempt.
             var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
             var shotTicket = new Continue(ContinuationKind.IntoShotType, selected);
-            var routing = resolver.Route(shotTicket);
-            var d = routing.Destination;
+            var d = resolver.Route(shotTicket).Destination;
 
-            if (!d.StartsWith("STUB:ShotResolution")) { unrecognized++; continue; }
-            if (d.EndsWith("NO_SLOT")) { missingSlot++; continue; }
-            if (d.EndsWith("NO_ZONE")) { missingZone++; continue; }
+            if (d == "END:Made") { destHits["END:Made"]++; continue; }
+            if (d == "END:MissOutOfBoundsLost") { destHits["END:MissOutOfBoundsLost"]++; continue; }
 
-            // Destination shape: STUB:ShotResolution:{Side}slot{N}:{Zone}
-            var zoneText = d[(d.LastIndexOf(':') + 1)..];
-            if (Enum.TryParse<ShotLocation>(zoneText, out var z)) { zonesSeen[z]++; landed++; }
+            // The three stub landings: STUB:{node}:{Side}slot{N}:{Zone}:{Result}
+            string node;
+            if (d.StartsWith("STUB:Rebound")) node = "STUB:Rebound";
+            else if (d.StartsWith("STUB:ShootingFreeThrows")) node = "STUB:ShootingFreeThrows";
+            else if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
+            else { unrecognized++; continue; }
+
+            if (d.EndsWith("NO_SLOT") || d.EndsWith("NO_ZONE") || d.EndsWith("NO_RESULT"))
+            {
+                missingFact++;
+                continue;
+            }
+
+            // Zone is the second-to-last colon token; result is the last.
+            var parts = d.Split(':');
+            var zoneText = parts[^2];
+            if (Enum.TryParse<ShotLocation>(zoneText, out var z)) { zonesSeenOnStubs[z]++; destHits[node]++; }
             else unrecognized++;
         }
 
-        Console.WriteLine($"  landed at shot-resolution stub: {landed:N0}");
+        var landed = destHits.Values.Sum();
+        Console.WriteLine($"  landed past G->H: {landed:N0}");
+        Console.WriteLine("  destinations reached:");
+        var allDests = true;
+        foreach (var (label, count) in destHits)
+        {
+            var hit = count > 0;
+            allDests &= hit;
+            Console.WriteLine($"    {label,-26} {count,8:N0}  {(hit ? "ok" : "NONE")}");
+        }
+
         var allZones = true;
-        Console.WriteLine("  all five zones rode through to the stub:");
+        Console.WriteLine("  all five zones rode through to the stub landings:");
         foreach (var z in Enum.GetValues<ShotLocation>())
         {
-            var hit = zonesSeen[z] > 0;
+            var hit = zonesSeenOnStubs[z] > 0;
             allZones &= hit;
-            Console.WriteLine($"    {z,-6} {zonesSeen[z],8:N0}  {(hit ? "ok" : "NONE")}");
+            Console.WriteLine($"    {z,-6} {zonesSeenOnStubs[z],8:N0}  {(hit ? "ok" : "NONE")}");
         }
 
         var routedOk = unrecognized == 0;
-        var slotOk = missingSlot == 0;
-        var zoneOk = missingZone == 0;
+        var factOk = missingFact == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  slot intact on every exit: missing={missingSlot} -> {(slotOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  zone stamped on every exit: missing={missingZone} -> {(zoneOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  all five zones reached the stub: {(allZones ? "ok" : "FAIL")}");
+        Console.WriteLine($"  slot+zone+result intact on every stub landing: missing={missingFact} -> {(factOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all five G->H destinations reached: {(allDests ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all five zones reached the stub landings: {(allZones ? "ok" : "FAIL")}");
 
-        return routedOk && slotOk && zoneOk && allZones;
+        return routedOk && factOk && allDests && allZones;
+    }
+
+    // --- Batch: Roll H's six-way make/miss distribution converges within
+    //     tolerance, every exit carries a stamped Result matching the rolled
+    //     outcome (no exit leaves Result null), and the prior two facts
+    //     (SelectedSlot, ShotType) plus the new Result all ride through. The pie is
+    //     flat-ish, location-blind (no signal); a future attribute generator tilts
+    //     it without this roll changing. Mirrors RollGLocationBatchCheck — Roll H
+    //     is direct-executed here (the resolver wiring is exercised by the handoff
+    //     check below). The state fed in already carries a real slot (Roll E) and a
+    //     real zone (Roll G), as it would in the live chain. ---
+    private static bool RollHResolutionBatchCheck(
+        RollAConfig cfg, RollHConfig cfgH, RollHStubPieGenerator genH, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} shots through Roll H (flat-ish six-way pie) ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var rng = new SystemRng(cfg.Seed);
+
+        // Build a fully-stamped pre-H state: select a slot (Roll E) and stamp a zone
+        // (Roll G), exactly as the live chain delivers to Roll H.
+        var cfgD = RollDConfig.Load(configPath);
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var genE = new RollEStubPieGenerator(RollEConfig.Load(configPath));
+        var genG = new RollGStubPieGenerator(RollGConfig.Load(configPath));
+        var selected = ((Continue)RollE.Execute(state, genE.Generate(state), game, rng)).State;
+        var preH = ((Continue)RollG.Execute(selected, genG.Generate(selected), rng)).State;
+
+        var pieH = genH.Generate(preH);
+
+        var counts = new Dictionary<ShotResult, int>();
+        foreach (var o in Enum.GetValues<ShotResult>()) counts[o] = 0;
+
+        var anomalies = 0;       // exit whose stamped Result is null or mismatched
+        var rideThroughFail = 0; // slot / zone / result not all present on the carried state
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var result = RollH.Execute(preH, pieH, rng);
+
+            // Pull the carried state and the stamped result off either arm.
+            var carried = result switch
+            {
+                Terminal t => t.State,
+                Continue c => c.State,
+                _ => throw new InvalidOperationException("Unknown Roll H result.")
+            };
+
+            if (carried.Result is not { } stamped) { anomalies++; continue; }
+
+            // The stamped Result must match the routing arm taken.
+            var expectedTerminal = stamped is ShotResult.Made or ShotResult.MissOutOfBoundsLost;
+            var isTerminal = result is Terminal;
+            if (expectedTerminal != isTerminal) anomalies++;
+
+            // All three per-possession facts must ride through.
+            if (carried.SelectedSlot is null || carried.ShotType is null || carried.Result is null)
+                rideThroughFail++;
+
+            counts[stamped]++;
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll H outcomes:");
+        foreach (var (outcome, weight) in pieH.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-24} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        var cleanOk = anomalies == 0;
+        var rideOk = rideThroughFail == 0;
+        Console.WriteLine($"\n  every exit a stamped Result matching its arm: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  slot+zone+result ride through every exit: fails={rideThroughFail} -> {(rideOk ? "ok" : "FAIL")}");
+
+        return ratesOk && cleanOk && rideOk;
+    }
+
+    // --- Clean handoff: route a batch of IntoShotResolution exits through the
+    //     resolver and confirm every one lands at its intended Roll H destination,
+    //     with zero unrouted: Made -> terminal, MissOutOfBoundsLost -> terminal,
+    //     Miss -> rebound stub, MadeAndFouled/MissFouled -> shooting-FT stub,
+    //     MissOutOfBoundsRetained -> sideline-inbound stub. Isolates the Roll H hop
+    //     exactly as RollGHandoffCheck isolated Roll G: the resolver executes Roll H
+    //     on an IntoShotResolution continuation (carrying a real slot + zone) and
+    //     lands at a terminal or one of the three new stubs. On the stub landings
+    //     it confirms slot, zone, AND result all rode through. A fresh local game +
+    //     resolver keeps it self-contained. ---
+    private static bool RollHHandoffCheck(RollAConfig cfg, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Clean handoff: {cfg.BatchSize:N0} IntoShotResolution exits routed through Roll H ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+
+        var cfgB = RollBConfig.Load(configPath);
+        var cfgC = RollCConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+        var cfgE = RollEConfig.Load(configPath);
+        var cfgF = RollFConfig.Load(configPath);
+        var cfgG = RollGConfig.Load(configPath);
+
+        var rng = new SystemRng(cfg.Seed);
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var genE = new RollEStubPieGenerator(cfgE);
+        var genG = new RollGStubPieGenerator(cfgG);
+
+        var resolver = new Resolver(
+            new RollBStubPieGenerator(cfgB),
+            new RollCStubPieGenerator(cfgC),
+            new RollDStubPieGenerator(cfgD),
+            genE,
+            new RollFStubPieGenerator(cfgF),
+            genG,
+            new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+            game,
+            rng,
+            new ResumeInboundStub(),
+            new ResolveFreeThrowsStub(),
+            new BlockRecoveryStub(),
+            new ReboundStub(),
+            new ShootingFreeThrowsStub(),
+            new SidelineInboundStub());
+
+        var pieE = genE.Generate(state);
+
+        var destHits = new Dictionary<string, int>
+        {
+            ["END:Made"] = 0,
+            ["END:MissOutOfBoundsLost"] = 0,
+            ["STUB:Rebound"] = 0,
+            ["STUB:ShootingFreeThrows"] = 0,
+            ["STUB:SidelineInbound"] = 0,
+        };
+        var resultsSeenOnStubs = new Dictionary<ShotResult, int>();
+        foreach (var r in Enum.GetValues<ShotResult>()) resultsSeenOnStubs[r] = 0;
+
+        var unrecognized = 0;
+        var missingFact = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            // Select a slot (Roll E) and stamp a zone (Roll G), then hand the
+            // resolver a clean IntoShotResolution continuation — exactly what Roll G
+            // emits — to isolate the Roll H hop.
+            var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
+            var withZone = ((Continue)RollG.Execute(selected, genG.Generate(selected), rng)).State;
+            var shotTicket = new Continue(ContinuationKind.IntoShotResolution, withZone);
+            var d = resolver.Route(shotTicket).Destination;
+
+            if (d == "END:Made") { destHits["END:Made"]++; continue; }
+            if (d == "END:MissOutOfBoundsLost") { destHits["END:MissOutOfBoundsLost"]++; continue; }
+
+            string node;
+            if (d.StartsWith("STUB:Rebound")) node = "STUB:Rebound";
+            else if (d.StartsWith("STUB:ShootingFreeThrows")) node = "STUB:ShootingFreeThrows";
+            else if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
+            else { unrecognized++; continue; }
+
+            if (d.EndsWith("NO_SLOT") || d.EndsWith("NO_ZONE") || d.EndsWith("NO_RESULT"))
+            {
+                missingFact++;
+                continue;
+            }
+
+            // Result is the last colon token on a stub landing.
+            var resultText = d[(d.LastIndexOf(':') + 1)..];
+            if (Enum.TryParse<ShotResult>(resultText, out var r)) { resultsSeenOnStubs[r]++; destHits[node]++; }
+            else unrecognized++;
+        }
+
+        var landed = destHits.Values.Sum();
+        Console.WriteLine($"  landed past Roll H: {landed:N0}");
+        Console.WriteLine("  destinations reached:");
+        var allDests = true;
+        foreach (var (label, count) in destHits)
+        {
+            var hit = count > 0;
+            allDests &= hit;
+            Console.WriteLine($"    {label,-26} {count,8:N0}  {(hit ? "ok" : "NONE")}");
+        }
+
+        // The three continue-outcomes that reach a stub: Miss -> Rebound,
+        // MadeAndFouled + MissFouled -> ShootingFreeThrows, MissOutOfBoundsRetained
+        // -> SidelineInbound. Confirm each rode its result through.
+        var continueResults = new[]
+        {
+            ShotResult.MadeAndFouled, ShotResult.Miss,
+            ShotResult.MissFouled, ShotResult.MissOutOfBoundsRetained
+        };
+        var allResults = true;
+        Console.WriteLine("  each continue-outcome's result rode through to its stub:");
+        foreach (var r in continueResults)
+        {
+            var hit = resultsSeenOnStubs[r] > 0;
+            allResults &= hit;
+            Console.WriteLine($"    {r,-24} {resultsSeenOnStubs[r],8:N0}  {(hit ? "ok" : "NONE")}");
+        }
+
+        var routedOk = unrecognized == 0;
+        var factOk = missingFact == 0;
+        Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  slot+zone+result intact on every stub landing: missing={missingFact} -> {(factOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all five Roll H destinations reached: {(allDests ? "ok" : "FAIL")}");
+        Console.WriteLine($"  every continue-outcome's result reached its stub: {(allResults ? "ok" : "FAIL")}");
+
+        return routedOk && factOk && allDests && allResults;
     }
 }

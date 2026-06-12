@@ -210,7 +210,7 @@ paths Roll A already has.
 
 ---
 
-## Verified routing map (audited from source, post Roll G)
+## Verified routing map (audited from source, post Roll H)
 
 The engine is NOT a single chain — it is a spine of action rolls draining into a
 small set of SHARED sink nodes. "Many feeders, one node" is the actual wiring, not
@@ -227,7 +227,8 @@ switch.
 | **D** Foul | (bonus state read) None / OneAndOne / Double | ResumeInbound stub / ResolveFreeThrows stub |
 | **E** Selection | one slot (flat 5-way) | Roll F (live) |
 | **F** Player action | ShotAttempt / Turnover / NonShootingFoul / Blocked / JumpBall | Roll G (live) / C / D / BlockRecovery stub / jump-ball node |
-| **G** Shot location | Three / Long / Mid / Short / Rim (flat-ish 5-way) | ShotResolution stub (all five) |
+| **G** Shot location | Three / Long / Mid / Short / Rim (flat-ish 5-way) | Roll H (live, all five) |
+| **H** Make/miss | Made / MadeAndFouled / Miss / MissFouled / MissOutOfBoundsLost / MissOutOfBoundsRetained (flat-ish 6-way, location-blind) | **TERMINAL** ×2 (Made, MissOutOfBoundsLost) / ShootingFreeThrows stub ×2 (MadeAndFouled, MissFouled) / Rebound stub (Miss) / SidelineInbound stub (MissOutOfBoundsRetained) |
 | **jump-ball node** | arrow read (or `Off` tip coin-flip) | **TERMINAL** (resolves + flips arrow) |
 
 Shared sinks and their feeders (current):
@@ -236,15 +237,25 @@ Shared sinks and their feeders (current):
 - **Jump-ball node:** fed by A (JumpBall), B (JumpBall), and F (JumpBall) — all three live.
 
 True terminals today: Roll A's three violation terminals (ShotClockViolation,
-FiveSecondInbound, TenSecondBackcourt), all five Roll C slices, and the jump-ball
-resolution. Everything else is a Continue that currently ends at a stub
-(`ResumeInbound`, `ResolveFreeThrows`, `ResolveBlock`, `IntoShotResolution`).
+FiveSecondInbound, TenSecondBackcourt), all five Roll C slices, the jump-ball
+resolution, and now Roll H's two terminals (Made, MissOutOfBoundsLost — a clean
+basket and a miss-out-of-bounds-off-offense, the possession's two cleanest ends).
+Everything else is a Continue that currently ends at a stub (`ResumeInbound`,
+`ResolveFreeThrows`, `ResolveBlock`, `ResolveRebound`, `ResolveShootingFreeThrows`,
+`ResolveSidelineInbound`). `IntoShotResolution` is no longer a dead-end stub — it
+is now live and runs Roll H.
 
-The live spine A → B → E → F → G now resolves the player's action AND stamps the
-shot's location, then dead-ends at the `IntoShotResolution` stub (a located shot got
-off) or the `ResolveBlock` stub (it was blocked). Roll F is the third feeder into C
-and D and the third feeder into the jump-ball node; Roll G adds no new feeders — like
-Roll E it stamps one fact and continues to a single next beat.
+The live spine A → B → E → F → G → H now resolves the player's action, stamps the
+shot's location, AND resolves make/miss — the first time a possession produces a
+scored or missed shot. It dead-ends at Roll H's two terminals or at one of three
+new continue-stubs: `ResolveRebound` (a live miss — the big dependency), 
+`ResolveShootingFreeThrows` (a shooting foul, kept SEPARATE from Roll D's bonus
+`ResolveFreeThrows` for now — see Roll H), or `ResolveSidelineInbound` (a miss
+deflected out off the defender, offense retains). Roll F remains the third feeder
+into C and D and the third feeder into the jump-ball node; Rolls G and H add no new
+feeders — like Roll E, each stamps one fact and continues to a single next beat
+(H's "next beat" fans into its mixed terminals/stubs, but it is still one roll, one
+draw, one stamp).
 
 ---
 
@@ -838,8 +849,72 @@ accidental early rebound system; it lands later, next to rebounds.
 | D | Non-Shooting Defensive Foul | Built (stubbed flavor generator + stubbed successors) |
 | E | Player Selection | Built (flat stubbed generator; feeds Roll F) |
 | F | Player Action | Built (flat-ish stubbed generator, no wire; shot exit now feeds live Roll G, block exit stubbed) |
-| G | Shot Location | Built (flat-ish stubbed generator, no wire; stamps ShotType; feeds make/miss stub — future Roll H) |
+| G | Shot Location | Built (flat-ish stubbed generator, no wire; stamps ShotType; shot now feeds live Roll H) |
+| H | Make/Miss | Built (flat-ish stubbed generator, no wire, location-blind; stamps Result; mixed terminals + 3 new continue-stubs) |
 | — | Jump ball (arrow node) | Built (50/50 tip placeholder; fed by A, B, F) |
+
+## Roll H — Make/Miss
+
+Roll H is the beat right after a shot's location is stamped: it resolves the
+located shot into one of six outcomes and stamps that outcome as the THIRD durable
+per-possession fact (`PossessionState.Result`), after Roll E's `SelectedSlot` and
+Roll G's `ShotType`. It is the first roll in the whole engine that turns a
+possession into a scored or missed shot — the point of the funnel everything above
+has been draining toward.
+
+**Structurally a weld of three earlier rolls.** Nothing about Roll H is novel
+architecture; it is the established patterns combined:
+- **Roll F's gate skeleton** — a switch over the rolled outcome, one arm per slice.
+- **Roll A's mixed ends** — some arms are `Terminal` (the possession ends), some are
+  `Continue`. Roll H is the first roll since A to mix the two: Roll C is all-terminal,
+  Rolls B/E/F/G are all-continue. Made and MissOutOfBoundsLost end the possession;
+  the other four continue.
+- **Roll G's stamp-a-fact** — it writes its own outcome onto the carried state via a
+  `with`-expression before routing, exactly as Roll G stamped `ShotType`. Both
+  terminals carry the stamped state too, so the future Governor reads `Result` +
+  `ShotType` off the terminal, not just off the continues.
+
+**The six outcomes (declaration order, settled):** `Made` → TERMINAL; `MadeAndFouled`
+(and-1) → `ResolveShootingFreeThrows`; `Miss` → `ResolveRebound`; `MissFouled` →
+`ResolveShootingFreeThrows`; `MissOutOfBoundsLost` → TERMINAL; `MissOutOfBoundsRetained`
+→ `ResolveSidelineInbound`. Placeholder weights are location-blind (a cross-zone
+average, not per-zone FG%): Made .43 / MadeAndFouled .03 / Miss .47 / MissFouled .04 /
+MissOutOfBoundsLost .02 / MissOutOfBoundsRetained .01.
+
+**Point value and free-throw count are DOWNSTREAM derivations, not stored.** Roll H
+records only WHICH of the six outcomes happened. Whether a make is worth 2 or 3, and
+whether a shooting foul yields 1 / 2 / 3 free throws, are derived later from the
+`(Result, ShotType)` pair by the scoring and free-throw layers. Roll H computes no
+points, charges no fouls, and tracks no stats — the same scope discipline that kept
+Roll G from resolving makes. Because of this it reads nothing off `GameState` and
+takes no `GameState` (signature `(state, pie, rng)`, like F and G).
+
+**It reads no stamps either.** Roll H does not inspect `SelectedSlot` or `ShotType`;
+they ride forward untouched. The intuition that "make/miss should read both stamps"
+is correct — but that belongs to Roll H's deferred GENERATOR, which will read the
+shooter-vs-defender matchup (and the other-four gravity term, the skill/athleticism
+gates, the bounded logistic make-% mapping) to tilt the pie. The roll itself reads
+only its pie. This is the same seam every roll since E has had: a smarter generator
+drops in later, handing H a non-flat pie over the same enum, with no change to Roll H
+or the resolver.
+
+**Shot quality is a percentage, not a slice.** A great look and a poor look differ
+only in the make/miss probability (folded into the deferred generator), never as a
+stored open/contested or assisted/unassisted value. Keeping quality out of the enum is
+what lets the attribute model express purely through the odds.
+
+**Three new continue-stubs, and an open fork.** Roll H's non-terminal arms land at
+three new holding-pen stubs: `ReboundStub` (the big dependency — an offensive board
+keeps the SAME possession, a defensive board flips it; the rebound system is designed
+but unbuilt), `ShootingFreeThrowsStub`, and `SidelineInboundStub`. The shooting-foul
+node is deliberately kept SEPARATE from Roll D's bonus `ResolveFreeThrows` node,
+because the shot-count rules differ (and-1 vs. fouled-miss vs. bonus). Whether the two
+free-throw paths later unify into one FT-resolution node is an OPEN FORK — flagged,
+not decided. `SidelineInboundStub` may likewise eventually share a loose-ball / inbound
+node with block recovery — also flagged, not merged.
+
+**Config lives separately.** Roll H's six weights live in the `"RollH"` section of
+`config.json`, loaded by `RollHConfig`.
 
 ## The Game Governor — the possession-to-possession layer (DESIGNED, not built)
 
