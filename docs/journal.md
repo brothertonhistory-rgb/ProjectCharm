@@ -1,3 +1,70 @@
+## Session 13 — Relocate Block (Roll F → Roll H, zone-weighted) (2026-06-12)
+
+**Moved.** `Blocked` left Roll F and became the seventh outcome of Roll H. A block
+depends on WHERE the shot comes from (rim attempts get swatted far more than
+threes), and the zone does not exist until Roll G stamps it — so block physically
+could not be location-weighted where it used to live. Roll H sits after Roll G with
+the zone already on the shot object, so it can read it. This is wiring up data that
+was already flowing.
+
+**Roll F (now four-way).** Dropped to `ShotAttempt` 85.5% / `Turnover` 9% /
+`NonShootingFoul` 5% / `JumpBall` 0.5%. The old `Blocked` weight (3.5%) folded into
+`ShotAttempt`. `Blocked` removed from `PlayerActionOutcome`. Roll F no longer emits
+`ResolveBlock`.
+
+**Roll H (now seven-way; block zone-aware).** `Blocked` added to `ShotResult`
+(appended last) and to H's pie. The generator now reads the stamped zone and sizes a
+per-zone block weight `b(zone)` — Rim 12%, Short 6%, Mid 3%, Long 2%, Three 1% —
+carving it off the top and scaling the six make/miss outcomes by `(1 − b(zone))`.
+Within a zone the make/miss SHAPE is unchanged except for the block carve-out; the
+six stay location-blind. Config holds one shared six-way shape + five block numbers
+(not a 35-number per-zone table). Every zone's pie sums to 1 by construction for any
+b in [0, 1). Blended block rate over Roll G's zone mix = **5.68%** (up from the old
+flat 3.5%).
+
+**Routing.** `Blocked` routes `Continue(ResolveBlock)` → the existing
+`BlockRecoveryStub`. The resolver's `ResolveBlock` edge is keyed on the continuation
+kind, NOT the source roll, so it was left untouched — Session 13 only moved the FEED
+point from F to H. `ContinuationKind.ResolveBlock` reused; no new continuation kind.
+`BlockRecoveryStub` upgraded from slot-only to `ShotFacts.Describe`
+(`slot:zone:result`), since block now lands fact-complete after Roll H like the other
+post-H stubs. Block routing is zone-BLIND even though block weight is zone-aware:
+every block lands at the same node.
+
+**Harness.**
+- `RollFActionBatchCheck`: four-way now; dropped the block bucket.
+- `RollFHandoffCheck`: dropped the "blocked → block stub" destination (block no
+  longer flows through F); four F exits.
+- `RollGHandoffCheck` / `RollHHandoffCheck`: added `STUB:BlockRecovery` as a sixth
+  destination; `Blocked` added to the result-ride-through set.
+- `RollHResolutionBatchCheck`: rewritten to vary the zone per draw (walk Roll G fresh
+  each iteration) and check the seven OBSERVED rates against ZONE-BLENDED expectations
+  (blended block = Σ P(zone)·b(zone); each make/miss = base × (1 − blended)). Adds a
+  per-zone block readout proving the gradient (Rim ≫ Three) plus a
+  blended-rate-vs-target line. Per-zone gate uses 3× tolerance (a single zone's block
+  sample is small); the hard gates are the gradient and the blended rate.
+- Roll H observability: prints the per-zone block weights and generates the pie per
+  sample shot's zone.
+
+**Decided.** Only block is zone-aware this pass — Make/Miss and the foul outcomes
+stay location-blind by design; per-zone shooting percentages are a separate future
+tuning pass. Block WEIGHT is zone-aware but block ROUTING is zone-blind: weighting
+(how often) and routing (what next) are different concerns.
+
+**Left stubbed / deferred.**
+- The block-recovery roll itself (replaces `BlockRecoveryStub`; may later feed
+  rebounds — its own call, a later session).
+- Per-zone make/miss shooting-% tuning (the six outcomes are still one shared shape).
+- The attribute-driven Roll H generator (the deferred matchup model).
+
+**Verified (SDK-less sandbox: pie arithmetic + Monte Carlo of the rewritten checks;
+live harness is Emmett's machine).** Every zone's seven-way pie sums to exactly 1;
+gradient monotonic; blended block 5.68%. Monte Carlo: seven blended rates, per-zone
+block, gradient, and blended target all pass within tolerance. No orphaned `Blocked` /
+`BaseBlocked` references; code-only braces and parens balance across all 12 files.
+
+---
+
 ## Session 12 — Engine folder reorganization (2026-06-12)
 
 Pure organizational refactor of `Charm.Engine`: sorted the flat ~43-file pile into four by-kind folders. **No behavior changes.** In C#, folder layout is purely cosmetic — files keep the `Charm.Engine` namespace regardless of folder, and the SDK-style project globs `.cs` recursively, so no `.csproj` edits and no harness changes. Moved with `git mv` so history follows each file.

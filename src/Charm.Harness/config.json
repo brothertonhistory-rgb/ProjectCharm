@@ -52,10 +52,9 @@
   },
 
   "RollF": {
-    "BaseShotAttempt": 0.82,
+    "BaseShotAttempt": 0.855,
     "BaseTurnover": 0.09,
     "BaseNonShootingFoul": 0.05,
-    "BaseBlocked": 0.035,
     "BaseJumpBall": 0.005,
     "Epsilon": 1e-9
   },
@@ -76,6 +75,11 @@
     "BaseMissFouled": 0.04,
     "BaseMissOutOfBoundsLost": 0.02,
     "BaseMissOutOfBoundsRetained": 0.01,
+    "BlockRim": 0.12,
+    "BlockShort": 0.06,
+    "BlockMid": 0.03,
+    "BlockLong": 0.02,
+    "BlockThree": 0.01,
     "Epsilon": 1e-9
   }
 }

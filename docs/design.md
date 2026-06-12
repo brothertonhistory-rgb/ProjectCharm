@@ -1005,3 +1005,45 @@ possession from Roll A) becomes buildable.
   Likely a sibling of Roll A.
 - **Height-driven tip contest** — replaces the jump-ball node's 50/50 placeholder
   once a player/attribute layer exists (S-curve on centers' height differential).
+
+---
+
+## Block location: why block lives in Roll H, not Roll F (Session 13)
+
+A block is not a property of the player's ACTION; it is a property of the SHOT —
+specifically where the shot comes from. Rim attempts get swatted far more than
+perimeter jumpers, and threes almost never. So a single flat block rate at the action
+beat (where Roll F sits, before any zone exists) is physically the wrong place: it
+cannot see the one variable that drives block frequency.
+
+Roll F decides the action BEFORE Roll G assigns the zone. Roll H sits AFTER Roll G,
+with the zone already stamped on the shot object. So block belongs in Roll H, where
+the variable it depends on already exists. This is the same "signal flows one
+direction, consumed where it is available" discipline the funnel is built on — we did
+not reach backward to teach Roll F about zones; we moved block forward to where the
+zone already rides. Because block left Roll F entirely, block happens exactly once,
+with no double-count risk.
+
+The block weight is carved off the top of Roll H's pie per zone (Rim highest, Three
+lowest); the six make/miss outcomes keep their relative proportions, scaled by
+(1 − b(zone)). This keeps config to one shared six-way shape plus five block numbers,
+rather than a 35-number per-zone make/miss table — only the axis that genuinely varies
+by zone THIS pass (block) is made zone-aware. Per-zone make/miss percentages are a
+deliberately separate future pass; folding them in now would crystallize a per-zone
+shooting model before we are ready to calibrate it.
+
+Block routing stays zone-blind even though block weighting is zone-aware: every block,
+from any zone, lands at the same block-recovery node. Weighting and routing are
+different concerns — how OFTEN a block happens depends on the zone; what happens AFTER
+does not.
+
+The block weights are best-guess placeholders. The general philosophy holds: give our
+best guess, keep it in editable config (one `BlockWeight(zone)` lookup, read by both
+the generator and the harness's blended-rate math), and calibrate later against the
+harness's zone-blended readout.
+
+**Forthcoming — the block-recovery roll.** `BlockRecoveryStub` is a parked
+placeholder. A future block-recovery roll will replace it (the live-ball scramble:
+out of bounds off either team, or recovered by either team) and may at that point feed
+the rebound system — its own decision, a later session. It MAY also share a loose-ball
+/ inbound node with the sideline-inbound stub — flagged, not merged.

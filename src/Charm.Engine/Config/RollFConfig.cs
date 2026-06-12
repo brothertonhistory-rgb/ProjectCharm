@@ -11,11 +11,13 @@ namespace Charm.Engine;
 public sealed class RollFConfig
 {
     // --- Stub pie base weights (placeholders; the real attribute-driven
-    //     generator will replace these). Kept summing to 1 for clarity. ---
-    public double BaseShotAttempt { get; set; } = 0.82;
+    //     generator will replace these). Kept summing to 1 for clarity.
+    //     NOTE (Session 13): Blocked left Roll F — block is now a per-zone slice
+    //     of Roll H (it depends on WHERE the shot comes from, which only exists
+    //     after Roll G). The old 3.5% block weight folded into ShotAttempt. ---
+    public double BaseShotAttempt { get; set; } = 0.855;
     public double BaseTurnover { get; set; } = 0.09;
     public double BaseNonShootingFoul { get; set; } = 0.05;
-    public double BaseBlocked { get; set; } = 0.035;
     public double BaseJumpBall { get; set; } = 0.005;
 
     // No live-wire scalar (unlike Roll B's physicality and Roll C's pressure):

@@ -9,10 +9,16 @@ namespace Charm.Engine;
 /// Roll F is a flat GATE, exactly like Roll B: every outcome is a CONTINUE,
 /// because each one has downstream work. THREE route to nodes that already
 /// exist (turnover, foul, jump ball — the "many feeders, one node" payoff);
-/// TWO open new pipes (blocked, shot attempt). What TILTS these odds — the
-/// handle, the defender's hands/length, rim protection, shot selection — is the
-/// deferred player/attribute model, delivered later as a smarter generator. The
-/// roll never changes when that lands.
+/// ONE opens the shot pipe (shot attempt -> Roll G). What TILTS these odds — the
+/// handle, the defender's hands/length, shot selection — is the deferred
+/// player/attribute model, delivered later as a smarter generator. The roll
+/// never changes when that lands.
+///
+/// NOTE (Session 13): the block USED to live here as a fifth outcome, but a
+/// block depends on WHERE the shot comes from (rim attempts get swatted far more
+/// than threes), and that zone does not exist until Roll G. So Blocked moved to
+/// Roll H (make/miss), where it is a per-zone weighted slice. Roll F's old block
+/// weight folded into ShotAttempt.
 /// </summary>
 public enum PlayerActionOutcome
 {
@@ -35,12 +41,6 @@ public enum PlayerActionOutcome
     /// SEPARATE home in the future make/miss roll (Roll H) — kept apart on
     /// purpose.</summary>
     NonShootingFoul,
-
-    /// <summary>The attempt is blocked. -> CONTINUE (to the new block-recovery
-    /// node). A block is a LIVE-BALL event with its own fan-out (out of bounds
-    /// off defense / off offense / scramble recovered by either team), so it is
-    /// a continue into its own future roll, NOT a terminal.</summary>
-    Blocked,
 
     /// <summary>A tie-up / held ball at the action beat (trapped handler, gang
     /// rebound). -> CONTINUE (to the existing jump-ball node, via the possession

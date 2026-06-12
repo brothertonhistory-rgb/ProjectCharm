@@ -2,10 +2,11 @@ namespace Charm.Engine;
 
 /// <summary>
 /// Roll H — Make/Miss. The beat right after a shot's location is stamped (Roll G's
-/// IntoShotResolution): resolves the located shot into one of six outcomes —
+/// IntoShotResolution): resolves the located shot into one of seven outcomes —
 /// made, made-and-fouled (and-1), miss, miss-and-fouled, miss-out-of-bounds-lost,
-/// or miss-out-of-bounds-retained — stamps that outcome onto the possession, then
-/// either ends the possession (Terminal) or hands off to the right downstream node.
+/// miss-out-of-bounds-retained, or blocked — stamps that outcome onto the
+/// possession, then either ends the possession (Terminal) or hands off to the
+/// right downstream node.
 ///
 /// Structurally a WELD of three earlier rolls:
 ///   - Roll F's GATE skeleton: switch on the rolled outcome, route each arm.
@@ -22,7 +23,9 @@ namespace Charm.Engine;
 /// or ShotType. Those ride forward on the carried state untouched. (The
 /// "H reads both stamps" idea is forward-looking — that belongs to H's deferred
 /// GENERATOR, which will read the shooter-vs-defender matchup to tilt make/miss.
-/// This skeleton reads only its pie.)
+/// This skeleton reads only its pie. As of Session 13 the GENERATOR does read one
+/// stamp — the shot ZONE — but only to size the block slice per zone; the roll
+/// itself still reads nothing but the finished pie handed to it.)
 ///
 /// What it does NOT do (the #1 scope firewall): it computes NO points, charges NO
 /// fouls, tracks NO stats, and resolves NO free throws or rebounds. The 2/3 point
@@ -89,6 +92,15 @@ public static class RollH
             // node (stub). Offense keeps it, inbounds from the side.
             ShotResult.MissOutOfBoundsRetained =>
                 new Continue(ContinuationKind.ResolveSidelineInbound, stamped),
+
+            // Blocked -> CONTINUE to the block-recovery node (stub). A live-ball
+            // event with its own future fan-out. The block weight is per-zone
+            // (carved off the top of H's pie by the generator), but the ROUTING is
+            // zone-blind: every block lands at the same recovery node. Reuses
+            // ResolveBlock — the same continuation kind and resolver edge Roll F
+            // used to emit; Session 13 just moved the feed point from F to H.
+            ShotResult.Blocked =>
+                new Continue(ContinuationKind.ResolveBlock, stamped),
 
             _ => throw new InvalidOperationException($"Unhandled shot result '{outcome}'.")
         };

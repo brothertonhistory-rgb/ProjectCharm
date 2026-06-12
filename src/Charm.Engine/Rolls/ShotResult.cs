@@ -49,5 +49,15 @@ public enum ShotResult
     /// defender. -> CONTINUE to the sideline-inbound node: the offense keeps it and
     /// inbounds from the side. (This node MAY eventually share a loose-ball /
     /// inbound node with block recovery — flagged, not merged.)</summary>
-    MissOutOfBoundsRetained
+    MissOutOfBoundsRetained,
+
+    /// <summary>The shot is blocked. -> CONTINUE to the block-recovery node. A
+    /// LIVE-BALL event with its own future fan-out (out of bounds off defense /
+    /// off offense / scramble recovered by either team). Added in Session 13 when
+    /// the block moved out of Roll F: a block depends on the shot's ZONE (rim
+    /// attempts get swatted far more than threes), and the zone only exists here,
+    /// after Roll G — so the block weight is carved per-zone off the top of this
+    /// pie (Rim highest, Three lowest), and the other six outcomes keep their
+    /// relative proportions, scaled by (1 − blockWeight).</summary>
+    Blocked
 }

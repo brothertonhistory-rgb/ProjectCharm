@@ -2,9 +2,10 @@ namespace Charm.Engine;
 
 /// <summary>
 /// Stub pie generator for Roll F. Returns the configured base weights as a
-/// finished five-way pie over <see cref="PlayerActionOutcome"/>. Realistic
+/// finished four-way pie over <see cref="PlayerActionOutcome"/>. Realistic
 /// placeholder weights this session, and — like Roll E — with NO live-wire
-/// scalar.
+/// scalar. (Block left Roll F in Session 13 — it is now a per-zone slice of
+/// Roll H — so the old fifth slice folded into ShotAttempt.)
 ///
 /// Why no live wire (unlike Roll B's physicality and Roll C's pressure): the
 /// only thing that tilts Roll F's pie is the deferred player/attribute model
@@ -38,7 +39,6 @@ public sealed class RollFStubPieGenerator
             [PlayerActionOutcome.ShotAttempt] = _cfg.BaseShotAttempt,
             [PlayerActionOutcome.Turnover] = _cfg.BaseTurnover,
             [PlayerActionOutcome.NonShootingFoul] = _cfg.BaseNonShootingFoul,
-            [PlayerActionOutcome.Blocked] = _cfg.BaseBlocked,
             [PlayerActionOutcome.JumpBall] = _cfg.BaseJumpBall,
         };
 

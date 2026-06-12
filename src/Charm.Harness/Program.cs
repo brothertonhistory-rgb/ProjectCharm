@@ -181,25 +181,29 @@ internal static class Program
         }
         Console.WriteLine();
 
-        // Roll H observability: the flat-ish six-way make/miss pie, then a few
-        // sample shots. Each is rolled through the live chain up to H — select a
-        // slot (Roll E), stamp a zone (Roll G) — so each resolved shot carries a
-        // real slot AND zone, and H stamps the result. Shows the six-way outcome,
-        // the zone it resolved against, and where it routes (terminal vs. one of
-        // the three new stubs). This is the first roll that turns a located shot
-        // into a scored/missed outcome.
+        // Roll H observability: the per-zone block weights (the Session 13
+        // headline), then a few sample shots. Each is rolled through the live chain
+        // up to H — select a slot (Roll E), stamp a zone (Roll G) — so each resolved
+        // shot carries a real slot AND zone; the generator sizes that shot's block
+        // slice from its zone, and H stamps the result. Shows the seven-way outcome,
+        // the zone it resolved against, and where it routes (terminal vs. one of the
+        // four post-H stubs, block recovery included).
         Console.WriteLine("--- Observability: Roll H (make/miss) ---");
         var configPathH = Path.Combine(AppContext.BaseDirectory, "config.json");
         var genGForH = new RollGStubPieGenerator(RollGConfig.Load(configPathH));
-        var genH = new RollHStubPieGenerator(RollHConfig.Load(configPathH));
-        var pieH = genH.Generate(state);
-        Console.WriteLine($"  make/miss pie (flat-ish, location-blind, no signal yet): {pieH}");
+        var cfgHForObs = RollHConfig.Load(configPathH);
+        var genH = new RollHStubPieGenerator(cfgHForObs);
+        Console.WriteLine("  per-zone block weight b(zone) (Rim highest, Three lowest):");
+        foreach (var z in new[] { ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid, ShotLocation.Long, ShotLocation.Three })
+            Console.WriteLine($"    {z,-6} {cfgHForObs.BlockWeight(z):P2}");
         var shotRng = new SystemRng(cfg.Seed);
         for (var i = 0; i < 8; i++)
         {
-            // Walk E -> G to deliver a fully-stamped pre-H state, then resolve H.
+            // Walk E -> G to deliver a fully-stamped pre-H state, generate the pie
+            // for THAT shot's zone, then resolve H.
             var selectedH = ((Continue)RollE.Execute(state, pieE, game, shotRng)).State;
             var withZone = ((Continue)RollG.Execute(selectedH, genGForH.Generate(selectedH), shotRng)).State;
+            var pieH = genH.Generate(withZone);
             var hr = RollH.Execute(withZone, pieH, shotRng);
             var carried = hr switch { Terminal t => t.State, Continue c => c.State, _ => withZone };
             var s2 = carried.SelectedSlot!.Value;
@@ -298,7 +302,9 @@ internal static class Program
 
         // Note: with Roll C and Roll F live, turnovers and jump balls now end the
         // possession (terminal) instead of routing to a stub. So "ended" includes
-        // them; the player-action shot/block exits and the foul exits route to stubs.
+        // them; the player-action shot exits and the foul exits route to stubs.
+        // (A blocked shot also routes to a stub, but it is now a Roll H outcome,
+        // not a Roll F exit.)
         var handoffOk = unrouted == 0 && (ended + routedToStub) == cfg.BatchSize;
         Console.WriteLine($"\n  handoff: ended={ended:N0}, routed-to-stub={routedToStub:N0}, unrouted={unrouted} -> {(handoffOk ? "ok" : "FAIL")}");
 
@@ -674,10 +680,12 @@ internal static class Program
         return ratesOk && cleanOk;
     }
 
-    // --- Batch: Roll F's five-way action distribution converges within tolerance,
-    //     and every exit is a clean Continue carrying one of the five expected
+    // --- Batch: Roll F's four-way action distribution converges within tolerance,
+    //     and every exit is a clean Continue carrying one of the four expected
     //     kinds. The pie is flat-ish (no signal); a future attribute generator
-    //     tilts it without this roll changing. Mirrors the Roll E batch check. ---
+    //     tilts it without this roll changing. Mirrors the Roll E batch check.
+    //     (Block left Roll F in Session 13 — it is now a per-zone slice of Roll
+    //     H.) ---
     private static bool RollFActionBatchCheck(
         RollAConfig cfg, RollFConfig cfgF, RollFStubPieGenerator genF, PossessionState state)
     {
@@ -700,7 +708,6 @@ internal static class Program
                 Continue { Next: ContinuationKind.IntoShotType } => PlayerActionOutcome.ShotAttempt,
                 Continue { Next: ContinuationKind.ResolveTurnoverType } => PlayerActionOutcome.Turnover,
                 Continue { Next: ContinuationKind.ResolveFoulType } => PlayerActionOutcome.NonShootingFoul,
-                Continue { Next: ContinuationKind.ResolveBlock } => PlayerActionOutcome.Blocked,
                 Continue { Next: ContinuationKind.ResolveJumpBall } => PlayerActionOutcome.JumpBall,
                 _ => (PlayerActionOutcome?)null
             };
@@ -734,11 +741,13 @@ internal static class Program
     // --- Clean handoff: route a batch of real E->F exits through the resolver and
     //     confirm every Roll F outcome lands at its intended destination, with
     //     zero unrouted: turnover -> Roll C terminal, non-shooting foul -> Roll D
-    //     (ResumeInbound/ResolveFreeThrows stub), blocked -> block stub, shot ->
-    //     shot-type stub, jump ball -> jump-ball terminal. A fresh local game +
-    //     resolver keeps this self-contained; the shared foul count climbing into
-    //     the bonus mid-run is expected (it just shifts some foul exits from
-    //     ResumeInbound to ResolveFreeThrows — both clean). ---
+    //     (ResumeInbound/ResolveFreeThrows stub), shot -> Roll G -> Roll H ->
+    //     resolved (any of its six destinations, including the block stub), jump
+    //     ball -> jump-ball terminal. A fresh local game + resolver keeps this
+    //     self-contained; the shared foul count climbing into the bonus mid-run is
+    //     expected (it just shifts some foul exits from ResumeInbound to
+    //     ResolveFreeThrows — both clean). (Block left Roll F in Session 13; it is
+    //     now a Roll H slice, so there is no F-stage block destination here.) ---
     private static bool RollFHandoffCheck(RollAConfig cfg, GameState sharedGame, PossessionState state)
     {
         Console.WriteLine($"\n--- Clean handoff: {cfg.BatchSize:N0} E->F exits routed through the resolver ---");
@@ -782,7 +791,6 @@ internal static class Program
         {
             ["turnover -> Roll C terminal"] = 0,
             ["foul -> Roll D stub"] = 0,
-            ["blocked -> block stub"] = 0,
             ["shot -> Roll G -> Roll H -> resolved"] = 0,
             ["jump ball -> terminal"] = 0,
         };
@@ -799,15 +807,16 @@ internal static class Program
             if (d.StartsWith("END:JumpBall")) destClasses["jump ball -> terminal"]++;
             // Roll H's resolved shot landings (checked BEFORE the generic END:
             // catch, since Made / MissOutOfBoundsLost are also END: terminals):
-            // a shot now flows F -> G -> H to one of five make/miss destinations.
+            // a shot now flows F -> G -> H to one of six make/miss destinations
+            // (the sixth, blocked, is a Roll H slice routing to the block stub).
             else if (d == "END:Made" || d == "END:MissOutOfBoundsLost"
                      || d.StartsWith("STUB:Rebound")
                      || d.StartsWith("STUB:ShootingFreeThrows")
-                     || d.StartsWith("STUB:SidelineInbound"))
+                     || d.StartsWith("STUB:SidelineInbound")
+                     || d.StartsWith("STUB:BlockRecovery"))
                 destClasses["shot -> Roll G -> Roll H -> resolved"]++;
             else if (d.StartsWith("END:")) destClasses["turnover -> Roll C terminal"]++;
             else if (d.StartsWith("STUB:ResumeInbound") || d.StartsWith("STUB:ResolveFreeThrows")) destClasses["foul -> Roll D stub"]++;
-            else if (d.StartsWith("STUB:BlockRecovery")) destClasses["blocked -> block stub"]++;
             else unrecognized++;
         }
 
@@ -822,7 +831,7 @@ internal static class Program
 
         var routedOk = unrecognized == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  all five F exits reached their destination: {(allHit ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all four F exits reached their destination: {(allHit ? "ok" : "FAIL")}");
 
         return routedOk && allHit;
     }
@@ -882,15 +891,15 @@ internal static class Program
 
     // --- G->H integration: route a batch of IntoShotType exits through the
     //     resolver. With Roll H now live, an IntoShotType ticket flows G (stamps a
-    //     zone) -> H (stamps a result) and lands at one of Roll H's five make/miss
-    //     destinations. This check confirms the WHOLE post-shot chain routes:
-    //     zero unrouted, all five destinations reached, and on the three stub
-    //     landings the zone Roll G stamped still rides through (parsed from the
-    //     STUB:{node}:{Side}slot{N}:{Zone}:{Result} label). The two terminal
-    //     landings (Made / MissOutOfBoundsLost) carry no zone in their END: label
-    //     and are counted as terminal landings. (Roll H in isolation is checked by
-    //     RollHHandoffCheck, which feeds IntoShotResolution directly.) A fresh
-    //     local game + resolver keeps it self-contained. ---
+    //     zone) -> H (stamps a result) and lands at one of Roll H's six make/miss
+    //     destinations (block recovery added Session 13). This check confirms the
+    //     WHOLE post-shot chain routes: zero unrouted, all six destinations
+    //     reached, and on the four stub landings the zone Roll G stamped still
+    //     rides through (parsed from the STUB:{node}:{Side}slot{N}:{Zone}:{Result}
+    //     label). The two terminal landings (Made / MissOutOfBoundsLost) carry no
+    //     zone in their END: label and are counted as terminal landings. (Roll H in
+    //     isolation is checked by RollHHandoffCheck, which feeds IntoShotResolution
+    //     directly.) A fresh local game + resolver keeps it self-contained. ---
     private static bool RollGHandoffCheck(RollAConfig cfg, PossessionState state)
     {
         Console.WriteLine($"\n--- G->H integration: {cfg.BatchSize:N0} IntoShotType exits routed through Roll G then Roll H ---");
@@ -926,7 +935,8 @@ internal static class Program
 
         var pieE = genE.Generate(state);
 
-        // The five destinations a shot can land at after G -> H.
+        // The six destinations a shot can land at after G -> H (block recovery
+        // added in Session 13: a located shot can now be blocked, zone-weighted).
         var destHits = new Dictionary<string, int>
         {
             ["END:Made"] = 0,
@@ -934,6 +944,7 @@ internal static class Program
             ["STUB:Rebound"] = 0,
             ["STUB:ShootingFreeThrows"] = 0,
             ["STUB:SidelineInbound"] = 0,
+            ["STUB:BlockRecovery"] = 0,
         };
         // Zone seen on the stub landings (the labels that carry it). Terminals
         // omit the zone, so they don't contribute here.
@@ -954,11 +965,12 @@ internal static class Program
             if (d == "END:Made") { destHits["END:Made"]++; continue; }
             if (d == "END:MissOutOfBoundsLost") { destHits["END:MissOutOfBoundsLost"]++; continue; }
 
-            // The three stub landings: STUB:{node}:{Side}slot{N}:{Zone}:{Result}
+            // The four stub landings: STUB:{node}:{Side}slot{N}:{Zone}:{Result}
             string node;
             if (d.StartsWith("STUB:Rebound")) node = "STUB:Rebound";
             else if (d.StartsWith("STUB:ShootingFreeThrows")) node = "STUB:ShootingFreeThrows";
             else if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
+            else if (d.StartsWith("STUB:BlockRecovery")) node = "STUB:BlockRecovery";
             else { unrecognized++; continue; }
 
             if (d.EndsWith("NO_SLOT") || d.EndsWith("NO_ZONE") || d.EndsWith("NO_RESULT"))
@@ -998,47 +1010,61 @@ internal static class Program
         var factOk = missingFact == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  slot+zone+result intact on every stub landing: missing={missingFact} -> {(factOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  all five G->H destinations reached: {(allDests ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all six G->H destinations reached: {(allDests ? "ok" : "FAIL")}");
         Console.WriteLine($"  all five zones reached the stub landings: {(allZones ? "ok" : "FAIL")}");
 
         return routedOk && factOk && allDests && allZones;
     }
 
-    // --- Batch: Roll H's six-way make/miss distribution converges within
+    // --- Batch: Roll H's seven-way make/miss distribution converges within
     //     tolerance, every exit carries a stamped Result matching the rolled
     //     outcome (no exit leaves Result null), and the prior two facts
-    //     (SelectedSlot, ShotType) plus the new Result all ride through. The pie is
-    //     flat-ish, location-blind (no signal); a future attribute generator tilts
-    //     it without this roll changing. Mirrors RollGLocationBatchCheck — Roll H
-    //     is direct-executed here (the resolver wiring is exercised by the handoff
-    //     check below). The state fed in already carries a real slot (Roll E) and a
-    //     real zone (Roll G), as it would in the live chain. ---
+    //     (SelectedSlot, ShotType) plus the new Result all ride through. As of
+    //     Session 13 the pie is ZONE-AWARE for the block slice: each draw walks a
+    //     fresh slot (Roll E) + zone (Roll G), and the generator sizes the block
+    //     weight from that zone (Rim highest, Three lowest), carving it off the top
+    //     and scaling the six make/miss outcomes by (1 − block). So the per-draw
+    //     pie varies; the seven OBSERVED rates are checked against their
+    //     ZONE-BLENDED expectations: blended block = Σ P(zone)·b(zone) over Roll G's
+    //     zone mix, and each make/miss rate = base × (1 − blended block). A per-zone
+    //     block readout confirms the gradient (Rim ≫ Three) directly. The six
+    //     make/miss outcomes stay location-BLIND in SHAPE; only the block slice is
+    //     zone-aware this pass. ---
     private static bool RollHResolutionBatchCheck(
         RollAConfig cfg, RollHConfig cfgH, RollHStubPieGenerator genH, PossessionState state)
     {
-        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} shots through Roll H (flat-ish six-way pie) ---");
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} shots through Roll H (zone-aware seven-way pie) ---");
         var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
         var rng = new SystemRng(cfg.Seed);
 
-        // Build a fully-stamped pre-H state: select a slot (Roll E) and stamp a zone
-        // (Roll G), exactly as the live chain delivers to Roll H.
+        // Generators to walk a fresh slot (Roll E) + zone (Roll G) per draw, so the
+        // zone varies across the batch exactly as the live chain delivers to Roll H.
         var cfgD = RollDConfig.Load(configPath);
+        var cfgG = RollGConfig.Load(configPath);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
         var genE = new RollEStubPieGenerator(RollEConfig.Load(configPath));
-        var genG = new RollGStubPieGenerator(RollGConfig.Load(configPath));
-        var selected = ((Continue)RollE.Execute(state, genE.Generate(state), game, rng)).State;
-        var preH = ((Continue)RollG.Execute(selected, genG.Generate(selected), rng)).State;
-
-        var pieH = genH.Generate(preH);
+        var genG = new RollGStubPieGenerator(cfgG);
+        var pieE = genE.Generate(state);
 
         var counts = new Dictionary<ShotResult, int>();
         foreach (var o in Enum.GetValues<ShotResult>()) counts[o] = 0;
+
+        // Per-zone totals + per-zone block counts, for the Rim-vs-Three gradient.
+        var zoneTotals = new Dictionary<ShotLocation, int>();
+        var zoneBlocked = new Dictionary<ShotLocation, int>();
+        foreach (var z in Enum.GetValues<ShotLocation>()) { zoneTotals[z] = 0; zoneBlocked[z] = 0; }
 
         var anomalies = 0;       // exit whose stamped Result is null or mismatched
         var rideThroughFail = 0; // slot / zone / result not all present on the carried state
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
+            // Fresh slot + zone, then the zone-aware pie for THAT zone.
+            var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
+            var preH = ((Continue)RollG.Execute(selected, genG.Generate(selected), rng)).State;
+            var zone = preH.ShotType!.Value;
+            var pieH = genH.Generate(preH);
+
             var result = RollH.Execute(preH, pieH, rng);
 
             // Pull the carried state and the stamped result off either arm.
@@ -1051,7 +1077,9 @@ internal static class Program
 
             if (carried.Result is not { } stamped) { anomalies++; continue; }
 
-            // The stamped Result must match the routing arm taken.
+            // The stamped Result must match the routing arm taken. Made and
+            // MissOutOfBoundsLost are the only terminals; everything else
+            // (including Blocked) is a continue.
             var expectedTerminal = stamped is ShotResult.Made or ShotResult.MissOutOfBoundsLost;
             var isTerminal = result is Terminal;
             if (expectedTerminal != isTerminal) anomalies++;
@@ -1061,38 +1089,100 @@ internal static class Program
                 rideThroughFail++;
 
             counts[stamped]++;
+            zoneTotals[zone]++;
+            if (stamped == ShotResult.Blocked) zoneBlocked[zone]++;
         }
 
         var n = (double)cfg.BatchSize;
+
+        // Zone-blended expectations. P(zone) is Roll G's zone mix; b(zone) is the
+        // configured per-zone block weight (same lookup the generator uses).
+        var zoneP = new Dictionary<ShotLocation, double>
+        {
+            [ShotLocation.Three] = cfgG.BaseThree,
+            [ShotLocation.Long] = cfgG.BaseLong,
+            [ShotLocation.Mid] = cfgG.BaseMid,
+            [ShotLocation.Short] = cfgG.BaseShort,
+            [ShotLocation.Rim] = cfgG.BaseRim,
+        };
+        var blendedBlock = 0.0;
+        foreach (var (z, p) in zoneP) blendedBlock += p * cfgH.BlockWeight(z);
+        var makeScale = 1.0 - blendedBlock;
+
+        var expected = new Dictionary<ShotResult, double>
+        {
+            [ShotResult.Made] = cfgH.BaseMade * makeScale,
+            [ShotResult.MadeAndFouled] = cfgH.BaseMadeAndFouled * makeScale,
+            [ShotResult.Miss] = cfgH.BaseMiss * makeScale,
+            [ShotResult.MissFouled] = cfgH.BaseMissFouled * makeScale,
+            [ShotResult.MissOutOfBoundsLost] = cfgH.BaseMissOutOfBoundsLost * makeScale,
+            [ShotResult.MissOutOfBoundsRetained] = cfgH.BaseMissOutOfBoundsRetained * makeScale,
+            [ShotResult.Blocked] = blendedBlock,
+        };
+
         var ratesOk = true;
-        Console.WriteLine("  Roll H outcomes:");
-        foreach (var (outcome, weight) in pieH.Slices)
+        Console.WriteLine("  Roll H outcomes (observed vs. zone-blended expectation):");
+        foreach (var outcome in Enum.GetValues<ShotResult>())
         {
             var observed = counts[outcome] / n;
-            var gap = Math.Abs(observed - weight);
+            var exp = expected[outcome];
+            var gap = Math.Abs(observed - exp);
             var pass = gap <= cfg.RateTolerance;
             ratesOk &= pass;
-            Console.WriteLine($"    {outcome,-24} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+            Console.WriteLine($"    {outcome,-24} observed={observed:P3}  expected={exp:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
         }
+
+        // Per-zone block gradient: observed b(zone) vs. configured, and the
+        // monotonic Rim >= Short >= Mid >= Long >= Three ordering the design wants.
+        // The per-zone gate uses a looser tolerance (3x the batch tolerance): a
+        // single zone's block sample is small (e.g. Rim is ~12% over ~35k draws),
+        // so the tight batch tolerance would flake on noise — but a real bug (a
+        // swapped or mis-scaled zone) shows a multi-point gap that 3x still catches.
+        // The hard gates that pin the design are the gradient and the blended rate.
+        Console.WriteLine("\n  block rate by zone (observed vs. configured b(zone)):");
+        var zoneTol = cfg.RateTolerance * 3.0;
+        var zoneOrder = new[] { ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid, ShotLocation.Long, ShotLocation.Three };
+        var lastObserved = 1.0;
+        var gradientOk = true;
+        var perZoneOk = true;
+        foreach (var z in zoneOrder)
+        {
+            var total = zoneTotals[z];
+            var observed = total > 0 ? zoneBlocked[z] / (double)total : 0.0;
+            var configured = cfgH.BlockWeight(z);
+            var gap = Math.Abs(observed - configured);
+            var pass = gap <= zoneTol;
+            perZoneOk &= pass;
+            if (observed > lastObserved + cfg.RateTolerance) gradientOk = false; // out-of-order spike
+            lastObserved = observed;
+            Console.WriteLine($"    {z,-6} block observed={observed:P3}  configured={configured:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+        Console.WriteLine($"  block gradient Rim >= ... >= Three: {(gradientOk ? "ok" : "FAIL")}");
+
+        var observedBlended = counts[ShotResult.Blocked] / n;
+        var blendedGap = Math.Abs(observedBlended - blendedBlock);
+        var blendedOk = blendedGap <= cfg.RateTolerance;
+        Console.WriteLine($"  zone-blended block rate: observed={observedBlended:P3}  expected={blendedBlock:P3}  gap={blendedGap:P3}  {(blendedOk ? "ok" : "FAIL")}");
 
         var cleanOk = anomalies == 0;
         var rideOk = rideThroughFail == 0;
         Console.WriteLine($"\n  every exit a stamped Result matching its arm: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  slot+zone+result ride through every exit: fails={rideThroughFail} -> {(rideOk ? "ok" : "FAIL")}");
 
-        return ratesOk && cleanOk && rideOk;
+        return ratesOk && perZoneOk && gradientOk && blendedOk && cleanOk && rideOk;
     }
 
     // --- Clean handoff: route a batch of IntoShotResolution exits through the
     //     resolver and confirm every one lands at its intended Roll H destination,
     //     with zero unrouted: Made -> terminal, MissOutOfBoundsLost -> terminal,
     //     Miss -> rebound stub, MadeAndFouled/MissFouled -> shooting-FT stub,
-    //     MissOutOfBoundsRetained -> sideline-inbound stub. Isolates the Roll H hop
-    //     exactly as RollGHandoffCheck isolated Roll G: the resolver executes Roll H
-    //     on an IntoShotResolution continuation (carrying a real slot + zone) and
-    //     lands at a terminal or one of the three new stubs. On the stub landings
-    //     it confirms slot, zone, AND result all rode through. A fresh local game +
-    //     resolver keeps it self-contained. ---
+    //     MissOutOfBoundsRetained -> sideline-inbound stub, Blocked -> block-
+    //     recovery stub (Session 13). Isolates the Roll H hop exactly as
+    //     RollGHandoffCheck isolated Roll G: the resolver executes Roll H on an
+    //     IntoShotResolution continuation (carrying a real slot + zone) and lands at
+    //     a terminal or one of the four stubs. On the stub landings it confirms
+    //     slot, zone, AND result all rode through. A fresh local game + resolver
+    //     keeps it self-contained. ---
     private static bool RollHHandoffCheck(RollAConfig cfg, PossessionState state)
     {
         Console.WriteLine($"\n--- Clean handoff: {cfg.BatchSize:N0} IntoShotResolution exits routed through Roll H ---");
@@ -1136,6 +1226,7 @@ internal static class Program
             ["STUB:Rebound"] = 0,
             ["STUB:ShootingFreeThrows"] = 0,
             ["STUB:SidelineInbound"] = 0,
+            ["STUB:BlockRecovery"] = 0,
         };
         var resultsSeenOnStubs = new Dictionary<ShotResult, int>();
         foreach (var r in Enum.GetValues<ShotResult>()) resultsSeenOnStubs[r] = 0;
@@ -1160,6 +1251,7 @@ internal static class Program
             if (d.StartsWith("STUB:Rebound")) node = "STUB:Rebound";
             else if (d.StartsWith("STUB:ShootingFreeThrows")) node = "STUB:ShootingFreeThrows";
             else if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
+            else if (d.StartsWith("STUB:BlockRecovery")) node = "STUB:BlockRecovery";
             else { unrecognized++; continue; }
 
             if (d.EndsWith("NO_SLOT") || d.EndsWith("NO_ZONE") || d.EndsWith("NO_RESULT"))
@@ -1185,13 +1277,15 @@ internal static class Program
             Console.WriteLine($"    {label,-26} {count,8:N0}  {(hit ? "ok" : "NONE")}");
         }
 
-        // The three continue-outcomes that reach a stub: Miss -> Rebound,
-        // MadeAndFouled + MissFouled -> ShootingFreeThrows, MissOutOfBoundsRetained
-        // -> SidelineInbound. Confirm each rode its result through.
+        // The continue-outcomes that reach a stub: Miss -> Rebound, MadeAndFouled
+        // + MissFouled -> ShootingFreeThrows, MissOutOfBoundsRetained ->
+        // SidelineInbound, Blocked -> BlockRecovery (Session 13). Confirm each rode
+        // its result through.
         var continueResults = new[]
         {
             ShotResult.MadeAndFouled, ShotResult.Miss,
-            ShotResult.MissFouled, ShotResult.MissOutOfBoundsRetained
+            ShotResult.MissFouled, ShotResult.MissOutOfBoundsRetained,
+            ShotResult.Blocked
         };
         var allResults = true;
         Console.WriteLine("  each continue-outcome's result rode through to its stub:");
@@ -1206,7 +1300,7 @@ internal static class Program
         var factOk = missingFact == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  slot+zone+result intact on every stub landing: missing={missingFact} -> {(factOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  all five Roll H destinations reached: {(allDests ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all six Roll H destinations reached: {(allDests ? "ok" : "FAIL")}");
         Console.WriteLine($"  every continue-outcome's result reached its stub: {(allResults ? "ok" : "FAIL")}");
 
         return routedOk && factOk && allDests && allResults;

@@ -36,22 +36,20 @@ public sealed class ResolveFreeThrowsStub : IContinuationNode
         $"STUB:ResolveFreeThrows:{continuation.Bonus}";
 }
 
-/// <summary>STUB for the block-recovery node — where Roll F's blocked attempt
-/// lands. A block is a LIVE-BALL event with its own future fan-out (ball out of
-/// bounds off defense / off offense / scramble recovered by either team), so
-/// this is the holding pen for that future roll. The selected slot rides on the
-/// carried <see cref="PossessionState"/>; the stub records WHICH slot's attempt
-/// was blocked, letting the harness confirm a real slot was named. A real node
-/// replaces this without Roll F changing.</summary>
+/// <summary>STUB for the block-recovery node — where Roll H's BLOCKED shot lands.
+/// A block is a LIVE-BALL event with its own future fan-out (ball out of bounds
+/// off defense / off offense / scramble recovered by either team), so this is the
+/// holding pen for that future roll. As of Session 13 the block moved from Roll F
+/// to Roll H, so it now lands AFTER all three per-possession facts are stamped
+/// (slot by Roll E, zone by Roll G, result by Roll H) — so it echoes slot, zone,
+/// AND result via the shared <see cref="ShotFacts"/> helper, exactly like the
+/// other post-Roll-H stubs, letting the harness confirm all three rode through.
+/// MAY eventually share a loose-ball / inbound node with the sideline-inbound stub
+/// — flagged, not merged. A real node replaces this without Roll H changing.</summary>
 public sealed class BlockRecoveryStub : IContinuationNode
 {
-    public string Receive(Continue continuation)
-    {
-        var slot = continuation.State.SelectedSlot;
-        return slot is { } s
-            ? $"STUB:BlockRecovery:{s.Side}slot{s.Number}"
-            : "STUB:BlockRecovery:NO_SLOT";   // should never happen; surfaces a bug loud
-    }
+    public string Receive(Continue continuation) =>
+        ShotFacts.Describe("BlockRecovery", continuation.State);
 }
 
 /// <summary>STUB for the rebound node — where Roll H's MISS lands. The big
@@ -99,12 +97,13 @@ public sealed class JumpBallResolverStub : IContinuationNode
 }
 
 /// <summary>
-/// Shared label-builder for the three post-Roll-H stubs (rebound, shooting free
-/// throws, sideline inbound). Each lands AFTER all three per-possession facts are
-/// stamped (slot by Roll E, zone by Roll G, result by Roll H), so each echoes all
-/// three in the form <c>STUB:{node}:{Side}slot{N}:{Zone}:{Result}</c>, surfacing
-/// any missing fact loud so the harness catches a dropped stamp. Centralized so
-/// the three stubs stay identical in shape.
+/// Shared label-builder for the four post-Roll-H stubs (rebound, shooting free
+/// throws, sideline inbound, and — as of Session 13 — block recovery). Each lands
+/// AFTER all three per-possession facts are stamped (slot by Roll E, zone by Roll
+/// G, result by Roll H), so each echoes all three in the form
+/// <c>STUB:{node}:{Side}slot{N}:{Zone}:{Result}</c>, surfacing any missing fact
+/// loud so the harness catches a dropped stamp. Centralized so the stubs stay
+/// identical in shape.
 /// </summary>
 internal static class ShotFacts
 {

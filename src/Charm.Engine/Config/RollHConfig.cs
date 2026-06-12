@@ -12,13 +12,45 @@ namespace Charm.Engine;
 public sealed class RollHConfig
 {
     // --- Stub pie base weights (placeholders; the real attribute-driven
-    //     generator will replace these). Kept summing to 1 for clarity. ---
+    //     generator will replace these). These six are the SHARED make/miss SHAPE
+    //     and sum to 1 among themselves. Per zone the generator carves the block
+    //     weight b(zone) off the top and scales these six by (1 − b(zone)), so
+    //     within a zone the make/miss shape is unchanged except for the block
+    //     carve-out. Location-BLIND otherwise (a future shooting-% pass owns
+    //     per-zone make/miss tuning). ---
     public double BaseMade { get; set; } = 0.43;
     public double BaseMadeAndFouled { get; set; } = 0.03;
     public double BaseMiss { get; set; } = 0.47;
     public double BaseMissFouled { get; set; } = 0.04;
     public double BaseMissOutOfBoundsLost { get; set; } = 0.02;
     public double BaseMissOutOfBoundsRetained { get; set; } = 0.01;
+
+    // --- Per-zone block weight b(zone) (Session 13). A block depends on WHERE the
+    //     shot comes from: rim attempts get swatted far more than threes. So the
+    //     block slice of Roll H's pie is sized per zone — Rim highest, Three
+    //     lowest — carved off the top, with the six make/miss weights above scaled
+    //     by (1 − b(zone)). Best-guess placeholders; tune against the harness's
+    //     zone-blended block-rate readout. Only block is zone-aware this pass.
+    //     One flat number per zone (five), NOT a 35-number per-zone make/miss
+    //     table. ---
+    public double BlockRim { get; set; } = 0.12;
+    public double BlockShort { get; set; } = 0.06;
+    public double BlockMid { get; set; } = 0.03;
+    public double BlockLong { get; set; } = 0.02;
+    public double BlockThree { get; set; } = 0.01;
+
+    /// <summary>The block weight b(zone) for a given shot location — the single
+    /// place the zone→weight mapping lives, so the generator and the harness's
+    /// blended-rate math read the same numbers.</summary>
+    public double BlockWeight(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim => BlockRim,
+        ShotLocation.Short => BlockShort,
+        ShotLocation.Mid => BlockMid,
+        ShotLocation.Long => BlockLong,
+        ShotLocation.Three => BlockThree,
+        _ => throw new InvalidOperationException($"No block weight for zone '{zone}'.")
+    };
 
     // No live-wire scalar (like Roll E, F, and G): the only thing that would tilt
     // Roll H's pie is the deferred player/attribute model (the shooter-vs-defender

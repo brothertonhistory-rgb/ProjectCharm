@@ -108,13 +108,14 @@ public sealed class Resolver
                         // Roll E's selection -> execute Roll F (player action),
                         // loop. Roll F is a flat gate: it returns a CONTINUE
                         // (IntoShotType / ResolveTurnoverType / ResolveFoulType /
-                        // ResolveBlock / ResolveJumpBall), never a terminal of its
-                        // own, so feeding it back re-enters this switch and lands
-                        // on the matching case. Roll F reads nothing off GameState
-                        // and stamps nothing, so it takes only (state, pie, rng) —
-                        // like Roll B, not Roll D/E. This is the "many feeders, one
-                        // node" payoff: Roll F becomes a third feeder into C and D
-                        // (and a feeder into the jump-ball node) at once.
+                        // ResolveJumpBall), never a terminal of its own, so feeding
+                        // it back re-enters this switch and lands on the matching
+                        // case. Roll F reads nothing off GameState and stamps
+                        // nothing, so it takes only (state, pie, rng) — like Roll B,
+                        // not Roll D/E. This is the "many feeders, one node" payoff:
+                        // Roll F becomes a third feeder into C and D (and a feeder
+                        // into the jump-ball node) at once. (Block left Roll F in
+                        // Session 13 — it now lives in Roll H, zone-weighted.)
                         case ContinuationKind.IntoPlayerAction:
                             var pieF = _rollFGenerator.Generate(c.State);
                             result = RollF.Execute(c.State, pieF, _rng);
@@ -142,9 +143,13 @@ public sealed class Resolver
                         case ContinuationKind.ResolveFreeThrows:
                             return new RoutingOutcome(false, _resolveFreeThrows.Receive(c));
 
-                        // Roll F, blocked attempt -> block-recovery node (stub). A
-                        // live-ball event with its own future fan-out. Chain ends
-                        // here for now.
+                        // Blocked shot (from Roll H) -> block-recovery node (stub).
+                        // A live-ball event with its own future fan-out. The block
+                        // weight is sized per zone upstream in Roll H's generator,
+                        // but the routing is zone-blind: every block lands here.
+                        // Reuses the ResolveBlock kind Roll F used to emit — Session
+                        // 13 moved the feed point from F to H, leaving this edge
+                        // untouched. Chain ends here for now.
                         case ContinuationKind.ResolveBlock:
                             return new RoutingOutcome(false, _resolveBlock.Receive(c));
 
@@ -166,11 +171,12 @@ public sealed class Resolver
                         // onto its state and returns EITHER a Terminal (Made,
                         // MissOutOfBoundsLost — the loop ends it on the next pass)
                         // OR a CONTINUE (ResolveShootingFreeThrows / ResolveRebound /
-                        // ResolveSidelineInbound) that re-enters this switch and
-                        // lands on the matching stub below. Roll H reads nothing off
-                        // GameState and only its pie, so it takes (state, pie, rng) —
-                        // like Roll F and Roll G. (Was the chain's dead-end stub
-                        // before Roll H; now live.)
+                        // ResolveSidelineInbound / ResolveBlock) that re-enters this
+                        // switch and lands on the matching stub below. Roll H reads
+                        // nothing off GameState and only its pie, so it takes
+                        // (state, pie, rng) — like Roll F and Roll G. (Its GENERATOR
+                        // reads the stamped zone to size the per-zone block slice,
+                        // but the roll itself does not.)
                         case ContinuationKind.IntoShotResolution:
                             var pieH = _rollHGenerator.Generate(c.State);
                             result = RollH.Execute(c.State, pieH, _rng);

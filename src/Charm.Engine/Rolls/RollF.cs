@@ -3,14 +3,19 @@ namespace Charm.Engine;
 /// <summary>
 /// Roll F — Player Action. The beat right after a player (slot) is selected:
 /// decides what the selected player's action BECOMES — a clean shot attempt, a
-/// turnover, a non-shooting foul drawn, a blocked attempt, or a held ball.
+/// turnover, a non-shooting foul drawn, or a held ball.
 ///
 /// A pure GATE, structurally a clone of Roll B: no terminal outcome, every
 /// result is a CONTINUE, because each outcome has downstream work. Three reuse
 /// existing shared nodes (turnover -> Roll C, foul -> Roll D, jump ball -> the
-/// jump-ball node); two open new pipes (block recovery, shot type). This is the
+/// jump-ball node); one opens the shot pipe (shot type -> Roll G). This is the
 /// "many feeders, one node" principle paying off again — Roll F becomes a third
 /// feeder into C and D for free.
+///
+/// NOTE (Session 13): the block left Roll F. A block depends on the shot's zone,
+/// which does not exist until Roll G stamps it — so Blocked now lives in Roll H
+/// (make/miss) as a per-zone weighted slice. Roll F's old block weight folded
+/// into ShotAttempt.
 ///
 /// Follows the uniform roll contract: receives state + a finished pie, rolls
 /// against it, returns one typed result, names no successor (the resolver maps
@@ -50,11 +55,6 @@ public static class RollF
             // foul node. Roll D charges the team foul and reads the bonus.
             PlayerActionOutcome.NonShootingFoul =>
                 new Continue(ContinuationKind.ResolveFoulType, state),
-
-            // Blocked attempt — a live-ball event with its own fan-out. Hand off
-            // to the (stubbed) block-recovery node.
-            PlayerActionOutcome.Blocked =>
-                new Continue(ContinuationKind.ResolveBlock, state),
 
             // Held ball / tie-up — hand off to the existing jump-ball node, which
             // consults the possession arrow.
