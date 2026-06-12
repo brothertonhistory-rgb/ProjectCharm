@@ -46,6 +46,7 @@ public sealed class Resolver
     private readonly RollGStubPieGenerator _rollGGenerator;
     private readonly RollHStubPieGenerator _rollHGenerator;
     private readonly RollIStubPieGenerator _rollIGenerator;
+    private readonly RollJStubPieGenerator _rollJGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
     private readonly IContinuationNode _resumeInbound;
@@ -54,6 +55,8 @@ public sealed class Resolver
     private readonly IContinuationNode _offensiveRebound;
     private readonly IContinuationNode _resolveShootingFreeThrows;
     private readonly IContinuationNode _sidelineInbound;
+    // Roll J's Push parks here — the future transition roll's holding pen.
+    private readonly IContinuationNode _transition;
 
     public Resolver(
         StubPieGenerator rollAGenerator,
@@ -66,6 +69,7 @@ public sealed class Resolver
         RollGStubPieGenerator rollGGenerator,
         RollHStubPieGenerator rollHGenerator,
         RollIStubPieGenerator rollIGenerator,
+        RollJStubPieGenerator rollJGenerator,
         GameState game,
         IRng rng,
         IContinuationNode resumeInbound,
@@ -73,7 +77,8 @@ public sealed class Resolver
         IContinuationNode resolveBlock,
         IContinuationNode offensiveRebound,
         IContinuationNode resolveShootingFreeThrows,
-        IContinuationNode sidelineInbound)
+        IContinuationNode sidelineInbound,
+        IContinuationNode transition)
     {
         _rollAGenerator = rollAGenerator;
         _rollAConfig = rollAConfig;
@@ -85,6 +90,7 @@ public sealed class Resolver
         _rollGGenerator = rollGGenerator;
         _rollHGenerator = rollHGenerator;
         _rollIGenerator = rollIGenerator;
+        _rollJGenerator = rollJGenerator;
         _game = game;
         _rng = rng;
         _resumeInbound = resumeInbound;
@@ -93,20 +99,45 @@ public sealed class Resolver
         _offensiveRebound = offensiveRebound;
         _resolveShootingFreeThrows = resolveShootingFreeThrows;
         _sidelineInbound = sidelineInbound;
+        _transition = transition;
     }
 
     /// <summary>
-    /// Run ONE whole possession from its start <paramref name="start"/>: generate
-    /// Roll A's pie, execute Roll A (the top of the chain), then walk the rest via
-    /// <see cref="Route"/>. The single entry the Governor calls — so the Governor
-    /// drops a START STATE at the top of the chain and never names a roll.
-    /// <para>Pressure is a flat 0.0 here (the neutral baseline the batch harness
-    /// already uses): the Governor does not model defensive pressure this session.</para>
+    /// Run ONE whole possession from its start <paramref name="start"/>: route the
+    /// start state to its ENTRY node, execute that node (the top of the chain), then
+    /// walk the rest via <see cref="Route"/>. The single entry the Governor calls — so
+    /// the Governor drops a START STATE at the top of the chain and never names a roll.
+    /// <para>Entry routing is a single localized switch on the start state, mirroring
+    /// how <see cref="Route"/> switches on <see cref="ContinuationKind"/> — entry logic
+    /// is not scattered. A start that began on a defensive rebound (a Transition entry
+    /// carrying the <see cref="TransitionSource.Rebound"/> ticket) enters Roll J, the
+    /// live transition-entry gate. Every other start — every dead-ball inbound, and
+    /// (this session) every not-yet-wired steal, which carries no context ticket —
+    /// enters Roll A, exactly as before. When the steal feeder lands and its terminals
+    /// carry a Steal context, this same switch routes every Transition start to Roll J.</para>
+    /// <para>Pressure is a flat 0.0 (the neutral baseline the batch harness uses): the
+    /// Governor does not model defensive pressure this session.</para>
     /// </summary>
     public RoutingOutcome RunPossession(PossessionState start)
     {
-        var pieA = _rollAGenerator.Generate(start, pressure: 0.0);
-        var result = RollA.Execute(start, pieA, _rng, _rollAConfig);
+        RollResult result;
+
+        if (start is { Entry: EntryType.Transition,
+                       TransitionContext: { Source: TransitionSource.Rebound } ctx })
+        {
+            // Rebound-born transition: Roll J owns the top of the chain. The arriving
+            // ticket selects Roll J's run-or-not pie. Roll J takes _game because its
+            // DefensiveFoul arm charges a team foul (the Roll D / Roll I shape).
+            var pieJ = _rollJGenerator.Generate(ctx);
+            result = RollJ.Execute(start, pieJ, _game, _rng);
+        }
+        else
+        {
+            // Legacy entry: Roll A (the generator + config produce its pie).
+            var pieA = _rollAGenerator.Generate(start, pressure: 0.0);
+            result = RollA.Execute(start, pieA, _rng, _rollAConfig);
+        }
+
         return Route(result);
     }
 
@@ -137,7 +168,15 @@ public sealed class Resolver
                         // next pass. Roll C integrates exactly like Roll B
                         // (execute + feed result back), not like a stub.
                         case ContinuationKind.ResolveTurnoverType:
-                            var pieC = _rollCGenerator.Generate(c.State, pressure: 0.0);
+                            // Select Roll C's pie by the turnover context the ticket
+                            // carries. A null stamp — every legacy feeder (Roll A, B,
+                            // F) stamps nothing — reads as Halfcourt, so the legacy
+                            // pie is byte-for-byte unchanged. Roll J's Turnover arm
+                            // stamps Transition for its outlet/push pie.
+                            var pieC = _rollCGenerator.Generate(
+                                c.State,
+                                pressure: 0.0,
+                                context: c.TurnoverContext ?? TurnoverContext.Halfcourt);
                             result = RollC.Execute(c.State, pieC, _rng);
                             continue;
 
@@ -285,6 +324,14 @@ public sealed class Resolver
                             result = new Terminal(reason, c.State,
                                 PossessionConsequence.DeadBallTo(award.AwardedTo));
                             continue;
+
+                        // Roll J's Push -> the parked transition node (stub): the
+                        // possession decided to RUN. Where the future transition roll
+                        // (what the fast break PRODUCES — numbers, leak-outs, shot mix)
+                        // will land. An Into* hand-off that parks for now, like the
+                        // other stub edges. Chain ends here for this session.
+                        case ContinuationKind.IntoTransition:
+                            return new RoutingOutcome(false, _transition.Receive(c));
 
                         default:
                             throw new InvalidOperationException($"No route for continuation '{c.Next}'.");

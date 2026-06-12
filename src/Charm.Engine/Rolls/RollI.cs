@@ -54,12 +54,12 @@ public static class RollI
         {
             // Defense secures the board. Ball switches teams — TERMINAL.
             // Consequence: ball to the rebounding team (= the defense this
-            // possession) on a LIVE-BALL transition push. The future transition
-            // roll is that next possession's real entry; the thin Governor
-            // temp-routes it through Roll A this session.
+            // possession) on a LIVE-BALL transition push, carrying the Rebound
+            // context ticket. As of Session 16 the resolver routes this to Roll J
+            // (the real transition entry), no longer temp-routing it through Roll A.
             ReboundOutcome.DefensiveRebound =>
                 new Terminal("DefensiveRebound", state,
-                    PossessionConsequence.TransitionTo(state.Defense)),
+                    PossessionConsequence.TransitionReboundTo(state.Defense)),
 
             // Offense secures the board. Same possession stays alive — CONTINUE.
             ReboundOutcome.OffensiveRebound =>

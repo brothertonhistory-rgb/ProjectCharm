@@ -1185,8 +1185,12 @@ what is slated for demolition:
   real `(Result, ShotType) → points` derivation replaces the 0 at that same spot.
 - **Possession-cap stop.** The game stops after `Governor.PossessionCap` possessions, NOT
   on a real clock. Replaced by real stop conditions (clock expiry, overtime).
-- **Temp-route-all-to-Roll-A.** Every spawned possession — even a `Transition`-tagged one —
-  starts at Roll A's dead-ball entry. Replaced by Roll J giving `Transition` its own entry.
+- **Temp-route-all-to-Roll-A.** *(Session 16: PARTIALLY discharged.)* A spawned possession
+  carrying a `Transition` entry **with a `Rebound` ticket** now enters **Roll J** (the live
+  transition-entry gate), not Roll A. Still provisional: a steal-born `Transition` start
+  carries no context ticket yet, so it continues to temp-route to Roll A until the
+  steal-feeder session lands its ticket and pie. Fully discharged when EVERY `Transition`
+  start carries a context ticket (see Session 16 design section below).
 - **Parked→default-flip.** Every stub-parked possession (FT, offensive rebound, sideline
   inbound, block recovery, resume inbound) flips to the OTHER team at Roll A on a default
   consequence — because the parked pipe isn't resolved yet. This is deliberately wrong
@@ -1226,3 +1230,124 @@ landings once the shared game crossed the bonus mid-batch) is structurally impos
   point resolution and a real next-possession decision off the last free throw.
 - **The real game layer.** Real clock, real score, real entry variety, real stop conditions
   — a guts-swap behind the permanent seam above.
+
+---
+
+## Session 16 — Roll J (transition-entry gate) & the ticket/station mechanism realized
+
+Session 16 lands the first **live transition entry** and, with it, turns the
+ticket/station context-tag idea from a sketch into a working, twice-instantiated
+mechanism. Two things were built together because one forces the other: a defensive
+rebound now enters a real roll (Roll J) instead of temp-routing to Roll A, and that
+roll is the first station to stamp a non-default turnover context on a ticket.
+
+### Two different things that both say "transition"
+
+A naming hazard worth fixing in the record: **transition ENTRY** and the **transition
+ROLL** are not the same node, and this session builds only the first.
+
+- **Transition entry (Roll J) — built.** The run-or-not GATE a live possession passes
+  through the instant it gains the ball off a defensive rebound. It decides only
+  *whether we run*: pull it out and set up (Settle), or go (Push). Grabbing a board
+  deep in the backcourt does not mean you run — that decision is exactly what Roll J
+  models.
+- **The transition roll — NOT built.** What the fast break *produces* once you have
+  decided to run: numbers advantage, leak-outs, the transition shot mix. Roll J's Push
+  arm parks this at `TransitionStub` via the new `IntoTransition` continuation. A later
+  session fills it.
+
+Keeping these separate is what lets Roll J be a small, flat five-way gate instead of a
+sprawling fast-break simulator.
+
+### Roll J's shape
+
+Five arms (`TransitionOutcome`), **all continues** — Roll J names no terminal of its
+own; its two "ending" flavors resolve at shared downstream nodes already built:
+
+| Arm | Continuation | Lands at |
+|---|---|---|
+| `Settle` (.65) | `IntoPlayerSelection` | Roll E (halfcourt set) |
+| `Push` (.25) | `IntoTransition` | `TransitionStub` (parked) |
+| `Turnover` (.06) | `ResolveTurnoverType` + `TurnoverContext.Transition` | Roll C (transition pie) |
+| `DefensiveFoul` (.035) | charge defense, bonus-fork | sideline inbound OR free throws |
+| `JumpBall` (.005) | `ResolveJumpBall` | shared jump-ball node (consults arrow) |
+
+Signature `(state, pie, game, rng)` — the Roll D / Roll I shape — because the
+`DefensiveFoul` arm mutates `GameState` (it charges a team foul). The foul is charged to
+`state.Defense`: on a possession spawned off a defensive rebound the new offense is the
+rebounding team, so the new defense is exactly the team that lost the board and is
+scrambling back — the team fouling on the push. This is the **third feeder** into the
+shared charge-and-fork (after Roll D and Roll I): copied, not reinvented.
+
+### The ticket/station mechanism, stated generally
+
+A shared resolution node is reached by multiple feeders. Each feeder **stamps a
+contextual ticket** on the object it hands forward; the node **reads the ticket to
+select its parameter set** and never queries who fed it. Signal flows one direction;
+the node stays blind to its callers. This session instantiates the pattern twice:
+
+1. **Roll C (turnover classification) is a context-consuming node.** Its generator now
+   selects between a **Halfcourt** weight set (the legacy `.30/.22/.18/.20/.10`, reached
+   by every pre-Roll-J feeder — Roll A, B, F — which stamp nothing and so read as
+   Halfcourt by default) and a **Transition** weight set (`.25/.15/.20/.35/.05` — more
+   live strips going the other way), reached only when an upstream station stamps
+   `TurnoverContext.Transition`. The Halfcourt path is **byte-for-byte unchanged**. The
+   context parameter sits LAST with a default, so every existing call site compiles
+   untouched; only the resolver passes a context, and only when the ticket carries one.
+
+2. **Roll J is itself a context-consuming node.** The *arriving* transition ticket
+   selects Roll J's run-or-not pie. This session one source is live — `Rebound` — so the
+   generator builds the rebound pie and fails loud on any other source. The steal pie
+   (more Push) is a sibling arm added with the steal-feeder session; no orphan steal
+   numbers ship now.
+
+Roll J's Turnover arm is the **forcing case** for the whole mechanism: it is the first
+station to stamp a non-default `TurnoverContext`, which is why Roll C had to learn to
+read one this session rather than later.
+
+### Carrier choice: a structured growable record, not an enum
+
+The cross-possession ticket is a record — `TransitionContext(TransitionSource Source)`
+— **not** a granular `EntryType` enum exploded into `TransitionOffRebound`,
+`TransitionOffSteal`, … . An enum would force a teardown every time transition gains a
+new origin or a new piece of remembered context; a record grows by **adding a field**
+(plug-in, not teardown), exactly the philosophy the rest of the engine follows.
+`TransitionSource` has one value this session (`Rebound`); `Steal` is deliberately
+undeclared — it arrives with its pie and its routing together, so no half-wired value
+sits around. The ticket rides the **cross-possession consequence→entry seam**:
+`PossessionConsequence` gained an optional `TransitionContext`, the Governor threads it
+onto the spawned `PossessionState`, and the resolver's entry switch reads it.
+
+### Ticket memory (model recorded; only single-hop built)
+
+The general model: a ticket accumulates context as a possession proceeds, and at the
+terminal the relevant memory distills into the consequence that seeds the next
+possession's entry. This session builds only **single-memory, single-hop** instances —
+Roll C reads one `TurnoverContext` off the immediate `Continue`; Roll J reads one
+`TransitionSource` off the immediate entry. **Multi-hop accumulation and provenance**
+(a steal-born break or an entry-stage turnover pushing the downstream pie harder than a
+halfcourt one) is a future clean-append onto the same record, NOT built here.
+
+### Roll J's two deferred modifier seams (documented, independent, NOT built)
+
+The Push/Settle split is where two SEPARATE future inputs will land — and, per the
+locked "strategy and matchup modifiers stay independent" rule, they are **never** fused
+into one pre-blended weight:
+
+1. **Rebounder tilt (attribute).** WHO grabbed the board nudges push vs. settle — a
+   guard pushes more than a center. Lands in the attribute layer, read off the rebounder
+   slot once selection/attribution names it.
+2. **Coach tempo (strategy).** The team's up-tempo / low-tempo setting nudges push vs.
+   settle. Lands in the strategy layer.
+
+Both attach at the GENERATOR (a smarter pie), exactly like the height-driven tip contest
+and Roll C's pressure wire; Roll J the roll never changes when they arrive.
+
+### Rebound-first scope, and the one-line flip that finishes it
+
+Only Roll I's `DefensiveRebound` is wired live to Roll J this session, via the new
+`PossessionConsequence.TransitionReboundTo(team)` factory (which stamps
+`TransitionContext.Rebound`). Steals still emit a plain `TransitionTo` with a null
+context, so the resolver's entry switch sends them to Roll A unchanged. When the steal
+feeder lands, the change is one line in that switch (every `Transition` start → Roll J)
+plus the steal pie — the seam is already shaped for it.

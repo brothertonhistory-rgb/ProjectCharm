@@ -16,6 +16,20 @@ public sealed class RollCConfig
     public double BaseLostBallLiveBall { get; set; } = 0.20;
     public double BaseOffensiveFoul { get; set; } = 0.10;
 
+    // --- Transition-context weight set (selected when a turnover arrives stamped
+    //     TurnoverContext.Transition — i.e. coughed up on the outlet/push). Flat
+    //     placeholders, sum to 1. Rationale (Emmett's): transition turnovers are
+    //     more often LIVE and going the other way — live strips (LostBallLiveBall)
+    //     jump to 0.35 and the two live slices together are ~50% (vs. halfcourt's
+    //     42%); offensive fouls nearly vanish (0.05) with little halfcourt contact
+    //     to draw a charge. Tuned later like every pie. The Halfcourt set above is
+    //     UNCHANGED, so the legacy path is byte-for-byte intact. ---
+    public double TransitionBadPassDeadBall { get; set; } = 0.25;
+    public double TransitionBadPassIntercepted { get; set; } = 0.15;
+    public double TransitionLostBallDeadBall { get; set; } = 0.20;
+    public double TransitionLostBallLiveBall { get; set; } = 0.35;
+    public double TransitionOffensiveFoul { get; set; } = 0.05;
+
     /// <summary>The single live wire proving the seam carries signal: how much a
     /// pressure of 1.0 adds to the live-strip weight before renormalization.
     /// Defensive ball pressure -> more live strips. Placeholder — not basketball

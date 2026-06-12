@@ -101,6 +101,18 @@ public sealed class JumpBallResolverStub : IContinuationNode
     public string Receive(Continue continuation) => "STUB:JumpBallResolver";
 }
 
+/// <summary>STUB for the transition node — where Roll J's <c>Push</c> lands: the
+/// possession decided to RUN. This is the future transition roll's holding pen (what
+/// the fast break PRODUCES — numbers, leak-outs, transition shot mix). A plain label
+/// stub like the pre-shot stubs (no per-possession facts to echo: a transition entry
+/// that pushes has not selected a player/zone/result — Settle, not Push, is what feeds
+/// player selection). The real transition roll replaces this without Roll J or the
+/// result contract changing.</summary>
+public sealed class TransitionStub : IContinuationNode
+{
+    public string Receive(Continue continuation) => "STUB:Transition";
+}
+
 /// <summary>
 /// Shared label-builder for the four post-Roll-H stubs (rebound, shooting free
 /// throws, sideline inbound, and — as of Session 13 — block recovery). Each lands

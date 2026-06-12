@@ -1,0 +1,129 @@
+namespace Charm.Engine;
+
+/// <summary>
+/// Roll J — Transition Entry (run-or-not gate). The node a LIVE-BALL possession
+/// enters when it starts off a defensive rebound: the new ball-handler decides
+/// whether to PUSH or PULL IT OUT — grabbing a board deep in the backcourt does not
+/// mean you run. This replaces Session 15's temp-route of a Transition start
+/// through Roll A: a defensive rebound now produces a real live-ball entry.
+///
+/// Roll J decides ONLY whether we run. What the fast break PRODUCES (numbers
+/// advantage, leak-outs, transition shot mix) is a separate later build that
+/// <see cref="TransitionOutcome.Push"/> parks at via the new TransitionStub.
+///
+/// FIVE arms (<see cref="TransitionOutcome"/>), ALL continues — Roll J names no
+/// terminal of its own; its two "ending" flavors resolve at shared downstream nodes:
+///   <list type="bullet">
+///   <item><see cref="TransitionOutcome.Settle"/> — pull it out, run a halfcourt set.
+///   CONTINUE via <see cref="ContinuationKind.IntoPlayerSelection"/> (Roll E).</item>
+///   <item><see cref="TransitionOutcome.Push"/> — we run. CONTINUE to the parked
+///   transition stub via <see cref="ContinuationKind.IntoTransition"/>.</item>
+///   <item><see cref="TransitionOutcome.Turnover"/> — coughed it up. CONTINUE to the
+///   shared turnover node via <see cref="ContinuationKind.ResolveTurnoverType"/>,
+///   STAMPING <see cref="TurnoverContext.Transition"/> on the ticket so Roll C
+///   selects its transition turnover pie. The first station to stamp a non-default
+///   turnover context — the forcing case for the whole ticket/station mechanism.</item>
+///   <item><see cref="TransitionOutcome.DefensiveFoul"/> — fouled on the push. Charges
+///   the rebound-LOSING team (= the new defense, <c>state.Defense</c>) via
+///   <see cref="FoulTracker"/>, reads the bonus, and forks: below ->
+///   <see cref="ContinuationKind.ResolveSidelineInbound"/>; in bonus ->
+///   <see cref="ContinuationKind.ResolveFreeThrows"/> with the <see cref="BonusType"/>
+///   payload. The THIRD feeder into the charge-and-fork, after Roll D and Roll I —
+///   copied, not reinvented.</item>
+///   <item><see cref="TransitionOutcome.JumpBall"/> — tie-up. CONTINUE to the shared
+///   jump-ball node via <see cref="ContinuationKind.ResolveJumpBall"/>.</item>
+///   </list>
+///
+/// Signature <c>(state, pie, game, rng)</c> — the Roll D / Roll I shape — because the
+/// <see cref="TransitionOutcome.DefensiveFoul"/> arm mutates <see cref="GameState"/>
+/// (charges the defensive team foul). The other four arms read nothing off
+/// <see cref="GameState"/>.
+///
+/// FLAT-PIE MODIFIER SEAMS (documented, NOT built — the Push/Settle split is where
+/// two SEPARATE, INDEPENDENT future inputs land, never fused into one pre-blended
+/// weight, per the locked "strategy and matchup modifiers stay independent" rule):
+///   1. REBOUNDER TILT (attribute): WHO grabbed the board nudges push vs. settle — a
+///      guard pushes more than a center. Lands in the attribute layer, read off the
+///      rebounder slot once selection/attribution names it.
+///   2. COACH TEMPO (strategy): the team's up-tempo / low-tempo setting nudges push
+///      vs. settle. Lands in the strategy layer.
+/// Both attach at the GENERATOR (a smarter pie), exactly like the height-driven tip
+/// contest and Roll C's pressure wire; Roll J itself never changes when they do.
+/// </summary>
+public static class RollJ
+{
+    public static RollResult Execute(
+        PossessionState state, Pie<TransitionOutcome> pie, GameState game, IRng rng)
+    {
+        // Roll the five-way pie to a run-or-not outcome.
+        var outcome = pie.Roll(rng.NextUnitInterval());
+
+        return outcome switch
+        {
+            // Pull it out -> run a halfcourt set. CONTINUE to player selection.
+            // The "proceed" analog; reads nothing off GameState.
+            TransitionOutcome.Settle =>
+                new Continue(ContinuationKind.IntoPlayerSelection, state),
+
+            // We run -> the future transition roll (parked). CONTINUE.
+            TransitionOutcome.Push =>
+                new Continue(ContinuationKind.IntoTransition, state),
+
+            // Coughed it up -> shared turnover node, STAMPED Transition so Roll C
+            // selects its transition pie. The context rides the ticket exactly as
+            // Bonus/Flavor do; Roll C reads it and never queries Roll J.
+            TransitionOutcome.Turnover =>
+                new Continue(ContinuationKind.ResolveTurnoverType, state)
+                {
+                    TurnoverContext = TurnoverContext.Transition
+                },
+
+            // Fouled on the push -> charge the rebound-losing team, fork on bonus.
+            // The Roll I / Roll D pattern, mutating GameState. (Branch isolated below.)
+            TransitionOutcome.DefensiveFoul =>
+                ResolveFoulOnDefense(state, game),
+
+            // Tie-up -> shared jump-ball node (consults the arrow). CONTINUE.
+            TransitionOutcome.JumpBall =>
+                new Continue(ContinuationKind.ResolveJumpBall, state),
+
+            _ => throw new InvalidOperationException($"Unhandled transition outcome '{outcome}'.")
+        };
+    }
+
+    /// <summary>
+    /// The DefensiveFoul arm: charge the foul to the team that LOST the rebound (the
+    /// new defense this possession), read the bonus, and fork to sideline inbound
+    /// (below bonus) or free throws (in bonus). Copied from Roll I's charge-and-fork
+    /// (itself from Roll D) — the third feeder into the shared fork. The foul is
+    /// charged to <c>state.Defense</c>: on a possession spawned off a defensive
+    /// rebound the new offense is the rebounding team, so the new defense is exactly
+    /// the team that lost the board and is scrambling back — the team fouling on the
+    /// push.
+    /// </summary>
+    private static RollResult ResolveFoulOnDefense(PossessionState state, GameState game)
+    {
+        // Charge the foul to the fouling team = the defense this possession.
+        var foulingTeam = state.Defense;
+        game.Fouls.Increment(foulingTeam);
+
+        // Read the bonus the fouling team is now in — a state read, not a roll.
+        var bonus = game.Fouls.BonusFor(foulingTeam);
+
+        if (bonus == BonusType.None)
+        {
+            // Below bonus: offense inbounds from the sideline. Same possession.
+            return new Continue(ContinuationKind.ResolveSidelineInbound, state)
+            {
+                Bonus = bonus
+            };
+        }
+
+        // In bonus (OneAndOne or Double): bonus free throws. Same possession. Bonus
+        // type rides as functional payload, exactly as Roll D and Roll I.
+        return new Continue(ContinuationKind.ResolveFreeThrows, state)
+        {
+            Bonus = bonus
+        };
+    }
+}

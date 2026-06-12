@@ -16,6 +16,7 @@ internal static class Program
         var cfgG = RollGConfig.Load(configPath);
         var cfgH = RollHConfig.Load(configPath);
         var cfgI = RollIConfig.Load(configPath);
+        var cfgJ = RollJConfig.Load(configPath);
         var cfgGov = GovernorConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
@@ -28,6 +29,7 @@ internal static class Program
         var rollGGenerator = new RollGStubPieGenerator(cfgG);
         var rollHGenerator = new RollHStubPieGenerator(cfgH);
         var rollIGenerator = new RollIStubPieGenerator(cfgI);
+        var rollJGenerator = new RollJStubPieGenerator(cfgJ);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -44,6 +46,7 @@ internal static class Program
             rollGGenerator,
             rollHGenerator,
             rollIGenerator,
+            rollJGenerator,
             game,
             rng,
             new ResumeInboundStub(),
@@ -51,7 +54,8 @@ internal static class Program
             new BlockRecoveryStub(),
             new OffensiveReboundStub(),
             new ShootingFreeThrowsStub(),
-            new SidelineInboundStub());
+            new SidelineInboundStub(),
+            new TransitionStub());
 
         var state = new PossessionState(
             PossessionNumber: 1,
@@ -79,6 +83,9 @@ internal static class Program
         ok &= RollHHandoffCheck(cfg, state);
         ok &= RollIReboundBatchCheck(cfg, cfgI, rollIGenerator, game, state);
         ok &= RollIBonusForkCheck(cfg, cfgD, cfgI, rollIGenerator, state);
+        ok &= RollJBatchCheck(cfg, cfgD, cfgJ, rollJGenerator, state);
+        ok &= RollJBonusForkCheck(cfg, cfgD, cfgJ, state);
+        ok &= RollCContextCheck(cfg, cfgC, rollCGenerator, state);
         ok &= GovernorLoopCheck(cfg, cfgD, cfgGov);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
@@ -831,6 +838,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -838,7 +846,8 @@ internal static class Program
             new BlockRecoveryStub(),
             new OffensiveReboundStub(),
             new ShootingFreeThrowsStub(),
-            new SidelineInboundStub());
+            new SidelineInboundStub(),
+            new TransitionStub());
 
         var pieE = genE.Generate(state);
         var pieF = genF.Generate(state);
@@ -995,6 +1004,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -1002,7 +1012,8 @@ internal static class Program
             new BlockRecoveryStub(),
             new OffensiveReboundStub(),
             new ShootingFreeThrowsStub(),
-            new SidelineInboundStub());
+            new SidelineInboundStub(),
+            new TransitionStub());
 
         var pieE = genE.Generate(state);
 
@@ -1303,6 +1314,7 @@ internal static class Program
             genG,
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -1310,7 +1322,8 @@ internal static class Program
             new BlockRecoveryStub(),
             new OffensiveReboundStub(),
             new ShootingFreeThrowsStub(),
-            new SidelineInboundStub());
+            new SidelineInboundStub(),
+            new TransitionStub());
 
         var pieE = genE.Generate(state);
 
@@ -1653,6 +1666,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -1660,7 +1674,8 @@ internal static class Program
             new BlockRecoveryStub(),
             new OffensiveReboundStub(),
             new ShootingFreeThrowsStub(),
-            new SidelineInboundStub());
+            new SidelineInboundStub(),
+            new TransitionStub());
 
         var governor = new Governor(resolver, game, cfgGov);
 
@@ -1703,6 +1718,7 @@ internal static class Program
         var contiguousOk = true;
         var flipsOk = true;
         var jumpBalls = 0;
+        var reboundIntoJ = 0;
         for (var i = 0; i < records.Count; i++)
         {
             var r = records[i];
@@ -1714,6 +1730,10 @@ internal static class Program
                 var prev = records[i - 1];
                 if (r.Offense != prev.Applied.NextOffense) flipsOk = false;
                 if (r.Entry != prev.Applied.NextEntry) flipsOk = false;
+                // A possession whose PREDECESSOR ended on a defensive rebound entered
+                // Roll J: the rebound consequence carries the Rebound context, which the
+                // resolver routes to Roll J (not Roll A). This counts the live path.
+                if (prev.EndedOnTerminal && prev.EndLabel == "DefensiveRebound") reboundIntoJ++;
             }
         }
         var firstOk = records.Count > 0
@@ -1737,6 +1757,13 @@ internal static class Program
                        && game.HomeLineup.OnCourt.Count == Lineup.Size
                        && game.AwayLineup.OnCourt.Count == Lineup.Size;
 
+        // Rebound -> Roll J, end to end. A defensive rebound spawns a Transition
+        // possession that ENTERS Roll J (not Roll A), and Roll J's Push reaches the
+        // transition stub. STUB:Transition is reachable ONLY via Roll J's Push, so its
+        // presence is proof Roll J actually ran off a rebound this loop. Both non-zero.
+        var transitionStubParks = result.PerStubParks.GetValueOrDefault("STUB:Transition", 0);
+        var rollJOk = reboundIntoJ > 0 && transitionStubParks > 0;
+
         // --- Report. ---
         Console.WriteLine(
             $"  resolved={records.Count:N0} | terminal-ended={result.TerminalEnded:N0} | parked={result.Parked:N0} " +
@@ -1751,6 +1778,9 @@ internal static class Program
             $"  fouls(Home): {homeFoulsBefore}({bonusBefore}) -> {homeFoulsAfter}({bonusAfter}) | " +
             $"monotonic + bonus stays crossed -> {(foulOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  lineups survive (same objects, 5 slots each) -> {(lineupOk ? "ok" : "FAIL")}");
+        Console.WriteLine(
+            $"  rebound -> Roll J: possessions entering J={reboundIntoJ:N0} | STUB:Transition parks={transitionStubParks:N0} " +
+            $"-> {(rollJOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  flat placeholder time accumulated: {result.TotalSeconds:N0}s (observability only)");
 
         // Per-stub park breakdown — quantifies how much of the game is currently
@@ -1773,10 +1803,248 @@ internal static class Program
         }
 
         var allOk = countOk && noLostOk && contiguousOk && flipsOk && firstOk
-                    && arrowOk && foulOk && lineupOk;
+                    && arrowOk && foulOk && lineupOk && rollJOk;
         Console.WriteLine($"  Governor loop: {(allOk ? "ok" : "FAIL")}");
         return allOk;
     }
+
+    // --- Batch: Roll J's five-way run-or-not distribution (rebound context) converges
+    //     within tolerance; every exit is a clean Continue of the expected kind (Roll J
+    //     names no terminal — all five arms are continues, so we count by
+    //     ContinuationKind); the Turnover arm stamps the Transition context for Roll C;
+    //     and the DefensiveFoul arm charges the defense and forks on the bonus (this
+    //     batch's own game crosses the threshold partway, exercising the §2a crossing). ---
+    private static bool RollJBatchCheck(
+        RollAConfig cfg, RollDConfig cfgD, RollJConfig cfgJ,
+        RollJStubPieGenerator genJ, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} transition entries through Roll J (rebound context) ---");
+
+        var rng = new SystemRng(cfg.Seed);
+        // A FRESH game (does not perturb Main's shared game). Its defense foul count
+        // climbs as the DefensiveFoul arm fires and CROSSES the bonus partway through
+        // — so both fork branches (sideline below bonus, FT in bonus) are exercised.
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var pieJ = genJ.Generate(TransitionContext.Rebound);
+
+        var counts = new Dictionary<TransitionOutcome, int>();
+        foreach (var o in Enum.GetValues<TransitionOutcome>()) counts[o] = 0;
+
+        var settleSel = 0;          // IntoPlayerSelection
+        var pushStub = 0;           // STUB:Transition
+        var turnoverStamped = 0;    // ResolveTurnoverType carrying TurnoverContext.Transition
+        var turnoverUnstamped = 0;  // ResolveTurnoverType MISSING the stamp (a FAIL)
+        var foulSideline = 0;       // ResolveSidelineInbound (below bonus)
+        var foulFreeThrows = 0;     // ResolveFreeThrows (in bonus)
+        var jumpBalls = 0;          // ResolveJumpBall
+        var unrecognized = 0;
+
+        var transitionStub = new TransitionStub();
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var r = RollJ.Execute(state, pieJ, game, rng);
+            switch (r)
+            {
+                case Continue { Next: ContinuationKind.IntoPlayerSelection }:
+                    counts[TransitionOutcome.Settle]++;
+                    settleSel++;
+                    break;
+                case Continue { Next: ContinuationKind.IntoTransition } pc:
+                    counts[TransitionOutcome.Push]++;
+                    if (transitionStub.Receive(pc) == "STUB:Transition") pushStub++;
+                    break;
+                case Continue { Next: ContinuationKind.ResolveTurnoverType } tc:
+                    counts[TransitionOutcome.Turnover]++;
+                    if (tc.TurnoverContext == TurnoverContext.Transition) turnoverStamped++;
+                    else turnoverUnstamped++;
+                    break;
+                case Continue { Next: ContinuationKind.ResolveSidelineInbound }:
+                    counts[TransitionOutcome.DefensiveFoul]++;
+                    foulSideline++;
+                    break;
+                case Continue { Next: ContinuationKind.ResolveFreeThrows }:
+                    counts[TransitionOutcome.DefensiveFoul]++;
+                    foulFreeThrows++;
+                    break;
+                case Continue { Next: ContinuationKind.ResolveJumpBall }:
+                    counts[TransitionOutcome.JumpBall]++;
+                    jumpBalls++;
+                    break;
+                default:
+                    unrecognized++;
+                    break;
+            }
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll J outcomes:");
+        foreach (var (outcome, weight) in pieJ.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-16} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine("\n  routing per outcome:");
+        Console.WriteLine($"    Settle        -> IntoPlayerSelection {settleSel,8:N0}  {(settleSel > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    Push          -> STUB:Transition     {pushStub,8:N0}  {(pushStub > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    Turnover      -> Roll C (stamped)    {turnoverStamped,8:N0}  {(turnoverStamped > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    DefensiveFoul -> SidelineInbound     {foulSideline,8:N0}  (below bonus)");
+        Console.WriteLine($"                  -> ResolveFreeThrows   {foulFreeThrows,8:N0}  (in bonus)");
+        Console.WriteLine($"    JumpBall      -> ResolveJumpBall     {jumpBalls,8:N0}  {(jumpBalls > 0 ? "ok" : "NONE")}");
+
+        var foulTotal = foulSideline + foulFreeThrows;
+        var allArms = settleSel > 0 && pushStub > 0 && turnoverStamped > 0 && foulTotal > 0 && jumpBalls > 0;
+        var routedOk = unrecognized == 0;
+        var stampOk = turnoverUnstamped == 0;
+        Console.WriteLine($"\n  zero unrouted exits: {unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  every Turnover stamped Transition for Roll C: unstamped={turnoverUnstamped} -> {(stampOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all five Roll J arms reached: {(allArms ? "ok" : "FAIL")}");
+
+        return ratesOk && routedOk && stampOk && allArms;
+    }
+
+    // --- Bonus fork: Roll J's DefensiveFoul arm charges the DEFENSE team foul and
+    //     forks on the bonus exactly as Roll I and Roll D do — the third feeder into
+    //     the shared charge-and-fork. All-mass-on-DefensiveFoul pie so every draw
+    //     exercises the arm regardless of RNG. Mirrors RollIBonusForkCheck. ---
+    private static bool RollJBonusForkCheck(
+        RollAConfig cfg, RollDConfig cfgD, RollJConfig cfgJ, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Bonus fork: Roll J defensive foul across the thresholds ---");
+
+        var foulOnlyPie = new Pie<TransitionOutcome>(new Dictionary<TransitionOutcome, double>
+        {
+            [TransitionOutcome.Settle] = 0.0,
+            [TransitionOutcome.Push] = 0.0,
+            [TransitionOutcome.Turnover] = 0.0,
+            [TransitionOutcome.DefensiveFoul] = 1.0,
+            [TransitionOutcome.JumpBall] = 0.0,
+        }, cfgJ.Epsilon);
+
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var rng = new SystemRng(cfg.Seed);
+
+        var ok = true;
+        Console.WriteLine($"  thresholds: bonus>={cfgD.BonusThreshold}, double>={cfgD.DoubleBonusThreshold}");
+        for (var i = 1; i <= cfgD.DoubleBonusThreshold + 1; i++)
+        {
+            var before = game.Fouls.FoulsFor(state.Defense);
+            var r = RollJ.Execute(state, foulOnlyPie, game, rng);
+            var after = game.Fouls.FoulsFor(state.Defense);
+
+            // Expected routing from the POST-increment foul count.
+            var expectedBonus = after >= cfgD.DoubleBonusThreshold ? BonusType.Double
+                              : after >= cfgD.BonusThreshold ? BonusType.OneAndOne
+                              : BonusType.None;
+            var expectedKind = expectedBonus == BonusType.None
+                ? ContinuationKind.ResolveSidelineInbound
+                : ContinuationKind.ResolveFreeThrows;
+
+            var c = r as Continue;
+            var kindOk = c is not null && c.Next == expectedKind;
+            var bonusOk = c is not null && c.Bonus == expectedBonus;
+            var chargedOk = after == before + 1;
+            var rowOk = kindOk && bonusOk && chargedOk;
+            ok &= rowOk;
+
+            var route = c is null ? "(not a continue!)"
+                : c.Next == ContinuationKind.ResolveFreeThrows
+                    ? $"ResolveFreeThrows({c.Bonus})"
+                    : $"SidelineInbound({c.Bonus})";
+            Console.WriteLine(
+                $"  foul#{after,2}: {before}->{after} | route={route,-28} | expected={expectedKind} ({expectedBonus}) -> {(rowOk ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine($"  bonus fork charges the defense and routes correctly: {(ok ? "ok" : "FAIL")}");
+        return ok;
+    }
+
+    // --- Context selection: Roll C builds the RIGHT pie for each turnover context,
+    //     and the resolved rates from each match. Proves the ticket/station seam end
+    //     to end: a Halfcourt ticket (the legacy/default) selects 30/22/18/20/10; a
+    //     Transition ticket selects 25/15/20/35/5. Each selected pie is asserted equal
+    //     to its configured weights (selection correct), then driven through Roll C
+    //     (consumption correct). The legacy pie is confirmed byte-for-byte. ---
+    private static bool RollCContextCheck(
+        RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Context: Roll C pie selection by turnover context ---");
+
+        var contexts = new (TurnoverContext ctx, (TurnoverOutcome o, double w)[] expected)[]
+        {
+            (TurnoverContext.Halfcourt, new[]
+            {
+                (TurnoverOutcome.BadPassDeadBall,    cfgC.BaseBadPassDeadBall),
+                (TurnoverOutcome.BadPassIntercepted, cfgC.BaseBadPassIntercepted),
+                (TurnoverOutcome.LostBallDeadBall,   cfgC.BaseLostBallDeadBall),
+                (TurnoverOutcome.LostBallLiveBall,   cfgC.BaseLostBallLiveBall),
+                (TurnoverOutcome.OffensiveFoul,      cfgC.BaseOffensiveFoul),
+            }),
+            (TurnoverContext.Transition, new[]
+            {
+                (TurnoverOutcome.BadPassDeadBall,    cfgC.TransitionBadPassDeadBall),
+                (TurnoverOutcome.BadPassIntercepted, cfgC.TransitionBadPassIntercepted),
+                (TurnoverOutcome.LostBallDeadBall,   cfgC.TransitionLostBallDeadBall),
+                (TurnoverOutcome.LostBallLiveBall,   cfgC.TransitionLostBallLiveBall),
+                (TurnoverOutcome.OffensiveFoul,      cfgC.TransitionOffensiveFoul),
+            }),
+        };
+
+        var ok = true;
+        foreach (var (ctx, expected) in contexts)
+        {
+            var pie = genC.Generate(state, pressure: 0.0, context: ctx);
+            var pieMap = pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+
+            // 1) The SELECTED pie equals the expected configured weights for this
+            //    context — proves the context picked the right SET, not merely that
+            //    some internally-valid pie came back.
+            var selectionOk = true;
+            foreach (var (o, w) in expected)
+                if (Math.Abs(pieMap[o] - w) > cfgC.Epsilon) selectionOk = false;
+
+            // 2) The resolved rates match the pie — proves the roll consumes it.
+            var rng = new SystemRng(cfg.Seed);
+            var counts = new Dictionary<TurnoverOutcome, int>();
+            foreach (var o in Enum.GetValues<TurnoverOutcome>()) counts[o] = 0;
+            for (var i = 0; i < cfg.BatchSize; i++)
+            {
+                var t = (Terminal)RollC.Execute(state, pie, rng);
+                counts[MapTurnover(t.Reason)]++;
+            }
+
+            var n = (double)cfg.BatchSize;
+            var ratesOk = true;
+            Console.WriteLine($"  context={ctx} (selection {(selectionOk ? "ok" : "FAIL")}):");
+            foreach (var (o, w) in expected)
+            {
+                var observed = counts[o] / n;
+                var gap = Math.Abs(observed - w);
+                var pass = gap <= cfg.RateTolerance;
+                ratesOk &= pass;
+                Console.WriteLine($"    {o,-20} observed={observed:P3}  expected={w:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+            }
+            ok &= selectionOk && ratesOk;
+        }
+
+        Console.WriteLine($"  Roll C context selection: {(ok ? "ok" : "FAIL")}");
+        return ok;
+    }
+
+    private static TurnoverOutcome MapTurnover(string reason) => reason switch
+    {
+        "BadPassDeadBall" => TurnoverOutcome.BadPassDeadBall,
+        "BadPassIntercepted" => TurnoverOutcome.BadPassIntercepted,
+        "LostBallDeadBall" => TurnoverOutcome.LostBallDeadBall,
+        "LostBallLiveBall" => TurnoverOutcome.LostBallLiveBall,
+        "OffensiveFoul" => TurnoverOutcome.OffensiveFoul,
+        _ => throw new InvalidOperationException($"Unmapped Roll C reason '{reason}'.")
+    };
 
     private static TeamSide Other(TeamSide side) =>
         side == TeamSide.Home ? TeamSide.Away : TeamSide.Home;

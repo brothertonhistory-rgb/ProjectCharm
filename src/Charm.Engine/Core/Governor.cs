@@ -4,7 +4,9 @@ namespace Charm.Engine;
 /// <param name="Number">The possession's monotonic id (the accounting anchor).</param>
 /// <param name="Offense">Who had the ball this possession.</param>
 /// <param name="Defense">Who defended (the other side).</param>
-/// <param name="Entry">How this possession started (temp-routed through Roll A this session).</param>
+/// <param name="Entry">How this possession started. A Transition entry off a defensive
+/// rebound now enters Roll J (the resolver routes it on the carried Rebound context);
+/// every other entry enters Roll A.</param>
 /// <param name="EndedOnTerminal">True if it reached a terminal; false if it parked at a stub.</param>
 /// <param name="EndLabel">The terminal reason, or "parked:{stub}".</param>
 /// <param name="Applied">The consequence used to spawn the NEXT possession (the
@@ -54,10 +56,13 @@ public sealed record GovernorRunResult(
 ///   Session-14 "only handled one landing" bug class cannot recur.</item>
 /// </list>
 ///
-/// <para>Either way it spawns the next possession (temp-routed through Roll A
-/// regardless of the entry tag this session), increments the count, and loops until
-/// the config'd possession cap. EVERY possession — terminal or parked — produces
-/// exactly one next possession, so the count never leaks.</para>
+/// <para>Either way it spawns the next possession — threading the consequence's
+/// offense, entry, AND transition context onto the new start state — increments the
+/// count, and loops until the config'd possession cap. The entry tag is now honored by
+/// the resolver: a Transition consequence off a defensive rebound carries the Rebound
+/// context and enters Roll J; every other entry enters Roll A. EVERY possession —
+/// terminal or parked — produces exactly one next possession, so the count never
+/// leaks.</para>
 ///
 /// <para>The cross-possession invariants it must NOT disturb — the possession arrow,
 /// the team-foul counts, and the lineups — all live on the shared <see cref="GameState"/>
@@ -145,16 +150,19 @@ public sealed class Governor
                 endedOnTerminal, endLabel, consequence));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
-            // the other side, number +1, entry the consequence's tag. Per-possession
-            // facts (slot / zone / result) reset to null — a fresh possession. The
-            // final iteration spawns a state that is never run (the loop exits), which
-            // is harmless.
+            // the other side, number +1, entry the consequence's tag, AND the transition
+            // context ticket it carries (non-null only off a defensive rebound this
+            // session — that ticket is what makes the resolver route the new possession
+            // to Roll J instead of Roll A). Per-possession facts (slot / zone / result)
+            // reset to null — a fresh possession. The final iteration spawns a state that
+            // is never run (the loop exits), which is harmless.
             var nextOffense = consequence.NextOffense;
             state = new PossessionState(
                 PossessionNumber: state.PossessionNumber + 1,
                 Offense: nextOffense,
                 Defense: Other(nextOffense),
-                Entry: consequence.NextEntry);
+                Entry: consequence.NextEntry,
+                TransitionContext: consequence.TransitionContext);
         }
 
         return new GovernorRunResult(records, terminalEnded, parked, totalSeconds, perStubParks);

@@ -72,6 +72,17 @@ public enum EntryType
 /// (2 vs. 3) and the free-throw count (1 / 2 / 3) — neither is stored here. Roll H
 /// stamps the outcome; the derivations are downstream. Its type is <see
 /// cref="ShotResult"/>.</para></param>
+/// <param name="TransitionContext">The transition CONTEXT TICKET this possession
+/// began with — the cross-possession ticket memory Roll J reads to choose its
+/// run-or-not pie. Set by the spawning terminal's
+/// <see cref="PossessionConsequence.TransitionContext"/> and threaded onto this
+/// possession by the Governor. Appended after the per-possession facts because all
+/// callers construct by name or <c>with</c>, so position is free; conceptually it
+/// belongs with <see cref="Entry"/> (it is part of the start-state).
+/// <para>Null on every possession that did NOT begin in transition — every dead-ball
+/// inbound, and (this session) every not-yet-wired steal. Non-null
+/// (<see cref="TransitionContext.Rebound"/>) means "this possession began on a
+/// defensive rebound": the resolver routes it to Roll J instead of Roll A.</para></param>
 public sealed record PossessionState(
     int PossessionNumber,
     TeamSide Offense,
@@ -79,4 +90,5 @@ public sealed record PossessionState(
     EntryType Entry,
     Slot? SelectedSlot = null,
     ShotLocation? ShotType = null,
-    ShotResult? Result = null);
+    ShotResult? Result = null,
+    TransitionContext? TransitionContext = null);

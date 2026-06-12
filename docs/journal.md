@@ -1,3 +1,99 @@
+## Session 16 — Roll J (transition-entry gate) & the ticket/station mechanism (2026-06-12)
+
+**Built.** The first **live transition entry**. A defensive rebound no longer
+temp-routes to Roll A — it spawns a possession that enters **Roll J**, a real run-or-not
+gate. And because Roll J needs to stamp a turnover context, the long-sketched
+**ticket/station context-tag mechanism** went from idea to working code, instantiated
+twice in one session (Roll C as a context-consuming node, Roll J as another).
+
+**Roll J — the run-or-not gate.** Five arms, ALL continues (Roll J names no terminal of
+its own): `Settle` (.65) → `IntoPlayerSelection` (run a halfcourt set, Roll E); `Push`
+(.25) → `IntoTransition` → the new `TransitionStub` (we run — what the break *produces*
+is a later build, parked here); `Turnover` (.06) → `ResolveTurnoverType` STAMPED
+`TurnoverContext.Transition`; `DefensiveFoul` (.035) → charge the foul to `state.Defense`
+(the rebound-losing team scrambling back), read the bonus, fork to sideline inbound
+(below bonus) or free throws (in bonus); `JumpBall` (.005) → `ResolveJumpBall`. Signature
+`(state, pie, game, rng)` — the Roll D / Roll I shape — because the foul arm mutates
+`GameState`. It is the THIRD feeder into the shared charge-and-fork, copied not
+reinvented.
+
+**Transition ENTRY vs the transition ROLL — kept separate on purpose.** Roll J decides
+only *whether we run*. What the fast break produces (numbers advantage, leak-outs,
+transition shot mix) is a different node, parked at `TransitionStub`. Keeping these apart
+is what lets Roll J stay a small flat five-way gate instead of a fast-break simulator.
+
+**The ticket/station mechanism, realized twice.** A shared node is reached by multiple
+feeders; each feeder stamps a contextual ticket on the object it hands forward; the node
+reads the ticket to pick its parameter set and NEVER queries who fed it.
+- **Roll C now selects by context.** Its generator picks a **Halfcourt** set (the legacy
+  `.30/.22/.18/.20/.10`, reached by every pre-Roll-J feeder — they stamp nothing and read
+  as Halfcourt by default) or a **Transition** set (`.25/.15/.20/.35/.05`, more live
+  strips the other way). The context parameter sits LAST with a default, so every existing
+  call site compiles untouched; only the resolver passes a context, and only when the
+  ticket carries one. The Halfcourt path is **byte-for-byte unchanged**.
+- **Roll J selects by the arriving transition ticket.** One source is live this session
+  (`Rebound`); the generator builds the rebound pie and fails loud on any other source. No
+  orphan steal numbers ship.
+
+Roll J's Turnover arm is the **forcing case** — the first station ever to stamp a
+non-default `TurnoverContext`, which is why Roll C had to learn to read one now.
+
+**Carrier = a structured growable record, not an enum.** `TransitionContext(TransitionSource
+Source)` rides the cross-possession consequence→entry seam.
+`PossessionConsequence` gained an optional `TransitionContext` and a
+`TransitionReboundTo(team)` factory; the Governor threads it onto the spawned
+`PossessionState`; the resolver's entry switch reads it. A record grows by ADDING A FIELD
+(plug-in, not teardown) — the reason we did not explode `EntryType` into
+`TransitionOffRebound` / `TransitionOffSteal` / … . `TransitionSource` has one value
+(`Rebound`); `Steal` is deliberately undeclared until it arrives with its own pie and
+routing.
+
+**Rebound-first scope.** Only Roll I's `DefensiveRebound` is wired live to Roll J (it now
+uses `TransitionReboundTo(state.Defense)`). Steals still emit a plain `TransitionTo` with
+a null context, so the resolver sends them to Roll A unchanged. When the steal feeder
+lands, the change is ONE line in the entry switch (every `Transition` start → Roll J) plus
+the steal pie — the seam is already shaped for it.
+
+**Two deferred modifier seams on Roll J (documented, NOT built).** The Push/Settle split
+is where two SEPARATE, INDEPENDENT future inputs land, never fused into one weight:
+**rebounder tilt** (attribute — a guard pushes more than a center) and **coach tempo**
+(strategy — the team's up/down-tempo setting). Both attach at the GENERATOR, exactly like
+the height-driven tip contest and Roll C's pressure wire; Roll J the roll never changes
+when they arrive.
+
+**Single-hop ticket memory only.** Roll C reads one `TurnoverContext` off the immediate
+`Continue`; Roll J reads one `TransitionSource` off the immediate entry. Multi-hop
+accumulation and provenance (a steal-born break or an entry-stage turnover pushing the
+downstream pie harder) is a future clean-append onto the same record, NOT built here.
+
+**Validated (Monte Carlo, pre-harness).** Roll J's five rates land on
+`.65/.25/.06/.035/.005` within tolerance; every arm is reached; every Turnover ticket is
+stamped `Transition`; zero possessions go unrouted. The DefensiveFoul fork crosses the
+bonus correctly (fouls 1–6 → sideline/None; 7–9 → free throws/OneAndOne; 10+ →
+Double). Roll C's Halfcourt pie reproduces the legacy rates byte-for-byte; its Transition
+pie reproduces `.25/.15/.20/.35/.05`; the pressure wire renormalizes and raises the
+live-strip share on the selected set. The harness adds: `RollJBatchCheck` (100k, five
+rates + all-arms-reached + every-Turnover-stamped + zero-unrouted, fresh game crossing
+the bonus mid-batch so the foul arm splits sideline/FT), `RollJBonusForkCheck`
+(all-mass-on-DefensiveFoul across thresholds), `RollCContextCheck` (drives both contexts
+directly, asserting selected pie == configured weights AND resolved rates match), and an
+extended `GovernorLoopCheck` that counts possessions entering Roll J off a rebound and
+parks at `STUB:Transition` (reachable ONLY via Roll J's Push — airtight proof the live
+wire fired).
+
+**Files.** New: `Core/TransitionContext.cs`, `Rolls/TransitionOutcomes.cs`,
+`Config/RollJConfig.cs`, `Generators/RollJStubPieGenerator.cs`, `Rolls/RollJ.cs`.
+Modified engine: `Rolls/TurnoverOutcomes.cs` (+`TurnoverContext`),
+`Rolls/EntryOutcomes.cs` (+`IntoTransition`), `Core/RollResult.cs` (turnover context on
+`Continue`; transition context + `TransitionReboundTo` on `PossessionConsequence`),
+`Rolls/RollI.cs` (rebound arm uses the new factory), `Core/Stubs.cs` (+`TransitionStub`),
+`Core/PossessionState.cs` (+optional `TransitionContext`), `Config/RollCConfig.cs`
+(+Transition weights), `Generators/RollCStubPieGenerator.cs` (context selection),
+`Core/Resolver.cs` (Roll J generator + entry gate + `IntoTransition` route + context
+pass-through), `Core/Governor.cs` (threads `TransitionContext` onto the spawn; doc
+updates). Harness: `Program.cs` (wiring + three new checks + extended Governor check),
+`config.json` (RollJ section + RollC Transition weights).
+
 ## Session 15 — The Thin Governor (possession-to-possession loop) (2026-06-12)
 
 **Built.** The thin Governor — the layer that turns "resolve ONE possession" into

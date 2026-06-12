@@ -39,15 +39,41 @@ public abstract record RollResult
 /// entry node lands.)</param>
 public sealed record PossessionConsequence(TeamSide NextOffense, EntryType NextEntry)
 {
+    /// <summary>
+    /// The transition CONTEXT TICKET this consequence hands to the NEXT possession —
+    /// the cross-possession ticket memory Roll J reads to choose its run-or-not pie.
+    /// A clean APPEND to this deliberately-small seam (cf. the class summary: points,
+    /// clock, foul context, momentum are the other planned appends). The terminal
+    /// that spawns a transition possession distills it here; the Governor threads it
+    /// onto the spawned <see cref="PossessionState.TransitionContext"/>.
+    /// <para>Null on every dead-ball consequence, and — this session — on a plain
+    /// <see cref="TransitionTo"/> (the steal path, still temp-routed through Roll A
+    /// until the steal-feeder session). Set only by <see cref="TransitionReboundTo"/>,
+    /// and only meaningful when <see cref="NextEntry"/> is
+    /// <see cref="EntryType.Transition"/>.</para>
+    /// </summary>
+    public TransitionContext? TransitionContext { get; init; }
+
     /// <summary>Ball to <paramref name="team"/> on a dead-ball restart (the common
     /// case: made basket, dead-ball turnover, violation, foul, jump-ball award).</summary>
     public static PossessionConsequence DeadBallTo(TeamSide team) =>
         new(team, EntryType.DeadBallInbound);
 
-    /// <summary>Ball to <paramref name="team"/> on a live-ball / transition start
-    /// (a steal, a defensive rebound — the new offense pushes the other way).</summary>
+    /// <summary>Ball to <paramref name="team"/> on a live-ball / transition start with
+    /// NO context ticket — the STEAL path (a live-ball interception/strip). It carries
+    /// no <see cref="TransitionContext"/>, so the resolver still temp-routes it through
+    /// Roll A this session (rebound-first; steals get their own wiring + a Steal pie in
+    /// the steal-feeder session). Kept distinct from <see cref="TransitionReboundTo"/>
+    /// so that session is a one-line routing flip, not a terminal rewrite.</summary>
     public static PossessionConsequence TransitionTo(TeamSide team) =>
         new(team, EntryType.Transition);
+
+    /// <summary>Ball to <paramref name="team"/> on a live-ball transition start off a
+    /// DEFENSIVE REBOUND — carrying the <see cref="TransitionContext.Rebound"/> ticket
+    /// so the resolver routes it to Roll J (live transition entry) and Roll J selects
+    /// the rebound run-or-not pie. The one transition source wired this session.</summary>
+    public static PossessionConsequence TransitionReboundTo(TeamSide team) =>
+        new(team, EntryType.Transition) { TransitionContext = TransitionContext.Rebound };
 }
 
 /// <summary>The possession is over. The ball will change hands.</summary>
@@ -85,4 +111,19 @@ public sealed record Continue(ContinuationKind Next, PossessionState State) : Ro
     /// play-by-play. Null on every non-foul continuation; set only by Roll D.
     /// </summary>
     public FoulFlavor? Flavor { get; init; }
+
+    /// <summary>
+    /// The turnover CONTEXT TICKET a turnover continuation carries to Roll C — the
+    /// within-possession ticket memory that selects which turnover pie Roll C uses.
+    /// FUNCTIONAL payload (it changes the odds), the same optional-payload shape as
+    /// <see cref="Bonus"/>/<see cref="Flavor"/>. Stamped by a feeding station; the
+    /// node reads it and never queries the station back.
+    /// <para>Null on every non-turnover continuation, and null on the legacy
+    /// turnover feeders (Roll A, Roll B, Roll F) which stamp nothing — a null reads
+    /// as <see cref="TurnoverContext.Halfcourt"/>, so their behavior is byte-for-byte
+    /// unchanged. Set only by Roll J's <c>Turnover</c> arm
+    /// (<see cref="TurnoverContext.Transition"/>), and only meaningful when
+    /// <see cref="Next"/> is <see cref="ContinuationKind.ResolveTurnoverType"/>.</para>
+    /// </summary>
+    public TurnoverContext? TurnoverContext { get; init; }
 }

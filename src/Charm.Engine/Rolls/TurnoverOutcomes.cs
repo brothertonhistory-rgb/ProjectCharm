@@ -42,3 +42,30 @@ public enum TurnoverOutcome
     /// credited to the defense. -> TERMINAL.</summary>
     OffensiveFoul
 }
+
+/// <summary>
+/// The CONTEXT TICKET a turnover carries into Roll C — the within-possession ticket
+/// memory that selects WHICH turnover pie Roll C uses. The first instance of the
+/// ticket/station mechanism: a feeding station stamps this on the <see cref="Continue"/>
+/// that routes to <see cref="ContinuationKind.ResolveTurnoverType"/>, and Roll C's
+/// generator reads it to pick a parameter set. Roll C NEVER queries who fed it —
+/// "many feeders, one node," now with route-specific weights.
+///
+/// Declaration order is significant: <see cref="Halfcourt"/> is FIRST so it is the
+/// default/legacy context. The ticket is carried as an optional payload
+/// (<see cref="Continue.TurnoverContext"/>); a null/absent stamp reads as
+/// <see cref="Halfcourt"/>, so EVERY existing feeder (Roll A, Roll B, Roll F),
+/// which stamps nothing, keeps today's exact behavior byte-for-byte.
+/// </summary>
+public enum TurnoverContext
+{
+    /// <summary>A turnover in a settled halfcourt possession — the default/legacy
+    /// context (the unchanged 30/22/18/20/10 pie). Every pre-Roll-J feeder lands
+    /// here by stamping nothing.</summary>
+    Halfcourt,
+
+    /// <summary>A turnover on a transition outlet/push — stamped by Roll J's
+    /// <see cref="TransitionOutcome.Turnover"/> arm. Selects Roll C's transition pie:
+    /// more often LIVE and going the other way (live strips up, offensive fouls down).</summary>
+    Transition
+}

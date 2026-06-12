@@ -29,6 +29,11 @@
     "BaseLostBallDeadBall": 0.18,
     "BaseLostBallLiveBall": 0.20,
     "BaseOffensiveFoul": 0.10,
+    "TransitionBadPassDeadBall": 0.25,
+    "TransitionBadPassIntercepted": 0.15,
+    "TransitionLostBallDeadBall": 0.20,
+    "TransitionLostBallLiveBall": 0.35,
+    "TransitionOffensiveFoul": 0.05,
     "PressureLostBallLiveBallNudge": 0.10,
     "Epsilon": 1e-9
   },
@@ -88,6 +93,15 @@
     "OffensiveRebound": 0.29,
     "LooseBallFoulOnDefense": 0.02,
     "LooseBallFoulOnOffense": 0.01,
+    "Epsilon": 1e-9
+  },
+
+  "RollJ": {
+    "Settle": 0.65,
+    "Push": 0.25,
+    "Turnover": 0.06,
+    "DefensiveFoul": 0.035,
+    "JumpBall": 0.005,
     "Epsilon": 1e-9
   },
 

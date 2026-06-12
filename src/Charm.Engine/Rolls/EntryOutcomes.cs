@@ -143,4 +143,13 @@ public enum ContinuationKind
     /// real offensive-rebound roll (with its own odds, one branch looping back to
     /// the halfcourt roll → player selection) is a later session.</summary>
     ResolveOffensiveRebound,
+
+    /// <summary>A transition possession decided to RUN (Roll J's <c>Push</c>): hand
+    /// off to the (stubbed) transition node — the future transition roll's holding
+    /// pen, where what the fast break PRODUCES (numbers, leak-outs, transition shot
+    /// mix) will resolve. An <c>Into*</c> kind (proceed DEEPER into a live beat, like
+    /// <see cref="IntoHalfcourtSet"/> / <see cref="IntoPlayerSelection"/> /
+    /// <see cref="IntoShotType"/>), not a <c>Resolve*</c> hand-off to a terminal-ish
+    /// node. The real transition roll replaces the stub without Roll J changing.</summary>
+    IntoTransition,
 }
