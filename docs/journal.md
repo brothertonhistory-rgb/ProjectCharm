@@ -1,3 +1,87 @@
+## Session 18 — Roll L (free-throw resolution): the FT loop, many feeders one node (2026-06-12)
+
+**Built.** The **free-throw resolution roll** — Roll L — the node every trip to the line
+lands at. It closes the **two longest-standing parked FT stubs at once**:
+`ShootingFreeThrows` (and-1 + fouled-miss, parked since Roll H) and `ResolveFreeThrows`
+(bonus FTs, parked since the Roll D / I / J / K forks). Many feeders, one node.
+
+**Roll L is the engine's purest primitive — and the only roll that breaks the result
+contract.** A free throw is the shooter against a flat `Make` / `Miss` pie, spun once per
+attempt. The make probability carries **no context**: identical whether the trip came from
+an and-1, a fouled three, or a bonus foul. So Roll L reads no state, takes no ticket, names
+no successor, selects no parameter set, and returns a **bare `FreeThrowOutcome`** (not a
+`RollResult`). It is just "does this attempt go in." Every other roll classifies its own
+continuation; Roll L deliberately does not, because it has no routing role.
+
+**The sequence is conductor-owned loop arithmetic, not a parameterized pie.** How many times
+Roll L spins, and whether the last spin is live, is a structural fact of *how the foul
+happened* — read by the resolver at the entry edge, never a stamp Roll L sees. The two FT
+edges became the two entry points to one `DriveFreeThrows` loop; they differ only in the
+shot count they hand it:
+
+| Arriving trip | Shots | Derived from |
+|---|---|---|
+| And-1 (`MadeAndFouled`) | 1 | `ShootingFreeThrows` edge, `Result` |
+| Fouled miss, non-three (`MissFouled`, zone ≠ Three) | 2 | `ShootingFreeThrows` edge, `Result` + `ShotType` |
+| Fouled miss, three (`MissFouled`, zone = Three) | 3 | `ShootingFreeThrows` edge, `ShotType` |
+| Bonus `OneAndOne` | 1-and-1 (conditional 2nd) | `ResolveFreeThrows` edge, `Bonus` |
+| Bonus `Double` | 2 | `ResolveFreeThrows` edge, `Bonus` |
+
+**Uniform per-spin routing.** Every intermediate shot (any shot before the last in a fixed
+2- or 3-shot set) is **dead regardless of make or miss** — it just retriggers the next
+attempt; the ball never goes live between shots. Only the **last** shot evaluates live/dead:
+**make → TERMINAL** `DeadBallTo(defense)` (opponent inbounds at Roll A — the same consequence
+as a made field goal, reused from Roll H's `Made`); **miss → CONTINUE** to the new
+`STUB:FTRebound` (live board). The 1-and-1 is the one conditional: the front end is
+**conditionally last** — miss it and it IS the last shot (live → FT-rebound, the second
+forfeited); make it and a now-last second shot follows the normal rule. An and-1 is a fixed
+1-shot set, so its single shot is the last shot.
+
+**`STUB:FTRebound` is a new park** — the future FT-rebound roll's holding pen (offensive /
+defensive board off a missed FT, plus any foul on that rebound). A **plain-label** stub,
+deliberately NOT a `ShotFacts` echo: a bonus trip has no shooter selected, no zone, no result,
+so echoing those would fire NO_SLOT and falsely flag a dropped fact.
+
+**The loop is hard-bounded (≤ 3 spins; 1-and-1 ≤ 2), so no 10,000-iteration guard.** It
+asserts the spin count never exceeds 3 — a derivation bug surfaces loud rather than
+silently. No score is wired: a made FT is 1 point, a downstream derivation the future points
+pass reads off the make/miss fact, exactly as a field goal's 2/3 is.
+
+**Clean ctor swap (the agreed full-clean).** The resolver dropped its two retired FT-stub
+slots and gained the Roll L generator + the FT-rebound stub. All **six** existing harness
+resolver sites were updated (plus a seventh built in the new Roll L check). The two retired
+stub classes are kept as harness fact-echo helpers: `ResolveFreeThrowsStub` is still used by
+the Roll I side-check to confirm the `Bonus` payload rides through; `ShootingFreeThrowsStub`
+is retained per plan but currently has no caller (it was only ever a live-ctor arg).
+
+**Observability counter, not a payload.** `RollResult.cs` was left untouched — the shot
+count is derived resolver-local from `Result` / `ShotType` / `Bonus`, all already on the
+carried state. The one append is `RoutingOutcome.FreeThrowSpins`, an output observability
+counter **exactly parallel to `PutbackAttempts`** (init-only, default 0, in `Resolver.cs`,
+not `RollResult.cs`), so the harness can prove the exact per-trip spin count and the ≤ 3
+bound. It is the harness-readable output seam, never an odds-bearing input ticket.
+
+**Validation (pending Emmett's harness run — reasoned + Monte-Carlo-traced per §2).** The new
+`RollLFreeThrowCheck` drives each trip type through the resolver and proves: the raw make
+rate ≈ the flat config make% (.72); each trip spins Roll L the right number of times (and-1
+= 1, fouled two / double = 2, fouled three = 3, 1-and-1 = 1 or 2), max never > 3; and the
+**END-vs-FTRebound split is the signature of the rule** — fixed n-shot trips route on the
+last shot only (intermediates dead), so END rate == p ≈ .72; a 1-and-1 ends only when BOTH
+shots make, so END rate == p² ≈ .518. A made final FT hands the ball to the opponent. A
+Python Monte-Carlo mirroring `DriveFreeThrows` matched every rate within 0.0023 and the spin
+bands exactly. The F / G / H handoff checks were updated so FT landings absorb into their
+existing "deeper" / FT-resolved buckets; the Governor check is unchanged (FT trips now show
+as `FreeThrowsMade` terminals or `STUB:FTRebound` parks in its observability breakdown).
+FT resolution charges no foul and touches no arrow, so it is **accumulation-free** (§2a) —
+the only mid-batch crossing is upstream, fixing `Bonus` before the trip ever arrives.
+
+**Out of scope (parked):** the FT-rebound roll itself (`STUB:FTRebound`), fouls on the FT
+rebound, lane / off-ball violations (not modelled), the real FT-rating attribute generator
+and the road penalty (seam at 0), the bonus-FT shooter identity (deferred seam), points
+accounting (the separate attribution pass), and end-game deliberate-foul / clock logic.
+
+---
+
 ## Session 17 — Roll K (offensive-rebound loop-back): the first possession-EXTENDING node (2026-06-12)
 
 **Built.** The **offensive-rebound resolution roll** — Roll K — replacing the parked

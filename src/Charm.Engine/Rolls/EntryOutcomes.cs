@@ -152,4 +152,15 @@ public enum ContinuationKind
     /// <see cref="IntoShotType"/>), not a <c>Resolve*</c> hand-off to a terminal-ish
     /// node. The real transition roll replaces the stub without Roll J changing.</summary>
     IntoTransition,
+
+    /// <summary>A missed FINAL free throw left the ball live: hand off to the
+    /// (stubbed) FT-rebound node. Emitted by the resolver's FT-sequence driver (Roll
+    /// L's loop), not by a roll — the last attempt of a trip missed, so the board is
+    /// contested exactly like a missed field goal. The future FT-rebound roll owns
+    /// the offensive/defensive board split off a missed FT plus any foul on that
+    /// rebound; this kind just parks there for now. Distinct from
+    /// <see cref="ResolveRebound"/> (the field-goal rebound) because the FT-rebound
+    /// population differs (everyone lined up along the lane, no shooter crashing) —
+    /// flagged, not merged.</summary>
+    ResolveFTRebound,
 }

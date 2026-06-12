@@ -29,6 +29,19 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// every existing construction is untouched — a pure append, like <see cref="EndedOn"/>.
     /// </summary>
     public int PutbackAttempts { get; init; }
+
+    /// <summary>
+    /// How many times Roll L was spun resolving this possession's trip to the line —
+    /// the FT-loop spin count, an observability counter exactly parallel to
+    /// <see cref="PutbackAttempts"/>. Zero on the overwhelming majority of possessions
+    /// (no foul trip). And-1 = 1, fouled two / double bonus = 2, fouled three = 3,
+    /// 1-and-1 = 1 (front miss) or 2 (front make). The harness reads this to PROVE the
+    /// shot count derived at the FT entry edge is correct per trip type and that the
+    /// hard ≤ 3 bound holds observably (not only via the in-engine assert). Init-only
+    /// with a 0 default, so every existing construction is untouched — a pure append,
+    /// like <see cref="EndedOn"/> and <see cref="PutbackAttempts"/>.
+    /// </summary>
+    public int FreeThrowSpins { get; init; }
 }
 
 /// <summary>
@@ -58,13 +71,15 @@ public sealed class Resolver
     private readonly RollIStubPieGenerator _rollIGenerator;
     private readonly RollJStubPieGenerator _rollJGenerator;
     private readonly RollKStubPieGenerator _rollKGenerator;
+    private readonly RollLStubPieGenerator _rollLGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
     private readonly IContinuationNode _resumeInbound;
-    private readonly IContinuationNode _resolveFreeThrows;
     private readonly IContinuationNode _resolveBlock;
-    private readonly IContinuationNode _resolveShootingFreeThrows;
     private readonly IContinuationNode _sidelineInbound;
+    // Roll L's FT-sequence driver parks a missed FINAL free throw here — the future
+    // FT-rebound roll's holding pen.
+    private readonly IContinuationNode _ftRebound;
     // Roll J's Push parks here — the future transition roll's holding pen.
     private readonly IContinuationNode _transition;
 
@@ -81,13 +96,13 @@ public sealed class Resolver
         RollIStubPieGenerator rollIGenerator,
         RollJStubPieGenerator rollJGenerator,
         RollKStubPieGenerator rollKGenerator,
+        RollLStubPieGenerator rollLGenerator,
         GameState game,
         IRng rng,
         IContinuationNode resumeInbound,
-        IContinuationNode resolveFreeThrows,
         IContinuationNode resolveBlock,
-        IContinuationNode resolveShootingFreeThrows,
         IContinuationNode sidelineInbound,
+        IContinuationNode ftRebound,
         IContinuationNode transition)
     {
         _rollAGenerator = rollAGenerator;
@@ -102,13 +117,13 @@ public sealed class Resolver
         _rollIGenerator = rollIGenerator;
         _rollJGenerator = rollJGenerator;
         _rollKGenerator = rollKGenerator;
+        _rollLGenerator = rollLGenerator;
         _game = game;
         _rng = rng;
         _resumeInbound = resumeInbound;
-        _resolveFreeThrows = resolveFreeThrows;
         _resolveBlock = resolveBlock;
-        _resolveShootingFreeThrows = resolveShootingFreeThrows;
         _sidelineInbound = sidelineInbound;
+        _ftRebound = ftRebound;
         _transition = transition;
     }
 
@@ -165,6 +180,7 @@ public sealed class Resolver
         // which is a real bug — it throws rather than silently breaking, and the
         // harness asserts it is never hit.
         var putbackAttempts = 0;
+        var freeThrowSpins = 0;
         var iterations = 0;
         const int IterationCeiling = 10_000;
 
@@ -180,7 +196,7 @@ public sealed class Resolver
             {
                 case Terminal t:
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
-                        { EndedOn = t, PutbackAttempts = putbackAttempts };
+                        { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
 
                 case Continue c:
                     switch (c.Next)
@@ -252,11 +268,21 @@ public sealed class Resolver
                         case ContinuationKind.ResumeInbound:
                             return new RoutingOutcome(false, _resumeInbound.Receive(c)) { PutbackAttempts = putbackAttempts };
 
-                        // Roll D, opponent in bonus -> free-throw node (stub). The
-                        // Bonus payload on c is the FT node's input. Chain ends
-                        // here for now.
+                        // Bonus fork (Roll D/I/J/K), opponent in bonus -> the Roll L
+                        // FT loop. The Bonus token IS the shot count: Double is a flat
+                        // two, OneAndOne is a conditional two (miss the front and it is
+                        // the last shot, the second forfeited). The driver loops Roll L
+                        // and hands back a Terminal (last make -> opponent's ball) or a
+                        // Continue(ResolveFTRebound) (last miss -> live board); feed it
+                        // back into this switch.
                         case ContinuationKind.ResolveFreeThrows:
-                            return new RoutingOutcome(false, _resolveFreeThrows.Receive(c)) { PutbackAttempts = putbackAttempts };
+                            result = DriveFreeThrows(
+                                c.State,
+                                shots: c.Bonus == BonusType.Double ? 2 : 1,
+                                oneAndOne: c.Bonus == BonusType.OneAndOne,
+                                out var bonusFtSpins);
+                            freeThrowSpins += bonusFtSpins;
+                            continue;
 
                         // Blocked shot (from Roll H) -> block-recovery node (stub).
                         // A live-ball event with its own future fan-out. The block
@@ -335,12 +361,18 @@ public sealed class Resolver
                             result = RollK.Execute(c.State, pieK, _game, _rng);
                             continue;
 
-                        // Roll H, shooting foul (and-1 or fouled miss) -> shooting-
-                        // free-throw node (stub), SEPARATE from Roll D's bonus FT
-                        // path. The FT count is a downstream derivation from
-                        // (Result, ShotType). Chain ends here for now.
+                        // Roll H, shooting foul (and-1 or fouled miss) -> the Roll L FT
+                        // loop. The shot count is plain sequencing read off the stamped
+                        // (Result, ShotType): and-1 = 1, fouled two = 2, fouled three =
+                        // 3 — never a 1-and-1. The driver loops Roll L and hands back a
+                        // Terminal (last make -> opponent's ball) or a
+                        // Continue(ResolveFTRebound) (last miss -> live board); feed it
+                        // back into this switch. A made and-1 basket already banked its
+                        // points upstream; the single FT here only sets the consequence.
                         case ContinuationKind.ResolveShootingFreeThrows:
-                            return new RoutingOutcome(false, _resolveShootingFreeThrows.Receive(c)) { PutbackAttempts = putbackAttempts };
+                            result = DriveFreeThrows(c.State, ShootingFoulShots(c.State), oneAndOne: false, out var shootingFtSpins);
+                            freeThrowSpins += shootingFtSpins;
+                            continue;
 
                         // Roll H, miss deflected OOB off the defender -> sideline-
                         // inbound node (stub); offense retains and inbounds. Chain
@@ -376,6 +408,13 @@ public sealed class Resolver
                         case ContinuationKind.IntoTransition:
                             return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts };
 
+                        // Roll L's FT loop, last shot missed (live ball) -> the parked
+                        // FT-rebound node (stub). The future FT-rebound roll's holding
+                        // pen — the offensive/defensive board off a missed FT plus any
+                        // foul on that rebound. Chain ends here for this session.
+                        case ContinuationKind.ResolveFTRebound:
+                            return new RoutingOutcome(false, _ftRebound.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
+
                         default:
                             throw new InvalidOperationException($"No route for continuation '{c.Next}'.");
                     }
@@ -385,4 +424,89 @@ public sealed class Resolver
             }
         }
     }
+
+    /// <summary>
+    /// The FT-sequence driver — the conductor-owned loop arithmetic for a trip to the
+    /// line. Both FT entry edges (Roll H's shooting fouls and the Roll D/I/J/K bonus
+    /// fork) converge here; they differ ONLY in the shot count they hand it. Roll L
+    /// itself never sees the sequence: this method spins it once per attempt and
+    /// applies the uniform dead-intermediate / live-last routing.
+    /// <para>Per spin: an INTERMEDIATE shot (any shot before the last in a fixed 2- or
+    /// 3-shot set) is DEAD regardless of make or miss — it just retriggers the next
+    /// attempt; the ball never goes live between shots. The LAST shot evaluates
+    /// live/dead via <see cref="LastShot"/>: make ends the possession (opponent's
+    /// ball, like a made field goal), miss leaves the ball live (-> FT-rebound).</para>
+    /// <para>A 1-and-1 is the one conditional: the FRONT end is conditionally the last
+    /// shot — miss it and it IS the last shot (the second is forfeited), make it and a
+    /// now-last second shot follows the normal rule. An and-1 is a fixed 1-shot set,
+    /// so its single shot is the last shot.</para>
+    /// <para>The loop is HARD-BOUNDED (≤ 3 spins; 1-and-1 ≤ 2), so it needs no
+    /// 10,000-iteration guard like the main walk — but it asserts the spin count never
+    /// exceeds 3, surfacing a shot-count derivation bug loud. No score is wired here: a
+    /// made FT is 1 point, a downstream derivation the future points pass reads off the
+    /// make/miss fact, exactly as a field goal's 2/3 is.</para>
+    /// </summary>
+    private RollResult DriveFreeThrows(PossessionState state, int shots, bool oneAndOne, out int spinCount)
+    {
+        var pie = _rollLGenerator.Generate();
+        var spins = 0;
+
+        // Spin Roll L once, count it, and assert the hard bound. A trip to the line is
+        // at most a fouled three (3 shots); more than 3 spins is a derivation bug.
+        FreeThrowOutcome Spin()
+        {
+            var outcome = RollL.Execute(pie, _rng);
+            if (++spins > 3)
+                throw new InvalidOperationException(
+                    $"Free-throw sequence spun {spins} times — exceeds the hard bound of 3. " +
+                    "A trip to the line is at most a fouled three; this is a shot-count " +
+                    "derivation bug.");
+            return outcome;
+        }
+
+        RollResult result;
+        if (oneAndOne)
+        {
+            // Front end is conditionally last: a miss forfeits the second and is the
+            // last shot (live -> FT-rebound); a make brings a now-last second shot.
+            result = Spin() == FreeThrowOutcome.Miss
+                ? LastShot(state, FreeThrowOutcome.Miss)
+                : LastShot(state, Spin());
+        }
+        else
+        {
+            // Fixed 1-, 2-, or 3-shot set: every shot before the last is a dead
+            // intermediate that just retriggers; only the last evaluates live/dead.
+            var last = FreeThrowOutcome.Make;
+            for (var i = 1; i <= shots; i++)
+                last = Spin();
+            result = LastShot(state, last);
+        }
+
+        spinCount = spins;
+        return result;
+    }
+
+    /// <summary>The uniform last-shot rule: a made final free throw ENDS the possession
+    /// (opponent inbounds and starts at Roll A — the same dead-ball consequence as a
+    /// made field goal); a missed final free throw leaves the ball LIVE and routes to
+    /// the FT-rebound node.</summary>
+    private static RollResult LastShot(PossessionState state, FreeThrowOutcome outcome) =>
+        outcome == FreeThrowOutcome.Make
+            ? new Terminal("FreeThrowsMade", state, PossessionConsequence.DeadBallTo(state.Defense))
+            : new Continue(ContinuationKind.ResolveFTRebound, state);
+
+    /// <summary>Derive the shot count for a SHOOTING foul from the stamped facts —
+    /// plain sequencing the conductor reads at the entry edge, never a stamp Roll L
+    /// sees. And-1 (a made-and-fouled basket) = 1; a fouled miss = 2, or 3 if the
+    /// fouled shot was a three. Never a 1-and-1 (that is bonus-only).</summary>
+    private static int ShootingFoulShots(PossessionState state) => state switch
+    {
+        { Result: ShotResult.MadeAndFouled } => 1,
+        { Result: ShotResult.MissFouled, ShotType: ShotLocation.Three } => 3,
+        { Result: ShotResult.MissFouled } => 2,
+        _ => throw new InvalidOperationException(
+            $"ResolveShootingFreeThrows reached with a non-shooting-foul result " +
+            $"'{state.Result}' (zone '{state.ShotType}').")
+    };
 }

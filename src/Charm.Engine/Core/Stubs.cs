@@ -26,10 +26,15 @@ public sealed class ResumeInboundStub : IContinuationNode
     public string Receive(Continue continuation) => "STUB:ResumeInbound";
 }
 
-/// <summary>STUB for the free-throw node — where a non-shooting foul with the
-/// opponent in the bonus lands. The <see cref="Continue.Bonus"/> payload
-/// (OneAndOne / Double) is this node's input; the stub records the bonus so the
-/// harness can confirm the right branch arrived.</summary>
+/// <summary>STUB for the free-throw node — RETIRED from the live chain as of Session
+/// 18, when Roll L's FT-sequence driver took over both FT edges. Where a non-shooting
+/// foul with the opponent in the bonus used to land; the bonus fork (Roll D / I / J /
+/// K) now drives Roll L directly and the resolver no longer parks here. Kept ONLY as
+/// a harness fact-echo helper: the I / J / K bonus-fork checks invoke
+/// <see cref="Receive"/> directly on a bonus-foul continue to confirm the
+/// <see cref="Continue.Bonus"/> payload (OneAndOne / Double) rode through, without
+/// routing through the resolver's FT loop. The stub records the bonus so those checks
+/// can confirm the right branch arrived.</summary>
 public sealed class ResolveFreeThrowsStub : IContinuationNode
 {
     public string Receive(Continue continuation) =>
@@ -67,17 +72,35 @@ public sealed class OffensiveReboundStub : IContinuationNode
         ShotFacts.Describe("OffensiveRebound", continuation.State);
 }
 
-/// <summary>STUB for the shooting-free-throw node — where Roll H's two foul arms
-/// land (an and-1 on a make, or a shooting foul on a miss). The free-throw COUNT
-/// (and-1 = 1; fouled miss = 2; fouled miss on a three = 3) is DERIVED later from
-/// the stamped (Result, ShotType) pair by the future FT-success roll — this stub
-/// resolves nothing. Kept SEPARATE from <see cref="ResolveFreeThrowsStub"/> (Roll
-/// D's bonus path) for now; possible future unification is an open fork. Echoes
-/// slot, zone, AND result so the harness confirms all three facts rode through.</summary>
+/// <summary>STUB for the shooting-free-throw node — RETIRED from the live chain as
+/// of Session 18, when Roll L's FT-sequence driver took over both FT edges (the same
+/// stub→roll swap as OffensiveReboundStub→Roll K a session earlier). Roll H's two
+/// foul arms (an and-1 on a make, or a shooting foul on a miss) now drive Roll L
+/// directly; the resolver no longer parks here. Kept ONLY as a harness fact-echo
+/// helper: a couple of checks invoke <see cref="Receive"/> directly on a Roll H
+/// shooting-foul continue to confirm slot+zone+result rode through, without routing
+/// through the resolver. The free-throw COUNT (and-1 = 1; fouled miss = 2; fouled
+/// miss on a three = 3) is now derived at the resolver's FT entry edge. Echoes slot,
+/// zone, AND result via <see cref="ShotFacts.Describe"/>.</summary>
 public sealed class ShootingFreeThrowsStub : IContinuationNode
 {
     public string Receive(Continue continuation) =>
         ShotFacts.Describe("ShootingFreeThrows", continuation.State);
+}
+
+/// <summary>STUB for the FT-rebound node — where a missed FINAL free throw lands
+/// (the ball is live). NEW this session (Roll L): the resolver's FT-sequence driver
+/// routes here when the last attempt of a trip misses — the shooting-foul last shot,
+/// the double-bonus second, or a 1-and-1 front-end miss (which forfeits the second).
+/// A PLAIN-label stub, deliberately NOT a <see cref="ShotFacts"/> echo: a bonus trip
+/// has no shooter selected (the FT-shooter identity is a deferred seam) and no shot
+/// zone/result, so reading slot/zone/result here would fire NO_SLOT and falsely flag
+/// a dropped fact. The future FT-rebound roll — the offensive/defensive board split
+/// off a missed FT plus any foul on that rebound — replaces this without the driver
+/// or Roll L changing.</summary>
+public sealed class FTReboundStub : IContinuationNode
+{
+    public string Receive(Continue continuation) => "STUB:FTRebound";
 }
 
 /// <summary>STUB for the sideline-inbound node — where Roll H's

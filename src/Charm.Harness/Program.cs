@@ -18,6 +18,7 @@ internal static class Program
         var cfgI = RollIConfig.Load(configPath);
         var cfgJ = RollJConfig.Load(configPath);
         var cfgK = RollKConfig.Load(configPath);
+        var cfgL = RollLConfig.Load(configPath);
         var cfgGov = GovernorConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
@@ -32,6 +33,7 @@ internal static class Program
         var rollIGenerator = new RollIStubPieGenerator(cfgI);
         var rollJGenerator = new RollJStubPieGenerator(cfgJ);
         var rollKGenerator = new RollKStubPieGenerator(cfgK);
+        var rollLGenerator = new RollLStubPieGenerator(cfgL);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -50,13 +52,13 @@ internal static class Program
             rollIGenerator,
             rollJGenerator,
             rollKGenerator,
+            rollLGenerator,
             game,
             rng,
             new ResumeInboundStub(),
-            new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShootingFreeThrowsStub(),
             new SidelineInboundStub(),
+            new FTReboundStub(),
             new TransitionStub());
 
         var state = new PossessionState(
@@ -90,6 +92,7 @@ internal static class Program
         ok &= RollKReboundBatchCheck(cfg, cfgK, rollKGenerator, game, state);
         ok &= RollKPutbackPieCheck(cfg, cfgH, state);
         ok &= RollKBonusForkCheck(cfg, cfgD, cfgK, rollKGenerator, state);
+        ok &= RollLFreeThrowCheck(cfg, state);
         ok &= OffensiveReboundConvergenceCheck(cfg, state);
         ok &= RollCContextCheck(cfg, cfgC, rollCGenerator, state);
         ok &= GovernorLoopCheck(cfg, cfgD, cfgGov);
@@ -846,13 +849,13 @@ internal static class Program
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+            new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
-            new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShootingFreeThrowsStub(),
             new SidelineInboundStub(),
+            new FTReboundStub(),
             new TransitionStub());
 
         var pieE = genE.Generate(state);
@@ -863,6 +866,7 @@ internal static class Program
             ["turnover -> Roll C terminal"] = 0,
             ["foul -> Roll D stub"] = 0,
             ["shot -> Roll G -> Roll H -> resolved"] = 0,
+            ["free throws -> resolved"] = 0,
             ["jump ball -> terminal"] = 0,
         };
         var unrecognized = 0;
@@ -881,21 +885,28 @@ internal static class Program
             // DefensiveRebound / LooseBallFoulOnOffense — are also END: terminals).
             // A shot now flows F -> G -> H, and a MISS flows on through Roll I to a
             // defensive/offensive board or a loose-ball foul. The resolved bucket
-            // therefore spans: Made / MissOutOfBoundsLost terminals; the shooting-FT,
-            // sideline-inbound, and block-recovery stubs; and Roll I's
-            // OffensiveRebound stub + DefensiveRebound / LooseBallFoulOnOffense
-            // terminals. (A loose-ball-defense foul lands at SidelineInbound below
-            // the bonus, already covered; the in-bonus FT case is caught in the
-            // foul bucket below.)
+            // therefore spans: Made / MissOutOfBoundsLost terminals; the sideline-
+            // inbound and block-recovery stubs; and Roll I's OffensiveRebound stub +
+            // DefensiveRebound / LooseBallFoulOnOffense terminals. (Shooting fouls no
+            // longer park at STUB:ShootingFreeThrows — they drive the Roll L FT loop
+            // and land at END:FreeThrowsMade / STUB:FTRebound, caught in the FT bucket
+            // below. A loose-ball-defense foul lands at SidelineInbound below the
+            // bonus; the in-bonus FT case is also a FT-bucket landing now.)
             else if (d == "END:Made" || d == "END:MissOutOfBoundsLost"
                      || d == "END:DefensiveRebound" || d == "END:LooseBallFoulOnOffense"
                      || d.StartsWith("STUB:OffensiveRebound")
-                     || d.StartsWith("STUB:ShootingFreeThrows")
                      || d.StartsWith("STUB:SidelineInbound")
                      || d.StartsWith("STUB:BlockRecovery"))
                 destClasses["shot -> Roll G -> Roll H -> resolved"]++;
+            // The Roll L FT loop's two landings — last-shot make ends the possession
+            // (END:FreeThrowsMade), last-shot miss leaves a live board (STUB:FTRebound).
+            // Both a shooting foul (Roll H) and a bonus foul (Roll D) converge here, so
+            // these are indistinguishable by destination and share one bucket. Checked
+            // before the generic END: catch so a made FT is not miscounted as a turnover.
+            else if (d == "END:FreeThrowsMade" || d.StartsWith("STUB:FTRebound"))
+                destClasses["free throws -> resolved"]++;
             else if (d.StartsWith("END:")) destClasses["turnover -> Roll C terminal"]++;
-            else if (d.StartsWith("STUB:ResumeInbound") || d.StartsWith("STUB:ResolveFreeThrows")) destClasses["foul -> Roll D stub"]++;
+            else if (d.StartsWith("STUB:ResumeInbound")) destClasses["foul -> Roll D stub"]++;
             else unrecognized++;
         }
 
@@ -1012,13 +1023,13 @@ internal static class Program
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+            new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
-            new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShootingFreeThrowsStub(),
             new SidelineInboundStub(),
+            new FTReboundStub(),
             new TransitionStub());
 
         var pieE = genE.Generate(state);
@@ -1041,10 +1052,8 @@ internal static class Program
             ["END:MissOutOfBoundsLost"] = 0,
             ["END:DefensiveRebound"] = 0,
             ["END:LooseBallFoulOnOffense"] = 0,
-            ["STUB:ShootingFreeThrows"] = 0,
             ["STUB:SidelineInbound"] = 0,
             ["STUB:BlockRecovery"] = 0,
-            ["STUB:ResolveFreeThrows"] = 0,
         };
         // Zone seen on the stub landings (the labels that carry it). Terminals
         // omit the zone, so they don't contribute here.
@@ -1072,16 +1081,9 @@ internal static class Program
             // must short-circuit here rather than fall into the zone-token parser.
             if (d == "END:DefensiveRebound") { destHits["END:DefensiveRebound"]++; continue; }
             if (d == "END:LooseBallFoulOnOffense") { destHits["END:LooseBallFoulOnOffense"]++; continue; }
-            // Roll I's / Roll K's in-bonus loose-ball-defense foul lands at the bonus
-            // FT stub, whose label is STUB:ResolveFreeThrows:{Bonus} — it carries no
-            // slot:zone:result tail, so (like the terminals) it short-circuits here
-            // rather than entering the zone-token parser below.
-            if (d.StartsWith("STUB:ResolveFreeThrows")) { destHits["STUB:ResolveFreeThrows"]++; continue; }
-
             // The fact-carrying stub landings: STUB:{node}:{Side}slot{N}:{Zone}:{Result}
             string node;
-            if (d.StartsWith("STUB:ShootingFreeThrows")) node = "STUB:ShootingFreeThrows";
-            else if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
+            if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
             else if (d.StartsWith("STUB:BlockRecovery")) node = "STUB:BlockRecovery";
             // Everything Roll K / a reset opens up is ROUTED, just not in the core
             // set: the three Roll K terminals (END:OffensiveFoul / DeadBallTurnover /
@@ -1296,14 +1298,16 @@ internal static class Program
     // --- Clean handoff: route a batch of IntoShotResolution exits through the
     //     resolver and confirm every one lands at its intended Roll H destination,
     //     with zero unrouted: Made -> terminal, MissOutOfBoundsLost -> terminal,
-    //     Miss -> rebound stub, MadeAndFouled/MissFouled -> shooting-FT stub,
-    //     MissOutOfBoundsRetained -> sideline-inbound stub, Blocked -> block-
-    //     recovery stub (Session 13). Isolates the Roll H hop exactly as
+    //     Miss -> deeper (Roll I/K), MissOutOfBoundsRetained -> sideline-inbound stub,
+    //     Blocked -> block-recovery stub (Session 13). The two SHOOTING-foul outcomes
+    //     (MadeAndFouled / MissFouled) drive the Roll L FT loop (Session 18) and land at
+    //     END:FreeThrowsMade / STUB:FTRebound, absorbed in the "deeper" buckets here and
+    //     proven by RollLFreeThrowCheck. Isolates the Roll H hop exactly as
     //     RollGHandoffCheck isolated Roll G: the resolver executes Roll H on an
     //     IntoShotResolution continuation (carrying a real slot + zone) and lands at
-    //     a terminal or one of the four stubs. On the stub landings it confirms
-    //     slot, zone, AND result all rode through. A fresh local game + resolver
-    //     keeps it self-contained. ---
+    //     a terminal, a fact-carrying stub, or deeper. On the fact-carrying stub
+    //     landings it confirms slot, zone, AND result all rode through. A fresh local
+    //     game + resolver keeps it self-contained. ---
     private static bool RollHHandoffCheck(RollAConfig cfg, PossessionState state)
     {
         Console.WriteLine($"\n--- Clean handoff: {cfg.BatchSize:N0} IntoShotResolution exits routed through Roll H ---");
@@ -1334,13 +1338,13 @@ internal static class Program
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+            new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
-            new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShootingFreeThrowsStub(),
             new SidelineInboundStub(),
+            new FTReboundStub(),
             new TransitionStub());
 
         var pieE = genE.Generate(state);
@@ -1361,10 +1365,8 @@ internal static class Program
             ["END:MissOutOfBoundsLost"] = 0,
             ["END:DefensiveRebound"] = 0,
             ["END:LooseBallFoulOnOffense"] = 0,
-            ["STUB:ShootingFreeThrows"] = 0,
             ["STUB:SidelineInbound"] = 0,
             ["STUB:BlockRecovery"] = 0,
-            ["STUB:ResolveFreeThrows"] = 0,
         };
         var resultsSeenOnStubs = new Dictionary<ShotResult, int>();
         foreach (var r in Enum.GetValues<ShotResult>()) resultsSeenOnStubs[r] = 0;
@@ -1391,14 +1393,9 @@ internal static class Program
             // slot:zone:result tail, so they must short-circuit here.
             if (d == "END:DefensiveRebound") { destHits["END:DefensiveRebound"]++; continue; }
             if (d == "END:LooseBallFoulOnOffense") { destHits["END:LooseBallFoulOnOffense"]++; continue; }
-            // Roll I's / Roll K's in-bonus loose-ball-defense foul lands at
-            // STUB:ResolveFreeThrows:{Bonus} — no slot:zone:result tail, so it
-            // short-circuits here like the terminals.
-            if (d.StartsWith("STUB:ResolveFreeThrows")) { destHits["STUB:ResolveFreeThrows"]++; continue; }
 
             string node;
-            if (d.StartsWith("STUB:ShootingFreeThrows")) node = "STUB:ShootingFreeThrows";
-            else if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
+            if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
             else if (d.StartsWith("STUB:BlockRecovery")) node = "STUB:BlockRecovery";
             // Everything Roll K / a reset opens up is ROUTED, just not core: the three
             // Roll K terminals (END:OffensiveFoul / DeadBallTurnover / LiveBallTurnover),
@@ -1431,18 +1428,19 @@ internal static class Program
             Console.WriteLine($"    {label,-26} {count,8:N0}  {(hit ? "ok" : "NONE")}");
         }
 
-        // The continue-outcomes whose result rides through to a stub STRAIGHT off the
-        // first Roll H — these land before any rebound, so they remain robust:
-        // and-1 / fouled-miss → ShootingFreeThrows, OOB-retained → SidelineInbound,
-        // block → BlockRecovery. A plain Miss is DELIBERATELY not here anymore: with
-        // Roll I + Roll K live it no longer parks at a stub carrying Result=Miss — it
-        // flows deeper (defensive board terminal, or offensive board → Roll K), which
-        // is exactly the behavior this session adds. Its routing is covered by the
-        // Roll I / Roll K batch checks.
+        // The continue-outcomes whose result rides through to a FACT-CARRYING stub
+        // STRAIGHT off the first Roll H — these land before any rebound, so they remain
+        // robust: OOB-retained → SidelineInbound, block → BlockRecovery. A plain Miss is
+        // DELIBERATELY not here: with Roll I + Roll K live it flows deeper (defensive
+        // board terminal, or offensive board → Roll K) rather than parking with
+        // Result=Miss. And as of Session 18 the two SHOOTING-foul outcomes
+        // (MadeAndFouled / MissFouled) are no longer here either: they drive the Roll L
+        // FT loop and end at END:FreeThrowsMade / STUB:FTRebound (a plain-label park that
+        // carries no slot:zone:result tail), so they never reach a fact stub. Their
+        // routing + result handling is covered by RollLFreeThrowCheck.
         var continueResults = new[]
         {
-            ShotResult.MadeAndFouled,
-            ShotResult.MissFouled, ShotResult.MissOutOfBoundsRetained,
+            ShotResult.MissOutOfBoundsRetained,
             ShotResult.Blocked
         };
         var allResults = true;
@@ -1696,13 +1694,13 @@ internal static class Program
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+            new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
-            new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShootingFreeThrowsStub(),
             new SidelineInboundStub(),
+            new FTReboundStub(),
             new TransitionStub());
 
         var governor = new Governor(resolver, game, cfgGov);
@@ -1812,10 +1810,12 @@ internal static class Program
         Console.WriteLine($"  flat placeholder time accumulated: {result.TotalSeconds:N0}s (observability only)");
 
         // Per-stub park breakdown — quantifies how much of the game is currently
-        // flowing through placeholder flips (the FT / offensive-rebound / etc. volume
-        // waiting to be closed). The mix SHIFTS across the loop as the bonus crosses:
-        // ResolveFreeThrows parks appear once the seeded + accumulating fouls put
-        // teams in the bonus — visible proof the §2a accumulation is exercised.
+        // flowing through placeholder flips (the offensive-rebound / transition / etc.
+        // volume waiting to be closed). The mix SHIFTS across the loop as the bonus
+        // crosses: a free-throw trip now RESOLVES (Roll L) rather than parking — a made
+        // final FT ends the possession (counted in terminal-ended), a missed final FT
+        // parks at STUB:FTRebound — so STUB:FTRebound volume climbing once teams reach
+        // the bonus is visible proof the §2a accumulation is exercised.
         Console.WriteLine("  per-stub park breakdown:");
         foreach (var (dest, n) in result.PerStubParks.OrderByDescending(kv => kv.Value))
             Console.WriteLine($"    {dest,-44} {n,6:N0}");
@@ -2332,6 +2332,135 @@ internal static class Program
         return ok;
     }
 
+    // --- Roll L: the free-throw loop. Drives each trip TYPE through the resolver's FT
+    //     sequence and proves three things. (a) The RAW make/miss rate matches the flat
+    //     config make% (Roll L spun in isolation). (b) Each trip spins Roll L the right
+    //     number of times — and-1 = 1, fouled two / double = 2, fouled three = 3,
+    //     1-and-1 = 1 (front miss) or 2 (front make) — and the global max never exceeds
+    //     3 (read off RoutingOutcome.FreeThrowSpins, the observability counter parallel
+    //     to PutbackAttempts). (c) The uniform last-shot routing holds, and the
+    //     observable END-vs-FTRebound SPLIT is its signature: a fixed n-shot trip routes
+    //     on the LAST shot only (intermediates are dead respins), so its END rate == p;
+    //     a 1-and-1 ends at END only when BOTH shots make (p*p), a front miss forfeiting
+    //     the second and going live to FTRebound (END rate == p*p). A made final FT hands
+    //     the ball to the OPPONENT (DeadBallTo the defense). FT resolution charges no foul
+    //     and touches no arrow, so a fresh local game stays pristine across the batch —
+    //     this node is accumulation-free (CONVENTIONS §2a), unlike the foul forks upstream.
+    private static bool RollLFreeThrowCheck(RollAConfig cfg, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Roll L: free-throw resolution ({cfg.BatchSize:N0} trips per type) ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var cfgL = RollLConfig.Load(configPath);
+        var p = cfgL.MakeProbability;
+
+        // (a) Raw make/miss rate — spin Roll L directly against its flat pie.
+        var rngRaw = new SystemRng(cfg.Seed);
+        var pieL = new RollLStubPieGenerator(cfgL).Generate();
+        var rawMakes = 0;
+        for (var i = 0; i < cfg.BatchSize; i++)
+            if (RollL.Execute(pieL, rngRaw) == FreeThrowOutcome.Make) rawMakes++;
+        var rawRate = (double)rawMakes / cfg.BatchSize;
+        var rawOk = Math.Abs(rawRate - p) <= cfg.RateTolerance;
+        Console.WriteLine($"  raw make rate: observed={rawRate:P3}  expected={p:P3}  -> {(rawOk ? "ok" : "FAIL")}");
+
+        // A resolver to drive whole FT trips end to end (loop arithmetic + routing). A
+        // FRESH local game; nothing in the FT path mutates it.
+        var cfgB = RollBConfig.Load(configPath);
+        var cfgC = RollCConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+        var cfgE = RollEConfig.Load(configPath);
+        var cfgF = RollFConfig.Load(configPath);
+        var cfgG = RollGConfig.Load(configPath);
+        var rng = new SystemRng(cfg.Seed);
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var resolver = new Resolver(
+            new StubPieGenerator(cfg),
+            cfg,
+            new RollBStubPieGenerator(cfgB),
+            new RollCStubPieGenerator(cfgC),
+            new RollDStubPieGenerator(cfgD),
+            new RollEStubPieGenerator(cfgE),
+            new RollFStubPieGenerator(cfgF),
+            new RollGStubPieGenerator(cfgG),
+            new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+            new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+            new RollLStubPieGenerator(cfgL),
+            game,
+            rng,
+            new ResumeInboundStub(),
+            new BlockRecoveryStub(),
+            new SidelineInboundStub(),
+            new FTReboundStub(),
+            new TransitionStub());
+
+        // Each trip type: the entry continuation, the expected exact spin-count band,
+        // and the expected END (last-shot-make) rate.
+        var trips = new (string Name, Continue Entry, int MinSpins, int MaxSpins, double ExpectedEnd)[]
+        {
+            ("and-1",        new Continue(ContinuationKind.ResolveShootingFreeThrows, state with { Result = ShotResult.MadeAndFouled, ShotType = ShotLocation.Rim }),   1, 1, p),
+            ("fouled two",   new Continue(ContinuationKind.ResolveShootingFreeThrows, state with { Result = ShotResult.MissFouled, ShotType = ShotLocation.Mid }),      2, 2, p),
+            ("fouled three", new Continue(ContinuationKind.ResolveShootingFreeThrows, state with { Result = ShotResult.MissFouled, ShotType = ShotLocation.Three }),    3, 3, p),
+            ("double bonus", new Continue(ContinuationKind.ResolveFreeThrows, state) { Bonus = BonusType.Double },                                                      2, 2, p),
+            ("one-and-one",  new Continue(ContinuationKind.ResolveFreeThrows, state) { Bonus = BonusType.OneAndOne },                                                   1, 2, p * p),
+        };
+
+        var allTripsOk = true;
+        var globalMaxSpins = 0;
+        Console.WriteLine("  per-trip: shot count, last-shot routing, made-FT consequence:");
+        foreach (var trip in trips)
+        {
+            var ends = 0;
+            var ftRebounds = 0;
+            var other = 0;
+            var minSeen = int.MaxValue;
+            var maxSeen = 0;
+            var spinOutOfRange = 0;
+            var wrongConsequence = 0;
+
+            for (var i = 0; i < cfg.BatchSize; i++)
+            {
+                var routing = resolver.Route(trip.Entry);
+                var s = routing.FreeThrowSpins;
+                if (s < minSeen) minSeen = s;
+                if (s > maxSeen) maxSeen = s;
+                if (s > globalMaxSpins) globalMaxSpins = s;
+                if (s < trip.MinSpins || s > trip.MaxSpins) spinOutOfRange++;
+
+                if (routing.Destination == "END:FreeThrowsMade")
+                {
+                    ends++;
+                    // A made final FT gives the ball to the OPPONENT (the defense).
+                    if (routing.EndedOn is { } term && term.Consequence.NextOffense != state.Defense)
+                        wrongConsequence++;
+                }
+                else if (routing.Destination == "STUB:FTRebound") ftRebounds++;
+                else other++;
+            }
+
+            var endRate = (double)ends / cfg.BatchSize;
+            var rateOk = Math.Abs(endRate - trip.ExpectedEnd) <= cfg.RateTolerance;
+            var spinOk = spinOutOfRange == 0;
+            var routedOk = other == 0;
+            var consequenceOk = wrongConsequence == 0;
+            var tripOk = rateOk && spinOk && routedOk && consequenceOk;
+            allTripsOk &= tripOk;
+
+            Console.WriteLine(
+                $"    {trip.Name,-13} spins=[{minSeen}-{maxSeen}] (want {trip.MinSpins}-{trip.MaxSpins}) | " +
+                $"END={endRate:P2} (want {trip.ExpectedEnd:P2})  FTReb={(double)ftRebounds / cfg.BatchSize:P2} | " +
+                $"unrouted={other} wrongCons={wrongConsequence} -> {(tripOk ? "ok" : "FAIL")}");
+        }
+
+        var boundOk = globalMaxSpins <= 3;
+        Console.WriteLine($"  spin count never exceeded 3: max={globalMaxSpins} -> {(boundOk ? "ok" : "FAIL")}");
+
+        var ok = rawOk && allTripsOk && boundOk;
+        Console.WriteLine($"  Roll L free-throw resolution: {(ok ? "ok" : "FAIL")}");
+        return ok;
+    }
+
     // --- Convergence: the putback <-> rebound LOOP bleeds out. Roll K is the first
     //     possession-EXTENDING node, so a single resolver walk can cycle PutBack ->
     //     Roll H -> miss -> Roll I -> OffensiveRebound -> PutBack ... (and reset back
@@ -2374,13 +2503,13 @@ internal static class Program
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+            new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
-            new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShootingFreeThrowsStub(),
             new SidelineInboundStub(),
+            new FTReboundStub(),
             new TransitionStub());
 
         var pieE = genE.Generate(state);

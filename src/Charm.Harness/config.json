@@ -123,6 +123,12 @@
     "Epsilon": 1e-9
   },
 
+  "RollL": {
+    "MakeProbability": 0.72,
+    "RoadMakePenalty": 0.0,
+    "Epsilon": 1e-9
+  },
+
   "Governor": {
     "PossessionCap": 200,
     "SecondsPerPossession": 18.0

@@ -1497,3 +1497,89 @@ replacing the deliberately-wrong park-and-flip. It opens the door to the deferre
 work on putback quality and same-player rebounding, and it leaves the broader chain's
 remaining stubs (free-throw resolution and rebounding, block recovery, the transition roll)
 untouched and on the horizon.
+
+---
+
+## Roll L — Free-Throw Resolution (Session 18)
+
+Roll L is the node every trip to the line resolves at, and the closing of the two
+longest-parked FT stubs (`ShootingFreeThrows`, `ResolveFreeThrows`) into one loop. It is the
+simplest roll in the engine — and the one place the uniform roll contract is deliberately
+relaxed.
+
+### A context-free primitive that returns a bare outcome
+
+Every other roll receives `(state, pie, …)`, classifies its result, and names a
+continuation *kind* the resolver maps. Roll L does none of that. A free throw is the shooter
+against a flat `Make` / `Miss` pie, and the make probability is **identical** regardless of
+how the trip arose — an and-1, a fouled three, and a bonus foul all shoot the same odds.
+There is no ticket, no wire, no parameter-set selection of the Roll C halfcourt-vs-transition
+kind. Modelling one would invent the very signal the design rejects. So `RollL.Execute(pie,
+rng)` reads no state, takes no ticket, and returns a bare `FreeThrowOutcome` (Make / Miss),
+not a `RollResult`. The resolver — not Roll L — owns what a make/miss *means*. This is the
+clean expression of the principle that probabilities are produced in one place and *consumed*
+in another: Roll L produces the bare fact; the conductor consumes it into routing.
+
+### The most direct attribute seam in the engine
+
+Where other rolls map attributes to odds through a skill/athleticism interaction, a free
+throw is a **literal 1:1**: a 71-rated shooter makes 71% per spin, full stop. The real
+generator is therefore the simplest the engine will have — read the shooter's FT rating,
+divide by 100, done. No gravity term, no matchup, no logistic. The stub ships a flat ~.72
+placeholder; the real generator reads the carried shooter slot and replaces it without Roll L
+or the resolver changing. Two documented seams sit at 0 / deferred: a **road make-penalty**
+(a small negative modifier *if* it proves a real statistical effect) and the **bonus-FT
+shooter identity** (a shooting-foul trip names the fouled shooter via `SelectedSlot`, correct;
+a bonus trip has no shot selected, so its FT shooter is not yet named — the flat stub reads no
+slot, so nothing blocks).
+
+### Sequencing is the conductor's, not Roll L's
+
+How many times Roll L spins, and whether the last spin is live, is a structural fact of *how
+the foul happened* — plain loop arithmetic the resolver already owns, read at the entry edge,
+never a stamp Roll L sees. The two FT resolver edges became two entry points to one
+`DriveFreeThrows` loop, differing only in the shot count they derive: the `ShootingFreeThrows`
+edge reads the stamped `(Result, ShotType)` — and-1 = 1, fouled two = 2, fouled three = 3;
+the `ResolveFreeThrows` edge reads the `Bonus` token — `Double` = 2, `OneAndOne` = a
+conditional 1-and-1. This keeps the FT rules in exactly one place (the conductor) and out of
+both the upstream foul rolls and Roll L itself.
+
+### The uniform dead-intermediate / live-last rule
+
+Every shot before the last in a fixed set is **dead** regardless of make or miss — the ball
+never goes live between shots; it just retriggers the next attempt. Only the last shot
+evaluates live/dead: a make ends the possession `DeadBallTo(defense)` (reusing Roll H's `Made`
+consequence — the opponent inbounds at Roll A), a miss leaves the ball live and routes to the
+FT-rebound node. The 1-and-1 is the one conditional: the front end is *conditionally* the last
+shot — a miss forfeits the second and is itself the last shot (live → FT-rebound); a make
+brings a now-last second shot under the normal rule. An and-1 is a fixed 1-shot set, so its
+single shot is the last shot — a missed and-1 free throw is a live ball (the made basket
+already banked its points upstream; only the FT sets the consequence).
+
+This rule has a clean observable signature, which is how the harness proves it without seeing
+inside the loop: for any **fixed** n-shot trip, routing depends only on the last shot, so the
+made-FT (END) rate equals the per-shot make probability p; for a **1-and-1**, an END requires
+both shots to make, so its END rate is p². The split between those two — p versus p² — is the
+proof that intermediates are dead and the front-end is conditional.
+
+### A hard bound instead of a convergence guard
+
+Unlike the putback↔rebound loop (which converges probabilistically and needs a loud
+10,000-iteration guard), the FT loop is **structurally bounded**: at most 3 spins, at most 2
+for a 1-and-1. So it carries a simple assert that the spin count never exceeds 3 — a
+shot-count derivation bug surfaces loud rather than silently over-spinning. The harness reads
+the exact count via `RoutingOutcome.FreeThrowSpins`, an output observability counter parallel
+to `PutbackAttempts` (and, like it, an output seam — never an odds-bearing input ticket;
+`RollResult.cs` stays untouched, the count being derived resolver-local from facts already on
+the carried state).
+
+### What Roll L closes, and what it opens
+
+It closes the two longest-standing FT parks at once — a trip to the line now *resolves*
+rather than dead-ending. It charges no foul and touches no arrow, so it is accumulation-free:
+the only mid-batch bonus crossing is upstream, which fixes the `Bonus` token before a trip
+ever reaches Roll L. It opens `STUB:FTRebound` — the future FT-rebound roll's holding pen
+(offensive / defensive board off a missed FT, plus any foul on that rebound), parked exactly
+as prior sessions parked their downstreams. It leaves points accounting (a made FT is 1 point
+— the separate deferred attribution pass), the FT-rating generator, the road penalty, the
+bonus-FT shooter identity, and end-game deliberate-foul / clock logic all on the horizon.
