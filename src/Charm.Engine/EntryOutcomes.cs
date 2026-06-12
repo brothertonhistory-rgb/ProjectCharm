@@ -93,9 +93,18 @@ public enum ContinuationKind
     /// team), so it continues into its own future roll rather than terminating.</summary>
     ResolveBlock,
 
-    /// <summary>A clean shot attempt got off: hand off to the (stubbed) shot-type
-    /// node — the future Roll G, which will stamp a ShotType onto
-    /// <see cref="PossessionState"/> that the make/miss roll reads. The one Roll F
-    /// outcome that proceeds DEEPER into the shot sequence.</summary>
+    /// <summary>A clean shot attempt got off: hand off to Roll G (shot location),
+    /// which stamps a <see cref="ShotLocation"/> onto <see cref="PossessionState"/>
+    /// (the second per-possession fact after SelectedSlot) that the make/miss roll
+    /// will read. The one Roll F outcome that proceeds DEEPER into the shot
+    /// sequence. (Was the chain's dead-end stub before Roll G; now live.)</summary>
     IntoShotType,
+
+    /// <summary>A shot location has been stamped: hand off to the (stubbed)
+    /// make/miss node — the future Roll H, the first roll that reads BOTH
+    /// SelectedSlot AND ShotType to resolve the matchup into points. The stamped
+    /// ShotType rides on <see cref="PossessionState"/>, not on the continuation.
+    /// Emitted by all five of Roll G's zones — like Roll E, every outcome stamps a
+    /// fact and continues to the same next beat.</summary>
+    IntoShotResolution,
 }

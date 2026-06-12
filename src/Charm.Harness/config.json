@@ -58,5 +58,14 @@
     "BaseBlocked": 0.035,
     "BaseJumpBall": 0.005,
     "Epsilon": 1e-9
+  },
+
+  "RollG": {
+    "BaseThree": 0.36,
+    "BaseLong": 0.08,
+    "BaseMid": 0.10,
+    "BaseShort": 0.11,
+    "BaseRim": 0.35,
+    "Epsilon": 1e-9
   }
 }

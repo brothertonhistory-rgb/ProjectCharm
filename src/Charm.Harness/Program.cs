@@ -13,6 +13,7 @@ internal static class Program
         var cfgD = RollDConfig.Load(configPath);
         var cfgE = RollEConfig.Load(configPath);
         var cfgF = RollFConfig.Load(configPath);
+        var cfgG = RollGConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
@@ -21,6 +22,7 @@ internal static class Program
         var rollDGenerator = new RollDStubPieGenerator(cfgD);
         var rollEGenerator = new RollEStubPieGenerator(cfgE);
         var rollFGenerator = new RollFStubPieGenerator(cfgF);
+        var rollGGenerator = new RollGStubPieGenerator(cfgG);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -32,12 +34,13 @@ internal static class Program
             rollDGenerator,
             rollEGenerator,
             rollFGenerator,
+            rollGGenerator,
             game,
             rng,
             new ResumeInboundStub(),
             new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShotTypeStub());
+            new ShotResolutionStub());
 
         var state = new PossessionState(
             PossessionNumber: 1,
@@ -45,7 +48,7 @@ internal static class Program
             Defense: TeamSide.Away,
             Entry: EntryType.DeadBallInbound);
 
-        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E -> F Chain ===\n");
+        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E -> F -> G Chain ===\n");
 
         ShowSamples(cfg, cfgE, rollAGenerator, rollEGenerator, resolver, game, state, rng);
         var ok = BatchCheck(cfg, cfgB, rollAGenerator, rollBGenerator, resolver, state);
@@ -59,6 +62,8 @@ internal static class Program
         ok &= RollESelectionBatchCheck(cfg, cfgE, rollEGenerator, game, state);
         ok &= RollFActionBatchCheck(cfg, cfgF, rollFGenerator, state);
         ok &= RollFHandoffCheck(cfg, game, state);
+        ok &= RollGLocationBatchCheck(cfg, cfgG, rollGGenerator, state);
+        ok &= RollGHandoffCheck(cfg, state);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -709,6 +714,7 @@ internal static class Program
         var cfgD = RollDConfig.Load(configPath);
         var cfgE = RollEConfig.Load(configPath);
         var cfgF = RollFConfig.Load(configPath);
+        var cfgG = RollGConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
@@ -721,12 +727,13 @@ internal static class Program
             new RollDStubPieGenerator(cfgD),
             genE,
             genF,
+            new RollGStubPieGenerator(cfgG),
             game,
             rng,
             new ResumeInboundStub(),
             new ResolveFreeThrowsStub(),
             new BlockRecoveryStub(),
-            new ShotTypeStub());
+            new ShotResolutionStub());
 
         var pieE = genE.Generate(state);
         var pieF = genF.Generate(state);
@@ -736,7 +743,7 @@ internal static class Program
             ["turnover -> Roll C terminal"] = 0,
             ["foul -> Roll D stub"] = 0,
             ["blocked -> block stub"] = 0,
-            ["shot -> shot-type stub"] = 0,
+            ["shot -> Roll G -> shot-resolution stub"] = 0,
             ["jump ball -> terminal"] = 0,
         };
         var unrecognized = 0;
@@ -753,7 +760,7 @@ internal static class Program
             else if (d.StartsWith("END:")) destClasses["turnover -> Roll C terminal"]++;
             else if (d.StartsWith("STUB:ResumeInbound") || d.StartsWith("STUB:ResolveFreeThrows")) destClasses["foul -> Roll D stub"]++;
             else if (d.StartsWith("STUB:BlockRecovery")) destClasses["blocked -> block stub"]++;
-            else if (d.StartsWith("STUB:ShotType")) destClasses["shot -> shot-type stub"]++;
+            else if (d.StartsWith("STUB:ShotResolution")) destClasses["shot -> Roll G -> shot-resolution stub"]++;
             else unrecognized++;
         }
 
@@ -771,5 +778,144 @@ internal static class Program
         Console.WriteLine($"  all five F exits reached their destination: {(allHit ? "ok" : "FAIL")}");
 
         return routedOk && allHit;
+    }
+
+    // --- Batch: Roll G's five-way location distribution converges within
+    //     tolerance, every exit is a clean Continue carrying the IntoShotResolution
+    //     kind, and the ShotType is actually stamped on the carried state. The pie
+    //     is flat-ish (no signal); a future attribute generator tilts it without
+    //     this roll changing. Mirrors the Roll E batch check — Roll G is
+    //     structurally Roll E: stamp a fact, continue to the same next beat. ---
+    private static bool RollGLocationBatchCheck(
+        RollAConfig cfg, RollGConfig cfgG, RollGStubPieGenerator genG, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} locations through Roll G (flat-ish pie) ---");
+        var rng = new SystemRng(cfg.Seed);
+        var pieG = genG.Generate(state);
+
+        var counts = new Dictionary<ShotLocation, int>();
+        foreach (var o in Enum.GetValues<ShotLocation>()) counts[o] = 0;
+
+        var anomalies = 0;   // anything that isn't a clean, zone-stamped IntoShotResolution continue
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var result = RollG.Execute(state, pieG, rng);
+
+            // Must be a Continue, into shot resolution, carrying a stamped zone on
+            // the forwarded state (confirms ShotType is actually set, not just the
+            // kind emitted).
+            if (result is not Continue { Next: ContinuationKind.IntoShotResolution } c
+                || c.State.ShotType is not { } zone)
+            {
+                anomalies++;
+                continue;
+            }
+
+            counts[zone]++;
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll G locations:");
+        foreach (var (outcome, weight) in pieG.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-6} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        var cleanOk = anomalies == 0;
+        Console.WriteLine($"\n  every exit a clean zone-stamped IntoShotResolution: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
+
+        return ratesOk && cleanOk;
+    }
+
+    // --- Clean handoff: route a batch of IntoShotType exits through the resolver
+    //     and confirm every one lands at the shot-resolution stub with a stamped
+    //     zone AND the carried slot intact, zero unrouted. Isolates the Roll G hop
+    //     exactly as RollFHandoffCheck isolates Roll F: the resolver executes Roll G
+    //     on an IntoShotType continuation, loops on the emitted IntoShotResolution,
+    //     and lands at the stub. A fresh local game + resolver keeps it
+    //     self-contained. ---
+    private static bool RollGHandoffCheck(RollAConfig cfg, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Clean handoff: {cfg.BatchSize:N0} IntoShotType exits routed through Roll G ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+
+        var cfgB = RollBConfig.Load(configPath);
+        var cfgC = RollCConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+        var cfgE = RollEConfig.Load(configPath);
+        var cfgF = RollFConfig.Load(configPath);
+        var cfgG = RollGConfig.Load(configPath);
+
+        var rng = new SystemRng(cfg.Seed);
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var genE = new RollEStubPieGenerator(cfgE);
+
+        var resolver = new Resolver(
+            new RollBStubPieGenerator(cfgB),
+            new RollCStubPieGenerator(cfgC),
+            new RollDStubPieGenerator(cfgD),
+            genE,
+            new RollFStubPieGenerator(cfgF),
+            new RollGStubPieGenerator(cfgG),
+            game,
+            rng,
+            new ResumeInboundStub(),
+            new ResolveFreeThrowsStub(),
+            new BlockRecoveryStub(),
+            new ShotResolutionStub());
+
+        var pieE = genE.Generate(state);
+
+        var zonesSeen = new Dictionary<ShotLocation, int>();
+        foreach (var z in Enum.GetValues<ShotLocation>()) zonesSeen[z] = 0;
+        var landed = 0;
+        var unrecognized = 0;
+        var missingZone = 0;
+        var missingSlot = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            // Select a real slot (Roll E), then hand the resolver a clean
+            // IntoShotType continuation — exactly what Roll F emits on a ShotAttempt.
+            var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
+            var shotTicket = new Continue(ContinuationKind.IntoShotType, selected);
+            var routing = resolver.Route(shotTicket);
+            var d = routing.Destination;
+
+            if (!d.StartsWith("STUB:ShotResolution")) { unrecognized++; continue; }
+            if (d.EndsWith("NO_SLOT")) { missingSlot++; continue; }
+            if (d.EndsWith("NO_ZONE")) { missingZone++; continue; }
+
+            // Destination shape: STUB:ShotResolution:{Side}slot{N}:{Zone}
+            var zoneText = d[(d.LastIndexOf(':') + 1)..];
+            if (Enum.TryParse<ShotLocation>(zoneText, out var z)) { zonesSeen[z]++; landed++; }
+            else unrecognized++;
+        }
+
+        Console.WriteLine($"  landed at shot-resolution stub: {landed:N0}");
+        var allZones = true;
+        Console.WriteLine("  all five zones rode through to the stub:");
+        foreach (var z in Enum.GetValues<ShotLocation>())
+        {
+            var hit = zonesSeen[z] > 0;
+            allZones &= hit;
+            Console.WriteLine($"    {z,-6} {zonesSeen[z],8:N0}  {(hit ? "ok" : "NONE")}");
+        }
+
+        var routedOk = unrecognized == 0;
+        var slotOk = missingSlot == 0;
+        var zoneOk = missingZone == 0;
+        Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  slot intact on every exit: missing={missingSlot} -> {(slotOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  zone stamped on every exit: missing={missingZone} -> {(zoneOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all five zones reached the stub: {(allZones ? "ok" : "FAIL")}");
+
+        return routedOk && slotOk && zoneOk && allZones;
     }
 }

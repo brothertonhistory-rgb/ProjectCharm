@@ -39,12 +39,13 @@ becomes trivial once every terminal is real and sitting right there to read.
 
 Current frontier: the chain terminates cleanly for turnovers (Roll C — now fed by A,
 B, and F), fouls (Roll D → stubs — also fed by A, B, F), violations and jump balls
-(Roll A, B, F). Roll F (player action) is built: it resolves the selected player's
-action into a shot attempt, turnover, non-shooting foul, block, or held ball. The
-chain now dead-ends at the `IntoShotType` stub for any possession that gets a shot
-off, and at the `ResolveBlock` stub for a blocked attempt. The next pipes are the
-shot web beyond Roll F (shot type → make/miss, block-recovery, rebound, free
-throws). The Governor is built only after those land.
+(Roll A, B, F). Roll F (player action) resolves the selected player's action into a
+shot attempt, turnover, non-shooting foul, block, or held ball; Roll G (shot
+location) then stamps WHERE a clean attempt comes from (Three / Long / Mid / Short /
+Rim). The chain now dead-ends at the `IntoShotResolution` stub for any possession
+that gets a shot off (the future Roll H — make/miss), and at the `ResolveBlock` stub
+for a blocked attempt. The next pipes are the shot web beyond Roll G (make/miss,
+block-recovery, rebound, free throws). The Governor is built only after those land.
 
 ---
 
@@ -209,7 +210,7 @@ paths Roll A already has.
 
 ---
 
-## Verified routing map (audited from source, post Roll F)
+## Verified routing map (audited from source, post Roll G)
 
 The engine is NOT a single chain — it is a spine of action rolls draining into a
 small set of SHARED sink nodes. "Many feeders, one node" is the actual wiring, not
@@ -225,7 +226,8 @@ switch.
 | **C** Turnover | 5 slices, all terminal | **TERMINAL** ×5 |
 | **D** Foul | (bonus state read) None / OneAndOne / Double | ResumeInbound stub / ResolveFreeThrows stub |
 | **E** Selection | one slot (flat 5-way) | Roll F (live) |
-| **F** Player action | ShotAttempt / Turnover / NonShootingFoul / Blocked / JumpBall | ShotType stub / C / D / BlockRecovery stub / jump-ball node |
+| **F** Player action | ShotAttempt / Turnover / NonShootingFoul / Blocked / JumpBall | Roll G (live) / C / D / BlockRecovery stub / jump-ball node |
+| **G** Shot location | Three / Long / Mid / Short / Rim (flat-ish 5-way) | ShotResolution stub (all five) |
 | **jump-ball node** | arrow read (or `Off` tip coin-flip) | **TERMINAL** (resolves + flips arrow) |
 
 Shared sinks and their feeders (current):
@@ -236,11 +238,13 @@ Shared sinks and their feeders (current):
 True terminals today: Roll A's three violation terminals (ShotClockViolation,
 FiveSecondInbound, TenSecondBackcourt), all five Roll C slices, and the jump-ball
 resolution. Everything else is a Continue that currently ends at a stub
-(`ResumeInbound`, `ResolveFreeThrows`, `ResolveBlock`, `IntoShotType`).
+(`ResumeInbound`, `ResolveFreeThrows`, `ResolveBlock`, `IntoShotResolution`).
 
-The live spine A → B → E → F now resolves the player's action and dead-ends at the
-`IntoShotType` stub (a shot got off) or the `ResolveBlock` stub (it was blocked).
-Roll F is the third feeder into C and D and the third feeder into the jump-ball node.
+The live spine A → B → E → F → G now resolves the player's action AND stamps the
+shot's location, then dead-ends at the `IntoShotResolution` stub (a located shot got
+off) or the `ResolveBlock` stub (it was blocked). Roll F is the third feeder into C
+and D and the third feeder into the jump-ball node; Roll G adds no new feeders — like
+Roll E it stamps one fact and continues to a single next beat.
 
 ---
 
@@ -702,7 +706,7 @@ every outcome a continue, because each one has downstream work.
 
 | Outcome | Result | Routes to |
 |---|---|---|
-| Shot attempt | `Continue(IntoShotType)` | shot-type node *(stub — future Roll G)* |
+| Shot attempt | `Continue(IntoShotType)` | Roll G — shot location *(live)* |
 | Turnover | `Continue(ResolveTurnoverType)` | turnover-type resolver (Roll C, live) |
 | Non-shooting foul | `Continue(ResolveFoulType)` | foul-type resolver (Roll D, live) |
 | Blocked | `Continue(ResolveBlock)` | block-recovery node *(stub)* |
@@ -716,14 +720,15 @@ reuse the exact kinds A and B already emit — Roll F becomes the third feeder i
 C, D, and the jump-ball node *for free*. This is the "many feeders, one node"
 payoff at its clearest: no new turnover roll, no new foul roll, just a third arrow
 into each. Only `Blocked` and `ShotAttempt` open new pipes (`ResolveBlock`,
-`IntoShotType`), because they have genuinely new downstream work.
+`IntoShotType`), because they have genuinely new downstream work. (`IntoShotType`
+now triggers the live Roll G; `ResolveBlock` is still a stub.)
 
 **Takes `(state, pie, rng)` — no `GameState`.** A flat gate reads nothing and
 mutates nothing. Unlike Roll D (which charges a team foul) or Roll E (which reads
 the lineup), Roll F touches no game state. The jump-ball arrow flip happens in the
 jump-ball node; the team-foul charge happens in Roll D. Roll F only classifies the
 action and emits a kind. It also stamps NOTHING on `PossessionState` — Roll E's
-`SelectedSlot` rides forward untouched; the future Roll G adds `ShotType`.
+`SelectedSlot` rides forward untouched; Roll G (live) adds `ShotType`.
 
 **Why the shooting foul is NOT here.** `NonShootingFoul` is non-shooting by
 construction: no shot is up yet at this beat, so it fits Roll D's existing pre-shot
@@ -758,6 +763,73 @@ Deferred — attribute-model-adjacent.
 **Config lives separately.** Roll F's five weights live in the `"RollF"` section of
 `config.json`, loaded by `RollFConfig`.
 
+---
+
+## Roll G — Shot Location
+
+**Simulates:** the beat right after a clean shot attempt gets off (Roll F's
+`ShotAttempt`) — WHERE the shot comes from. Stamps one of five zones onto the
+possession, then hands off to the future make/miss roll (Roll H).
+
+**Structurally Roll E, not Roll F.** Like Roll E, every outcome stamps a fact and
+continues to the SAME next beat; the only thing that differs per outcome is which
+zone gets stamped. (Roll E stamped a `SelectedSlot` and all five slots emitted
+`IntoPlayerAction`; Roll G stamps a `ShotType` and all five zones emit
+`IntoShotResolution`.) It is NOT a gate like Roll F, whose outcomes branch to
+different nodes. Unlike Roll E it needs NO `GameState` — a zone is just an enum
+value, nothing to look up — so its signature is `(state, pie, rng)`, the Roll F
+shape.
+
+**Pie shape:** five slices over `ShotLocation` — `Three`, `Long`, `Mid`, `Short`,
+`Rim` (declaration order, walked by the pie). Placeholder weights this session,
+roughly real D1 attempt shares: `Three 0.36 / Rim 0.35 / Short 0.11 / Mid 0.10 /
+Long 0.08`.
+
+**Five exits, one destination:**
+
+| Outcome (zone) | Result | Routes to |
+|---|---|---|
+| Three / Long / Mid / Short / Rim | `Continue(IntoShotResolution)` *(zone stamped on state)* | make/miss node *(stub — future Roll H)* |
+
+**The second per-possession fact.** Roll G stamps `ShotType` onto `PossessionState`
+(after Roll E's `SelectedSlot`) via a `with`-expression — a durable fact, named
+`ShotType` but typed `ShotLocation`. It lands on state, not on the continuation,
+for the same reason `SelectedSlot` does: Roll H reads BOTH facts across a chain hop
+to resolve the matchup into points. (Contrast Roll D's `Bonus`, which rides the
+continuation because it is transient input for the very next node.)
+
+**Location ONLY — quality is NOT here.** No open-vs-contested, no
+assisted-vs-unassisted. Shot quality is not its own beat at all: it is folded into
+the make/miss PERCENTAGE at Roll H (a great look and a poor look differ only in
+conversion odds, never as a stored value). Keeping each zone to one clean meaning
+is what gives every bucket a real-world FG% to calibrate against later; a bucket
+that smuggled in a second axis would have no clean reference number. This is the
+same discipline as Roll F's localized outcomes.
+
+**Why these five buckets (settled, not to re-litigate):**
+- **`Long` (long two) stays its own bucket** — the *inefficient* shot. Separating it
+  is what lets shot selection matter: lots of long twos should visibly bleed
+  efficiency. Never collapsed into `Mid`.
+- **`Short` and `Mid` are different populations** — short (floaters, runners, hooks;
+  bigs) vs. mid (pull-up jumpers; guards). The split is where slot identity starts
+  to express.
+- **One `Three` bucket for now** — corner vs. above-the-break is a real efficiency
+  gap but a cheap future slice-split; not front-loaded.
+
+**The pie generator is stubbed, with NO live wire (like Roll E and Roll F).** The
+only thing that tilts Roll G's pie is the deferred player/attribute model (shot
+selection, role, defensive pressure). A placeholder wire would pantomime the exact
+signal being deferred. The real generator drops in later through the same seam —
+a non-flat pie over the same enum, with no change to Roll G or the resolver.
+
+**Block recovery is deliberately NOT folded in here.** A blocked attempt
+(`ResolveBlock`) stays a separate stub — it is loose-ball resolution, entangled
+with the not-yet-built rebound system. Building it now risks throwaway work or an
+accidental early rebound system; it lands later, next to rebounds.
+
+**Config lives separately.** Roll G's five weights live in the `"RollG"` section of
+`config.json`, loaded by `RollGConfig`.
+
 | Roll | Name | Status |
 |---|---|---|
 | A | Entry — Inbounds (Dead Ball) | Built (stubbed generator + stubbed successors) |
@@ -765,7 +837,8 @@ Deferred — attribute-model-adjacent.
 | C | Turnover Classification | Built (stubbed generator; terminal — no successors) |
 | D | Non-Shooting Defensive Foul | Built (stubbed flavor generator + stubbed successors) |
 | E | Player Selection | Built (flat stubbed generator; feeds Roll F) |
-| F | Player Action | Built (flat-ish stubbed generator, no wire; 2 live nodes + 2 stubs) |
+| F | Player Action | Built (flat-ish stubbed generator, no wire; shot exit now feeds live Roll G, block exit stubbed) |
+| G | Shot Location | Built (flat-ish stubbed generator, no wire; stamps ShotType; feeds make/miss stub — future Roll H) |
 | — | Jump ball (arrow node) | Built (50/50 tip placeholder; fed by A, B, F) |
 
 ## The Game Governor — the possession-to-possession layer (DESIGNED, not built)

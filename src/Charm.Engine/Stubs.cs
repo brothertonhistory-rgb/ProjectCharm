@@ -54,21 +54,24 @@ public sealed class BlockRecoveryStub : IContinuationNode
     }
 }
 
-/// <summary>STUB for the shot-type node (the future Roll G) — where Roll F's
-/// clean shot attempt lands, the one outcome that proceeds DEEPER into the shot
-/// sequence. Roll G will stamp a ShotType onto <see cref="PossessionState"/>
-/// (the second per-possession fact after SelectedSlot) that the make/miss roll
-/// reads. The stub records WHICH slot is taking the shot, letting the harness
-/// confirm a real slot was named. A real node replaces this without Roll F
-/// changing — this is the chain's new dead-end / next frontier.</summary>
-public sealed class ShotTypeStub : IContinuationNode
+/// <summary>STUB for the make/miss node (the future Roll H) — where Roll G's
+/// stamped shot lands, after a location has been chosen. Roll H will read BOTH
+/// <see cref="PossessionState.SelectedSlot"/> AND <see cref="PossessionState.ShotType"/>
+/// to resolve the matchup into points. The stub echoes WHICH slot is shooting and
+/// from WHICH zone, letting the harness confirm both per-possession facts rode
+/// through. A real node replaces this without Roll G changing — this is the chain's
+/// new dead-end / next frontier.</summary>
+public sealed class ShotResolutionStub : IContinuationNode
 {
     public string Receive(Continue continuation)
     {
         var slot = continuation.State.SelectedSlot;
-        return slot is { } s
-            ? $"STUB:ShotType:{s.Side}slot{s.Number}"
-            : "STUB:ShotType:NO_SLOT";   // should never happen; surfaces a bug loud
+        var zone = continuation.State.ShotType;
+        if (slot is not { } s)
+            return "STUB:ShotResolution:NO_SLOT";   // should never happen; surfaces a bug loud
+        if (zone is not { } z)
+            return $"STUB:ShotResolution:{s.Side}slot{s.Number}:NO_ZONE";   // ditto
+        return $"STUB:ShotResolution:{s.Side}slot{s.Number}:{z}";
     }
 }
 

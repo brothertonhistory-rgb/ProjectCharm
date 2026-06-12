@@ -4,6 +4,87 @@ Newest entries first. What was built, decided, and left stubbed each session.
 
 ---
 
+## Session 10 — Roll G (shot location)
+
+**Built**
+- `ShotLocation.cs` — `ShotLocation` enum, five members in declaration order:
+  `Three`, `Long`, `Mid`, `Short`, `Rim` (`Long` = long two). Location ONLY; each
+  zone one clean meaning, so each has a real-world FG% to calibrate against later.
+- `RollG.cs` — the shot-location roll, structurally a clone of Roll E (stamp a
+  fact, continue to the SAME next beat), NOT a gate like Roll F. Drops Roll E's
+  `GameState` — a zone is just an enum value, nothing to look up — so the signature
+  is `(state, pie, rng)`. Rolls the five-way pie, stamps `state with { ShotType =
+  zone }`, returns `Continue(IntoShotResolution)` for all five zones.
+- `RollGConfig.cs` — loads the `"RollG"` section (`System.Text.Json`, cloned from
+  `RollFConfig`). Five base weights + Epsilon. No live-wire scalar.
+- `RollGStubPieGenerator.cs` — builds the flat-ish five-way pie from config. NO
+  live wire (mirrors Roll E/Roll F). Real attribute-driven generator replaces it
+  later without touching Roll G or the resolver.
+
+**Edited**
+- `PossessionState.cs` — added the nullable `ShotLocation? ShotType` field (the
+  SECOND per-possession fact, after `SelectedSlot`), mirroring the `SelectedSlot`
+  record + `with`-expression pattern. Named `ShotType` (reads cleanly at call
+  sites); typed `ShotLocation`.
+- `EntryOutcomes.cs` — added one `ContinuationKind`, `IntoShotResolution` (→ the
+  future make/miss roll, Roll H). Refreshed the `IntoShotType` doc (now triggers
+  the live Roll G, not a stub).
+- `Resolver.cs` — `IntoShotType` converted from stub-receive to execute-and-loop
+  (generate pie → `RollG.Execute` → feed result back), exactly like the C/D/E/F
+  swaps. Added `RollGStubPieGenerator` field + ctor param. Added the
+  `IntoShotResolution` case routing to the new stub. Retired the `_intoShotType`
+  stub-node field (replaced by a `_shotResolution` node).
+- `Stubs.cs` — retired `ShotTypeStub`; added `ShotResolutionStub`, which echoes
+  BOTH the carried `SelectedSlot` AND the stamped `ShotType`
+  (`STUB:ShotResolution:{Side}slot{N}:{Zone}`), so the harness confirms both facts
+  rode through. Surfaces `NO_SLOT` / `NO_ZONE` loud if either is missing.
+- `Program.cs` — load `RollGConfig`, build the generator, threaded it +
+  `ShotResolutionStub` through all three `Resolver` constructions (Main, the Roll F
+  handoff check, the new Roll G handoff check). Updated `RollFHandoffCheck`'s shot
+  destination (now `STUB:ShotResolution`). Added `RollGLocationBatchCheck` and
+  `RollGHandoffCheck`. Banner now reads A → B → … → G.
+- `config.json` — added the `"RollG"` section (`Three 0.36 / Long 0.08 / Mid 0.10
+  / Short 0.11 / Rim 0.35`, sums to 1; Epsilon 1e-9).
+
+**Decided**
+- **Shot quality is NOT its own beat.** It folds into the make/miss PERCENTAGE at
+  Roll H — a great look and a poor look differ only in conversion odds, never as a
+  stored value. Splitting it out would create a bucket with no clean reference
+  number, against the localized-bucket rule. This settled the one open fork: shot
+  quality lives inside Roll H, so the stub after G is a genuine shot-RESOLUTION
+  node (`IntoShotResolution` / `ShotResolutionStub`).
+- **Roll H's make/miss pie (designed, not built):** Made / Made-fouled /
+  Miss-to-rebound / Miss-fouled / Miss-OOB-possession-change, plus a sixth —
+  Miss-deflects-off-defender-offense-retains (sideline inbound, future roll). Point
+  value (2 vs. 3) comes from G's stamped `ShotType`, not a pie slice — which is why
+  Roll H reads BOTH `SelectedSlot` and `ShotType`.
+- **Attention is one conserved mechanic.** Teammate gravity (a post drawing a
+  defender off the shooter's man) and lone-shooter pressure (attention collapsing
+  onto the only threat) are the SAME thing — defensive attention allocated across
+  the five matchups — read once per possession, one-directional, no feedback loop.
+  Wide (touches all five) is safe; looping is the danger. Lives in Roll H's
+  deferred generator.
+
+**Left stubbed / deferred**
+- `ShotResolutionStub` (the make/miss node — Roll H, the next frontier and the
+  first roll that turns dominance into points).
+- `BlockRecoveryStub` (unchanged — loose-ball resolution, built later next to
+  rebounds).
+- Roll G's real attribute-driven pie generator (shot selection by role/matchup).
+
+**Verified (by pie/routing mirror in Python, then the live harness on Emmett's
+machine — SDK-less sandbox, same as prior sessions)**
+- Five-way location distribution converges within tolerance (Three 36.09 / Rim
+  34.98 / Short 10.87 / Mid 10.07 / Long 7.99).
+- Every Roll G exit is a clean `IntoShotResolution` Continue with `ShotType`
+  actually stamped on the carried state (anomalies = 0).
+- Clean handoff `IntoShotType` → Roll G → `ShotResolutionStub`: 100,000 routed,
+  zero unrouted, slot AND zone intact on every exit, all five zones reach the stub.
+- Full-chain observability samples land at `STUB:ShotResolution:{slot}:{zone}`; all
+  prior checks (A–F, jump ball, slot layer, seam signals) still pass.
+
+---
+
 ## Session 9 — Roll F (player action) + Roll B jump-ball sliver
 
 **Built**

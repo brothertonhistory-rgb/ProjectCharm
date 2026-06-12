@@ -19,12 +19,13 @@ public sealed class Resolver
     private readonly RollDStubPieGenerator _rollDGenerator;
     private readonly RollEStubPieGenerator _rollEGenerator;
     private readonly RollFStubPieGenerator _rollFGenerator;
+    private readonly RollGStubPieGenerator _rollGGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
     private readonly IContinuationNode _resumeInbound;
     private readonly IContinuationNode _resolveFreeThrows;
     private readonly IContinuationNode _resolveBlock;
-    private readonly IContinuationNode _intoShotType;
+    private readonly IContinuationNode _shotResolution;
 
     public Resolver(
         RollBStubPieGenerator rollBGenerator,
@@ -32,24 +33,26 @@ public sealed class Resolver
         RollDStubPieGenerator rollDGenerator,
         RollEStubPieGenerator rollEGenerator,
         RollFStubPieGenerator rollFGenerator,
+        RollGStubPieGenerator rollGGenerator,
         GameState game,
         IRng rng,
         IContinuationNode resumeInbound,
         IContinuationNode resolveFreeThrows,
         IContinuationNode resolveBlock,
-        IContinuationNode intoShotType)
+        IContinuationNode shotResolution)
     {
         _rollBGenerator = rollBGenerator;
         _rollCGenerator = rollCGenerator;
         _rollDGenerator = rollDGenerator;
         _rollEGenerator = rollEGenerator;
         _rollFGenerator = rollFGenerator;
+        _rollGGenerator = rollGGenerator;
         _game = game;
         _rng = rng;
         _resumeInbound = resumeInbound;
         _resolveFreeThrows = resolveFreeThrows;
         _resolveBlock = resolveBlock;
-        _intoShotType = intoShotType;
+        _shotResolution = shotResolution;
     }
 
     /// <summary>Walk the chain from <paramref name="result"/> until a terminal
@@ -136,11 +139,24 @@ public sealed class Resolver
                         case ContinuationKind.ResolveBlock:
                             return new RoutingOutcome(false, _resolveBlock.Receive(c));
 
-                        // Roll F, clean attempt got off -> shot-type node (stub),
-                        // the future Roll G. The one Roll F outcome that proceeds
-                        // deeper. Chain ends here for now (the new frontier).
+                        // Roll F, clean attempt got off -> execute Roll G (shot
+                        // location), loop. Roll G is structurally Roll E: it stamps
+                        // a ShotType onto its state and returns a CONTINUE
+                        // (IntoShotResolution) for all five zones — so feeding it
+                        // back re-enters this switch and lands on the
+                        // IntoShotResolution case below. Roll G reads nothing off
+                        // GameState (a zone is just an enum value), so it takes only
+                        // (state, pie, rng) — like Roll F, not Roll E.
                         case ContinuationKind.IntoShotType:
-                            return new RoutingOutcome(false, _intoShotType.Receive(c));
+                            var pieG = _rollGGenerator.Generate(c.State);
+                            result = RollG.Execute(c.State, pieG, _rng);
+                            continue;
+
+                        // Roll G's stamped shot -> make/miss node (stub), the future
+                        // Roll H. The ShotType rides on the carried state. Chain ends
+                        // here for now (the new frontier).
+                        case ContinuationKind.IntoShotResolution:
+                            return new RoutingOutcome(false, _shotResolution.Receive(c));
 
                         // Jump ball (from any feeder: Roll A, Roll B, Roll F) ->
                         // resolve against the possession arrow, then END the
