@@ -81,5 +81,13 @@
     "BlockLong": 0.02,
     "BlockThree": 0.01,
     "Epsilon": 1e-9
+  },
+
+  "RollI": {
+    "DefensiveRebound": 0.68,
+    "OffensiveRebound": 0.29,
+    "LooseBallFoulOnDefense": 0.02,
+    "LooseBallFoulOnOffense": 0.01,
+    "Epsilon": 1e-9
   }
 }

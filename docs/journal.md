@@ -1,3 +1,134 @@
+## Session 14 — Roll I (Rebound Resolution) (2026-06-12)
+
+**Built.** Roll I, the rebound roll — the node a missed shot drains into. Replaces
+the parked `ReboundStub` on the existing `ResolveRebound` edge (the same stub→roll
+swap as C/D/E/F/G/H). Four outcomes, mixed ends (two terminals, two continues),
+structurally closest to Roll H. This is the first roll whose job includes handing
+the ball to the OTHER team, so it is the first place we honor the locked rule:
+anything that switches which team has the ball is a TERMINAL (the possession-end
+flag that will later trigger that possession's stat accumulation).
+
+**The four outcomes (`ReboundOutcome`, new enum, declaration order significant):**
+- `DefensiveRebound` (0.68) — defense secures the board; ball switches teams →
+  TERMINAL. Next possession is a LIVE push into the future transition roll
+  (design knowledge, not routed here).
+- `OffensiveRebound` (0.29) — offense secures the board; SAME possession stays
+  alive → CONTINUE to the new `ResolveOffensiveRebound` kind → `OffensiveReboundStub`.
+- `LooseBallFoulOnDefense` (0.02) — foul on the defense; offense retains → CONTINUE.
+  The ONLY GameState-touching arm: charges the DEFENSIVE team foul via `FoulTracker`
+  and reads the bonus exactly as Roll D — below bonus → `ResolveSidelineInbound`
+  (reused `SidelineInboundStub`); in bonus → `ResolveFreeThrows` carrying the
+  `Bonus` payload (reused `ResolveFreeThrowsStub`, Roll D's bonus FT path).
+- `LooseBallFoulOnOffense` (0.01) — foul on the offense; ball switches teams →
+  TERMINAL. Charges NO foul and touches no GameState (Roll C's `OffensiveFoul`
+  precedent). Next possession is a DEAD-ball inbound at Roll A (design knowledge,
+  not routed here).
+
+Two flip the ball (terminals), two keep it (continues). The flip pair splits on
+live-vs-dead exactly like Roll C's turnover axis: defensive rebound is a live flip
+(→ transition); offensive foul is a dead flip (→ Roll A).
+
+**Signature `(state, pie, game, rng)`** — like Roll D, because of the one
+GameState-touching arm. The other three arms read nothing off GameState. Roll I
+stamps NO new `PossessionState` fact (which slot grabbed the board is the deferred
+attribution layer); the terminal reason names the outcome (Roll C pattern), the
+stub labels record the continue landings.
+
+**Files added.** `Rolls/ReboundOutcomes.cs` (the enum), `Rolls/RollI.cs` (the roll),
+`Config/RollIConfig.cs` (loads the `"RollI"` section — four base weights + Epsilon,
+no live-wire scalar), `Generators/RollIStubPieGenerator.cs` (flat four-way pie from
+config, no signal argument). Config gained the `"RollI"` section.
+
+**Files edited.**
+- `EntryOutcomes.cs` — added the `ResolveOffensiveRebound` continuation kind.
+  (`ResolveSidelineInbound` and `ResolveFreeThrows` already existed — reused for the
+  foul arm, nothing added there.)
+- `Stubs.cs` — RETIRED `ReboundStub`; added `OffensiveReboundStub` (echoes
+  slot:zone:result via `ShotFacts.Describe`, lands fact-complete like the other
+  post-H stubs).
+- `Resolver.cs` — swapped the `ResolveRebound` case from `ReboundStub.Receive` to
+  execute-Roll-I-and-loop (generate pie → `RollI.Execute` → feed result back),
+  exactly the C/D/E/F/G/H move. Added the `RollIStubPieGenerator` field + ctor
+  param. Retired the `_rebound` field; added `_offensiveRebound` + the
+  `ResolveOffensiveRebound` case. Ctor is now 16 args (8 generators + game + rng +
+  6 stub nodes).
+
+**Harness — the Miss ripple (Session 11/13 precedent).** With Roll I live, a `Miss`
+no longer lands at `STUB:Rebound`; it flows THROUGH Roll I to one of five landings:
+`END:DefensiveRebound`, `END:LooseBallFoulOnOffense`, `STUB:OffensiveRebound`,
+`STUB:SidelineInbound`, `STUB:ResolveFreeThrows`. Every upstream check updated:
+- Threaded `RollIConfig` + `RollIStubPieGenerator` + `OffensiveReboundStub` (and
+  dropped `ReboundStub`) through ALL four `Resolver` constructions (Main + the three
+  handoff checks).
+- `RollHHandoffCheck` / `RollGHandoffCheck`: their `STUB:Rebound` destination is
+  gone, replaced with Roll I's landings. The two new terminals
+  (`END:DefensiveRebound`, `END:LooseBallFoulOnOffense`) are matched BEFORE the
+  generic stub parse / `END:` catch (the same trap S11/13 handled for `END:Made` /
+  `END:MissOutOfBoundsLost`), since terminals carry no slot:zone:result tail. Both
+  destination sets grew from six to eight.
+- `RollFHandoffCheck`: the "shot → resolved" bucket swapped `STUB:Rebound` for Roll
+  I's two terminals + `STUB:OffensiveRebound` (sideline/FT were already in the
+  resolved/foul sets), with the two new `END:` reasons caught BEFORE the generic
+  `END:` → turnover line.
+- Main `BatchCheck`: no structural change — the generic `PossessionEnded` /
+  `StartsWith("STUB:")` split already absorbs Roll I's two terminals (as `ended`)
+  and three continues (as `routed-to-stub`); only the explanatory comment changed.
+  Invariant `ended + routed-to-stub == BatchSize`, `unrouted == 0` preserved.
+- Added `RollIReboundBatchCheck` (four rates vs. pie within tolerance; every exit a
+  clean terminal-or-continue of the expected kind; slot+zone+result ride through the
+  stub landings; driven through a real `Miss` so the state carries slot+zone+result)
+  and `RollIBonusForkCheck` (a foul-only pie driving the defense's foul count across
+  the thresholds, confirming SidelineInbound below the bonus and ResolveFreeThrows
+  with the right Bonus at/above — mirrors `RollDBonusRoutingCheck`). Added Roll I
+  observability (the four-way pie + sample misses showing each landing). Banner now
+  reads A→…→I.
+
+**Decided.**
+- Team-switch ⇒ terminal. Defensive rebound and the offensive loose-ball foul end
+  the possession because the ball changes hands; the terminal is the future
+  stat-accumulation trigger. Offensive rebound and the defensive loose-ball foul
+  keep the same possession (continues).
+- The loose-ball-defense arm REUSES `FoulTracker` (charge + bonus),
+  `SidelineInboundStub` (below bonus), and `ResolveFreeThrowsStub` (in bonus) — free
+  to diverge later via a distinct continuation kind or a context tag without
+  reopening Roll I.
+- The offensive-foul terminal charges nothing (Roll C's `OffensiveFoul` precedent).
+- Flat placeholder weights (68/29/2/1). Offensive-rebound rate is a possession-count
+  calibration knob, deferred to the real attribute-driven generator.
+
+**Left stubbed / deferred.**
+- The offensive-rebound roll itself (replaces `OffensiveReboundStub`; its own odds,
+  one branch looping back to the half-court roll → player selection — a later session).
+- The transition roll (defensive rebound is a terminal; "transition" is the next
+  possession's entry — future work, consumed by the future spawner/Governor).
+- The next-possession spawner / Governor (terminals just end the possession; nothing
+  reads the terminal to start the other team's possession yet).
+- The attribute-driven Roll I generator (the deferred offensive-rebound-rate model).
+- `MissOutOfBoundsRetained` / block-recovery rerouting: unchanged; block recovery
+  does NOT feed Roll I this session.
+
+**Verified (live harness, Emmett's machine — ALL CHECKS PASSED).** Full G→H→I
+chain: all destinations reached, zero unrouted, all five zones ride through the
+stub landings. Roll I rates converge within tolerance (def 68.1% / off 28.9% /
+foul-def 2.0% / foul-off 1.0% at N≈44.6k misses), all four arms exercised. Bonus
+fork crosses at exactly 7 (OneAndOne) and 10 (Double), charging the defense each
+draw. Every prior check still ok.
+
+**One fix during validation (the shared-game bonus crossing).** First harness run
+flagged `unrecognized=878` in the G/H handoff checks and the Roll I batch. Cause: the
+handoff checks share ONE `game` across all 100k iterations, so the defense's foul
+count climbs and crosses the bonus mid-batch. Once in the bonus, the
+loose-ball-defense arm correctly routes to `STUB:ResolveFreeThrows:{Bonus}` (not
+`SidelineInbound`) — but its label carries a Bonus token, not slot:zone:result, so
+the fact-parsers miscounted it. Fix: recognize `STUB:ResolveFreeThrows` as a valid
+Roll I landing and short-circuit it BEFORE the fact-parser (same shape as the
+terminal short-circuits), in all three handoff parsers + the Roll I batch's
+defense-foul arm (now split into below-bonus SidelineInbound + in-bonus
+ResolveFreeThrows sub-counts). This is the live analogue of Roll D's bonus crossing,
+just surfacing through Roll I's foul arm — expected behavior, not an engine bug.
+
+---
+
 ## Session 13 — Relocate Block (Roll F → Roll H, zone-weighted) (2026-06-12)
 
 **Moved.** `Blocked` left Roll F and became the seventh outcome of Roll H. A block

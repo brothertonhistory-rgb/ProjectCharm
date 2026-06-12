@@ -136,4 +136,11 @@ public enum ContinuationKind
     /// merged. The stamped <see cref="ShotResult"/> rides on
     /// <see cref="PossessionState"/>.</summary>
     ResolveSidelineInbound,
+
+    /// <summary>The offense secured the offensive rebound: hand off to the
+    /// (stubbed) offensive-rebound node. The same possession stays alive — the
+    /// offense retains the ball and the rebound roll keeps the chain going. The
+    /// real offensive-rebound roll (with its own odds, one branch looping back to
+    /// the halfcourt roll → player selection) is a later session.</summary>
+    ResolveOffensiveRebound,
 }

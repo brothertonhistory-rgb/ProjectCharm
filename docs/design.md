@@ -1047,3 +1047,74 @@ placeholder. A future block-recovery roll will replace it (the live-ball scrambl
 out of bounds off either team, or recovered by either team) and may at that point feed
 the rebound system — its own decision, a later session. It MAY also share a loose-ball
 / inbound node with the sideline-inbound stub — flagged, not merged.
+
+---
+
+## The possession boundary: team-switch ⇒ terminal (Session 14, Roll I)
+
+Roll I (rebound resolution) is the first roll whose job includes handing the ball to
+the OTHER team, so it is where the project's possession-boundary rule first becomes
+load-bearing: **anything that switches which team has the ball is a TERMINAL.** A
+terminal is not just "this roll is done" — it is the possession-end flag, the future
+stat-accumulation trigger. When the Governor exists (built last, see "The funnel
+principle" and "The Game Governor" notes), it reads each terminal to (a) close the
+current possession's accounting and (b) start the next team's possession. So the
+terminal/continue distinction is not stylistic; it marks exactly where one
+possession's accounting ends and the next begins.
+
+This is why Roll I's four outcomes split the way they do:
+- **Defensive rebound** and **loose-ball foul on the offense** flip the ball →
+  TERMINALS. The possession is over; its stats will accumulate; a new possession for
+  the other team begins (future).
+- **Offensive rebound** and **loose-ball foul on the defense** keep the ball with the
+  offense → CONTINUES. The SAME possession stays alive — no boundary, no
+  possession-count increment. The offensive rebound is the canonical "same team,
+  possession continues" case the loop was shaped for from day one (it is what
+  preserves the ~67–70 possessions/team anchor: an offensive board does NOT mint a new
+  possession).
+
+### Live-vs-dead next-possession entry mapping (what the future spawner consumes)
+The two terminals are not interchangeable. They differ on the live-vs-dead axis — the
+same axis Roll C's turnover classification splits on — because that axis drives what
+the NEXT possession looks like:
+- **Defensive rebound → LIVE flip.** The defense secures the ball in live play; its
+  next possession enters via the future TRANSITION roll (a fast, live-ball entry), not
+  a dead-ball inbound.
+- **Loose-ball foul on the offense → DEAD flip.** The whistle stops play; the defense's
+  next possession is a DEAD-ball inbound at Roll A.
+
+This mapping is design knowledge recorded HERE for the future next-possession spawner
+to consume; Roll I does NOT route it. Roll I only classifies the rebound and names the
+terminal; the spawner (when built) reads the terminal's meaning and picks the entry
+variant. This is the same discipline as "a roll names its continuation kind, the
+Resolver maps it" — the consequence lives where it is generated, the consumer reads it.
+
+### The loose-ball-foul-on-defense arm: reuse, free to diverge
+The one continue that touches GameState charges the DEFENSIVE team foul through
+`FoulTracker` and reads the bonus exactly as Roll D does — then reuses Roll D's
+downstream nodes: `SidelineInboundStub` below the bonus (offense retains, inbounds from
+the side) and `ResolveFreeThrowsStub` in the bonus (carrying the `Bonus` payload). This
+is deliberate reuse, not fusion: if loose-ball free throws ever need to diverge from
+Roll D's non-shooting bonus FTs (different reboundability rules, say), they get a
+distinct continuation kind or a context tag at that point — without reopening Roll I.
+The offensive-foul terminal, by contrast, charges NOTHING and touches no GameState,
+following Roll C's `OffensiveFoul` precedent (personal/offensive-foul accounting is the
+deferred attribution layer's concern).
+
+### Forthcoming — the rolls the Roll I stubs hold water for
+- **The offensive-rebound roll.** `OffensiveReboundStub` is a parked placeholder. The
+  real roll has its own odds and one branch that loops the live possession back to the
+  half-court roll → player selection (a put-back, a reset, a kick-out). Its rate is
+  also where the possession-count calibration knob lives — too many offensive boards
+  inflate possessions per team above the ~67–70 anchor — so the flat 0.29 placeholder
+  is explicitly Emmett's to tune against the future full-game readout. A later session.
+- **The transition roll.** The defensive-rebound terminal's LIVE meaning enters here.
+  No transition roll exists yet; "transition" is the next possession's entry, built
+  once the next-possession spawner / Governor exists. A later session.
+- **The next-possession spawner / Governor.** Reads Roll I's terminals (and every
+  other terminal) to close accounting and start the next possession with the right
+  entry variant per the live-vs-dead mapping above. Built last, against a whole funnel.
+
+The block weights' philosophy holds here too: best-guess placeholders, kept in editable
+config (the `"RollI"` section), calibrated later against the harness's possession-count
+and rebound-rate readouts rather than guessed precisely now.

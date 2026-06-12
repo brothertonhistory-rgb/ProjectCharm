@@ -52,17 +52,22 @@ public sealed class BlockRecoveryStub : IContinuationNode
         ShotFacts.Describe("BlockRecovery", continuation.State);
 }
 
-/// <summary>STUB for the rebound node — where Roll H's MISS lands. The big
-/// dependency several stubs now wait on: an offensive board keeps the SAME
-/// possession (the ~67–70 accounting anchor), a defensive board flips it, and the
-/// Governor's "same team continues" branch hangs off this. No rebound logic lives
-/// here yet — it is a holding pen. Echoes the carried slot, zone, AND the stamped
-/// result so the harness confirms all three per-possession facts rode through. A
-/// real node replaces this without Roll H changing.</summary>
-public sealed class ReboundStub : IContinuationNode
+/// <summary>STUB for the offensive-rebound node — where Roll I's
+/// <c>OffensiveRebound</c> outcome lands. The offense secured the board; the same
+/// possession stays alive. The real offensive-rebound roll (its own odds, one
+/// branch looping back to the halfcourt roll → player selection) is a later
+/// session. Echoes slot, zone, AND result via <see cref="ShotFacts.Describe"/> so
+/// the harness confirms all three per-possession facts rode through Roll I intact.
+/// A real node replaces this without Roll I changing.
+/// <para>NOTE: <c>ReboundStub</c> was RETIRED this session — Roll I replaced it.
+/// <c>OffensiveReboundStub</c> is its successor for the offensive-rebound continue
+/// arm only; the terminal arms (<c>DefensiveRebound</c> /
+/// <c>LooseBallFoulOnOffense</c>) end the possession directly and need no stub.</para>
+/// </summary>
+public sealed class OffensiveReboundStub : IContinuationNode
 {
     public string Receive(Continue continuation) =>
-        ShotFacts.Describe("Rebound", continuation.State);
+        ShotFacts.Describe("OffensiveRebound", continuation.State);
 }
 
 /// <summary>STUB for the shooting-free-throw node — where Roll H's two foul arms
