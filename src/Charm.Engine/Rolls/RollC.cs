@@ -33,22 +33,34 @@ public static class RollC
         // and attribution layer to consume. Elapsed time defers to the future
         // time roll (null) — a turnover has real path variance in how long it
         // took, unlike the invariant shot-clock violation.
+        //
+        // The consequence makes the dead/live axis FUNCTIONAL, not just named: the
+        // ball goes to the other team (state.Defense) on every slice, but a dead-ball
+        // slice restarts at Roll A while a live-ball slice (intercepted / stripped
+        // live) is tagged Transition — the new offense pushing the other way. (The
+        // thin Governor temp-routes Transition through Roll A this session; the tag
+        // is honest for when the live-ball entry node lands.)
         return outcome switch
         {
             TurnoverOutcome.BadPassDeadBall =>
-                new Terminal("BadPassDeadBall", state),
+                new Terminal("BadPassDeadBall", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
 
             TurnoverOutcome.BadPassIntercepted =>
-                new Terminal("BadPassIntercepted", state),
+                new Terminal("BadPassIntercepted", state,
+                    PossessionConsequence.TransitionTo(state.Defense)),
 
             TurnoverOutcome.LostBallDeadBall =>
-                new Terminal("LostBallDeadBall", state),
+                new Terminal("LostBallDeadBall", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
 
             TurnoverOutcome.LostBallLiveBall =>
-                new Terminal("LostBallLiveBall", state),
+                new Terminal("LostBallLiveBall", state,
+                    PossessionConsequence.TransitionTo(state.Defense)),
 
             TurnoverOutcome.OffensiveFoul =>
-                new Terminal("OffensiveFoul", state),
+                new Terminal("OffensiveFoul", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
 
             _ => throw new InvalidOperationException($"Unhandled turnover outcome '{outcome}'.")
         };

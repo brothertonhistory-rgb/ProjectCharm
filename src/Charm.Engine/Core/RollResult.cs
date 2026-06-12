@@ -17,10 +17,48 @@ public abstract record RollResult
     public double? ElapsedSeconds { get; init; }
 }
 
+/// <summary>
+/// What a terminal MEANS for the next possession — the clean, MINIMAL seam the
+/// Governor reads to spawn possession N+1. It carries ONLY what the thin Governor
+/// needs today: who has the ball next, and how that possession starts.
+///
+/// <para>This lives where the terminal is GENERATED (each roll names its own
+/// consequence), not parsed from a reason string by the Governor — the same
+/// philosophy as "a roll names its continuation kind, the resolver maps it."</para>
+///
+/// <para>It is deliberately small and designed to GROW: points, clock, foul
+/// context, and momentum are clean appends LATER, when their consumers exist. A
+/// big speculative consequence now would be a bottleneck wearing a scalability
+/// costume — rejected on purpose.</para>
+/// </summary>
+/// <param name="NextOffense">The team that has the ball on the next possession.
+/// Its <see cref="PossessionState.Defense"/> is simply the other side.</param>
+/// <param name="NextEntry">How that next possession starts — the single reconciled
+/// <see cref="EntryType"/>. (The thin Governor temp-routes every entry through Roll
+/// A this session regardless of this tag; the tag is honest for when the live-ball
+/// entry node lands.)</param>
+public sealed record PossessionConsequence(TeamSide NextOffense, EntryType NextEntry)
+{
+    /// <summary>Ball to <paramref name="team"/> on a dead-ball restart (the common
+    /// case: made basket, dead-ball turnover, violation, foul, jump-ball award).</summary>
+    public static PossessionConsequence DeadBallTo(TeamSide team) =>
+        new(team, EntryType.DeadBallInbound);
+
+    /// <summary>Ball to <paramref name="team"/> on a live-ball / transition start
+    /// (a steal, a defensive rebound — the new offense pushes the other way).</summary>
+    public static PossessionConsequence TransitionTo(TeamSide team) =>
+        new(team, EntryType.Transition);
+}
+
 /// <summary>The possession is over. The ball will change hands.</summary>
 /// <param name="Reason">Why it ended (e.g. "ShotClockViolation").</param>
 /// <param name="State">The possession state as it ended.</param>
-public sealed record Terminal(string Reason, PossessionState State) : RollResult;
+/// <param name="Consequence">What this ending means for the next possession —
+/// REQUIRED, so every terminal must state it. Required (not nullable) deliberately:
+/// it makes an un-named consequence a COMPILE error at the construction site rather
+/// than a silent null the Governor would have to guess at — omissions surface loud,
+/// exactly when and where they happen.</param>
+public sealed record Terminal(string Reason, PossessionState State, PossessionConsequence Consequence) : RollResult;
 
 /// <summary>The possession continues. The resolver routes by <paramref name="Next"/>.</summary>
 /// <param name="Next">Which kind of continuation this is (not which node).</param>

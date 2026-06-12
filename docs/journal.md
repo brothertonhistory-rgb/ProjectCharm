@@ -1,3 +1,95 @@
+## Session 15 — The Thin Governor (possession-to-possession loop) (2026-06-12)
+
+**Built.** The thin Governor — the layer that turns "resolve ONE possession" into
+"play a sequence of possessions." Until now nothing read a terminal to start the next
+possession, so the engine had **never run a second possession.** This closes the loop.
+It is a deliberate TEMP building: its guts are provisional (flat clock, zero score,
+possession-cap stop, temp-route-every-entry-to-Roll-A, parked→default-flip); its seams
+are permanent. The teardown contract is recorded in `design.md`.
+
+**The seam — terminals now carry a structured consequence.** A new small record
+`PossessionConsequence(TeamSide NextOffense, EntryType NextEntry)` says what a terminal
+MEANS for the next possession: who gets the ball, and how that possession starts. It
+lives where the terminal is GENERATED (each roll names its own), never parsed from a
+reason string by the Governor — the same philosophy as "a roll names its continuation
+kind, the resolver maps it." It is MINIMAL by design (no points/clock/foul/momentum) and
+grows by clean append when those consumers exist.
+
+**Required, not nullable.** The consequence is a required positional field on `Terminal`,
+so an un-named consequence is a COMPILE error at the construction site, not a silent null
+the Governor guesses at. All 13 terminal sites were updated to name theirs:
+- Roll A's three violations → dead-ball to the other team.
+- Roll C's five turnovers → other team; dead slices `DeadBallInbound`, the two live
+  slices (`BadPassIntercepted`, `LostBallLiveBall`) `Transition`.
+- Roll H's `Made` and `MissOutOfBoundsLost` → dead-ball to the other team. (A made basket
+  is inbounded under the hoop — ball out of bounds with an inbounding player — so it is a
+  DEAD ball, not a live push. Emmett's call.)
+- Roll I's `DefensiveRebound` → `Transition` to the rebounding (defense) team; its
+  `LooseBallFoulOnOffense` → dead-ball to the other team.
+- The Resolver's jump-ball terminal → dead-ball to the AWARDED team (the one terminal
+  whose next offense is set by the arrow/tip, not by "the other team").
+
+**The resolver surfaces the ended-on terminal.** `RoutingOutcome` gains
+`Terminal? EndedOn` (init-only, null default). The terminal case sets it; a stub-park
+leaves it null. `Destination` / `PossessionEnded` are untouched, so every prior check
+still reads exactly what it read before. The resolver also gained `RunPossession(start)`
+— it now owns the TOP of the chain (generate Roll A's pie → execute Roll A → `Route`) so
+the Governor drops a START STATE and never names a roll. (Its ctor took the Roll A
+generator + config; the four harness `new Resolver(...)` sites were updated.)
+
+**EntryType reconciled to ONE enum.** `EntryType` grew a `Transition` member. There is no
+parallel start-state concept — a possession's entry IS its start-state. Per the locked
+call, the Governor temp-routes EVERY entry (even `Transition`) through Roll A this
+session; the tag is honest for when the live-ball entry node (Roll J) lands.
+
+**The Governor (`Core/Governor.cs`).** Owns the loop and nothing else. Per possession:
+ask the resolver to run it; if it ended on a terminal, read that terminal's consequence;
+if it PARKED at a stub (`EndedOn` null), apply the DEFAULT consequence — ball to the
+other team, dead-ball restart at Roll A. Then spawn possession N+1 (offense from the
+consequence, defense the other side, number +1, entry the consequence's tag), until the
+config'd cap. It writes score (literal 0, to the real `GameState` field — real path,
+placeholder value) and accumulates a flat placeholder time LOCALLY (no clock field was
+added — adding one is clock-building, out of scope; the possession cap is the stop rule).
+
+**Why park→default-flip can't explode an FT-heavy chain, and can't reintroduce the
+Session-14 bug.** The stub never produces a free throw — it absorbs and parks ONE
+possession; the Governor only decides what comes AFTER it (flip forward once). And every
+stub-park is handled by ONE uniform path keyed on `EndedOn == null` — there is no
+per-stub branch to forget. The Session-14 failure (a fact-parser that handled only the
+below-bonus landing and not the in-bonus one once the shared game crossed the bonus
+mid-batch) is structurally impossible here: the Governor doesn't parse the stub label to
+pick the consequence; it applies the default for ANY null terminal. The per-stub
+breakdown is observability, never routing.
+
+**Cross-possession invariants — exercised in sequence for the FIRST time, and validated.**
+The arrow, foul counts, and lineups all live on the shared `GameState` and persist
+because the same resolver (same game) runs every possession; the Governor never resets or
+clobbers them. `GovernorLoopCheck` confirms, on a 200-possession run sharing one game:
+- possession numbers contiguous 1..200; offense/defense flips match each possession's
+  applied consequence; first possession is Home / DeadBallInbound;
+- **terminal-ended + parked == 200, zero possessions lost** (the load-bearing invariant —
+  a dropped park is exactly how the count would silently leak);
+- **arrow persistence** — seeded ON (Home), it is never Off thereafter and flips exactly
+  once per jump ball, so the final arrow is predicted exactly by jump-ball parity;
+- **foul accumulation** — Home seeded to the bonus threshold; fouls only climb (no
+  half-reset this session) so the bonus STAYS crossed; monotonic non-decrease;
+- **lineups survive** — same objects, five slots each.
+The check also prints the terminal-vs-parked split, the per-stub park breakdown (which
+SHIFTS as the bonus crosses mid-loop — `ResolveFreeThrows` parks appear — visible proof
+the §2a accumulation is exercised), and the first 10 possessions.
+
+**Validation.** Reasoned + Monte-Carlo-traced (2000 seeded sequential-loop runs held
+every invariant, including the bonus crossing mid-loop), pending Emmett's harness run. No
+.NET SDK in the sandbox.
+
+**Config.** New `"Governor"` section: `PossessionCap` (200), `SecondsPerPossession` (18.0),
+loaded by a new `GovernorConfig` exactly like the per-roll configs.
+
+**Out of scope (held the walls):** no real clock, no scoring, no Roll J / entry variety
+(every spawn temp-routes to Roll A), no offensive-rebound loop-back, no half-reset, no
+real stop conditions, no consequence enrichment, no parked-stub resolution, no roll
+internal-behavior changes beyond naming each terminal's consequence.
+
 ## Session 14 — Roll I (Rebound Resolution) (2026-06-12)
 
 **Built.** Roll I, the rebound roll — the node a missed shot drains into. Replaces

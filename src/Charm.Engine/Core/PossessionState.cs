@@ -1,10 +1,27 @@
 namespace Charm.Engine;
 
-/// <summary>How the possession began. Roll A only handles dead-ball inbounds;
-/// transition / live-ball entries are out of scope for this node.</summary>
+/// <summary>
+/// How a possession began — the single, reconciled start-state enum. A terminal's
+/// <see cref="PossessionConsequence"/> names one of these as the next possession's
+/// entry, and the Governor reads it to choose how to start that possession.
+/// <para>There is deliberately ONE enum here, not a parallel "start-state" concept
+/// alongside it: a possession's entry IS its start-state. New entry kinds append
+/// here as they are modelled.</para>
+/// </summary>
 public enum EntryType
 {
-    DeadBallInbound
+    /// <summary>A dead-ball restart: the offense inbounds (after a made basket, a
+    /// turnover out of bounds, a violation, a foul, a jump-ball award). Roll A is
+    /// this entry's node.</summary>
+    DeadBallInbound,
+
+    /// <summary>A live-ball start: the new offense gets the ball in motion (a steal,
+    /// a defensive rebound) and pushes the other way. Tagged here so a consequence
+    /// can record it; the live-ball entry node itself (the future transition roll)
+    /// is not built yet, so the Governor TEMP-ROUTES a Transition start through
+    /// Roll A's dead-ball entry for now — deliberately wrong basketball, replaced
+    /// when that roll lands.</summary>
+    Transition
 }
 
 /// <summary>

@@ -89,5 +89,10 @@
     "LooseBallFoulOnDefense": 0.02,
     "LooseBallFoulOnOffense": 0.01,
     "Epsilon": 1e-9
+  },
+
+  "Governor": {
+    "PossessionCap": 200,
+    "SecondsPerPossession": 18.0
   }
 }

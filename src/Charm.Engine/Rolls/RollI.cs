@@ -53,10 +53,13 @@ public static class RollI
         return outcome switch
         {
             // Defense secures the board. Ball switches teams — TERMINAL.
-            // The future transition roll is the next possession's entry; recorded
-            // in design.md, not routed here.
+            // Consequence: ball to the rebounding team (= the defense this
+            // possession) on a LIVE-BALL transition push. The future transition
+            // roll is that next possession's real entry; the thin Governor
+            // temp-routes it through Roll A this session.
             ReboundOutcome.DefensiveRebound =>
-                new Terminal("DefensiveRebound", state),
+                new Terminal("DefensiveRebound", state,
+                    PossessionConsequence.TransitionTo(state.Defense)),
 
             // Offense secures the board. Same possession stays alive — CONTINUE.
             ReboundOutcome.OffensiveRebound =>
@@ -69,10 +72,10 @@ public static class RollI
 
             // Loose-ball foul on the offense. Ball switches teams — TERMINAL.
             // No foul charged (Roll C's OffensiveFoul precedent).
-            // The dead-ball inbound at Roll A is the next possession's entry;
-            // recorded in design.md, not routed here.
+            // Consequence: ball to the other team on a dead-ball inbound at Roll A.
             ReboundOutcome.LooseBallFoulOnOffense =>
-                new Terminal("LooseBallFoulOnOffense", state),
+                new Terminal("LooseBallFoulOnOffense", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
 
             _ => throw new InvalidOperationException($"Unhandled rebound outcome '{outcome}'.")
         };

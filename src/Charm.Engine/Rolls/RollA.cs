@@ -27,18 +27,27 @@ public static class RollA
 
             // Shot-clock violation -> TERMINAL. Elapsed time is invariant (full
             // clock), so it is stamped here and needs no separate time roll.
+            // Consequence: ball to the other team, dead-ball restart.
             EntryOutcome.ShotClockViolation =>
-                new Terminal("ShotClockViolation", state) { ElapsedSeconds = cfg.ViolationElapsedSeconds },
+                new Terminal("ShotClockViolation", state,
+                    PossessionConsequence.DeadBallTo(state.Defense))
+                    { ElapsedSeconds = cfg.ViolationElapsedSeconds },
 
             // 5-second inbound violation -> TERMINAL. The inbound never came in,
             // so the clock never started: elapsed time is ZERO, stamped here.
+            // Consequence: ball to the other team, dead-ball restart.
             EntryOutcome.FiveSecondInbound =>
-                new Terminal("FiveSecondInbound", state) { ElapsedSeconds = 0.0 },
+                new Terminal("FiveSecondInbound", state,
+                    PossessionConsequence.DeadBallTo(state.Defense))
+                    { ElapsedSeconds = 0.0 },
 
             // 10-second backcourt violation -> TERMINAL. The count ran before the
             // whistle, so a fixed 10 seconds elapsed, stamped here.
+            // Consequence: ball to the other team, dead-ball restart.
             EntryOutcome.TenSecondBackcourt =>
-                new Terminal("TenSecondBackcourt", state) { ElapsedSeconds = cfg.TenSecondElapsedSeconds },
+                new Terminal("TenSecondBackcourt", state,
+                    PossessionConsequence.DeadBallTo(state.Defense))
+                    { ElapsedSeconds = cfg.TenSecondElapsedSeconds },
 
             // Foul -> CONTINUE. A future foul-type resolver decides defensive vs.
             // offensive and what it triggers. Real variance, never resolved here.

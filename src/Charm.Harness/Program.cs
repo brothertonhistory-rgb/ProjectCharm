@@ -16,6 +16,7 @@ internal static class Program
         var cfgG = RollGConfig.Load(configPath);
         var cfgH = RollHConfig.Load(configPath);
         var cfgI = RollIConfig.Load(configPath);
+        var cfgGov = GovernorConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
@@ -33,6 +34,8 @@ internal static class Program
         var game = new GameState(fouls);  // arrow starts Off — first jump ball is the tip
 
         var resolver = new Resolver(
+            rollAGenerator,
+            cfg,
             rollBGenerator,
             rollCGenerator,
             rollDGenerator,
@@ -76,6 +79,7 @@ internal static class Program
         ok &= RollHHandoffCheck(cfg, state);
         ok &= RollIReboundBatchCheck(cfg, cfgI, rollIGenerator, game, state);
         ok &= RollIBonusForkCheck(cfg, cfgD, cfgI, rollIGenerator, state);
+        ok &= GovernorLoopCheck(cfg, cfgD, cfgGov);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -817,6 +821,8 @@ internal static class Program
         var genF = new RollFStubPieGenerator(cfgF);
 
         var resolver = new Resolver(
+            new StubPieGenerator(cfg),
+            cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
             new RollDStubPieGenerator(cfgD),
@@ -979,6 +985,8 @@ internal static class Program
         var genE = new RollEStubPieGenerator(cfgE);
 
         var resolver = new Resolver(
+            new StubPieGenerator(cfg),
+            cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
             new RollDStubPieGenerator(cfgD),
@@ -1285,6 +1293,8 @@ internal static class Program
         var genG = new RollGStubPieGenerator(cfgG);
 
         var resolver = new Resolver(
+            new StubPieGenerator(cfg),
+            cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
             new RollDStubPieGenerator(cfgD),
@@ -1610,4 +1620,164 @@ internal static class Program
         Console.WriteLine($"  bonus fork charges the defense and routes correctly: {(ok ? "ok" : "FAIL")}");
         return ok;
     }
+
+    // --- Session 15: the thin Governor's possession-to-possession loop. ---
+    // The FIRST check whose whole point is state persisting across iterations: it
+    // shares ONE GameState across the entire loop, so foul counts climb and CROSS
+    // THE BONUS mid-loop (CONVENTIONS §2a). The Governor handles every stub-park
+    // through ONE default-consequence path (keyed only on "no terminal"), so the
+    // Session-14 "only handled one landing" bug class cannot recur — the per-stub
+    // breakdown is observability, never routing.
+    private static bool GovernorLoopCheck(RollAConfig cfg, RollDConfig cfgD, GovernorConfig cfgGov)
+    {
+        Console.WriteLine($"\n--- Governor loop: {cfgGov.PossessionCap:N0} possessions back-to-back ---");
+
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var cfgB = RollBConfig.Load(configPath);
+        var cfgC = RollCConfig.Load(configPath);
+        var cfgE = RollEConfig.Load(configPath);
+        var cfgF = RollFConfig.Load(configPath);
+        var cfgG = RollGConfig.Load(configPath);
+
+        var rng = new SystemRng(cfg.Seed);
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+
+        var resolver = new Resolver(
+            new StubPieGenerator(cfg),
+            cfg,
+            new RollBStubPieGenerator(cfgB),
+            new RollCStubPieGenerator(cfgC),
+            new RollDStubPieGenerator(cfgD),
+            new RollEStubPieGenerator(cfgE),
+            new RollFStubPieGenerator(cfgF),
+            new RollGStubPieGenerator(cfgG),
+            new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+            new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+            game,
+            rng,
+            new ResumeInboundStub(),
+            new ResolveFreeThrowsStub(),
+            new BlockRecoveryStub(),
+            new OffensiveReboundStub(),
+            new ShootingFreeThrowsStub(),
+            new SidelineInboundStub());
+
+        var governor = new Governor(resolver, game, cfgGov);
+
+        // --- Seed the cross-possession state so persistence is DETERMINISTIC. ---
+        // Arrow: turn it ON (Home) before the loop. It is never Off thereafter (no OT
+        // reset), so every jump ball takes the ON path and FLIPS it exactly once —
+        // letting us predict the final arrow exactly from the jump-ball count.
+        game.SetPossessionArrow(TeamSide.Home);
+
+        // Fouls: push Home to the bonus threshold so its opponent is ALREADY in bonus
+        // before the loop. Fouls only ever increment (no half-reset this session), so
+        // the bonus must STAY crossed — a deterministic "never un-crosses" check.
+        for (var i = 0; i < cfgD.BonusThreshold; i++) game.Fouls.Increment(TeamSide.Home);
+        var homeFoulsBefore = game.Fouls.FoulsFor(TeamSide.Home);
+        var bonusBefore = game.Fouls.BonusFor(TeamSide.Home);
+
+        // Lineups: capture references to confirm they survive untouched.
+        var homeLineupRef = game.HomeLineup;
+        var awayLineupRef = game.AwayLineup;
+
+        var first = new PossessionState(
+            PossessionNumber: 1,
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
+            Entry: EntryType.DeadBallInbound);
+
+        var result = governor.Run(first);
+        var records = result.Possessions;
+
+        // --- Invariant checks. ---
+        var countOk = records.Count == cfgGov.PossessionCap;
+
+        // The load-bearing one: zero possessions lost. A dropped park is exactly how
+        // the count would silently leak.
+        var noLostOk = result.TerminalEnded + result.Parked == cfgGov.PossessionCap
+                       && records.Count == cfgGov.PossessionCap;
+
+        // Contiguous numbers 1..N, and offense/defense flips that match each
+        // possession's APPLIED consequence (proving the Governor spawned from it).
+        var contiguousOk = true;
+        var flipsOk = true;
+        var jumpBalls = 0;
+        for (var i = 0; i < records.Count; i++)
+        {
+            var r = records[i];
+            if (r.Number != i + 1) contiguousOk = false;
+            if (r.Defense != Other(r.Offense)) flipsOk = false;
+            if (r.EndedOnTerminal && r.EndLabel.StartsWith("JumpBall")) jumpBalls++;
+            if (i > 0)
+            {
+                var prev = records[i - 1];
+                if (r.Offense != prev.Applied.NextOffense) flipsOk = false;
+                if (r.Entry != prev.Applied.NextEntry) flipsOk = false;
+            }
+        }
+        var firstOk = records.Count > 0
+            && records[0].Offense == TeamSide.Home
+            && records[0].Entry == EntryType.DeadBallInbound;
+
+        // Arrow persistence: ON the whole loop, flipped once per jump ball and by
+        // NOTHING else — so the final arrow is exactly predictable.
+        var expectedArrow = jumpBalls % 2 == 0 ? ArrowState.Home : ArrowState.Away;
+        var arrowOk = game.PossessionArrow != ArrowState.Off
+                      && game.PossessionArrow == expectedArrow;
+
+        // Foul persistence: monotonic (never reset) and the bonus stays crossed.
+        var homeFoulsAfter = game.Fouls.FoulsFor(TeamSide.Home);
+        var bonusAfter = game.Fouls.BonusFor(TeamSide.Home);
+        var foulOk = homeFoulsAfter >= homeFoulsBefore && bonusAfter != BonusType.None;
+
+        // Lineup persistence: same objects, still five slots each.
+        var lineupOk = ReferenceEquals(game.HomeLineup, homeLineupRef)
+                       && ReferenceEquals(game.AwayLineup, awayLineupRef)
+                       && game.HomeLineup.OnCourt.Count == Lineup.Size
+                       && game.AwayLineup.OnCourt.Count == Lineup.Size;
+
+        // --- Report. ---
+        Console.WriteLine(
+            $"  resolved={records.Count:N0} | terminal-ended={result.TerminalEnded:N0} | parked={result.Parked:N0} " +
+            $"| terminal+parked==cap -> {(noLostOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  possession numbers contiguous 1..{cfgGov.PossessionCap} -> {(contiguousOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  offense/defense flips match applied consequence -> {(flipsOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  first possession = Home, DeadBallInbound -> {(firstOk ? "ok" : "FAIL")}");
+        Console.WriteLine(
+            $"  arrow: jump balls={jumpBalls} | final={game.PossessionArrow} | expected={expectedArrow} " +
+            $"-> {(arrowOk ? "ok" : "FAIL")}");
+        Console.WriteLine(
+            $"  fouls(Home): {homeFoulsBefore}({bonusBefore}) -> {homeFoulsAfter}({bonusAfter}) | " +
+            $"monotonic + bonus stays crossed -> {(foulOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  lineups survive (same objects, 5 slots each) -> {(lineupOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  flat placeholder time accumulated: {result.TotalSeconds:N0}s (observability only)");
+
+        // Per-stub park breakdown — quantifies how much of the game is currently
+        // flowing through placeholder flips (the FT / offensive-rebound / etc. volume
+        // waiting to be closed). The mix SHIFTS across the loop as the bonus crosses:
+        // ResolveFreeThrows parks appear once the seeded + accumulating fouls put
+        // teams in the bonus — visible proof the §2a accumulation is exercised.
+        Console.WriteLine("  per-stub park breakdown:");
+        foreach (var (dest, n) in result.PerStubParks.OrderByDescending(kv => kv.Value))
+            Console.WriteLine($"    {dest,-44} {n,6:N0}");
+
+        // First 10 possessions: number, offense, entry, how it ended, consequence applied.
+        Console.WriteLine("  first 10 possessions:");
+        foreach (var r in records.Take(10))
+        {
+            var applied = $"{r.Applied.NextOffense}/{r.Applied.NextEntry}";
+            Console.WriteLine(
+                $"    #{r.Number,-3} {r.Offense,-4} entry={r.Entry,-15} " +
+                $"end={r.EndLabel,-34} -> next={applied}");
+        }
+
+        var allOk = countOk && noLostOk && contiguousOk && flipsOk && firstOk
+                    && arrowOk && foulOk && lineupOk;
+        Console.WriteLine($"  Governor loop: {(allOk ? "ok" : "FAIL")}");
+        return allOk;
+    }
+
+    private static TeamSide Other(TeamSide side) =>
+        side == TeamSide.Home ? TeamSide.Away : TeamSide.Home;
 }

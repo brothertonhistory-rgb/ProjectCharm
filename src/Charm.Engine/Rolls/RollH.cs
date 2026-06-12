@@ -63,9 +63,13 @@ public static class RollH
         return outcome switch
         {
             // Make -> TERMINAL. The basket counts; its 2/3 value is a downstream
-            // derivation from Result + ShotType, not computed here.
+            // derivation from Result + ShotType, not computed here. Consequence:
+            // ball to the other team on a DEAD-BALL restart — a made basket is
+            // inbounded under the hoop (the ball is out of bounds with an inbounding
+            // player), so it is a dead ball, not a live push.
             ShotResult.Made =>
-                new Terminal("Made", stamped),
+                new Terminal("Made", stamped,
+                    PossessionConsequence.DeadBallTo(stamped.Defense)),
 
             // And-1 -> CONTINUE to the shooting-free-throw node (stub). The basket
             // and the single free throw are downstream derivations; H records
@@ -85,8 +89,11 @@ public static class RollH
                 new Continue(ContinuationKind.ResolveShootingFreeThrows, stamped),
 
             // Miss sails OOB off the offense -> TERMINAL. Defense's ball.
+            // Consequence: ball to the other team, dead-ball restart (sideline
+            // inbound for the defense).
             ShotResult.MissOutOfBoundsLost =>
-                new Terminal("MissOutOfBoundsLost", stamped),
+                new Terminal("MissOutOfBoundsLost", stamped,
+                    PossessionConsequence.DeadBallTo(stamped.Defense)),
 
             // Miss deflects OOB off the defender -> CONTINUE to the sideline-inbound
             // node (stub). Offense keeps it, inbounds from the side.

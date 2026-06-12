@@ -1118,3 +1118,111 @@ deferred attribution layer's concern).
 The block weights' philosophy holds here too: best-guess placeholders, kept in editable
 config (the `"RollI"` section), calibrated later against the harness's possession-count
 and rebound-rate readouts rather than guessed precisely now.
+
+---
+
+## The thin Governor (Session 15) — the possession-to-possession loop
+
+After Roll I nearly every possession reaches a real terminal, so the funnel terminates
+cleanly enough that a second possession is the next thing worth proving. The design doc
+had deferred the Governor with one rule — *don't build it against a half-built funnel* —
+and that condition has expired. Building it now exercises every cross-possession invariant
+(arrow, foul counts, lineup, possession counter) IN SEQUENCE for the first time, surfacing
+that bug class one at a time against a small engine instead of all at once later, and it
+settles the `EntryType`-vs-start-state reconciliation in a few hundred lines before many
+rolls depend on the answer.
+
+### The permanent seam: terminals carry a consequence; the Governor stays dumb
+
+What a terminal MEANS for the next possession — who gets the ball, and how that possession
+starts — lives on the terminal as a `PossessionConsequence`, named where the terminal is
+generated, NOT parsed from a reason string by the Governor. This is the same discipline as
+"a roll names its continuation kind, the resolver maps it": signal flows one direction, and
+the consumer stays ignorant of the producer's internals.
+
+The consequence is deliberately MINIMAL — `NextOffense` (a `TeamSide`) and `NextEntry` (the
+single reconciled `EntryType`). It carries no points, clock, foul context, or momentum. A
+big speculative consequence now would be a bottleneck wearing a scalability costume; those
+are clean appends when their consumers exist. It is **required** on `Terminal` (not
+nullable): a missing consequence is a compile error at the construction site, which
+surfaces omissions loud rather than letting a silent null reach the Governor.
+
+The resolver surfaces the terminal it ended on (`RoutingOutcome.EndedOn`, null on a
+stub-park) without disturbing `Destination` / `PossessionEnded`, and owns the top of the
+chain via `RunPossession(start)` so the Governor drops a start state and never names a roll.
+
+### One reconciled start-state enum
+
+A possession's entry IS its start-state, so there is ONE enum: `EntryType`, now with
+`DeadBallInbound` and `Transition`. There is no parallel "start-state" concept layered
+alongside it. New entry kinds append here as they are modelled.
+
+### The live-vs-dead mapping (where each terminal sends the next possession)
+
+| Terminal | Next offense | Next entry |
+| --- | --- | --- |
+| Roll A violations (shot-clock / 5s / 10s) | the other team | DeadBallInbound |
+| Roll C dead turnovers (bad-pass-dead, lost-dead, offensive foul) | the other team | DeadBallInbound |
+| Roll C live turnovers (intercepted, stripped live) | the other team | Transition |
+| Roll H `Made` | the other team | DeadBallInbound (inbounded under the hoop — a dead ball) |
+| Roll H `MissOutOfBoundsLost` | the other team | DeadBallInbound |
+| Roll I `DefensiveRebound` | the rebounding (defense) team | Transition |
+| Roll I `LooseBallFoulOnOffense` | the other team | DeadBallInbound |
+| Jump-ball terminal | the AWARDED team (arrow/tip) | DeadBallInbound |
+
+Every terminal but the jump ball sends the ball to "the other team" (`state.Defense`); the
+jump ball is the one exception, set by the arrow/tip.
+
+### TEARDOWN CONTRACT (read before leaning on anything here)
+
+The thin Governor is a temp building. Knowing in one glance what is safe to lean on and
+what is slated for demolition:
+
+**PROVISIONAL guts — slated for demolition, do NOT build on these:**
+- **Flat clock.** A fixed `SecondsPerPossession` drained per possession, accumulated only
+  in the Governor (no clock field exists on `GameState`). Replaced by the future time roll.
+- **Zero score.** The Governor writes a literal 0 to the real `GameState` score field. The
+  real `(Result, ShotType) → points` derivation replaces the 0 at that same spot.
+- **Possession-cap stop.** The game stops after `Governor.PossessionCap` possessions, NOT
+  on a real clock. Replaced by real stop conditions (clock expiry, overtime).
+- **Temp-route-all-to-Roll-A.** Every spawned possession — even a `Transition`-tagged one —
+  starts at Roll A's dead-ball entry. Replaced by Roll J giving `Transition` its own entry.
+- **Parked→default-flip.** Every stub-parked possession (FT, offensive rebound, sideline
+  inbound, block recovery, resume inbound) flips to the OTHER team at Roll A on a default
+  consequence — because the parked pipe isn't resolved yet. This is deliberately wrong
+  basketball (an FT-parked possession should resolve points and decide the next possession
+  off the last free throw; an offensive-rebound park should KEEP the same team). When each
+  pipe closes, "park → default flip" is replaced AT THE SAME SEAM by "resolve → real
+  consequence."
+
+**PERMANENT seam — safe to build on, a future guts-swap hides behind these:**
+- **The consequence on the terminal.** `PossessionConsequence(NextOffense, NextEntry)`,
+  named at the terminal's generation site. Grows by append (points/clock/etc.) when needed.
+- **The resolver surfacing the ended-on terminal AND signalling park-vs-terminal.**
+  `RoutingOutcome.EndedOn` (non-null = ended on that terminal; null = parked at a stub).
+- **The one reconciled start-state enum** (`EntryType`).
+- **The Governor-reads-consequence-and-spawns contract** — INCLUDING the default-consequence
+  path that a closed pipe later replaces. The loop shape (run a possession → read its
+  consequence, or the default on a park → spawn the next) is what the real game layer swaps
+  guts behind without touching the seam.
+
+### Why the loop can't silently leak the possession count
+
+Every possession — terminal OR parked — produces exactly one next possession (until the
+cap), and the harness asserts `terminal-ended + parked == cap`. The parked count is the
+load-bearing invariant: a dropped park is exactly how the count would silently leak. And
+because every stub-park is handled by ONE uniform path (keyed only on "no terminal"), there
+is no per-stub branch to forget — the Session-14 bug (handling only one of two bonus-split
+landings once the shared game crossed the bonus mid-batch) is structurally impossible here.
+
+### Forthcoming — what closes the provisional guts
+
+- **Roll J (transition entry).** Gives the `Transition` start-state its own entry roll,
+  replacing the temp-route-to-Roll-A for live possessions. The next session.
+- **The offensive-rebound loop-back.** Replaces that stub's park→default-flip with "same
+  team continues, possession count does NOT increment" — the loop is already shaped so this
+  is expressible.
+- **FT resolution + FT rebounding.** Replaces the FT stubs' park→default-flip with real
+  point resolution and a real next-possession decision off the last free throw.
+- **The real game layer.** Real clock, real score, real entry variety, real stop conditions
+  — a guts-swap behind the permanent seam above.

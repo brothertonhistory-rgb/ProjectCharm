@@ -1,7 +1,25 @@
 namespace Charm.Engine;
 
 /// <summary>What the resolver did with one result — for observability/harness.</summary>
-public readonly record struct RoutingOutcome(bool PossessionEnded, string Destination);
+/// <param name="PossessionEnded">True if the possession ended on a terminal; false
+/// if it parked at a stub. Unchanged — every existing check reads this.</param>
+/// <param name="Destination">The destination label ("END:{reason}" on a terminal,
+/// "STUB:…" on a park). Unchanged — every existing check reads this.</param>
+public readonly record struct RoutingOutcome(bool PossessionEnded, string Destination)
+{
+    /// <summary>
+    /// The actual terminal the possession ENDED on — the object itself, carrying its
+    /// <see cref="Terminal.State"/> and its <see cref="Terminal.Consequence"/> — so a
+    /// caller (the Governor) can spawn the next possession without parsing the
+    /// destination string. NULL when the possession PARKED at a stub (no terminal was
+    /// reached); the Governor reads that null as "apply the default consequence."
+    /// <para>Init-only with a null default, so every existing positional construction
+    /// (<c>new RoutingOutcome(false, "STUB:…")</c>) and every existing read of
+    /// <see cref="Destination"/> / <see cref="PossessionEnded"/> stays untouched —
+    /// this is a pure append to the seam.</para>
+    /// </summary>
+    public Terminal? EndedOn { get; init; }
+}
 
 /// <summary>
 /// The conductor. It walks the chain: route a ticket -> run that station ->
@@ -14,6 +32,12 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
 /// </summary>
 public sealed class Resolver
 {
+    // Roll A entry: the resolver owns the TOP of the chain too, so a caller (the
+    // Governor) can ask it to run a whole possession from a start state without
+    // ever naming a roll itself. The generator + config produce Roll A's pie; the
+    // resolver then walks the chain via the existing Route loop.
+    private readonly StubPieGenerator _rollAGenerator;
+    private readonly RollAConfig _rollAConfig;
     private readonly RollBStubPieGenerator _rollBGenerator;
     private readonly RollCStubPieGenerator _rollCGenerator;
     private readonly RollDStubPieGenerator _rollDGenerator;
@@ -32,6 +56,8 @@ public sealed class Resolver
     private readonly IContinuationNode _sidelineInbound;
 
     public Resolver(
+        StubPieGenerator rollAGenerator,
+        RollAConfig rollAConfig,
         RollBStubPieGenerator rollBGenerator,
         RollCStubPieGenerator rollCGenerator,
         RollDStubPieGenerator rollDGenerator,
@@ -49,6 +75,8 @@ public sealed class Resolver
         IContinuationNode resolveShootingFreeThrows,
         IContinuationNode sidelineInbound)
     {
+        _rollAGenerator = rollAGenerator;
+        _rollAConfig = rollAConfig;
         _rollBGenerator = rollBGenerator;
         _rollCGenerator = rollCGenerator;
         _rollDGenerator = rollDGenerator;
@@ -67,6 +95,21 @@ public sealed class Resolver
         _sidelineInbound = sidelineInbound;
     }
 
+    /// <summary>
+    /// Run ONE whole possession from its start <paramref name="start"/>: generate
+    /// Roll A's pie, execute Roll A (the top of the chain), then walk the rest via
+    /// <see cref="Route"/>. The single entry the Governor calls — so the Governor
+    /// drops a START STATE at the top of the chain and never names a roll.
+    /// <para>Pressure is a flat 0.0 here (the neutral baseline the batch harness
+    /// already uses): the Governor does not model defensive pressure this session.</para>
+    /// </summary>
+    public RoutingOutcome RunPossession(PossessionState start)
+    {
+        var pieA = _rollAGenerator.Generate(start, pressure: 0.0);
+        var result = RollA.Execute(start, pieA, _rng, _rollAConfig);
+        return Route(result);
+    }
+
     /// <summary>Walk the chain from <paramref name="result"/> until a terminal
     /// ends the possession. Returns the final routing outcome.</summary>
     public RoutingOutcome Route(RollResult result)
@@ -76,7 +119,8 @@ public sealed class Resolver
             switch (result)
             {
                 case Terminal t:
-                    return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}");
+                    return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
+                        { EndedOn = t };
 
                 case Continue c:
                     switch (c.Next)
@@ -234,7 +278,12 @@ public sealed class Resolver
                             var reason = award.WasTipContest
                                 ? $"JumpBallTip:{award.AwardedTo}"
                                 : $"JumpBallArrow:{award.AwardedTo}";
-                            result = new Terminal(reason, c.State);
+                            // Consequence: the AWARDED team gets the ball next (NOT
+                            // necessarily the current defense — this is the one
+                            // terminal whose next offense is set by the arrow/tip,
+                            // not by "the other team"), on a dead-ball restart.
+                            result = new Terminal(reason, c.State,
+                                PossessionConsequence.DeadBallTo(award.AwardedTo));
                             continue;
 
                         default:
