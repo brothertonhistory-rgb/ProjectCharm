@@ -126,4 +126,23 @@ public sealed record Continue(ContinuationKind Next, PossessionState State) : Ro
     /// <see cref="Next"/> is <see cref="ContinuationKind.ResolveTurnoverType"/>.</para>
     /// </summary>
     public TurnoverContext? TurnoverContext { get; init; }
+
+    /// <summary>
+    /// The PUTBACK CONTEXT TICKET an offensive-rebound putback carries into Roll H —
+    /// the within-possession marker that tells Roll H's generator to select its
+    /// distinct putback pie (its own make/foul/and-1 numbers) instead of the normal
+    /// located-shot pie. FUNCTIONAL payload (it changes the odds), the same
+    /// optional-payload shape as <see cref="Bonus"/>/<see cref="Flavor"/>/<see
+    /// cref="TurnoverContext"/>. Stamped by Roll K's <c>PutBack</c> arm (which also
+    /// forces the zone to <see cref="ShotLocation.Rim"/>); Roll H's generator reads
+    /// it and never queries Roll K back.
+    /// <para>A single bit suffices because there is exactly one putback flavor; the
+    /// attribute tilts (who put it back — size, athleticism, rim rating, the
+    /// defender) live in the deferred generator that reads the carried slot, not in
+    /// more ticket variants. False on every normal located shot (Roll G stamps
+    /// nothing here), so the regular Roll H pie path is byte-for-byte unchanged.
+    /// Meaningful only when <see cref="Next"/> is
+    /// <see cref="ContinuationKind.IntoShotResolution"/>.</para>
+    /// </summary>
+    public bool Putback { get; init; }
 }

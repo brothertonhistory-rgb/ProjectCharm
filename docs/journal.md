@@ -1,3 +1,102 @@
+## Session 17 — Roll K (offensive-rebound loop-back): the first possession-EXTENDING node (2026-06-12)
+
+**Built.** The **offensive-rebound resolution roll** — Roll K — replacing the parked
+`OffensiveReboundStub` on the `ResolveOffensiveRebound` edge (the same stub→roll swap
+every prior session ran). It is the engine's highest-volume open node and a structural
+first: until now every roll either ended a possession or handed it forward ONE step. Roll
+K is the first roll that keeps the SAME possession alive and **loops it back up the
+chain** — a putback goes straight back up at the rim, a reset kicks it out and runs a
+fresh play. The loop lives **entirely inside the resolver's `while` walk**; the Governor
+never sees it.
+
+**Roll K — seven arms, mixed ends (the Roll I shape).** Two keep the offense's ball and
+extend the possession, one keeps it via the bonus fork, three flip it, one ties it up:
+
+| Arm | Routing | Lands |
+|---|---|---|
+| `PutBack` (.40) | `IntoShotResolution`, zone forced Rim, **putback ticket** | Roll H's distinct putback pie |
+| `ResetOffense` (.47) | `IntoPlayerSelection`, prior shot facts **wiped** | Roll E on a blank slate |
+| `DefensiveFoul` (.05) | charge defense, bonus-fork | sideline inbound OR free throws |
+| `JumpBall` (.01) | `ResolveJumpBall` | shared arrow node |
+| `OffensiveFoul` (.02) | TERMINAL `DeadBallTo(defense)` | Roll A (other team) |
+| `DeadBallTurnover` (.03) | TERMINAL `DeadBallTo(defense)` | Roll A (other team) |
+| `LiveBallTurnover` (.02) | TERMINAL `TransitionTo(defense)` | Roll A (steal-style temp-route) |
+
+Signature `(state, pie, game, rng)` — the Roll D / I / J shape — because `DefensiveFoul`
+mutates `GameState`. It is the **FOURTH feeder** into the shared charge-and-fork (after
+D, I, J): copied verbatim, not reinvented.
+
+**Possession-extension without leaking the count.** `PutBack` and `ResetOffense` are
+CONTINUES that resolve back into the same walk, so a single `resolver.Route(...)` call can
+now cycle PutBack → Roll H → miss → Roll I → OffensiveRebound → PutBack … and reset → Roll
+E → … . The Governor only ever hears about a possession when it ENDS (a terminal) or PARKS
+(a stub), so its one-in-one-out invariant `terminal + parked == cap` is **untouched**, and
+the possession count does NOT increment on a reset or a putback. `GovernorLoopCheck` passes
+unchanged for exactly this reason — the loop is invisible to it.
+
+**The putback is its own shot population (ticket/station, instance #3).** A go-back-up is
+point-blank, often through contact — a different make/miss/foul distribution from a normal
+located attempt. So `PutBack` stamps a **putback ticket** (`Continue.Putback`) and forces
+the zone to Rim; Roll H's generator reads the ticket and returns a **distinct putback
+pie** (its own `Putback*` weights in `RollHConfig`) instead of the located-shot pie. This
+is the third live instance of the ticket/station mechanism (after Roll C's turnover
+context and Roll J's transition context): a feeder stamps, the node reads, signal flows one
+way. A single bool suffices because there is exactly one putback flavor — the attribute
+tilts (size / athleticism / rim rating / the contesting defender) live in the deferred
+generator that reads the carried slot, NOT in more ticket variants. A missed putback
+re-enters Roll I on the existing flat pie; the selected slot rides through the whole loop
+untouched, so the future same-player rebound tilt (a big who misses his own putback is
+favored to re-grab it) has the rebounder to read.
+
+**Reset = a clean slate, back at player selection.** `ResetOffense` wipes the prior shot's
+facts (`SelectedSlot`, `ShotType`, `Result` → null) and re-enters at **Roll E**, drawing
+the inherent selection odds. It re-enters at E, NOT Roll B: the offensive-rebound pie
+already absorbed the turnover / foul / jumpball hazards, so routing through B would
+double-charge them.
+
+**The loud convergence guard.** Because the walk can now cycle, the resolver's `Route` got
+a real safety guard: an `iterations` counter with a 10,000 ceiling that THROWS (it does not
+silently break) if a possession ever fails to converge — a real bug surfaced loudly rather
+than swallowed. A new `RoutingOutcome.PutbackAttempts` tally counts the putback shots a
+walk takes, so the harness can PROVE convergence rather than assume it.
+
+**Validated (Monte Carlo, pre-harness).** Roll K's seven rates land on
+`.40/.01/.05/.02/.03/.02/.47` within tolerance; every arm reached; PutBack always carries
+the ticket + Rim; ResetOffense always wipes the prior shot; the three flip terminals all
+hand the ball to the defense; the DefensiveFoul fork crosses the bonus correctly (the
+fourth feeder behaves identically to D/I/J). The putback pie is confirmed DISTINCT from the
+normal Rim pie (make .50 vs ~.38) and matches its configured `Putback*` weights. The
+**nested putback↔rebound loop converges**: across 100k possessions driven into Roll K, the
+putback-depth survival distribution strictly decays (≈58% take zero putbacks, ≈42% one,
+≈1.4% two, a handful three, one four), the **max observed depth is 4** (ceiling is 20), and
+**zero** possessions hit the iteration guard — the odds bleed the loop out exactly as
+intended.
+
+**Harness.** New: `RollKReboundBatchCheck` (seven rates + every-arm-routes + putback-shape
++ reset-wipe + flip-to-defense + bonus-fork, fresh game crossing the bonus),
+`RollKPutbackPieCheck` (ticket selects a pie distinct from the Rim pie, matching the
+configured weights, then consumed correctly — the Roll C context check applied to Roll H),
+`RollKBonusForkCheck` (fourth-feeder parity across thresholds), and
+`OffensiveReboundConvergenceCheck` (drives 100k offensive rebounds through the real
+resolver loop, reads `PutbackAttempts`, asserts strict survival decay + bounded max + guard
+never hit). `RollGHandoffCheck` and `RollHHandoffCheck` were updated for Roll K being live:
+the offensive-rebound landing no longer parks at `STUB:OffensiveRebound` (dropped from their
+required sets) — it executes Roll K and fans out, so both now bucket the Roll-K/reset
+fan-out as "routed deeper" while still asserting the core post-shot destinations, zero
+unrouted, and facts intact. A plain `Miss` was dropped from `RollHHandoffCheck`'s
+result-on-a-stub set (it now flows deeper rather than parking). All prior checks still pass.
+
+**Files.** New engine: `Rolls/OffensiveReboundOutcomes.cs`, `Config/RollKConfig.cs`,
+`Generators/RollKStubPieGenerator.cs`, `Rolls/RollK.cs`. Modified engine:
+`Core/RollResult.cs` (+`Putback` ticket on `Continue`), `Core/Resolver.cs` (Roll K
+generator + `ResolveOffensiveRebound` executes Roll K + putback pie pass-through +
+`PutbackAttempts` on `RoutingOutcome` + the iteration guard; `OffensiveReboundStub` retired
+from the live chain), `Config/RollHConfig.cs` (+seven `Putback*` pie weights),
+`Generators/RollHStubPieGenerator.cs` (+putback-pie branch), `Core/Stubs.cs`
+(`OffensiveReboundStub` redocumented as a harness-only fact-echo helper). Harness:
+`Program.cs` (Roll K wiring into all five resolver constructions + four new checks + the two
+handoff-check updates), `config.json` (RollK section + RollH `Putback*` weights).
+
 ## Session 16 — Roll J (transition-entry gate) & the ticket/station mechanism (2026-06-12)
 
 **Built.** The first **live transition entry**. A defensive rebound no longer

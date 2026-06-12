@@ -52,18 +52,15 @@ public sealed class BlockRecoveryStub : IContinuationNode
         ShotFacts.Describe("BlockRecovery", continuation.State);
 }
 
-/// <summary>STUB for the offensive-rebound node — where Roll I's
-/// <c>OffensiveRebound</c> outcome lands. The offense secured the board; the same
-/// possession stays alive. The real offensive-rebound roll (its own odds, one
-/// branch looping back to the halfcourt roll → player selection) is a later
-/// session. Echoes slot, zone, AND result via <see cref="ShotFacts.Describe"/> so
-/// the harness confirms all three per-possession facts rode through Roll I intact.
-/// A real node replaces this without Roll I changing.
-/// <para>NOTE: <c>ReboundStub</c> was RETIRED this session — Roll I replaced it.
-/// <c>OffensiveReboundStub</c> is its successor for the offensive-rebound continue
-/// arm only; the terminal arms (<c>DefensiveRebound</c> /
-/// <c>LooseBallFoulOnOffense</c>) end the possession directly and need no stub.</para>
-/// </summary>
+/// <summary>STUB for the offensive-rebound node — RETIRED from the live chain as of
+/// Session 17, when Roll K replaced it on the <c>ResolveOffensiveRebound</c> edge
+/// (the same stub→roll swap as ReboundStub→Roll I a session earlier). Roll I's
+/// <c>OffensiveRebound</c> continue now executes Roll K, which keeps the same
+/// possession alive (putback / reset) or flips the ball — the resolver no longer
+/// parks here. This class is kept ONLY as a harness fact-echo helper: a couple of
+/// checks invoke <see cref="Receive"/> directly on a Roll I OffensiveRebound continue
+/// to confirm slot+zone+result rode through, without routing through the resolver.
+/// Echoes slot, zone, AND result via <see cref="ShotFacts.Describe"/>.</summary>
 public sealed class OffensiveReboundStub : IContinuationNode
 {
     public string Receive(Continue continuation) =>

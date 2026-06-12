@@ -1351,3 +1351,149 @@ Only Roll I's `DefensiveRebound` is wired live to Roll J this session, via the n
 context, so the resolver's entry switch sends them to Roll A unchanged. When the steal
 feeder lands, the change is one line in that switch (every `Transition` start → Roll J)
 plus the steal pie — the seam is already shaped for it.
+
+---
+
+## Session 17 — Roll K (offensive-rebound loop-back): the first possession-EXTENDING node
+
+Session 17 lands the offensive-rebound resolution roll (Roll K) and, with it, the first
+node that does not move the possession strictly forward. Every roll before this one either
+ENDED a possession (a terminal) or HANDED IT FORWARD one step (a continue to the next
+roll). Roll K introduces a third shape — a continue that loops the SAME possession back up
+the chain — and the architecture absorbs it without a new control structure, because the
+resolver was already a `while`-walk and the Governor already counted only ends and parks.
+
+### Two arms that keep the same possession alive
+
+The offense secured its own miss. What happens next splits seven ways, but the load-bearing
+distinction is what happens to the BALL:
+
+- **It stays, going back up (`PutBack`).** An immediate go-back-up at the rim. This is a
+  CONTINUE into Roll H — the shot-resolution roll already built — with two stamps: the zone
+  forced to `Rim`, and a **putback ticket** that tells Roll H's generator to use a distinct
+  putback pie. A made putback ends the possession at Roll H's terminal; a missed putback
+  re-enters Roll I (the rebound roll), and the cycle can repeat.
+- **It stays, kicked back out (`ResetOffense`).** Pull it out and run a fresh play. A
+  CONTINUE back to Roll E (player selection) on a blank slate.
+- **It stays, via the foul fork (`DefensiveFoul`).** A foul on the defense in the scrum;
+  the offense retains. Charges the defensive team foul and forks on the bonus.
+
+Three arms FLIP the ball (`OffensiveFoul`, `DeadBallTurnover`, `LiveBallTurnover` —
+terminals), and one ties it up (`JumpBall` — a continue to the shared arrow node). The
+seven-way pie's placeholder weights live in `RollKConfig`; the headline calibration knob is
+the PutBack/ResetOffense split, which directly sizes how many extra shots and possessions
+an offensive board generates.
+
+### The loop lives in the resolver, and the count cannot leak
+
+`PutBack` and `ResetOffense` resolve back into the SAME `resolver.Route(...)` call:
+`IntoShotResolution` re-enters Roll H, `IntoPlayerSelection` re-enters Roll E, and a missed
+putback flows Roll H → Roll I → `ResolveOffensiveRebound` → Roll K again. So a single walk
+can now cycle:
+
+```
+PutBack → Roll H → Miss → Roll I → OffensiveRebound → Roll K → PutBack → …
+ResetOffense → Roll E → Roll F → ShotAttempt → … → Miss → Roll I → OffensiveRebound → Roll K → …
+```
+
+This is invisible above the resolver. The Governor's contract is unchanged: it spawns the
+next possession only when `Route` RETURNS — at a terminal (`EndedOn` non-null) or a stub
+park (`EndedOn` null). A reset or a putback is neither; it is an internal hop. So the
+load-bearing invariant `terminal-ended + parked == cap` holds untouched, and the possession
+NUMBER never increments inside the loop. The Session-15 design note — "every possession
+produces exactly one next possession" — survives intact, because a loop iteration is not a
+possession.
+
+### Convergence is a property, so the engine proves it (and guards it)
+
+A node that can re-enter itself raises the obvious question: does it terminate? The answer
+is structural, not hopeful. Every cycle requires a chain of independent sub-1.0
+probabilities — a putback must be attempted (.40 of boards), MISS (~.42 of putbacks),
+produce another offensive board (~.29 of misses), and draw PutBack again — so each
+additional cycle is rarer than the last by a large factor. The loop is a decaying geometric
+process; it bleeds out.
+
+Two mechanisms make this concrete rather than asserted:
+
+1. **A loud guard.** `Route` carries an `iterations` counter with a 10,000 ceiling. A
+   converging possession bleeds out in a handful of cycles, so the ceiling is orders of
+   magnitude above any real walk. Reaching it means a genuine non-convergence bug, and the
+   resolver THROWS — it does not silently `break` and return a half-resolved possession.
+   This is the §2 "fail loud" rule applied to a re-entrant chain.
+2. **A depth tally.** `RoutingOutcome.PutbackAttempts` counts the putback shots a walk
+   takes. `OffensiveReboundConvergenceCheck` drives 100k possessions into Roll K through the
+   REAL resolver, reads the tally, and asserts the survival distribution
+   `reachedAtLeast[n]` strictly decreases on its populated levels and the max is comfortably
+   bounded. Observed: ≈58% zero putbacks, ≈42% one, ≈1.4% two, a handful three, one four —
+   max depth 4, ceiling 20, zero guard hits. The guard never firing IS the convergence
+   proof; the tally shows the shape of the bleed-out.
+
+This is the §2a "watch the accumulation across iterations" discipline turned inward: the
+shared thing changing across iterations is the possession's own depth.
+
+### The putback as a distinct shot population — ticket/station, third instance
+
+A go-back-up is not a jump shot relocated to the rim; it is a different event with a
+different make/miss/foul distribution (point-blank, frequently through contact, higher make
+AND higher foul rate, real block risk). Rather than mint a new roll, the putback is
+PARAMETERIZED onto the existing shot-resolution roll via the ticket/station mechanism:
+
+- **Stamp.** Roll K's `PutBack` arm sets `Continue.Putback = true` and forces
+  `ShotType = Rim`.
+- **Read.** `RollHStubPieGenerator.Generate(state, putback)` returns a distinct putback pie
+  (its own `Putback*` weights from `RollHConfig`, a flat seven-way placeholder with no
+  per-zone block carve — a putback is always at the rim) instead of the located-shot pie.
+- **Blind.** The generator never asks who set the ticket; signal flows one direction.
+
+This is the third live instance of the pattern (Roll C's turnover context, Roll J's
+transition context, now Roll H's putback context). The carrier is the leanest that fits: a
+single bool, because there is exactly one putback flavor. The variety a putback will
+eventually express — a 7-foot center finishing over a guard vs. a point guard who happened
+to grab the board flinging up a low-percentage attempt — is NOT more ticket variants; it is
+the deferred attribute generator reading the carried slot. The seam is shaped so that
+generator drops in WITHOUT Roll K, Roll H, or the resolver changing: the slot already rides
+the whole loop untouched.
+
+### Reset re-enters at selection, not initiation
+
+`ResetOffense` wipes the prior shot's facts and re-enters at **Roll E** (player selection),
+not Roll B (halfcourt initiation). The reasoning is conservation of hazard: the
+offensive-rebound pie ALREADY priced the turnover, foul, and jump-ball risk of the scrum,
+so sending the reset back through Roll B — which prices initiation turnovers and fouls
+again — would double-charge the same hazards on one possession. Re-entering at E treats the
+reset as what it is: the offense already has the ball and settled; it is choosing a new
+action, not re-initiating. The wiped slate (`SelectedSlot`, `ShotType`, `Result` all null)
+means the fresh play draws the inherent selection odds with no residue from the shot that
+missed.
+
+### Two deferred seams on the putback (documented, NOT built)
+
+1. **Putback shot quality (attribute).** The real make/foul/and-1 percentages, tilted by
+   the putback-er's size / athleticism / rim rating and the contesting defender. Lands in
+   the attribute layer at Roll H's putback-pie generator, reading the carried slot. The
+   flat `Putback*` placeholders are the stand-in.
+2. **Same-player rebound tilt (attribute).** A missed putback re-enters Roll I, and the
+   shooter — especially a big — should be favored to grab his own miss back. Lands in the
+   attribution layer once it names the rebounder; the slot rides the loop so it has the
+   player to favor.
+
+Both attach at a GENERATOR, exactly like every prior deferred modifier (the height-driven
+tip contest, Roll C's pressure wire, Roll J's rebounder/tempo seams); the rolls themselves
+never change when they arrive.
+
+### One temp-route still standing
+
+`LiveBallTurnover` emits a plain `TransitionTo(defense)` with no context ticket, so the
+resolver temp-routes the spawned possession through Roll A — exactly how steals are handled
+today. Its real home is the transition module via the steal feeder; when that feeder lands,
+this becomes a one-line routing flip (every `Transition` start → Roll J) plus the steal
+pie, the seam already shaped for it in Session 16.
+
+### What Roll K closes, and what it opens
+
+It closes the Session-15 "offensive-rebound stub → default-flip" provisional: an offensive
+board now KEEPS the ball with the same team and the possession count does not increment,
+replacing the deliberately-wrong park-and-flip. It opens the door to the deferred attribute
+work on putback quality and same-player rebounding, and it leaves the broader chain's
+remaining stubs (free-throw resolution and rebounding, block recovery, the transition roll)
+untouched and on the horizon.

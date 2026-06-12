@@ -85,6 +85,13 @@
     "BlockMid": 0.03,
     "BlockLong": 0.02,
     "BlockThree": 0.01,
+    "PutbackMade": 0.50,
+    "PutbackMadeAndFouled": 0.08,
+    "PutbackMiss": 0.28,
+    "PutbackMissFouled": 0.05,
+    "PutbackMissOutOfBoundsLost": 0.01,
+    "PutbackMissOutOfBoundsRetained": 0.01,
+    "PutbackBlocked": 0.07,
     "Epsilon": 1e-9
   },
 
@@ -102,6 +109,17 @@
     "Turnover": 0.06,
     "DefensiveFoul": 0.035,
     "JumpBall": 0.005,
+    "Epsilon": 1e-9
+  },
+
+  "RollK": {
+    "PutBack": 0.40,
+    "JumpBall": 0.01,
+    "DefensiveFoul": 0.05,
+    "OffensiveFoul": 0.02,
+    "DeadBallTurnover": 0.03,
+    "LiveBallTurnover": 0.02,
+    "ResetOffense": 0.47,
     "Epsilon": 1e-9
   },
 

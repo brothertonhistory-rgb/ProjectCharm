@@ -52,6 +52,25 @@ public sealed class RollHConfig
         _ => throw new InvalidOperationException($"No block weight for zone '{zone}'.")
     };
 
+    // --- Putback pie (Session 17). A go-back-up off an offensive rebound is a
+    //     DISTINCT shot population from a normal located attempt — point-blank,
+    //     often through contact — so it gets its OWN seven-way make/miss/foul pie
+    //     rather than reusing the at-the-rim numbers. Selected when Roll K's PutBack
+    //     arm stamps the putback ticket (it also forces the zone to Rim). These seven
+    //     sum to 1 among themselves and are best-guess PLACEHOLDERS: the real
+    //     percentages — and the tilt by the putback-er's size / athleticism / rim
+    //     rating and the defender contesting — are a future basketball call delivered
+    //     by the attribute-driven generator, which reads the carried slot. Block is
+    //     just a flat slice here (no per-zone carve: a putback is always Rim), unlike
+    //     the located-shot pie above. ---
+    public double PutbackMade { get; set; } = 0.50;
+    public double PutbackMadeAndFouled { get; set; } = 0.08;
+    public double PutbackMiss { get; set; } = 0.28;
+    public double PutbackMissFouled { get; set; } = 0.05;
+    public double PutbackMissOutOfBoundsLost { get; set; } = 0.01;
+    public double PutbackMissOutOfBoundsRetained { get; set; } = 0.01;
+    public double PutbackBlocked { get; set; } = 0.07;
+
     // No live-wire scalar (like Roll E, F, and G): the only thing that would tilt
     // Roll H's pie is the deferred player/attribute model (the shooter-vs-defender
     // matchup, the other-four gravity term, the skill/athleticism gates, the

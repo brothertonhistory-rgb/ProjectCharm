@@ -39,8 +39,19 @@ public sealed class RollHStubPieGenerator
     /// read SelectedSlot; the full attribute-driven matchup tilt is the deferred
     /// real generator. ShotType must be present (Roll G runs before Roll H in the
     /// live chain); a null zone is a wiring bug and fails loud.</param>
-    public Pie<ShotResult> Generate(PossessionState state)
+    /// <param name="putback">When true, the shot is an offensive-rebound PUTBACK
+    /// (Roll K stamped the ticket and forced the zone to Rim): return the DISTINCT
+    /// putback pie from config instead of the normal located-shot pie. The putback
+    /// pie is a flat seven-way placeholder with no per-zone block carve (a putback is
+    /// always Rim); the real make/foul percentages and the attribute tilt are the
+    /// deferred generator's job. Defaults to false, so every normal located shot
+    /// (Roll G's path) keeps the existing zone-carve pie byte-for-byte.</param>
+    public Pie<ShotResult> Generate(PossessionState state, bool putback = false)
     {
+        // Putback: a distinct shot population with its own make/miss/foul pie.
+        if (putback)
+            return BuildPutbackPie();
+
         // Read the zone Roll G stamped, then look up its block weight b(zone).
         var zone = state.ShotType
             ?? throw new InvalidOperationException(
@@ -67,6 +78,32 @@ public sealed class RollHStubPieGenerator
         // The Pie constructor validates the sum is 1 within Epsilon, so a bad
         // shape (six bases not summing to 1, or a block ≥ 1) fails loud rather
         // than rolling skewed.
+        return new Pie<ShotResult>(weights, _cfg.Epsilon);
+    }
+
+    /// <summary>
+    /// Build the DISTINCT putback pie: a flat seven-way placeholder over the same
+    /// <see cref="ShotResult"/> enum, taken straight from the <c>Putback*</c> config
+    /// weights with NO per-zone block carve (a putback is always at the rim). This is
+    /// the seam where the real make/foul/and-1 percentages — and the attribute tilt
+    /// by the putback-er's size / athleticism / rim rating and the contesting
+    /// defender — drop in later; the roll and the resolver never change when they do.
+    /// The <see cref="Pie{TOutcome}"/> constructor validates sum-to-one, so a
+    /// misconfigured putback shape fails loud here.
+    /// </summary>
+    private Pie<ShotResult> BuildPutbackPie()
+    {
+        var weights = new Dictionary<ShotResult, double>
+        {
+            [ShotResult.Made] = _cfg.PutbackMade,
+            [ShotResult.MadeAndFouled] = _cfg.PutbackMadeAndFouled,
+            [ShotResult.Miss] = _cfg.PutbackMiss,
+            [ShotResult.MissFouled] = _cfg.PutbackMissFouled,
+            [ShotResult.MissOutOfBoundsLost] = _cfg.PutbackMissOutOfBoundsLost,
+            [ShotResult.MissOutOfBoundsRetained] = _cfg.PutbackMissOutOfBoundsRetained,
+            [ShotResult.Blocked] = _cfg.PutbackBlocked,
+        };
+
         return new Pie<ShotResult>(weights, _cfg.Epsilon);
     }
 }

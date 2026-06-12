@@ -19,6 +19,16 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// this is a pure append to the seam.</para>
     /// </summary>
     public Terminal? EndedOn { get; init; }
+
+    /// <summary>
+    /// How many PUTBACK attempts this possession's walk made before it ended or
+    /// parked — the re-entrant-loop depth counter (PutBack → Roll H → miss → Roll I →
+    /// OffensiveRebound → PutBack …). Zero on the overwhelming majority of
+    /// possessions. The harness reads this to PROVE the nested putback↔rebound loop
+    /// converges (a decaying tail and a bounded max). Init-only with a 0 default, so
+    /// every existing construction is untouched — a pure append, like <see cref="EndedOn"/>.
+    /// </summary>
+    public int PutbackAttempts { get; init; }
 }
 
 /// <summary>
@@ -47,12 +57,12 @@ public sealed class Resolver
     private readonly RollHStubPieGenerator _rollHGenerator;
     private readonly RollIStubPieGenerator _rollIGenerator;
     private readonly RollJStubPieGenerator _rollJGenerator;
+    private readonly RollKStubPieGenerator _rollKGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
     private readonly IContinuationNode _resumeInbound;
     private readonly IContinuationNode _resolveFreeThrows;
     private readonly IContinuationNode _resolveBlock;
-    private readonly IContinuationNode _offensiveRebound;
     private readonly IContinuationNode _resolveShootingFreeThrows;
     private readonly IContinuationNode _sidelineInbound;
     // Roll J's Push parks here — the future transition roll's holding pen.
@@ -70,12 +80,12 @@ public sealed class Resolver
         RollHStubPieGenerator rollHGenerator,
         RollIStubPieGenerator rollIGenerator,
         RollJStubPieGenerator rollJGenerator,
+        RollKStubPieGenerator rollKGenerator,
         GameState game,
         IRng rng,
         IContinuationNode resumeInbound,
         IContinuationNode resolveFreeThrows,
         IContinuationNode resolveBlock,
-        IContinuationNode offensiveRebound,
         IContinuationNode resolveShootingFreeThrows,
         IContinuationNode sidelineInbound,
         IContinuationNode transition)
@@ -91,12 +101,12 @@ public sealed class Resolver
         _rollHGenerator = rollHGenerator;
         _rollIGenerator = rollIGenerator;
         _rollJGenerator = rollJGenerator;
+        _rollKGenerator = rollKGenerator;
         _game = game;
         _rng = rng;
         _resumeInbound = resumeInbound;
         _resolveFreeThrows = resolveFreeThrows;
         _resolveBlock = resolveBlock;
-        _offensiveRebound = offensiveRebound;
         _resolveShootingFreeThrows = resolveShootingFreeThrows;
         _sidelineInbound = sidelineInbound;
         _transition = transition;
@@ -145,13 +155,32 @@ public sealed class Resolver
     /// ends the possession. Returns the final routing outcome.</summary>
     public RoutingOutcome Route(RollResult result)
     {
+        // Re-entrant-loop instrumentation (Session 17). PutBack and ResetOffense keep
+        // the same possession alive INSIDE this walk, so a single Route call can now
+        // cycle: PutBack → Roll H → miss → Roll I → OffensiveRebound → PutBack … and
+        // reset → Roll E → … . `putbackAttempts` counts the putback shots taken (the
+        // depth the convergence check watches). `iterations` is a LOUD safety guard:
+        // a converging possession bleeds out in a handful of cycles, so the ceiling is
+        // far above any real walk; reaching it means a possession is NOT converging,
+        // which is a real bug — it throws rather than silently breaking, and the
+        // harness asserts it is never hit.
+        var putbackAttempts = 0;
+        var iterations = 0;
+        const int IterationCeiling = 10_000;
+
         while (true)
         {
+            if (++iterations > IterationCeiling)
+                throw new InvalidOperationException(
+                    $"Resolver walk exceeded {IterationCeiling} iterations — a possession is not " +
+                    $"converging (putback attempts so far: {putbackAttempts}). This is a real " +
+                    "non-convergence bug, not something to swallow.");
+
             switch (result)
             {
                 case Terminal t:
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
-                        { EndedOn = t };
+                        { EndedOn = t, PutbackAttempts = putbackAttempts };
 
                 case Continue c:
                     switch (c.Next)
@@ -221,13 +250,13 @@ public sealed class Resolver
                         // Roll D, opponent not in bonus -> offense keeps the ball
                         // and inbounds (stub). Chain ends here for now.
                         case ContinuationKind.ResumeInbound:
-                            return new RoutingOutcome(false, _resumeInbound.Receive(c));
+                            return new RoutingOutcome(false, _resumeInbound.Receive(c)) { PutbackAttempts = putbackAttempts };
 
                         // Roll D, opponent in bonus -> free-throw node (stub). The
                         // Bonus payload on c is the FT node's input. Chain ends
                         // here for now.
                         case ContinuationKind.ResolveFreeThrows:
-                            return new RoutingOutcome(false, _resolveFreeThrows.Receive(c));
+                            return new RoutingOutcome(false, _resolveFreeThrows.Receive(c)) { PutbackAttempts = putbackAttempts };
 
                         // Blocked shot (from Roll H) -> block-recovery node (stub).
                         // A live-ball event with its own future fan-out. The block
@@ -237,7 +266,7 @@ public sealed class Resolver
                         // 13 moved the feed point from F to H, leaving this edge
                         // untouched. Chain ends here for now.
                         case ContinuationKind.ResolveBlock:
-                            return new RoutingOutcome(false, _resolveBlock.Receive(c));
+                            return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts };
 
                         // Roll F, clean attempt got off -> execute Roll G (shot
                         // location), loop. Roll G is structurally Roll E: it stamps
@@ -264,7 +293,11 @@ public sealed class Resolver
                         // reads the stamped zone to size the per-zone block slice,
                         // but the roll itself does not.)
                         case ContinuationKind.IntoShotResolution:
-                            var pieH = _rollHGenerator.Generate(c.State);
+                            // A putback ticket (Roll K's PutBack arm) selects Roll H's
+                            // distinct putback pie and counts toward this possession's
+                            // putback depth — the re-entrant loop's accumulation.
+                            if (c.Putback) putbackAttempts++;
+                            var pieH = _rollHGenerator.Generate(c.State, c.Putback);
                             result = RollH.Execute(c.State, pieH, _rng);
                             continue;
 
@@ -284,26 +317,36 @@ public sealed class Resolver
                             result = RollI.Execute(c.State, pieI, _game, _rng);
                             continue;
 
-                        // Roll I, offense secures the offensive board -> offensive-
-                        // rebound node (stub). Same possession stays alive. The real
-                        // offensive-rebound roll (its own odds, loop back to
-                        // halfcourt → player selection) is a later session. Chain
-                        // ends here for now.
+                        // Roll I, offense secures the offensive board -> execute
+                        // Roll K (offensive-rebound resolution), loop. Roll K is a
+                        // GATE with mixed ends (the Roll I shape): TERMINALS
+                        // (OffensiveFoul / DeadBallTurnover / LiveBallTurnover — the
+                        // ball flips) and CONTINUES (PutBack → Roll H with a putback
+                        // ticket + Rim forced; ResetOffense → Roll E on a blank slate;
+                        // DefensiveFoul → the charge-and-fork; JumpBall → the arrow
+                        // node). PutBack and ResetOffense keep the SAME possession
+                        // alive — the loop lives in THIS walk, the Governor never sees
+                        // it, the count never increments. Roll K mutates GameState (its
+                        // DefensiveFoul arm charges the defensive team foul), hence it
+                        // takes _game — the Roll D / I / J shape. OffensiveReboundStub
+                        // is retired from the live chain; this edge now executes Roll K.
                         case ContinuationKind.ResolveOffensiveRebound:
-                            return new RoutingOutcome(false, _offensiveRebound.Receive(c));
+                            var pieK = _rollKGenerator.Generate();
+                            result = RollK.Execute(c.State, pieK, _game, _rng);
+                            continue;
 
                         // Roll H, shooting foul (and-1 or fouled miss) -> shooting-
                         // free-throw node (stub), SEPARATE from Roll D's bonus FT
                         // path. The FT count is a downstream derivation from
                         // (Result, ShotType). Chain ends here for now.
                         case ContinuationKind.ResolveShootingFreeThrows:
-                            return new RoutingOutcome(false, _resolveShootingFreeThrows.Receive(c));
+                            return new RoutingOutcome(false, _resolveShootingFreeThrows.Receive(c)) { PutbackAttempts = putbackAttempts };
 
                         // Roll H, miss deflected OOB off the defender -> sideline-
                         // inbound node (stub); offense retains and inbounds. Chain
                         // ends here for now.
                         case ContinuationKind.ResolveSidelineInbound:
-                            return new RoutingOutcome(false, _sidelineInbound.Receive(c));
+                            return new RoutingOutcome(false, _sidelineInbound.Receive(c)) { PutbackAttempts = putbackAttempts };
 
                         // Jump ball (from any feeder: Roll A, Roll B, Roll F) ->
                         // resolve against the possession arrow, then END the
@@ -331,7 +374,7 @@ public sealed class Resolver
                         // will land. An Into* hand-off that parks for now, like the
                         // other stub edges. Chain ends here for this session.
                         case ContinuationKind.IntoTransition:
-                            return new RoutingOutcome(false, _transition.Receive(c));
+                            return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts };
 
                         default:
                             throw new InvalidOperationException($"No route for continuation '{c.Next}'.");
