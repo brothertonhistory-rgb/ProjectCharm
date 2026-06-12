@@ -58,24 +58,23 @@ public enum ContinuationKind
     /// <summary>Clean entry: hand off to Roll B (halfcourt initiation).</summary>
     IntoHalfcourtSet,
 
-    /// <summary>Turnover: hand off to the (stubbed) turnover-type resolver.</summary>
+    /// <summary>Turnover: hand off to the shared turnover-type resolver (Roll C).</summary>
     ResolveTurnoverType,
 
-    /// <summary>Foul: hand off to the (stubbed) foul-type resolver.</summary>
+    /// <summary>Foul: hand off to the shared foul-type resolver (Roll D).</summary>
     ResolveFoulType,
 
-    /// <summary>Jump ball: hand off to the (stubbed) jump-ball resolver.</summary>
+    /// <summary>Jump ball: hand off to the jump-ball node (consults the arrow).</summary>
     ResolveJumpBall,
 
     /// <summary>Halfcourt possession proceeds: hand off to Roll E (player
     /// selection), which picks which on-court offensive slot gets the action.</summary>
     IntoPlayerSelection,
 
-    /// <summary>A player (slot) has been selected: hand off to the (stubbed)
-    /// player-action sequence — the future shot-creation / shot-quality /
-    /// make-miss / rebound / shooting-foul rolls that resolve what happens TO the
-    /// selected player. The selected slot rides on <see cref="PossessionState"/>,
-    /// not on the continuation.</summary>
+    /// <summary>A player (slot) has been selected: hand off to Roll F (player
+    /// action), which decides what the selected player's action becomes — shot
+    /// attempt, turnover, non-shooting foul, blocked, or held ball. The selected
+    /// slot rides on <see cref="PossessionState"/>, not on the continuation.</summary>
     IntoPlayerAction,
 
     /// <summary>A non-shooting defensive foul with the opponent NOT in the bonus:
@@ -87,4 +86,16 @@ public enum ContinuationKind
     /// (1-and-1 or double): hand off to the (stubbed) free-throw node. The
     /// <see cref="BonusType"/> rides on the continuation as the FT node's input.</summary>
     ResolveFreeThrows,
+
+    /// <summary>A shot attempt was blocked: hand off to the (stubbed)
+    /// block-recovery node. A block is a live-ball event with its own fan-out
+    /// (out of bounds off defense / off offense / scramble recovered by either
+    /// team), so it continues into its own future roll rather than terminating.</summary>
+    ResolveBlock,
+
+    /// <summary>A clean shot attempt got off: hand off to the (stubbed) shot-type
+    /// node — the future Roll G, which will stamp a ShotType onto
+    /// <see cref="PossessionState"/> that the make/miss roll reads. The one Roll F
+    /// outcome that proceeds DEEPER into the shot sequence.</summary>
+    IntoShotType,
 }

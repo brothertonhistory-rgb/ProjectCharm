@@ -12,6 +12,7 @@ internal static class Program
         var cfgC = RollCConfig.Load(configPath);
         var cfgD = RollDConfig.Load(configPath);
         var cfgE = RollEConfig.Load(configPath);
+        var cfgF = RollFConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
@@ -19,6 +20,7 @@ internal static class Program
         var rollCGenerator = new RollCStubPieGenerator(cfgC);
         var rollDGenerator = new RollDStubPieGenerator(cfgD);
         var rollEGenerator = new RollEStubPieGenerator(cfgE);
+        var rollFGenerator = new RollFStubPieGenerator(cfgF);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -29,11 +31,13 @@ internal static class Program
             rollCGenerator,
             rollDGenerator,
             rollEGenerator,
+            rollFGenerator,
             game,
             rng,
-            new PlayerActionStub(),
             new ResumeInboundStub(),
-            new ResolveFreeThrowsStub());
+            new ResolveFreeThrowsStub(),
+            new BlockRecoveryStub(),
+            new ShotTypeStub());
 
         var state = new PossessionState(
             PossessionNumber: 1,
@@ -41,7 +45,7 @@ internal static class Program
             Defense: TeamSide.Away,
             Entry: EntryType.DeadBallInbound);
 
-        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E Chain ===\n");
+        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E -> F Chain ===\n");
 
         ShowSamples(cfg, cfgE, rollAGenerator, rollEGenerator, resolver, game, state, rng);
         var ok = BatchCheck(cfg, cfgB, rollAGenerator, rollBGenerator, resolver, state);
@@ -53,6 +57,8 @@ internal static class Program
         ok &= JumpBallCheck(cfg);
         ok &= SlotLayerCheck(game);
         ok &= RollESelectionBatchCheck(cfg, cfgE, rollEGenerator, game, state);
+        ok &= RollFActionBatchCheck(cfg, cfgF, rollFGenerator, state);
+        ok &= RollFHandoffCheck(cfg, game, state);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -139,6 +145,29 @@ internal static class Program
                 $"  proceed -> selected {s.Side} slot {s.Number} | next={r.Next}");
         }
         Console.WriteLine();
+
+        // Roll F observability: the flat-ish action pie, then a few sample
+        // actions. Each starts from a SELECTED slot (rolled through Roll E first,
+        // exactly as the live chain does), so the resolved action carries a real
+        // slot forward. Shows the five-way classification and the kind each emits
+        // — STUB:PlayerAction is gone; the action now resolves into one of five
+        // real exits.
+        Console.WriteLine("--- Observability: Roll F (player action) ---");
+        var genF = new RollFStubPieGenerator(RollFConfig.Load(
+            Path.Combine(AppContext.BaseDirectory, "config.json")));
+        var pieF = genF.Generate(state);
+        Console.WriteLine($"  action pie (flat-ish, no signal yet): {pieF}");
+        var actRng = new SystemRng(cfg.Seed);
+        for (var i = 0; i < 8; i++)
+        {
+            // Select a player first (Roll E), then resolve the action (Roll F).
+            var selected = ((Continue)RollE.Execute(state, pieE, game, actRng)).State;
+            var r = (Continue)RollF.Execute(selected, pieF, actRng);
+            var s = r.State.SelectedSlot!.Value;
+            Console.WriteLine(
+                $"  {s.Side} slot {s.Number} action -> {r.Next}");
+        }
+        Console.WriteLine();
     }
 
     // --- Batch: confirm A->B rates and clean hand-offs throughout. ---
@@ -188,6 +217,7 @@ internal static class Program
                     Continue { Next: ContinuationKind.IntoPlayerSelection } => HalfcourtOutcome.Proceed,
                     Continue { Next: ContinuationKind.ResolveFoulType } => HalfcourtOutcome.Foul,
                     Continue { Next: ContinuationKind.ResolveTurnoverType } => HalfcourtOutcome.DeadBallTurnover,
+                    Continue { Next: ContinuationKind.ResolveJumpBall } => HalfcourtOutcome.JumpBall,
                     _ => throw new InvalidOperationException("Unmapped Roll B result.")
                 };
                 bCounts[bOutcome]++;
@@ -224,8 +254,9 @@ internal static class Program
             Console.WriteLine($"    {outcome,-18} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
         }
 
-        // Note: with Roll C live, turnovers now end the possession (terminal)
-        // instead of routing to a stub. So "ended" now includes them.
+        // Note: with Roll C and Roll F live, turnovers and jump balls now end the
+        // possession (terminal) instead of routing to a stub. So "ended" includes
+        // them; the player-action shot/block exits and the foul exits route to stubs.
         var handoffOk = unrouted == 0 && (ended + routedToStub) == cfg.BatchSize;
         Console.WriteLine($"\n  handoff: ended={ended:N0}, routed-to-stub={routedToStub:N0}, unrouted={unrouted} -> {(handoffOk ? "ok" : "FAIL")}");
 
@@ -599,5 +630,146 @@ internal static class Program
         Console.WriteLine($"\n  every exit a clean slot-stamped IntoPlayerAction: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
 
         return ratesOk && cleanOk;
+    }
+
+    // --- Batch: Roll F's five-way action distribution converges within tolerance,
+    //     and every exit is a clean Continue carrying one of the five expected
+    //     kinds. The pie is flat-ish (no signal); a future attribute generator
+    //     tilts it without this roll changing. Mirrors the Roll E batch check. ---
+    private static bool RollFActionBatchCheck(
+        RollAConfig cfg, RollFConfig cfgF, RollFStubPieGenerator genF, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} actions through Roll F (flat-ish pie) ---");
+        var rng = new SystemRng(cfg.Seed);
+        var pieF = genF.Generate(state);
+
+        var counts = new Dictionary<PlayerActionOutcome, int>();
+        foreach (var o in Enum.GetValues<PlayerActionOutcome>()) counts[o] = 0;
+
+        var anomalies = 0;   // anything that isn't a clean Continue with an expected kind
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var result = RollF.Execute(state, pieF, rng);
+
+            // Map the emitted continuation kind back to its action outcome bucket.
+            var bucket = result switch
+            {
+                Continue { Next: ContinuationKind.IntoShotType } => PlayerActionOutcome.ShotAttempt,
+                Continue { Next: ContinuationKind.ResolveTurnoverType } => PlayerActionOutcome.Turnover,
+                Continue { Next: ContinuationKind.ResolveFoulType } => PlayerActionOutcome.NonShootingFoul,
+                Continue { Next: ContinuationKind.ResolveBlock } => PlayerActionOutcome.Blocked,
+                Continue { Next: ContinuationKind.ResolveJumpBall } => PlayerActionOutcome.JumpBall,
+                _ => (PlayerActionOutcome?)null
+            };
+
+            if (bucket is not { } b)
+            {
+                anomalies++;
+                continue;
+            }
+            counts[b]++;
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll F actions:");
+        foreach (var (outcome, weight) in pieF.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-16} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        var cleanOk = anomalies == 0;
+        Console.WriteLine($"\n  every exit a clean Continue with an expected kind: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
+
+        return ratesOk && cleanOk;
+    }
+
+    // --- Clean handoff: route a batch of real E->F exits through the resolver and
+    //     confirm every Roll F outcome lands at its intended destination, with
+    //     zero unrouted: turnover -> Roll C terminal, non-shooting foul -> Roll D
+    //     (ResumeInbound/ResolveFreeThrows stub), blocked -> block stub, shot ->
+    //     shot-type stub, jump ball -> jump-ball terminal. A fresh local game +
+    //     resolver keeps this self-contained; the shared foul count climbing into
+    //     the bonus mid-run is expected (it just shifts some foul exits from
+    //     ResumeInbound to ResolveFreeThrows — both clean). ---
+    private static bool RollFHandoffCheck(RollAConfig cfg, GameState sharedGame, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Clean handoff: {cfg.BatchSize:N0} E->F exits routed through the resolver ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+
+        // Build a self-contained resolver from config (mirrors Main's wiring), on
+        // a FRESH game so this check does not perturb the shared game state.
+        var cfgB = RollBConfig.Load(configPath);
+        var cfgC = RollCConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+        var cfgE = RollEConfig.Load(configPath);
+        var cfgF = RollFConfig.Load(configPath);
+
+        var rng = new SystemRng(cfg.Seed);
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var genE = new RollEStubPieGenerator(cfgE);
+        var genF = new RollFStubPieGenerator(cfgF);
+
+        var resolver = new Resolver(
+            new RollBStubPieGenerator(cfgB),
+            new RollCStubPieGenerator(cfgC),
+            new RollDStubPieGenerator(cfgD),
+            genE,
+            genF,
+            game,
+            rng,
+            new ResumeInboundStub(),
+            new ResolveFreeThrowsStub(),
+            new BlockRecoveryStub(),
+            new ShotTypeStub());
+
+        var pieE = genE.Generate(state);
+        var pieF = genF.Generate(state);
+
+        var destClasses = new Dictionary<string, int>
+        {
+            ["turnover -> Roll C terminal"] = 0,
+            ["foul -> Roll D stub"] = 0,
+            ["blocked -> block stub"] = 0,
+            ["shot -> shot-type stub"] = 0,
+            ["jump ball -> terminal"] = 0,
+        };
+        var unrecognized = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            // Select a player (Roll E), resolve the action (Roll F), then route.
+            var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
+            var fResult = RollF.Execute(selected, pieF, rng);
+            var routing = resolver.Route(fResult);
+            var d = routing.Destination;
+
+            if (d.StartsWith("END:JumpBall")) destClasses["jump ball -> terminal"]++;
+            else if (d.StartsWith("END:")) destClasses["turnover -> Roll C terminal"]++;
+            else if (d.StartsWith("STUB:ResumeInbound") || d.StartsWith("STUB:ResolveFreeThrows")) destClasses["foul -> Roll D stub"]++;
+            else if (d.StartsWith("STUB:BlockRecovery")) destClasses["blocked -> block stub"]++;
+            else if (d.StartsWith("STUB:ShotType")) destClasses["shot -> shot-type stub"]++;
+            else unrecognized++;
+        }
+
+        Console.WriteLine("  destinations reached:");
+        var allHit = true;
+        foreach (var (label, count) in destClasses)
+        {
+            var hit = count > 0;
+            allHit &= hit;
+            Console.WriteLine($"    {label,-32} {count,8:N0}  {(hit ? "ok" : "NONE")}");
+        }
+
+        var routedOk = unrecognized == 0;
+        Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all five F exits reached their destination: {(allHit ? "ok" : "FAIL")}");
+
+        return routedOk && allHit;
     }
 }

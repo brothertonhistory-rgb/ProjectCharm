@@ -4,6 +4,119 @@ Newest entries first. What was built, decided, and left stubbed each session.
 
 ---
 
+## Session 9 — Roll F (player action) + Roll B jump-ball sliver
+
+**Built**
+- `PlayerActionOutcomes.cs` — `PlayerActionOutcome` enum, five members in
+  declaration order: `ShotAttempt`, `Turnover`, `NonShootingFoul`, `Blocked`,
+  `JumpBall`. The success/proceed-deeper slice (`ShotAttempt`) is first, mirroring
+  `CleanEntry`/`Proceed` on Rolls A/B.
+- `RollF.cs` — the player-action GATE, a structural clone of Roll B. No terminal;
+  every outcome a `Continue`. Takes only `(state, pie, rng)` — reads nothing off
+  GameState, mutates nothing, stamps nothing on PossessionState. Five switch arms:
+  `ShotAttempt`→`IntoShotType`, `Turnover`→`ResolveTurnoverType`,
+  `NonShootingFoul`→`ResolveFoulType`, `Blocked`→`ResolveBlock`,
+  `JumpBall`→`ResolveJumpBall`. THREE reuse existing shared nodes (C, D, jump-ball
+  node); TWO open new pipes.
+- `RollFConfig.cs` — loads the `"RollF"` section (`System.Text.Json`, matching
+  RollC/RollD loaders exactly — no guessing this time). Five base weights +
+  Epsilon. No live-wire scalar.
+- `RollFStubPieGenerator.cs` — builds the flat-ish five-way pie from config. NO
+  live wire (mirrors Roll E/Roll D). Real attribute-driven generator replaces it
+  later without touching Roll F or the resolver.
+
+**Edited**
+- `EntryOutcomes.cs` — added two `ContinuationKind`s: `ResolveBlock` (→ block
+  recovery) and `IntoShotType` (→ the future Roll G). Refreshed the
+  `IntoPlayerAction` doc (now hands to Roll F, not a stub).
+- `Resolver.cs` — `IntoPlayerAction` converted from stub-receive to
+  execute-and-loop (generate pie → `RollF.Execute` → feed result back), exactly
+  like the C/D/E swaps. Added `RollFStubPieGenerator` field + ctor param. Added
+  `ResolveBlock` and `IntoShotType` cases routing to the two new stubs. Retired
+  the `_intoPlayerAction` stub-node field.
+- `Stubs.cs` — retired `PlayerActionStub`; added `BlockRecoveryStub` and
+  `ShotTypeStub` (both echo the carried `SelectedSlot`, so the harness confirms a
+  real slot rode through to the shot/block beat).
+- `Program.cs` — load `RollFConfig`, build the generator, updated the `Resolver`
+  construction (new generator param + two new stubs, `PlayerActionStub` gone).
+  Added a Roll F observability block (selects via Roll E first, then resolves the
+  action), a `RollFActionBatchCheck` (five-way convergence + clean-Continue), and
+  a `RollFHandoffCheck` (routes real E→F exits through a fresh resolver, confirms
+  all five destinations are reached with zero unrouted). Added the `JumpBall` arm
+  to the Roll B mapping switch in `BatchCheck`.
+
+**Roll B jump-ball sliver (folded in this session — required by the audit)**
+- `HalfcourtOutcomes.cs` — added `JumpBall` member (4th slice).
+- `RollB.cs` — added the `JumpBall` switch arm emitting `ResolveJumpBall`.
+- `RollBConfig.cs` — added `BaseJumpBall` (0.005), carved from `BaseProceed`
+  (0.85 → 0.845) so the pie still sums to 1.
+- `RollBStubPieGenerator.cs` — added the `JumpBall` slice to the weights dict
+  (the foul wire still nudges only the foul slice). NOTE: this generator file was
+  not in the read set and was rebuilt from the B/C pattern — verify it matches the
+  working copy; the only substantive change is the added slice.
+- `config.json` — `RollB` section gets `BaseJumpBall` + lowered `BaseProceed`.
+
+**Verified (by static contract audit + pie/routing mirror in Python; SDK
+unavailable in this env)**
+- Roll F five-way pie (0.82 / 0.09 / 0.05 / 0.035 / 0.005) sums to exactly 1 and
+  converges within the 0.5% tolerance across 1,000,000 draws.
+- Roll B with the jump-ball sliver (0.845 / 0.12 / 0.03 / 0.005) sums to 1 and
+  converges within tolerance.
+- Every Roll F outcome maps to a continuation kind; three to existing kinds
+  (`ResolveTurnoverType`, `ResolveFoulType`, `ResolveJumpBall`), two to new
+  (`ResolveBlock`, `IntoShotType`). Zero unrouted by construction.
+- The 10-second/shot-clock backcourt violations remain Roll A terminals, NOT Roll
+  C slices — so a Roll F turnover cannot become one. The physical impossibility is
+  excluded by routing for free, no suppression needed.
+
+**Decided**
+- **Roll F is a flat gate, nothing more.** What tilts its pie — the handle,
+  defender length/hands, rim protection, shot selection — is the deferred
+  player/attribute model. Holding the line here; the smarter generator drops in
+  later through the same seam.
+- **No live wire (like Roll E).** The only honest signal for Roll F is an
+  attribute, and F sits one inch from the player model. A placeholder wire would
+  pantomime the deferred signal. Critically, a signal like defensive pressure is a
+  possession-level INPUT that F is only one reader of (it also pushes shot quality
+  on the back end) — wiring it into F alone would bake in the wrong ownership.
+- **`ShotAttempt` over `ShotGetsOff`** — flat tone, pairs with the `IntoShotType`
+  kind it emits.
+- **Two new kinds, two new stubs:** `ResolveBlock`→`BlockRecoveryStub`,
+  `IntoShotType`→`ShotTypeStub`. Mirrors the Session 8 `IntoPlayerAction` /
+  `PlayerActionStub` naming.
+- **Roll F takes no GameState.** A flat gate reads nothing and mutates nothing;
+  the jump-ball arrow flip happens in the jump-ball node, the foul charge in Roll
+  D — not in F. So `(state, pie, rng)` like Roll B, not D/E.
+- **Roll F stamps nothing on PossessionState.** Only Roll E's `SelectedSlot` rides
+  forward; the future Roll G will add `ShotType`.
+
+**Decided (designed, NOT built — context-shifted turnover/foul odds)**
+- A turnover in the halfcourt (from Roll F) should have a different MIX than a
+  backcourt entry turnover (from Roll A) — more live strips, more offensive fouls.
+  This lives in **Roll C's generator**, not in Roll C or Roll F: "many feeders,
+  one node" means one classification ROLL, never one PIE. Each feeder can hand the
+  generator its context and get back a pie shaped to it.
+- The provenance the generator needs is likely already free on `PossessionState`:
+  `SelectedSlot` is null before Roll E and set after, so a turnover with a null
+  slot came from the backcourt/halfcourt-init beat and one with a slot came from
+  Roll F. No new plumbing required when this is built. Deferred
+  (attribute-model-adjacent); logged so it isn't lost.
+
+**Stubbed / deferred**
+- `STUB:PlayerAction` is gone from sample output, replaced by the five resolved
+  actions (turnover→C terminal, foul→D, blocked→block stub, shot→shot-type stub,
+  jump ball→terminal). The chain now dead-ends at `STUB:ShotType` — the future
+  Roll G, the next frontier.
+- The block-recovery roll (OOB off defense/offense, scramble) — routes to its stub.
+- Roll G (shot type → stamps `ShotType` on PossessionState) and Roll H
+  (make/miss/fouled-in-the-act, with its own and-1 resolution feeding free throws).
+- The player/attribute model that eventually tilts Roll F's pie (and every other).
+- The jump-ball retain/turnover branch (defense-retains terminal / offense-retains
+  sideline inbound) — both destinations still unbuilt; the terminal-on-resolve
+  placeholder stands, now fed by A, B, and F.
+
+---
+
 ## Session 8.a — Routing audit, backcourt framing, Roll A violations
 
 (Same session as Roll E below; continued work after the roll landed.)

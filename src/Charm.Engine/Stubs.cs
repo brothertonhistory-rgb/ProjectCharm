@@ -12,23 +12,6 @@ public interface IContinuationNode
     string Receive(Continue continuation);
 }
 
-/// <summary>STUB for the player-action sequence — where Roll E's selection lands
-/// (the future shot-creation / shot-quality / make-miss / rebound / shooting-foul
-/// rolls that resolve what happens TO the selected player). The selected slot
-/// rides on <see cref="Continue"/>'s <see cref="PossessionState"/>, so the stub
-/// records WHICH slot arrived, letting the harness confirm a real slot was named.
-/// A real node replaces this without Roll E changing.</summary>
-public sealed class PlayerActionStub : IContinuationNode
-{
-    public string Receive(Continue continuation)
-    {
-        var slot = continuation.State.SelectedSlot;
-        return slot is { } s
-            ? $"STUB:PlayerAction:{s.Side}slot{s.Number}"
-            : "STUB:PlayerAction:NO_SLOT";   // should never happen; surfaces a bug loud
-    }
-}
-
 /// <summary>STUB for the turnover-type resolver.</summary>
 public sealed class TurnoverTypeResolverStub : IContinuationNode
 {
@@ -51,6 +34,42 @@ public sealed class ResolveFreeThrowsStub : IContinuationNode
 {
     public string Receive(Continue continuation) =>
         $"STUB:ResolveFreeThrows:{continuation.Bonus}";
+}
+
+/// <summary>STUB for the block-recovery node — where Roll F's blocked attempt
+/// lands. A block is a LIVE-BALL event with its own future fan-out (ball out of
+/// bounds off defense / off offense / scramble recovered by either team), so
+/// this is the holding pen for that future roll. The selected slot rides on the
+/// carried <see cref="PossessionState"/>; the stub records WHICH slot's attempt
+/// was blocked, letting the harness confirm a real slot was named. A real node
+/// replaces this without Roll F changing.</summary>
+public sealed class BlockRecoveryStub : IContinuationNode
+{
+    public string Receive(Continue continuation)
+    {
+        var slot = continuation.State.SelectedSlot;
+        return slot is { } s
+            ? $"STUB:BlockRecovery:{s.Side}slot{s.Number}"
+            : "STUB:BlockRecovery:NO_SLOT";   // should never happen; surfaces a bug loud
+    }
+}
+
+/// <summary>STUB for the shot-type node (the future Roll G) — where Roll F's
+/// clean shot attempt lands, the one outcome that proceeds DEEPER into the shot
+/// sequence. Roll G will stamp a ShotType onto <see cref="PossessionState"/>
+/// (the second per-possession fact after SelectedSlot) that the make/miss roll
+/// reads. The stub records WHICH slot is taking the shot, letting the harness
+/// confirm a real slot was named. A real node replaces this without Roll F
+/// changing — this is the chain's new dead-end / next frontier.</summary>
+public sealed class ShotTypeStub : IContinuationNode
+{
+    public string Receive(Continue continuation)
+    {
+        var slot = continuation.State.SelectedSlot;
+        return slot is { } s
+            ? $"STUB:ShotType:{s.Side}slot{s.Number}"
+            : "STUB:ShotType:NO_SLOT";   // should never happen; surfaces a bug loud
+    }
 }
 
 /// <summary>STUB for the jump-ball resolver (consults the possession arrow).</summary>

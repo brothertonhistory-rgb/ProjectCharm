@@ -15,9 +15,10 @@
   "Seed": 20260610,
 
   "RollB": {
-    "BaseProceed": 0.85,
+    "BaseProceed": 0.845,
     "BaseFoul": 0.12,
     "BaseDeadBallTurnover": 0.03,
+    "BaseJumpBall": 0.005,
     "PhysicalityFoulNudge": 0.10,
     "Epsilon": 1e-9
   },
@@ -47,6 +48,15 @@
     "BaseSlot3": 0.20,
     "BaseSlot4": 0.20,
     "BaseSlot5": 0.20,
+    "Epsilon": 1e-9
+  },
+
+  "RollF": {
+    "BaseShotAttempt": 0.82,
+    "BaseTurnover": 0.09,
+    "BaseNonShootingFoul": 0.05,
+    "BaseBlocked": 0.035,
+    "BaseJumpBall": 0.005,
     "Epsilon": 1e-9
   }
 }

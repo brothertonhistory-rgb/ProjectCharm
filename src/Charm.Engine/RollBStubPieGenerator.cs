@@ -1,10 +1,15 @@
 namespace Charm.Engine;
 
 /// <summary>
-/// STUB. Not the real attribute-driven pie generator for Roll B. Exists only so
-/// Roll B has a valid pie to consume and to prove the generator->roll seam
-/// carries signal. The real generator (attributes -> matchup -> weighted odds)
-/// will replace this without changing Roll B.
+/// Stub pie generator for Roll B. Returns the configured base weights as a
+/// finished four-way pie over <see cref="HalfcourtOutcome"/>, with ONE live
+/// wire: a 0–1 <c>physicality</c> scalar nudges the foul slice, then the whole
+/// pie renormalizes to sum 1. Placeholder proving the seam carries signal — not
+/// basketball logic. The real attribute-driven generator replaces this class
+/// later WITHOUT touching Roll B or the resolver.
+///
+/// The jump-ball slice is a small sliver (no wire of its own); only the foul
+/// slice is nudged.
 /// </summary>
 public sealed class RollBStubPieGenerator
 {
@@ -12,27 +17,26 @@ public sealed class RollBStubPieGenerator
 
     public RollBStubPieGenerator(RollBConfig cfg) => _cfg = cfg;
 
-    /// <param name="state">Current possession (unused by the stub; the real
-    /// generator will read attributes off it).</param>
-    /// <param name="physicality">A single 0..1 scalar standing in for defensive
-    /// physicality. The one live input, wired to a trivial nudge on the foul
-    /// slice — a placeholder to prove the wire moves outcomes, not real logic.</param>
+    /// <param name="physicality">0–1 live wire: how strongly to nudge the foul
+    /// slice before renormalization. 0 leaves the base weights as-is.</param>
     public Pie<HalfcourtOutcome> Generate(PossessionState state, double physicality)
     {
-        if (physicality < 0 || physicality > 1)
-            throw new ArgumentOutOfRangeException(nameof(physicality), physicality, "Physicality must be in [0, 1].");
-
-        var proceed = _cfg.BaseProceed;
-        var foul = _cfg.BaseFoul + physicality * _cfg.PhysicalityFoulNudge;
-        var deadBallTurnover = _cfg.BaseDeadBallTurnover;
-
-        var total = proceed + foul + deadBallTurnover;
         var weights = new Dictionary<HalfcourtOutcome, double>
         {
-            [HalfcourtOutcome.Proceed] = proceed / total,
-            [HalfcourtOutcome.Foul] = foul / total,
-            [HalfcourtOutcome.DeadBallTurnover] = deadBallTurnover / total,
+            [HalfcourtOutcome.Proceed] = _cfg.BaseProceed,
+            [HalfcourtOutcome.Foul] = _cfg.BaseFoul,
+            [HalfcourtOutcome.DeadBallTurnover] = _cfg.BaseDeadBallTurnover,
+            [HalfcourtOutcome.JumpBall] = _cfg.BaseJumpBall,
         };
+
+        // Live wire: physicality pushes the foul slice up.
+        weights[HalfcourtOutcome.Foul] += physicality * _cfg.PhysicalityFoulNudge;
+
+        // Renormalize so the nudged pie sums to 1 (the Pie constructor validates
+        // this within Epsilon, so a bad nudge fails loud rather than rolling skewed).
+        var total = weights.Values.Sum();
+        foreach (var key in weights.Keys.ToList())
+            weights[key] /= total;
 
         return new Pie<HalfcourtOutcome>(weights, _cfg.Epsilon);
     }

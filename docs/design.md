@@ -5,6 +5,49 @@ task lists (those live in the journal). It is updated every session.
 
 ---
 
+## The funnel principle (the project's spine — read first)
+
+The possession engine is a gravity funnel. Imagine dropping balls into the top:
+each one falls through pipes and branches until it EXTINGUISHES at the bottom — a
+turnover, a missed shot, a made shot, a resolved foul — all into one discard pile.
+The work right now is building the pipes and naming them as we go. Where a pipe
+isn't built yet, balls park in a HOLDING PEN (a stub) until the next pipe is laid —
+exactly as ~80% of possessions parked at the player-selection stub until Roll E
+was built.
+
+Two consequences that govern all sequencing:
+
+1. **Build the pipes until every path terminates.** The job is to make every
+   possession reach a real ending: turnover, miss, make, foul resolved. A
+   possession that dead-ends at a stub isn't finished — it's waiting for its next
+   pipe. The roll web is built stub-first, each new roll converting a holding pen
+   into either a terminal or another pipe that eventually terminates.
+
+2. **The game layer comes LAST, after the funnel is whole.** The Game Governor
+   (the thing that drops the next ball and decides which side it starts on, tracks
+   score, declares a winner) does NOT exist yet and should not. There is nothing to
+   govern until possessions produce real endings — points, turnovers, misses. "The
+   game begins" only once the funnel terminates everywhere. Until then, validation
+   is per-pipe (drop balls, check the rates, confirm every ball reaches a bottom),
+   exactly as every session has worked so far — no game-level view is needed or
+   wanted yet.
+
+Anti-pattern to avoid (it has cost real time): trying to build the Governor against
+a half-built funnel, then discovering "this outcome can't say where the next ball
+goes." Of course it can't — that pipe isn't built. Finish the pipes; the Governor
+becomes trivial once every terminal is real and sitting right there to read.
+
+Current frontier: the chain terminates cleanly for turnovers (Roll C — now fed by A,
+B, and F), fouls (Roll D → stubs — also fed by A, B, F), violations and jump balls
+(Roll A, B, F). Roll F (player action) is built: it resolves the selected player's
+action into a shot attempt, turnover, non-shooting foul, block, or held ball. The
+chain now dead-ends at the `IntoShotType` stub for any possession that gets a shot
+off, and at the `ResolveBlock` stub for a blocked attempt. The next pipes are the
+shot web beyond Roll F (shot type → make/miss, block-recovery, rebound, free
+throws). The Governor is built only after those land.
+
+---
+
 ## The on-court slot layer
 
 The slot layer is the set of ten on-court identities — five per team — that
@@ -133,34 +176,71 @@ changes. Rolls never call each other and never know what comes next.
 
 ---
 
-## Verified routing map (audited from source, post Roll E)
+## The backcourt / frontcourt division (organizing principle)
+
+The chain splits on a single physical line: **Roll A is the entire BACKCOURT
+phase of an offensive possession; everything after Roll A is FRONTCOURT.**
+
+Roll A is not just "the inbound." It owns the whole journey from dead ball to set
+offense: inbound the ball, advance it up the floor, get into the halfcourt set.
+Every way a possession can die or be interrupted BEFORE it is set up at the
+offensive end lives in Roll A — the 5-second inbound failure, the 10-second
+backcourt violation, a backcourt turnover (bad pass out of bounds, stepping on the
+division line), a backcourt foul, a backcourt jump ball (tie-up bringing it up),
+and the shot-clock violation if they never get across. `CleanEntry` is the single
+SUCCESS path: "the offense is now set in its halfcourt."
+
+Everything downstream is frontcourt, by construction:
+- **Roll B** — halfcourt initiation (the ball is already set; the offense starts working).
+- **Rolls E / F / G / H** — a player gets the action, attempts, and it resolves.
+
+This is why Roll A is the busiest node (the backcourt has many failure modes) and
+why Roll B is a near-pure gate (surviving to B means the backcourt is already
+cleared). It also locates backcourt TIME: the 8/10-second count and the early shot
+clock are the same backcourt window, so Roll A is where backcourt time gets
+apportioned when the time roll lands (the 10-second violation already stamps its
+invariant 10s; a clean entry's advancement time defers to the future time roll).
+
+Consequence for turnovers: a backcourt turnover happens in Roll A's phase, so Roll
+A classifies it as a turnover and routes to Roll C exactly as it does today — no
+new slice needed for it. The only NEW dedicated Roll A slices are the two
+zero-variance VIOLATION terminals (5-second, 10-second); everything else rides
+paths Roll A already has.
+
+---
+
+## Verified routing map (audited from source, post Roll F)
 
 The engine is NOT a single chain — it is a spine of action rolls draining into a
 small set of SHARED sink nodes. "Many feeders, one node" is the actual wiring, not
-a slogan: Rolls A and B both feed the turnover node (C) and the foul node (D), and
-Roll F will make each a third feeder. This table is the authoritative map; it was
-reconstructed by reading each roll's outcomes and the resolver's routing switch.
+a slogan: Rolls A, B, and F all feed the turnover node (C) and the foul node (D),
+and A, B, and F all feed the jump-ball node. This table is the authoritative map;
+it was reconstructed by reading each roll's outcomes and the resolver's routing
+switch.
 
 | Roll | Outcomes (from source) | Routes to |
 |---|---|---|
-| **A** Entry | CleanEntry / Turnover / ShotClockViolation / Foul / JumpBall | B / C / **TERMINAL** / D / jump-ball node |
-| **B** Halfcourt | Proceed / Foul / DeadBallTurnover | E / D / C |
+| **A** Entry | CleanEntry / Turnover / ShotClockViolation / FiveSecondInbound / TenSecondBackcourt / Foul / JumpBall | B / C / **TERMINAL** ×3 / D / jump-ball node |
+| **B** Halfcourt | Proceed / Foul / DeadBallTurnover / JumpBall | E / D / C / jump-ball node |
 | **C** Turnover | 5 slices, all terminal | **TERMINAL** ×5 |
 | **D** Foul | (bonus state read) None / OneAndOne / Double | ResumeInbound stub / ResolveFreeThrows stub |
-| **E** Selection | one slot (flat 5-way) | IntoPlayerAction stub |
+| **E** Selection | one slot (flat 5-way) | Roll F (live) |
+| **F** Player action | ShotAttempt / Turnover / NonShootingFoul / Blocked / JumpBall | ShotType stub / C / D / BlockRecovery stub / jump-ball node |
 | **jump-ball node** | arrow read (or `Off` tip coin-flip) | **TERMINAL** (resolves + flips arrow) |
 
 Shared sinks and their feeders (current):
-- **Roll C (turnover):** fed by A (Turnover) and B (DeadBallTurnover). Roll F adds a third.
-- **Roll D (foul):** fed by A (Foul) and B (Foul). Roll F adds a third.
-- **Jump-ball node:** fed by A only today. INTENDED: also B and F (see Jump ball section).
+- **Roll C (turnover):** fed by A (Turnover), B (DeadBallTurnover), and F (Turnover).
+- **Roll D (foul):** fed by A (Foul), B (Foul), and F (NonShootingFoul).
+- **Jump-ball node:** fed by A (JumpBall), B (JumpBall), and F (JumpBall) — all three live.
 
-True terminals today: A's ShotClockViolation, all five Roll C slices, and the
-jump-ball resolution. Everything else is a Continue that currently ends at a stub
-(`IntoPlayerAction`, `ResumeInbound`, `ResolveFreeThrows`).
+True terminals today: Roll A's three violation terminals (ShotClockViolation,
+FiveSecondInbound, TenSecondBackcourt), all five Roll C slices, and the jump-ball
+resolution. Everything else is a Continue that currently ends at a stub
+(`ResumeInbound`, `ResolveFreeThrows`, `ResolveBlock`, `IntoShotType`).
 
-The live spine A → B → E currently dead-ends at the `IntoPlayerAction` stub. Roll F
-replaces that stub and becomes the third feeder into C and D.
+The live spine A → B → E → F now resolves the player's action and dead-ends at the
+`IntoShotType` stub (a shot got off) or the `ResolveBlock` stub (it was blocked).
+Roll F is the third feeder into C and D and the third feeder into the jump-ball node.
 
 ---
 
@@ -220,16 +300,15 @@ operation on the possession arrow.
 | `Off` (opening / OT tip) | A real contest. 50/50 coin flip; winner gets the ball; arrow turned ON pointing at the LOSER (they are owed the next award). |
 | `Home` / `Away` | Routine alternating possession. The pointed-at team is awarded the ball; the arrow flips away from them. Deterministic. |
 
-**Feeders (verified from source).** As of the Roll E audit the only feeder is
-Roll A's `JumpBall` entry outcome — Roll B and the player-action beat do NOT yet
-emit it. INTENT (settled Session 9 design talk, not yet built): a held ball is a
-live-ball event, so it should be reachable from every live-ball ACTION beat —
-Roll A (have it), Roll B (ball being advanced), and Roll F (the player-action
-beat: trapped handler, gang rebound). NOT from Roll E (selection is not a physical
-contest) nor from the shot-resolution rolls (a held ball there is already a block
-or a foul). Adding the `JumpBall` slice to Roll B and Roll F is cheap — they emit
-the existing `ResolveJumpBall` kind into the existing node; "many feeders, one
-node," exactly like C and D.
+**Feeders (verified from source).** Three live feeders: Roll A's `JumpBall` entry
+outcome, Roll B's `JumpBall` slice (held ball while initiating), and Roll F's
+`JumpBall` slice (held ball at the player-action beat: trapped handler, gang
+rebound). All three emit the same `ResolveJumpBall` kind into the same node — "many
+feeders, one node," exactly like C and D. NOT fed from Roll E (selection is not a
+physical contest) nor from the shot-resolution rolls (a held ball there is already
+a block or a foul). The Roll B and Roll F slivers are small (0.005 each), carved
+out of their proceed/shot weights; adding them was the cheap edit the design
+predicted — a slice + a switch arm + a config number, no new node.
 
 **The arrow read IS the branch (INTENDED — partially built).** A held ball is
 NOT uniformly terminal. The arrow decides both who gets the ball AND which of two
@@ -282,40 +361,52 @@ generators.
 
 ---
 
-## Roll A — Entry: Inbounds (Dead Ball)
+## Roll A — Entry: the backcourt phase
 
-**Simulates:** the first touch of a possession that begins with a dead-ball
-inbound pass.
+**Simulates:** the entire backcourt phase of an offensive possession — inbound the
+ball, advance it up the floor, get set in the halfcourt. Not just the inbound pass:
+everything that can happen before the offense is set at its end lives here. (See
+"The backcourt / frontcourt division" above for the organizing principle.)
 
-**Pie shape:** five slices over `EntryOutcome` — `CleanEntry`, `Turnover`,
-`ShotClockViolation`, `Foul`, `JumpBall`. (Stub weights today; see below.)
+**Pie shape:** seven slices over `EntryOutcome` — `CleanEntry`, `Turnover`,
+`ShotClockViolation`, `FiveSecondInbound`, `TenSecondBackcourt`, `Foul`,
+`JumpBall`. (Stub weights today; see below.)
 
-**Five exits:**
+**Seven exits:**
 
 | Outcome | Result | Routes to |
 |---|---|---|
 | Clean entry | `Continue(IntoHalfcourtSet)` | Roll B |
-| Turnover | `Continue(ResolveTurnoverType)` | turnover-type resolver *(stub)* |
-| Shot-clock violation | `Terminal("ShotClockViolation")`, elapsed = full clock | possession ends, ball switches |
-| Foul | `Continue(ResolveFoulType)` | foul-type resolver *(stub)* |
-| Jump ball | `Continue(ResolveJumpBall)` | jump-ball resolver *(stub)* |
+| Turnover (incl. backcourt bad pass / stepping on line) | `Continue(ResolveTurnoverType)` | Roll C |
+| Shot-clock violation | `Terminal("ShotClockViolation")`, elapsed = 30s | possession ends |
+| 5-second inbound | `Terminal("FiveSecondInbound")`, elapsed = 0s | possession ends |
+| 10-second backcourt | `Terminal("TenSecondBackcourt")`, elapsed = 10s | possession ends |
+| Foul | `Continue(ResolveFoulType)` | Roll D |
+| Jump ball | `Continue(ResolveJumpBall)` | jump-ball node |
 
-**Why the violation is the only terminal.** A shot-clock violation is invariant:
-no shot, the full clock off, never any more or less. There is no path variance to
-simulate on the way to it, so collapsing it into a single terminal at entry is
-strictly cheaper and loses nothing — and it is why its elapsed time can be
-stamped on the result with no time roll.
+**Three violation terminals, three fixed elapsed times.** All three violations are
+zero-variance: the violation simply *is* the outcome, nothing remains to resolve,
+so each stamps its own invariant elapsed time with no time roll. They differ only
+in how much clock burned:
+- Shot-clock (30s) — never got a shot off in the full backcourt+frontcourt window.
+- 10-second backcourt (10s) — inbounded, but never cleared the division line; the
+  count ran before the whistle.
+- 5-second inbound (0s) — the entry pass never came in, so the clock never started.
+
+A backcourt *turnover* (bad pass out of bounds, stepping on the division line) is
+NOT a new slice: it rides the existing `Turnover → ResolveTurnoverType` path and
+Roll C classifies it by ball-state as it does any other turnover.
 
 **Why foul and jump ball are continues, not terminals.** Both have real variance
-in what they become. A foul still needs its type decided (defensive non-shooting
-vs. offensive) and what that triggers. A jump ball needs the possession arrow
-consulted. Roll A only classifies that the outcome occurred and hands off; the
-downstream resolver does the deciding.
+in what they become. A foul still needs its type decided (Roll D). A jump ball
+needs the possession arrow consulted. Roll A only classifies that the outcome
+occurred and hands off; the resolver does the deciding.
 
-**The pie generator is stubbed.** `StubPieGenerator` returns the configured base
-weights with one live wire: a single 0–1 `pressure` scalar nudges the turnover
-slice (then renormalizes). Placeholder to prove the seam carries signal — not
-basketball logic.
+**The pie generator is stubbed.** `StubPieGenerator` (in `StubPieGenerator.cs`;
+its config is `RollAConfig`, which lives in the misleadingly-named `Config.cs`)
+returns the configured base weights with one live wire: a single 0–1 `pressure`
+scalar nudges the turnover slice, then renormalizes. Placeholder to prove the seam
+carries signal — not basketball logic.
 
 ---
 
@@ -325,16 +416,18 @@ basketball logic.
 set. A pure gate: decides whether the possession advances to player selection or
 is interrupted by a foul or dead-ball turnover before any action occurs.
 
-**Pie shape:** three slices over `HalfcourtOutcome` — `Proceed`, `Foul`,
-`DeadBallTurnover`. (Stub weights today; see below.)
+**Pie shape:** four slices over `HalfcourtOutcome` — `Proceed`, `Foul`,
+`DeadBallTurnover`, `JumpBall`. (Stub weights today; see below. The `JumpBall`
+sliver, 0.005, was carved out of `Proceed` in Session 9.)
 
-**Three exits:**
+**Four exits:**
 
 | Outcome | Result | Routes to |
 |---|---|---|
-| Proceed | `Continue(IntoPlayerSelection)` | player-selection roll *(stub)* |
-| Foul | `Continue(ResolveFoulType)` | foul-type resolver *(stub)* |
-| Dead-ball turnover | `Continue(ResolveTurnoverType)` | turnover-type resolver *(stub)* |
+| Proceed | `Continue(IntoPlayerSelection)` | player-selection roll (Roll E, live) |
+| Foul | `Continue(ResolveFoulType)` | foul-type resolver (Roll D, live) |
+| Dead-ball turnover | `Continue(ResolveTurnoverType)` | turnover-type resolver (Roll C, live) |
+| Jump ball | `Continue(ResolveJumpBall)` | jump-ball node (live) |
 
 **No terminal.** Roll B has no terminal outcome. Every result is a continue
 because every outcome here has downstream variance to resolve. The possession
@@ -574,10 +667,10 @@ name no successor — and the extra argument is just the state the roll must tou
 
 **Integration: execute-and-loop, like C and D.** The resolver executes Roll E
 inside the `IntoPlayerSelection` case and feeds the returned `Continue` back
-through its loop, which re-routes it by its `IntoPlayerAction` kind to the
-player-action stub. The retired `PlayerSelectionStub` is dropped; `Proceed` still
+through its loop, which re-routes it by its `IntoPlayerAction` kind to Roll F (live
+as of Session 9). The retired `PlayerSelectionStub` is dropped; `Proceed` still
 emits the same `IntoPlayerSelection` kind — only its destination moved from a stub
-to a real roll. The new dead-end is `PlayerActionStub`.
+to a real roll.
 
 **Why the next kind is `IntoPlayerAction`.** What follows selection is whatever
 happens *to* the selected player — a shot attempt, a turnover, a drawn foul — not
@@ -593,14 +686,138 @@ section of `config.json`, loaded by `RollEConfig` — written as five explicit 0
 values (not a computed uniform), so the weights are visible and tunable and a
 future generator overwrites numbers rather than flipping a mode.
 
+---
+
+## Roll F — Player Action
+
+**Simulates:** the beat right after a player (slot) is selected — what the selected
+player's action BECOMES. A pure GATE, structurally a clone of Roll B: no terminal,
+every outcome a continue, because each one has downstream work.
+
+**Pie shape:** five slices over `PlayerActionOutcome` — `ShotAttempt`, `Turnover`,
+`NonShootingFoul`, `Blocked`, `JumpBall`. Placeholder weights this session
+(0.82 / 0.09 / 0.05 / 0.035 / 0.005).
+
+**Five exits:**
+
+| Outcome | Result | Routes to |
+|---|---|---|
+| Shot attempt | `Continue(IntoShotType)` | shot-type node *(stub — future Roll G)* |
+| Turnover | `Continue(ResolveTurnoverType)` | turnover-type resolver (Roll C, live) |
+| Non-shooting foul | `Continue(ResolveFoulType)` | foul-type resolver (Roll D, live) |
+| Blocked | `Continue(ResolveBlock)` | block-recovery node *(stub)* |
+| Jump ball | `Continue(ResolveJumpBall)` | jump-ball node (live) |
+
+**No terminal.** Like Roll B, every outcome continues. A shot attempt proceeds
+deeper into the shot sequence; the other four route to shared sinks or stubs.
+
+**Three feeders into existing nodes, two new pipes.** Turnover, foul, and jump ball
+reuse the exact kinds A and B already emit — Roll F becomes the third feeder into
+C, D, and the jump-ball node *for free*. This is the "many feeders, one node"
+payoff at its clearest: no new turnover roll, no new foul roll, just a third arrow
+into each. Only `Blocked` and `ShotAttempt` open new pipes (`ResolveBlock`,
+`IntoShotType`), because they have genuinely new downstream work.
+
+**Takes `(state, pie, rng)` — no `GameState`.** A flat gate reads nothing and
+mutates nothing. Unlike Roll D (which charges a team foul) or Roll E (which reads
+the lineup), Roll F touches no game state. The jump-ball arrow flip happens in the
+jump-ball node; the team-foul charge happens in Roll D. Roll F only classifies the
+action and emits a kind. It also stamps NOTHING on `PossessionState` — Roll E's
+`SelectedSlot` rides forward untouched; the future Roll G adds `ShotType`.
+
+**Why the shooting foul is NOT here.** `NonShootingFoul` is non-shooting by
+construction: no shot is up yet at this beat, so it fits Roll D's existing pre-shot
+definition exactly. The shooting foul (fouled in the act, and-1, free throws) is a
+deliberately SEPARATE home in the future make/miss roll (Roll H) — kept apart on
+purpose, because it resolves against a shot that has already gone up.
+
+**Why the 10-second backcourt violation can't appear here.** A Roll F turnover
+routes to Roll C, whose five slices do not include the 10-second/shot-clock
+backcourt violations — those are Roll A *terminals*, not Roll C slices. So the
+physically nonsensical "backcourt count in the halfcourt" is excluded by routing,
+for free, with no suppression logic.
+
+**The pie generator is stubbed, with NO live wire (like Roll E).** The only thing
+that tilts Roll F's pie is the deferred player/attribute model (handle, defender
+length/hands, rim protection, shot selection), and Roll F sits one inch from it. A
+placeholder wire would pantomime the exact signal being deferred. Worse, a signal
+like defensive pressure is really a possession-level INPUT Roll F is only one
+reader of (it also pushes shot quality on the back end if pressure fails) — wiring
+it into F alone would bake in the wrong ownership. So, like Roll D's flavor and
+Roll E's selection, the generator takes no signal argument; the real generator
+drops in later through the same seam.
+
+**Context-shifted turnover odds (DESIGNED, not built).** A halfcourt turnover
+(from Roll F) should classify differently than a backcourt entry turnover (from
+Roll A) — more live strips, more offensive fouls. That belongs in **Roll C's
+generator**, not in Roll C or Roll F: one classification ROLL, many context-shaped
+PIES. The provenance is likely already free on `PossessionState` (`SelectedSlot`
+null before Roll E, set after), so no new plumbing is needed when this is built.
+Deferred — attribute-model-adjacent.
+
+**Config lives separately.** Roll F's five weights live in the `"RollF"` section of
+`config.json`, loaded by `RollFConfig`.
+
 | Roll | Name | Status |
 |---|---|---|
 | A | Entry — Inbounds (Dead Ball) | Built (stubbed generator + stubbed successors) |
-| B | Halfcourt Initiation | Built (stubbed generator + stubbed successors) |
+| B | Halfcourt Initiation | Built (stubbed generator; jump-ball slice added S9) |
 | C | Turnover Classification | Built (stubbed generator; terminal — no successors) |
 | D | Non-Shooting Defensive Foul | Built (stubbed flavor generator + stubbed successors) |
-| E | Player Selection | Built (flat stubbed generator + stubbed successor) |
-| — | Jump ball (arrow node) | Built (50/50 tip placeholder; arrow complete) |
+| E | Player Selection | Built (flat stubbed generator; feeds Roll F) |
+| F | Player Action | Built (flat-ish stubbed generator, no wire; 2 live nodes + 2 stubs) |
+| — | Jump ball (arrow node) | Built (50/50 tip placeholder; fed by A, B, F) |
+
+## The Game Governor — the possession-to-possession layer (DESIGNED, not built)
+
+The engine resolves ONE possession (the Resolver) but has no layer above it: the
+ball never changes teams, no second possession ever begins, and the
+possessions-as-accounting-unit anchor (~67–70/team, ~1.0 PPP) is therefore not even
+measurable. The Game Governor is the layer that turns "resolve a possession" into
+"play a game." DESIGNED this session; built LAST — only once the possession engine
+terminates on every path (see "The funnel principle" below). The Governor governs a
+finished funnel; until every possession reaches a real ending there is nothing to
+govern, so it is deliberately deferred behind the rest of the roll web.
+
+**Two routing layers, kept distinct.** WITHIN a possession, routing is unchanged:
+roll → continuation kind → Resolver → next roll. BETWEEN possessions is the new
+layer: a roll produces a TERMINAL → the Governor records it → the Governor begins
+the NEXT possession by handing a fresh `PossessionState` (new offense + start-state)
+to the Resolver. The Governor never picks a roll; it picks the next possession's
+STARTING CONDITIONS and drops them at the top of the chain. It never reaches inside
+a possession.
+
+**Terminals carry their consequence; the Governor stays dumb.** What a terminal
+MEANS for the next possession (who gets the ball, dead vs. live start, points
+scored) lives where it is generated — the same philosophy as "a roll names its
+continuation kind, the Resolver maps it." The Governor reads the stamped
+consequence and executes it; it does not inspect reason strings and decide. (The
+exact attachment mechanism — stamp every terminal vs. a gap-filling interpreter for
+legacy terminals — is the central question for the build session.)
+
+**Default flip, override on the consequence.** Most terminals flip the ball to the
+other team. The OFFENSIVE REBOUND is the exception: same team, and it does NOT
+increment the possession count — it is a continuation, which is what preserves the
+~67–70 anchor. No rebound roll exists yet, so this is a stub branch, but the loop
+is SHAPED from day one to allow "same team, possession continues," because
+retrofitting that later is painful.
+
+**Owns: loop, whose-ball, clock, score, possession count.** The clock and score are
+STUBBED-but-real-shaped at first: the Governor writes score (0 until the make/miss
+roll exists) and drains a flat placeholder time per possession toward 40 minutes
+(until the real time roll exists). The write paths and fields are real; the values
+snap in later without reopening the Governor. The stopping rule starts as a config'd
+possession cap, not a real clock.
+
+**Start-state is an enum** (`DeadBallInbound`, `Transition`, …), so the Governor can
+eventually route to different entry variants. Roll A is the `DeadBallInbound` entry;
+a transition-entry roll is future. (`EntryType` and this enum may be the same
+concept — reconcile, don't carry both.) This is also the home for the deferred
+jump-ball retain/turnover branch: the jump-ball terminal's consequence carries the
+arrow-award result, and once the Governor exists the defense-retains case (new
+possession from Roll A) becomes buildable.
+
+---
 
 ## Known required infrastructure (not yet built)
 
@@ -625,10 +842,12 @@ future generator overwrites numbers rather than flipping a mode.
   offensive slot the possession runs through and stamps it on `PossessionState`.
   Roll B's `Proceed` exit lands here. Flat odds for now; the attribute model tilts
   them later via a smarter generator.
-- **Player-action sequence** — where Roll E's selection lands: the shot-creation /
-  shot-quality / make-miss / rebound / shooting-foul rolls that resolve what
-  happens TO the selected player. Currently the `PlayerActionStub` dead-end; the
-  next frontier. Consumes `PossessionState.SelectedSlot`.
+- **Player-action sequence** — where Roll E's selection lands. The gate (Roll F,
+  BUILT S9) resolves the action into shot attempt / turnover / non-shooting foul /
+  block / held ball. Still ahead: the shot-creation / shot-quality / make-miss /
+  rebound / shooting-foul rolls beyond it. The chain now dead-ends at the
+  `IntoShotType` and `ResolveBlock` stubs — the next frontier. Roll F consumes
+  `PossessionState.SelectedSlot` only indirectly (it rides forward untouched).
 - **Player/steal attribution layer** — runs over outcomes whenever a counting
   stat is generated; assigns the offensive turnover and (on live-ball slices) the
   defensive steal to specific players. Orthogonal to the possession chain; reads,

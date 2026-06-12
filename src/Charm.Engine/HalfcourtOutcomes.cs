@@ -18,4 +18,11 @@ public enum HalfcourtOutcome
     /// <summary>A dead-ball turnover in the frontcourt (held ball, violation,
     /// etc.) before any action. -> CONTINUE (to turnover-type resolver).</summary>
     DeadBallTurnover,
+
+    /// <summary>A tie-up / held ball while the offense is initiating (ball being
+    /// worked/advanced into the set). -> CONTINUE (to the jump-ball node, which
+    /// consults the possession arrow). A held ball is reachable from every
+    /// live-ball action beat; this mirrors Roll A's and Roll F's jump-ball slice
+    /// — "many feeders, one node." A small sliver.</summary>
+    JumpBall,
 }

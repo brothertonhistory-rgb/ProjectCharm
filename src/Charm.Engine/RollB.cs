@@ -3,7 +3,8 @@ namespace Charm.Engine;
 /// <summary>
 /// Roll B — Halfcourt Initiation. The first beat after the offense is cleanly
 /// into its halfcourt set. Decides whether the possession advances to player
-/// selection or is interrupted by a foul or dead-ball turnover.
+/// selection or is interrupted by a foul, a dead-ball turnover, or a held ball
+/// before any action.
 ///
 /// Follows the uniform roll contract: receives state + a finished pie, rolls
 /// against it, returns one typed result, names no successor.
@@ -27,6 +28,10 @@ public static class RollB
             // Dead-ball turnover in the frontcourt — hand off to turnover-type resolver.
             HalfcourtOutcome.DeadBallTurnover =>
                 new Continue(ContinuationKind.ResolveTurnoverType, state),
+
+            // Held ball while initiating — hand off to the jump-ball node (arrow).
+            HalfcourtOutcome.JumpBall =>
+                new Continue(ContinuationKind.ResolveJumpBall, state),
 
             _ => throw new InvalidOperationException($"Unhandled halfcourt outcome '{outcome}'.")
         };

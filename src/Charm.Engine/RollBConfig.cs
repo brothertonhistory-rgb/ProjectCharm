@@ -9,10 +9,12 @@ namespace Charm.Engine;
 public sealed class RollBConfig
 {
     // --- Stub pie base weights (placeholders; the real attribute-driven
-    //     generator will replace these). Kept summing to 1 for clarity. ---
-    public double BaseProceed { get; set; } = 0.85;
+    //     generator will replace these). Kept summing to 1 for clarity. The
+    //     jump-ball sliver is carved out of Proceed (0.85 -> 0.845). ---
+    public double BaseProceed { get; set; } = 0.845;
     public double BaseFoul { get; set; } = 0.12;
     public double BaseDeadBallTurnover { get; set; } = 0.03;
+    public double BaseJumpBall { get; set; } = 0.005;
 
     /// <summary>The single live wire proving the seam carries signal: how much
     /// a physicality of 1.0 adds to the foul weight before renormalization.
