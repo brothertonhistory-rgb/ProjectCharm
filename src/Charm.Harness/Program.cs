@@ -22,6 +22,7 @@ internal static class Program
         var cfgM = RollMConfig.Load(configPath);
         var cfgOffFoul = RollOffensiveFoulConfig.Load(configPath);
         var cfgGov = GovernorConfig.Load(configPath);
+        var cfgClock = RollClockConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
@@ -108,7 +109,7 @@ internal static class Program
         ok &= OffensiveReboundConvergenceCheck(cfg, state);
         ok &= RollCContextCheck(cfg, cfgC, rollCGenerator, state);
         ok &= RollCExpansionCheck(cfg, cfgC, rollCGenerator, state);
-        ok &= GovernorLoopCheck(cfg, cfgD, cfgGov);
+        ok &= GovernorLoopCheck(cfg, cfgD, cfgGov, cfgClock);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -2137,9 +2138,9 @@ internal static class Program
     // through ONE default-consequence path (keyed only on "no terminal"), so the
     // Session-14 "only handled one landing" bug class cannot recur — the per-stub
     // breakdown is observability, never routing.
-    private static bool GovernorLoopCheck(RollAConfig cfg, RollDConfig cfgD, GovernorConfig cfgGov)
+    private static bool GovernorLoopCheck(RollAConfig cfg, RollDConfig cfgD, GovernorConfig cfgGov, RollClockConfig cfgClock)
     {
-        Console.WriteLine($"\n--- Governor loop: {cfgGov.PossessionCap:N0} possessions back-to-back ---");
+        Console.WriteLine($"\n--- Governor loop: two {cfgGov.HalfSeconds:N0}s halves ---");
 
         var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
         var cfgB = RollBConfig.Load(configPath);
@@ -2175,7 +2176,7 @@ internal static class Program
             new SidelineInboundStub(),
             new TransitionStub());
 
-        var governor = new Governor(resolver, game, cfgGov);
+        var governor = new Governor(resolver, game, cfgGov, cfgClock, new SystemRng(cfg.Seed + 1));
 
         // --- Seed the cross-possession state so persistence is DETERMINISTIC. ---
         // Arrow: turn it ON (Home) before the loop. It is never Off thereafter (no OT
@@ -2204,12 +2205,9 @@ internal static class Program
         var records = result.Possessions;
 
         // --- Invariant checks. ---
-        var countOk = records.Count == cfgGov.PossessionCap;
-
         // The load-bearing one: zero possessions lost. A dropped park is exactly how
-        // the count would silently leak.
-        var noLostOk = result.TerminalEnded + result.Parked == cfgGov.PossessionCap
-                       && records.Count == cfgGov.PossessionCap;
+        // the count would silently leak. Possession count is now clock-driven (no fixed cap).
+        var noLostOk = result.TerminalEnded + result.Parked == records.Count;
 
         // Contiguous numbers 1..N, and offense/defense flips that match each
         // possession's APPLIED consequence (proving the Governor spawned from it).
@@ -2287,8 +2285,8 @@ internal static class Program
         // --- Report. ---
         Console.WriteLine(
             $"  resolved={records.Count:N0} | terminal-ended={result.TerminalEnded:N0} | parked={result.Parked:N0} " +
-            $"| terminal+parked==cap -> {(noLostOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  possession numbers contiguous 1..{cfgGov.PossessionCap} -> {(contiguousOk ? "ok" : "FAIL")}");
+            $"| terminal+parked==total -> {(noLostOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  possession numbers contiguous 1..{records.Count} -> {(contiguousOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  offense/defense flips match applied consequence -> {(flipsOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  first possession = Home, DeadBallInbound -> {(firstOk ? "ok" : "FAIL")}");
         Console.WriteLine(
@@ -2304,7 +2302,48 @@ internal static class Program
         Console.WriteLine(
             $"  steal -> Roll J: possessions entering J={stealIntoJ:N0} (live turnovers now feed Roll J; " +
             $"observability — rigorous proof is RollJStealBatchCheck)");
-        Console.WriteLine($"  flat placeholder time accumulated: {result.TotalSeconds:N0}s (observability only)");
+        // Clock checks.
+        var half1Seconds = records.Where(r => r.Half == 1).Sum(r => r.Elapsed);
+        var half2Seconds = records.Where(r => r.Half == 2).Sum(r => r.Elapsed);
+        var drainOk = Math.Abs(half1Seconds - cfgGov.HalfSeconds) < 0.01
+                   && Math.Abs(half2Seconds - cfgGov.HalfSeconds) < 0.01;
+        Console.WriteLine(
+            $"  half 1: {half1Seconds:N0}s / half 2: {half2Seconds:N0}s " +
+            $"| each drains to {cfgGov.HalfSeconds:N0} -> {(drainOk ? "ok" : "FAIL")}");
+
+        var apl = result.TotalSeconds / records.Count;
+        var aplOk = apl >= 14.0 && apl <= 21.0;
+        var countInBand = records.Count >= 100 && records.Count <= 220;
+        Console.WriteLine(
+            $"  possessions={records.Count:N0} (~{records.Count / 2:N0} per half) " +
+            $"| realized APL={apl:F1}s -> {((aplOk && countInBand) ? "ok" : "FAIL")}");
+
+        // Tempo histogram — the tuning instrument and truncation proof.
+        // 100k samples of ClockDraw directly (not from the game run) with a fresh rng.
+        var histRng = new SystemRng(cfg.Seed);
+        var bins = new int[6]; // [0,5) [5,10) [10,15) [15,20) [20,25) [25,30)
+        var truncationOk = true;
+        double histMin = double.MaxValue, histMax = double.MinValue;
+        for (var s = 0; s < 100_000; s++)
+        {
+            var t = ClockDraw.Sample(histRng, cfgClock.Center, cfgClock.StdDev, cfgClock.Floor, cfgClock.FullClockSeconds);
+            if (t < cfgClock.Floor || t >= cfgClock.FullClockSeconds) truncationOk = false;
+            if (t < histMin) histMin = t;
+            if (t > histMax) histMax = t;
+            var bin = Math.Min((int)(t / 5.0), bins.Length - 1);
+            bins[bin]++;
+        }
+        Console.WriteLine(
+            $"  tempo histogram (100k samples, center={cfgClock.Center} sd={cfgClock.StdDev} " +
+            $"floor={cfgClock.Floor} ceiling<{cfgClock.FullClockSeconds}):");
+        string[] binLabels = ["[0,5)", "[5,10)", "[10,15)", "[15,20)", "[20,25)", "[25,30)"];
+        for (var b = 0; b < bins.Length; b++)
+            Console.WriteLine($"    {binLabels[b]}: {bins[b]:N0}");
+        Console.WriteLine(
+            $"  min={histMin:F2} / max={histMax:F2} " +
+            $"| truncation holds (>= floor, < ceiling) -> {(truncationOk ? "ok" : "FAIL")}");
+
+        var clockOk = drainOk && aplOk && countInBand && truncationOk;
 
         // Score: FG-rule deterministic check (no RNG), then accumulation integrity.
         var fgRuleOk = Scoring.FieldGoalPoints(ShotLocation.Three) == 3
@@ -2341,8 +2380,9 @@ internal static class Program
                 $"end={r.EndLabel,-34} -> next={applied}");
         }
 
-        var allOk = countOk && noLostOk && contiguousOk && flipsOk && firstOk
-                    && arrowOk && foulOk && lineupOk && rollJOk && scoreOk && fgRuleOk;
+        var allOk = noLostOk && contiguousOk && flipsOk && firstOk
+                    && arrowOk && foulOk && lineupOk && rollJOk && scoreOk && fgRuleOk
+                    && clockOk;
         Console.WriteLine($"  Governor loop: {(allOk ? "ok" : "FAIL")}");
         return allOk;
     }

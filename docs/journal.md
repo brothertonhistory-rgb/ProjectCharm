@@ -1,3 +1,120 @@
+## Session 29 — Game clock: possessions draw elapsed per shot-clock period; Governor counts down two halves (2026-06-13)
+
+**The first session that puts real time on the board.** The Governor previously drained a flat 18s
+placeholder per possession and stopped at a fixed 200-possession cap — a marked seam, exactly like
+`score = 0` in Session 28. This session fills it with real machinery: each possession's duration is a
+draw from a truncated normal, the resolver counts how many shot-clock periods a possession used, and
+the Governor counts that time **down** from two 20-minute halves until the clock runs out.
+
+**Confirmation mode, not rediscovery (CONVENTIONS §0/§6c).** The prompt carried a fully verified §6c
+map; the pull confirmed every anchor against the committed tree with zero drift. Session 28 preconditions
+verified first (Scoring.cs exists; `public int Points` present in Resolver.cs). All §6c anchors confirmed:
+`public int Points { get; init; }` in `RoutingOutcome`; `var points = 0;` in `Route`; the single
+`case ContinuationKind.ResolveOffensiveRebound:` site; all three `return new RoutingOutcome` forms;
+`SecondsPerPossession` in GovernorConfig; the Governor ctor and `for` loop; both `totalSeconds +=` lines;
+the `PossessionRecord` tail; and the GovernorLoopCheck call sites. No drift. No design questions — all locked.
+
+**The load-bearing architectural decision: the draw lives in the Governor, not the resolver.**
+The resolver's walk **counts** shot-clock periods and surfaces the count on `RoutingOutcome.ShotClockPeriods`
+— a fourth walk tally of the exact `Points` / `FreeThrowSpins` shape (init-only `int`, 0 default, pure
+append; every existing construction untouched). The **Governor** owns the actual time draw because it
+already owns the time accumulation and the stop rule; the countdown and the per-period sampling belong
+there. This keeps the resolver's 8 constructor sites untouched (no new dependency on the resolver).
+The walk must supply the count because the Governor cannot see how many 20-second reset periods a
+possession used — offensive rebounds happen inside the walk and the Governor never sees them.
+
+**The new continuous primitive: `Core/ClockDraw.cs`.** The engine's first non-pie roll: a truncated
+normal. Box-Muller turns two uniform draws into one standard normal; reject-and-resample keeps the result
+inside `[floor, ceiling)` — ceiling is **exclusive** so a fast team's tail thins smoothly through 28s and
+29s and nothing piles at exactly 30 (exact-30 is owned by the shot-clock-violation terminal, its own
+invariant `ElapsedSeconds`). The fallback after 100 attempts clamps to center — a guard so a pathological
+config can never spin forever. Follows the `JumpBall.cs` / `Scoring.cs` static-helper house style.
+
+**The tempo config: `Config/RollClockConfig.cs`.** Every tempo number lives here, nothing hardcoded.
+Mirrors `GovernorConfig.cs`'s `JsonDocument` → `GetProperty("Clock")` → `JsonSerializer.Deserialize`
+pattern exactly. Five properties with defaults: `Center = 17.0`, `StdDev = 4.5`, `Floor = 4.0`,
+`FullClockSeconds = 30.0`, `ResetClockSeconds = 20.0`. These are starting knobs, not calibrated values.
+Realized APL runs a touch above `Center` because offensive-rebound reset periods add time to ~12% of
+possessions; Emmett tunes `Center` down by watching the harness histogram. The **future coach pace (1–10)
+attribute** shifts the center passed to `ClockDraw.Sample` — no engine change at that point.
+
+**Resolver edits (the ONLY resolver change): the period counter.**
+- `var shotClockPeriods = 1;` beside the other `Route` inits (period 1 = the fresh 30s clock the
+  possession opens on).
+- `shotClockPeriods++;` as the first statement of `case ContinuationKind.ResolveOffensiveRebound:` —
+  every offensive rebound resets the clock to 20 and starts a new period, and that case is hit exactly
+  once per offensive rebound (Roll I's `OffensiveRebound` arm → `Continue(ResolveOffensiveRebound)` → Roll
+  K). Outcome-blind: the period counts whether Roll K puts it back, resets the offense, or turns it over.
+- All three `return new RoutingOutcome` calls gained `, ShotClockPeriods = shotClockPeriods`. No pie,
+  no route, no rate changed. Confirmed exactly 3 returns before editing.
+
+**Governor edits: the clock-driven countdown.**
+- `GovernorConfig` overhauled: `SecondsPerPossession` **removed** (retired completely — stale-ref
+  sweep confirmed zero references remain after the edits). Added `int Halves = 2` and
+  `double HalfSeconds = 1200.0`. `PossessionCap` bumped to 400 and repurposed as a safety ceiling
+  (the clock is the real stop rule; the guard exists so a game that somehow never drains the clock
+  throws rather than spinning).
+- `PossessionRecord` gained trailing `double Elapsed` and `int Half` params (with `<param>` docs in the
+  established voice).
+- Governor ctor gained `RollClockConfig clock` and `IRng rng` (stored as `_clock`, `_rng`). The harness
+  passes a **separate seeded** `SystemRng(cfg.Seed + 1)` so the resolver's existing draw stream is
+  untouched and every other check stays byte-for-byte identical.
+- `Run` replaced the `for (var p = 0; ...)` cap loop with a `while (half <= _cfg.Halves)` countdown.
+  State: `half = 1`, `halfRemaining = _cfg.HalfSeconds`, `guard = 0`. The guard increments each
+  iteration and throws at `PossessionCap` — the clock-not-draining tripwire.
+- Per possession: compute `rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(...)`.
+  Invariant terminals (shot-clock violation 30s, backcourt 10s, five-second inbound 0s) use their real
+  value; everything else draws. Cap at the half boundary: `applied = Math.Min(rawElapsed, halfRemaining)`;
+  `halfRemaining -= applied; totalSeconds += applied` — so each half sums to **exactly** `HalfSeconds`.
+  After spawning the next state: `if (halfRemaining <= 0.0) { half++; halfRemaining = _cfg.HalfSeconds; }`.
+  Only the clock resets at the half — fouls and arrow carry (no halftime foul reset this session,
+  matching the existing persistence checks).
+- New private `DrawPossessionSeconds(int shotClockPeriods)`: period 1 draws from `(Center, StdDev, Floor,
+  FullClockSeconds)`; each subsequent period (per offensive rebound) draws from the 20s distribution with
+  center and sd scaled by `ResetClockSeconds / FullClockSeconds` (≈ 0.667), floor unchanged. The
+  `Math.Max(1, periods)` guard handles the 0-default defensively.
+
+**Harness changes.** `RollClockConfig.Load` added to `Main` and threaded to `GovernorLoopCheck`. The
+check's title updated ("two 1,200s halves"), `countOk` removed (clock-driven, no fixed cap), `noLostOk`
+simplified to `terminal + parked == records.Count`. New clock block: per-half drain check (exact to
+0.01s); realized APL assertion `[14, 21]`; possession-count band `[100, 220]`; a 100k-sample tempo
+histogram (5-second bins) with truncation proof (every sample `>= Floor` and `< FullClockSeconds`).
+All are folded into `clockOk` which joins the `allOk` aggregation. Prior rate/routing/score checks
+unchanged — timing adds time to each possession but touches no pie, no route, no rate.
+
+**Validation (CONVENTIONS §2).** Python Monte Carlo mirrored `ClockDraw.Sample` (Box-Muller +
+reject-resample, center=17, sd=4.5, floor=4, ceiling<30) over 100k samples: mean=17.01, every sample
+in [4, 30), truncation holds, histogram peaks in [15,20) with visible 5–10s and 25–30s tails. Multi-period
+check: 2-period mean (28.4s) > 1-period mean (17.0s) as expected. Half-drain simulation: avg game secs
+= 2400.0 (exact), avg possessions ~133, APL ~18.0s (in [14,21]). Brace balance ok across all 7 touched
+files. Stale-ref sweep: `SecondsPerPossession` appears zero times in any file after edits.
+Harness run (Emmett's machine): **ALL CHECKS PASSED** on the first run. New clock lines read
+`half 1: 1,200s / half 2: 1,200s | each drains to 1,200 -> ok`, `possessions=135 (~67 per half) |
+realized APL=17.8s -> ok`, histogram peaking in [15,20) with thin 5–10s and 25–30s tails, and
+`min=4.01 / max=30.00 | truncation holds -> ok`. Prior `score:` and `FG rule` lines still ok.
+
+**Note on `max=30.00` in the harness output.** The histogram prints `max=30.00` with `:F2` formatting,
+but the truncation assertion passed — no sample actually reached 30.0. The `:F2` format rounds 29.998
+(the highest observed value) to 30.00. Nothing piles at 30; the ceiling-exclusive contract holds.
+
+**What stays out.** No end-of-half hold-for-last-shot behavior (capped and resolved normally). No
+late-game tactics. No per-outcome time shaping (all outcomes draw from the same distribution). No halftime
+team-foul reset (fouls carry continuously, matching the existing persistence check). No tempo calibration
+or coach pace attribute. No new pie, `ContinuationKind`, or roll-signature changes — rolls A–M and every
+generator are untouched.
+
+**Deferrals (carried).**
+- **End-of-half hold-for-last-shot** — the NEXT session. When a possession starts with < 30s left, the
+  offense mostly drains the clock and shoots last; this session just caps. The probabilistic intent branch
+  gates on `halfRemaining` in the Governor.
+- **Per-outcome time shaping** — turnovers reading shorter than makes, etc. Deferred (creep risk).
+- **Halftime team-foul reset** — real basketball resets at the half; this session's fouls stay
+  continuous. When added, it reworks the foul-monotonic check.
+- **Tempo calibration + coach pace (1–10) attribute** — `Center` is tuned down to hit a target blended
+  APL; the pace attribute later shifts `Center` per team. No engine change at that point.
+- **Shot-clock-violation-after-offensive-rebound elapsed** — the violation invariant is a flat 30s
+  regardless of which clock it occurred on; a violation on a 20s reset is vanishingly rare and left at 30.
+
 ## Session 28 — Scoring: the Governor accumulates real points (2026-06-13)
 
 **The first session that puts real numbers on the board.** The Governor already ran an N-possession

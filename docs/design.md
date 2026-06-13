@@ -2098,3 +2098,67 @@ wrong accumulator and fails the match. It also asserts the total matches and tha
 signature; rolls C/H/K/L and every generator are untouched. The only engine files that changed are
 `Resolver.cs`, `Governor.cs`, and the new `Core/Scoring.cs`. Realistic scorelines and per-player point
 attribution are both deferred — the machinery reports whatever the pies produce and credits the team.
+
+---
+
+## Session 29 — The game clock: possessions draw elapsed per shot-clock period; Governor counts down two halves
+
+**The clock model.** A possession's elapsed time is the sum of its **shot-clock periods**. The first
+period runs the full 30-second clock; each offensive rebound that keeps the possession alive resets the
+clock to 20 and starts a new period. Each period's duration is an **outcome-blind truncated-normal draw**
+— centered by pace (a config stub today), bounded by `[floor, ceiling)`, where the exclusive ceiling is
+what produces the natural skew (a fast center keeps its tail toward the cap; a slow center gets its tail
+clipped and leans short). Two things override the draw: a terminal that already carries an **invariant
+`ElapsedSeconds`** (shot-clock violation = 30s, backcourt = 10s, five-second inbound = 0s), and
+**free throws, which draw 0** (the FT sequence is a clock-stopper; the live period up to the foul
+already drew its time). The Governor counts each possession's elapsed **down** from `HalfSeconds`
+(1200), runs two halves, and ends a half when the time is spent — the last possession's contribution
+is **capped** at the time remaining so each half sums exactly to 1200.
+
+**The architecture: draw lives in the Governor, count lives in the walk.**
+- The resolver's `Route` walk **counts** shot-clock periods: `var shotClockPeriods = 1;` at the top
+  (period 1 = the fresh 30s clock), incremented at every `case ContinuationKind.ResolveOffensiveRebound:`
+  (one per offensive rebound, hit exactly once each). The count rides out on the new
+  `RoutingOutcome.ShotClockPeriods` (fourth walk tally, same init-only `int`/0-default shape as `Points`).
+- The Governor owns the actual draw via `DrawPossessionSeconds(periods)`: period 1 from `(Center, StdDev,
+  Floor, FullClockSeconds)`, each reset period from the same distribution scaled by
+  `ResetClockSeconds / FullClockSeconds` (≈ 0.667). `RollClockConfig` and `IRng` are injected into the
+  Governor; the resolver's 8 construction sites are untouched.
+
+**Why the split keeps the resolver clean.** Injecting a clock config + rng into the resolver would
+touch all 8 harness constructor sites and create a new dependency for something the resolver does not
+need (it routes; it does not accumulate time). The Governor already owns the stop rule and the
+accumulation; the clock draw belongs there. The period count is the only piece the walk must supply
+because the Governor cannot see offensive rebounds from outside.
+
+**`Core/ClockDraw.cs` — the engine's first continuous roll.** A static helper implementing a truncated
+normal via Box-Muller + reject-resample. The ceiling is exclusive (`x < ceiling`, not `x <= ceiling`) so
+the upper tail thins smoothly and nothing piles at exactly the shot clock — the exact-clock case is the
+shot-clock-violation terminal (invariant 30s), not a draw. An attempt guard after 100 rejections falls
+back to the clamped center so no config can spin forever.
+
+**`Config/RollClockConfig.cs` — every tempo number in one editable place.**
+- `Center = 17.0` — the stub average for all teams; a future coach pace (1–10) attribute shifts this
+  per team, pushing the draw distribution left or right.
+- `StdDev = 4.5` — spread; controls how fat the tails are.
+- `Floor = 4.0` — minimum possession length (can't shoot in under a few seconds).
+- `FullClockSeconds = 30.0` — fresh shot-clock ceiling (exclusive).
+- `ResetClockSeconds = 20.0` — offensive-rebound reset ceiling.
+
+**`GovernorConfig` retired `SecondsPerPossession`; gained `Halves = 2`, `HalfSeconds = 1200.0`.**
+`PossessionCap` repurposed as a safety ceiling (default bumped to 400); the clock is the real stop rule.
+
+**`PossessionRecord` gains `double Elapsed` and `int Half`.** The harness uses these for the per-half
+drain check, realized APL, and the tempo histogram.
+
+**The tempo histogram is the tuning instrument.** The harness samples `ClockDraw` 100k times and prints
+5-second bin counts, min, and max. Emmett reads this to see the bell shape, verify both tails are
+present, tune `Center`/`StdDev`, and confirm the ceiling-exclusive contract (nothing at or past 30).
+
+**Future seams seated by this session.**
+- The coach pace (1–10) attribute plugs in at `RollClockConfig.Center` — no engine change, only the
+  center value shifts.
+- Per-outcome time shaping (turnovers shorter than makes) would go in `DrawPossessionSeconds` as a
+  context parameter, but is explicitly deferred (creep risk).
+- End-of-half hold-for-last-shot is the next clock session: a `halfRemaining < 30` branch in the
+  Governor that probabilistically drains and then resolves (or misses the shot) rather than just capping.

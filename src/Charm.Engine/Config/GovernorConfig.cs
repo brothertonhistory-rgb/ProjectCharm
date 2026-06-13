@@ -3,35 +3,25 @@ using System.Text.Json;
 namespace Charm.Engine;
 
 /// <summary>
-/// Every tunable number for the thin Governor lives here — nothing is hardcoded in
-/// logic. Loaded from the "Governor" section of config.json, exactly like the per-roll
-/// configs.
-///
-/// <para>Both values are PROVISIONAL guts of the thin Governor (see design.md's
-/// teardown contract):</para>
-/// <list type="bullet">
-///   <item><see cref="PossessionCap"/> is the stop rule — a flat possession count,
-///   NOT a real clock. The real stop condition (clock expiry, overtime) replaces it
-///   later.</item>
-///   <item><see cref="SecondsPerPossession"/> is a flat placeholder drained per
-///   possession for observability only. The real per-possession time comes from a
-///   future time roll; this number is the "score = 0" of the clock.</item>
-/// </list>
+/// Every tunable number for the Governor lives here — nothing is hardcoded in
+/// logic. Loaded from the "Governor" section of config.json, exactly like the
+/// per-roll configs.
 /// </summary>
 public sealed class GovernorConfig
 {
-    /// <summary>How many possessions the Governor plays before stopping. The thin
-    /// Governor's entire stop rule (a real clock is future work). A full college game
-    /// is roughly 130–145 possessions across both teams; 200 over-covers it so the
-    /// bonus is comfortably crossed mid-loop and the accumulation invariants are
-    /// exercised.</summary>
-    public int PossessionCap { get; set; } = 200;
+    /// <summary>Safety ceiling on the number of possessions per run. The clock is
+    /// the real stop rule; this guard exists so a game that somehow never drains the
+    /// clock throws rather than spinning forever. Should be well above any realistic
+    /// possession count (~130–145 for a full college game across both teams).</summary>
+    public int PossessionCap { get; set; } = 400;
 
-    /// <summary>Flat placeholder seconds drained per possession (observability only;
-    /// not written to any clock — there is no clock field yet). Where a terminal
-    /// already carries an invariant <c>ElapsedSeconds</c> (a shot-clock or backcourt
-    /// violation), that real value is used instead of this placeholder.</summary>
-    public double SecondsPerPossession { get; set; } = 18.0;
+    /// <summary>Number of halves per game. Two for a standard college game.</summary>
+    public int Halves { get; set; } = 2;
+
+    /// <summary>Length of each half in seconds. 1200 = 20 minutes × 60 seconds per
+    /// minute, matching NCAA regulation. The Governor counts each half down from this
+    /// value and moves to the next half when it reaches zero.</summary>
+    public double HalfSeconds { get; set; } = 1200.0;
 
     public static GovernorConfig Load(string path)
     {

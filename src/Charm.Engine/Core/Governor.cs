@@ -12,6 +12,10 @@ namespace Charm.Engine;
 /// <param name="Applied">The consequence used to spawn the NEXT possession (the
 /// terminal's own consequence, or the default flip on a park).</param>
 /// <param name="Points">Points scored on this possession (credited to <see cref="Offense"/>).</param>
+/// <param name="Elapsed">Seconds this possession actually drained from the half clock —
+/// the raw draw capped at the time remaining in the half, so the cap makes each half
+/// sum to exactly <see cref="GovernorConfig.HalfSeconds"/>.</param>
+/// <param name="Half">Which half this possession ran in (1 or 2).</param>
 public sealed record PossessionRecord(
     int Number,
     TeamSide Offense,
@@ -20,13 +24,18 @@ public sealed record PossessionRecord(
     bool EndedOnTerminal,
     string EndLabel,
     PossessionConsequence Applied,
-    int Points);
+    int Points,
+    double Elapsed,
+    int Half);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
 /// <param name="TerminalEnded">How many ended on a real terminal.</param>
 /// <param name="Parked">How many parked at a stub (and flipped on the default consequence).</param>
-/// <param name="TotalSeconds">Flat placeholder time accumulated (observability only).</param>
+/// <param name="TotalSeconds">Total game time drained in seconds — the sum of each possession's
+/// elapsed time (each capped at its half's remaining time). Equals
+/// <see cref="GovernorConfig.Halves"/> × <see cref="GovernorConfig.HalfSeconds"/> when the
+/// countdown completes normally.</param>
 /// <param name="PerStubParks">Per-stub park breakdown: stub destination -> count. This
 /// quantifies the FT / offensive-rebound / etc. volume still flowing through placeholder
 /// flips — the point of printing it.</param>
@@ -72,27 +81,32 @@ public sealed record GovernorRunResult(
 /// every possession. The Governor never resets or clobbers them; it reaches the score
 /// field to credit the offense with the resolver's tallied points each possession.</para>
 ///
-/// <para>PROVISIONAL (see design.md teardown contract): the flat clock, the
-/// possession-cap stop, the temp-route-all-to-Roll-A, and the
-/// parked→default-flip rule. PERMANENT: the loop shape — read the consequence off the
-/// terminal (or the default on a park) and spawn — which a real game layer swaps the
-/// guts behind without touching the seam.</para>
+/// <para>PROVISIONAL (see design.md teardown contract): the temp-route-all-to-Roll-A
+/// and the parked→default-flip rule. PERMANENT: the loop shape — read the consequence
+/// off the terminal (or the default on a park) and spawn — which a real game layer
+/// swaps the guts behind without touching the seam.</para>
 /// </summary>
 public sealed class Governor
 {
     private readonly Resolver _resolver;
     private readonly GameState _game;
     private readonly GovernorConfig _cfg;
+    private readonly RollClockConfig _clock;
+    private readonly IRng _rng;
 
-    public Governor(Resolver resolver, GameState game, GovernorConfig cfg)
+    public Governor(Resolver resolver, GameState game, GovernorConfig cfg, RollClockConfig clock, IRng rng)
     {
         _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         _game = game ?? throw new ArgumentNullException(nameof(game));
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _rng = rng ?? throw new ArgumentNullException(nameof(rng));
     }
 
-    /// <summary>Play <see cref="GovernorConfig.PossessionCap"/> possessions starting
-    /// from <paramref name="first"/>. Returns the full record for validation.</summary>
+    /// <summary>Run two halves against the clock, starting from <paramref name="first"/>.
+    /// Each possession draws its elapsed time from a truncated normal; the Governor counts
+    /// down from <see cref="GovernorConfig.HalfSeconds"/> per half and stops when both
+    /// halves are spent. Returns the full record for validation.</summary>
     public GovernorRunResult Run(PossessionState first)
     {
         var state = first;
@@ -101,9 +115,17 @@ public sealed class Governor
         var terminalEnded = 0;
         var parked = 0;
         var totalSeconds = 0.0;
+        var half = 1;
+        var halfRemaining = _cfg.HalfSeconds;
+        var guard = 0;
 
-        for (var p = 0; p < _cfg.PossessionCap; p++)
+        while (half <= _cfg.Halves)
         {
+            if (++guard > _cfg.PossessionCap)
+                throw new InvalidOperationException(
+                    $"Governor safety guard exceeded {_cfg.PossessionCap} possessions — the clock " +
+                    "is not draining (check HalfSeconds and possession-time config).");
+
             var outcome = _resolver.RunPossession(state);
 
             PossessionConsequence consequence;
@@ -117,12 +139,6 @@ public sealed class Governor
                 consequence = term.Consequence;
                 endLabel = term.Reason;
                 terminalEnded++;
-
-                // Time: a terminal that carries an invariant elapsed (shot-clock /
-                // backcourt violation) uses that real value; otherwise the flat
-                // placeholder. (FiveSecondInbound carries 0.0 — non-null — so it
-                // correctly contributes zero, not the placeholder.)
-                totalSeconds += term.ElapsedSeconds ?? _cfg.SecondsPerPossession;
             }
             else
             {
@@ -135,8 +151,17 @@ public sealed class Governor
                 parked++;
                 perStubParks[outcome.Destination] =
                     perStubParks.GetValueOrDefault(outcome.Destination) + 1;
-                totalSeconds += _cfg.SecondsPerPossession;
             }
+
+            // Time: a terminal that carries an invariant elapsed (shot-clock /
+            // backcourt violation) uses that real value; a parked possession has no
+            // terminal (EndedOn? is null) and draws. The cap makes each half sum to
+            // exactly HalfSeconds — a §2a "handle every branch" discipline: both the
+            // terminal and the parked path reach this single block.
+            var rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(outcome.ShotClockPeriods);
+            var applied = Math.Min(rawElapsed, halfRemaining);
+            halfRemaining -= applied;
+            totalSeconds += applied;
 
             // Score write: points scored on this possession's walk (made FG 2/3 + made
             // FTs), tallied by the resolver and surfaced on the outcome — the seam the
@@ -148,7 +173,7 @@ public sealed class Governor
 
             records.Add(new PossessionRecord(
                 state.PossessionNumber, state.Offense, state.Defense, state.Entry,
-                endedOnTerminal, endLabel, consequence, pointsThisPossession));
+                endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, half));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition
@@ -164,9 +189,32 @@ public sealed class Governor
                 Defense: Other(nextOffense),
                 Entry: consequence.NextEntry,
                 TransitionContext: consequence.TransitionContext);
+
+            // Half boundary: when this half's clock is spent, advance to the next half.
+            // Only the clock resets — fouls, arrow, and lineups carry (no halftime reset
+            // this session, matching the existing persistence checks).
+            if (halfRemaining <= 0.0)
+            {
+                half++;
+                halfRemaining = _cfg.HalfSeconds;
+            }
         }
 
         return new GovernorRunResult(records, terminalEnded, parked, totalSeconds, perStubParks);
+    }
+
+    /// <summary>Sum the truncated-normal draws for a possession's shot-clock periods:
+    /// period 1 on the full clock, each offensive-rebound reset on the 20s clock (center
+    /// and sd scaled to the shorter window). Outcome-blind — the draw never depends on how
+    /// a period ended; an invariant terminal (handled by the caller) overrides this.</summary>
+    private double DrawPossessionSeconds(int shotClockPeriods)
+    {
+        var periods = Math.Max(1, shotClockPeriods);
+        var seconds = ClockDraw.Sample(_rng, _clock.Center, _clock.StdDev, _clock.Floor, _clock.FullClockSeconds);
+        var resetScale = _clock.ResetClockSeconds / _clock.FullClockSeconds;
+        for (var p = 2; p <= periods; p++)
+            seconds += ClockDraw.Sample(_rng, _clock.Center * resetScale, _clock.StdDev * resetScale, _clock.Floor, _clock.ResetClockSeconds);
+        return seconds;
     }
 
     private static TeamSide Other(TeamSide side) =>

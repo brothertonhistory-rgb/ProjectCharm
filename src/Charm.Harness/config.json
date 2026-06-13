@@ -194,8 +194,9 @@
     "Epsilon": 1e-09
   },
   "Governor": {
-    "PossessionCap": 200,
-    "SecondsPerPossession": 18.0
+    "PossessionCap": 400,
+    "Halves": 2,
+    "HalfSeconds": 1200.0
   },
   "OffensiveFoulFlavor": {
     "FrontcourtCharge": 0.3,
@@ -205,5 +206,12 @@
     "BackcourtPushOff": 0.5,
     "BackcourtIllegalScreen": 0.1,
     "Epsilon": 1e-09
+  },
+  "Clock": {
+    "Center": 17.0,
+    "StdDev": 4.5,
+    "Floor": 4.0,
+    "FullClockSeconds": 30.0,
+    "ResetClockSeconds": 20.0
   }
 }

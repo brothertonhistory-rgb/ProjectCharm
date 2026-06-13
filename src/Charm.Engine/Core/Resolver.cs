@@ -52,6 +52,17 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// like <see cref="PutbackAttempts"/> and <see cref="FreeThrowSpins"/>.
     /// </summary>
     public int Points { get; init; }
+
+    /// <summary>
+    /// The number of shot-clock periods this possession's walk used — 1 for any
+    /// possession that never got an offensive rebound, plus one additional period
+    /// per offensive rebound (each rebound resets the clock to 20 and starts a new
+    /// period). Init-only with a 0 default (the Governor treats it as
+    /// <c>Max(1, periods)</c> defensively), so every existing construction is
+    /// untouched — a pure append, like <see cref="Points"/> and
+    /// <see cref="FreeThrowSpins"/>. The Governor reads this to draw per-period time.
+    /// </summary>
+    public int ShotClockPeriods { get; init; }
 }
 
 /// <summary>
@@ -225,6 +236,7 @@ public sealed class Resolver
         var putbackAttempts = 0;
         var freeThrowSpins = 0;
         var points = 0;
+        var shotClockPeriods = 1;
         var iterations = 0;
         const int IterationCeiling = 10_000;
 
@@ -255,7 +267,7 @@ public sealed class Resolver
                     if (t.Reason == "Made")
                         points += Scoring.FieldGoalPoints(t.State.ShotType!.Value);
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
-                        { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points };
+                        { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods };
 
                 case Continue c:
                     switch (c.Next)
@@ -391,7 +403,7 @@ public sealed class Resolver
                         // corner (dead, unreachable in a live walk), to be swept with the
                         // other retired stubs in a future cleanup. Do not route here.
                         case ContinuationKind.ResolveBlock:
-                            return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points };
+                            return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods };
 
                         // Roll F, clean attempt got off -> execute Roll G (shot
                         // location), loop. Roll G is structurally Roll E: it stamps
@@ -464,6 +476,8 @@ public sealed class Resolver
                         // takes _game — the Roll D / I / J shape. OffensiveReboundStub
                         // is retired from the live chain; this edge now executes Roll K.
                         case ContinuationKind.ResolveOffensiveRebound:
+                            // An offensive rebound resets the shot clock to 20 and starts a new period.
+                            shotClockPeriods++;
                             // Select Roll K's pie by the source the board arrived with. A
                             // null stamp — every legacy feeder (Roll I) stamps nothing —
                             // reads as LiveBall, so the field-goal path is byte-for-byte
@@ -537,7 +551,7 @@ public sealed class Resolver
                         // corner (dead, unreachable in a live walk), to be swept with the
                         // other retired stubs in a future cleanup. Do not route here.
                         case ContinuationKind.IntoTransition:
-                            return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points };
+                            return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods };
 
                         // Roll L's FT loop, last shot missed (live ball) -> execute Roll M
                         // (free-throw rebound resolution), loop. Roll M is a GATE with
