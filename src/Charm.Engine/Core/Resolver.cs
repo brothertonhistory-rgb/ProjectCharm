@@ -132,12 +132,13 @@ public sealed class Resolver
     /// the Governor drops a START STATE at the top of the chain and never names a roll.
     /// <para>Entry routing is a single localized switch on the start state, mirroring
     /// how <see cref="Route"/> switches on <see cref="ContinuationKind"/> — entry logic
-    /// is not scattered. A start that began on a defensive rebound (a Transition entry
-    /// carrying the <see cref="TransitionSource.Rebound"/> ticket) enters Roll J, the
-    /// live transition-entry gate. Every other start — every dead-ball inbound, and
-    /// (this session) every not-yet-wired steal, which carries no context ticket —
-    /// enters Roll A, exactly as before. When the steal feeder lands and its terminals
-    /// carry a Steal context, this same switch routes every Transition start to Roll J.</para>
+    /// is not scattered. A start that began on a defensive rebound or a steal (a
+    /// Transition entry carrying a <see cref="TransitionSource"/> ticket) enters Roll J,
+    /// the live transition-entry gate; the ticket's source selects Roll J's pie. Every
+    /// other start — every dead-ball inbound — enters Roll A, exactly as before. As of
+    /// Contextification #3 every transition consequence carries a recognized source, so
+    /// a Transition entry can never reach the legacy branch (it fails loud if one ever
+    /// does — a wiring-bug tripwire).</para>
     /// <para>Pressure is a flat 0.0 (the neutral baseline the batch harness uses): the
     /// Governor does not model defensive pressure this session.</para>
     /// </summary>
@@ -147,18 +148,31 @@ public sealed class Resolver
 
         if (start is { Entry: EntryType.Transition,
                        TransitionContext: { Source: TransitionSource.Rebound
-                                                  or TransitionSource.FreeThrowRebound } ctx })
+                                                  or TransitionSource.FreeThrowRebound
+                                                  or TransitionSource.Steal } ctx })
         {
-            // Rebound-born transition (field-goal OR free-throw board): Roll J owns the
-            // top of the chain. The arriving ticket's Source selects Roll J's run-or-not
-            // pie — the FreeThrowRebound source picks the tamer, conservative pie. Roll J
-            // takes _game because its DefensiveFoul arm charges a team foul (the Roll D /
-            // Roll I shape).
+            // Rebound- OR steal-born transition: Roll J owns the top of the chain. The
+            // arriving ticket's Source selects Roll J's run-or-not pie — Rebound and
+            // FreeThrowRebound pick the rebound pies, Steal picks the most run-happy pie.
+            // Roll J takes _game because its DefensiveFoul arm charges a team foul (the
+            // Roll D / Roll I shape).
             var pieJ = _rollJGenerator.Generate(ctx);
             result = RollJ.Execute(start, pieJ, _game, _rng);
         }
         else
         {
+            // A Transition entry must ALWAYS carry a recognized source (every transition
+            // consequence — TransitionReboundTo / TransitionFreeThrowReboundTo /
+            // TransitionStealTo — stamps one), so it can never legitimately reach this
+            // legacy branch. A null-context Transition is no longer produced by anything
+            // (Contextification #3 retired the bare helper); if one ever shows up it is a
+            // wiring bug, so fail LOUD here rather than silently halfcourt-routing it.
+            if (start.Entry == EntryType.Transition)
+                throw new InvalidOperationException(
+                    "A Transition-entry possession reached the legacy (Roll A) branch without a " +
+                    "recognized TransitionContext source. Every transition consequence must carry " +
+                    "Rebound, FreeThrowRebound, or Steal — a null-context transition is a wiring bug.");
+
             // Legacy entry: Roll A (the generator + config produce its pie).
             var pieA = _rollAGenerator.Generate(start, pressure: 0.0);
             result = RollA.Execute(start, pieA, _rng, _rollAConfig);

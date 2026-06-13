@@ -37,9 +37,10 @@ public static class RollC
         // The consequence makes the dead/live axis FUNCTIONAL, not just named: the
         // ball goes to the other team (state.Defense) on every slice, but a dead-ball
         // slice restarts at Roll A while a live-ball slice (intercepted / stripped
-        // live) is tagged Transition — the new offense pushing the other way. (The
-        // thin Governor temp-routes Transition through Roll A this session; the tag
-        // is honest for when the live-ball entry node lands.)
+        // live) is tagged a STEAL transition — the new offense pushing the other way.
+        // As of Contextification #3 those live arms carry TransitionContext.Steal, so
+        // the resolver routes the spawned possession to Roll J (live transition entry)
+        // on the most run-happy pie — no longer temp-routed through Roll A.
         return outcome switch
         {
             TurnoverOutcome.BadPassDeadBall =>
@@ -48,7 +49,7 @@ public static class RollC
 
             TurnoverOutcome.BadPassIntercepted =>
                 new Terminal("BadPassIntercepted", state,
-                    PossessionConsequence.TransitionTo(state.Defense)),
+                    PossessionConsequence.TransitionStealTo(state.Defense)),
 
             TurnoverOutcome.LostBallDeadBall =>
                 new Terminal("LostBallDeadBall", state,
@@ -56,7 +57,7 @@ public static class RollC
 
             TurnoverOutcome.LostBallLiveBall =>
                 new Terminal("LostBallLiveBall", state,
-                    PossessionConsequence.TransitionTo(state.Defense)),
+                    PossessionConsequence.TransitionStealTo(state.Defense)),
 
             TurnoverOutcome.OffensiveFoul =>
                 new Terminal("OffensiveFoul", state,

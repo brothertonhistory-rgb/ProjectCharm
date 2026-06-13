@@ -119,16 +119,21 @@
   },
 
   "RollJ": {
-    "Settle": 0.65,
-    "Push": 0.25,
+    "Settle": 0.60,
+    "Push": 0.30,
     "Turnover": 0.06,
     "DefensiveFoul": 0.035,
     "JumpBall": 0.005,
-    "FreeThrowSettle": 0.78,
-    "FreeThrowPush": 0.12,
+    "FreeThrowSettle": 0.82,
+    "FreeThrowPush": 0.08,
     "FreeThrowTurnover": 0.05,
     "FreeThrowDefensiveFoul": 0.04,
     "FreeThrowJumpBall": 0.01,
+    "StealSettle": 0.40,
+    "StealPush": 0.50,
+    "StealTurnover": 0.06,
+    "StealDefensiveFoul": 0.035,
+    "StealJumpBall": 0.005,
     "Epsilon": 1e-9
   },
 

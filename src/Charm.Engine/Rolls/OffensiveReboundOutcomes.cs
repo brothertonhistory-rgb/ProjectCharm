@@ -59,12 +59,11 @@ public enum OffensiveReboundOutcome
     DeadBallTurnover,
 
     /// <summary>A live-ball turnover off the board (stripped, lost live). Ball to
-    /// the defense on a live push. PARKED this session: emitted as a plain
-    /// <see cref="PossessionConsequence.TransitionTo"/> with NO context ticket, so
-    /// the resolver temp-routes the spawned possession through Roll A — EXACTLY how
-    /// steals are handled now. Its real home is the transition module via the steal
-    /// feeder's contextual wiring; that lands with the steal-feeder session as a
-    /// one-line routing flip. -> TERMINAL.</summary>
+    /// the defense on a live push. As of Contextification #3 emitted as a
+    /// <see cref="PossessionConsequence.TransitionStealTo"/> carrying the Steal
+    /// context, so the resolver routes the spawned possession to Roll J on the steal
+    /// pie — the third caller of the shared steal helper (alongside Roll C's two live
+    /// arms). -> TERMINAL.</summary>
     LiveBallTurnover,
 
     /// <summary>Kick it back out and run a fresh play. The same possession stays

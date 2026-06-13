@@ -1,3 +1,77 @@
+## Session 22 — Contextification #3 (Steal Feeder): live turnovers enter Roll J as a `Steal` source (2026-06-13)
+
+**The premise this session opens.** Third of the five-session contextification arc. Three
+live-turnover arms — Roll C's `BadPassIntercepted` and `LostBallLiveBall`, and Roll K's
+`LiveBallTurnover` — already emitted a transition consequence, but a PLACEHOLDER one with no
+context ticket (`TransitionTo(defense)`), so the resolver temp-routed the spawned possession
+through Roll A (a halfcourt start) instead of Roll J (live transition). This was pre-staged on
+purpose for exactly this session. #3 turns that staged routing on and gives the steal its own
+Roll J pie. A live theft is the best fast-break trigger in basketball — the defender is already
+moving the other way with the offense caught upcourt — so the steal pie runs harder than any
+other transition source.
+
+**Promote, not add (the up-front scope decision).** All three callers of the placeholder helper
+are steals, so the helper itself was promoted: `PossessionConsequence.TransitionTo` →
+`TransitionStealTo`, now carrying `TransitionContext.Steal`. No bare null-context transition
+helper is kept in the corner — a transition with a null context is no longer produced by
+anything, so a retained bare helper would be dead weight, not a retired stub. One helper, three
+callers re-pointed.
+
+**The alarm (the second up-front decision).** Once all three live arms carry `Steal`, NO
+null-context transition is emitted anywhere, so a `Transition` entry can never legitimately reach
+the resolver's legacy (Roll A) branch. Rather than leave that as a silent assumption, the else
+now throws if a `Transition` entry arrives without a recognized source — a loud wiring-bug
+tripwire. Cheap insurance: if some future change ever breaks the "every transition stamps a
+source" guarantee, the harness fails immediately instead of silently halfcourt-routing a steal.
+
+**The Steal source and its pie.** `TransitionSource.Steal` is the third value (parallel to
+`Rebound` / `FreeThrowRebound`), with a `TransitionContext.Steal` static. Roll J's generator gains
+a Steal branch returning a third weight set; Roll J's five arms and their routing are UNCHANGED —
+the Steal pie reweights the same Settle / Push / Turnover / DefensiveFoul / JumpBall arms. The
+resolver's transition-entry guard gained `or TransitionSource.Steal`, so a steal-born possession
+routes to Roll J on the steal pie via the same `Generate(ctx)` path the other two sources use.
+
+**The pie intent — runs hardest, with the gaps spread wide (Emmett's call).** Steal Push > Rebound
+Push > FreeThrowRebound Push, Settle correspondingly lowest for Steal. Emmett widened the
+placeholders to ease later calibration:
+
+| Transition source | Settle | **Push** | Turnover | DefFoul | JumpBall |
+|---|---|---|---|---|---|
+| Steal *(new)* | 0.40 | **0.50** | 0.06 | 0.035 | 0.005 |
+| Rebound *(was 0.65/0.25)* | 0.60 | **0.30** | 0.06 | 0.035 | 0.005 |
+| FreeThrowRebound *(was 0.78/0.12)* | 0.82 | **0.08** | 0.05 | 0.04 | 0.01 |
+
+All placeholders, all tunable in `config.json` with no engine change. The real speed/athleticism
+favoring ("who got the steal") is the deferred attribute seam; Roll J reads no attributes yet.
+
+**Walls that held.** No new live turnover TYPES — Roll C's classification pie and Roll K's
+offensive-rebound pie are untouched; #3 changed only the CONSEQUENCE of arms that were already
+live. The DEAD turnovers stay dead (they keep `DeadBallTo` → Roll A). `TransitionSource.Block`
+was NOT added (deferred again): a block's defensive rebound shares Roll I's single
+`DefensiveRebound` arm, so a Block transition context would force Roll I's ROUTING to read the
+`ReboundSource` — crossing the generator-eats-source / roll-eats-pie seam #2 just built. Each steal
+arm statically IS a steal, so it has no such problem. Rolls A, I, H, M untouched.
+
+**Validation (reasoned + Monte-Carlo-traced, pending Emmett's harness run).** A sandbox Monte
+Carlo mirroring the steal pie converged within the 0.005 tolerance on all five arms, and the §2a
+bonus crossing fired both branches on the steal `DefensiveFoul` arm (sideline ~6 before the
+defense reaches the 7-foul bonus, FT ~3,500 after). New/updated harness checks: a Steal sub-check
+added to the Roll J pie-selection check (selection + rates + the Steal > Rebound > FT Push
+ordering); a new `RollJStealBatchCheck` proving the steal pie's five arms route as designed and the
+`DefensiveFoul` arm crosses the bonus mid-batch (sideline → FT split); the Governor loop now counts
+`stealIntoJ` alongside `reboundIntoJ` (steals join rebounds as Roll J feeders — both must be > 0);
+and the Roll C and Roll K batch checks now assert the live arms carry the `Steal` context while the
+dead arms carry none. The §2b sweep retired every `TransitionTo` reference in code (only frozen
+doc history remains, superseded by this entry).
+
+**What #3 closes, and what it opens.** Closes: the last placeholder transition feed — every
+live-ball possession start (rebound, free-throw rebound, steal) now carries a real context into
+Roll J. Opens nothing new; the next session is #4 (Bonus-fork extract — the charge-and-fork copied
+verbatim in Rolls D / I / J / K / M collapsed into one shared node). Still deferred and logged:
+`TransitionSource.Block` push tempo, a distinct Block offensive-rebound source on Roll K, steal
+ATTRIBUTION (which defender), and Roll A's own turnovers becoming steals (comes free at #5b).
+
+
 ## Session 21 — Contextification #2 (Block Recovery): Roll H `Blocked` enters the rebound machinery via a `Block` source (2026-06-13)
 
 **The premise this session opens.** Second of the five-session contextification arc.

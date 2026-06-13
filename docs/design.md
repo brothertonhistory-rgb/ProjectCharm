@@ -1788,3 +1788,55 @@ context. (2) A **distinct block offensive-rebound source** on Roll K (a tipped-i
 putback differently than a clean board) is a later Roll K context; this session reuses
 `LiveBall`. (3) `OutOfBoundsOffDefense`'s **own-side inbound modifiers** belong to the inbound
 node and land with the **Roll A reshape (#5b)**.
+
+### #3 — Steal feeder: live turnovers enter Roll J as a `TransitionSource.Steal`
+
+The last placeholder transition feed. Three live-turnover arms — Roll C's `BadPassIntercepted`
+and `LostBallLiveBall`, Roll K's `LiveBallTurnover` — emitted `PossessionConsequence.TransitionTo`
+with a **null context ticket**, which the resolver temp-routed through Roll A. #3 turns the staged
+routing on: those arms now carry a `Steal` context into Roll J, the live transition-entry gate.
+
+**Promote, not add.** Every caller of the placeholder is a steal, so the helper was promoted in
+place — `TransitionTo` → **`TransitionStealTo`**, carrying `TransitionContext.Steal`. No bare
+null-context helper is retained: a transition with a null context is no longer produced by
+anything, so a retained helper would be dead weight, not a retired stub. The three callers are
+re-pointed; nothing else changes in those rolls (their pies and the turnover TYPES are untouched —
+that expansion is #5a).
+
+**The source append, not an enum-explosion.** `TransitionSource` gains a third value, `Steal`
+(parallel to `Rebound` / `FreeThrowRebound`), with a `TransitionContext.Steal` static. The
+generator gains a Steal branch returning a third weight set; Roll J's **five arms and their
+routing are unchanged** — the Steal pie reweights the same Settle / Push / Turnover / DefensiveFoul
+/ JumpBall arms. The resolver's transition-entry guard gains `or TransitionSource.Steal`, so a
+steal-born possession enters Roll J via the same `Generate(ctx)` path the other two sources use.
+This is the "many feeders, one node" discipline applied to a source: the value, its pie, and its
+routing arrive together.
+
+**The pie intent — a steal runs hardest.** Off a live theft the break is already on, so the Steal
+pie leans hardest to Push and lowest to Settle of the three transition contexts: **Steal Push >
+Rebound Push > FreeThrowRebound Push**. Placeholder weights, spread deliberately wide (Steal 0.50 /
+Rebound 0.30 / FreeThrowRebound 0.08) for easier later calibration — larger gaps make the
+direction of any tuning nudge obvious. The Rebound and FreeThrowRebound Push values were widened
+from their #1/#2 seeds (0.25 → 0.30, 0.12 → 0.08) as part of that spread; all remain tunable in
+`config.json` with no engine change. The real speed/athleticism favoring ("who got the steal") is
+the deferred attribute seam; Roll J reads no attributes yet.
+
+**The dead-path tripwire.** Once all three live arms carry `Steal`, every transition consequence
+stamps a recognized source (`TransitionReboundTo` / `TransitionFreeThrowReboundTo` /
+`TransitionStealTo`), so a `Transition` entry can never legitimately reach the resolver's legacy
+(Roll A) branch. The else now **throws** if a `Transition` entry arrives without a recognized
+source — a loud wiring-bug tripwire rather than a silent halfcourt-route. It costs one line and
+fails fast exactly when a future change would otherwise quietly break the "every transition stamps
+a source" invariant.
+
+**The `Block` wall (deferred again).** `TransitionSource.Block` is NOT added. A block's defensive
+rebound shares Roll I's single `DefensiveRebound` arm with the normal-miss path, so emitting a
+Block transition context would force Roll I's **routing** to read the `ReboundSource` — which the
+generator consumes, not the roll — crossing the clean generator-eats-source / roll-eats-pie seam #2
+just built. Each steal arm statically IS a steal, so it has no such problem. Block tempo gets its
+own design conversation later; a block's defensive recovery reuses the `Rebound` context for now.
+
+**What #3 closes.** Every live-ball possession start — defensive rebound, free-throw-board rebound,
+and now steal — carries a real context into Roll J. No placeholder transition feed remains. The arc
+moves to #4 (collapse the charge-and-fork copied verbatim in Rolls D / I / J / K / M into one
+shared node).

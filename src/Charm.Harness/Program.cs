@@ -93,6 +93,7 @@ internal static class Program
         ok &= RollIBlockContextSelectionCheck(cfg, cfgI, state);
         ok &= RollJBatchCheck(cfg, cfgD, cfgJ, rollJGenerator, state);
         ok &= RollJBonusForkCheck(cfg, cfgD, cfgJ, state);
+        ok &= RollJStealBatchCheck(cfg, cfgD, cfgJ, rollJGenerator, state);
         ok &= RollKReboundBatchCheck(cfg, cfgK, rollKGenerator, game, state);
         ok &= RollKPutbackPieCheck(cfg, cfgH, state);
         ok &= RollKBonusForkCheck(cfg, cfgD, cfgK, rollKGenerator, state);
@@ -401,6 +402,10 @@ internal static class Program
         foreach (var o in Enum.GetValues<TurnoverOutcome>()) counts[o] = 0;
 
         var nonTerminal = 0;
+        var liveStealCtxOk = 0;   // live arms carrying TransitionContext.Steal (-> Roll J)
+        var liveCtxBad = 0;       // live arms MISSING the steal context (a FAIL)
+        var deadNullCtxOk = 0;    // dead arms carrying a dead-ball restart, no context (-> Roll A)
+        var deadCtxBad = 0;       // dead arms wrongly carrying a transition context (a FAIL)
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
@@ -420,6 +425,23 @@ internal static class Program
                 _ => throw new InvalidOperationException($"Unmapped Roll C reason '{t.Reason}'.")
             };
             counts[outcome]++;
+
+            // Contextification #3: the two LIVE arms (intercepted / stripped-live) now carry
+            // the Steal transition context, so the resolver routes the spawned possession to
+            // Roll J; the three DEAD arms carry NO context (a dead-ball restart at Roll A).
+            var live = outcome is TurnoverOutcome.BadPassIntercepted or TurnoverOutcome.LostBallLiveBall;
+            if (live)
+            {
+                if (t.Consequence.NextEntry == EntryType.Transition
+                    && t.Consequence.TransitionContext?.Source == TransitionSource.Steal) liveStealCtxOk++;
+                else liveCtxBad++;
+            }
+            else
+            {
+                if (t.Consequence.NextEntry == EntryType.DeadBallInbound
+                    && t.Consequence.TransitionContext is null) deadNullCtxOk++;
+                else deadCtxBad++;
+            }
         }
 
         var n = (double)cfg.BatchSize;
@@ -437,7 +459,12 @@ internal static class Program
         var terminalOk = nonTerminal == 0;
         Console.WriteLine($"\n  every exit is a clean terminal: non-terminal={nonTerminal} -> {(terminalOk ? "ok" : "FAIL")}");
 
-        return ratesOk && terminalOk;
+        var liveCtxOk = liveCtxBad == 0 && liveStealCtxOk > 0;
+        var deadCtxOk = deadCtxBad == 0 && deadNullCtxOk > 0;
+        Console.WriteLine($"  live arms carry Steal context (-> Roll J): ok={liveStealCtxOk:N0} bad={liveCtxBad} -> {(liveCtxOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  dead arms carry no context (-> Roll A): ok={deadNullCtxOk:N0} bad={deadCtxBad} -> {(deadCtxOk ? "ok" : "FAIL")}");
+
+        return ratesOk && terminalOk && liveCtxOk && deadCtxOk;
     }
 
     // --- Batch: Roll D's three flavor rates match its pie, and every exit is a
@@ -2199,6 +2226,7 @@ internal static class Program
         var flipsOk = true;
         var jumpBalls = 0;
         var reboundIntoJ = 0;
+        var stealIntoJ = 0;
         for (var i = 0; i < records.Count; i++)
         {
             var r = records[i];
@@ -2214,6 +2242,15 @@ internal static class Program
                 // Roll J: the rebound consequence carries the Rebound context, which the
                 // resolver routes to Roll J (not Roll A). This counts the live path.
                 if (prev.EndedOnTerminal && prev.EndLabel == "DefensiveRebound") reboundIntoJ++;
+                // A possession whose PREDECESSOR ended on a LIVE turnover (a steal) also
+                // entered Roll J as of Contextification #3: the three live-turnover
+                // terminals (BadPassIntercepted / LostBallLiveBall / LiveBallTurnover)
+                // carry the Steal context, which the resolver routes to Roll J on the
+                // steal pie. Steals JOIN rebounds as Roll J feeders — more possessions
+                // enter J than before.
+                if (prev.EndedOnTerminal && prev.EndLabel is "BadPassIntercepted"
+                        or "LostBallLiveBall" or "LiveBallTurnover")
+                    stealIntoJ++;
             }
         }
         var firstOk = records.Count > 0
@@ -2237,13 +2274,17 @@ internal static class Program
                        && game.HomeLineup.OnCourt.Count == Lineup.Size
                        && game.AwayLineup.OnCourt.Count == Lineup.Size;
 
-        // Rebound -> Roll J, end to end. A defensive rebound spawns a Transition
-        // possession that ENTERS Roll J (not Roll A). As of Contextification #1, Roll
-        // J's Push no longer parks at STUB:Transition — it flows into Roll E (with
-        // FastBreak set) and on through the shot chain, so the proof that Roll J ran is
-        // simply that possessions entered it off a rebound. The Push->Roll E wiring and
-        // the transition-pie selection are proven in the dedicated Roll J / Roll E
-        // batch checks below, where the state is isolated.
+        // Rebound -> Roll J, end to end (the robust gate). A defensive rebound spawns a
+        // Transition possession that ENTERS Roll J (not Roll A). As of Contextification
+        // #1, Roll J's Push flows into Roll E (FastBreak set) and on through the shot
+        // chain, so the proof that Roll J ran is simply that possessions entered it off a
+        // rebound. Steals ALSO feed Roll J as of #3, but they are far rarer than rebounds,
+        // so over a 200-possession cap stealIntoJ is reported for observability rather than
+        // gated (a hard >0 gate would be seed-fragile). The rigorous steal-routing proof is
+        // the dedicated 100k RollJStealBatchCheck plus the resolver's wiring-bug alarm: if a
+        // steal-born Transition ever reached this loop with a bad/null context, RunPossession
+        // would THROW, so the loop completing at all is itself proof the steal context rides
+        // correctly whenever a steal occurs.
         var rollJOk = reboundIntoJ > 0;
 
         // --- Report. ---
@@ -2262,7 +2303,10 @@ internal static class Program
         Console.WriteLine($"  lineups survive (same objects, 5 slots each) -> {(lineupOk ? "ok" : "FAIL")}");
         Console.WriteLine(
             $"  rebound -> Roll J: possessions entering J={reboundIntoJ:N0} (Push now flows into Roll E) " +
-            $"-> {(rollJOk ? "ok" : "FAIL")}");
+            $"-> {(reboundIntoJ > 0 ? "ok" : "FAIL")}");
+        Console.WriteLine(
+            $"  steal -> Roll J: possessions entering J={stealIntoJ:N0} (live turnovers now feed Roll J; " +
+            $"observability — rigorous proof is RollJStealBatchCheck)");
         Console.WriteLine($"  flat placeholder time accumulated: {result.TotalSeconds:N0}s (observability only)");
 
         // Per-stub park breakdown — quantifies how much of the game is currently
@@ -2463,6 +2507,117 @@ internal static class Program
         return ok;
     }
 
+    // --- Batch: Roll J's five-way distribution under the STEAL context (Contextification
+    //     #3). Identical in shape to the rebound batch — Roll J's five arms and routing are
+    //     source-agnostic; only the pie differs (the steal pie leans hardest to Push). Proves
+    //     (a) the steal pie's five arms all route as designed, (b) the Turnover arm still
+    //     stamps Transition for Roll C, and (c) the §2a bonus crossing on the STEAL path: this
+    //     batch's own foul-accumulating game crosses the threshold partway, so the DefensiveFoul
+    //     arm forks BOTH sideline (below bonus) and FT (in bonus) — the same charge-and-fork the
+    //     rebound DefensiveFoul arm feeds. ---
+    private static bool RollJStealBatchCheck(
+        RollAConfig cfg, RollDConfig cfgD, RollJConfig cfgJ,
+        RollJStubPieGenerator genJ, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} transition entries through Roll J (STEAL context) ---");
+
+        var rng = new SystemRng(cfg.Seed);
+        // A FRESH game (does not perturb Main's shared game). Its defense foul count
+        // climbs as the DefensiveFoul arm fires and CROSSES the bonus partway through —
+        // the §2a stateful-accumulation check on the steal path: an arm that routes to
+        // sideline early routes to FT once the shared game enters the bonus, so BOTH
+        // fork branches must be exercised.
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var pieJ = genJ.Generate(TransitionContext.Steal);
+
+        var counts = new Dictionary<TransitionOutcome, int>();
+        foreach (var o in Enum.GetValues<TransitionOutcome>()) counts[o] = 0;
+
+        var settleSel = 0;          // IntoPlayerSelection, FastBreak=false (Settle -> halfcourt)
+        var pushSel = 0;            // IntoPlayerSelection, FastBreak=true  (Push   -> transition)
+        var pushFastBreakOk = 0;    // Push continues that correctly carry FastBreak=true
+        var turnoverStamped = 0;    // ResolveTurnoverType carrying TurnoverContext.Transition
+        var turnoverUnstamped = 0;  // ResolveTurnoverType MISSING the stamp (a FAIL)
+        var foulSideline = 0;       // ResolveSidelineInbound (below bonus)
+        var foulFreeThrows = 0;     // ResolveFreeThrows (in bonus)
+        var jumpBalls = 0;          // ResolveJumpBall
+        var unrecognized = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var r = RollJ.Execute(state, pieJ, game, rng);
+            switch (r)
+            {
+                case Continue { Next: ContinuationKind.IntoPlayerSelection } sel:
+                    if (sel.State.FastBreak)
+                    {
+                        counts[TransitionOutcome.Push]++;
+                        pushSel++;
+                        pushFastBreakOk++;   // by construction FastBreak is true here
+                    }
+                    else
+                    {
+                        counts[TransitionOutcome.Settle]++;
+                        settleSel++;
+                    }
+                    break;
+                case Continue { Next: ContinuationKind.ResolveTurnoverType } tc:
+                    counts[TransitionOutcome.Turnover]++;
+                    if (tc.TurnoverContext == TurnoverContext.Transition) turnoverStamped++;
+                    else turnoverUnstamped++;
+                    break;
+                case Continue { Next: ContinuationKind.ResolveSidelineInbound }:
+                    counts[TransitionOutcome.DefensiveFoul]++;
+                    foulSideline++;
+                    break;
+                case Continue { Next: ContinuationKind.ResolveFreeThrows }:
+                    counts[TransitionOutcome.DefensiveFoul]++;
+                    foulFreeThrows++;
+                    break;
+                case Continue { Next: ContinuationKind.ResolveJumpBall }:
+                    counts[TransitionOutcome.JumpBall]++;
+                    jumpBalls++;
+                    break;
+                default:
+                    unrecognized++;
+                    break;
+            }
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll J outcomes (steal pie):");
+        foreach (var (outcome, weight) in pieJ.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-16} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine("\n  routing per outcome:");
+        Console.WriteLine($"    Settle        -> IntoPlayerSelection (halfcourt) {settleSel,8:N0}  {(settleSel > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    Push          -> IntoPlayerSelection (FastBreak)  {pushSel,8:N0}  {(pushSel > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"      of which carry FastBreak=true: {pushFastBreakOk,8:N0} / {pushSel:N0}  {(pushFastBreakOk == pushSel ? "ok" : "FAIL")}");
+        Console.WriteLine($"    Turnover      -> Roll C (stamped)    {turnoverStamped,8:N0}  {(turnoverStamped > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    DefensiveFoul -> SidelineInbound     {foulSideline,8:N0}  (below bonus)");
+        Console.WriteLine($"                  -> ResolveFreeThrows   {foulFreeThrows,8:N0}  (in bonus)");
+        Console.WriteLine($"    JumpBall      -> ResolveJumpBall     {jumpBalls,8:N0}  {(jumpBalls > 0 ? "ok" : "NONE")}");
+
+        var pushOk = pushSel > 0 && pushFastBreakOk == pushSel;   // every Push exit carried the marker
+        var foulForkOk = foulSideline > 0 && foulFreeThrows > 0;  // §2a crossing on the steal path
+        var allArms = settleSel > 0 && pushOk && turnoverStamped > 0 && foulForkOk && jumpBalls > 0;
+        var routedOk = unrecognized == 0;
+        var stampOk = turnoverUnstamped == 0;
+        Console.WriteLine($"\n  zero unrouted exits: {unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  every Turnover stamped Transition for Roll C: unstamped={turnoverUnstamped} -> {(stampOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  §2a: steal DefensiveFoul crossed the bonus mid-batch (sideline -> FT): {(foulForkOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all five Roll J steal arms reached: {(allArms ? "ok" : "FAIL")}");
+
+        return ratesOk && routedOk && stampOk && allArms;
+    }
+
     // --- Context selection: Roll C builds the RIGHT pie for each turnover context,
     //     and the resolved rates from each match. Proves the ticket/station seam end
     //     to end: a Halfcourt ticket (the legacy/default) selects 30/22/18/20/10; a
@@ -2576,6 +2731,8 @@ internal static class Program
         var defFoulSideline = 0;   // DefensiveFoul below bonus
         var defFoulFreeThrows = 0; // DefensiveFoul in bonus
         var flipToDefenseOk = 0;   // terminals whose consequence hands the ball to the defense
+        var liveTurnoverStealCtxOk = 0; // LiveBallTurnover carrying the Steal context (-> Roll J)
+        var liveTurnoverCtxBad = 0;     // LiveBallTurnover MISSING the steal context (a FAIL)
         var unrecognized = 0;
 
         for (var i = 0; i < cfg.BatchSize; i++)
@@ -2620,6 +2777,12 @@ internal static class Program
                 case Terminal { Reason: "LiveBallTurnover" } t3:
                     counts[OffensiveReboundOutcome.LiveBallTurnover]++;
                     if (t3.Consequence.NextOffense == stamped.Defense) flipToDefenseOk++;
+                    // Contextification #3: a live turnover off the board now carries the
+                    // Steal context, so the resolver routes the spawn to Roll J (not Roll A).
+                    if (t3.Consequence.NextEntry == EntryType.Transition
+                        && t3.Consequence.TransitionContext?.Source == TransitionSource.Steal)
+                        liveTurnoverStealCtxOk++;
+                    else liveTurnoverCtxBad++;
                     break;
                 case Continue { Next: ContinuationKind.IntoPlayerSelection } rs:
                     counts[OffensiveReboundOutcome.ResetOffense]++;
@@ -2673,7 +2836,10 @@ internal static class Program
         Console.WriteLine($"  all seven Roll K arms reached: {(allArms ? "ok" : "FAIL")}");
         Console.WriteLine($"  zero unrouted / unexpected exits: {unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
 
-        return ratesOk && putbackShapeOk && resetShapeOk && flipOk && foulForkOk && allArms && routedOk;
+        var liveTurnoverCtxOk = liveTurnoverCtxBad == 0 && liveTurnoverStealCtxOk > 0;
+        Console.WriteLine($"  LiveBallTurnover carries Steal context (-> Roll J): ok={liveTurnoverStealCtxOk:N0} bad={liveTurnoverCtxBad} -> {(liveTurnoverCtxOk ? "ok" : "FAIL")}");
+
+        return ratesOk && putbackShapeOk && resetShapeOk && flipOk && foulForkOk && allArms && routedOk && liveTurnoverCtxOk;
     }
 
     // --- Context: the putback ticket selects a DISTINCT shot pie. Proves the
@@ -3223,6 +3389,14 @@ internal static class Program
                 (TransitionOutcome.DefensiveFoul, cfgJ.FreeThrowDefensiveFoul),
                 (TransitionOutcome.JumpBall,      cfgJ.FreeThrowJumpBall),
             }),
+            (TransitionContext.Steal, new[]
+            {
+                (TransitionOutcome.Settle,        cfgJ.StealSettle),
+                (TransitionOutcome.Push,          cfgJ.StealPush),
+                (TransitionOutcome.Turnover,      cfgJ.StealTurnover),
+                (TransitionOutcome.DefensiveFoul, cfgJ.StealDefensiveFoul),
+                (TransitionOutcome.JumpBall,      cfgJ.StealJumpBall),
+            }),
         };
 
         double JPush(TransitionContext c) =>
@@ -3256,6 +3430,18 @@ internal static class Program
         var jDiffer = Math.Abs(JPush(TransitionContext.FreeThrowRebound) - JPush(TransitionContext.Rebound)) > cfgJ.Epsilon;
         Console.WriteLine($"  Roll J FT pie differs from rebound pie (Push): {(jDiffer ? "ok" : "FAIL")}");
         ok &= jDiffer;
+
+        // Steal is the third source (Contextification #3): its pie must DIFFER from the
+        // rebound pie, and the run-happiness must order Steal > Rebound > FreeThrowRebound
+        // on Push (the locked pie intent — a steal runs hardest, a missed FT least).
+        var jStealDiffer = Math.Abs(JPush(TransitionContext.Steal) - JPush(TransitionContext.Rebound)) > cfgJ.Epsilon;
+        var jPushOrderOk = JPush(TransitionContext.Steal) > JPush(TransitionContext.Rebound)
+                           && JPush(TransitionContext.Rebound) > JPush(TransitionContext.FreeThrowRebound);
+        Console.WriteLine($"  Roll J Steal pie differs from rebound pie (Push): {(jStealDiffer ? "ok" : "FAIL")}");
+        Console.WriteLine(
+            $"  Roll J Push order Steal({JPush(TransitionContext.Steal):P1}) > Rebound({JPush(TransitionContext.Rebound):P1}) " +
+            $"> FT({JPush(TransitionContext.FreeThrowRebound):P1}): {(jPushOrderOk ? "ok" : "FAIL")}");
+        ok &= jStealDiffer && jPushOrderOk;
 
         Console.WriteLine($"  Roll M context selection: {(ok ? "ok" : "FAIL")}");
         return ok;

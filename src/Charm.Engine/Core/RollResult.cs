@@ -46,10 +46,12 @@ public sealed record PossessionConsequence(TeamSide NextOffense, EntryType NextE
     /// clock, foul context, momentum are the other planned appends). The terminal
     /// that spawns a transition possession distills it here; the Governor threads it
     /// onto the spawned <see cref="PossessionState.TransitionContext"/>.
-    /// <para>Null on every dead-ball consequence, and — this session — on a plain
-    /// <see cref="TransitionTo"/> (the steal path, still temp-routed through Roll A
-    /// until the steal-feeder session). Set only by <see cref="TransitionReboundTo"/>,
-    /// and only meaningful when <see cref="NextEntry"/> is
+    /// <para>Null on every dead-ball consequence. Every transition consequence carries
+    /// a ticket: <see cref="TransitionReboundTo"/> (Rebound),
+    /// <see cref="TransitionFreeThrowReboundTo"/> (FreeThrowRebound), and — as of
+    /// Contextification #3 — <see cref="TransitionStealTo"/> (Steal). No
+    /// transition consequence carries a null context, so a <see cref="EntryType.Transition"/>
+    /// entry ALWAYS routes to Roll J; meaningful only when <see cref="NextEntry"/> is
     /// <see cref="EntryType.Transition"/>.</para>
     /// </summary>
     public TransitionContext? TransitionContext { get; init; }
@@ -59,14 +61,19 @@ public sealed record PossessionConsequence(TeamSide NextOffense, EntryType NextE
     public static PossessionConsequence DeadBallTo(TeamSide team) =>
         new(team, EntryType.DeadBallInbound);
 
-    /// <summary>Ball to <paramref name="team"/> on a live-ball / transition start with
-    /// NO context ticket — the STEAL path (a live-ball interception/strip). It carries
-    /// no <see cref="TransitionContext"/>, so the resolver still temp-routes it through
-    /// Roll A this session (rebound-first; steals get their own wiring + a Steal pie in
-    /// the steal-feeder session). Kept distinct from <see cref="TransitionReboundTo"/>
-    /// so that session is a one-line routing flip, not a terminal rewrite.</summary>
-    public static PossessionConsequence TransitionTo(TeamSide team) =>
-        new(team, EntryType.Transition);
+    /// <summary>Ball to <paramref name="team"/> on a live-ball / transition start off a
+    /// STEAL — a live-ball interception or a strip of a live dribble (Roll C's
+    /// <c>BadPassIntercepted</c> / <c>LostBallLiveBall</c>, Roll K's
+    /// <c>LiveBallTurnover</c>). Carries the <see cref="TransitionContext.Steal"/>
+    /// ticket so the resolver routes it to Roll J (live transition entry) and Roll J
+    /// selects its most run-happy pie (the highest Push of the three sources). As of
+    /// Contextification #3 every one of its three callers is a steal, so this is the
+    /// single steal helper — there is no bare null-context transition helper (the
+    /// promote-not-add decision: a transition with a null context is no longer produced
+    /// by anything). Parallel to <see cref="TransitionReboundTo"/> /
+    /// <see cref="TransitionFreeThrowReboundTo"/>.</summary>
+    public static PossessionConsequence TransitionStealTo(TeamSide team) =>
+        new(team, EntryType.Transition) { TransitionContext = TransitionContext.Steal };
 
     /// <summary>Ball to <paramref name="team"/> on a live-ball transition start off a
     /// DEFENSIVE REBOUND of a field-goal miss — carrying the

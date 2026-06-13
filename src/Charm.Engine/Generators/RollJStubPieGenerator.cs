@@ -6,12 +6,12 @@ namespace Charm.Engine;
 /// possession arrived with — the SAME ticket/station pattern as Roll C, carried on
 /// the cross-possession seam instead of a within-possession <see cref="Continue"/>.
 ///
-/// This session TWO contexts are live — <see cref="TransitionSource.Rebound"/> and
+/// This session THREE contexts are live — <see cref="TransitionSource.Rebound"/>,
 /// <see cref="TransitionSource.FreeThrowRebound"/> (Roll M's defensive board, a tamer
-/// pie) — so the generator builds those two and nothing else. The Steal context's pie
-/// (more Push) is a sibling arm added in the steal-feeder session; until then no
-/// ticket carries any other source, so no other arm is reachable (the <c>_</c> arm
-/// fails loud if one ever sneaks in without its pie).
+/// pie), and <see cref="TransitionSource.Steal"/> (a live theft, the most run-happy
+/// pie) — so the generator builds those three. The Steal pie leans hardest to Push of
+/// the three (Steal Push &gt; Rebound Push &gt; FreeThrowRebound Push); the <c>_</c>
+/// arm fails loud if an unmodelled source ever sneaks in without its pie.
 ///
 /// Flat placeholder weights, no live-wire scalar (like Roll I): the only things
 /// that will tilt this pie are Roll J's two deferred, INDEPENDENT modifier seams —
@@ -29,8 +29,8 @@ public sealed class RollJStubPieGenerator
     /// (so slice order is fixed regardless of dictionary order) and validates
     /// sum-to-one, so any misconfigured weights fail loud here.</summary>
     /// <param name="context">The transition ticket's memory; its
-    /// <see cref="TransitionContext.Source"/> selects the weight set. Rebound is the
-    /// only live source this session.</param>
+    /// <see cref="TransitionContext.Source"/> selects the weight set. Rebound,
+    /// FreeThrowRebound, and Steal are the three live sources.</param>
     public Pie<TransitionOutcome> Generate(TransitionContext context)
     {
         var weights = context.Source switch
@@ -53,9 +53,18 @@ public sealed class RollJStubPieGenerator
                 [TransitionOutcome.JumpBall]      = _config.FreeThrowJumpBall,
             },
 
+            TransitionSource.Steal => new Dictionary<TransitionOutcome, double>
+            {
+                [TransitionOutcome.Settle]        = _config.StealSettle,
+                [TransitionOutcome.Push]          = _config.StealPush,
+                [TransitionOutcome.Turnover]      = _config.StealTurnover,
+                [TransitionOutcome.DefensiveFoul] = _config.StealDefensiveFoul,
+                [TransitionOutcome.JumpBall]      = _config.StealJumpBall,
+            },
+
             _ => throw new InvalidOperationException(
-                $"No Roll J pie for transition source '{context.Source}'. Rebound and " +
-                "FreeThrowRebound are modelled; Steal lands with the steal-feeder session.")
+                $"No Roll J pie for transition source '{context.Source}'. Rebound, " +
+                "FreeThrowRebound, and Steal are modelled.")
         };
 
         return new Pie<TransitionOutcome>(weights, _config.Epsilon);

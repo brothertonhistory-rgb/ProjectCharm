@@ -32,10 +32,10 @@ namespace Charm.Engine;
 ///   <item><b>OffensiveFoul</b> — TERMINAL. Dead ball to the other team at Roll A.
 ///   No foul charged (Roll C's OffensiveFoul precedent).</item>
 ///   <item><b>DeadBallTurnover</b> — TERMINAL. Same consequence as OffensiveFoul.</item>
-///   <item><b>LiveBallTurnover</b> — TERMINAL, PARKED: a plain
-///   <see cref="PossessionConsequence.TransitionTo"/> with no context ticket, so the
-///   resolver temp-routes the spawn through Roll A exactly as steals do now. Its real
-///   home is the transition module via the steal feeder.</item>
+///   <item><b>LiveBallTurnover</b> — TERMINAL. As of Contextification #3 a
+///   <see cref="PossessionConsequence.TransitionStealTo"/> carrying the Steal context,
+///   so the resolver routes the spawned possession to Roll J on the steal pie — the
+///   third caller of the shared steal helper, alongside Roll C's two live arms.</item>
 ///   <item><b>ResetOffense</b> — CONTINUE back to Roll E on a BLANK slate (slot,
 ///   zone, result, AND FastBreak wiped): a fresh HALFCOURT play at the inherent
 ///   selection odds. The FastBreak wipe is the marker leak-guard — a reset off a
@@ -52,10 +52,11 @@ namespace Charm.Engine;
 ///
 /// What Roll K does NOT do: the actual putback make/foul percentages (Roll H's
 /// putback pie — a future basketball call), the same-player rebound tilt on a missed
-/// putback (the attribute layer, read off the still-stamped slot), the
-/// LiveBallTurnover→transition wiring (the steal feeder), and any stat logging
-/// (events flow visibly through the loop, nothing is tallied). All documented seams,
-/// none built here.
+/// putback (the attribute layer, read off the still-stamped slot), the steal
+/// ATTRIBUTION (which defender got the live turnover — the deferred attribution
+/// layer; the LiveBallTurnover→Roll J routing itself is wired as of #3), and any stat
+/// logging (events flow visibly through the loop, nothing is tallied). All documented
+/// seams, none built here.
 /// </summary>
 public static class RollK
 {
@@ -101,12 +102,13 @@ public static class RollK
                     PossessionConsequence.DeadBallTo(state.Defense)),
 
             // Live-ball turnover off the board. Ball to the defense on a live push —
-            // TERMINAL. PARKED: a plain TransitionTo with NO context ticket, so the
-            // resolver temp-routes the spawn through Roll A exactly as steals do now.
-            // The steal-feeder session flips this to the transition entry in one line.
+            // TERMINAL. As of Contextification #3 this carries TransitionContext.Steal
+            // (the same steal helper Roll C's two live arms use), so the resolver routes
+            // the spawned possession to Roll J on the steal pie — no longer temp-routed
+            // through Roll A.
             OffensiveReboundOutcome.LiveBallTurnover =>
                 new Terminal("LiveBallTurnover", state,
-                    PossessionConsequence.TransitionTo(state.Defense)),
+                    PossessionConsequence.TransitionStealTo(state.Defense)),
 
             // Kick it back out and run a fresh play. Same possession stays alive —
             // CONTINUE back to Roll E (player selection). Wipe the prior shot's facts

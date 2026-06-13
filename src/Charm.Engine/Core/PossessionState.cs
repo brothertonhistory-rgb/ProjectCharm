@@ -80,9 +80,10 @@ public enum EntryType
 /// callers construct by name or <c>with</c>, so position is free; conceptually it
 /// belongs with <see cref="Entry"/> (it is part of the start-state).
 /// <para>Null on every possession that did NOT begin in transition — every dead-ball
-/// inbound, and (this session) every not-yet-wired steal. Non-null
-/// (<see cref="TransitionContext.Rebound"/>) means "this possession began on a
-/// defensive rebound": the resolver routes it to Roll J instead of Roll A.</para></param>
+/// inbound. Non-null means "this possession began in transition": the resolver routes
+/// it to Roll J instead of Roll A, and the ticket's <see cref="TransitionContext.Source"/>
+/// (Rebound, FreeThrowRebound, or — as of Contextification #3 — Steal) selects Roll J's
+/// run-or-not pie.</para></param>
 /// <param name="FastBreak">Whether the possession is RUNNING a live break RIGHT NOW —
 /// the fast-break marker Roll J stamps on its <c>Push</c> arm (the decision to run).
 /// Distinct from <see cref="TransitionContext"/>: that records how the possession
