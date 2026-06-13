@@ -17,10 +17,11 @@ public enum EntryType
 
     /// <summary>A live-ball start: the new offense gets the ball in motion (a steal,
     /// a defensive rebound) and pushes the other way. Tagged here so a consequence
-    /// can record it; the live-ball entry node itself (the future transition roll)
-    /// is not built yet, so the Governor TEMP-ROUTES a Transition start through
-    /// Roll A's dead-ball entry for now — deliberately wrong basketball, replaced
-    /// when that roll lands.</summary>
+    /// can record it. The resolver routes a Transition entry (which always carries a
+    /// recognized <see cref="TransitionContext.Source"/> — Rebound, FreeThrowRebound,
+    /// or Steal) into ROLL J, the live transition-entry gate; a null-context
+    /// Transition is produced by nothing and FAILS LOUD as a wiring-bug tripwire. It
+    /// is NOT routed through Roll A's dead-ball entry.</summary>
     Transition
 }
 
@@ -100,6 +101,28 @@ public enum EntryType
 /// a Roll K <c>ResetOffense</c> re-entry — a reset off a missed break is a fresh
 /// halfcourt play, so it must NOT redraw the transition selection pie. The marker is
 /// deliberately scoped to the break: it does not leak past a reset.</para></param>
+/// <param name="Frontcourt">The COURT-STATE of the possession — false = BACKCOURT
+/// (the offense is still bringing the ball up: the 10-second count, the backcourt
+/// shot-clock, and the 5-second inbound are all in play), true = FRONTCOURT (the ball
+/// is across and into the set: those backcourt-only ways to lose it are gone). The
+/// origin signal Contextification #6 introduced so Roll A can pick its loss CONTEXT —
+/// a turnover while still in the backcourt routes to Roll C's
+/// <see cref="TurnoverContext.EntryBackcourt"/> pie (where the backcourt violations
+/// live), a turnover already across routes to the <see cref="TurnoverContext.Halfcourt"/>
+/// pie (where they cannot happen).
+/// <para>FALSE on every brand-new possession (the Governor constructs by name and
+/// never sets it, so a fresh inbound defaults to backcourt — it must be brought up).
+/// LATCHES to true the instant Roll A's <c>CleanEntry</c> hands off to Roll B (the
+/// offense successfully crossed into the set) and NEVER flips back within the
+/// possession — there is no spatial "return to the backcourt" in the role-based model;
+/// over-and-back is a Roll C frontcourt loss, not a court-state flip. A keep-the-ball
+/// re-inbound (Roll D below-bonus <c>ResumeInbound</c>, an OOB-retained
+/// <c>ResolveSidelineInbound</c>) re-runs Roll A carrying WHATEVER court-state is
+/// current: a foul on the backcourt bring-up resumes backcourt (still must cross), a
+/// foul or OOB-retain once across resumes frontcourt (no backcourt losses). A single
+/// bool, the same "single bit suffices" shape as <see cref="FastBreak"/>; the finer
+/// spot-flip (the OTHER team starting in front after a backcourt turnover) is deferred
+/// to a later task.</para></param>
 public sealed record PossessionState(
     int PossessionNumber,
     TeamSide Offense,
@@ -109,4 +132,5 @@ public sealed record PossessionState(
     ShotLocation? ShotType = null,
     ShotResult? Result = null,
     TransitionContext? TransitionContext = null,
-    bool FastBreak = false);
+    bool FastBreak = false,
+    bool Frontcourt = false);

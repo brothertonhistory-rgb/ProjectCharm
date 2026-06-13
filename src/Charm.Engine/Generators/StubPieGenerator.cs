@@ -23,24 +23,22 @@ public sealed class StubPieGenerator
             throw new ArgumentOutOfRangeException(nameof(pressure), pressure, "Pressure must be in [0, 1].");
 
         // The single live wire: pressure nudges turnover up. Everything else is
-        // the configured base. Then renormalize so the slices sum to 1.
+        // the configured base. Then renormalize so the slices sum to 1. The three
+        // former violation slices are gone (their loss resolves in Roll C now); the
+        // old foul slice is split into offensive vs. defensive.
         var clean = _cfg.BaseClean;
         var turnover = _cfg.BaseTurnover + pressure * _cfg.PressureTurnoverNudge;
-        var violation = _cfg.BaseViolation;
-        var foul = _cfg.BaseFoul;
+        var offensiveFoul = _cfg.BaseOffensiveFoul;
+        var defensiveFoul = _cfg.BaseDefensiveFoul;
         var jumpBall = _cfg.BaseJumpBall;
-        var fiveSecond = _cfg.BaseFiveSecondInbound;
-        var tenSecond = _cfg.BaseTenSecondBackcourt;
 
-        var total = clean + turnover + violation + foul + jumpBall + fiveSecond + tenSecond;
+        var total = clean + turnover + offensiveFoul + defensiveFoul + jumpBall;
         var weights = new Dictionary<EntryOutcome, double>
         {
             [EntryOutcome.CleanEntry] = clean / total,
             [EntryOutcome.Turnover] = turnover / total,
-            [EntryOutcome.ShotClockViolation] = violation / total,
-            [EntryOutcome.FiveSecondInbound] = fiveSecond / total,
-            [EntryOutcome.TenSecondBackcourt] = tenSecond / total,
-            [EntryOutcome.Foul] = foul / total,
+            [EntryOutcome.OffensiveFoul] = offensiveFoul / total,
+            [EntryOutcome.DefensiveFoul] = defensiveFoul / total,
             [EntryOutcome.JumpBall] = jumpBall / total,
         };
 

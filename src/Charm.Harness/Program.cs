@@ -46,6 +46,7 @@ internal static class Program
             cfg,
             rollBGenerator,
             rollCGenerator,
+            cfgC,
             rollDGenerator,
             rollEGenerator,
             rollFGenerator,
@@ -135,14 +136,15 @@ internal static class Program
 
         // Roll C observability: print its pie, an input, and a resolved outcome.
         Console.WriteLine("--- Observability: Roll C (turnover classification) ---");
-        var genC = new RollCStubPieGenerator(RollCConfig.Load(
-            Path.Combine(AppContext.BaseDirectory, "config.json")));
+        var cfgCForObs = RollCConfig.Load(
+            Path.Combine(AppContext.BaseDirectory, "config.json"));
+        var genC = new RollCStubPieGenerator(cfgCForObs);
         var pieC = genC.Generate(state, pressure: 0.0);
         Console.WriteLine($"  pie: {pieC}");
         var sampleRng = new SystemRng(cfg.Seed);
         for (var i = 0; i < 5; i++)
         {
-            var r = RollC.Execute(state, pieC, sampleRng);
+            var r = RollC.Execute(state, pieC, sampleRng, cfgCForObs);
             var term = (Terminal)r;
             var elapsed = r.ElapsedSeconds is { } s ? $"{s:0}s" : "deferred";
             Console.WriteLine($"  input=turnover | result=TERMINAL | reason={term.Reason,-18} | elapsed={elapsed}");
@@ -319,12 +321,10 @@ internal static class Program
 
             var aOutcome = result switch
             {
-                Terminal { Reason: "ShotClockViolation" } => EntryOutcome.ShotClockViolation,
-                Terminal { Reason: "FiveSecondInbound" } => EntryOutcome.FiveSecondInbound,
-                Terminal { Reason: "TenSecondBackcourt" } => EntryOutcome.TenSecondBackcourt,
                 Continue { Next: ContinuationKind.IntoHalfcourtSet } => EntryOutcome.CleanEntry,
                 Continue { Next: ContinuationKind.ResolveTurnoverType } => EntryOutcome.Turnover,
-                Continue { Next: ContinuationKind.ResolveFoulType } => EntryOutcome.Foul,
+                Continue { Next: ContinuationKind.ResolveOffensiveFoul } => EntryOutcome.OffensiveFoul,
+                Continue { Next: ContinuationKind.ResolveFoulType } => EntryOutcome.DefensiveFoul,
                 Continue { Next: ContinuationKind.ResolveJumpBall } => EntryOutcome.JumpBall,
                 _ => throw new InvalidOperationException("Unmapped Roll A result.")
             };
@@ -376,23 +376,25 @@ internal static class Program
             Console.WriteLine($"    {outcome,-18} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
         }
 
-        // Note: with Roll C, Roll F, and now Roll I live, the ended/routed split
-        // shifts again. Turnovers and jump balls end the possession (terminal), as
-        // before. A MISS now flows through Roll I: a defensive board and an
-        // offensive loose-ball foul END the possession (the two Roll I terminals —
-        // they flip the ball, so they count as `ended`), while an offensive board
-        // and a loose-ball-defense foul KEEP it alive and route to a stub
-        // (OffensiveRebound, or SidelineInbound/ResolveFreeThrows). So `ended` now
-        // also includes the two Roll I terminals; the three Roll I continues join
-        // the player-action shot/foul exits as routed-to-stub. The invariant holds:
-        // ended + routed-to-stub == BatchSize, unrouted == 0.
+        // As of Contextification #6 the possession chain CLOSES: the two inbound
+        // edges that used to park (Roll D below-bonus ResumeInbound, OOB-retained
+        // ResolveSidelineInbound) now RE-RUN Roll A and resolve downstream, and Roll
+        // A's three former violation terminals moved into Roll C. So nothing parks at
+        // a stub in the live chain anymore — every possession ends on a terminal.
+        // `routed-to-stub` therefore drops to ~0 and `ended` rises to ≈ BatchSize.
+        // (The shared game's fouls climb across the batch and cross the bonus within
+        // the first few possessions, so almost every defensive foul becomes a
+        // free-throw trip rather than a re-inbound — both terminate.) The invariant is
+        // unchanged: ended + routed-to-stub == BatchSize, unrouted == 0.
         var handoffOk = unrouted == 0 && (ended + routedToStub) == cfg.BatchSize;
         Console.WriteLine($"\n  handoff: ended={ended:N0}, routed-to-stub={routedToStub:N0}, unrouted={unrouted} -> {(handoffOk ? "ok" : "FAIL")}");
 
         return ratesOk && handoffOk;
     }
 
-    // --- Batch: Roll C's five rates match its pie, and every exit is a clean terminal. ---
+    // --- Batch: Roll C's (Halfcourt) rates match its pie, and every exit is a clean
+    //     terminal. As of #6 the Halfcourt context is the full live 15-way loss set,
+    //     so this now exercises every halfcourt-natural turnover type, not just five. ---
     private static bool RollCBatchCheck(
         RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
     {
@@ -411,21 +413,15 @@ internal static class Program
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var result = RollC.Execute(state, pieC, rng);
+            var result = RollC.Execute(state, pieC, rng, cfgC);
             if (result is not Terminal t)
             {
                 nonTerminal++;
                 continue;
             }
-            var outcome = t.Reason switch
-            {
-                "BadPassDeadBall" => TurnoverOutcome.BadPassDeadBall,
-                "BadPassIntercepted" => TurnoverOutcome.BadPassIntercepted,
-                "LostBallDeadBall" => TurnoverOutcome.LostBallDeadBall,
-                "LostBallLiveBall" => TurnoverOutcome.LostBallLiveBall,
-                "OffensiveFoul" => TurnoverOutcome.OffensiveFoul,
-                _ => throw new InvalidOperationException($"Unmapped Roll C reason '{t.Reason}'.")
-            };
+            // Halfcourt is now a LIVE multi-type pie (#6), so a draw can land on any
+            // of the fifteen reasons — map them all via the shared regression-net map.
+            var outcome = MapTurnover(t.Reason);
             counts[outcome]++;
 
             // Contextification #3: the two LIVE arms (intercepted / stripped-live) now carry
@@ -664,9 +660,9 @@ internal static class Program
     {
         Console.WriteLine("\n--- Seam signal: Roll C live-strip rate vs. pressure ---");
         var rng = new SystemRng(42);
-        var low = RollCLiveStripRate(genC, state, rng, pressure: 0.0);
+        var low = RollCLiveStripRate(genC, state, rng, pressure: 0.0, cfgC);
         rng = new SystemRng(42);
-        var high = RollCLiveStripRate(genC, state, rng, pressure: 1.0);
+        var high = RollCLiveStripRate(genC, state, rng, pressure: 1.0, cfgC);
 
         Console.WriteLine($"  live-strip rate @ pressure 0.00 = {low:P3}");
         Console.WriteLine($"  live-strip rate @ pressure 1.00 = {high:P3}");
@@ -677,13 +673,13 @@ internal static class Program
     }
 
     private static double RollCLiveStripRate(
-        RollCStubPieGenerator genC, PossessionState state, IRng rng, double pressure)
+        RollCStubPieGenerator genC, PossessionState state, IRng rng, double pressure, RollCConfig cfgC)
     {
         var pie = genC.Generate(state, pressure);
         var strips = 0;
         const int n = 100_000;
         for (var i = 0; i < n; i++)
-            if (RollC.Execute(state, pie, rng) is Terminal { Reason: "LostBallLiveBall" })
+            if (RollC.Execute(state, pie, rng, cfgC) is Terminal { Reason: "LostBallLiveBall" })
                 strips++;
         return strips / (double)n;
     }
@@ -946,14 +942,16 @@ internal static class Program
 
     // --- Clean handoff: route a batch of real E->F exits through the resolver and
     //     confirm every Roll F outcome lands at its intended destination, with
-    //     zero unrouted: turnover -> Roll C terminal, non-shooting foul -> Roll D
-    //     (ResumeInbound/ResolveFreeThrows stub), shot -> Roll G -> Roll H ->
-    //     resolved (any of its six destinations, including the block stub), jump
-    //     ball -> jump-ball terminal. A fresh local game + resolver keeps this
-    //     self-contained; the shared foul count climbing into the bonus mid-run is
-    //     expected (it just shifts some foul exits from ResumeInbound to
-    //     ResolveFreeThrows — both clean). (Block left Roll F in Session 13; it is
-    //     now a Roll H slice, so there is no F-stage block destination here.) ---
+    //     zero unrouted: turnover -> Roll C terminal, shot -> Roll G -> Roll H ->
+    //     resolved, jump ball -> jump-ball terminal. As of #6 a non-shooting foul no
+    //     longer parks: below the bonus Roll D's ResumeInbound RE-RUNS Roll A and the
+    //     possession resolves downstream (into the shot / turnover / jump-ball
+    //     buckets), and in the bonus it lands at the made-FT terminal — so the foul
+    //     exit has no bucket of its own; it is absorbed into the others, and the
+    //     zero-unrouted gate still proves it routes. A fresh local game + resolver
+    //     keeps this self-contained; the shared foul count climbing into the bonus
+    //     mid-run is expected. (Block left Roll F in Session 13; it is now a Roll H
+    //     slice, so there is no F-stage block destination here.) ---
     private static bool RollFHandoffCheck(RollAConfig cfg, GameState sharedGame, PossessionState state)
     {
         Console.WriteLine($"\n--- Clean handoff: {cfg.BatchSize:N0} E->F exits routed through the resolver ---");
@@ -978,6 +976,7 @@ internal static class Program
             cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
+            cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
             genF,
@@ -1001,7 +1000,6 @@ internal static class Program
         var destClasses = new Dictionary<string, int>
         {
             ["turnover -> Roll C terminal"] = 0,
-            ["foul -> Roll D stub"] = 0,
             ["shot -> Roll G -> Roll H -> resolved"] = 0,
             ["free throws -> resolved"] = 0,
             ["jump ball -> terminal"] = 0,
@@ -1036,8 +1034,7 @@ internal static class Program
             else if (d == "END:Made" || d == "END:MissOutOfBoundsLost"
                      || d == "END:DefensiveRebound" || d == "END:LooseBallFoulOnOffense"
                      || d == "END:OutOfBoundsOffOffense"
-                     || d.StartsWith("STUB:OffensiveRebound")
-                     || d.StartsWith("STUB:SidelineInbound"))
+                     || d.StartsWith("STUB:OffensiveRebound"))
                 destClasses["shot -> Roll G -> Roll H -> resolved"]++;
             // The Roll L FT loop's made-last-shot landing ends the possession
             // (END:FreeThrowsMade). A missed last shot no longer parks at STUB:FTRebound
@@ -1048,7 +1045,6 @@ internal static class Program
             else if (d == "END:FreeThrowsMade")
                 destClasses["free throws -> resolved"]++;
             else if (d.StartsWith("END:")) destClasses["turnover -> Roll C terminal"]++;
-            else if (d.StartsWith("STUB:ResumeInbound")) destClasses["foul -> Roll D stub"]++;
             else unrecognized++;
         }
 
@@ -1063,7 +1059,7 @@ internal static class Program
 
         var routedOk = unrecognized == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  all four F exits reached their destination: {(allHit ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all four resolved destinations reached: {(allHit ? "ok" : "FAIL")}");
 
         return routedOk && allHit;
     }
@@ -1122,20 +1118,17 @@ internal static class Program
     }
 
     // --- G->H->I integration: route a batch of IntoShotType exits through the
-    //     resolver. With Roll H and Roll I now live, an IntoShotType ticket flows
-    //     G (stamps a zone) -> H (stamps a result) and, on a MISS, on through I
-    //     (rebound resolution). It lands at one of EIGHT destinations: the Made /
-    //     MissOutOfBoundsLost terminals, the shooting-FT / sideline-inbound /
-    //     block-recovery stubs, and (Session 14) Roll I's DefensiveRebound /
-    //     LooseBallFoulOnOffense terminals + OffensiveRebound stub. This check
-    //     confirms the WHOLE post-shot chain routes: zero unrouted, all eight
-    //     destinations reached, and on the fact-carrying stub landings the zone Roll
-    //     G stamped still rides through (parsed from the
-    //     STUB:{node}:{Side}slot{N}:{Zone}:{Result} label). The four terminal
-    //     landings carry no zone in their END: label and are counted as terminal
-    //     landings. (Roll H in isolation is checked by RollHHandoffCheck, which
-    //     feeds IntoShotResolution directly.) A fresh local game + resolver keeps it
-    //     self-contained. ---
+    //     resolver. With Roll H and Roll I live, an IntoShotType ticket flows G (stamps
+    //     a zone) -> H (stamps a result) and, on a MISS, on through I (rebound
+    //     resolution). This check confirms the WHOLE post-shot chain routes: zero
+    //     unrouted and the CORE landings still reached straight off the first Roll H /
+    //     Roll I (Made / MissOutOfBoundsLost terminals + Roll I's DefensiveRebound /
+    //     LooseBallFoulOnOffense terminals). Everything Roll K / a reset / a re-inbound
+    //     opens up is bucketed as routed-deeper, not required. As of #6 the OOB-retained
+    //     sideline inbound no longer parks (it re-runs Roll A and lands deeper), so there
+    //     is no fact-carrying core stub here anymore; clean one-hop zone ride-through is
+    //     proven authoritatively by RollHResolutionBatchCheck. A fresh local game +
+    //     resolver keeps it self-contained. ---
     private static bool RollGHandoffCheck(RollAConfig cfg, PossessionState state)
     {
         Console.WriteLine($"\n--- G->H integration: {cfg.BatchSize:N0} IntoShotType exits routed through Roll G then Roll H ---");
@@ -1157,6 +1150,7 @@ internal static class Program
             cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
+            cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
             new RollFStubPieGenerator(cfgF),
@@ -1197,17 +1191,16 @@ internal static class Program
             ["END:MissOutOfBoundsLost"] = 0,
             ["END:DefensiveRebound"] = 0,
             ["END:LooseBallFoulOnOffense"] = 0,
-            ["STUB:SidelineInbound"] = 0,
         };
-        // Zone seen on the stub landings (the labels that carry it). Terminals
-        // omit the zone, so they don't contribute here.
-        var zonesSeenOnStubs = new Dictionary<ShotLocation, int>();
-        foreach (var z in Enum.GetValues<ShotLocation>()) zonesSeenOnStubs[z] = 0;
+        // STUB:SidelineInbound is DROPPED from the core set as of #6: an OOB-retained
+        // shot no longer parks — it re-runs Roll A and lands DEEPER (a terminal or a
+        // deeper stub), bucketed below. With no fact-carrying core stub left, the
+        // zone-ride-through assertion moves with it; clean one-hop fact ride-through
+        // is proven authoritatively by RollHResolutionBatchCheck.
 
         var unrecognized = 0;
-        var missingFact = 0;     // any NO_SLOT / NO_ZONE / NO_RESULT on a stub landing
-        var deeperTerminals = 0; // Roll K / reset terminals beyond the core set (routed)
-        var deeperStubs = 0;     // Roll K / reset stub parks beyond the core set (routed)
+        var deeperTerminals = 0; // Roll K / reset / re-inbound terminals beyond core (routed)
+        var deeperStubs = 0;     // Roll K / reset stub parks beyond core (routed)
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
@@ -1225,36 +1218,14 @@ internal static class Program
             // must short-circuit here rather than fall into the zone-token parser.
             if (d == "END:DefensiveRebound") { destHits["END:DefensiveRebound"]++; continue; }
             if (d == "END:LooseBallFoulOnOffense") { destHits["END:LooseBallFoulOnOffense"]++; continue; }
-            // The fact-carrying stub landings: STUB:{node}:{Side}slot{N}:{Zone}:{Result}
-            string node;
-            if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
-            // Everything Roll K / a reset opens up is ROUTED, just not in the core
-            // set: the three Roll K terminals (END:OffensiveFoul / DeadBallTurnover /
-            // LiveBallTurnover), a jump-ball terminal, any reset-born terminal
-            // (Roll C turnovers, a deeper Made), and any deeper stub park
-            // (ResumeInbound, Transition, …). Bucket them so they don't read as
-            // unrouted, but don't require them.
-            else if (d.StartsWith("END:")) { deeperTerminals++; continue; }
-            else if (d.StartsWith("STUB:")) { deeperStubs++; continue; }
-            else { unrecognized++; continue; }
-
-            if (d.EndsWith("NO_SLOT") || d.EndsWith("NO_ZONE") || d.EndsWith("NO_RESULT"))
-            {
-                // Now that Roll M is live, a fact-echo stub can be reached via a DEEP path
-                // — a shooting foul -> Roll L -> Roll M -> a bonus FT trip or a Roll K
-                // reset — whose state carries no original shot facts (the deferred
-                // FT-shooter seam). That is a routed-DEEPER landing, not a dropped fact:
-                // clean one-hop fact ride-through is proven authoritatively by
-                // RollHResolutionBatchCheck (fails=0). Bucket as deeper; tally for sight.
-                deeperStubs++;
-                missingFact++;
-                continue;
-            }
-
-            // Zone is the second-to-last colon token; result is the last.
-            var parts = d.Split(':');
-            var zoneText = parts[^2];
-            if (Enum.TryParse<ShotLocation>(zoneText, out var z)) { zonesSeenOnStubs[z]++; destHits[node]++; }
+            // Everything else is ROUTED but not in the core set: every Roll K / reset /
+            // re-inbound landing — the three Roll K terminals (END:OffensiveFoul /
+            // DeadBallTurnover / LiveBallTurnover), a jump-ball terminal, any reset- or
+            // re-entry-born terminal (a deeper Made, a Roll C turnover), an OOB-retained
+            // shot that re-ran Roll A and resolved downstream, and any deeper stub park.
+            // Bucket so they don't read as unrouted; don't require them.
+            else if (d.StartsWith("END:")) deeperTerminals++;
+            else if (d.StartsWith("STUB:")) deeperStubs++;
             else unrecognized++;
         }
 
@@ -1270,22 +1241,11 @@ internal static class Program
             Console.WriteLine($"    {label,-26} {count,8:N0}  {(hit ? "ok" : "NONE")}");
         }
 
-        var allZones = true;
-        Console.WriteLine("  all five zones rode through to the stub landings:");
-        foreach (var z in Enum.GetValues<ShotLocation>())
-        {
-            var hit = zonesSeenOnStubs[z] > 0;
-            allZones &= hit;
-            Console.WriteLine($"    {z,-6} {zonesSeenOnStubs[z],8:N0}  {(hit ? "ok" : "NONE")}");
-        }
-
         var routedOk = unrecognized == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  clean one-hop shots ride slot+zone+result through to their stub landings ({missingFact:N0} deep FT/reset landings carry no shot facts and are routed-deeper, not failed)");
-        Console.WriteLine($"  all core G->H->I destinations reached (offensive rebound now executes Roll K): {(allDests ? "ok" : "FAIL")}");
-        Console.WriteLine($"  all five zones reached the stub landings: {(allZones ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all core G->H->I destinations reached (offensive rebound now executes Roll K; OOB-retained re-runs Roll A and lands deeper): {(allDests ? "ok" : "FAIL")}");
 
-        return routedOk && allDests && allZones;
+        return routedOk && allDests;
     }
 
     // --- Batch: Roll H's seven-way make/miss distribution converges within
@@ -1480,6 +1440,7 @@ internal static class Program
             cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
+            cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
             new RollFStubPieGenerator(cfgF),
@@ -1505,28 +1466,27 @@ internal static class Program
         // possession alive (putback back into Roll H, or a reset back into Roll E) or
         // flips it (three terminals). So the post-shot destination set is now OPEN.
         // We assert the CORE landings that still come straight off the FIRST Roll H /
-        // Roll I (and-1, fouled miss, OOB-retained, block, the made basket, the two
-        // Roll I terminals), zero-unrouted, and facts intact — and bucket everything
-        // Roll K / a reset opens up as "deeper" (routed, not required).
-        // STUB:OffensiveRebound is DROPPED — it is structurally unreachable now.
-        // STUB:BlockRecovery is also dropped — Roll H's Blocked now routes into Roll I
-        // (the block pie), so a block lands at one of Roll I's existing landings (core
-        // or bucketed-deeper), never at the retired block-recovery stub.
+        // Roll I (the made basket, MissOutOfBoundsLost, the two Roll I terminals),
+        // zero-unrouted — and bucket everything Roll K / a reset / a re-inbound opens
+        // up as "deeper" (routed, not required). As of #6 the OOB-retained sideline
+        // inbound is DROPPED from the core set too — it no longer parks; it re-runs
+        // Roll A and lands deeper. STUB:OffensiveRebound and STUB:BlockRecovery remain
+        // dropped (offensive board executes Roll K; a block routes into Roll I).
         var destHits = new Dictionary<string, int>
         {
             ["END:Made"] = 0,
             ["END:MissOutOfBoundsLost"] = 0,
             ["END:DefensiveRebound"] = 0,
             ["END:LooseBallFoulOnOffense"] = 0,
-            ["STUB:SidelineInbound"] = 0,
         };
-        var resultsSeenOnStubs = new Dictionary<ShotResult, int>();
-        foreach (var r in Enum.GetValues<ShotResult>()) resultsSeenOnStubs[r] = 0;
+        // STUB:SidelineInbound is DROPPED from the core set as of #6: an OOB-retained
+        // shot no longer parks — it re-runs Roll A and lands DEEPER. With no
+        // fact-carrying core stub left, the result-ride-through assertion goes with it;
+        // clean one-hop fact ride-through is proven by RollHResolutionBatchCheck.
 
         var unrecognized = 0;
-        var missingFact = 0;
-        var deeperTerminals = 0; // Roll K / reset terminals beyond the core set (routed)
-        var deeperStubs = 0;     // Roll K / reset stub parks beyond the core set (routed)
+        var deeperTerminals = 0; // Roll K / reset / re-inbound terminals beyond core (routed)
+        var deeperStubs = 0;     // Roll K / reset stub parks beyond core (routed)
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
@@ -1546,31 +1506,12 @@ internal static class Program
             if (d == "END:DefensiveRebound") { destHits["END:DefensiveRebound"]++; continue; }
             if (d == "END:LooseBallFoulOnOffense") { destHits["END:LooseBallFoulOnOffense"]++; continue; }
 
-            string node;
-            if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
-            // Everything Roll K / a reset opens up is ROUTED, just not core: the three
-            // Roll K terminals (END:OffensiveFoul / DeadBallTurnover / LiveBallTurnover),
-            // a jump-ball terminal, any reset-born terminal, any deeper stub park.
-            else if (d.StartsWith("END:")) { deeperTerminals++; continue; }
-            else if (d.StartsWith("STUB:")) { deeperStubs++; continue; }
-            else { unrecognized++; continue; }
-
-            if (d.EndsWith("NO_SLOT") || d.EndsWith("NO_ZONE") || d.EndsWith("NO_RESULT"))
-            {
-                // Now that Roll M is live, a fact-echo stub can be reached via a DEEP path
-                // — a shooting foul -> Roll L -> Roll M -> a bonus FT trip or a Roll K
-                // reset — whose state carries no original shot facts (the deferred
-                // FT-shooter seam). That is a routed-DEEPER landing, not a dropped fact:
-                // clean one-hop fact ride-through is proven authoritatively by
-                // RollHResolutionBatchCheck (fails=0). Bucket as deeper; tally for sight.
-                deeperStubs++;
-                missingFact++;
-                continue;
-            }
-
-            // Result is the last colon token on a stub landing.
-            var resultText = d[(d.LastIndexOf(':') + 1)..];
-            if (Enum.TryParse<ShotResult>(resultText, out var r)) { resultsSeenOnStubs[r]++; destHits[node]++; }
+            // Everything else is ROUTED but not core: the three Roll K terminals, a
+            // jump-ball terminal, any reset- or re-inbound-born terminal, an OOB-retained
+            // shot that re-ran Roll A, and any deeper stub park. Bucket so they don't read
+            // as unrouted; don't require them.
+            if (d.StartsWith("END:")) deeperTerminals++;
+            else if (d.StartsWith("STUB:")) deeperStubs++;
             else unrecognized++;
         }
 
@@ -1586,39 +1527,11 @@ internal static class Program
             Console.WriteLine($"    {label,-26} {count,8:N0}  {(hit ? "ok" : "NONE")}");
         }
 
-        // The continue-outcomes whose result rides through to a FACT-CARRYING stub
-        // STRAIGHT off the first Roll H — these land before any rebound, so they remain
-        // robust: OOB-retained → SidelineInbound. A plain Miss is DELIBERATELY not here:
-        // with Roll I + Roll K live it flows deeper (defensive board terminal, or
-        // offensive board → Roll K) rather than parking with Result=Miss. As of the
-        // block-recovery session BLOCKED is no longer here either: Roll H's Blocked arm
-        // now routes into Roll I (the block pie) exactly as a Miss does, so it flows
-        // deeper through the rebound machinery rather than parking at a block stub — its
-        // routing is proven by RollIBlockReboundBatchCheck / RollIBlockContextSelectionCheck.
-        // And as of Session 18 the two SHOOTING-foul outcomes (MadeAndFouled / MissFouled)
-        // are not here either: they drive the Roll L FT loop and end at END:FreeThrowsMade
-        // on a made last shot, or flow into Roll M on a missed last shot (Session 19).
-        // Their routing is covered by RollLFreeThrowCheck and RollMReboundBatchCheck.
-        var continueResults = new[]
-        {
-            ShotResult.MissOutOfBoundsRetained
-        };
-        var allResults = true;
-        Console.WriteLine("  each straight-off-Roll-H continue-outcome's result rode through to its stub:");
-        foreach (var r in continueResults)
-        {
-            var hit = resultsSeenOnStubs[r] > 0;
-            allResults &= hit;
-            Console.WriteLine($"    {r,-24} {resultsSeenOnStubs[r],8:N0}  {(hit ? "ok" : "NONE")}");
-        }
-
         var routedOk = unrecognized == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  clean one-hop shots ride slot+zone+result through to their stub landings ({missingFact:N0} deep FT/reset landings carry no shot facts and are routed-deeper, not failed)");
-        Console.WriteLine($"  all core Roll H->I destinations reached (offensive rebound now executes Roll K): {(allDests ? "ok" : "FAIL")}");
-        Console.WriteLine($"  every straight-off-Roll-H continue-outcome's result reached its stub: {(allResults ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all core Roll H->I destinations reached (offensive rebound now executes Roll K; OOB-retained re-runs Roll A and lands deeper): {(allDests ? "ok" : "FAIL")}");
 
-        return routedOk && allDests && allResults;
+        return routedOk && allDests;
     }
 
     // --- Batch: Roll I's four-way rebound distribution converges within tolerance,
@@ -2137,6 +2050,7 @@ internal static class Program
             cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
+            cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
             new RollFStubPieGenerator(cfgF),
@@ -2231,6 +2145,7 @@ internal static class Program
             cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
+            cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
             new RollFStubPieGenerator(cfgF),
@@ -2374,15 +2289,12 @@ internal static class Program
         Console.WriteLine($"  flat placeholder time accumulated: {result.TotalSeconds:N0}s (observability only)");
 
         // Per-stub park breakdown — quantifies how much of the game is currently
-        // flowing through placeholder flips (the offensive-rebound / transition / etc.
-        // volume waiting to be closed). The mix SHIFTS across the loop as the bonus
-        // crosses: a free-throw trip now RESOLVES end-to-end — a made final FT ends the
-        // possession (counted in terminal-ended), and a missed final FT drives Roll M
-        // (Session 19), which lands on a board, a dead ball, a sideline inbound, or — when
-        // its loose-ball-defense arm fires with the defense in the bonus — a SECOND FT
-        // trip. STUB:FTRebound no longer appears in this breakdown at all. The §2a
+        // flowing through placeholder flips. As of #6 the chain CLOSES: the inbound
+        // edges (ResumeInbound / SidelineInbound) no longer park — they re-run Roll A —
+        // and Roll A's violation terminals moved into Roll C, so this breakdown is now
+        // expected to be ESSENTIALLY EMPTY (parked ≈ 0, terminal-ended ≈ cap). The §2a
         // accumulation is still exercised: the volume flowing through the in-bonus forks
-        // (Roll I / J / K / M) climbing once teams reach the bonus is the visible proof.
+        // (Roll I / J / K / M) once teams reach the bonus is the visible proof.
         Console.WriteLine("  per-stub park breakdown:");
         foreach (var (dest, n) in result.PerStubParks.OrderByDescending(kv => kv.Value))
             Console.WriteLine($"    {dest,-44} {n,6:N0}");
@@ -2684,10 +2596,12 @@ internal static class Program
 
     // --- Context selection: Roll C builds the RIGHT pie for each turnover context,
     //     and the resolved rates from each match. Proves the ticket/station seam end
-    //     to end: a Halfcourt ticket (the legacy/default) selects 30/22/18/20/10; a
-    //     Transition ticket selects 25/15/20/35/5. Each selected pie is asserted equal
-    //     to its configured weights (selection correct), then driven through Roll C
-    //     (consumption correct). The legacy pie is confirmed byte-for-byte. ---
+    //     to end: a Halfcourt ticket selects the live 15-way halfcourt loss set; a
+    //     Transition ticket selects 25/15/20/35/5. Each selected pie's five MAIN
+    //     slices are asserted equal to their configured weights (selection correct),
+    //     then driven through Roll C (consumption correct). As of #6 the Halfcourt
+    //     context is no longer the legacy 30/22/18/20/10 — the five mains now read
+    //     24/18/14/16/9 with the expanded minor types live alongside them. ---
     private static bool RollCContextCheck(
         RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
     {
@@ -2732,7 +2646,7 @@ internal static class Program
             foreach (var o in Enum.GetValues<TurnoverOutcome>()) counts[o] = 0;
             for (var i = 0; i < cfg.BatchSize; i++)
             {
-                var t = (Terminal)RollC.Execute(state, pie, rng);
+                var t = (Terminal)RollC.Execute(state, pie, rng, cfgC);
                 counts[MapTurnover(t.Reason)]++;
             }
 
@@ -3091,6 +3005,7 @@ internal static class Program
             cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
+            cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
             new RollFStubPieGenerator(cfgF),
@@ -3545,6 +3460,7 @@ internal static class Program
             cfg,
             new RollBStubPieGenerator(cfgB),
             new RollCStubPieGenerator(cfgC),
+            cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
             new RollFStubPieGenerator(cfgF),
@@ -3621,16 +3537,18 @@ internal static class Program
     //     correctly in ISOLATION. Two parts: (1) drive the new Entry/Backcourt
     //     context directly and confirm its weighted members are reachable at their
     //     configured rate; (2) a directly-built UNIFORM pie over all 15 types lights
-    //     up every arm — including the halfcourt-natural new types that are 0.0 in
-    //     every live context this session — and asserts each is a clean terminal
-    //     with the right consequence (dead-ball to defense, except the two existing
-    //     live steals) and the right elapsed (violations stamp 30/0/10; every
-    //     turnover defers to null), and that NO new type leaks a steal. Owns its own
-    //     full reason map so the regression-net MapTurnover stays byte-for-byte. ---
+    //     up every arm — including any type that is 0.0 in a given live context — and
+    //     asserts each is a clean terminal with the right consequence (dead-ball to
+    //     defense, except the two existing live steals) and the right elapsed
+    //     (violations stamp 30/0/10; every turnover defers to null), and that NO new
+    //     type leaks a steal. (As of #6 the new halfcourt-natural types are LIVE in
+    //     the Halfcourt context; this check still drives them in isolation via the
+    //     EntryBackcourt + uniform pies, independent of that.) Keeps its own full
+    //     reason map local; the shared MapTurnover is now full too. ---
     private static bool RollCExpansionCheck(
         RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
     {
-        Console.WriteLine("\n--- Expansion (#5a): Roll C dormant loss types resolve in isolation ---");
+        Console.WriteLine("\n--- Expansion: Roll C expanded loss types resolve in isolation ---");
         var rng = new SystemRng(cfg.Seed);
         var ok = true;
 
@@ -3776,6 +3694,16 @@ internal static class Program
         "LostBallDeadBall" => TurnoverOutcome.LostBallDeadBall,
         "LostBallLiveBall" => TurnoverOutcome.LostBallLiveBall,
         "OffensiveFoul" => TurnoverOutcome.OffensiveFoul,
+        "Travel" => TurnoverOutcome.Travel,
+        "DoubleDribble" => TurnoverOutcome.DoubleDribble,
+        "Carry" => TurnoverOutcome.Carry,
+        "ThreeSecondViolation" => TurnoverOutcome.ThreeSecondViolation,
+        "FiveSecondCloselyGuarded" => TurnoverOutcome.FiveSecondCloselyGuarded,
+        "OffensiveGoaltending" => TurnoverOutcome.OffensiveGoaltending,
+        "BackcourtViolation" => TurnoverOutcome.BackcourtViolation,
+        "ShotClockViolation" => TurnoverOutcome.ShotClockViolation,
+        "FiveSecondInbound" => TurnoverOutcome.FiveSecondInbound,
+        "TenSecondBackcourt" => TurnoverOutcome.TenSecondBackcourt,
         _ => throw new InvalidOperationException($"Unmapped Roll C reason '{reason}'.")
     };
 

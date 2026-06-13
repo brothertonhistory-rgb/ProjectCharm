@@ -87,20 +87,22 @@ public enum TurnoverOutcome
     BackcourtViolation,
 
     /// <summary>Shot-clock violation. Dead ball. -> TERMINAL. INVARIANT elapsed:
-    /// the full shot clock (30s). Roll A holds an identical terminal today;
-    /// #5b consolidates. (Same name as <c>EntryOutcome.ShotClockViolation</c>,
-    /// different enum — no collision.)</summary>
+    /// the full shot clock (30s). As of Contextification #6 this is the SOLE home of
+    /// a shot-clock violation — Roll A's old twin terminal was retired and its loss
+    /// now routes here via the Turnover exit's EntryBackcourt context.</summary>
     ShotClockViolation,
 
     /// <summary>Five-second inbound violation (failure to inbound in time). Dead
-    /// ball. -> TERMINAL. INVARIANT elapsed: ZERO (the clock never started).
-    /// Roll A holds an identical terminal today; #5b consolidates.</summary>
+    /// ball. -> TERMINAL. INVARIANT elapsed: ZERO (the clock never started). As of #6
+    /// this is the SOLE home of the violation; Roll A's old twin terminal was retired
+    /// (its loss routes here via the EntryBackcourt context).</summary>
     FiveSecondInbound,
 
     /// <summary>Ten-second backcourt violation (failure to advance past the
     /// division line in time). Dead ball. -> TERMINAL. INVARIANT elapsed: a fixed
-    /// 10s (the count ran before the whistle). Roll A holds an identical terminal
-    /// today; #5b consolidates.</summary>
+    /// 10s (the count ran before the whistle). As of #6 this is the SOLE home of the
+    /// violation; Roll A's old twin terminal was retired (its loss routes here via the
+    /// EntryBackcourt context).</summary>
     TenSecondBackcourt
 }
 

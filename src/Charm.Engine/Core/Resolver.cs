@@ -63,6 +63,7 @@ public sealed class Resolver
     private readonly RollAConfig _rollAConfig;
     private readonly RollBStubPieGenerator _rollBGenerator;
     private readonly RollCStubPieGenerator _rollCGenerator;
+    private readonly RollCConfig _rollCConfig;
     private readonly RollDStubPieGenerator _rollDGenerator;
     private readonly RollEStubPieGenerator _rollEGenerator;
     private readonly RollFStubPieGenerator _rollFGenerator;
@@ -75,9 +76,8 @@ public sealed class Resolver
     private readonly RollMStubPieGenerator _rollMGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
-    private readonly IContinuationNode _resumeInbound;
+    // RETIRED stubs still referenced by their corner cases (block recovery, transition).
     private readonly IContinuationNode _resolveBlock;
-    private readonly IContinuationNode _sidelineInbound;
     // Roll J's Push parks here — the future transition roll's holding pen.
     private readonly IContinuationNode _transition;
 
@@ -86,6 +86,7 @@ public sealed class Resolver
         RollAConfig rollAConfig,
         RollBStubPieGenerator rollBGenerator,
         RollCStubPieGenerator rollCGenerator,
+        RollCConfig rollCConfig,
         RollDStubPieGenerator rollDGenerator,
         RollEStubPieGenerator rollEGenerator,
         RollFStubPieGenerator rollFGenerator,
@@ -98,6 +99,11 @@ public sealed class Resolver
         RollMStubPieGenerator rollMGenerator,
         GameState game,
         IRng rng,
+        // resumeInbound / sidelineInbound are accepted but no longer stored: as of #6
+        // the live chain re-runs Roll A on those edges instead of parking, so the
+        // resolver holds no inbound stub. The params are kept so the (8) construction
+        // sites are unchanged here; the harness builds its own stub instances for its
+        // direct fact-echo checks.
         IContinuationNode resumeInbound,
         IContinuationNode resolveBlock,
         IContinuationNode sidelineInbound,
@@ -107,6 +113,7 @@ public sealed class Resolver
         _rollAConfig = rollAConfig;
         _rollBGenerator = rollBGenerator;
         _rollCGenerator = rollCGenerator;
+        _rollCConfig = rollCConfig;
         _rollDGenerator = rollDGenerator;
         _rollEGenerator = rollEGenerator;
         _rollFGenerator = rollFGenerator;
@@ -119,9 +126,7 @@ public sealed class Resolver
         _rollMGenerator = rollMGenerator;
         _game = game;
         _rng = rng;
-        _resumeInbound = resumeInbound;
         _resolveBlock = resolveBlock;
-        _sidelineInbound = sidelineInbound;
         _transition = transition;
     }
 
@@ -229,15 +234,18 @@ public sealed class Resolver
                         // (execute + feed result back), not like a stub.
                         case ContinuationKind.ResolveTurnoverType:
                             // Select Roll C's pie by the turnover context the ticket
-                            // carries. A null stamp — every legacy feeder (Roll A, B,
-                            // F) stamps nothing — reads as Halfcourt, so the legacy
-                            // pie is byte-for-byte unchanged. Roll J's Turnover arm
-                            // stamps Transition for its outlet/push pie.
+                            // carries. Roll A now stamps EntryBackcourt (backcourt
+                            // bring-up) or Halfcourt (frontcourt re-inbound); Roll J's
+                            // Turnover arm stamps Transition; Roll B and Roll F stamp
+                            // nothing, and a null reads as Halfcourt — so their pie is
+                            // byte-for-byte unchanged. The RollCConfig is passed (it was
+                            // not before #6): the now-LIVE violation arms read their
+                            // invariant elapsed through it, and would FAIL LOUD without it.
                             var pieC = _rollCGenerator.Generate(
                                 c.State,
                                 pressure: 0.0,
                                 context: c.TurnoverContext ?? TurnoverContext.Halfcourt);
-                            result = RollC.Execute(c.State, pieC, _rng);
+                            result = RollC.Execute(c.State, pieC, _rng, _rollCConfig);
                             continue;
 
                         // Roll B's proceed -> execute Roll E (player selection),
@@ -284,10 +292,35 @@ public sealed class Resolver
                             result = RollD.Execute(c.State, pieD, _game, _rng);
                             continue;
 
-                        // Roll D, opponent not in bonus -> offense keeps the ball
-                        // and inbounds (stub). Chain ends here for now.
+                        // Offensive foul on the entry (Roll A) -> a dead-ball loss to
+                        // the other team. Deterministic: a player-control foul yields no
+                        // free throws and no bonus credit, so it maps straight to the
+                        // same OffensiveFoul terminal Roll C names for an offensive foul
+                        // (ball to the defense, dead-ball restart) — no pie, no Roll D
+                        // charge. "One node names the loss": the reason string and
+                        // consequence match Roll C's OffensiveFoul arm exactly. (A future
+                        // flavor tag — charge / off-arm / illegal screen — plugs in here.)
+                        case ContinuationKind.ResolveOffensiveFoul:
+                            result = new Terminal("OffensiveFoul", c.State,
+                                PossessionConsequence.DeadBallTo(c.State.Defense));
+                            continue;
+
+                        // Roll D, opponent not in bonus -> the offense keeps the ball and
+                        // RE-INBOUNDS. As of #6 this no longer parks: it re-runs Roll A
+                        // carrying the CURRENT court-state (a backcourt entry foul resumes
+                        // backcourt and must still cross; a frontcourt foul resumes
+                        // frontcourt, where the backcourt losses are unreachable). The
+                        // re-entry feeds the loop exactly like IntoHalfcourtSet, so a
+                        // foul on the re-inbound charges another team foul and can cross
+                        // the bonus MID-LOOP — then this same kind routes to
+                        // ResolveFreeThrows instead. The IterationCeiling guard + the
+                        // dominant CleanEntry weight keep it converging in a few hops.
+                        // (The resolver no longer holds an inbound stub; the harness
+                        // builds its own for the direct fact-echo checks.)
                         case ContinuationKind.ResumeInbound:
-                            return new RoutingOutcome(false, _resumeInbound.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
+                            var pieAResume = _rollAGenerator.Generate(c.State, pressure: 0.0);
+                            result = RollA.Execute(c.State, pieAResume, _rng, _rollAConfig);
+                            continue;
 
                         // Bonus fork (Roll D/I/J/K), opponent in bonus -> the Roll L
                         // FT loop. The Bonus token IS the shot count: Double is a flat
@@ -408,11 +441,21 @@ public sealed class Resolver
                             freeThrowSpins += shootingFtSpins;
                             continue;
 
-                        // Roll H, miss deflected OOB off the defender -> sideline-
-                        // inbound node (stub); offense retains and inbounds. Chain
-                        // ends here for now.
+                        // OOB off the defender, offense RETAINS (Roll H's
+                        // MissOutOfBoundsRetained, and the I/J/K/M OutOfBoundsOffDefense
+                        // + below-bonus loose-ball-defense fork): a sideline throw-in.
+                        // As of #6 this no longer parks: it re-runs Roll A carrying the
+                        // current court-state. These all arrive post-cross (frontcourt is
+                        // already latched), so the re-inbound runs the frontcourt entry —
+                        // the backcourt losses are unreachable and it almost always
+                        // CleanEntry's back into the set. Same loop shape as ResumeInbound;
+                        // the same guard + dominant CleanEntry weight keep it converging.
+                        // (The resolver no longer holds an inbound stub; the harness
+                        // builds its own for the direct fact-echo checks.)
                         case ContinuationKind.ResolveSidelineInbound:
-                            return new RoutingOutcome(false, _sidelineInbound.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
+                            var pieASideline = _rollAGenerator.Generate(c.State, pressure: 0.0);
+                            result = RollA.Execute(c.State, pieASideline, _rng, _rollAConfig);
+                            continue;
 
                         // Jump ball (from any feeder: Roll A, Roll B, Roll F) ->
                         // resolve against the possession arrow, then END the

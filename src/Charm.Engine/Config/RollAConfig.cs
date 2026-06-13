@@ -9,34 +9,31 @@ namespace Charm.Engine;
 public sealed class RollAConfig
 {
     // --- Stub pie base weights (placeholders; the real attribute-driven
-    //     generator will replace these). The generator renormalizes, but these
-    //     are kept summing to 1 for clarity. ---
+    //     generator will replace these). Kept summing to 1 for clarity. The five
+    //     reshaped outcomes (Contextification #6): the three former violation
+    //     terminals are GONE — their loss now resolves inside Roll C via the
+    //     Turnover exit's EntryBackcourt context, so the old violation mass folded
+    //     into BaseTurnover. The old single foul slice split into offensive vs.
+    //     defensive (≈15 / 85 — entry fouls are overwhelmingly defensive reach-ins;
+    //     the split scales with pressure in the real generator later). ---
     public double BaseClean { get; set; } = 0.88;
-    public double BaseTurnover { get; set; } = 0.06;
-    public double BaseViolation { get; set; } = 0.02;
-    public double BaseFoul { get; set; } = 0.03;
+    public double BaseTurnover { get; set; } = 0.08;
+
+    /// <summary>Weight for an OFFENSIVE foul on the entry (charge / illegal screen).
+    /// ≈15% of the entry-foul slice; the rest is defensive. A placeholder that scales
+    /// up with backcourt pressure in the real generator.</summary>
+    public double BaseOffensiveFoul { get; set; } = 0.0045;
+
+    /// <summary>Weight for a non-shooting DEFENSIVE foul on the entry (reach-in, grab).
+    /// ≈85% of the entry-foul slice. Routes to Roll D (charge-and-fork).</summary>
+    public double BaseDefensiveFoul { get; set; } = 0.0255;
+
     public double BaseJumpBall { get; set; } = 0.01;
-
-    /// <summary>Weight for the 5-second inbound violation slice. Rare. The
-    /// generator renormalizes, so the full set need not sum to exactly 1.</summary>
-    public double BaseFiveSecondInbound { get; set; } = 0.003;
-
-    /// <summary>Weight for the 10-second backcourt violation slice. Rare.</summary>
-    public double BaseTenSecondBackcourt { get; set; } = 0.005;
 
     /// <summary>The single live wire proving the seam carries signal: how much
     /// a pressure of 1.0 adds to the turnover weight before renormalization.
     /// Placeholder, not basketball logic.</summary>
     public double PressureTurnoverNudge { get; set; } = 0.10;
-
-    /// <summary>Invariant elapsed time stamped on a shot-clock-violation
-    /// terminal: the full shot clock (NCAA men's = 30s).</summary>
-    public double ViolationElapsedSeconds { get; set; } = 30.0;
-
-    /// <summary>Invariant elapsed time stamped on a 10-second backcourt
-    /// violation: the fixed 10s the count ran before the whistle. (The 5-second
-    /// inbound stamps zero — the clock never started — so it needs no config.)</summary>
-    public double TenSecondElapsedSeconds { get; set; } = 10.0;
 
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;

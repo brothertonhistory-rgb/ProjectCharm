@@ -8,38 +8,36 @@ namespace Charm.Engine;
 /// </summary>
 public enum EntryOutcome
 {
-    /// <summary>Offense gets cleanly into its halfcourt set. -> CONTINUE.</summary>
+    /// <summary>Offense gets cleanly into its halfcourt set. -> CONTINUE. Latches the
+    /// possession's court-state to FRONTCOURT on the way to Roll B — the offense has
+    /// crossed, so the backcourt-only ways to lose it are gone from here on.</summary>
     CleanEntry,
 
-    /// <summary>Offense coughs it up on the entry. -> CONTINUE (to turnover-type resolver).</summary>
+    /// <summary>Offense coughs it up on the entry. -> CONTINUE (to the shared
+    /// turnover-type resolver, Roll C). Roll A stamps the loss CONTEXT by the current
+    /// court-state: a backcourt bring-up routes to Roll C's EntryBackcourt pie (the
+    /// backcourt violations live there), a frontcourt re-inbound to the Halfcourt
+    /// pie. Roll A no longer terminates any violation itself — the loss resolves in
+    /// Roll C (Contextification #6 consolidated the three former violation terminals
+    /// there).</summary>
     Turnover,
 
-    /// <summary>
-    /// Shot clock expires in the backcourt — they never got it across in 30s.
-    /// -> TERMINAL. Invariant: always the full clock off, so its elapsed time is
-    /// known here and needs no separate time roll. (The 30s case; contrast the
-    /// 5s and 10s violations below, which burn different fixed amounts.)
-    /// </summary>
-    ShotClockViolation,
+    /// <summary>An OFFENSIVE foul on the entry — a charge or illegal screen by the team
+    /// bringing it up. -> CONTINUE (to the OffensiveFoul resolution: a player-control
+    /// foul is a dead-ball turnover to the other team, no free throws, no bonus). The
+    /// foul is still attributed to the individual player by the future attribution
+    /// layer; the possession-level effect is just a loss. Split out from the old single
+    /// <c>Foul</c> slice in Contextification #6.</summary>
+    OffensiveFoul,
 
-    /// <summary>Failure to inbound within 5 seconds. -> TERMINAL. The clock never
-    /// started (the entry pass never came in), so elapsed time is ZERO. A
-    /// backcourt-phase violation; like the shot-clock case it is zero-variance and
-    /// ends the possession here.</summary>
-    FiveSecondInbound,
+    /// <summary>A non-shooting DEFENSIVE foul on the entry — a reach-in, a grab, a bump
+    /// on the ball-handler. -> CONTINUE (to the shared foul-type node, Roll D, which
+    /// charges the team foul and forks on the bonus). Below the bonus the offense keeps
+    /// the ball and re-inbounds in the CURRENT court-state; in the bonus it goes to the
+    /// line. Split out from the old single <c>Foul</c> slice in Contextification #6.</summary>
+    DefensiveFoul,
 
-    /// <summary>Failure to advance the ball past the division line within 10
-    /// seconds of a successful inbound. -> TERMINAL. Burns a fixed 10 seconds
-    /// (the count ran before the whistle). A backcourt-phase violation; the ball
-    /// was inbounded but never cleared the backcourt.</summary>
-    TenSecondBackcourt,
-
-    /// <summary>A foul on the inbound/entry. -> CONTINUE (to foul-type resolver,
-    /// which will decide defensive non-shooting vs. offensive and what it
-    /// triggers). Has real variance, so it is never resolved here.</summary>
-    Foul,
-
-    /// <summary>A tie-up / held ball on the inbound. -> CONTINUE (to jump-ball
+    /// <summary>A tie-up / held ball on the inbound. -> CONTINUE (to the jump-ball
     /// resolver, which consults the possession arrow on GameState). Rare but
     /// real on virtually every pie going forward.</summary>
     JumpBall
@@ -63,6 +61,16 @@ public enum ContinuationKind
 
     /// <summary>Foul: hand off to the shared foul-type resolver (Roll D).</summary>
     ResolveFoulType,
+
+    /// <summary>An OFFENSIVE foul (a charge / illegal screen) was drawn on the entry:
+    /// hand off to the offensive-foul resolution. Deterministic — the resolver maps
+    /// this straight to the same dead-ball loss terminal Roll C names for an offensive
+    /// foul (ball to the other team, no free throws, no bonus), with no pie roll. Kept
+    /// as a CONTINUATION KIND rather than a Roll A terminal so the "one node names the
+    /// loss" rule holds and a future flavor tag (charge vs. off-arm vs. illegal screen)
+    /// has a single home. Added in Contextification #6 when Roll A's foul slice split
+    /// into offensive vs. defensive.</summary>
+    ResolveOffensiveFoul,
 
     /// <summary>Jump ball: hand off to the jump-ball node (consults the arrow).</summary>
     ResolveJumpBall,

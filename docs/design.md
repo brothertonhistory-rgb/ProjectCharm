@@ -1954,3 +1954,71 @@ accepted, not a behavior change. Separately, `Pie.Roll`'s overflow fallback retu
 now a zero-weight appended type, so a draw within ~1e-16 of 1.0 in a live context could fall through
 to it (≈ 1e-11 expected over a 100k batch — will not fire). Fixing it is a pie-mechanism change, out
 of scope; logged as a deferral.
+
+---
+
+## Contextification #6 — Roll A reshaped, the halfcourt loss set live, and the chain closed
+
+#6 completes the arc #5a seated. #5a made Roll C the canonical home of every no-shot loss, seated but
+dormant. #6 turns the halfcourt set live, reshapes Roll A to its real outcomes, wires Roll A's loss
+exit into Roll C by court phase, and closes the possession loop. (Forecast as "#5b" in the #5a notes;
+shipped as #6 — the plan bent to the code, CONVENTIONS §6a.)
+
+**Roll A's five outcomes.** `EntryOutcome` is now `CleanEntry`, `Turnover`, `OffensiveFoul`,
+`DefensiveFoul`, `JumpBall`. The three former violation terminals are GONE from Roll A — a backcourt
+violation is a way the possession is lost, and every no-shot loss belongs in Roll C, so they resolve
+there via the Turnover exit's `EntryBackcourt` context. The old single foul slice split offensive vs.
+defensive. Base weights (placeholders, sum 1): clean 0.88, turnover 0.08 (absorbing the old violation
+mass, which now surfaces as TYPES inside Roll C's EntryBackcourt pie), offensive foul 0.0045, defensive
+foul 0.0255, jump ball 0.01. Roll A no longer reads its config (the violation terminals were its only
+readers); `cfg` is retained on `Execute`'s signature for call-site parity.
+
+**The court-state marker.** `PossessionState.Frontcourt` (a single `bool`, default false) records court
+phase: false = backcourt (bringing it up — 10-second count, backcourt shot-clock, 5-second inbound all
+live), true = frontcourt (across, into the set — those backcourt-only losses unreachable). It latches
+true the instant `CleanEntry` hands to Roll B and never flips back within a possession (the role-based
+model has no spatial "return to backcourt"; over-and-back is a Halfcourt loss, not a court-state flip).
+A re-inbound carries the current phase. This is the origin signal that selects Roll A's loss context.
+A single bit suffices today, exactly like `FastBreak`; the finer spot-flip (the other team starting in
+the frontcourt after a backcourt turnover) appends later without teardown.
+
+**Context selection on the loss exit.** Roll A's Turnover arm stamps
+`state.Frontcourt ? TurnoverContext.Halfcourt : TurnoverContext.EntryBackcourt`. A backcourt bring-up
+routes to the EntryBackcourt pie (5-second inbound, 10-second backcourt, backcourt shot-clock, plus a
+bad pass / lost ball on the way up); a frontcourt re-inbound routes to the Halfcourt pie (where those
+backcourt-only violations are 0.0 and cannot happen). The Halfcourt pie is now the live 13-way
+breakdown — 24/18/16/14 mains, 9 offensive foul, then travel 8, over-and-back 2, shot-clock 2.5,
+3-second 2.5, double-dribble/carry 1.5 each, closely-guarded/offensive-goaltending 0.5 each. This one
+pie governs EVERY halfcourt turnover (Roll A frontcourt re-inbound, Roll B, Roll F): a travel is a
+travel whoever caused it.
+
+**Invariant elapsed wired through the resolver.** With Halfcourt `ShotClockViolation` and the
+EntryBackcourt violation arms now live, the resolver MUST pass `RollCConfig` to `RollC.Execute` so those
+arms can stamp their invariant elapsed (30/0/10) — they fail loud without it. The resolver gained a
+`_rollCConfig` field/param and passes it; all eight harness resolver constructions pass it too. This is
+the consolidation #5a forecast: Roll A's violation-elapsed fields were removed and Roll C's
+`*ElapsedSeconds` are now the sole source.
+
+**Offensive foul: a deterministic loss terminal.** A new `ContinuationKind.ResolveOffensiveFoul` maps
+in the resolver, with no pie, to `Terminal("OffensiveFoul", state, DeadBallTo(defense))` — identical
+reason and consequence to Roll C's offensive-foul arm. A player-control foul yields no free throws and
+no bonus charge. Keeping it a continuation kind (not a Roll A terminal) preserves "one node names the
+loss" and gives the future offensive-foul flavor tag (charge / off-arm / illegal screen) a single home.
+That tag needs a flavor field on the loss TERMINAL — terminals carry none today — so it is a separate
+task; it matters because those flavors attribute to different players (the handler vs. the screener).
+
+**The closed chain.** The two keep-the-ball inbound edges no longer park. `ResumeInbound` (Roll D
+below bonus) and `ResolveSidelineInbound` (OOB-retained, and the I/J/K/M below-bonus loose-ball-defense
+/ OOB-off-defense edges) RE-RUN Roll A carrying the current court-state, feeding the resolver loop
+exactly like `IntoHalfcourtSet`. The resolver no longer stores the two inbound stub objects (fields and
+assignments removed; ctor params retained only to keep construction sites stable; the harness builds
+its own stub instances for direct fact-echo). With the violation terminals moved into Roll C and these
+two edges re-entrant, the live chain parks NOWHERE — every possession resolves to a terminal. The
+re-entry is convergent: `CleanEntry`'s dominant weight makes the inbound loop geometric (mean ≈ 1.03
+hops), and a shared game's accumulating fouls cross the bonus, converting a re-inbound into a
+free-throw trip that terminates — both landings handled, the iteration ceiling never threatened (§2a).
+
+**Deferrals seated by #6.** Offensive-foul flavor (needs a terminal flavor tag); the backcourt-turnover
+spot-flip; "easier + pressure-driven" re-inbound weights (the marker carries the distinction now, the
+weights tilt later in the real generator); and the attribute-driven generators that replace every stub
+pie.

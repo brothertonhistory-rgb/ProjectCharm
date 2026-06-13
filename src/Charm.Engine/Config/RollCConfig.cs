@@ -10,26 +10,29 @@ public sealed class RollCConfig
 {
     // --- Stub pie base weights (placeholders; the real attribute-driven
     //     generator will replace these). Kept summing to 1 for clarity. ---
-    public double BaseBadPassDeadBall { get; set; } = 0.30;
-    public double BaseBadPassIntercepted { get; set; } = 0.22;
-    public double BaseLostBallDeadBall { get; set; } = 0.18;
-    public double BaseLostBallLiveBall { get; set; } = 0.20;
-    public double BaseOffensiveFoul { get; set; } = 0.10;
+    public double BaseBadPassDeadBall { get; set; } = 0.24;
+    public double BaseBadPassIntercepted { get; set; } = 0.18;
+    public double BaseLostBallDeadBall { get; set; } = 0.14;
+    public double BaseLostBallLiveBall { get; set; } = 0.16;
+    public double BaseOffensiveFoul { get; set; } = 0.09;
 
-    // --- Contextification #5a: the expanded loss set, DORMANT in the Halfcourt
-    //     (legacy) context — every new type is 0.0 here this session, so the
-    //     Halfcourt pie stays the unchanged 30/22/18/20/10. Pie requires a weight
-    //     for EVERY enum member, so these must be present (zeroed), not absent.
-    //     #5b sets the real Halfcourt weights (travel, over-and-back, etc. live
-    //     here) when the loss exit is wired in. ---
-    public double BaseTravel { get; set; } = 0.0;
-    public double BaseDoubleDribble { get; set; } = 0.0;
-    public double BaseCarry { get; set; } = 0.0;
-    public double BaseThreeSecondViolation { get; set; } = 0.0;
-    public double BaseFiveSecondCloselyGuarded { get; set; } = 0.0;
-    public double BaseOffensiveGoaltending { get; set; } = 0.0;
-    public double BaseBackcourtViolation { get; set; } = 0.0;
-    public double BaseShotClockViolation { get; set; } = 0.0;
+    // --- Contextification #6: the expanded loss set is now LIVE in the Halfcourt
+    //     context — the realistic ways a SET possession dies (a travel, an over-and-
+    //     back, a shot-clock violation, etc.). This governs EVERY halfcourt turnover
+    //     (Roll A's frontcourt re-inbound, Roll B's halfcourt loss, Roll F's player
+    //     action) — correct: a travel is a travel whoever caused it. The two
+    //     backcourt-only violations (5-second inbound, 10-second backcourt) stay 0.0
+    //     here — they cannot happen once the ball is across. Placeholder weights, the
+    //     blessed 24/18/16/14/9 main + 8/2.5/2.5/2/1.5/1.5/0.5/0.5 minor shape; tuned
+    //     later like every pie. ---
+    public double BaseTravel { get; set; } = 0.08;
+    public double BaseDoubleDribble { get; set; } = 0.015;
+    public double BaseCarry { get; set; } = 0.015;
+    public double BaseThreeSecondViolation { get; set; } = 0.025;
+    public double BaseFiveSecondCloselyGuarded { get; set; } = 0.005;
+    public double BaseOffensiveGoaltending { get; set; } = 0.005;
+    public double BaseBackcourtViolation { get; set; } = 0.02;
+    public double BaseShotClockViolation { get; set; } = 0.025;
     public double BaseFiveSecondInbound { get; set; } = 0.0;
     public double BaseTenSecondBackcourt { get; set; } = 0.0;
 
