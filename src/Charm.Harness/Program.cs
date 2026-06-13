@@ -27,6 +27,7 @@ internal static class Program
         var cfgOffFoul = RollOffensiveFoulConfig.Load(configPath);
         var cfgGov = GovernorConfig.Load(configPath);
         var cfgClock = RollClockConfig.Load(configPath);
+        var cfgEndOfHalf = EndOfHalfConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
@@ -113,7 +114,8 @@ internal static class Program
         ok &= OffensiveReboundConvergenceCheck(cfg, state);
         ok &= RollCContextCheck(cfg, cfgC, rollCGenerator, state);
         ok &= RollCExpansionCheck(cfg, cfgC, rollCGenerator, state);
-        ok &= GovernorLoopCheck(cfg, cfgD, cfgGov, cfgClock);
+        ok &= EndOfHalfIntentBatchCheck(cfg, cfgEndOfHalf);
+        ok &= GovernorLoopCheck(cfg, cfgD, cfgGov, cfgClock, cfgEndOfHalf);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -2135,6 +2137,45 @@ internal static class Program
         return ok;
     }
 
+    // --- Session 30: end-of-half intent pie — rate proof (flat, score-blind, clock-only).
+    //     Mirrors the same Pie<EndOfHalfIntent> the Governor builds from the same config,
+    //     rolled 100k times directly. Proves the three rates converge within tolerance
+    //     without reaching into the Governor's private fields. ---
+    private static bool EndOfHalfIntentBatchCheck(RollAConfig cfg, EndOfHalfConfig cfgEndOfHalf)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} end-of-half intent draws (flat, score-blind) ---");
+        var rng = new SystemRng(cfg.Seed);
+
+        var pie = new Pie<EndOfHalfIntent>(
+            new Dictionary<EndOfHalfIntent, double>
+            {
+                [EndOfHalfIntent.HoldShootLast] = cfgEndOfHalf.HoldShootLast,
+                [EndOfHalfIntent.ShootEarly]    = cfgEndOfHalf.ShootEarly,
+                [EndOfHalfIntent.NoShot]        = cfgEndOfHalf.NoShot,
+            },
+            cfgEndOfHalf.Epsilon);
+
+        var counts = new Dictionary<EndOfHalfIntent, int>();
+        foreach (var o in Enum.GetValues<EndOfHalfIntent>()) counts[o] = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+            counts[pie.Roll(rng.NextUnitInterval())]++;
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  end-of-half intent rates:");
+        foreach (var (intent, weight) in pie.Slices)
+        {
+            var observed = counts[intent] / n;
+            var gap      = Math.Abs(observed - weight);
+            var pass     = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {intent,-16} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        return ratesOk;
+    }
+
     // --- Session 15: the thin Governor's possession-to-possession loop. ---
     // The FIRST check whose whole point is state persisting across iterations: it
     // shares ONE GameState across the entire loop, so foul counts climb and CROSS
@@ -2142,7 +2183,7 @@ internal static class Program
     // through ONE default-consequence path (keyed only on "no terminal"), so the
     // Session-14 "only handled one landing" bug class cannot recur — the per-stub
     // breakdown is observability, never routing.
-    private static bool GovernorLoopCheck(RollAConfig cfg, RollDConfig cfgD, GovernorConfig cfgGov, RollClockConfig cfgClock)
+    private static bool GovernorLoopCheck(RollAConfig cfg, RollDConfig cfgD, GovernorConfig cfgGov, RollClockConfig cfgClock, EndOfHalfConfig cfgEndOfHalf)
     {
         Console.WriteLine($"\n--- Governor loop: two {cfgGov.HalfSeconds:N0}s halves ---");
 
@@ -2180,7 +2221,7 @@ internal static class Program
             new SidelineInboundStub(),
             new TransitionStub());
 
-        var governor = new Governor(resolver, game, cfgGov, cfgClock, new SystemRng(cfg.Seed + 1));
+        var governor = new Governor(resolver, game, cfgGov, cfgClock, new SystemRng(cfg.Seed + 1), cfgEndOfHalf);
 
         // --- Seed the cross-possession state so persistence is DETERMINISTIC. ---
         // Arrow: turn it ON (Home) before the loop. It is never Off thereafter (no OT
@@ -2211,7 +2252,12 @@ internal static class Program
         // --- Invariant checks. ---
         // The load-bearing one: zero possessions lost. A dropped park is exactly how
         // the count would silently leak. Possession count is now clock-driven (no fixed cap).
-        var noLostOk = result.TerminalEnded + result.Parked == records.Count;
+        // §2a discipline: NoShot possessions are a THIRD class — neither terminalEnded nor
+        // parked; they must be counted separately so the assertion remains total.
+        var noShotCount = records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.NoShot);
+        var intentHeld  = records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.HoldShootLast);
+        var intentEarly = records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.ShootEarly);
+        var noLostOk = result.TerminalEnded + result.Parked + noShotCount == records.Count;
 
         // Contiguous numbers 1..N, and offense/defense flips that match each
         // possession's APPLIED consequence (proving the Governor spawned from it).
@@ -2289,7 +2335,7 @@ internal static class Program
         // --- Report. ---
         Console.WriteLine(
             $"  resolved={records.Count:N0} | terminal-ended={result.TerminalEnded:N0} | parked={result.Parked:N0} " +
-            $"| terminal+parked==total -> {(noLostOk ? "ok" : "FAIL")}");
+            $"| noShot={noShotCount:N0} | terminal+parked+noShot==total -> {(noLostOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  possession numbers contiguous 1..{records.Count} -> {(contiguousOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  offense/defense flips match applied consequence -> {(flipsOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  first possession = Home, DeadBallInbound -> {(firstOk ? "ok" : "FAIL")}");
@@ -2349,7 +2395,11 @@ internal static class Program
 
         var clockOk = drainOk && aplOk && countInBand && truncationOk;
 
-        // Score: FG-rule deterministic check (no RNG), then accumulation integrity.
+        // End-of-half observability: per-game counts are small (a handful of possessions
+        // per game), so this is informational only — the rigorous rate proof is
+        // EndOfHalfIntentBatchCheck. The drain check above is the load-bearing gate.
+        Console.WriteLine(
+            $"  end-of-half: HoldShootLast={intentHeld} ShootEarly={intentEarly} NoShot={noShotCount}");
         var fgRuleOk = Scoring.FieldGoalPoints(ShotLocation.Three) == 3
                     && Scoring.FieldGoalPoints(ShotLocation.Long)  == 2
                     && Scoring.FieldGoalPoints(ShotLocation.Mid)   == 2
@@ -3811,6 +3861,7 @@ internal static class Program
         var cfgG     = RollGConfig.Load(configPath);
         var cfgGov   = GovernorConfig.Load(configPath);
         var cfgClock = RollClockConfig.Load(configPath);
+        var cfgEndOfHalf = EndOfHalfConfig.Load(configPath);
 
         var seed = (int)(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() & 0x7FFFFFFF);
         Console.WriteLine($"  seed: {seed}");
@@ -3843,7 +3894,7 @@ internal static class Program
             new TransitionStub());
 
         game.SetPossessionArrow(TeamSide.Home);
-        var governor = new Governor(resolver, game, cfgGov, cfgClock, new SystemRng(seed + 1));
+        var governor = new Governor(resolver, game, cfgGov, cfgClock, new SystemRng(seed + 1), cfgEndOfHalf);
 
         var first = new PossessionState(
             PossessionNumber: 1,
@@ -3885,8 +3936,15 @@ internal static class Program
             var score   = $"Home {homeScore,3} - Away {awayScore,3}";
             var offTeam = r.Offense == TeamSide.Home ? "Home" : "Away";
             var outcome = r.EndLabel.Length > 27 ? r.EndLabel[..27] : r.EndLabel;
+            var intentMarker = r.EndOfHalfIntent switch
+            {
+                EndOfHalfIntent.HoldShootLast => " (held)",
+                EndOfHalfIntent.ShootEarly    => " (early)",
+                EndOfHalfIntent.NoShot        => " (no shot)",
+                _                             => ""
+            };
 
-            Console.WriteLine($"  {r.Number,-4} {offTeam,-5} {r.Entry,-18} {outcome,-28} {pts,-4} {score,-20} {r.Elapsed:F0}s");
+            Console.WriteLine($"  {r.Number,-4} {offTeam,-5} {r.Entry,-18} {outcome,-28} {pts,-4} {score,-20} {r.Elapsed:F0}s{intentMarker}");
         }
 
         Console.WriteLine();

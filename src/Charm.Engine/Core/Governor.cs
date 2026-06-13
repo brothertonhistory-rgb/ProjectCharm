@@ -16,6 +16,12 @@ namespace Charm.Engine;
 /// the raw draw capped at the time remaining in the half, so the cap makes each half
 /// sum to exactly <see cref="GovernorConfig.HalfSeconds"/>.</param>
 /// <param name="Half">Which half this possession ran in (1 or 2).</param>
+/// <param name="EndOfHalfIntent">Which end-of-half intent fired on this possession,
+/// or <c>null</c> if the possession started with a full shot clock or more left
+/// (the common case). Set to <see cref="EndOfHalfIntent.HoldShootLast"/>,
+/// <see cref="EndOfHalfIntent.ShootEarly"/>, or <see cref="EndOfHalfIntent.NoShot"/>
+/// only when <c>halfRemaining &lt; HoldThresholdSeconds</c> at the start of the
+/// possession. Null on every normal possession; non-null only at the end of a half.</param>
 public sealed record PossessionRecord(
     int Number,
     TeamSide Offense,
@@ -26,7 +32,8 @@ public sealed record PossessionRecord(
     PossessionConsequence Applied,
     int Points,
     double Elapsed,
-    int Half);
+    int Half,
+    EndOfHalfIntent? EndOfHalfIntent);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -85,6 +92,18 @@ public sealed record GovernorRunResult(
 /// and the parked→default-flip rule. PERMANENT: the loop shape — read the consequence
 /// off the terminal (or the default on a park) and spawn — which a real game layer
 /// swaps the guts behind without touching the seam.</para>
+///
+/// <para>END-OF-HALF INTENT: when a possession starts with less than a full shot clock
+/// left (<see cref="EndOfHalfConfig.HoldThresholdSeconds"/>), the Governor draws a
+/// three-way intent — <see cref="EndOfHalfIntent.HoldShootLast"/> (milk the clock;
+/// force elapsed to the whole remaining time; the resolver still runs for points),
+/// <see cref="EndOfHalfIntent.ShootEarly"/> (normal-tempo possession; opponent may get
+/// a return trip), or <see cref="EndOfHalfIntent.NoShot"/> (run out the clock; no
+/// resolver call; zero points; half ends). On all other possessions intent is null and
+/// the S29 base-clock path runs byte-for-byte. The per-half drain invariant
+/// (<see cref="GovernorConfig.HalfSeconds"/> per half) holds for every intent value.
+/// Score-blind and tempo-blind — the split is a flat pie; a future score-aware layer
+/// replaces it with a context-selected generator.</para>
 /// </summary>
 public sealed class Governor
 {
@@ -93,20 +112,40 @@ public sealed class Governor
     private readonly GovernorConfig _cfg;
     private readonly RollClockConfig _clock;
     private readonly IRng _rng;
+    private readonly EndOfHalfConfig _endOfHalf;
+    private readonly Pie<EndOfHalfIntent> _endOfHalfPie;
 
-    public Governor(Resolver resolver, GameState game, GovernorConfig cfg, RollClockConfig clock, IRng rng)
+    public Governor(Resolver resolver, GameState game, GovernorConfig cfg, RollClockConfig clock, IRng rng, EndOfHalfConfig endOfHalf)
     {
         _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         _game = game ?? throw new ArgumentNullException(nameof(game));
         _cfg = cfg ?? throw new ArgumentNullException(nameof(cfg));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _rng = rng ?? throw new ArgumentNullException(nameof(rng));
+        _endOfHalf = endOfHalf ?? throw new ArgumentNullException(nameof(endOfHalf));
+        _endOfHalfPie = new Pie<EndOfHalfIntent>(
+            new Dictionary<EndOfHalfIntent, double>
+            {
+                [EndOfHalfIntent.HoldShootLast] = endOfHalf.HoldShootLast,
+                [EndOfHalfIntent.ShootEarly]    = endOfHalf.ShootEarly,
+                [EndOfHalfIntent.NoShot]        = endOfHalf.NoShot,
+            },
+            endOfHalf.Epsilon);
     }
 
     /// <summary>Run two halves against the clock, starting from <paramref name="first"/>.
     /// Each possession draws its elapsed time from a truncated normal; the Governor counts
     /// down from <see cref="GovernorConfig.HalfSeconds"/> per half and stops when both
-    /// halves are spent. Returns the full record for validation.</summary>
+    /// halves are spent. Returns the full record for validation.
+    ///
+    /// <para>When a possession starts with less than a full shot clock left, the Governor
+    /// draws an end-of-half intent: <see cref="EndOfHalfIntent.HoldShootLast"/> forces
+    /// elapsed to the whole remaining half time (half ends, no return trip); 
+    /// <see cref="EndOfHalfIntent.ShootEarly"/> draws elapsed normally (opponent may
+    /// return); <see cref="EndOfHalfIntent.NoShot"/> skips the resolver entirely (zero
+    /// points, clock fully drained). Null intent = the S29 base-clock path, byte-for-byte.
+    /// The per-half drain invariant holds for all values: each half sums to exactly
+    /// <see cref="GovernorConfig.HalfSeconds"/>.</para></summary>
     public GovernorRunResult Run(PossessionState first)
     {
         var state = first;
@@ -126,54 +165,87 @@ public sealed class Governor
                     $"Governor safety guard exceeded {_cfg.PossessionCap} possessions — the clock " +
                     "is not draining (check HalfSeconds and possession-time config).");
 
-            var outcome = _resolver.RunPossession(state);
+            // End-of-half intent: drawn only when this possession starts with less than
+            // a full shot clock left; null on every normal possession (the common case).
+            // When null, the S29 base-clock behavior runs byte-for-byte. NoShot
+            // short-circuits the resolver; HoldShootLast and ShootEarly run it normally
+            // and differ only in how much clock drains. §2a note: this draw consumes one
+            // unit from _rng per end-of-half possession, so the rng stream (and therefore
+            // the exact possession count and score) will differ from the S29 output once
+            // the first intent fires — expected; the harness asserts bands, not exact values.
+            EndOfHalfIntent? intent = halfRemaining < _endOfHalf.HoldThresholdSeconds
+                ? _endOfHalfPie.Roll(_rng.NextUnitInterval())
+                : null;
 
             PossessionConsequence consequence;
             bool endedOnTerminal;
             string endLabel;
+            int pointsThisPossession;
+            double applied;
 
-            if (outcome.EndedOn is { } term)
+            if (intent == EndOfHalfIntent.NoShot)
             {
-                // Ended on a terminal: read its consequence directly.
-                endedOnTerminal = true;
-                consequence = term.Consequence;
-                endLabel = term.Reason;
-                terminalEnded++;
+                // No resolver call: the offense ran out the clock without a shot.
+                // Synthesize a zero-point, no-terminal possession. Does NOT increment
+                // terminalEnded or parked — it is a third class (§2a discipline: handle
+                // every branch the loop can reach; the count assertion in the harness
+                // accounts for it as noShotCount separately).
+                endedOnTerminal = false;
+                endLabel = "endOfHalf:NoShot";
+                consequence = PossessionConsequence.DeadBallTo(state.Defense);
+                pointsThisPossession = 0;
+                applied = halfRemaining;   // drains the rest of the half to 0
             }
             else
             {
-                // Parked at a stub: no terminal, no consequence. Apply the DEFAULT —
-                // ball to the other team, dead-ball restart at Roll A. One uniform
-                // path for every stub.
-                endedOnTerminal = false;
-                consequence = PossessionConsequence.DeadBallTo(state.Defense);
-                endLabel = $"parked:{outcome.Destination}";
-                parked++;
-                perStubParks[outcome.Destination] =
-                    perStubParks.GetValueOrDefault(outcome.Destination) + 1;
+                // Normal / HoldShootLast / ShootEarly: run the resolver.
+                var outcome = _resolver.RunPossession(state);
+
+                if (outcome.EndedOn is { } term)
+                {
+                    // Ended on a terminal: read its consequence directly.
+                    endedOnTerminal = true;
+                    consequence = term.Consequence;
+                    endLabel = term.Reason;
+                    terminalEnded++;
+                }
+                else
+                {
+                    // Parked at a stub: no terminal, no consequence. Apply the DEFAULT —
+                    // ball to the other team, dead-ball restart at Roll A. One uniform
+                    // path for every stub.
+                    endedOnTerminal = false;
+                    consequence = PossessionConsequence.DeadBallTo(state.Defense);
+                    endLabel = $"parked:{outcome.Destination}";
+                    parked++;
+                    perStubParks[outcome.Destination] =
+                        perStubParks.GetValueOrDefault(outcome.Destination) + 1;
+                }
+
+                // Time: HoldShootLast forces the whole remaining clock (the offense
+                // milked — forced even if the resolver produced an invariant terminal
+                // elapsed, because the milk intent dominates). ShootEarly and normal
+                // draw elapsed the S29 way (invariant terminal wins; otherwise truncated-
+                // normal draw) and cap at halfRemaining.
+                var rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(outcome.ShotClockPeriods);
+                applied = intent == EndOfHalfIntent.HoldShootLast
+                    ? halfRemaining
+                    : Math.Min(rawElapsed, halfRemaining);
+
+                pointsThisPossession = outcome.Points;
             }
 
-            // Time: a terminal that carries an invariant elapsed (shot-clock /
-            // backcourt violation) uses that real value; a parked possession has no
-            // terminal (EndedOn? is null) and draws. The cap makes each half sum to
-            // exactly HalfSeconds — a §2a "handle every branch" discipline: both the
-            // terminal and the parked path reach this single block.
-            var rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(outcome.ShotClockPeriods);
-            var applied = Math.Min(rawElapsed, halfRemaining);
+            // Shared by all three intent values + normal possessions.
             halfRemaining -= applied;
-            totalSeconds += applied;
+            totalSeconds  += applied;
 
-            // Score write: points scored on this possession's walk (made FG 2/3 + made
-            // FTs), tallied by the resolver and surfaced on the outcome — the seam the
-            // placeholder 0 marked. All points credit the offense (state.Offense);
-            // the Governor's Home/Away split below routes them to the right accumulator.
-            var pointsThisPossession = outcome.Points;
+            // Score write: points credit the offense (state.Offense). Zero for NoShot.
             if (state.Offense == TeamSide.Home) _game.HomeScore += pointsThisPossession;
             else _game.AwayScore += pointsThisPossession;
 
             records.Add(new PossessionRecord(
                 state.PossessionNumber, state.Offense, state.Defense, state.Entry,
-                endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, half));
+                endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, half, intent));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition

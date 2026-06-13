@@ -2162,3 +2162,68 @@ present, tune `Center`/`StdDev`, and confirm the ceiling-exclusive contract (not
   context parameter, but is explicitly deferred (creep risk).
 - End-of-half hold-for-last-shot is the next clock session: a `halfRemaining < 30` branch in the
   Governor that probabilistically drains and then resolves (or misses the shot) rather than just capping.
+
+---
+
+## Session 30 — End-of-half intent: the Governor's clock-management branch
+
+The possession engine now models what the offense does when it has less than a full shot clock left in
+the half. This is a Governor-side decision, not a resolver or roll decision — the resolver resolves one
+possession and knows nothing about the clock or the half. The Governor, which already owns the clock
+countdown, is the only component that has `halfRemaining` in scope.
+
+### The three intents and what each does
+
+When `halfRemaining < EndOfHalfConfig.HoldThresholdSeconds` at the start of a possession, the Governor
+draws from a flat `Pie<EndOfHalfIntent>` built once in the ctor from config weights:
+
+| Intent | Weight | What the Governor does | Points | Elapsed |
+|---|---|---|---|---|
+| `HoldShootLast` | 70% (starting knob) | Resolver runs normally; elapsed **forced** to `halfRemaining` | real | `halfRemaining` |
+| `ShootEarly` | 20% | Resolver runs normally; elapsed drawn the S29 way and capped at `halfRemaining` | real | S29 cap |
+| `NoShot` | 10% | Resolver **not called**; possession synthesized | 0 | `halfRemaining` |
+
+On all other possessions (`halfRemaining >= HoldThresholdSeconds`) the intent is null and the S29
+base-clock path runs byte-for-byte.
+
+### Why this is in the Governor, not the resolver or a new roll
+
+The end-of-half intent is a **clock-management** decision, not a possession-resolution decision. The
+resolver resolves one possession and knows nothing about the clock or the half; the Governor already owns
+`halfRemaining` and the stop rule. Putting the intent draw in the resolver would violate the seam that
+kept the resolver's 8 construction sites untouched in S29. Putting it in a new roll would create a roll
+that gates on a single clock check and produces no new ball-state — a resolution node that resolves
+nothing. The Governor is the right home for the same reason S29's time draw is in the Governor.
+
+### NoShot is a third possession class (§2a discipline)
+
+A `NoShot` possession is not a terminal (no resolver, no EndedOn) and not a stub park. This was the
+load-bearing §2a check: any assertion of the form `terminalEnded + parked == records.Count` is wrong the
+moment a NoShot can fire. The count assertion is now three-class:
+`terminalEnded + parked + noShotCount == records.Count`, where `noShotCount` is counted from the records
+directly via the new `PossessionRecord.EndOfHalfIntent` field. The §2b sweep confirmed this was the only
+site of the old shape.
+
+### The single-construction-site discipline preserved
+
+NoShot synthesizes its variables (zero points, `applied = halfRemaining`, synthesized consequence and
+label) and then **converges to the same `records.Add(new PossessionRecord(...))` call** every other path
+uses. There is no second construction site. The prior `grep -n "new PossessionRecord("` returning exactly
+one hit is still true after this session.
+
+### The drain invariant (the load-bearing harness gate)
+
+Both `HoldShootLast` and `NoShot` force `applied = halfRemaining`, driving `halfRemaining` to 0 and
+always tripping the half boundary. `ShootEarly` and normal possessions cap at `halfRemaining` as before.
+So the S29 guarantee holds for all intent values: each half sums to exactly `HalfSeconds`. The existing
+`drainOk` check (per-half sum within 0.01) is unchanged and is the load-bearing gate — if the intent
+ever leaked into the drain, this is where it would fail.
+
+### Score-blind and tempo-blind by design; future seam is explicit
+
+The flat pie knows nothing about the score margin, the score itself, or which team is ahead. The intent
+depends only on the clock. Score-aware late-game tactics (leading team milks, trailing team races;
+intentional fouling) are a future session where the intent becomes a **context-selected** pie — a
+generator reading the margin and the time — and this session's flat weights become the context-neutral
+fallback. The architecture is already shaped for that: a generator replaces the ctor's direct `Pie`
+construction without touching the Governor loop, the resolver, or the rolls.

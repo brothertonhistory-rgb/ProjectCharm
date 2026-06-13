@@ -1,3 +1,119 @@
+## Session 30 — End-of-half intent: the offense holds for the last shot (or doesn't get one off) (2026-06-13)
+
+**The second clock session.** Session 29 put real time on the board but the end of a half was still
+naive — a possession starting with almost no time left just capped its elapsed at the remaining time
+and resolved normally. This session makes the end of a half behave like basketball: when a possession
+starts with less than a full shot clock left, the offense draws a three-way intent and the Governor
+forces or overrides the elapsed accordingly.
+
+**Confirmation mode, not rediscovery (CONVENTIONS §0/§6c).** The prompt carried a fully verified §6c
+map. S29 dependency confirmed first (`grep "var halfRemaining"` and `grep "double HalfSeconds"` both
+hit). All §6c anchors confirmed against the committed tree with zero drift: `int Half);` tail of
+`PossessionRecord`; Governor ctor signature; resolver call site `var outcome = _resolver.RunPossession`;
+S29 time block `rawElapsed = … ?? DrawPossessionSeconds`; record construction line
+`endedOnTerminal, endLabel, … applied, half));`; `noLostOk` count assertion; both harness Governor
+construction sites; `"Clock"` section in config.json. No drift.
+
+**The model in one paragraph.** When `halfRemaining >= HoldThresholdSeconds` (default 30s — one full
+shot clock) nothing changes; the S29 path runs byte-for-byte. When `halfRemaining < HoldThresholdSeconds`,
+the Governor draws a three-way intent from a flat, score-blind, tempo-blind pie:
+
+- **`HoldShootLast` (70%)** — milk the clock and shoot last. The resolver runs normally for its points,
+  but the Governor overrides `applied = halfRemaining`, draining the entire remaining clock. The opponent
+  gets no return trip.
+- **`ShootEarly` (20%)** — take a normal-tempo possession. Elapsed is drawn the S29 way and capped at
+  `halfRemaining`, so if time remains the opponent may get a return trip.
+- **`NoShot` (10%)** — run out the clock with no attempt. The resolver is NOT called. Zero points;
+  `applied = halfRemaining`. A §2a third class: neither `terminalEnded` nor `parked` increments.
+
+**Architectural decision: intent draw in the Governor, resolver untouched.** Same rationale as S29's
+"the draw lives in the Governor": the end-of-half decision is a clock-management concern only the
+Governor sees. The resolver resolves one possession and knows nothing about the clock or the half.
+All changes are Governor-side; the resolver's 8 constructor sites and `RunPossession` are untouched.
+No new roll, no new `ContinuationKind`, no generator.
+
+**The § 2a discipline: NoShot is a third possession class.** S29's `noLostOk` asserted
+`terminalEnded + parked == records.Count`. A NoShot possession is neither a terminal nor a stub park,
+so that assertion was wrong as soon as NoShot could fire. The count assertion was reworked to three
+classes: `terminalEnded + parked + noShotCount == records.Count`, where `noShotCount` is derived from
+the records directly. The §2b sweep confirmed this was the only site of the old shape; it is now gone.
+
+**Single record construction site preserved (the §0 observation).** The concern going in was whether
+NoShot would need its own `new PossessionRecord(...)` call, breaking the "one construction site" rule.
+It does not: NoShot synthesizes its variables (`endedOnTerminal = false`, `endLabel = "endOfHalf:NoShot"`,
+`consequence`, `pointsThisPossession = 0`, `applied = halfRemaining`) and then converges to the single
+existing `records.Add(new PossessionRecord(..., intent))` at the bottom of the loop — the same site
+every other path uses. One construction site; three paths feeding it.
+
+**New files.**
+- `Rolls/EndOfHalfOutcomes.cs` — `EndOfHalfIntent` enum (`HoldShootLast`, `ShootEarly`, `NoShot`),
+  house style mirroring `FoulOutcomes.cs`'s `FoulFlavor`.
+- `Config/EndOfHalfConfig.cs` — five properties (`HoldThresholdSeconds`, `HoldShootLast`, `ShootEarly`,
+  `NoShot`, `Epsilon`), `Load` pattern mirroring `RollClockConfig.cs`, section `"EndOfHalf"`.
+
+**Governor edits.**
+- `PossessionRecord` gains trailing `EndOfHalfIntent? EndOfHalfIntent` (nullable; null on every normal
+  possession; non-null only at the end of a half). Added with `<param>` doc in the established voice.
+- Governor ctor gains `EndOfHalfConfig endOfHalf` (last param, after `IRng rng`). Stores `_endOfHalf`
+  and builds `_endOfHalfPie = new Pie<EndOfHalfIntent>(...)` once in the ctor from config weights — no
+  generator needed (this session's pie is context-free; a generator appears when the split becomes
+  score-aware, which is deferred).
+- `Run` loop restructured: `intent` computed at the top (before the resolver call) from
+  `halfRemaining < _endOfHalf.HoldThresholdSeconds ? _endOfHalfPie.Roll(...) : null`. NoShot
+  short-circuits the resolver; HoldShootLast and ShootEarly call it normally. The time block is replaced
+  by a small `intent`-aware switch producing `applied`: NoShot → `halfRemaining`; HoldShootLast →
+  `halfRemaining`; ShootEarly/normal → existing `Math.Min(rawElapsed, halfRemaining)`.
+  `halfRemaining -= applied; totalSeconds += applied;` shared after the if/else.
+
+**Harness edits.**
+- `Main`: `cfgEndOfHalf = EndOfHalfConfig.Load(configPath)` added after `cfgClock`; `EndOfHalfIntentBatchCheck`
+  wired into the `ok &=` chain before `GovernorLoopCheck`; `GovernorLoopCheck` call updated to pass it.
+- `GovernorLoopCheck`: signature extended; BOTH Governor construction sites pass `cfgEndOfHalf`
+  (GovernorLoopCheck + RunGame); count assertion reworked to three-class; new `noShotCount` / `intentHeld`
+  / `intentEarly` counters; end-of-half observability line added (`end-of-half: HoldShootLast=<n>
+  ShootEarly=<m> NoShot=<k>`); report count label updated to `terminal+parked+noShot==total`.
+- New `EndOfHalfIntentBatchCheck`: builds the same `Pie<EndOfHalfIntent>` from the same config weights
+  the Governor uses, rolls 100k times with a fresh seeded `SystemRng`, asserts all three rates within
+  `RateTolerance`. Modeled on `RollFActionBatchCheck`.
+- `RunGame`: `cfgEndOfHalf` loaded alongside other configs; per-possession print line gains an
+  `(held)` / `(early)` / `(no shot)` marker for end-of-half possessions.
+- `config.json`: `"EndOfHalf"` section added as a sibling of `"Clock"` with the five default values.
+
+**Validation (CONVENTIONS §2).** Python Monte Carlo confirmed: 100k intent draws all three rates
+within 0.005pp tolerance; per-half drain invariant holds across 1000 simulated halves (every half sums
+to exactly 1200s regardless of intent mix — HoldShootLast and NoShot drive `halfRemaining` to 0,
+ShootEarly caps normally); count math `terminal + parked + noShot == total` holds. Brace balance ok
+across all touched files. §2b stale-ref sweep: old `TerminalEnded + result.Parked == records.Count`
+shape appears zero times after edits. Harness run (Emmett's machine): **ALL CHECKS PASSED** on the
+first run (after fixing a dropped `var rng` / `var seed` line from a str_replace that consumed more
+than intended — caught immediately on the first build error, corrected in one targeted fix).
+
+Key harness signals: `EndOfHalfIntentBatchCheck` — HoldShootLast 70.067%, ShootEarly 19.970%,
+NoShot 9.963%, all `ok`; `GovernorLoopCheck` — `resolved=134 | terminal-ended=134 | parked=0 |
+noShot=0 | terminal+parked+noShot==total -> ok`; `half 1: 1,200s / half 2: 1,200s | each drains
+to 1,200 -> ok` (the load-bearing drain invariant); `end-of-half: HoldShootLast=1 ShootEarly=1
+NoShot=0` (tiny per-game counts — correct; the rigorous rate proof is the batch check).
+The `noShot=0` in the game run is expected: with 134 possessions and a 30s threshold, NoShot (10%
+of intent draws) simply did not fire this seed. Every prior rate/routing/score/clock check
+byte-for-byte unchanged.
+
+**What stays out.** Score-aware late-game tactics (the leading team milks, the trailing team races;
+intentional fouling to stop the clock). Rushed-shot quality penalty (a held buzzer-beater resolves
+through the normal roll chain at the same shot quality as any other shot — shot quality is not yet
+modelled). Second-half tip/alternating-possession reset. Per-outcome time shaping. Tempo calibration
+and the coach pace attribute. The intent weights are explicitly uncalibrated starting knobs for
+Emmett to tune by watching games.
+
+**Deferrals (carried).**
+- **Score-aware late-game tactics** — the intent becomes a CONTEXT-SELECTED pie reading the margin
+  and the time. The flat, score-blind pie this session is the seam it plugs into.
+- **Rushed-shot quality penalty** — a held buzzer-beater at a lower make rate than a normal look.
+  A shot-quality tilt; deferred until attribute-driven Roll H generator lands.
+- **Second-half tip / alternating-possession reset** — the second half continues from the last
+  possession's consequence; a real reset (and overtime) is its own session.
+- **Per-outcome time shaping** — turnovers reading shorter than makes, etc. Still deferred.
+- **Tempo calibration + the coach pace (1–10) attribute** — unchanged from S29.
+
 ## Session 29 — Game clock: possessions draw elapsed per shot-clock period; Governor counts down two halves (2026-06-13)
 
 **The first session that puts real time on the board.** The Governor previously drained a flat 18s

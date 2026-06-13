@@ -213,5 +213,12 @@
     "Floor": 4.0,
     "FullClockSeconds": 30.0,
     "ResetClockSeconds": 20.0
+  },
+  "EndOfHalf": {
+    "HoldThresholdSeconds": 30.0,
+    "HoldShootLast": 0.70,
+    "ShootEarly": 0.20,
+    "NoShot": 0.10,
+    "Epsilon": 1e-09
   }
 }
