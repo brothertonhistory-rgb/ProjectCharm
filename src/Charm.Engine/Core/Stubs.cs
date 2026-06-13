@@ -88,16 +88,16 @@ public sealed class ShootingFreeThrowsStub : IContinuationNode
         ShotFacts.Describe("ShootingFreeThrows", continuation.State);
 }
 
-/// <summary>STUB for the FT-rebound node — where a missed FINAL free throw lands
-/// (the ball is live). NEW this session (Roll L): the resolver's FT-sequence driver
-/// routes here when the last attempt of a trip misses — the shooting-foul last shot,
-/// the double-bonus second, or a 1-and-1 front-end miss (which forfeits the second).
-/// A PLAIN-label stub, deliberately NOT a <see cref="ShotFacts"/> echo: a bonus trip
-/// has no shooter selected (the FT-shooter identity is a deferred seam) and no shot
-/// zone/result, so reading slot/zone/result here would fire NO_SLOT and falsely flag
-/// a dropped fact. The future FT-rebound roll — the offensive/defensive board split
-/// off a missed FT plus any foul on that rebound — replaces this without the driver
-/// or Roll L changing.</summary>
+/// <summary>STUB for the FT-rebound node — RETIRED from the live chain as of Session
+/// 19, when Roll M took over the <c>ResolveFTRebound</c> edge (the same stub→roll swap
+/// as OffensiveReboundStub→Roll K). A missed FINAL free throw now executes Roll M (the
+/// offensive/defensive board split off a missed FT, the OOB pair, and any foul on that
+/// rebound); the resolver no longer parks here and no longer injects this stub.
+/// <para>KEPT IN THE CORNER, FLAGGED FOR FUTURE REMOVAL: unlike the other two retired
+/// FT stubs (<see cref="ResolveFreeThrowsStub"/>, still used as a harness fact-echo
+/// helper), this is a plain-label stub with NO remaining caller — no check invokes it.
+/// It is retained only as cheap insurance against a near-term need to re-park; delete
+/// it once Roll M has settled and no re-park is wanted.</para></summary>
 public sealed class FTReboundStub : IContinuationNode
 {
     public string Receive(Continue continuation) => "STUB:FTRebound";

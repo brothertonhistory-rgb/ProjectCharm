@@ -5,8 +5,9 @@ namespace Charm.Engine;
 /// is the part of a transition ticket's memory that selects Roll J's run-or-not
 /// pie. It is a tag, not a <see cref="Pie{TOutcome}"/> outcome.
 ///
-/// <para>ONE value is live this session: <see cref="Rebound"/> (a defensive
-/// rebound that pushed the other way). A live-ball STEAL (Roll C's
+/// <para>TWO values are live: <see cref="Rebound"/> (a defensive rebound off a
+/// field-goal miss) and <see cref="FreeThrowRebound"/> (a defensive rebound off a
+/// missed free throw — Roll M). A live-ball STEAL (Roll C's
 /// <c>BadPassIntercepted</c> / <c>LostBallLiveBall</c>) is the next source and
 /// lands in the steal-feeder session — when those terminals begin stamping it,
 /// Roll J grows a steal pie, and the resolver routes it. It is deliberately NOT
@@ -16,9 +17,16 @@ namespace Charm.Engine;
 /// </summary>
 public enum TransitionSource
 {
-    /// <summary>The possession began on a defensive rebound — the rebounding team
-    /// pushes the other way. The only live transition source this session.</summary>
-    Rebound
+    /// <summary>The possession began on a defensive rebound off a field-goal miss —
+    /// the rebounding team pushes the other way.</summary>
+    Rebound,
+
+    /// <summary>The possession began on a defensive rebound off a missed FREE THROW
+    /// (Roll M's DefensiveRebound arm). The same live-ball push, but Roll J selects a
+    /// tamer, more conservative run-or-not pie for it: the made/missed free throw gave
+    /// everyone time to get back, so the break is less likely to run than off a live
+    /// field-goal board. Added this session alongside Roll M.</summary>
+    FreeThrowRebound
 }
 
 /// <summary>
@@ -49,8 +57,14 @@ public enum TransitionSource
 /// this session.</param>
 public sealed record TransitionContext(TransitionSource Source)
 {
-    /// <summary>The defensive-rebound transition ticket — the only live context this
-    /// session. A read-clear shorthand for terminal/consequence sites; equivalent to
+    /// <summary>The defensive-rebound transition ticket (off a field-goal miss). A
+    /// read-clear shorthand for terminal/consequence sites; equivalent to
     /// <c>new TransitionContext(TransitionSource.Rebound)</c>.</summary>
     public static TransitionContext Rebound { get; } = new(TransitionSource.Rebound);
+
+    /// <summary>The free-throw-rebound transition ticket (off a missed final free
+    /// throw — Roll M's DefensiveRebound arm). Selects Roll J's conservative pie. A
+    /// read-clear shorthand; equivalent to
+    /// <c>new TransitionContext(TransitionSource.FreeThrowRebound)</c>.</summary>
+    public static TransitionContext FreeThrowRebound { get; } = new(TransitionSource.FreeThrowRebound);
 }

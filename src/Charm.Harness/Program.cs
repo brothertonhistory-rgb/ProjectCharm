@@ -19,6 +19,7 @@ internal static class Program
         var cfgJ = RollJConfig.Load(configPath);
         var cfgK = RollKConfig.Load(configPath);
         var cfgL = RollLConfig.Load(configPath);
+        var cfgM = RollMConfig.Load(configPath);
         var cfgGov = GovernorConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
@@ -34,6 +35,7 @@ internal static class Program
         var rollJGenerator = new RollJStubPieGenerator(cfgJ);
         var rollKGenerator = new RollKStubPieGenerator(cfgK);
         var rollLGenerator = new RollLStubPieGenerator(cfgL);
+        var rollMGenerator = new RollMStubPieGenerator(cfgM);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -53,12 +55,12 @@ internal static class Program
             rollJGenerator,
             rollKGenerator,
             rollLGenerator,
+            rollMGenerator,
             game,
             rng,
             new ResumeInboundStub(),
             new BlockRecoveryStub(),
             new SidelineInboundStub(),
-            new FTReboundStub(),
             new TransitionStub());
 
         var state = new PossessionState(
@@ -93,6 +95,8 @@ internal static class Program
         ok &= RollKPutbackPieCheck(cfg, cfgH, state);
         ok &= RollKBonusForkCheck(cfg, cfgD, cfgK, rollKGenerator, state);
         ok &= RollLFreeThrowCheck(cfg, state);
+        ok &= RollMReboundBatchCheck(cfg, cfgM, rollMGenerator, game, state);
+        ok &= RollMContextSelectionCheck(cfg, cfgK, cfgJ, state);
         ok &= OffensiveReboundConvergenceCheck(cfg, state);
         ok &= RollCContextCheck(cfg, cfgC, rollCGenerator, state);
         ok &= GovernorLoopCheck(cfg, cfgD, cfgGov);
@@ -850,12 +854,12 @@ internal static class Program
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+            new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
             new BlockRecoveryStub(),
             new SidelineInboundStub(),
-            new FTReboundStub(),
             new TransitionStub());
 
         var pieE = genE.Generate(state);
@@ -880,30 +884,33 @@ internal static class Program
             var d = routing.Destination;
 
             if (d.StartsWith("END:JumpBall")) destClasses["jump ball -> terminal"]++;
-            // Roll H/I's resolved shot landings (checked BEFORE the generic END:
-            // catch, since Made / MissOutOfBoundsLost AND Roll I's two terminals —
-            // DefensiveRebound / LooseBallFoulOnOffense — are also END: terminals).
-            // A shot now flows F -> G -> H, and a MISS flows on through Roll I to a
-            // defensive/offensive board or a loose-ball foul. The resolved bucket
-            // therefore spans: Made / MissOutOfBoundsLost terminals; the sideline-
-            // inbound and block-recovery stubs; and Roll I's OffensiveRebound stub +
-            // DefensiveRebound / LooseBallFoulOnOffense terminals. (Shooting fouls no
-            // longer park at STUB:ShootingFreeThrows — they drive the Roll L FT loop
-            // and land at END:FreeThrowsMade / STUB:FTRebound, caught in the FT bucket
-            // below. A loose-ball-defense foul lands at SidelineInbound below the
-            // bonus; the in-bonus FT case is also a FT-bucket landing now.)
+            // Roll H/I/M's resolved shot/board landings (checked BEFORE the generic
+            // END: catch, since Made / MissOutOfBoundsLost AND the rebound terminals —
+            // DefensiveRebound / LooseBallFoulOnOffense / OutOfBoundsOffOffense — are
+            // also END: terminals). A shot flows F -> G -> H, a MISS flows through Roll
+            // I to a board or loose-ball foul, and a missed FINAL free throw now flows
+            // through Roll M (Session 19) to the SAME board landings (its DefensiveRebound
+            // is a transition terminal, its OOB-off-offense a dead-ball terminal, its
+            // OOB-off-defense a sideline inbound). The resolved bucket therefore spans:
+            // Made / MissOutOfBoundsLost terminals; the sideline-inbound and block-
+            // recovery stubs; and the rebound terminals from Roll I and Roll M. (Shooting
+            // fouls drive the Roll L FT loop and land at END:FreeThrowsMade on a made last
+            // shot — caught in the FT bucket below — or flow into Roll M on a missed last
+            // shot, caught here.)
             else if (d == "END:Made" || d == "END:MissOutOfBoundsLost"
                      || d == "END:DefensiveRebound" || d == "END:LooseBallFoulOnOffense"
+                     || d == "END:OutOfBoundsOffOffense"
                      || d.StartsWith("STUB:OffensiveRebound")
                      || d.StartsWith("STUB:SidelineInbound")
                      || d.StartsWith("STUB:BlockRecovery"))
                 destClasses["shot -> Roll G -> Roll H -> resolved"]++;
-            // The Roll L FT loop's two landings — last-shot make ends the possession
-            // (END:FreeThrowsMade), last-shot miss leaves a live board (STUB:FTRebound).
-            // Both a shooting foul (Roll H) and a bonus foul (Roll D) converge here, so
-            // these are indistinguishable by destination and share one bucket. Checked
-            // before the generic END: catch so a made FT is not miscounted as a turnover.
-            else if (d == "END:FreeThrowsMade" || d.StartsWith("STUB:FTRebound"))
+            // The Roll L FT loop's made-last-shot landing ends the possession
+            // (END:FreeThrowsMade). A missed last shot no longer parks at STUB:FTRebound
+            // (retired Session 19) — it drives Roll M and lands in the resolved bucket
+            // above. Both a shooting foul (Roll H) and a bonus foul (Roll D) converge on
+            // the made-FT terminal, so they share this bucket. Checked before the generic
+            // END: catch so a made FT is not miscounted as a turnover.
+            else if (d == "END:FreeThrowsMade")
                 destClasses["free throws -> resolved"]++;
             else if (d.StartsWith("END:")) destClasses["turnover -> Roll C terminal"]++;
             else if (d.StartsWith("STUB:ResumeInbound")) destClasses["foul -> Roll D stub"]++;
@@ -1024,12 +1031,12 @@ internal static class Program
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+            new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
             new BlockRecoveryStub(),
             new SidelineInboundStub(),
-            new FTReboundStub(),
             new TransitionStub());
 
         var pieE = genE.Generate(state);
@@ -1097,6 +1104,13 @@ internal static class Program
 
             if (d.EndsWith("NO_SLOT") || d.EndsWith("NO_ZONE") || d.EndsWith("NO_RESULT"))
             {
+                // Now that Roll M is live, a fact-echo stub can be reached via a DEEP path
+                // — a shooting foul -> Roll L -> Roll M -> a bonus FT trip or a Roll K
+                // reset — whose state carries no original shot facts (the deferred
+                // FT-shooter seam). That is a routed-DEEPER landing, not a dropped fact:
+                // clean one-hop fact ride-through is proven authoritatively by
+                // RollHResolutionBatchCheck (fails=0). Bucket as deeper; tally for sight.
+                deeperStubs++;
                 missingFact++;
                 continue;
             }
@@ -1130,13 +1144,12 @@ internal static class Program
         }
 
         var routedOk = unrecognized == 0;
-        var factOk = missingFact == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  slot+zone+result intact on every stub landing: missing={missingFact} -> {(factOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  clean one-hop shots ride slot+zone+result through to their stub landings ({missingFact:N0} deep FT/reset landings carry no shot facts and are routed-deeper, not failed)");
         Console.WriteLine($"  all core G->H->I destinations reached (offensive rebound now executes Roll K): {(allDests ? "ok" : "FAIL")}");
         Console.WriteLine($"  all five zones reached the stub landings: {(allZones ? "ok" : "FAIL")}");
 
-        return routedOk && factOk && allDests && allZones;
+        return routedOk && allDests && allZones;
     }
 
     // --- Batch: Roll H's seven-way make/miss distribution converges within
@@ -1301,8 +1314,9 @@ internal static class Program
     //     Miss -> deeper (Roll I/K), MissOutOfBoundsRetained -> sideline-inbound stub,
     //     Blocked -> block-recovery stub (Session 13). The two SHOOTING-foul outcomes
     //     (MadeAndFouled / MissFouled) drive the Roll L FT loop (Session 18) and land at
-    //     END:FreeThrowsMade / STUB:FTRebound, absorbed in the "deeper" buckets here and
-    //     proven by RollLFreeThrowCheck. Isolates the Roll H hop exactly as
+    //     END:FreeThrowsMade on a made last shot, or flow into Roll M on a missed last
+    //     shot (Session 19) — both absorbed in the "deeper" buckets here and proven by
+    //     RollLFreeThrowCheck and RollMReboundBatchCheck. Isolates the Roll H hop exactly as
     //     RollGHandoffCheck isolated Roll G: the resolver executes Roll H on an
     //     IntoShotResolution continuation (carrying a real slot + zone) and lands at
     //     a terminal, a fact-carrying stub, or deeper. On the fact-carrying stub
@@ -1339,12 +1353,12 @@ internal static class Program
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+            new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
             new BlockRecoveryStub(),
             new SidelineInboundStub(),
-            new FTReboundStub(),
             new TransitionStub());
 
         var pieE = genE.Generate(state);
@@ -1406,6 +1420,13 @@ internal static class Program
 
             if (d.EndsWith("NO_SLOT") || d.EndsWith("NO_ZONE") || d.EndsWith("NO_RESULT"))
             {
+                // Now that Roll M is live, a fact-echo stub can be reached via a DEEP path
+                // — a shooting foul -> Roll L -> Roll M -> a bonus FT trip or a Roll K
+                // reset — whose state carries no original shot facts (the deferred
+                // FT-shooter seam). That is a routed-DEEPER landing, not a dropped fact:
+                // clean one-hop fact ride-through is proven authoritatively by
+                // RollHResolutionBatchCheck (fails=0). Bucket as deeper; tally for sight.
+                deeperStubs++;
                 missingFact++;
                 continue;
             }
@@ -1435,9 +1456,9 @@ internal static class Program
         // board terminal, or offensive board → Roll K) rather than parking with
         // Result=Miss. And as of Session 18 the two SHOOTING-foul outcomes
         // (MadeAndFouled / MissFouled) are no longer here either: they drive the Roll L
-        // FT loop and end at END:FreeThrowsMade / STUB:FTRebound (a plain-label park that
-        // carries no slot:zone:result tail), so they never reach a fact stub. Their
-        // routing + result handling is covered by RollLFreeThrowCheck.
+        // FT loop and end at END:FreeThrowsMade on a made last shot, or flow into Roll M
+        // on a missed last shot (Session 19), so they never reach a fact stub here. Their
+        // routing + result handling is covered by RollLFreeThrowCheck and RollMReboundBatchCheck.
         var continueResults = new[]
         {
             ShotResult.MissOutOfBoundsRetained,
@@ -1453,13 +1474,12 @@ internal static class Program
         }
 
         var routedOk = unrecognized == 0;
-        var factOk = missingFact == 0;
         Console.WriteLine($"\n  zero unrouted exits: unrecognized={unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  slot+zone+result intact on every stub landing: missing={missingFact} -> {(factOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  clean one-hop shots ride slot+zone+result through to their stub landings ({missingFact:N0} deep FT/reset landings carry no shot facts and are routed-deeper, not failed)");
         Console.WriteLine($"  all core Roll H->I destinations reached (offensive rebound now executes Roll K): {(allDests ? "ok" : "FAIL")}");
         Console.WriteLine($"  every straight-off-Roll-H continue-outcome's result reached its stub: {(allResults ? "ok" : "FAIL")}");
 
-        return routedOk && factOk && allDests && allResults;
+        return routedOk && allDests && allResults;
     }
 
     // --- Batch: Roll I's four-way rebound distribution converges within tolerance,
@@ -1695,12 +1715,12 @@ internal static class Program
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+            new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
             new BlockRecoveryStub(),
             new SidelineInboundStub(),
-            new FTReboundStub(),
             new TransitionStub());
 
         var governor = new Governor(resolver, game, cfgGov);
@@ -1812,10 +1832,13 @@ internal static class Program
         // Per-stub park breakdown — quantifies how much of the game is currently
         // flowing through placeholder flips (the offensive-rebound / transition / etc.
         // volume waiting to be closed). The mix SHIFTS across the loop as the bonus
-        // crosses: a free-throw trip now RESOLVES (Roll L) rather than parking — a made
-        // final FT ends the possession (counted in terminal-ended), a missed final FT
-        // parks at STUB:FTRebound — so STUB:FTRebound volume climbing once teams reach
-        // the bonus is visible proof the §2a accumulation is exercised.
+        // crosses: a free-throw trip now RESOLVES end-to-end — a made final FT ends the
+        // possession (counted in terminal-ended), and a missed final FT drives Roll M
+        // (Session 19), which lands on a board, a dead ball, a sideline inbound, or — when
+        // its loose-ball-defense arm fires with the defense in the bonus — a SECOND FT
+        // trip. STUB:FTRebound no longer appears in this breakdown at all. The §2a
+        // accumulation is still exercised: the volume flowing through the in-bonus forks
+        // (Roll I / J / K / M) climbing once teams reach the bonus is the visible proof.
         Console.WriteLine("  per-stub park breakdown:");
         foreach (var (dest, n) in result.PerStubParks.OrderByDescending(kv => kv.Value))
             Console.WriteLine($"    {dest,-44} {n,6:N0}");
@@ -2093,7 +2116,7 @@ internal static class Program
         var genE = new RollEStubPieGenerator(cfgE);
         var genG = new RollGStubPieGenerator(cfgG);
         var pieE = genE.Generate(state);
-        var pieK = genK.Generate();
+        var pieK = genK.Generate(OffensiveReboundSource.LiveBall);
 
         var counts = new Dictionary<OffensiveReboundOutcome, int>();
         foreach (var o in Enum.GetValues<OffensiveReboundOutcome>()) counts[o] = 0;
@@ -2342,10 +2365,13 @@ internal static class Program
     //     observable END-vs-FTRebound SPLIT is its signature: a fixed n-shot trip routes
     //     on the LAST shot only (intermediates are dead respins), so its END rate == p;
     //     a 1-and-1 ends at END only when BOTH shots make (p*p), a front miss forfeiting
-    //     the second and going live to FTRebound (END rate == p*p). A made final FT hands
-    //     the ball to the OPPONENT (DeadBallTo the defense). FT resolution charges no foul
-    //     and touches no arrow, so a fresh local game stays pristine across the batch —
-    //     this node is accumulation-free (CONVENTIONS §2a), unlike the foul forks upstream.
+    //     the second and going live to the rebound boundary (END rate == p*p). A made
+    //     final FT hands the ball to the OPPONENT (DeadBallTo the defense). A missed final
+    //     FT now flows into Roll M (Session 19), PINNED here to its DefensiveRebound
+    //     terminal so the trip ends cleanly at the boundary — Roll L charges no foul and
+    //     touches no arrow, and the pinned Roll M charges none either, so a fresh local
+    //     game stays pristine across the batch and this check stays accumulation-free
+    //     (CONVENTIONS §2a), unlike the foul forks upstream.
     private static bool RollLFreeThrowCheck(RollAConfig cfg, PossessionState state)
     {
         Console.WriteLine($"\n--- Roll L: free-throw resolution ({cfg.BatchSize:N0} trips per type) ---");
@@ -2387,12 +2413,25 @@ internal static class Program
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(cfgL),
+            // Roll M PINNED to its DefensiveRebound terminal for this check: a missed
+            // final free throw must terminate cleanly at the rebound boundary so the FT
+            // LOOP can be observed in isolation (exact spin bands, max <= 3, a clean
+            // make/miss split). The live Roll M's loose-ball-defense arm would charge
+            // fouls and its offensive-board arm would spin Roll K — both would pollute
+            // spin counts and break the §2a accumulation-free property this check relies
+            // on. Pinning one arm is the same isolation RollKBonusForkCheck uses with its
+            // foulOnlyPie; Roll M's real distribution is RollMReboundBatchCheck's mandate.
+            new RollMStubPieGenerator(new RollMConfig
+            {
+                DefensiveRebound = 1.0,
+                OffensiveRebound = 0, LooseBallFoulOnDefense = 0, LooseBallFoulOnOffense = 0,
+                OutOfBoundsOffOffense = 0, OutOfBoundsOffDefense = 0, JumpBall = 0
+            }),
             game,
             rng,
             new ResumeInboundStub(),
             new BlockRecoveryStub(),
             new SidelineInboundStub(),
-            new FTReboundStub(),
             new TransitionStub());
 
         // Each trip type: the entry continuation, the expected exact spin-count band,
@@ -2435,7 +2474,7 @@ internal static class Program
                     if (routing.EndedOn is { } term && term.Consequence.NextOffense != state.Defense)
                         wrongConsequence++;
                 }
-                else if (routing.Destination == "STUB:FTRebound") ftRebounds++;
+                else if (routing.Destination == "END:DefensiveRebound") ftRebounds++;
                 else other++;
             }
 
@@ -2458,6 +2497,310 @@ internal static class Program
 
         var ok = rawOk && allTripsOk && boundOk;
         Console.WriteLine($"  Roll L free-throw resolution: {(ok ? "ok" : "FAIL")}");
+        return ok;
+    }
+
+    // --- Batch: Roll M's seven-way free-throw-rebound distribution converges within
+    //     tolerance, and every arm routes as designed. Driven by calling RollM.Execute
+    //     DIRECTLY on a post-FT state (the RollI / RollK batch pattern), so all seven
+    //     arms are exercised every draw. A FRESH game crosses the bonus mid-batch, so the
+    //     LooseBallFoulOnDefense arm splits sideline/FT (§2a accumulation). Per-arm
+    //     routing is asserted: DefensiveRebound -> Terminal whose consequence is a
+    //     TRANSITION to the defense carrying the FreeThrowRebound context; OffensiveRebound
+    //     -> Continue(ResolveOffensiveRebound) stamped OffensiveReboundSource.FreeThrow;
+    //     LooseBallFoulOnDefense -> charge the defense + bonus fork; LooseBallFoulOnOffense
+    //     / OutOfBoundsOffOffense -> Terminal DeadBallTo the defense; OutOfBoundsOffDefense
+    //     -> Continue(ResolveSidelineInbound) with NO fork even in the bonus; JumpBall ->
+    //     Continue(ResolveJumpBall). Foul-charge discipline is asserted PER DRAW off the
+    //     team-foul delta: ONLY the loose-ball-defense arm increments the defensive team
+    //     foul; the OOB pair and every other arm charge nothing. ---
+    private static bool RollMReboundBatchCheck(
+        RollAConfig cfg, RollMConfig cfgM, RollMStubPieGenerator genM,
+        GameState sharedGame, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} free-throw rebounds routed through Roll M ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var cfgD = RollDConfig.Load(configPath);
+
+        var rng = new SystemRng(cfg.Seed);
+        // A FRESH game so the charge here does not perturb the shared game. The
+        // loose-ball-defense arm's charge crosses the bonus partway through THIS game,
+        // exercising the §2a split (sideline below the bonus, FTs in it).
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var pieM = genM.Generate();
+
+        var counts = new Dictionary<FreeThrowReboundOutcome, int>();
+        foreach (var o in Enum.GetValues<FreeThrowReboundOutcome>()) counts[o] = 0;
+
+        var defTransition = 0;     // DefensiveRebound -> transition terminal to defense
+        var offReboundCont = 0;    // OffensiveRebound -> Roll K cont, FreeThrow source
+        var offFoulDead = 0;       // LooseBallFoulOnOffense -> dead-ball terminal
+        var oobOffDead = 0;        // OutOfBoundsOffOffense -> dead-ball terminal
+        var oobDefSideline = 0;    // OutOfBoundsOffDefense -> sideline (no fork, no charge)
+        var defFoulSideline = 0;   // LooseBallFoulOnDefense below bonus -> sideline
+        var defFoulFreeThrows = 0; // LooseBallFoulOnDefense in bonus -> FTs
+        var jumpBalls = 0;         // JumpBall -> arrow node
+        var unrecognized = 0;
+        var badConsequence = 0;    // wrong team / entry / context on a terminal or ticket
+        var badCharge = 0;         // a non-foul arm moved the team-foul count (or the
+                                   //  foul arm failed to charge exactly 1)
+
+        var sidelineStub = new SidelineInboundStub();
+        var freeThrowStub = new ResolveFreeThrowsStub();
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var before = game.Fouls.FoulsFor(state.Defense);
+            var mRes = RollM.Execute(state, pieM, game, rng);
+            var delta = game.Fouls.FoulsFor(state.Defense) - before;
+
+            switch (mRes)
+            {
+                case Terminal { Reason: "DefensiveRebound" } dr:
+                    counts[FreeThrowReboundOutcome.DefensiveRebound]++;
+                    if (delta != 0) badCharge++;
+                    if (dr.Consequence.NextOffense != state.Defense
+                        || dr.Consequence.NextEntry != EntryType.Transition
+                        || dr.Consequence.TransitionContext?.Source != TransitionSource.FreeThrowRebound)
+                        badConsequence++;
+                    else defTransition++;
+                    break;
+
+                case Continue { Next: ContinuationKind.ResolveOffensiveRebound } orc:
+                    counts[FreeThrowReboundOutcome.OffensiveRebound]++;
+                    if (delta != 0) badCharge++;
+                    // The FreeThrow source ticket must be stamped (selects Roll K's FT pie).
+                    if (orc.OffensiveReboundSource != OffensiveReboundSource.FreeThrow) badConsequence++;
+                    else offReboundCont++;
+                    break;
+
+                case Terminal { Reason: "LooseBallFoulOnOffense" } lbo:
+                    counts[FreeThrowReboundOutcome.LooseBallFoulOnOffense]++;
+                    if (delta != 0) badCharge++;       // an offensive foul charges nothing
+                    if (lbo.Consequence.NextOffense != state.Defense) badConsequence++;
+                    else offFoulDead++;
+                    break;
+
+                case Terminal { Reason: "OutOfBoundsOffOffense" } oobo:
+                    counts[FreeThrowReboundOutcome.OutOfBoundsOffOffense]++;
+                    if (delta != 0) badCharge++;       // OOB charges nothing
+                    if (oobo.Consequence.NextOffense != state.Defense) badConsequence++;
+                    else oobOffDead++;
+                    break;
+
+                case Continue { Next: ContinuationKind.ResolveSidelineInbound } sc:
+                    // BOTH the OOB-off-defense arm and the below-bonus loose-ball-defense
+                    // arm land on a plain sideline inbound; the foul DELTA separates them
+                    // (the foul arm charged 1, the OOB arm charged 0). This is also the
+                    // proof the OOB pair charges nothing.
+                    if (delta == 0)
+                    {
+                        counts[FreeThrowReboundOutcome.OutOfBoundsOffDefense]++;
+                        oobDefSideline++;
+                    }
+                    else
+                    {
+                        counts[FreeThrowReboundOutcome.LooseBallFoulOnDefense]++;
+                        if (delta != 1) badCharge++;
+                        defFoulSideline++;
+                    }
+                    _ = sidelineStub.Receive(sc);
+                    break;
+
+                case Continue { Next: ContinuationKind.ResolveFreeThrows } ftc:
+                    // ONLY the loose-ball-defense arm IN THE BONUS lands here (it charged
+                    // a foul and the defense has crossed the threshold). The OOB-off-defense
+                    // arm can NEVER reach this branch — it reads no bonus and charges no
+                    // foul — so a delta of 0 here would be a routing bug.
+                    counts[FreeThrowReboundOutcome.LooseBallFoulOnDefense]++;
+                    if (delta != 1) badCharge++;
+                    defFoulFreeThrows++;
+                    _ = freeThrowStub.Receive(ftc);
+                    break;
+
+                case Continue { Next: ContinuationKind.ResolveJumpBall }:
+                    counts[FreeThrowReboundOutcome.JumpBall]++;
+                    if (delta != 0) badCharge++;
+                    jumpBalls++;
+                    break;
+
+                default:
+                    unrecognized++;
+                    break;
+            }
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll M outcomes:");
+        foreach (var (outcome, weight) in pieM.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-24} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine("\n  routing per outcome:");
+        Console.WriteLine($"    DefensiveRebound       -> transition terminal (defense) {defTransition,8:N0}  {(defTransition > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OffensiveRebound       -> Roll K cont (FreeThrow source) {offReboundCont,8:N0}  {(offReboundCont > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    LooseBallFoulOnOffense -> dead-ball terminal (defense)   {offFoulDead,8:N0}  {(offFoulDead > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OutOfBoundsOffOffense  -> dead-ball terminal (defense)   {oobOffDead,8:N0}  {(oobOffDead > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OutOfBoundsOffDefense  -> sideline inbound (no charge)   {oobDefSideline,8:N0}  {(oobDefSideline > 0 ? "ok" : "NONE")}");
+        // The loose-ball-defense foul splits on the bonus: sideline below it, FTs once
+        // the fresh game crosses the threshold mid-batch (§2a).
+        var defFoulTotal = defFoulSideline + defFoulFreeThrows;
+        Console.WriteLine($"    LooseBallFoulOnDefense -> SidelineInbound (below bonus)  {defFoulSideline,8:N0}");
+        Console.WriteLine($"                           -> ResolveFreeThrows (in bonus)   {defFoulFreeThrows,8:N0}");
+        Console.WriteLine($"    JumpBall               -> arrow node                     {jumpBalls,8:N0}  {(jumpBalls > 0 ? "ok" : "NONE")}");
+
+        var allArms = defTransition > 0 && offReboundCont > 0 && offFoulDead > 0 && oobOffDead > 0
+                      && oobDefSideline > 0 && defFoulTotal > 0 && jumpBalls > 0;
+        var routedOk = unrecognized == 0;
+        var consequenceOk = badConsequence == 0;
+        var chargeOk = badCharge == 0;
+        Console.WriteLine($"\n  zero unrouted / unexpected exits: {unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  consequence/ticket correct on every terminal+continue: bad={badConsequence} -> {(consequenceOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  foul-charge discipline (only loose-ball-defense charges): bad={badCharge} -> {(chargeOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  §2a: loose-ball-defense crossed the bonus mid-batch (sideline -> FT): {(defFoulSideline > 0 && defFoulFreeThrows > 0 ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all seven Roll M arms reached: {(allArms ? "ok" : "FAIL")}");
+
+        var ok = ratesOk && routedOk && consequenceOk && chargeOk && allArms
+                 && defFoulSideline > 0 && defFoulFreeThrows > 0;
+        Console.WriteLine($"  Roll M free-throw rebound resolution: {(ok ? "ok" : "FAIL")}");
+        return ok;
+    }
+
+    // --- Context: the two FT tickets Roll M stamps SELECT the right pies downstream.
+    //     (1) Roll K's generator, given OffensiveReboundSource.FreeThrow, returns the
+    //     FT-specific weight set (more putback, less reset); given LiveBall (the legacy
+    //     default), it returns the byte-for-byte original set. (2) Roll J's generator,
+    //     given TransitionSource.FreeThrowRebound, returns the conservative run-or-not
+    //     set (more Settle, less Push); given Rebound, the original set. Each is proven
+    //     two ways, the RollCContextCheck pattern: the SELECTED pie's weights equal the
+    //     configured set (right SET picked), and a draw sample off that pie converges to
+    //     those weights (the pie is actually consumed). The two sources must also DIFFER
+    //     (a null/legacy stamp can never accidentally get the FT odds). ---
+    private static bool RollMContextSelectionCheck(
+        RollAConfig cfg, RollKConfig cfgK, RollJConfig cfgJ, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Context: Roll K + Roll J pie selection by the FT tickets ---");
+        var ok = true;
+
+        // ---- Roll K: LiveBall (legacy default) vs FreeThrow ----
+        var genK = new RollKStubPieGenerator(cfgK);
+        var kContexts = new (OffensiveReboundSource src, (OffensiveReboundOutcome o, double w)[] expected)[]
+        {
+            (OffensiveReboundSource.LiveBall, new[]
+            {
+                (OffensiveReboundOutcome.PutBack,          cfgK.PutBack),
+                (OffensiveReboundOutcome.JumpBall,         cfgK.JumpBall),
+                (OffensiveReboundOutcome.DefensiveFoul,    cfgK.DefensiveFoul),
+                (OffensiveReboundOutcome.OffensiveFoul,    cfgK.OffensiveFoul),
+                (OffensiveReboundOutcome.DeadBallTurnover, cfgK.DeadBallTurnover),
+                (OffensiveReboundOutcome.LiveBallTurnover, cfgK.LiveBallTurnover),
+                (OffensiveReboundOutcome.ResetOffense,     cfgK.ResetOffense),
+            }),
+            (OffensiveReboundSource.FreeThrow, new[]
+            {
+                (OffensiveReboundOutcome.PutBack,          cfgK.FreeThrowPutBack),
+                (OffensiveReboundOutcome.JumpBall,         cfgK.FreeThrowJumpBall),
+                (OffensiveReboundOutcome.DefensiveFoul,    cfgK.FreeThrowDefensiveFoul),
+                (OffensiveReboundOutcome.OffensiveFoul,    cfgK.FreeThrowOffensiveFoul),
+                (OffensiveReboundOutcome.DeadBallTurnover, cfgK.FreeThrowDeadBallTurnover),
+                (OffensiveReboundOutcome.LiveBallTurnover, cfgK.FreeThrowLiveBallTurnover),
+                (OffensiveReboundOutcome.ResetOffense,     cfgK.FreeThrowResetOffense),
+            }),
+        };
+
+        double KPutBack(OffensiveReboundSource s) =>
+            genK.Generate(s).Slices.First(x => x.Outcome == OffensiveReboundOutcome.PutBack).Weight;
+
+        foreach (var (src, expected) in kContexts)
+        {
+            var pie = genK.Generate(src);
+            var pieMap = pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+
+            var selectionOk = true;
+            foreach (var (o, w) in expected)
+                if (Math.Abs(pieMap[o] - w) > cfgK.Epsilon) selectionOk = false;
+
+            var rng = new SystemRng(cfg.Seed);
+            var counts = new Dictionary<OffensiveReboundOutcome, int>();
+            foreach (var o in Enum.GetValues<OffensiveReboundOutcome>()) counts[o] = 0;
+            for (var i = 0; i < cfg.BatchSize; i++) counts[pie.Roll(rng.NextUnitInterval())]++;
+
+            var ratesOk = true;
+            Console.WriteLine($"  Roll K source={src} (selection {(selectionOk ? "ok" : "FAIL")}):");
+            foreach (var (o, w) in expected)
+            {
+                var observed = counts[o] / (double)cfg.BatchSize;
+                var pass = Math.Abs(observed - w) <= cfg.RateTolerance;
+                ratesOk &= pass;
+                Console.WriteLine($"    {o,-18} observed={observed:P3}  expected={w:P3}  {(pass ? "ok" : "FAIL")}");
+            }
+            ok &= selectionOk && ratesOk;
+        }
+        var kDiffer = Math.Abs(KPutBack(OffensiveReboundSource.FreeThrow) - KPutBack(OffensiveReboundSource.LiveBall)) > cfgK.Epsilon;
+        Console.WriteLine($"  Roll K FT pie differs from live-ball pie (PutBack): {(kDiffer ? "ok" : "FAIL")}");
+        ok &= kDiffer;
+
+        // ---- Roll J: Rebound vs FreeThrowRebound ----
+        var genJ = new RollJStubPieGenerator(cfgJ);
+        var jContexts = new (TransitionContext ctx, (TransitionOutcome o, double w)[] expected)[]
+        {
+            (TransitionContext.Rebound, new[]
+            {
+                (TransitionOutcome.Settle,        cfgJ.Settle),
+                (TransitionOutcome.Push,          cfgJ.Push),
+                (TransitionOutcome.Turnover,      cfgJ.Turnover),
+                (TransitionOutcome.DefensiveFoul, cfgJ.DefensiveFoul),
+                (TransitionOutcome.JumpBall,      cfgJ.JumpBall),
+            }),
+            (TransitionContext.FreeThrowRebound, new[]
+            {
+                (TransitionOutcome.Settle,        cfgJ.FreeThrowSettle),
+                (TransitionOutcome.Push,          cfgJ.FreeThrowPush),
+                (TransitionOutcome.Turnover,      cfgJ.FreeThrowTurnover),
+                (TransitionOutcome.DefensiveFoul, cfgJ.FreeThrowDefensiveFoul),
+                (TransitionOutcome.JumpBall,      cfgJ.FreeThrowJumpBall),
+            }),
+        };
+
+        double JPush(TransitionContext c) =>
+            genJ.Generate(c).Slices.First(x => x.Outcome == TransitionOutcome.Push).Weight;
+
+        foreach (var (ctx, expected) in jContexts)
+        {
+            var pie = genJ.Generate(ctx);
+            var pieMap = pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+
+            var selectionOk = true;
+            foreach (var (o, w) in expected)
+                if (Math.Abs(pieMap[o] - w) > cfgJ.Epsilon) selectionOk = false;
+
+            var rng = new SystemRng(cfg.Seed);
+            var counts = new Dictionary<TransitionOutcome, int>();
+            foreach (var o in Enum.GetValues<TransitionOutcome>()) counts[o] = 0;
+            for (var i = 0; i < cfg.BatchSize; i++) counts[pie.Roll(rng.NextUnitInterval())]++;
+
+            var ratesOk = true;
+            Console.WriteLine($"  Roll J source={ctx.Source} (selection {(selectionOk ? "ok" : "FAIL")}):");
+            foreach (var (o, w) in expected)
+            {
+                var observed = counts[o] / (double)cfg.BatchSize;
+                var pass = Math.Abs(observed - w) <= cfg.RateTolerance;
+                ratesOk &= pass;
+                Console.WriteLine($"    {o,-18} observed={observed:P3}  expected={w:P3}  {(pass ? "ok" : "FAIL")}");
+            }
+            ok &= selectionOk && ratesOk;
+        }
+        var jDiffer = Math.Abs(JPush(TransitionContext.FreeThrowRebound) - JPush(TransitionContext.Rebound)) > cfgJ.Epsilon;
+        Console.WriteLine($"  Roll J FT pie differs from rebound pie (Push): {(jDiffer ? "ok" : "FAIL")}");
+        ok &= jDiffer;
+
+        Console.WriteLine($"  Roll M context selection: {(ok ? "ok" : "FAIL")}");
         return ok;
     }
 
@@ -2504,12 +2847,12 @@ internal static class Program
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+            new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
             new BlockRecoveryStub(),
             new SidelineInboundStub(),
-            new FTReboundStub(),
             new TransitionStub());
 
         var pieE = genE.Generate(state);

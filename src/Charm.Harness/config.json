@@ -109,6 +109,11 @@
     "Turnover": 0.06,
     "DefensiveFoul": 0.035,
     "JumpBall": 0.005,
+    "FreeThrowSettle": 0.78,
+    "FreeThrowPush": 0.12,
+    "FreeThrowTurnover": 0.05,
+    "FreeThrowDefensiveFoul": 0.04,
+    "FreeThrowJumpBall": 0.01,
     "Epsilon": 1e-9
   },
 
@@ -120,12 +125,29 @@
     "DeadBallTurnover": 0.03,
     "LiveBallTurnover": 0.02,
     "ResetOffense": 0.47,
+    "FreeThrowPutBack": 0.55,
+    "FreeThrowJumpBall": 0.01,
+    "FreeThrowDefensiveFoul": 0.05,
+    "FreeThrowOffensiveFoul": 0.02,
+    "FreeThrowDeadBallTurnover": 0.03,
+    "FreeThrowLiveBallTurnover": 0.02,
+    "FreeThrowResetOffense": 0.32,
     "Epsilon": 1e-9
   },
 
   "RollL": {
     "MakeProbability": 0.72,
     "RoadMakePenalty": 0.0,
+    "Epsilon": 1e-9
+  },
+  "RollM": {
+    "DefensiveRebound": 0.735,
+    "OffensiveRebound": 0.18,
+    "LooseBallFoulOnDefense": 0.02,
+    "LooseBallFoulOnOffense": 0.01,
+    "OutOfBoundsOffOffense": 0.02,
+    "OutOfBoundsOffDefense": 0.03,
+    "JumpBall": 0.005,
     "Epsilon": 1e-9
   },
 

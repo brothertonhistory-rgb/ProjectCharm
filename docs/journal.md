@@ -1,3 +1,81 @@
+## Session 19 — Roll M (free-throw rebound resolution): the FT loop's downstream closes, two pies grow a second context (2026-06-12)
+
+**Built.** The **free-throw rebound roll** — Roll M — the node a **missed final free throw**
+drains into. It closes the `STUB:FTRebound` park Roll L opened last session, the same
+stub→roll swap every prior session ran. The `ResolveFTRebound` edge now executes Roll M
+instead of parking; the chain runs A → … → L → **M** end-to-end.
+
+**Roll M is Roll I's shape, twice tilted.** It is a board-battle gate with mixed
+terminals/continues plus the shared loose-ball foul fork — structurally Roll I — with two
+deliberate differences: a **more defensive board population** (everyone lined along the lane
+off a free throw, no shooter crashing in, so the offensive-board share is lower than off a
+live field-goal miss) and an added **out-of-bounds pair**. It opens **no new stub and no new
+`ContinuationKind`**: every one of its seven arms routes to a node that already exists.
+
+| Roll M arm | Routes to | End/continue |
+|---|---|---|
+| DefensiveRebound | transition to defense, `FreeThrowRebound` context → Roll J | TERMINAL |
+| OffensiveRebound | offensive-rebound node → Roll K, `FreeThrow` source | CONTINUE |
+| LooseBallFoulOnDefense | charge defense + bonus fork (5th feeder) | CONTINUE |
+| LooseBallFoulOnOffense | dead ball to defense at Roll A, no charge | TERMINAL |
+| OutOfBoundsOffOffense | dead ball to defense at Roll A, no charge | TERMINAL |
+| OutOfBoundsOffDefense | sideline inbound, no charge / no fork | CONTINUE |
+| JumpBall | shared arrow node | CONTINUE |
+
+**Reuse over duplication — two existing rolls grew a second context.** Roll M owns no FT-rebound
+shooting or transition logic; it **routes into Roll K and Roll J** via context tickets, exactly
+the ticket/station discipline of Roll C's turnover context:
+- **Roll K** gained a labeled `OffensiveReboundSource { LiveBall, FreeThrow }` ticket on the
+  offensive-rebound continuation. Roll M stamps `FreeThrow`; **every legacy feeder (Roll I)
+  stamps nothing → reads as `LiveBall`**, so the field-goal path is byte-for-byte unchanged. The
+  FT pie is more putback / less reset (the offense is right under the rim off an FT board).
+- **Roll J** gained a `FreeThrowRebound` value on its `TransitionSource`, selecting a tamer, more
+  conservative run-or-not pie (off a made/missed FT everyone got back, so the break runs less).
+  The `Rebound` pie is untouched.
+
+A **labeled tag, not a bool**, in both cases — so a third source (off a tip, a steal) grows by
+append rather than forcing a second bool.
+
+**The OOB pair is the foul pair minus the whistle.** `OutOfBoundsOffOffense` lands exactly where
+`LooseBallFoulOnOffense` lands (dead ball to the defense at Roll A) — different reason label,
+identical routing, no charge. `OutOfBoundsOffDefense` is the one arm that is *always* a plain
+sideline inbound: no foul means no bonus question, so unlike the loose-ball-defense arm it
+**never forks** even when the defense is in the bonus.
+
+**Roll M fires once per FT trip.** A missed putback off its *offensive* board re-enters **Roll I**
+(a live field-goal miss), not back into Roll M — so Roll M adds no new convergence loop; the
+existing Roll K putback↔rebound proof still bounds the possession.
+
+**`FTReboundStub` retired, kept in the corner.** The resolver no longer injects it and no check
+invokes it; it is flagged for future removal as cheap re-park insurance. The seven harness
+resolver sites dropped the stub arg and gained the Roll M generator (net-zero arg count).
+`FreeThrowSpins` is now threaded onto all four stub-return paths so the FT-spin count survives an
+FT rebound that lands at a sideline inbound.
+
+**Validation.** A new `RollMReboundBatchCheck` proves the seven-way split converges, all arms
+route as designed, the foul-charge discipline holds **per draw off the team-foul delta** (only the
+loose-ball-defense arm charges; the OOB pair and every other arm charge nothing), and the §2a bonus
+crossing splits the loose-ball-defense arm sideline→FT mid-batch. A new `RollMContextSelectionCheck`
+proves both new tickets select the right downstream pie (and that each differs from its legacy
+sibling). `RollLFreeThrowCheck` was **isolated** from Roll M by pinning its Roll M to the clean
+`DefensiveRebound` terminal — the same one-arm-pie technique `RollKBonusForkCheck` uses — so the FT
+loop's exact spin bands and accumulation-free property survive a now-live downstream. Every
+`STUB:FTRebound` reference across the harness was swept.
+
+**One regression, caught and corrected.** Two upstream shot-handoff checks (`RollGHandoffCheck`,
+`RollHHandoffCheck`) walk a possession to completion and audited slot+zone+result on the *final*
+stub landing. Roll M now lets a shooting-foul possession recurse through bonus-FT / Roll-K-reset
+paths whose state legitimately carries no shooter facts (the deferred FT-shooter seam), so ~3 in
+100k landed at a fact-echo stub with an absent fact tail and the audit cried FAIL. That is not a
+dropped fact — it is a routed-deeper landing — and one-hop fact integrity is proven authoritatively
+by `RollHResolutionBatchCheck` (fails=0) regardless. The two checks now bucket those deep landings
+as routed-deeper and report the count informationally rather than failing on it. Same class as the
+Session 14 lesson: a check's assumption silently expired the moment a downstream node went live.
+
+**Deferred unchanged.** Real attribute-driven board tilt (size / box-out / lane positioning), the
+FT-shooter identity, points accounting, and end-game / clock logic all remain on the horizon. Roll M
+stamps no new `PossessionState` fact — which slot grabbed the board is the deferred attribution layer.
+
 ## Session 18 — Roll L (free-throw resolution): the FT loop, many feeders one node (2026-06-12)
 
 **Built.** The **free-throw resolution roll** — Roll L — the node every trip to the line

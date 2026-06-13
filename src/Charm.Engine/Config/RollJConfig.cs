@@ -13,8 +13,9 @@ namespace Charm.Engine;
 /// pushed into transition) — the only transition source fed this session. The
 /// Steal context's pie (more Push, extra if the steal came from an entry-stage
 /// turnover) is a SIBLING weight set added in the steal-feeder session, exactly as
-/// <see cref="RollCConfig"/> grew a Transition set beside its Halfcourt set. One
-/// context is fed now, so one set lives here.</para>
+/// <see cref="RollCConfig"/> grew a Transition set beside its Halfcourt set. The
+/// FreeThrowRebound set (a tamer pie off a missed FT) is fed by Roll M this session;
+/// the Steal set lands later. Two contexts are fed now, so two sets live here.</para>
 /// </summary>
 public sealed class RollJConfig
 {
@@ -27,6 +28,19 @@ public sealed class RollJConfig
     public double Turnover { get; set; } = 0.06;
     public double DefensiveFoul { get; set; } = 0.035;
     public double JumpBall { get; set; } = 0.005;
+
+    // --- Free-throw-rebound-context run-or-not weights (placeholders; seeded
+    //     CONSERVATIVE, Emmett's to tune). The SECOND weight set, a clean sibling to
+    //     the Rebound set above — added with Roll M exactly as RollCConfig grew a
+    //     Transition set beside its Halfcourt set. Off a missed FREE THROW the
+    //     made/missed shot gave everyone time to get back, so the break runs LESS: a
+    //     higher Settle and a lower Push than the field-goal rebound set. The five
+    //     sum to 1. ---
+    public double FreeThrowSettle { get; set; } = 0.78;
+    public double FreeThrowPush { get; set; } = 0.12;
+    public double FreeThrowTurnover { get; set; } = 0.05;
+    public double FreeThrowDefensiveFoul { get; set; } = 0.04;
+    public double FreeThrowJumpBall { get; set; } = 0.01;
 
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;

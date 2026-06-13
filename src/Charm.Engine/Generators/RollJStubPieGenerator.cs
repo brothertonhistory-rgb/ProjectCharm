@@ -6,8 +6,9 @@ namespace Charm.Engine;
 /// possession arrived with — the SAME ticket/station pattern as Roll C, carried on
 /// the cross-possession seam instead of a within-possession <see cref="Continue"/>.
 ///
-/// This session ONE context is live — <see cref="TransitionSource.Rebound"/> — so
-/// the generator builds the rebound pie and nothing else. The Steal context's pie
+/// This session TWO contexts are live — <see cref="TransitionSource.Rebound"/> and
+/// <see cref="TransitionSource.FreeThrowRebound"/> (Roll M's defensive board, a tamer
+/// pie) — so the generator builds those two and nothing else. The Steal context's pie
 /// (more Push) is a sibling arm added in the steal-feeder session; until then no
 /// ticket carries any other source, so no other arm is reachable (the <c>_</c> arm
 /// fails loud if one ever sneaks in without its pie).
@@ -43,9 +44,18 @@ public sealed class RollJStubPieGenerator
                 [TransitionOutcome.JumpBall]      = _config.JumpBall,
             },
 
+            TransitionSource.FreeThrowRebound => new Dictionary<TransitionOutcome, double>
+            {
+                [TransitionOutcome.Settle]        = _config.FreeThrowSettle,
+                [TransitionOutcome.Push]          = _config.FreeThrowPush,
+                [TransitionOutcome.Turnover]      = _config.FreeThrowTurnover,
+                [TransitionOutcome.DefensiveFoul] = _config.FreeThrowDefensiveFoul,
+                [TransitionOutcome.JumpBall]      = _config.FreeThrowJumpBall,
+            },
+
             _ => throw new InvalidOperationException(
-                $"No Roll J pie for transition source '{context.Source}'. Only Rebound is " +
-                "modelled this session; Steal lands with the steal-feeder session.")
+                $"No Roll J pie for transition source '{context.Source}'. Rebound and " +
+                "FreeThrowRebound are modelled; Steal lands with the steal-feeder session.")
         };
 
         return new Pie<TransitionOutcome>(weights, _config.Epsilon);

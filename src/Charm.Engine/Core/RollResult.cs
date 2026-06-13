@@ -69,11 +69,20 @@ public sealed record PossessionConsequence(TeamSide NextOffense, EntryType NextE
         new(team, EntryType.Transition);
 
     /// <summary>Ball to <paramref name="team"/> on a live-ball transition start off a
-    /// DEFENSIVE REBOUND — carrying the <see cref="TransitionContext.Rebound"/> ticket
-    /// so the resolver routes it to Roll J (live transition entry) and Roll J selects
-    /// the rebound run-or-not pie. The one transition source wired this session.</summary>
+    /// DEFENSIVE REBOUND of a field-goal miss — carrying the
+    /// <see cref="TransitionContext.Rebound"/> ticket so the resolver routes it to Roll
+    /// J (live transition entry) and Roll J selects the rebound run-or-not pie.</summary>
     public static PossessionConsequence TransitionReboundTo(TeamSide team) =>
         new(team, EntryType.Transition) { TransitionContext = TransitionContext.Rebound };
+
+    /// <summary>Ball to <paramref name="team"/> on a live-ball transition start off a
+    /// DEFENSIVE REBOUND of a missed FREE THROW (Roll M's DefensiveRebound arm) —
+    /// carrying the <see cref="TransitionContext.FreeThrowRebound"/> ticket so the
+    /// resolver routes it to Roll J and Roll J selects its tamer, conservative pie (off
+    /// an FT the break is less likely to run). Parallel to
+    /// <see cref="TransitionReboundTo"/>; the second transition source wired.</summary>
+    public static PossessionConsequence TransitionFreeThrowReboundTo(TeamSide team) =>
+        new(team, EntryType.Transition) { TransitionContext = TransitionContext.FreeThrowRebound };
 }
 
 /// <summary>The possession is over. The ball will change hands.</summary>
@@ -145,4 +154,21 @@ public sealed record Continue(ContinuationKind Next, PossessionState State) : Ro
     /// <see cref="ContinuationKind.IntoShotResolution"/>.</para>
     /// </summary>
     public bool Putback { get; init; }
+
+    /// <summary>
+    /// The OFFENSIVE-REBOUND SOURCE TICKET an offensive board carries into Roll K — the
+    /// within-possession label that tells Roll K's generator WHICH pie to select: the
+    /// live-ball field-goal pie or the FT-specific pie (more putback, point-blank).
+    /// FUNCTIONAL payload (it changes the odds), the same optional-payload shape as
+    /// <see cref="Bonus"/>/<see cref="Flavor"/>/<see cref="TurnoverContext"/>/<see
+    /// cref="Putback"/>. A LABELED tag rather than a bool so it grows by append if a
+    /// third source (e.g. off a tip) ever feeds in. Stamped by Roll M's
+    /// <c>OffensiveRebound</c> arm (<see cref="OffensiveReboundSource.FreeThrow"/>);
+    /// Roll K's generator reads it and never queries the stamping station back.
+    /// <para>NULL on every legacy feeder — Roll I (the field-goal rebound) stamps
+    /// nothing — and a null reads as <see cref="OffensiveReboundSource.LiveBall"/>, so
+    /// the regular Roll K pie path is byte-for-byte unchanged. Meaningful only when
+    /// <see cref="Next"/> is <see cref="ContinuationKind.ResolveOffensiveRebound"/>.</para>
+    /// </summary>
+    public OffensiveReboundSource? OffensiveReboundSource { get; init; }
 }

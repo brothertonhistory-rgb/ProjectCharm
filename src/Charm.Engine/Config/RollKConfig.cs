@@ -37,6 +37,21 @@ public sealed class RollKConfig
     public double LiveBallTurnover { get; set; } = 0.02;
     public double ResetOffense { get; set; } = 0.47;
 
+    // --- Free-throw-source weights (placeholders; seeded CONSERVATIVE, Emmett's to
+    //     tune). The SECOND weight set, a clean sibling to the live-ball set above —
+    //     selected when an offensive board arrives stamped
+    //     <see cref="OffensiveReboundSource.FreeThrow"/> (Roll M). Off a missed FREE
+    //     THROW the offense is right under the rim, so MORE putback and LESS
+    //     kick-it-out-and-reset than off a live field-goal board. The other five arms
+    //     carry the same rare-event weights. The seven sum to 1. ---
+    public double FreeThrowPutBack { get; set; } = 0.55;
+    public double FreeThrowJumpBall { get; set; } = 0.01;
+    public double FreeThrowDefensiveFoul { get; set; } = 0.05;
+    public double FreeThrowOffensiveFoul { get; set; } = 0.02;
+    public double FreeThrowDeadBallTurnover { get; set; } = 0.03;
+    public double FreeThrowLiveBallTurnover { get; set; } = 0.02;
+    public double FreeThrowResetOffense { get; set; } = 0.32;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 

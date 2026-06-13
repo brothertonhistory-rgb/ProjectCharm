@@ -76,3 +76,31 @@ public enum OffensiveReboundOutcome
     /// same hazards. -> CONTINUE.</summary>
     ResetOffense
 }
+
+/// <summary>
+/// The SOURCE axis of an offensive rebound — HOW the offense came to secure its own
+/// board. This is the within-possession ticket memory that selects Roll K's pie: the
+/// same ticket/station pattern as the putback bit and Roll C's turnover context (a
+/// station stamps it at write time; Roll K's generator reads it to pick a weight set;
+/// the generator NEVER queries the stamping station). A labeled tag, not a bool, so it
+/// GROWS BY APPEND if a third offensive-rebound source ever feeds in (e.g. off a tip),
+/// rather than forcing a second bool or a teardown.
+///
+/// <para>It rides on the <see cref="Continue.OffensiveReboundSource"/> field of the
+/// <see cref="ContinuationKind.ResolveOffensiveRebound"/> continuation. A NULL stamp
+/// reads as <see cref="LiveBall"/>: every legacy feeder (Roll I, the field-goal
+/// rebound) stamps nothing, so the live-ball path is byte-for-byte unchanged. Only
+/// Roll M (the free-throw rebound) stamps <see cref="FreeThrow"/>.</para>
+/// </summary>
+public enum OffensiveReboundSource
+{
+    /// <summary>The offensive board came off a LIVE field-goal miss (Roll I's
+    /// OffensiveRebound arm). The default — every legacy feeder reads as this, so a
+    /// null stamp maps here and the live-ball Roll K pie is byte-for-byte unchanged.</summary>
+    LiveBall,
+
+    /// <summary>The offensive board came off a missed FREE THROW (Roll M's
+    /// OffensiveRebound arm). Selects Roll K's FT-specific pie (more putback,
+    /// point-blank — the offense is right under the rim off an FT board).</summary>
+    FreeThrow
+}

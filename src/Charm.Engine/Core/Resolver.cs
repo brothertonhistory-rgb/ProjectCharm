@@ -72,14 +72,12 @@ public sealed class Resolver
     private readonly RollJStubPieGenerator _rollJGenerator;
     private readonly RollKStubPieGenerator _rollKGenerator;
     private readonly RollLStubPieGenerator _rollLGenerator;
+    private readonly RollMStubPieGenerator _rollMGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
     private readonly IContinuationNode _resumeInbound;
     private readonly IContinuationNode _resolveBlock;
     private readonly IContinuationNode _sidelineInbound;
-    // Roll L's FT-sequence driver parks a missed FINAL free throw here — the future
-    // FT-rebound roll's holding pen.
-    private readonly IContinuationNode _ftRebound;
     // Roll J's Push parks here — the future transition roll's holding pen.
     private readonly IContinuationNode _transition;
 
@@ -97,12 +95,12 @@ public sealed class Resolver
         RollJStubPieGenerator rollJGenerator,
         RollKStubPieGenerator rollKGenerator,
         RollLStubPieGenerator rollLGenerator,
+        RollMStubPieGenerator rollMGenerator,
         GameState game,
         IRng rng,
         IContinuationNode resumeInbound,
         IContinuationNode resolveBlock,
         IContinuationNode sidelineInbound,
-        IContinuationNode ftRebound,
         IContinuationNode transition)
     {
         _rollAGenerator = rollAGenerator;
@@ -118,12 +116,12 @@ public sealed class Resolver
         _rollJGenerator = rollJGenerator;
         _rollKGenerator = rollKGenerator;
         _rollLGenerator = rollLGenerator;
+        _rollMGenerator = rollMGenerator;
         _game = game;
         _rng = rng;
         _resumeInbound = resumeInbound;
         _resolveBlock = resolveBlock;
         _sidelineInbound = sidelineInbound;
-        _ftRebound = ftRebound;
         _transition = transition;
     }
 
@@ -148,11 +146,14 @@ public sealed class Resolver
         RollResult result;
 
         if (start is { Entry: EntryType.Transition,
-                       TransitionContext: { Source: TransitionSource.Rebound } ctx })
+                       TransitionContext: { Source: TransitionSource.Rebound
+                                                  or TransitionSource.FreeThrowRebound } ctx })
         {
-            // Rebound-born transition: Roll J owns the top of the chain. The arriving
-            // ticket selects Roll J's run-or-not pie. Roll J takes _game because its
-            // DefensiveFoul arm charges a team foul (the Roll D / Roll I shape).
+            // Rebound-born transition (field-goal OR free-throw board): Roll J owns the
+            // top of the chain. The arriving ticket's Source selects Roll J's run-or-not
+            // pie — the FreeThrowRebound source picks the tamer, conservative pie. Roll J
+            // takes _game because its DefensiveFoul arm charges a team foul (the Roll D /
+            // Roll I shape).
             var pieJ = _rollJGenerator.Generate(ctx);
             result = RollJ.Execute(start, pieJ, _game, _rng);
         }
@@ -266,7 +267,7 @@ public sealed class Resolver
                         // Roll D, opponent not in bonus -> offense keeps the ball
                         // and inbounds (stub). Chain ends here for now.
                         case ContinuationKind.ResumeInbound:
-                            return new RoutingOutcome(false, _resumeInbound.Receive(c)) { PutbackAttempts = putbackAttempts };
+                            return new RoutingOutcome(false, _resumeInbound.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
 
                         // Bonus fork (Roll D/I/J/K), opponent in bonus -> the Roll L
                         // FT loop. The Bonus token IS the shot count: Double is a flat
@@ -292,7 +293,7 @@ public sealed class Resolver
                         // 13 moved the feed point from F to H, leaving this edge
                         // untouched. Chain ends here for now.
                         case ContinuationKind.ResolveBlock:
-                            return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts };
+                            return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
 
                         // Roll F, clean attempt got off -> execute Roll G (shot
                         // location), loop. Roll G is structurally Roll E: it stamps
@@ -357,7 +358,12 @@ public sealed class Resolver
                         // takes _game — the Roll D / I / J shape. OffensiveReboundStub
                         // is retired from the live chain; this edge now executes Roll K.
                         case ContinuationKind.ResolveOffensiveRebound:
-                            var pieK = _rollKGenerator.Generate();
+                            // Select Roll K's pie by the source the board arrived with. A
+                            // null stamp — every legacy feeder (Roll I) stamps nothing —
+                            // reads as LiveBall, so the field-goal path is byte-for-byte
+                            // unchanged. Roll M stamps FreeThrow for its FT-specific pie.
+                            var pieK = _rollKGenerator.Generate(
+                                c.OffensiveReboundSource ?? OffensiveReboundSource.LiveBall);
                             result = RollK.Execute(c.State, pieK, _game, _rng);
                             continue;
 
@@ -378,7 +384,7 @@ public sealed class Resolver
                         // inbound node (stub); offense retains and inbounds. Chain
                         // ends here for now.
                         case ContinuationKind.ResolveSidelineInbound:
-                            return new RoutingOutcome(false, _sidelineInbound.Receive(c)) { PutbackAttempts = putbackAttempts };
+                            return new RoutingOutcome(false, _sidelineInbound.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
 
                         // Jump ball (from any feeder: Roll A, Roll B, Roll F) ->
                         // resolve against the possession arrow, then END the
@@ -406,14 +412,26 @@ public sealed class Resolver
                         // will land. An Into* hand-off that parks for now, like the
                         // other stub edges. Chain ends here for this session.
                         case ContinuationKind.IntoTransition:
-                            return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts };
+                            return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
 
-                        // Roll L's FT loop, last shot missed (live ball) -> the parked
-                        // FT-rebound node (stub). The future FT-rebound roll's holding
-                        // pen — the offensive/defensive board off a missed FT plus any
-                        // foul on that rebound. Chain ends here for this session.
+                        // Roll L's FT loop, last shot missed (live ball) -> execute Roll M
+                        // (free-throw rebound resolution), loop. Roll M is a GATE with
+                        // mixed ends (the Roll I shape): TERMINALS (DefensiveRebound ->
+                        // transition to the defense; LooseBallFoulOnOffense /
+                        // OutOfBoundsOffOffense -> dead ball to the defense) and CONTINUES
+                        // (OffensiveRebound -> Roll K with the FreeThrow source;
+                        // LooseBallFoulOnDefense -> the charge-and-fork; OutOfBoundsOffDefense
+                        // -> sideline inbound; JumpBall -> the arrow node). It mutates
+                        // GameState (its LooseBallFoulOnDefense arm charges the defensive
+                        // team foul), hence it takes _game — the Roll D / I / J / K shape.
+                        // FTReboundStub is retired from the live chain; this edge now
+                        // executes Roll M. Roll M fires ONCE per FT trip — a missed putback
+                        // off its offensive board re-enters Roll I, not Roll M, so it adds
+                        // no new convergence loop.
                         case ContinuationKind.ResolveFTRebound:
-                            return new RoutingOutcome(false, _ftRebound.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
+                            var pieM = _rollMGenerator.Generate();
+                            result = RollM.Execute(c.State, pieM, _game, _rng);
+                            continue;
 
                         default:
                             throw new InvalidOperationException($"No route for continuation '{c.Next}'.");
