@@ -2218,6 +2218,9 @@ internal static class Program
         var jumpBalls = 0;
         var reboundIntoJ = 0;
         var stealIntoJ = 0;
+        var homePoints = 0;
+        var awayPoints = 0;
+        var talliedPoints = 0;
         for (var i = 0; i < records.Count; i++)
         {
             var r = records[i];
@@ -2243,6 +2246,9 @@ internal static class Program
                         or "LostBallLiveBall" or "LiveBallTurnover")
                     stealIntoJ++;
             }
+            if (r.Offense == TeamSide.Home) homePoints += r.Points;
+            else awayPoints += r.Points;
+            talliedPoints += r.Points;
         }
         var firstOk = records.Count > 0
             && records[0].Offense == TeamSide.Home
@@ -2300,6 +2306,20 @@ internal static class Program
             $"observability — rigorous proof is RollJStealBatchCheck)");
         Console.WriteLine($"  flat placeholder time accumulated: {result.TotalSeconds:N0}s (observability only)");
 
+        // Score: FG-rule deterministic check (no RNG), then accumulation integrity.
+        var fgRuleOk = Scoring.FieldGoalPoints(ShotLocation.Three) == 3
+                    && Scoring.FieldGoalPoints(ShotLocation.Long)  == 2
+                    && Scoring.FieldGoalPoints(ShotLocation.Mid)   == 2
+                    && Scoring.FieldGoalPoints(ShotLocation.Short) == 2
+                    && Scoring.FieldGoalPoints(ShotLocation.Rim)   == 2;
+        var scoreOk = game.HomeScore == homePoints
+                   && game.AwayScore == awayPoints
+                   && game.HomeScore + game.AwayScore == talliedPoints
+                   && talliedPoints > 0;
+        Console.WriteLine(
+            $"  score: Home {game.HomeScore} / Away {game.AwayScore} | accumulates per-possession tally -> {(scoreOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  FG rule (Three=3, others=2) -> {(fgRuleOk ? "ok" : "FAIL")}");
+
         // Per-stub park breakdown — quantifies how much of the game is currently
         // flowing through placeholder flips. As of #6 the chain CLOSES: the inbound
         // edges (ResumeInbound / SidelineInbound) no longer park — they re-run Roll A —
@@ -2322,7 +2342,7 @@ internal static class Program
         }
 
         var allOk = countOk && noLostOk && contiguousOk && flipsOk && firstOk
-                    && arrowOk && foulOk && lineupOk && rollJOk;
+                    && arrowOk && foulOk && lineupOk && rollJOk && scoreOk && fgRuleOk;
         Console.WriteLine($"  Governor loop: {(allOk ? "ok" : "FAIL")}");
         return allOk;
     }

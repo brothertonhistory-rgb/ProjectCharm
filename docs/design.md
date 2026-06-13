@@ -2053,3 +2053,48 @@ Halfcourt-only (EntryBackcourt weight 0.0), so it always reads Frontcourt==true 
 The Governor is unchanged — it already threads `Entry: consequence.NextEntry` onto the spawned
 possession. Later: Roll B's pie odds can reflect the easier inbound situation (no full-court press
 possible on a BallAdvanced inbound).
+
+---
+
+## Session 28 — Scoring: the resolver tallies points, the Governor accumulates the score
+
+The first real numbers on the board. The score-write seam already existed (the Governor wrote `+= 0`
+every possession); this session fills it with a real tally. Stub pies still drive everything, so the
+scorelines are un-basketball-like — the machinery is proven, calibration waits for attribute generators.
+
+**Where points are tallied: the walk, not the terminal.** Points have three sources, and only the
+resolver's walk sees all three: a clean made field goal (a `Made` terminal, 2/3 by zone); an and-1
+basket (a `MadeAndFouled` shot — a `Continue` into the shooting-FT node, NOT a terminal); and made free
+throws (1 point each). The Governor cannot derive the full total from the final terminal alone — the
+and-1 basket and the intermediate FT makes are invisible there — so the tally rides out on
+`RoutingOutcome.Points`, the same reasoning that put `FreeThrowSpins` there. `Points` is a third walk
+tally of the exact `PutbackAttempts` / `FreeThrowSpins` shape: init-only `int`, 0 default, pure append.
+
+**The 2/3 rule lives in one place.** `Core/Scoring.FieldGoalPoints(ShotLocation)` → 3 for `Three`, 2
+for every other zone (Long is a long *two*). A made free throw is always 1 point and is counted in the
+FT driver, never here. The single-home discipline matches `JumpBall` and `DefensiveFoulCharge`.
+
+**The three banking sites.**
+- *Clean FG* — at the `case Terminal t:` return, `t.Reason == "Made"` banks `FieldGoalPoints(zone)`.
+  `ShotType` is non-null (Roll G stamped it before Roll H could resolve a make).
+- *And-1 FG* — at the `ResolveShootingFreeThrows` edge, `Result == MadeAndFouled` banks the basket's
+  2/3. The edge is hit exactly once per shooting foul; `Result` distinguishes the and-1 (basket counts)
+  from a fouled miss (no FG).
+- *Free throws* — `DriveFreeThrows` counts every `Make` in its `Spin()` local (intermediate or last,
+  each worth 1) and returns the count via a new `out int ftPoints`; both call sites (the bonus fork and
+  the shooting-foul edge) add it to the walk's `points`.
+
+**Accumulation and the offense-only invariant.** The Governor reads `outcome.Points` into
+`pointsThisPossession` (replacing the literal 0) and credits it to the offense via the unchanged
+Home/Away split — all points credit `state.Offense`, never the defense. `PossessionRecord` carries a
+trailing `int Points` so the harness can verify per-possession. The harness proves the offense-only rule
+*for free*: it accumulates `homePoints` / `awayPoints` keyed on `r.Offense` and asserts
+`HomeScore == homePoints && AwayScore == awayPoints` — a point credited to the wrong side lands in the
+wrong accumulator and fails the match. It also asserts the total matches and that points actually flow
+(`> 0`), plus a deterministic FG-rule check.
+
+**What stays out.** No clock (flat placeholders persist). No config knobs — points are *derived*
+(2/3 + FT makes), so nothing was added to `config.json`. No new `ContinuationKind`, enum, or roll
+signature; rolls C/H/K/L and every generator are untouched. The only engine files that changed are
+`Resolver.cs`, `Governor.cs`, and the new `Core/Scoring.cs`. Realistic scorelines and per-player point
+attribution are both deferred — the machinery reports whatever the pies produce and credits the team.

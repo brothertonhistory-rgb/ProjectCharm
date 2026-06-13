@@ -42,6 +42,16 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// like <see cref="EndedOn"/> and <see cref="PutbackAttempts"/>.
     /// </summary>
     public int FreeThrowSpins { get; init; }
+
+    /// <summary>
+    /// Points scored on this possession's walk — made field goals (2 or 3 by zone) plus
+    /// made free throws (1 each) — accumulated by the resolver and surfaced here so the
+    /// Governor can credit the offense without re-deriving from the terminal alone (the
+    /// and-1 basket and intermediate FT makes are invisible on the terminal). Init-only
+    /// with a 0 default, so every existing construction is untouched — a pure append,
+    /// like <see cref="PutbackAttempts"/> and <see cref="FreeThrowSpins"/>.
+    /// </summary>
+    public int Points { get; init; }
 }
 
 /// <summary>
@@ -214,6 +224,7 @@ public sealed class Resolver
         // harness asserts it is never hit.
         var putbackAttempts = 0;
         var freeThrowSpins = 0;
+        var points = 0;
         var iterations = 0;
         const int IterationCeiling = 10_000;
 
@@ -237,8 +248,14 @@ public sealed class Resolver
                         var flavor    = flavorPie.Roll(_rng.NextUnitInterval());
                         t = t with { Flavor = flavor };
                     }
+                    // A clean made field goal banks its 2/3 here (the and-1 basket banks
+                    // at the shooting-FT edge instead, since it is a Continue, not a
+                    // terminal). ShotType is non-null on a Made terminal — Roll G stamped
+                    // it upstream before Roll H could resolve a make.
+                    if (t.Reason == "Made")
+                        points += Scoring.FieldGoalPoints(t.State.ShotType!.Value);
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
-                        { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
+                        { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points };
 
                 case Continue c:
                     switch (c.Next)
@@ -361,8 +378,9 @@ public sealed class Resolver
                                 c.State,
                                 shots: c.Bonus == BonusType.Double ? 2 : 1,
                                 oneAndOne: c.Bonus == BonusType.OneAndOne,
-                                out var bonusFtSpins);
+                                out var bonusFtSpins, out var bonusFtPoints);
                             freeThrowSpins += bonusFtSpins;
+                            points += bonusFtPoints;
                             continue;
 
                         // RETIRED (Contextification #2): Roll H's Blocked no longer
@@ -373,7 +391,7 @@ public sealed class Resolver
                         // corner (dead, unreachable in a live walk), to be swept with the
                         // other retired stubs in a future cleanup. Do not route here.
                         case ContinuationKind.ResolveBlock:
-                            return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
+                            return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points };
 
                         // Roll F, clean attempt got off -> execute Roll G (shot
                         // location), loop. Roll G is structurally Roll E: it stamps
@@ -464,8 +482,16 @@ public sealed class Resolver
                         // back into this switch. A made and-1 basket already banked its
                         // points upstream; the single FT here only sets the consequence.
                         case ContinuationKind.ResolveShootingFreeThrows:
-                            result = DriveFreeThrows(c.State, ShootingFoulShots(c.State), oneAndOne: false, out var shootingFtSpins);
+                            // An and-1 (MadeAndFouled) banks its made basket's 2/3 here:
+                            // the basket counts, and this edge is hit exactly once per
+                            // shooting foul, with Result distinguishing and-1 from a
+                            // fouled miss (which scores no FG). ShotType is non-null —
+                            // the shot resolved, so Roll G stamped the zone.
+                            if (c.State.Result == ShotResult.MadeAndFouled)
+                                points += Scoring.FieldGoalPoints(c.State.ShotType!.Value);
+                            result = DriveFreeThrows(c.State, ShootingFoulShots(c.State), oneAndOne: false, out var shootingFtSpins, out var shootingFtPoints);
                             freeThrowSpins += shootingFtSpins;
+                            points += shootingFtPoints;
                             continue;
 
                         // OOB off the defender, offense RETAINS (Roll H's
@@ -511,7 +537,7 @@ public sealed class Resolver
                         // corner (dead, unreachable in a live walk), to be swept with the
                         // other retired stubs in a future cleanup. Do not route here.
                         case ContinuationKind.IntoTransition:
-                            return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
+                            return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points };
 
                         // Roll L's FT loop, last shot missed (live ball) -> execute Roll M
                         // (free-throw rebound resolution), loop. Roll M is a GATE with
@@ -563,10 +589,11 @@ public sealed class Resolver
     /// made FT is 1 point, a downstream derivation the future points pass reads off the
     /// make/miss fact, exactly as a field goal's 2/3 is.</para>
     /// </summary>
-    private RollResult DriveFreeThrows(PossessionState state, int shots, bool oneAndOne, out int spinCount)
+    private RollResult DriveFreeThrows(PossessionState state, int shots, bool oneAndOne, out int spinCount, out int ftPoints)
     {
         var pie = _rollLGenerator.Generate();
         var spins = 0;
+        var ftMakes = 0;
 
         // Spin Roll L once, count it, and assert the hard bound. A trip to the line is
         // at most a fouled three (3 shots); more than 3 spins is a derivation bug.
@@ -578,6 +605,7 @@ public sealed class Resolver
                     $"Free-throw sequence spun {spins} times — exceeds the hard bound of 3. " +
                     "A trip to the line is at most a fouled three; this is a shot-count " +
                     "derivation bug.");
+            if (outcome == FreeThrowOutcome.Make) ftMakes++;
             return outcome;
         }
 
@@ -601,6 +629,7 @@ public sealed class Resolver
         }
 
         spinCount = spins;
+        ftPoints = ftMakes;
         return result;
     }
 

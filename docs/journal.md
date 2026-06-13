@@ -1,3 +1,86 @@
+## Session 28 — Scoring: the Governor accumulates real points (2026-06-13)
+
+**The first session that puts real numbers on the board.** The Governor already ran an N-possession
+game and already wrote to the score every possession — but the value was a literal `0`, a marked
+placeholder seam. This session made that value real: the resolver tallies points on its walk, surfaces
+the total on `RoutingOutcome`, and the Governor accumulates it into the score. Stub pies still, so the
+scorelines are un-basketball-like (Home 107 / Away 103 over 200 possessions) — correct and intended.
+This proves the scoring *machinery*; realistic scorelines come when the attribute-driven generators land.
+
+**Confirmation mode, not rediscovery (CONVENTIONS §0/§6c).** The prompt carried a fully verified §6c
+map; the pull confirmed every anchor against the committed tree with zero drift. Confirmed: exactly
+three `return new RoutingOutcome` statements in `Route` (Terminal + the two retired-stub corners);
+`RoutingOutcome` carrying `PutbackAttempts` and `FreeThrowSpins` as the init-only `int`-with-0-default
+template; `DriveFreeThrows`'s `out int spinCount` signature and its local `Spin()` counting pattern;
+the two FT call sites (bonus fork + shooting fouls); the Governor's `const int pointsThisPossession = 0`
+placeholder and its Home/Away split; `PossessionRecord`'s positional shape; and `GovernorLoopCheck`'s
+single per-record `for` loop. No design questions remained — all locked.
+
+**Why the tally lives on the walk.** Points have three sources and only the resolver's walk sees all
+three at once: (1) a clean made field goal — a `Made` terminal, worth 2/3 by zone; (2) an and-1 basket
+— a `MadeAndFouled` shot, which is NOT a terminal (it is a `Continue` into the shooting-FT node), so its
+2/3 must be banked at the shooting-FT edge; (3) made free throws — 1 point each, covering and-1, bonus,
+and shooting-foul FTs uniformly. The Governor cannot derive points from the final terminal alone — the
+and-1 basket and intermediate FT makes are invisible there — exactly the reasoning behind `FreeThrowSpins`.
+
+**The 2/3 rule has one home.** New `Core/Scoring.cs`: a single static `FieldGoalPoints(ShotLocation)`
+→ 3 for `Three`, 2 for every other zone (Long is a long TWO — worth 2 despite the name). Same small
+`Core/` static-class shape as `JumpBall` and `DefensiveFoulCharge`. A made free throw is always 1 point
+and is tallied directly in the FT driver, not here.
+
+**Resolver edits (the walk tally).**
+- `RoutingOutcome` gained `public int Points { get; init; }` — a third walk tally of the exact
+  `PutbackAttempts` / `FreeThrowSpins` shape (init-only, 0 default, pure append; every existing
+  construction untouched).
+- A `var points = 0;` counter beside `freeThrowSpins` in `Route`, set on all three `return`s.
+- **FG banking at the Terminal return:** `if (t.Reason == "Made") points += Scoring.FieldGoalPoints(t.State.ShotType!.Value);`
+  before the return. `ShotType` is non-null on a Made terminal (Roll G stamped it before Roll H resolved).
+- **And-1 banking at the shooting-FT edge:** `if (c.State.Result == ShotResult.MadeAndFouled) points += Scoring.FieldGoalPoints(c.State.ShotType!.Value);`
+  — the basket counts even though it routed in as a Continue; this edge is hit exactly once per shooting
+  foul, with `Result` distinguishing and-1 from a fouled miss (which scores no FG).
+- **FT makes:** `DriveFreeThrows` gained `out int ftPoints`; a `ftMakes` counter increments on every
+  `Make` inside `Spin()` (intermediate or last — each made FT is 1 point), returned as `ftPoints`. Both
+  call sites (bonus fork, shooting fouls) bank it: `points += bonusFtPoints` / `points += shootingFtPoints`.
+
+**Governor edits (accumulation).** The `const int pointsThisPossession = 0;` placeholder became
+`var pointsThisPossession = outcome.Points;` — the Home/Away credit lines below are unchanged (they
+already credit the offense; only the source value changed). `PossessionRecord` gained a trailing
+`int Points` param (credited to `Offense`), threaded at the construction site. The stale class-doc
+references to "the placeholder 0" / "the zero score" were updated to describe the real derivation.
+
+**Harness (light validation, Emmett's explicit call).** `GovernorLoopCheck` extended in place — no new
+loop. Three accumulators (`homePoints` / `awayPoints` / `talliedPoints`) fold into the existing per-record
+`for`, keyed on `r.Offense`. New assertions: accumulation matches (`game.HomeScore == homePoints &&
+game.AwayScore == awayPoints`), total matches (`HomeScore + AwayScore == talliedPoints`), and points
+actually flow (`talliedPoints > 0`). The "credit offense only, never defense" rule is proven *for free*
+by the split — a point credited to the wrong side would land in the wrong accumulator and fail the match.
+A trivial no-RNG FG-rule assertion (`FieldGoalPoints(Three)==3`, all others `==2`) folded into the same
+check. Both `scoreOk` and `fgRuleOk` added to the `allOk` aggregation.
+
+**Validation (CONVENTIONS §2).** Pre-check: Python Monte Carlo mirrored the point arithmetic over 10k
+mixed possessions — clean Made (3/else 2), and-1 (FG + 1/made FT), bonus/shooting FT trips (1/made FT)
+— confirming the per-possession tally matches an independent recompute, accumulation equals the summed
+tally, and home+away equals total (no leak to defense). Harness run: the two new lines read
+`score: Home 107 / Away 103 | accumulates per-possession tally -> ok` and `FG rule (Three=3, others=2) -> ok`;
+every prior rate/routing check byte-for-byte unchanged; **ALL CHECKS PASSED** on the first run.
+
+**Out of scope (held).** No clock work (`SecondsPerPossession` / `TotalSeconds` stay flat placeholders).
+No config knobs (points are derived, not configured — nothing added to `config.json`). No new
+`ContinuationKind` / enum / roll-signature changes; rolls C/H/K/L and every generator untouched. Only
+`Resolver.cs`, `Governor.cs`, and the new `Core/Scoring.cs` changed in the engine.
+
+**Deferrals (carried).**
+- **Live-ball backcourt steal, high push** — a near-basket steal should push harder than the current
+  single 50% steal pie. Needs Emmett's backcourt-steal numbers + a small Roll J split keyed on the
+  court stamp the steal terminal already carries.
+- **Real, calibrated scoring** — the un-basketball-like stub-pie scorelines become realistic only when
+  attribute-driven generators replace the stub pies (the deferred ~90%). No engine change at that point;
+  the machinery built this session just reports whatever the pies produce.
+- **Clock / time** — a real clock and end-game logic is its own future session.
+- **Per-player point attribution** (which slot scored) — the deferred attribution layer reads the
+  selected slot off the possession; this session credits the *team* only.
+
+
 ## Session 27 — Offensive-foul flavor tag + backcourt dead-ball spot-flip (2026-06-13)
 
 **Two small surface refinements, no structural gaps.** Both were deferred by #6: the offensive-foul

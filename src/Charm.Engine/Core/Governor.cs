@@ -11,6 +11,7 @@ namespace Charm.Engine;
 /// <param name="EndLabel">The terminal reason, or "parked:{stub}".</param>
 /// <param name="Applied">The consequence used to spawn the NEXT possession (the
 /// terminal's own consequence, or the default flip on a park).</param>
+/// <param name="Points">Points scored on this possession (credited to <see cref="Offense"/>).</param>
 public sealed record PossessionRecord(
     int Number,
     TeamSide Offense,
@@ -18,7 +19,8 @@ public sealed record PossessionRecord(
     EntryType Entry,
     bool EndedOnTerminal,
     string EndLabel,
-    PossessionConsequence Applied);
+    PossessionConsequence Applied,
+    int Points);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -67,11 +69,11 @@ public sealed record GovernorRunResult(
 /// <para>The cross-possession invariants it must NOT disturb — the possession arrow,
 /// the team-foul counts, and the lineups — all live on the shared <see cref="GameState"/>
 /// and persist automatically because the same resolver (holding the same game) runs
-/// every possession. The Governor never resets or clobbers them; it only reaches the
-/// score field, and only to write the placeholder 0.</para>
+/// every possession. The Governor never resets or clobbers them; it reaches the score
+/// field to credit the offense with the resolver's tallied points each possession.</para>
 ///
-/// <para>PROVISIONAL (see design.md teardown contract): the flat clock, the zero
-/// score, the possession-cap stop, the temp-route-all-to-Roll-A, and the
+/// <para>PROVISIONAL (see design.md teardown contract): the flat clock, the
+/// possession-cap stop, the temp-route-all-to-Roll-A, and the
 /// parked→default-flip rule. PERMANENT: the loop shape — read the consequence off the
 /// terminal (or the default on a park) and spawn — which a real game layer swaps the
 /// guts behind without touching the seam.</para>
@@ -136,18 +138,17 @@ public sealed class Governor
                 totalSeconds += _cfg.SecondsPerPossession;
             }
 
-            // Score write: REAL field, PLACEHOLDER value. Exercises the path to the
-            // GameState score (proving the seam) while the points derivation is still
-            // future — so the value added is a literal 0, charged to the offense that
-            // just played. When the scoring layer lands, this 0 becomes a real
-            // (Result, ShotType) -> points derivation at this exact spot.
-            const int pointsThisPossession = 0;
+            // Score write: points scored on this possession's walk (made FG 2/3 + made
+            // FTs), tallied by the resolver and surfaced on the outcome — the seam the
+            // placeholder 0 marked. All points credit the offense (state.Offense);
+            // the Governor's Home/Away split below routes them to the right accumulator.
+            var pointsThisPossession = outcome.Points;
             if (state.Offense == TeamSide.Home) _game.HomeScore += pointsThisPossession;
             else _game.AwayScore += pointsThisPossession;
 
             records.Add(new PossessionRecord(
                 state.PossessionNumber, state.Offense, state.Defense, state.Entry,
-                endedOnTerminal, endLabel, consequence));
+                endedOnTerminal, endLabel, consequence, pointsThisPossession));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition
