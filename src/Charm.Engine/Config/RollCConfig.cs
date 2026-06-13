@@ -16,6 +16,23 @@ public sealed class RollCConfig
     public double BaseLostBallLiveBall { get; set; } = 0.20;
     public double BaseOffensiveFoul { get; set; } = 0.10;
 
+    // --- Contextification #5a: the expanded loss set, DORMANT in the Halfcourt
+    //     (legacy) context — every new type is 0.0 here this session, so the
+    //     Halfcourt pie stays the unchanged 30/22/18/20/10. Pie requires a weight
+    //     for EVERY enum member, so these must be present (zeroed), not absent.
+    //     #5b sets the real Halfcourt weights (travel, over-and-back, etc. live
+    //     here) when the loss exit is wired in. ---
+    public double BaseTravel { get; set; } = 0.0;
+    public double BaseDoubleDribble { get; set; } = 0.0;
+    public double BaseCarry { get; set; } = 0.0;
+    public double BaseThreeSecondViolation { get; set; } = 0.0;
+    public double BaseFiveSecondCloselyGuarded { get; set; } = 0.0;
+    public double BaseOffensiveGoaltending { get; set; } = 0.0;
+    public double BaseBackcourtViolation { get; set; } = 0.0;
+    public double BaseShotClockViolation { get; set; } = 0.0;
+    public double BaseFiveSecondInbound { get; set; } = 0.0;
+    public double BaseTenSecondBackcourt { get; set; } = 0.0;
+
     // --- Transition-context weight set (selected when a turnover arrives stamped
     //     TurnoverContext.Transition — i.e. coughed up on the outlet/push). Flat
     //     placeholders, sum to 1. Rationale (Emmett's): transition turnovers are
@@ -29,6 +46,53 @@ public sealed class RollCConfig
     public double TransitionLostBallDeadBall { get; set; } = 0.20;
     public double TransitionLostBallLiveBall { get; set; } = 0.35;
     public double TransitionOffensiveFoul { get; set; } = 0.05;
+
+    // --- Contextification #5a: the expanded loss set, DORMANT in the Transition
+    //     context too — every new type is 0.0 here, so the Transition pie stays
+    //     the unchanged 25/15/20/35/05. (The transition outlet/push is a live-ball
+    //     phase; which new types belong here, if any, is a #5b/tuning question.) ---
+    public double TransitionTravel { get; set; } = 0.0;
+    public double TransitionDoubleDribble { get; set; } = 0.0;
+    public double TransitionCarry { get; set; } = 0.0;
+    public double TransitionThreeSecondViolation { get; set; } = 0.0;
+    public double TransitionFiveSecondCloselyGuarded { get; set; } = 0.0;
+    public double TransitionOffensiveGoaltending { get; set; } = 0.0;
+    public double TransitionBackcourtViolation { get; set; } = 0.0;
+    public double TransitionShotClockViolation { get; set; } = 0.0;
+    public double TransitionFiveSecondInbound { get; set; } = 0.0;
+    public double TransitionTenSecondBackcourt { get; set; } = 0.0;
+
+    // --- Contextification #5a: the Entry/Backcourt context (NEW, DORMANT — nothing
+    //     routes here this session). This is the only context that gives the new
+    //     types real weight; it is exercised solely by the isolation check until
+    //     #5b stamps it on Roll A's loss exit. The phase-appropriate losses carry
+    //     weight (bad pass / lost ball on the way up, plus the three backcourt-only
+    //     violations); the halfcourt-only types (travel, over-and-back, 3-second,
+    //     carry, closely-guarded, offensive goaltending) and the offensive foul are
+    //     0.0 here. Placeholder values, sum to 1; tuned in #5b like every pie. ---
+    public double EntryBackcourtBadPassDeadBall { get; set; } = 0.20;
+    public double EntryBackcourtBadPassIntercepted { get; set; } = 0.15;
+    public double EntryBackcourtLostBallDeadBall { get; set; } = 0.15;
+    public double EntryBackcourtLostBallLiveBall { get; set; } = 0.15;
+    public double EntryBackcourtOffensiveFoul { get; set; } = 0.0;
+    public double EntryBackcourtTravel { get; set; } = 0.0;
+    public double EntryBackcourtDoubleDribble { get; set; } = 0.0;
+    public double EntryBackcourtCarry { get; set; } = 0.0;
+    public double EntryBackcourtThreeSecondViolation { get; set; } = 0.0;
+    public double EntryBackcourtFiveSecondCloselyGuarded { get; set; } = 0.0;
+    public double EntryBackcourtOffensiveGoaltending { get; set; } = 0.0;
+    public double EntryBackcourtBackcourtViolation { get; set; } = 0.0;
+    public double EntryBackcourtShotClockViolation { get; set; } = 0.10;
+    public double EntryBackcourtFiveSecondInbound { get; set; } = 0.10;
+    public double EntryBackcourtTenSecondBackcourt { get; set; } = 0.15;
+
+    // --- Contextification #5a: invariant elapsed for Roll C's three violation arms
+    //     (the only Roll C arms that stamp time; turnovers defer to the future time
+    //     roll). DORMANT copies of Roll A's values — #5b consolidates Roll A's
+    //     violation terminals into Roll C and removes the duplication. ---
+    public double ShotClockViolationElapsedSeconds { get; set; } = 30.0;
+    public double FiveSecondInboundElapsedSeconds { get; set; } = 0.0;
+    public double TenSecondBackcourtElapsedSeconds { get; set; } = 10.0;
 
     /// <summary>The single live wire proving the seam carries signal: how much a
     /// pressure of 1.0 adds to the live-strip weight before renormalization.

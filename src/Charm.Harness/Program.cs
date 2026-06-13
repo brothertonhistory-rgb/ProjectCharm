@@ -103,6 +103,7 @@ internal static class Program
         ok &= RollMContextSelectionCheck(cfg, cfgK, cfgJ, state);
         ok &= OffensiveReboundConvergenceCheck(cfg, state);
         ok &= RollCContextCheck(cfg, cfgC, rollCGenerator, state);
+        ok &= RollCExpansionCheck(cfg, cfgC, rollCGenerator, state);
         ok &= GovernorLoopCheck(cfg, cfgD, cfgGov);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
@@ -3614,6 +3615,158 @@ internal static class Program
         Console.WriteLine($"  iteration guard never hit (harness reached here): ok");
 
         return strictDecay && boundedMax;
+    }
+
+    // --- Expansion (#5a): every DORMANT loss type seated in Roll C resolves
+    //     correctly in ISOLATION. Two parts: (1) drive the new Entry/Backcourt
+    //     context directly and confirm its weighted members are reachable at their
+    //     configured rate; (2) a directly-built UNIFORM pie over all 15 types lights
+    //     up every arm — including the halfcourt-natural new types that are 0.0 in
+    //     every live context this session — and asserts each is a clean terminal
+    //     with the right consequence (dead-ball to defense, except the two existing
+    //     live steals) and the right elapsed (violations stamp 30/0/10; every
+    //     turnover defers to null), and that NO new type leaks a steal. Owns its own
+    //     full reason map so the regression-net MapTurnover stays byte-for-byte. ---
+    private static bool RollCExpansionCheck(
+        RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
+    {
+        Console.WriteLine("\n--- Expansion (#5a): Roll C dormant loss types resolve in isolation ---");
+        var rng = new SystemRng(cfg.Seed);
+        var ok = true;
+
+        static TurnoverOutcome Map(string r) => r switch
+        {
+            "BadPassDeadBall" => TurnoverOutcome.BadPassDeadBall,
+            "BadPassIntercepted" => TurnoverOutcome.BadPassIntercepted,
+            "LostBallDeadBall" => TurnoverOutcome.LostBallDeadBall,
+            "LostBallLiveBall" => TurnoverOutcome.LostBallLiveBall,
+            "OffensiveFoul" => TurnoverOutcome.OffensiveFoul,
+            "Travel" => TurnoverOutcome.Travel,
+            "DoubleDribble" => TurnoverOutcome.DoubleDribble,
+            "Carry" => TurnoverOutcome.Carry,
+            "ThreeSecondViolation" => TurnoverOutcome.ThreeSecondViolation,
+            "FiveSecondCloselyGuarded" => TurnoverOutcome.FiveSecondCloselyGuarded,
+            "OffensiveGoaltending" => TurnoverOutcome.OffensiveGoaltending,
+            "BackcourtViolation" => TurnoverOutcome.BackcourtViolation,
+            "ShotClockViolation" => TurnoverOutcome.ShotClockViolation,
+            "FiveSecondInbound" => TurnoverOutcome.FiveSecondInbound,
+            "TenSecondBackcourt" => TurnoverOutcome.TenSecondBackcourt,
+            _ => throw new InvalidOperationException($"Unmapped Roll C reason '{r}'.")
+        };
+
+        var live = new HashSet<TurnoverOutcome>
+            { TurnoverOutcome.BadPassIntercepted, TurnoverOutcome.LostBallLiveBall };
+        var violationElapsed = new Dictionary<TurnoverOutcome, double>
+        {
+            [TurnoverOutcome.ShotClockViolation] = cfgC.ShotClockViolationElapsedSeconds,
+            [TurnoverOutcome.FiveSecondInbound]  = cfgC.FiveSecondInboundElapsedSeconds,
+            [TurnoverOutcome.TenSecondBackcourt] = cfgC.TenSecondBackcourtElapsedSeconds,
+        };
+        var newTypes = new HashSet<TurnoverOutcome>
+        {
+            TurnoverOutcome.Travel, TurnoverOutcome.DoubleDribble, TurnoverOutcome.Carry,
+            TurnoverOutcome.ThreeSecondViolation, TurnoverOutcome.FiveSecondCloselyGuarded,
+            TurnoverOutcome.OffensiveGoaltending, TurnoverOutcome.BackcourtViolation,
+            TurnoverOutcome.ShotClockViolation, TurnoverOutcome.FiveSecondInbound,
+            TurnoverOutcome.TenSecondBackcourt,
+        };
+
+        // --- Part 1: drive the Entry/Backcourt context directly. ---
+        var expectedEB = new (TurnoverOutcome o, double w)[]
+        {
+            (TurnoverOutcome.BadPassDeadBall,    cfgC.EntryBackcourtBadPassDeadBall),
+            (TurnoverOutcome.BadPassIntercepted, cfgC.EntryBackcourtBadPassIntercepted),
+            (TurnoverOutcome.LostBallDeadBall,   cfgC.EntryBackcourtLostBallDeadBall),
+            (TurnoverOutcome.LostBallLiveBall,   cfgC.EntryBackcourtLostBallLiveBall),
+            (TurnoverOutcome.ShotClockViolation, cfgC.EntryBackcourtShotClockViolation),
+            (TurnoverOutcome.FiveSecondInbound,  cfgC.EntryBackcourtFiveSecondInbound),
+            (TurnoverOutcome.TenSecondBackcourt, cfgC.EntryBackcourtTenSecondBackcourt),
+        };
+        var pieEB = genC.Generate(state, pressure: 0.0, context: TurnoverContext.EntryBackcourt);
+        var pieMapEB = pieEB.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+
+        var selOk = true;
+        foreach (var (o, w) in expectedEB)
+            if (Math.Abs(pieMapEB[o] - w) > cfgC.Epsilon) selOk = false;
+
+        var countEB = new Dictionary<TurnoverOutcome, int>();
+        foreach (var o in Enum.GetValues<TurnoverOutcome>()) countEB[o] = 0;
+        for (var i = 0; i < cfg.BatchSize; i++)
+            countEB[Map(((Terminal)RollC.Execute(state, pieEB, rng, cfgC)).Reason)]++;
+
+        var nEB = (double)cfg.BatchSize;
+        var rateOkEB = true;
+        Console.WriteLine($"  Entry/Backcourt context (selection {(selOk ? "ok" : "FAIL")}):");
+        foreach (var (o, w) in expectedEB)
+        {
+            var obs = countEB[o] / nEB;
+            var gap = Math.Abs(obs - w);
+            var pass = gap <= cfg.RateTolerance;
+            rateOkEB &= pass;
+            Console.WriteLine($"    {o,-26} observed={obs:P3}  expected={w:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+        var zeroLeak = Enum.GetValues<TurnoverOutcome>()
+            .Where(o => expectedEB.All(e => e.o != o))
+            .Any(o => countEB[o] > 0);
+        Console.WriteLine($"  zero-weight members unreachable in context: {(!zeroLeak ? "ok" : "FAIL")}");
+        ok &= selOk && rateOkEB && !zeroLeak;
+
+        // --- Part 2: uniform pie over ALL types proves every arm + consequence. ---
+        var all = Enum.GetValues<TurnoverOutcome>();
+        var uniform = all.ToDictionary(o => o, _ => 1.0 / all.Length);
+        var pieAll = new Pie<TurnoverOutcome>(uniform, cfgC.Epsilon);
+
+        var countAll = new Dictionary<TurnoverOutcome, int>();
+        foreach (var o in all) countAll[o] = 0;
+        var consequenceBad = 0;
+        var elapsedBad = 0;
+        var stealLeak = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var t = (Terminal)RollC.Execute(state, pieAll, rng, cfgC);
+            var o = Map(t.Reason);
+            countAll[o]++;
+            var c = t.Consequence;
+
+            if (live.Contains(o))
+            {
+                if (!(c.NextOffense == state.Defense && c.NextEntry == EntryType.Transition
+                      && c.TransitionContext?.Source == TransitionSource.Steal)) consequenceBad++;
+                if (t.ElapsedSeconds is not null) elapsedBad++;
+            }
+            else
+            {
+                if (!(c.NextOffense == state.Defense && c.NextEntry == EntryType.DeadBallInbound
+                      && c.TransitionContext is null)) consequenceBad++;
+
+                if (violationElapsed.TryGetValue(o, out var exp))
+                {
+                    if (t.ElapsedSeconds is not { } es || Math.Abs(es - exp) > 1e-9) elapsedBad++;
+                }
+                else if (t.ElapsedSeconds is not null) elapsedBad++;
+            }
+
+            if (newTypes.Contains(o) && c.NextEntry == EntryType.Transition) stealLeak++;
+        }
+
+        var allReached = all.All(o => countAll[o] > 0);
+        var n = (double)cfg.BatchSize;
+        var expect = 1.0 / all.Length;
+        var ratesOk = true;
+        foreach (var o in all)
+            if (Math.Abs(countAll[o] / n - expect) > cfg.RateTolerance) ratesOk = false;
+
+        Console.WriteLine($"  uniform pie over all {all.Length} types (expected {expect:P3} each):");
+        Console.WriteLine($"    all types reachable: {(allReached ? "ok" : "FAIL")}");
+        Console.WriteLine($"    rates within tolerance: {(ratesOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"    consequences correct (dead-ball to defense; steal only on the two live): bad={consequenceBad} -> {(consequenceBad == 0 ? "ok" : "FAIL")}");
+        Console.WriteLine($"    elapsed correct (violations 30/0/10, turnovers deferred): bad={elapsedBad} -> {(elapsedBad == 0 ? "ok" : "FAIL")}");
+        Console.WriteLine($"    no NEW type leaks a steal: leaks={stealLeak} -> {(stealLeak == 0 ? "ok" : "FAIL")}");
+        ok &= allReached && ratesOk && consequenceBad == 0 && elapsedBad == 0 && stealLeak == 0;
+
+        Console.WriteLine($"  Roll C expansion: {(ok ? "ok" : "FAIL")}");
+        return ok;
     }
 
     private static TurnoverOutcome MapTurnover(string reason) => reason switch

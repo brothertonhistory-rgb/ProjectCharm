@@ -1,3 +1,86 @@
+## Session 24 — Contextification #5a (Roll C expansion): every no-shot loss type seated in Roll C, context-gated and DORMANT (2026-06-13)
+
+**The premise this session opens.** Fifth of the contextification arc, split in two. #5a makes Roll C
+the single canonical home for EVERY way a possession is lost without a shot — all turnover types AND
+all violation types — by SEATING them, gated by context, but DORMANT: declared, resolvable, given
+zero weight in every live context, with nothing routing to them. They are proven in ISOLATION here.
+#5b then reshapes Roll A and wires its loss exit into the ready Roll C, turning them live. The split
+is deliberate: it keeps the expansion behavior-neutral and independently provable before anything
+depends on it.
+
+**Confirmation mode, not rediscovery (CONVENTIONS §0/§6c).** The prompt carried a verified
+reconnaissance map; the pull confirmed it against the tree rather than re-deriving it. Both audited
+gotchas held exactly: (1) `Pie` walks ALL enum members and throws on any omission AND validates
+sum-to-1, so adding members forces every existing context dict to list them at `0.0` and the config
+to carry backing fields — "dormant" means explicitly zeroed, not absent. (2) Roll C's existing arms
+set no `ElapsedSeconds`; the new violation arms must stamp invariant elapsed (30/0/10), unlike every
+existing turnover arm, so `RollCConfig` gains violation-elapsed fields (dormant copies of Roll A's,
+until #5b consolidates).
+
+**Two places the code diverged from the map's wording (code wins, flagged per §0).** (1) "All three
+regression checks byte-for-byte" is literally true only for `RollCContextCheck` and
+`PressureSignalCheck`, which reference the five existing types by name. `RollCBatchCheck` iterates
+`pieC.Slices`, and since `Pie` stores a slice for every member, its output GAINS additive `0.000`
+rows for each new type — every existing rate and pass/fail signal unchanged, output merely longer.
+The three checks were left untouched (truly byte-for-byte source); the additive zero-rows are
+accepted (`ShowSamples`' pie print grows the same way). (2) A latent FP wrinkle, flagged not fixed
+(fixing it is an out-of-scope pie-mechanism change): `Pie.Roll`'s overflow fallback returns the LAST
+slice, now a zero-weight appended type, so a draw within ~1e-16 of 1.0 in a live context could fall
+through to it (→ `RollCBatchCheck`'s unmapped-reason throw). Expected occurrences over a 100k batch
+≈ 1e-11 — will not fire in practice. Logged as a deferral.
+
+**The taxonomy seated (settled with Emmett).** ONE expanded `TurnoverOutcome` enum, ONE weighted pie
+per context — a possession is lost exactly one way, so a single draw picks the single loss type. Ten
+new members appended after `OffensiveFoul` (append order keeps every existing draw byte-for-byte:
+zero-weight slices don't advance the cumulative walk, so the same `u` maps to the same outcome —
+confirmed by a same-seed 5-member-vs-15-member parity trace). Seven new turnover types (`Travel`,
+`DoubleDribble`, `Carry`, `ThreeSecondViolation`, `FiveSecondCloselyGuarded`, `OffensiveGoaltending`,
+`BackcourtViolation`) are dead-ball, null elapsed. Three violation types (`ShotClockViolation`,
+`FiveSecondInbound`, `TenSecondBackcourt`) are dead-ball but stamp invariant elapsed (30/0/10) — the
+only timed arms in Roll C. Defensive goaltending is explicitly NOT here (it AWARDS the basket → a
+Roll H make/miss variant, deferred). The enum keeps its name this session; the broader rename to
+`PossessionLossOutcome` is a later cosmetic pass.
+
+**The context scheme.** A third `TurnoverContext` value, `EntryBackcourt`, seats the
+post-made-basket / backcourt-start phase. Court-phase gates which losses are reachable: Halfcourt
+(the settled set — where travel, over-and-back, 3-second etc. will live once #5b turns them on);
+Transition (the outlet/push, unchanged); EntryBackcourt (the bring-it-up phase — 5-second inbound,
+10-second backcourt, backcourt shot-clock, plus a bad pass / lost ball on the way up). This session
+every new type is `0.0` in BOTH live contexts; real (placeholder) weight lives only in EntryBackcourt
+and is exercised solely by the isolation check. #5b sets the live Halfcourt weights and implements
+the origin-dependent routing (made basket vs. foul past halfcourt) that selects the context.
+
+**The signature wrinkle.** The violation arms need their elapsed from config, but `RollC.Execute`
+took no config. Rather than add a required parameter (which would touch every legacy call site and
+the resolver), an OPTIONAL `RollCConfig? config = null` was added — mirroring the generator's optional
+`context` default. Every legacy caller compiles and behaves byte-for-byte unchanged, because the
+violation arms are dormant (0 weight in Halfcourt/Transition, the only contexts the resolver builds)
+and so are never reached on the live path. A violation arm reached without a config fails LOUD (not a
+silent null-deref), consistent with the engine's fail-at-the-seam rule. Only the isolation check,
+which deliberately weights the violations, passes a config.
+
+**Validation (reasoned + Monte-Carlo-traced, pending Emmett's harness run).** The three existing Roll
+C checks are unchanged. A new `RollCExpansionCheck` proves the seated set in isolation in two parts:
+(1) it drives the `EntryBackcourt` context directly, confirming its seven weighted members are
+reachable at their configured rate (selection + resolved rate) and its eight zero-weight members are
+unreachable; (2) a directly-built UNIFORM pie over all fifteen types lights up every arm — including
+the halfcourt-natural new types that are `0.0` in every live context this session — and asserts each
+is a clean terminal with the right consequence (dead-ball to defense, except the two existing live
+steals) and the right elapsed (violations 30/0/10, every turnover null), and that NO new type leaks a
+steal. It carries its own complete reason map so the regression-net `MapTurnover` stays byte-for-byte.
+A Python mirror of the generator + `Pie` cumulative walk confirmed: Halfcourt 30/22/18/20/10 and
+Transition 25/15/20/35/05 with the new types at 0%, EntryBackcourt at its configured rates, the
+uniform pie within tolerance, and per-draw legacy parity. §2a: the new context is unrouted and
+`RollC.Execute` touches no shared state, so the Governor loop is unchanged (`unrouted == 0`). §2b
+sweep clean: the new type names and `EntryBackcourt` appear only in Roll C's enum/config/generator/
+arms and the isolation check — no feeder references them.
+
+**What #5a closes.** Roll C is now the structural home for every no-shot loss, with the
+court-phase context scheme in place — all behavior-neutral and proven in isolation. The arc moves to
+#5b (Roll A reshape: collapse to five outcomes, route the loss exit into the ready EntryBackcourt
+context, fold the retained inbounds back in, turn the dormant types live), drafted as a separate
+audited pass per §6.
+
 ## Session 23 — Contextification #4 (Bonus-fork extract): the charge-and-fork in Rolls D / I / J / K / M collapsed into one shared node (2026-06-13)
 
 **The premise this session opens.** Fourth of the five-session contextification arc, and a

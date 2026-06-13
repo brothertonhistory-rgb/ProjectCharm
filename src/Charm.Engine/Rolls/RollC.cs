@@ -24,9 +24,26 @@ namespace Charm.Engine;
 /// </summary>
 public static class RollC
 {
-    public static RollResult Execute(PossessionState state, Pie<TurnoverOutcome> pie, IRng rng)
+    public static RollResult Execute(
+        PossessionState state, Pie<TurnoverOutcome> pie, IRng rng,
+        RollCConfig? config = null)
     {
         var outcome = pie.Roll(rng.NextUnitInterval());
+
+        // The three violation arms (and ONLY they) stamp an invariant elapsed read
+        // from config. Added in Contextification #5a as an OPTIONAL parameter with a
+        // default, mirroring the generator's optional context default: every legacy
+        // call site (the batch/context/pressure checks, ShowSamples, the resolver)
+        // is byte-for-byte unchanged, because the violation arms are DORMANT (zero
+        // weight in every live context) and therefore never reached on the live
+        // path. Only the isolation check, which deliberately weights the violations,
+        // passes a config. A violation arm reached without one fails LOUD here rather
+        // than dereferencing null — consistent with the engine's fail-at-the-seam rule.
+        double Elapsed(Func<RollCConfig, double> pick) =>
+            config is null
+                ? throw new InvalidOperationException(
+                    "Roll C reached a violation arm without a RollCConfig to supply its invariant elapsed time.")
+                : pick(config);
 
         // Every slice is a terminal; the Reason string carries the classification
         // (including the dead/live distinction by name) for the future entry roll
@@ -62,6 +79,61 @@ public static class RollC
             TurnoverOutcome.OffensiveFoul =>
                 new Terminal("OffensiveFoul", state,
                     PossessionConsequence.DeadBallTo(state.Defense)),
+
+            // --- Contextification #5a: the expanded loss set. Every arm below is
+            //     a DEAD-ball loss -> the ball goes to the defense on a dead-ball
+            //     restart (a future inbound). DORMANT this session: zero weight in
+            //     every live context, so none of these fire on the live path.
+            //
+            //     The seven turnover types defer elapsed time (null), exactly like
+            //     the five existing turnovers. The three violation types are the
+            //     ONLY Roll C arms that stamp their own elapsed: invariant, known
+            //     here, needing no time roll — mirroring Roll A's violation
+            //     terminals (whose copies #5b consolidates away).
+
+            TurnoverOutcome.Travel =>
+                new Terminal("Travel", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
+
+            TurnoverOutcome.DoubleDribble =>
+                new Terminal("DoubleDribble", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
+
+            TurnoverOutcome.Carry =>
+                new Terminal("Carry", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
+
+            TurnoverOutcome.ThreeSecondViolation =>
+                new Terminal("ThreeSecondViolation", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
+
+            TurnoverOutcome.FiveSecondCloselyGuarded =>
+                new Terminal("FiveSecondCloselyGuarded", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
+
+            TurnoverOutcome.OffensiveGoaltending =>
+                new Terminal("OffensiveGoaltending", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
+
+            TurnoverOutcome.BackcourtViolation =>
+                new Terminal("BackcourtViolation", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
+
+            // Violations carry their own INVARIANT elapsed (the only timed arms here).
+            TurnoverOutcome.ShotClockViolation =>
+                new Terminal("ShotClockViolation", state,
+                    PossessionConsequence.DeadBallTo(state.Defense))
+                    { ElapsedSeconds = Elapsed(c => c.ShotClockViolationElapsedSeconds) },
+
+            TurnoverOutcome.FiveSecondInbound =>
+                new Terminal("FiveSecondInbound", state,
+                    PossessionConsequence.DeadBallTo(state.Defense))
+                    { ElapsedSeconds = Elapsed(c => c.FiveSecondInboundElapsedSeconds) },
+
+            TurnoverOutcome.TenSecondBackcourt =>
+                new Terminal("TenSecondBackcourt", state,
+                    PossessionConsequence.DeadBallTo(state.Defense))
+                    { ElapsedSeconds = Elapsed(c => c.TenSecondBackcourtElapsedSeconds) },
 
             _ => throw new InvalidOperationException($"Unhandled turnover outcome '{outcome}'.")
         };

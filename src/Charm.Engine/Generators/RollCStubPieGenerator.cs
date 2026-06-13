@@ -52,6 +52,17 @@ public sealed class RollCStubPieGenerator
                 [TurnoverOutcome.LostBallDeadBall]   = _cfg.BaseLostBallDeadBall,
                 [TurnoverOutcome.LostBallLiveBall]   = _cfg.BaseLostBallLiveBall,
                 [TurnoverOutcome.OffensiveFoul]      = _cfg.BaseOffensiveFoul,
+                // #5a expanded set, DORMANT here (all 0.0 — pie requires every member).
+                [TurnoverOutcome.Travel]                   = _cfg.BaseTravel,
+                [TurnoverOutcome.DoubleDribble]            = _cfg.BaseDoubleDribble,
+                [TurnoverOutcome.Carry]                    = _cfg.BaseCarry,
+                [TurnoverOutcome.ThreeSecondViolation]     = _cfg.BaseThreeSecondViolation,
+                [TurnoverOutcome.FiveSecondCloselyGuarded] = _cfg.BaseFiveSecondCloselyGuarded,
+                [TurnoverOutcome.OffensiveGoaltending]     = _cfg.BaseOffensiveGoaltending,
+                [TurnoverOutcome.BackcourtViolation]       = _cfg.BaseBackcourtViolation,
+                [TurnoverOutcome.ShotClockViolation]       = _cfg.BaseShotClockViolation,
+                [TurnoverOutcome.FiveSecondInbound]        = _cfg.BaseFiveSecondInbound,
+                [TurnoverOutcome.TenSecondBackcourt]       = _cfg.BaseTenSecondBackcourt,
             },
 
             TurnoverContext.Transition => new Dictionary<TurnoverOutcome, double>
@@ -61,6 +72,40 @@ public sealed class RollCStubPieGenerator
                 [TurnoverOutcome.LostBallDeadBall]   = _cfg.TransitionLostBallDeadBall,
                 [TurnoverOutcome.LostBallLiveBall]   = _cfg.TransitionLostBallLiveBall,
                 [TurnoverOutcome.OffensiveFoul]      = _cfg.TransitionOffensiveFoul,
+                // #5a expanded set, DORMANT here (all 0.0 — pie requires every member).
+                [TurnoverOutcome.Travel]                   = _cfg.TransitionTravel,
+                [TurnoverOutcome.DoubleDribble]            = _cfg.TransitionDoubleDribble,
+                [TurnoverOutcome.Carry]                    = _cfg.TransitionCarry,
+                [TurnoverOutcome.ThreeSecondViolation]     = _cfg.TransitionThreeSecondViolation,
+                [TurnoverOutcome.FiveSecondCloselyGuarded] = _cfg.TransitionFiveSecondCloselyGuarded,
+                [TurnoverOutcome.OffensiveGoaltending]     = _cfg.TransitionOffensiveGoaltending,
+                [TurnoverOutcome.BackcourtViolation]       = _cfg.TransitionBackcourtViolation,
+                [TurnoverOutcome.ShotClockViolation]       = _cfg.TransitionShotClockViolation,
+                [TurnoverOutcome.FiveSecondInbound]        = _cfg.TransitionFiveSecondInbound,
+                [TurnoverOutcome.TenSecondBackcourt]       = _cfg.TransitionTenSecondBackcourt,
+            },
+
+            // #5a: the Entry/Backcourt context (DORMANT — nothing routes here yet).
+            // The only context giving the new types real weight; exercised solely by
+            // the isolation check until #5b wires Roll A's loss exit into it. Lists
+            // every member, as Pie requires.
+            TurnoverContext.EntryBackcourt => new Dictionary<TurnoverOutcome, double>
+            {
+                [TurnoverOutcome.BadPassDeadBall]    = _cfg.EntryBackcourtBadPassDeadBall,
+                [TurnoverOutcome.BadPassIntercepted] = _cfg.EntryBackcourtBadPassIntercepted,
+                [TurnoverOutcome.LostBallDeadBall]   = _cfg.EntryBackcourtLostBallDeadBall,
+                [TurnoverOutcome.LostBallLiveBall]   = _cfg.EntryBackcourtLostBallLiveBall,
+                [TurnoverOutcome.OffensiveFoul]      = _cfg.EntryBackcourtOffensiveFoul,
+                [TurnoverOutcome.Travel]                   = _cfg.EntryBackcourtTravel,
+                [TurnoverOutcome.DoubleDribble]            = _cfg.EntryBackcourtDoubleDribble,
+                [TurnoverOutcome.Carry]                    = _cfg.EntryBackcourtCarry,
+                [TurnoverOutcome.ThreeSecondViolation]     = _cfg.EntryBackcourtThreeSecondViolation,
+                [TurnoverOutcome.FiveSecondCloselyGuarded] = _cfg.EntryBackcourtFiveSecondCloselyGuarded,
+                [TurnoverOutcome.OffensiveGoaltending]     = _cfg.EntryBackcourtOffensiveGoaltending,
+                [TurnoverOutcome.BackcourtViolation]       = _cfg.EntryBackcourtBackcourtViolation,
+                [TurnoverOutcome.ShotClockViolation]       = _cfg.EntryBackcourtShotClockViolation,
+                [TurnoverOutcome.FiveSecondInbound]        = _cfg.EntryBackcourtFiveSecondInbound,
+                [TurnoverOutcome.TenSecondBackcourt]       = _cfg.EntryBackcourtTenSecondBackcourt,
             },
 
             _ => throw new InvalidOperationException(

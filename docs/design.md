@@ -1889,3 +1889,68 @@ node itself: both below-bonus kinds, with and without flavor, across the foul-co
 charge-to-defense-only, the below/in-bonus split, the `Bonus` payload on both arms, and the flavor
 pass-through. The node is now the single place fouls cross the bonus, so the Governor accumulation
 check (§2a) is the end-to-end guarantee.
+
+### Contextification #5a — Roll C expansion: every no-shot loss seated, context-gated and DORMANT (Session 24)
+
+**What it establishes.** Roll C becomes the single canonical home for EVERY way a possession is lost
+without a shot — all turnover types and all violation types. #5a SEATS the full set, gated by
+context, but DORMANT: declared and resolvable, zero weight in every live context, nothing routing to
+them. Proven in isolation. #5b reshapes Roll A and wires its loss exit in, turning them live. The
+split keeps the expansion behavior-neutral and independently provable before anything depends on it.
+
+**One enum, one pie per context.** A possession is lost exactly one way, so a single draw over one
+expanded `TurnoverOutcome` picks the single loss type. Ten members are APPENDED after `OffensiveFoul`
+— append order is load-bearing: a zero-weight slice does not advance `Pie`'s cumulative walk, so the
+same draw maps to the same outcome it did before (a same-seed 5-vs-15-member parity trace confirmed
+per-draw identity for the five legacy types). Seven new turnover types (`Travel`, `DoubleDribble`,
+`Carry`, `ThreeSecondViolation`, `FiveSecondCloselyGuarded`, `OffensiveGoaltending`,
+`BackcourtViolation`) are dead-ball with deferred (null) elapsed. Three violation types
+(`ShotClockViolation`, `FiveSecondInbound`, `TenSecondBackcourt`) are dead-ball but stamp INVARIANT
+elapsed (30 / 0 / 10) — the only timed arms in Roll C. Defensive goaltending is deliberately excluded
+(it awards the basket → a Roll H make/miss variant, deferred).
+
+**The Pie-forces-zeros consequence.** `Pie` walks every enum member and throws on any omission, and
+validates sum-to-1. So "dormant" cannot mean "absent": every new member must appear at `0.0` in the
+Halfcourt and Transition dicts, and `RollCConfig` (and the `"RollC"` config.json section) must carry
+a backing field for each — in all three contexts — so #5b turns weights on by editing config alone.
+The Halfcourt pie stays 30/22/18/20/10 and Transition stays 25/15/20/35/05, byte-for-byte.
+
+**Invariant elapsed inside Roll C (the new wrinkle).** Every existing Roll C arm sets no
+`ElapsedSeconds` (a turnover's duration has real variance, deferred to the future time roll). The
+three violation arms are the exception: their elapsed is invariant and known here, mirroring Roll A's
+violation terminals. `RollCConfig` gains `ShotClockViolationElapsedSeconds` (30),
+`FiveSecondInboundElapsedSeconds` (0), `TenSecondBackcourtElapsedSeconds` (10) — dormant copies of
+Roll A's values until #5b consolidates Roll A's terminals into Roll C and removes the duplication.
+`RollC.Execute` gains an OPTIONAL `RollCConfig? config = null` parameter (mirroring the generator's
+optional `context` default) so every legacy call site is unchanged; the violation arms read elapsed
+through it and fail loud if reached without one. They are never reached on the live path (dormant), so
+the resolver's existing `RollC.Execute(..., _rng)` call (config defaulting to null) is safe.
+
+**The court-phase context scheme.** A third `TurnoverContext`, `EntryBackcourt`, seats the
+post-made-basket / backcourt-start phase. Court phase gates which losses are reachable: Halfcourt is
+the settled set (travel, over-and-back, 3-second, carry, closely-guarded, offensive goaltending,
+frontcourt shot-clock — turned on in #5b); Transition is the outlet/push (unchanged); EntryBackcourt
+is the bring-it-up phase (5-second inbound, 10-second backcourt, backcourt shot-clock, plus a bad pass
+/ lost ball on the way up). Over-and-back lives in Halfcourt, not EntryBackcourt — it is only possible
+once the frontcourt is established. The origin-dependent gating that selects the context per inbound
+(made basket → 10-second + backcourt shot-clock reachable, over-and-back not; foul past halfcourt →
+frontcourt start, no 10-second, over-and-back possible) is SEATED ready here and IMPLEMENTED in #5b.
+
+**The dormancy / isolation discipline.** Every new type is `0.0` in both live contexts this session;
+real (placeholder) weight lives only in EntryBackcourt and is exercised solely by `RollCExpansionCheck`.
+That check proves the seated set in two parts: (1) drive `EntryBackcourt` directly — its weighted
+members reachable at configured rates, its zero members unreachable; (2) a directly-built uniform pie
+over all fifteen types lights up every arm (including the halfcourt-natural types zeroed in every live
+context this session), asserting each is a clean terminal with the right consequence (dead-ball to
+defense; steal only on the two pre-existing live arms) and the right elapsed (violations 30/0/10,
+turnovers null), and that no new type leaks a steal. The three existing Roll C checks are untouched
+and read identical (modulo additive `0.000` rows where a check iterates `Pie.Slices`, since `Pie`
+stores a slice per member — every existing rate and pass/fail signal is unchanged).
+
+**Known divergence and deferral (flagged per §0/§6c).** "All three regression checks byte-for-byte"
+is literally true only for the two that reference the five existing types by name;
+`RollCBatchCheck` (and `ShowSamples`' pie print) iterate all slices and gain additive zero-rows —
+accepted, not a behavior change. Separately, `Pie.Roll`'s overflow fallback returns the last slice,
+now a zero-weight appended type, so a draw within ~1e-16 of 1.0 in a live context could fall through
+to it (≈ 1e-11 expected over a 100k batch — will not fire). Fixing it is a pie-mechanism change, out
+of scope; logged as a deferral.

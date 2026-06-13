@@ -40,7 +40,68 @@ public enum TurnoverOutcome
 
     /// <summary>Charge, illegal screen, etc. Always a dead ball; no steal is
     /// credited to the defense. -> TERMINAL.</summary>
-    OffensiveFoul
+    OffensiveFoul,
+
+    // --- Contextification #5a: the full set of ways a possession is lost
+    //     WITHOUT a shot, seated here so Roll C is the single canonical loss
+    //     node. APPENDED after OffensiveFoul so every existing RNG draw maps to
+    //     the same outcome it did before (declaration order is significant). All
+    //     new members are DORMANT this session: zero weight in every live context
+    //     (Halfcourt, Transition), nothing routes to them yet. #5b turns them
+    //     live by rewiring Roll A's loss exit and setting real Halfcourt weights.
+    //
+    //     Every new member is a DEAD-ball loss -> DeadBallTo(defense). The seven
+    //     turnover types defer elapsed time (null) like the existing turnovers;
+    //     the three violation types carry their own INVARIANT elapsed (the only
+    //     arms in Roll C that stamp time), mirroring Roll A's violation terminals.
+
+    /// <summary>Travel. Dead ball; next possession resumes on an inbound.
+    /// -> TERMINAL.</summary>
+    Travel,
+
+    /// <summary>Double dribble. Dead ball. -> TERMINAL.</summary>
+    DoubleDribble,
+
+    /// <summary>Carry / palming. Dead ball. -> TERMINAL.</summary>
+    Carry,
+
+    /// <summary>Three-second violation (offensive player in the lane too long).
+    /// Dead ball. -> TERMINAL.</summary>
+    ThreeSecondViolation,
+
+    /// <summary>Five-second closely-guarded violation (NCAA men's: ball-handler
+    /// held in the frontcourt with a defender within six feet). A settled-set
+    /// type. Dead ball. -> TERMINAL.</summary>
+    FiveSecondCloselyGuarded,
+
+    /// <summary>Offensive goaltending / offensive basket interference — the
+    /// basket is waved off and the ball goes to the defense. Dead ball.
+    /// -> TERMINAL. (DEFENSIVE goaltending is NOT here: it AWARDS the basket, so
+    /// it belongs to the make/miss roll, not the loss node.)</summary>
+    OffensiveGoaltending,
+
+    /// <summary>Backcourt violation / over-and-back — the offense returns the
+    /// ball to the backcourt after establishing the frontcourt. Dead ball.
+    /// -> TERMINAL. A halfcourt-phase type: only possible once the frontcourt is
+    /// established, never on the entry itself.</summary>
+    BackcourtViolation,
+
+    /// <summary>Shot-clock violation. Dead ball. -> TERMINAL. INVARIANT elapsed:
+    /// the full shot clock (30s). Roll A holds an identical terminal today;
+    /// #5b consolidates. (Same name as <c>EntryOutcome.ShotClockViolation</c>,
+    /// different enum — no collision.)</summary>
+    ShotClockViolation,
+
+    /// <summary>Five-second inbound violation (failure to inbound in time). Dead
+    /// ball. -> TERMINAL. INVARIANT elapsed: ZERO (the clock never started).
+    /// Roll A holds an identical terminal today; #5b consolidates.</summary>
+    FiveSecondInbound,
+
+    /// <summary>Ten-second backcourt violation (failure to advance past the
+    /// division line in time). Dead ball. -> TERMINAL. INVARIANT elapsed: a fixed
+    /// 10s (the count ran before the whistle). Roll A holds an identical terminal
+    /// today; #5b consolidates.</summary>
+    TenSecondBackcourt
 }
 
 /// <summary>
@@ -67,5 +128,14 @@ public enum TurnoverContext
     /// <summary>A turnover on a transition outlet/push — stamped by Roll J's
     /// <see cref="TransitionOutcome.Turnover"/> arm. Selects Roll C's transition pie:
     /// more often LIVE and going the other way (live strips up, offensive fouls down).</summary>
-    Transition
+    Transition,
+
+    /// <summary>A loss while bringing the ball up from a backcourt start — the
+    /// post-made-basket / inbound-in-the-backcourt phase. Selects Roll C's
+    /// entry/backcourt pie, where the backcourt-only losses live: the 5-second
+    /// inbound, 10-second backcourt, backcourt shot-clock, plus a bad pass / lost
+    /// ball on the way up. Added DORMANT in Contextification #5a: nothing routes
+    /// here yet. #5b's Roll A reshape stamps this on its loss exit, selecting the
+    /// context by inbound origin (made basket vs. foul past halfcourt).</summary>
+    EntryBackcourt
 }
