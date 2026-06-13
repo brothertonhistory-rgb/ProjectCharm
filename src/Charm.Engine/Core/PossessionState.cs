@@ -22,7 +22,15 @@ public enum EntryType
     /// or Steal) into ROLL J, the live transition-entry gate; a null-context
     /// Transition is produced by nothing and FAILS LOUD as a wiring-bug tripwire. It
     /// is NOT routed through Roll A's dead-ball entry.</summary>
-    Transition
+    Transition,
+
+    /// <summary>A dead-ball restart where the ball was already across the halfcourt
+    /// line when the turnover occurred — the other team inbounds from the frontcourt
+    /// (near their basket) and skips the backcourt bring-up entirely. Roll B is this
+    /// entry's node; Roll A's bring-up (and all its backcourt-only ways to lose it)
+    /// are bypassed. The pie odds on Roll B can later reflect the easier inbound
+    /// situation (no full-court pressure possible).</summary>
+    BallAdvanced
 }
 
 /// <summary>

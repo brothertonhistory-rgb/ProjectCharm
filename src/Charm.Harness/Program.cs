@@ -20,6 +20,7 @@ internal static class Program
         var cfgK = RollKConfig.Load(configPath);
         var cfgL = RollLConfig.Load(configPath);
         var cfgM = RollMConfig.Load(configPath);
+        var cfgOffFoul = RollOffensiveFoulConfig.Load(configPath);
         var cfgGov = GovernorConfig.Load(configPath);
 
         var rng = new SystemRng(cfg.Seed);
@@ -36,6 +37,7 @@ internal static class Program
         var rollKGenerator = new RollKStubPieGenerator(cfgK);
         var rollLGenerator = new RollLStubPieGenerator(cfgL);
         var rollMGenerator = new RollMStubPieGenerator(cfgM);
+        var offensiveFoulGenerator = new RollOffensiveFoulStubPieGenerator(cfgOffFoul);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -57,6 +59,7 @@ internal static class Program
             rollKGenerator,
             rollLGenerator,
             rollMGenerator,
+            offensiveFoulGenerator,
             game,
             rng,
             new ResumeInboundStub(),
@@ -436,7 +439,11 @@ internal static class Program
             }
             else
             {
-                if (t.Consequence.NextEntry == EntryType.DeadBallInbound
+                // Session 27 spot-flip: a dead-ball turnover in the backcourt now
+                // produces BallAdvanced (skip Roll A); frontcourt stays DeadBallInbound.
+                // Both are correct dead-ball consequences — neither carries a transition context.
+                if ((t.Consequence.NextEntry == EntryType.DeadBallInbound
+                     || t.Consequence.NextEntry == EntryType.BallAdvanced)
                     && t.Consequence.TransitionContext is null) deadNullCtxOk++;
                 else deadCtxBad++;
             }
@@ -460,7 +467,7 @@ internal static class Program
         var liveCtxOk = liveCtxBad == 0 && liveStealCtxOk > 0;
         var deadCtxOk = deadCtxBad == 0 && deadNullCtxOk > 0;
         Console.WriteLine($"  live arms carry Steal context (-> Roll J): ok={liveStealCtxOk:N0} bad={liveCtxBad} -> {(liveCtxOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  dead arms carry no context (-> Roll A): ok={deadNullCtxOk:N0} bad={deadCtxBad} -> {(deadCtxOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  dead arms carry DeadBallInbound or BallAdvanced, no transition context: ok={deadNullCtxOk:N0} bad={deadCtxBad} -> {(deadCtxOk ? "ok" : "FAIL")}");
 
         return ratesOk && terminalOk && liveCtxOk && deadCtxOk;
     }
@@ -987,6 +994,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -1161,6 +1169,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -1451,6 +1460,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -2061,6 +2071,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
             game,
             rngR,
             new ResumeInboundStub(),
@@ -2156,6 +2167,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -3029,6 +3041,7 @@ internal static class Program
                 OffensiveRebound = 0, LooseBallFoulOnDefense = 0, LooseBallFoulOnOffense = 0,
                 OutOfBoundsOffOffense = 0, OutOfBoundsOffDefense = 0, JumpBall = 0
             }),
+            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -3471,6 +3484,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
             game,
             rng,
             new ResumeInboundStub(),
@@ -3655,8 +3669,12 @@ internal static class Program
             }
             else
             {
-                if (!(c.NextOffense == state.Defense && c.NextEntry == EntryType.DeadBallInbound
-                      && c.TransitionContext is null)) consequenceBad++;
+                // Session 27 spot-flip: dead-ball arms may produce DeadBallInbound (frontcourt)
+                // or BallAdvanced (backcourt). Both are correct; neither carries a transition context.
+                var deadOk = c.NextOffense == state.Defense
+                    && (c.NextEntry == EntryType.DeadBallInbound || c.NextEntry == EntryType.BallAdvanced)
+                    && c.TransitionContext is null;
+                if (!deadOk) consequenceBad++;
 
                 if (violationElapsed.TryGetValue(o, out var exp))
                 {
@@ -3678,7 +3696,7 @@ internal static class Program
         Console.WriteLine($"  uniform pie over all {all.Length} types (expected {expect:P3} each):");
         Console.WriteLine($"    all types reachable: {(allReached ? "ok" : "FAIL")}");
         Console.WriteLine($"    rates within tolerance: {(ratesOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"    consequences correct (dead-ball to defense; steal only on the two live): bad={consequenceBad} -> {(consequenceBad == 0 ? "ok" : "FAIL")}");
+        Console.WriteLine($"    consequences correct (DeadBallInbound or BallAdvanced to defense; steal only on the two live): bad={consequenceBad} -> {(consequenceBad == 0 ? "ok" : "FAIL")}");
         Console.WriteLine($"    elapsed correct (violations 30/0/10, turnovers deferred): bad={elapsedBad} -> {(elapsedBad == 0 ? "ok" : "FAIL")}");
         Console.WriteLine($"    no NEW type leaks a steal: leaks={stealLeak} -> {(stealLeak == 0 ? "ok" : "FAIL")}");
         ok &= allReached && ratesOk && consequenceBad == 0 && elapsedBad == 0 && stealLeak == 0;

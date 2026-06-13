@@ -74,6 +74,7 @@ public sealed class Resolver
     private readonly RollKStubPieGenerator _rollKGenerator;
     private readonly RollLStubPieGenerator _rollLGenerator;
     private readonly RollMStubPieGenerator _rollMGenerator;
+    private readonly RollOffensiveFoulStubPieGenerator _offensiveFoulGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
     // RETIRED stubs still referenced by their corner cases (block recovery, transition).
@@ -97,6 +98,7 @@ public sealed class Resolver
         RollKStubPieGenerator rollKGenerator,
         RollLStubPieGenerator rollLGenerator,
         RollMStubPieGenerator rollMGenerator,
+        RollOffensiveFoulStubPieGenerator offensiveFoulGenerator,
         GameState game,
         IRng rng,
         // resumeInbound / sidelineInbound are accepted but no longer stored: as of #6
@@ -124,6 +126,7 @@ public sealed class Resolver
         _rollKGenerator = rollKGenerator;
         _rollLGenerator = rollLGenerator;
         _rollMGenerator = rollMGenerator;
+        _offensiveFoulGenerator = offensiveFoulGenerator;
         _game = game;
         _rng = rng;
         _resolveBlock = resolveBlock;
@@ -163,6 +166,16 @@ public sealed class Resolver
             // Roll D / Roll I shape).
             var pieJ = _rollJGenerator.Generate(ctx);
             result = RollJ.Execute(start, pieJ, _game, _rng);
+        }
+        else if (start.Entry == EntryType.BallAdvanced)
+        {
+            // The other team lost the ball dead in the backcourt — the new offense
+            // starts already across and skips Roll A's bring-up entirely. Drop straight
+            // into Roll B (halfcourt initiation). Backcourt-only violations and the
+            // 10-second count are unreachable; the team still faces Roll B's normal
+            // foul / turnover / jump-ball chances before getting a shot.
+            var pieB = _rollBGenerator.Generate(start, physicality: 0.0);
+            result = RollB.Execute(start, pieB, _rng);
         }
         else
         {
@@ -215,6 +228,15 @@ public sealed class Resolver
             switch (result)
             {
                 case Terminal t:
+                    // Stamp offensive-foul flavor at the single chokepoint where all
+                    // three OffensiveFoul emitters (Roll C, Roll K, ResolveOffensiveFoul)
+                    // converge. Theater only — never read for routing.
+                    if (t.Reason == "OffensiveFoul")
+                    {
+                        var flavorPie = _offensiveFoulGenerator.Generate(t.State);
+                        var flavor    = flavorPie.Roll(_rng.NextUnitInterval());
+                        t = t with { Flavor = flavor };
+                    }
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
                         { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
 
@@ -301,8 +323,13 @@ public sealed class Resolver
                         // consequence match Roll C's OffensiveFoul arm exactly. (A future
                         // flavor tag — charge / off-arm / illegal screen — plugs in here.)
                         case ContinuationKind.ResolveOffensiveFoul:
+                            // Spot-flip: an offensive foul during the backcourt bring-up
+                            // hands the defense the ball already advanced (they skip Roll A).
+                            // A frontcourt offensive foul is a normal dead-ball restart.
                             result = new Terminal("OffensiveFoul", c.State,
-                                PossessionConsequence.DeadBallTo(c.State.Defense));
+                                c.State.Frontcourt
+                                    ? PossessionConsequence.DeadBallTo(c.State.Defense)
+                                    : PossessionConsequence.BallAdvancedTo(c.State.Defense));
                             continue;
 
                         // Roll D, opponent not in bonus -> the offense keeps the ball and

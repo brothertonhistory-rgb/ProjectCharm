@@ -4,21 +4,19 @@
   "BaseOffensiveFoul": 0.0045,
   "BaseDefensiveFoul": 0.0255,
   "BaseJumpBall": 0.01,
-  "PressureTurnoverNudge": 0.10,
-  "Epsilon": 1e-9,
+  "PressureTurnoverNudge": 0.1,
+  "Epsilon": 1e-09,
   "BatchSize": 100000,
   "RateTolerance": 0.005,
   "Seed": 20260610,
-
   "RollB": {
     "BaseProceed": 0.845,
     "BaseFoul": 0.12,
     "BaseDeadBallTurnover": 0.03,
     "BaseJumpBall": 0.005,
-    "PhysicalityFoulNudge": 0.10,
-    "Epsilon": 1e-9
+    "PhysicalityFoulNudge": 0.1,
+    "Epsilon": 1e-09
   },
-
   "RollC": {
     "BaseBadPassDeadBall": 0.24,
     "BaseBadPassIntercepted": 0.18,
@@ -37,7 +35,7 @@
     "BaseTenSecondBackcourt": 0.0,
     "TransitionBadPassDeadBall": 0.25,
     "TransitionBadPassIntercepted": 0.15,
-    "TransitionLostBallDeadBall": 0.20,
+    "TransitionLostBallDeadBall": 0.2,
     "TransitionLostBallLiveBall": 0.35,
     "TransitionOffensiveFoul": 0.05,
     "TransitionTravel": 0.0,
@@ -50,7 +48,7 @@
     "TransitionShotClockViolation": 0.0,
     "TransitionFiveSecondInbound": 0.0,
     "TransitionTenSecondBackcourt": 0.0,
-    "EntryBackcourtBadPassDeadBall": 0.20,
+    "EntryBackcourtBadPassDeadBall": 0.2,
     "EntryBackcourtBadPassIntercepted": 0.15,
     "EntryBackcourtLostBallDeadBall": 0.15,
     "EntryBackcourtLostBallLiveBall": 0.15,
@@ -62,56 +60,51 @@
     "EntryBackcourtFiveSecondCloselyGuarded": 0.0,
     "EntryBackcourtOffensiveGoaltending": 0.0,
     "EntryBackcourtBackcourtViolation": 0.0,
-    "EntryBackcourtShotClockViolation": 0.10,
-    "EntryBackcourtFiveSecondInbound": 0.10,
+    "EntryBackcourtShotClockViolation": 0.1,
+    "EntryBackcourtFiveSecondInbound": 0.1,
     "EntryBackcourtTenSecondBackcourt": 0.15,
     "ShotClockViolationElapsedSeconds": 30.0,
     "FiveSecondInboundElapsedSeconds": 0.0,
     "TenSecondBackcourtElapsedSeconds": 10.0,
-    "PressureLostBallLiveBallNudge": 0.10,
-    "Epsilon": 1e-9
+    "PressureLostBallLiveBallNudge": 0.1,
+    "Epsilon": 1e-09
   },
-
   "RollD": {
-    "FlavorReachIn": 0.60,
-    "FlavorBlocking": 0.30,
-    "FlavorOffBall": 0.10,
+    "FlavorReachIn": 0.6,
+    "FlavorBlocking": 0.3,
+    "FlavorOffBall": 0.1,
     "BonusThreshold": 7,
     "DoubleBonusThreshold": 10,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "RollE": {
-    "BaseSlot1": 0.20,
-    "BaseSlot2": 0.20,
-    "BaseSlot3": 0.20,
-    "BaseSlot4": 0.20,
-    "BaseSlot5": 0.20,
-    "TransitionSlot1": 0.30,
-    "TransitionSlot2": 0.30,
+    "BaseSlot1": 0.2,
+    "BaseSlot2": 0.2,
+    "BaseSlot3": 0.2,
+    "BaseSlot4": 0.2,
+    "BaseSlot5": 0.2,
+    "TransitionSlot1": 0.3,
+    "TransitionSlot2": 0.3,
     "TransitionSlot3": 0.25,
-    "TransitionSlot4": 0.10,
+    "TransitionSlot4": 0.1,
     "TransitionSlot5": 0.05,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "RollF": {
     "BaseShotAttempt": 0.855,
     "BaseTurnover": 0.09,
     "BaseNonShootingFoul": 0.05,
     "BaseJumpBall": 0.005,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "RollG": {
     "BaseThree": 0.36,
     "BaseLong": 0.08,
-    "BaseMid": 0.10,
+    "BaseMid": 0.1,
     "BaseShort": 0.11,
     "BaseRim": 0.35,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "RollH": {
     "BaseMade": 0.43,
     "BaseMadeAndFouled": 0.03,
@@ -124,16 +117,15 @@
     "BlockMid": 0.03,
     "BlockLong": 0.02,
     "BlockThree": 0.01,
-    "PutbackMade": 0.50,
+    "PutbackMade": 0.5,
     "PutbackMadeAndFouled": 0.08,
     "PutbackMiss": 0.28,
     "PutbackMissFouled": 0.05,
     "PutbackMissOutOfBoundsLost": 0.01,
     "PutbackMissOutOfBoundsRetained": 0.01,
     "PutbackBlocked": 0.07,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "RollI": {
     "DefensiveRebound": 0.66,
     "OffensiveRebound": 0.27,
@@ -142,19 +134,18 @@
     "OutOfBoundsOffOffense": 0.025,
     "OutOfBoundsOffDefense": 0.01,
     "JumpBall": 0.005,
-    "BlockDefensiveRebound": 0.50,
+    "BlockDefensiveRebound": 0.5,
     "BlockOffensiveRebound": 0.32,
     "BlockLooseBallFoulOnDefense": 0.03,
     "BlockLooseBallFoulOnOffense": 0.02,
     "BlockOutOfBoundsOffOffense": 0.07,
     "BlockOutOfBoundsOffDefense": 0.05,
     "BlockJumpBall": 0.01,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "RollJ": {
-    "Settle": 0.60,
-    "Push": 0.30,
+    "Settle": 0.6,
+    "Push": 0.3,
     "Turnover": 0.06,
     "DefensiveFoul": 0.035,
     "JumpBall": 0.005,
@@ -163,16 +154,15 @@
     "FreeThrowTurnover": 0.05,
     "FreeThrowDefensiveFoul": 0.04,
     "FreeThrowJumpBall": 0.01,
-    "StealSettle": 0.40,
-    "StealPush": 0.50,
+    "StealSettle": 0.4,
+    "StealPush": 0.5,
     "StealTurnover": 0.06,
     "StealDefensiveFoul": 0.035,
     "StealJumpBall": 0.005,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "RollK": {
-    "PutBack": 0.40,
+    "PutBack": 0.4,
     "JumpBall": 0.01,
     "DefensiveFoul": 0.05,
     "OffensiveFoul": 0.02,
@@ -186,13 +176,12 @@
     "FreeThrowDeadBallTurnover": 0.03,
     "FreeThrowLiveBallTurnover": 0.02,
     "FreeThrowResetOffense": 0.32,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "RollL": {
     "MakeProbability": 0.72,
     "RoadMakePenalty": 0.0,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
   "RollM": {
     "DefensiveRebound": 0.735,
@@ -202,11 +191,19 @@
     "OutOfBoundsOffOffense": 0.02,
     "OutOfBoundsOffDefense": 0.03,
     "JumpBall": 0.005,
-    "Epsilon": 1e-9
+    "Epsilon": 1e-09
   },
-
   "Governor": {
     "PossessionCap": 200,
     "SecondsPerPossession": 18.0
+  },
+  "OffensiveFoulFlavor": {
+    "FrontcourtCharge": 0.3,
+    "FrontcourtPushOff": 0.2,
+    "FrontcourtIllegalScreen": 0.5,
+    "BackcourtCharge": 0.4,
+    "BackcourtPushOff": 0.5,
+    "BackcourtIllegalScreen": 0.1,
+    "Epsilon": 1e-09
   }
 }

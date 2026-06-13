@@ -1,3 +1,85 @@
+## Session 27 — Offensive-foul flavor tag + backcourt dead-ball spot-flip (2026-06-13)
+
+**Two small surface refinements, no structural gaps.** Both were deferred by #6: the offensive-foul
+flavor tag (theater only, unblocks correct per-player attribution later) and the backcourt dead-ball
+spot-flip (a team that loses the ball dead before crossing hands the other team the ball already
+advanced, skipping the bring-up). Neither changes any rate; neither opens a new stub; both are additive
+appends onto what already exists.
+
+**Confirmation mode, not rediscovery (CONVENTIONS §0/§6c).** The prompt carried a verified §6c map;
+the pull confirmed all anchors against the committed tree. No drift. The Terminal record confirmed as a
+one-liner (no Flavor field yet); three OffensiveFoul emitters confirmed (Roll C line 79, Roll K line
+95, Resolver `ResolveOffensiveFoul` line 303); `EntryType` confirmed with only `DeadBallInbound` and
+`Transition`; all 13 Roll C dead-ball arms confirmed as plain `DeadBallTo(state.Defense)`. Governor
+`NextEntry` threading confirmed at line 164. One pre-build question surfaced: the spot-flip rule
+applies to all 13 dead-ball arms in Roll C (not just the original five) — Emmett confirmed, the
+principle is ball-was-already-on-that-side regardless of how it was lost.
+
+**Name decision: `BallAdvanced`, not `FrontcourtInbound`.** The draft map used `FrontcourtInbound`;
+Emmett renamed it `BallAdvanced` in the design conversation. The name describes what happened (the
+other team gets the ball already advanced across) rather than naming a court position. Settled before
+any code was written.
+
+**Offensive-foul flavor.**
+- New `OffensiveFoulFlavor` enum: `Charge`, `PushOff`, `IllegalScreen`. Theater only — never read for
+  routing, never changes any consequence. Lives in `Rolls/OffensiveFoulOutcomes.cs`, same shape and
+  doc wording as `FoulFlavor`.
+- Two weight sets selected by court-state: **frontcourt** (Charge 30 / PushOff 20 / IllegalScreen 50
+  — illegal screens dominate; these are set-play halfcourt fouls) and **backcourt** (Charge 40 /
+  PushOff 50 / IllegalScreen 10 — screens don't happen before the ball crosses).
+- `Terminal` record expanded from a one-liner to carry `public OffensiveFoulFlavor? Flavor { get;
+  init; }` — mirroring `Continue.Flavor` doc wording exactly (theater, never routed, null on every
+  non-offensive-foul terminal).
+- New `RollOffensiveFoulConfig` and `RollOffensiveFoulStubPieGenerator` — same shape as Roll D's
+  flavor pair. The generator reads `state.Frontcourt` to select the mix.
+- **Single stamp site (the chokepoint):** `Resolver.cs`'s `case Terminal t:` — the one place all
+  three emitters (Roll C, Roll K, `ResolveOffensiveFoul`) converge. When `t.Reason == "OffensiveFoul"`,
+  draw the flavor pie and stamp `t = t with { Flavor = flavor }` before returning the routing outcome.
+  Roll C and Roll K are untouched; the resolver-stamp approach was the chosen design (per-roll
+  alternative was the fallback only if a snag arose).
+
+**Backcourt dead-ball spot-flip.**
+- New `EntryType.BallAdvanced` — a dead-ball restart where the ball was already in the backcourt when
+  the turnover occurred, so the new offense inbounds from the frontcourt (near their basket) and skips
+  Roll A's bring-up entirely. Roll B is the entry node.
+- New `PossessionConsequence.BallAdvancedTo(team)` static helper — parallel to `DeadBallTo`, lives in
+  `RollResult.cs` alongside the other helpers.
+- **`RunPossession` branch:** a `BallAdvanced` entry drops straight into Roll B (generator + execute),
+  bypassing Roll A entirely. Sits between the Transition branch and the legacy Roll A branch.
+- **Roll C: all 13 dead-ball arms updated** with the spot-flip conditional:
+  `state.Frontcourt ? DeadBallTo(state.Defense) : BallAdvancedTo(state.Defense)`. Live arms
+  (BadPassIntercepted, LostBallLiveBall) are untouched — they route to Roll J as steals. The timed
+  violation arms keep their `ElapsedSeconds` property; only the consequence changes.
+- **`ResolveOffensiveFoul` in the Resolver** likewise: a backcourt offensive foul (Frontcourt==false)
+  yields `BallAdvancedTo`; a frontcourt one yields `DeadBallTo`.
+- **Over-and-back self-handles cleanly:** it is Halfcourt-only (verified EntryBackcourt weight 0.0),
+  so it always reads `Frontcourt==true` and always produces `DeadBallTo` — no carve-out needed.
+- **Governor unchanged:** already threads `Entry: consequence.NextEntry` onto the spawned possession;
+  `BallAdvanced` possession then enters `RunPossession`, hits the new branch, drops to Roll B.
+- **Harness:** two existing checks asserted `NextEntry == DeadBallInbound` for all dead-ball Roll C
+  arms. Both updated to accept `DeadBallInbound` OR `BallAdvanced`, with no transition context on
+  either. Labels updated to reflect the new reality.
+
+**Config.** `OffensiveFoulFlavor` section added to `config.json` (front/back weight sets + Epsilon).
+`RollOffensiveFoulConfig.Load` reads it. All 8 harness `Resolver` constructor sites wired with
+`RollOffensiveFoulStubPieGenerator`.
+
+**Validation (CONVENTIONS §2).** Pre-check: Python Monte Carlo confirmed both flavor mixes converge
+within 0.005pp tolerance (100k draws each); spot-flip conditional produces BallAdvanced only on
+backcourt draws and DeadBallInbound only on frontcourt draws (0 misroutes); over-and-back confirmed
+self-handling. First harness run flagged two FAIL lines in the existing Roll C checks — the
+`DeadBallInbound`-only assertion was stale. Fixed both sites to accept `BallAdvanced`; second run:
+**ALL CHECKS PASSED.**
+
+**Deferrals (carried).**
+- Live-ball backcourt steal high-push split (Roll J near-basket steal → higher Push than current single
+  50% steal pie). Needs Emmett's backcourt-steal pie numbers and a small Roll J split keyed on the
+  stamp the steal terminal already carries. The live twin of the dead-ball spot-flip.
+- Scoring — the identified next big step. Governor already accumulates `+= 0`; the work is deriving
+  points per possession from the made-FG zone and free throws made, tallied on the resolver's walk.
+- Re-inbound weights, attribute generators, attribution/stats layer — all carried from prior sessions.
+
+
 ## Session 25 — Contextification #6 (Roll A reshape + live halfcourt losses + closed chain) (2026-06-13)
 
 **The premise this session opens.** #6 completes the contextification arc that #5a set up. #5a SEATED

@@ -61,6 +61,15 @@ public sealed record PossessionConsequence(TeamSide NextOffense, EntryType NextE
     public static PossessionConsequence DeadBallTo(TeamSide team) =>
         new(team, EntryType.DeadBallInbound);
 
+    /// <summary>Ball to <paramref name="team"/> already advanced — the other team
+    /// lost it dead BEFORE crossing the halfcourt line, so the new offense starts
+    /// their inbound from the frontcourt (near their basket) and skips Roll A's
+    /// bring-up entirely. Roll B is the entry node; backcourt-only violations
+    /// (10-second, full-court press) are unreachable. Parallel to
+    /// <see cref="DeadBallTo"/>.</summary>
+    public static PossessionConsequence BallAdvancedTo(TeamSide team) =>
+        new(team, EntryType.BallAdvanced);
+
     /// <summary>Ball to <paramref name="team"/> on a live-ball / transition start off a
     /// STEAL — a live-ball interception or a strip of a live dribble (Roll C's
     /// <c>BadPassIntercepted</c> / <c>LostBallLiveBall</c>, Roll K's
@@ -100,7 +109,19 @@ public sealed record PossessionConsequence(TeamSide NextOffense, EntryType NextE
 /// it makes an un-named consequence a COMPILE error at the construction site rather
 /// than a silent null the Governor would have to guess at — omissions surface loud,
 /// exactly when and where they happen.</param>
-public sealed record Terminal(string Reason, PossessionState State, PossessionConsequence Consequence) : RollResult;
+public sealed record Terminal(string Reason, PossessionState State, PossessionConsequence Consequence) : RollResult
+{
+    /// <summary>
+    /// The descriptive flavor of an OffensiveFoul terminal — THEATER, never read
+    /// for routing. Logged for observability and future play-by-play exactly as
+    /// <see cref="Continue.Flavor"/> is on a defensive-foul continuation. Null on
+    /// every non-offensive-foul terminal; stamped by the resolver at its single
+    /// OffensiveFoul chokepoint (where all three emitters converge) so no emitter
+    /// carries it directly. Meaningful only when <see cref="Reason"/> is
+    /// "OffensiveFoul".
+    /// </summary>
+    public OffensiveFoulFlavor? Flavor { get; init; }
+}
 
 /// <summary>The possession continues. The resolver routes by <paramref name="Next"/>.</summary>
 /// <param name="Next">Which kind of continuation this is (not which node).</param>

@@ -2022,3 +2022,34 @@ free-throw trip that terminates — both landings handled, the iteration ceiling
 spot-flip; "easier + pressure-driven" re-inbound weights (the marker carries the distinction now, the
 weights tilt later in the real generator); and the attribute-driven generators that replace every stub
 pie.
+
+---
+
+## Session 27 — Offensive-foul flavor tag + backcourt dead-ball spot-flip
+
+Two surface refinements deferred by #6. Neither changes any rate or opens any stub; both are additive
+appends to existing structure.
+
+**Offensive-foul flavor.** `OffensiveFoulFlavor { Charge, PushOff, IllegalScreen }` is theater
+backfilled onto every `OffensiveFoul` terminal at the resolver's single chokepoint — the one `case
+Terminal t:` where all three emitters (Roll C, Roll K, `ResolveOffensiveFoul`) converge. Two mixes,
+selected by `t.State.Frontcourt`: frontcourt (30/20/50 — illegal screens dominate halfcourt set plays)
+and backcourt (40/50/10 — screens don't happen before the ball crosses). `Terminal` gained
+`public OffensiveFoulFlavor? Flavor { get; init; }` mirroring `Continue.Flavor`; null on every
+non-offensive-foul terminal. The stamping is a `t = t with { Flavor = flavor }` mutation at the single
+return site; Roll C and Roll K signatures are unchanged. Config: `OffensiveFoulFlavor` section in
+`config.json` (front/back weight sets). Unblocks correct per-player attribution later: a charge
+attributes to the ball-handler; an illegal screen attributes to the screener.
+
+**Backcourt dead-ball spot-flip.** The rule: on a dead-ball turnover, the new offense inbounds from
+wherever the ball already was. Lost it before crossing (Frontcourt==false) → the other team starts
+already across, skip Roll A's bring-up → `BallAdvanced` entry → Roll B. Lost it after crossing
+(Frontcourt==true) → normal dead-ball restart → `DeadBallInbound` → Roll A. `EntryType.BallAdvanced`
+is the new enum value; `PossessionConsequence.BallAdvancedTo(team)` is the parallel static helper to
+`DeadBallTo`. All 13 dead-ball arms in Roll C now use the conditional; `ResolveOffensiveFoul` in the
+resolver likewise. `RunPossession` has a new `BallAdvanced` branch that drops straight into Roll B,
+between the Transition branch and the legacy Roll A branch. Over-and-back self-handles: it is
+Halfcourt-only (EntryBackcourt weight 0.0), so it always reads Frontcourt==true and never flips.
+The Governor is unchanged — it already threads `Entry: consequence.NextEntry` onto the spawned
+possession. Later: Roll B's pie odds can reflect the easier inbound situation (no full-court press
+possible on a BallAdvanced inbound).
