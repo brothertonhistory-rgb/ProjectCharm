@@ -16,8 +16,13 @@ namespace Charm.Engine;
 ///   <list type="bullet">
 ///   <item><see cref="TransitionOutcome.Settle"/> — pull it out, run a halfcourt set.
 ///   CONTINUE via <see cref="ContinuationKind.IntoPlayerSelection"/> (Roll E).</item>
-///   <item><see cref="TransitionOutcome.Push"/> — we run. CONTINUE to the parked
-///   transition stub via <see cref="ContinuationKind.IntoTransition"/>.</item>
+///   <item><see cref="TransitionOutcome.Push"/> — we run. CONTINUE into player
+///   selection (Roll E) via <see cref="ContinuationKind.IntoPlayerSelection"/> — the
+///   SAME node <see cref="TransitionOutcome.Settle"/> uses — but STAMPING
+///   <c>FastBreak=true</c> on the carried state so Roll E's generator draws the
+///   transition selection pie. (Contextification #1: the old IntoTransition park is
+///   retired; a fast break now produces a shot through the shared rolls, tilted by a
+///   context.)</item>
 ///   <item><see cref="TransitionOutcome.Turnover"/> — coughed it up. CONTINUE to the
 ///   shared turnover node via <see cref="ContinuationKind.ResolveTurnoverType"/>,
 ///   STAMPING <see cref="TurnoverContext.Transition"/> on the ticket so Roll C
@@ -65,9 +70,13 @@ public static class RollJ
             TransitionOutcome.Settle =>
                 new Continue(ContinuationKind.IntoPlayerSelection, state),
 
-            // We run -> the future transition roll (parked). CONTINUE.
+            // We run -> player selection (Roll E), the SAME node Settle uses, but
+            // STAMPED FastBreak=true so Roll E's generator draws the transition
+            // selection pie. The marker rides on the carried state (it persists for
+            // Roll G/H's deferred transition tilts), not as a Continue payload. The
+            // old IntoTransition/TransitionStub park is retired (kept in the corner).
             TransitionOutcome.Push =>
-                new Continue(ContinuationKind.IntoTransition, state),
+                new Continue(ContinuationKind.IntoPlayerSelection, state with { FastBreak = true }),
 
             // Coughed it up -> shared turnover node, STAMPED Transition so Roll C
             // selects its transition pie. The context rides the ticket exactly as

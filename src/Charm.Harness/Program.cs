@@ -750,7 +750,44 @@ internal static class Program
         var cleanOk = anomalies == 0;
         Console.WriteLine($"\n  every exit a clean slot-stamped IntoPlayerAction: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
 
-        return ratesOk && cleanOk;
+        // --- FastBreak selects the transition pie (Contextification #1). The generator
+        //     reads ONE field — PossessionState.FastBreak — to choose between the flat
+        //     halfcourt pie and the transition pie. Build both states and assert each
+        //     pie's slices equal the configured weights. This is the direct proof that
+        //     the transition selection pie is drawn ONLY on the Push (FastBreak) path;
+        //     the flat batch above already covered the halfcourt path's RATES.
+        var halfcourtPie = genE.Generate(state with { FastBreak = false });
+        var transitionPie = genE.Generate(state with { FastBreak = true });
+
+        var halfcourtExpected = new Dictionary<SelectionOutcome, double>
+        {
+            [SelectionOutcome.Slot1] = cfgE.BaseSlot1, [SelectionOutcome.Slot2] = cfgE.BaseSlot2,
+            [SelectionOutcome.Slot3] = cfgE.BaseSlot3, [SelectionOutcome.Slot4] = cfgE.BaseSlot4,
+            [SelectionOutcome.Slot5] = cfgE.BaseSlot5,
+        };
+        var transitionExpected = new Dictionary<SelectionOutcome, double>
+        {
+            [SelectionOutcome.Slot1] = cfgE.TransitionSlot1, [SelectionOutcome.Slot2] = cfgE.TransitionSlot2,
+            [SelectionOutcome.Slot3] = cfgE.TransitionSlot3, [SelectionOutcome.Slot4] = cfgE.TransitionSlot4,
+            [SelectionOutcome.Slot5] = cfgE.TransitionSlot5,
+        };
+
+        bool PieMatches(Pie<SelectionOutcome> pie, Dictionary<SelectionOutcome, double> expected) =>
+            pie.Slices.All(s => Math.Abs(s.Item2 - expected[s.Item1]) <= cfgE.Epsilon);
+
+        var halfcourtPieOk = PieMatches(halfcourtPie, halfcourtExpected);
+        var transitionPieOk = PieMatches(transitionPie, transitionExpected);
+        // The two pies MUST differ — otherwise "transition pie selected" would be
+        // unobservable. The placeholder transition weights are non-flat for this reason.
+        var piesDiffer = transitionPie.Slices.Any(s =>
+            Math.Abs(s.Item2 - halfcourtExpected[s.Item1]) > cfgE.Epsilon);
+
+        Console.WriteLine("\n  FastBreak pie selection:");
+        Console.WriteLine($"    FastBreak=false -> halfcourt pie (flat 20s): {(halfcourtPieOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"    FastBreak=true  -> transition pie (30/30/25/10/5): {(transitionPieOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"    the two pies differ (selection is observable): {(piesDiffer ? "ok" : "FAIL")}");
+
+        return ratesOk && cleanOk && halfcourtPieOk && transitionPieOk && piesDiffer;
     }
 
     // --- Batch: Roll F's four-way action distribution converges within tolerance,
@@ -1804,11 +1841,13 @@ internal static class Program
                        && game.AwayLineup.OnCourt.Count == Lineup.Size;
 
         // Rebound -> Roll J, end to end. A defensive rebound spawns a Transition
-        // possession that ENTERS Roll J (not Roll A), and Roll J's Push reaches the
-        // transition stub. STUB:Transition is reachable ONLY via Roll J's Push, so its
-        // presence is proof Roll J actually ran off a rebound this loop. Both non-zero.
-        var transitionStubParks = result.PerStubParks.GetValueOrDefault("STUB:Transition", 0);
-        var rollJOk = reboundIntoJ > 0 && transitionStubParks > 0;
+        // possession that ENTERS Roll J (not Roll A). As of Contextification #1, Roll
+        // J's Push no longer parks at STUB:Transition — it flows into Roll E (with
+        // FastBreak set) and on through the shot chain, so the proof that Roll J ran is
+        // simply that possessions entered it off a rebound. The Push->Roll E wiring and
+        // the transition-pie selection are proven in the dedicated Roll J / Roll E
+        // batch checks below, where the state is isolated.
+        var rollJOk = reboundIntoJ > 0;
 
         // --- Report. ---
         Console.WriteLine(
@@ -1825,7 +1864,7 @@ internal static class Program
             $"monotonic + bonus stays crossed -> {(foulOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  lineups survive (same objects, 5 slots each) -> {(lineupOk ? "ok" : "FAIL")}");
         Console.WriteLine(
-            $"  rebound -> Roll J: possessions entering J={reboundIntoJ:N0} | STUB:Transition parks={transitionStubParks:N0} " +
+            $"  rebound -> Roll J: possessions entering J={reboundIntoJ:N0} (Push now flows into Roll E) " +
             $"-> {(rollJOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  flat placeholder time accumulated: {result.TotalSeconds:N0}s (observability only)");
 
@@ -1861,10 +1900,12 @@ internal static class Program
 
     // --- Batch: Roll J's five-way run-or-not distribution (rebound context) converges
     //     within tolerance; every exit is a clean Continue of the expected kind (Roll J
-    //     names no terminal — all five arms are continues, so we count by
-    //     ContinuationKind); the Turnover arm stamps the Transition context for Roll C;
-    //     and the DefensiveFoul arm charges the defense and forks on the bonus (this
-    //     batch's own game crosses the threshold partway, exercising the §2a crossing). ---
+    //     names no terminal — all five arms are continues). Push and Settle now BOTH
+    //     exit via IntoPlayerSelection, split by the FastBreak marker (Push stamps it,
+    //     Settle does not) — so the batch proves they are distinguishable downstream.
+    //     The Turnover arm stamps the Transition context for Roll C; and the
+    //     DefensiveFoul arm charges the defense and forks on the bonus (this batch's own
+    //     game crosses the threshold partway, exercising the §2a crossing). ---
     private static bool RollJBatchCheck(
         RollAConfig cfg, RollDConfig cfgD, RollJConfig cfgJ,
         RollJStubPieGenerator genJ, PossessionState state)
@@ -1881,8 +1922,9 @@ internal static class Program
         var counts = new Dictionary<TransitionOutcome, int>();
         foreach (var o in Enum.GetValues<TransitionOutcome>()) counts[o] = 0;
 
-        var settleSel = 0;          // IntoPlayerSelection
-        var pushStub = 0;           // STUB:Transition
+        var settleSel = 0;          // IntoPlayerSelection, FastBreak=false (Settle -> halfcourt)
+        var pushSel = 0;            // IntoPlayerSelection, FastBreak=true  (Push   -> transition)
+        var pushFastBreakOk = 0;    // Push continues that correctly carry FastBreak=true
         var turnoverStamped = 0;    // ResolveTurnoverType carrying TurnoverContext.Transition
         var turnoverUnstamped = 0;  // ResolveTurnoverType MISSING the stamp (a FAIL)
         var foulSideline = 0;       // ResolveSidelineInbound (below bonus)
@@ -1890,20 +1932,27 @@ internal static class Program
         var jumpBalls = 0;          // ResolveJumpBall
         var unrecognized = 0;
 
-        var transitionStub = new TransitionStub();
-
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             var r = RollJ.Execute(state, pieJ, game, rng);
             switch (r)
             {
-                case Continue { Next: ContinuationKind.IntoPlayerSelection }:
-                    counts[TransitionOutcome.Settle]++;
-                    settleSel++;
-                    break;
-                case Continue { Next: ContinuationKind.IntoTransition } pc:
-                    counts[TransitionOutcome.Push]++;
-                    if (transitionStub.Receive(pc) == "STUB:Transition") pushStub++;
+                // Push AND Settle now BOTH exit via IntoPlayerSelection — the split is
+                // the FastBreak marker on the carried state (Push stamps it true, Settle
+                // leaves it false). Counting by FastBreak is the proof the two are
+                // distinguishable downstream despite sharing the edge.
+                case Continue { Next: ContinuationKind.IntoPlayerSelection } sel:
+                    if (sel.State.FastBreak)
+                    {
+                        counts[TransitionOutcome.Push]++;
+                        pushSel++;
+                        pushFastBreakOk++;   // by construction FastBreak is true here
+                    }
+                    else
+                    {
+                        counts[TransitionOutcome.Settle]++;
+                        settleSel++;
+                    }
                     break;
                 case Continue { Next: ContinuationKind.ResolveTurnoverType } tc:
                     counts[TransitionOutcome.Turnover]++;
@@ -1941,15 +1990,17 @@ internal static class Program
         }
 
         Console.WriteLine("\n  routing per outcome:");
-        Console.WriteLine($"    Settle        -> IntoPlayerSelection {settleSel,8:N0}  {(settleSel > 0 ? "ok" : "NONE")}");
-        Console.WriteLine($"    Push          -> STUB:Transition     {pushStub,8:N0}  {(pushStub > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    Settle        -> IntoPlayerSelection (halfcourt) {settleSel,8:N0}  {(settleSel > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    Push          -> IntoPlayerSelection (FastBreak)  {pushSel,8:N0}  {(pushSel > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"      of which carry FastBreak=true: {pushFastBreakOk,8:N0} / {pushSel:N0}  {(pushFastBreakOk == pushSel ? "ok" : "FAIL")}");
         Console.WriteLine($"    Turnover      -> Roll C (stamped)    {turnoverStamped,8:N0}  {(turnoverStamped > 0 ? "ok" : "NONE")}");
         Console.WriteLine($"    DefensiveFoul -> SidelineInbound     {foulSideline,8:N0}  (below bonus)");
         Console.WriteLine($"                  -> ResolveFreeThrows   {foulFreeThrows,8:N0}  (in bonus)");
         Console.WriteLine($"    JumpBall      -> ResolveJumpBall     {jumpBalls,8:N0}  {(jumpBalls > 0 ? "ok" : "NONE")}");
 
         var foulTotal = foulSideline + foulFreeThrows;
-        var allArms = settleSel > 0 && pushStub > 0 && turnoverStamped > 0 && foulTotal > 0 && jumpBalls > 0;
+        var pushOk = pushSel > 0 && pushFastBreakOk == pushSel;   // every Push exit carried the marker
+        var allArms = settleSel > 0 && pushOk && turnoverStamped > 0 && foulTotal > 0 && jumpBalls > 0;
         var routedOk = unrecognized == 0;
         var stampOk = turnoverUnstamped == 0;
         Console.WriteLine($"\n  zero unrouted exits: {unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
@@ -2097,7 +2148,8 @@ internal static class Program
     //     DefensiveFoul -> sideline/FT fork charging the defense; OffensiveFoul /
     //     DeadBallTurnover / LiveBallTurnover -> terminals whose consequence flips the
     //     ball to the defense; ResetOffense -> Continue(IntoPlayerSelection) with the
-    //     prior shot's facts WIPED (ShotType and Result null). ---
+    //     prior shot's facts WIPED (ShotType and Result null) AND FastBreak cleared (a
+    //     reset off a missed break is a fresh halfcourt play — the marker leak guard). ---
     private static bool RollKReboundBatchCheck(
         RollAConfig cfg, RollKConfig cfgK, RollKStubPieGenerator genK,
         GameState sharedGame, PossessionState state)
@@ -2122,7 +2174,8 @@ internal static class Program
         foreach (var o in Enum.GetValues<OffensiveReboundOutcome>()) counts[o] = 0;
 
         var putbackTicketOk = 0;   // PutBack arms with Putback==true && ShotType==Rim
-        var resetWipedOk = 0;      // ResetOffense arms with ShotType==null && Result==null
+        var resetWipedOk = 0;      // ResetOffense arms with ShotType==null && Result==null && FastBreak==false
+        var resetClearedBreak = 0; // ResetOffense arms with FastBreak cleared (the leak guard)
         var defFoulSideline = 0;   // DefensiveFoul below bonus
         var defFoulFreeThrows = 0; // DefensiveFoul in bonus
         var flipToDefenseOk = 0;   // terminals whose consequence hands the ball to the defense
@@ -2133,10 +2186,12 @@ internal static class Program
             // Build a fully-stamped post-miss state: slot (E) + zone (G) + a Miss
             // result, exactly what arrives at the offensive-rebound node in the live
             // chain. The zone is a REAL non-Rim mix, so the PutBack arm's force-to-Rim
-            // and the ResetOffense arm's wipe are both observable.
+            // and the ResetOffense arm's wipe are both observable. FastBreak=true
+            // simulates a possession that PUSHED, missed, and grabbed its own board —
+            // so the ResetOffense leak-guard (FastBreak must clear) is exercised.
             var sel = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), rng)).State;
-            var stamped = zoned with { Result = ShotResult.Miss };
+            var stamped = zoned with { Result = ShotResult.Miss, FastBreak = true };
 
             var kRes = RollK.Execute(stamped, pieK, game, rng);
 
@@ -2171,7 +2226,11 @@ internal static class Program
                     break;
                 case Continue { Next: ContinuationKind.IntoPlayerSelection } rs:
                     counts[OffensiveReboundOutcome.ResetOffense]++;
-                    if (rs.State.ShotType is null && rs.State.Result is null) resetWipedOk++;
+                    // The reset must wipe the prior shot's facts AND clear FastBreak so
+                    // the fresh play draws the HALFCOURT pie — even though it arrived on
+                    // a FastBreak=true state. The marker must not leak past the reset.
+                    if (rs.State.ShotType is null && rs.State.Result is null && !rs.State.FastBreak) resetWipedOk++;
+                    if (!rs.State.FastBreak) resetClearedBreak++;
                     break;
                 default:
                     unrecognized++;
@@ -2194,7 +2253,8 @@ internal static class Program
         var defFoulTotal = defFoulSideline + defFoulFreeThrows;
         Console.WriteLine("\n  routing per arm:");
         Console.WriteLine($"    PutBack        -> Roll H, putback ticket + Rim forced  {putbackTicketOk,8:N0} / {counts[OffensiveReboundOutcome.PutBack]:N0}");
-        Console.WriteLine($"    ResetOffense   -> Roll E, facts wiped (zone+result null) {resetWipedOk,7:N0} / {counts[OffensiveReboundOutcome.ResetOffense]:N0}");
+        Console.WriteLine($"    ResetOffense   -> Roll E, facts wiped (zone+result null, FastBreak cleared) {resetWipedOk,7:N0} / {counts[OffensiveReboundOutcome.ResetOffense]:N0}");
+        Console.WriteLine($"                      FastBreak cleared (leak guard) {resetClearedBreak,8:N0} / {counts[OffensiveReboundOutcome.ResetOffense]:N0}  {(resetClearedBreak == counts[OffensiveReboundOutcome.ResetOffense] ? "ok" : "FAIL")}");
         Console.WriteLine($"    DefensiveFoul  -> SidelineInbound {defFoulSideline,8:N0} (below bonus) / ResolveFreeThrows {defFoulFreeThrows,7:N0} (in bonus)");
         Console.WriteLine($"    terminals flip ball to defense: {flipToDefenseOk,8:N0}");
 

@@ -1658,3 +1658,69 @@ Roll M with a one-arm pie fixed to the clean `DefensiveRebound` terminal (the sa
 `RollKBonusForkCheck` uses with its `foulOnlyPie`), so a missed final FT terminates cleanly at the
 rebound boundary exactly as the old stub did. Roll M's real distribution is `RollMReboundBatchCheck`'s
 mandate, not this check's.
+
+## Contextification arc: closing the open stubs as contexts, not new rolls (Session 20)
+
+The possession-flow roll web is complete. From here, **every remaining open stub closes as
+a CONTEXT on an existing roll — never a new roll.** A context selects a different pie
+(weights may go to zero) but never changes where an outcome routes. Existing rolls are not
+renamed or deleted; retired *stubs* are kept in the corner per the established pattern.
+This is the spine of a five-session arc.
+
+### The work order (build sequence)
+
+1. **Transition output** — Roll J `Push` → the player-selection chain (Roll E),
+   contextualized by a `FastBreak` marker. *(Session 20 — done.)*
+2. **Block recovery** — Roll H `Blocked` → Roll M's loose-ball machinery under a `Block`
+   context.
+3. **Steal feeder** — live turnovers (Roll C intercepted/stripped-live + Roll K live-ball
+   TO) → Roll J as a `Steal` source.
+4. **Bonus-fork extract** — the charge-and-fork copied in D/I/J/K/M → one shared node.
+5a. **Roll C expansion** — seat ALL turnover + violation types in Roll C, context-gated,
+   DORMANT (nothing routes to them yet; validate in isolation).
+5b. **Roll A reshape** — collapse Roll A to Successful inbound / Turnover / Offensive foul
+   before inbound / Defensive foul before inbound / Jump ball; route its Turnover exit into
+   the ready Roll C; fold the retained inbounds (ResumeInbound + SidelineInbound) back into
+   Roll A.
+
+**Order rationale.** Quiet branches first, the high-traffic inbound spine reshaped last (its
+feeders settle first); the bonus-fork extract (#4) collapses five below-bonus landing sites
+into one, thinning #5b before it runs.
+
+### #1 — Transition output: the FastBreak marker
+
+Roll J's `Push` (the possession decided to run) used to park at a dead-end stub. It now
+routes into **player selection (Roll E)** — the same node `Settle` uses — so a fast break
+produces a shot through the shared shot chain, tilted by a transition *context* rather than
+a separate transition roll. `IntoTransition` and `TransitionStub` are retired and kept in
+the corner.
+
+**Distinguishing Push from Settle.** Both arms enter Roll J off a board, so both carry a
+non-null `TransitionContext` — but that ticket records how the possession *started*, and is
+non-null on a Settle too. It cannot express "we ran." The decision Roll J made is therefore
+a distinct fact: **`bool FastBreak` on `PossessionState`** (default false). `Push` stamps it
+true; `Settle` leaves it false. This is the `Continue.Putback` precedent applied to a new
+edge — two pies on one `IntoPlayerSelection` edge, a single bit selecting between them —
+chosen over a parallel `IntoTransitionSelection` ContinuationKind, which would be the
+enum-explosion the engine deliberately avoids.
+
+**State field, not Continue payload.** Unlike `Putback`/`Bonus`/`TurnoverContext` (transient
+payloads consumed by the very next node), `FastBreak` must persist across hops because the
+deferred Roll G / Roll H transition tilts read it later. So it lives on `PossessionState`
+beside `SelectedSlot`/`ShotType`/`Result`. A single bool (one break flavor today); richer
+break memory — numbers advantage, leak-out — appends later as a nullable field, no teardown.
+
+**Roll E's context branch.** Roll E's generator reads `FastBreak`: true → the transition
+selection pie, false → the flat halfcourt pie — the same context-selects-a-pie pattern as
+Roll C/J/K. The transition weights are a non-flat placeholder (30/30/25/10/5) this session,
+chosen non-flat *only* so selection is observable in the harness; the real speed/athleticism
+favoring is the deferred attribute seam, which replaces the generator without touching Roll
+E or the resolver.
+
+**The leak guard.** The only edge that re-enters Roll E for a fresh play is Roll K's
+`ResetOffense`. A pushed possession that misses and rebounds would carry `FastBreak=true`
+into that reset and wrongly draw the transition pie, so `ResetOffense` clears `FastBreak`
+alongside the shot facts — a reset is a fresh halfcourt play. `PutBack` routes to Roll H,
+not Roll E, so it draws no wrong pie; the marker riding through a putback is harmless while
+G/H are transition-blind, and whether a putback off a break counts as transition is the G/H
+follow-up's call, not this session's.

@@ -37,7 +37,9 @@ namespace Charm.Engine;
 ///   resolver temp-routes the spawn through Roll A exactly as steals do now. Its real
 ///   home is the transition module via the steal feeder.</item>
 ///   <item><b>ResetOffense</b> — CONTINUE back to Roll E on a BLANK slate (slot,
-///   zone, result wiped): a fresh play at the inherent selection odds. The
+///   zone, result, AND FastBreak wiped): a fresh HALFCOURT play at the inherent
+///   selection odds. The FastBreak wipe is the marker leak-guard — a reset off a
+///   missed break must not redraw the transition selection pie. The
 ///   possession stays alive; the count does not increment. Re-enters at E, not Roll
 ///   B — the offensive-rebound pie already absorbed the turnover/foul/jumpball
 ///   hazards, so routing through B would double-charge them.</item>
@@ -112,7 +114,7 @@ public static class RollK
             // possession number does NOT increment (this is resolver-internal).
             OffensiveReboundOutcome.ResetOffense =>
                 new Continue(ContinuationKind.IntoPlayerSelection,
-                    state with { SelectedSlot = null, ShotType = null, Result = null }),
+                    state with { SelectedSlot = null, ShotType = null, Result = null, FastBreak = false }),
 
             _ => throw new InvalidOperationException($"Unhandled offensive-rebound outcome '{outcome}'.")
         };

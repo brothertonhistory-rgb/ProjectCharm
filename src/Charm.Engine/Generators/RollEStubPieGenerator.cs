@@ -1,9 +1,12 @@
 namespace Charm.Engine;
 
 /// <summary>
-/// Stub pie generator for Roll E. Returns the configured base weights as a
-/// finished five-way pie over <see cref="SelectionOutcome"/>. FLAT this session —
-/// 20% per slot — and with NO live-wire scalar.
+/// Stub pie generator for Roll E. Returns a finished five-way pie over
+/// <see cref="SelectionOutcome"/>, selected by the possession's
+/// <see cref="PossessionState.FastBreak"/> marker: the flat halfcourt pie (20% per
+/// slot) normally, or the transition selection pie (a non-flat placeholder) when the
+/// possession is running a break — the same context-selects-a-pie pattern as Roll
+/// C/J/K. Still NO live-wire scalar.
 ///
 /// Why no live wire (unlike Roll B's physicality and Roll C's pressure): the
 /// first real selection signal is usage, which belongs to the deferred
@@ -22,19 +25,34 @@ public sealed class RollEStubPieGenerator
 
     public RollEStubPieGenerator(RollEConfig cfg) => _cfg = cfg;
 
-    /// <param name="state">Carried for signature parity with real generators;
-    /// the stub does not read it yet. The real generator will use it to find the
-    /// offense, walk its lineup, and weight by the filling players' attributes.</param>
+    /// <param name="state">The carried possession state. The stub reads ONE field:
+    /// <see cref="PossessionState.FastBreak"/>, to choose between the halfcourt pie
+    /// (the flat Base* weights) and the transition pie (the Transition* weights) —
+    /// the SAME context-selects-a-pie pattern as Roll C/J/K. The rest is carried for
+    /// signature parity; the real generator will use the lineup + attributes.</param>
     public Pie<SelectionOutcome> Generate(PossessionState state)
     {
-        var weights = new Dictionary<SelectionOutcome, double>
-        {
-            [SelectionOutcome.Slot1] = _cfg.BaseSlot1,
-            [SelectionOutcome.Slot2] = _cfg.BaseSlot2,
-            [SelectionOutcome.Slot3] = _cfg.BaseSlot3,
-            [SelectionOutcome.Slot4] = _cfg.BaseSlot4,
-            [SelectionOutcome.Slot5] = _cfg.BaseSlot5,
-        };
+        // FastBreak=true (Roll J pushed) draws the transition selection pie; otherwise
+        // the flat halfcourt pie. The transition tilt is a placeholder this session —
+        // the real speed/athleticism favoring is the deferred attribute seam, which
+        // replaces this class without touching Roll E or the resolver.
+        var weights = state.FastBreak
+            ? new Dictionary<SelectionOutcome, double>
+            {
+                [SelectionOutcome.Slot1] = _cfg.TransitionSlot1,
+                [SelectionOutcome.Slot2] = _cfg.TransitionSlot2,
+                [SelectionOutcome.Slot3] = _cfg.TransitionSlot3,
+                [SelectionOutcome.Slot4] = _cfg.TransitionSlot4,
+                [SelectionOutcome.Slot5] = _cfg.TransitionSlot5,
+            }
+            : new Dictionary<SelectionOutcome, double>
+            {
+                [SelectionOutcome.Slot1] = _cfg.BaseSlot1,
+                [SelectionOutcome.Slot2] = _cfg.BaseSlot2,
+                [SelectionOutcome.Slot3] = _cfg.BaseSlot3,
+                [SelectionOutcome.Slot4] = _cfg.BaseSlot4,
+                [SelectionOutcome.Slot5] = _cfg.BaseSlot5,
+            };
 
         // No nudge, so no renormalize step is strictly needed — but the Pie
         // constructor still validates the sum is 1 within Epsilon, so flat

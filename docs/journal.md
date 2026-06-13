@@ -1,3 +1,76 @@
+## Session 20 — Contextification #1 (Transition Output): Push enters the shot chain via a FastBreak marker (2026-06-12)
+
+**The premise this session opens.** The possession-flow roll web is complete. Every
+remaining open stub closes as a **CONTEXT on an existing roll, never a new roll**: a
+context selects a different pie (weights may go to zero) but never changes where an
+outcome routes. This is the first of a five-session **contextification arc** (the full
+work order is recorded in `design.md` this session). #1 closes the transition-output park.
+
+**Built.** Roll J's `Push` arm — "we decided to run" — no longer parks at the dead-end
+`TransitionStub`. It now routes into **player selection (Roll E)**, the *same* node
+`Settle` uses, carrying a **`FastBreak` marker** so a fast break produces a shot through
+the shared rolls everyone else uses, tilted by a transition context rather than a separate
+beat. `IntoTransition` + `TransitionStub` are **retired, kept in the corner** (dead but
+present, swept later — your call to keep the diff small).
+
+**The distinguisher: a marker on carried state, not a new ContinuationKind.** Both `Push`
+and `Settle` entered Roll J off a board, so both carry a non-null `TransitionContext` —
+that field records how the possession *started*, and cannot tell "we ran" from "we pulled
+it out." The decision Roll J made is a new fact: `bool FastBreak` on `PossessionState`
+(default false). `Push` stamps it true; `Settle` leaves it false. Roll E's generator reads
+it to pick the pie. This is the **`Putback`-bit precedent** applied to a new edge — two
+pies on one `IntoPlayerSelection` edge, a payload bit selecting between them — not the
+enum-explosion of a parallel `IntoTransitionSelection` kind.
+
+**Why a state field, not a Continue payload.** `Putback`/`Bonus`/`TurnoverContext` are
+transient — consumed by the very next node. `FastBreak` must **persist across hops**
+(E → F → G → H) because the deferred Roll G / Roll H transition tilts will read it later —
+so it lives on `PossessionState` alongside `SelectedSlot`/`ShotType`/`Result`, not on the
+`Continue`. A single bool because there is exactly one break flavor today (the same "single
+bit suffices" call as `Putback`); richer break memory appends later as a nullable field.
+
+**Roll E's generator grew a context branch.** `FastBreak=true` → the transition selection
+pie; otherwise the flat halfcourt pie — the same context-selects-a-pie shape as Roll C/J/K.
+Placeholder transition weights this session, deliberately **non-flat** (30/30/25/10/5: two
+guards and a wing run, the bigs trail) so the harness can *prove* the break path draws its
+own pie — flat-vs-flat would be unobservable. The real speed/athleticism favoring is the
+**deferred attribute seam**; Roll E reads no attributes yet, exactly as the halfcourt pie
+is a flat placeholder.
+
+| Roll J arm | Routes to | Marker |
+|---|---|---|
+| Settle | `IntoPlayerSelection` → Roll E | FastBreak = **false** (halfcourt pie) |
+| Push | `IntoPlayerSelection` → Roll E | FastBreak = **true** (transition pie) |
+| Turnover / DefensiveFoul / JumpBall | unchanged | — |
+
+**The marker does not leak past the break.** The only edge that re-enters Roll E for a
+*fresh* play is Roll K's `ResetOffense` (kick-out after an offensive board). A transition
+possession that pushed, missed, and rebounded would otherwise carry `FastBreak=true` into
+that reset and wrongly draw the transition pie. So `ResetOffense` now wipes `FastBreak`
+alongside slot/zone/result — a reset is a fresh **halfcourt** play. `PutBack` (the other
+Roll K continue) goes to Roll H, not Roll E, so it draws no wrong pie; leaving the marker
+set there is harmless now (G/H are transition-blind) and is the G/H follow-up's call.
+
+**Validation (reasoned + Monte-Carlo-traced, pending the harness run).**
+- `RollESelectionBatchCheck` gained a **pie-selection sub-check**: `FastBreak=true` draws
+  exactly 30/30/25/10/5, `FastBreak=false` draws flat 20s, and the two pies differ (so
+  selection is observable). This is the authoritative "transition pie only on Push" proof.
+- `RollJBatchCheck` rewritten: `Push` and `Settle` now both exit via `IntoPlayerSelection`,
+  split by `FastBreak`; every `Push` exit is asserted to carry the marker; zero unrouted.
+  (Rates unchanged — only Push's *routing* moved.)
+- `RollKReboundBatchCheck` now feeds a `FastBreak=true` post-miss state and asserts every
+  `ResetOffense` clears it (the §2a leak guard, treating the marker as a carried field).
+- The whole-game loop's "rebound → Roll J end-to-end" check dropped its `STUB:Transition`
+  assertion (Push no longer parks there) down to "rebounds enter Roll J"; the Push→Roll E
+  wiring is proven in the isolated batches. Every `STUB:Transition` / `IntoTransition`
+  reference across the harness was swept.
+
+**Deferred unchanged.** The Roll G (shot location) and Roll H (make/miss) transition tilts
+are the immediate follow-up — the marker rides on state for them to read, but their
+generators stay transition-blind now. All weight tuning is deferred (placeholders). The
+remaining four contextification items (block recovery, steal feeder, bonus-fork extract,
+Roll C expansion + Roll A reshape) each get their own session.
+
 ## Session 19 — Roll M (free-throw rebound resolution): the FT loop's downstream closes, two pies grow a second context (2026-06-12)
 
 **Built.** The **free-throw rebound roll** — Roll M — the node a **missed final free throw**

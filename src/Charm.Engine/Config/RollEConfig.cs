@@ -26,6 +26,18 @@ public sealed class RollEConfig
     public double BaseSlot3 { get; init; }
     public double BaseSlot4 { get; init; }
     public double BaseSlot5 { get; init; }
+
+    // Transition selection weights — the pie Roll E draws when the possession carries
+    // FastBreak=true (Roll J pushed). PLACEHOLDER this session and deliberately NOT
+    // flat: visibly different from the Base* 20s so the harness can PROVE the break
+    // path draws its own pie. The real speed/athleticism tilt is the deferred attribute
+    // seam (a smarter generator), exactly like the flat Base* weights.
+    public double TransitionSlot1 { get; init; }
+    public double TransitionSlot2 { get; init; }
+    public double TransitionSlot3 { get; init; }
+    public double TransitionSlot4 { get; init; }
+    public double TransitionSlot5 { get; init; }
+
     public double Epsilon { get; init; }
 
     /// <summary>Load the <c>"RollE"</c> section from the config file at
@@ -42,6 +54,11 @@ public sealed class RollEConfig
             BaseSlot3 = e.GetProperty("BaseSlot3").GetDouble(),
             BaseSlot4 = e.GetProperty("BaseSlot4").GetDouble(),
             BaseSlot5 = e.GetProperty("BaseSlot5").GetDouble(),
+            TransitionSlot1 = e.GetProperty("TransitionSlot1").GetDouble(),
+            TransitionSlot2 = e.GetProperty("TransitionSlot2").GetDouble(),
+            TransitionSlot3 = e.GetProperty("TransitionSlot3").GetDouble(),
+            TransitionSlot4 = e.GetProperty("TransitionSlot4").GetDouble(),
+            TransitionSlot5 = e.GetProperty("TransitionSlot5").GetDouble(),
             Epsilon = e.GetProperty("Epsilon").GetDouble(),
         };
     }

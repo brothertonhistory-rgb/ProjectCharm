@@ -83,6 +83,22 @@ public enum EntryType
 /// inbound, and (this session) every not-yet-wired steal. Non-null
 /// (<see cref="TransitionContext.Rebound"/>) means "this possession began on a
 /// defensive rebound": the resolver routes it to Roll J instead of Roll A.</para></param>
+/// <param name="FastBreak">Whether the possession is RUNNING a live break RIGHT NOW —
+/// the fast-break marker Roll J stamps on its <c>Push</c> arm (the decision to run).
+/// Distinct from <see cref="TransitionContext"/>: that records how the possession
+/// STARTED (off a rebound), and is non-null on BOTH a Push and a Settle (both entered
+/// Roll J off a board), so it cannot tell "we ran" from "we pulled it out." This flag
+/// is the decision Roll J made. Read by Roll E's generator to draw the transition
+/// selection pie instead of the halfcourt pie; it also rides forward so Roll G (shot
+/// location) and Roll H (make/miss) can read it for their transition tilts LATER (a
+/// follow-up — those generators are transition-blind this session).
+/// <para>A single bool because there is exactly one break flavor today — the same
+/// "single bit suffices" call as <see cref="Continue.Putback"/>. Richer break memory
+/// (numbers advantage, leak-out) appends later as a nullable field, no teardown.
+/// False on every halfcourt possession (Roll B Proceed, Roll J Settle) and CLEARED on
+/// a Roll K <c>ResetOffense</c> re-entry — a reset off a missed break is a fresh
+/// halfcourt play, so it must NOT redraw the transition selection pie. The marker is
+/// deliberately scoped to the break: it does not leak past a reset.</para></param>
 public sealed record PossessionState(
     int PossessionNumber,
     TeamSide Offense,
@@ -91,4 +107,5 @@ public sealed record PossessionState(
     Slot? SelectedSlot = null,
     ShotLocation? ShotType = null,
     ShotResult? Result = null,
-    TransitionContext? TransitionContext = null);
+    TransitionContext? TransitionContext = null,
+    bool FastBreak = false);

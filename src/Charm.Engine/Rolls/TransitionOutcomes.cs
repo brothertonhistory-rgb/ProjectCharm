@@ -19,8 +19,9 @@ public enum TransitionOutcome
     /// Roll A CleanEntry, Roll B Proceed). -> CONTINUE to player selection (Roll E).</summary>
     Settle,
 
-    /// <summary>We run. -> CONTINUE to the parked transition stub (the future
-    /// transition roll's holding pen).</summary>
+    /// <summary>We run. -> CONTINUE into player selection (Roll E) — the same node
+    /// Settle uses — stamping <c>FastBreak=true</c> so Roll E draws the transition
+    /// selection pie. (The old transition stub is retired, kept in the corner.)</summary>
     Push,
 
     /// <summary>Coughed it up on the outlet/push. -> CONTINUE to the shared turnover

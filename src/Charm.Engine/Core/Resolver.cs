@@ -232,6 +232,12 @@ public sealed class Resolver
                         // feeding it back re-enters this switch and lands on the
                         // IntoPlayerAction case below (now Roll F). Roll E reaches
                         // GameState to name a real slot on the offense's lineup.
+                        // FEEDERS into this edge: Roll B Proceed, Roll J Settle (both
+                        // halfcourt), Roll J Push (FastBreak=true — Roll E's generator
+                        // reads it and draws the transition selection pie), and Roll K
+                        // ResetOffense (FastBreak cleared — a fresh halfcourt play). The
+                        // generator selects the pie from the carried state; the edge is
+                        // marker-blind, exactly the Roll C/K ticket pattern.
                         case ContinuationKind.IntoPlayerSelection:
                             var pieE = _rollEGenerator.Generate(c.State);
                             result = RollE.Execute(c.State, pieE, _game, _rng);
@@ -406,11 +412,12 @@ public sealed class Resolver
                                 PossessionConsequence.DeadBallTo(award.AwardedTo));
                             continue;
 
-                        // Roll J's Push -> the parked transition node (stub): the
-                        // possession decided to RUN. Where the future transition roll
-                        // (what the fast break PRODUCES — numbers, leak-outs, shot mix)
-                        // will land. An Into* hand-off that parks for now, like the
-                        // other stub edges. Chain ends here for this session.
+                        // RETIRED (Contextification #1): Roll J's Push no longer emits
+                        // IntoTransition — it now routes into IntoPlayerSelection with
+                        // FastBreak stamped, so a break produces a shot through the
+                        // shared rolls. This case + the _transition stub are kept in the
+                        // corner (dead, unreachable in a live walk), to be swept with the
+                        // other retired stubs in a future cleanup. Do not route here.
                         case ContinuationKind.IntoTransition:
                             return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
 
