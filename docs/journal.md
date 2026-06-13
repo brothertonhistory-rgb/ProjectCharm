@@ -1,3 +1,104 @@
+## Session 21 — Contextification #2 (Block Recovery): Roll H `Blocked` enters the rebound machinery via a `Block` source (2026-06-13)
+
+**The premise this session opens.** Second of the five-session contextification arc.
+Roll H's `Blocked` arm dead-ended at `BlockRecoveryStub` (the last live stub on the
+field-goal side). A blocked shot *is* a loose-ball scramble — the same battle a missed-shot
+rebound already is — so it should resolve through the rebound machinery, not its own node.
+
+**The home is Roll I, not Roll M — and it became an arm-add, not a pure reweight.** The
+arc's work order said "Roll M's loose-ball machinery," but Roll M is the **free-throw-board**
+resolver; a *field-goal* block belongs to the **field-goal-side** loose-ball resolver, which
+is **Roll I**. The catch: Roll I only had four arms, Roll M seven. Rather than route a block
+through a four-arm pie that can't express a swat going out of bounds or a tie-up, we **grew
+Roll I to Roll M's seven-arm shape** — and made those new arms **live for normal misses too**
+(your basketball call: caroms off the rim go out of bounds, rebounders fumble the ball out,
+tie-ups happen, on every miss, not just blocks). The block is then a **reweight** of those
+seven arms. So this session is a small *arm-add* on Roll I plus a *context* on top, not the
+pure reweight the one-line plan implied. The two resolvers (I and M) now share one vocabulary.
+
+**Why the OOB pair is distinct from the rebound arms (the whole point).** A ball that caroms
+out of bounds off the offense and a clean defensive rebound both hand the defense the ball —
+but they start the defense's *next* possession completely differently: the rebound is a
+**live push** (transition, its own weights), the OOB is a **dead-ball inbound** under the far
+basket (Roll A, its own weights). Folding OOB into `DefensiveRebound` would erase exactly that
+distinction. Same on the other side: an offensive rebound is a live putback/reset (Roll K),
+while an OOB off the defender is the offense restarting **dead** from the sideline. Neither is
+a turnover (no true possession was established) — they only change *how* the possession starts.
+That is why they are seven separate arms, each pointing the next possession at the right
+starting context, all routing to nodes that already exist (**no new stub opened**).
+
+**The seven arms and where each routes (live-miss and block share routes; only weights differ):**
+
+| Roll I arm | Routes to | Live / dead | Charge? |
+|---|---|---|---|
+| `DefensiveRebound` | Terminal → transition to defense (`Rebound` context → Roll J) | live | no |
+| `OffensiveRebound` | Continue → `ResolveOffensiveRebound` (Roll K) | live | no |
+| `LooseBallFoulOnDefense` | Continue → charge defense + bonus fork (sideline / FTs) | — | **yes (1)** |
+| `LooseBallFoulOnOffense` | Terminal → `DeadBallTo(defense)` (Roll A) | dead | no |
+| `OutOfBoundsOffOffense` *(new)* | Terminal → `DeadBallTo(defense)` (Roll A) | dead | no |
+| `OutOfBoundsOffDefense` *(new)* | Continue → `ResolveSidelineInbound` (offense retains) | dead | no |
+| `JumpBall` *(new)* | Continue → `ResolveJumpBall` (arrow node) | live | no |
+
+**The ticket: `ReboundSource { LiveBall, Block }`.** A new optional `ReboundSource?` field on
+`Continue`, the `Putback`/`OffensiveReboundSource` precedent: stamped by Roll H's `Blocked`
+arm, read by **Roll I's generator** to select the pie, never queried back. A **labeled tag,
+not a bool**, so a third loose-ball source appends later without a teardown. **Null reads as
+`LiveBall`** — every legacy feeder (Roll H's `Miss`, a missed putback re-entering Roll I)
+stamps nothing — so the *selection* is byte-for-byte the legacy path. A block reuses the
+`LiveBall` offensive-rebound pie (Roll I stamps no source onward) and reuses the `Rebound`
+transition context; a distinct block offensive-rebound source and a `Block` transition push
+rate are deferred (see below).
+
+**Edge reuse; the old node retired to the corner.** `Blocked` now emits
+`Continue(ResolveRebound) { ReboundSource = Block }` on the **existing** `ResolveRebound`
+edge — one edge, a payload selects the pie (the #1 `IntoPlayerSelection` precedent).
+`ContinuationKind.ResolveBlock`, the resolver's `ResolveBlock` case, and `BlockRecoveryStub`
+are **retired and kept in the corner** (dead but present, swept later — same as #1 left
+`IntoTransition`). The seven harness Resolver-ctor injections of `new BlockRecoveryStub()`
+are therefore untouched.
+
+**Byte-for-byte was deliberately broken — and that is correct.** Because jump-ball and the
+OOB pair are now live on *normal misses*, the live-miss outcome rates shift slightly from the
+old four-way split. That is the rebound model getting more honest, not a regression. The new
+validation is rate-match against the new seven-arm live-miss pie (the four originals keep
+their declaration order, so the new arms are appended last and the pre-existing cumulative
+ranges are untouched; only the new slivers change the picture).
+
+**Placeholder weights (yours to tune).** Live-miss: DefensiveRebound .66 / OffensiveRebound
+.27 / LooseBallFoulOnDefense .02 / LooseBallFoulOnOffense .01 / OutOfBoundsOffOffense .025 /
+OutOfBoundsOffDefense .01 / JumpBall .005. Block (deliberately different, per your read):
+.50 / .32 / .03 / .02 / .07 / .05 / .01 — more stays with or squirts off the swatting
+defense, a **higher offensive-recovery rate than a clean miss** (a blocked player often beats
+his man to his own loose ball), a visible jump-ball sliver. Both sum to 1.
+
+**Validation (no SDK in the sandbox — reasoned + Monte-Carlo).** Brace/paren balance clean on
+all eight edited files; the retired-string sweep confirms no live route emits `ResolveBlock`
+or lands at `STUB:BlockRecovery` (only the corner remains). Three checks carry the proof:
+`RollIReboundBatchCheck` (now seven arms; the OOB-off-defense and below-bonus
+loose-ball-defense arms both land on a plain sideline inbound and are separated by the **foul
+delta** — the foul arm charged 1, the OOB arm 0, which is also the proof the OOB pair charges
+nothing); the new `RollIBlockReboundBatchCheck` (the same seven-arm proof on the block pie,
+asserting `DefensiveRebound` carries the `Rebound` context *not* `FreeThrowRebound`, and the
+offensive board stamps no source); and the new `RollIBlockContextSelectionCheck` (pie-equality
+both ways — Block selects the block weights, LiveBall the live weights, the two differ — plus
+a real-resolver route proof that a `Blocked` shot reaches a Roll-I destination and **never**
+the retired stub, zero unrouted). Both batches cross the bonus mid-run, exercising §2a. A
+Python Monte-Carlo of both pies reproduces every rate within the 0.5pp tolerance, all seven
+arms, the §2a crossing, and zero bad charges.
+
+**The §2b sweep bit, as warned.** Retiring `BlockRecovery` touched five assertion sites, not
+one: the resolved-bucket OR-list in `RollFHandoffCheck`, the required-destination dicts **and**
+classifiers in `RollGHandoffCheck` and `RollHHandoffCheck`, and the `continueResults` array in
+`RollHHandoffCheck` (where `ShotResult.Blocked` was asserted to ride straight to a fact stub —
+no longer true, since a block now flows *through* Roll I like a miss). All five were swept.
+
+**Deferred (noted for later sessions).** The block-specific **transition push rate** (a
+`TransitionSource.Block` flavor — a block-and-go runs differently than a board-and-go) goes to
+**#3 (steal feeder)**, which also wires `TransitionSource.Steal`. A **distinct block
+offensive-rebound source** (a block recovery may putback differently than a clean board) is a
+later Roll K context. The **own-side inbound modifiers** for `OutOfBoundsOffDefense` are the
+inbound node's job, landing with the **Roll A reshape (#5b)**.
+
 ## Session 20 — Contextification #1 (Transition Output): Push enters the shot chain via a FastBreak marker (2026-06-12)
 
 **The premise this session opens.** The possession-flow roll web is complete. Every

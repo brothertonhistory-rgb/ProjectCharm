@@ -171,4 +171,24 @@ public sealed record Continue(ContinuationKind Next, PossessionState State) : Ro
     /// <see cref="Next"/> is <see cref="ContinuationKind.ResolveOffensiveRebound"/>.</para>
     /// </summary>
     public OffensiveReboundSource? OffensiveReboundSource { get; init; }
+
+    /// <summary>
+    /// The REBOUND SOURCE TICKET a loose ball carries into Roll I — the
+    /// within-possession label that tells Roll I's generator WHICH pie to select: the
+    /// live-miss pie (a clean field-goal carom) or the block pie (a swatted shot, which
+    /// keeps more with the defense, squirts OOB more, recovers offensively more, and
+    /// carries a minuscule jump-ball sliver). FUNCTIONAL payload (it changes the odds),
+    /// the same optional-payload shape as <see cref="Bonus"/>/<see cref="Flavor"/>/<see
+    /// cref="TurnoverContext"/>/<see cref="Putback"/>/<see cref="OffensiveReboundSource"/>.
+    /// A LABELED tag rather than a bool so it grows by append if a third loose-ball
+    /// source ever feeds in. Stamped by Roll H's <c>Blocked</c> arm
+    /// (<see cref="ReboundSource.Block"/>); Roll I's generator reads it and never queries
+    /// the stamping station back.
+    /// <para>NULL on every legacy feeder — Roll H's <c>Miss</c> arm stamps nothing, and a
+    /// missed putback re-entering Roll I stamps nothing — and a null reads as
+    /// <see cref="ReboundSource.LiveBall"/>, so the live-miss pie path is byte-for-byte
+    /// unchanged. Meaningful only when <see cref="Next"/> is
+    /// <see cref="ContinuationKind.ResolveRebound"/>.</para>
+    /// </summary>
+    public ReboundSource? ReboundSource { get; init; }
 }

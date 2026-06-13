@@ -1,45 +1,50 @@
 namespace Charm.Engine;
 
 /// <summary>
-/// Roll I — Rebound Resolution. The node a MISSED SHOT (Roll H's <c>Miss</c>)
-/// drains into. Replaces the parked <c>ReboundStub</c> on the existing
-/// <c>ResolveRebound</c> edge, exactly the way every prior stub→roll swap has
-/// gone (C, D, E, F, G, H).
+/// Roll I — Rebound / Loose-Ball Resolution. The node a MISSED SHOT (Roll H's
+/// <c>Miss</c>) and a BLOCKED SHOT (Roll H's <c>Blocked</c>) both drain into, on the
+/// shared <c>ResolveRebound</c> edge — a blocked shot is a loose-ball scramble, which
+/// is the same battle a missed-shot rebound already is. Replaces the parked
+/// <c>ReboundStub</c> the way every prior stub→roll swap has gone (C, D, E, F, G, H).
 ///
-/// Classifies the rebound into four outcomes and routes:
+/// Classifies the loose ball into SEVEN outcomes (the same vocabulary Roll M, the
+/// free-throw-board resolution, carries) and routes — every arm to a node that already
+/// exists, opening NO new stub:
 /// <list type="bullet">
-///   <item><see cref="ReboundOutcome.DefensiveRebound"/> — defense secures the
-///   board; ball switches teams; possession ENDS (Terminal). Next entry is a live
-///   push into the future transition roll — recorded as design knowledge, not
-///   routed here.</item>
-///   <item><see cref="ReboundOutcome.OffensiveRebound"/> — offense secures the
-///   board; same possession stays alive; Continue to
-///   <see cref="ContinuationKind.ResolveOffensiveRebound"/> →
-///   <c>OffensiveReboundStub</c>.</item>
-///   <item><see cref="ReboundOutcome.LooseBallFoulOnDefense"/> — foul on the
-///   defense in the scramble; offense retains. Charges the defensive team foul via
-///   <see cref="FoulTracker"/>; reads the bonus; forks: None →
-///   <see cref="ContinuationKind.ResolveSidelineInbound"/>; OneAndOne/Double →
-///   <see cref="ContinuationKind.ResolveFreeThrows"/> with the
-///   <see cref="BonusType"/> payload. Continue.</item>
-///   <item><see cref="ReboundOutcome.LooseBallFoulOnOffense"/> — foul on the
-///   offense; ball switches teams; possession ENDS (Terminal). No foul charged
-///   (Roll C's <c>OffensiveFoul</c> precedent). Next entry is a dead-ball inbound
-///   at Roll A — recorded as design knowledge, not routed here.</item>
+///   <item><see cref="ReboundOutcome.DefensiveRebound"/> — defense secures the board on
+///   a LIVE board; ball switches teams; TERMINAL, a transition start to the defense
+///   (carries the <see cref="TransitionContext.Rebound"/> ticket → Roll J).</item>
+///   <item><see cref="ReboundOutcome.OffensiveRebound"/> — offense secures the board;
+///   same possession; CONTINUE to <see cref="ContinuationKind.ResolveOffensiveRebound"/>
+///   (Roll K).</item>
+///   <item><see cref="ReboundOutcome.LooseBallFoulOnDefense"/> — foul on the defense;
+///   offense retains; charges the defensive team foul and forks on the bonus. CONTINUE.</item>
+///   <item><see cref="ReboundOutcome.LooseBallFoulOnOffense"/> and
+///   <see cref="ReboundOutcome.OutOfBoundsOffOffense"/> — ball to the defense on a DEAD
+///   ball; TERMINALS, a dead-ball inbound at Roll A. No foul charged (Roll C's
+///   <c>OffensiveFoul</c> precedent); they differ only in the reason label.</item>
+///   <item><see cref="ReboundOutcome.OutOfBoundsOffDefense"/> — offense retains on a
+///   DEAD ball; CONTINUE to <see cref="ContinuationKind.ResolveSidelineInbound"/>, NO
+///   charge and NO fork.</item>
+///   <item><see cref="ReboundOutcome.JumpBall"/> — tie-up; CONTINUE to the shared
+///   jump-ball node (consults the arrow).</item>
 /// </list>
 ///
-/// This is the first roll in the engine whose job includes handing the ball to
-/// the OTHER team, making it the first roll where terminals carry the
-/// possession-end flag that will later trigger stat accumulation.
+/// Which pie those seven arms are weighted by is selected by the
+/// <see cref="ReboundSource"/> the loose ball arrived with — read by Roll I's GENERATOR,
+/// never by this roll. A null/<see cref="ReboundSource.LiveBall"/> stamp (every legacy
+/// miss feeder) draws the live-miss pie; <see cref="ReboundSource.Block"/> (Roll H's
+/// Blocked arm) draws the block pie. The ROUTING below is identical for both — only the
+/// weights differ.
 ///
-/// Signature <c>(state, pie, game, rng)</c> — the same shape as Roll D — because
+/// Signature <c>(state, pie, game, rng)</c> — the same shape as Roll D / M — because
 /// the <see cref="ReboundOutcome.LooseBallFoulOnDefense"/> arm mutates
-/// <see cref="GameState"/> (charges the defensive team foul). The other three
-/// arms read nothing off <see cref="GameState"/>.
+/// <see cref="GameState"/> (charges the defensive team foul). The other six arms read
+/// nothing off <see cref="GameState"/>.
 ///
-/// Stamps NO new <see cref="PossessionState"/> fact. Which slot grabbed the board
-/// is the deferred attribution layer. The terminal reason names the outcome (Roll C
-/// pattern); the stub labels record the continue landings.
+/// Stamps NO new <see cref="PossessionState"/> fact. Which slot grabbed the board (or
+/// got the block) is the deferred attribution layer. The terminal reason names the
+/// outcome (Roll C pattern); the stub labels record the continue landings.
 /// </summary>
 public static class RollI
 {
@@ -76,6 +81,31 @@ public static class RollI
             ReboundOutcome.LooseBallFoulOnOffense =>
                 new Terminal("LooseBallFoulOnOffense", state,
                     PossessionConsequence.DeadBallTo(state.Defense)),
+
+            // Ball out of bounds last off the OFFENSE (a carom off the rim and out, a
+            // fumbled board). Ball switches teams — TERMINAL. Same routing as the
+            // offensive loose-ball foul (defense's ball at Roll A), NO foul charged —
+            // only the reason label differs. Distinct from DefensiveRebound so the
+            // defense starts DEAD (inbound under the far basket) rather than on a live
+            // push. Mirrors Roll M's OutOfBoundsOffOffense arm.
+            ReboundOutcome.OutOfBoundsOffOffense =>
+                new Terminal("OutOfBoundsOffOffense", state,
+                    PossessionConsequence.DeadBallTo(state.Defense)),
+
+            // Ball out of bounds last off the DEFENSE (a swatted block out, a fumbled
+            // loose ball). Offense retains — CONTINUE to the sideline-inbound node.
+            // NO charge, NO bonus fork: no foul means no bonus question, so this is
+            // always a plain sideline inbound. Mirrors Roll M's OutOfBoundsOffDefense
+            // arm. (The own-side inbound modifiers are the inbound node's job, landing
+            // with the Roll A reshape.)
+            ReboundOutcome.OutOfBoundsOffDefense =>
+                new Continue(ContinuationKind.ResolveSidelineInbound, state),
+
+            // Tie-up on the loose ball. -> shared jump-ball node (consults the arrow),
+            // exactly as Roll K's and Roll M's tie-up arms. The current possession ends
+            // at that node; the awarded team's ensuing possession is a new one.
+            ReboundOutcome.JumpBall =>
+                new Continue(ContinuationKind.ResolveJumpBall, state),
 
             _ => throw new InvalidOperationException($"Unhandled rebound outcome '{outcome}'.")
         };

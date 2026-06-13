@@ -291,13 +291,13 @@ public sealed class Resolver
                             freeThrowSpins += bonusFtSpins;
                             continue;
 
-                        // Blocked shot (from Roll H) -> block-recovery node (stub).
-                        // A live-ball event with its own future fan-out. The block
-                        // weight is sized per zone upstream in Roll H's generator,
-                        // but the routing is zone-blind: every block lands here.
-                        // Reuses the ResolveBlock kind Roll F used to emit — Session
-                        // 13 moved the feed point from F to H, leaving this edge
-                        // untouched. Chain ends here for now.
+                        // RETIRED (Contextification #2): Roll H's Blocked no longer
+                        // emits ResolveBlock — a blocked shot is a loose-ball scramble,
+                        // so it now routes into ResolveRebound carrying ReboundSource.Block,
+                        // and Roll I's block pie resolves it (the #1 IntoTransition→corner
+                        // precedent). This case + the _resolveBlock stub are kept in the
+                        // corner (dead, unreachable in a live walk), to be swept with the
+                        // other retired stubs in a future cleanup. Do not route here.
                         case ContinuationKind.ResolveBlock:
                             return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins };
 
@@ -346,7 +346,15 @@ public sealed class Resolver
                         // hence it takes _game — the same shape as Roll D.
                         // ReboundStub is retired; this edge now executes Roll I.
                         case ContinuationKind.ResolveRebound:
-                            var pieI = _rollIGenerator.Generate();
+                            // Select Roll I's pie by the source the loose ball arrived
+                            // with. A null stamp — every legacy feeder (Roll H's Miss
+                            // arm, and a missed putback re-entering here) stamps nothing
+                            // — reads as LiveBall, so the live-miss path is byte-for-byte
+                            // unchanged. Roll H's Blocked arm stamps Block for the
+                            // block-recovery pie. The routing in Roll I is identical for
+                            // both; only the weights differ.
+                            var pieI = _rollIGenerator.Generate(
+                                c.ReboundSource ?? ReboundSource.LiveBall);
                             result = RollI.Execute(c.State, pieI, _game, _rng);
                             continue;
 

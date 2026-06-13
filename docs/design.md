@@ -1724,3 +1724,67 @@ alongside the shot facts — a reset is a fresh halfcourt play. `PutBack` routes
 not Roll E, so it draws no wrong pie; the marker riding through a putback is harmless while
 G/H are transition-blind, and whether a putback off a break counts as transition is the G/H
 follow-up's call, not this session's.
+
+### #2 — Block recovery: the ReboundSource ticket, and Roll I as the field-goal loose-ball resolver
+
+Roll H's `Blocked` arm used to dead-end at `BlockRecoveryStub`. A blocked shot is a
+loose-ball scramble — the same event a missed-shot rebound is — so it now resolves through
+the rebound machinery. `ContinuationKind.ResolveBlock`, the resolver's `ResolveBlock` case,
+and `BlockRecoveryStub` are retired and kept in the corner.
+
+**Home: Roll I, not Roll M.** The work order above says "Roll M's loose-ball machinery," but
+Roll M is the *free-throw-board* resolver; a *field-goal* block belongs to the field-goal-side
+loose-ball resolver, which is **Roll I**. The session prompt corrected the one-line plan
+accordingly. The two resolvers stay parallel (same vocabulary, different board populations),
+not merged.
+
+**Reweight became a small arm-add — and why that is the right call.** Roll I had four arms;
+Roll M seven. A four-arm pie cannot express a swat going out of bounds or a tie-up, so a pure
+"reweight the four" would have nowhere to put a block's real outcomes. Roll I was therefore
+grown to Roll M's **seven-arm shape** (`+JumpBall`, `+OutOfBoundsOffOffense`,
+`+OutOfBoundsOffDefense`), and — the domain call — those arms are **live for normal misses
+too**, not block-only: caroms off the rim go out, rebounders fumble the ball out, tie-ups
+happen on any miss. The `Block` context is then a *reweight* of those seven. So #2 is an
+arm-add on Roll I plus a context on top, larger than the one-line plan, deliberately.
+
+**Why the OOB pair is distinct from the rebound arms.** A carom out of bounds off the offense
+and a clean defensive rebound both give the defense the ball, but they start the defense's
+*next* possession differently: the rebound is a **live** transition push (its own weights via
+Roll J), the OOB is a **dead-ball** inbound at Roll A (its own weights). Likewise an offensive
+rebound (live putback/reset via Roll K) vs. an OOB off the defender (offense restarts **dead**
+from the sideline). Folding either OOB into its rebound twin would erase the live-vs-dead
+next-possession distinction that is the entire reason to model it. Neither OOB is a turnover
+(no possession was established); each only changes how the next possession begins. All seven
+arms route to nodes that already exist — **no new stub is opened.**
+
+**The ticket: `ReboundSource { LiveBall, Block }`.** A new optional `ReboundSource?` field on
+`Continue` — the `Putback`/`OffensiveReboundSource` precedent. Stamped by Roll H's `Blocked`
+arm, read by **Roll I's generator** to select the weight set, never queried back (the
+ticket/station rule). A **labeled tag, not a bool**, so a third loose-ball source appends
+without a teardown. **Null reads as `LiveBall`**: every legacy feeder (Roll H's `Miss`, a
+missed putback re-entering Roll I) stamps nothing, so pie *selection* on the legacy path is
+byte-for-byte unchanged. A block reuses the `LiveBall` offensive-rebound pie (Roll I stamps no
+source onward to Roll K) and the `Rebound` transition context; distinct block flavors are
+deferred (below).
+
+**Edge reuse, not a new ContinuationKind.** `Blocked` emits `Continue(ResolveRebound) {
+ReboundSource = Block }` on the existing `ResolveRebound` edge — one edge, a payload selects
+the pie, the same shape as #1's `IntoPlayerSelection` carrying `FastBreak`. This is the
+enum-explosion the engine avoids (no `IntoBlockRecovery` kind).
+
+**Byte-for-byte deliberately broken at the output.** Because jump-ball and the OOB pair are
+live on normal misses, the live-miss outcome *rates* shift slightly from the old four-way
+split. This is the rebound model getting more honest, not a regression. Declaration order is
+preserved (new members appended last), so the four originals keep their cumulative ranges; the
+new slivers are what move the picture. Validation is rate-match against the new seven-arm pie.
+
+**Roll I naming.** The class stays `RollI`; its prose generalized from "rebound resolution" to
+"rebound / loose-ball resolution" to cover the blocked-shot and OOB entries. No rename churn.
+
+**Deferred from this session.** (1) A **`TransitionSource.Block`** push rate — a block-and-go
+runs differently than a board-and-go — is wired in **#3 (steal feeder)** alongside
+`TransitionSource.Steal`; this session a block's defensive recovery reuses the `Rebound`
+context. (2) A **distinct block offensive-rebound source** on Roll K (a tipped-in block may
+putback differently than a clean board) is a later Roll K context; this session reuses
+`LiveBall`. (3) `OutOfBoundsOffDefense`'s **own-side inbound modifiers** belong to the inbound
+node and land with the **Roll A reshape (#5b)**.

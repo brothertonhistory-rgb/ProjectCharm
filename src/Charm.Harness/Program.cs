@@ -89,6 +89,8 @@ internal static class Program
         ok &= RollHHandoffCheck(cfg, state);
         ok &= RollIReboundBatchCheck(cfg, cfgI, rollIGenerator, game, state);
         ok &= RollIBonusForkCheck(cfg, cfgD, cfgI, rollIGenerator, state);
+        ok &= RollIBlockReboundBatchCheck(cfg, cfgI, rollIGenerator, state);
+        ok &= RollIBlockContextSelectionCheck(cfg, cfgI, state);
         ok &= RollJBatchCheck(cfg, cfgD, cfgJ, rollJGenerator, state);
         ok &= RollJBonusForkCheck(cfg, cfgD, cfgJ, state);
         ok &= RollKReboundBatchCheck(cfg, cfgK, rollKGenerator, game, state);
@@ -244,17 +246,19 @@ internal static class Program
         }
         Console.WriteLine();
 
-        // Roll I observability: the four-way rebound pie, then a few sample MISSES
+        // Roll I observability: the seven-way rebound pie, then a few sample MISSES
         // driven through the live chain (E -> G -> H), each landing on one of Roll
-        // I's five destinations. Only misses reach Roll I, so we keep rolling H
+        // I's destinations. Only misses reach Roll I here (blocks do too, via the
+        // block pie — exercised in the dedicated block checks). We keep rolling H
         // until a Miss lands, then route it and show where the rebound resolved:
-        // a defensive board / offensive foul ends the possession (terminal), an
-        // offensive board / loose-ball-defense foul keeps it alive (continue).
+        // a defensive board / offensive foul / OOB-off-offense ends the possession
+        // (terminal), an offensive board / loose-ball-defense foul / OOB-off-defense /
+        // jump ball keeps it alive (continue).
         Console.WriteLine("--- Observability: Roll I (rebound resolution) ---");
         var cfgIForObs = RollIConfig.Load(configPathH);
         var genI = new RollIStubPieGenerator(cfgIForObs);
-        var pieIObs = genI.Generate();
-        Console.WriteLine($"  rebound pie (flat, no signal yet): {pieIObs}");
+        var pieIObs = genI.Generate(ReboundSource.LiveBall);
+        Console.WriteLine($"  live-miss rebound pie (flat, no signal yet): {pieIObs}");
         var obsGameI = new GameState(new FoulTracker(
             RollDConfig.Load(configPathH).BonusThreshold,
             RollDConfig.Load(configPathH).DoubleBonusThreshold));
@@ -276,6 +280,7 @@ internal static class Program
                 Continue { Next: ContinuationKind.ResolveOffensiveRebound } => "CONTINUE -> OffensiveRebound (same possession)",
                 Continue { Next: ContinuationKind.ResolveSidelineInbound } c => $"CONTINUE -> SidelineInbound (bonus={c.Bonus})",
                 Continue { Next: ContinuationKind.ResolveFreeThrows } c => $"CONTINUE -> FreeThrows (bonus={c.Bonus})",
+                Continue { Next: ContinuationKind.ResolveJumpBall } => "CONTINUE -> JumpBall (arrow node)",
                 _ => "?"
             };
             Console.WriteLine($"  miss rebounded -> {landing}");
@@ -933,13 +938,15 @@ internal static class Program
             // recovery stubs; and the rebound terminals from Roll I and Roll M. (Shooting
             // fouls drive the Roll L FT loop and land at END:FreeThrowsMade on a made last
             // shot — caught in the FT bucket below — or flow into Roll M on a missed last
-            // shot, caught here.)
+            // shot, caught here.) Blocked shots no longer park at a block-recovery
+            // stub — Roll H's Blocked arm now routes into Roll I (the block pie), so a
+            // block lands at one of Roll I's board/foul/OOB/jump landings, all already
+            // bucketed below or as a jump-ball terminal above.
             else if (d == "END:Made" || d == "END:MissOutOfBoundsLost"
                      || d == "END:DefensiveRebound" || d == "END:LooseBallFoulOnOffense"
                      || d == "END:OutOfBoundsOffOffense"
                      || d.StartsWith("STUB:OffensiveRebound")
-                     || d.StartsWith("STUB:SidelineInbound")
-                     || d.StartsWith("STUB:BlockRecovery"))
+                     || d.StartsWith("STUB:SidelineInbound"))
                 destClasses["shot -> Roll G -> Roll H -> resolved"]++;
             // The Roll L FT loop's made-last-shot landing ends the possession
             // (END:FreeThrowsMade). A missed last shot no longer parks at STUB:FTRebound
@@ -1089,7 +1096,10 @@ internal static class Program
         // CORE post-shot landings (still reliably reached straight off the first Roll H
         // and Roll I) plus zero-unrouted, and bucket everything Roll K/reset opens up
         // as "deeper" (routed, not required). STUB:OffensiveRebound is DROPPED from the
-        // required set — it is structurally unreachable now.
+        // required set — it is structurally unreachable now. STUB:BlockRecovery is also
+        // dropped — Roll H's Blocked now routes into Roll I (the block pie), so a block
+        // lands at one of Roll I's existing landings (already covered here / bucketed
+        // as deeper), never at the retired block-recovery stub.
         var destHits = new Dictionary<string, int>
         {
             ["END:Made"] = 0,
@@ -1097,7 +1107,6 @@ internal static class Program
             ["END:DefensiveRebound"] = 0,
             ["END:LooseBallFoulOnOffense"] = 0,
             ["STUB:SidelineInbound"] = 0,
-            ["STUB:BlockRecovery"] = 0,
         };
         // Zone seen on the stub landings (the labels that carry it). Terminals
         // omit the zone, so they don't contribute here.
@@ -1128,7 +1137,6 @@ internal static class Program
             // The fact-carrying stub landings: STUB:{node}:{Side}slot{N}:{Zone}:{Result}
             string node;
             if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
-            else if (d.StartsWith("STUB:BlockRecovery")) node = "STUB:BlockRecovery";
             // Everything Roll K / a reset opens up is ROUTED, just not in the core
             // set: the three Roll K terminals (END:OffensiveFoul / DeadBallTurnover /
             // LiveBallTurnover), a jump-ball terminal, any reset-born terminal
@@ -1410,6 +1418,9 @@ internal static class Program
         // Roll I terminals), zero-unrouted, and facts intact — and bucket everything
         // Roll K / a reset opens up as "deeper" (routed, not required).
         // STUB:OffensiveRebound is DROPPED — it is structurally unreachable now.
+        // STUB:BlockRecovery is also dropped — Roll H's Blocked now routes into Roll I
+        // (the block pie), so a block lands at one of Roll I's existing landings (core
+        // or bucketed-deeper), never at the retired block-recovery stub.
         var destHits = new Dictionary<string, int>
         {
             ["END:Made"] = 0,
@@ -1417,7 +1428,6 @@ internal static class Program
             ["END:DefensiveRebound"] = 0,
             ["END:LooseBallFoulOnOffense"] = 0,
             ["STUB:SidelineInbound"] = 0,
-            ["STUB:BlockRecovery"] = 0,
         };
         var resultsSeenOnStubs = new Dictionary<ShotResult, int>();
         foreach (var r in Enum.GetValues<ShotResult>()) resultsSeenOnStubs[r] = 0;
@@ -1447,7 +1457,6 @@ internal static class Program
 
             string node;
             if (d.StartsWith("STUB:SidelineInbound")) node = "STUB:SidelineInbound";
-            else if (d.StartsWith("STUB:BlockRecovery")) node = "STUB:BlockRecovery";
             // Everything Roll K / a reset opens up is ROUTED, just not core: the three
             // Roll K terminals (END:OffensiveFoul / DeadBallTurnover / LiveBallTurnover),
             // a jump-ball terminal, any reset-born terminal, any deeper stub park.
@@ -1488,18 +1497,20 @@ internal static class Program
 
         // The continue-outcomes whose result rides through to a FACT-CARRYING stub
         // STRAIGHT off the first Roll H — these land before any rebound, so they remain
-        // robust: OOB-retained → SidelineInbound, block → BlockRecovery. A plain Miss is
-        // DELIBERATELY not here: with Roll I + Roll K live it flows deeper (defensive
-        // board terminal, or offensive board → Roll K) rather than parking with
-        // Result=Miss. And as of Session 18 the two SHOOTING-foul outcomes
-        // (MadeAndFouled / MissFouled) are no longer here either: they drive the Roll L
-        // FT loop and end at END:FreeThrowsMade on a made last shot, or flow into Roll M
-        // on a missed last shot (Session 19), so they never reach a fact stub here. Their
-        // routing + result handling is covered by RollLFreeThrowCheck and RollMReboundBatchCheck.
+        // robust: OOB-retained → SidelineInbound. A plain Miss is DELIBERATELY not here:
+        // with Roll I + Roll K live it flows deeper (defensive board terminal, or
+        // offensive board → Roll K) rather than parking with Result=Miss. As of the
+        // block-recovery session BLOCKED is no longer here either: Roll H's Blocked arm
+        // now routes into Roll I (the block pie) exactly as a Miss does, so it flows
+        // deeper through the rebound machinery rather than parking at a block stub — its
+        // routing is proven by RollIBlockReboundBatchCheck / RollIBlockContextSelectionCheck.
+        // And as of Session 18 the two SHOOTING-foul outcomes (MadeAndFouled / MissFouled)
+        // are not here either: they drive the Roll L FT loop and end at END:FreeThrowsMade
+        // on a made last shot, or flow into Roll M on a missed last shot (Session 19).
+        // Their routing is covered by RollLFreeThrowCheck and RollMReboundBatchCheck.
         var continueResults = new[]
         {
-            ShotResult.MissOutOfBoundsRetained,
-            ShotResult.Blocked
+            ShotResult.MissOutOfBoundsRetained
         };
         var allResults = true;
         Console.WriteLine("  each straight-off-Roll-H continue-outcome's result rode through to its stub:");
@@ -1522,13 +1533,20 @@ internal static class Program
     // --- Batch: Roll I's four-way rebound distribution converges within tolerance,
     //     and every exit is a clean terminal-or-continue of the expected kind, with
     //     slot+zone+result riding through the stub landings. Driven through a REAL
-    //     Miss so the carried state holds slot + zone + result (the chain walks
-    //     E -> G -> H, keeping only the misses, then resolves I). The four rates are
-    //     checked against the configured pie; the routing is checked per outcome:
-    //     DefensiveRebound -> END terminal, LooseBallFoulOnOffense -> END terminal,
-    //     OffensiveRebound -> STUB:OffensiveRebound (carrying facts), and (in a
-    //     fresh game, below the bonus) LooseBallFoulOnDefense -> STUB:SidelineInbound.
-    //     The bonus fork itself is exercised separately by RollIBonusForkCheck. ---
+    // --- Batch: Roll I's seven-way LIVE-MISS rebound distribution converges within
+    //     tolerance, and every arm routes as designed, with slot+zone+result riding
+    //     through the fact-carrying stub landings. Driven through a REAL Miss so the
+    //     carried state holds slot + zone + result (the chain walks E -> G -> H, keeping
+    //     only the misses, then resolves I on the LiveBall pie). The seven rates are
+    //     checked against the configured pie; routing is checked per outcome:
+    //     DefensiveRebound / LooseBallFoulOnOffense / OutOfBoundsOffOffense -> END
+    //     terminals; OffensiveRebound -> STUB:OffensiveRebound (facts); OutOfBoundsOffDefense
+    //     -> STUB:SidelineInbound with NO charge; LooseBallFoulOnDefense -> SidelineInbound
+    //     (below bonus) or ResolveFreeThrows (in bonus, §2a); JumpBall -> the arrow node.
+    //     The OOB-off-defense and below-bonus loose-ball-defense arms both land on a
+    //     plain sideline inbound and are separated by the foul DELTA (the foul arm
+    //     charged 1, the OOB arm 0 — also the proof the OOB pair charges nothing).
+    //     The block pie is exercised separately by RollIBlockReboundBatchCheck. ---
     private static bool RollIReboundBatchCheck(
         RollAConfig cfg, RollIConfig cfgI, RollIStubPieGenerator genI,
         GameState sharedGame, PossessionState state)
@@ -1550,7 +1568,7 @@ internal static class Program
         var genG = new RollGStubPieGenerator(cfgG);
         var genH = new RollHStubPieGenerator(cfgH);
         var pieE = genE.Generate(state);
-        var pieI = genI.Generate();
+        var pieI = genI.Generate(ReboundSource.LiveBall);
 
         var counts = new Dictionary<ReboundOutcome, int>();
         foreach (var o in Enum.GetValues<ReboundOutcome>()) counts[o] = 0;
@@ -1558,11 +1576,15 @@ internal static class Program
         // Where each outcome routed, and whether facts rode through the stubs.
         var defTerminals = 0;       // END:DefensiveRebound
         var offFoulTerminals = 0;   // END:LooseBallFoulOnOffense
+        var oobOffTerminals = 0;    // END:OutOfBoundsOffOffense
         var offReboundStubs = 0;    // STUB:OffensiveRebound
+        var oobDefSideline = 0;     // STUB:SidelineInbound (OOB-off-defense, no charge)
         var defFoulSideline = 0;    // STUB:SidelineInbound (loose-ball-defense, below bonus)
         var defFoulFreeThrows = 0;  // STUB:ResolveFreeThrows (loose-ball-defense, in bonus)
+        var jumpBalls = 0;          // ResolveJumpBall
         var unrecognized = 0;
         var missingFact = 0;
+        var badCharge = 0;          // a non-foul arm moved the team-foul count
         var resolved = 0;
 
         // We resolve Roll I's continuations against the same stub set the resolver
@@ -1583,38 +1605,68 @@ internal static class Program
             if (hRes is not Continue { Next: ContinuationKind.ResolveRebound } miss) continue;
 
             resolved++;
+            var before = game.Fouls.FoulsFor(miss.State.Defense);
             var iRes = RollI.Execute(miss.State, pieI, game, rng);
+            var delta = game.Fouls.FoulsFor(miss.State.Defense) - before;
 
             switch (iRes)
             {
                 case Terminal { Reason: "DefensiveRebound" }:
                     counts[ReboundOutcome.DefensiveRebound]++;
+                    if (delta != 0) badCharge++;
                     defTerminals++;
                     break;
                 case Terminal { Reason: "LooseBallFoulOnOffense" }:
                     counts[ReboundOutcome.LooseBallFoulOnOffense]++;
+                    if (delta != 0) badCharge++;   // an offensive foul charges nothing
                     offFoulTerminals++;
+                    break;
+                case Terminal { Reason: "OutOfBoundsOffOffense" }:
+                    counts[ReboundOutcome.OutOfBoundsOffOffense]++;
+                    if (delta != 0) badCharge++;   // OOB charges nothing
+                    oobOffTerminals++;
                     break;
                 case Continue { Next: ContinuationKind.ResolveOffensiveRebound } orc:
                     counts[ReboundOutcome.OffensiveRebound]++;
+                    if (delta != 0) badCharge++;
                     var od = offReboundStub.Receive(orc);
                     if (od.EndsWith("NO_SLOT") || od.EndsWith("NO_ZONE") || od.EndsWith("NO_RESULT")) missingFact++;
                     else offReboundStubs++;
                     break;
                 case Continue { Next: ContinuationKind.ResolveSidelineInbound } sic:
-                    counts[ReboundOutcome.LooseBallFoulOnDefense]++;
-                    var sd = sidelineStub.Receive(sic);
-                    if (sd.EndsWith("NO_SLOT") || sd.EndsWith("NO_ZONE") || sd.EndsWith("NO_RESULT")) missingFact++;
-                    else defFoulSideline++;
+                    // BOTH the OOB-off-defense arm and the below-bonus loose-ball-defense
+                    // arm land on a plain sideline inbound; the foul DELTA separates them
+                    // (the foul arm charged 1, the OOB arm charged 0). This is also the
+                    // proof the OOB-off-defense arm charges nothing.
+                    var sdLabel = sidelineStub.Receive(sic);
+                    if (sdLabel.EndsWith("NO_SLOT") || sdLabel.EndsWith("NO_ZONE") || sdLabel.EndsWith("NO_RESULT")) missingFact++;
+                    if (delta == 0)
+                    {
+                        counts[ReboundOutcome.OutOfBoundsOffDefense]++;
+                        if (!sdLabel.EndsWith("NO_SLOT") && !sdLabel.EndsWith("NO_ZONE") && !sdLabel.EndsWith("NO_RESULT")) oobDefSideline++;
+                    }
+                    else
+                    {
+                        counts[ReboundOutcome.LooseBallFoulOnDefense]++;
+                        if (delta != 1) badCharge++;
+                        if (!sdLabel.EndsWith("NO_SLOT") && !sdLabel.EndsWith("NO_ZONE") && !sdLabel.EndsWith("NO_RESULT")) defFoulSideline++;
+                    }
                     break;
                 case Continue { Next: ContinuationKind.ResolveFreeThrows } ftc:
                     // The loose-ball-defense foul with the defense IN the bonus — the
                     // shared game crosses the threshold partway through the batch, so
                     // this is expected, not an anomaly. Charges the bonus FT stub,
-                    // carrying the Bonus payload (OneAndOne / Double).
+                    // carrying the Bonus payload (OneAndOne / Double). The OOB-off-defense
+                    // arm can NEVER reach this branch (it reads no bonus, charges no foul).
                     counts[ReboundOutcome.LooseBallFoulOnDefense]++;
+                    if (delta != 1) badCharge++;
                     _ = freeThrowStub.Receive(ftc);
                     defFoulFreeThrows++;
+                    break;
+                case Continue { Next: ContinuationKind.ResolveJumpBall }:
+                    counts[ReboundOutcome.JumpBall]++;
+                    if (delta != 0) badCharge++;
+                    jumpBalls++;
                     break;
                 default:
                     unrecognized++;
@@ -1636,23 +1688,31 @@ internal static class Program
         }
 
         Console.WriteLine("\n  routing per outcome:");
-        Console.WriteLine($"    DefensiveRebound      -> END terminal      {defTerminals,8:N0}  {(defTerminals > 0 ? "ok" : "NONE")}");
-        Console.WriteLine($"    LooseBallFoulOnOffense -> END terminal     {offFoulTerminals,8:N0}  {(offFoulTerminals > 0 ? "ok" : "NONE")}");
-        Console.WriteLine($"    OffensiveRebound      -> STUB (same poss.) {offReboundStubs,8:N0}  {(offReboundStubs > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    DefensiveRebound       -> END terminal       {defTerminals,8:N0}  {(defTerminals > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    LooseBallFoulOnOffense -> END terminal       {offFoulTerminals,8:N0}  {(offFoulTerminals > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OutOfBoundsOffOffense  -> END terminal       {oobOffTerminals,8:N0}  {(oobOffTerminals > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OffensiveRebound       -> STUB (same poss.)  {offReboundStubs,8:N0}  {(offReboundStubs > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OutOfBoundsOffDefense  -> SidelineInbound     {oobDefSideline,8:N0}  {(oobDefSideline > 0 ? "ok" : "NONE")}  (no charge)");
         // The loose-ball-defense foul splits on the bonus: SidelineInbound below it,
-        // ResolveFreeThrows once the shared game crosses the threshold mid-batch.
+        // ResolveFreeThrows once the shared game crosses the threshold mid-batch (§2a).
         var defFoulTotal = defFoulSideline + defFoulFreeThrows;
-        Console.WriteLine($"    LooseBallFoulOnDefense -> SidelineInbound  {defFoulSideline,8:N0}  (below bonus)");
-        Console.WriteLine($"                           -> ResolveFreeThrows {defFoulFreeThrows,7:N0}  (in bonus)");
+        Console.WriteLine($"    LooseBallFoulOnDefense -> SidelineInbound     {defFoulSideline,8:N0}  (below bonus)");
+        Console.WriteLine($"                           -> ResolveFreeThrows  {defFoulFreeThrows,7:N0}  (in bonus)");
+        Console.WriteLine($"    JumpBall               -> arrow node         {jumpBalls,8:N0}  {(jumpBalls > 0 ? "ok" : "NONE")}");
 
-        var allArms = defTerminals > 0 && offFoulTerminals > 0 && offReboundStubs > 0 && defFoulTotal > 0;
+        var allArms = defTerminals > 0 && offFoulTerminals > 0 && oobOffTerminals > 0
+                      && offReboundStubs > 0 && oobDefSideline > 0 && defFoulTotal > 0 && jumpBalls > 0;
         var routedOk = unrecognized == 0;
         var factOk = missingFact == 0;
+        var chargeOk = badCharge == 0;
+        var bonusCrossOk = defFoulSideline > 0 && defFoulFreeThrows > 0;
         Console.WriteLine($"\n  zero unrouted / unexpected exits: {unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
         Console.WriteLine($"  slot+zone+result intact on stub landings: missing={missingFact} -> {(factOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"  all four Roll I arms reached: {(allArms ? "ok" : "FAIL")}");
+        Console.WriteLine($"  foul-charge discipline (only loose-ball-defense charges): bad={badCharge} -> {(chargeOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  §2a: loose-ball-defense crossed the bonus mid-batch (sideline -> FT): {(bonusCrossOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all seven Roll I arms reached: {(allArms ? "ok" : "FAIL")}");
 
-        return ratesOk && routedOk && factOk && allArms;
+        return ratesOk && routedOk && factOk && chargeOk && allArms && bonusCrossOk;
     }
 
     // --- Bonus fork: the loose-ball-foul-on-defense arm charges the DEFENSIVE team
@@ -1676,7 +1736,10 @@ internal static class Program
             [ReboundOutcome.DefensiveRebound] = 0.0,
             [ReboundOutcome.OffensiveRebound] = 0.0,
             [ReboundOutcome.LooseBallFoulOnDefense] = 1.0,
-            [ReboundOutcome.LooseBallFoulOnOffense] = 0.0
+            [ReboundOutcome.LooseBallFoulOnOffense] = 0.0,
+            [ReboundOutcome.OutOfBoundsOffOffense] = 0.0,
+            [ReboundOutcome.OutOfBoundsOffDefense] = 0.0,
+            [ReboundOutcome.JumpBall] = 0.0
         }, cfgI.Epsilon);
 
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
@@ -1714,6 +1777,340 @@ internal static class Program
         }
 
         Console.WriteLine($"  bonus fork charges the defense and routes correctly: {(ok ? "ok" : "FAIL")}");
+        return ok;
+    }
+
+    // --- Batch: Roll I's seven-way BLOCK-RECOVERY distribution converges within
+    //     tolerance, and every arm routes exactly as the live-miss path does (same
+    //     routes, different weights). Driven by calling RollI.Execute DIRECTLY on the
+    //     base state with the BLOCK pie (the RollM batch pattern), so all seven arms
+    //     are exercised every draw. A FRESH game crosses the bonus mid-batch, so the
+    //     LooseBallFoulOnDefense arm splits sideline/FT (§2a). Per-arm routing is
+    //     asserted: DefensiveRebound -> Terminal whose consequence is a TRANSITION to
+    //     the defense carrying the Rebound context (NOT FreeThrowRebound — that is Roll
+    //     M's); OffensiveRebound -> Continue(ResolveOffensiveRebound) with NO source
+    //     stamp (a block reuses the LiveBall offensive-rebound pie — a distinct block
+    //     source is deferred); LooseBallFoulOnOffense / OutOfBoundsOffOffense -> Terminal
+    //     DeadBallTo the defense; OutOfBoundsOffDefense -> Continue(ResolveSidelineInbound)
+    //     with NO charge even in the bonus; LooseBallFoulOnDefense -> charge the defense
+    //     + bonus fork; JumpBall -> Continue(ResolveJumpBall). Foul-charge discipline is
+    //     asserted PER DRAW off the team-foul delta: ONLY the loose-ball-defense arm
+    //     increments the defensive team foul; the OOB pair and every other arm charge
+    //     nothing. ---
+    private static bool RollIBlockReboundBatchCheck(
+        RollAConfig cfg, RollIConfig cfgI, RollIStubPieGenerator genI, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} BLOCK recoveries routed through Roll I ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var cfgD = RollDConfig.Load(configPath);
+
+        var rng = new SystemRng(cfg.Seed);
+        // A FRESH game so the charge here does not perturb the shared game. The
+        // loose-ball-defense arm's charge crosses the bonus partway through THIS game,
+        // exercising the §2a split (sideline below the bonus, FTs in it).
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var pieI = genI.Generate(ReboundSource.Block);
+
+        var counts = new Dictionary<ReboundOutcome, int>();
+        foreach (var o in Enum.GetValues<ReboundOutcome>()) counts[o] = 0;
+
+        var defTransition = 0;     // DefensiveRebound -> transition terminal to defense
+        var offReboundCont = 0;    // OffensiveRebound -> Roll K cont, NO source (LiveBall)
+        var offFoulDead = 0;       // LooseBallFoulOnOffense -> dead-ball terminal
+        var oobOffDead = 0;        // OutOfBoundsOffOffense -> dead-ball terminal
+        var oobDefSideline = 0;    // OutOfBoundsOffDefense -> sideline (no fork, no charge)
+        var defFoulSideline = 0;   // LooseBallFoulOnDefense below bonus -> sideline
+        var defFoulFreeThrows = 0; // LooseBallFoulOnDefense in bonus -> FTs
+        var jumpBalls = 0;         // JumpBall -> arrow node
+        var unrecognized = 0;
+        var badConsequence = 0;    // wrong team / entry / context on a terminal or ticket
+        var badCharge = 0;         // a non-foul arm moved the team-foul count (or the
+                                   //  foul arm failed to charge exactly 1)
+
+        var sidelineStub = new SidelineInboundStub();
+        var freeThrowStub = new ResolveFreeThrowsStub();
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var before = game.Fouls.FoulsFor(state.Defense);
+            var iRes = RollI.Execute(state, pieI, game, rng);
+            var delta = game.Fouls.FoulsFor(state.Defense) - before;
+
+            switch (iRes)
+            {
+                case Terminal { Reason: "DefensiveRebound" } dr:
+                    counts[ReboundOutcome.DefensiveRebound]++;
+                    if (delta != 0) badCharge++;
+                    if (dr.Consequence.NextOffense != state.Defense
+                        || dr.Consequence.NextEntry != EntryType.Transition
+                        || dr.Consequence.TransitionContext?.Source != TransitionSource.Rebound)
+                        badConsequence++;
+                    else defTransition++;
+                    break;
+
+                case Continue { Next: ContinuationKind.ResolveOffensiveRebound } orc:
+                    counts[ReboundOutcome.OffensiveRebound]++;
+                    if (delta != 0) badCharge++;
+                    // A block reuses the LiveBall offensive-rebound pie: NO source stamp
+                    // (a distinct block source is deferred). A null reads as LiveBall.
+                    if (orc.OffensiveReboundSource is not null) badConsequence++;
+                    else offReboundCont++;
+                    break;
+
+                case Terminal { Reason: "LooseBallFoulOnOffense" } lbo:
+                    counts[ReboundOutcome.LooseBallFoulOnOffense]++;
+                    if (delta != 0) badCharge++;       // an offensive foul charges nothing
+                    if (lbo.Consequence.NextOffense != state.Defense) badConsequence++;
+                    else offFoulDead++;
+                    break;
+
+                case Terminal { Reason: "OutOfBoundsOffOffense" } oobo:
+                    counts[ReboundOutcome.OutOfBoundsOffOffense]++;
+                    if (delta != 0) badCharge++;       // OOB charges nothing
+                    if (oobo.Consequence.NextOffense != state.Defense) badConsequence++;
+                    else oobOffDead++;
+                    break;
+
+                case Continue { Next: ContinuationKind.ResolveSidelineInbound } sc:
+                    // BOTH the OOB-off-defense arm and the below-bonus loose-ball-defense
+                    // arm land on a plain sideline inbound; the foul DELTA separates them
+                    // (the foul arm charged 1, the OOB arm charged 0). This is also the
+                    // proof the OOB pair charges nothing.
+                    if (delta == 0)
+                    {
+                        counts[ReboundOutcome.OutOfBoundsOffDefense]++;
+                        oobDefSideline++;
+                    }
+                    else
+                    {
+                        counts[ReboundOutcome.LooseBallFoulOnDefense]++;
+                        if (delta != 1) badCharge++;
+                        defFoulSideline++;
+                    }
+                    _ = sidelineStub.Receive(sc);
+                    break;
+
+                case Continue { Next: ContinuationKind.ResolveFreeThrows } ftc:
+                    // ONLY the loose-ball-defense arm IN THE BONUS lands here. The
+                    // OOB-off-defense arm can NEVER reach this branch — it reads no bonus
+                    // and charges no foul — so a delta of 0 here would be a routing bug.
+                    counts[ReboundOutcome.LooseBallFoulOnDefense]++;
+                    if (delta != 1) badCharge++;
+                    defFoulFreeThrows++;
+                    _ = freeThrowStub.Receive(ftc);
+                    break;
+
+                case Continue { Next: ContinuationKind.ResolveJumpBall }:
+                    counts[ReboundOutcome.JumpBall]++;
+                    if (delta != 0) badCharge++;
+                    jumpBalls++;
+                    break;
+
+                default:
+                    unrecognized++;
+                    break;
+            }
+        }
+
+        var n = (double)cfg.BatchSize;
+        var ratesOk = true;
+        Console.WriteLine("  Roll I block outcomes:");
+        foreach (var (outcome, weight) in pieI.Slices)
+        {
+            var observed = counts[outcome] / n;
+            var gap = Math.Abs(observed - weight);
+            var pass = gap <= cfg.RateTolerance;
+            ratesOk &= pass;
+            Console.WriteLine($"    {outcome,-24} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine("\n  routing per outcome:");
+        Console.WriteLine($"    DefensiveRebound       -> transition terminal (defense) {defTransition,8:N0}  {(defTransition > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OffensiveRebound       -> Roll K cont (no source stamp)  {offReboundCont,8:N0}  {(offReboundCont > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    LooseBallFoulOnOffense -> dead-ball terminal (defense)   {offFoulDead,8:N0}  {(offFoulDead > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OutOfBoundsOffOffense  -> dead-ball terminal (defense)   {oobOffDead,8:N0}  {(oobOffDead > 0 ? "ok" : "NONE")}");
+        Console.WriteLine($"    OutOfBoundsOffDefense  -> sideline inbound (no charge)   {oobDefSideline,8:N0}  {(oobDefSideline > 0 ? "ok" : "NONE")}");
+        var defFoulTotal = defFoulSideline + defFoulFreeThrows;
+        Console.WriteLine($"    LooseBallFoulOnDefense -> SidelineInbound (below bonus)  {defFoulSideline,8:N0}");
+        Console.WriteLine($"                           -> ResolveFreeThrows (in bonus)   {defFoulFreeThrows,8:N0}");
+        Console.WriteLine($"    JumpBall               -> arrow node                     {jumpBalls,8:N0}  {(jumpBalls > 0 ? "ok" : "NONE")}");
+
+        var allArms = defTransition > 0 && offReboundCont > 0 && offFoulDead > 0 && oobOffDead > 0
+                      && oobDefSideline > 0 && defFoulTotal > 0 && jumpBalls > 0;
+        var routedOk = unrecognized == 0;
+        var consequenceOk = badConsequence == 0;
+        var chargeOk = badCharge == 0;
+        var bonusCrossOk = defFoulSideline > 0 && defFoulFreeThrows > 0;
+        Console.WriteLine($"\n  zero unrouted / unexpected exits: {unrecognized} -> {(routedOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  consequence/ticket correct on every terminal+continue: bad={badConsequence} -> {(consequenceOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  foul-charge discipline (only loose-ball-defense charges): bad={badCharge} -> {(chargeOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  §2a: loose-ball-defense crossed the bonus mid-batch (sideline -> FT): {(bonusCrossOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  all seven Roll I block arms reached: {(allArms ? "ok" : "FAIL")}");
+
+        var okAll = ratesOk && routedOk && consequenceOk && chargeOk && allArms && bonusCrossOk;
+        Console.WriteLine($"  Roll I block-recovery resolution: {(okAll ? "ok" : "FAIL")}");
+        return okAll;
+    }
+
+    // --- Context: the block source SELECTS the block pie, and a blocked shot actually
+    //     REACHES Roll I (never the retired block-recovery stub). Two parts, the
+    //     RollMContextSelectionCheck pattern:
+    //     (1) Pie selection. Roll I's generator, given ReboundSource.Block, returns the
+    //     block weight set; given LiveBall (the legacy default a null stamp maps to), the
+    //     live-miss set. Each is proven two ways: the SELECTED pie's weights equal the
+    //     configured set (right SET picked), and a draw sample off that pie converges to
+    //     those weights (the pie is actually consumed). The two sources must also DIFFER
+    //     (a null/legacy stamp can never accidentally get the block odds).
+    //     (2) Route proof. Roll H's Blocked arm now emits Continue(ResolveRebound) carrying
+    //     ReboundSource.Block — asserted directly off the emission — and routing that
+    //     continuation through a REAL resolver lands at a Roll-I-family destination, NEVER
+    //     at STUB:BlockRecovery (retired to the corner), with zero unrouted. ---
+    private static bool RollIBlockContextSelectionCheck(
+        RollAConfig cfg, RollIConfig cfgI, PossessionState state)
+    {
+        Console.WriteLine($"\n--- Context: Roll I block pie selection + Blocked -> Roll I routing ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var ok = true;
+
+        // ---- (1) Pie selection: LiveBall (legacy default) vs Block ----
+        var genI = new RollIStubPieGenerator(cfgI);
+        var contexts = new (ReboundSource src, (ReboundOutcome o, double w)[] expected)[]
+        {
+            (ReboundSource.LiveBall, new[]
+            {
+                (ReboundOutcome.DefensiveRebound,       cfgI.DefensiveRebound),
+                (ReboundOutcome.OffensiveRebound,       cfgI.OffensiveRebound),
+                (ReboundOutcome.LooseBallFoulOnDefense, cfgI.LooseBallFoulOnDefense),
+                (ReboundOutcome.LooseBallFoulOnOffense, cfgI.LooseBallFoulOnOffense),
+                (ReboundOutcome.OutOfBoundsOffOffense,  cfgI.OutOfBoundsOffOffense),
+                (ReboundOutcome.OutOfBoundsOffDefense,  cfgI.OutOfBoundsOffDefense),
+                (ReboundOutcome.JumpBall,               cfgI.JumpBall),
+            }),
+            (ReboundSource.Block, new[]
+            {
+                (ReboundOutcome.DefensiveRebound,       cfgI.BlockDefensiveRebound),
+                (ReboundOutcome.OffensiveRebound,       cfgI.BlockOffensiveRebound),
+                (ReboundOutcome.LooseBallFoulOnDefense, cfgI.BlockLooseBallFoulOnDefense),
+                (ReboundOutcome.LooseBallFoulOnOffense, cfgI.BlockLooseBallFoulOnOffense),
+                (ReboundOutcome.OutOfBoundsOffOffense,  cfgI.BlockOutOfBoundsOffOffense),
+                (ReboundOutcome.OutOfBoundsOffDefense,  cfgI.BlockOutOfBoundsOffDefense),
+                (ReboundOutcome.JumpBall,               cfgI.BlockJumpBall),
+            }),
+        };
+
+        double Defensive(ReboundSource s) =>
+            genI.Generate(s).Slices.First(x => x.Outcome == ReboundOutcome.DefensiveRebound).Weight;
+
+        foreach (var (src, expected) in contexts)
+        {
+            var pie = genI.Generate(src);
+            var pieMap = pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+
+            var selectionOk = true;
+            foreach (var (o, w) in expected)
+                if (Math.Abs(pieMap[o] - w) > cfgI.Epsilon) selectionOk = false;
+
+            var rng = new SystemRng(cfg.Seed);
+            var counts = new Dictionary<ReboundOutcome, int>();
+            foreach (var o in Enum.GetValues<ReboundOutcome>()) counts[o] = 0;
+            for (var i = 0; i < cfg.BatchSize; i++) counts[pie.Roll(rng.NextUnitInterval())]++;
+
+            var ratesOk = true;
+            Console.WriteLine($"  Roll I source={src} (selection {(selectionOk ? "ok" : "FAIL")}):");
+            foreach (var (o, w) in expected)
+            {
+                var observed = counts[o] / (double)cfg.BatchSize;
+                var pass = Math.Abs(observed - w) <= cfg.RateTolerance;
+                ratesOk &= pass;
+                Console.WriteLine($"    {o,-24} observed={observed:P3}  expected={w:P3}  {(pass ? "ok" : "FAIL")}");
+            }
+            ok &= selectionOk && ratesOk;
+        }
+        var differ = Math.Abs(Defensive(ReboundSource.Block) - Defensive(ReboundSource.LiveBall)) > cfgI.Epsilon;
+        Console.WriteLine($"  block pie differs from live-miss pie (DefensiveRebound): {(differ ? "ok" : "FAIL")}");
+        ok &= differ;
+
+        // ---- (2) Route proof: a Blocked shot reaches Roll I, never STUB:BlockRecovery ----
+        var cfgB = RollBConfig.Load(configPath);
+        var cfgC = RollCConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+        var cfgE = RollEConfig.Load(configPath);
+        var cfgF = RollFConfig.Load(configPath);
+        var cfgG = RollGConfig.Load(configPath);
+        var cfgH = RollHConfig.Load(configPath);
+
+        var rngR = new SystemRng(cfg.Seed);
+        var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var resolver = new Resolver(
+            new StubPieGenerator(cfg),
+            cfg,
+            new RollBStubPieGenerator(cfgB),
+            new RollCStubPieGenerator(cfgC),
+            new RollDStubPieGenerator(cfgD),
+            new RollEStubPieGenerator(cfgE),
+            new RollFStubPieGenerator(cfgF),
+            new RollGStubPieGenerator(cfgG),
+            new RollHStubPieGenerator(cfgH),
+            new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+            new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+            new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+            game,
+            rngR,
+            new ResumeInboundStub(),
+            new BlockRecoveryStub(),
+            new SidelineInboundStub(),
+            new TransitionStub());
+
+        var genE = new RollEStubPieGenerator(cfgE);
+        var genG = new RollGStubPieGenerator(cfgG);
+        var genH = new RollHStubPieGenerator(cfgH);
+        var pieE = genE.Generate(state);
+
+        var blocks = 0;
+        var blockStampOk = 0;
+        var blockRecoveryHits = 0;
+        var unrouted = 0;
+        var landedAtRollI = 0;
+
+        for (var i = 0; i < cfg.BatchSize; i++)
+        {
+            var sel = ((Continue)RollE.Execute(state, pieE, game, rngR)).State;
+            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), rngR)).State;
+            var hRes = RollH.Execute(zoned, genH.Generate(zoned), rngR);
+
+            // Keep only the BLOCKED shots — the arm this check is about.
+            if (hRes is not Continue { Next: ContinuationKind.ResolveRebound } cont) continue;
+            if (cont.ReboundSource != ReboundSource.Block) continue;   // a plain miss; skip
+
+            blocks++;
+            // Re-point proof: Roll H's Blocked arm emits ResolveRebound + Block, NOT the
+            // retired ResolveBlock edge.
+            if (cont is { Next: ContinuationKind.ResolveRebound, ReboundSource: ReboundSource.Block })
+                blockStampOk++;
+
+            // Route it through the real resolver and inspect the landing.
+            var d = resolver.Route(cont).Destination;
+            if (d.StartsWith("STUB:BlockRecovery")) blockRecoveryHits++;
+            // A blocked shot now lands at a Roll-I-family destination: a rebound terminal
+            // (END:DefensiveRebound / LooseBallFoulOnOffense / OutOfBoundsOffOffense), a
+            // made/missed putback or reset deeper through Roll K, a sideline inbound, a
+            // jump-ball terminal, or a bonus-FT landing. The one thing it must NEVER be is
+            // the retired block-recovery stub, and it must always route somewhere.
+            if (d.StartsWith("END:") || d.StartsWith("STUB:")) landedAtRollI++;
+            else unrouted++;
+        }
+
+        Console.WriteLine($"  blocked shots observed: {blocks:N0}");
+        Console.WriteLine($"  each Blocked emits Continue(ResolveRebound) + ReboundSource.Block: {blockStampOk:N0}/{blocks:N0} -> {(blockStampOk == blocks && blocks > 0 ? "ok" : "FAIL")}");
+        Console.WriteLine($"  blocked shots routed to a Roll-I destination: {landedAtRollI:N0}");
+        Console.WriteLine($"  blocked shots landing at the retired STUB:BlockRecovery: {blockRecoveryHits} -> {(blockRecoveryHits == 0 ? "ok" : "FAIL")}");
+        Console.WriteLine($"  zero unrouted blocked shots: {unrouted} -> {(unrouted == 0 ? "ok" : "FAIL")}");
+
+        var routeOk = blocks > 0 && blockStampOk == blocks && blockRecoveryHits == 0 && unrouted == 0;
+        ok &= routeOk;
+        Console.WriteLine($"  Roll I block context selection + routing: {(ok ? "ok" : "FAIL")}");
         return ok;
     }
 

@@ -100,14 +100,20 @@ public static class RollH
             ShotResult.MissOutOfBoundsRetained =>
                 new Continue(ContinuationKind.ResolveSidelineInbound, stamped),
 
-            // Blocked -> CONTINUE to the block-recovery node (stub). A live-ball
-            // event with its own future fan-out. The block weight is per-zone
-            // (carved off the top of H's pie by the generator), but the ROUTING is
-            // zone-blind: every block lands at the same recovery node. Reuses
-            // ResolveBlock — the same continuation kind and resolver edge Roll F
-            // used to emit; Session 13 just moved the feed point from F to H.
+            // Blocked -> CONTINUE into ROLL I, the rebound / loose-ball resolver,
+            // stamping ReboundSource.Block so Roll I's generator selects the
+            // block-recovery pie. A blocked shot IS a loose-ball scramble — the same
+            // battle a missed-shot rebound is — so it reuses the existing
+            // ResolveRebound edge (the #1 IntoPlayerSelection precedent: one edge, a
+            // payload selects the pie) rather than its own node. The block weight is
+            // still per-zone (carved off the top of H's pie by the generator), but the
+            // ROUTING is zone-blind: every block enters Roll I. (Retires ResolveBlock /
+            // BlockRecoveryStub from the live chain — kept in the corner, not deleted.)
             ShotResult.Blocked =>
-                new Continue(ContinuationKind.ResolveBlock, stamped),
+                new Continue(ContinuationKind.ResolveRebound, stamped)
+                {
+                    ReboundSource = ReboundSource.Block
+                },
 
             _ => throw new InvalidOperationException($"Unhandled shot result '{outcome}'.")
         };
