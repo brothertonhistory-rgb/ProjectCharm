@@ -1840,3 +1840,52 @@ own design conversation later; a block's defensive recovery reuses the `Rebound`
 and now steal — carries a real context into Roll J. No placeholder transition feed remains. The arc
 moves to #4 (collapse the charge-and-fork copied verbatim in Rolls D / I / J / K / M into one
 shared node).
+
+### Contextification #4 — Bonus-fork extract: one shared `DefensiveFoulCharge` node (Session 23)
+
+**What was de-duplicated.** The non-shooting-defensive-foul charge-and-fork existed in five copies,
+each written as its roll was built ("copied, not reinvented," deliberately, to avoid premature
+abstraction): inline in Roll D's `Execute`, and as a private `ResolveFoulOnDefense(state, game)` in
+Rolls I, J, K, and M. All five did the same three steps — charge the foul to `state.Defense` via
+`FoulTracker.Increment`, read `FoulTracker.BonusFor`, and fork on the bonus. With five live copies
+the shape was proven and stable, so #4 collapsed it into one definition. This was a PURE refactor:
+byte-for-byte-identical `Continue` at every caller, no rate moved, no route changed.
+
+**The two audited divergences (the reason the careless one-line plan is wrong).** (1) Roll D had no
+helper — its fork was inline, so the extract deleted FOUR helpers and replaced ONE inline fork, not
+"five private copies." (2) Roll D alone carried a `Flavor` payload on its `Continue` (both arms),
+and its below-bonus kind was `ResumeInbound`; I/J/K/M carried `Bonus` only and used
+`ResolveSidelineInbound` below bonus. In bonus, all five were identical (`ResolveFreeThrows` +
+`Bonus`). A confirmed-on-pull clarification, byte-identical rather than a divergence: all five
+already set `Bonus = bonus` on both arms (below-bonus `bonus` is `None`), so the shared node always
+sets it.
+
+**The node.** `Core/DefensiveFoulCharge`, a `public static class` with
+`RollResult Resolve(PossessionState state, GameState game, ContinuationKind belowBonusKind,
+FoulFlavor? flavor = null)`. It is cross-roll infrastructure that reads `GameState.Fouls` and
+returns a `Continue`, sitting in `Core/` beside `FoulTracker` and `JumpBall` (the established
+static-`Resolve` precedent) rather than parked inside any one roll. Logic: charge `state.Defense`,
+read the bonus, fork — in bonus → `ResolveFreeThrows`; below bonus → `belowBonusKind`; stamp
+`Bonus = bonus` always and `Flavor = flavor` (null when unsupplied).
+
+**Two knobs stay caller-owned, on purpose.** The below-bonus continuation kind and the flavor are
+parameters, never hardcoded — because the five feeders genuinely differ on them and unifying either
+would be a behavior change wearing a refactor costume. Roll D passes `ResumeInbound` + its rolled
+flavor; I/J/K/M pass `ResolveSidelineInbound` + nothing. The below-bonus kind encodes a real
+basketball distinction the role-based engine carries as "which inbound" rather than a court
+coordinate: a pre-shot Roll-A/Roll-B foul below bonus resumes the inbound; a live-action foul
+(rebound, transition push, FT board) below bonus goes to a sideline throw-in. Both the optional
+flavor and the caller-supplied kind are the seams that future work (per-foul-type weighted
+descriptors; court-side-aware inbound weighting) plugs into without touching this node.
+
+**Wiring.** Five callers, one `DefensiveFoulCharge.Resolve(...)` call each; four private helpers
+deleted; Roll D's inline fork replaced by a tail call that keeps its flavor roll. `ResolveFoulOnDefense`
+appears nowhere in engine or harness after the extract.
+
+**Why it is safe.** The five pre-existing per-roll fork checks are unchanged and constitute the
+correctness proof — each exercises its caller and asserts the produced `Continue`, so identical
+routing through the new node = success. A direct unit check (`DefensiveFoulChargeCheck`) proves the
+node itself: both below-bonus kinds, with and without flavor, across the foul-count climb, asserting
+charge-to-defense-only, the below/in-bonus split, the `Bonus` payload on both arms, and the flavor
+pass-through. The node is now the single place fouls cross the bonus, so the Governor accumulation
+check (§2a) is the end-to-end guarantee.

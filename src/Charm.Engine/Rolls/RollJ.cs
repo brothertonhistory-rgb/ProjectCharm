@@ -87,52 +87,17 @@ public static class RollJ
                     TurnoverContext = TurnoverContext.Transition
                 },
 
-            // Fouled on the push -> charge the rebound-losing team, fork on bonus.
-            // The Roll I / Roll D pattern, mutating GameState. (Branch isolated below.)
+            // Fouled on the push -> charge the new defense (the rebound-losing team,
+            // = state.Defense) and fork on the bonus via the shared charge-and-fork;
+            // below bonus -> a sideline throw-in (no flavor).
             TransitionOutcome.DefensiveFoul =>
-                ResolveFoulOnDefense(state, game),
+                DefensiveFoulCharge.Resolve(state, game, ContinuationKind.ResolveSidelineInbound),
 
             // Tie-up -> shared jump-ball node (consults the arrow). CONTINUE.
             TransitionOutcome.JumpBall =>
                 new Continue(ContinuationKind.ResolveJumpBall, state),
 
             _ => throw new InvalidOperationException($"Unhandled transition outcome '{outcome}'.")
-        };
-    }
-
-    /// <summary>
-    /// The DefensiveFoul arm: charge the foul to the team that LOST the rebound (the
-    /// new defense this possession), read the bonus, and fork to sideline inbound
-    /// (below bonus) or free throws (in bonus). Copied from Roll I's charge-and-fork
-    /// (itself from Roll D) — the third feeder into the shared fork. The foul is
-    /// charged to <c>state.Defense</c>: on a possession spawned off a defensive
-    /// rebound the new offense is the rebounding team, so the new defense is exactly
-    /// the team that lost the board and is scrambling back — the team fouling on the
-    /// push.
-    /// </summary>
-    private static RollResult ResolveFoulOnDefense(PossessionState state, GameState game)
-    {
-        // Charge the foul to the fouling team = the defense this possession.
-        var foulingTeam = state.Defense;
-        game.Fouls.Increment(foulingTeam);
-
-        // Read the bonus the fouling team is now in — a state read, not a roll.
-        var bonus = game.Fouls.BonusFor(foulingTeam);
-
-        if (bonus == BonusType.None)
-        {
-            // Below bonus: offense inbounds from the sideline. Same possession.
-            return new Continue(ContinuationKind.ResolveSidelineInbound, state)
-            {
-                Bonus = bonus
-            };
-        }
-
-        // In bonus (OneAndOne or Double): bonus free throws. Same possession. Bonus
-        // type rides as functional payload, exactly as Roll D and Roll I.
-        return new Continue(ContinuationKind.ResolveFreeThrows, state)
-        {
-            Bonus = bonus
         };
     }
 }

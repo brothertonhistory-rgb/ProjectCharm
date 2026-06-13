@@ -76,6 +76,7 @@ internal static class Program
         ok &= RollCBatchCheck(cfg, cfgC, rollCGenerator, state);
         ok &= RollDFlavorBatchCheck(cfg, cfgD, rollDGenerator, state);
         ok &= RollDBonusRoutingCheck(cfgD, rollDGenerator, state);
+        ok &= DefensiveFoulChargeCheck(cfgD, state);
         ok &= PhysicalitySignalCheck(cfgB, rollBGenerator, state);
         ok &= PressureSignalCheck(cfgC, rollCGenerator, state);
         ok &= JumpBallCheck(cfg);
@@ -563,6 +564,68 @@ internal static class Program
         Console.WriteLine($"  final: defense fouls={game.Fouls.FoulsFor(state.Defense)}, bonus={game.Fouls.BonusFor(state.Defense)}");
 
         return allOk && !offenseFoulsLeaked;
+    }
+
+    // --- Direct unit check on the shared charge-and-fork (Core/DefensiveFoulCharge).
+    //     This node is now the SINGLE place all five defensive-foul feeders (D, I, J,
+    //     K, M) cross the bonus. Drive it across the foul thresholds with BOTH
+    //     below-bonus kinds and with/without a flavor; confirm (a) the charge lands on
+    //     the defense only, (b) the below/in-bonus split, (c) the Bonus payload on
+    //     both arms, and (d) the optional flavor passes through (Roll D's shape) or
+    //     stays null (I/J/K/M's shape). The five per-roll fork checks prove each
+    //     caller still routes correctly THROUGH this node; this proves the node
+    //     itself. ---
+    private static bool DefensiveFoulChargeCheck(RollDConfig cfgD, PossessionState state)
+    {
+        Console.WriteLine("\n--- Shared node: DefensiveFoulCharge charge + fork + payload ---");
+
+        bool RunPass(string label, ContinuationKind belowKind, FoulFlavor? flavor)
+        {
+            var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var allOk = true;
+            var offenseLeaked = false;
+
+            for (var foul = 1; foul <= cfgD.DoubleBonusThreshold + 2; foul++)
+            {
+                var c = (Continue)DefensiveFoulCharge.Resolve(state, game, belowKind, flavor);
+
+                // Expected bonus for this post-increment count (mirrors FoulTracker).
+                var expectedBonus =
+                    foul >= cfgD.DoubleBonusThreshold ? BonusType.Double
+                    : foul >= cfgD.BonusThreshold ? BonusType.OneAndOne
+                    : BonusType.None;
+                var expectedKind = expectedBonus == BonusType.None
+                    ? belowKind
+                    : ContinuationKind.ResolveFreeThrows;
+
+                var bonusOk = c.Bonus == expectedBonus;
+                var kindOk = c.Next == expectedKind;
+                var flavorOk = c.Flavor == flavor;   // null == null when none supplied
+                allOk &= bonusOk && kindOk && flavorOk;
+
+                // The foul must land on the defense (fouling team), never the offense.
+                if (game.Fouls.FoulsFor(state.Offense) != 0) offenseLeaked = true;
+
+                if (!bonusOk || !kindOk || !flavorOk)
+                    Console.WriteLine($"    [{label}] foul#{foul,2}: bonus={c.Bonus} (exp {expectedBonus}), " +
+                        $"kind={c.Next} (exp {expectedKind}), flavor={c.Flavor?.ToString() ?? "<none>"} " +
+                        $"(exp {flavor?.ToString() ?? "<none>"}) -> FAIL");
+            }
+
+            var pass = allOk && !offenseLeaked;
+            Console.WriteLine($"  [{label}] below->{belowKind}, in-bonus->ResolveFreeThrows, " +
+                $"flavor={(flavor?.ToString() ?? "<none>")}, charged defense only -> {(pass ? "ok" : "FAIL")}");
+            return pass;
+        }
+
+        // Roll D's shape: below bonus resumes the inbound and carries a flavor.
+        var dLike = RunPass("D: ResumeInbound+flavor", ContinuationKind.ResumeInbound, FoulFlavor.ReachIn);
+        // I/J/K/M's shape: below bonus -> sideline throw-in, no flavor.
+        var ijkmLike = RunPass("I/J/K/M: SidelineInbound", ContinuationKind.ResolveSidelineInbound, null);
+
+        var ok = dLike && ijkmLike;
+        Console.WriteLine($"  shared node reproduces BOTH caller shapes across the climb -> {(ok ? "ok" : "FAIL")}");
+        return ok;
     }
 
     // --- Prove Roll B's seam carries signal: foul rate must rise with physicality. ---

@@ -44,27 +44,14 @@ public static class RollD
         //    it changes nothing about the route below.
         var flavor = flavorPie.Roll(rng.NextUnitInterval());
 
-        // 2. Charge the foul to the fouling team = the defense this possession.
-        //    state.Defense is a TeamSide identity (fixed per game), so this lands
-        //    on the right half-counter with no string mapping.
-        var foulingTeam = state.Defense;
-        game.Fouls.Increment(foulingTeam);
-
-        // 3. Route on the bonus the fouling team is now in — a state read, not a
-        //    roll. The same flavor draw routes identically; only the foul count
-        //    (state) decides the branch.
-        var bonus = game.Fouls.BonusFor(foulingTeam);
-
-        var next = bonus == BonusType.None
-            ? ContinuationKind.ResumeInbound     // offense keeps the ball, inbounds
-            : ContinuationKind.ResolveFreeThrows; // 1-and-1 or double bonus
-
-        // Flavor is recorded on the Continue's reason-tag for observability; the
-        // bonus type rides as functional payload the FT node will consume.
-        return new Continue(next, state)
-        {
-            Bonus = bonus,
-            Flavor = flavor
-        };
+        // 2. Charge the foul and route on the bonus — the shared charge-and-fork
+        //    (Core/DefensiveFoulCharge). Roll D's below-bonus kind is ResumeInbound
+        //    (offense keeps the ball after a pre-shot entry/halfcourt foul), and it
+        //    is the one feeder that carries a flavor: the node stamps both the bonus
+        //    payload and the rolled flavor onto the returned Continue. The same
+        //    flavor draw routes identically; only the foul count (state) decides the
+        //    branch.
+        return DefensiveFoulCharge.Resolve(
+            state, game, ContinuationKind.ResumeInbound, flavor);
     }
 }

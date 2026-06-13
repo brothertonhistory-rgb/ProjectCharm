@@ -1,3 +1,73 @@
+## Session 23 — Contextification #4 (Bonus-fork extract): the charge-and-fork in Rolls D / I / J / K / M collapsed into one shared node (2026-06-13)
+
+**The premise this session opens.** Fourth of the five-session contextification arc, and a
+different KIND of close than #1–#3: not a new context on an existing roll, but a DE-DUPLICATION.
+The same non-shooting-defensive-foul charge-and-fork — charge `state.Defense`, read the bonus,
+fork below/in-bonus — was copied into five rolls as each was built ("copied, not reinvented," to
+avoid premature abstraction). With five live copies the shape is proven and stable, so it earns
+exactly one home. Pure refactor: identical behavior, one definition. Byte-for-byte-identical
+output at every one of the five callers was the load-bearing requirement, and the five existing
+fork checks are its correctness proof.
+
+**Confirmation mode, not rediscovery (CONVENTIONS §0/§6c).** The prompt carried a verified
+reconnaissance map; the pull confirmed it against the tree rather than re-deriving it. The two
+audited exceptions both held: (1) Roll D has NO `ResolveFoulOnDefense` helper — its fork is INLINE
+in `Execute`, so #4 deleted FOUR helpers (I/J/K/M) and replaced ONE inline fork (D); (2) Roll D is
+the only caller that carries a `Flavor` payload, and its below-bonus kind is `ResumeInbound` where
+the other four use `ResolveSidelineInbound`. One clarification surfaced on pull, byte-identical not
+a divergence: all five already set `Bonus = bonus` on BOTH arms (below-bonus `bonus` is literally
+`None`), so the shared node always sets `Bonus = bonus` and reproduces every caller exactly.
+
+**The shared node.** `Core/DefensiveFoulCharge.Resolve(state, game, belowBonusKind, flavor = null)`
+— cross-roll infrastructure that reads `GameState.Fouls` and returns a `Continue`, sitting beside
+`FoulTracker` and `JumpBall` (the `Core/` static-`Resolve` precedent). It charges the foul, reads
+the bonus, and forks: in bonus → `ResolveFreeThrows` (identical for all five); below bonus → the
+CALLER-SUPPLIED kind. The optional `flavor` is stamped only when supplied (Roll D passes its rolled
+flavor; I/J/K/M pass nothing, so `Flavor = null` ≡ unset). Two things stay caller-owned on purpose
+— the below-bonus kind and the flavor — because the five feeders genuinely differ on them; folding
+either in would be a behavior change wearing a refactor costume.
+
+**The two caller-owned knobs map to a real basketball distinction (Emmett's framing).** A foul that
+came in through Roll A (a pre-shot entry/halfcourt foul) below the bonus just re-runs the inbound
+(`ResumeInbound`) — the "ball already came in, fouled back near the other team's goal, repeat the
+inbound" case. A foul during live action (rebound scrum, transition push, FT-board scramble) below
+the bonus goes to a sideline throw-in (`ResolveSidelineInbound`) — the "frontcourt foul, throw-in
+near the basket they're attacking, different weights" case. The role-based engine expresses that
+backcourt/frontcourt difference as WHICH inbound, not as a court coordinate; keeping the below-bonus
+kind caller-supplied preserves exactly that split. (Court-side-AWARE inbound weighting, and every
+foul eventually earning its own weighted descriptor set, are logged future work — this node is the
+home both plug into, unchanged when they land.)
+
+**Re-point and delete.** All five callers now make a single `DefensiveFoulCharge.Resolve(...)`
+call: I/J/K/M pass `ResolveSidelineInbound` (no flavor); Roll D keeps its flavor roll and tail-calls
+with `ResumeInbound` + the flavor. The four private `ResolveFoulOnDefense` helpers (I/J/K/M) are
+deleted; Roll D's inline charge-and-fork is replaced by the tail call. `ResolveFoulOnDefense` now
+appears nowhere in engine or harness (§2b sweep clean).
+
+**Validation (reasoned + Monte-Carlo-traced, pending Emmett's harness run).** The five existing
+fork checks — `RollDFlavorBatchCheck`, `RollDBonusRoutingCheck`, `RollIBonusForkCheck`,
+`RollJBonusForkCheck`, `RollKBonusForkCheck`, and Roll M's loose-ball fork — are unchanged and ARE
+the refactor's proof: identical routing through the new node = success. A new direct unit check,
+`DefensiveFoulChargeCheck`, drives the node across the foul thresholds with BOTH below-bonus kinds
+and with/without a flavor, asserting the charge lands on the defense only, the below/in-bonus split,
+the Bonus payload on both arms, and the flavor pass-through. A Python trace confirmed byte-for-byte
+identical `(kind, bonus, flavor)` for all five callers across the full climb (fouls 1–12, 7/10
+thresholds). Per §2a the node is now the SINGLE place fouls cross the bonus, so the Governor loop's
+accumulation check is the end-to-end proof (counts climb monotonically, bonus stays crossed,
+`unrouted == 0`).
+
+**What #4 closes.** The charge-and-fork has one definition and one place to change when the
+free-throw / inbound rules evolve. The arc moves to #5a (seat ALL turnover and violation types in
+Roll C, context-gated and DORMANT, validated in isolation) — drafted as a separate audited pass per
+CONVENTIONS §6, not as the tail of this build.
+
+**Carried-forward deferrals (unchanged, not this session).** `TransitionSource.Block` push tempo
+and a distinct Block `OffensiveReboundSource` into Roll K; `OutOfBoundsOffDefense` own-side inbound
+modifiers (land with the Roll A reshape, #5b); steal/foul attribution (the deferred attribution
+layer); Roll A's own turnovers becoming steals (comes free at #5b); court-side-aware inbound
+weighting and per-foul-type weighted descriptors (new this session, parked for the inbound/foul-roll
+buildout).
+
 ## Session 22 — Contextification #3 (Steal Feeder): live turnovers enter Roll J as a `Steal` source (2026-06-13)
 
 **The premise this session opens.** Third of the five-session contextification arc. Three

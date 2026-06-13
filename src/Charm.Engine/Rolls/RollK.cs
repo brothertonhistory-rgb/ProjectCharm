@@ -85,9 +85,10 @@ public static class RollK
                 new Continue(ContinuationKind.ResolveJumpBall, state),
 
             // Foul on the defense in the scrum. Offense retains — CONTINUE.
-            // Charge the defensive team foul and read the bonus, exactly as Roll I.
+            // Charge the defensive team foul and fork on the bonus via the shared
+            // charge-and-fork; below bonus -> a sideline throw-in (no flavor).
             OffensiveReboundOutcome.DefensiveFoul =>
-                ResolveFoulOnDefense(state, game),
+                DefensiveFoulCharge.Resolve(state, game, ContinuationKind.ResolveSidelineInbound),
 
             // Offensive foul in the scrum. Ball switches teams — TERMINAL.
             // No foul charged (Roll C's OffensiveFoul precedent).
@@ -119,39 +120,6 @@ public static class RollK
                     state with { SelectedSlot = null, ShotType = null, Result = null, FastBreak = false }),
 
             _ => throw new InvalidOperationException($"Unhandled offensive-rebound outcome '{outcome}'.")
-        };
-    }
-
-    /// <summary>
-    /// The defensive-foul arm: charge the defensive team foul via
-    /// <see cref="FoulTracker"/>, read the resulting bonus, and fork to the
-    /// sideline-inbound (below bonus) or free-throw (in bonus) continuation. Copied
-    /// verbatim from Roll I's charge-and-read (itself from Roll D) — the fourth
-    /// feeder into the shared fork.
-    /// </summary>
-    private static RollResult ResolveFoulOnDefense(PossessionState state, GameState game)
-    {
-        // Charge the foul to the fouling team = the defense this possession.
-        var foulingTeam = state.Defense;
-        game.Fouls.Increment(foulingTeam);
-
-        // Read the bonus the fouling team is now in — a state read, not a roll.
-        var bonus = game.Fouls.BonusFor(foulingTeam);
-
-        if (bonus == BonusType.None)
-        {
-            // Below bonus: offense inbounds from the sideline. Same possession.
-            return new Continue(ContinuationKind.ResolveSidelineInbound, state)
-            {
-                Bonus = bonus
-            };
-        }
-
-        // In bonus (OneAndOne or Double): bonus free throws. Same possession. Bonus
-        // type rides as functional payload, exactly as Roll D / I / J.
-        return new Continue(ContinuationKind.ResolveFreeThrows, state)
-        {
-            Bonus = bonus
         };
     }
 }

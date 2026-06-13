@@ -71,9 +71,10 @@ public static class RollI
                 new Continue(ContinuationKind.ResolveOffensiveRebound, state),
 
             // Loose-ball foul on the defense. Offense retains — CONTINUE.
-            // Charge the defensive team foul and read the bonus, exactly as Roll D.
+            // Charge the defensive team foul and fork on the bonus via the shared
+            // charge-and-fork; below bonus -> a sideline throw-in (no flavor).
             ReboundOutcome.LooseBallFoulOnDefense =>
-                ResolveFoulOnDefense(state, game),
+                DefensiveFoulCharge.Resolve(state, game, ContinuationKind.ResolveSidelineInbound),
 
             // Loose-ball foul on the offense. Ball switches teams — TERMINAL.
             // No foul charged (Roll C's OffensiveFoul precedent).
@@ -109,39 +110,5 @@ public static class RollI
 
             _ => throw new InvalidOperationException($"Unhandled rebound outcome '{outcome}'.")
         };
-    }
-
-    /// <summary>
-    /// The loose-ball-foul-on-defense arm: charge the defensive team foul via
-    /// <see cref="FoulTracker"/>, read the resulting bonus, and fork to the
-    /// sideline-inbound (below bonus) or free-throw (in bonus) continuation.
-    /// Copied verbatim from Roll D's charge-and-read pattern.
-    /// </summary>
-    private static RollResult ResolveFoulOnDefense(PossessionState state, GameState game)
-    {
-        // Charge the foul to the fouling team = the defense this possession.
-        var foulingTeam = state.Defense;
-        game.Fouls.Increment(foulingTeam);
-
-        // Read the bonus the fouling team is now in — a state read, not a roll.
-        var bonus = game.Fouls.BonusFor(foulingTeam);
-
-        if (bonus == BonusType.None)
-        {
-            // Below bonus: offense inbounds from the sideline. Same possession.
-            return new Continue(ContinuationKind.ResolveSidelineInbound, state)
-            {
-                Bonus = bonus
-            };
-        }
-        else
-        {
-            // In bonus (OneAndOne or Double): bonus free throws. Same possession.
-            // Bonus type rides as functional payload, exactly as Roll D.
-            return new Continue(ContinuationKind.ResolveFreeThrows, state)
-            {
-                Bonus = bonus
-            };
-        }
     }
 }
