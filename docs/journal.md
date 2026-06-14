@@ -1,3 +1,79 @@
+## Session 33 — Phase 3: The pie fingerprints (three tangible axes) (2026-06-14)
+
+**A design session, not a build (CONVENTIONS §4) — no code, no harness; the deliverable is the spec
+written into `docs/axes.md`.** Phase 2 proved the player-object → make-curve pipe end to end with the
+shooter's own rating. Phase 3 is the first design pass of the *matchup* layer: for each of the three
+computable-now axes — athletic, skilled, big — a precise **pie fingerprint** (which pies it tilts,
+which way, by what mechanism, and the shape of the gap → tilt response). The experience/cohesion
+fingerprint is deliberately left open (it waits on the persistence layer). No magnitudes — those are
+the calibration pass.
+
+**What was locked (the reasoning, conversed before any spec text):**
+
+1. **Make/miss is an effective-rating SHIFT, not a curve change.** A matchup tilt slides the
+   shooter's *effective rating* along the one per-zone curve everyone shoots on (the Phase 2
+   `MakeProbability(zone, rating)` logistic, reused untouched) — never reshaping the curve, moving
+   its midpoint/ceiling, or multiplying the output. Categorical pies (location, rebound, turnover,
+   transition, tip) have no curve, so a tilt reweights their slices directly.
+
+2. **The zero point is AVERAGE defense, not an open shot.** No modifier = an utterly average
+   contest, so a league-average shooter with no modifier shoots league-average. Positive modifier =
+   worse-than-average defense (more open) → up the curve; negative = tighter → down. Average sits in
+   the *middle* of the scale, not the bottom.
+
+3. **The gap → tilt response is ACCELERATING, not saturating (a deliberate refinement of the
+   prompt's starting lean).** A marginal edge is imperceptible; the effect grows *faster* than the
+   gap; a true mismatch is cartoonish. The only ceiling is physical reality (a make% cannot exceed
+   the curve's asymptote; a frequency cannot exceed 100%) — not an imposed cap, which would
+   manufacture parity. Edges on different axes **compound** (each tilts its own pies → all leaning
+   one way multiplies into a blowout, correct). Absurd matchups are kept rare by realistic
+   scheduling, not by softening the math. The bottom-end "credible beats elite" lean survives; the
+   top-end saturation is rejected. The coverage / roster strength-read stays the laddering pass.
+
+4. **Two efficiency doors.** A matchup moves efficiency through the shot *mix* (which zone) and the
+   *make%* (whether it falls), independently. A quickness edge swings both; a quickness deficit
+   against equal size swings mainly the **mix** — a worse shot diet — even when each shot's make is
+   unchanged. The mix has a standing pull toward the rim; the matchup grants access.
+
+5. **Three independent dials set "how open."** The defender matchup (this pass), team fit (gravity /
+   spacing / passing aggregate), and role / usage (tendencies) — kept in separate drawers, never
+   pre-fused. Only the first is a fingerprint.
+
+6. **The keynote — skilled is the BASELINE, not a tilt.** Once each specific skill is placed, skill
+   does not *push* pies the way athletic and big do. It is the level the physical axes tilt around:
+   shooting touch (the make/miss baseline) + ball security (the turnover baseline) + the decider when
+   the physical battle is even (the vast majority of D1 games). Its creation side — the passing
+   make-bump (the alley-oop / backdoor read, baked into the %) — is a hidden **team aggregate**
+   beside gravity and spacing, the lifeline by which a smaller, skilled team passes itself open. This
+   is the asymmetry made concrete: physical caps skill expression, and not symmetrically.
+
+**The two physical bundles (summary).**
+- **Athletic** — make/miss separation on all shot types (both ends); shot location pulled to the rim
+  (deficit → pushed out, worse mix); a *usage* choke on the out-athleted player with an emergent
+  offense-breaking cascade if forced; live steals manufactured at big gaps; secondary on the glass;
+  transition *efficiency* (frequency is mostly a coaching choice).
+- **Big** — rim protection down / finish-over up, length weighted to the rim; raises the *block*
+  slice (rim-weighted; small finishers get swatted more, block carved before make/miss); strength
+  pulls the mix inside; primary rebounder (rebounding skill the gated baseline); wins the *tip* on
+  the wingspan gap (accelerating S-curve, the existing `JumpBall.cs` seam).
+
+**Overlaps resolved.** Athletic *horizontal* (separation) vs big *vertical* (over the top / wall off
+the rim) — no shared rim tilt; self-creation → the athletic matchup (not a skill bump, since the
+coverage-breakdown event cannot be modeled); passing → a team aggregate (not a skill matchup tilt);
+rebounding skill → its own ability; tip → size / wingspan.
+
+**Deferred (named, not designed).** Defender identification (the build pass); the per-matchup gap
+computation + attribute → axis laddering + coverage / strength-read (the laddering pass); all
+magnitudes (the calibration pass); the strategy layer that multiplies the terrain; and the
+team-aggregate build (gravity, spacing, the new passing aggregate).
+
+**Deliverable.** `docs/axes.md` — one new section ("The three tangible fingerprints (the precise
+bundles)") inserted after the illustrative-sketch section, plus the Settled/Open lists updated (the
+three tangible fingerprints moved to Settled; the experience fingerprint stays Open). All prior
+settled concept text untouched; no code touched. (Note: the prompt referenced a one-line
+reconciliation to `player-model-roadmap.md`, which is not present in the committed tree — no such
+file exists to edit.)
+
 ## Session 32 — Phase 2: Direct self-rating wiring (Roll H real generator) (2026-06-14)
 
 **The second session of the player-model arc.** Phase 1 gave the slot layer a `Player` to hold and
