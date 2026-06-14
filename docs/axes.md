@@ -564,14 +564,22 @@ that comes later.
 - The fourth axis has two components (individual experience carried by the player + team
   cohesion grown over a season) and a hard dependency on cross-game persistence in the future
   franchise layer.
+- The attribute -> axis laddering is defined (Phase 4): athletic = horizontal separation
+  (speed / quickness / first step); big = vertical reach + mass (height / wingspan / weight /
+  strength / vertical); derived athleticism stays the full composite as the locked ceiling,
+  distinct from the axis; named defensive ratings are the skill layer only (their physicals live
+  in the axes); modifiers ride duels; discipline -> foul pies; no trait double-counted.
+- The counter-attribute pairing map is defined per door (Phase 4): make (touch ↔ the
+  perimeter→post→rim gradient), location (self-creation / handling ↔ on-ball D), turnovers
+  (handling ↔ steals), the glass (off-reb ↔ def-reb), blocks (finishing ↔ rim protection), tip
+  (wingspan). Team-aggregate / interaction items parked.
+- The per-matchup gap function is defined (Phase 4): one convex gap→shift primitive (no imposed
+  cap, only the curve's asymptote), per-axis physical gaps + per-pairing skill gaps summed
+  additively onto the baseline; the curve's floor + flattening deliver the residual / clawback and
+  "skill never extinguished," the convex physical delivers "size insurmountable"; categorical pies
+  reweight slices; experience/cohesion enters as a hard-zero stub.
 
 **Open (future conversations, NOT decided here):**
-- How exactly each attribute ladders into each axis (and how to avoid double-counting a trait
-  across correlated axes).
-- The **counter-attribute pairing map** — which offensive skill contests which defensive one
-  (shooting ↔ perimeter-D, handling ↔ steal skill, finishing ↔ rim protection, …) and where
-  *defensive* skill itself ladders. Settled now: make/miss and the skill pies ARE skill-vs-skill
-  contests; enumerating the pairings is the laddering pass (Phase 4).
 - The non-linear strength read — the actual diminishing-returns / coverage / threshold math.
 - The experience/cohesion fingerprint — its pie tilts and gap-response. (The three tangible
   fingerprints — athletic, skilled, big — are now settled above; this fourth one is gated on
@@ -580,3 +588,155 @@ that comes later.
 - How strategy multiplies the terrain (the strategy-layer design).
 - The cross-game persistence subsystem (career counters + co-appearance logging) and the
   growth/decay model for cohesion — gated on the franchise layer.
+
+---
+
+## Phase 4 — the individual-matchup tilt (laddering, pairings, gap function)
+
+This completes the **Dependencies** block's "attribute → axis laddering (anti-double-count)" and
+"per-matchup gap computation" for the case of **one attacker against one defender.** The roster
+coverage / strength-read (no-weakness-beats-one-peak, diminishing returns, credible-beats-elite) is
+**Phase 5**; the defender-ID picker and the generator wiring are **Phase 6.** Structure and direction
+only — every number is a calibration-pass concern, tuned by watching games. (Phase numbering; for
+these items it supersedes the older "Pass 2" framing per the append-only rule, newest canonical.)
+
+### The two-layer shape (the spine this rests on)
+
+Every door resolves the same way: a **baseline** plus a **physical layer** plus a **skill layer**,
+summed onto the shooter's effective rating and read off the one shared per-zone curve
+(`RollHConfig.MakeProbability`, reused untouched); categorical pies reweight their slices by the same
+signed magnitude. Intuitively the **physical layer sets the scene** — how open is everyone if the game
+were resolved on athleticism and size alone (equal → near-flat) — the coaching layer then leans on
+that scene (deferred), and **skill goes to war inside it.** Arithmetically the layers are signed
+nudges that **sum**; "physical first" is intuition, not a sequence of rolls. Zero gap = **average**
+defense = the flat modifier (not an open shot). The gap → tilt response is **convex / accelerating**,
+bounded only by the curve's own asymptote (and 100% for frequencies) — no imposed cap.
+
+**The double-count line.** Offensive skill enters **once** — as the baseline (the shooter's own touch,
+where he starts on the curve). The defender's defense enters **once** — as a nudge anchored at average
+defensive stature. The physical openness gap slides him along that scale. No attribute is charged
+twice: touch is the scale, the defensive rating is the nudge, the physical gap is the slide.
+
+### Laddering — attributes → axes
+
+The anti-double-count rule: **a physical trait feeds exactly one axis, and the named skill ratings are
+a separate skill layer — never the same trait twice.** The physical axes are read off the raw
+physicals; a defensive *rating* carries only the technique / timing on top of the physical tools the
+axes already hold.
+
+- **Athletic axis — horizontal separation:** speed, quickness (lateral), first step. (Getting open /
+  getting downhill / staying in front.)
+- **Big / size axis — vertical reach + mass disruption:** height, wingspan, weight, **strength,
+  vertical.** The organizing question: *does the player's size and the heights he can reach disrupt the
+  opponent's skill advantage?* (Finishing and shooting over the top, walling off the rim, the glass,
+  contesting at the rim.) Strength and vertical land **here, not on athletic** — the resolved
+  horizontal/vertical split.
+- **Derived athleticism stays the FULL composite** (strength + speed + quickness + first step +
+  vertical) **purely as the locked ceiling concept** — distinct from the athletic *matchup axis*, so
+  the axis never re-counts the composite's parts. Same name, two objects: the axis is the
+  horizontal-separation read; the composite is the skill-expression ceiling.
+- **Offensive skill — the door baselines (not axis members):** the touch ratings (Close / Mid /
+  Outside / Finishing), ball-handling, self-creation, offensive rebounding, post moves, passing. These
+  set where a player *starts* on each door; the matchup slides them.
+- **Defensive skill — the skill-layer defensive faces (technique / timing / discipline only):**
+  perimeter D, post D, rim protection, defensive rebounding, steals. Their physical underpinnings
+  (quickness, length, size, strength) live in the axes; the rating is the residual skill on top, so
+  perimeter D never secretly re-counts the quickness the athletic axis already used.
+- **Modifiers ride duels, never axis members:** hustle amplifies the effort family (the glass,
+  steals); IQ the decision family (creation / playmaking).
+- **Discipline feeds the foul pies directly** — not an axis member, not a matchup duel.
+- **Free throw is matchup-immune** — the flat 1:1 in Roll L; no defender contests it.
+- **Composition within an axis** (flat composite vs. weighted) is left a calibration choice; the
+  structure keeps the member weights configurable.
+
+### The counter-attribute pairing map (per door)
+
+Each door is one offensive-skill baseline contested by a specific defensive-skill counter, over a
+physical-axis scene — the same baseline → physical → skill shape on every door:
+
+- **Make %** — touch (by zone) ↔ a defensive **gradient**; physical = athletic + big openness. The
+  gradient slides with shot distance: **Outside ↔ perimeter D · Mid ↔ perimeter D + post D · Close ↔
+  post D + rim protection · Rim / Finishing ↔ rim protection · Post moves ↔ post D.** (Perimeter →
+  perimeter+post → post+rim → rim, moving out-to-in; the composite blend weights are calibration. The
+  mid-range pairing is a 3/4-type read: a mid scorer punishes a small defender in the post or drags a
+  post defender out to test his foot speed, so a switchy perimeter+post defender is the counter.)
+- **Shot location / mix** — self-creation + ball-handling (control) ↔ perimeter / on-ball D; physical
+  = athletic (separation → rim) and big (strength → inside). **Self-creation gates shot *type*:** low →
+  limited to catch-and-shoot and entry-to-position looks; high → manufactures his own off the dribble
+  and beats on-ball pressure. (A low-self-creation scorer therefore leans on team scaffolding — gravity,
+  spacing, the passing bump — to get manufactured looks; a self-creator is self-sufficient.)
+- **Turnovers** — ball-handling (security) + passing ↔ steals; physical = athletic (hands / quickness).
+- **The glass** — offensive rebounding ↔ defensive rebounding; physical = big (primary), athletic
+  secondary (motor / second jump).
+- **Blocks** (carved off the top *before* make resolves) — finishing / shooter size ↔ rim protection;
+  physical = big (length).
+- **The tip** — a wingspan / reach contest; physical = big. (The existing `JumpBall` seam.)
+- **Transition** — athletic owns the *efficiency* (open floor, rim-heavy, high finish); *frequency* is
+  mostly a coaching choice (deferred).
+
+**Parked — team-aggregate or interaction effects, not one-on-one duels:** passing's creation
+make-bump, gravity, spacing, help defense, off-ball defense (the team-aggregate layer); screening (a
+screener-helps-handler interaction); playmaking's creating-for-others (IQ-amplified, team-aggregate
+side); off-ball movement, whose real counter is off-ball D (team-aggregate) — its individual catch
+rides perimeter D and the rest is deferred.
+
+### The gap function (shape, not magnitudes)
+
+1. **One convex primitive.** A single accelerating gap → shift curve (a power / exponential on the
+   signed gap): near-flat for a marginal gap, steepening as the gap widens, cartoonish at a true
+   mismatch. **No imposed cap** — the only ceiling is the make-curve's own asymptote (and 100% for
+   frequencies), which it already bends toward. The primitive is reused everywhere; **per-axis and
+   per-pairing weights** parameterize it (surface variety as parameterized inputs to one contest type,
+   not new contest types). Knob: the steepness / exponent, tuned **steeper for physical than for
+   skill** — the "physical louder than skill" asymmetry living in the shape itself.
+2. **Two outputs.** Curve pies (make / miss): the shift is an **effective-rating delta** added to the
+   baseline and fed straight into `MakeProbability` — the curve is never reshaped, its output never
+   multiplied. Categorical pies (location, turnovers, rebound, transition, tip): the same signed
+   magnitude is a **slice reweight**.
+3. **The gap split.** The **physical** gap is taken **per-axis** (an athletic gap, a big gap, as
+   bundles, which **compound** on a door where both apply). The **skill** gap is taken **per-pairing**
+   (this offensive rating vs its defensive counter), anchored at **average** defense so a player facing
+   an average defender gets the flat modifier.
+4. **Composition — additive, no separate recovery term.** Physical (Σ athletic + big) and skill (the
+   pairing duel) are signed shifts that **sum onto the baseline.** The recovery behaviors the design
+   demands — *talent claws back a few against an overwhelming physical edge*, *athleticism can never
+   fully extinguish skill*, *size can never be completely defeated* — are **not** a bolted-on clawback
+   term; they fall out of the structure already in hand:
+   - **Skill lives in the baseline,** always present and scaling with skill, so pure athleticism never
+     zeroes it — a monster physical nudge drags a high baseline down hard, but it is still *his* high
+     baseline being dragged.
+   - **The make-curve has its own floor and flattens near it.** A monster physical edge crushes a
+     player toward the bottom of the curve, where (a) make% never reaches 0 and (b) the make%-distance
+     between him and a scrub **compresses** — so athleticism "wipes out the skill gap" in the box score
+     even though the rating contributions are unchanged, while the skilled player still edges the scrub
+     and hits a few.
+   - **The physical nudge is convex,** so at an extreme gap it swamps even a high baseline (**size
+     insurmountable**), and at a small gap it is ~0 so the skill duel is the whole signal (**skill
+     decides the even game**). Tuning the physical convexity steep enough that an extreme gap outruns
+     the whole rating scale guarantees "size can't be completely defeated" by the *shape*, not a cap.
+   - Beneath all of it sits the **per-possession floor** (see `design.md` — the squirts-free /
+     defender-falls residue of events the engine does not model): skill-agnostic, everyone gets a
+     sliver. A residual-floor config knob can be exposed purely for calibration headroom, but it is not
+     structurally required.
+   - *Why additive over multiplicative `gap × (1 − recovery)`:* additive is one mechanism,
+     double-count-free, and gives "skill decides the even game" automatically (physical = 0 → net =
+     skill), whereas the multiplicative form needs a second additive skill term bolted on for the even
+     case.
+5. **The 4th-axis stub (experience / cohesion).** It enters the sum as a **hard-zero-gap term** — the
+   slot exists in the gap function's signature and contributes nothing until the cross-game persistence
+   layer (career counters + co-appearance logging) feeds it. Neutral now, wired later; no shape designed
+   here.
+
+### What Phase 4 does NOT do (the walls held)
+
+- **No roster coverage / strength-read** (no-weakness-beats-one-peak, diminishing returns,
+  credible-beats-elite) — Phase 5.
+- **No defender-ID picker and no wiring** — Phase 6; Phase 4 assumes a defender is given.
+- **No team aggregates** (gravity, spacing, help / off-ball defense, the passing make-bump) — later
+  layers, parked above.
+- **No strategy, tendencies, usage / attention, streaks, fatigue, game-state.** The out-athleted
+  player's **volume choke** ("he'd never shoot 20 times") is the **usage / cascade** lever and is *not*
+  here — Phase 4 owns only the per-shot tilt (his looks are poor and few of them fall); how many touches
+  he gets is the usage layer.
+- **No magnitudes.** Anything wanting a number is logged for the calibration pass.
+- **`MakeProbability` is untouched** — reused exactly as Phase 2 built it.

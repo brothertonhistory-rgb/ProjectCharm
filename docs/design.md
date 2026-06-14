@@ -2590,3 +2590,136 @@ Python builds. Logged for their proper pass:
   session: 3 fingerprints (done) → 4 individual tilt → 5 roster read → 6 build. (This supersedes the
   older "Phase 5 = tendencies" forward-reference in the Session 32 wall, which is left as-is per the
   append-only rule; the newest entry is canonical.)
+
+## Session 35 — Phase 4: the individual-matchup tilt (2026-06-14)
+
+**A design session, not a build (CONVENTIONS §4) — no code, no harness.** Phase 4 turns **one
+attacker against one defender** into a set of pie tilts: the attribute → axis laddering, the
+counter-attribute pairing map, and the per-matchup gap function. The spec lands in `docs/axes.md`
+(new "Phase 4" section, completing its Dependencies block; Settled/Open lists updated); this entry is
+the conversational deep-dive behind it. Everything is structure and direction — **no magnitudes** —
+and still unwired (the picker and the generators are Phase 6). The locked two-layer spine from the
+post-Phase-3 conversation (the Session 34 capture) is the input; this session resolved the open
+structure on top of it.
+
+### The two-layer shape, confirmed and made concrete
+
+The make door — and every door — is **baseline → physical nudge → defensive (skill) nudge**, all
+effective-rating shifts that **sum** on the one shared curve (`MakeProbability`, never touched; its
+output % never multiplied). Emmett's framing of the flow: **athletic/size sets the scene first** (how
+open is everyone if the game were resolved on physics alone — equal → near-flat), the coaching layer
+leans on that scene (deferred), and **skill goes to war inside it.** "Physical first" is intuition; the
+arithmetic is a single additive sum. Zero gap = **average** defense = flat (not an open shot).
+
+**The double-count line, settled.** Offensive skill enters **once** — as the baseline (the shooter's
+own touch, where he starts on the curve). The defender's defense enters **once** — as a nudge anchored
+at average defensive stature (a great defender slides him down, a weak one up). The physical openness
+gap slides him along that scale. No attribute is charged twice: touch is the scale, the defensive
+rating is the nudge, the physical gap is the slide.
+
+### Laddering — the trait assignments (the anti-double-count crux)
+
+The doc had a live contradiction: `axes.md` equated the **athletic axis** with *derived athleticism*
+(strength + speed + quickness + first step + vertical), while the resolved horizontal/vertical
+principle wanted **vertical** and **strength** expressing through **big.** Resolved:
+
+- **Athletic axis = horizontal separation only:** speed, quickness, first step.
+- **Big / size axis = vertical reach + mass:** height, wingspan, weight, **strength, vertical.**
+  Emmett's organizing read: *does the player's size and the heights he can reach disrupt the
+  opponent's skill advantage?*
+- **Derived athleticism stays the FULL composite as the locked ceiling** — a separate object from the
+  athletic matchup axis, so the axis never re-counts the composite's parts. (Same name, two objects:
+  the axis is the separation read; the composite is the skill-expression ceiling.)
+- **The defensive-side overlaps resolved by the same principle as the offense:** a named defensive
+  rating (perimeter D, post D, rim protection, defensive rebounding, steals) is the **skill layer
+  only** — technique, timing, discipline, anticipation. Its physical underpinning (quickness for
+  steals, length for rim protection, size / strength for the glass) lives in the **physical axes**,
+  read off the raw physicals — never the same trait twice. So perimeter D does not secretly re-count
+  the quickness the athletic axis already used.
+- **Modifiers ride duels, not axes:** hustle → the effort family (glass, steals); IQ → the decision
+  family (creation, playmaking). **Discipline → the foul pies** directly (not an axis member). **Free
+  throw is matchup-immune** (Roll L's flat 1:1).
+
+### The counter-attribute pairing map (the per-door duels)
+
+One offensive-skill baseline vs a specific defensive counter, over a physical scene, on each door:
+
+- **Make %** — touch (by zone) ↔ a **defensive gradient** that slides with distance: Outside ↔
+  perimeter D · Mid ↔ **perimeter D + post D** · Close ↔ **post D + rim protection** · Rim / Finishing
+  ↔ rim protection · Post moves ↔ post D. The mid-range pairing was Emmett's call: a 3/4-type mid-range
+  scorer punishes a small defender in the post *or* drags a post defender out to challenge his foot
+  speed, so a switchy (perimeter+post) defender is the counter. ("Help" dropped out of the duel once
+  post carried the mid-range — help is a team aggregate anyway.)
+- **Shot location / mix** — self-creation + ball-handling (control) ↔ perimeter / on-ball D; physical =
+  athletic separation, big (strength → inside). **Self-creation gates shot *type*:** Emmett's framing —
+  a great-touch player with no self-creation is limited to catch-and-shoot and entry-to-position looks
+  (shots needing little beyond getting to the spot); self-creation is the craft to manufacture his own
+  look off the dribble and to fight on-ball pressure. Consequence: a low-self-creation scorer leans on
+  team scaffolding (gravity / spacing / passing) to get open; a self-creator is self-sufficient — which
+  is exactly the job those team aggregates do (a forward hook, parked).
+- **Turnovers** — ball-handling (security) + passing ↔ steals; physical = athletic (hands / quickness).
+- **The glass** — offensive rebounding ↔ defensive rebounding; physical = big primary, athletic
+  secondary (motor / second jump).
+- **Blocks** — carved off the top before make resolves; finishing / shooter size ↔ rim protection;
+  physical = big (length).
+- **The tip** — wingspan / reach; physical = big (the `JumpBall` seam).
+- **Transition** — athletic owns efficiency; frequency is coaching (deferred).
+
+Parked as team-aggregate / interaction, not duels: passing's creation make-bump, gravity, spacing,
+help D, off-ball D, screening, playmaking's create-for-others, off-ball movement's real counter.
+
+### The gap function — additive, convex, lean on the curve
+
+- **One convex primitive.** Accelerating gap → shift (power / exponential on the signed gap):
+  near-flat at a marginal gap, steepening, cartoonish at a mismatch. No imposed cap — only the curve's
+  asymptote / 100%. Reused everywhere; per-axis and per-pairing weights parameterize it. Steepness
+  knob, **steeper for physical than skill** (the asymmetry in the shape).
+- **Two outputs:** curve pies → an effective-rating delta into `MakeProbability`; categorical pies → a
+  slice reweight of the same signed magnitude.
+- **The gap split:** physical gap **per-axis** (athletic, big, compounding); skill gap **per-pairing**,
+  anchored at average defense.
+- **Composition is additive, with NO separate recovery / clawback term.** This was the session's
+  sharpest resolution. Emmett pressed the floor case: a 5'6" poor athlete who can shoot, against a
+  6'6", 6'10"-wingspan, stronger / quicker / bigger athlete — his shooting is "virtually obsolete, he
+  won't get open," yet over a long game he still hits a few (he squirts free, the defender falls);
+  athleticism "can't extinguish that." And the converse: when athleticism + size are insurmountable
+  they can "wipe out all skill gaps." The clean structure delivers **both residuals without a bolted-on
+  term:**
+  - **Skill lives in the baseline** (always present, scales with skill) — pure athleticism never zeroes
+    it; a monster physical nudge drags a high baseline down hard but it is still *his* high baseline.
+  - **The make-curve's own floor + flattening:** a monster physical edge crushes a player toward the
+    floor, where make% never hits 0 *and* the make%-distance between him and a scrub **compresses** —
+    athleticism "wipes out the skill gap" in the box score while the skilled player still edges the
+    scrub and hits a few.
+  - **The convex physical nudge:** at an extreme gap it swamps even a high baseline (**size
+    insurmountable**); at a small gap it is ~0 so the skill duel is the whole signal (**skill decides
+    the even game**). Tuned steep enough, an extreme gap outruns the rating scale — "size can't be
+    completely defeated" is the *shape*, not a cap.
+  - Under all of it: the **per-possession floor** (the unmodeled-events residue — squirts-free /
+    defender-falls), skill-agnostic. A residual-floor knob can exist for calibration headroom; it is
+    not structurally required.
+  - **Additive beats multiplicative `gap × (1 − recovery)`:** one mechanism, double-count-free, and
+    "skill decides the even game" falls out for free (physical = 0 → net = skill); the multiplicative
+    form needs a second additive skill term for the even case.
+- **The 4th-axis stub:** experience / cohesion enters as a **hard-zero-gap term** — the signature slot
+  exists, contributes nothing until the persistence layer feeds it.
+
+### Worked check — 5 elite athletes (low skill) vs 5 elite skill (low athletes)
+
+Falls straight out of the model, each side with its benefits and sacrifices:
+- The **athletes** live at the rim with high finishes and own the glass (the athletic + big physical
+  nudges), and shoot poorly from range (low touch baseline, no physical help out there) — so they hunt
+  the rim, where physics helps most.
+- The **skill** team cuts turnovers (handling baseline beats the steal pressure), lifts each other's
+  looks through the passing bump (team aggregate), and brings real shooting to every roll — paying for
+  it on the glass and at the rim.
+- The **zero-athlete elite shooter still shows up in the box score** — his high baseline + the curve
+  floor + the passing bump keep him scoring, exactly as he would in real life. The engine cannot
+  extinguish skill from athleticism alone.
+
+### Scope walls held
+
+No roster coverage / strength-read (Phase 5). No defender-ID picker, no wiring (Phase 6). No team
+aggregates, no strategy / tendencies / usage / fatigue / game-state. The out-athleted player's
+**volume choke** ("never shoots 20 times") is the **usage / cascade** lever — deferred; Phase 4 owns
+only the per-shot tilt. No magnitudes. `MakeProbability` untouched.

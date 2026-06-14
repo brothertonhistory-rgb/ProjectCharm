@@ -1,3 +1,43 @@
+## Session 35 — Phase 4: the individual-matchup tilt (2026-06-14)
+
+**A design session, not a build (CONVENTIONS §4) — no code, no harness.** Phase 4 turns **one
+attacker vs one defender** into pie tilts: the attribute → axis laddering, the counter-attribute
+pairing map, and the per-matchup gap function. Structure and direction only — no magnitudes, still
+unwired (picker + generators are Phase 6). Built on the locked two-layer spine from the Session 34
+capture; this session resolved the open structure and wrote it down.
+
+**Where it landed:** a new **"Phase 4" section in `docs/axes.md`** (laddering map + pairing map + gap
+function, completing the Dependencies block), with the Settled/Open lists updated to move the three
+resolved items (laddering, pairing map, gap function) from Open to Settled. The conversational
+deep-dive is appended to `docs/design.md`. No other files touched.
+
+**The calls that got made:**
+- **Laddering, anti-double-count.** Athletic axis = horizontal separation (speed / quickness / first
+  step). Big / size axis = vertical reach + mass (height / wingspan / weight / **strength + vertical**)
+  — Emmett's read: does the player's size and reach disrupt the opponent's skill advantage. **Derived
+  athleticism stays the full composite as the locked ceiling**, a separate object from the axis. Named
+  **defensive ratings are the skill layer only** (technique / timing); their physical tools live in the
+  axes — same trait never counted twice. Modifiers (hustle, IQ) ride duels; discipline → foul pies;
+  free throw is matchup-immune.
+- **Pairing map, per door.** Make %: touch ↔ a perimeter → perimeter+post → post+rim → rim **gradient**
+  (Mid = perimeter + post was Emmett's call; "help" dropped out as a team aggregate). Location:
+  self-creation / handling ↔ on-ball D, with **self-creation gating shot *type*** (no creation →
+  catch-and-shoot + entry looks only). Turnovers: handling ↔ steals. Glass: off-reb ↔ def-reb. Blocks:
+  finishing ↔ rim protection (carved off the top). Tip: wingspan. Team-aggregate / interaction items
+  parked.
+- **Gap function: additive, convex, no separate recovery term.** One convex gap → shift primitive (no
+  cap but the curve's asymptote), per-axis physical gaps + per-pairing skill gaps **summed** onto the
+  baseline. The recovery behaviors fall out of the structure: **skill lives in the baseline** (never
+  zeroed by athleticism), the **make-curve's floor + flattening** compress make%-gaps near the bottom
+  while keeping the skilled player above a scrub (the 5'6"-shooter-still-hits-a-few case), and the
+  **convex physical nudge** makes a big gap insurmountable and a small gap defer to skill. Per-possession
+  floor underneath. **Additive chosen over multiplicative** — one mechanism, gives "skill decides the
+  even game" for free. 4th axis = a hard-zero-gap stub in the signature.
+
+**Walls held:** no coverage / strength-read (Phase 5), no defender-ID picker or wiring (Phase 6), no
+team aggregates / strategy / tendencies / usage. The out-athleted player's **volume choke** is the
+usage lever (deferred) — Phase 4 owns only the per-shot tilt. `MakeProbability` untouched.
+
 ## Session 34 — Post-Phase-3 design capture: the matchup deep dive (2026-06-14)
 
 **A design session, not a build (CONVENTIONS §4) — no code, no harness.** A long conversation after
