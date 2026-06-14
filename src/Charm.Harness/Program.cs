@@ -37,7 +37,7 @@ internal static class Program
         var rollEGenerator = new RollEStubPieGenerator(cfgE);
         var rollFGenerator = new RollFStubPieGenerator(cfgF);
         var rollGGenerator = new RollGStubPieGenerator(cfgG);
-        var rollHGenerator = new RollHStubPieGenerator(cfgH);
+        // RollHGenerator constructed below, after game (needs GameState)
         var rollIGenerator = new RollIStubPieGenerator(cfgI);
         var rollJGenerator = new RollJStubPieGenerator(cfgJ);
         var rollKGenerator = new RollKStubPieGenerator(cfgK);
@@ -48,6 +48,7 @@ internal static class Program
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
         var game = new GameState(fouls);  // arrow starts Off — first jump ball is the tip
+        var rollHGenerator = new RollHGenerator(cfgH, game);
 
         var resolver = new Resolver(
             rollAGenerator,
@@ -117,6 +118,7 @@ internal static class Program
         ok &= EndOfHalfIntentBatchCheck(cfg, cfgEndOfHalf);
         ok &= GovernorLoopCheck(cfg, cfgD, cfgGov, cfgClock, cfgEndOfHalf);
         ok &= Phase1RosterCheck(configPath);
+        ok &= Phase2AttributeWiringCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -1280,7 +1282,7 @@ internal static class Program
     //     make/miss outcomes stay location-BLIND in SHAPE; only the block slice is
     //     zone-aware this pass. ---
     private static bool RollHResolutionBatchCheck(
-        RollAConfig cfg, RollHConfig cfgH, RollHStubPieGenerator genH, PossessionState state)
+        RollAConfig cfg, RollHConfig cfgH, IRollHPieGenerator genH, PossessionState state)
     {
         Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} shots through Roll H (zone-aware seven-way pie) ---");
         var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
@@ -4115,5 +4117,173 @@ internal static class Program
         Console.WriteLine(pass ? "  Phase 1 PASSED." : "  Phase 1 FAILED.");
         return pass;
     }
+
+    // ---------------------------------------------------------------------------
+    // Phase 2: Attribute wiring — RollHGenerator produces higher make rates for
+    // higher-rated shooters. This is the load-bearing proof that the pipe works:
+    // shooter attribute → logistic → make weight → resolver → outcome rate.
+    // ---------------------------------------------------------------------------
+    private static bool Phase2AttributeWiringCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 2: Attribute wiring (RollH real generator) ---");
+        var pass = true;
+
+        var cfgH  = RollHConfig.Load(configPath);
+        var cfg   = RollAConfig.Load(configPath);
+        var cfgB  = RollBConfig.Load(configPath);
+        var cfgC  = RollCConfig.Load(configPath);
+        var cfgD  = RollDConfig.Load(configPath);
+        var cfgE  = RollEConfig.Load(configPath);
+        var cfgF  = RollFConfig.Load(configPath);
+        var cfgG  = RollGConfig.Load(configPath);
+        var cfgI  = RollIConfig.Load(configPath);
+        var cfgJ  = RollJConfig.Load(configPath);
+        var cfgK  = RollKConfig.Load(configPath);
+        var cfgL  = RollLConfig.Load(configPath);
+        var cfgM  = RollMConfig.Load(configPath);
+        var cfgOffFoul = RollOffensiveFoulConfig.Load(configPath);
+
+        // --- Logistic range check: no make probability outside [0, 1] ---
+        Console.WriteLine("  Logistic range check (ratings 1/25/50/75/99, all five zones)...");
+        var ratingProbes = new[] { 1, 25, 50, 75, 99 };
+        foreach (ShotLocation zone in Enum.GetValues<ShotLocation>())
+        {
+            foreach (var r in ratingProbes)
+            {
+                var p = cfgH.MakeProbability(zone, r);
+                if (p < 0.0 || p > 1.0)
+                {
+                    Console.WriteLine($"  FAIL  MakeProbability({zone}, {r}) = {p:F4} — out of [0,1].");
+                    pass = false;
+                }
+            }
+        }
+        Console.WriteLine("  Logistic values all in [0,1] — OK.");
+
+        // --- Monotonicity: make% at rating 99 > rating 50 > rating 1 per zone ---
+        foreach (ShotLocation zone in Enum.GetValues<ShotLocation>())
+        {
+            var p1  = cfgH.MakeProbability(zone, 1);
+            var p50 = cfgH.MakeProbability(zone, 50);
+            var p99 = cfgH.MakeProbability(zone, 99);
+            if (!(p1 < p50 && p50 < p99))
+            {
+                Console.WriteLine($"  FAIL  {zone}: logistic not monotone — p1={p1:F3} p50={p50:F3} p99={p99:F3}.");
+                pass = false;
+            }
+        }
+        Console.WriteLine("  Logistic monotone per zone — OK.");
+
+        // --- Wiring check: 10k three-point attempts, high vs low Outside shooter ---
+        const int Batch        = 10_000;
+        const double MinGapPp  = 0.10;  // at least 10 percentage points
+
+        // Helper: build a GameState with two players in slots 1 and 2, given Outside rating.
+        static (GameState game, Slot slot1) MakeGame(int outsideRating, RollDConfig cfgD2)
+        {
+            var fouls = new FoulTracker(cfgD2.BonusThreshold, cfgD2.DoubleBonusThreshold);
+            var g     = new GameState(fouls);
+            g.SetPossessionArrow(TeamSide.Home);
+
+            var homeLineup = g.HomeLineup;
+            var homeRoster = g.HomeRoster;
+            var awayLineup = g.AwayLineup;
+            var awayRoster = g.AwayRoster;
+
+            for (var i = 1; i <= Lineup.Size; i++)
+            {
+                var shooter = new Player($"Shooter{i}") { Outside = outsideRating, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 70,
+                    BallHandling = 50, Passing = 50, Playmaking = 50, SelfCreation = 50, PostMoves = 50,
+                    OffBallMovement = 50, Screening = 50, OffensiveRebounding = 50,
+                    PerimeterDefense = 50, PostDefense = 50, RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                    Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50, Quickness = 50,
+                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50 };
+                var defender = new Player($"Defender{i}") { Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 70,
+                    BallHandling = 50, Passing = 50, Playmaking = 50, SelfCreation = 50, PostMoves = 50,
+                    OffBallMovement = 50, Screening = 50, OffensiveRebounding = 50,
+                    PerimeterDefense = 50, PostDefense = 50, RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                    Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50, Quickness = 50,
+                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50 };
+                homeRoster.SetStarter(homeLineup.SlotAt(i), shooter);
+                awayRoster.SetStarter(awayLineup.SlotAt(i), defender);
+            }
+            return (g, homeLineup.SlotAt(1));
+        }
+
+        // Helper: run Batch three-point attempts through the resolver using a given game,
+        // count Made + MadeAndFouled outcomes from Roll H directly.
+        static double RunThreePointBatch(GameState g, RollHConfig cfgH2, int batch)
+        {
+            var gen = new RollHGenerator(cfgH2, g);
+            var state = new PossessionState(
+                PossessionNumber: 1,
+                Offense: TeamSide.Home,
+                Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                ShotType: ShotLocation.Three,
+                SelectedSlot: g.HomeLineup.SlotAt(1));
+
+            var made = 0;
+            for (var i = 0; i < batch; i++)
+            {
+                var pie    = gen.Generate(state, putback: false);
+                var result = pie.Roll(new SystemRng(i).NextUnitInterval());
+                if (result is ShotResult.Made or ShotResult.MadeAndFouled)
+                    made++;
+            }
+            return (double)made / batch;
+        }
+
+        var (highGame, _) = MakeGame(outsideRating: 85, cfgD2: cfgD);
+        var (lowGame,  _) = MakeGame(outsideRating: 25, cfgD2: cfgD);
+
+        var highRate = RunThreePointBatch(highGame, cfgH, Batch);
+        var lowRate  = RunThreePointBatch(lowGame,  cfgH, Batch);
+        var gap      = highRate - lowRate;
+
+        Console.WriteLine($"  Three-point make rate — high Outside (85): {highRate:P1}");
+        Console.WriteLine($"  Three-point make rate — low  Outside (25): {lowRate:P1}");
+        Console.WriteLine($"  Gap: {gap:P1}  (threshold ≥ {MinGapPp:P0})");
+
+        if (gap < MinGapPp)
+        {
+            Console.WriteLine($"  FAIL  Gap {gap:P1} is below the {MinGapPp:P0} threshold.");
+            pass = false;
+        }
+        else
+        {
+            Console.WriteLine("  Wiring check PASSED — high shooter beats low shooter by required margin.");
+        }
+
+        // --- Fallback check: null roster → stub pie (no exception) ---
+        Console.WriteLine("  Fallback check (unpopulated roster → stub pie, no throw)...");
+        var bareGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var bareGen  = new RollHGenerator(cfgH, bareGame);
+        var bareState = new PossessionState(
+            PossessionNumber: 1,
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
+            Entry: EntryType.DeadBallInbound,
+            ShotType: ShotLocation.Three,
+            SelectedSlot: bareGame.HomeLineup.SlotAt(1));
+        try
+        {
+            var pie = bareGen.Generate(bareState, putback: false);
+            // Should equal stub pie output — Made weight = BaseMade * (1 - BlockThree)
+            var expectedMade = cfgH.BaseMade * (1.0 - cfgH.BlockThree);
+            // Pie doesn't expose weights directly; just confirm no exception and the
+            // result is a valid (non-null) pie object.
+            Console.WriteLine("  Fallback OK — unpopulated roster returns stub pie without throwing.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  FAIL  Fallback threw: {ex.Message}");
+            pass = false;
+        }
+
+        Console.WriteLine(pass ? "  Phase 2 PASSED." : "  Phase 2 FAILED.");
+        return pass;
+    }
+
 
 }

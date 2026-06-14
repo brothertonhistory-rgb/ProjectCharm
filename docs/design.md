@@ -2294,3 +2294,92 @@ make-rate mapping. Phase 6 tunes the actual mapping.
 No generator reads a `Player`. The seam exists and resolves end to end; nothing on the roll side
 touches it. Rolls A–M, the Governor, and every stub generator are byte-for-byte unchanged by this
 session. Phase 2 wires the first generator (own-attribute → own-pie, no matchup effects).
+
+---
+
+## Session 32 — Phase 2: The bounded logistic make-rate model (Roll H real generator)
+
+Phase 2 wires the first real generator into the possession engine. The seam is
+`game.RosterFor(side).PlayerAt(slot)` → `player.{ZoneAttr}` → `cfg.MakeProbability(zone,
+rating)` → `Made` weight in Roll H's pie. Everything else in the pie (block carve, foul slices,
+OOB pair, putback path) is unchanged.
+
+### Zone → attribute mapping
+
+`ShotLocation` names WHERE the shot comes from; the player attribute names the SKILL needed to
+convert it. These are two different axes and naming both is what makes the mapping legible:
+
+| Zone | Player attribute | Why |
+|---|---|---|
+| Three | `Outside` | Perimeter shooting skill |
+| Long | `Outside` | Same — a long two draws from the same skill pool as a three |
+| Mid | `Mid` | Mid-range skill |
+| Short | `Close` | Floaters, runners, hooks — close-range conversion inside the paint |
+| Rim | `Finishing` | Converting rim attempts; distinct from `Close` |
+
+`Short` reads `Close`, not `Finishing`. The doc comment on `Player.Close` says "Converting
+close-range looks (inside the paint, not at the rim)"; `Player.Finishing` says "Converting rim
+attempts." The naming split is intentional and preserved.
+
+### The logistic formula
+
+`makePct = floor + (ceiling − floor) / (1 + exp(−k × (rating − midpoint)))`
+
+The curve is **inflection-above-50**: slow crawl from rating 1 to 50, steeper gains through the
+elite range, flattening near the ceiling. This intentional asymmetry means average-rated players
+(50) produce make rates near the middle of the floor-to-ceiling range but slightly below midpoint,
+elite players (85+) gain steeply, and the ceiling acts as an honest cap.
+
+Parameters live in `RollHConfig` — nothing hardcoded in the generator — so every knob is editable
+without touching any C# code. The `MakeProbability(ShotLocation zone, double rating)` method lives
+on config (not on the generator) so the generator and the harness validation checks always call
+the same formula.
+
+### Make weight substitution (not a full-pie rebuild)
+
+The logistic result replaces the `Made` weight only. The five non-Made, non-Blocked base weights
+are **rescaled proportionally** to fill `(1 − block − makePct)`:
+
+```
+nonMadeBase  = BaseMadeAndFouled + BaseMiss + BaseMissFouled + BaseMissOutOfBoundsLost + BaseMissOutOfBoundsRetained
+nonMadeShare = 1.0 − block − makePct
+scale        = nonMadeShare / nonMadeBase
+```
+
+Each of the five weights is multiplied by `scale`. The seven-way pie always sums to 1 for any
+`(zone, rating)` combination where `makePct ∈ [0, 1 − block]`, which the logistic guarantees when
+parameters are well-formed. The `Pie` constructor's sum-to-one validation remains the loud guard.
+
+The SHAPE of the non-Made outcomes (their relative proportions) is unchanged by Phase 2 — a high
+make rate shrinks the non-made share, but MadeAndFouled still slightly dominates MissFouled, etc.
+Changing those relative proportions is a future basketball call, not a Phase 2 concern.
+
+### The interface pattern
+
+`IRollHPieGenerator` with one method: `Pie<ShotResult> Generate(PossessionState state, bool putback
+= false)`. The Resolver field is typed to the interface; both the stub and the real generator
+implement it. This is the permanent pattern for all future real generators — stub implements the
+interface, real generator implements the interface, Resolver holds the interface. No teardown when
+the next phase builds another real generator; only the construction site changes.
+
+The 12 harness sites that construct `RollHStubPieGenerator` directly for isolated checks are typed
+to the concrete class and are unaffected — they never go through the Resolver's field.
+
+### Fallback discipline
+
+A null `SelectedSlot` is a wiring bug (throws). A null player (unpopulated roster) is a harness
+convenience (falls back to stub pie). This asymmetry is intentional: a missing slot means something
+upstream failed to run the selection roll, which is always a bug; a missing player means the harness
+didn't call `SetStarter`, which is legitimate for the 12 isolated checks that existed before Phase 2.
+
+The fallback ensures the isolated checks produce flat stub rates and their existing assertions pass
+unchanged — no harness regression from the generator swap.
+
+### Phase 2 wall (what is deliberately NOT here)
+
+- No defender attribute. No matchup effects.
+- No gravity, no spacing, no team aggregates. Phase 4.
+- No axis math. Phase 3.
+- No tendencies. Phase 5.
+- No putback tilt by size/athleticism. Putback path stays flat. Phase 4.
+- No other generator. Roll H only.

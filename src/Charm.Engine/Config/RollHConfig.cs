@@ -44,10 +44,10 @@ public sealed class RollHConfig
     /// blended-rate math read the same numbers.</summary>
     public double BlockWeight(ShotLocation zone) => zone switch
     {
-        ShotLocation.Rim => BlockRim,
+        ShotLocation.Rim   => BlockRim,
         ShotLocation.Short => BlockShort,
-        ShotLocation.Mid => BlockMid,
-        ShotLocation.Long => BlockLong,
+        ShotLocation.Mid   => BlockMid,
+        ShotLocation.Long  => BlockLong,
         ShotLocation.Three => BlockThree,
         _ => throw new InvalidOperationException($"No block weight for zone '{zone}'.")
     };
@@ -70,6 +70,75 @@ public sealed class RollHConfig
     public double PutbackMissOutOfBoundsLost { get; set; } = 0.01;
     public double PutbackMissOutOfBoundsRetained { get; set; } = 0.01;
     public double PutbackBlocked { get; set; } = 0.07;
+
+    // --- Per-zone logistic parameters (Phase 2). The real attribute-driven
+    //     generator reads the shooter's zone-relevant rating and runs a bounded
+    //     logistic: makePct = Floor + (Ceiling - Floor) / (1 + exp(-K * (rating - Midpoint))).
+    //     Five zones, each with its own four parameters. Fitted to three anchor
+    //     points per zone (rating 1 / 50 / 99) in the Phase 2 design session.
+    //     Every tunable here — nothing hardcoded in RollHGenerator. ---
+
+    // Three (reads player.Outside)
+    public double ThreeFloor    { get; set; } = 0.03;
+    public double ThreeCeiling  { get; set; } = 0.65;
+    public double ThreeK        { get; set; } = 0.057667;
+    public double ThreeMidpoint { get; set; } = 49.6239;
+
+    // Long (reads player.Outside)
+    public double LongFloor    { get; set; } = 0.03;
+    public double LongCeiling  { get; set; } = 0.63;
+    public double LongK        { get; set; } = 0.061286;
+    public double LongMidpoint { get; set; } = 45.4063;
+
+    // Mid (reads player.Mid)
+    public double MidFloor    { get; set; } = 0.05;
+    public double MidCeiling  { get; set; } = 0.67;
+    public double MidK        { get; set; } = 0.059158;
+    public double MidMidpoint { get; set; } = 44.2696;
+
+    // Short (reads player.Close)
+    public double ShortFloor    { get; set; } = 0.08;
+    public double ShortCeiling  { get; set; } = 0.83;
+    public double ShortK        { get; set; } = 0.057781;
+    public double ShortMidpoint { get; set; } = 46.3470;
+
+    // Rim (reads player.Finishing)
+    public double RimFloor    { get; set; } = 0.10;
+    public double RimCeiling  { get; set; } = 0.93;
+    public double RimK        { get; set; } = 0.061713;
+    public double RimMidpoint { get; set; } = 42.1330;
+
+    /// <summary>
+    /// The bounded logistic make probability for a given zone and player rating.
+    /// Single implementation owned by config so the generator and the harness's
+    /// validation checks always read the same formula.
+    ///
+    /// <para>Formula: Floor + (Ceiling − Floor) / (1 + exp(−K × (rating − Midpoint)))</para>
+    ///
+    /// <para>Zone→attribute mapping (caller's responsibility to pass the right rating):
+    /// Three/Long → player.Outside; Mid → player.Mid; Short → player.Close;
+    /// Rim → player.Finishing.</para>
+    /// </summary>
+    public double MakeProbability(ShotLocation zone, double rating)
+    {
+        double floor, ceiling, k, midpoint;
+        switch (zone)
+        {
+            case ShotLocation.Three:
+                floor = ThreeFloor; ceiling = ThreeCeiling; k = ThreeK; midpoint = ThreeMidpoint; break;
+            case ShotLocation.Long:
+                floor = LongFloor;  ceiling = LongCeiling;  k = LongK;  midpoint = LongMidpoint;  break;
+            case ShotLocation.Mid:
+                floor = MidFloor;   ceiling = MidCeiling;   k = MidK;   midpoint = MidMidpoint;   break;
+            case ShotLocation.Short:
+                floor = ShortFloor; ceiling = ShortCeiling; k = ShortK; midpoint = ShortMidpoint; break;
+            case ShotLocation.Rim:
+                floor = RimFloor;   ceiling = RimCeiling;   k = RimK;   midpoint = RimMidpoint;   break;
+            default:
+                throw new InvalidOperationException($"No logistic parameters for zone '{zone}'.");
+        }
+        return floor + (ceiling - floor) / (1.0 + Math.Exp(-k * (rating - midpoint)));
+    }
 
     // No live-wire scalar (like Roll E, F, and G): the only thing that would tilt
     // Roll H's pie is the deferred player/attribute model (the shooter-vs-defender

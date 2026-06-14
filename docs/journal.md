@@ -1,3 +1,126 @@
+## Session 32 — Phase 2: Direct self-rating wiring (Roll H real generator) (2026-06-14)
+
+**The second session of the player-model arc.** Phase 1 gave the slot layer a `Player` to hold and
+proved the seam `GameState.RosterFor(side).PlayerAt(slot)` resolves end to end. Phase 2 wires the
+first real generator: `RollHGenerator` reads the shooter's own attribute rating and produces a make
+probability via a per-zone bounded logistic. No matchup effects, no defender, no gravity, no team
+aggregates. Own rating → own pie only. That is the Phase 2 wall.
+
+**Design questions settled before any code (CONVENTIONS §4).**
+1. **Zone → attribute mapping.** `ShotLocation` names WHERE the shot comes from; the player
+   attribute names the SKILL needed to convert it. Three and Long → `player.Outside`; Mid →
+   `player.Mid`; Short → `player.Close`; Rim → `player.Finishing`. `Short` reads `Close` (not
+   `Finishing`) because Short is floaters, runners, hooks inside the paint — a skill-bucket, not
+   a rim conversion. `Finishing` is explicitly "converting rim attempts." The location/skill split
+   is intentional and naming both axes precisely is what makes the mapping legible.
+2. **The logistic curve: inflection-above-50.** `makePct = floor + (ceiling - floor) / (1 + exp(-k
+   * (rating - midpoint)))`. Slow crawl from rating 1 to 50, steeper gains through the elite range,
+   flattening near the ceiling. Five zones, five parameter sets fitted to three anchor points each
+   (ratings 1 / 50 / 99). Fitted analytically (Nelder-Mead on the three-anchor residual); result
+   confirmed by Python Monte Carlo before writing any C#.
+3. **Make weight substitution, not full-pie rebuild.** The logistic result replaces only the `Made`
+   weight. All other pie structure — block carve, foul slices, OOB pair, putback path — is preserved
+   unchanged from the stub. The five non-Made, non-Blocked base weights are rescaled to fill
+   `(1 − block − makePct)` proportionally, so the pie always sums to 1 and the `Pie` constructor's
+   validation never fires on a valid rating.
+4. **Interface pattern for the resolver field.** `IRollHPieGenerator` with a single
+   `Generate(PossessionState, bool)` method. Both the stub and the real generator implement it;
+   the Resolver field and ctor param are typed to the interface. This is the long-term pattern —
+   every generator that eventually gets a real implementation will follow it. The 14 existing harness
+   sites that construct `RollHStubPieGenerator` directly are typed to the concrete class and are
+   unaffected; they never go through the Resolver's interface-typed field.
+5. **Fail-loud on null slot; fallback on null player.** A null `SelectedSlot` when a possession
+   reaches Roll H is a wiring bug and throws. A null player (roster not populated) is a harness
+   convenience and silently falls back to stub behavior — this is what allows all 14 existing harness
+   checks to pass unchanged.
+6. **Putback path unchanged.** Putback shots return the flat putback pie from config. The real
+   putback tilt by size/athleticism/rim rating is Phase 4 work.
+
+**The five-zone logistic parameters (fitted and locked in config):**
+
+| Zone | Rating attr | Floor | Ceiling | K | Midpoint | R=1 | R=50 | R=99 |
+|---|---|---|---|---|---|---|---|---|
+| Three | Outside | 0.03 | 0.65 | 0.057667 | 49.6239 | ~6.5% | ~34% | ~62% |
+| Long | Outside | 0.03 | 0.63 | 0.061286 | 45.4063 | ~6.7% | ~37% | ~61% |
+| Mid | Mid | 0.05 | 0.67 | 0.059158 | 44.2696 | ~9.5% | ~41% | ~65% |
+| Short | Close | 0.08 | 0.83 | 0.057781 | 46.3470 | ~13% | ~49% | ~80% |
+| Rim | Finishing | 0.10 | 0.93 | 0.061713 | 42.1330 | ~16% | ~61% | ~91% |
+
+Python Monte Carlo confirmed all values in [0, 1], monotone per zone, and pies summing to exactly 1.
+
+**New files.**
+- `Generators/IRollHPieGenerator.cs` — the interface. Single `Generate(PossessionState state, bool
+  putback = false)` method. Both `RollHStubPieGenerator` and `RollHGenerator` implement it.
+- `Generators/RollHGenerator.cs` — the real generator. Constructor takes `RollHConfig` and
+  `GameState`. On `Generate`: reads zone from `state.ShotType` (throws if null), reads slot from
+  `state.SelectedSlot` (throws if null — wiring bug), looks up `_game.RosterFor(state.Offense)
+  .PlayerAt(slot)` (falls back to stub if null — unpopulated roster). Calls
+  `_cfg.MakeProbability(zone, rating)` and builds the pie via `BuildRealPie`. `BuildRealPie` computes
+  the five non-Made non-Blocked weights' proportional share, scales them to fill `(1 − block −
+  makePct)`, assembles the `Dictionary<ShotResult, double>`, and hands to `new Pie<ShotResult>`.
+  `BuildStubPie` and `BuildPutbackPie` mirror the stub exactly for the fallback and putback paths.
+
+**Edited files.**
+- `Config/RollHConfig.cs` — added twenty new properties (Floor, Ceiling, K, Midpoint for each of the
+  five zones) and the `MakeProbability(ShotLocation zone, double rating)` method that encapsulates the
+  logistic formula. This is the single place the formula lives — both the generator and the harness
+  check read the same method. Existing properties (`BaseMade`, etc.) and `BlockWeight` unchanged.
+- `Generators/RollHStubPieGenerator.cs` — added `: IRollHPieGenerator` to the class declaration.
+  No other change; the stub is byte-for-byte identical in behavior.
+- `Core/Resolver.cs` — two surgical type changes: `private readonly RollHStubPieGenerator
+  _rollHGenerator;` → `IRollHPieGenerator`, and `RollHStubPieGenerator rollHGenerator,` → `IRollHPieGenerator`
+  in the ctor signature. The store and the call site (`var pieH = _rollHGenerator.Generate(c.State,
+  c.Putback)`) are untouched. All other generator fields and params unchanged.
+- `src/Charm.Harness/Program.cs` — three changes:
+  1. Main construction site: `var rollHGenerator = new RollHStubPieGenerator(cfgH)` moved to after
+     `var game = new GameState(fouls)` and replaced with `var rollHGenerator = new RollHGenerator(cfgH,
+     game)` — the real generator needs `GameState`, which is declared after the generators in the
+     original code.
+  2. `RollHResolutionBatchCheck` param type changed from `RollHStubPieGenerator` to `IRollHPieGenerator`
+     (so the main construction site can pass the real generator to it).
+  3. New `Phase2AttributeWiringCheck` method appended and wired into the `ok &=` chain after
+     `Phase1RosterCheck`. Proves: all logistic values in [0, 1]; monotone per zone; high-Outside (85)
+     vs. low-Outside (25) three-point make rates differ by ≥ 10pp; fallback on unpopulated roster does
+     not throw.
+  The 12 remaining `RollHStubPieGenerator` construction sites in isolated batch checks are untouched
+  (they hit the fallback path and produce the flat stub pie unchanged).
+
+**Validation.** Python pre-check: pies sum to 1.0 for all ratings/zones; gap between Outside-85 and
+Outside-25 three-point make rates ≈ 40pp (≥ 10pp threshold); fallback path distinct from real path.
+Brace balance checked on all new and edited files (all matched). Harness run (Emmett's machine):
+**ALL CHECKS PASSED** on the second run (first run: one build error — `pie.Draw(...)` instead of
+`pie.Roll(NextUnitInterval())`; fixed in one line). Key Phase 2 output:
+
+```
+Three-point make rate — high Outside (85): 60.0%
+Three-point make rate — low  Outside (25): 19.5%
+Gap: 40.6pp  (threshold ≥ 10%)
+Wiring check PASSED — high shooter beats low shooter by required margin.
+Fallback OK — unpopulated roster returns stub pie without throwing.
+Phase 2 PASSED.
+```
+
+All 14 existing Roll H checks produced identical output (the 12 remaining stub sites hit the fallback
+path; `RollHResolutionBatchCheck` accepted the interface-typed real generator and ran against the same
+flat weights via the fallback).
+
+**Phase 2 wall held.** No defender attribute. No matchup effects. No gravity, no spacing, no team
+aggregates. No other generator. No putback tilt. The only attribute the generator reads this session
+is the shooter's own zone-relevant rating.
+
+**What stays out (carried to Phase 3+).**
+- No defender attribute or matchup effects. Those are Phase 3 (axis math) and Phase 4 (gravity,
+  spacing, team aggregates).
+- No axis laddering. Phase 3.
+- No shot tendencies. Phase 5.
+- No putback tilt by size/athleticism. Putback path stays flat (config weights). Phase 4.
+- No free-throw rating wiring (Roll L). Separate session.
+- No other generator. Roll H only this pass.
+
+**Carried deferrals (unchanged from prior sessions).**
+- Attribute-driven generators for all other rolls (the deferred ~90% of the work).
+- Score-aware late-game tactics, rushed-shot quality penalty, per-outcome time shaping.
+
 ## Session 31 — Phase 1: The player object and Roster seam (2026-06-13)
 
 **The first session of the player-model arc.** The possession engine is functionally complete as a

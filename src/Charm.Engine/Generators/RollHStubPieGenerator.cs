@@ -26,8 +26,12 @@ namespace Charm.Engine;
 /// class later WITHOUT touching Roll H or the resolver — it just hands back a
 /// richer pie over the same enum (one that reads the carried SelectedSlot +
 /// ShotType to tilt the make %).
+///
+/// Implements <see cref="IRollHPieGenerator"/> so the resolver holds the interface,
+/// not the concrete stub — swapping in the real generator only changes the
+/// construction site.
 /// </summary>
-public sealed class RollHStubPieGenerator
+public sealed class RollHStubPieGenerator : IRollHPieGenerator
 {
     private readonly RollHConfig _cfg;
 
@@ -66,13 +70,13 @@ public sealed class RollHStubPieGenerator
         var scale = 1.0 - block;
         var weights = new Dictionary<ShotResult, double>
         {
-            [ShotResult.Made] = _cfg.BaseMade * scale,
-            [ShotResult.MadeAndFouled] = _cfg.BaseMadeAndFouled * scale,
-            [ShotResult.Miss] = _cfg.BaseMiss * scale,
-            [ShotResult.MissFouled] = _cfg.BaseMissFouled * scale,
-            [ShotResult.MissOutOfBoundsLost] = _cfg.BaseMissOutOfBoundsLost * scale,
-            [ShotResult.MissOutOfBoundsRetained] = _cfg.BaseMissOutOfBoundsRetained * scale,
-            [ShotResult.Blocked] = block,
+            [ShotResult.Made]                   = _cfg.BaseMade                   * scale,
+            [ShotResult.MadeAndFouled]          = _cfg.BaseMadeAndFouled          * scale,
+            [ShotResult.Miss]                   = _cfg.BaseMiss                   * scale,
+            [ShotResult.MissFouled]             = _cfg.BaseMissFouled             * scale,
+            [ShotResult.MissOutOfBoundsLost]    = _cfg.BaseMissOutOfBoundsLost    * scale,
+            [ShotResult.MissOutOfBoundsRetained]= _cfg.BaseMissOutOfBoundsRetained* scale,
+            [ShotResult.Blocked]                = block,
         };
 
         // The Pie constructor validates the sum is 1 within Epsilon, so a bad
@@ -95,13 +99,13 @@ public sealed class RollHStubPieGenerator
     {
         var weights = new Dictionary<ShotResult, double>
         {
-            [ShotResult.Made] = _cfg.PutbackMade,
-            [ShotResult.MadeAndFouled] = _cfg.PutbackMadeAndFouled,
-            [ShotResult.Miss] = _cfg.PutbackMiss,
-            [ShotResult.MissFouled] = _cfg.PutbackMissFouled,
-            [ShotResult.MissOutOfBoundsLost] = _cfg.PutbackMissOutOfBoundsLost,
+            [ShotResult.Made]                    = _cfg.PutbackMade,
+            [ShotResult.MadeAndFouled]           = _cfg.PutbackMadeAndFouled,
+            [ShotResult.Miss]                    = _cfg.PutbackMiss,
+            [ShotResult.MissFouled]              = _cfg.PutbackMissFouled,
+            [ShotResult.MissOutOfBoundsLost]     = _cfg.PutbackMissOutOfBoundsLost,
             [ShotResult.MissOutOfBoundsRetained] = _cfg.PutbackMissOutOfBoundsRetained,
-            [ShotResult.Blocked] = _cfg.PutbackBlocked,
+            [ShotResult.Blocked]                 = _cfg.PutbackBlocked,
         };
 
         return new Pie<ShotResult>(weights, _cfg.Epsilon);
