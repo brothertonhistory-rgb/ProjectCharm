@@ -2469,17 +2469,17 @@ Two halves, both resolved:
   machine (high variance); a rim-attack team is a steady favorite (low variance). The same average
   can carry very different variance — which is where upsets and bad-games-for-good-teams live.
 
-### Defender identification — a weighted roll (Phase 5 build)
+### Defender identification — a weighted roll (Phase 6 build)
 
 - Who guards whom at the shot is a **weighted roll**, not a fixed slot map. Weights encode scheme
   (man / zone) and switch variability; base weights do the matching (perimeter D on perimeter, bigs
   on bigs) without rigid slot-vs-slot lockstep.
 - **v1 premise = positional pairing** (the engine already has on-court slots). Cross-slot
-  **mismatch-hunting** (deliberately attacking the weak defender) is a later Phase-5 elaboration, not
-  v1.
+  **mismatch-hunting** (deliberately attacking the weak defender) is a later build-pass elaboration,
+  not v1.
 - **Sequencing is load-bearing and must not be reordered:** Phase 4 designs the **gap function**
-  (defender ratings → modifier); Phase 5 builds the **picker** (who the defender is). The gap
-  function assumes a defender exists; the picker supplies him. Function first, picker second.
+  (defender ratings → modifier); the **picker** (who the defender is) is built later in Phase 6. The
+  gap function assumes a defender exists; the picker supplies him. Function first, picker second.
 
 ### Variance and streaks — hot/cold meters, governed by usage
 
@@ -2580,5 +2580,13 @@ Python builds. Logged for their proper pass:
   before it.
 - **Generation floors** — the competency floor and the relative-expressed-game constraints land on
   the future **player-generation** pass.
-- **Phase 4 scope** — as framed (laddering map + gap function + coverage math + counter-attribute
-  pairings + 4th-axis seam) it is likely **too much for one session**; split it at prompt-draft time.
+- **Phase 4 scope — RESOLVED at prompt-draft time (the split is decided):** the matchup math is
+  split along the one-duel / whole-roster seam. **Phase 4 = the individual-matchup tilt** (laddering
+  attributes → axes + counter-attribute pairings + the per-matchup gap function — everything to turn
+  one attacker-vs-defender into pie tilts). **Phase 5 = the roster strength-read** (the non-linear
+  coverage math alone: no-weakness-beats-one-peak, diminishing returns, credible-beats-elite).
+  **Phase 6 = the build** (defender-ID picker + wiring matchup into the generators). The 4th-axis
+  (experience/cohesion) neutral stub seam rides along in Phase 4. Canonical phase ladder as of this
+  session: 3 fingerprints (done) → 4 individual tilt → 5 roster read → 6 build. (This supersedes the
+  older "Phase 5 = tendencies" forward-reference in the Session 32 wall, which is left as-is per the
+  append-only rule; the newest entry is canonical.)

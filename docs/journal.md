@@ -33,9 +33,9 @@ offensive skill contests which defensive one) is Phase 4.
    *sparse* round robin (each attack meets its counter). Within a team = **coverage** ("no weakness
    beats one peak"). **Pace is not a dial** — it lives in turnovers + defensive rebounds. Roster
    composition sets **variance**, not just average.
-6. **Defender-ID = a weighted roll (Phase 5 build).** Scheme/switch weights; positional pairing v1;
-   cross-slot hunting later. **Sequencing locked:** Phase 4 = the gap *function*, Phase 5 = the
-   *picker*; do not reorder.
+6. **Defender-ID = a weighted roll (Phase 6 build).** Scheme/switch weights; positional pairing v1;
+   cross-slot hunting later. **Sequencing locked:** Phase 4 designs the gap *function*, the *picker*
+   is built later (Phase 6); do not reorder — function first, picker second.
 7. **Variance & streaks.** Per-player hot/cold meters (real 3+ runs only), with **usage as the
    self-correcting thermostat.** Tuned, not automatic; cold side needs a hard floor; **depends on the
    usage layer — don't ship before the governor.** A per-game "shooting weather" draw is the safer
@@ -56,13 +56,19 @@ offensive skill contests which defensive one) is Phase 4.
     event-sim we reject. Recorded so it isn't re-raised.
 
 **Deferred on purpose (not resolved — that would be designing ahead of the current pass):** the
-attention × matchup combination; the streak's usage governor; the generation floors; and **Phase 4's
-own scope** (likely too big for one session — split it at prompt-draft time).
+attention × matchup combination; the streak's usage governor; and the generation floors.
 
-**Next:** draft the Phase 4 prompt (a design pass) — the laddering map (attributes → axes,
-anti-double-count), the per-matchup gap function, the coverage / strength-read math, and the
-counter-attribute pairings — per CONVENTIONS §6, gated by the reflection + audit, with a possible
-scope-split.
+**Phase 4 scope — resolved (the split is decided).** Canonical phase ladder as of this session:
+**3** fingerprints (done) → **4** individual-matchup tilt (laddering + counter-pairings + the gap
+function) → **5** roster strength-read (the non-linear coverage math alone) → **6** the build
+(defender-ID picker + wiring). The 4th-axis stub seam rides along in Phase 4. (This supersedes the
+older "Phase 5 = tendencies" note in the Session 32 wall, left as-is per append-only; newest entry
+is canonical.)
+
+**Next:** draft the **Phase 4** prompt (a design pass) — the laddering map (attributes → axes,
+anti-double-count), the counter-attribute pairings, and the per-matchup gap function — per
+CONVENTIONS §6, gated by the reflection + audit. Coverage / strength-read is now Phase 5, its own
+session.
 
 ## Session 33 — Phase 3: The pie fingerprints (three tangible axes) (2026-06-14)
 
