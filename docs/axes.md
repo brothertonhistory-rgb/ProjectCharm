@@ -227,6 +227,169 @@ written, the relative comparison and the emergent game character largely compute
 
 ---
 
+## The three tangible fingerprints (the precise bundles)
+
+Pass 2's starting instruction — *"defining the four fingerprints is where the math conversation
+should START"* — worked through for the three computable-now axes (athletic, skilled, big). The
+experience/cohesion fingerprint is deliberately left open; it waits on the persistence layer.
+**Structure and direction only: which pies each axis tilts, which way, by what mechanism, and the
+shape of the gap -> tilt response. No magnitudes** — every number is a calibration-pass concern,
+tuned by watching games.
+
+### How a tilt enters a pie (the composition mechanism)
+
+- **Make/miss is an effective-rating SHIFT, not a curve change.** A matchup tilt slides the
+  shooter's *effective rating* along the one per-zone make-curve everyone shoots on (the Phase 2
+  `RollHConfig.MakeProbability(zone, rating)` logistic), reused untouched. The curve is never
+  reshaped, its midpoint/ceiling never moved per matchup, the output make% never multiplied. A
+  contest is just the shooter sliding up or down the shared scale.
+- **The zero point is AVERAGE defense, not an open shot.** No modifier = an utterly average
+  contest, so a league-average shooter with no modifier shoots league-average. A *positive* modifier
+  means the defense on that shot is worse than average (more open) -> higher up the curve; a
+  *negative* modifier means tighter than average -> lower. Average sits in the *middle* of the
+  scale, not the bottom.
+- **Categorical pies are direct slice reweights.** Location, rebound, turnover, transition, and the
+  tip have no make-curve — they are distributions, so a tilt reweights their slices directly (more
+  rim share, more live steals, a heavier tip-win slice).
+
+### The gap -> tilt response is ACCELERATING (a deliberate refinement)
+
+The per-matchup gap on an axis is an abstract signed input here (its computation is the laddering
+pass). The shape of gap -> tilt is **accelerating / convex, not saturating**: a marginal edge
+(barely quicker, barely more skilled) is imperceptible; the effect grows *faster* than the gap as it
+widens; a true mismatch produces cartoonish results. The only ceiling is **physical reality** — a
+make% cannot exceed the curve's own asymptote (an uncontested shot is not 110%), a frequency cannot
+exceed 100%. That bound is not an imposed cap (which would manufacture parity — forbidden by the
+no-artificial-limits principle); it is the edge of what is possible, and the make-curve already
+bends toward it on its own. Edges on different axes **compound** — each tilts its *own* pies, so a
+team ahead on all of them has every pie leaning its way, multiplying on the scoreboard into a
+blowout (correct, not a flaw). Absurd matchups are kept rare by **realistic scheduling**, not by
+softening the math.
+
+> This refines the conceptual sketch's "credible beats elite" lean *for the single-axis
+> gap-response*: the bottom end holds (a sub-credible edge does almost nothing), but the top end
+> does **not** saturate toward parity. The coverage / "no weakness beats one peak" *roster* read is
+> a separate question — the strength-read math of the laddering pass.
+
+### Two efficiency doors
+
+A matchup moves scoring efficiency through two independent channels, and the engine already keeps
+them as separate steps (where the shot comes from, then whether it falls):
+1. **The shot mix** — which zone the attempt comes from.
+2. **The make%** — whether that shot falls.
+A quickness edge swings *both* (more rim attempts AND a higher make on everything, same beaten
+defender). A quickness *deficit* against an equal-sized defender swings mainly the **mix** — fewer
+rim, more jumpers — so efficiency drops through a worse shot *diet* even when each individual shot's
+make is unchanged. Underneath, the mix has a standing pull toward the rim ("everyone wants the rim
+if they can get there"); the matchup decides how much access is granted.
+
+### Three independent dials set "how open"
+
+How contested a shot is has three separate sources, kept in separate drawers so they never
+pre-fuse:
+1. **The defender matchup** — the four-axis terrain (this pass).
+2. **Team fit** — gravity, spacing, and the passing aggregate (the team-aggregate layer).
+3. **Role / usage** — who shoots when (tendencies).
+Only the first is a fingerprint. The other two are real, wanted, and their own later passes.
+
+### Athletic — a relative tilt
+
+- **Make/miss (effective-rating shift, both ends, all zones):** a quickness edge buys a sliver of
+  separation on *every* shot type — off a screen, relocating, attacking — so the shooter's make
+  slides up; the mirror on defense slides the man he guards down. Strongest at the rim, real
+  everywhere. There is no open/contested state in the engine, so this is the *average* separation
+  edge expressed straight into the make%.
+- **Shot location (direct reweight):** an offensive edge pulls the mix toward the **rim** (you get
+  downhill); a defensive edge pushes the opponent's mix **out** (walled off the paint, settling for
+  jumpers).
+- **Usage (selection reweight) + the cascade:** a large athletic mismatch chokes the out-athleted
+  player's *scoring touches* — he cannot get into his action — not just his make%. Forcing the ball
+  to him anyway (strategy) bogs the offense down and spills usage to players never meant to carry
+  it, dropping their efficiency too. The cascade is *emergent*: the matchup chokes the usage,
+  strategy insists, personnel eats the spillover — nobody scripts "the offense breaks."
+- **Turnovers / steals (slice reweight):** a big athletic gap manufactures **live** turnovers and
+  steals on defense (a full-court press is strategy *weaponizing* this edge). The authored steal
+  talent (quick hands) and basketball IQ on the offensive side are personnel inputs stacking on top,
+  not part of this tilt.
+- **Rebounding (secondary):** motor, leaping, quickness to the ball — rebounding above one's size,
+  the second jump.
+- **Transition:** the matchup owns the **efficiency** (rim-heavy mix, high finish — the open floor
+  is already low-defense and the athletic edge cashes in); **frequency** is mostly a coaching choice,
+  only nudged by the gap (athletes run when they can beat everyone down the floor).
+
+### Big — a relative tilt
+
+- **Make/miss (effective-rating shift):** rim protection slides the opponent's rim attempts
+  **down**; finishing over and through a smaller body slides one's own rim **up** (plus a smaller
+  bump shooting *over* a shorter man out on the floor). Length contests everywhere, weighted to the
+  rim.
+- **Blocks (slice reweight):** a length edge in a direct matchup raises the block slice, weighted to
+  the rim and fading outward; a size *deficit* raises one's *own* blocked rate (the tiny finisher
+  gets swatted more). The engine carves block off the top first (size-driven), then resolves
+  make/miss among the rest (skill-driven) — so a small, skilled finisher reads as a high blocked
+  rate *and* a solid make on what he gets off, both true at once.
+- **Shot location (direct reweight):** a strength edge pulls the mix **inside** (close / rim —
+  leaning on it to get into the paint).
+- **Rebounding (primary, both ends):** size, length, and strength own the glass — securing the
+  opponent's misses and grabbing one's own for second chances (each offensive board a *fresh
+  possession*, compounding on the scoreboard). The rebounding *skill* (box-out, timing, positioning)
+  is the baseline this terrain gates — decisive when the physical battle is even, dominant and
+  compounding when it is not.
+- **The tip:** a weighted roll on the wingspan / reach gap (even reach ~ 50/50; the win probability
+  climbs an accelerating S-curve as the gap grows), consuming the centers' matchup. The seam already
+  exists in `JumpBall.cs`.
+
+### Skilled — the baseline, NOT a tilt (the keynote)
+
+Once each specific skill is placed, "skilled" is **not** a set of pie-tilts the way athletic and big
+are. It is the **baseline level the physical axes tilt around:**
+- **Shooting touch** (close / mid / outside / finishing) is the make/miss baseline — the shooter's
+  own rating, already wired in Phase 2. The physical matchup slides it; touch sets where it slides
+  *from*.
+- **Ball security** (handling, passing) sets the baseline turnover rate that the athletic
+  steal-pressure then pushes on. Basketball IQ amplifies the decision side (a personnel modifier,
+  not an axis).
+- **Skill decides the game when the physical battle is even** — which, with realistic scheduling, is
+  the vast majority of D1 games. It is what is left showing once the physical tilts cancel.
+- **Skill's creation side is a team aggregate, not a matchup tilt.** A team with strong passing earns
+  a small make **bump** on teammates' shots — the alley-oop, the backdoor read — baked into the
+  percentage because the engine cannot simulate the pass itself. This behaves like gravity and
+  spacing (more good passers -> higher efficiency for everyone; five elite passers lift the whole
+  floor), so it lives in the team-aggregate layer beside them, hidden, surfaced only in outcomes. It
+  is the lifeline by which a smaller, less athletic but skilled team passes itself open and competes
+  — skill routing around a physical deficit.
+
+This is the **asymmetry made concrete in the fingerprints themselves:** the physical axes
+aggressively *push* pies; skill is the level they push against. Skill is what you *can* do; the
+physical axes decide whether you are *let* to. And it is not symmetric — a large physical edge
+erases skill far more effectively than a large skill edge climbs out of a physical hole.
+
+### Correlated-axis overlaps, resolved
+
+- **Athletic vs. big at the rim:** athletic is *horizontal* (separation — beating your man to get
+  open / to the rim); big is *vertical* (finishing and shooting over the top, walling off the rim).
+  Different traits, no shared tilt.
+- **Self-creation** (getting one's *own* shot open) is the athletic matchup's job, not a skill
+  make-bump — the engine cannot model the coverage-breakdown event, so the physical gap is the
+  lever.
+- **Passing / playmaking** (creating a *teammate's* shot) *is* a make-bump, but a team-aggregate
+  one, sitting with gravity and spacing — distinct from self-creation.
+- **Rebounding skill** is its own ability gated by the size / athletic terrain, not the offensive
+  skilled axis.
+- **The tip** is a size (wingspan) contest, not athletic, though leaping nudges it.
+
+### Dependencies (named, not designed here)
+
+These fingerprints assume an opposing lineup exists to produce the gap. Still owed by later passes:
+**defender identification** (who is matched on whom at a shot — the build pass), the **per-matchup
+gap computation**, the **attribute -> axis laddering** (anti-double-count) and the **coverage /
+strength-read** math (the laddering pass), all **magnitudes** (the calibration pass), the
+**strategy layer** that multiplies the terrain, and the **team-aggregate** build (gravity, spacing,
+the passing aggregate). Each fingerprint is also written to read in the **box score** — the user's
+only window into the hidden layer.
+
+---
+
 ## The three composing inputs (where this meets the pies — Pass 3)
 
 The generators consume **three independent inputs** to shape a pie, composing *without ever
@@ -344,6 +507,18 @@ that comes later.
 - Team strength is NOT a linear sum (hard constraint).
 - Game *character* is emergent from profile collision.
 - Each axis is a pie fingerprint; defining the four fingerprints is where the math pass starts.
+- The three tangible fingerprints (athletic, skilled, big) are defined as precise per-pie
+  bundles with directions and composition mechanisms (see "The three tangible fingerprints").
+- Make/miss composes as an effective-rating SHIFT on the shared per-zone curve (reused
+  untouched); the zero point is AVERAGE defense; categorical pies reweight slices directly.
+- The gap -> tilt response is ACCELERATING (not saturating), bounded only by physical reality;
+  edges on different axes compound; absurd matchups are kept rare by scheduling, not by caps.
+- Skilled is the BASELINE the physical axes tilt around (touch + ball security + the even-game
+  decider), not a pie-pusher; its creation side (the passing make-bump) is a hidden team
+  aggregate beside gravity and spacing.
+- The correlated-axis overlaps are resolved (athletic horizontal vs big vertical;
+  self-creation -> athletic; passing -> team aggregate; rebounding skill its own ability;
+  tip -> size/wingspan).
 - Three composing inputs (matchup / strategy / personnel), never pre-blended; matchup is
   derived-per-matchup and relative.
 - The axes are hidden engine internals, surfaced only through outcomes; outcome legibility is a
@@ -356,8 +531,9 @@ that comes later.
 - How exactly each attribute ladders into each axis (and how to avoid double-counting a trait
   across correlated axes).
 - The non-linear strength read — the actual diminishing-returns / coverage / threshold math.
-- The four pie fingerprints — which specific pies each axis tilts, in which direction, and how
-  the per-matchup gap scales the tilt.
+- The experience/cohesion fingerprint — its pie tilts and gap-response. (The three tangible
+  fingerprints — athletic, skilled, big — are now settled above; this fourth one is gated on
+  the persistence layer.)
 - The asymptotic make-rate mapping and the *combined* ceiling on stacked aggregate tilts.
 - How strategy multiplies the terrain (the strategy-layer design).
 - The cross-game persistence subsystem (career counters + co-appearance logging) and the
