@@ -339,30 +339,64 @@ Only the first is a fingerprint. The other two are real, wanted, and their own l
   climbs an accelerating S-curve as the gap grows), consuming the centers' matchup. The seam already
   exists in `JumpBall.cs`.
 
-### Skilled — the baseline, NOT a tilt (the keynote)
+### Skilled — a baseline AND an active contest (the keynote, corrected)
 
-Once each specific skill is placed, "skilled" is **not** a set of pie-tilts the way athletic and big
-are. It is the **baseline level the physical axes tilt around:**
-- **Shooting touch** (close / mid / outside / finishing) is the make/miss baseline — the shooter's
-  own rating, already wired in Phase 2. The physical matchup slides it; touch sets where it slides
-  *from*.
-- **Ball security** (handling, passing) sets the baseline turnover rate that the athletic
-  steal-pressure then pushes on. Basketball IQ amplifies the decision side (a personnel modifier,
-  not an axis).
-- **Skill decides the game when the physical battle is even** — which, with realistic scheduling, is
-  the vast majority of D1 games. It is what is left showing once the physical tilts cancel.
-- **Skill's creation side is a team aggregate, not a matchup tilt.** A team with strong passing earns
-  a small make **bump** on teammates' shots — the alley-oop, the backdoor read — baked into the
-  percentage because the engine cannot simulate the pass itself. This behaves like gravity and
-  spacing (more good passers -> higher efficiency for everyone; five elite passers lift the whole
-  floor), so it lives in the team-aggregate layer beside them, hidden, surfaced only in outcomes. It
-  is the lifeline by which a smaller, less athletic but skilled team passes itself open and competes
-  — skill routing around a physical deficit.
+> **Correction to Session 33.** The first pass called skilled "the baseline, NOT a tilt" — a passive
+> floor the physical axes slide around. That was half right and is now amended: skill *is* the baseline
+> the shift starts from, **and** it is an active **skill-vs-skill contest** in its own right. The
+> passive-only framing is retired.
 
-This is the **asymmetry made concrete in the fingerprints themselves:** the physical axes
-aggressively *push* pies; skill is the level they push against. Skill is what you *can* do; the
-physical axes decide whether you are *let* to. And it is not symmetric — a large physical edge
-erases skill far more effectively than a large skill edge climbs out of a physical hole.
+Make/miss is not just the shooter's touch slid by a physical gap. It is a **contest between the
+shooter's shooting rating and the *defender's* defending**, resolved as the same effective-rating
+shift on the one shared per-zone curve. A great perimeter defender slides the shooter *down* even at
+**equal physicals**; a weak one slides him *up*. So the effective-rating shift on any shot has **two
+independent sources**, both moving the single effective rating, neither a separate roll:
+1. **The physical matchup** — the athletic / big gap (the fingerprints above).
+2. **The skill matchup** — the offense's relevant offensive skill against the defense's relevant
+   defensive skill.
+
+**There is no simulated "did he get open" step.** The quality of the look is an *input* to the shift
+— set by the matchup now, and by the team's attention allocation later — never its own simulated
+event. The engine resolves *odds*, not the play unfolding. "Openness" is just the name for the
+**physical** side of that input; it is a contributor to the one make%, not a thing the engine rolls
+(rolling "is he open," then "does the open shot fall," is the event-by-event simulation the project
+rejected). This is the resolution of the earlier "two faucets" sketch: openness = getting the look
+(the physical contribution) and conversion = making it (the skill-vs-skill contribution) are two
+*inputs to the same shift*, not two sequential rolls.
+
+This is what actually drives the locked **"skill decides the even game":** when the physical battle is
+even — which, with realistic scheduling, is the vast majority of D1 games — the physical contribution
+is ~0, so the **skill-vs-skill contest is the entire signal.** Skill goes *loud* precisely when the
+physical tilts cancel. Not "what is passively left showing" — an active shooter-skill-against-
+defender-skill fight that decides the game.
+
+What the first pass got right and stays true:
+- **Shooting touch** (close / mid / outside / finishing) is the make/miss **baseline** — the shooter's
+  own rating, already wired in Phase 2. Both contests above slide it; touch sets where it slides *from*.
+- **Ball security** (handling, passing) sets the **baseline turnover rate** the athletic steal-pressure
+  pushes on — and this too is a skill-vs-skill contest (ball-handling against the defender's steal
+  skill), the same shape as the make/miss one. Basketball IQ amplifies the decision side (a personnel
+  modifier, not an axis).
+- **Skill's creation side is a team aggregate, not a self matchup.** A team with strong passing earns a
+  small make **bump** on teammates' shots — the alley-oop, the backdoor read — baked into the percentage
+  because the engine cannot simulate the pass itself. This behaves like gravity and spacing (more good
+  passers -> higher efficiency for everyone; five elite passers lift the whole floor), so it lives in
+  the team-aggregate layer beside them, hidden, surfaced only in outcomes. It is the lifeline by which a
+  smaller, less athletic but skilled team passes itself open and competes — skill routing around a
+  physical deficit. (Distinct from self-creation, which is the athletic matchup's job.)
+
+> **The pairing map is Phase 4.** Each offensive skill contests a *specific* defensive skill —
+> shooting ↔ perimeter defense, ball-handling ↔ steal skill, finishing ↔ rim protection, and so on.
+> Enumerating those **counter-attribute pairings** (and where defensive skill itself ladders) is the
+> laddering pass, not settled here. This section settles only that make/miss (and the other skill pies)
+> *are* skill-vs-skill contests, not a one-sided baseline.
+
+**The asymmetry still holds, now stated correctly:** the physical axes aggressively *push* pies; skill
+sets the level they push against *and* fights its own opposite number on top. Skill is what you *can*
+do; the physical axes decide whether you are *let* to. It is not symmetric — a large physical edge
+erases skill far more effectively than a large skill edge climbs out of a physical hole — which is why
+the physical contribution, when it is large, swamps the skill contest, and why the skill contest only
+becomes the whole story once the physical gap closes.
 
 ### Correlated-axis overlaps, resolved
 
@@ -513,9 +547,13 @@ that comes later.
   untouched); the zero point is AVERAGE defense; categorical pies reweight slices directly.
 - The gap -> tilt response is ACCELERATING (not saturating), bounded only by physical reality;
   edges on different axes compound; absurd matchups are kept rare by scheduling, not by caps.
-- Skilled is the BASELINE the physical axes tilt around (touch + ball security + the even-game
-  decider), not a pie-pusher; its creation side (the passing make-bump) is a hidden team
-  aggregate beside gravity and spacing.
+- Skilled is a BASELINE *and* an active skill-vs-skill contest (corrected from Session 33's
+  "baseline, not a tilt"). Make/miss is the shooter's shooting vs the defender's defending; the
+  effective-rating shift has two sources (physical matchup + skill matchup), neither a separate
+  roll. There is NO simulated "did he get open" step — openness is the physical *input* to the
+  shift, not an event. Skill becomes the whole signal when the physical battle is even (most D1
+  games). Touch still sets where the shift starts from; ball security is itself a handling-vs-steal
+  contest; the creation/passing make-bump stays a hidden team aggregate beside gravity and spacing.
 - The correlated-axis overlaps are resolved (athletic horizontal vs big vertical;
   self-creation -> athletic; passing -> team aggregate; rebounding skill its own ability;
   tip -> size/wingspan).
@@ -530,6 +568,10 @@ that comes later.
 **Open (future conversations, NOT decided here):**
 - How exactly each attribute ladders into each axis (and how to avoid double-counting a trait
   across correlated axes).
+- The **counter-attribute pairing map** — which offensive skill contests which defensive one
+  (shooting ↔ perimeter-D, handling ↔ steal skill, finishing ↔ rim protection, …) and where
+  *defensive* skill itself ladders. Settled now: make/miss and the skill pies ARE skill-vs-skill
+  contests; enumerating the pairings is the laddering pass (Phase 4).
 - The non-linear strength read — the actual diminishing-returns / coverage / threshold math.
 - The experience/cohesion fingerprint — its pie tilts and gap-response. (The three tangible
   fingerprints — athletic, skilled, big — are now settled above; this fourth one is gated on

@@ -1,3 +1,69 @@
+## Session 34 — Post-Phase-3 design capture: the matchup deep dive (2026-06-14)
+
+**A design session, not a build (CONVENTIONS §4) — no code, no harness.** A long conversation after
+Phase 3 shipped produced a pile of locked design that lived only in chat; this session writes it down
+so the Phase 4 prompt is drafted from the record, not from memory. Deliverables: a **correction** in
+`docs/axes.md` and a **deep-dive capture** appended to `docs/design.md` (full detail there). Nothing
+is wired; every item is gated to a later pass.
+
+**The one correction (axes.md):** Session 33 called skilled "the baseline, NOT a tilt." That is now
+amended — skill is the baseline the shift starts from **and** an active **skill-vs-skill contest.**
+Make/miss is the shooter's shooting against the *defender's* defending; the effective-rating shift has
+**two sources** (physical matchup + skill matchup), neither a separate roll. There is **no simulated
+"did he get open" step** — openness is the *physical input* to the shift, not an event (rolling "is he
+open" then "does it fall" is the event-sim the project rejects). Skill becomes the **whole signal**
+when the physical battle is even — most D1 games. The counter-attribute **pairing map** (which
+offensive skill contests which defensive one) is Phase 4.
+
+**What else was locked (captured in design.md, summarized here):**
+
+1. **Per-possession ceiling & floor are emergent.** A single shot tops out at the curve's asymptote
+   (no imposed cap); offensive rebounds legitimately push a *possession* higher (distinct events
+   compound). The floor (~20–25% even in the worst mismatch) is the residue of events we can't
+   simulate and doubles as the cold-streak hard bottom.
+2. **Double-count discipline + the two-defender drive.** Spend a gap once; different *matchups* source
+   different doors. On-ball defender gates **location**; the help big gates the **finish**.
+   Defender-ID resolves **before** location.
+3. **The expressed game is relative.** Opportunity widens *attempts*; skill still governs *results*
+   (identity preserved). Roles are earned against the competition, not assigned — so tendencies can't
+   be fixed per-player numbers.
+4. **The competency floor.** College is a selected population; a wide-open college guard hits ~30%+.
+   A bad rating = how far he drops as the look tightens. A constraint on future player-generation.
+5. **Combination.** Between teams = two one-way battles, **scoreboard as the common currency**, a
+   *sparse* round robin (each attack meets its counter). Within a team = **coverage** ("no weakness
+   beats one peak"). **Pace is not a dial** — it lives in turnovers + defensive rebounds. Roster
+   composition sets **variance**, not just average.
+6. **Defender-ID = a weighted roll (Phase 5 build).** Scheme/switch weights; positional pairing v1;
+   cross-slot hunting later. **Sequencing locked:** Phase 4 = the gap *function*, Phase 5 = the
+   *picker*; do not reorder.
+7. **Variance & streaks.** Per-player hot/cold meters (real 3+ runs only), with **usage as the
+   self-correcting thermostat.** Tuned, not automatic; cold side needs a hard floor; **depends on the
+   usage layer — don't ship before the governor.** A per-game "shooting weather" draw is the safer
+   variance dial (no feedback loop).
+8. **Usage ↔ efficiency + the two-pie game.** Offense's usage pie vs defense's attention pie.
+   **Attention is the source of openness** (unifies the parked gravity/spacing dial). Superstar =
+   flat usage-efficiency curve + outsized gravity. Depth requires adaptive allocation.
+9. **Coaching / tactics.** Rigid coaches that top out are content (needs scouting to be legible).
+   The tactics rating drives **allocation quality via a simple heuristic — NOT a flat make-boost**
+   (that would be the forbidden absolute difficulty dial). Through the model, not around it.
+10. **Fatigue / endurance** — its own large future session. Endurance sets drain rate; drains the
+    **physical axis first** and flows through the existing matchup machinery; iron-men exist; bigs
+    tire faster.
+11. **Game-state awareness** — a future modifier layer that **bends existing pies** (threes/pace/
+    fouling), not a new system; extends the Session 30 end-of-half seam.
+12. **Closed: shot-quality degradation.** Rejected as a separate mechanism — it already lives in the
+    shot-mix reweight + the make%-tilt; a within-possession option-1/2/heave sequence would be the
+    event-sim we reject. Recorded so it isn't re-raised.
+
+**Deferred on purpose (not resolved — that would be designing ahead of the current pass):** the
+attention × matchup combination; the streak's usage governor; the generation floors; and **Phase 4's
+own scope** (likely too big for one session — split it at prompt-draft time).
+
+**Next:** draft the Phase 4 prompt (a design pass) — the laddering map (attributes → axes,
+anti-double-count), the per-matchup gap function, the coverage / strength-read math, and the
+counter-attribute pairings — per CONVENTIONS §6, gated by the reflection + audit, with a possible
+scope-split.
+
 ## Session 33 — Phase 3: The pie fingerprints (three tangible axes) (2026-06-14)
 
 **A design session, not a build (CONVENTIONS §4) — no code, no harness; the deliverable is the spec

@@ -2383,3 +2383,202 @@ unchanged — no harness regression from the generator swap.
 - No tendencies. Phase 5.
 - No putback tilt by size/athleticism. Putback path stays flat. Phase 4.
 - No other generator. Roll H only.
+
+## Session 34 — Post-Phase-3 design capture: the matchup deep dive (2026-06-14)
+
+**A design session, not a build (CONVENTIONS §4) — no code, no harness.** This records the design
+locked *verbally* in the long conversation after Phase 3 (Session 33) shipped, so the next prompt is
+built on the written record, not chat memory. The Session 33 **skill correction** lives in `axes.md`
+(it amends that doc directly); everything else is captured here. All of it is concept, each item
+gated to a later pass; nothing is wired.
+
+### The skill correction (full text in axes.md)
+
+Session 33 called skilled "the baseline, NOT a tilt." Corrected: skill is the baseline the shift
+starts from **and** an active **skill-vs-skill contest**. Make/miss is the shooter's shooting against
+the defender's defending; the effective-rating shift has **two sources** (physical matchup + skill
+matchup), neither a separate roll. There is **no simulated "did he get open" step** — openness is the
+*physical input* to the shift, not an event. Skill becomes the **whole signal** when the physical
+battle is even (most D1 games). The counter-attribute **pairing map** (which offensive skill contests
+which defensive one) is Phase 4. See `axes.md` → "Skilled — a baseline AND an active contest."
+
+### The per-possession ceiling and floor (emergent, no new mechanism)
+
+- Each pie spin tops out around college reality (~75–80% on the best looks); a single shot is never
+  99%, so a possession's scoring odds are bounded above by the **curve's own asymptote** — no cap is
+  imposed.
+- **Offensive rebounds legitimately push a *possession* above the per-shot ceiling.** Each ORB is a
+  fresh, distinct event, so they **compound** — the 7-footer who keeps tipping it back and scoring is
+  correct, good compounding of distinct events, not a ceiling violation.
+- **Floor:** the worst mismatch (a D3 team vs a champion) still scores something — ~20–25% / ~40 pts
+  baked in — from busted coverage, run-outs, and lucky bounces the engine cannot simulate. Not an
+  imposed floor; it is the **residue of events we do not model.** This same floor doubles as the
+  **cold-streak hard bottom** — nobody goes to literally 0%.
+- Both ceiling and floor are **emergent** from the curve plus distinct-event compounding. No new
+  mechanism.
+
+### Double-count discipline and the two-defender drive
+
+- **Spend a gap ONCE per shot.** A single physical edge must not be charged into both the location
+  pie and the make% as if it were two separate edges.
+- **"Different faucets"** keeps it honest: different *matchups* source different doors.
+- **The two-defender drive** makes it concrete: the **on-ball defender gates location** (beaten off
+  the dribble → rim access), while a rotating help **big gates the finish** (make% / block / foul at
+  the rim). Two defenders, two doors — not one gap double-charged.
+- **Defender-ID resolves BEFORE location**, so the matchup is known in time to shape both doors.
+
+### The expressed game is relative (opportunity widens attempts; skill governs results)
+
+- A player's *attempted* game expands and contracts with the competition. Expressed game = latent
+  skill × whether the gap lets him use it. A D1 role-player dropped to D2 starts launching threes;
+  prime Shaq on a D2 team would handle the ball.
+- **Opportunity widens *attempts*; skill still governs *results*** — which preserves player identity
+  (he is not a different player, he just gets more rope).
+- Same lever as the usage-choke, opposite direction: the athletic mismatch *chokes* the out-classed
+  player's touches; the talent mismatch *widens* the dominant player's.
+- Consequence: **roles are earned against the competition, not assigned.** Tendencies therefore
+  cannot be fixed per-player numbers — they must emerge from the matchup. (A constraint on the future
+  tendencies pass.)
+
+### The competency floor (a player-generation constraint, later)
+
+- College is a *selected* population: everyone can shoot OR defend OR pass OR has size/athleticism —
+  the recruiting bar enforces a floor of competence.
+- So a wide-open college guard hits ~30%+ from three at minimum. A bad rating shows up as **how far
+  below the floor he drops as the look tightens**, not as "can't make an open one."
+- This constrains the future **player-generation** layer (the curve's floor + how ratings
+  distribute), recorded here so generation honors it.
+
+### Combination — how the matchups become a game
+
+Two halves, both resolved:
+
+- **Between teams = two one-way battles.** A's offense vs B's defense, and B's offense vs A's
+  defense — separate. Each resolves ~130 trips; the sum is the game. The axes are **never weighted
+  against each other by a formula** — the **scoreboard is the common currency.** The "round robin"
+  is **sparse**: each attack meets its natural counter (this attacker vs his defender), not an
+  all-vs-all cross product.
+- **Within a team = coverage.** Strength = how many fronts you hold serve on; weakness = a front you
+  lose badly. **"No weakness beats one peak"** falls directly out of this (a team with no losing
+  front beats a team with one elite front and three soft ones).
+- **Pace/tempo is NOT a separate dial.** It lives in **turnovers + defensive rebounds:** a fast team
+  feeds its break through steals and run-outs; a strong, ball-secure team starves the break by not
+  turning it over and by ending possessions on the defensive glass → forcing halfcourt. Tempo
+  *emerges*; it is not set.
+- **Roster composition sets VARIANCE, not just average.** A volume-three team is a coin-flip / upset
+  machine (high variance); a rim-attack team is a steady favorite (low variance). The same average
+  can carry very different variance — which is where upsets and bad-games-for-good-teams live.
+
+### Defender identification — a weighted roll (Phase 5 build)
+
+- Who guards whom at the shot is a **weighted roll**, not a fixed slot map. Weights encode scheme
+  (man / zone) and switch variability; base weights do the matching (perimeter D on perimeter, bigs
+  on bigs) without rigid slot-vs-slot lockstep.
+- **v1 premise = positional pairing** (the engine already has on-court slots). Cross-slot
+  **mismatch-hunting** (deliberately attacking the weak defender) is a later Phase-5 elaboration, not
+  v1.
+- **Sequencing is load-bearing and must not be reordered:** Phase 4 designs the **gap function**
+  (defender ratings → modifier); Phase 5 builds the **picker** (who the defender is). The gap
+  function assumes a defender exists; the picker supplies him. Function first, picker second.
+
+### Variance and streaks — hot/cold meters, governed by usage
+
+- The independent-rolls model under-produces real-life variance (a flaw surfaced earlier). The fix
+  revisits the hot/cold idea once talked out of — now *justified* by that flaw.
+- **Per-player hot/cold meters** aggregating to a team feel; only **real runs (3+)** trigger — normal
+  scatter is ignored, so it does not become noise.
+- **Usage is the self-correcting thermostat.** Hot → fed more → more attention → exposed → cools
+  (+ turnover risk). Cold → fed less → cleaner looks for others → warms. This converts a dangerous
+  snowball into negative feedback.
+- **CAUTION (load-bearing):** the self-correction is a **tuned** relationship, not automatic. The
+  cold side is more dangerous than the hot side and needs a **hard floor** (the per-possession floor
+  above). The whole governor **depends on the deferred usage layer** — at flat-usage v1 the streak is
+  an *unregulated snowball*. **Do not ship the streak mechanic before its usage governor exists.**
+- **Alternative / complement:** a per-game **"shooting weather"** draw carries variance with **no
+  feedback loop** — safer. Streak for *feel*, weather for the *variance dial*. Likely both.
+
+### Usage ↔ efficiency, and the two-pie strategic game
+
+- **Usage and efficiency are inverse** — the load-bearing regulator. Pile volume on a player and his
+  efficiency falls (more attention, harder shots); *how fast* it falls is the player's signature.
+- **The two-pie game:** the offense allocates a **usage pie** (who shoots); the defense allocates an
+  **attention pie of 100** across the five offensive players. They collide through the make-odds.
+- **KEY UNIFICATION — attention is the source of "openness."** Openness = a player's gravity minus
+  the attention spent on him. This ties the previously-parked **gravity/spacing** dial into the same
+  machinery: attention is *not* a new make% input, it is the team-level half of the openness input
+  the skill section already named.
+- **Superstar, defined mechanically:** a **flat usage-efficiency curve** (stays efficient at high
+  volume) **+ outsized gravity** (draws over-allocation). You can pile both usage and attention on
+  him and he still rolls well — and the attention he vacuums off the other four feeds *their* looks.
+  Multiple stars force the defense to either flatten attention (pure matchups, conceding the stars)
+  or overload (gambling the lightly-guarded others get cold rolls).
+- **CAUTION:** this depth exists only with **intelligent, adaptive** allocation; static dumb AI gets
+  exploited. The usage-efficiency curve is THE regulator and must stay calibrated.
+
+### Coaching AI and the tactics rating
+
+- **Imperfect adaptivity is partly a FEATURE.** Coaches have rigid identities, recruit-to-style, and
+  brute-force their strengths; the relative model lets a real edge **leak through a counter**
+  (dampened, not erased), so a coach can impose his game without perfectly reacting. Rigid coaches
+  struggle vs certain team types and **top out** at a level — realistic content, not a bug.
+- **Dependency:** "rigid coach struggles vs certain teams" is only good *content* if the user can
+  **see** the rigidity (scouting / legibility) and build or play to exploit it. The payoff rides on
+  scouting being real.
+- **The tactics rating drives ALLOCATION quality, NOT a flat make-boost.** Two traps, both rejected:
+  (a) computing the *optimal* allocation per game/lineup (the swamp — uncomputable for every dynamic
+  matchup); (b) a **flat make-success boost** (an *absolute* "good coach = your shots fall more" dial,
+  the back-door difficulty knob the engine forbids). The threadable middle: run a **simple adjustment
+  heuristic** — attention follows threat and drifts toward whoever's hot; usage flows to where
+  attention isn't — and let the **tactics rating scale how *sharp and prompt* that heuristic runs**
+  (high = quick, pointed; low = slow, blunt). The difference shows up **through the pies** (the
+  relative model resolves it), never as a free bonus. Tactics = adjustment quality, working through
+  the model, not around it.
+
+### Fatigue / endurance (its own future session)
+
+- An **endurance attribute** sets each player's **stamina drain rate**; falling stamina reduces
+  effectiveness. The engine must accommodate **iron-men** who play 36–37 minutes (they exist), and
+  stamina costs more for **bigger, heavier** players.
+- **Design hook to bank:** fatigue should drain the **physical / athletic axis first**, not nuke
+  everything flat — a tired great shooter keeps his touch but his legs go (his three flattens); a
+  tired defender cannot stay in front. Run the sag **through the existing matchup machinery** (tired →
+  athletic axis dips → beaten more → worse looks) rather than a separate flat penalty. "Bigs tire
+  faster" and "iron-men exist" both fall out of per-player drain rates. Same discipline as the
+  tactics rating: through the model, not around it.
+- A **large, standalone session.** It also gives the roster its center of gravity (depth, the bench,
+  minutes as a resource) and feeds late-game variance.
+
+### Game-state awareness (a future modifier layer)
+
+- The engine does not yet know the **score or clock** in its possession behavior. Wanted: state-aware
+  modifiers — down big late → more threes, faster pace, more pressure, end-game fouling; up big late
+  → milk clock, avoid fouls, take the safe two. This is where comebacks and white-knuckle finishes
+  live.
+- **Discipline:** game-state is **not a new system** — it **bends the pies already present** (shot-mix
+  toward threes, the possession/pace count, foul tendency in the hack zone). Score and clock are just
+  another set of inputs reweighting existing levers. The **end-of-half intent** branch (Session 30) is
+  the existing seam this extends.
+
+### Closed question: shot-quality degradation (recorded so it is not re-raised)
+
+Considered and **rejected as a separate mechanism.** "A good defense forces a *worse* shot" is
+already fully covered by the two existing doors: it is the **shot-mix** pie reweighting toward worse
+zones, and/or the **make%-tilt** lowering the odds on the shot taken. A separate within-possession
+"clock winds down, option 1 taken away, then 2, then a heave" sequence would be exactly the
+event-by-event simulation the architecture rejects; its *outcome* (more desperation shots vs elite
+defense) already emerges from the mix reweight. **No new lever — scratched.**
+
+### Deferred seams (captured open, deliberately NOT resolved)
+
+Resolving these now would design layers ahead of the current one — the cascade trap that killed the
+Python builds. Logged for their proper pass:
+
+- **Attention × matchup combination** — how the team-level attention contribution and the
+  individual-matchup contribution combine into the one make% shift (attention is a deferred layer;
+  combining them now is premature).
+- **The streak governor** — the usage layer the hot/cold mechanic depends on; streak cannot ship
+  before it.
+- **Generation floors** — the competency floor and the relative-expressed-game constraints land on
+  the future **player-generation** pass.
+- **Phase 4 scope** — as framed (laddering map + gap function + coverage math + counter-attribute
+  pairings + 4th-axis seam) it is likely **too much for one session**; split it at prompt-draft time.
