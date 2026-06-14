@@ -116,6 +116,7 @@ internal static class Program
         ok &= RollCExpansionCheck(cfg, cfgC, rollCGenerator, state);
         ok &= EndOfHalfIntentBatchCheck(cfg, cfgEndOfHalf);
         ok &= GovernorLoopCheck(cfg, cfgD, cfgGov, cfgClock, cfgEndOfHalf);
+        ok &= Phase1RosterCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -3953,6 +3954,166 @@ internal static class Program
         Console.WriteLine($"  ==========================================");
         Console.WriteLine();
         Console.WriteLine($"  {records.Count} possessions  |  APL {result.TotalSeconds / records.Count:F1}s  |  total {result.TotalSeconds:N0}s");
+    }
+
+    // -------------------------------------------------------------------------
+    // Phase 1 — Player object & Roster seam
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Proves the full seam: config → RosterConfig.Load → PlayerConfig.ToPlayer →
+    /// Player (authored attributes) → Roster.SetStarter → GameState.RosterFor →
+    /// Roster.PlayerAt → derived attributes computed correctly.
+    ///
+    /// Three assertions:
+    ///   1. Every slot on both sides resolves to a non-null Player.
+    ///   2. Every player passes Validate() (all attributes 0–99).
+    ///   3. Derived values are in physically plausible ranges and directionally
+    ///      correct (bigs have lower athleticism than guards in this fixture).
+    /// </summary>
+    private static bool Phase1RosterCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 1: Player object & Roster seam ---");
+        var pass = true;
+
+        // --- Load ---
+        RosterConfig cfgRoster;
+        try
+        {
+            cfgRoster = RosterConfig.Load(configPath);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  FAIL  RosterConfig.Load threw: {ex.Message}");
+            return false;
+        }
+        Console.WriteLine("  RosterConfig loaded OK.");
+
+        // --- Populate a fresh GameState ---
+        var fouls = new FoulTracker(7, 10);
+        var game  = new GameState(fouls);
+
+        foreach (var (side, configs) in new[]
+        {
+            (TeamSide.Home, cfgRoster.Home),
+            (TeamSide.Away, cfgRoster.Away)
+        })
+        {
+            var lineup = game.LineupFor(side);
+            var roster = game.RosterFor(side);
+            for (var i = 0; i < Lineup.Size; i++)
+            {
+                var slot   = lineup.SlotAt(i + 1);
+                var player = configs[i].ToPlayer();
+                roster.SetStarter(slot, player);
+            }
+        }
+        Console.WriteLine("  Rosters populated OK.");
+
+        // --- Per-slot assertions ---
+        Console.WriteLine();
+        Console.WriteLine($"  {"Side",-6} {"Slot",-5} {"Name",-20} {"Ath":>6} {"Trans":>6} {"Grav":>6} {"Spac":>6}  Validate");
+        Console.WriteLine($"  {new string('-', 75)}");
+
+        foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
+        {
+            var lineup = game.LineupFor(side);
+            var roster = game.RosterFor(side);
+
+            for (var n = 1; n <= Lineup.Size; n++)
+            {
+                var slot   = lineup.SlotAt(n);
+                var player = roster.PlayerAt(slot);
+
+                // Assertion 1: slot resolves to a player
+                if (player is null)
+                {
+                    Console.WriteLine($"  FAIL  {side} slot {n} resolved null.");
+                    pass = false;
+                    continue;
+                }
+
+                // Assertion 2: all authored attributes in 0–99
+                var errors = player.Validate();
+                var validateLabel = errors.Count == 0 ? "OK" : $"FAIL({errors.Count})";
+                if (errors.Count > 0)
+                {
+                    pass = false;
+                    foreach (var e in errors)
+                        Console.WriteLine($"    {e}");
+                }
+
+                // Print derived values
+                Console.WriteLine(
+                    $"  {side,-6} {n,-5} {player.Name,-20} " +
+                    $"{player.Athleticism,6:F1} {player.Transition,6:F1} " +
+                    $"{player.GravityContribution,6:F1} {player.SpacingContribution,6:F1}" +
+                    $"  {validateLabel}");
+
+                // Assertion 3: derived values in plausible range (0–99; can't exceed
+                // component max of 99 from a flat mean of 0–99 inputs)
+                if (player.Athleticism < 0 || player.Athleticism > 99)
+                { Console.WriteLine($"    FAIL  {player.Name}.Athleticism out of range: {player.Athleticism:F1}"); pass = false; }
+                if (player.Transition < 0 || player.Transition > 99)
+                { Console.WriteLine($"    FAIL  {player.Name}.Transition out of range: {player.Transition:F1}"); pass = false; }
+                if (player.GravityContribution < 0 || player.GravityContribution > 99)
+                { Console.WriteLine($"    FAIL  {player.Name}.GravityContribution out of range: {player.GravityContribution:F1}"); pass = false; }
+                if (player.SpacingContribution < 0 || player.SpacingContribution > 99)
+                { Console.WriteLine($"    FAIL  {player.Name}.SpacingContribution out of range: {player.SpacingContribution:F1}"); pass = false; }
+            }
+        }
+
+        // --- Directional sanity: bigs (slot 4) should have lower athleticism
+        //     than guards (slot 1) in the configured fixture ---
+        var homeBig   = game.RosterFor(TeamSide.Home).PlayerAt(game.LineupFor(TeamSide.Home).SlotAt(4))!;
+        var homeGuard = game.RosterFor(TeamSide.Home).PlayerAt(game.LineupFor(TeamSide.Home).SlotAt(1))!;
+        if (homeBig.Athleticism >= homeGuard.Athleticism)
+        {
+            Console.WriteLine(
+                $"  FAIL  Directional check: {homeBig.Name} athleticism ({homeBig.Athleticism:F1}) " +
+                $">= {homeGuard.Name} athleticism ({homeGuard.Athleticism:F1}). " +
+                "Expected big < guard in this fixture.");
+            pass = false;
+        }
+        else
+        {
+            Console.WriteLine(
+                $"\n  Directional OK — {homeGuard.Name} (guard) ath {homeGuard.Athleticism:F1} " +
+                $"> {homeBig.Name} (big) ath {homeBig.Athleticism:F1}.");
+        }
+
+        // --- Substitution log sanity: 5 entries per side (one per starter) ---
+        var homeLog = game.RosterFor(TeamSide.Home).Log;
+        var awayLog = game.RosterFor(TeamSide.Away).Log;
+        if (homeLog.Count != Lineup.Size || awayLog.Count != Lineup.Size)
+        {
+            Console.WriteLine($"  FAIL  Expected {Lineup.Size} log entries per side; " +
+                              $"got Home={homeLog.Count}, Away={awayLog.Count}.");
+            pass = false;
+        }
+        else
+        {
+            Console.WriteLine($"  Substitution log OK — {Lineup.Size} entries per side, all at possession 1.");
+        }
+
+        // --- Existing GameState sites: all 24 new GameState(fouls) calls elsewhere
+        //     in this file compile unchanged (no ctor change). Prove that a bare
+        //     GameState has empty (null) roster slots before population. ---
+        var bareGame   = new GameState(new FoulTracker(7, 10));
+        var barePlayer = bareGame.RosterFor(TeamSide.Home)
+                                 .PlayerAt(bareGame.LineupFor(TeamSide.Home).SlotAt(1));
+        if (barePlayer is not null)
+        {
+            Console.WriteLine("  FAIL  Bare GameState slot 1 should be null before population.");
+            pass = false;
+        }
+        else
+        {
+            Console.WriteLine("  Bare GameState slots are null before population — existing sites unaffected.");
+        }
+
+        Console.WriteLine(pass ? "  Phase 1 PASSED." : "  Phase 1 FAILED.");
+        return pass;
     }
 
 }

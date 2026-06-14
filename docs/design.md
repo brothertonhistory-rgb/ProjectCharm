@@ -2227,3 +2227,70 @@ intentional fouling) are a future session where the intent becomes a **context-s
 generator reading the margin and the time — and this session's flat weights become the context-neutral
 fallback. The architecture is already shaped for that: a generator replaces the ctor's direct `Pie`
 construction without touching the Governor loop, the resolver, or the rolls.
+
+---
+
+## Session 31 — The player object and Roster seam
+
+### The player model arc (overview)
+
+Phase 1 of a six-phase arc that replaces all stub pie generators with real, attribute-driven ones.
+The arc is documented in full in `player-model-roadmap.md`. Phase 1 delivers the player object and
+the slot-to-player seam; Phases 2–4 wire attributes into generators; Phase 5 builds the
+shot-creation classifier roll; Phase 6 calibrates.
+
+### The author-vs-derived line
+
+Every attribute is one of four kinds (from `attributes.md`): authored individual (a raw 0–99 integer
+typed per player), derived (computed by the engine, never authored), team-aggregate (authored or
+derived per player, aggregated across the five on the floor), or modifier/amplifier (scales a family
+of other attributes). Phase 1 implements all authored individual attributes and the four derived
+attributes. Team-aggregates and modifier effects are deferred.
+
+The derived values computed on `Player` (never stored, always recomputed on read):
+- `Athleticism` — mean of Strength, Speed, Quickness, FirstStep, Vertical. The locked ceiling
+  principle: athleticism caps how far skill can express against a given competition level.
+- `Transition` — mean of Athleticism and Finishing. Derived-from-derived; dependency order is
+  explicit so nothing cycles.
+- `GravityContribution` — mean of Close, Mid, Outside, Finishing. Per-player input to the future
+  team-aggregate gravity value. Dormant-pending-module.
+- `SpacingContribution` — Outside rating. Per-player input to the future team-aggregate spacing
+  value. Dormant-pending-module.
+
+All four placeholder formulas are flat means. Phase 6 tunes weights and formula shapes.
+
+### The Roster object (the almanac bridge)
+
+`Roster` is a separate object — not inline on `Lineup` or `GameState` — because it is the thing that
+persists into the dynasty/almanac layer. The historical archive holds rosters, rosters point at
+players, players accumulate career stat lines. The sports-reference shape: player page → season logs
+→ game logs, navigable because the roster is the bridge.
+
+`GameState` holds `HomeRoster` and `AwayRoster` (constructed internally; no ctor signature change;
+all 24 existing `new GameState(fouls)` sites unaffected). `RosterFor(side)` mirrors `LineupFor(side)`.
+The seam the attribute generator will walk: `game.RosterFor(side).PlayerAt(slot)`.
+
+The substitution model: slot is a stable seat for the whole game. A substitution appends a
+`SubstitutionEntry(Slot, Player, AtPossession)` to the roster's log. Starters are logged at
+AtPossession = 1. The current occupant is the last log entry for that slot. A player can occupy
+different slots at different times (a returning sub goes to whatever slot is open); the log is the
+source of truth for per-player attribution across any possession window.
+
+### The config JSON authoring path
+
+The `"Rosters"` section of `config.json` is the embryo of the dynasty save format. Every future
+layer that writes or reads a starting lineup — the coach screen, the save file, the almanac — points
+at the same JSON contract. `PlayerConfig` (the DTO) and `RosterConfig` (the loader) follow the
+nested `GetProperty` pattern established by `RollHConfig`.
+
+### Rating scale
+
+0–99 integer. 99 is the ceiling; 100 is impossible. The 1:1 free-throw calibration note in
+`attributes.md` (a 72-rated shooter makes ~72%) is a rough Phase-2 anchor for the bounded logistic
+make-rate mapping. Phase 6 tunes the actual mapping.
+
+### Phase 1 wall
+
+No generator reads a `Player`. The seam exists and resolves end to end; nothing on the roll side
+touches it. Rolls A–M, the Governor, and every stub generator are byte-for-byte unchanged by this
+session. Phase 2 wires the first generator (own-attribute → own-pie, no matchup effects).

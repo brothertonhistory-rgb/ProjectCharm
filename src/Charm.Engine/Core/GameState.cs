@@ -51,8 +51,10 @@ public sealed class GameState
     {
         Fouls = fouls ?? throw new ArgumentNullException(nameof(fouls));
         PossessionArrow = initialArrow;
-        HomeLineup = new Lineup(TeamSide.Home);
-        AwayLineup = new Lineup(TeamSide.Away);
+        HomeLineup  = new Lineup(TeamSide.Home);
+        AwayLineup  = new Lineup(TeamSide.Away);
+        HomeRoster  = new Roster(TeamSide.Home);
+        AwayRoster  = new Roster(TeamSide.Away);
     }
 
     /// <summary>Turn the arrow ON, pointing at <paramref name="team"/>. Used by
@@ -95,6 +97,23 @@ public sealed class GameState
     /// possession role -> LineupFor -> SlotAt -> (later) the filling player.</summary>
     public Lineup LineupFor(TeamSide side) =>
         side == TeamSide.Home ? HomeLineup : AwayLineup;
+
+    /// <summary>Home team's slot-to-player map for this game. Populated by the
+    /// harness (or future game-setup layer) before possession resolution begins;
+    /// constructed empty so all 24 existing <c>new GameState(...)</c> sites in the
+    /// harness compile and run byte-for-byte unchanged. The seam the attribute
+    /// generator will walk: <c>game.RosterFor(side).PlayerAt(slot)</c>.</summary>
+    public Roster HomeRoster { get; }
+
+    /// <summary>Away team's slot-to-player map for this game. Same construction
+    /// contract as <see cref="HomeRoster"/>.</summary>
+    public Roster AwayRoster { get; }
+
+    /// <summary>The roster for a given team identity — mirrors
+    /// <see cref="LineupFor"/> so the call sites stay symmetric:
+    /// <c>game.RosterFor(side).PlayerAt(slot)</c>.</summary>
+    public Roster RosterFor(TeamSide side) =>
+        side == TeamSide.Home ? HomeRoster : AwayRoster;
 
     // --- Placeholder fields: defined shape, not yet wired to anything. ---
     public int HomeScore { get; set; }

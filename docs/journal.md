@@ -1,3 +1,102 @@
+## Session 31 — Phase 1: The player object and Roster seam (2026-06-13)
+
+**The first session of the player-model arc.** The possession engine is functionally complete as a
+funnel (Rolls A–M wired, real clock, real score, end-of-half intent). All generators are still stub
+pies. This session gives the empty slot layer a player to hold: the `Player` object, the authored
+attributes, the derived-attribute computation, the `Roster` that maps slots to players, and the
+config-section authoring path. The seam `GameState.RosterFor(side).PlayerAt(slot)` now resolves end
+to end. No pie is wired; no generator reads a player. That is Phase 2.
+
+**Design questions settled before any code (CONVENTIONS §4).**
+1. **Rating scale: 0–99 integer.** 99 is the ceiling; 100 is impossible. A 99-rated free-throw
+   shooter is historically elite, not infallible. The 1:1 calibration note in `attributes.md` (a
+   72-rated shooter makes ~72%) is a rough Phase-2 anchor, not a hard formula — the real mapping is
+   a bounded logistic, tuned in Phase 6.
+2. **Attachment: Option C — a separate `Roster` object.** `Slot` stays pure identity; `Lineup`
+   stays a pure identity layer; `GameState` grows `HomeRoster`/`AwayRoster`/`RosterFor(side)`. The
+   `Roster` is the bridge between the live game and the almanac: the historical archive holds rosters,
+   rosters point at players, players accumulate career stat lines. Building it as a separate object
+   rather than inline on `Lineup` or `GameState` is the only option that doesn't create a seam to
+   rip out when the dynasty/almanac layer arrives.
+3. **Derived-attribute formulas: plain means as placeholders.** Athleticism = mean of Strength +
+   Speed + Quickness + FirstStep + Vertical. Transition = mean of Athleticism + Finishing.
+   GravityContribution = mean of Close + Mid + Outside + Finishing. SpacingContribution = Outside.
+   All provisional; Phase 6 tunes the weights and formula shapes.
+4. **Authoring mechanism: config JSON `"Rosters"` section.** The harness gets rated players from a
+   new `"Rosters"` section in `config.json` — two arrays of five `PlayerConfig` objects (home/away).
+   This is the embryo of the dynasty save format: every future layer that writes or reads a starting
+   lineup (the coach screen, the save file, the almanac) points at the same JSON contract.
+5. **Name: `Player`.** The live domain object is `Player`. Future distinction: `PlayerSnapshot` or
+   `PlayerHistoryEntry` for the almanac's read-only copies if needed.
+
+**The substitution architecture (settled conversationally).** Slot is a stable seat assignment for
+the whole game. A substitution swaps WHO fills slot 3, never what slot 3 IS — so a player can
+return from the bench into a different slot if the coach wants, and a player can occupy different
+slots at different times. The `Roster` handles this via an append-only substitution log:
+`SubstitutionEntry(Slot, Player, AtPossession)`. Starters are logged at AtPossession = 1. The
+current occupant of a slot is always the last log entry for that slot. The almanac reads the full
+log to reconstruct per-player minutes and stat windows per game.
+
+**New files.**
+- `Core/Player.cs` — the rated player. 30 authored `int` properties (0–99), grouped by umbrella
+  (Offense / Defense / Physical / Intangible). Four computed properties (never stored): `Athleticism`
+  (mean of 5 physicals), `Transition` (mean of Athleticism + Finishing), `GravityContribution` (mean
+  of 4 scoring ratings), `SpacingContribution` (Outside). `Validate()` returns a list of
+  range-violation strings (empty = valid). Includes `Endurance` as a dormant-pending-module authored
+  field — seated and proven to exist before the stamina module consumes it, same discipline as Roll
+  C's Session-24 expansion.
+- `Core/Roster.cs` — one team's slot-to-player map. `SetStarter(slot, player)` populates at game
+  start; `Substitute(slot, incoming, atPossession)` appends mid-game. `PlayerAt(Slot)` returns the
+  current occupant; `PlayerAt(Slot, atPossession)` returns who was there at a specific possession
+  (the almanac's attribution seam). `Log` is the full append-only substitution timeline.
+- `Config/RosterConfig.cs` — two classes. `PlayerConfig` is the JSON-deserialisable DTO with all 30
+  authored properties plus `Name`; `ToPlayer()` converts it to a `Player`. `RosterConfig` loads the
+  `"Rosters"` section from `config.json` (the nested `GetProperty` pattern from `RollHConfig`),
+  validates that both arrays carry exactly 5 players, and validates every player's attribute ranges
+  before returning.
+
+**Edited files.**
+- `Core/GameState.cs` — `HomeRoster` and `AwayRoster` properties (both `Roster`, constructed in the
+  ctor alongside `HomeLineup`/`AwayLineup`) and `RosterFor(TeamSide)` (mirrors `LineupFor`). **Zero
+  change to the `GameState` constructor signature** — both rosters are constructed internally. All 24
+  existing `new GameState(fouls)` sites in the harness compile and run byte-for-byte unchanged.
+- `src/Charm.Harness/config.json` — new `"Rosters"` section with two five-player arrays. Ten
+  players with realistic, varied attribute profiles (guards with high athleticism and perimeter
+  skills; bigs with high strength/size and low lateral quickness). All ratings in the 0–99 range.
+- `src/Charm.Harness/Program.cs` — new `Phase1RosterCheck` method (appended at the bottom of the
+  class) wired into the `ok &=` dispatch chain. Proves: `RosterConfig.Load` succeeds; all 10 slots
+  resolve to non-null players; all 30 authored attributes pass `Validate()`; all four derived values
+  are in the 0–99 range; the directional check holds (guards have higher athleticism than bigs in
+  the configured fixture); the substitution log has 5 entries per side at possession 1; a bare
+  (unpopulated) `GameState` returns null for every slot (existing sites unaffected).
+
+**Validation.** Python pre-check confirmed all 10 players' derived values in range and directionally
+correct (Marcus Webb guard ath 73.6 > Javon Okafor big ath 60.6; Darius Eze big ath 58.8 < Kendrick
+Shaw guard ath 71.6). Brace balance checked across all new and edited files (all matched). Stale-ref
+sweep: no existing file references `RosterFor`, `HomeRoster`, `AwayRoster`, or `PlayerAt` before this
+session — zero collision risk. Harness run (Emmett's machine): **ALL CHECKS PASSED** on the first
+run. Key Phase 1 output: all 10 slots resolve OK, all Validate() calls return empty, derived values
+match the Python pre-check within rounding, directional and substitution log checks both pass, bare
+GameState null check passes.
+
+**Phase 1 wall held.** No generator reads a `Player`. No pie is wired. The seam exists and resolves;
+nothing on the roll side touches it yet. Rolls A–M, the Governor, and every stub generator are
+byte-for-byte unchanged.
+
+**What stays out (Phase 1 wall, carried to Phase 2+).**
+- No pie wiring. No generator reads a player attribute yet (Phase 2).
+- No axis math. No four-axis laddering, coverage formula, or fingerprints (Phase 3).
+- No player tendencies on the `Player` object beyond noting where they will live (Phase 5).
+- No team-aggregate computation (team gravity/spacing as a five-man read). Phase 1 computes the
+  per-player contribution; the aggregation is Phase 4.
+- No franchise/persistence fields (career counters, co-appearance). 4th-axis, off-roadmap.
+- No engine behavior change beyond giving the slot a player to hold.
+
+**Carried deferrals (unchanged from prior sessions).**
+- Attribute-driven generators (the deferred ~90% of the work) — the whole Phase 2–4 arc.
+- Score-aware late-game tactics, rushed-shot quality penalty, second-half tip reset, per-outcome
+  time shaping, tempo calibration — all carried from the clock sessions.
+
 ## Session 30 — End-of-half intent: the offense holds for the last shot (or doesn't get one off) (2026-06-13)
 
 **The second clock session.** Session 29 put real time on the board but the end of a half was still
