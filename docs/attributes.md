@@ -324,52 +324,28 @@ wiring (the premature-fusion failure mode the project guards against). They are 
 the dependency order is unambiguous, not specified.
 
 ### Pass 2 — The four-axis model (the derived read on the catalogue)
-Player quality is a composition across **four axes — athletic / skilled / smart / big** —
-and a player's tier *emerges* from how many axes he clears (none = not a college player;
-one ≈ D3; two ≈ low D1; three ≈ solid D1; all four ≈ power-conference). This is a **derived
-read** on the catalogue: each attribute ladders into an axis, "clearing an axis" is a
-computed read on that axis's attributes, and a **matchup** compares two lineups' axis
-profiles into *contextual terrain*.
+Player quality is a composition across **four axes — athletic / skilled / big /
+experience-cohesion** — and a player's tier *emerges* from how many axes he clears (none =
+not a college player; one ≈ D3; two ≈ low D1; three ≈ solid D1; all four ≈ power-conference).
+This is a **derived read** on the catalogue: each attribute ladders into an axis, and a
+**matchup** compares two lineups' axis profiles — *relatively* — into the *contextual terrain*
+a possession resolves on.
 
-The load-bearing principle of this pass is the **multi-front war with no fixed winner** —
-not rock-paper-scissors with a lookup table, but four axes where each *can* win an exchange
-and each possession is a contest over which axis got leverage. Five elite athletes overwhelm
-with athleticism everywhere; five skilled players score and create regardless of size; five
-big players win on natural advantages — and **the bigger the edge on any one axis, the more
-it dominates the others.** Critically, a *balanced* roster must be able to overcome one or
-two outsized but one-dimensional talents through coverage across the axes — the explicit
-**defense against min-maxing.**
-
-> **Hard constraint this pass inherits (recorded now so the wiring pass cannot violate it):**
-> team strength is **NOT** the linear sum of rating points. Pure addition *is* a min-max
-> numbers battle and rewards stacking the highest total. Making balance beat raw total
-> requires **diminishing returns** (the fifth elite athlete adds less than the first) and/or
-> **coverage/threshold mechanics** (being *credible* on an axis matters more than being
-> elite on it; having no weakness beats having one peak). Linear sums are ruled out by the
-> design intent itself.
+The full Pass 2 design — the four axes, the relativity principle, the abundant-skill /
+scarce-disruption asymmetry, the multi-front-war (no-fixed-winner) model, the no-linear-sum
+hard constraint, emergent game character, the per-axis pie fingerprints, the hidden-not-public
+decision, and the special experience/cohesion axis with its cross-game persistence dependency
+— lives in its own standing document: **`docs/axes.md`**. (Note: basketball IQ and roster fit
+are deliberately NOT axes — IQ stays a player attribute in this catalogue; fit is the
+team-aggregate layer.)
 
 ### Pass 3 — Wiring (how attributes mold pie percentages)
 The generators consume **three independent inputs** to shape a pie, composing without ever
 being pre-blended (the locked "strategy and matchup modifiers stay independent inputs"
-principle, extended from two inputs to three):
-1. **Matchup (the four-axis war)** — sets the *contextual terrain* (which pies tilt which
-   way based on how the teams' axes stack). *Where* the advantage is. Derived (computed from
-   the two lineups on the floor), not authored.
-2. **Coaching strategy** — tilts on top: what the team chooses to do with that terrain. The
-   *plan*.
-3. **Personnel / attributes** — *how well* it is executed within that terrain, and whether
-   an axis edge is a slight lean or a blowout. *Who* is doing it.
-
-Worked example of the three composing without fusing: a small quick team vs. a big plodding
-one. The matchup tilts the big team's shot-location pie toward rim/close (size advantage
-inside) and the small team's toward threes with a turnover bump from pressing (no answer
-inside, so go perimeter and gamble) — but whether the small team's perimeter terrain is a
-death sentence or a massacre is decided by *personnel*: pure shooters need variance; guards
-who shoot AND create AND pass pick the big team apart regardless of the size disadvantage,
-because their skill-axis edge overwhelms the size axis. Three signals, one pie, none
-pre-blended, contradicting at the output while blind to each other at the input.
-
-This pass also owns the mechanics that keep the war a war and not a min-max: the
-diminishing-returns / coverage / threshold formulas for the team-aggregate bin, and the
-asymptotic mapping that delivers the team-output ceiling. It is the hardest pass and the
-last, gated on Passes 1 and 2.
+principle, extended from two inputs to three): **matchup** (the four-axis terrain — derived
+per matchup, relative), **coaching strategy** (what the team does with that terrain), and
+**personnel / attributes / tendencies** (how well it is executed within it). Macro terrain
+first, micro execution within it. This pass also owns the mechanics that keep the war a war
+and not a min-max — the diminishing-returns / coverage / threshold formulas and the asymptotic
+make-rate mapping that delivers the team-output ceiling. It is the hardest pass and the last,
+gated on Passes 1 and 2. Its open questions are catalogued in `docs/axes.md`.
