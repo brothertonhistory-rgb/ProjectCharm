@@ -2956,3 +2956,137 @@ athletic/big axis split — one physical gap on the full Athleticism composite (
 deferred). No team aggregates, no gravity lift. No magnitude hunt — placeholders throughout, calibration
 owns the numbers. One placeholder explicitly needs a basketball call: the Rim blend split
 (Post 0.35 / RimProtection 0.65), flagged in both the config and the code.
+
+---
+
+## Phase 7 — The block door (Session 38, 2026-06-15)
+
+The second matchup door. Phase 6 made the **make %** matchup-aware by sliding the shooter along the
+existing per-zone make-curve. Phase 7 does the analogous thing for **block weight**: the configured
+per-zone baseline (Rim 12%, Short 6%, Mid 3%, Long 2%, Three 1%) bends toward a per-zone ceiling when
+the defender has the edge and toward a per-zone floor when the shooter does. The make curve, the
+gap-function primitives, and the defender picker are all reused untouched — Phase 7 only adds new
+weights, a new physical composite, and one new method.
+
+### What the block contest is, conceptually
+
+A block is not the negation of a make. It depends on **different physical attributes** than the make
+door. Height, wingspan, and vertical leap are what put a hand on the ball; quickness and strength matter
+for a contest but don't matter for *whether the shot is blocked at all*. So Phase 7 introduces a
+block-specific **length** composite (Height + Wingspan + Vertical, equal weights by default) that is
+separate from the make door's full Athleticism composite (Strength + Speed + Quickness + FirstStep +
+Vertical). The asymmetry is intentional and *not* to be unified — the two doors read different physical
+signals.
+
+The skill side of the block contest, however, reuses the make door's reads exactly: the same per-zone
+offense attribute (Three/Long → Outside, Mid → Mid, Short → Close, Rim → Finishing) against the same
+CONF-1 per-zone defensive blend (Three: perimeter only; Mid: 50/50 perimeter/post; Rim: 35/65
+post/rim protection; etc.). A rim protector blocks more rim shots; a perimeter defender contests more
+threes; the blend table is shared.
+
+### The bend formula
+
+Two contributions, additively composed and then per-zone weighted:
+
+```
+skillShift  = GapFn(defense_blend − offense_skill, skillSteepness, skillExponent, scale)
+lengthShift = GapFn(defender_length − shooter_length, physicalSteepness, physicalExponent, scale)
+totalShift  = skillWeight·skillShift + lengthWeight·lengthShift   // per zone
+```
+
+Both shifts use the same `GapFn` from Phase 6 — same steepnesses, same exponents, same reference scale.
+The block contest does **not** introduce a new gap function. What it does introduce is **per-zone
+contest weighting**: the relative importance of skill vs length depends on where the shot is from.
+
+- **Rim:** 40% skill / 60% length. Length is the physical anchor — a wingspan advantage matters more
+  here than a rim-protection rating delta.
+- **Three:** 40% skill / 60% length (Emmett's anchor). The contest is dominated by reach; the perimeter
+  defender's positional skill is real but secondary.
+- **Mid, Short, Long:** interpolated between (0.50/0.50, 0.45/0.55, 0.42/0.58 respectively).
+
+Each pair sums to 1.0 (enforced in `Load`). These are placeholders — the magnitudes are calibration work.
+
+### Saturating toward floor and ceiling
+
+The total shift then bends the configured per-zone block weight via a tanh saturation:
+
+```
+bw      = baseBlockWeight[zone]
+span    = (totalShift ≥ 0) ? (ceiling − bw) : (bw − floor)
+bend    = span · tanh(totalShift / BlockReferenceShift)
+result  = bw + bend
+```
+
+`tanh` is the key: it's odd (zero gap → zero bend, even matchup → exact baseline), bounded in (−1, +1)
+so the result *asymptotes* toward ceiling or floor but **never crosses**, and smooth so there's no
+discontinuity at any shift magnitude. `BlockReferenceShift` is the saturation knob — a net total shift
+of that many rating points gets you to tanh(1) ≈ 76% of the way from baseline toward the asymptote.
+Default 20.0; calibrate later.
+
+`span` is asymmetric by direction: defender-edge bends use the headroom toward the ceiling; shooter-edge
+bends use the headroom toward the floor. This is what lets the **same formula** produce both directions
+without crossing baseline at zero shift.
+
+**Floors are non-zero.** Even a peak shooter against a stiff is occasionally blocked — Rim floor 4%,
+Short 2%, Mid 1%, Long 0.5%, Three 0.3%. Ceilings encode "what an elite defender can credibly do":
+Rim 30% (Emmett's anchor), Three 4%. The whole table is placeholder; the shape is the spec.
+
+### The DEC-6 fallback (carried from Phase 6)
+
+The block door inherits the same two-tier fallback the make door uses:
+
+1. **Unpopulated roster** (no shooter) → `BuildStubPie` reads `_cfg.BlockWeight(zone)` directly, no
+   matchup logic invoked. Unchanged from pre-Phase-7.
+2. **Shooter present, defending slot empty** → the new path. The caller checks for a null defender; if
+   null, the configured baseline is used (no call to `Matchup.BlockWeight`). The block-rate read
+   collapses to pre-Phase-7 behaviour. This is enforced as an exact-equality test in harness check (d).
+
+### The one design call: the tanh sign
+
+The session's design prompt specified the bend as `result = bw + (shift ≥ 0 ? bend : -bend)`. The
+intent was symmetric — defender edge bends up, shooter edge bends down. But because `tanh` is already
+odd, `bend` is *already* negative when `totalShift` is negative; the `-bend` in the spec's negative
+branch re-flipped it back to positive, producing the wrong direction. The fix is to drop the conditional
+entirely: `return baseBlockWeight + bend`. The asymmetric **span** selection still happens (different
+headroom toward ceiling vs floor); `tanh` handles the directional sign on its own.
+
+This was caught at the Monte-Carlo pre-check stage on check (e), the shooter-edge symmetry test, before
+any code was delivered. Per CONVENTIONS §0, the spec contradiction was surfaced to Emmett rather than
+silently overridden. The build then went green on the first harness run.
+
+### Why this doesn't reshape the make door
+
+The make door reads `makePct × (1 − block)` (Session 37.5's carve-then-convert). When Phase 7 varies
+`block` per matchup, the make-curve's output is still the **conversion rate given the shot is not
+blocked** — semantically unchanged. The observed make rate shifts slightly because the non-block
+headroom `(1 − block)` now varies per shot, but the relationship `observed-FG% ≈ curve × (1 − block)`
+is the same one the calibration pass will fit. Harness check (f) confirms an elite finisher vs a weak
+rim protector still produces a valid pie and an 88.1% make rate — relationships intact.
+
+### Validation
+
+Six sub-checks in `Phase7BlockDoorCheck`, all deterministic (`Matchup.BlockWeight` is pure, no batching
+needed for the analytical checks):
+
+- **(a)** Rim defender sweep monotone rising; bounded by `[floor, ceiling]`.
+- **(b)** Three defender sweep monotone rising; *spread* much smaller than the Rim sweep's spread
+  (proves per-zone weighting is registering — Three is closer to baseline because both its ceiling and
+  its block rate are smaller).
+- **(c)** Skill-only delta vs length-only delta, at both Rim and Three. Length delta exceeds skill
+  delta at both zones (the 60/40 split, observed: Rim 9.7% vs 4.2%; Three 1.6% vs 1.4%).
+- **(d)** DEC-6 fallback: empty slot == configured baseline; even matchup == baseline (exact
+  arithmetic, zero shift); strong defender > baseline + 0.005.
+- **(e)** Shooter-edge symmetry at Rim: block rate falls monotonically as shooter improves, stays above
+  the floor. The check that exposed the spec's sign bug.
+- **(f)** Regression — Phase 6's make door still produces valid pies with the new block weight
+  threading through `BuildRealPie`'s carve.
+
+### Scope walls held / deferred
+
+Block door only — OOB rates, shooting-foul rates, and the rebound pie remain matchup-blind. Putback
+contests still use the flat config block weight (Phase 4 work — no defender slot is carried into the
+putback path yet). `PossessionState.DefenderSlot` is **not** promoted — Phase 7 is the second
+matchup-aware door but reuses the same picker, single consumer, derived at generate-time; the
+promotion bar is "a second *independent* consumer," not satisfied yet. The Athleticism/Length composite
+asymmetry is intentional, flagged in the code comments so the watchdog and future sessions don't try to
+"unify" them.

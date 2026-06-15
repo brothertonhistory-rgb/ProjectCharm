@@ -1,3 +1,69 @@
+## Session 38 — Phase 7: the block door (2026-06-15)
+
+**A build (CONVENTIONS §0–§3) — code + harness, all green.** The second matchup door is now wired:
+**blocks** are matchup-aware. A shot at the rim against a 7'1" rim protector is blocked more often than
+the same shot against a 6'2" guard, and before this session it wasn't — the block weight was flat per
+zone from `RollHConfig`. Phase 7 leaves the make door untouched and bends only `BlockWeight`. OOB rates,
+foul rates, and every other Roll H weight remain matchup-blind; that's the next session's work.
+
+**What landed (5 files):**
+- **`Core/Matchup.cs` (edit)** — two new pure-static methods. `LengthRating(p, cfg)` is the new
+  block-specific physical composite — `Height·LengthHeight + Wingspan·LengthWingspan + Vertical·LengthVertical`,
+  blend weights in config so the calibration pass can tune the composite without touching code. **It is
+  deliberately not the existing `Athleticism` composite** — length is what blocks shots; quickness and
+  strength belong to the make door. `BlockWeight(zone, shooter, defender, baseBlockWeight, cfg)` is the
+  new core: skill gap (defender blend − shooter zone skill, same attribute reads as Phase 6) and length
+  gap (defender length − shooter length) each through `GapFn` with the existing skill/physical params,
+  per-zone weighted sum (e.g. 40% skill / 60% length at Rim and Three), tanh-saturated toward a per-zone
+  ceiling (defender edge) or floor (shooter edge). All existing methods untouched.
+- **`Config/MatchupConfig.cs` (edit)** — per-zone skill/length weight pair (sum to 1.0, enforced),
+  per-zone block floor/ceiling (floor ≥ 0, ceiling > floor, enforced), `BlockReferenceShift` saturation
+  knob (default 20.0), `LengthHeight/Wingspan/Vertical` blend (sum to 1.0, enforced). Accessors
+  (`BlockContestWeights`, `BlockFloor`, `BlockCeiling`) mirror the `BlendWeights` style. `Load` extended
+  with the new invariants — Phase 6's load-validation pattern, never `RollHConfig`'s no-validation one.
+- **`Generators/RollHGenerator.cs` (edit)** — between defender resolution and the pie build, the block
+  weight is computed via `Matchup.BlockWeight` (or `_cfg.BlockWeight(zone)` if the defending slot is
+  empty — DEC-6 fallback, same shape as the make door's). `BuildRealPie`'s signature gained a
+  `blockWeight` parameter; the carve-then-convert math is unchanged (it already handled any block weight
+  in [0, 1) safely). `BuildStubPie` and `BuildPutbackPie` keep reading the flat config baseline — the
+  stub path runs only for unpopulated rosters (no matchup data), and the putback contest is a known
+  Phase 4 deferral.
+- **`Harness/config.json` (edit)** — `Matchup` section extended with the 24 new fields (10 weights,
+  10 floor/ceiling, the reference shift, the 3 length blend weights).
+- **`Harness/Program.cs` (edit)** — new `Phase7BlockDoorCheck` (six sub-checks, wired into `Main` after
+  the Phase 6 call).
+
+**The one design call (spec contradiction caught at pre-check): the tanh sign.** The session prompt's
+§2c formula said `result = bw + (shift >= 0 ? bend : -bend)`. The Monte-Carlo pre-check on check (e) —
+**shooter-edge symmetry, where block rate must FALL as the shooter improves** — failed: the block rate
+*rose* once the shooter's edge grew past about gap 50 instead of asymptoting toward the floor. Trace:
+`tanh` is odd, so when `totalShift` is negative, `bend = span · tanh(total/ref)` is already negative; the
+spec's `-bend` re-flipped it to positive and bent the result *up* instead of down. The fix is one line:
+`return baseBlockWeight + bend`. The spec wrote the conditional flip to mirror the asymmetric span
+selection (different headroom toward ceiling vs floor), but didn't account for tanh already supplying the
+sign. Surfaced before delivering per CONVENTIONS §0; Emmett approved the fix; check (e) then dropped
+monotonically from 15.3% to 5.8% across the shooter sweep.
+
+**Harness — ALL CHECKS PASSED.** Phase 7 sub-results, all green: (a) Rim defender sweep monotone 11.5% →
+24.0%, bounded by [4.0%, 30.0%]; (b) Three sweep monotone 0.89% → 3.32%, spread 2.4% vs Rim spread 12.5%
+(per-zone weights working — Three is much flatter); (c) at both Rim and Three the length-only delta
+exceeds the skill-only delta (Rim: 9.7% > 4.2%; Three: 1.6% > 1.4%), confirming the 60/40 split;
+(d) empty slot == baseline == even matchup (12.00% exact), strong defender raises to 21.4%; (e) shooter
+edge bends block down monotonically, 15.3% → 5.8%, never crossing the floor; (f) regression — elite
+finisher vs weak rim protector still produces a valid pie, 88.1% make rate. Phase 6 unchanged. The full
+100k chain still passes — the zone-blended observed block rate (5.59% vs configured 5.68%) sits inside
+tolerance even though the per-shot weight now varies (the population of contested shots in the harness
+has no shooter, so the stub-pie fallback fires and reads the configured baseline; the matchup path is
+only exercised through the populated-roster Phase 7 check, by design).
+
+**Walls held / deferred:** block door only — OOB rates, shooting-foul rates, and the rebound pie all
+remain matchup-blind. The putback contest stays a Phase 4 deferral. The asymmetry between Phase 6's
+Athleticism composite (5 attributes) and Phase 7's Length composite (3 attributes) is **intentional** and
+not unified — they read different physical signals. No `PossessionState.DefenderSlot` (still derived at
+generate-time; promotion deferred until a second door needs it — Phase 7 is the second door but reuses
+the picker, so the bar still isn't reached). The placeholder magnitudes (per-zone weights, floors,
+ceilings, the reference shift) are best-guess scaffolding — calibration owns the numbers.
+
 ## Session 37.5 — Hygiene: Roll H pie overflow fix + retired-stub hard-errors (2026-06-15)
 
 **A hygiene pass (no new features) — code + harness, all green.** Three surgical fixes from an
@@ -36,6 +102,62 @@ files + 2 `Program.cs` lookup tables — deserves a focused pass where a failure
 
 **Harness — ALL CHECKS PASSED.** Numbers match the Session 37 run except for the small carve-then-convert
 shifts noted above; block (g) prints "valid pie, no overflow" confirming the fix.
+
+## Session 37 — Phase 6: the matchup wiring (make-door vertical slice) (2026-06-15)
+
+**A build (CONVENTIONS §0–§3) — code + harness, all green.** The first vertical slice of Phase 6:
+the **make door** becomes the first place two players' attributes meet. Phases 4–5 *designed* the
+matchup; this session wires **one** door of it — the shooter vs the slot-matched defender, the make%
+read off a matchup-adjusted effective rating. Every other door (location, turnovers, glass, blocks,
+tip) stays matchup-blind. The session opened on a near-complete interrupted build sitting uncommitted
+on disk, found and fixed its one gap (a referenced-but-unwritten harness check that would not have
+compiled), validated, and shipped.
+
+**What landed (6 files):**
+- **`Core/DefenderPicker.cs` (new)** — v1 **slot-guards-slot** (DEC-1): the defender is the same slot
+  number on the defense side. Deterministic, single-consumer, **derived at generate-time** (not carried
+  on `PossessionState`) — a named, swappable unit so the eventual mismatch-hunting picker is a drop-in.
+- **`Core/Matchup.cs` (new)** — the matchup primitive. `OffenseRating` (the zone→skill map, now the
+  **single source** — RollHGenerator's old private `RatingFor` was deleted and delegates here),
+  `DefenseRating` (the CONF-1 per-zone defensive blend), `GapFn` (the DEC-5 signed power law),
+  `EffectiveRating` (baseline + skillShift + physicalShift, additive per DEC-2). Pure, static, no RNG.
+- **`Config/MatchupConfig.cs` (new)** — five gap parameters (skill/physical steepness + exponent, a
+  shared reference scale) and the CONF-1 blend table as data. `Load` mirrors `RollHConfig.Load` **plus**
+  a DEC-5 invariant guard (throws if an exponent ≤ 1 or scale ≤ 0).
+- **`Generators/RollHGenerator.cs` (edit)** — the make door resolves the defender via the picker and
+  reads make% off `Matchup.EffectiveRating`; **DEC-6 fallback**: an empty defending slot reads the raw
+  own-rating (no matchup term, == pre-Phase-6), while the unpopulated-roster case still short-circuits to
+  the stub pie upstream. The make-curve (`MakeProbability`) is untouched — a contest just slides the
+  shooter along it.
+- **`Harness/config.json` (edit)** — one new top-level `Matchup` section; nothing else changed.
+- **`Harness/Program.cs` (edit)** — three generator sites threaded to the 3-arg ctor, and a new
+  **`Phase6MatchupWiringCheck`** (the §4 calibration evidence).
+
+**The one design call (DEC-5): the gap function is a signed power law.**
+`shift = steepness · sign(gap) · (|gap| / scale)^exponent`, exponent > 1 — the only simple family that
+satisfies all of axes.md's Phase-4 properties at once: **odd** (an even matchup → zero shift; the
+asymmetry of real basketball lives in the make-curve, not here), **flat-bottomed** (exponent > 1 ⇒ zero
+slope at the origin, so a marginal edge is imperceptible — this rules out `exp(|g|)−1` and linear, which
+have non-zero origin slope), **convex and uncapped** (the make-curve's logistic asymptote is the *only*
+payoff bound). **Physical steeper than skill via a larger exponent** — a *tail* property ("size
+insurmountable") — while the curve's floor independently delivers "skill never extinguished." The
+`referenceScale` is a fixed, legible **unit** (the gap at which a shift equals its steepness), kept so the
+steepness knobs stay identifiable. Magnitudes are best-guess placeholders; calibration owns the numbers.
+
+**Harness — ALL CHECKS PASSED** (the full 100k chain plus the new Phase 6 block, matching an independent
+Monte-Carlo pre-check to the decimal): defender sweep monotone down (47→21%) with even == baseline (34.3%)
+and the big edge compressing toward the floor, not zero; the Mid blend's two sub-attributes move make% by
+the identical amount (swap-symmetric, 0.5/0.5); a rim specialist is beatable on the perimeter (Mid 44.5% >
+41.2%) but strong at the rim (55.3% < 61.4%); the shooter sweep rises and flattens under the ceiling
+(64.1% < 65%); physical is steeper than skill at equal gap (21.34 > 15.36); and the DEC-6 fallback through
+the real generator reads raw rating (empty == even, 37.7%) while a strong defender lowers make% (25.5%).
+Phase 2 still passes — its high/low gap *widens* to 46.5% under wiring.
+
+**Walls held / deferred:** make door only — location/turnovers/glass/blocks/tip untouched; no
+`PossessionState.DefenderSlot` (the picker is derived at generate-time until a second door needs it, with
+promotion flagged); no athletic/big axis split (one physical gap on the full Athleticism composite); no
+team aggregates / gravity; no magnitude hunt (placeholders throughout). **One placeholder needs Emmett's
+basketball call:** the Rim blend split (Post 0.35 / RimProtection 0.65), flagged in the config and the code.
 
 ## Session 36 — Phase 5: the roster strength-read (2026-06-14)
 
