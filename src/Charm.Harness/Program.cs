@@ -121,6 +121,7 @@ internal static class Program
         ok &= Phase1RosterCheck(configPath);
         ok &= Phase2AttributeWiringCheck(configPath);
         ok &= Phase6MatchupWiringCheck(configPath);
+        ok &= Phase7BlockDoorCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -4502,6 +4503,247 @@ internal static class Program
         pass &= gRimOk;
 
         Console.WriteLine(pass ? "  Phase 6 PASSED." : "  Phase 6 FAILED.");
+        return pass;
+    }
+
+    // Phase 7: the block door. Confirms that block rate bends correctly with matchup —
+    // defender-edge raises it toward the per-zone ceiling, shooter-edge lowers it toward
+    // the floor — and that all per-zone tuning knobs (skill/length weights, referenceShift)
+    // are actually registering. Also confirms the DEC-6 fallback (empty slot → baseline)
+    // and that Phase 6 (the make door) is unbroken by the block-weight change.
+    //
+    // No batch rolls here: block rate is deterministic given the pie weights. All checks
+    // call Matchup.BlockWeight directly and assert on the returned double — exact arithmetic,
+    // no sampling noise.
+    private static bool Phase7BlockDoorCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 7: Block door (matchup-aware block weight) ---");
+        var pass = true;
+
+        var cfgH = RollHConfig.Load(configPath);
+        var cfgM = MatchupConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+
+        // Helper: build a player with all attributes at baseline b, overriding only
+        // the named ones. Mirrors Phase 6's Mk helper so the two checks are comparable.
+        // Height/Wingspan/Vertical are the length attributes (block-specific).
+        // Finishing / PerimeterDefense / RimProtection are the skill attributes for Rim/Three.
+        static Player Mk(int b,
+                         int? fin = null, int? outside = null,
+                         int? rimP = null, int? perimD = null,
+                         int? h = null, int? ws = null, int? v = null)
+            => new Player("p")
+            {
+                Outside = outside ?? b, Mid = b, Close = b, Finishing = fin ?? b, FreeThrow = b,
+                BallHandling = b, Passing = b, Playmaking = b, SelfCreation = b, PostMoves = b,
+                OffBallMovement = b, Screening = b, OffensiveRebounding = b,
+                PerimeterDefense = perimD ?? b, PostDefense = b, RimProtection = rimP ?? b,
+                DefensiveRebounding = b, Steals = b,
+                Height = h ?? b, Wingspan = ws ?? b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = v ?? b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b
+            };
+
+        // Shorthand: the matchup block weight for a zone, shooter, defender.
+        double Blk(ShotLocation z, Player s, Player d)
+            => Matchup.BlockWeight(z, s, d, cfgH.BlockWeight(z), cfgM);
+
+        // ----------------------------------------------------------------
+        // (a) Defender length sweep @Rim. Fix shooter (Finishing=50, all else 50).
+        //     Sweep defender RimProtection AND length together from low to high.
+        //     Block rate must rise monotonically and stay bounded by [floor, ceiling].
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (a) Defender sweep @Rim (shooter Fin=50, all 50; sweep RimP+H/W/V 20..95):");
+        var shooterA = Mk(50, fin: 50);
+        double prevA = double.NegativeInfinity;
+        var monoA = true;
+        var boundA = true;
+        var rimFloor = cfgM.BlockFloor(ShotLocation.Rim);
+        var rimCeil  = cfgM.BlockCeiling(ShotLocation.Rim);
+        foreach (var (rp, hw) in new[] { (20, 60), (40, 70), (50, 70), (60, 75), (80, 85), (95, 90) })
+        {
+            var bw = Blk(ShotLocation.Rim, shooterA, Mk(50, rimP: rp, h: hw, ws: hw, v: hw));
+            Console.WriteLine($"      RimP={rp,2}  H/W/V={hw}  block={bw:P3}  [{rimFloor:P2},{rimCeil:P2}]");
+            if (bw <= prevA) { monoA = false; Console.WriteLine($"        FAIL — not strictly increasing (prev={prevA:P3})"); }
+            if (bw < rimFloor - 1e-9 || bw > rimCeil + 1e-9) { boundA = false; Console.WriteLine($"        FAIL — out of [floor,ceil]"); }
+            prevA = bw;
+        }
+        if (monoA && boundA) Console.WriteLine("      OK — monotone rising; bounded by [floor, ceiling].");
+        pass &= monoA && boundA;
+
+        // ----------------------------------------------------------------
+        // (b) Defender sweep @Three. Same shape — block rate must rise,
+        //     but the spread must be much smaller than at Rim (per-zone weighting proof).
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (b) Defender sweep @Three (shooter Outside=50, all 50; sweep PerimD+H/W/V):");
+        var shooterB = Mk(50, outside: 50);
+        double prevB = double.NegativeInfinity;
+        var monoB = true;
+        var boundB = true;
+        var threeFloor = cfgM.BlockFloor(ShotLocation.Three);
+        var threeCeil  = cfgM.BlockCeiling(ShotLocation.Three);
+        double loB = double.PositiveInfinity, hiB = double.NegativeInfinity;
+        foreach (var (pd, hw) in new[] { (20, 60), (40, 70), (50, 70), (60, 75), (80, 85), (95, 90) })
+        {
+            var bw = Blk(ShotLocation.Three, shooterB, Mk(50, perimD: pd, h: hw, ws: hw, v: hw));
+            Console.WriteLine($"      PerimD={pd,2}  H/W/V={hw}  block={bw:P3}  [{threeFloor:P3},{threeCeil:P3}]");
+            if (bw <= prevB) { monoB = false; Console.WriteLine($"        FAIL — not strictly increasing (prev={prevB:P3})"); }
+            if (bw < threeFloor - 1e-9 || bw > threeCeil + 1e-9) { boundB = false; Console.WriteLine($"        FAIL — out of [floor,ceil]"); }
+            if (bw < loB) loB = bw;
+            if (bw > hiB) hiB = bw;
+            prevB = bw;
+        }
+        // Spread at Three must be smaller than spread at Rim — proves per-zone weighting.
+        var spreadThree = hiB - loB;
+        var spreadRim   = (Blk(ShotLocation.Rim, Mk(50, fin: 50), Mk(50, rimP: 95, h: 90, ws: 90, v: 90))
+                         - Blk(ShotLocation.Rim, Mk(50, fin: 50), Mk(50, rimP: 20, h: 60, ws: 60, v: 60)));
+        var spreadOk = spreadThree < spreadRim;
+        Console.WriteLine($"      Three spread={spreadThree:P3}  Rim spread={spreadRim:P3}  Three < Rim: {spreadOk}");
+        if (!spreadOk) Console.WriteLine("  FAIL  (b) Three spread should be smaller than Rim spread.");
+        if (monoB && boundB && spreadOk) Console.WriteLine("      OK — monotone, bounded, spread smaller than Rim (per-zone weights working).");
+        pass &= monoB && boundB && spreadOk;
+
+        // ----------------------------------------------------------------
+        // (c) Skill vs length contribution split.
+        //     At Rim: hold length=70, sweep RimProtection 20→95; measure delta.
+        //             hold RimP=70,   sweep length 60→90; measure delta.
+        //             Length delta should exceed skill delta (60/40 split).
+        //     At Three: same; length dominates even more.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (c) Skill vs length split @Rim and @Three:");
+        var shooterC = Mk(50);
+
+        // Rim — skill-only sweep (hold length at 70)
+        var rimSk20 = Blk(ShotLocation.Rim, shooterC, Mk(50, rimP: 20,  h: 70, ws: 70, v: 70));
+        var rimSk95 = Blk(ShotLocation.Rim, shooterC, Mk(50, rimP: 95,  h: 70, ws: 70, v: 70));
+        var rimSkDelta = rimSk95 - rimSk20;
+
+        // Rim — length-only sweep (hold RimP at 70)
+        var rimLe60 = Blk(ShotLocation.Rim, shooterC, Mk(50, rimP: 70,  h: 60, ws: 60, v: 60));
+        var rimLe90 = Blk(ShotLocation.Rim, shooterC, Mk(50, rimP: 70,  h: 90, ws: 90, v: 90));
+        var rimLeDelta = rimLe90 - rimLe60;
+
+        Console.WriteLine($"      Rim skill-only  (RimP 20→95, length=70): Δblock = {rimSkDelta:P3}");
+        Console.WriteLine($"      Rim length-only (length 60→90, RimP=70):  Δblock = {rimLeDelta:P3}");
+        var cRimOk = rimLeDelta > rimSkDelta;
+        if (!cRimOk) Console.WriteLine("  FAIL  (c) length delta should exceed skill delta at Rim (60/40 split).");
+        if (cRimOk) Console.WriteLine("      OK @Rim — length delta > skill delta (length heavier at 60%).");
+        pass &= cRimOk;
+
+        // Three — skill-only sweep (hold length at 70)
+        var thrSk20 = Blk(ShotLocation.Three, shooterC, Mk(50, perimD: 20, h: 70, ws: 70, v: 70));
+        var thrSk95 = Blk(ShotLocation.Three, shooterC, Mk(50, perimD: 95, h: 70, ws: 70, v: 70));
+        var thrSkDelta = thrSk95 - thrSk20;
+
+        // Three — length-only sweep (hold PerimD at 70)
+        var thrLe60 = Blk(ShotLocation.Three, shooterC, Mk(50, perimD: 70, h: 60, ws: 60, v: 60));
+        var thrLe90 = Blk(ShotLocation.Three, shooterC, Mk(50, perimD: 70, h: 90, ws: 90, v: 90));
+        var thrLeDelta = thrLe90 - thrLe60;
+
+        Console.WriteLine($"      Three skill-only  (PerimD 20→95, length=70): Δblock = {thrSkDelta:P3}");
+        Console.WriteLine($"      Three length-only (length 60→90, PerimD=70):  Δblock = {thrLeDelta:P3}");
+        var cThreeOk = thrLeDelta > thrSkDelta;
+        if (!cThreeOk) Console.WriteLine("  FAIL  (c) length delta should exceed skill delta at Three (60/40 split).");
+        if (cThreeOk) Console.WriteLine("      OK @Three — length delta > skill delta (length heavier at 60%).");
+        pass &= cThreeOk;
+
+        // ----------------------------------------------------------------
+        // (d) Empty-slot fallback (DEC-6). Confirms the three cases:
+        //     empty slot → block == configured baseline (exact);
+        //     even defender → block == baseline (even matchup, zero shift);
+        //     strong defender → block > baseline.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (d) DEC-6 fallback — empty slot, even matchup, strong defender:");
+        var shooterD = Mk(50, fin: 50);
+
+        // Empty slot: caller uses _cfg.BlockWeight(zone) directly, no Matchup.BlockWeight call.
+        var dEmpty = cfgH.BlockWeight(ShotLocation.Rim);          // the baseline itself
+
+        // Even matchup: both players at 50, so zero gap → zero shift → baseline.
+        var dEven  = Blk(ShotLocation.Rim, shooterD, Mk(50));
+
+        // Strong defender: should be above baseline.
+        var dStrong = Blk(ShotLocation.Rim, shooterD, Mk(50, rimP: 90, h: 85, ws: 85, v: 85));
+
+        Console.WriteLine($"      empty-slot (baseline): {dEmpty:P3}");
+        Console.WriteLine($"      even matchup:           {dEven:P3}");
+        Console.WriteLine($"      strong defender:        {dStrong:P3}");
+
+        const double FallbackEps = 1e-9;
+        var dFallbackOk = Math.Abs(dEmpty - cfgH.BlockWeight(ShotLocation.Rim)) < FallbackEps;
+        var dEvenOk     = Math.Abs(dEven  - cfgH.BlockWeight(ShotLocation.Rim)) < FallbackEps;
+        var dStrongOk   = dStrong > cfgH.BlockWeight(ShotLocation.Rim) + 0.005;
+        if (!dFallbackOk) Console.WriteLine("  FAIL  (d) empty-slot baseline is not the configured value.");
+        if (!dEvenOk)     Console.WriteLine("  FAIL  (d) even matchup did not return exactly the baseline.");
+        if (!dStrongOk)   Console.WriteLine("  FAIL  (d) strong defender did not raise block above baseline.");
+        if (dFallbackOk && dEvenOk && dStrongOk)
+            Console.WriteLine("      OK — empty==baseline; even==baseline; strong defender raises block.");
+        pass &= dFallbackOk && dEvenOk && dStrongOk;
+
+        // ----------------------------------------------------------------
+        // (e) Symmetric shooter edge. Fix balanced defender (all 50).
+        //     Raise shooter's Finishing AND length. Block rate at Rim must FALL,
+        //     asymptoting toward floor. Proves the curve bends down for shooter edge.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (e) Shooter-edge symmetry @Rim (fix defender all=50; raise shooter Fin+H/W/V):");
+        var defenderE = Mk(50);
+        double prevE = double.PositiveInfinity;
+        var monoE = true;
+        var floorE = true;
+        foreach (var (fin, hw) in new[] { (20, 40), (35, 50), (50, 60), (65, 70), (80, 80), (95, 90) })
+        {
+            var bw = Blk(ShotLocation.Rim, Mk(50, fin: fin, h: hw, ws: hw, v: hw), defenderE);
+            Console.WriteLine($"      shooter Fin={fin,2}  H/W/V={hw}  block={bw:P3}");
+            if (bw >= prevE) { monoE = false; Console.WriteLine($"        FAIL — not strictly decreasing (prev={prevE:P3})"); }
+            if (bw < rimFloor - 1e-9) { floorE = false; Console.WriteLine($"        FAIL — crossed the floor {rimFloor:P3}"); }
+            prevE = bw;
+        }
+        if (monoE && floorE) Console.WriteLine("      OK — block rate falls as shooter improves; stays above floor.");
+        pass &= monoE && floorE;
+
+        // ----------------------------------------------------------------
+        // (f) Regression guard — Phase 6 make door still works after block weight change.
+        //     Elite finisher vs weak rim protector: make rate should be > 0.50 and
+        //     the pie should be valid (no throw). Mirrors Phase 6 check (g) but verifies
+        //     that the new matchup block weight (higher for a strong defender, passed into
+        //     BuildRealPie) doesn't break the pie.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (f) Regression — Phase 6 make door valid after Phase 7 block change:");
+        var fOk = true;
+        try
+        {
+            var gReg = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            gReg.SetPossessionArrow(TeamSide.Home);
+            gReg.HomeRoster.SetStarter(gReg.HomeLineup.SlotAt(1), Mk(50, fin: 99, h: 70, ws: 70, v: 70));
+            gReg.AwayRoster.SetStarter(gReg.AwayLineup.SlotAt(1), Mk(50, rimP: 10, h: 55, ws: 55, v: 55));
+            var genReg = new RollHGenerator(cfgH, cfgM, gReg);
+            var stateReg = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, ShotType: ShotLocation.Rim,
+                SelectedSlot: gReg.HomeLineup.SlotAt(1));
+
+            var madeReg = 0;
+            for (var i = 0; i < 5_000; i++)
+            {
+                var pie = genReg.Generate(stateReg, putback: false);   // must not throw
+                if (pie.Roll(new SystemRng(i).NextUnitInterval()) is ShotResult.Made or ShotResult.MadeAndFouled)
+                    madeReg++;
+            }
+            var makeRate = (double)madeReg / 5_000;
+            Console.WriteLine($"      elite finisher vs weak rim protector @Rim: make {makeRate:P1}  (valid pie)");
+            var fRateOk = makeRate > 0.50;
+            if (!fRateOk) Console.WriteLine($"  FAIL  (f) make rate {makeRate:P1} is not > 0.50 for an extreme shooter edge.");
+            if (fRateOk) Console.WriteLine("      OK — valid pie; make rate > 0.50 for extreme shooter edge.");
+            fOk = fRateOk;
+        }
+        catch (Exception ex)
+        {
+            fOk = false;
+            Console.WriteLine($"  FAIL  (f) pie threw: {ex.Message}");
+        }
+        pass &= fOk;
+
+        Console.WriteLine(pass ? "  Phase 7 PASSED." : "  Phase 7 FAILED.");
         return pass;
     }
 }

@@ -9,9 +9,20 @@ namespace Charm.Engine;
 /// (his zone rating vs the matched defender's blended per-zone defensive read) and the
 /// physical (athletic) gap, composed additively (Matchup.EffectiveRating). The defender
 /// is resolved by DefenderPicker (v1 slot-guards-slot). Only the make door is wired this
-/// slice — location, turnovers, rebounds, blocks, and the tip remain matchup-blind.
-/// Gravity, spacing, the athletic/big split, and the carried-defender promotion are
-/// still deferred and drop in here without touching Roll H's structure or the resolver.</para>
+/// slice — location, turnovers, rebounds, and the tip remain matchup-blind. Gravity,
+/// spacing, the athletic/big split, and the carried-defender promotion are still deferred
+/// and drop in here without touching Roll H's structure or the resolver.</para>
+///
+/// <para><b>Phase 7 — matchup-aware block door.</b> The block weight is now computed
+/// via Matchup.BlockWeight rather than read flat from config. A 7'1" rim protector blocks
+/// more rim attempts than a 6'2" guard (same shooter). Two contributions — skill
+/// (shooter zone-skill vs defender blend, same attributes as the make door) and length
+/// (Height/Wingspan/Vertical composite, block-specific because length blocks shots;
+/// quickness belongs to the make door's Athleticism read) — are weighted per zone and
+/// run through a tanh saturation that asymptotes toward per-zone floor/ceiling. The
+/// DEC-6 empty-slot fallback keeps the configured baseline, same shape as the make door.
+/// OOB rates, foul rates, and all other Roll H weights remain flat from config this
+/// session.</para>
 ///
 /// <para><b>Zone→attribute mapping.</b>
 /// Three and Long read <see cref="Player.Outside"/>;
@@ -21,20 +32,26 @@ namespace Charm.Engine;
 /// The zone/location distinction is intentional: ShotLocation names WHERE the
 /// shot comes from; the player attribute names the SKILL needed to convert it.</para>
 ///
-/// <para><b>Make weight substitution.</b> Block is carved off the top first; the
-/// logistic result is the conversion rate GIVEN the shot is not blocked, so the
-/// Made weight is <c>makePct × (1 − block)</c> — the same shape the stub uses
+/// <para><b>Make weight substitution (carve-then-convert).</b> Block is carved off the
+/// top first; the logistic result is the conversion rate GIVEN the shot is not blocked,
+/// so the Made weight is <c>makePct × (1 − block)</c> — the same shape the stub uses
 /// (<c>BaseMade × (1 − block)</c>). The other five outcomes keep their relative
 /// proportions and fill the rest of the non-block share. The pie always sums to 1
-/// and never goes negative for any makePct in [0, 1].</para>
+/// and never goes negative for any (makePct, blockWeight) pair in [0, 1).
+/// (The earlier form set Made = makePct and added block on top, which went negative
+/// once makePct + block exceeded 1 — reachable at the rim. The fix: blockWeight is
+/// carved first, then makePct is the conversion rate GIVEN not blocked.)
+/// Phase 7 changes blockWeight per matchup, so the observed make rate shifts slightly
+/// because the non-block headroom (1 − block) now varies per shot — the calibration
+/// pass fits it as observed-FG% ≈ curve × (1 − block) regardless.</para>
 ///
 /// <para><b>Fallback when no player is present.</b> If the roster is not populated
 /// (a harness that constructs a Resolver without calling SetStarter), PlayerAt
 /// returns null and the generator falls back to the flat stub behaviour — identical
-/// to what RollHStubPieGenerator produces. This keeps all 14 existing harness sites
+/// to what RollHStubPieGenerator produces. This keeps all existing harness sites
 /// that do not populate a roster passing unchanged. Separately (DEC-6), if the shooter
-/// is present but the matched defending slot is empty, the make door reads the raw
-/// own-rating with no matchup term — the pre-Phase-6 behaviour.</para>
+/// is present but the matched defending slot is empty, both the make door and the block
+/// door read the raw own-rating / configured baseline with no matchup term.</para>
 ///
 /// <para><b>Fail-loud on null slot.</b> If SelectedSlot is null when a possession
 /// reaches Roll H, that is a wiring bug upstream (the selection roll must run
@@ -43,7 +60,8 @@ namespace Charm.Engine;
 /// <para><b>Putback path unchanged.</b> Putback shots return the flat putback pie
 /// from config (the real putback tilt by size/athleticism/rim rating is Phase 4
 /// work). The generator returns early when <paramref name="putback"/> is true,
-/// exactly as the stub does.</para>
+/// exactly as the stub does. BuildPutbackPie uses _cfg.BlockWeight(zone) directly —
+/// putback has no carried defender slot yet.</para>
 ///
 /// Implements <see cref="IRollHPieGenerator"/> — the resolver holds the interface,
 /// so swapping this for a richer Phase 3/4/5 generator only changes the
@@ -99,7 +117,17 @@ public sealed class RollHGenerator : IRollHPieGenerator
 
         var makePct = _cfg.MakeProbability(zone, effectiveRating);
 
-        return BuildRealPie(zone, makePct);
+        // Phase 7 — matchup-aware block door. Compute the bent block weight from the
+        // matchup, or fall back to the configured baseline if the defending slot is empty
+        // (DEC-6, same guard as the make door above). The block weight is computed here,
+        // before BuildRealPie, so the pie builder receives it as a plain double and does
+        // not need to re-examine the matchup.
+        var blockWeight = defender is null
+            ? _cfg.BlockWeight(zone)                                      // DEC-6 fallback: no matchup term
+            : Matchup.BlockWeight(zone, player, defender,
+                                  _cfg.BlockWeight(zone), _matchup);      // Phase 7: bent by matchup
+
+        return BuildRealPie(zone, makePct, blockWeight);
     }
 
     // -------------------------------------------------------------------------
@@ -107,19 +135,20 @@ public sealed class RollHGenerator : IRollHPieGenerator
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Build the real seven-way pie. Block is carved off the top first; the logistic
-    /// make probability is the conversion rate GIVEN the shot is not blocked, so
+    /// Build the real seven-way pie. Block is carved off the top first (carve-then-convert);
+    /// the logistic make probability is the conversion rate GIVEN the shot is not blocked, so
     /// Made = makePct × (1 − block) — the same shape the stub uses (BaseMade × (1 − block)).
     /// The other five outcomes keep their relative proportions and fill the rest of the
     /// non-block share. Overflow-safe: the pie always sums to 1 with no negative weight.
-    /// (The earlier form set Made = makePct and added block on top, which went negative
-    /// once makePct + block exceeded 1 — reachable at the rim, where ceiling 0.93 +
-    /// block 0.12 > 1.) The per-zone curve therefore reads as conversion-when-not-blocked,
-    /// not final FG%; the calibration pass fits it as observed-FG% ≈ curve × (1 − block).
+    ///
+    /// <para>Phase 7: <paramref name="blockWeight"/> is now the matchup-aware value computed
+    /// in Generate (or the configured baseline for the DEC-6 fallback). BuildRealPie does not
+    /// read _cfg.BlockWeight(zone) — it receives the pre-computed value so that the carve math
+    /// is unchanged and the caller owns the matchup logic.</para>
     /// </summary>
-    private Pie<ShotResult> BuildRealPie(ShotLocation zone, double makePct)
+    private Pie<ShotResult> BuildRealPie(ShotLocation zone, double makePct, double blockWeight)
     {
-        var block        = _cfg.BlockWeight(zone);
+        var block        = blockWeight;
         var nonBlock     = 1.0 - block;
         var made         = makePct * nonBlock;                 // make% = conversion given not blocked
 
@@ -152,7 +181,9 @@ public sealed class RollHGenerator : IRollHPieGenerator
 
     /// <summary>
     /// Stub fallback: flat pie identical to what RollHStubPieGenerator produces.
-    /// Used when the roster is unpopulated — preserves all 14 existing harness checks.
+    /// Used when the roster is unpopulated — preserves all existing harness checks.
+    /// Block weight comes directly from config (no matchup) — this path only fires
+    /// when there is no shooter, so there is certainly no defender to contest with.
     /// </summary>
     private Pie<ShotResult> BuildStubPie(ShotLocation zone)
     {
@@ -174,6 +205,8 @@ public sealed class RollHGenerator : IRollHPieGenerator
     /// <summary>
     /// Putback pie — flat, from config, no per-zone block carve.
     /// Identical to RollHStubPieGenerator.BuildPutbackPie().
+    /// Block weight stays flat from config — the putback matchup (who is contesting the
+    /// put-back) is Phase 4 work; there is no defender slot to read here yet.
     /// </summary>
     private Pie<ShotResult> BuildPutbackPie()
     {
