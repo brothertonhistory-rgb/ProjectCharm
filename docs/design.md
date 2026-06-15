@@ -2723,3 +2723,117 @@ No roster coverage / strength-read (Phase 5). No defender-ID picker, no wiring (
 aggregates, no strategy / tendencies / usage / fatigue / game-state. The out-athleted player's
 **volume choke** ("never shoots 20 times") is the **usage / cascade** lever — deferred; Phase 4 owns
 only the per-shot tilt. No magnitudes. `MakeProbability` untouched.
+
+## Session 36 — Phase 5: the roster strength-read (2026-06-14)
+
+**A design session, not a build (CONVENTIONS §4) — no code, no harness.** Phase 5 is how the **five
+individual matchups** across a roster (Phase 4's per-attacker-vs-defender outputs) combine into team
+strength: the non-linear coverage math alone — *no weakness beats one peak*, *credible beats elite*,
+*composition sets variance*. The spec lands in `docs/axes.md` (new "Phase 5" section; the Open "non-linear
+strength read" item moved to Settled); this entry is the conversational deep-dive behind it. Everything
+is structure and direction — **no magnitudes** — and still unwired (picker + generators are Phase 6).
+
+### The crux that framed the whole session
+
+Phase 4's gap → tilt response is **convex and explicitly does NOT saturate** (axes.md ~270): a bigger
+edge on one front keeps paying. So "no weakness beats one peak" and "credible beats elite" **cannot**
+come from the gap function flattening — it doesn't. The saturation that reverses it lives **elsewhere,
+and it is already in hand:** the gap → tilt feeds the **make-curve, which is a bounded logistic and
+does** saturate. The per-possession *payoff* of an edge caps even while the rating edge climbs. That one
+observation is the spine of Phase 5 — everything else is its consequences.
+
+### Q1 — where the non-linearity lives: it EMERGES, never computed
+
+Resolved: the non-linearity lives in the **sparse five-matchup sum on the scoreboard**, not in a profile
+aggregation the engine consults and not in a coverage formula. Worked in plain terms and confirmed:
+
+- A game is **five one-on-one battles, each resolved ~26 times, added up.**
+- **A won front is capped** (an open shot is not 110%; frequencies cap at 100%). **A lost front bleeds
+  every trip.** Asymmetric ends.
+- A one-peak roster **wins one capped front and loses four bleeding ones** — four leaks drown one
+  fountain. The balanced roster that holds serve everywhere wins the four trades.
+
+Consequence for the **no-scalar wall** (the easiest locked principle to violate): there is no
+team-strength number *to* violate it — it is **never built.** The radar / team-axis profile is a
+**derived descriptor** for intuition and legibility, never an input the resolver reads. Tightest possible
+satisfaction of the wall.
+
+**Emmett's counterweight call.** Emmett immediately named the force that pushes back: a superstar good
+enough to **bend the defense** draws so much attention (gravity) that his four teammates get easier looks
+than their own matchups would earn — "less than full man-to-man." Correct and true to life — and
+correctly **out of scope**: that lift is the **gravity / attention / team-aggregate layer** (one player's
+pull changing *other* players' looks), hard-gated on the deferred attention machinery. Kept in a separate
+drawer so coverage and the gravity lift can push against each other naturally instead of being
+pre-blended. Flagged loudly in the spec; not folded in.
+
+### Q2 — diminishing returns: two kinds wearing one name, only one ours
+
+The HARD CONSTRAINT's "diminishing returns *and/or* coverage" resolved as **two distinct ideas**, not one
+mechanism viewed twice:
+
+1. **Over-investing in a front you already win** (a better star, or a second star on the same matchup)
+   yields less and less — the **same coin as the cap.** Comes free here, no extra knob.
+2. **Spreading elite talent across positions** (does the fifth great athlete add as much as the first?)
+   — in the pure five-matchup picture he *does* (he wins a fifth front the team would otherwise lose).
+   The reason he adds less in reality (five rim-attackers crowding the paint, five shooters past the help
+   point, one ball) is **spacing / gravity / usage crowding** — the **parked** team-aggregate / usage
+   layer.
+
+So Phase 5 needs **no separate diminishing-returns mechanism.** Confirmed.
+
+### Q3 — "credible" and "front held": the curve's middle, not a threshold
+
+Not a line we draw — a region of the **make-curve already in use.** The top **caps** (elite → dominant is
+wasted surplus). The bottom has a **soft floor and flattens** (the Phase-4 residual — broken plays, the
+defender slips, garbage looks — so a badly-beaten man still hits a few, and the make%-gap to a scrub
+compresses; losing a lost front *worse* barely moves the number, but you pay it every trip). The
+**responsive action is the middle**, where most matchups live. "**Credible**" = still in that middle, not
+pinned to the floor; "**front held**" = not shoved to the bottom. We never pick a credibility magnitude —
+it is the **natural bend of the curve**, reused. This is *why* credible-everywhere beats elite-in-one-spot.
+
+### Q4 — composition → spread: the shot diet, refined twice by Emmett
+
+Confirmed: the spread rides the **shot diet the matchups already produce**, expressed through the existing
+pies — **not** a variance dial, **not** the deferred streak governor. Two Emmett refinements sharpened it:
+
+- **"Not swingy — low odds that sometimes hit."** A three-heavy diet is genuinely **lower-odds**, not the
+  same average with more bounce. The rim team is both more efficient *and* steadier. The three team
+  competes on **volume** and by **winning the other battles** (rebounds, turnovers → extra possessions →
+  more cracks, independent of the jumper falling) — which are just more of the five-matchup picture, and
+  the categorical fronts swing whole possessions.
+- **"It's what they try to do to win — and it's a *good* strategy with the personnel."** Not two fixed
+  identities (steady team vs swingy team). The real variable is **how much a team must lean on the
+  lower-odds shot with nothing underneath.** A team with real shooters that *also* wins the glass and the
+  defensive fronts is **covered** — cold night, still in the game; low spread, high quality (a sound,
+  even dominant, build). The genuine **upset machine** is the *three-or-nothing* team that has no other
+  way to score. This is the coverage picture again, applied to variance: *do you hold the other fronts
+  when the shots aren't falling?*
+
+Parked here: the **strategic choice** of how many threes to take (strategy layer); the
+**usage-concentration** kind of variance (leaning on one or two scorers — usage layer); the **streak**
+mechanic (wall).
+
+### Q5 — the Phase-6 seam
+
+Phase 5 is the coverage math over a **given** sparse round-robin — it sums whatever five matchups it is
+handed. **Who guards whom** (the defender-ID picker, including later mismatch-hunting) is **Phase 6**, the
+mirror of Phase 4's "assumes a defender is given." Nothing in the coverage read secretly needs the picker.
+Function first, picker second. Confirmed.
+
+### Q6 — legibility: read off results, never a meter
+
+No team-strength number to show, so the read **telegraphs through outcomes:** no-weakness-beats-one-peak
+shows as a star's huge line *in a loss* with the other four outplayed by their counterparts ("carried in
+one spot, bled everywhere else"); the balanced team as nobody's line jumping off the page but everyone
+holding serve in a grind-out win; the upset machine across a **season** as blowout wins / ugly losses /
+wide scoring range (and runs inside a game); the steady favorite as tight, consistent margins. The user
+infers strength the way a real coach does — from results.
+
+### Scope walls held
+
+No team-strength scalar, no coverage formula (it emerges). No defender-ID picker, no wiring (Phase 6). No
+team aggregates — the **gravity lift** and the **across-position diminishing returns** stay parked in their
+own layer. No strategy / tendencies / usage / fatigue / game-state; the **streak governor is deferred** and
+the **usage-concentration** variance with it — the spread here is the static shot-diet kind only. No
+magnitudes. The **make-curve and the Phase-4 gap function are untouched** — the cap and floor that do the
+coverage work are already inside them.

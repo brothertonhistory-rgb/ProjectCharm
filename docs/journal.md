@@ -1,3 +1,44 @@
+## Session 36 — Phase 5: the roster strength-read (2026-06-14)
+
+**A design session, not a build (CONVENTIONS §4) — no code, no harness.** Phase 5 is how the **five
+individual matchups** across a roster (Phase 4's outputs) combine into team strength: the non-linear
+coverage math alone — *no weakness beats one peak*, *credible beats elite*, *composition sets the spread*.
+Structure and direction only — no magnitudes, still unwired (picker + generators are Phase 6).
+
+**Where it landed:** a new **"Phase 5" section in `docs/axes.md`** (the frame, the cap-vs-bleed
+asymmetry, credibility, the two diminishing-returns kinds, the spread, the gravity counterweight,
+legibility, the Phase-6 seam, the walls), with the Open "non-linear strength read" item moved to Settled.
+The conversational deep-dive is appended to `docs/design.md`. No other files touched.
+
+**The calls that got made:**
+- **It EMERGES; it is never computed.** The non-linearity lives in the **sparse five-matchup sum on the
+  scoreboard** — no coverage formula, no team-strength scalar (the scalar is never built — tightest
+  satisfaction of the no-scalar wall). The radar / profile read is a **derived descriptor** for
+  legibility, never consulted by the engine.
+- **The crux.** Phase 4's gap response is convex and does NOT saturate, so coverage can't come from it
+  flattening. The saturation lives in the **make-curve** (a bounded logistic). So: a **won front is
+  capped**, a **lost front bleeds every trip**, and a one-peak roster's one capped peak can't outrun its
+  **four bleeding valleys** — *four leaks drown one fountain.* Categorical fronts (rebounds, turnovers)
+  sharpen it — they swing whole possessions.
+- **"Credible" = the responsive middle of the curve, not a threshold we set.** Top caps (elite→dominant
+  wasted), bottom floors-and-flattens (a beaten man still hits a few; losing worse barely moves it but is
+  paid every trip). Credible-everywhere beats elite-in-one-spot.
+- **Diminishing returns = two ideas, one ours.** Over-stacking a front you win → less and less (same coin
+  as the cap, here). The fifth-great-athlete-across-positions kind → spacing / usage crowding, **parked.**
+  No separate knob needed.
+- **Spread = the shot diet** (Emmett's two refinements): not "swingy" but **lower-odds shots that
+  sometimes hit**, competing on volume + winning the other battles; and not two fixed identities but **how
+  much you lean on the lower-odds shot with nothing underneath** — a covered three-team is strong, a
+  three-or-nothing team is the upset machine. Not a variance dial; not the streak governor.
+- **Gravity lift = the parked counterweight.** A superstar bending the defense to free his teammates is
+  the real force pushing back on coverage — but it's the **gravity/attention layer**, kept in a separate
+  drawer so the two forces fight it out naturally. Flagged loudly, not folded in.
+
+**Walls held:** no team-strength scalar / coverage formula (it emerges), no defender-ID picker or wiring
+(Phase 6), no team aggregates (gravity lift + across-position diminishing returns parked), no strategy /
+usage / streaks (the spread is the static shot-diet kind only). No magnitudes. Make-curve and Phase-4 gap
+function untouched.
+
 ## Session 35 — Phase 4: the individual-matchup tilt (2026-06-14)
 
 **A design session, not a build (CONVENTIONS §4) — no code, no harness.** Phase 4 turns **one
