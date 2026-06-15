@@ -379,6 +379,138 @@ public sealed class MatchupConfig
                 $"LocationMaxMultiplier must be > 1.0 (a max of 1.0 or below would be smaller than the neutral " +
                 $"case; nonsensical): got {cfg.LocationMaxMultiplier}.");
 
+        // Phase 10 invariants — rebound door (the glass).
+        if (Math.Abs(cfg.ReboundSizeWeight + cfg.ReboundSkillWeight - 1.0) > Eps)
+            throw new InvalidOperationException(
+                $"ReboundSizeWeight + ReboundSkillWeight must sum to 1.0: " +
+                $"size={cfg.ReboundSizeWeight}, skill={cfg.ReboundSkillWeight}, sum={cfg.ReboundSizeWeight + cfg.ReboundSkillWeight}.");
+
+        if (cfg.ReboundOffShareFloor < 0.0 || cfg.ReboundOffShareFloor >= cfg.ReboundOffShareCeiling)
+            throw new InvalidOperationException(
+                $"ReboundOffShareFloor must be >= 0 and < ReboundOffShareCeiling: " +
+                $"floor={cfg.ReboundOffShareFloor}, ceiling={cfg.ReboundOffShareCeiling}.");
+
+        if (cfg.ReboundOffShareCeiling > 1.0)
+            throw new InvalidOperationException(
+                $"ReboundOffShareCeiling must be <= 1.0: got {cfg.ReboundOffShareCeiling}.");
+
+        if (cfg.ReboundReferenceShift <= 0.0)
+            throw new InvalidOperationException(
+                $"ReboundReferenceShift must be > 0: got {cfg.ReboundReferenceShift}.");
+
+        if (cfg.ReboundPositionalScale <= 0.0)
+            throw new InvalidOperationException(
+                $"ReboundPositionalScale must be > 0: got {cfg.ReboundPositionalScale}.");
+
+        if (cfg.ReboundPositionalSwing < 0.0 || cfg.ReboundPositionalSwing >= 1.0)
+            throw new InvalidOperationException(
+                $"ReboundPositionalSwing must be >= 0 and < 1.0: got {cfg.ReboundPositionalSwing}.");
+
+        if (cfg.ReboundShooterNerf < 0.0 || cfg.ReboundShooterNerf > 1.0)
+            throw new InvalidOperationException(
+                $"ReboundShooterNerf must be in [0.0, 1.0] (a nerf multiplier, never a boost or negative): " +
+                $"got {cfg.ReboundShooterNerf}.");
+
         return cfg;
     }
+
+    // =========================================================================
+    // Phase 10 — rebound door (the glass)
+    // =========================================================================
+
+    // --- Phase 10: pre-staging team-size composite blend.
+    //     ReboundPhysical(p) = ReboundStrengthWeight * p.Strength + ReboundHeightWeight * p.Height.
+    //     Weights need not sum to 1 (a weighted read, like LengthRating). Placeholders. ---
+
+    /// <summary>Weight of <see cref="Player.Strength"/> in the pre-staging size composite.
+    /// Calibration placeholder — equal thirds for now.</summary>
+    public double ReboundStrengthWeight { get; set; } = 0.5;
+
+    /// <summary>Weight of <see cref="Player.Height"/> in the pre-staging size composite.
+    /// Calibration placeholder — equal thirds for now.</summary>
+    public double ReboundHeightWeight { get; set; } = 0.5;
+
+    // --- Phase 10: positional composite (Postness) blend.
+    //     Postness(p) = PostnessHeight * p.Height + PostnessPostDefense * p.PostDefense
+    //                 + PostnessStrength * p.Strength.
+    //     Weights need not sum to 1 (a weighted read). Placeholders. ---
+
+    /// <summary>Weight of <see cref="Player.Height"/> in the postness composite.
+    /// Calibration placeholder — equal thirds.</summary>
+    public double PostnessHeight { get; set; } = 1.0 / 3.0;
+
+    /// <summary>Weight of <see cref="Player.PostDefense"/> in the postness composite.
+    /// Calibration placeholder — equal thirds.</summary>
+    public double PostnessPostDefense { get; set; } = 1.0 / 3.0;
+
+    /// <summary>Weight of <see cref="Player.Strength"/> in the postness composite.
+    /// Calibration placeholder — equal thirds.</summary>
+    public double PostnessStrength { get; set; } = 1.0 / 3.0;
+
+    // --- Phase 10: positional weight swing.
+    //     posWeight_i = 1.0 + ReboundPositionalSwing * tanh((postness_i − meanPostness) / scale).
+    //     Bounded in (1 − swing, 1 + swing) ≈ (0.8, 1.2) at swing=0.2; exactly 1 at mean.
+    //     swing < 1.0 is enforced in Load (keeps weights strictly positive).
+    //     scale > 0 is enforced in Load. Both are calibration knobs. ---
+
+    /// <summary>Half-amplitude of the positional weight swing. Default 0.2 → range (0.8, 1.2).
+    /// Must be in [0, 1) (enforced in Load). Calibration placeholder.</summary>
+    public double ReboundPositionalSwing { get; set; } = 0.2;
+
+    /// <summary>Rating-point spread at which one positional-weight unit of swing is reached
+    /// (tanh saturation knob). Default 15.0. Must be &gt; 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double ReboundPositionalScale { get; set; } = 15.0;
+
+    // --- Phase 10: size/skill split for the total shift composition.
+    //     totalShift = ReboundSizeWeight * sizeShift + ReboundSkillWeight * skillShift.
+    //     Must sum to 1.0 (enforced in Load). ---
+
+    /// <summary>Weight of the pre-staging size shift in the total rebound shift.
+    /// Must sum to 1.0 with <see cref="ReboundSkillWeight"/> (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double ReboundSizeWeight { get; set; } = 0.45;
+
+    /// <summary>Weight of the positional-weighted skill shift in the total rebound shift.
+    /// Must sum to 1.0 with <see cref="ReboundSizeWeight"/> (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double ReboundSkillWeight { get; set; } = 0.55;
+
+    // --- Phase 10: shooter nerf multiplier.
+    //     Applied to the shooter's OffensiveRebounding contribution when zone is Three/Long/Mid.
+    //     A multiplier in [0, 1]: 0 = shooter contributes nothing, 1 = no nerf.
+    //     Rim/Short: no nerf (shooter is already inside). Must be in [0, 1] (enforced in Load). ---
+
+    /// <summary>Multiplier on the shooter's <see cref="Player.OffensiveRebounding"/> contribution
+    /// when the shot came from <c>Three</c>, <c>Long</c>, or <c>Mid</c>. The shooter is outside
+    /// and can't crash his own miss as easily. Default 0.35 (significant but not zeroed).
+    /// Must be in [0.0, 1.0] (enforced in Load). Calibration placeholder.</summary>
+    public double ReboundShooterNerf { get; set; } = 0.35;
+
+    // --- Phase 10: off-share floor and ceiling.
+    //     The tanh saturation asymptotes toward these values without crossing.
+    //     Defined on the OFF-SHARE (= offWeight / (defWeight + offWeight)), shared across
+    //     both live-miss and block sources. The two sources start at different baselines
+    //     (≈0.290 and ≈0.390) but bend within the same band.
+    //     floor >= 0, ceiling <= 1.0, floor < ceiling (enforced in Load). ---
+
+    /// <summary>The minimum off-share the rebound bend can reach (defense-dominant asymptote).
+    /// Default 0.08. Must be &gt;= 0 and &lt; <see cref="ReboundOffShareCeiling"/>
+    /// (enforced in Load). Calibration placeholder.</summary>
+    public double ReboundOffShareFloor { get; set; } = 0.08;
+
+    /// <summary>The maximum off-share the rebound bend can reach (offense-dominant asymptote).
+    /// Default 0.55. Must be &lt;= 1.0 and &gt; <see cref="ReboundOffShareFloor"/>
+    /// (enforced in Load). Calibration placeholder.</summary>
+    public double ReboundOffShareCeiling { get; set; } = 0.55;
+
+    // --- Phase 10: tanh saturation knob for the rebound contest.
+    //     A net shift of ReboundReferenceShift reaches tanh(1) ≈ 76% of span.
+    //     Default 20.0 (rating points). Must be > 0 (enforced in Load). ---
+
+    /// <summary>The net shift (rating points) that reaches ~76% saturation toward
+    /// the rebound off-share floor/ceiling. Higher = slower saturation (wider gap
+    /// needed for a large shift). Must be &gt; 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double ReboundReferenceShift { get; set; } = 20.0;
 }

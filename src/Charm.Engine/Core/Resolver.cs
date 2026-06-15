@@ -90,7 +90,7 @@ public sealed class Resolver
     private readonly RollFStubPieGenerator _rollFGenerator;
     private readonly IRollGPieGenerator _rollGGenerator;
     private readonly IRollHPieGenerator _rollHGenerator;
-    private readonly RollIStubPieGenerator _rollIGenerator;
+    private readonly IRollIPieGenerator _rollIGenerator;
     private readonly RollJStubPieGenerator _rollJGenerator;
     private readonly RollKStubPieGenerator _rollKGenerator;
     private readonly RollLStubPieGenerator _rollLGenerator;
@@ -110,7 +110,7 @@ public sealed class Resolver
         RollFStubPieGenerator rollFGenerator,
         IRollGPieGenerator rollGGenerator,
         IRollHPieGenerator rollHGenerator,
-        RollIStubPieGenerator rollIGenerator,
+        IRollIPieGenerator rollIGenerator,
         RollJStubPieGenerator rollJGenerator,
         RollKStubPieGenerator rollKGenerator,
         RollLStubPieGenerator rollLGenerator,
@@ -450,6 +450,7 @@ public sealed class Resolver
                             // block-recovery pie. The routing in Roll I is identical for
                             // both; only the weights differ.
                             var pieI = _rollIGenerator.Generate(
+                                c.State,
                                 c.ReboundSource ?? ReboundSource.LiveBall);
                             result = RollI.Execute(c.State, pieI, _game, _rng);
                             continue;

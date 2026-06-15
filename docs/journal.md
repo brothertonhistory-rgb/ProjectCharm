@@ -1,3 +1,155 @@
+## Session 41 — Phase 10: matchup-aware rebounding (Roll I, "the glass") (2026-06-15)
+
+**A build (CONVENTIONS §0–§3) — code + harness, all green.** Roll I is now matchup-aware.
+Before this session every rebound resolved from the same flat 66/27 defensive/offensive split
+regardless of who was on the floor. Phase 10 bends that split by a two-touchpoint model: the
+pre-staging team-size check (which team is bigger/stronger on the floor) and the
+positional-weighted skill check (whose rebounders are in position, weighted by post-ness).
+
+**The two-touchpoint model (settled in design, implemented here):**
+
+1. **Pre-staging size check (team-vs-team, external).** Compare each team's mean
+   `ReboundPhysical` composite (height + strength). The bigger team tilts the split its way.
+   This is a *relative* comparison — a 7-foot stiff helps against a small lineup and hurts
+   against giants. Size earns boards on its own, independent of rebounding skill.
+
+2. **Positional-weighted skill shift (intra-team, internal).** Within each lineup, each player
+   gets a `PositionalWeight` based on their `Postness` (height + post defense + strength)
+   relative to the lineup mean — posts above 1.0, guards below 1.0, exactly 1.0 at the mean.
+   Applied to `OffensiveRebounding` (offense) or `DefensiveRebounding` (defense) as a weighted
+   mean before comparing team edges. The shooter's offensive contribution is nerfed on
+   `Three/Long/Mid` (the shooter is already outside and can't crash easily); no nerf on
+   `Rim/Short`.
+
+Both shifts sum additively into a `totalShift`, then bend the offensive off-share toward a
+ceiling (offense crashes successfully) or floor (defense locks the glass) via tanh saturation —
+the same shape as `BlockWeight` and `FoulRate`. Plain addition; tanh is odd and supplies the
+sign (the Session 38 lesson, honored here).
+
+**The binary mass reweight (Divergence 3 from the Phase 9 template).** Roll G renormalizes all
+five location slices. Roll I only moves `DefensiveRebound` and `OffensiveRebound` within the
+`Def+Off` mass. The five flat slivers (fouls, OOB, jump-ball) stay at their config values
+unchanged. The pie still sums to 1 by construction.
+
+**What landed (8 files — 2 new + 6 edits):**
+
+- **`Generators/IRollIPieGenerator.cs` (NEW)** — the interface, mirroring `IRollGPieGenerator`
+  and `IRollHPieGenerator`. Two-arg `Generate(PossessionState state, ReboundSource source)` —
+  the structural Divergence 1 from Phase 9: Roll I's generator needs both the source (which
+  baseline pie) AND the state (rosters, shooter slot, shot zone). Both the stub and the real
+  generator implement it; the Resolver field types to the interface.
+
+- **`Generators/RollIGenerator.cs` (NEW)** — the matchup-aware real generator. Ctor takes
+  `(RollIConfig, MatchupConfig, GameState)` with null guards plus a **cross-config invariant
+  guard**: at construction, both source baselines' off-shares must lie inside
+  `[ReboundOffShareFloor, ReboundOffShareCeiling]`. If a future config edit pushes a baseline
+  outside the bend band, the tanh direction would invert silently — caught loud at startup.
+  Fallback fires before any `SelectedSlot`/`ShotType` read: if either team has zero populated
+  players OR `SelectedSlot` is null (batch-check / harness paths with real rosters but no
+  shooter stamped), returns the flat baseline pie. A real in-game possession always has both
+  rosters populated and a slot stamped. Populated path computes `Matchup.OffensiveReboundShare`,
+  splits the mass, leaves the five slivers untouched, and returns the seven-way pie.
+  Includes a **neutral coaching seam** note: crash-glass / get-back sliders will bend
+  `finalOffShare` further when the strategy layer lands; v1 is matchup-only; the documented
+  insertion point sits at identity.
+
+- **`Generators/RollIStubPieGenerator.cs` (edit)** — added `: IRollIPieGenerator`. Changed
+  `Generate(ReboundSource source)` → `Generate(PossessionState state, ReboundSource source)`;
+  `state` is explicitly documented as ignored. No behavior change.
+
+- **`Core/Matchup.cs` (edit)** — four new Phase 10 public static methods:
+  - `ReboundPhysical(Player p, MatchupConfig cfg)` — the pre-staging size composite:
+    `ReboundStrengthWeight × Strength + ReboundHeightWeight × Height`. Mirrors `LengthRating`.
+  - `Postness(Player p, MatchupConfig cfg)` — the positional composite:
+    `PostnessHeight × Height + PostnessPostDefense × PostDefense + PostnessStrength × Strength`.
+  - `PositionalWeight(double playerPostness, double lineupMeanPostness, MatchupConfig cfg)` —
+    `1.0 + ReboundPositionalSwing × tanh((postness − mean) / ReboundPositionalScale)`. Exactly
+    1.0 at the lineup mean; bounded in `(1−swing, 1+swing)` ≈ `(0.8, 1.2)`; monotone.
+  - `OffensiveReboundShare(...)` — the door. Stage 1: mean `ReboundPhysical` gap → `GapFn` →
+    `sizeShift`. Stage 2: each player's rebounding rating × `PositionalWeight` × shooter nerf
+    → weighted mean per team → `GapFn` → `skillShift`. Compose: `totalShift =
+    ReboundSizeWeight × sizeShift + ReboundSkillWeight × skillShift`. Tanh saturation toward
+    ceiling or floor; plain addition (tanh supplies the sign).
+
+- **`Config/MatchupConfig.cs` (edit)** — Phase 10 block appended: 14 new properties
+  (`ReboundStrengthWeight`, `ReboundHeightWeight`, `PostnessHeight`, `PostnessPostDefense`,
+  `PostnessStrength`, `ReboundPositionalSwing`, `ReboundPositionalScale`, `ReboundSizeWeight`,
+  `ReboundSkillWeight`, `ReboundShooterNerf`, `ReboundOffShareFloor`, `ReboundOffShareCeiling`,
+  `ReboundReferenceShift`). All with calibration-placeholder defaults. `Load` invariants added:
+  `ReboundSizeWeight + ReboundSkillWeight == 1.0`; `0 ≤ floor < ceiling ≤ 1.0`; reference
+  shift > 0; positional scale > 0; `0 ≤ swing < 1.0`; `0 ≤ ShooterNerf ≤ 1.0` (a nerf,
+  never a boost or negative).
+
+- **`Core/Resolver.cs` (edit)** — two surgical changes: `_rollIGenerator` field retyped from
+  `RollIStubPieGenerator` to `IRollIPieGenerator`; ctor param likewise. Dispatch updated to
+  pass `c.State` into `Generate`: `_rollIGenerator.Generate(c.State, c.ReboundSource ??
+  ReboundSource.LiveBall)`. The `?? LiveBall` null-coalesce stays in the resolver.
+
+- **`Harness/Program.cs` (edit)** — several changes:
+  - Early `var rollIGenerator = new RollIStubPieGenerator(cfgI)` (line ~40, before
+    `cfgMatchup` and rosters existed) **deleted**; replaced by
+    `var rollIGenerator = new RollIGenerator(cfgI, cfgMatchup, game)` constructed after
+    `cfgMatchup` and `SeatStartersFromConfig`, beside `rollGGenerator` and `rollHGenerator`.
+    Exact same move Phase 9 made for `rollGGenerator`.
+  - Three batch check call sites updated to pass `new RollIStubPieGenerator(cfgI)` instead
+    of the matchup-aware `rollIGenerator` — keeps the four baseline rate checks flat and
+    independent of matchup (same cure as the Phase 9 `RollHResolutionBatchCheck` fix).
+  - All five `genI.Generate(src)` calls updated to `genI.Generate(state, src)` (four batch
+    check internals + one observability section).
+  - `Phase10ReboundDoorCheck(string configPath)` added and registered after
+    `Phase9LocationDoorCheck`. Seven sub-checks, all deterministic (no Monte Carlo batch):
+    (a) neutral all-50 → off-share equals baseline exactly; five flat slivers equal config
+    exactly. (b) size check: offense big (85) vs defense small (35) → off-share rises.
+    (c) skill check: equal size, off OffReb=85 vs def DefReb=35 → off-share rises.
+    (d) positional weight isolated: equal height+strength (size check = wash); PostDefense
+    alone separates the teams; concentrated OffReb in high-PostDef player beats flat spread.
+    (e) shooter nerf: Three (nerf on) yields lower off-share than Rim (nerf off). (f) flat
+    slivers unchanged across (b)–(e) cases. (g) block source baseline: at neutral, block
+    off-share ≈ 0.390, distinct from live-miss ≈ 0.290.
+
+- **`Harness/config.json` (edit)** — 14 new Phase 10 keys added to the `Matchup` section.
+  `RollI` section unchanged.
+
+**Harness — ALL CHECKS PASSED (two runs).** First run threw on `SelectedSlot is null` in
+the 100k batch check: the main game has real rosters (from `SeatStartersFromConfig`), so the
+empty-roster fallback didn't fire, but the batch check's bare possession state has no shooter
+stamped. Fix: extended the fallback to also cover `state.SelectedSlot is null` — any path
+without a stamped shooter returns the flat baseline. This is correct: a real in-game possession
+always has a slot stamped by Roll E before reaching Roll I. Second run: all green.
+
+**Phase 10 sub-results (from the second run):** (a) neutral: exact 0.29032258 vs baseline
+0.29032258; (b) size check: 0.473403 > 0.290323; (c) skill check: 0.440510 > 0.290323;
+(d) positional weight: concentrated 0.266434 > flat 0.258584 — positional weight rewards
+OffReb in bigs; (e) nerf: Three 0.287977 < Rim 0.290323; (f) all three tested cases: flat
+slivers exactly equal config; (g) block off-share 0.390244 = blockBase 0.390244, gap from
+live-miss > 0.05.
+
+**Python pre-wiring validation (all 8 checks, all passed before any C# was written):**
+neutral share unchanged; bigger/better team monotonically raises share; extreme gaps stay
+strictly inside `(0.08, 0.55)`; positional weight exactly 1.0 at lineup mean, bounded
+`(0.8, 1.2)`; shooter nerf lowers offensive contribution only on `Three/Long/Mid`; block
+baseline distinct from live-miss baseline; both baselines inside `[floor, ceiling]`.
+
+**The execution error (not a prompt failure).** The prompt explicitly said "Do NOT
+front-load a `SelectedSlot ?? throw`" and "the fallback is on roster population, not slot."
+The first implementation threw on null `SelectedSlot` anyway. The fix was one condition
+added to the existing fallback guard.
+
+**Walls held / deferred:**
+- **Roll M** (free-throw-board rebounds) — same battle, different baseline, no shooter nerf.
+  Fast-follow next session; these exact rails carry it.
+- **Per-player rebound attribution** (which slot grabbed the board) — Roll I decides only
+  which TEAM. The attribution pass is separate.
+- **Coaching sliders** (crash-glass vs. get-back, crash-vs-break-out) — documented neutral
+  seam; no code hook needed; strategy layer not yet built.
+- **Per-zone rebounding** (long misses off threes favoring guards) — the zone gate for the
+  shooter nerf is the only zone read. No per-zone rebound table.
+- **`Hustle`** — exists on `Player`, noted as the natural amplifier to fold in later; not
+  used in v1.
+- **Athletic/big axis split** — the glass uses its own `ReboundPhysical` and `Postness`
+  composites; does NOT read `Player.Athleticism`; no entanglement with the deferred
+  horizontal/vertical axis refactor.
+
 ## Session 40 — Phase 9: the shot location door (2026-06-15)
 
 **A build (CONVENTIONS §0–§3) — code + harness, all green.** Roll G is now matchup-aware.

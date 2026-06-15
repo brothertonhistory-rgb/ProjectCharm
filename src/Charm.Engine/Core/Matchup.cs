@@ -329,4 +329,163 @@ public static class Matchup
         return Math.Exp(Math.Log(cfg.LocationMaxMultiplier)
                       * Math.Tanh(shift / cfg.LocationReferenceShift));
     }
+
+    // =========================================================================
+    // Phase 10 — rebound door (the glass)
+    // =========================================================================
+
+    /// <summary>
+    /// The pre-staging team-size composite for rebounding (Phase 10, stage 1).
+    /// A weighted read of a player's physical presence on the glass — height and
+    /// strength. Mirrors <see cref="LengthRating"/> in shape; blend weights live
+    /// in config so the "tune the size composite" pass is trivial.
+    ///
+    /// <para>Used as the external comparison (team A's mean vs team B's mean) to
+    /// decide which team physically wins the board before skill enters. A 7-footer
+    /// helps his team against a small lineup and hurts it against giants because
+    /// the comparison is <em>relative</em>.</para>
+    /// </summary>
+    public static double ReboundPhysical(Player p, MatchupConfig cfg)
+        => cfg.ReboundStrengthWeight * p.Strength
+         + cfg.ReboundHeightWeight   * p.Height;
+
+    /// <summary>
+    /// The positional composite for rebounding (Phase 10, stage 2). A weighted
+    /// read of how "post-like" a player is — used to sort who within a lineup
+    /// is positioned to snag a board. Combines height, post defense, and strength
+    /// in config-tunable proportions.
+    ///
+    /// <para>The positional weight per player is computed <em>relative to the
+    /// lineup mean</em> (see <see cref="OffensiveReboundShare"/>), so even a
+    /// positionless 5-out lineup always has a relative post (the tallest/strongest
+    /// player is the big). Blend weights need not sum to 1 — they are a weighted
+    /// read, like <see cref="LengthRating"/>.</para>
+    /// </summary>
+    public static double Postness(Player p, MatchupConfig cfg)
+        => cfg.PostnessHeight      * p.Height
+         + cfg.PostnessPostDefense * p.PostDefense
+         + cfg.PostnessStrength    * p.Strength;
+
+    /// <summary>
+    /// The positional weight for one player within a lineup (Phase 10, stage 2).
+    /// Returns a value in <c>(1 − swing, 1 + swing)</c> ≈ <c>(0.8, 1.2)</c> at
+    /// the default swing of 0.2. Exactly 1.0 at the lineup mean; monotonically
+    /// increasing with post-ness; bounded by the tanh asymptote.
+    ///
+    /// <para>A post (above-mean post-ness) gets a weight above 1.0; a guard
+    /// (below-mean) gets a weight below 1.0. The weighted mean over the whole
+    /// lineup is exactly 1.0 when the weights are balanced — so the aggregate
+    /// rebounding read is not inflated or deflated by this step.</para>
+    ///
+    /// <para><b>Public and static</b> so the harness can verify the math directly
+    /// — same pattern as <see cref="BlockWeight"/> and <see cref="FoulRate"/>.</para>
+    /// </summary>
+    public static double PositionalWeight(double playerPostness, double lineupMeanPostness, MatchupConfig cfg)
+        => 1.0 + cfg.ReboundPositionalSwing
+               * Math.Tanh((playerPostness - lineupMeanPostness) / cfg.ReboundPositionalScale);
+
+    /// <summary>
+    /// The matchup-bent offensive-rebound share (Phase 10). Starts at
+    /// <paramref name="baseOffShare"/> (the natural share of the Def+Off mass for
+    /// this source) and bends it toward a ceiling (offense crashes successfully) or
+    /// floor (defense locks the glass) via a tanh saturation.
+    ///
+    /// <para><b>Two contributions, additively composed (same shape as
+    /// <see cref="BlockWeight"/>):</b>
+    /// <list type="number">
+    ///   <item>Size shift: team A's mean <see cref="ReboundPhysical"/> vs team B's.
+    ///         Positive = offense bigger = off-share up.</item>
+    ///   <item>Positional-weighted skill shift: each player's rebounding rating
+    ///         multiplied by a <see cref="PositionalWeight"/> (posts up, guards down,
+    ///         exactly 1 at the lineup mean), plus a shooter nerf on
+    ///         <c>Three/Long/Mid</c>. The difference in the two teams' weighted
+    ///         means goes through <see cref="GapFn"/> — positive = offense better
+    ///         at crashing = off-share up.</item>
+    /// </list>
+    /// Weighted sum → tanh → added to <paramref name="baseOffShare"/> (plain
+    /// addition; tanh is odd and supplies the sign — the Session 38 lesson).</para>
+    ///
+    /// <para><b>Degenerate aggregation.</b> A team with Σ posWeight = 0 cannot
+    /// happen when swing &lt; 1 (all weights are in (0, 2)). A zero-populated team
+    /// must already be short-circuited by the generator BEFORE this method is called
+    /// — the generator documents that precondition, mirroring
+    /// <see cref="DefensiveResistance"/>'s zero-defender precondition.</para>
+    ///
+    /// <para><b>Pure and static.</b> No state, no RNG. The harness calls this
+    /// directly in <c>Phase10ReboundDoorCheck</c>.</para>
+    /// </summary>
+    public static double OffensiveReboundShare(
+        IReadOnlyList<Player?> offense,
+        IReadOnlyList<Player?> defense,
+        int                    shooterIdx,   // index into offense list; -1 if unknown
+        ShotLocation           zone,
+        double                 baseOffShare,
+        MatchupConfig          cfg)
+    {
+        // ── Stage 1: pre-staging size shift (team-vs-team) ──────────────────
+        var offPhys = new List<double>();
+        foreach (var p in offense) if (p is not null) offPhys.Add(ReboundPhysical(p, cfg));
+        var defPhys = new List<double>();
+        foreach (var p in defense) if (p is not null) defPhys.Add(ReboundPhysical(p, cfg));
+
+        var offSize = offPhys.Count > 0 ? offPhys.Average() : 50.0;
+        var defSize = defPhys.Count > 0 ? defPhys.Average() : 50.0;
+        var sizeShift = GapFn(offSize - defSize, cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+
+        // ── Stage 2: positional-weighted skill shift (intra-team) ─────────
+        // Compute postness for each player, then lineup mean.
+        var offPostness = new List<(double pn, double offReb, bool isShooter)>();
+        for (var i = 0; i < offense.Count; i++)
+        {
+            var p = offense[i];
+            if (p is not null)
+                offPostness.Add((Postness(p, cfg), p.OffensiveRebounding, i == shooterIdx));
+        }
+        var defPostness = new List<(double pn, double defReb)>();
+        foreach (var p in defense)
+            if (p is not null)
+                defPostness.Add((Postness(p, cfg), p.DefensiveRebounding));
+
+        var offMeanPn = offPostness.Count > 0 ? offPostness.Average(x => x.pn) : 50.0;
+        var defMeanPn = defPostness.Count > 0 ? defPostness.Average(x => x.pn) : 50.0;
+
+        // Zones where the shooter nerf applies.
+        var nerfZones = zone is ShotLocation.Three or ShotLocation.Long or ShotLocation.Mid;
+
+        // Offense: weighted mean of OffensiveRebounding × posWeight × nerf
+        var offWSum = 0.0; var offNumer = 0.0;
+        foreach (var (pn, offReb, isShooter) in offPostness)
+        {
+            var pw   = PositionalWeight(pn, offMeanPn, cfg);
+            var nerf = isShooter && nerfZones ? cfg.ReboundShooterNerf : 1.0;
+            offNumer += offReb * pw * nerf;
+            offWSum  += pw;
+        }
+        var offWeightedReb = offWSum > 0.0 ? offNumer / offWSum : 50.0;
+
+        // Defense: weighted mean of DefensiveRebounding × posWeight
+        var defWSum = 0.0; var defNumer = 0.0;
+        foreach (var (pn, defReb) in defPostness)
+        {
+            var pw = PositionalWeight(pn, defMeanPn, cfg);
+            defNumer += defReb * pw;
+            defWSum  += pw;
+        }
+        var defWeightedReb = defWSum > 0.0 ? defNumer / defWSum : 50.0;
+
+        var skillShift = GapFn(offWeightedReb - defWeightedReb, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+
+        // ── Compose + bend (BlockWeight shape) ──────────────────────────────
+        var totalShift = cfg.ReboundSizeWeight * sizeShift + cfg.ReboundSkillWeight * skillShift;
+        var ceiling    = cfg.ReboundOffShareCeiling;
+        var floor      = cfg.ReboundOffShareFloor;
+        var span       = totalShift >= 0.0 ? (ceiling - baseOffShare) : (baseOffShare - floor);
+        var bend       = span * Math.Tanh(totalShift / cfg.ReboundReferenceShift);
+
+        // Plain addition — tanh is odd and supplies the sign.
+        // The Session 38 lesson: do NOT write `bend if shift >= 0 else -bend`;
+        // bend is already negative when totalShift is negative, and -bend would
+        // flip it the wrong way.
+        return baseOffShare + bend;
+    }
 }

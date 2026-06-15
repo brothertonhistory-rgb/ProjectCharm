@@ -3374,3 +3374,117 @@ checks were unaffected (they always constructed their own isolated setups). This
 architectural resolution: the batch check is a **baseline calibration** check (configured rates),
 not a matchup-validity check (that's Phase 6/7/8's job).
 
+
+---
+
+## Phase 10 — Matchup-aware rebounding (Roll I, "the glass")
+
+### The settled model: two touchpoints, binary mass reweight
+
+A missed or blocked shot becomes a loose ball. Roll I's seven-way pie resolves it.
+Phase 10 makes **exactly one thing** matchup-sensitive: the `DefensiveRebound` vs
+`OffensiveRebound` split. The five flat slivers (fouls, OOB, jump-ball) are untouched.
+
+The bend uses **two size touchpoints that do not collide:**
+
+**Touchpoint 1 — Pre-staging size check (external, team-vs-team).**
+Compare the mean `ReboundPhysical` composite (height + strength, config-weighted) across
+both teams' populated players. Bigger mean → positive size shift → off-share bends up.
+This is a *relative* comparison: a 7-foot stiff helps against a small lineup and hurts against
+giants. Works example: a stiff vs. a 5-out team of guards wins the size check AND his rating
+× 1.2 beats a guard's × 0.8 — he vacuums the boards. The same stiff vs. a lineup of athletes
+loses the size check AND his ratings may not overcome theirs.
+
+**Touchpoint 2 — Positional-weighted skill shift (internal, intra-team).**
+Within each lineup, each player gets a `PositionalWeight` =
+`1.0 + swing × tanh((Postness_i − lineupMean) / scale)`. The "post-ness" composite
+(height + post defense + strength, config-weighted) sorts who within a lineup is positioned
+to rebound. Posts above 1.0, guards below 1.0, exactly 1.0 at the lineup mean. Even a
+positionless 5-out lineup forces someone to be the relative post.
+
+Each team's weighted mean `OffensiveRebounding` (or `DefensiveRebounding`) × positional
+weight is computed, then the gap goes through `GapFn` → skill shift. On the offensive side,
+the shooter's contribution is nerfed on `Three/Long/Mid` (the shooter is outside and can't
+crash as easily); no nerf on `Rim/Short`.
+
+**Composition (BlockWeight shape):**
+`totalShift = ReboundSizeWeight × sizeShift + ReboundSkillWeight × skillShift`
+`span = (ceiling − baseOffShare) if totalShift ≥ 0 else (baseOffShare − floor)`
+`bend = span × tanh(totalShift / ReboundReferenceShift)`
+`finalOffShare = baseOffShare + bend`  ← plain addition; tanh is odd and supplies the sign.
+
+**Why not a double-count.** Both touchpoints share the underlying traits (height, strength)
+but do different jobs. Touchpoint 1 compares teams *across* teams (external). Touchpoint 2
+sorts who within a team is the big (internal). A 7-footer plays both roles simultaneously,
+but the two comparisons answer different questions and can produce orthogonal results.
+
+### The binary mass reweight (Divergence 3 from the Phase 9 template)
+
+Roll G renormalizes all five location slices. Roll I only moves `DefensiveRebound` and
+`OffensiveRebound` within their combined `Def+Off` mass. The five flat slivers are left
+at their baseline config values. The pie still sums to 1 because:
+`newDef + newOff = mass × (1 − finalOffShare) + mass × finalOffShare = mass`
+and `mass + five_slivers = 1` (the original pie summed to 1).
+
+### Two source baselines (Divergence 1)
+
+Live-miss: `Def 0.66 + Off 0.27 = 0.93` mass; off-share ≈ 0.290.
+Block: `Def 0.50 + Off 0.32 = 0.82` mass; off-share ≈ 0.390.
+
+The bend operates from each source's own baseline. At a neutral matchup (all-50 teams)
+each returns exactly its own baseline, confirmed in `Phase10ReboundDoorCheck` sub-check (a)
+and (g).
+
+### The interface signature (Divergence 1 continued)
+
+`IRollIPieGenerator.Generate(PossessionState state, ReboundSource source)` takes both
+parameters because the real generator needs both: `source` to select the baseline, `state`
+for the rosters, shooter slot, and shot zone. The stub ignores `state`. This is the one
+structural difference from `IRollGPieGenerator` (single `state` param) and
+`IRollHPieGenerator` (state + bool).
+
+### The fallback guard (Divergence vs Roll G)
+
+`RollGGenerator` fails loud on a null `SelectedSlot` — a slot is always stamped when Roll G
+runs. `RollIGenerator` cannot make the same assumption because the four harness batch checks
+call the resolver with real rosters but bare possession states (no shooter stamped). The
+fallback fires whenever either team has zero populated players OR `SelectedSlot` is null.
+Both conditions return the flat baseline pie. A real in-game possession always has populated
+rosters and a stamped slot; the fallback never fires on the live path.
+
+### The cross-config constructor guard
+
+At construction, for both source baselines, `RollIGenerator` computes `baseOff /
+(baseDef + baseOff)` and throws if it falls outside `[ReboundOffShareFloor,
+ReboundOffShareCeiling]`. The baseline lives in `RollIConfig`; the band lives in
+`MatchupConfig`. A future config edit that pushes a baseline outside the band would silently
+invert the tanh bend direction — caught loud at startup rather than producing wrong
+(but not obviously broken) output.
+
+### Parked items
+
+- **Roll M (free-throw-board rebounds):** same seven-arm vocabulary, different baseline
+  (more defensive, lower off-share, no shooter nerf), no shooter position to read. Fast-follow
+  next session; these exact rails carry it.
+- **Per-player rebound attribution:** which slot grabbed the board is the deferred attribution
+  pass. Roll I decides only which team.
+- **Coaching sliders** (crash-glass vs. get-back / crash-vs-break-out): the `finalOffShare`
+  returned by `OffensiveReboundShare` is the insertion point; v1 is matchup-only; the seam is
+  documented in `RollIGenerator.Generate`.
+- **Per-zone rebounding** (long misses off threes favoring guards): the zone gate (shooter
+  nerf on/off) is the only zone read. No per-zone rebound table.
+- **`Hustle`:** confirmed on `Player`, natural amplifier to fold in later; not used in v1.
+- **Athletic/big axis split:** `ReboundPhysical` and `Postness` are dedicated composites;
+  `Player.Athleticism` is not read; no entanglement with the deferred horizontal/vertical
+  axis refactor.
+
+### Phase 10 calibration knobs (all placeholders)
+
+`ReboundStrengthWeight` / `ReboundHeightWeight` (size composite); `PostnessHeight` /
+`PostnessPostDefense` / `PostnessStrength` (postness composite); `ReboundPositionalSwing`
+(~0.8/1.2 range of positional weights); `ReboundPositionalScale` (spread at which one unit
+of swing is reached); `ReboundSizeWeight` / `ReboundSkillWeight` (sum to 1; relative pull of
+each touchpoint); `ReboundShooterNerf` (multiplier on shooter's offensive contribution on
+Three/Long/Mid); `ReboundOffShareFloor` / `ReboundOffShareCeiling` (tanh asymptotes on the
+off-share); `ReboundReferenceShift` (tanh saturation speed). All in the `Matchup` section of
+`config.json`. None are calibrated values — Emmett tunes against the harness.

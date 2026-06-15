@@ -36,8 +36,8 @@ internal static class Program
         var rollDGenerator = new RollDStubPieGenerator(cfgD);
         var rollEGenerator = new RollEStubPieGenerator(cfgE);
         var rollFGenerator = new RollFStubPieGenerator(cfgF);
-        // RollHGenerator and RollGGenerator constructed below, after game and cfgMatchup (need GameState)
-        var rollIGenerator = new RollIStubPieGenerator(cfgI);
+        // RollHGenerator, RollGGenerator, and RollIGenerator constructed below,
+        // after game and cfgMatchup (need GameState and MatchupConfig).
         var rollJGenerator = new RollJStubPieGenerator(cfgJ);
         var rollKGenerator = new RollKStubPieGenerator(cfgK);
         var rollLGenerator = new RollLStubPieGenerator(cfgL);
@@ -51,6 +51,7 @@ internal static class Program
         SeatStartersFromConfig(game, configPath);       // v2 fix: seat real rosters before generators
         var rollGGenerator = new RollGGenerator(cfgG, cfgMatchup, game);   // Phase 9: matchup-aware location
         var rollHGenerator = new RollHGenerator(cfgH, cfgMatchup, game);
+        var rollIGenerator = new RollIGenerator(cfgI, cfgMatchup, game);   // Phase 10: matchup-aware rebounding
 
         var resolver = new Resolver(
             rollAGenerator,
@@ -101,9 +102,9 @@ internal static class Program
         ok &= RollGHandoffCheck(cfg, state);
         ok &= RollHResolutionBatchCheck(cfg, cfgH, rollHGenerator, state);
         ok &= RollHHandoffCheck(cfg, state);
-        ok &= RollIReboundBatchCheck(cfg, cfgI, rollIGenerator, game, state);
-        ok &= RollIBonusForkCheck(cfg, cfgD, cfgI, rollIGenerator, state);
-        ok &= RollIBlockReboundBatchCheck(cfg, cfgI, rollIGenerator, state);
+        ok &= RollIReboundBatchCheck(cfg, cfgI, new RollIStubPieGenerator(cfgI), game, state);
+        ok &= RollIBonusForkCheck(cfg, cfgD, cfgI, new RollIStubPieGenerator(cfgI), state);
+        ok &= RollIBlockReboundBatchCheck(cfg, cfgI, new RollIStubPieGenerator(cfgI), state);
         ok &= RollIBlockContextSelectionCheck(cfg, cfgI, state);
         ok &= RollJBatchCheck(cfg, cfgD, cfgJ, rollJGenerator, state);
         ok &= RollJBonusForkCheck(cfg, cfgD, cfgJ, state);
@@ -125,6 +126,7 @@ internal static class Program
         ok &= Phase7BlockDoorCheck(configPath);
         ok &= Phase8FoulDoorCheck(configPath);
         ok &= Phase9LocationDoorCheck(configPath);
+        ok &= Phase10ReboundDoorCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -281,7 +283,7 @@ internal static class Program
         Console.WriteLine("--- Observability: Roll I (rebound resolution) ---");
         var cfgIForObs = RollIConfig.Load(configPathH);
         var genI = new RollIStubPieGenerator(cfgIForObs);
-        var pieIObs = genI.Generate(ReboundSource.LiveBall);
+        var pieIObs = genI.Generate(state, ReboundSource.LiveBall);
         Console.WriteLine($"  live-miss rebound pie (flat, no signal yet): {pieIObs}");
         var obsGameI = new GameState(new FoulTracker(
             RollDConfig.Load(configPathH).BonusThreshold,
@@ -1629,7 +1631,7 @@ internal static class Program
         var genG = new RollGStubPieGenerator(cfgG);
         var genH = new RollHStubPieGenerator(cfgH);
         var pieE = genE.Generate(state);
-        var pieI = genI.Generate(ReboundSource.LiveBall);
+        var pieI = genI.Generate(state, ReboundSource.LiveBall);
 
         var counts = new Dictionary<ReboundOutcome, int>();
         foreach (var o in Enum.GetValues<ReboundOutcome>()) counts[o] = 0;
@@ -1870,7 +1872,7 @@ internal static class Program
         // loose-ball-defense arm's charge crosses the bonus partway through THIS game,
         // exercising the §2a split (sideline below the bonus, FTs in it).
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
-        var pieI = genI.Generate(ReboundSource.Block);
+        var pieI = genI.Generate(state, ReboundSource.Block);
 
         var counts = new Dictionary<ReboundOutcome, int>();
         foreach (var o in Enum.GetValues<ReboundOutcome>()) counts[o] = 0;
@@ -2060,11 +2062,11 @@ internal static class Program
         };
 
         double Defensive(ReboundSource s) =>
-            genI.Generate(s).Slices.First(x => x.Outcome == ReboundOutcome.DefensiveRebound).Weight;
+            genI.Generate(state, s).Slices.First(x => x.Outcome == ReboundOutcome.DefensiveRebound).Weight;
 
         foreach (var (src, expected) in contexts)
         {
-            var pie = genI.Generate(src);
+            var pie = genI.Generate(state, src);
             var pieMap = pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
 
             var selectionOk = true;
@@ -5396,6 +5398,296 @@ internal static class Program
         pass &= hOk;
 
         Console.WriteLine(pass ? "  Phase 9 PASSED." : "  Phase 9 FAILED.");
+        return pass;
+    }
+
+    // =========================================================================
+    // Phase 10 — rebound door check (Roll G matchup-aware rebounding)
+    // =========================================================================
+    // Deterministic assertions — NOT a Monte Carlo batch. Proves the two-touchpoint
+    // model bends the off-share in the correct direction across seven sub-checks:
+    // (a) neutral, (b) size check, (c) skill check, (d) positional weight isolated,
+    // (e) shooter nerf + zone gate, (f) flat slivers unchanged, (g) block baseline.
+    // Mirrors the structure of Phase9LocationDoorCheck exactly.
+    // =========================================================================
+
+    private static bool Phase10ReboundDoorCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 10: Rebound door (Roll I matchup-aware) ---");
+        var pass = true;
+
+        var cfgI       = RollIConfig.Load(configPath);
+        var cfgMatchup = MatchupConfig.Load(configPath);
+        const double Eps = 1e-9;
+
+        // Config baselines.
+        var liveMass    = cfgI.DefensiveRebound + cfgI.OffensiveRebound;
+        var liveBase    = cfgI.OffensiveRebound / liveMass;   // ≈ 0.290
+        var blockMass   = cfgI.BlockDefensiveRebound + cfgI.BlockOffensiveRebound;
+        var blockBase   = cfgI.BlockOffensiveRebound / blockMass; // ≈ 0.390
+
+        // Helper: build a player with all attributes at baseline b; override specific ones.
+        static Player Mk(int b,
+                         int? str = null, int? height = null, int? offReb = null,
+                         int? defReb = null, int? postDef = null)
+            => new Player("p")
+            {
+                Outside = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation = b, PostMoves = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding  = offReb  ?? b,
+                PerimeterDefense = b, PostDefense = postDef ?? b, RimProtection = b,
+                DefensiveRebounding  = defReb  ?? b,
+                Steals = b,
+                Height = height ?? b, Wingspan = b, Weight = b,
+                Strength = str ?? b, Speed = b, Quickness = b, FirstStep = b,
+                Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
+                Discipline = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Helper: build a minimal GameState, seat offense in Home 1–5, defense in Away 1–5.
+        GameState BuildGame(Player[] off, Player[] def)
+        {
+            var g = new GameState(new FoulTracker(7, 10));
+            for (var i = 0; i < 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), off[i]);
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), def[i]);
+            }
+            return g;
+        }
+
+        // Helper: build a PossessionState for Home offense, Away defense, with a stamped
+        // shooter slot (slot 1 by default) and zone.
+        static PossessionState St(GameState g, ShotLocation zone, int shooterSlot = 1)
+            => new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                SelectedSlot: g.HomeLineup.SlotAt(shooterSlot),
+                ShotType: zone);
+
+        // Helper: generate the pie and return the seven weights as a dict.
+        static Dictionary<ReboundOutcome, double> Split(
+            RollIConfig cfgI, MatchupConfig cfgMatchup,
+            GameState g, PossessionState state,
+            ReboundSource src = ReboundSource.LiveBall)
+        {
+            var gen = new RollIGenerator(cfgI, cfgMatchup, g);
+            var pie = gen.Generate(state, src);
+            return pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+        }
+
+        // ── (a) Neutral matchup: all-50 teams, Rim zone (nerf off) ──────────
+        Console.WriteLine("  (a) Neutral (all-50 teams, Rim zone): off-share == baseline:");
+        bool aOk;
+        try
+        {
+            var off5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+            var def5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+            var g  = BuildGame(off5, def5);
+            var st = St(g, ShotLocation.Rim);
+            var d  = Split(cfgI, cfgMatchup, g, st);
+
+            var offShare = d[ReboundOutcome.OffensiveRebound] / liveMass;
+            var isNeutral = Math.Abs(offShare - liveBase) < Eps;
+
+            // Other five slivers must equal config exactly.
+            var flatOk =
+                Math.Abs(d[ReboundOutcome.LooseBallFoulOnDefense] - cfgI.LooseBallFoulOnDefense) < Eps &&
+                Math.Abs(d[ReboundOutcome.LooseBallFoulOnOffense] - cfgI.LooseBallFoulOnOffense) < Eps &&
+                Math.Abs(d[ReboundOutcome.OutOfBoundsOffOffense]  - cfgI.OutOfBoundsOffOffense)  < Eps &&
+                Math.Abs(d[ReboundOutcome.OutOfBoundsOffDefense]  - cfgI.OutOfBoundsOffDefense)  < Eps &&
+                Math.Abs(d[ReboundOutcome.JumpBall]               - cfgI.JumpBall)               < Eps;
+
+            aOk = isNeutral && flatOk;
+            Console.WriteLine($"    off-share={offShare:F8}  baseline={liveBase:F8}  neutral? {(isNeutral ? "OK" : "FAIL")}");
+            Console.WriteLine($"    five flat slivers == config: {(flatOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex) { aOk = false; Console.WriteLine($"  FAIL  (a) threw: {ex.Message}"); }
+        pass &= aOk;
+
+        // ── (b) Size check: offense big (85), defense small (35), equal ratings ──
+        Console.WriteLine("  (b) Size check (off Str/Ht=85 vs def Str/Ht=35, equal ratings):");
+        bool bOk;
+        try
+        {
+            var off5 = new[] { Mk(50, str: 85, height: 85), Mk(50, str: 85, height: 85),
+                               Mk(50, str: 85, height: 85), Mk(50, str: 85, height: 85),
+                               Mk(50, str: 85, height: 85) };
+            var def5 = new[] { Mk(50, str: 35, height: 35), Mk(50, str: 35, height: 35),
+                               Mk(50, str: 35, height: 35), Mk(50, str: 35, height: 35),
+                               Mk(50, str: 35, height: 35) };
+            var g  = BuildGame(off5, def5);
+            var st = St(g, ShotLocation.Rim);
+            var d  = Split(cfgI, cfgMatchup, g, st);
+
+            var offShare = d[ReboundOutcome.OffensiveRebound] / liveMass;
+            bOk = offShare > liveBase;
+            Console.WriteLine($"    off-share={offShare:F6}  baseline={liveBase:F6}  rises above baseline? {(bOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex) { bOk = false; Console.WriteLine($"  FAIL  (b) threw: {ex.Message}"); }
+        pass &= bOk;
+
+        // ── (c) Skill check: equal size, off OffReb=85 vs def DefReb=35 ────
+        Console.WriteLine("  (c) Skill check (equal size, off OffReb=85 vs def DefReb=35):");
+        bool cOk;
+        try
+        {
+            var off5 = new[] { Mk(50, offReb: 85), Mk(50, offReb: 85), Mk(50, offReb: 85),
+                               Mk(50, offReb: 85), Mk(50, offReb: 85) };
+            var def5 = new[] { Mk(50, defReb: 35), Mk(50, defReb: 35), Mk(50, defReb: 35),
+                               Mk(50, defReb: 35), Mk(50, defReb: 35) };
+            var g  = BuildGame(off5, def5);
+            var st = St(g, ShotLocation.Rim);
+            var d  = Split(cfgI, cfgMatchup, g, st);
+
+            var offShare = d[ReboundOutcome.OffensiveRebound] / liveMass;
+            cOk = offShare > liveBase;
+            Console.WriteLine($"    off-share={offShare:F6}  baseline={liveBase:F6}  rises above baseline? {(cOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex) { cOk = false; Console.WriteLine($"  FAIL  (c) threw: {ex.Message}"); }
+        pass &= cOk;
+
+        // ── (d) Positional weight — isolated from size check ────────────────
+        // Both teams: identical height AND strength (so ReboundPhysical is a wash).
+        // Separate them with PostDefense alone (in Postness but NOT in ReboundPhysical).
+        // Offense A: concentrate OffReb in high-PostDef player (stark 90 vs 10).
+        // Offense B: spread same total flat. Expected: A > B (positional weight rewarded).
+        Console.WriteLine("  (d) Positional weight isolated (PostDefense only, equal Str/Height):");
+        bool dOk;
+        try
+        {
+            // Offense A: post player has PostDef=90 and OffReb=90; guards have PostDef=10 and OffReb=10.
+            var offA = new[]
+            {
+                Mk(50, str: 50, height: 50, offReb: 10, postDef: 10),
+                Mk(50, str: 50, height: 50, offReb: 10, postDef: 10),
+                Mk(50, str: 50, height: 50, offReb: 10, postDef: 10),
+                Mk(50, str: 50, height: 50, offReb: 10, postDef: 10),
+                Mk(50, str: 50, height: 50, offReb: 90, postDef: 90),  // the post
+            };
+            // Total OffReb in A: 4*10 + 90 = 130. Spread flat: 5*26 = 130.
+            var offB = new[]
+            {
+                Mk(50, str: 50, height: 50, offReb: 26, postDef: 50),
+                Mk(50, str: 50, height: 50, offReb: 26, postDef: 50),
+                Mk(50, str: 50, height: 50, offReb: 26, postDef: 50),
+                Mk(50, str: 50, height: 50, offReb: 26, postDef: 50),
+                Mk(50, str: 50, height: 50, offReb: 26, postDef: 50),
+            };
+            var def5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+
+            // Shooter at slot 1 (a guard with low PostDef), nerf OFF (Rim zone).
+            var gA = BuildGame(offA, def5);
+            var stA = St(gA, ShotLocation.Rim, shooterSlot: 1);
+            var dA = Split(cfgI, cfgMatchup, gA, stA);
+            var shareA = dA[ReboundOutcome.OffensiveRebound] / liveMass;
+
+            var gB = BuildGame(offB, def5);
+            var stB = St(gB, ShotLocation.Rim, shooterSlot: 1);
+            var dB = Split(cfgI, cfgMatchup, gB, stB);
+            var shareB = dB[ReboundOutcome.OffensiveRebound] / liveMass;
+
+            dOk = shareA > shareB;
+            Console.WriteLine($"    concentrated (OffReb in big): share={shareA:F6}");
+            Console.WriteLine($"    flat spread:                   share={shareB:F6}");
+            Console.WriteLine($"    concentrated > flat: {(dOk ? "OK — positional weight rewards OffReb in bigs" : "FAIL")}");
+        }
+        catch (Exception ex) { dOk = false; Console.WriteLine($"  FAIL  (d) threw: {ex.Message}"); }
+        pass &= dOk;
+
+        // ── (e) Shooter nerf + zone gate ────────────────────────────────────
+        // Identical matchup; Three (nerf on) vs Rim (nerf off). Shooter is slot 1.
+        Console.WriteLine("  (e) Shooter nerf: Three (nerf on) yields lower off-share than Rim (nerf off):");
+        bool eOk;
+        try
+        {
+            var off5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+            var def5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+            var g = BuildGame(off5, def5);
+
+            var stThree = St(g, ShotLocation.Three, shooterSlot: 1);
+            var dThree  = Split(cfgI, cfgMatchup, g, stThree);
+            var shareThree = dThree[ReboundOutcome.OffensiveRebound] / liveMass;
+
+            var stRim = St(g, ShotLocation.Rim, shooterSlot: 1);
+            var dRim  = Split(cfgI, cfgMatchup, g, stRim);
+            var shareRim = dRim[ReboundOutcome.OffensiveRebound] / liveMass;
+
+            eOk = shareThree < shareRim;
+            Console.WriteLine($"    Three (nerf on): off-share={shareThree:F6}");
+            Console.WriteLine($"    Rim  (nerf off): off-share={shareRim:F6}");
+            Console.WriteLine($"    Three < Rim: {(eOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex) { eOk = false; Console.WriteLine($"  FAIL  (e) threw: {ex.Message}"); }
+        pass &= eOk;
+
+        // ── (f) Other arms flat across (b)–(e) ─────────────────────────────
+        // Only Def/Off should move; the five flat slivers must equal config in every case.
+        Console.WriteLine("  (f) Flat slivers unchanged across (b)–(e) cases:");
+        bool fOk = true;
+        try
+        {
+            var testCases = new (string label, Player[] off, Player[] def, ShotLocation zone)[]
+            {
+                ("size-check (b)",
+                    new[] { Mk(50,str:85,height:85), Mk(50,str:85,height:85), Mk(50,str:85,height:85), Mk(50,str:85,height:85), Mk(50,str:85,height:85) },
+                    new[] { Mk(50,str:35,height:35), Mk(50,str:35,height:35), Mk(50,str:35,height:35), Mk(50,str:35,height:35), Mk(50,str:35,height:35) },
+                    ShotLocation.Rim),
+                ("skill-check (c)",
+                    new[] { Mk(50,offReb:85), Mk(50,offReb:85), Mk(50,offReb:85), Mk(50,offReb:85), Mk(50,offReb:85) },
+                    new[] { Mk(50,defReb:35), Mk(50,defReb:35), Mk(50,defReb:35), Mk(50,defReb:35), Mk(50,defReb:35) },
+                    ShotLocation.Rim),
+                ("shooter-nerf Three (e)",
+                    new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) },
+                    new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) },
+                    ShotLocation.Three),
+            };
+
+            foreach (var (label, off, def, zone) in testCases)
+            {
+                var g  = BuildGame(off, def);
+                var st = St(g, zone, shooterSlot: 1);
+                var d  = Split(cfgI, cfgMatchup, g, st);
+                var rowOk =
+                    Math.Abs(d[ReboundOutcome.LooseBallFoulOnDefense] - cfgI.LooseBallFoulOnDefense) < Eps &&
+                    Math.Abs(d[ReboundOutcome.LooseBallFoulOnOffense] - cfgI.LooseBallFoulOnOffense) < Eps &&
+                    Math.Abs(d[ReboundOutcome.OutOfBoundsOffOffense]  - cfgI.OutOfBoundsOffOffense)  < Eps &&
+                    Math.Abs(d[ReboundOutcome.OutOfBoundsOffDefense]  - cfgI.OutOfBoundsOffDefense)  < Eps &&
+                    Math.Abs(d[ReboundOutcome.JumpBall]               - cfgI.JumpBall)               < Eps;
+                fOk &= rowOk;
+                Console.WriteLine($"    {label}: flat slivers == config: {(rowOk ? "OK" : "FAIL")}");
+            }
+        }
+        catch (Exception ex) { fOk = false; Console.WriteLine($"  FAIL  (f) threw: {ex.Message}"); }
+        pass &= fOk;
+
+        // ── (g) Block source baseline preserved ─────────────────────────────
+        // At neutral, the block source's off-share ≈ blockBase (≈0.390), distinct from live-miss (≈0.290).
+        Console.WriteLine("  (g) Block source baseline (neutral matchup):");
+        bool gOk;
+        try
+        {
+            var off5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+            var def5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+            var g  = BuildGame(off5, def5);
+            var st = St(g, ShotLocation.Rim);
+
+            var dBlock = Split(cfgI, cfgMatchup, g, st, ReboundSource.Block);
+            var blockOffShare = dBlock[ReboundOutcome.OffensiveRebound] / blockMass;
+
+            var atBlockBase  = Math.Abs(blockOffShare - blockBase) < Eps;
+            var distinctFrom = Math.Abs(blockBase - liveBase) > 0.05;
+            gOk = atBlockBase && distinctFrom;
+            Console.WriteLine($"    block off-share={blockOffShare:F8}  blockBase={blockBase:F8}  matches? {(atBlockBase ? "OK" : "FAIL")}");
+            Console.WriteLine($"    block baseline distinct from live-miss (>0.05 gap): {(distinctFrom ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex) { gOk = false; Console.WriteLine($"  FAIL  (g) threw: {ex.Message}"); }
+        pass &= gOk;
+
+        Console.WriteLine(pass ? "  Phase 10 PASSED." : "  Phase 10 FAILED.");
         return pass;
     }
 }

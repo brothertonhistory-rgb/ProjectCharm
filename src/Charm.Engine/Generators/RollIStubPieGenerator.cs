@@ -14,7 +14,7 @@ namespace Charm.Engine;
 /// <see cref="Pie{TOutcome}"/> validates sum-to-one on construction, so any
 /// misconfigured weights fail loudly here rather than silently warping odds.
 /// </summary>
-public sealed class RollIStubPieGenerator
+public sealed class RollIStubPieGenerator : IRollIPieGenerator
 {
     private readonly RollIConfig _config;
 
@@ -28,9 +28,18 @@ public sealed class RollIStubPieGenerator
     /// in Roll I is identical for both — only the weights differ. The
     /// <see cref="Pie{TOutcome}"/> constructor walks the enum in declaration order, so
     /// slice order is fixed for reproducibility regardless of dictionary iteration
-    /// order, and validates sum-to-one so any misconfigured weights fail loud here.</summary>
+    /// order, and validates sum-to-one so any misconfigured weights fail loud here.
+    ///
+    /// <para><b>Stub behaviour (Phase 10).</b> <paramref name="state"/> is IGNORED —
+    /// this is the flat baseline that the four Roll I harness batch checks use to
+    /// confirm config-weight convergence independently of any matchup. The real
+    /// attribute-driven generator (<see cref="RollIGenerator"/>) reads
+    /// <paramref name="state"/> fully. Implements <see cref="IRollIPieGenerator"/>.</para>
+    /// </summary>
+    /// <param name="state">Ignored by this stub. The resolver passes the live
+    /// possession state; the stub treats every possession identically.</param>
     /// <param name="source">Which loose ball this is — selects the weight set.</param>
-    public Pie<ReboundOutcome> Generate(ReboundSource source)
+    public Pie<ReboundOutcome> Generate(PossessionState state, ReboundSource source)
     {
         var weights = source switch
         {

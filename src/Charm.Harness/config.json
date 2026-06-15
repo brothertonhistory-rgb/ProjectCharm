@@ -197,7 +197,21 @@
     "LocationBlendSecond": 0.3,
     "LocationBlendThird": 0.15,
     "LocationReferenceShift": 20.0,
-    "LocationMaxMultiplier": 2.5
+    "LocationMaxMultiplier": 2.5,
+
+    "ReboundStrengthWeight": 0.5,
+    "ReboundHeightWeight": 0.5,
+    "PostnessHeight": 0.3333333333333333,
+    "PostnessPostDefense": 0.3333333333333333,
+    "PostnessStrength": 0.3333333333333333,
+    "ReboundPositionalSwing": 0.2,
+    "ReboundPositionalScale": 15.0,
+    "ReboundSizeWeight": 0.45,
+    "ReboundSkillWeight": 0.55,
+    "ReboundShooterNerf": 0.35,
+    "ReboundOffShareFloor": 0.08,
+    "ReboundOffShareCeiling": 0.55,
+    "ReboundReferenceShift": 20.0
   },
   "RollI": {
     "DefensiveRebound": 0.66,
