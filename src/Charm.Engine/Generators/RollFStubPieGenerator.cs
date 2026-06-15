@@ -23,7 +23,7 @@ namespace Charm.Engine;
 /// class later WITHOUT touching Roll F or the resolver — it just hands back a
 /// non-flat pie over the same enum.
 /// </summary>
-public sealed class RollFStubPieGenerator
+public sealed class RollFStubPieGenerator : IRollFPieGenerator
 {
     private readonly RollFConfig _cfg;
 

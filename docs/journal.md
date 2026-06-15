@@ -1,3 +1,215 @@
+## Session 43 — Phase 12: the pressure / disruption door (Roll F) (2026-06-15)
+
+**A build (CONVENTIONS §0–§3) — code + harness, all green.** Roll F's generator is now
+pressure-and-matchup-aware. The selected handler's chance of coughing the ball up and of drawing
+a non-shooting reach-in foul now reflect the defending team's **pressure setting** and the
+**handling-vs-steals matchup** — while Roll F itself is untouched. This is the defensive-disruption
+twin of the block door: rim protection disrupts the shot; ball pressure disrupts the possession
+before the shot gets off.
+
+**Scope: disruption face only.** Pressure has two faces in Emmett's model. This session builds only
+the **disruption face**: pressure raises the `Turnover` slice and the `NonShootingFoul` slice.
+The **shot-quality face** — beating high pressure yields scrambled-defense rim busts; backed-off
+low pressure packs the paint and concedes the perimeter — is explicitly deferred to its own session.
+No hooks, no stubs. The split is deliberate cascade-avoidance: one dial bending four things in
+opposing directions is exactly the interacting-variable trap that sank the project's two prior
+Python attempts. One face, calibrated, before the other.
+
+**The matchup: handling vs. steals, with pressure as the master dial.** Two attributes meet: the
+handler's `BallHandling` against his defender's `Steals`. On top sits **pressure** — a per-team
+defensive coach dial on a 1–10 scale. Pressure does two jobs on the steal/turnover slice:
+
+1. **Flat, skill-independent lift:** pressing with bad hands still earns steals off a low baseline.
+   Even a zero-or-negative matchup produces a positive lift when pressure is above neutral.
+2. **Gates how much the matchup matters:** at low pressure even great hands generate almost nothing;
+   at high pressure, ball-hawks against weak handlers feast.
+
+"A high-steals defender climbs faster" and "a huge handling gap climbs even faster" are **the same
+single lever** — the gap (`defender.Steals − handler.BallHandling`) through the existing convex
+`GapFn`. One term captures both. The `pressureGate = max(0, pUnit)` multiplier on the matchup
+shift is what gates the matchup contribution: at backed-off pressure the matchup is irrelevant
+(gate ≈ 0); at high pressure the gate opens and the gap drives the outcome.
+
+**Foul slice: pressure only, no matchup term.** The non-shooting reach-in foul tracks aggression,
+not skill. `foulShift = pressureLift` only — the handling-vs-steals matchup does NOT steepen the
+foul climb. You can reach in against anyone if you're playing that aggressively.
+
+**The mass split — JumpBall held flat.** Roll F's four arms: `ShotAttempt`, `Turnover`,
+`NonShootingFoul`, `JumpBall`. Pressure bends the first three arms; `JumpBall` is pinned at
+`BaseJumpBall` exactly. This is a **three-way reweight** with jump held out — NOT a four-way
+renormalization. The `actionMass = BaseShotAttempt + BaseTurnover + BaseNonShootingFoul` defines
+the moving mass; `ShotAttempt` absorbs the complement of the other two.
+
+**Changed calibration anchor — the first door to break "even = baseline."** Every prior door held
+the invariant "an even matchup reproduces the config baseline." Here that sub-invariant holds only
+at **neutral pressure**. The anchor is **(neutral pressure + even matchup) = today's flat rates**.
+This is Emmett's basketball call — pressure is the new axis that moves the rates, with the matchup
+gated underneath. Documented in `MatchupConfig` and `RollFGenerator`; should not be treated as a
+bug in calibration.
+
+**Pressure home — v1 config scalar.** Pressure is a per-team defensive setting, not a player
+attribute and not a per-possession fact. For v1, it lives as `HomePressure` / `AwayPressure` in
+`MatchupConfig` with a `PressureFor(TeamSide)` helper the generator calls at generate-time.
+`CoachProfile` is the eventual owner (stubbed in Phase 9 precisely for this). Migration path: when
+the coach-settings layer arrives, these two scalars move to per-team `CoachProfile` fields and
+`RollFGenerator` reads them from there. The `PressureFor(...)` call site in the generator is the
+only thing that changes. No structural change needed. This was the prompt's recommendation over
+half-building the coach-settings layer, which is its own session.
+
+**DefenderPicker fork — second consumer, promotion still deferred.** Roll H already consumes the
+slot-matched defender via `DefenderPicker.Pick`. Roll F now reads the same slot-matched defender
+(handler's slot number on the defense side) — making Phase 12 the **second door** to consume the
+defender, which is the stated trigger for `PossessionState.DefenderSlot` promotion per
+`DefenderPicker`'s own doc-comment. However, the pick is still **pure and deterministic** —
+`new Slot(state.Defense, state.SelectedSlot.Number)` — so two doors deriving it independently
+produce the **same defender** with zero divergence risk. The hazard the promotion guards against
+(two doors picking *different* defenders, or a non-deterministic pick) does not exist while the
+pick is this pure.
+
+Decision: Roll F derives the defender **locally without calling `DefenderPicker`** — the same
+slot-match logic, different call site, same result. Promotion is **still deferred**. The first
+door that needs a non-deterministic or mismatch-hunting pick is what forces it. Phase 12 is now
+the second consumer, so the promotion bar is technically met — but because the pick is still pure,
+promotion remains a "when it needs to be, not before" call. This is recorded in both the journal
+and design docs so the next person knows where the bar moved.
+
+**Verdict on the outside-LLM pre-prompt review.** Adopted its structural points; rejected its two
+basketball calls:
+
+- **Adopt:** Roll F only (not Roll C); matchup-aware turnover occurrence not classification; the
+  interface pattern (`IRollFPieGenerator`, retype Resolver, keep batch check on stub); the
+  mass-split discipline (three-way, jump held flat); the fallback rules; the DefenderPicker
+  architecture warning (the review's most valuable catch — flagged the second-consumer trigger
+  before the build started).
+- **Reject:** It proposed broader composites (offense ball-security = BallHandling + Passing +
+  BasketballIQ; defensive pressure = Steals + PerimeterDefense + Quickness). Emmett settled
+  on **handling vs. steals alone**. It also said the foul slice stays flat (bend only ShotAttempt
+  vs. Turnover). Emmett settled that pressure **also raises the foul slice** (the flat aggression
+  lift). And it didn't model the pressure dial at all — no flat-lift, no pressure-gating, no
+  gradual-low-cap. The whole pressure mechanism was absent from its model.
+
+Net: useful for scaffolding, wrong on the basketball calls. Per working-with-emmett.md §6: Claude
+pushed back clearly and directly rather than summarizing or accommodating.
+
+**What landed (8 files — 2 new + 6 edits):**
+
+- **`Generators/IRollFPieGenerator.cs` (NEW)** — the interface. Single one-arg method
+  `Pie<PlayerActionOutcome> Generate(PossessionState state)`. Mirrors `IRollGPieGenerator` shape
+  (no source enum, no bool). Both stub and real generator implement it; Resolver holds the
+  interface.
+
+- **`Generators/RollFGenerator.cs` (NEW)** — the matchup-aware real generator. Ctor takes
+  `(RollFConfig cfgF, MatchupConfig matchup, GameState game)` with null guards. At generate-time:
+  (1) null `SelectedSlot` → flat baseline (wiring guard — Roll E always runs before Roll F on the
+  live path); (2) handler player absent → flat baseline (DEC-6); (3) slot-matched defender absent
+  → flat baseline (DEC-6; can't compute one-on-one matchup against a phantom). Defender derived
+  locally as `new Slot(state.Defense, selectedSlot.Number)` — NOT via `DefenderPicker.Pick`, per
+  the fork decision. Pressure read via `_matchup.PressureFor(state.Defense)`. Calls
+  `Matchup.DisruptionShares`; does the three-way mass split; `JumpBall` pinned exactly flat.
+  Includes overflow guard (throws if `finalToShare + finalFoulShare ≥ 1`). Documents the deferred
+  shot-quality face and the CoachProfile migration path as neutral seams.
+
+  **One compile error caught after initial delivery:** `state.SelectedSlot` is `Slot?`
+  (nullable value type `Nullable<Slot>`); the null check at lines 105–107 satisfies the
+  programmer's intent but C# doesn't automatically unwrap it. Fix: `var selectedSlot =
+  state.SelectedSlot.Value;` after the null guard, then use `selectedSlot` (plain `Slot`) for
+  `PlayerAt` and `.Number`. One line; fixed immediately.
+
+- **`Generators/RollFStubPieGenerator.cs` (edit)** — added `: IRollFPieGenerator`. No behavior
+  change. Used by `RollFActionBatchCheck` (fresh stub via inline construction) and all 8 Resolver-
+  construction sites in isolated harness checks — all compile through the interface unchanged.
+
+- **`Core/Resolver.cs` (edit)** — two surgical type changes: `_rollFGenerator` field retyped from
+  `RollFStubPieGenerator` to `IRollFPieGenerator`; ctor param likewise. Dispatch line unchanged
+  (already passes `c.State`).
+
+- **`Core/Matchup.cs` (edit)** — one new `public static` method appended at the bottom:
+  `DisruptionShares(Player handler, Player defender, double pressure, double baseTurnoverShare,
+  double baseFoulShare, MatchupConfig cfg)` returning `(double turnoverShare, double foulShare)`.
+  Mirrors `FoulRate`'s structure (the prompt's recommended template). Pressure normalization:
+  `pUnit = (pressure − PressureNeutral) / PressureScale`; `pressureLift = pUnit`;
+  `pressureGate = max(0, pUnit)`. Turnover: `disruptionShift = pressureLift + pressureGate ×
+  matchupShift`; tanh saturation toward `TurnoverCeiling` or `TurnoverFloor`. Foul: `foulShift =
+  pressureLift` only (no matchup term); same tanh shape toward `FoulPressureCeiling` /
+  `FoulPressureFloor`. Plain addition throughout — tanh is odd and supplies the sign; same
+  Session 38 lesson as `BlockWeight` and `OffensiveReboundShare`.
+
+- **`Config/MatchupConfig.cs` (edit)** — Phase 12 block appended: `HomePressure` (5.0),
+  `AwayPressure` (5.0), `PressureFor(TeamSide)` helper method, `PressureNeutral` (5.0),
+  `PressureScale` (4.0), `PressureReferenceShift` (1.2 — deliberately high for gradual climb),
+  `TurnoverCeiling` (0.18 — low by design, "nobody gets 5 steals a game"),
+  `TurnoverFloor` (0.02), `FoulPressureCeiling` (0.09), `FoulPressureFloor` (0.01). `Load`
+  extended with Phase 12 invariants: `PressureNeutral ∈ [1, 10]`; `PressureScale > 0`;
+  `PressureReferenceShift > 0`; `TurnoverFloor ≥ 0`; `TurnoverCeiling > TurnoverFloor`;
+  `FoulPressureFloor ≥ 0`; `FoulPressureCeiling > FoulPressureFloor`.
+
+- **`Harness/Program.cs` (edit)** — changes:
+  - Early `var rollFGenerator = new RollFStubPieGenerator(cfgF)` (pre-SeatStartersFromConfig)
+    **replaced with a comment**; live generator added after `SeatStartersFromConfig` alongside
+    G/H/I/M: `var rollFGenerator = new RollFGenerator(cfgF, cfgMatchup, game)`.
+  - `RollFActionBatchCheck` call site: passes `new RollFStubPieGenerator(cfgF)` (fresh stub) so
+    baseline rates stay flat and matchup-independent — same cure as Phase 9 `RollH` and Phase 11
+    `RollM`.
+  - `RollFActionBatchCheck` method signature: `RollFStubPieGenerator genF` → `IRollFPieGenerator
+    genF`.
+  - `Phase12DisruptionDoorCheck` registered after `Phase11FreeThrowReboundDoorCheck`.
+  - `Phase12DisruptionDoorCheck` method added. Eight deterministic sub-checks, mirroring
+    Phase 10/11 pattern. `Split` helper constructs `RollFGenerator`, calls `Generate`, returns
+    dict. `WithAwayPressure(p)` helper loads `MatchupConfig` and sets `AwayPressure` for
+    test-specific pressure values (Away = defense in the standard test setup).
+
+- **`Harness/config.json` (edit)** — 9 new keys added to `Matchup` section:
+  `HomePressure: 5.0`, `AwayPressure: 5.0`, `PressureNeutral: 5.0`, `PressureScale: 4.0`,
+  `PressureReferenceShift: 1.2`, `TurnoverCeiling: 0.18`, `TurnoverFloor: 0.02`,
+  `FoulPressureCeiling: 0.09`, `FoulPressureFloor: 0.01`. Both team pressures set to 5.0
+  (neutral) so the neutral anchor invariant is provably satisfied at the harness level.
+
+**Python pre-wiring validation (all checks passed before any C# was written):**
+Neutral + even → exact baseline (all four arms); pressure raises TO above neutral and lowers
+it below neutral; flat lift with bad-hand balance (BH=30, ST=30 at high pressure still lifts TO);
+low-pressure delta ≈ 0.000 (matchup muted), high-pressure delta = 0.159 (matchup open); monotone:
+BH=30 > BH=50 > BH=80 at high pressure, ST=30 < ST=50 < ST=80; cap holds (0.18 at max lopsided);
+foul rises with pressure, flat across matchup (BH/ST don't move it); JumpBall flat and sum = 1 in
+all cases; overflow worst case TO + Foul = 0.261 << 1.
+
+**Harness — ALL CHECKS PASSED.** Phase 12 sub-results:
+- (a) Neutral anchor: ShotAttempt=0.85500000 (want 0.85500000), Turnover=0.09000000,
+  Foul=0.05000000, JumpBall=0.00500000 — all exact.
+- (b) TO: low=0.051123, neutral=0.090000, high=0.150790. Bad-hands flat lift: neutral=0.090000,
+  high=0.150790 — flatLift=True.
+- (c) Low-pressure delta=0.000000; high-pressure delta=0.157977. Gate confirmed.
+- (d) BH monotone-fall: 0.179100 > 0.178185 > 0.037619. ST monotone-rise: 0.021123 < 0.150790 <
+  0.179100.
+- (e) TO=0.179100 ≤ ceiling=0.180000 — capped=True, sane=True (well below 35%).
+- (f) Foul rises: 0.027788 < 0.050000 < 0.076983. Flat across matchup: all three cases
+  0.07193442 at p=8 — flat=True.
+- (g) All 6 cases: JumpBall == BaseJumpBall and sum == 1 — OK.
+- (h) Null SelectedSlot → flat baseline: OK. Empty offense roster → flat baseline: OK. Zero
+  populated defense → flat baseline: OK.
+- `Phase 12 PASSED.`
+
+The existing `RollFActionBatchCheck` stayed green (fresh stub path; four flat baseline rates
+unchanged). `RollFHandoffCheck` and the 100k full chain passed unchanged.
+
+**NOT changed (confirmed):** `RollF.cs`, `PlayerActionOutcomes.cs`, `RollFConfig.cs`,
+`PossessionState.cs`, `GameState.cs`, `Player.cs`, `RollC.cs`, `RollD.cs`, `DefenderPicker.cs`.
+
+**Walls held / deferred:**
+
+- **Shot-quality face of pressure** (beat-the-press rim busts; packed-paint perimeter
+  concession). Deferred. No hooks, no stubs.
+- **Roll B, Roll A** (the same matchup one and two steps earlier in the chain). Their own
+  fast-follow sessions.
+- **Roll C turnover classification / type mix.** Pressure moves the turnover RATE (Roll F);
+  the type mix (Roll C) is unchanged.
+- **Player/steal attribution** (which defender gets the steal). Deferred attribution pass.
+- **Broader coach-settings layer** (tempo, help rules, etc.) beyond the single pressure dial.
+- **`PossessionState.DefenderSlot` promotion.** Deferred; the pick is still pure and
+  deterministic. Phase 12 is the second consumer but promotion bar has not yet been crossed
+  in a way that forces it.
+- **Broader composites** (Passing, BasketballIQ, PerimeterDefense, Quickness in the matchup).
+  Emmett settled on handling vs. steals alone.
+
 ## Session 42 — Phase 11: matchup-aware free-throw rebounding (Roll M, "the FT glass") (2026-06-15)
 
 **A build (CONVENTIONS §0–§3) — code + harness, all green.** Roll M is now matchup-aware.

@@ -488,4 +488,113 @@ public static class Matchup
         // flip it the wrong way.
         return baseOffShare + bend;
     }
+
+    // =========================================================================
+    // Phase 12 — pressure / disruption door (Roll F)
+    // =========================================================================
+
+    /// <summary>
+    /// The disruption-face of the pressure model (Phase 12). Returns
+    /// (<c>finalTurnoverShare</c>, <c>finalFoulShare</c>) as shares of the Roll F
+    /// action mass (= BaseShotAttempt + BaseTurnover + BaseNonShootingFoul). The
+    /// generator does the three-way mass split and pins JumpBall; this method only
+    /// computes the two moving shares.
+    ///
+    /// <para><b>Two jobs of pressure on the steal/turnover slice.</b>
+    /// <list type="number">
+    ///   <item>A flat, skill-independent lift: even a neutral matchup produces a
+    ///         positive TO lift when pressure is above neutral.</item>
+    ///   <item>Pressure gates how much the matchup matters: at low pressure even great
+    ///         hands generate almost nothing; at high pressure ball-hawks feast.
+    ///         The gate is <c>pressureGate = max(0, pUnit)</c>, so at backed-off
+    ///         pressure the matchup contribution is zeroed out entirely.</item>
+    /// </list>
+    /// Both jobs are captured by a single term: <c>pressureLift + pressureGate × matchupShift</c>,
+    /// where <c>matchupShift = GapFn(defender.Steals − handler.BallHandling, ...)</c>.
+    /// One term captures "high steals climbs faster" and "big gap climbs faster" —
+    /// they are the same lever through <see cref="GapFn"/>.</para>
+    ///
+    /// <para><b>Foul slice: pressure only.</b> The non-shooting reach-in foul tracks
+    /// aggression, not skill — the handling-vs-steals matchup does NOT steepen it.
+    /// <c>foulShift = pressureLift</c> with NO matchup term.</para>
+    ///
+    /// <para><b>Gradual low cap.</b> <see cref="MatchupConfig.TurnoverCeiling"/> is
+    /// deliberately LOW and <see cref="MatchupConfig.PressureReferenceShift"/> is
+    /// deliberately HIGH relative to the pUnit range. Together they make the climb
+    /// gradual and saturate well short of absurd steal rates. Nobody gets 5 steals
+    /// a game no matter how high pressure goes.</para>
+    ///
+    /// <para><b>Changed calibration anchor.</b> Unlike prior doors where an even
+    /// matchup always reproduces the config baseline, here that sub-invariant only
+    /// holds at <em>neutral pressure</em>. (neutral pressure + even matchup) = today's
+    /// flat rates. This is Emmett's basketball call — pressure is the new axis.</para>
+    ///
+    /// <para><b>Plain addition (Session 38 lesson).</b> <c>Math.Tanh</c> is odd and
+    /// already negative when <c>shift</c> is negative — do NOT write
+    /// <c>bend if shift ≥ 0 else -bend</c>. That flips the sign of an already-negative
+    /// bend, pushing the result toward the ceiling instead of the floor. Same lesson
+    /// as <see cref="BlockWeight"/> and <see cref="OffensiveReboundShare"/>.</para>
+    ///
+    /// <para><b>Caller responsibility.</b> The generator short-circuits to the flat
+    /// baseline BEFORE calling this method for null slots, absent players, or empty
+    /// defense — same precondition pattern as <see cref="BlockWeight"/> and
+    /// <see cref="FoulRate"/>.</para>
+    /// </summary>
+    /// <param name="handler">The on-ball offensive player (the handler being pressed).</param>
+    /// <param name="defender">The slot-matched defender.</param>
+    /// <param name="pressure">The defending team's pressure dial (1–10 scale).</param>
+    /// <param name="baseTurnoverShare">The natural TO share within the action mass
+    /// (= BaseTurnover / actionMass). Reproduced exactly at neutral pressure + even matchup.</param>
+    /// <param name="baseFoulShare">The natural foul share within the action mass
+    /// (= BaseNonShootingFoul / actionMass). Reproduced exactly at neutral pressure.</param>
+    /// <param name="cfg">The matchup config — pressure knobs, steal ceiling/floor,
+    /// foul ceiling/floor, and the existing GapFn parameters.</param>
+    public static (double turnoverShare, double foulShare) DisruptionShares(
+        Player handler, Player defender, double pressure,
+        double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg)
+    {
+        // ── Pressure normalization ───────────────────────────────────────────
+        // Map the 1–10 dial to a signed unit around neutral.
+        // pUnit = 0 at neutral; negative = backed-off; positive = aggressive.
+        var pUnit        = (pressure - cfg.PressureNeutral) / cfg.PressureScale;
+        var pressureLift = pUnit;
+        var pressureGate = Math.Max(0.0, pUnit);   // non-negative; 0 when backed off
+
+        // ── Steal/turnover share — two jobs of pressure ──────────────────────
+        // Skill matchup: defender Steals minus handler BallHandling.
+        // Positive = defender edge = steals go up. GapFn captures both "high steals"
+        // and "big gap" as one term (convex, flat-bottomed, no cap — the cap is the
+        // tanh ceiling below).
+        var stealGap       = (double)defender.Steals - handler.BallHandling;
+        var matchupShift   = GapFn(stealGap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+
+        // Disruption shift: flat lift + pressure-gated matchup.
+        // At low pressure, pressureGate ≈ 0 so matchup is muted regardless of attributes.
+        // At high pressure, matchupShift is scaled in — ball-hawks feast.
+        var disruptionShift = pressureLift + pressureGate * matchupShift;
+
+        var toCeiling   = cfg.TurnoverCeiling;
+        var toFloor     = cfg.TurnoverFloor;
+        var toSpan      = disruptionShift >= 0.0
+                          ? (toCeiling - baseTurnoverShare)
+                          : (baseTurnoverShare - toFloor);
+        // High PressureReferenceShift → small tanh argument → gradual climb.
+        // The "low cap" is TurnoverCeiling; the "gradual" is the high ref shift.
+        var toBend      = toSpan * Math.Tanh(disruptionShift / cfg.PressureReferenceShift);
+        var finalToShare = baseTurnoverShare + toBend;   // plain addition; tanh supplies the sign
+
+        // ── Foul share — flat-lift only, no matchup term ─────────────────────
+        // Reach-in non-shooting fouls track aggression, not skill: any level of
+        // BallHandling/Steals matchup produces the same foul rate at the same pressure.
+        var foulShift    = pressureLift;                 // NO matchupShift term
+        var foulCeiling  = cfg.FoulPressureCeiling;
+        var foulFloor    = cfg.FoulPressureFloor;
+        var foulSpan     = foulShift >= 0.0
+                           ? (foulCeiling - baseFoulShare)
+                           : (baseFoulShare - foulFloor);
+        var foulBend     = foulSpan * Math.Tanh(foulShift / cfg.PressureReferenceShift);
+        var finalFoulShare = baseFoulShare + foulBend;   // plain addition
+
+        return (finalToShare, finalFoulShare);
+    }
 }

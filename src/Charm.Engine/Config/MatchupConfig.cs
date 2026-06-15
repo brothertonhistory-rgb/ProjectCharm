@@ -282,8 +282,96 @@ public sealed class MatchupConfig
     //     fixed by the v2 ratio form). Must be > 1.0 (enforced in Load). ---
     public double LocationMaxMultiplier { get; set; } = 2.5;
 
-    public static MatchupConfig Load(string path)
-    {
+    // =========================================================================
+    // Phase 12 — pressure / disruption door (Roll F)
+    // =========================================================================
+
+    // --- Phase 12: per-team defensive pressure dials.
+    //     Range 1–10; neutral at PressureNeutral (= 5 by default).
+    //     v1 home: scalars in MatchupConfig.
+    //     Migration path: when the coach-settings layer arrives, these move to
+    //     per-team CoachProfile fields and RollFGenerator reads them from there.
+    //     PressureFor(TeamSide) is the read seam; only that method changes.
+    //     Must be in [1, 10] (enforced in Load). ---
+
+    /// <summary>Home team's defensive pressure setting (1–10 scale). Neutral = 5.
+    /// The defense applies pressure; read for the DEFENDING team at generate-time.
+    /// Calibration placeholder — set to neutral so the door reproduces today's
+    /// flat Roll F rates with even matchups.</summary>
+    public double HomePressure { get; set; } = 5.0;
+
+    /// <summary>Away team's defensive pressure setting (1–10 scale). Neutral = 5.
+    /// Calibration placeholder.</summary>
+    public double AwayPressure { get; set; } = 5.0;
+
+    /// <summary>The pressure dial for the given team. The generator calls this for
+    /// <c>state.Defense</c> — the defense applies pressure to the offense's handler.
+    /// Migration seam: when CoachProfile is plumbed, this method reads from there
+    /// instead; nothing else in the generator changes.</summary>
+    public double PressureFor(TeamSide side) =>
+        side == TeamSide.Home ? HomePressure : AwayPressure;
+
+    // --- Phase 12: pressure normalization.
+    //     pUnit = (pressure − PressureNeutral) / PressureScale.
+    //     pUnit = 0 at neutral; negative = backed-off; positive = aggressive.
+    //     PressureNeutral in [1, 10] (enforced in Load).
+    //     PressureScale > 0 (enforced in Load). ---
+
+    /// <summary>The pressure value that maps to pUnit = 0 (no disruption lift vs.
+    /// today's flat baseline). Must be in [1, 10] (enforced in Load).
+    /// Default 5.0 — midpoint of the 1–10 dial.</summary>
+    public double PressureNeutral { get; set; } = 5.0;
+
+    /// <summary>Divisor that converts the raw pressure dial into a signed unit.
+    /// Higher = wider dial (same pressure difference → smaller pUnit → less sensitivity).
+    /// Must be &gt; 0 (enforced in Load). Default 4.0.</summary>
+    public double PressureScale { get; set; } = 4.0;
+
+    // --- Phase 12: pressure saturation knob.
+    //     Controls how fast TO and foul rates approach floor/ceiling as pUnit grows.
+    //     Deliberately HIGH (relative to the pUnit range) to keep the climb gradual
+    //     — the "low cap + high reference" encoding of "nobody gets 5 steals a game."
+    //     Must be > 0 (enforced in Load). ---
+
+    /// <summary>The tanh saturation knob for both the turnover and the foul disruption
+    /// bends. Higher = slower saturation (gentler climb toward ceiling/floor). Default
+    /// 1.2. The pUnit at max pressure ≈ 1.25; with ref = 1.2, tanh(1.04) ≈ 0.78 →
+    /// climb reaches ~78% of ceiling headroom at max pressure with an even matchup.
+    /// Must be &gt; 0 (enforced in Load). Calibration placeholder.</summary>
+    public double PressureReferenceShift { get; set; } = 1.2;
+
+    // --- Phase 12: steal/turnover slice ceiling and floor.
+    //     LOW ceiling is the whole point — real steal rates cap out; nobody averages
+    //     5 steals a game even in the fastest system. All values are shares of the
+    //     action mass (= BaseShotAttempt + BaseTurnover + BaseNonShootingFoul), NOT
+    //     the full pie. Enforced in Load: ceiling > floor >= 0. ---
+
+    /// <summary>Maximum TO share within the action mass (defender-pressure asymptote).
+    /// LOW by design — real steal rates cap out. Default 0.18 (18% of action-mass
+    /// possessions ending in a Roll F turnover at maximum disruption). Must exceed
+    /// <see cref="TurnoverFloor"/> (enforced in Load). Calibration placeholder.</summary>
+    public double TurnoverCeiling { get; set; } = 0.18;
+
+    /// <summary>Minimum TO share within the action mass (backed-off asymptote).
+    /// Low pressure → few disruptions regardless of matchup. Default 0.02.
+    /// Must be &gt;= 0 and &lt; <see cref="TurnoverCeiling"/> (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double TurnoverFloor { get; set; } = 0.02;
+
+    // --- Phase 12: non-shooting foul slice ceiling and floor.
+    //     Shares of the action mass. Enforced in Load: ceiling > floor >= 0. ---
+
+    /// <summary>Maximum non-shooting-foul share within the action mass (max-pressure
+    /// asymptote). Default 0.09 (about 1.8× the baseline of ≈0.0503). Must exceed
+    /// <see cref="FoulPressureFloor"/> (enforced in Load). Calibration placeholder.</summary>
+    public double FoulPressureCeiling { get; set; } = 0.09;
+
+    /// <summary>Minimum non-shooting-foul share within the action mass (backed-off
+    /// asymptote). Default 0.01. Must be &gt;= 0 and &lt; <see cref="FoulPressureCeiling"/>
+    /// (enforced in Load). Calibration placeholder.</summary>
+    public double FoulPressureFloor { get; set; } = 0.01;
+
+    public static MatchupConfig Load(string path)    {
         var json = File.ReadAllText(path);
         using var doc = JsonDocument.Parse(json);
         var section = doc.RootElement.GetProperty("Matchup");
@@ -410,6 +498,37 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"ReboundShooterNerf must be in [0.0, 1.0] (a nerf multiplier, never a boost or negative): " +
                 $"got {cfg.ReboundShooterNerf}.");
+
+        // Phase 12 invariants — disruption door (Roll F).
+        if (cfg.PressureNeutral < 1.0 || cfg.PressureNeutral > 10.0)
+            throw new InvalidOperationException(
+                $"PressureNeutral must be in [1, 10]: got {cfg.PressureNeutral}.");
+
+        if (cfg.PressureScale <= 0.0)
+            throw new InvalidOperationException(
+                $"PressureScale must be > 0: got {cfg.PressureScale}.");
+
+        if (cfg.PressureReferenceShift <= 0.0)
+            throw new InvalidOperationException(
+                $"PressureReferenceShift must be > 0: got {cfg.PressureReferenceShift}.");
+
+        if (cfg.TurnoverFloor < 0.0)
+            throw new InvalidOperationException(
+                $"TurnoverFloor must be >= 0: got {cfg.TurnoverFloor}.");
+
+        if (cfg.TurnoverCeiling <= cfg.TurnoverFloor)
+            throw new InvalidOperationException(
+                $"TurnoverCeiling must exceed TurnoverFloor: " +
+                $"floor={cfg.TurnoverFloor}, ceiling={cfg.TurnoverCeiling}.");
+
+        if (cfg.FoulPressureFloor < 0.0)
+            throw new InvalidOperationException(
+                $"FoulPressureFloor must be >= 0: got {cfg.FoulPressureFloor}.");
+
+        if (cfg.FoulPressureCeiling <= cfg.FoulPressureFloor)
+            throw new InvalidOperationException(
+                $"FoulPressureCeiling must exceed FoulPressureFloor: " +
+                $"floor={cfg.FoulPressureFloor}, ceiling={cfg.FoulPressureCeiling}.");
 
         return cfg;
     }

@@ -211,7 +211,17 @@
     "ReboundShooterNerf": 0.35,
     "ReboundOffShareFloor": 0.08,
     "ReboundOffShareCeiling": 0.55,
-    "ReboundReferenceShift": 20.0
+    "ReboundReferenceShift": 20.0,
+
+    "HomePressure": 5.0,
+    "AwayPressure": 5.0,
+    "PressureNeutral": 5.0,
+    "PressureScale": 4.0,
+    "PressureReferenceShift": 1.2,
+    "TurnoverCeiling": 0.18,
+    "TurnoverFloor": 0.02,
+    "FoulPressureCeiling": 0.09,
+    "FoulPressureFloor": 0.01
   },
   "RollI": {
     "DefensiveRebound": 0.66,
