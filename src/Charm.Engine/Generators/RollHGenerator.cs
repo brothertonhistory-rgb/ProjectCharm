@@ -21,13 +21,12 @@ namespace Charm.Engine;
 /// The zone/location distinction is intentional: ShotLocation names WHERE the
 /// shot comes from; the player attribute names the SKILL needed to convert it.</para>
 ///
-/// <para><b>Make weight substitution.</b> The logistic result replaces only the
-/// <c>BaseMade</c> weight. All other pie structure — block carve, foul slices,
-/// OOB pair, putback path — is preserved unchanged from the stub. The make weight
-/// is renormalised: the six non-block outcomes sum to 1, so replacing BaseMade
-/// while keeping the other five proportional (scaling by the remaining share)
-/// produces a valid pie. The block carve is applied on top, exactly as the stub
-/// does it.</para>
+/// <para><b>Make weight substitution.</b> Block is carved off the top first; the
+/// logistic result is the conversion rate GIVEN the shot is not blocked, so the
+/// Made weight is <c>makePct × (1 − block)</c> — the same shape the stub uses
+/// (<c>BaseMade × (1 − block)</c>). The other five outcomes keep their relative
+/// proportions and fill the rest of the non-block share. The pie always sums to 1
+/// and never goes negative for any makePct in [0, 1].</para>
 ///
 /// <para><b>Fallback when no player is present.</b> If the roster is not populated
 /// (a harness that constructs a Resolver without calling SetStarter), PlayerAt
@@ -108,32 +107,38 @@ public sealed class RollHGenerator : IRollHPieGenerator
     // -------------------------------------------------------------------------
 
     /// <summary>
-    /// Build the real seven-way pie using the logistic make probability.
-    /// The make weight replaces BaseMade; the other five make/miss outcomes keep
-    /// their relative proportions scaled to fill the non-make, non-block share.
-    /// The block carve is applied identically to the stub.
+    /// Build the real seven-way pie. Block is carved off the top first; the logistic
+    /// make probability is the conversion rate GIVEN the shot is not blocked, so
+    /// Made = makePct × (1 − block) — the same shape the stub uses (BaseMade × (1 − block)).
+    /// The other five outcomes keep their relative proportions and fill the rest of the
+    /// non-block share. Overflow-safe: the pie always sums to 1 with no negative weight.
+    /// (The earlier form set Made = makePct and added block on top, which went negative
+    /// once makePct + block exceeded 1 — reachable at the rim, where ceiling 0.93 +
+    /// block 0.12 > 1.) The per-zone curve therefore reads as conversion-when-not-blocked,
+    /// not final FG%; the calibration pass fits it as observed-FG% ≈ curve × (1 − block).
     /// </summary>
     private Pie<ShotResult> BuildRealPie(ShotLocation zone, double makePct)
     {
-        var block = _cfg.BlockWeight(zone);
+        var block        = _cfg.BlockWeight(zone);
+        var nonBlock     = 1.0 - block;
+        var made         = makePct * nonBlock;                 // make% = conversion given not blocked
 
-        // The remaining share after carving block and make.
-        // The five non-Made, non-Blocked base weights sum to (1 − BaseMade).
-        // We scale them so they fill (1 − block − makePct), preserving shape.
+        // The five non-Made, non-Blocked base weights sum to (1 − BaseMade); scale them
+        // to fill the rest of the non-block share, preserving their relative shape.
         var nonMadeBase  = _cfg.BaseMadeAndFouled
                          + _cfg.BaseMiss
                          + _cfg.BaseMissFouled
                          + _cfg.BaseMissOutOfBoundsLost
                          + _cfg.BaseMissOutOfBoundsRetained;   // = 1 − BaseMade
 
-        var nonMadeShare = 1.0 - block - makePct;              // share left for the five
+        var nonMadeShare = nonBlock - made;                    // = nonBlock × (1 − makePct), ≥ 0
         var scale        = nonMadeBase > 0.0
                              ? nonMadeShare / nonMadeBase
                              : 0.0;
 
         var weights = new Dictionary<ShotResult, double>
         {
-            [ShotResult.Made]                    = makePct,
+            [ShotResult.Made]                    = made,
             [ShotResult.MadeAndFouled]           = _cfg.BaseMadeAndFouled           * scale,
             [ShotResult.Miss]                    = _cfg.BaseMiss                    * scale,
             [ShotResult.MissFouled]              = _cfg.BaseMissFouled              * scale,

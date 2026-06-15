@@ -4467,6 +4467,40 @@ internal static class Program
         if (fOk) Console.WriteLine("      OK — empty slot reads raw rating (==even); a strong defender lowers make% through the real pipe.");
         pass &= fOk;
 
+        // (g) Regression guard for fix #8 (carve-then-convert). A dominant finisher vs a
+        //     weak rim protector drives the effective rim rating into the make-curve's
+        //     ceiling (~0.93). Under the OLD math (Made = makePct, block added on top) that
+        //     made makePct + block > 1 → a negative weight → the Pie constructor threw.
+        //     The fix must build a valid pie through the real generator (no throw).
+        Console.WriteLine("  (g) Rim overflow guard (fix #8, carve-then-convert):");
+        var gRimOk = true;
+        try
+        {
+            var gRim = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            gRim.SetPossessionArrow(TeamSide.Home);
+            gRim.HomeRoster.SetStarter(gRim.HomeLineup.SlotAt(1), Mk(50, fin: 99));        // elite finisher
+            gRim.AwayRoster.SetStarter(gRim.AwayLineup.SlotAt(1), Mk(50, postD: 10, rimP: 10)); // weak rim protection
+            var genRim = new RollHGenerator(cfgH, cfgM, gRim);
+            var stateRim = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, ShotType: ShotLocation.Rim,
+                SelectedSlot: gRim.HomeLineup.SlotAt(1));
+            var madeRim = 0;
+            for (var i = 0; i < 5_000; i++)
+            {
+                var pie = genRim.Generate(stateRim, putback: false);   // would THROW pre-fix
+                if (pie.Roll(new SystemRng(i).NextUnitInterval()) is ShotResult.Made or ShotResult.MadeAndFouled) madeRim++;
+            }
+            Console.WriteLine($"      elite finisher vs weak rim protector @Rim: make {(double)madeRim / 5_000:P1}  (valid pie, no overflow)");
+        }
+        catch (Exception ex)
+        {
+            gRimOk = false;
+            Console.WriteLine($"  FAIL  (g) rim pie overflowed / threw: {ex.Message}");
+        }
+        if (gRimOk) Console.WriteLine("      OK — the extreme rim matchup builds a valid pie; the make+block overflow is fixed.");
+        pass &= gRimOk;
+
         Console.WriteLine(pass ? "  Phase 6 PASSED." : "  Phase 6 FAILED.");
         return pass;
     }

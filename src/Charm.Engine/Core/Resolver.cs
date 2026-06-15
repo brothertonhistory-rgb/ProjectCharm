@@ -98,10 +98,6 @@ public sealed class Resolver
     private readonly RollOffensiveFoulStubPieGenerator _offensiveFoulGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
-    // RETIRED stubs still referenced by their corner cases (block recovery, transition).
-    private readonly IContinuationNode _resolveBlock;
-    // Roll J's Push parks here — the future transition roll's holding pen.
-    private readonly IContinuationNode _transition;
 
     public Resolver(
         StubPieGenerator rollAGenerator,
@@ -150,8 +146,6 @@ public sealed class Resolver
         _offensiveFoulGenerator = offensiveFoulGenerator;
         _game = game;
         _rng = rng;
-        _resolveBlock = resolveBlock;
-        _transition = transition;
     }
 
     /// <summary>
@@ -395,15 +389,13 @@ public sealed class Resolver
                             points += bonusFtPoints;
                             continue;
 
-                        // RETIRED (Contextification #2): Roll H's Blocked no longer
-                        // emits ResolveBlock — a blocked shot is a loose-ball scramble,
-                        // so it now routes into ResolveRebound carrying ReboundSource.Block,
-                        // and Roll I's block pie resolves it (the #1 IntoTransition→corner
-                        // precedent). This case + the _resolveBlock stub are kept in the
-                        // corner (dead, unreachable in a live walk), to be swept with the
-                        // other retired stubs in a future cleanup. Do not route here.
+                        // RETIRED (Contextification #2): Roll H's Blocked no longer emits
+                        // ResolveBlock — a blocked shot routes into ResolveRebound carrying
+                        // ReboundSource.Block, and Roll I's block pie resolves it. Nothing
+                        // should ever route here; fail loud if something does.
                         case ContinuationKind.ResolveBlock:
-                            return new RoutingOutcome(false, _resolveBlock.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods };
+                            throw new InvalidOperationException(
+                                "ResolveBlock is retired (Contextification #2): a blocked shot routes into ResolveRebound with ReboundSource.Block. Nothing should route here.");
 
                         // Roll F, clean attempt got off -> execute Roll G (shot
                         // location), loop. Roll G is structurally Roll E: it stamps
@@ -545,13 +537,12 @@ public sealed class Resolver
                             continue;
 
                         // RETIRED (Contextification #1): Roll J's Push no longer emits
-                        // IntoTransition — it now routes into IntoPlayerSelection with
-                        // FastBreak stamped, so a break produces a shot through the
-                        // shared rolls. This case + the _transition stub are kept in the
-                        // corner (dead, unreachable in a live walk), to be swept with the
-                        // other retired stubs in a future cleanup. Do not route here.
+                        // IntoTransition — it routes into IntoPlayerSelection with FastBreak
+                        // stamped, so a break produces a shot through the shared rolls.
+                        // Nothing should ever route here; fail loud if something does.
                         case ContinuationKind.IntoTransition:
-                            return new RoutingOutcome(false, _transition.Receive(c)) { PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods };
+                            throw new InvalidOperationException(
+                                "IntoTransition is retired (Contextification #1): a break routes into IntoPlayerSelection with FastBreak stamped. Nothing should route here.");
 
                         // Roll L's FT loop, last shot missed (live ball) -> execute Roll M
                         // (free-throw rebound resolution), loop. Roll M is a GATE with
