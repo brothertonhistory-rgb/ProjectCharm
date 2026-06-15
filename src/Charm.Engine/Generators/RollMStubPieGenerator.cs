@@ -2,28 +2,31 @@ namespace Charm.Engine;
 
 /// <summary>
 /// Stub pie generator for Roll M (free-throw rebound resolution). Builds a flat
-/// seven-way pie directly from config weights — no signal argument, no attribute
-/// model. Structurally identical to <see cref="RollIStubPieGenerator"/> (and
+/// seven-way pie directly from config weights — no matchup math. Structurally
+/// identical to <see cref="RollIStubPieGenerator"/> (and
 /// <see cref="RollKStubPieGenerator"/>'s live-ball arm).
 ///
-/// The real attribute-driven generator (which will tilt the board split on size /
-/// box-out / positioning along the lane — a more defensive population than a
-/// field-goal board, with no shooter crashing) replaces this without touching Roll M
-/// or the resolver. The <see cref="Pie{TOutcome}"/> validates sum-to-one on
-/// construction, so any misconfigured weights fail loudly here rather than silently
-/// warping odds.
+/// The real attribute-driven generator (<see cref="RollMGenerator"/>) replaces this
+/// in the live resolver field without touching Roll M or the resolver's routing.
+/// The <see cref="Pie{TOutcome}"/> validates sum-to-one on construction, so any
+/// misconfigured weights fail loudly here rather than silently warping odds.
+///
+/// Implements <see cref="IRollMPieGenerator"/>.
 /// </summary>
-public sealed class RollMStubPieGenerator
+public sealed class RollMStubPieGenerator : IRollMPieGenerator
 {
     private readonly RollMConfig _config;
 
     public RollMStubPieGenerator(RollMConfig config) => _config = config;
 
-    /// <summary>Generate the seven-way free-throw-rebound pie. No signal argument —
-    /// flat weights only. The <see cref="Pie{TOutcome}"/> constructor walks the enum
-    /// in declaration order, so slice order is fixed for reproducibility regardless of
-    /// dictionary iteration order.</summary>
-    public Pie<FreeThrowReboundOutcome> Generate()
+    /// <summary>Generate the seven-way free-throw-rebound pie. <paramref name="state"/>
+    /// is accepted to satisfy <see cref="IRollMPieGenerator"/> but is intentionally
+    /// IGNORED — the stub returns the flat config weights regardless of possession
+    /// context. Use <see cref="RollMGenerator"/> for the matchup-aware path.
+    /// The <see cref="Pie{TOutcome}"/> constructor walks the enum in declaration
+    /// order, so slice order is fixed for reproducibility regardless of dictionary
+    /// iteration order.</summary>
+    public Pie<FreeThrowReboundOutcome> Generate(PossessionState state)
     {
         var weights = new Dictionary<FreeThrowReboundOutcome, double>
         {

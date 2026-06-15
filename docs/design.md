@@ -3488,3 +3488,103 @@ each touchpoint); `ReboundShooterNerf` (multiplier on shooter's offensive contri
 Three/Long/Mid); `ReboundOffShareFloor` / `ReboundOffShareCeiling` (tanh asymptotes on the
 off-share); `ReboundReferenceShift` (tanh saturation speed). All in the `Matchup` section of
 `config.json`. None are calibrated values — Emmett tunes against the harness.
+
+---
+
+## Phase 11 — Matchup-aware free-throw rebounding (Roll M, "the FT glass")
+
+### The settled model: the Phase 10 twin, more defensive, no crashing shooter
+
+Roll M is Roll I's two-touchpoint model applied to the FT glass. The machinery is identical:
+`Matchup.OffensiveReboundShare` (pre-staging size check + positional-weighted skill shift + tanh
+saturation); `Matchup.ReboundPhysical`, `Matchup.Postness`, `Matchup.PositionalWeight` reused
+verbatim; the binary mass reweight of `DefensiveRebound` and `OffensiveRebound` within the
+`Def+Off` mass, five flat slivers untouched. No new config, no new player attributes.
+
+Two basketball facts make the FT glass different from the field-goal glass:
+
+1. **The shooter is behind the line.** Off a field-goal miss the shooter may be near the rim and
+   crash in. Off a free throw the shooter is behind the line by rule; everyone else lines up along
+   the lane in assigned box-out spots. The defense holds the better positions and no one crashes
+   from the shooter's spot.
+
+2. **The defense is more organized.** Box-out assignments are explicit off a free throw in a way
+   they aren't off a live shot. This produces a lower natural offensive-rebound share.
+
+The model expresses both facts through Roll M's config baseline (`Def 0.735 / Off 0.18`, natural
+off-share ≈ **0.197** vs Roll I's live-miss ≈ 0.290) and by passing `shooterIdx = -1` to
+`OffensiveReboundShare` — the shooter nerf is structurally off, not tuned off. The FT baseline
+sits inside the same `[ReboundOffShareFloor, ReboundOffShareCeiling]` band as Roll I's baselines;
+the same bend applies from this lower starting point.
+
+### The four divergences from the Roll I template
+
+All four are structural necessities, not design preferences:
+
+**Divergence 1 — No source selector; one-arg interface.**
+Roll I has two baselines (live-miss, block); its generator takes `(state, source)`. Roll M has
+exactly ONE source (a missed final FT). `IRollMPieGenerator.Generate(state)` takes only `state`.
+One cross-config baseline guard at construction; one flat-baseline fallback helper (no source
+enum, no source switch).
+
+**Divergence 2 — No shooter, no nerf.**
+`OffensiveReboundShare` is called with `shooterIdx = -1` and `zone = ShotLocation.Rim` (a
+constant, not derived). The nerf gate `i == shooterIdx` is never true at -1; every offensive
+rebounder contributes un-nerfed. The generator does not read `state.SelectedSlot` or
+`state.ShotType` for the matchup math.
+
+**Divergence 3 — Fallback: empty-roster only.**
+The single fallback condition is zero populated players on either team. No `SelectedSlot` check,
+no `ShotType` check. Two kinds of state reach Roll M: a bonus FT trip (slot null, zone null) and
+a shooting-foul FT trip (slot and zone stamped). Roll M must accept both without branching on
+slot nullness — a null slot is expected, not a fallback trigger. The empty-roster path returns
+the flat baseline pie (byte-for-byte the stub).
+
+**Divergence 4 — Resolver field was typed to the concrete stub.**
+`Resolver._rollMGenerator` was `RollMStubPieGenerator` (the only generator field that hadn't
+been promoted to an interface yet). Retyped to `IRollMPieGenerator`; ctor param likewise. The
+dispatch site updated: `_rollMGenerator.Generate(c.State)` (was `Generate()` with no args).
+
+### Architecture after Phase 11
+
+- `IRollMPieGenerator` — new interface. One-arg `Generate(PossessionState state)`. Both stub and
+  real generator implement it; Resolver holds the interface.
+- `RollMStubPieGenerator` — now `: IRollMPieGenerator`. Accepts `state` (ignored); returns flat
+  config baseline. Used by `RollMReboundBatchCheck` (directly, via the stub constructor at the
+  call site) and all 8 Resolver-construction sites in isolated harness checks.
+- `RollMGenerator` — new matchup-aware generator. Ctor `(RollMConfig, MatchupConfig, GameState)`
+  with null guards + cross-config baseline guard. `Generate(state)`: empty-roster fallback only;
+  populated path calls `Matchup.OffensiveReboundShare(..., shooterIdx: -1, zone: Rim, ...)`;
+  splits the `Def+Off` mass; five slivers untouched. Coaching seam documented at identity.
+- **Roll M itself unchanged.** `RollM.Execute` still takes `(state, pie, game, rng)`. Only the
+  generator reads `GameState`.
+
+### The no-shooter invariance (the positive proof)
+
+`Phase11FreeThrowReboundDoorCheck` sub-check (e) constructs two identical all-50 neutral matchups
+— one with `SelectedSlot = null, ShotType = null` (the bonus trip path) and one with a stamped
+slot and nerf-eligible zone (`Three`) — and asserts the off-shares are **byte-identical**. With
+an all-50 lineup `Matchup.OffensiveReboundShare` produces the baseline exactly in both cases
+because `shooterIdx = -1` means the nerf never fires regardless of zone or slot. This confirms
+Divergences 2 and 3 are correctly implemented: Roll M is slot-blind and zone-blind by design.
+
+### The FT-vs-field-goal baseline comparison
+
+At neutral (all-50 teams), Roll M's off-share is ≈ 0.197 vs Roll I's live-miss ≈ 0.290 and
+block ≈ 0.390. The FT glass is the most defensive of the three, exactly as basketball dictates.
+All three baselines lie inside the same `[0.08, 0.55]` band; the shared tanh saturation knobs
+apply to all three. Calibrating the FT glass is a matter of tuning Roll M's config weights
+(`DefensiveRebound` / `OffensiveRebound`); the matchup machinery reacts automatically.
+
+### Parked items
+
+- **Per-player rebound attribution:** Roll M decides only which TEAM. The attribution pass is
+  separate and deferred.
+- **Coaching sliders** (crash-glass / get-back): the insertion point is after
+  `OffensiveReboundShare` returns and before the mass split; v1 is matchup-only; the seam is
+  documented in `RollMGenerator.Generate`.
+- **Per-zone FT rebounding:** Roll M passes `zone = Rim` as a constant because a bonus FT trip
+  carries no `ShotType`. The nerf gate never fires at `shooterIdx = -1` regardless of zone, so
+  the zone constant is arbitrary (Rim is the clean choice). No per-zone FT rebound table.
+- **`Hustle`, athletic/big axis split:** same parks as Phase 10.
+

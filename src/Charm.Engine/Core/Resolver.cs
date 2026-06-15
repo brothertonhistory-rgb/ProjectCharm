@@ -94,7 +94,7 @@ public sealed class Resolver
     private readonly RollJStubPieGenerator _rollJGenerator;
     private readonly RollKStubPieGenerator _rollKGenerator;
     private readonly RollLStubPieGenerator _rollLGenerator;
-    private readonly RollMStubPieGenerator _rollMGenerator;
+    private readonly IRollMPieGenerator _rollMGenerator;
     private readonly RollOffensiveFoulStubPieGenerator _offensiveFoulGenerator;
     private readonly GameState _game;
     private readonly IRng _rng;
@@ -114,7 +114,7 @@ public sealed class Resolver
         RollJStubPieGenerator rollJGenerator,
         RollKStubPieGenerator rollKGenerator,
         RollLStubPieGenerator rollLGenerator,
-        RollMStubPieGenerator rollMGenerator,
+        IRollMPieGenerator rollMGenerator,
         RollOffensiveFoulStubPieGenerator offensiveFoulGenerator,
         GameState game,
         IRng rng,
@@ -560,7 +560,7 @@ public sealed class Resolver
                         // off its offensive board re-enters Roll I, not Roll M, so it adds
                         // no new convergence loop.
                         case ContinuationKind.ResolveFTRebound:
-                            var pieM = _rollMGenerator.Generate();
+                            var pieM = _rollMGenerator.Generate(c.State);
                             result = RollM.Execute(c.State, pieM, _game, _rng);
                             continue;
 

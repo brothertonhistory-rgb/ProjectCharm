@@ -1,3 +1,120 @@
+## Session 42 — Phase 11: matchup-aware free-throw rebounding (Roll M, "the FT glass") (2026-06-15)
+
+**A build (CONVENTIONS §0–§3) — code + harness, all green.** Roll M is now matchup-aware.
+The FT glass is the twin of the field-goal glass (Roll I, Phase 10): the same two-touchpoint
+size model, the same binary mass reweight, the same `Matchup.OffensiveReboundShare` door.
+Four structural divergences from the Roll I template are the entire delta; no new math, no new
+config, no new player attributes. This was the fast-follow Phase 10 promised.
+
+**What the FT glass is, and why it's more defensive than the field-goal glass.**
+Off a free throw, the shooter is behind the line by rule. Everyone else is lined calmly along
+the lane in assigned box-out spots. The defense holds the better positions and no one crashes
+from the shooter's spot. The model expresses this two ways, both already built by Phase 10:
+
+1. A lower offensive baseline: Roll M's config is `Def 0.735 / Off 0.18`, natural off-share
+   ≈ **0.197**, vs Roll I's live-miss ≈ 0.290. The bend operates from this lower baseline.
+2. No shooter nerf: Roll M always passes `shooterIdx = -1` to `OffensiveReboundShare`. The
+   nerf gate `i == shooterIdx` is never true at -1, so every offensive rebounder contributes
+   un-nerfed — exactly right, because there is no crashing shooter.
+
+**The four divergences from Roll I (the entire design delta):**
+
+1. **No source selector (Divergence 1).** Roll I has two baselines (live-miss and block). Roll M
+   has exactly ONE (missed final FT). The generator takes one-arg `Generate(PossessionState state)`,
+   not two-arg. The interface is `IRollMPieGenerator` (mirrors `IRollGPieGenerator` shape, not
+   `IRollIPieGenerator`). One cross-config baseline guard at construction, not two.
+
+2. **No shooter, no nerf (Divergence 2).** Always `shooterIdx = -1`, `zone = ShotLocation.Rim`.
+   The generator does NOT read `state.SelectedSlot` or `state.ShotType` for the matchup math.
+   A null slot is normal; it must NOT trigger a fallback.
+
+3. **Fallback: empty-roster ONLY (Divergence 3).** The only fallback condition is zero populated
+   players on either team. No `SelectedSlot` check, no `ShotType` check. Every bonus FT trip
+   reaches Roll M with `SelectedSlot = null`; this is expected, not a fallback trigger. The empty-
+   roster path returns the flat baseline pie. A real game always has both teams populated.
+
+4. **Resolver field previously concrete (Divergence 4).** `Resolver._rollMGenerator` was typed
+   `RollMStubPieGenerator` (concrete stub). Retyped to `IRollMPieGenerator` (interface); ctor
+   param likewise. Dispatch updated: `_rollMGenerator.Generate(c.State)` (was `Generate()`).
+
+**What landed (5 files — 2 new + 3 edits):**
+
+- **`Generators/IRollMPieGenerator.cs` (NEW)** — the interface. Single one-arg method
+  `Pie<FreeThrowReboundOutcome> Generate(PossessionState state)`. Documented: one source (no
+  `ReboundSource`), no shooter (no nerf), slot-blind by design.
+
+- **`Generators/RollMGenerator.cs` (NEW)** — the matchup-aware real generator. Ctor takes
+  `(RollMConfig cfg, MatchupConfig matchup, GameState game)` with null guards plus a
+  **single cross-config invariant guard**: at construction, Roll M's natural off-share
+  (`baseOff / (baseDef + baseOff) ≈ 0.197`) must lie inside `[ReboundOffShareFloor,
+  ReboundOffShareCeiling]`. Confirmed in-band at draft: `0.197 ∈ [0.08, 0.55]`.
+  `Generate(state)` reads both rosters (null-tolerant), short-circuits to the flat baseline
+  if either team has zero populated players (the ONLY fallback condition — no slot check),
+  then calls `Matchup.OffensiveReboundShare(offPlayers, defPlayers, shooterIdx: -1,
+  zone: ShotLocation.Rim, baseOffShare, _matchup)`. Splits the `Def+Off` mass by the bent
+  share; five flat slivers untouched. Includes the neutral coaching seam note (v1 is
+  matchup-only; the crash-glass / get-back insertion point is after `OffensiveReboundShare`
+  returns).
+
+- **`Generators/RollMStubPieGenerator.cs` (edit)** — added `: IRollMPieGenerator`. Changed
+  `Generate()` → `Generate(PossessionState state)`; `state` is accepted but intentionally
+  ignored (documented). No behavior change.
+
+- **`Core/Resolver.cs` (edit)** — three surgical changes: `_rollMGenerator` field retyped to
+  `IRollMPieGenerator`; ctor param likewise; dispatch updated to `Generate(c.State)`.
+
+- **`Harness/Program.cs` (edit)** — several changes:
+  - Early `var rollMGenerator = new RollMStubPieGenerator(cfgM)` (line ~44, before `cfgMatchup`
+    and `game` existed) **deleted**; replaced by `var rollMGenerator = new RollMGenerator(cfgM,
+    cfgMatchup, game)` constructed after `SeatStartersFromConfig`, beside the G/H/I generators.
+    Same move Phase 10 made for `rollIGenerator`. The `cfgM` naming note: `cfgM` is
+    `RollMConfig` in Main; locally-scoped `cfgM` naming `MatchupConfig` inside Phase 6/7/8/9
+    checks never collides (different scopes).
+  - `RollMReboundBatchCheck` call site: passes `new RollMStubPieGenerator(cfgM)` instead of the
+    matchup-aware `rollMGenerator`. The check asserts convergence to the *config* weights —
+    it must stay flat. The check's internal `genM.Generate()` → `genM.Generate(state)`.
+  - All 8 other `new RollMStubPieGenerator(...)` sites pass the stub to `new Resolver(...)`;
+    they compile through `IRollMPieGenerator` (interface) without change — no direct
+    `.Generate()` calls there.
+  - `Phase11FreeThrowReboundDoorCheck(string configPath)` added and registered after
+    `Phase10ReboundDoorCheck`. Seven deterministic sub-checks, mirroring Phase 10:
+    (a) neutral all-50, no slot → off-share equals Roll M baseline exactly; five flat slivers
+    equal config exactly. (b) size check: offense big (85) vs defense small (35) → off-share
+    rises. (c) skill check: equal size, off OffReb=85 vs def DefReb=35 → off-share rises.
+    (d) positional weight isolated: equal Str/Height (size check = wash); PostDefense alone
+    separates; concentrated OffReb in high-PostDef player beats flat spread. ⚠ Cleaner than
+    Phase 10's (d): no shooter slot to pick. (e) no-shooter invariance: null-slot state and
+    stamped-slot+zone state produce **byte-identical** off-shares — proves Roll M is slot-blind
+    (Divergences 2 and 3). (f) flat slivers unchanged across (b)–(c) cases. (g) FT baseline
+    (≈ 0.197) strictly lower than Roll I live-miss baseline (≈ 0.290).
+
+**NOT changed** (confirmed): `RollM.cs`, `FreeThrowReboundOutcomes.cs`, `RollMConfig.cs`,
+`Harness/config.json`, `Core/Matchup.cs`, `Config/MatchupConfig.cs`, `Core/Player.cs`.
+Roll M reuses the Phase 10 `Matchup` methods verbatim; no new config fields are needed.
+
+**Python pre-wiring validation (all checks, all passed before any C# was written):**
+neutral share unchanged (== 0.197 exact); bigger/better offense raises share monotonically;
+extreme gaps stay strictly inside `(0.08, 0.55)`; positional weight exactly 1.0 at lineup mean,
+bounded `(0.8, 1.2)`; `shooterIdx=-1` produces same share regardless of any slot index (the
+no-shooter proof); FT baseline (0.197) strictly below field-goal baseline (0.290).
+
+**Harness — ALL CHECKS PASSED.** Phase 11 sub-results: (a) neutral: exact 0.19672131 vs
+baseline 0.19672131; (b) size check: 0.445793 > 0.196721; (c) skill check: 0.401045 > 0.196721;
+(d) positional weight: concentrated 0.183464 > flat 0.179108; (e) no-shooter invariance:
+null-slot and stamped-slot both produce 0.1967213115 — identical to 10 decimal places;
+(f) flat slivers exactly equal config across both tested cases; (g) Roll M 0.196721 < Roll I
+0.290323. The existing `RollMReboundBatchCheck` stayed green (flat stub path); all prior Phase 6
+through Phase 10 checks unchanged.
+
+**Walls held / deferred:**
+- **Per-player rebound attribution** (which slot grabbed the board): Roll M decides only which
+  TEAM. No `PossessionState` fact stamped. The attribution pass is separate.
+- **Coaching sliders** (crash-glass / get-back): same documented neutral seam as Phase 10.
+  `finalOffShare` is the insertion point; v1 is matchup-only.
+- **Per-zone FT rebounding**: Roll M has no shot zone at all for a bonus trip. `zone = Rim`
+  is a constant (the nerf gate never fires when `shooterIdx = -1`).
+- **`Hustle`, athletic/big axis split**: same parks as Phase 10.
+
 ## Session 41 — Phase 10: matchup-aware rebounding (Roll I, "the glass") (2026-06-15)
 
 **A build (CONVENTIONS §0–§3) — code + harness, all green.** Roll I is now matchup-aware.
