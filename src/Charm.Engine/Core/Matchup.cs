@@ -240,4 +240,93 @@ public static class Matchup
         // when shift is negative, and -bend would flip it the wrong way.
         return baseFoulRate + bend;
     }
+
+    /// <summary>
+    /// The defending team's per-zone defensive resistance (Phase 9). The blend
+    /// of the top three defenders' <see cref="DefenseRating"/> at the given zone,
+    /// weighted by <see cref="MatchupConfig.LocationBlendFirst"/>,
+    /// <c>LocationBlendSecond</c>, and <c>LocationBlendThird</c>.
+    ///
+    /// <para><b>Why top-3, not the slot-matched defender.</b> Shot location is
+    /// the LEAST one-on-one of the matchup doors. The offense reads where the
+    /// defense is collectively weakest before deciding what to attack — a great
+    /// rim protector pushes attempts outside even if HE isn't the slot-matched
+    /// defender, because he'll rotate. Help arrives less than instantly, so the
+    /// second and third options also matter. Fourth and fifth are too far from
+    /// the action.</para>
+    ///
+    /// <para><b>Fewer than 3 populated defenders (DEC-6 partial case).</b> If
+    /// only N defenders are populated (N in 1..3), the blend uses the first N
+    /// weights renormalized to sum to 1.0. If N = 0, the caller must
+    /// short-circuit BEFORE calling this method (it throws on no populated
+    /// defenders).</para>
+    ///
+    /// <para><b>Pure and static.</b> No state, no RNG.</para>
+    /// </summary>
+    public static double DefensiveResistance(ShotLocation zone,
+                                             IReadOnlyList<Player?> defenders,
+                                             MatchupConfig cfg)
+    {
+        var scores = new List<double>();
+        foreach (var d in defenders)
+            if (d is not null)
+                scores.Add(DefenseRating(zone, d, cfg));
+
+        if (scores.Count == 0)
+            throw new InvalidOperationException(
+                $"DefensiveResistance for zone {zone}: no populated defenders. " +
+                "Caller must short-circuit BEFORE calling this method.");
+
+        scores.Sort((a, b) => b.CompareTo(a));   // descending — best first
+        var take = Math.Min(3, scores.Count);
+
+        var w = new[] { cfg.LocationBlendFirst, cfg.LocationBlendSecond, cfg.LocationBlendThird };
+        var weightSum = 0.0;
+        for (var i = 0; i < take; i++) weightSum += w[i];
+
+        var blended = 0.0;
+        for (var i = 0; i < take; i++)
+            blended += (w[i] / weightSum) * scores[i];
+
+        return blended;
+    }
+
+    /// <summary>
+    /// The per-zone multiplier that bends a shooter's authored tendency for
+    /// that zone (Phase 9). Computed via the ratio form so the multiplier is
+    /// bounded in <c>(1/LocationMaxMultiplier, LocationMaxMultiplier)</c> —
+    /// strictly positive and exactly 1.0 at zero gap.
+    ///
+    /// <para>The formula: read the per-zone gap (capability minus resistance),
+    /// run through <see cref="GapFn"/> with the existing skill steepness/
+    /// exponent (foul-drawing reused the same primitive in Phase 8; shot
+    /// location reuses it again here), and pass through
+    /// <c>exp(log(LocationMaxMultiplier) * tanh(shift / LocationReferenceShift))</c>.
+    /// </para>
+    ///
+    /// <para><b>Public static so the harness can test the math directly.</b>
+    /// Mirrors <see cref="BlockWeight"/> and <see cref="FoulRate"/> — the
+    /// matchup primitive lives on <c>Matchup</c>, not buried in the generator.
+    /// The generator's job is to call this method per zone, multiply
+    /// tendencies, and renormalize.</para>
+    ///
+    /// <para>Caller's responsibility: ensure at least one defender is
+    /// populated. With zero populated defenders, <see cref="DefensiveResistance"/>
+    /// would throw — the generator short-circuits to pure-tendency normalization
+    /// in that case.</para>
+    /// </summary>
+    public static double LocationMultiplier(ShotLocation zone,
+                                            Player shooter,
+                                            IReadOnlyList<Player?> defenders,
+                                            MatchupConfig cfg)
+    {
+        var resistance = DefensiveResistance(zone, defenders, cfg);
+        var capability = OffenseRating(zone, shooter);
+        var gap        = capability - resistance;
+        var shift      = GapFn(gap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+        // Ratio form: strictly positive, exactly 1.0 at zero shift, bounded in
+        // (1 / LocationMaxMultiplier, LocationMaxMultiplier).
+        return Math.Exp(Math.Log(cfg.LocationMaxMultiplier)
+                      * Math.Tanh(shift / cfg.LocationReferenceShift));
+    }
 }

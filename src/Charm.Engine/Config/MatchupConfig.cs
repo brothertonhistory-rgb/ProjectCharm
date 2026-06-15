@@ -253,6 +253,35 @@ public sealed class MatchupConfig
     //     Must be > 0 (enforced in Load). ---
     public double AttributeMidpoint { get; set; } = 50.0;
 
+    // =========================================================================
+    // Phase 9 — shot-location door parameters
+    // =========================================================================
+
+    // --- Phase 9: top-3 defender blend weights for per-zone defensive resistance.
+    //     The best zone defender carries the most weight (he rotates over), but
+    //     help arrives less than instantly so the second and third matter too.
+    //     Fourth and fifth are too far from the action. Must sum to 1.0 (enforced
+    //     in Load). Global (not per-zone) for v1; a per-zone variant is a
+    //     calibration call deferred. ---
+    public double LocationBlendFirst  { get; set; } = 0.55;
+    public double LocationBlendSecond { get; set; } = 0.30;
+    public double LocationBlendThird  { get; set; } = 0.15;
+
+    // --- Phase 9: tanh saturation knob for the shot-location contest.
+    //     Mirrors BlockReferenceShift / FoulReferenceShift. A net per-zone gap of
+    //     LocationReferenceShift rating points reaches ~76% of the multiplier's
+    //     log range. Default 20.0; must be > 0 (enforced in Load). ---
+    public double LocationReferenceShift { get; set; } = 20.0;
+
+    // --- Phase 9: per-zone multiplier upper asymptote (and 1 / this is the lower).
+    //     The multiplier formula is the RATIO form:
+    //         mult = exp(log(LocationMaxMultiplier) * tanh(shift / refShift))
+    //     Bounded in (1 / LocationMaxMultiplier, LocationMaxMultiplier). With the
+    //     default 2.5, multipliers asymptote toward (0.4, 2.5) and are exactly 1
+    //     at zero gap. NEVER negative (the v1 additive form could go negative —
+    //     fixed by the v2 ratio form). Must be > 1.0 (enforced in Load). ---
+    public double LocationMaxMultiplier { get; set; } = 2.5;
+
     public static MatchupConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -334,6 +363,21 @@ public sealed class MatchupConfig
                     $"FoulCeiling for zone {zone} must exceed FoulFloor: " +
                     $"floor={cfg.FoulFloor(zone)}, ceiling={cfg.FoulCeiling(zone)}.");
         }
+
+        // Phase 9 invariants.
+        var blendSum = cfg.LocationBlendFirst + cfg.LocationBlendSecond + cfg.LocationBlendThird;
+        if (Math.Abs(blendSum - 1.0) > Eps)
+            throw new InvalidOperationException(
+                $"LocationBlendFirst + LocationBlendSecond + LocationBlendThird must sum to 1.0: got {blendSum}.");
+
+        if (cfg.LocationReferenceShift <= 0.0)
+            throw new InvalidOperationException(
+                $"LocationReferenceShift must be > 0: got {cfg.LocationReferenceShift}.");
+
+        if (cfg.LocationMaxMultiplier <= 1.0)
+            throw new InvalidOperationException(
+                $"LocationMaxMultiplier must be > 1.0 (a max of 1.0 or below would be smaller than the neutral " +
+                $"case; nonsensical): got {cfg.LocationMaxMultiplier}.");
 
         return cfg;
     }

@@ -3221,3 +3221,156 @@ Individual player foul tracking ("foul trouble") requires a personal foul ledger
 by Emmett — one global offense-dominant pair; zone impact lives in floors/ceilings. Physical anchor
 (Strength) was explicitly rejected — correlation with size lives in attribute generation. `PossessionState.
 DefenderSlot` not promoted (three matchup-aware doors but all reuse the same single-consumer picker).
+
+## Phase 9 — The shot-location door (Session 40, 2026-06-15)
+
+Phase 9 makes Roll G matchup-aware: the shot-zone distribution a player attacks reflects both
+**who he is** (his authored per-zone tendencies) and **what the defense looks like** (the
+defending team's collective per-zone resistance). Before this session every shooter received
+the same flat zone mix. After, Cory Baptiste (high `ThreeTendency`) attacks the arc more than
+Javon Okafor (high `RimTendency`) even against the same defense, and both adjust toward the
+zones where the specific defense they're facing is weakest.
+
+### Why shot location reads the whole defense, not the slot-matched defender
+
+The make, block, and foul doors are duel-shaped: one shooter vs his matched defender. Shot
+location is different. The shooter is reading the *entire defense's deployment* before he
+decides where to attack — he goes to the rim because the rim protector is already committed,
+or he pulls up for a mid-range because the defense is packing the lane. A great rim protector
+suppresses rim attempts even when the ball-handler is matched up against a wing defender, because
+he will rotate. So Phase 9's resistance read is a **top-3 defender blend** across all five
+on the floor, not just the slot-matched player.
+
+### The five new per-player authored attributes
+
+`RimTendency`, `ShortTendency`, `MidTendency`, `LongTendency`, `ThreeTendency` (0–99, authored
+per player, validated on load). These represent **how much this player wants to shoot from each
+zone**, separate from how well he converts. A player with `Outside=80` and `ThreeTendency=80`
+is a high-volume three-point shooter; a player with `Outside=80` and `ThreeTendency=30` is a
+skilled shooter who rarely takes them (the Klay Thompson shape). Skill and tendency are
+independently authored. Tendency governs the shot MIX; the existing skill attributes govern
+CONVERSION. The new tendency-sum rule in `Player.Validate()` catches configs with all five
+tendency fields omitted or zero — those would produce an invalid pie at runtime.
+
+### The coaching seam (identity in v1)
+
+`CoachingPull.Apply(shooter, coach, malleability)` routes tendencies through the coaching layer
+before the matchup math runs. In v1 this is the identity function. The coaching session adds
+fields to the `CoachProfile` placeholder type and replaces `CoachingPull.Apply`'s body; every
+call site in `RollGGenerator` is unchanged because the signature already uses the real type.
+Emmett's basketball call on the future coaching session: every player is at least somewhat
+malleable — coaches pull tendencies toward the team's system, weighted by a per-player
+malleability attribute. Coaching pull can be against the player's best interest (a coach running
+three-heavy with a post-up big makes the big shoot threes he can't make — a basketball feature,
+not a bug).
+
+### The top-3 blend and what it models
+
+For each zone: rank all five defenders by their `DefenseRating` at that zone (the existing
+CONF-1 blended per-zone defensive read), take the top three, and blend with weights 0.55 / 0.30
+/ 0.15 (sum to 1). The weights encode: the best zone defender carries the most weight because
+he'll rotate over, but help is not instantaneous so the second and third also matter. Fourth
+and fifth are too far from the action.
+
+Per-zone weights are **global for v1** — the same 0.55/0.30/0.15 for every zone. A per-zone
+variant (rim specialist-driven vs perimeter coverage) is a calibration call deferred.
+
+### The ratio-form multiplier (v2 fix)
+
+For each zone, the per-zone gap (offensive capability minus defensive resistance) runs through
+the existing `GapFn` → tanh saturation into a **ratio-form multiplier**:
+
+```
+multiplier = exp(log(LocationMaxMultiplier) × tanh(shift / LocationReferenceShift))
+```
+
+This form is bounded in `(1/LocationMaxMultiplier, LocationMaxMultiplier)`, exactly 1.0 at
+zero gap, and **can never go negative or zero**. An earlier draft used an additive form
+(`1 + tanh(x) × Range`) with Range=1.5, which could produce a lower asymptote of −0.5 and
+blow up the pie. The ratio form fixes this structurally — no clamp, no guard, just math that
+cannot produce a negative weight.
+
+With `LocationMaxMultiplier = 2.5`: multipliers range between 0.4 and 2.5. At zero gap the
+multiplier is exactly 1.0. At extreme gaps (fin=99 vs rimP=1) the harness measured 2.491;
+at the opposite extreme (fin=1 vs rimP=99) it measured 0.401.
+
+### The renormalization and why it is mathematically honest
+
+After computing five bent tendencies (each tendency × its zone's multiplier), renormalize to
+sum to 1. The relative magnitudes of the multipliers are what redistributes the shot mix; the
+absolute magnitudes don't matter. This produces one critical behavior: **uniform gaps cancel**.
+If every zone has the same gap → every multiplier is the same constant → renormalization erases
+the shift → the player shoots at his raw tendency ratios. D3 vs D3 and D1 vs D1 produce very
+similar mixes; the weird stuff only shows up when you mix levels AND the defensive shape is
+uneven. A D1 finisher vs a D3 team with weak rim protection but average perimeter D will
+shift toward the rim — because the rim gap is large and the perimeter gap is small. The engine
+encodes per-zone gap inequality, not average level difference.
+
+### DEC-6 fallbacks (two tiers)
+
+1. **No shooter** (roster not populated): flat stub pie from `RollGConfig`, byte-for-byte
+   identical to `RollGStubPieGenerator`. Every isolated regression check in the harness hits
+   this path.
+2. **Shooter present, zero populated defenders**: normalized player tendencies through the
+   coaching seam, NO matchup multiplier. Player identity preserved; only the matchup term is
+   absent.
+3. **1–2 populated defenders**: `Matchup.DefensiveResistance` renormalizes the blend weights
+   to the available N defenders, then proceeds normally.
+
+### Roll G's architecture after Phase 9
+
+- `IRollGPieGenerator` — new interface. Both stub and real generator implement it; Resolver
+  holds the interface (`_rollGGenerator` field typed to the interface).
+- `RollGStubPieGenerator` — unchanged in behavior; now `: IRollGPieGenerator`. Used by all 14
+  isolated harness check constructions (13 stub-only + 1 inside `RollGLocationBatchCheck` for
+  baseline regression).
+- `RollGGenerator` — matchup-aware real generator. Ctor takes `(RollGConfig, MatchupConfig,
+  GameState)`. Mirrors `RollHGenerator`'s pattern.
+- **Roll G itself unchanged.** `RollG.Execute` still takes `(state, pie, rng)`. Only the
+  generator reads `GameState`.
+
+### SeatStartersFromConfig (the v2 fix that makes Phase 9 actually run)
+
+Main's `game` object has empty rosters by default. `RollGGenerator` and `RollHGenerator` are
+both tied to this `game`; without seating, every `PlayerAt()` returns null and both generators
+fall back to stub pies. Phase 9 would be "wired" but never actually exercised in the live chain
+— bizarre and undetectable from a passing harness run.
+
+`SeatStartersFromConfig(game, configPath)` is called in Main after `GameState` construction and
+before the generator constructions. It mirrors the seating loop in `Phase1RosterCheck`. Called
+in `RunGame` also (generators there remain stubs but the seating future-proofs that path).
+
+### Phase 9 check results (all sub-checks, all green)
+
+- Zero-gap neutral matchup: exact raw-tendency normalization confirmed to 4 decimal places.
+- All-five-weak-rim defense: rim share 24.993% > 20% uniform baseline.
+- Top-3 blend: Config B (1 elite + 3 solid help) resists more than Config A (1 elite + 4 weak),
+  rim share B 17.6% < A 19.9%.
+- D1 finisher vs D3 weak-rim: rim 65.9% vs tendency baseline 50.0% — rises significantly.
+- Same-level matched control: within 4.6pp of tendency baseline.
+- Uniform D1 vs D3 (everyone 75 vs 45): diff = 0.000% — uniform gaps cancel exactly.
+- DEC-6 zero defenders: exact 20.0% for uniform tendencies.
+- DEC-6 one elite rim defender: rim 14.2% < 20% — strong suppression.
+- DEC-6 one elite + two normals: rim 17.9% > 14.2% — elite diluted by help, less suppression
+  (counterintuitive but correct: one defender alone gets 100% blend weight, max suppression;
+  two normal partners dilute and reduce it).
+- Coaching seam identity: confirmed exact pass-through.
+- Roll H regression valid after Phase 9 roster seating.
+- Negative-multiplier guard: both extremes confirmed strictly within `(0.4, 2.5)`.
+
+### The RollHResolutionBatchCheck fix (post-harness run #1)
+
+The first harness run revealed an unexpected failure: `RollHResolutionBatchCheck` produced
+a Made rate of 48.4% vs the expected 36.5%. Root cause: `SeatStartersFromConfig` now populates
+Main's `game` (a necessary change for Phase 9 to work), and `rollHGenerator` is constructed
+against that same `game` — so the check's `rollHGenerator.Generate(state)` now reads actual
+player attributes (Marcus Webb, Outside=71, etc.) and produces matchup-adjusted make rates
+instead of the neutral/stub rates the expected values were calibrated against.
+
+Fix: `RollHResolutionBatchCheck` now constructs its own isolated `RollHGenerator` bound to its
+own local empty `game`. PlayerAt returns null everywhere in that game → the generator falls back
+to stub/neutral rates → the calibrated expected values remain valid. The Phase 6/7/8 matchup
+checks were unaffected (they always constructed their own isolated setups). This is the correct
+architectural resolution: the batch check is a **baseline calibration** check (configured rates),
+not a matchup-validity check (that's Phase 6/7/8's job).
+

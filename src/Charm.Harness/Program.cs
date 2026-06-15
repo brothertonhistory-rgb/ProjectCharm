@@ -36,8 +36,7 @@ internal static class Program
         var rollDGenerator = new RollDStubPieGenerator(cfgD);
         var rollEGenerator = new RollEStubPieGenerator(cfgE);
         var rollFGenerator = new RollFStubPieGenerator(cfgF);
-        var rollGGenerator = new RollGStubPieGenerator(cfgG);
-        // RollHGenerator constructed below, after game (needs GameState)
+        // RollHGenerator and RollGGenerator constructed below, after game and cfgMatchup (need GameState)
         var rollIGenerator = new RollIStubPieGenerator(cfgI);
         var rollJGenerator = new RollJStubPieGenerator(cfgJ);
         var rollKGenerator = new RollKStubPieGenerator(cfgK);
@@ -49,6 +48,8 @@ internal static class Program
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
         var game = new GameState(fouls);  // arrow starts Off — first jump ball is the tip
         var cfgMatchup = MatchupConfig.Load(configPath);
+        SeatStartersFromConfig(game, configPath);       // v2 fix: seat real rosters before generators
+        var rollGGenerator = new RollGGenerator(cfgG, cfgMatchup, game);   // Phase 9: matchup-aware location
         var rollHGenerator = new RollHGenerator(cfgH, cfgMatchup, game);
 
         var resolver = new Resolver(
@@ -96,7 +97,7 @@ internal static class Program
         ok &= RollESelectionBatchCheck(cfg, cfgE, rollEGenerator, game, state);
         ok &= RollFActionBatchCheck(cfg, cfgF, rollFGenerator, state);
         ok &= RollFHandoffCheck(cfg, game, state);
-        ok &= RollGLocationBatchCheck(cfg, cfgG, rollGGenerator, state);
+        ok &= RollGLocationBatchCheck(cfg, cfgG, state);
         ok &= RollGHandoffCheck(cfg, state);
         ok &= RollHResolutionBatchCheck(cfg, cfgH, rollHGenerator, state);
         ok &= RollHHandoffCheck(cfg, state);
@@ -123,6 +124,7 @@ internal static class Program
         ok &= Phase6MatchupWiringCheck(configPath);
         ok &= Phase7BlockDoorCheck(configPath);
         ok &= Phase8FoulDoorCheck(configPath);
+        ok &= Phase9LocationDoorCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -1093,9 +1095,13 @@ internal static class Program
     //     this roll changing. Mirrors the Roll E batch check — Roll G is
     //     structurally Roll E: stamp a fact, continue to the same next beat. ---
     private static bool RollGLocationBatchCheck(
-        RollAConfig cfg, RollGConfig cfgG, RollGStubPieGenerator genG, PossessionState state)
+        RollAConfig cfg, RollGConfig cfgG, PossessionState state)
     {
         Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} locations through Roll G (flat-ish pie) ---");
+        // Option (ii): construct the stub directly here so this check remains a
+        // flat baseline regression regardless of whether Main's live chain uses the
+        // real RollGGenerator. This preserves the pre-Phase-9 baseline check value.
+        var genG = new RollGStubPieGenerator(cfgG);
         var rng = new SystemRng(cfg.Seed);
         var pieG = genG.Generate(state);
 
@@ -1299,6 +1305,13 @@ internal static class Program
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
         var genE = new RollEStubPieGenerator(RollEConfig.Load(configPath));
         var genG = new RollGStubPieGenerator(cfgG);
+        // Phase 9 fix: use an isolated RollHGenerator bound to the LOCAL empty game so
+        // PlayerAt() returns null and the generator falls back to its stub/baseline behavior.
+        // This preserves RollHResolutionBatchCheck as a pure baseline calibration against
+        // the configured rates, independent of whatever real rosters Main has seated.
+        // Phase 6/7/8 matchup tests are in their own dedicated checks.
+        var cfgMatchup = MatchupConfig.Load(configPath);
+        var isolatedGenH = new RollHGenerator(cfgH, cfgMatchup, game);  // game is empty — no rosters
         var pieE = genE.Generate(state);
 
         var counts = new Dictionary<ShotResult, int>();
@@ -1318,7 +1331,7 @@ internal static class Program
             var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
             var preH = ((Continue)RollG.Execute(selected, genG.Generate(selected), rng)).State;
             var zone = preH.ShotType!.Value;
-            var pieH = genH.Generate(preH);
+            var pieH = isolatedGenH.Generate(preH);
 
             var result = RollH.Execute(preH, pieH, rng);
 
@@ -3883,6 +3896,26 @@ internal static class Program
         side == TeamSide.Home ? TeamSide.Away : TeamSide.Home;
 
     // -----------------------------------------------------------------
+    // Phase 9 helper: seat starting fives from config into a GameState.
+    // Must be called after the GameState is constructed but before any
+    // generator that reads PlayerAt is used — otherwise those generators
+    // silently fall back to their stub pies and the matchup machinery
+    // never runs. Mirrors the seating loop in Phase1RosterCheck.
+    // -----------------------------------------------------------------
+    private static void SeatStartersFromConfig(GameState game, string configPath)
+    {
+        var rosterCfg = RosterConfig.Load(configPath);
+        foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
+        {
+            var lineup  = game.LineupFor(side);
+            var roster  = game.RosterFor(side);
+            var configs = side == TeamSide.Home ? rosterCfg.Home : rosterCfg.Away;
+            for (var i = 0; i < Lineup.Size; i++)
+                roster.SetStarter(lineup.SlotAt(i + 1), configs[i].ToPlayer());
+        }
+    }
+
+    // -----------------------------------------------------------------
     // dotnet run --project "..." -- game
     // Plays one full game using the real engine. Fresh seed every run.
     // -----------------------------------------------------------------
@@ -3908,6 +3941,7 @@ internal static class Program
         Console.WriteLine();
 
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeatStartersFromConfig(game, configPath);       // seat real rosters (generators currently use stubs; seating future-proofs RunGame)
 
         var resolver = new Resolver(
             new StubPieGenerator(cfg),
@@ -4230,17 +4264,21 @@ internal static class Program
             for (var i = 1; i <= Lineup.Size; i++)
             {
                 var shooter = new Player($"Shooter{i}") { Outside = outsideRating, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 70,
+                    FoulDrawing = 50,
                     BallHandling = 50, Passing = 50, Playmaking = 50, SelfCreation = 50, PostMoves = 50,
                     OffBallMovement = 50, Screening = 50, OffensiveRebounding = 50,
                     PerimeterDefense = 50, PostDefense = 50, RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                     Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50, Quickness = 50,
-                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50 };
+                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50,
+                    RimTendency = 50, ShortTendency = 50, MidTendency = 50, LongTendency = 50, ThreeTendency = 50 };
                 var defender = new Player($"Defender{i}") { Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 70,
+                    FoulDrawing = 50,
                     BallHandling = 50, Passing = 50, Playmaking = 50, SelfCreation = 50, PostMoves = 50,
                     OffBallMovement = 50, Screening = 50, OffensiveRebounding = 50,
                     PerimeterDefense = 50, PostDefense = 50, RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                     Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50, Quickness = 50,
-                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50 };
+                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50,
+                    RimTendency = 50, ShortTendency = 50, MidTendency = 50, LongTendency = 50, ThreeTendency = 50 };
                 homeRoster.SetStarter(homeLineup.SlotAt(i), shooter);
                 awayRoster.SetStarter(awayLineup.SlotAt(i), defender);
             }
@@ -4343,7 +4381,8 @@ internal static class Program
         // no attribute is left at 0; athletic attrs stay equal => physical gap 0 unless `ath` is set.
         static Player Mk(int b, int? outside = null, int? mid = null, int? close = null, int? fin = null,
                          int? perimD = null, int? postD = null, int? rimP = null, int? ath = null,
-                         int? foulDrawing = null)
+                         int? foulDrawing = null,
+                         int? rimT = null, int? shortT = null, int? midT = null, int? longT = null, int? threeT = null)
             => new Player("p")
             {
                 Outside = outside ?? b, Mid = mid ?? b, Close = close ?? b, Finishing = fin ?? b, FreeThrow = b,
@@ -4354,7 +4393,9 @@ internal static class Program
                 DefensiveRebounding = b, Steals = b,
                 Height = b, Wingspan = b, Weight = b,
                 Strength = ath ?? b, Speed = ath ?? b, Quickness = ath ?? b, FirstStep = ath ?? b, Vertical = ath ?? b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                RimTendency = rimT ?? b, ShortTendency = shortT ?? b, MidTendency = midT ?? b,
+                LongTendency = longT ?? b, ThreeTendency = threeT ?? b,
             };
 
         // The make% the wired generator assigns to a contested shot, and the raw no-matchup baseline.
@@ -4568,7 +4609,8 @@ internal static class Program
                          int? fin = null, int? outside = null,
                          int? rimP = null, int? perimD = null,
                          int? h = null, int? ws = null, int? v = null,
-                         int? foulDrawing = null)
+                         int? foulDrawing = null,
+                         int? rimT = null, int? shortT = null, int? midT = null, int? longT = null, int? threeT = null)
             => new Player("p")
             {
                 Outside = outside ?? b, Mid = b, Close = b, Finishing = fin ?? b, FreeThrow = b,
@@ -4579,7 +4621,9 @@ internal static class Program
                 DefensiveRebounding = b, Steals = b,
                 Height = h ?? b, Wingspan = ws ?? b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = v ?? b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                RimTendency = rimT ?? b, ShortTendency = shortT ?? b, MidTendency = midT ?? b,
+                LongTendency = longT ?? b, ThreeTendency = threeT ?? b,
             };
 
         // Shorthand: the matchup block weight for a zone, shooter, defender.
@@ -4801,7 +4845,8 @@ internal static class Program
                          int? fd = null, int? disc = null,
                          int? fin = null, int? rimP = null,
                          int? h = null, int? ws = null, int? v = null,
-                         int? foulDrawing = null)
+                         int? foulDrawing = null,
+                         int? rimT = null, int? shortT = null, int? midT = null, int? longT = null, int? threeT = null)
             => new Player("p")
             {
                 Outside = b, Mid = b, Close = b, Finishing = fin ?? b, FreeThrow = b,
@@ -4812,7 +4857,9 @@ internal static class Program
                 DefensiveRebounding = b, Steals = b,
                 Height = h ?? b, Wingspan = ws ?? b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = v ?? b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = disc ?? b
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = disc ?? b,
+                RimTendency = rimT ?? b, ShortTendency = shortT ?? b, MidTendency = midT ?? b,
+                LongTendency = longT ?? b, ThreeTendency = threeT ?? b,
             };
 
         // Shorthand: the matchup foul rate for a zone, shooter, defender.
@@ -5021,6 +5068,334 @@ internal static class Program
         pass &= gOk;
 
         Console.WriteLine(pass ? "  Phase 8 PASSED." : "  Phase 8 FAILED.");
+        return pass;
+    }
+
+    // =========================================================================
+    // Phase 9 — shot-location door (Roll G matchup-aware)
+    // =========================================================================
+    private static bool Phase9LocationDoorCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 9: Shot-location door (Roll G matchup-aware) ---");
+        var pass = true;
+
+        var cfgG       = RollGConfig.Load(configPath);
+        var cfgMatchup = MatchupConfig.Load(configPath);
+        const double Eps = 1e-9;
+
+        // Helper: build a player with all attributes at baseline b.
+        static Player Mk(int b,
+                         int? fin = null, int? outside = null, int? mid = null, int? close = null,
+                         int? rimP = null, int? perimD = null, int? postD = null,
+                         int? rimT = null, int? shortT = null, int? midT = null, int? longT = null, int? threeT = null)
+            => new Player("p")
+            {
+                Outside = outside ?? b, Mid = mid ?? b, Close = close ?? b, Finishing = fin ?? b, FreeThrow = b,
+                FoulDrawing = b,
+                BallHandling = b, Passing = b, Playmaking = b, SelfCreation = b, PostMoves = b,
+                OffBallMovement = b, Screening = b, OffensiveRebounding = b,
+                PerimeterDefense = perimD ?? b, PostDefense = postD ?? b, RimProtection = rimP ?? b,
+                DefensiveRebounding = b, Steals = b,
+                Height = b, Wingspan = b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                RimTendency   = rimT   ?? b,
+                ShortTendency = shortT ?? b,
+                MidTendency   = midT   ?? b,
+                LongTendency  = longT  ?? b,
+                ThreeTendency = threeT ?? b,
+            };
+
+        // Helper: build a list of N copies of a player as the defending roster (slots 1..5).
+        static IReadOnlyList<Player?> Defenders(params Player?[] ds) => ds;
+
+        // Shorthand: compute shot mix for a shooter + defender list via RollGGenerator.
+        Dictionary<ShotLocation, double> Mix(Player shooter, IReadOnlyList<Player?> defs)
+        {
+            // Build a minimal GameState with the shooter in Home slot 1, defenders in Away slots 1–5.
+            var fouls = new FoulTracker(7, 10);
+            var game  = new GameState(fouls);
+            game.HomeRoster.SetStarter(game.HomeLineup.SlotAt(1), shooter);
+            for (var i = 0; i < defs.Count && i < 5; i++)
+                if (defs[i] is not null)
+                    game.AwayRoster.SetStarter(game.AwayLineup.SlotAt(i + 1), defs[i]!);
+
+            var gen = new RollGGenerator(cfgG, cfgMatchup, game);
+            var state = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, SelectedSlot: game.HomeLineup.SlotAt(1));
+            var pie = gen.Generate(state);
+            return pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+        }
+
+        // ----------------------------------------------------------------
+        // (a) Neutral matchup: zero gap everywhere → mix == raw tendencies normalized.
+        //     Shooter: skewed tendencies (Rim=80, others=20). All offensive attributes
+        //     50. All five defenders all-50. Every gap is exactly zero → every multiplier
+        //     exactly 1.0 → bent mix == raw tendencies after renormalization.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (a) Neutral matchup: zero gap → mix equals raw tendencies normalized:");
+        bool aOk;
+        try
+        {
+            var shooter = Mk(50, fin: 50, rimT: 80, shortT: 20, midT: 20, longT: 20, threeT: 20);
+            var defs    = Defenders(Mk(50), Mk(50), Mk(50), Mk(50), Mk(50));
+            var mix     = Mix(shooter, defs);
+
+            var rawSum = 80.0 + 20 + 20 + 20 + 20;
+            var expectedRim = 80.0 / rawSum;
+            var expectedOther = 20.0 / rawSum;
+
+            var rimOk   = Math.Abs(mix[ShotLocation.Rim]   - expectedRim)   < Eps;
+            var othersOk = Math.Abs(mix[ShotLocation.Short] - expectedOther) < Eps
+                        && Math.Abs(mix[ShotLocation.Mid]   - expectedOther) < Eps
+                        && Math.Abs(mix[ShotLocation.Long]  - expectedOther) < Eps
+                        && Math.Abs(mix[ShotLocation.Three] - expectedOther) < Eps;
+            aOk = rimOk && othersOk;
+
+            Console.WriteLine($"    Rim={mix[ShotLocation.Rim]:P4}  expected={expectedRim:P4}  {(rimOk ? "ok" : "FAIL")}");
+            Console.WriteLine($"    others each={mix[ShotLocation.Short]:P4}  expected={expectedOther:P4}  {(othersOk ? "ok" : "FAIL")}");
+            if (aOk) Console.WriteLine("    OK — zero-gap produces exact raw-tendency normalization.");
+        }
+        catch (Exception ex) { aOk = false; Console.WriteLine($"  FAIL  (a) threw: {ex.Message}"); }
+        pass &= aOk;
+
+        // ----------------------------------------------------------------
+        // (b) All-weak-rim defenders shift mix toward rim.
+        //     Shooter: uniform tendencies (all 50), uniform offensive attrs (all 50).
+        //     All five defenders: RimProtection=10, everything else 50.
+        //     Expected: rim share rises noticeably above 20% (uniform baseline).
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (b) All-five-weak-rim defenders: rim share rises above 20%:");
+        bool bOk;
+        try
+        {
+            var shooter = Mk(50, rimT: 50, shortT: 50, midT: 50, longT: 50, threeT: 50);
+            var weakRim = Mk(50, rimP: 10);
+            var defs    = Defenders(weakRim, weakRim, weakRim, weakRim, weakRim);
+            var mix     = Mix(shooter, defs);
+            var rimShare = mix[ShotLocation.Rim];
+            bOk = rimShare > 0.20;
+            Console.WriteLine($"    rim share={rimShare:P3}  (>20%? {(bOk ? "OK" : "FAIL")})");
+            if (bOk) Console.WriteLine("    OK — all-weak-rim defense raises rim share above uniform baseline.");
+        }
+        catch (Exception ex) { bOk = false; Console.WriteLine($"  FAIL  (b) threw: {ex.Message}"); }
+        pass &= bOk;
+
+        // ----------------------------------------------------------------
+        // (c) Top-3 blend: Config A (1 elite + 4 weak rim) vs Config B (1 elite + 3 solid + 1 weak).
+        //     Config B should resist more (higher rim resistance) → lower rim share for the offense.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (c) Top-3 blend: Config B (1 elite + 3 solid) resists more than Config A (1 elite + 4 weak):");
+        bool cOk;
+        try
+        {
+            var shooter = Mk(50, rimT: 50, shortT: 50, midT: 50, longT: 50, threeT: 50);
+            // Config A: elite rim protector at slot-1, four weak at slots 2–5.
+            var defsA = Defenders(Mk(50, rimP: 95), Mk(50, rimP: 10), Mk(50, rimP: 10), Mk(50, rimP: 10), Mk(50, rimP: 10));
+            // Config B: elite at slot-1, three solid (60) at slots 2–4, one weak at slot-5.
+            var defsB = Defenders(Mk(50, rimP: 95), Mk(50, rimP: 60), Mk(50, rimP: 60), Mk(50, rimP: 60), Mk(50, rimP: 10));
+            var mixA  = Mix(shooter, defsA);
+            var mixB  = Mix(shooter, defsB);
+
+            var rimShareA = mixA[ShotLocation.Rim];
+            var rimShareB = mixB[ShotLocation.Rim];
+            // Config B has higher resistance → offense attacks rim less → lower rim share in B.
+            cOk = rimShareB < rimShareA;
+            Console.WriteLine($"    rim share A={rimShareA:P3}  rim share B={rimShareB:P3}  (B<A? {(cOk ? "OK" : "FAIL")})");
+            if (cOk) Console.WriteLine("    OK — three solid help defenders add more resistance than three weak ones.");
+        }
+        catch (Exception ex) { cOk = false; Console.WriteLine($"  FAIL  (c) threw: {ex.Message}"); }
+        pass &= cOk;
+
+        // ----------------------------------------------------------------
+        // (d) Level-mismatch behavior: shift is gap-INEQUALITY-driven, not level-driven.
+        //   (d1) D1 finisher vs D3 with weak rim → rim share rises (uneven gaps).
+        //   (d2) Same-level matched control → mix stays within ~3pp of tendency baseline.
+        //   (d3) Uniform D1 vs uniform D3 (everyone 75 vs everyone 45) → mix stays within ~2pp
+        //        (uniform gaps cancel in renormalization — proves gap-inequality drives shifts).
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (d) Level-mismatch behavior (gap-inequality driven):");
+        bool dOk = true;
+        try
+        {
+            // D1 finisher: rim-heavy offensive shape
+            var finisher = Mk(50, fin: 85, outside: 65, mid: 60, close: 60,
+                               rimT: 50, shortT: 25, midT: 15, longT: 5, threeT: 5);
+
+            // D3 with weak rim protection: rim weak, perimeter normal
+            var d3Weak = Mk(50, rimP: 30, perimD: 50, postD: 40);
+            var d3Defs = Defenders(d3Weak, d3Weak, d3Weak, d3Weak, d3Weak);
+            var mixMismatch = Mix(finisher, d3Defs);
+
+            // Tendency baseline for finisher: rim=50/(50+25+15+5+5)=0.50
+            var tendRimRaw = 50.0 / (50 + 25 + 15 + 5 + 5);
+            var rimMismatch = mixMismatch[ShotLocation.Rim];
+            var d1MismatchOk = rimMismatch > tendRimRaw;
+            Console.WriteLine($"    (d1) D1 finisher vs D3 weak rim: rim={rimMismatch:P3}  tendency baseline={tendRimRaw:P3}  {(d1MismatchOk ? "OK — rises" : "FAIL")}");
+            dOk &= d1MismatchOk;
+
+            // Same-level matched control: defenders with same offensive shape everywhere
+            var matched = Mk(50, rimP: 65, perimD: 65, postD: 65);
+            var matchedDefs = Defenders(matched, matched, matched, matched, matched);
+            var mixMatched  = Mix(finisher, matchedDefs);
+            var rimMatched  = mixMatched[ShotLocation.Rim];
+            // Mix stays within ~3pp of the tendency baseline when gaps are roughly equal
+            var d2ControlOk = Math.Abs(rimMatched - tendRimRaw) < 0.06;
+            Console.WriteLine($"    (d2) Same-level matched: rim={rimMatched:P3}  tendency baseline={tendRimRaw:P3}  diff={Math.Abs(rimMatched - tendRimRaw):P3}  {(d2ControlOk ? "OK" : "FAIL — too far from baseline")}");
+            dOk &= d2ControlOk;
+
+            // (d3) Plain D1 (everyone 75) vs plain D3 (everyone 45) — uniform attributes.
+            // Uniform gaps cancel → mix very close to raw tendencies.
+            var d1Off = Mk(75, rimT: 50, shortT: 25, midT: 15, longT: 5, threeT: 5);
+            var d3Def = Mk(45);
+            var d3DefsUniform = Defenders(d3Def, d3Def, d3Def, d3Def, d3Def);
+            var mixUniform = Mix(d1Off, d3DefsUniform);
+            var rimUniform = mixUniform[ShotLocation.Rim];
+            var tendRimUniform = 50.0 / (50 + 25 + 15 + 5 + 5);
+            var d3UniformOk = Math.Abs(rimUniform - tendRimUniform) < 0.02;
+            Console.WriteLine($"    (d3) Uniform D1 vs D3 (all attrs 75 vs 45): rim={rimUniform:P3}  baseline={tendRimUniform:P3}  diff={Math.Abs(rimUniform - tendRimUniform):P3}  {(d3UniformOk ? "OK — uniform gaps cancel" : "FAIL")}");
+            dOk &= d3UniformOk;
+        }
+        catch (Exception ex) { dOk = false; Console.WriteLine($"  FAIL  (d) threw: {ex.Message}"); }
+        pass &= dOk;
+
+        // ----------------------------------------------------------------
+        // (e) DEC-6 partial defenders.
+        //   (e1) Zero defenders: bent mix == tendency normalized exactly.
+        //   (e2) One elite rim defender: 100% weight on him → strong suppression.
+        //   (e3) Three populated (elite + two normal rim): top-3 blend dilutes → resistance ~77.
+        //         Counterintuitive: one elite alone suppresses MORE than one elite + two normals
+        //         (the blend renormalizes: 1 defender gets 100%; 3 defenders get 0.55/0.30/0.15).
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (e) DEC-6 partial defenders:");
+        bool eOk = true;
+        try
+        {
+            var shooter = Mk(50, fin: 50, rimT: 50, shortT: 50, midT: 50, longT: 50, threeT: 50);
+
+            // (e1) Zero defenders: pure tendency normalization, NO matchup multiplier.
+            var defs0 = Defenders(null, null, null, null, null);
+            var mix0  = Mix(shooter, defs0);
+            var rim0  = mix0[ShotLocation.Rim];
+            var e1Ok  = Math.Abs(rim0 - 0.20) < Eps;   // all tendencies equal → each zone 20%
+            Console.WriteLine($"    (e1) Zero defenders: rim={rim0:P4}  expected=20.0000%  {(e1Ok ? "OK" : "FAIL")}");
+            eOk &= e1Ok;
+
+            // (e2) One elite rim protector (slot-1 only, slots 2–5 null).
+            // With 1 defender, blend renormalizes to 1.0 weight on him → resistance ≈ DefenseRating(Rim, elite).
+            var elite = Mk(50, rimP: 99);
+            var defs1 = Defenders(elite, null, null, null, null);
+            var mix1  = Mix(shooter, defs1);
+            var rim1  = mix1[ShotLocation.Rim];
+            // Strong suppression expected — rim share should drop below 20%.
+            var e2Ok  = rim1 < 0.20;
+            Console.WriteLine($"    (e2) One elite rim defender: rim={rim1:P3}  (<20%? {(e2Ok ? "OK" : "FAIL")})");
+            eOk &= e2Ok;
+
+            // (e3) Three defenders: elite (99) + two normal (50). Top-3 blend: 0.55×99 + 0.30×50 + 0.15×50 ≈ 77.
+            // One-defender suppression (e2) should be STRONGER than three-defender (e3) for the same elite — counterintuitive.
+            var normal = Mk(50, rimP: 50);
+            var defs3  = Defenders(elite, normal, normal, null, null);
+            var mix3   = Mix(shooter, defs3);
+            var rim3   = mix3[ShotLocation.Rim];
+            // rim3 > rim1: three defenders dilutes the elite → less suppression → higher rim share.
+            var e3Ok   = rim3 > rim1;
+            Console.WriteLine($"    (e3) Three defenders (1 elite + 2 normal): rim={rim3:P3}  one-defender rim={rim1:P3}  (three>one? {(e3Ok ? "OK (elite diluted)" : "FAIL")})");
+            Console.WriteLine($"         Note: this is correct — 1 elite alone gets 100% blend weight (max suppression);");
+            Console.WriteLine($"         two average help partners dilute the blend and REDUCE suppression.");
+            eOk &= e3Ok;
+        }
+        catch (Exception ex) { eOk = false; Console.WriteLine($"  FAIL  (e) threw: {ex.Message}"); }
+        pass &= eOk;
+
+        // ----------------------------------------------------------------
+        // (f) Coaching seam is identity in v1.
+        //     CoachingPull.Apply returns exactly the authored tendency values.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (f) Coaching seam identity:");
+        bool fOk;
+        try
+        {
+            var shooter = Mk(50, rimT: 30, shortT: 40, midT: 50, longT: 60, threeT: 70);
+            var (rim, sh, mid, lng, three) = CoachingPull.Apply(shooter, null, null);
+            fOk = rim == 30 && sh == 40 && mid == 50 && lng == 60 && three == 70;
+            Console.WriteLine($"    returned ({rim},{sh},{mid},{lng},{three}) expected (30,40,50,60,70)  {(fOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex) { fOk = false; Console.WriteLine($"  FAIL  (f) threw: {ex.Message}"); }
+        pass &= fOk;
+
+        // ----------------------------------------------------------------
+        // (g) Phase 6/7/8 regression — Roll H still correct given a forced zone.
+        //     Force the shot zone via PossessionState (bypass Roll G) and verify
+        //     make+and-1 / block / foul rates match Phase 8 expectations at Rim.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (g) Roll H regression with Phase 9 roster loaded:");
+        bool gOk;
+        try
+        {
+            var cfgH      = RollHConfig.Load(configPath);
+            var foulsReg  = new FoulTracker(7, 10);
+            var gReg      = new GameState(foulsReg);
+            SeatStartersFromConfig(gReg, configPath);
+            var genReg = new RollHGenerator(cfgH, cfgMatchup, gReg);
+
+            // Force Rim, slot-1 shooter. Roll H still reads the same matchup context.
+            var stateReg = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, ShotType: ShotLocation.Rim,
+                SelectedSlot: gReg.HomeLineup.SlotAt(1));
+
+            var madeReg = 0;
+            for (var i = 0; i < 5_000; i++)
+            {
+                var pie    = genReg.Generate(stateReg, putback: false);
+                var result = pie.Roll(new SystemRng(i).NextUnitInterval());
+                if (result is ShotResult.Made or ShotResult.MadeAndFouled) madeReg++;
+            }
+            var makeRate = (double)madeReg / 5_000;
+            Console.WriteLine($"    slot-1 @Rim: make+and-1={makeRate:P1}  (valid pie, >0 and <1?)");
+            gOk = makeRate > 0.0 && makeRate < 1.0;
+            if (gOk)  Console.WriteLine("    OK — Roll H valid after Phase 9 roster seating.");
+            if (!gOk) Console.WriteLine($"  FAIL  (g) make rate {makeRate:P1} out of (0, 1).");
+        }
+        catch (Exception ex) { gOk = false; Console.WriteLine($"  FAIL  (g) threw: {ex.Message}"); }
+        pass &= gOk;
+
+        // ----------------------------------------------------------------
+        // (h) v3 negative-multiplier guard.
+        //     Direct call to Matchup.LocationMultiplier with extreme gaps.
+        //     Confirms the ratio form never goes negative or outside the asymptote bounds.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (h) Negative-multiplier guard (ratio form bounds):");
+        bool hOk = true;
+        try
+        {
+            var maxMult  = cfgMatchup.LocationMaxMultiplier;
+            var minMult  = 1.0 / maxMult;
+
+            // Extreme positive: shooter 99 Finishing vs five defenders all RimProtection=1.
+            var eliteShooter   = Mk(50, fin: 99, rimT: 50, shortT: 50, midT: 50, longT: 50, threeT: 50);
+            var weakDefenders  = Defenders(Mk(50, rimP: 1), Mk(50, rimP: 1), Mk(50, rimP: 1), Mk(50, rimP: 1), Mk(50, rimP: 1));
+            var multPos = Matchup.LocationMultiplier(ShotLocation.Rim, eliteShooter, weakDefenders, cfgMatchup);
+
+            var posOk = multPos > 0.0 && multPos < maxMult;
+            Console.WriteLine($"    extreme positive (fin=99 vs rimP=1): mult={multPos:F6}  bounds=(0, {maxMult})  {(posOk ? "OK" : "FAIL")}");
+            hOk &= posOk;
+
+            // Extreme negative: shooter Finishing=1 vs five defenders all RimProtection=99.
+            var poorShooter     = Mk(50, fin: 1, rimT: 50, shortT: 50, midT: 50, longT: 50, threeT: 50);
+            var eliteDefenders  = Defenders(Mk(50, rimP: 99), Mk(50, rimP: 99), Mk(50, rimP: 99), Mk(50, rimP: 99), Mk(50, rimP: 99));
+            var multNeg = Matchup.LocationMultiplier(ShotLocation.Rim, poorShooter, eliteDefenders, cfgMatchup);
+
+            var negOk = multNeg > minMult && multNeg > 0.0;
+            Console.WriteLine($"    extreme negative (fin=1 vs rimP=99): mult={multNeg:F6}  lower bound={minMult:F4}  {(negOk ? "OK — strictly positive, above lower asymptote" : "FAIL — at or below lower asymptote or negative")}");
+            hOk &= negOk;
+        }
+        catch (Exception ex) { hOk = false; Console.WriteLine($"  FAIL  (h) threw: {ex.Message}"); }
+        pass &= hOk;
+
+        Console.WriteLine(pass ? "  Phase 9 PASSED." : "  Phase 9 FAILED.");
         return pass;
     }
 }

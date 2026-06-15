@@ -17,7 +17,7 @@ namespace Charm.Engine;
 /// later WITHOUT touching Roll G or the resolver — it just hands back a non-flat
 /// pie over the same enum.
 /// </summary>
-public sealed class RollGStubPieGenerator
+public sealed class RollGStubPieGenerator : IRollGPieGenerator
 {
     private readonly RollGConfig _cfg;
 

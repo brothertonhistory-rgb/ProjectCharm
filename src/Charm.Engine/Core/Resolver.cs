@@ -88,7 +88,7 @@ public sealed class Resolver
     private readonly RollDStubPieGenerator _rollDGenerator;
     private readonly RollEStubPieGenerator _rollEGenerator;
     private readonly RollFStubPieGenerator _rollFGenerator;
-    private readonly RollGStubPieGenerator _rollGGenerator;
+    private readonly IRollGPieGenerator _rollGGenerator;
     private readonly IRollHPieGenerator _rollHGenerator;
     private readonly RollIStubPieGenerator _rollIGenerator;
     private readonly RollJStubPieGenerator _rollJGenerator;
@@ -108,7 +108,7 @@ public sealed class Resolver
         RollDStubPieGenerator rollDGenerator,
         RollEStubPieGenerator rollEGenerator,
         RollFStubPieGenerator rollFGenerator,
-        RollGStubPieGenerator rollGGenerator,
+        IRollGPieGenerator rollGGenerator,
         IRollHPieGenerator rollHGenerator,
         RollIStubPieGenerator rollIGenerator,
         RollJStubPieGenerator rollJGenerator,

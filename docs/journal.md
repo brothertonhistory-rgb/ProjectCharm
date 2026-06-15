@@ -1,3 +1,161 @@
+## Session 40 — Phase 9: the shot location door (2026-06-15)
+
+**A build (CONVENTIONS §0–§3) — code + harness, all green.** Roll G is now matchup-aware.
+Before this session every shooter got the same shot-zone distribution regardless of who they
+were or who was guarding them. Phase 9 makes Roll G read each player's **authored per-zone
+shot tendencies** (five new attributes), bends them by the **defending team's collective
+per-zone resistance**, and renormalizes — so the offense's shot mix shifts toward the zones
+where the defense is weakest.
+
+This is the first matchup-aware door that reads the **entire defending team** rather than just
+the slot-matched defender: shot location is the least one-on-one decision. A great rim protector
+suppresses rim attempts even when he isn't the player directly guarding the shooter, because
+he'll rotate.
+
+**What landed (14 files — 9 edits + 5 new):**
+
+- **`Core/Player.cs` (edit)** — five new `int` authored attributes (0–99): `RimTendency`,
+  `ShortTendency`, `MidTendency`, `LongTendency`, `ThreeTendency`. Represent how much a player
+  WANTS to shoot from each zone, independent of how well he converts there (Klay Thompson and
+  Steph Curry can have similar three-point skill but very different tendency values). Five new
+  `Check(...)` calls in `Validate()` plus a **tendency-sum rule**: if all five are zero the
+  config has missing fields; `Player.Validate()` throws loud at load time rather than letting
+  Roll G build an invalid pie at runtime.
+
+- **`Config/RosterConfig.cs` (edit)** — five new `int` fields in the `PlayerConfig` DTO and
+  five new lines in `ToPlayer()`, mirroring `FoulDrawing`'s Session 39 shape exactly.
+
+- **`Config/MatchupConfig.cs` (edit)** — five new Phase 9 parameters after the Phase 8 block:
+  `LocationBlendFirst` (0.55), `LocationBlendSecond` (0.30), `LocationBlendThird` (0.15) —
+  the top-3 defender blend weights, enforced to sum to 1.0 in `Load`; `LocationReferenceShift`
+  (20.0, mirrors `BlockReferenceShift` / `FoulReferenceShift`); `LocationMaxMultiplier` (2.5,
+  the upper asymptote — and 1/this is the lower). All five invariants enforced in `Load`.
+
+- **`Core/CoachProfile.cs` (NEW)** — empty placeholder `sealed record CoachProfile`. Exists so
+  the coaching seam can use a semantically-honest type from day one instead of faking it with
+  `Player?`. Future coaching session adds fields here and replaces `CoachingPull.Apply`'s body;
+  all call sites in `RollGGenerator` stay unchanged.
+
+- **`Core/CoachingPull.cs` (NEW)** — the coaching-malleability seam. v1 is the **identity
+  function**: `Apply(shooter, null, null)` returns the shooter's authored tendency values
+  unchanged. The seam ships so the future coaching session is a clean append (body replaces,
+  signature stays). Three design decisions logged in comments as deferred: malleability is
+  per-player (stars conform less), coaching pull can be against the player's best interest, and
+  the "system" question (5 independent zone preferences vs coherent identity) is its own design
+  call.
+
+- **`Core/Matchup.cs` (edit)** — two new pure-static methods:
+  - `DefensiveResistance(zone, defenders, cfg)` — the defending team's per-zone resistance as a
+    top-3 weighted blend of the five defenders' `DefenseRating` at that zone, ranked descending.
+    Renormalizes blend weights when fewer than 3 defenders are populated. Throws if zero
+    defenders (caller must short-circuit first).
+  - `LocationMultiplier(zone, shooter, defenders, cfg)` — the per-zone multiplier in the ratio
+    form: `exp(log(MaxMultiplier) × tanh(shift / ReferenceShift))`. Bounded in
+    `(1/Max, Max)`, exactly 1.0 at zero gap, **never negative**. Public static (mirrors Phase
+    7's `BlockWeight` and Phase 8's `FoulRate`) so the harness can test the math directly
+    without needing access to a private generator helper.
+
+- **`Generators/IRollGPieGenerator.cs` (NEW)** — interface mirroring `IRollHPieGenerator`.
+  Single method `Pie<ShotLocation> Generate(PossessionState state)`. Both stub and real
+  generator implement it; Resolver holds the interface.
+
+- **`Generators/RollGStubPieGenerator.cs` (edit)** — single change: `: IRollGPieGenerator`
+  added to the class declaration. No behavior modification.
+
+- **`Generators/RollGGenerator.cs` (NEW)** — the matchup-aware Roll G pie generator. Reads the
+  shooter's five tendency attributes, routes them through the coaching seam (identity in v1),
+  then computes per-zone multipliers via `Matchup.LocationMultiplier` and renormalizes. Three
+  fallback paths: (1) no shooter → flat config stub pie; (2) shooter present, zero populated
+  defenders → normalized player tendencies with no matchup multiplier; (3) 1–5 defenders →
+  top-3 blend. The critical math finding: **uniform gaps cancel in renormalization** — if every
+  zone has the same gap, every multiplier is the same, and renormalization restores the original
+  tendency mix. Mix shifts only when gaps are *unequal* across zones, not when there is a
+  uniform level difference. D3 vs D3 and D1 vs D1 produce similar mixes; the weird stuff
+  happens when you mix levels AND the shapes are uneven.
+
+- **`Core/Resolver.cs` (edit)** — two surgical type changes: `_rollGGenerator` field and ctor
+  param changed from `RollGStubPieGenerator` to `IRollGPieGenerator`. All else unchanged.
+
+- **`Harness/Program.cs` (edit)** — several changes:
+  - `SeatStartersFromConfig(game, configPath)` helper added. Mirrors the seating loop in
+    `Phase1RosterCheck`. Must be called after `GameState` construction and before any
+    generator that reads `PlayerAt`.
+  - Called in `Main` (between `game` creation and generator construction) and in `RunGame`
+    (harmless future-proofing; generators there remain stubs for now).
+  - Main's early `var rollGGenerator = new RollGStubPieGenerator(cfgG)` removed; replaced by
+    `var rollGGenerator = new RollGGenerator(cfgG, cfgMatchup, game)` after `cfgMatchup` and
+    the seating call. Variable name `cfgMatchup` preserved (important: `cfgM` already names
+    `RollMConfig` in Main).
+  - All three `Mk()` helpers (Phase 6, 7, 8) extended with five new optional tendency params.
+  - `RunThreePointBatch` player constructions gained `FoulDrawing = 50` (carry-forward miss
+    from Phase 8) and the five new tendency fields (defaulting to 50).
+  - `RollGLocationBatchCheck` switched to option (ii): constructs its own stub internally so
+    the baseline regression stays flat regardless of what Main's live chain does. The `genG`
+    parameter was removed; the function now takes `(cfg, cfgG, state)`.
+  - `Phase9LocationDoorCheck` — new check (8 sub-checks), wired into `Main` after
+    `Phase8FoulDoorCheck`.
+  - `RollHResolutionBatchCheck` — Phase 9 required a fix: `SeatStartersFromConfig` now seats
+    real players in Main's `game` before `rollHGenerator` is constructed. The check used the
+    passed `rollHGenerator` (tied to a now-populated game) and expected values calibrated
+    against neutral/stub behavior. Fix: the check now constructs its own isolated
+    `RollHGenerator` with an empty local game, so PlayerAt returns null, the generator falls
+    back to stub rates, and the calibrated expected values remain valid. The Phase 6/7/8
+    matchup checks construct their own isolated setups and were unaffected.
+
+- **`Harness/config.json` (edit)** — `Matchup` section: five new Phase 9 fields. `Rosters`
+  section: all 10 players given all five tendency fields, varied by archetype (post bigs: high
+  Rim/Short; catch-and-shoot wings: high Three; guards/creators: balanced leaning Three+Mid;
+  versatile wings: balanced all five).
+
+**The ratio-form multiplier (v2 fix, critical).** An earlier draft used an additive form
+(`1 + tanh(shift) × Range`) with `LocationRange = 1.5`, which could produce negative
+multipliers (lower asymptote `1 − 1.5 = −0.5`). The ratio form:
+`exp(log(MaxMultiplier) × tanh(shift / ReferenceShift))` is **bounded in
+(1/Max, Max), exactly 1.0 at zero gap, and can NEVER go negative.** With `MaxMultiplier = 2.5`
+the range is `(0.4, 2.5)`. Python pre-check confirmed: extreme positive (fin=99 vs rimP=1) →
+2.491, extreme negative (fin=1 vs rimP=99) → 0.401, zero gap → 1.000 exactly.
+
+**Harness (two runs, both green).** First run failed on `RollHResolutionBatchCheck`:
+observed Made rate was 48.4% vs expected 36.5%. Root cause: `SeatStartersFromConfig` now
+populates Main's game before `rollHGenerator` is constructed, so the real matchup fired with
+actual player attributes. The expected values were calibrated against neutral/stub behavior.
+Fix described above. Second run: **ALL CHECKS PASSED.**
+
+**Phase 9 sub-results (all from the second run):** (a) zero-gap exact (50.0000% vs expected
+50.0000%); (b) all-weak-rim defense raises rim share 24.993% > 20%; (c) Config B (1 elite + 3
+solid) resists more than Config A (1 elite + 4 weak), B rim share 17.6% < A rim share 19.9%;
+(d1) D1 finisher vs D3 weak-rim defense: rim rises 65.9% vs 50% tendency baseline; (d2) same-
+level matched control: mix stays within 4.6pp of baseline; (d3) uniform D1 vs D3 (everyone
+75 vs 45): diff = 0.000% confirming uniform gaps cancel; (e1) zero defenders: 20.0000% exact;
+(e2) one elite rim defender: rim 14.2% < 20%; (e3) one elite + two normal: rim 17.9% > 14.2%
+(elite diluted — counterintuitive but correct, one elite alone gets 100% blend weight); (f)
+coaching seam identity confirmed (30,40,50,60,70); (g) Roll H regression valid; (h) negative-
+multiplier guard confirmed (2.491 < 2.5, 0.401 > 0.400).
+
+**The counterintuitive DEC-6 finding (sub-check e).** One elite rim defender in a slot-1-only
+roster suppresses rim attempts MORE than the same elite defender plus two average helpers.
+This is correct: with one defender, the blend renormalizes his weight to 1.0 (he carries
+everything). With three populated defenders, his weight is diluted to 0.55, and the two average
+defenders (RimProtection=50) pull the blended resistance down from 99 toward 77. The engine
+treats "1 elite, no help" as "the elite is everywhere because there's no one else to cover for."
+This is not a bug.
+
+**Walls held / deferred:** shot location only — Roll H's three doors (make, block, foul), OOB
+rates, putback contests, and the rebound pie are unchanged. The coaching layer itself ships as
+an identity seam (`CoachProfile` empty, `CoachingPull.Apply` returns authored values). Per-zone
+blend weights are global for v1. `PossessionState.DefenderSlot` NOT promoted (Phase 9 reads
+the defending ROSTER, not a carried slot; slot-matched picker isn't relevant to the whole-team
+read). Roll G's `Execute` signature stays `(state, pie, rng)` — only the generator reads
+`GameState`.
+
+**Stub count note (surfaced at delivery, not a bug).** The prompt predicted 13 stub sites after
+the Main conversion; the actual count is 14. The discrepancy: when `RollGLocationBatchCheck`
+was updated to option (ii), it gained its own `new RollGStubPieGenerator(cfgG)` construction
+inside the function body — a new site that replaced the one previously passed as a parameter
+from line 39 of Main. Net effect: Main's line 39 was removed (−1) and the check function gained
+one (+1), holding the count at 14. Behavior is correct: 1 real generator site in Main, 13
+stub-only check sites plus 1 baseline-regression site inside `RollGLocationBatchCheck`.
+
 ## Session 39 — Phase 8: the foul door (2026-06-15)
 
 **A build (CONVENTIONS §0–§3) — code + harness, all green.** The third matchup door is now wired:

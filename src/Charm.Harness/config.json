@@ -192,7 +192,12 @@
     "FoulReferenceShift": 20.0,
     "OffenseFoulWeight": 0.8,
     "DefenseFoulWeight": 0.2,
-    "AttributeMidpoint": 50.0
+    "AttributeMidpoint": 50.0,
+    "LocationBlendFirst": 0.55,
+    "LocationBlendSecond": 0.3,
+    "LocationBlendThird": 0.15,
+    "LocationReferenceShift": 20.0,
+    "LocationMaxMultiplier": 2.5
   },
   "RollI": {
     "DefensiveRebound": 0.66,
@@ -323,7 +328,12 @@
         "Hustle": 70,
         "BasketballIQ": 82,
         "Discipline": 75,
-        "FoulDrawing": 45
+        "FoulDrawing": 45,
+        "RimTendency": 35,
+        "ShortTendency": 20,
+        "MidTendency": 35,
+        "LongTendency": 15,
+        "ThreeTendency": 50
       },
       {
         "Name": "DeShawn Pryor",
@@ -357,7 +367,12 @@
         "Hustle": 76,
         "BasketballIQ": 70,
         "Discipline": 68,
-        "FoulDrawing": 55
+        "FoulDrawing": 55,
+        "RimTendency": 40,
+        "ShortTendency": 30,
+        "MidTendency": 30,
+        "LongTendency": 20,
+        "ThreeTendency": 40
       },
       {
         "Name": "Trey Holloway",
@@ -391,7 +406,12 @@
         "Hustle": 80,
         "BasketballIQ": 65,
         "Discipline": 62,
-        "FoulDrawing": 62
+        "FoulDrawing": 62,
+        "RimTendency": 35,
+        "ShortTendency": 25,
+        "MidTendency": 35,
+        "LongTendency": 25,
+        "ThreeTendency": 45
       },
       {
         "Name": "Javon Okafor",
@@ -425,7 +445,12 @@
         "Hustle": 74,
         "BasketballIQ": 60,
         "Discipline": 58,
-        "FoulDrawing": 85
+        "FoulDrawing": 85,
+        "RimTendency": 80,
+        "ShortTendency": 65,
+        "MidTendency": 25,
+        "LongTendency": 10,
+        "ThreeTendency": 10
       },
       {
         "Name": "Cory Baptiste",
@@ -459,7 +484,12 @@
         "Hustle": 65,
         "BasketballIQ": 72,
         "Discipline": 70,
-        "FoulDrawing": 30
+        "FoulDrawing": 30,
+        "RimTendency": 20,
+        "ShortTendency": 15,
+        "MidTendency": 25,
+        "LongTendency": 20,
+        "ThreeTendency": 80
       }
     ],
     "Away": [
@@ -495,7 +525,12 @@
         "Hustle": 72,
         "BasketballIQ": 78,
         "Discipline": 72,
-        "FoulDrawing": 42
+        "FoulDrawing": 42,
+        "RimTendency": 38,
+        "ShortTendency": 22,
+        "MidTendency": 32,
+        "LongTendency": 18,
+        "ThreeTendency": 48
       },
       {
         "Name": "Rashid Monroe",
@@ -529,7 +564,12 @@
         "Hustle": 70,
         "BasketballIQ": 68,
         "Discipline": 65,
-        "FoulDrawing": 68
+        "FoulDrawing": 68,
+        "RimTendency": 42,
+        "ShortTendency": 28,
+        "MidTendency": 28,
+        "LongTendency": 22,
+        "ThreeTendency": 42
       },
       {
         "Name": "Antoine Dupree",
@@ -563,7 +603,12 @@
         "Hustle": 75,
         "BasketballIQ": 68,
         "Discipline": 65,
-        "FoulDrawing": 58
+        "FoulDrawing": 58,
+        "RimTendency": 38,
+        "ShortTendency": 30,
+        "MidTendency": 30,
+        "LongTendency": 22,
+        "ThreeTendency": 38
       },
       {
         "Name": "Darius Eze",
@@ -597,7 +642,12 @@
         "Hustle": 72,
         "BasketballIQ": 62,
         "Discipline": 55,
-        "FoulDrawing": 88
+        "FoulDrawing": 88,
+        "RimTendency": 75,
+        "ShortTendency": 60,
+        "MidTendency": 30,
+        "LongTendency": 12,
+        "ThreeTendency": 12
       },
       {
         "Name": "Malik Thornton",
@@ -631,7 +681,12 @@
         "Hustle": 62,
         "BasketballIQ": 70,
         "Discipline": 68,
-        "FoulDrawing": 28
+        "FoulDrawing": 28,
+        "RimTendency": 18,
+        "ShortTendency": 12,
+        "MidTendency": 22,
+        "LongTendency": 18,
+        "ThreeTendency": 82
       }
     ]
   }

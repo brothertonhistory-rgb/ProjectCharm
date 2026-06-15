@@ -58,6 +58,13 @@ public sealed class PlayerConfig
     public int BasketballIQ        { get; set; }
     public int Discipline          { get; set; }
 
+    // Phase 9 — per-zone shot tendencies
+    public int RimTendency         { get; set; }
+    public int ShortTendency       { get; set; }
+    public int MidTendency         { get; set; }
+    public int LongTendency        { get; set; }
+    public int ThreeTendency       { get; set; }
+
     /// <summary>
     /// Convert this config DTO into the engine's domain <see cref="Player"/>
     /// object. All authored fields are transferred via init-setters; derived
@@ -96,6 +103,11 @@ public sealed class PlayerConfig
         Hustle              = Hustle,
         BasketballIQ        = BasketballIQ,
         Discipline          = Discipline,
+        RimTendency         = RimTendency,
+        ShortTendency       = ShortTendency,
+        MidTendency         = MidTendency,
+        LongTendency        = LongTendency,
+        ThreeTendency       = ThreeTendency,
     };
 }
 

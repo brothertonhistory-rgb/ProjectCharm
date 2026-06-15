@@ -93,6 +93,44 @@ public sealed class Player
     /// </summary>
     public int FoulDrawing { get; init; }
 
+    // -------------------------------------------------------------------------
+    // Phase 9 — per-zone shot tendencies (authored, 0–99)
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// How often this player wants to take rim attempts when given the choice.
+    /// Authored, 0–99, INDEPENDENT of <see cref="Finishing"/> (which governs
+    /// CONVERSION at the rim). Klay Thompson and Steph Curry can have similar
+    /// three-point conversion skill but very different ThreeTendency values — the
+    /// shot mix the engine produces reflects what a player WANTS to take, not
+    /// just what they're good at.
+    ///
+    /// <para><b>Phase 9 read:</b> RimTendency is one of the five per-zone
+    /// tendency baselines RollGGenerator normalizes and bends by the matchup
+    /// before producing the shot pie.</para>
+    /// </summary>
+    public int RimTendency { get; init; }
+
+    /// <summary>How often this player wants to take short attempts (floaters,
+    /// runners, hooks inside the paint but not at the rim). See
+    /// <see cref="RimTendency"/> for the skill/tendency-are-independent rule.</summary>
+    public int ShortTendency { get; init; }
+
+    /// <summary>How often this player wants to take mid-range attempts. See
+    /// <see cref="RimTendency"/>.</summary>
+    public int MidTendency { get; init; }
+
+    /// <summary>How often this player wants to take long-two attempts. See
+    /// <see cref="RimTendency"/>.</summary>
+    public int LongTendency { get; init; }
+
+    /// <summary>How often this player wants to take three-point attempts. See
+    /// <see cref="RimTendency"/>. A high <see cref="Outside"/> + low
+    /// ThreeTendency player is a skilled shooter who doesn't shoot much (catch-
+    /// and-shoot role); a low Outside + high ThreeTendency player is a volume
+    /// chucker.</summary>
+    public int ThreeTendency { get; init; }
+
     /// <summary>Ball security and control — turnover resistance, beating pressure.
     /// </summary>
     public int BallHandling { get; init; }
@@ -304,6 +342,17 @@ public sealed class Player
         Check(nameof(Finishing),           Finishing);
         Check(nameof(FreeThrow),           FreeThrow);
         Check(nameof(FoulDrawing),         FoulDrawing);
+        Check(nameof(RimTendency),         RimTendency);
+        Check(nameof(ShortTendency),       ShortTendency);
+        Check(nameof(MidTendency),         MidTendency);
+        Check(nameof(LongTendency),        LongTendency);
+        Check(nameof(ThreeTendency),       ThreeTendency);
+        // v2: every shooter must have non-zero total tendency. A JSON config
+        // missing all five fields would deserialize them as 0; without this rule
+        // Roll G would build an invalid pie at runtime instead of failing here.
+        var tendencySum = RimTendency + ShortTendency + MidTendency + LongTendency + ThreeTendency;
+        if (tendencySum <= 0)
+            errors.Add($"{Name}: tendency sum must be > 0 (all five zone tendencies are 0; check config).");
         Check(nameof(BallHandling),        BallHandling);
         Check(nameof(Passing),             Passing);
         Check(nameof(Playmaking),          Playmaking);
