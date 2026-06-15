@@ -186,4 +186,58 @@ public static class Matchup
         // -bend when bend is already negative returns a positive value, bending the wrong way.
         return baseBlockWeight + bend;
     }
+
+    /// <summary>
+    /// The matchup-aware foul rate for a shot attempt (Phase 8). Bends a per-zone
+    /// foul baseline toward a per-zone ceiling (shooter-favorable contest) or floor
+    /// (defender-favorable) using a tanh saturation.
+    ///
+    /// <para><b>Asymmetric contest (Phase 8 distinct shape).</b> Unlike Phase 6/7
+    /// which used a raw attribute gap, the foul contest uses asymmetrically-weighted
+    /// differences from a midpoint: offense-dominant (FoulDrawing carries the bigger
+    /// weight) and defender-light (Discipline carries the smaller one). This encodes
+    /// Emmett's basketball call that low foul-drawing isn't an active skill — it's
+    /// absence of opportunity — so the shooter's contribution dominates and the
+    /// defender's is a light tap. The single GLOBAL weight pair is uniform across
+    /// zones; per-zone variation in impact lives in the per-zone floors/ceilings
+    /// (narrow downward, wide upward).</para>
+    ///
+    /// <para><b>No physical anchor.</b> Unlike <see cref="EffectiveRating"/>
+    /// (Athleticism) and <see cref="BlockWeight"/> (Length), foul-drawing has no
+    /// physical term. The correlation between physical traits and foul-drawing lives
+    /// in attribute generation (a strong post player gets a high FoulDrawing rating),
+    /// not in the contest itself.</para>
+    ///
+    /// <para><b>Reuses <see cref="GapFn"/> with the skill parameters.</b>
+    /// Foul-drawing IS a skill contest — the FoulDrawing vs Discipline gap goes
+    /// through GapFn with SkillSteepness and SkillExponent, same as the make door.
+    /// The separate FoulReferenceShift governs the tanh saturation speed.</para>
+    ///
+    /// <para><b>Empty-defender fallback (DEC-6) is the caller's responsibility.</b>
+    /// This method assumes a populated defender; null-checking is upstream in
+    /// RollHGenerator (same pattern as <see cref="BlockWeight"/>).</para>
+    /// </summary>
+    public static double FoulRate(ShotLocation zone, Player shooter, Player defender,
+                                  double baseFoulRate, MatchupConfig cfg)
+    {
+        // Asymmetric contest: offense-dominant (FoulDrawing) minus defense-light (Discipline),
+        // both expressed as deviations from AttributeMidpoint so an average player (50)
+        // contributes zero. Positive contestValue = shooter edge = bends rate up.
+        var contestValue = cfg.OffenseFoulWeight * (shooter.FoulDrawing - cfg.AttributeMidpoint)
+                         - cfg.DefenseFoulWeight * (defender.Discipline  - cfg.AttributeMidpoint);
+
+        // Reuse the skill gap-function parameters — foul-drawing IS a skill contest.
+        var shift = GapFn(contestValue, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+
+        // Tanh saturation toward ceiling (shooter edge) or floor (defender edge).
+        var ceiling = cfg.FoulCeiling(zone);
+        var floor   = cfg.FoulFloor(zone);
+        var span    = shift >= 0.0 ? (ceiling - baseFoulRate) : (baseFoulRate - floor);
+        var bend    = span * Math.Tanh(shift / cfg.FoulReferenceShift);
+
+        // Plain addition — tanh supplies the sign. The Session 38 lesson:
+        // do NOT write `bend if shift >= 0 else -bend` — bend is already negative
+        // when shift is negative, and -bend would flip it the wrong way.
+        return baseFoulRate + bend;
+    }
 }

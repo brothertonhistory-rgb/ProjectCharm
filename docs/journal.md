@@ -1,3 +1,85 @@
+## Session 39 — Phase 8: the foul door (2026-06-15)
+
+**A build (CONVENTIONS §0–§3) — code + harness, all green.** The third matchup door is now wired:
+**shooting fouls** are matchup-aware. A foul-magnet (high `FoulDrawing`) going up strong at the rim
+against an undisciplined defender draws fouls far more often than a catch-and-shoot wing at the three;
+before this session the foul rate was a flat per-zone number regardless of who was shooting or defending.
+Phase 8 also fixes a related basketball-wrong flatness: the foul rate was the same at every zone (7%
+everywhere), when in reality three-point shooters almost never draw shooting fouls and rim attempts draw
+them constantly.
+
+**What landed (9 files):**
+- **`Core/Player.cs` (edit)** — one new authored `int` attribute: `FoulDrawing` (0–99), placed near
+  `Finishing` and `FreeThrow`. Comment notes the asymmetry: low `FoulDrawing` is NOT a skill, it is
+  absence of opportunity — the model encodes this via narrow downward floors, not by reducing the
+  attribute's effect. Validation check added.
+- **`Config/RosterConfig.cs` (edit)** — `FoulDrawing` added to `PlayerConfig` DTO and `ToPlayer()`
+  mapping.
+- **`Config/RollHConfig.cs` (edit)** — `BaseMadeAndFouled` and `BaseMissFouled` **retired** (5 touch
+  sites gone, stale-ref grep returns zero). Replaced by 10 new per-zone fields: `FoulRim/Short/Mid/
+  Long/Three` (foul baselines, replaces the flat ~7% blob with a 20%/10%/5%/3%/1.5% spread) and
+  `MafFractionRim/Short/Mid/Long/Three` (the and-1 split — how much of a drawn foul becomes a
+  MadeAndFouled vs MissFouled; rim 35%, three 10%). Both exposed via `FoulRate(zone)` and
+  `MafFraction(zone)` accessor methods mirroring `BlockWeight(zone)`.
+- **`Config/MatchupConfig.cs` (edit)** — 14 new Phase 8 fields: per-zone foul floor (5) and ceiling (5)
+  encoding the asymmetry (floors close to baseline, ceilings far above), `FoulReferenceShift` (tanh
+  saturation knob, default 20.0), `OffenseFoulWeight` (0.80), `DefenseFoulWeight` (0.20), and
+  `AttributeMidpoint` (50.0). `Load` extended with invariants: weights sum to 1.0, floor ≥ 0,
+  ceiling > floor, shift > 0, midpoint > 0.
+- **`Core/Matchup.cs` (edit)** — `FoulRate(zone, shooter, defender, baseFoulRate, cfg)` added as a
+  pure static method. Distinct shape from Phases 6 and 7: offense-dominant asymmetric weights rather
+  than a raw attribute gap, both sides expressed as deviations from `AttributeMidpoint` so an average
+  player (50) contributes zero. No physical anchor — Emmett's call that foul-drawing's correlation with
+  size lives in attribute generation, not in the contest. Reuses `GapFn` with the skill parameters.
+  Same tanh saturation shape as Phase 7 (plain addition — no sign conditional, tanh already supplies
+  the sign, same Session 38 lesson that caught the Phase 7 bug).
+- **`Generators/RollHGenerator.cs` (edit)** — `Generate` now computes `foulRate` via `Matchup.FoulRate`
+  (or `_cfg.FoulRate(zone)` for the DEC-6 empty-slot fallback, same shape as block and make doors).
+  `BuildRealPie` signature gains a `foulRate` parameter; the carve math changes from one-carve (block)
+  to two-carve (block + foul): `nonBlockNonFoul = 1 − block − foul`; `made = makePct × nonBlockNonFoul`;
+  `maf = foul × MafFraction(zone)`; `missFouled = foul × (1 − MafFraction)`; `Miss/OOB×2` scale to
+  fill the rest. `BuildStubPie` and `BuildPutbackPie` rewired to use per-zone `FoulRate`/`MafFraction`
+  (same carve math, no matchup — stub and putback paths have no defender data). Overflow guard added:
+  throws if `block + foul ≥ 1`.
+- **`Generators/RollHStubPieGenerator.cs` (edit)** — same Phase 8 carve logic applied to the
+  matchup-blind stub path.
+- **`Harness/Program.cs` (edit)** — `RollHBatchCheck` expected values rewritten to use Phase 8 carve
+  math (zone-blended `FoulRate` and `MafFraction` instead of the retired flat fields). Both
+  `Phase6MatchupWiringCheck` and `Phase7BlockDoorCheck` Mk() helpers updated with `FoulDrawing`
+  parameter. `RollKPutbackPieCheck` expected values updated to Phase 8 carve math (was the sole failure
+  on the first harness run — a preexisting flat-Putback* expected array that the Phase 8 carve
+  displaced). New `Phase8FoulDoorCheck` (seven sub-checks) added and wired into `Main`.
+- **`Harness/config.json` (edit)** — `FoulDrawing` added to all 10 players (varied by archetype: post
+  bigs 85–88, drivers 60–68, catch-and-shoot wings 28–30). `RollH` section: `BaseMadeAndFouled` and
+  `BaseMissFouled` removed, 10 new foul/MAF fields added. `Matchup` section: 14 new Phase 8 fields
+  added.
+
+**The putback failure on the first harness run.** `RollKPutbackPieCheck` compared the putback pie's
+slices against the old flat `Putback*` config values (e.g. expected `Made = 0.50` flat). After Phase 8,
+`BuildPutbackPie` applies the carve math (block off the top, foul off the top, remainder scaled), so the
+slice for `Made` is `PutbackMade × nonBlockNonFoul ≈ 0.365`, not `0.50`. The check's expected array was
+a preexisting assumption that Phase 8 invalidated. Fix: compute expected values in the harness using the
+same carve formula `BuildPutbackPie` uses. Second run: all green.
+
+**Harness — ALL CHECKS PASSED (second run).** Phase 8 sub-results: (a) shooter FD sweep @Rim monotone
+19.2% → 28.3%, below ceiling 35%, top noticeably above baseline 20%; (b) defender Disc sweep @Rim
+monotone 20.3% → 19.9%, above floor 17%, only slightly below baseline (small downward range confirmed);
+(c) asymmetry up_bend 6.8% vs down_bend 0.09% — up > 3× down, confirming "low FoulDrawing is not an
+active skill"; (d) Three spread 1.6% vs Rim spread 9.1% — zone differentiation working; (e) DEC-6
+fallback exact baseline, even matchup exact baseline, elite drawer 26.8% > 22%; (f) MAF split at Rim:
+14,502 fouled outcomes, 35.00% MAF vs expected 35.00% (exact); (g) regression — elite finisher vs
+weak rim protector still produces a valid pie and 76.2% make+and-1. Phase 6 and Phase 7 unchanged.
+`RollHBatchCheck` all green with the new per-zone expected values.
+
+**Walls held / deferred:** shooting fouls only — OOB rates, block weight, make %, location, and the
+rebound pie remain matchup-blind. Per-player foul tracking (individual foul trouble, the "2-in-1st-half"
+cascade) is its own future session requiring a personal foul ledger that doesn't exist yet (team fouls
+via `FoulTracker`; individual fouls deferred). `PossessionState.DefenderSlot` NOT promoted — Phase 8 is
+the third matchup-aware door but still reuses the single-consumer slot-guards-slot picker (promotion bar
+still "a second independent consumer"). No per-zone foul contest weights — Emmett's call: one global
+offense-dominant pair, per-zone variation in impact lives in the floors/ceilings. No physical anchor on
+the foul contest — Emmett's call: foul-drawing's correlation with size lives in attribute generation.
+
 ## Session 38 — Phase 7: the block door (2026-06-15)
 
 **A build (CONVENTIONS §0–§3) — code + harness, all green.** The second matchup door is now wired:

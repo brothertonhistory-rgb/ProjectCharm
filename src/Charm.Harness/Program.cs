@@ -122,6 +122,7 @@ internal static class Program
         ok &= Phase2AttributeWiringCheck(configPath);
         ok &= Phase6MatchupWiringCheck(configPath);
         ok &= Phase7BlockDoorCheck(configPath);
+        ok &= Phase8FoulDoorCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -1361,14 +1362,34 @@ internal static class Program
         };
         var blendedBlock = 0.0;
         foreach (var (z, p) in zoneP) blendedBlock += p * cfgH.BlockWeight(z);
-        var makeScale = 1.0 - blendedBlock;
+
+        // Phase 8: blended foul rate and MAF/MissFouled split, weighted by zone probability.
+        var blendedFoul = 0.0;
+        var blendedMaf  = 0.0;
+        foreach (var (z, p) in zoneP)
+        {
+            var f = cfgH.FoulRate(z);
+            var m = cfgH.MafFraction(z);
+            blendedFoul += p * f;
+            blendedMaf  += p * f * m;
+        }
+        var blendedMissFouled = blendedFoul - blendedMaf;
+        var nonBlockNonFoul   = 1.0 - blendedBlock - blendedFoul;
+
+        // Made: BaseMade is the conversion rate given not blocked AND not fouled.
+        var blendedMade  = cfgH.BaseMade * nonBlockNonFoul;
+
+        // Miss and OOB: fill nonBlockNonFoul - Made, preserving relative proportions.
+        var nonMadeBase  = cfgH.BaseMiss + cfgH.BaseMissOutOfBoundsLost + cfgH.BaseMissOutOfBoundsRetained;
+        var nonMadeShare = nonBlockNonFoul - blendedMade;
+        var makeScale    = nonMadeBase > 0.0 ? nonMadeShare / nonMadeBase : 0.0;
 
         var expected = new Dictionary<ShotResult, double>
         {
-            [ShotResult.Made] = cfgH.BaseMade * makeScale,
-            [ShotResult.MadeAndFouled] = cfgH.BaseMadeAndFouled * makeScale,
+            [ShotResult.Made] = blendedMade,
+            [ShotResult.MadeAndFouled] = blendedMaf,
             [ShotResult.Miss] = cfgH.BaseMiss * makeScale,
-            [ShotResult.MissFouled] = cfgH.BaseMissFouled * makeScale,
+            [ShotResult.MissFouled] = blendedMissFouled,
             [ShotResult.MissOutOfBoundsLost] = cfgH.BaseMissOutOfBoundsLost * makeScale,
             [ShotResult.MissOutOfBoundsRetained] = cfgH.BaseMissOutOfBoundsRetained * makeScale,
             [ShotResult.Blocked] = blendedBlock,
@@ -2973,18 +2994,31 @@ internal static class Program
         var normalMap = normalPie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
         var putbackMap = putbackPie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
 
+        // Phase 8: expected values use the same carve-then-convert math as BuildPutbackPie.
+        // PutbackMade is the conversion rate GIVEN not blocked AND not fouled.
+        var pbBlock           = cfgH.PutbackBlocked;
+        var pbFoul            = cfgH.FoulRate(ShotLocation.Rim);
+        var pbNonBlockNonFoul = 1.0 - pbBlock - pbFoul;
+        var pbMade        = cfgH.PutbackMade * pbNonBlockNonFoul;
+        var pbMafFrac     = cfgH.MafFraction(ShotLocation.Rim);
+        var pbMaf         = pbFoul * pbMafFrac;
+        var pbMissFouled  = pbFoul * (1.0 - pbMafFrac);
+        var pbNonMadeBase = cfgH.PutbackMiss + cfgH.PutbackMissOutOfBoundsLost + cfgH.PutbackMissOutOfBoundsRetained;
+        var pbNonMadeShare = pbNonBlockNonFoul - pbMade;
+        var pbScale       = pbNonMadeBase > 0.0 ? pbNonMadeShare / pbNonMadeBase : 0.0;
+
         var expected = new[]
         {
-            (ShotResult.Made, cfgH.PutbackMade),
-            (ShotResult.MadeAndFouled, cfgH.PutbackMadeAndFouled),
-            (ShotResult.Miss, cfgH.PutbackMiss),
-            (ShotResult.MissFouled, cfgH.PutbackMissFouled),
-            (ShotResult.MissOutOfBoundsLost, cfgH.PutbackMissOutOfBoundsLost),
-            (ShotResult.MissOutOfBoundsRetained, cfgH.PutbackMissOutOfBoundsRetained),
-            (ShotResult.Blocked, cfgH.PutbackBlocked),
+            (ShotResult.Made,                    pbMade),
+            (ShotResult.MadeAndFouled,           pbMaf),
+            (ShotResult.Miss,                    cfgH.PutbackMiss                    * pbScale),
+            (ShotResult.MissFouled,              pbMissFouled),
+            (ShotResult.MissOutOfBoundsLost,     cfgH.PutbackMissOutOfBoundsLost     * pbScale),
+            (ShotResult.MissOutOfBoundsRetained, cfgH.PutbackMissOutOfBoundsRetained * pbScale),
+            (ShotResult.Blocked,                 pbBlock),
         };
 
-        // 1) Selection: the putback pie equals its configured Putback* weights.
+        // 1) Selection: the putback pie matches the Phase 8 carve-computed weights.
         var selectionOk = true;
         foreach (var (o, w) in expected)
             if (Math.Abs(putbackMap[o] - w) > cfgH.Epsilon) selectionOk = false;
@@ -4308,10 +4342,12 @@ internal static class Program
         // athletic attrs (Athleticism's source) via `ath`. Mirrors MakeGame's full initializer so
         // no attribute is left at 0; athletic attrs stay equal => physical gap 0 unless `ath` is set.
         static Player Mk(int b, int? outside = null, int? mid = null, int? close = null, int? fin = null,
-                         int? perimD = null, int? postD = null, int? rimP = null, int? ath = null)
+                         int? perimD = null, int? postD = null, int? rimP = null, int? ath = null,
+                         int? foulDrawing = null)
             => new Player("p")
             {
                 Outside = outside ?? b, Mid = mid ?? b, Close = close ?? b, Finishing = fin ?? b, FreeThrow = b,
+                FoulDrawing = foulDrawing ?? b,
                 BallHandling = b, Passing = b, Playmaking = b, SelfCreation = b, PostMoves = b,
                 OffBallMovement = b, Screening = b, OffensiveRebounding = b,
                 PerimeterDefense = perimD ?? b, PostDefense = postD ?? b, RimProtection = rimP ?? b,
@@ -4531,10 +4567,12 @@ internal static class Program
         static Player Mk(int b,
                          int? fin = null, int? outside = null,
                          int? rimP = null, int? perimD = null,
-                         int? h = null, int? ws = null, int? v = null)
+                         int? h = null, int? ws = null, int? v = null,
+                         int? foulDrawing = null)
             => new Player("p")
             {
                 Outside = outside ?? b, Mid = b, Close = b, Finishing = fin ?? b, FreeThrow = b,
+                FoulDrawing = foulDrawing ?? b,
                 BallHandling = b, Passing = b, Playmaking = b, SelfCreation = b, PostMoves = b,
                 OffBallMovement = b, Screening = b, OffensiveRebounding = b,
                 PerimeterDefense = perimD ?? b, PostDefense = b, RimProtection = rimP ?? b,
@@ -4744,6 +4782,245 @@ internal static class Program
         pass &= fOk;
 
         Console.WriteLine(pass ? "  Phase 7 PASSED." : "  Phase 7 FAILED.");
+        return pass;
+    }
+
+    private static bool Phase8FoulDoorCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 8: Foul door (matchup-aware foul rate) ---");
+        var pass = true;
+
+        var cfgH = RollHConfig.Load(configPath);
+        var cfgM = MatchupConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+
+        // Helper: build a player with all attributes at baseline b, overriding only
+        // the named ones. FoulDrawing and Discipline are the foul-door attributes.
+        // Height/Wingspan/Vertical are included so block math stays valid in regression.
+        static Player Mk(int b,
+                         int? fd = null, int? disc = null,
+                         int? fin = null, int? rimP = null,
+                         int? h = null, int? ws = null, int? v = null,
+                         int? foulDrawing = null)
+            => new Player("p")
+            {
+                Outside = b, Mid = b, Close = b, Finishing = fin ?? b, FreeThrow = b,
+                FoulDrawing = fd ?? foulDrawing ?? b,
+                BallHandling = b, Passing = b, Playmaking = b, SelfCreation = b, PostMoves = b,
+                OffBallMovement = b, Screening = b, OffensiveRebounding = b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = rimP ?? b,
+                DefensiveRebounding = b, Steals = b,
+                Height = h ?? b, Wingspan = ws ?? b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = v ?? b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = disc ?? b
+            };
+
+        // Shorthand: the matchup foul rate for a zone, shooter, defender.
+        double FR(ShotLocation z, Player s, Player d)
+            => Matchup.FoulRate(z, s, d, cfgH.FoulRate(z), cfgM);
+
+        var rimBaseline = cfgH.FoulRate(ShotLocation.Rim);
+        var rimCeiling  = cfgM.FoulCeiling(ShotLocation.Rim);
+        var rimFloor    = cfgM.FoulFloor(ShotLocation.Rim);
+
+        // ----------------------------------------------------------------
+        // (a) Shooter FoulDrawing sweep @Rim (UP, large bend).
+        //     Fix defender (all=50, Discipline=50). Sweep FD 20->95.
+        //     Foul rate must rise monotonically and stay below ceiling.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (a) Shooter sweep @Rim (fix defender Disc=50, sweep FD 20..95):");
+        var defA = Mk(50);
+        double prevA = double.NegativeInfinity;
+        var monoA = true;
+        var ceilA = true;
+        foreach (var fd in new[] { 20, 30, 40, 50, 60, 70, 80, 90, 95 })
+        {
+            var fr = FR(ShotLocation.Rim, Mk(50, fd: fd), defA);
+            Console.WriteLine($"      FD={fd,2}  foulRate={fr:P3}");
+            if (fr <= prevA) { monoA = false; Console.WriteLine($"        FAIL — not strictly increasing (prev={prevA:P3})"); }
+            if (fr >= rimCeiling) { ceilA = false; Console.WriteLine($"        FAIL — crossed the ceiling {rimCeiling:P3}"); }
+            prevA = fr;
+        }
+        var topA = FR(ShotLocation.Rim, Mk(50, fd: 95), defA);
+        var topNearCeiling = topA > rimBaseline + 0.05;  // noticeably above baseline
+        if (monoA && ceilA && topNearCeiling)
+            Console.WriteLine($"      OK — monotonically rising; top={topA:P3} well above baseline={rimBaseline:P3}; below ceiling={rimCeiling:P3}.");
+        if (!monoA) Console.WriteLine("  FAIL  (a) not monotonically increasing.");
+        if (!ceilA) Console.WriteLine("  FAIL  (a) crossed the ceiling.");
+        if (!topNearCeiling) Console.WriteLine($"  FAIL  (a) top of sweep ({topA:P3}) not noticeably above baseline ({rimBaseline:P3}).");
+        pass &= monoA && ceilA && topNearCeiling;
+
+        // ----------------------------------------------------------------
+        // (b) Defender Discipline sweep @Rim (DOWN, small bend).
+        //     Fix shooter (all=50, FD=50). Sweep Discipline 20->95.
+        //     Foul rate must fall monotonically and stay above floor.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (b) Defender sweep @Rim (fix shooter FD=50, sweep Disc 20..95):");
+        var shooterB = Mk(50);
+        double prevB = double.PositiveInfinity;
+        var monoB = true;
+        var floorB = true;
+        foreach (var disc in new[] { 20, 30, 40, 50, 60, 70, 80, 90, 95 })
+        {
+            var fr = FR(ShotLocation.Rim, shooterB, Mk(50, disc: disc));
+            Console.WriteLine($"      Disc={disc,2}  foulRate={fr:P3}");
+            if (fr >= prevB) { monoB = false; Console.WriteLine($"        FAIL — not strictly decreasing (prev={prevB:P3})"); }
+            if (fr <= rimFloor) { floorB = false; Console.WriteLine($"        FAIL — crossed the floor {rimFloor:P3}"); }
+            prevB = fr;
+        }
+        var bottomB = FR(ShotLocation.Rim, shooterB, Mk(50, disc: 95));
+        var bottomSlightlyBelow = bottomB < rimBaseline && bottomB > rimFloor;
+        if (monoB && floorB && bottomSlightlyBelow)
+            Console.WriteLine($"      OK — monotonically falling; bottom={bottomB:P3} only slightly below baseline={rimBaseline:P3}; above floor={rimFloor:P3}.");
+        if (!monoB) Console.WriteLine("  FAIL  (b) not monotonically decreasing.");
+        if (!floorB) Console.WriteLine("  FAIL  (b) crossed the floor.");
+        if (!bottomSlightlyBelow) Console.WriteLine($"  FAIL  (b) bottom ({bottomB:P3}) not in expected range ({rimFloor:P3}, {rimBaseline:P3}).");
+        pass &= monoB && floorB && bottomSlightlyBelow;
+
+        // ----------------------------------------------------------------
+        // (c) Asymmetry — bend up >> bend down.
+        //     An elite foul-drawer raises the rate more than an elite disciplined
+        //     defender lowers it. Encodes "low FoulDrawing is not a skill."
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (c) Asymmetry @Rim (up_bend > 3 x down_bend):");
+        var even     = FR(ShotLocation.Rim, Mk(50), Mk(50));
+        var upBend   = FR(ShotLocation.Rim, Mk(50, fd: 90), Mk(50)) - even;
+        var downBend = even - FR(ShotLocation.Rim, Mk(50), Mk(50, disc: 90));
+        Console.WriteLine($"      baseline={rimBaseline:P3}  up_bend (FD=90)={upBend:P3}  down_bend (Disc=90)={downBend:P3}");
+        var asymOk = upBend > 3.0 * downBend;
+        Console.WriteLine($"      up > 3x down? {upBend:P3} > {3.0 * downBend:P3} => {(asymOk ? "OK" : "FAIL")}");
+        Console.WriteLine("      Basketball: a weak shooter doesn't suppress fouls as much as an elite drawer raises them.");
+        if (!asymOk) Console.WriteLine("  FAIL  (c) asymmetry check failed.");
+        pass &= asymOk;
+
+        // ----------------------------------------------------------------
+        // (d) Three sweep — much smaller spread than Rim.
+        //     The per-zone foul impact is tiny at the three-point line.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (d) Three spread vs Rim spread (Three << Rim):");
+        var defD  = Mk(50);
+        var rimSpread = Enumerable.Range(0, 16).Select(i => FR(ShotLocation.Rim,   Mk(50, fd: 20 + i * 5), defD)).Max()
+                      - Enumerable.Range(0, 16).Select(i => FR(ShotLocation.Rim,   Mk(50, fd: 20 + i * 5), defD)).Min();
+        var thrSpread = Enumerable.Range(0, 16).Select(i => FR(ShotLocation.Three, Mk(50, fd: 20 + i * 5), defD)).Max()
+                      - Enumerable.Range(0, 16).Select(i => FR(ShotLocation.Three, Mk(50, fd: 20 + i * 5), defD)).Min();
+        Console.WriteLine($"      Rim spread={rimSpread:P3}   Three spread={thrSpread:P3}");
+        var spreadOk = thrSpread < rimSpread;
+        Console.WriteLine($"      Three spread < Rim spread? {(spreadOk ? "ok" : "FAIL")}");
+        if (!spreadOk) Console.WriteLine("  FAIL  (d) Three spread not smaller than Rim spread.");
+        pass &= spreadOk;
+
+        // ----------------------------------------------------------------
+        // (e) DEC-6 fallback — baseline for empty defender; baseline for even matchup;
+        //     elite foul-drawer > baseline + 0.02 at Rim.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (e) DEC-6 fallback and baseline checks @Rim:");
+        var emptyFallback   = cfgH.FoulRate(ShotLocation.Rim);   // DEC-6: no matchup call
+        var evenMatchup     = FR(ShotLocation.Rim, Mk(50), Mk(50));
+        var eliteDrawer     = FR(ShotLocation.Rim, Mk(50, fd: 90), Mk(50));
+        var fallbackOk      = Math.Abs(emptyFallback - rimBaseline) < 1e-9;
+        var evenOk          = Math.Abs(evenMatchup   - rimBaseline) < 1e-9;
+        var eliteOk         = eliteDrawer > rimBaseline + 0.02;
+        Console.WriteLine($"      empty (DEC-6) = {emptyFallback:P3}  (expect {rimBaseline:P3}): {(fallbackOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"      even matchup  = {evenMatchup:P3}  (expect {rimBaseline:P3}): {(evenOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"      elite FD=90   = {eliteDrawer:P3}  (expect > {rimBaseline + 0.02:P3}): {(eliteOk ? "ok" : "FAIL")}");
+        if (fallbackOk && evenOk && eliteOk)
+            Console.WriteLine("      OK — empty==baseline; even==baseline; elite drawer > baseline+0.02.");
+        pass &= fallbackOk && evenOk && eliteOk;
+
+        // ----------------------------------------------------------------
+        // (f) MAF/MissFouled split — batched check at Rim.
+        //     Run 50,000 possessions through the real generator with an elite
+        //     foul-drawer vs sloppy defender (high foul rate for signal). Of all
+        //     fouled-shot outcomes, assert MAF fraction ~= MafFractionRim.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (f) MAF/MissFouled split @Rim (50k possessions, elite FD=90 vs Disc=20):");
+        var fOk = true;
+        try
+        {
+            var gF = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            gF.SetPossessionArrow(TeamSide.Home);
+            gF.HomeRoster.SetStarter(gF.HomeLineup.SlotAt(1), Mk(50, fd: 90));
+            gF.AwayRoster.SetStarter(gF.AwayLineup.SlotAt(1), Mk(50, disc: 20));
+            var genF    = new RollHGenerator(cfgH, cfgM, gF);
+            var stateF  = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, ShotType: ShotLocation.Rim,
+                SelectedSlot: gF.HomeLineup.SlotAt(1));
+
+            var mafCount  = 0;
+            var mfCount   = 0;
+            for (var i = 0; i < 50_000; i++)
+            {
+                var pie = genF.Generate(stateF, putback: false);
+                var result = pie.Roll(new SystemRng(i).NextUnitInterval());
+                if (result == ShotResult.MadeAndFouled) mafCount++;
+                if (result == ShotResult.MissFouled)    mfCount++;
+            }
+            var totalFouled = mafCount + mfCount;
+            if (totalFouled < 100)
+            {
+                fOk = false;
+                Console.WriteLine($"  FAIL  (f) too few fouled outcomes ({totalFouled}) to measure split — check foul rate.");
+            }
+            else
+            {
+                var observedMafFrac = (double)mafCount / totalFouled;
+                var expectedMafFrac = cfgH.MafFraction(ShotLocation.Rim);
+                var splitGap = Math.Abs(observedMafFrac - expectedMafFrac);
+                var splitOk  = splitGap < 0.04;  // loose tolerance — split from a random subsample
+                Console.WriteLine($"      total fouled={totalFouled}  MAF={mafCount}  MissFouled={mfCount}");
+                Console.WriteLine($"      MAF fraction: observed={observedMafFrac:P2}  expected={expectedMafFrac:P2}  gap={splitGap:P2}  {(splitOk ? "ok" : "FAIL")}");
+                if (!splitOk) Console.WriteLine("  FAIL  (f) MAF fraction outside tolerance.");
+                fOk = splitOk;
+            }
+        }
+        catch (Exception ex)
+        {
+            fOk = false;
+            Console.WriteLine($"  FAIL  (f) threw: {ex.Message}");
+        }
+        pass &= fOk;
+
+        // ----------------------------------------------------------------
+        // (g) Regression — Phase 6 and Phase 7 still valid after Phase 8 carve change.
+        //     Elite finisher vs weak rim protector: make rate > 0.50, pie valid.
+        // ----------------------------------------------------------------
+        Console.WriteLine("  (g) Regression — Phase 6 + Phase 7 still valid after Phase 8 carve change:");
+        var gOk = true;
+        try
+        {
+            var gReg = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            gReg.SetPossessionArrow(TeamSide.Home);
+            gReg.HomeRoster.SetStarter(gReg.HomeLineup.SlotAt(1), Mk(50, fin: 99, h: 70, ws: 70, v: 70));
+            gReg.AwayRoster.SetStarter(gReg.AwayLineup.SlotAt(1), Mk(50, rimP: 10, h: 55, ws: 55, v: 55));
+            var genReg  = new RollHGenerator(cfgH, cfgM, gReg);
+            var stateReg = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, ShotType: ShotLocation.Rim,
+                SelectedSlot: gReg.HomeLineup.SlotAt(1));
+
+            var madeReg = 0;
+            for (var i = 0; i < 5_000; i++)
+            {
+                var pie = genReg.Generate(stateReg, putback: false);
+                var result = pie.Roll(new SystemRng(i).NextUnitInterval());
+                if (result is ShotResult.Made or ShotResult.MadeAndFouled) madeReg++;
+            }
+            var makeRate = (double)madeReg / 5_000;
+            Console.WriteLine($"      elite finisher vs weak rim protector @Rim: make/and-1={makeRate:P1}  (valid pie)");
+            var rateOk = makeRate > 0.50;
+            if (rateOk)  Console.WriteLine("      OK — valid pie; make+and-1 > 0.50 for extreme shooter edge.");
+            if (!rateOk) Console.WriteLine($"  FAIL  (g) make rate {makeRate:P1} is not > 0.50 for an extreme shooter edge.");
+            gOk = rateOk;
+        }
+        catch (Exception ex)
+        {
+            gOk = false;
+            Console.WriteLine($"  FAIL  (g) pie threw: {ex.Message}");
+        }
+        pass &= gOk;
+
+        Console.WriteLine(pass ? "  Phase 8 PASSED." : "  Phase 8 FAILED.");
         return pass;
     }
 }

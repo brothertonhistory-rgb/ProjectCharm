@@ -3090,3 +3090,134 @@ matchup-aware door but reuses the same picker, single consumer, derived at gener
 promotion bar is "a second *independent* consumer," not satisfied yet. The Athleticism/Length composite
 asymmetry is intentional, flagged in the code comments so the watchdog and future sessions don't try to
 "unify" them.
+
+## Phase 8 — The foul door (Session 39, 2026-06-15)
+
+Phase 8 makes the shooting-foul rate matchup-aware (the third Roll H matchup door, after make% in Phase 6
+and block weight in Phase 7) and simultaneously fixes the zone-flat foul-rate problem: a 7% foul rate
+regardless of zone was basketball-wrong (three-point shooters almost never draw shooting fouls; rim
+attacks draw them constantly).
+
+### The new attribute: FoulDrawing
+
+`FoulDrawing` (0–99) is the skill of generating shooting fouls — going up strong, initiating contact,
+selling the call. Emmett's basketball call: **low FoulDrawing is NOT a skill**; it is absence of
+opportunity. A catch-and-shoot wing who doesn't draw fouls isn't "bad at it" — he's just not in
+foul-drawing situations. The model encodes this asymmetry via per-zone floor/ceiling positions (narrow
+downward range, wide upward range), not via any special-casing of the attribute itself.
+
+### The contest — offense-dominant, asymmetric weights
+
+Two attributes participate in the foul contest:
+- **Shooter: `FoulDrawing`** — the dominant signal (weight 0.80).
+- **Defender: `Discipline`** — a light tap (weight 0.20).
+
+Both are expressed as deviations from an `AttributeMidpoint` (default 50.0), so an average player
+contributes zero:
+
+```
+contestValue = OffenseFoulWeight × (shooter.FoulDrawing − midpoint)
+             − DefenseFoulWeight × (defender.Discipline  − midpoint)
+```
+
+One global weight pair governs all five zones. Per-zone variation in foul *impact* lives entirely in
+the per-zone floors and ceilings — not in the weights. This is Emmett's explicit call against per-zone
+weight pairs.
+
+**No physical anchor.** Unlike Phase 6 (Athleticism) and Phase 7 (Length), the foul contest has no
+physical term. The correlation between size/strength and foul-drawing lives in attribute *generation*
+(a strong post player earns a high `FoulDrawing` rating because of how he plays), not in the contest
+itself. Strength and similar attributes were explicitly rejected from this formula.
+
+### The math — same GapFn, same tanh, different inputs
+
+```csharp
+var shift   = GapFn(contestValue, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+var ceiling = cfg.FoulCeiling(zone);
+var floor   = cfg.FoulFloor(zone);
+var span    = shift >= 0.0 ? (ceiling − baseFoulRate) : (baseFoulRate − floor);
+var bend    = span × Math.Tanh(shift / cfg.FoulReferenceShift);
+result      = baseFoulRate + bend;   // plain addition — tanh supplies the sign
+```
+
+Foul-drawing IS a skill contest, so the call reuses `GapFn` with the skill steepness and exponent —
+the same parameters the make door uses. The tanh saturation shape mirrors Phase 7 (plain addition, same
+Session 38 lesson: tanh is already odd and supplies the sign; a conditional flip would reverse the
+direction). `FoulReferenceShift` (default 20.0, same as `BlockReferenceShift`) is the saturation knob.
+
+### Per-zone baselines, floors, and ceilings
+
+The asymmetry — **narrow downward range, wide upward range** — encodes Emmett's basketball insight:
+
+| Zone  | Floor | Baseline | Ceiling |
+|-------|-------|----------|---------|
+| Rim   | 0.17  | 0.20     | 0.35    |
+| Short | 0.075 | 0.10     | 0.18    |
+| Mid   | 0.035 | 0.05     | 0.10    |
+| Long  | 0.02  | 0.03     | 0.06    |
+| Three | 0.008 | 0.015    | 0.04    |
+
+An elite foul-drawer can push the rim rate from 20% to 35% (15pp upward range). An elite disciplined
+defender can only push it from 20% to 17% (3pp downward range). The harness asymmetry check confirmed
+up_bend (6.8%) > 3× down_bend (0.09%) at Rim.
+
+### The and-1 split (MafFraction) — per-zone, not matchup-aware
+
+When a foul is drawn, a per-zone `MafFraction` splits it into `MadeAndFouled` (and-1, shot went in)
+and `MissFouled` (two-shot trip). This split is **not matchup-aware** — Emmett's call. It is a pure
+configuration:
+
+| Zone  | MafFraction |
+|-------|-------------|
+| Rim   | 0.35        |
+| Short | 0.28        |
+| Mid   | 0.18        |
+| Long  | 0.12        |
+| Three | 0.10        |
+
+Rim fouls become and-1s often (a layup finishing through contact). Three fouls rarely do (the shot is
+disrupted). All placeholders; calibration owns the magnitudes.
+
+### The carve math — extending Phase 7's carve-then-convert
+
+Phase 7 carved block off the top. Phase 8 carves block AND foul:
+
+```
+block           = matchup-aware block weight  (Phase 7)
+foul            = matchup-aware foul rate     (Phase 8)
+nonBlockNonFoul = 1 − block − foul
+
+made            = makePct × nonBlockNonFoul                  // clean unblocked-unfouled conversions
+maf             = foul × MafFraction(zone)                   // MadeAndFouled
+missFouled      = foul × (1 − MafFraction(zone))             // MissFouled
+nonMadeShare    = nonBlockNonFoul − made
+scale           = nonMadeShare / (BaseMiss + BaseMissOOBLost + BaseMissOOBRetained)
+```
+
+`Miss`, `MissOutOfBoundsLost`, and `MissOutOfBoundsRetained` scale to fill the remainder. The pie sums
+to 1 by construction for any (makePct, block, foul) triple where block + foul < 1. Max possible at Rim
+(block ceiling 30% + foul ceiling 35% = 65%) is well below 1; an overflow guard throws explicitly if
+`nonBlockNonFoul ≤ 0` (defense in depth).
+
+`BaseMadeAndFouled` and `BaseMissFouled` were retired from `RollHConfig` — their jobs are now done by
+`FoulRate(zone) × MafFraction(zone)` and `FoulRate(zone) × (1 − MafFraction(zone))`.
+
+### Stub and putback paths
+
+`BuildStubPie` (unpopulated roster) and `BuildPutbackPie` (offensive rebound putback) apply the same
+carve-then-convert math using the configured per-zone `FoulRate` and `MafFraction` directly — no matchup
+term, because these paths have no defender data. For putback (always Rim), `FoulRate(Rim)` and
+`MafFraction(Rim)` are used.
+
+The preexisting `RollKPutbackPieCheck` in the harness needed updating: it previously compared the putback
+pie's slices against the old flat `Putback*` config values; after Phase 8 those slices are computed by
+the carve formula. The expected values in the check were updated to match.
+
+### Scope walls held / deferred
+
+Shooting fouls only. OOB rates, block weight, make %, shot location, rebounding all remain matchup-blind.
+Individual player foul tracking ("foul trouble") requires a personal foul ledger that doesn't exist yet
+(only team fouls via `FoulTracker` are tracked). Per-zone foul contest weights were explicitly rejected
+by Emmett — one global offense-dominant pair; zone impact lives in floors/ceilings. Physical anchor
+(Strength) was explicitly rejected — correlation with size lives in attribute generation. `PossessionState.
+DefenderSlot` not promoted (three matchup-aware doors but all reuse the same single-consumer picker).

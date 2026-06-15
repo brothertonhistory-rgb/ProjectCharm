@@ -12,16 +12,13 @@ namespace Charm.Engine;
 public sealed class RollHConfig
 {
     // --- Stub pie base weights (placeholders; the real attribute-driven
-    //     generator will replace these). These six are the SHARED make/miss SHAPE
-    //     and sum to 1 among themselves. Per zone the generator carves the block
-    //     weight b(zone) off the top and scales these six by (1 − b(zone)), so
-    //     within a zone the make/miss shape is unchanged except for the block
-    //     carve-out. Location-BLIND otherwise (a future shooting-% pass owns
-    //     per-zone make/miss tuning). ---
+    //     generator will replace these). These FOUR are the SHARED make/miss SHAPE
+    //     for the non-foul, non-block outcomes and sum to less than 1 among themselves
+    //     (foul and block are carved separately in Phase 8). Per zone the generator
+    //     carves block(zone) and foul(zone) off the top and scales these three miss/OOB
+    //     weights by the remaining share. Location-BLIND otherwise. ---
     public double BaseMade { get; set; } = 0.43;
-    public double BaseMadeAndFouled { get; set; } = 0.03;
     public double BaseMiss { get; set; } = 0.47;
-    public double BaseMissFouled { get; set; } = 0.04;
     public double BaseMissOutOfBoundsLost { get; set; } = 0.02;
     public double BaseMissOutOfBoundsRetained { get; set; } = 0.01;
 
@@ -50,6 +47,57 @@ public sealed class RollHConfig
         ShotLocation.Long  => BlockLong,
         ShotLocation.Three => BlockThree,
         _ => throw new InvalidOperationException($"No block weight for zone '{zone}'.")
+    };
+
+    // --- Per-zone shooting-foul baseline (Phase 8). Replaces the flat
+    //     per-shooting-foul base weights. Three-point fouls are rare; rim
+    //     fouls are common — flatness was basketball-wrong. Placeholders.
+    //     The matchup-aware foul rate (Matchup.FoulRate) bends this baseline
+    //     toward a per-zone ceiling (foul-drawer edge) or floor (disciplined
+    //     defender edge), using MatchupConfig's new foul floor/ceiling fields. ---
+    public double FoulRim   { get; set; } = 0.20;
+    public double FoulShort { get; set; } = 0.10;
+    public double FoulMid   { get; set; } = 0.05;
+    public double FoulLong  { get; set; } = 0.03;
+    public double FoulThree { get; set; } = 0.015;
+
+    /// <summary>The shooting-foul baseline for a given shot location.
+    /// Single place the zone→foul-baseline mapping lives (generator and harness
+    /// read the same numbers). Phase 8's Matchup.FoulRate bends this per matchup;
+    /// this value is the DEC-6 fallback and the midpoint for the tanh bend.</summary>
+    public double FoulRate(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => FoulRim,
+        ShotLocation.Short => FoulShort,
+        ShotLocation.Mid   => FoulMid,
+        ShotLocation.Long  => FoulLong,
+        ShotLocation.Three => FoulThree,
+        _ => throw new InvalidOperationException($"No foul rate for zone '{zone}'.")
+    };
+
+    // --- Per-zone and-1 split (Phase 8). When a foul is drawn, the fraction
+    //     that becomes MadeAndFouled (and-1); the rest becomes MissFouled.
+    //     Rim fouls become and-1s often (layup through contact); three fouls
+    //     rarely (the shot is disrupted). NOT matchup-aware — Emmett's call.
+    //     Placeholders; magnitudes are calibration work. ---
+    public double MafFractionRim   { get; set; } = 0.35;
+    public double MafFractionShort { get; set; } = 0.28;
+    public double MafFractionMid   { get; set; } = 0.18;
+    public double MafFractionLong  { get; set; } = 0.12;
+    public double MafFractionThree { get; set; } = 0.10;
+
+    /// <summary>The and-1 fraction of a drawn foul (MadeAndFouled / total foul).
+    /// The complement (1 − MafFraction) becomes MissFouled.
+    /// Single place the zone→MAF-split lives; generator and harness read the same
+    /// numbers. NOT matchup-aware — per-zone config only.</summary>
+    public double MafFraction(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => MafFractionRim,
+        ShotLocation.Short => MafFractionShort,
+        ShotLocation.Mid   => MafFractionMid,
+        ShotLocation.Long  => MafFractionLong,
+        ShotLocation.Three => MafFractionThree,
+        _ => throw new InvalidOperationException($"No MAF fraction for zone '{zone}'.")
     };
 
     // --- Putback pie (Session 17). A go-back-up off an offensive rebound is a

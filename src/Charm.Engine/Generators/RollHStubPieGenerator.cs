@@ -2,34 +2,25 @@ namespace Charm.Engine;
 
 /// <summary>
 /// Stub pie generator for Roll H. Returns the configured weights as a finished
-/// SEVEN-way pie over <see cref="ShotResult"/>. The six make/miss outcomes are
-/// realistic placeholders; the seventh, <c>Blocked</c>, is sized PER ZONE.
+/// SEVEN-way pie over <see cref="ShotResult"/>. The make/miss outcomes are
+/// realistic placeholders; <c>Blocked</c> is sized PER ZONE.
 ///
 /// Zone-awareness (Session 13): this generator reads ONE stamp — the shot zone
 /// (<see cref="PossessionState.ShotType"/>, stamped by Roll G) — and uses it to
-/// size the block slice: Rim highest, Three lowest. The block weight b(zone) is
-/// carved off the top and the six make/miss weights are scaled by (1 − b(zone)),
-/// so within a zone the make/miss SHAPE is unchanged except for the block
-/// carve-out. The six make/miss outcomes themselves remain location-BLIND — a
-/// future shooting-% pass owns per-zone make/miss tuning. Apart from the zone, the
-/// generator reads no stamps and has NO live-wire scalar.
+/// size the block slice: Rim highest, Three lowest.
 ///
-/// Why no further live wire: the rest of what tilts Roll H's pie is the deferred
-/// player/attribute model — the shooter-vs-defender matchup, the other-six
-/// defensive-attention (gravity) term, the skill/athleticism gates, the bounded
-/// logistic make/miss mapping, and shot quality folded into the make percentage.
-/// Roll H sits exactly where that model expresses, so a placeholder wire here
-/// would pantomime the precise signal being deferred.
+/// Phase 8: the foul slice is also now per-zone, not flat. Block AND foul are carved
+/// off the top; the remaining three slices (Miss, OOBLost, OOBRetained) fill the rest,
+/// preserving their relative proportions. The foul total is split into MadeAndFouled
+/// (and-1) and MissFouled (two-shot trip) by the per-zone MafFraction — not matchup-
+/// aware. This path fires only when no roster is populated (matchup-blind by design).
 ///
 /// This is the seam, real and (mostly) flat: the Pie validates on construction
 /// (bad weights fail loud), and the real attribute-driven generator replaces this
-/// class later WITHOUT touching Roll H or the resolver — it just hands back a
-/// richer pie over the same enum (one that reads the carried SelectedSlot +
-/// ShotType to tilt the make %).
+/// class later WITHOUT touching Roll H or the resolver.
 ///
 /// Implements <see cref="IRollHPieGenerator"/> so the resolver holds the interface,
-/// not the concrete stub — swapping in the real generator only changes the
-/// construction site.
+/// not the concrete stub.
 /// </summary>
 public sealed class RollHStubPieGenerator : IRollHPieGenerator
 {
@@ -39,73 +30,87 @@ public sealed class RollHStubPieGenerator : IRollHPieGenerator
 
     /// <param name="state">The carried possession state. The generator reads ONE
     /// stamp off it — the shot ZONE (<see cref="PossessionState.ShotType"/>,
-    /// stamped by Roll G) — to size the block slice per zone. It still does NOT
-    /// read SelectedSlot; the full attribute-driven matchup tilt is the deferred
-    /// real generator. ShotType must be present (Roll G runs before Roll H in the
-    /// live chain); a null zone is a wiring bug and fails loud.</param>
-    /// <param name="putback">When true, the shot is an offensive-rebound PUTBACK
-    /// (Roll K stamped the ticket and forced the zone to Rim): return the DISTINCT
-    /// putback pie from config instead of the normal located-shot pie. The putback
-    /// pie is a flat seven-way placeholder with no per-zone block carve (a putback is
-    /// always Rim); the real make/foul percentages and the attribute tilt are the
-    /// deferred generator's job. Defaults to false, so every normal located shot
-    /// (Roll G's path) keeps the existing zone-carve pie byte-for-byte.</param>
+    /// stamped by Roll G) — to size the block and foul slices per zone. ShotType
+    /// must be present (Roll G runs before Roll H in the live chain); a null zone
+    /// is a wiring bug and fails loud.</param>
+    /// <param name="putback">When true, the shot is an offensive-rebound PUTBACK:
+    /// return the DISTINCT putback pie (always Rim, Phase 8 carve applied with Rim
+    /// foul baseline). Defaults to false.</param>
     public Pie<ShotResult> Generate(PossessionState state, bool putback = false)
     {
-        // Putback: a distinct shot population with its own make/miss/foul pie.
         if (putback)
             return BuildPutbackPie();
 
-        // Read the zone Roll G stamped, then look up its block weight b(zone).
         var zone = state.ShotType
             ?? throw new InvalidOperationException(
                 "RollH generator requires a stamped ShotType — Roll G must run before Roll H.");
-        var block = _cfg.BlockWeight(zone);
 
-        // Carve the block weight off the top; the six make/miss outcomes keep
-        // their RELATIVE proportions, scaled by (1 − block). Because the six base
-        // weights sum to 1, the scaled six sum to (1 − block), and adding the
-        // block slice brings the pie back to exactly 1 — so the Pie constructor's
-        // sum-to-one validation holds for any block in [0, 1).
-        var scale = 1.0 - block;
+        return BuildLocatedPie(zone);
+    }
+
+    private Pie<ShotResult> BuildLocatedPie(ShotLocation zone)
+    {
+        var block           = _cfg.BlockWeight(zone);
+        var foul            = _cfg.FoulRate(zone);
+        var nonBlockNonFoul = 1.0 - block - foul;
+
+        var made        = _cfg.BaseMade * nonBlockNonFoul;
+
+        var mafFraction = _cfg.MafFraction(zone);
+        var maf         = foul * mafFraction;
+        var missFouled  = foul * (1.0 - mafFraction);
+
+        var nonMadeBase  = _cfg.BaseMiss
+                         + _cfg.BaseMissOutOfBoundsLost
+                         + _cfg.BaseMissOutOfBoundsRetained;
+        var nonMadeShare = nonBlockNonFoul - made;
+        var scale        = nonMadeBase > 0.0 ? nonMadeShare / nonMadeBase : 0.0;
+
         var weights = new Dictionary<ShotResult, double>
         {
-            [ShotResult.Made]                   = _cfg.BaseMade                   * scale,
-            [ShotResult.MadeAndFouled]          = _cfg.BaseMadeAndFouled          * scale,
-            [ShotResult.Miss]                   = _cfg.BaseMiss                   * scale,
-            [ShotResult.MissFouled]             = _cfg.BaseMissFouled             * scale,
-            [ShotResult.MissOutOfBoundsLost]    = _cfg.BaseMissOutOfBoundsLost    * scale,
-            [ShotResult.MissOutOfBoundsRetained]= _cfg.BaseMissOutOfBoundsRetained* scale,
-            [ShotResult.Blocked]                = block,
+            [ShotResult.Made]                    = made,
+            [ShotResult.MadeAndFouled]           = maf,
+            [ShotResult.Miss]                    = _cfg.BaseMiss                    * scale,
+            [ShotResult.MissFouled]              = missFouled,
+            [ShotResult.MissOutOfBoundsLost]     = _cfg.BaseMissOutOfBoundsLost     * scale,
+            [ShotResult.MissOutOfBoundsRetained] = _cfg.BaseMissOutOfBoundsRetained * scale,
+            [ShotResult.Blocked]                 = block,
         };
 
-        // The Pie constructor validates the sum is 1 within Epsilon, so a bad
-        // shape (six bases not summing to 1, or a block ≥ 1) fails loud rather
-        // than rolling skewed.
         return new Pie<ShotResult>(weights, _cfg.Epsilon);
     }
 
     /// <summary>
-    /// Build the DISTINCT putback pie: a flat seven-way placeholder over the same
-    /// <see cref="ShotResult"/> enum, taken straight from the <c>Putback*</c> config
-    /// weights with NO per-zone block carve (a putback is always at the rim). This is
-    /// the seam where the real make/foul/and-1 percentages — and the attribute tilt
-    /// by the putback-er's size / athleticism / rim rating and the contesting
-    /// defender — drop in later; the roll and the resolver never change when they do.
-    /// The <see cref="Pie{TOutcome}"/> constructor validates sum-to-one, so a
-    /// misconfigured putback shape fails loud here.
+    /// Putback pie — Phase 8 carve applied using Rim foul baseline and MafFraction.
+    /// PutbackMade is the conversion rate given not blocked AND not fouled.
     /// </summary>
     private Pie<ShotResult> BuildPutbackPie()
     {
+        var block           = _cfg.PutbackBlocked;
+        var foul            = _cfg.FoulRate(ShotLocation.Rim);
+        var nonBlockNonFoul = 1.0 - block - foul;
+
+        var made        = _cfg.PutbackMade * nonBlockNonFoul;
+
+        var mafFraction = _cfg.MafFraction(ShotLocation.Rim);
+        var maf         = foul * mafFraction;
+        var missFouled  = foul * (1.0 - mafFraction);
+
+        var nonMadeBase  = _cfg.PutbackMiss
+                         + _cfg.PutbackMissOutOfBoundsLost
+                         + _cfg.PutbackMissOutOfBoundsRetained;
+        var nonMadeShare = nonBlockNonFoul - made;
+        var scale        = nonMadeBase > 0.0 ? nonMadeShare / nonMadeBase : 0.0;
+
         var weights = new Dictionary<ShotResult, double>
         {
-            [ShotResult.Made]                    = _cfg.PutbackMade,
-            [ShotResult.MadeAndFouled]           = _cfg.PutbackMadeAndFouled,
-            [ShotResult.Miss]                    = _cfg.PutbackMiss,
-            [ShotResult.MissFouled]              = _cfg.PutbackMissFouled,
-            [ShotResult.MissOutOfBoundsLost]     = _cfg.PutbackMissOutOfBoundsLost,
-            [ShotResult.MissOutOfBoundsRetained] = _cfg.PutbackMissOutOfBoundsRetained,
-            [ShotResult.Blocked]                 = _cfg.PutbackBlocked,
+            [ShotResult.Made]                    = made,
+            [ShotResult.MadeAndFouled]           = maf,
+            [ShotResult.Miss]                    = _cfg.PutbackMiss                    * scale,
+            [ShotResult.MissFouled]              = missFouled,
+            [ShotResult.MissOutOfBoundsLost]     = _cfg.PutbackMissOutOfBoundsLost     * scale,
+            [ShotResult.MissOutOfBoundsRetained] = _cfg.PutbackMissOutOfBoundsRetained * scale,
+            [ShotResult.Blocked]                 = block,
         };
 
         return new Pie<ShotResult>(weights, _cfg.Epsilon);

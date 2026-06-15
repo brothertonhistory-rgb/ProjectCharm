@@ -78,6 +78,21 @@ public sealed class Player
     /// shooter converts roughly 72% per attempt, no gravity or matchup term.</summary>
     public int FreeThrow { get; init; }
 
+    /// <summary>
+    /// The skill of generating shooting fouls — initiating contact, going up
+    /// strong, selling the call. Dominant on contact-heavy zones (Rim, Short),
+    /// nearly inert on perimeter (Three, Long) where shooting fouls are rare.
+    /// Read against the defender's <see cref="Discipline"/> in
+    /// <see cref="Matchup.FoulRate"/> with an offense-dominant weight pair.
+    ///
+    /// <para><b>Asymmetry (Emmett's basketball call).</b> Low FoulDrawing is NOT
+    /// a skill — it's absence of opportunity. The model encodes this through
+    /// per-zone foul floors close to baselines (see MatchupConfig.FoulFloor),
+    /// NOT by lowering this attribute's effect to zero. A 50-rated FoulDrawing
+    /// is "average opportunity for his role," not "actively bad at it."</para>
+    /// </summary>
+    public int FoulDrawing { get; init; }
+
     /// <summary>Ball security and control — turnover resistance, beating pressure.
     /// </summary>
     public int BallHandling { get; init; }
@@ -288,6 +303,7 @@ public sealed class Player
         Check(nameof(Outside),             Outside);
         Check(nameof(Finishing),           Finishing);
         Check(nameof(FreeThrow),           FreeThrow);
+        Check(nameof(FoulDrawing),         FoulDrawing);
         Check(nameof(BallHandling),        BallHandling);
         Check(nameof(Passing),             Passing);
         Check(nameof(Playmaking),          Playmaking);

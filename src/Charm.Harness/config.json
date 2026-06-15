@@ -107,9 +107,7 @@
   },
   "RollH": {
     "BaseMade": 0.43,
-    "BaseMadeAndFouled": 0.03,
     "BaseMiss": 0.47,
-    "BaseMissFouled": 0.04,
     "BaseMissOutOfBoundsLost": 0.02,
     "BaseMissOutOfBoundsRetained": 0.01,
     "BlockRim": 0.12,
@@ -124,7 +122,17 @@
     "PutbackMissOutOfBoundsLost": 0.01,
     "PutbackMissOutOfBoundsRetained": 0.01,
     "PutbackBlocked": 0.07,
-    "Epsilon": 1e-09
+    "Epsilon": 1e-09,
+    "FoulRim": 0.2,
+    "FoulShort": 0.1,
+    "FoulMid": 0.05,
+    "FoulLong": 0.03,
+    "FoulThree": 0.015,
+    "MafFractionRim": 0.35,
+    "MafFractionShort": 0.28,
+    "MafFractionMid": 0.18,
+    "MafFractionLong": 0.12,
+    "MafFractionThree": 0.1
   },
   "Matchup": {
     "SkillSteepness": 6.0,
@@ -170,7 +178,21 @@
     "BlockReferenceShift": 20.0,
     "LengthHeight": 0.3333333333333333,
     "LengthWingspan": 0.3333333333333333,
-    "LengthVertical": 0.3333333333333334
+    "LengthVertical": 0.3333333333333334,
+    "FoulFloorRim": 0.17,
+    "FoulCeilRim": 0.35,
+    "FoulFloorShort": 0.075,
+    "FoulCeilShort": 0.18,
+    "FoulFloorMid": 0.035,
+    "FoulCeilMid": 0.1,
+    "FoulFloorLong": 0.02,
+    "FoulCeilLong": 0.06,
+    "FoulFloorThree": 0.008,
+    "FoulCeilThree": 0.04,
+    "FoulReferenceShift": 20.0,
+    "OffenseFoulWeight": 0.8,
+    "DefenseFoulWeight": 0.2,
+    "AttributeMidpoint": 50.0
   },
   "RollI": {
     "DefensiveRebound": 0.66,
@@ -300,7 +322,8 @@
         "Endurance": 78,
         "Hustle": 70,
         "BasketballIQ": 82,
-        "Discipline": 75
+        "Discipline": 75,
+        "FoulDrawing": 45
       },
       {
         "Name": "DeShawn Pryor",
@@ -333,7 +356,8 @@
         "Endurance": 72,
         "Hustle": 76,
         "BasketballIQ": 70,
-        "Discipline": 68
+        "Discipline": 68,
+        "FoulDrawing": 55
       },
       {
         "Name": "Trey Holloway",
@@ -366,7 +390,8 @@
         "Endurance": 70,
         "Hustle": 80,
         "BasketballIQ": 65,
-        "Discipline": 62
+        "Discipline": 62,
+        "FoulDrawing": 62
       },
       {
         "Name": "Javon Okafor",
@@ -399,7 +424,8 @@
         "Endurance": 65,
         "Hustle": 74,
         "BasketballIQ": 60,
-        "Discipline": 58
+        "Discipline": 58,
+        "FoulDrawing": 85
       },
       {
         "Name": "Cory Baptiste",
@@ -432,7 +458,8 @@
         "Endurance": 68,
         "Hustle": 65,
         "BasketballIQ": 72,
-        "Discipline": 70
+        "Discipline": 70,
+        "FoulDrawing": 30
       }
     ],
     "Away": [
@@ -467,7 +494,8 @@
         "Endurance": 80,
         "Hustle": 72,
         "BasketballIQ": 78,
-        "Discipline": 72
+        "Discipline": 72,
+        "FoulDrawing": 42
       },
       {
         "Name": "Rashid Monroe",
@@ -500,7 +528,8 @@
         "Endurance": 74,
         "Hustle": 70,
         "BasketballIQ": 68,
-        "Discipline": 65
+        "Discipline": 65,
+        "FoulDrawing": 68
       },
       {
         "Name": "Antoine Dupree",
@@ -533,7 +562,8 @@
         "Endurance": 72,
         "Hustle": 75,
         "BasketballIQ": 68,
-        "Discipline": 65
+        "Discipline": 65,
+        "FoulDrawing": 58
       },
       {
         "Name": "Darius Eze",
@@ -566,7 +596,8 @@
         "Endurance": 62,
         "Hustle": 72,
         "BasketballIQ": 62,
-        "Discipline": 55
+        "Discipline": 55,
+        "FoulDrawing": 88
       },
       {
         "Name": "Malik Thornton",
@@ -599,7 +630,8 @@
         "Endurance": 65,
         "Hustle": 62,
         "BasketballIQ": 70,
-        "Discipline": 68
+        "Discipline": 68,
+        "FoulDrawing": 28
       }
     ]
   }

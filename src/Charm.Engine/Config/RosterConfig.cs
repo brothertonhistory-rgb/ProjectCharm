@@ -25,6 +25,7 @@ public sealed class PlayerConfig
     public int Outside             { get; set; }
     public int Finishing           { get; set; }
     public int FreeThrow           { get; set; }
+    public int FoulDrawing         { get; set; }
     public int BallHandling        { get; set; }
     public int Passing             { get; set; }
     public int Playmaking          { get; set; }
@@ -69,6 +70,7 @@ public sealed class PlayerConfig
         Outside             = Outside,
         Finishing           = Finishing,
         FreeThrow           = FreeThrow,
+        FoulDrawing         = FoulDrawing,
         BallHandling        = BallHandling,
         Passing             = Passing,
         Playmaking          = Playmaking,

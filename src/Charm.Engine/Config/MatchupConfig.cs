@@ -177,6 +177,82 @@ public sealed class MatchupConfig
     public double LengthWingspan { get; set; } = 1.0 / 3.0;
     public double LengthVertical { get; set; } = 1.0 / 3.0;
 
+    // =========================================================================
+    // Phase 8 — foul-door parameters
+    // =========================================================================
+
+    // --- Phase 8: per-zone foul floor and ceiling.
+    //     Floor is close to baseline (small downward range — low FoulDrawing is
+    //     NOT an active skill; it's absence of opportunity). Ceiling is far above
+    //     baseline (large upward range — an elite foul-drawer can push the rate
+    //     way up). All placeholders; calibration pass owns the magnitudes.
+    //     Named FoulFloor{Zone} / FoulCeil{Zone}. ---
+    public double FoulFloorRim   { get; set; } = 0.17;
+    public double FoulCeilRim    { get; set; } = 0.35;
+
+    public double FoulFloorShort { get; set; } = 0.075;
+    public double FoulCeilShort  { get; set; } = 0.18;
+
+    public double FoulFloorMid   { get; set; } = 0.035;
+    public double FoulCeilMid    { get; set; } = 0.10;
+
+    public double FoulFloorLong  { get; set; } = 0.02;
+    public double FoulCeilLong   { get; set; } = 0.06;
+
+    public double FoulFloorThree { get; set; } = 0.008;
+    public double FoulCeilThree  { get; set; } = 0.04;
+
+    /// <summary>The foul floor (disciplined-defender-edge asymptote) for a zone.
+    /// Close to the baseline — low FoulDrawing is absence of opportunity, not
+    /// active failure, so the downward range is narrow.
+    /// Read by <see cref="Matchup.FoulRate"/>.</summary>
+    public double FoulFloor(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => FoulFloorRim,
+        ShotLocation.Short => FoulFloorShort,
+        ShotLocation.Mid   => FoulFloorMid,
+        ShotLocation.Long  => FoulFloorLong,
+        ShotLocation.Three => FoulFloorThree,
+        _ => throw new InvalidOperationException($"No foul floor for zone '{zone}'.")
+    };
+
+    /// <summary>The foul ceiling (foul-drawer-edge asymptote) for a zone.
+    /// Far above the baseline — an elite foul-drawer against an undisciplined
+    /// defender can push the foul rate well above baseline, especially at the rim.
+    /// Read by <see cref="Matchup.FoulRate"/>.</summary>
+    public double FoulCeiling(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => FoulCeilRim,
+        ShotLocation.Short => FoulCeilShort,
+        ShotLocation.Mid   => FoulCeilMid,
+        ShotLocation.Long  => FoulCeilLong,
+        ShotLocation.Three => FoulCeilThree,
+        _ => throw new InvalidOperationException($"No foul ceiling for zone '{zone}'.")
+    };
+
+    // --- Phase 8: tanh saturation knob for the foul contest.
+    //     Controls how fast the foul rate approaches floor/ceiling as the
+    //     foul-drawing advantage widens. Default 20.0 (same as BlockReferenceShift).
+    //     Must be > 0 (enforced in Load). ---
+    /// <summary>The net shift (rating points) that reaches ~76% saturation toward
+    /// foul floor/ceiling. Higher values → slower saturation.
+    /// Must be &gt; 0 (enforced in Load).</summary>
+    public double FoulReferenceShift { get; set; } = 20.0;
+
+    // --- Phase 8: foul contest weights.
+    //     Offense-dominant: FoulDrawing carries the bigger weight; Discipline (defense)
+    //     carries a light tap. One GLOBAL pair (not per-zone) — per-zone variation in
+    //     foul impact lives in the per-zone floors/ceilings, not the weights.
+    //     Must sum to 1.0 (enforced in Load). ---
+    public double OffenseFoulWeight { get; set; } = 0.80;
+    public double DefenseFoulWeight { get; set; } = 0.20;
+
+    // --- Phase 8: attribute midpoint for the foul contest.
+    //     Both FoulDrawing and Discipline are expressed as deviations from this
+    //     midpoint, so an average (50) player contributes zero contest value.
+    //     Must be > 0 (enforced in Load). ---
+    public double AttributeMidpoint { get; set; } = 50.0;
+
     public static MatchupConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -232,6 +308,32 @@ public sealed class MatchupConfig
         if (Math.Abs(lenSum - 1.0) > Eps)
             throw new InvalidOperationException(
                 $"LengthHeight + LengthWingspan + LengthVertical must sum to 1.0: got {lenSum}.");
+
+        // Phase 8 invariants.
+        if (cfg.FoulReferenceShift <= 0.0)
+            throw new InvalidOperationException(
+                $"FoulReferenceShift must be > 0: got {cfg.FoulReferenceShift}.");
+
+        if (Math.Abs(cfg.OffenseFoulWeight + cfg.DefenseFoulWeight - 1.0) > Eps)
+            throw new InvalidOperationException(
+                $"OffenseFoulWeight + DefenseFoulWeight must sum to 1.0: " +
+                $"offense={cfg.OffenseFoulWeight}, defense={cfg.DefenseFoulWeight}.");
+
+        if (cfg.AttributeMidpoint <= 0.0)
+            throw new InvalidOperationException(
+                $"AttributeMidpoint must be > 0: got {cfg.AttributeMidpoint}.");
+
+        foreach (var zone in new[] { ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid,
+                                     ShotLocation.Long, ShotLocation.Three })
+        {
+            if (cfg.FoulFloor(zone) < 0.0)
+                throw new InvalidOperationException(
+                    $"FoulFloor for zone {zone} must be >= 0: got {cfg.FoulFloor(zone)}.");
+            if (cfg.FoulCeiling(zone) <= cfg.FoulFloor(zone))
+                throw new InvalidOperationException(
+                    $"FoulCeiling for zone {zone} must exceed FoulFloor: " +
+                    $"floor={cfg.FoulFloor(zone)}, ceiling={cfg.FoulCeiling(zone)}.");
+        }
 
         return cfg;
     }
