@@ -4,11 +4,14 @@ namespace Charm.Engine;
 /// Real, attribute-driven Roll H generator (Phase 2). Reads the shooter's own
 /// rating and produces a make probability via a per-zone bounded logistic.
 ///
-/// <para><b>Phase 2 wall — own rating only.</b> No matchup effects, no defender,
-/// no gravity, no team aggregates. The pipe is: zone → player attribute → logistic
-/// → make weight. Everything else (matchup tilt, gravity, spacing, athleticism
-/// ceiling) is deferred to later phases and will drop in here without touching
-/// Roll H or the resolver.</para>
+/// <para><b>Phase 6 — matchup-aware make door.</b> The make% is now read off a
+/// matchup-adjusted effective rating: the shooter's baseline slid by the skill gap
+/// (his zone rating vs the matched defender's blended per-zone defensive read) and the
+/// physical (athletic) gap, composed additively (Matchup.EffectiveRating). The defender
+/// is resolved by DefenderPicker (v1 slot-guards-slot). Only the make door is wired this
+/// slice — location, turnovers, rebounds, blocks, and the tip remain matchup-blind.
+/// Gravity, spacing, the athletic/big split, and the carried-defender promotion are
+/// still deferred and drop in here without touching Roll H's structure or the resolver.</para>
 ///
 /// <para><b>Zone→attribute mapping.</b>
 /// Three and Long read <see cref="Player.Outside"/>;
@@ -30,7 +33,9 @@ namespace Charm.Engine;
 /// (a harness that constructs a Resolver without calling SetStarter), PlayerAt
 /// returns null and the generator falls back to the flat stub behaviour — identical
 /// to what RollHStubPieGenerator produces. This keeps all 14 existing harness sites
-/// that do not populate a roster passing unchanged.</para>
+/// that do not populate a roster passing unchanged. Separately (DEC-6), if the shooter
+/// is present but the matched defending slot is empty, the make door reads the raw
+/// own-rating with no matchup term — the pre-Phase-6 behaviour.</para>
 ///
 /// <para><b>Fail-loud on null slot.</b> If SelectedSlot is null when a possession
 /// reaches Roll H, that is a wiring bug upstream (the selection roll must run
@@ -48,12 +53,14 @@ namespace Charm.Engine;
 public sealed class RollHGenerator : IRollHPieGenerator
 {
     private readonly RollHConfig _cfg;
+    private readonly MatchupConfig _matchup;
     private readonly GameState _game;
 
-    public RollHGenerator(RollHConfig cfg, GameState game)
+    public RollHGenerator(RollHConfig cfg, MatchupConfig matchup, GameState game)
     {
-        _cfg  = cfg  ?? throw new ArgumentNullException(nameof(cfg));
-        _game = game ?? throw new ArgumentNullException(nameof(game));
+        _cfg     = cfg     ?? throw new ArgumentNullException(nameof(cfg));
+        _matchup = matchup ?? throw new ArgumentNullException(nameof(matchup));
+        _game    = game    ?? throw new ArgumentNullException(nameof(game));
     }
 
     /// <inheritdoc cref="IRollHPieGenerator.Generate"/>
@@ -79,9 +86,19 @@ public sealed class RollHGenerator : IRollHPieGenerator
         if (player is null)
             return BuildStubPie(zone);
 
-        // Read the zone-relevant rating and run the logistic.
-        var rating = RatingFor(zone, player);
-        var makePct = _cfg.MakeProbability(zone, rating);
+        // Phase 6 — matchup-aware make door. Resolve the contesting defender via the
+        // (swappable) picker, then read make% off a matchup-adjusted effective rating.
+        // DEC-6 fallback: if no defender is present (an empty defending slot), use the
+        // raw own-rating read — no matchup term — exactly as pre-Phase-6. (The
+        // unpopulated-roster case is already handled above by the shooter-null return.)
+        var defenderSlot = DefenderPicker.Pick(state);
+        var defender     = _game.RosterFor(state.Defense).PlayerAt(defenderSlot);
+
+        var effectiveRating = defender is null
+            ? Matchup.OffenseRating(zone, player)
+            : Matchup.EffectiveRating(zone, player, defender, _matchup);
+
+        var makePct = _cfg.MakeProbability(zone, effectiveRating);
 
         return BuildRealPie(zone, makePct);
     }
@@ -89,20 +106,6 @@ public sealed class RollHGenerator : IRollHPieGenerator
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
-
-    /// <summary>
-    /// The player attribute that governs conversion in each zone.
-    /// Location (where the shot comes from) maps to skill (what converts it).
-    /// </summary>
-    private static double RatingFor(ShotLocation zone, Player player) => zone switch
-    {
-        ShotLocation.Three => player.Outside,
-        ShotLocation.Long  => player.Outside,
-        ShotLocation.Mid   => player.Mid,
-        ShotLocation.Short => player.Close,
-        ShotLocation.Rim   => player.Finishing,
-        _ => throw new InvalidOperationException($"No rating mapping for zone '{zone}'.")
-    };
 
     /// <summary>
     /// Build the real seven-way pie using the logistic make probability.

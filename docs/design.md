@@ -2837,3 +2837,122 @@ own layer. No strategy / tendencies / usage / fatigue / game-state; the **streak
 the **usage-concentration** variance with it — the spread here is the static shot-diet kind only. No
 magnitudes. The **make-curve and the Phase-4 gap function are untouched** — the cap and floor that do the
 coverage work are already inside them.
+
+## Session 37 — Phase 6: the matchup wiring (make-door vertical slice) (2026-06-15)
+
+The first build of Phase 6, and the first time two players' attributes meet on the court. Phases 4–5
+*designed* the matchup (the attribute → axis laddering, the pairing map, the convex gap, the coverage
+math); this session wires **one door** — the make door — end to end, leaving every other door
+matchup-blind. It is deliberately a vertical slice: prove the seam (picker → gap → effective rating →
+make-curve) on the single highest-value door, with a named, swappable picker and a pure matchup
+primitive, so the remaining doors and the mismatch-hunting picker drop in without re-architecting.
+
+### The pieces
+
+**DefenderPicker (v1, slot-guards-slot).** The contesting defender is the player in the same slot number
+on the defense side (the selection roll stamps an offense-side `SelectedSlot`; the matched defender is
+that number on `Defense`). The pick is deterministic and currently has a single consumer (the make door),
+so it is **derived at generate-time, not carried on `PossessionState`** — the leanest seam that still
+isolates the concept. It is a distinct, named unit precisely so the eventual mismatch-hunting picker is a
+drop-in replacement. **Flagged promotion:** the moment a second door consumes the defender, or the pick
+becomes non-deterministic, it must be promoted to a `PossessionState.DefenderSlot` stamped once after
+Roll E so every door in a possession shares one coherent pick.
+
+**Matchup (the primitive).** Pure and static. Four pieces:
+- `OffenseRating(zone, player)` — the zone→skill map (Three/Long → Outside, Mid → Mid, Short → Close,
+  Rim → Finishing). This is now the **single source** of that pairing: RollHGenerator's old private
+  `RatingFor` was deleted and the generator's baseline read delegates here.
+- `DefenseRating(zone, defender, cfg)` — the **CONF-1 per-zone defensive blend**: a weighted read of the
+  defender's three defensive attributes (PerimeterDefense / PostDefense / RimProtection) that slides
+  perimeter → interior across the five zones. A blend, not one attribute per zone, so a two-way defender
+  is rewarded everywhere and a rim-protector-only big gives up his weak perimeter share at Mid/Long.
+  Weights are config data.
+- `GapFn(gap, steepness, exponent, scale)` — DEC-5 (below).
+- `EffectiveRating(zone, attacker, defender, cfg)` — DEC-2 composition: `baseline + skillShift +
+  physicalShift`, where the skill shift runs the (baseline − blended-defense) gap through `GapFn` with the
+  skill steepness/exponent and the physical shift runs the (attacker − defender Athleticism) gap through
+  `GapFn` with the physical steepness/exponent. The shifts are summed onto the baseline and the result is
+  fed to the **unchanged** make-curve. A contest is a shooter sliding up or down the shared scale — never
+  a reshaping of the curve.
+
+### DEC-5 — the gap function is a signed power law
+
+The one design act of the session. axes.md's Phase 4 gave the *properties* of the gap response but never
+an equation; pinning the functional form was a design decision, not a build choice, and was settled
+conversationally before any code. The form:
+
+> `shift = steepness · sign(gap) · (|gap| / scale)^exponent`,  exponent > 1.
+
+It is the only simple family that satisfies every property axes.md demands **simultaneously**:
+- **Odd / signed.** An even matchup yields exactly zero shift; a skill or size disadvantage shifts down by
+  the same law it shifts up. The *asymmetry* of real basketball (a beaten man still scores; the floor)
+  lives in the **make-curve**, not here — so the gap function itself stays clean and symmetric.
+- **Flat-bottomed.** exponent > 1 forces zero slope at the origin, so a marginal edge is imperceptible and
+  the effect only becomes real as the gap opens. This is the property that **rules out** the obvious
+  alternatives: `exp(|g|) − 1` and any linear form both have a non-zero slope at the origin (a one-point
+  edge would already register), and a concave / ≤ 1 exponent would make small edges *over*-matter.
+- **Convex / accelerating, and uncapped.** The effect grows faster than the gap. There is **no asymptote
+  in the gap function** — the make-curve's logistic ceiling/floor is the *only* bound on the payoff, so
+  the saturation lives in exactly one place (the curve), consistent with the Phase-5 coverage math.
+- **Physical steeper than skill.** Implemented as `physicalExponent > skillExponent`. Steepness in the
+  *tail* (not a larger constant) is what encodes "**size is insurmountable**" — a large athletic gap runs
+  away faster than a large skill gap — while the make-curve's floor independently guarantees "**skill is
+  never extinguished**" (the baseline carries the skill, and the floor keeps even a badly-beaten skilled
+  shooter above a scrub).
+
+**`referenceScale` is a unit, not a magnitude.** It is the gap (in rating points) at which a shift equals
+its steepness — a fixed, legible denominator that keeps the steepness parameters identifiable (move it
+rarely; tune steepness/exponent in calibration). Placeholder defaults: skill exponent 2.0, physical
+exponent 2.7, both steepnesses 6.0, scale 25.0. These are best-guess scaffolding; the calibration pass
+owns the real numbers, and `MatchupConfig.Load` enforces only the **invariant** (exponent > 1, scale > 0),
+not any particular magnitude — a deliberate, small deviation from `RollHConfig.Load`'s no-validation
+pattern, justified because an exponent ≤ 1 silently breaks the convex/flat-bottom contract.
+
+### DEC-6 — two distinct fallbacks, not one
+
+The make door has **two** independent "no real matchup" paths, and they must not be conflated:
+1. **Unpopulated roster** (no shooter in the selected slot) — the pre-existing path: the generator
+   short-circuits to the stub pie before any matchup logic. Unchanged this session.
+2. **Shooter present, defending slot empty** (the defender lookup returns null) — the **new** guard: the
+   make% reads the **raw own-rating** via `OffenseRating` with no matchup term, exactly reproducing
+   pre-Phase-6 behaviour. This is the only fallback Phase 6 added.
+
+### Why the make-curve is untouched
+
+The bounded logistic from Phase 2 already maps a single effective rating to a make%. Phase 6 changes *what
+rating* is fed in (own → matchup-adjusted), never the curve. This is the load-bearing reuse: the cap and
+the floor that do the Phase-5 coverage work (a won front caps; a lost front bleeds but never zeroes) are
+already inside the curve, so the matchup layer only has to produce the right effective rating and let the
+curve do the saturation.
+
+### Validation
+
+A new `Phase6MatchupWiringCheck` provides the §4 calibration evidence. The sweeps read make%
+analytically (`MakeProbability` over `EffectiveRating` — exactly the weight `BuildRealPie` assigns to
+Made), so they are deterministic; the DEC-6 fallback is exercised through the **real generator** (batched)
+so the picker, the null-defender guard, and the pie build are covered end to end. Every assertion matched
+an independent Monte-Carlo pre-check to the decimal: the defender sweep monotone down with even ==
+baseline and the edge compressing toward the floor, not zero; the Mid blend's two sub-attributes equal and
+swap-symmetric; a rim specialist beatable on the perimeter but strong at the rim; the shooter sweep rising
+and flattening under the ceiling; physical steeper than skill at equal gap; and the empty slot reading raw
+rating while a strong defender lowers the sampled make rate. The full 100k chain and Phase 2 still pass —
+Phase 2's high/low shooter gap actually *widens* under wiring (the convex skill gap amplifies the edge).
+
+### Process note
+
+The session opened on a near-complete interrupted build sitting uncommitted on disk: the three new files,
+the RollHGenerator edit, and the config edit were all present and correct, but `Program.cs` referenced a
+`Phase6MatchupWiringCheck` that had never been written (the interruption fell between adding the call and
+writing the body — the harness would not have compiled). The fix was to author that one method against the
+confirmed-current tree, re-verify (brace balance, defined-once / called-once, no stale `RatingFor`
+references anywhere, all generator sites 3-arg), and only then deliver and — after the harness went green —
+write these docs. The build was validated before a word of documentation was written (CONVENTIONS §3).
+
+### Scope walls held / deferred
+
+Make door only — location, turnovers, glass, blocks, and the tip remain matchup-blind. No
+`PossessionState.DefenderSlot` (the picker is derived at generate-time; promotion is flagged). No
+athletic/big axis split — one physical gap on the full Athleticism composite (the Phase-4 axis split is
+deferred). No team aggregates, no gravity lift. No magnitude hunt — placeholders throughout, calibration
+owns the numbers. One placeholder explicitly needs a basketball call: the Rim blend split
+(Post 0.35 / RimProtection 0.65), flagged in both the config and the code.

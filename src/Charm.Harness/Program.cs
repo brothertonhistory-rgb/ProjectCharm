@@ -48,7 +48,8 @@ internal static class Program
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
         var game = new GameState(fouls);  // arrow starts Off — first jump ball is the tip
-        var rollHGenerator = new RollHGenerator(cfgH, game);
+        var cfgMatchup = MatchupConfig.Load(configPath);
+        var rollHGenerator = new RollHGenerator(cfgH, cfgMatchup, game);
 
         var resolver = new Resolver(
             rollAGenerator,
@@ -119,6 +120,7 @@ internal static class Program
         ok &= GovernorLoopCheck(cfg, cfgD, cfgGov, cfgClock, cfgEndOfHalf);
         ok &= Phase1RosterCheck(configPath);
         ok &= Phase2AttributeWiringCheck(configPath);
+        ok &= Phase6MatchupWiringCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -4212,9 +4214,9 @@ internal static class Program
 
         // Helper: run Batch three-point attempts through the resolver using a given game,
         // count Made + MadeAndFouled outcomes from Roll H directly.
-        static double RunThreePointBatch(GameState g, RollHConfig cfgH2, int batch)
+        static double RunThreePointBatch(GameState g, RollHConfig cfgH2, MatchupConfig cfgM2, int batch)
         {
-            var gen = new RollHGenerator(cfgH2, g);
+            var gen = new RollHGenerator(cfgH2, cfgM2, g);
             var state = new PossessionState(
                 PossessionNumber: 1,
                 Offense: TeamSide.Home,
@@ -4237,8 +4239,9 @@ internal static class Program
         var (highGame, _) = MakeGame(outsideRating: 85, cfgD2: cfgD);
         var (lowGame,  _) = MakeGame(outsideRating: 25, cfgD2: cfgD);
 
-        var highRate = RunThreePointBatch(highGame, cfgH, Batch);
-        var lowRate  = RunThreePointBatch(lowGame,  cfgH, Batch);
+        var cfgMatchup = MatchupConfig.Load(configPath);
+        var highRate = RunThreePointBatch(highGame, cfgH, cfgMatchup, Batch);
+        var lowRate  = RunThreePointBatch(lowGame,  cfgH, cfgMatchup, Batch);
         var gap      = highRate - lowRate;
 
         Console.WriteLine($"  Three-point make rate — high Outside (85): {highRate:P1}");
@@ -4258,7 +4261,7 @@ internal static class Program
         // --- Fallback check: null roster → stub pie (no exception) ---
         Console.WriteLine("  Fallback check (unpopulated roster → stub pie, no throw)...");
         var bareGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
-        var bareGen  = new RollHGenerator(cfgH, bareGame);
+        var bareGen  = new RollHGenerator(cfgH, cfgMatchup, bareGame);
         var bareState = new PossessionState(
             PossessionNumber: 1,
             Offense: TeamSide.Home,
@@ -4285,5 +4288,186 @@ internal static class Program
         return pass;
     }
 
+    // Phase 6 — matchup wiring (DefenderPicker + Matchup.GapFn/EffectiveRating + the make door).
+    // The sweeps read the make% analytically (cfgH.MakeProbability over Matchup.EffectiveRating —
+    // exactly the weight BuildRealPie assigns to Made), so they are deterministic. The DEC-6
+    // fallback is exercised through the REAL generator (batched) so the defender lookup, the
+    // null-defender guard, and the pie build are covered end to end.
+    private static bool Phase6MatchupWiringCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 6: Matchup wiring (defender picker + gap fn + make door) ---");
+        var pass = true;
 
+        var cfgH = RollHConfig.Load(configPath);
+        var cfgM = MatchupConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+
+        // A uniform player at baseline b, overriding only the attributes the make door reads:
+        // offense Outside/Mid/Close/Finishing, defense Perimeter/Post/RimProtection, and the five
+        // athletic attrs (Athleticism's source) via `ath`. Mirrors MakeGame's full initializer so
+        // no attribute is left at 0; athletic attrs stay equal => physical gap 0 unless `ath` is set.
+        static Player Mk(int b, int? outside = null, int? mid = null, int? close = null, int? fin = null,
+                         int? perimD = null, int? postD = null, int? rimP = null, int? ath = null)
+            => new Player("p")
+            {
+                Outside = outside ?? b, Mid = mid ?? b, Close = close ?? b, Finishing = fin ?? b, FreeThrow = b,
+                BallHandling = b, Passing = b, Playmaking = b, SelfCreation = b, PostMoves = b,
+                OffBallMovement = b, Screening = b, OffensiveRebounding = b,
+                PerimeterDefense = perimD ?? b, PostDefense = postD ?? b, RimProtection = rimP ?? b,
+                DefensiveRebounding = b, Steals = b,
+                Height = b, Wingspan = b, Weight = b,
+                Strength = ath ?? b, Speed = ath ?? b, Quickness = ath ?? b, FirstStep = ath ?? b, Vertical = ath ?? b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b
+            };
+
+        // The make% the wired generator assigns to a contested shot, and the raw no-matchup baseline.
+        double Make(ShotLocation z, Player s, Player d)
+            => cfgH.MakeProbability(z, Matchup.EffectiveRating(z, s, d, cfgM));
+        double Raw(ShotLocation z, Player s)
+            => cfgH.MakeProbability(z, Matchup.OffenseRating(z, s));
+
+        const double Eps = 1e-9;
+
+        // (a) Defender sweep: fix the shooter, raise the matched defensive rating -> make% falls.
+        Console.WriteLine("  (a) Defender sweep @Three (shooter Outside=50, sweep PerimeterDefense 10->90):");
+        var shooterA = Mk(50, outside: 50);
+        var baseA = Raw(ShotLocation.Three, shooterA);
+        double prevA = double.PositiveInfinity, evenA = 0, edgeA = 0;
+        var monoA = true;
+        foreach (var pd in new[] { 10, 30, 50, 70, 90 })
+        {
+            var mk = Make(ShotLocation.Three, shooterA, Mk(50, perimD: pd));
+            Console.WriteLine($"      PD={pd,2}  make={mk:P1}");
+            if (mk >= prevA) monoA = false;
+            prevA = mk;
+            if (pd == 50) evenA = mk;
+            if (pd == 90) edgeA = mk;
+        }
+        var aOk = monoA
+                  && Math.Abs(evenA - baseA) < Eps
+                  && edgeA > cfgH.ThreeFloor && edgeA < baseA;
+        if (!monoA) Console.WriteLine("  FAIL  (a) make% not strictly decreasing as defense rises.");
+        if (Math.Abs(evenA - baseA) >= Eps) Console.WriteLine("  FAIL  (a) even matchup (PD=50) != raw own-rating baseline.");
+        if (!(edgeA > cfgH.ThreeFloor && edgeA < baseA)) Console.WriteLine($"  FAIL  (a) big edge should compress below baseline but stay above floor {cfgH.ThreeFloor:P1}.");
+        if (aOk) Console.WriteLine("      OK — monotone down; even==baseline; edge compresses toward the floor, not zero.");
+        pass &= aOk;
+
+        // (b) Blend (CONF-1) @Mid (0.5/0.5): both sub-attributes register at equal half weight.
+        Console.WriteLine("  (b) Blend @Mid: PerimeterDefense and PostDefense each move make% at half weight:");
+        var shooterB = Mk(50, mid: 50);
+        var dPerim = Make(ShotLocation.Mid, shooterB, Mk(50, perimD: 20, postD: 40))
+                   - Make(ShotLocation.Mid, shooterB, Mk(50, perimD: 60, postD: 40));
+        var dPost  = Make(ShotLocation.Mid, shooterB, Mk(50, perimD: 40, postD: 20))
+                   - Make(ShotLocation.Mid, shooterB, Mk(50, perimD: 40, postD: 60));
+        var swap1 = Make(ShotLocation.Mid, shooterB, Mk(50, perimD: 20, postD: 60));
+        var swap2 = Make(ShotLocation.Mid, shooterB, Mk(50, perimD: 60, postD: 20));
+        Console.WriteLine($"      raise PerimeterDefense 20->60: make drops {dPerim:P2}");
+        Console.WriteLine($"      raise PostDefense      20->60: make drops {dPost:P2}");
+        var bOk = dPerim > 0 && dPost > 0 && Math.Abs(dPerim - dPost) < Eps && Math.Abs(swap1 - swap2) < Eps;
+        if (!(dPerim > 0 && dPost > 0)) Console.WriteLine("  FAIL  (b) a sub-attribute did not register.");
+        if (Math.Abs(dPerim - dPost) >= Eps) Console.WriteLine("  FAIL  (b) sub-attributes not equally weighted (expected 0.5/0.5).");
+        if (Math.Abs(swap1 - swap2) >= Eps) Console.WriteLine("  FAIL  (b) blend not swap-symmetric at Mid.");
+        if (bOk) Console.WriteLine("      OK — both register, equal half weight, swap-symmetric.");
+        pass &= bOk;
+
+        // (c) Rim specialist: strong at Rim, beatable on the perimeter zones (vs a balanced defender).
+        Console.WriteLine("  (c) Rim specialist (Perim=20,Post=40,Rim=90) vs balanced (all 50), shooter rating 50:");
+        var shooterC = Mk(50, mid: 50, fin: 50);
+        var rimSpec  = Mk(50, perimD: 20, postD: 40, rimP: 90);
+        var balanced = Mk(50, perimD: 50, postD: 50, rimP: 50);
+        var midSpec = Make(ShotLocation.Mid, shooterC, rimSpec);
+        var midBal  = Make(ShotLocation.Mid, shooterC, balanced);
+        var rmSpec  = Make(ShotLocation.Rim, shooterC, rimSpec);
+        var rmBal   = Make(ShotLocation.Rim, shooterC, balanced);
+        Console.WriteLine($"      Mid: vs specialist {midSpec:P1}  vs balanced {midBal:P1}   (specialist gives up MORE)");
+        Console.WriteLine($"      Rim: vs specialist {rmSpec:P1}  vs balanced {rmBal:P1}   (specialist gives up LESS)");
+        var cOk = midSpec > midBal && rmSpec < rmBal;
+        if (!(midSpec > midBal)) Console.WriteLine("  FAIL  (c) rim specialist not exploitable at Mid.");
+        if (!(rmSpec < rmBal)) Console.WriteLine("  FAIL  (c) rim specialist not stronger at Rim.");
+        if (cOk) Console.WriteLine("      OK — beatable on the perimeter, strong at the rim.");
+        pass &= cOk;
+
+        // (d) Shooter sweep: fix the defender, raise shooter rating -> make% rises and saturates.
+        Console.WriteLine("  (d) Shooter sweep @Three (balanced defender, sweep Outside 30->99):");
+        var defD = Mk(50, perimD: 50);
+        double prevD = double.NegativeInfinity, m30 = 0, m50 = 0, m90 = 0, m99 = 0;
+        var monoD = true;
+        foreach (var o in new[] { 30, 50, 70, 90, 99 })
+        {
+            var mk = Make(ShotLocation.Three, Mk(50, outside: o), defD);
+            Console.WriteLine($"      Outside={o,2}  make={mk:P1}");
+            if (mk <= prevD) monoD = false;
+            prevD = mk;
+            if (o == 30) m30 = mk;
+            if (o == 50) m50 = mk;
+            if (o == 90) m90 = mk;
+            if (o == 99) m99 = mk;
+        }
+        var dOk = monoD && (m99 - m90) < (m50 - m30) && m99 < cfgH.ThreeCeiling;
+        if (!monoD) Console.WriteLine("  FAIL  (d) make% not strictly increasing as shooter rating rises.");
+        if (!((m99 - m90) < (m50 - m30))) Console.WriteLine("  FAIL  (d) top end not flattening (no saturation).");
+        if (!(m99 < cfgH.ThreeCeiling)) Console.WriteLine($"  FAIL  (d) make% breached the curve ceiling {cfgH.ThreeCeiling:P1}.");
+        if (dOk) Console.WriteLine($"      OK — monotone up, flattening toward the ceiling ({cfgH.ThreeCeiling:P1}); the curve caps the payoff.");
+        pass &= dOk;
+
+        // (e) Physical is steeper than skill (DEC-5: larger exponent), and the physical term moves make%.
+        Console.WriteLine("  (e) Physical gap (DEC-5: steeper than skill via the larger exponent):");
+        var skillShift40    = Matchup.GapFn(40, cfgM.SkillSteepness,    cfgM.SkillExponent,    cfgM.ReferenceScale);
+        var physicalShift40 = Matchup.GapFn(40, cfgM.PhysicalSteepness, cfgM.PhysicalExponent, cfgM.ReferenceScale);
+        var athEdge = Make(ShotLocation.Three, Mk(50, outside: 50, ath: 70), Mk(50, perimD: 50, ath: 30));
+        var athEven = Make(ShotLocation.Three, Mk(50, outside: 50, ath: 50), Mk(50, perimD: 50, ath: 50));
+        Console.WriteLine($"      at gap=40:  skillShift={skillShift40:F2}  physicalShift={physicalShift40:F2}");
+        Console.WriteLine($"      athletic edge (70 vs 30) make={athEdge:P1}  vs even make={athEven:P1}");
+        var eOk = physicalShift40 > skillShift40 && athEdge > athEven;
+        if (!(physicalShift40 > skillShift40)) Console.WriteLine("  FAIL  (e) physical not steeper than skill at equal gap.");
+        if (!(athEdge > athEven)) Console.WriteLine("  FAIL  (e) athletic edge did not raise make%.");
+        if (eOk) Console.WriteLine("      OK — physical steeper than skill; an athletic edge raises make%.");
+        pass &= eOk;
+
+        // (f) DEC-6 fallback through the REAL generator: an empty defending slot reads the raw
+        //     own-rating (== the even matchup), while a strong defender lowers the sampled rate.
+        Console.WriteLine("  (f) DEC-6 fallback + end-to-end wiring (real generator, batched):");
+        const int Batch = 20_000;
+        const double RateTol = 0.02;
+
+        static double Rate(GameState g, RollHConfig ch, MatchupConfig cm, int batch)
+        {
+            var gen = new RollHGenerator(ch, cm, g);
+            var state = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, ShotType: ShotLocation.Three,
+                SelectedSlot: g.HomeLineup.SlotAt(1));
+            var made = 0;
+            for (var i = 0; i < batch; i++)
+            {
+                var pie = gen.Generate(state, putback: false);
+                var r = pie.Roll(new SystemRng(i).NextUnitInterval());
+                if (r is ShotResult.Made or ShotResult.MadeAndFouled) made++;
+            }
+            return (double)made / batch;
+        }
+
+        GameState GameWith(Player? defender)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            g.SetPossessionArrow(TeamSide.Home);
+            g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(1), Mk(50, outside: 50));
+            if (defender is not null)
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(1), defender);  // empty slot otherwise -> null -> raw rating
+            return g;
+        }
+
+        var rEmpty  = Rate(GameWith(null),                            cfgH, cfgM, Batch);
+        var rEven   = Rate(GameWith(Mk(50, perimD: 50)),             cfgH, cfgM, Batch);
+        var rStrong = Rate(GameWith(Mk(50, perimD: 90)),             cfgH, cfgM, Batch);
+        Console.WriteLine($"      empty-slot {rEmpty:P1}   even {rEven:P1}   strong-defender {rStrong:P1}");
+        var fOk = Math.Abs(rEmpty - rEven) <= RateTol && rStrong < rEven - 0.05;
+        if (Math.Abs(rEmpty - rEven) > RateTol) Console.WriteLine("  FAIL  (f) empty-slot fallback diverges from the even-matchup baseline.");
+        if (!(rStrong < rEven - 0.05)) Console.WriteLine("  FAIL  (f) a strong defender did not lower the generator's make rate.");
+        if (fOk) Console.WriteLine("      OK — empty slot reads raw rating (==even); a strong defender lowers make% through the real pipe.");
+        pass &= fOk;
+
+        Console.WriteLine(pass ? "  Phase 6 PASSED." : "  Phase 6 FAILED.");
+        return pass;
+    }
 }
