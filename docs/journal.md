@@ -1,36 +1,42 @@
-## Session 50 — Per-zone shooting counters + shooting-curve calibration plan (2026-06-16)
+## Session 50 — Per-zone shooting counters + shooting-curve calibration (2026-06-16)
 
-**Scope:** Two parts. (1) Build: extend the v1 counters with a make/attempt pair per shot zone so the harness reports FG% and attempt share for Rim/Short/Mid/Long/Three separately (Three reuses the existing 3PA/3PM pair). Additive only — no weight, routing, or pie moved. (2) Design conversation: with the per-zone data in hand, settle the shooting make-curve calibration plan. No calibration executed this session.
+**Scope:** Three parts, one conversation. (1) Build: extend the v1 counters with a make/attempt pair per shot zone so the harness reports FG% and attempt share for Rim/Short/Mid/Long/Three separately (Three reuses the existing 3PA/3PM pair). Additive only. (2) Design conversation: with the per-zone data in hand, settle the shooting make-curve calibration. (3) Execute that calibration in-session (Emmett's call — not a separate session): re-fit the five logistic make curves, validate, ship. One harness check (Phase 6f) needed its magnitude threshold relaxed to match the now-flatter curve.
 
-**What shipped (build):**
-- `Core/Resolver.cs` — `RoutingOutcome` gains 8 new `init`-only fields (`RimFga`/`RimFgm`, `ShortFga`/`ShortFgm`, `MidFga`/`MidFgm`, `LongFga`/`LongFgm`), 0 defaults. `Route` bins each resolved shot into its zone at the single `IntoShotResolution` chokepoint (the same site as the v1 FGA tally), switching on `ShotLocation`. Three continues to use `ThreePa`/`ThreePm`.
+**What shipped (counters):**
+- `Core/Resolver.cs` — `RoutingOutcome` gains 8 new `init`-only fields (`RimFga`/`RimFgm`, `ShortFga`/`ShortFgm`, `MidFga`/`MidFgm`, `LongFga`/`LongFgm`), 0 defaults. `Route` bins each resolved shot into its zone at the single `IntoShotResolution` chokepoint (the v1 FGA-tally site), switching on `ShotLocation`. Three keeps `ThreePa`/`ThreePm`.
 - `Core/Governor.cs` — `PossessionRecord` gains the same 8 parameters (default 0); `Run` threads them through.
-- `Harness/Program.cs` — new `SHOOTING BY ZONE (combined, per game)` section: FG% by zone and attempt share by zone. Two new mechanical checks: zone attempts sum to FGA, zone makes sum to FGM (the per-zone analog of the v1 denominator guard). DEFERRED section trimmed — full shot mix is now live; only press frequency/break rate remains.
+- `Harness/Program.cs` — new `SHOOTING BY ZONE (combined, per game)` section: FG% by zone and attempt share by zone. Two new mechanical checks: zone attempts sum to FGA, zone makes sum to FGM. DEFERRED section trimmed — only press frequency/break rate remains.
 
-**New archive entry:** `docs/observations.md` — Run 3 prepended (same frozen-corpus-v1 run as Run 2, plus the zone section).
+**What shipped (calibration — executed in-session):**
+- `Config/RollHConfig.cs` — all five per-zone logistic make curves re-fit to the agreed observed-FG% anchors (Floor/Ceiling/K/Midpoint each). Final values: Three 0.1608/0.6328/0.029646/65.8067; Long 0.1934/0.6034/0.034190/59.5793; Mid 0.1042/0.6447/0.021592/42.3369; Short 0.1316/0.7045/0.021592/42.3369; Rim 0.3582/0.9527/0.024666/43.9840. `config.json` does not override these, so editing the class defaults IS the calibration.
+- **Carve correction:** the logistic outputs the *clean* make rate (given not blocked/not fouled); the harness reports *observed* FG% AFTER the block/foul carve. Anchors were inverted through each zone's block+foul rates so the observed number lands on target — most visibly at Rim, whose make ceiling is raised to ~0.95 to net ~73% observed after its large carve. Flagged in the file: if Roll H block/foul baselines change, the rim/short make anchors must be re-derived.
+- **Long ≥ Three:** Long's rating-99 even anchor nudged 49→51% so a long two stays at or above a three at every rating (the stated gradient).
+- `Harness/Program.cs` — Phase 6 (f) make-drop margin relaxed 0.05 → 0.03. On the flattened curve a *skill-only* strong defender (PerimD 90 vs a 50 shooter, even athleticism) lowers the three by ~4.9 points by design; the old 0.05 floor assumed the retired steep curve. Direction (strong defender lowers make) is what the check guards.
+
+**New archive entries:** `docs/observations.md` — Run 3 (pre-calibration baseline, FG% 57.8%) and Run 4 (post-calibration, FG% 50.4%) both present; the before/after pair is the calibration record.
 
 **Harness result — ALL CHECKS PASSED:**
-- All v1/v2 checks still green (additive, nothing leaked) ✓
-- Zone-attempt bin (`Rim+Short+Mid+Long+Three == FGA`) passed 1,000/1,000 ✓
-- Zone-make bin (`== FGM`) passed 1,000/1,000 ✓
-- SHOOTING BY ZONE section finite and in range ✓
+- All v1/v2 + Phase 1–16 checks green ✓
+- Zone-attempt bin (`Rim+Short+Mid+Long+Three == FGA`) and zone-make bin (`== FGM`) passed 1,000/1,000 ✓
+- Phase 6 (f) reads OK: even 33.5%, strong-defender 28.6% — 4.9-pt drop clears the 3.0 floor ✓
 
-**First readings — per-zone (recorded, not judged):**
-- FG% by zone: Rim 67.9%, Short 64.5%, Mid 49.3%, Long 48.5%, Three 49.7%. Combined 57.8% (reconstructs from the five exactly).
-- Attempt share: Rim 32.0%, Short 16.4%, Mid 16.3%, Long 10.0%, Three 25.3%.
-- Diagnosis: the high combined FG% is make-rate, not shot mix — every zone is above its real-D1 ballpark, and the middle three (Mid/Long/Three) cluster ~49% with no efficiency gradient.
+**Result — calibration landed where predicted (Python pre-check → harness, near-exact):**
+- Combined FG% 57.8% → **50.4%** (predicted 50.6). A rating-50 roster nets 45.1% (real D1 average); the test rosters read ~50% because their shooting ratings average ~64–67 (above average). The elevation is "above-average rosters," not "hot curve."
+- Per-zone FG% (was → now): Rim 67.9→64.5, Short 64.5→48.3, Mid 49.3→42.3, Long 48.5→41.9, Three 49.7→41.7. Gradient now real: Three < Long < Mid < Short < Rim.
+- Combined PPP 1.19 → **1.08** (realistic). FT%, shot mix, ORB%, FTr unchanged (calibration touched only the make curves).
 
-**Python Monte Carlo:** 9/9 zone-bin invariant cases passed before C# delivery.
+**Design conversation — what was settled (full detail in design.md):**
+- **50 is absolute average** on the 1–99 scale; a 50 shooter vs a 50 defender cancels to the zone target. Level-flat: one curve all divisions, distributions differ.
+- **Old curves were centered right but too steep** (99-three ~62%, 1-three ~6% even-matchup, ~2–3× real spread). Calibration flattened all five (floors up, ceilings down, 50-anchor held). A 16-point rating gap now ≈ 5% make — inside season noise.
+- **Athletic > skill for suppressing shooters** — confirmed the engine already encodes this (DEC-5: physical gap exponent 2.7 > skill 2.0). A skill-only strong defender only nudges a good shooter (Outside 78: 46→43% vs an elite-skill/even-athlete defender); real athletic separation drags him down (→39% at a 40-pt athletic gap). The axes cross at a 25-pt gap (= ReferenceScale); below that they are comparable. Lever noted if Emmett ever wants athletic to dominate at moderate gaps too.
+- **Era lives in the shot mix, not these curves** (Roll G profile swapped later).
+- **The real at-scale target is a healthy strategy space**, which only manifests with 350 unequal teams; small-scale tuning has diminishing returns.
 
-**Design conversation — shooting-curve calibration plan (settled; full detail in design.md):**
-- The Roll H make rate is a per-zone bounded logistic in `RollHConfig` (Floor/Ceiling/K/Midpoint × 5, in the class defaults). Tracing it: at an even (rating-50) matchup it ALREADY returns ~the targets (Three 34.3%, Rim 61.4%, Long 37.2%). The inflated game FG% is because the test rosters are rated ~64–67 in shooting skills, not 50 — they read off the upper part of the curve. Feeding actual roster ratings through the curve reproduces the observed per-zone FG% almost to the decimal. The matchup shift is minor.
-- **Decision — 50 is absolute average** on the 1–99 scale (25 below, 75 above). A 50 shooter vs a 50 defender cancels to the zone target (34% from three); the engine already implements this (gap-shifts are zero at 50-vs-50). This is the level-flat principle: one curve for all divisions, distributions differ.
-- **Decision — the curves are centered right but too steep.** Even-matchup, the current curve gives a 99 three-shooter ~62% and a 1-rated shooter ~6% — ~2–3× the real spread, which means dominance is partly imposed by the curve rather than emergent. Calibration = flatten all five (floors up, ceilings down, 50-anchor held). Per-zone 1/50/99 anchor table recorded in design.md; Emmett set Three's endpoints (~50% even / ~60% maxed for a 99).
-- **Principle — era lives in the shot mix, not these curves.** Make rates are ~era-invariant; "modern vs 1990s" is a Roll G location-weight profile swapped later, leaving the make curves fixed.
-- **Principle — the real at-scale calibration target is a healthy strategy space** (no style bizarre-dominant, none non-viable), which only manifests once 350 unequal teams play full schedules. Small-scale tuning has diminishing returns; settle roughly and move on. Because elite ratings will be rare, the curve endpoints barely move league aggregates.
-- **Next step:** a fresh calibration session re-fits the five logistic curves to the agreed anchors (`RollHConfig` Floor/Ceiling/K/Midpoint). Hard dependency: this session's per-zone counters must be committed first — the SHOOTING BY ZONE readout is the verification surface.
+**Validation honesty:** curves fit + Monte-Carlo-traced in the sandbox, then confirmed green on Emmett's harness. The carve inversion and game prediction were re-derived straight from the edited `.cs` to rule out a transcription slip.
 
-**Git commit:** Emmett stamps.
+**Latent note (not fixed):** the observation "config hash" is over `config.json` only, so Run 3 and Run 4 share a hash despite different make curves (the calibration lives in `.cs` defaults). Flagged for a future "fingerprint the resolved config" pass.
+
+**Git commit:** Emmett stamps — one commit banks the counters, the calibration, and the Phase 6f threshold fix.
 
 ## Session 49 — Counter Plumbing v1: shooting + rebounding sentinels (2026-06-16)
 

@@ -4183,7 +4183,7 @@ The identity was validated by Python Monte Carlo (23/23 cases) before any C# was
 
 ## Shooting-Curve Calibration Plan (Session 50)
 
-**Status: confirmed design, not yet executed.** The per-zone counters above exposed the shooting numbers; this section records the calibration decisions reached conversationally. A separate fresh session executes the re-fit.
+**Status: EXECUTED in-session (Session 50) — see "Shooting-Curve Calibration — Executed" at the end of this doc for the final parameters and the validated result.** The per-zone counters above exposed the shooting numbers; this section records the calibration decisions reached conversationally. (The re-fit was originally scoped for a separate session; Emmett chose to execute it in the same conversation once the design was settled.)
 
 **Where the make rate comes from.** Roll H's make% is a per-zone bounded logistic owned by `RollHConfig`: `make = Floor + (Ceiling − Floor) / (1 + exp(−K·(rating − Midpoint)))`, with its own Floor/Ceiling/K/Midpoint per zone (five sets, living in the class defaults — `config.json` does not override them). The rating fed in is the shooter's zone-relevant attribute (Three/Long→Outside, Mid→Mid, Short→Close, Rim→Finishing), slid by the matchup (`Matchup.EffectiveRating` = own rating + skill-gap shift + athletic-gap shift, both odd and zero at an even matchup). These five logistic parameter sets are the calibration dials.
 
@@ -4210,3 +4210,31 @@ Emmett set the Three endpoints explicitly: a 99 three-shooter tops at ~50% at an
 **Principle — the real at-scale calibration target is a healthy strategy space.** Matching D1 aggregate FG% is the small-scale check. The harder, truer test arrives only when 350 teams of varying talent play full conference/non-conference schedules: no style should be bizarre-dominant, and none utterly non-viable. Because elite ratings will be rare in the player population (a rating-distribution decision that lands in the player-model layer), the exact curve endpoints barely move league aggregates — the 40–70 middle and the 50-anchor carry the numbers. So the endpoints are set roughly and not over-tuned; getting the two-team case "in the right neighborhood" is sufficient before moving on.
 
 **Next step.** A fresh calibration session re-fits the five logistic curves to the three anchors per zone (editing the `RollHConfig` Floor/Ceiling/K/Midpoint defaults), validates with Python that each curve hits its 1/50/99 anchors and that a rating-50 roster reproduces the targets, then Emmett's harness confirms the aggregate. Hard dependency: this session's per-zone counters must be committed first — the SHOOTING BY ZONE readout is the verification surface.
+
+
+## Shooting-Curve Calibration — Executed (Session 50)
+
+The plan above was executed in the same conversation. The five per-zone logistic make curves in `RollHConfig` were re-fit to the agreed anchors, validated in Python, and confirmed green on the harness.
+
+**Final curve parameters** (`RollHConfig` class defaults; `config.json` does not override them, so these defaults are the live calibration):
+
+| Zone | Floor | Ceiling | K | Midpoint |
+|------|-------|---------|------|----------|
+| Three | 0.1608 | 0.6328 | 0.029646 | 65.8067 |
+| Long  | 0.1934 | 0.6034 | 0.034190 | 59.5793 |
+| Mid   | 0.1042 | 0.6447 | 0.021592 | 42.3369 |
+| Short | 0.1316 | 0.7045 | 0.021592 | 42.3369 |
+| Rim   | 0.3582 | 0.9527 | 0.024666 | 43.9840 |
+
+**The carve correction (why the anchors are not the raw make targets).** The logistic returns the *clean* make rate — the conversion given the shot is neither blocked nor fouled. The harness (and a box score) report *observed* FG% = made / attempts, computed AFTER blocks and shooting fouls are carved out of the pie. The two differ by an affine map per zone: `observed = slope·makePct + intercept`, where `slope = (1 − block − foul)/FGA`, `intercept = (foul·mafFraction)/FGA`, and `FGA = 1 − foul·(1 − mafFraction)`. The agreed anchors are *observed* targets, so each was inverted through its zone's block/foul/maf rates to get the makePct the logistic must output. The effect is negligible on the perimeter (three carve ≈ 1%) and large at the rim (block 0.12, foul 0.20, maf 0.35 → slope 0.78, intercept 0.08), which is why the rim make ceiling sits at ~0.95 to net ~73% observed. **Coupling flag:** this ties the rim/short make anchors to the Roll H block/foul baselines; if those move, the rim/short make curves must be re-derived. Noted in `RollHConfig.cs`.
+
+**Long ≥ Three.** Long's rating-99 even anchor was nudged 49→51% (above Three's 50%) so a long two stays at or above a three at every rating; otherwise the curves crossed at the elite end.
+
+**Phase 6 (f) threshold.** The harness check that a strong defender lowers the generator's make rate demanded a >5-point drop — a value calibrated to the retired steep curve. On the flattened curve a *skill-only* strong defender (PerimD 90 vs a 50 shooter, even athleticism) lowers the three by ~4.9 points, correct by design: a skilled-but-not-more-athletic defender should only nudge a shooter. The floor was relaxed to 0.03. The direction (strong defender lowers make) is the invariant; the magnitude is a design quantity, not an invariant.
+
+**Athletic vs skill (confirmation, not a change).** The engine already encodes "athletic separation suppresses a shooter harder than a skill gap" via DEC-5 (physical gap exponent 2.7 > skill 2.0). The two axes cross at a 25-point gap (= ReferenceScale): below it skill is marginally steeper, above it athletic runs away. Worked example, good shooter (Outside 78) at Three: vs an elite-skill/even-athlete defender 46→43% (barely dented), vs a much-more-athletic defender 46→39% (dragged down), vs both 46→36%. If a future pass wants athletic to dominate at *moderate* gaps too, the lever is a smaller physical ReferenceScale or a higher PhysicalSteepness — left unchanged for now.
+
+**Validated result (frozen-corpus-v1, 1000 games; Run 4 in observations.md):**
+- Combined FG% 57.8% → 50.4%. A rating-50 roster nets 45.1% (real D1 average); the test rosters read ~50% because their shooting ratings average ~64–67 (above average) — the intended consequence of "50 = average," not a hot curve.
+- Per-zone FG% (was → now): Rim 67.9→64.5, Short 64.5→48.3, Mid 49.3→42.3, Long 48.5→41.9, Three 49.7→41.7 — a real efficiency gradient Three < Long < Mid < Short < Rim.
+- Combined PPP 1.19 → 1.08. FT%, shot mix, ORB%, FTr unchanged (the calibration touched only the make curves).

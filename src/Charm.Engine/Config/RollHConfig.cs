@@ -122,39 +122,49 @@ public sealed class RollHConfig
     // --- Per-zone logistic parameters (Phase 2). The real attribute-driven
     //     generator reads the shooter's zone-relevant rating and runs a bounded
     //     logistic: makePct = Floor + (Ceiling - Floor) / (1 + exp(-K * (rating - Midpoint))).
-    //     Five zones, each with its own four parameters. Fitted to three anchor
-    //     points per zone (rating 1 / 50 / 99) in the Phase 2 design session.
+    //     Five zones, each with its own four parameters.
+    //
+    //     CALIBRATED Session 50 (replaces the Phase 2 placeholders). Fitted to the
+    //     agreed per-zone OBSERVED FG% anchors at rating 1 / 50 / 99 (even matchup):
+    //       Three 22/34/50, Long 24/36/51, Mid 26/39/51, Short 30/43/55, Rim 48/61/73.
+    //     50 = average; a rating-50 roster nets ~45% combined (real D1). The curves are
+    //     deliberately gentle (a 16-point rating gap ~= 5% make, inside season noise).
+    //     NOTE: these are clean-make (makePct) anchors carve-CORRECTED for each zone's
+    //     block+foul rates, so the OBSERVED FG% (made/FGA, what the harness reports)
+    //     lands on target — most visibly at Rim, where the make ceiling is raised to
+    //     net ~73% observed after the rim block/foul carve. If the Roll H block or foul
+    //     baselines change, the rim/short make anchors should be re-derived.
     //     Every tunable here — nothing hardcoded in RollHGenerator. ---
 
     // Three (reads player.Outside)
-    public double ThreeFloor    { get; set; } = 0.03;
-    public double ThreeCeiling  { get; set; } = 0.65;
-    public double ThreeK        { get; set; } = 0.057667;
-    public double ThreeMidpoint { get; set; } = 49.6239;
+    public double ThreeFloor    { get; set; } = 0.1608;
+    public double ThreeCeiling  { get; set; } = 0.6328;
+    public double ThreeK        { get; set; } = 0.029646;
+    public double ThreeMidpoint { get; set; } = 65.8067;
 
     // Long (reads player.Outside)
-    public double LongFloor    { get; set; } = 0.03;
-    public double LongCeiling  { get; set; } = 0.63;
-    public double LongK        { get; set; } = 0.061286;
-    public double LongMidpoint { get; set; } = 45.4063;
+    public double LongFloor    { get; set; } = 0.1934;
+    public double LongCeiling  { get; set; } = 0.6034;
+    public double LongK        { get; set; } = 0.034190;
+    public double LongMidpoint { get; set; } = 59.5793;
 
     // Mid (reads player.Mid)
-    public double MidFloor    { get; set; } = 0.05;
-    public double MidCeiling  { get; set; } = 0.67;
-    public double MidK        { get; set; } = 0.059158;
-    public double MidMidpoint { get; set; } = 44.2696;
+    public double MidFloor    { get; set; } = 0.1042;
+    public double MidCeiling  { get; set; } = 0.6447;
+    public double MidK        { get; set; } = 0.021592;
+    public double MidMidpoint { get; set; } = 42.3369;
 
     // Short (reads player.Close)
-    public double ShortFloor    { get; set; } = 0.08;
-    public double ShortCeiling  { get; set; } = 0.83;
-    public double ShortK        { get; set; } = 0.057781;
-    public double ShortMidpoint { get; set; } = 46.3470;
+    public double ShortFloor    { get; set; } = 0.1316;
+    public double ShortCeiling  { get; set; } = 0.7045;
+    public double ShortK        { get; set; } = 0.021592;
+    public double ShortMidpoint { get; set; } = 42.3369;
 
     // Rim (reads player.Finishing)
-    public double RimFloor    { get; set; } = 0.10;
-    public double RimCeiling  { get; set; } = 0.93;
-    public double RimK        { get; set; } = 0.061713;
-    public double RimMidpoint { get; set; } = 42.1330;
+    public double RimFloor    { get; set; } = 0.3582;
+    public double RimCeiling  { get; set; } = 0.9527;
+    public double RimK        { get; set; } = 0.024666;
+    public double RimMidpoint { get; set; } = 43.9840;
 
     /// <summary>
     /// The bounded logistic make probability for a given zone and player rating.

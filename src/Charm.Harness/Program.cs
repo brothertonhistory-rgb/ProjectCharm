@@ -5051,6 +5051,11 @@ internal static class Program
 
         // (f) DEC-6 fallback through the REAL generator: an empty defending slot reads the raw
         //     own-rating (== the even matchup), while a strong defender lowers the sampled rate.
+        //     Margin floor is 0.03: against the Session-50 calibrated (flatter) curve, a skill-ONLY
+        //     strong defender (PerimD 90 vs a 50 shooter, even athleticism) lowers the three by
+        //     ~4-5 points — by design, a skilled-but-not-more-athletic defender only nudges a
+        //     shooter (athletic separation is what suppresses harder). The old 0.05 floor assumed
+        //     the retired steep curve. The direction (strong defender lowers make) is what matters.
         Console.WriteLine("  (f) DEC-6 fallback + end-to-end wiring (real generator, batched):");
         const int Batch = 20_000;
         const double RateTol = 0.02;
@@ -5086,9 +5091,9 @@ internal static class Program
         var rEven   = Rate(GameWith(Mk(50, perimD: 50)),             cfgH, cfgM, Batch);
         var rStrong = Rate(GameWith(Mk(50, perimD: 90)),             cfgH, cfgM, Batch);
         Console.WriteLine($"      empty-slot {rEmpty:P1}   even {rEven:P1}   strong-defender {rStrong:P1}");
-        var fOk = Math.Abs(rEmpty - rEven) <= RateTol && rStrong < rEven - 0.05;
+        var fOk = Math.Abs(rEmpty - rEven) <= RateTol && rStrong < rEven - 0.03;
         if (Math.Abs(rEmpty - rEven) > RateTol) Console.WriteLine("  FAIL  (f) empty-slot fallback diverges from the even-matchup baseline.");
-        if (!(rStrong < rEven - 0.05)) Console.WriteLine("  FAIL  (f) a strong defender did not lower the generator's make rate.");
+        if (!(rStrong < rEven - 0.03)) Console.WriteLine("  FAIL  (f) a strong defender did not lower the generator's make rate by the expected margin.");
         if (fOk) Console.WriteLine("      OK — empty slot reads raw rating (==even); a strong defender lowers make% through the real pipe.");
         pass &= fOk;
 

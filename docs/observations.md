@@ -6,6 +6,44 @@ This file archives every `ObservationRunV1` (and future vN) sentinel block in fu
 
 ---
 
+## Run 4 — frozen-corpus-v1, shooting-curve calibration applied (2026-06-16)
+
+**Run 4 vs Run 3:** Same corpus, same RNG seeds. Session 50 re-fit the five per-zone logistic make curves (`RollHConfig` defaults) to the agreed observed-FG% anchors. This is an *engine* change, not an additive counter, so it shifts RNG draw topology — per the caveat above, means are comparable but individual possessions are not paired. The sections that moved are reproduced below; pace, shot mix, ORB%, and FTr are materially unchanged from Run 3 (a made shot that becomes a miss still feeds a rebound, so possession structure barely moves).
+
+**Hash caveat (latent):** the printed config hash (`5196d857…`) is identical to Run 3 even though the make curves changed, because the hash is computed over `config.json` and the calibration lives in the `RollHConfig` class defaults. The hash does NOT fingerprint `.cs`-level calibration — flagged for a future "fingerprint the resolved config" pass. The distinguishing fact between Run 3 and Run 4 is the FG%, not the hash.
+
+```
+--- PPP (points per possession) ---
+    Home        mean= 1.0827  sd=0.1290
+    Away        mean= 1.0851  sd=0.1412
+    Combined    mean= 1.0838  sd=0.0909   (Run 3: ~1.19)
+
+--- SCORE & MARGIN ---
+    Home score  mean=   71.9  sd=  8.9
+    Away score  mean=   71.2  sd=  9.4
+    Margin      mean=    0.7  sd= 13.1
+
+--- SHOOTING SPLITS ---
+  FG% combined   mean= 0.5043  sd=0.0470   (Run 3: 0.578)
+  3P% combined   mean= 0.4170  sd=0.0979   (Run 3: 0.497)
+  FT% combined   mean= 0.7237  sd=0.0709   (unchanged — Roll L untouched)
+
+--- SHOOTING BY ZONE (combined, per game) ---
+  FG% by zone (per-game mean):     Run 3  ->  Run 4
+    Rim     0.679 -> 0.645
+    Short   0.645 -> 0.483
+    Mid     0.493 -> 0.423
+    Long    0.485 -> 0.419
+    Three   0.497 -> 0.417
+  Attempt share by zone (per-game mean, ~unchanged):
+    Rim 0.329  Short 0.162  Mid 0.161  Long 0.099  Three 0.249
+```
+
+**Notes (recorded, not judged):**
+- A real efficiency gradient now exists: Three (41.7%) < Long (41.9%) < Mid (42.3%) < Short (48.3%) < Rim (64.5%). The middle-three cluster from Run 3 is gone.
+- Combined FG% 50.4% sits above the real-D1 ~45% average by design: these rosters average ~64–67 in shooting skills, and on the calibrated curve a rating-50 roster nets exactly 45.1%. The elevation is above-average rosters, not a hot curve.
+- PPP 1.19 → 1.08, into the realistic band. All mechanical checks (reconciliation, denominator, zone bins) green; all Phase 1–16 wiring checks green.
+
 ## Run 3 — frozen-corpus-v1, per-zone shooting added (2026-06-16)
 
 **Run 3 vs Run 2:** Same corpus, same config (hash matches), same RNG seeds. Session 50 added a make/attempt counter per shot zone; the only new output is the `SHOOTING BY ZONE` section. Every v1/v2 sentinel is byte-identical to Run 2 (the counters are passive), so only the new zone block is reproduced here rather than duplicating the full Run 2 archive.
