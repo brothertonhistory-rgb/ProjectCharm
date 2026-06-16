@@ -4165,3 +4165,48 @@ The Governor does not add the counters to `GovernorRunResult`'s aggregate fields
 - Bonus FT trip (ResolveFreeThrows): FGA=0, FTM=k, points=k
 
 The identity was validated by Python Monte Carlo (23/23 cases) before any C# was written.
+
+
+---
+
+## Per-Zone Shooting Counters (Session 50)
+
+**What this session adds.** Eight integer counters extend the v1 set: `RimFga`/`RimFgm`, `ShortFga`/`ShortFgm`, `MidFga`/`MidFgm`, `LongFga`/`LongFgm`. The Three zone reuses the existing `ThreePa`/`ThreePm` pair rather than adding a redundant ninth/tenth, so the five zones are covered by four new pairs plus Three. Same shape as the v1 counters: init-only fields on `RoutingOutcome`, threaded through `PossessionRecord`, reduced in the harness. No weight or routing moved.
+
+**One chokepoint, binned by zone.** Every field-goal attempt already passes through `IntoShotResolution` (the case that calls `RollH.Execute`), where the v1 FGA/FGM tally lives. The per-zone bin happens at that same single site: a switch on the stamped `ShotLocation` routes the attempt (and the make, if any) into exactly one of the five zone counters. No second site, no new field on any outcome type — the zone is already on `result.State`. This is the single-chokepoint discipline from the v1 FGA work, extended.
+
+**The bin-integrity guard.** Two mechanical checks pin the zone split to the totals: `RimFga + ShortFga + MidFga + LongFga + ThreePa == FGA`, and the same for makes against FGM. This is the per-zone analog of the v1 denominator guard. If a shot ever failed to bin (e.g. a null `ShotLocation`), the sums fall short of FGA/FGM and the check fails loud rather than silently distorting a zone's FG%. Validated by Python Monte Carlo (9/9 bin cases) before delivery.
+
+**What it exposed.** The combined 57.8% FG% decomposes as Rim 67.9% / Short 64.5% / Mid 49.3% / Long 48.5% / Three 49.7%, with attempt shares Rim 32% / Short 16% / Mid 16% / Long 10% / Three 25%. The five reconstruct the combined figure exactly. The reading is decisive: the high FG% is make-rate, not shot selection (the mid-heavy mix, if anything, suppresses FG%). This is the data the calibration plan below is built on.
+
+---
+
+## Shooting-Curve Calibration Plan (Session 50)
+
+**Status: confirmed design, not yet executed.** The per-zone counters above exposed the shooting numbers; this section records the calibration decisions reached conversationally. A separate fresh session executes the re-fit.
+
+**Where the make rate comes from.** Roll H's make% is a per-zone bounded logistic owned by `RollHConfig`: `make = Floor + (Ceiling − Floor) / (1 + exp(−K·(rating − Midpoint)))`, with its own Floor/Ceiling/K/Midpoint per zone (five sets, living in the class defaults — `config.json` does not override them). The rating fed in is the shooter's zone-relevant attribute (Three/Long→Outside, Mid→Mid, Short→Close, Rim→Finishing), slid by the matchup (`Matchup.EffectiveRating` = own rating + skill-gap shift + athletic-gap shift, both odd and zero at an even matchup). These five logistic parameter sets are the calibration dials.
+
+**Why the game FG% is high (the decisive trace).** At an even (rating-50) matchup the current curve already returns ~the real targets: Three 34.3%, Rim 61.4%, Long 37.2%, Mid 41.2%, Short 49.4%. Three/Rim/Long are essentially on target at 50. The game reads ~50% threes / ~68% rim only because the test rosters are rated ~64–67 in their shooting skills — they sit on the upper part of the curve. Feeding the actual roster ratings through the logistic reproduces the observed per-zone FG% almost to the decimal (the rim gap is blocked shots). The matchup shift is minor (a 10–20 point rating gap moves effective rating ~1–4 points). So the FG% problem is not a 13-point miscalibration of the curve — it is above-average rosters read against a curve that is correct at the average.
+
+**Decision — 50 is absolute average.** On the 1–99 scale, 50 is dead-on average (25 = below average, 75 = above). At equal context a 50-rated shooter vs a 50-rated defender cancels to the zone's average make rate (e.g. 34% from three). The engine already implements exactly this — the two gap-shift terms are zero at 50-vs-50, so the effective rating stays 50. This is the level-flat principle made concrete: one curve for all divisions; D2/D3/JUCO differ by where their players' ratings fall, not by a separate curve.
+
+**Decision — the curves are centered right but too steep.** At an even matchup the current curve gives a rating-99 three-shooter ~62% and a rating-1 shooter ~6% — roughly 2–3× the real spread (real elite ~44%, real floor ~27%). An over-steep curve means dominance is partly *imposed by the curve* rather than emerging from attributes, which cuts against the project's thesis. Calibration = flatten all five curves: floors up, ceilings down, the 50-anchor held at the targets. The Short zone (49.4% at rating 50 vs ~43% target) is the one mid-anchor that also comes down.
+
+**The agreed anchors** (rough, 2015–2025 D1 style; even matchup unless noted):
+
+| Zone | rating 1 | rating 50 | rating 99 even | rating 99 maxed |
+|------|----------|-----------|----------------|-----------------|
+| Rim   | ~48% | 61% | ~73% | ~80% |
+| Short | ~30% | 43% | ~55% | ~63% |
+| Mid   | ~26% | 39% | ~51% | ~59% |
+| Long  | ~24% | 36% | ~49% | ~57% |
+| Three | ~22% | 34% | ~50% | ~60% |
+
+Emmett set the Three endpoints explicitly: a 99 three-shooter tops at ~50% at an even matchup and ~60% with every advantage (the matchup shift owns the 50→60 band; the logistic itself tops near 50 at even). The rating-1 column is the worst shooter in the file at even; max disadvantage pushes a bit below. The 50-row is the locked target set. The gentle middle is the point: a 16-point rating gap (e.g. 46 vs 62, both a B/C grade) maps to ~5% make difference — inside the season-to-season noise band (a ~100–150-attempt season carries a ±~4% binomial SE; you need a true gap of >~10% to distinguish two shooters), so nearby ratings are correctly indistinguishable.
+
+**Principle — era lives in the shot mix, not these curves.** Per-zone make rates are ~era-invariant (a mid-range jumper hit ~39% in 1995 and ~39% in 2020; what changed is how often it was taken). "Modern (minimal mid-range) vs 1990s (mid-range-heavy)" is a Roll G location-weight profile swapped later, on top of fixed make curves. Calibrate the curves once now; the era selector drops in without redoing them.
+
+**Principle — the real at-scale calibration target is a healthy strategy space.** Matching D1 aggregate FG% is the small-scale check. The harder, truer test arrives only when 350 teams of varying talent play full conference/non-conference schedules: no style should be bizarre-dominant, and none utterly non-viable. Because elite ratings will be rare in the player population (a rating-distribution decision that lands in the player-model layer), the exact curve endpoints barely move league aggregates — the 40–70 middle and the 50-anchor carry the numbers. So the endpoints are set roughly and not over-tuned; getting the two-team case "in the right neighborhood" is sufficient before moving on.
+
+**Next step.** A fresh calibration session re-fits the five logistic curves to the three anchors per zone (editing the `RollHConfig` Floor/Ceiling/K/Midpoint defaults), validates with Python that each curve hits its 1/50/99 anchors and that a rating-50 roster reproduces the targets, then Emmett's harness confirms the aggregate. Hard dependency: this session's per-zone counters must be committed first — the SHOOTING BY ZONE readout is the verification surface.

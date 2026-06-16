@@ -146,6 +146,31 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// <c>OrbWon / OrbChances</c> across all possessions.
     /// </summary>
     public int OrbWon { get; init; }
+
+    // ── Per-zone field-goal counters (shot-mix observability) ──────────────────
+    // A make/attempt pair for each of the four non-Three zones. The Three zone
+    // reuses the existing <see cref="ThreePa"/>/<see cref="ThreePm"/> pair, so all
+    // five zones are covered without redundancy. Each FGA bins to exactly one zone
+    // (the harness asserts RimFga+ShortFga+MidFga+LongFga+ThreePa == Fga), so per-zone
+    // FG% (zoneFgm/zoneFga) and attempt share (zoneFga/Fga) both fall out. All eight
+    // are init-only with 0 defaults — a pure append, like the v1 counters.
+
+    /// <summary>Rim-zone field-goal attempts (the <see cref="ShotLocation.Rim"/> subset of <see cref="Fga"/>).</summary>
+    public int RimFga { get; init; }
+    /// <summary>Rim-zone field goals made (the <see cref="ShotLocation.Rim"/> subset of <see cref="Fgm"/>).</summary>
+    public int RimFgm { get; init; }
+    /// <summary>Short-zone field-goal attempts (the <see cref="ShotLocation.Short"/> subset of <see cref="Fga"/>).</summary>
+    public int ShortFga { get; init; }
+    /// <summary>Short-zone field goals made (the <see cref="ShotLocation.Short"/> subset of <see cref="Fgm"/>).</summary>
+    public int ShortFgm { get; init; }
+    /// <summary>Mid-zone field-goal attempts (the <see cref="ShotLocation.Mid"/> subset of <see cref="Fga"/>).</summary>
+    public int MidFga { get; init; }
+    /// <summary>Mid-zone field goals made (the <see cref="ShotLocation.Mid"/> subset of <see cref="Fgm"/>).</summary>
+    public int MidFgm { get; init; }
+    /// <summary>Long-two-zone field-goal attempts (the <see cref="ShotLocation.Long"/> subset of <see cref="Fga"/>).</summary>
+    public int LongFga { get; init; }
+    /// <summary>Long-two-zone field goals made (the <see cref="ShotLocation.Long"/> subset of <see cref="Fgm"/>).</summary>
+    public int LongFgm { get; init; }
 }
 
 /// <summary>
@@ -328,6 +353,14 @@ public sealed class Resolver
         var ftm = 0;
         var orbChances = 0;
         var orbWon = 0;
+        var rimFga = 0;
+        var rimFgm = 0;
+        var shortFga = 0;
+        var shortFgm = 0;
+        var midFga = 0;
+        var midFgm = 0;
+        var longFga = 0;
+        var longFgm = 0;
         var iterations = 0;
         const int IterationCeiling = 10_000;
 
@@ -361,7 +394,9 @@ public sealed class Resolver
                         { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods,
                           Fga = fga, Fgm = fgm, ThreePa = threePa, ThreePm = threePm,
                           ShotResolutions = shotResolutions, MissFouled = missFouled,
-                          Fta = fta, Ftm = ftm, OrbChances = orbChances, OrbWon = orbWon };
+                          Fta = fta, Ftm = ftm, OrbChances = orbChances, OrbWon = orbWon,
+                          RimFga = rimFga, RimFgm = rimFgm, ShortFga = shortFga, ShortFgm = shortFgm,
+                          MidFga = midFga, MidFgm = midFgm, LongFga = longFga, LongFgm = longFgm };
 
                 case Continue c:
                     switch (c.Next)
@@ -566,12 +601,28 @@ public sealed class Resolver
                                 else
                                 {
                                     // All six remaining outcomes are a field-goal attempt.
+                                    // Bin the attempt into its zone (each FGA lands in exactly
+                                    // one of the five zones; the harness asserts the bins sum to FGA).
                                     fga++;
-                                    if (shotSt.ShotType == ShotLocation.Three) threePa++;
+                                    switch (shotSt.ShotType)
+                                    {
+                                        case ShotLocation.Three: threePa++; break;
+                                        case ShotLocation.Long:  longFga++;  break;
+                                        case ShotLocation.Mid:   midFga++;   break;
+                                        case ShotLocation.Short: shortFga++; break;
+                                        case ShotLocation.Rim:   rimFga++;   break;
+                                    }
                                     if (shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled)
                                     {
                                         fgm++;
-                                        if (shotSt.ShotType == ShotLocation.Three) threePm++;
+                                        switch (shotSt.ShotType)
+                                        {
+                                            case ShotLocation.Three: threePm++; break;
+                                            case ShotLocation.Long:  longFgm++;  break;
+                                            case ShotLocation.Mid:   midFgm++;   break;
+                                            case ShotLocation.Short: shortFgm++; break;
+                                            case ShotLocation.Rim:   rimFgm++;   break;
+                                        }
                                     }
                                 }
                             }

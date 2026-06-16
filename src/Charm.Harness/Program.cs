@@ -4104,6 +4104,18 @@ internal static class Program
         var orbPctList        = new List<double>(N);  // ORB won / ORB chances combined
         var ftrList           = new List<double>(N);  // FTA / FGA combined
 
+        // ── Per-zone shooting accumulators (combined; FG% and attempt share per zone) ──
+        var rimFgPctList    = new List<double>(N);
+        var shortFgPctList  = new List<double>(N);
+        var midFgPctList    = new List<double>(N);
+        var longFgPctList   = new List<double>(N);
+        var threeFgPctList  = new List<double>(N);
+        var rimShareList    = new List<double>(N);
+        var shortShareList  = new List<double>(N);
+        var midShareList    = new List<double>(N);
+        var longShareList   = new List<double>(N);
+        var threeShareList  = new List<double>(N);
+
         // Terminal mix — accumulated across all possessions, all games.
         var termBuckets = new Dictionary<string, long>
         {
@@ -4258,6 +4270,33 @@ internal static class Program
                 mechanicsOk = false;
             }
 
+            // ── Mechanical check — per-zone bin integrity ───────────────────────
+            // Every FGA bins into exactly one of the five zones, and every FGM likewise.
+            // (Three uses the existing ThreePa/ThreePm pair; the other four use the new
+            // per-zone counters.) If a shot's zone ever failed to bin, these sums would
+            // fall short of FGA/FGM and fail loud — the per-zone analog of the denominator
+            // guard, pinning the zone splits to the totals.
+            var recRimA   = records.Sum(r => r.RimFga);
+            var recShortA = records.Sum(r => r.ShortFga);
+            var recMidA   = records.Sum(r => r.MidFga);
+            var recLongA  = records.Sum(r => r.LongFga);
+            var recRimM   = records.Sum(r => r.RimFgm);
+            var recShortM = records.Sum(r => r.ShortFgm);
+            var recMidM   = records.Sum(r => r.MidFgm);
+            var recLongM  = records.Sum(r => r.LongFgm);
+            if (recRimA + recShortA + recMidA + recLongA + rec3pa != recFga)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: zone-attempt bin — Rim({recRimA})+Short({recShortA})+Mid({recMidA})+Long({recLongA})+Three({rec3pa}) != FGA({recFga})");
+                mechanicsOk = false;
+            }
+            if (recRimM + recShortM + recMidM + recLongM + rec3pm != recFgm)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: zone-make bin — Rim({recRimM})+Short({recShortM})+Mid({recMidM})+Long({recLongM})+Three({rec3pm}) != FGM({recFgm})");
+                mechanicsOk = false;
+            }
+
             var hPoss = records.Count(r => r.Offense == TeamSide.Home);
             var aPoss = records.Count(r => r.Offense == TeamSide.Away);
             var hPts  = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Points);
@@ -4328,6 +4367,27 @@ internal static class Program
             threePaRateList.Add(tFga > 0   ? (double)t3pa / tFga     : 0.0);
             orbPctList.Add(tOrbCh > 0      ? (double)tOrbWon / tOrbCh : 0.0);
             ftrList.Add(tFga > 0           ? (double)tFta / tFga     : 0.0);
+
+            // Per-zone shooting (combined): FG% by zone and attempt share by zone.
+            // Three reuses t3pa/t3pm (computed above); the other four sum the per-zone counters.
+            var tRimA   = records.Sum(r => r.RimFga);
+            var tShortA = records.Sum(r => r.ShortFga);
+            var tMidA   = records.Sum(r => r.MidFga);
+            var tLongA  = records.Sum(r => r.LongFga);
+            var tRimM   = records.Sum(r => r.RimFgm);
+            var tShortM = records.Sum(r => r.ShortFgm);
+            var tMidM   = records.Sum(r => r.MidFgm);
+            var tLongM  = records.Sum(r => r.LongFgm);
+            rimFgPctList.Add(tRimA > 0     ? (double)tRimM / tRimA     : 0.0);
+            shortFgPctList.Add(tShortA > 0 ? (double)tShortM / tShortA : 0.0);
+            midFgPctList.Add(tMidA > 0     ? (double)tMidM / tMidA     : 0.0);
+            longFgPctList.Add(tLongA > 0   ? (double)tLongM / tLongA   : 0.0);
+            threeFgPctList.Add(t3pa > 0    ? (double)t3pm / t3pa       : 0.0);
+            rimShareList.Add(tFga > 0      ? (double)tRimA / tFga      : 0.0);
+            shortShareList.Add(tFga > 0    ? (double)tShortA / tFga    : 0.0);
+            midShareList.Add(tFga > 0      ? (double)tMidA / tFga      : 0.0);
+            longShareList.Add(tFga > 0     ? (double)tLongA / tFga     : 0.0);
+            threeShareList.Add(tFga > 0    ? (double)t3pa / tFga       : 0.0);
 
             foreach (var r in records)
             {
@@ -4418,7 +4478,21 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("--- SHOT MIX ---");
         ObsPrintD("  3PA rate (3PA/FGA, combined)", threePaRateList);
-        Console.WriteLine("  (Full per-zone distribution deferred — needs per-zone counter beyond Three-vs-not)");
+
+        Console.WriteLine();
+        Console.WriteLine("--- SHOOTING BY ZONE (combined, per game) ---");
+        Console.WriteLine("  FG% by zone:");
+        ObsPrintD("    Rim",   rimFgPctList);
+        ObsPrintD("    Short", shortFgPctList);
+        ObsPrintD("    Mid",   midFgPctList);
+        ObsPrintD("    Long",  longFgPctList);
+        ObsPrintD("    Three", threeFgPctList);
+        Console.WriteLine("  Attempt share by zone (fraction of FGA from each zone):");
+        ObsPrintD("    Rim",   rimShareList);
+        ObsPrintD("    Short", shortShareList);
+        ObsPrintD("    Mid",   midShareList);
+        ObsPrintD("    Long",  longShareList);
+        ObsPrintD("    Three", threeShareList);
 
         Console.WriteLine();
         Console.WriteLine("--- ORB% (offensive rebound rate, FG-miss + block + FT misses combined) ---");
@@ -4430,7 +4504,6 @@ internal static class Program
 
         Console.WriteLine();
         Console.WriteLine("--- DEFERRED SENTINELS (counter-plumbing needed — future session) ---");
-        Console.WriteLine("  Full shot mix (per-zone attempt distribution beyond Three-vs-not)");
         Console.WriteLine("  Press frequency / break rate at game level");
 
         Console.WriteLine();

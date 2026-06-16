@@ -6,6 +6,33 @@ This file archives every `ObservationRunV1` (and future vN) sentinel block in fu
 
 ---
 
+## Run 3 — frozen-corpus-v1, per-zone shooting added (2026-06-16)
+
+**Run 3 vs Run 2:** Same corpus, same config (hash matches), same RNG seeds. Session 50 added a make/attempt counter per shot zone; the only new output is the `SHOOTING BY ZONE` section. Every v1/v2 sentinel is byte-identical to Run 2 (the counters are passive), so only the new zone block is reproduced here rather than duplicating the full Run 2 archive.
+
+```
+--- SHOOTING BY ZONE (combined, per game) ---
+  FG% by zone (per-game mean):
+    Rim     mean= 0.679
+    Short   mean= 0.645
+    Mid     mean= 0.493
+    Long    mean= 0.485
+    Three   mean= 0.497
+  Attempt share by zone (fraction of FGA, per-game mean):
+    Rim     mean= 0.320
+    Short   mean= 0.164
+    Mid     mean= 0.163
+    Long    mean= 0.100
+    Three   mean= 0.253
+```
+
+*(Per-game spread — sd/min/max — for the zone rows printed to the run console but is not reproduced in this archive entry; the means recorded above are the calibration-relevant figures. The five FG% values weighted by their attempt shares reconstruct the combined 57.8% FG% from Run 2 exactly.)*
+
+**Notes on this reading (recorded, not judged — calibration is a later gated phase):**
+- Every zone is above its real-D1 ballpark; the middle three (Mid 49.3%, Long 48.5%, Three 49.7%) cluster with no efficiency gradient — a long two should be the worst two-point shot and a three worth 50% more.
+- Confirms the high combined FG% is make-rate, not shot mix: the mid-heavy attempt split (Short + Mid + Long ≈ 43% of attempts) would suppress FG% if anything, not inflate it.
+- This is the readout the Session 50 shooting-curve calibration plan (see `design.md`) is built on, and the verification surface for the upcoming calibration re-fit.
+
 ## Run 2 — frozen-corpus-v1, v2 sentinels (2026-06-16)
 
 **v2 vs v1:** Same corpus, same config, same RNG seeds. The counter-plumbing session (Session 49) added per-possession shot and rebound counters to the resolver and threaded them through the Governor. Run 2 is the same 1,000 games with additional sentinel sections — not a corpus change. The config hash matches Run 1 exactly.

@@ -54,6 +54,18 @@ namespace Charm.Engine;
 /// <param name="OrbWon">Offensive rebounds won on this possession — Roll I or Roll M
 /// resolutions where the offense secured the board. The team offensive-rebound rate is
 /// <c>OrbWon / OrbChances</c> across possessions. Zero on NoShot possessions.</param>
+/// <param name="OrbWon">Offensive rebounds won on this possession — Roll I or Roll M
+/// resolutions where the offense secured the board. The team offensive-rebound rate is
+/// <c>OrbWon / OrbChances</c> across possessions. Zero on NoShot possessions.</param>
+/// <param name="RimFga">Rim-zone field-goal attempts on this possession (the
+/// <see cref="ShotLocation.Rim"/> subset of <see cref="Fga"/>). Zero on NoShot.</param>
+/// <param name="RimFgm">Rim-zone field goals made on this possession. Zero on NoShot.</param>
+/// <param name="ShortFga">Short-zone field-goal attempts on this possession. Zero on NoShot.</param>
+/// <param name="ShortFgm">Short-zone field goals made on this possession. Zero on NoShot.</param>
+/// <param name="MidFga">Mid-zone field-goal attempts on this possession. Zero on NoShot.</param>
+/// <param name="MidFgm">Mid-zone field goals made on this possession. Zero on NoShot.</param>
+/// <param name="LongFga">Long-two-zone field-goal attempts on this possession. Zero on NoShot.</param>
+/// <param name="LongFgm">Long-two-zone field goals made on this possession. Zero on NoShot.</param>
 public sealed record PossessionRecord(
     int Number,
     TeamSide Offense,
@@ -75,7 +87,15 @@ public sealed record PossessionRecord(
     int Fta = 0,
     int Ftm = 0,
     int OrbChances = 0,
-    int OrbWon = 0);
+    int OrbWon = 0,
+    int RimFga = 0,
+    int RimFgm = 0,
+    int ShortFga = 0,
+    int ShortFgm = 0,
+    int MidFga = 0,
+    int MidFgm = 0,
+    int LongFga = 0,
+    int LongFgm = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -229,6 +249,8 @@ public sealed class Governor
             int possessionFga = 0, possessionFgm = 0, possessionThreePa = 0, possessionThreePm = 0;
             int possessionShotResolutions = 0, possessionMissFouled = 0;
             int possessionFta = 0, possessionFtm = 0, possessionOrbChances = 0, possessionOrbWon = 0;
+            int possessionRimFga = 0, possessionRimFgm = 0, possessionShortFga = 0, possessionShortFgm = 0;
+            int possessionMidFga = 0, possessionMidFgm = 0, possessionLongFga = 0, possessionLongFgm = 0;
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -291,6 +313,14 @@ public sealed class Governor
                 possessionFtm             = outcome.Ftm;
                 possessionOrbChances      = outcome.OrbChances;
                 possessionOrbWon          = outcome.OrbWon;
+                possessionRimFga          = outcome.RimFga;
+                possessionRimFgm          = outcome.RimFgm;
+                possessionShortFga        = outcome.ShortFga;
+                possessionShortFgm        = outcome.ShortFgm;
+                possessionMidFga          = outcome.MidFga;
+                possessionMidFgm          = outcome.MidFgm;
+                possessionLongFga         = outcome.LongFga;
+                possessionLongFgm         = outcome.LongFgm;
             }
 
             // Shared by all three intent values + normal possessions.
@@ -306,7 +336,9 @@ public sealed class Governor
                 endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, half, intent,
                 possessionFga, possessionFgm, possessionThreePa, possessionThreePm,
                 possessionShotResolutions, possessionMissFouled,
-                possessionFta, possessionFtm, possessionOrbChances, possessionOrbWon));
+                possessionFta, possessionFtm, possessionOrbChances, possessionOrbWon,
+                possessionRimFga, possessionRimFgm, possessionShortFga, possessionShortFgm,
+                possessionMidFga, possessionMidFgm, possessionLongFga, possessionLongFgm));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition

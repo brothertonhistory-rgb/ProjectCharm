@@ -1,3 +1,37 @@
+## Session 50 — Per-zone shooting counters + shooting-curve calibration plan (2026-06-16)
+
+**Scope:** Two parts. (1) Build: extend the v1 counters with a make/attempt pair per shot zone so the harness reports FG% and attempt share for Rim/Short/Mid/Long/Three separately (Three reuses the existing 3PA/3PM pair). Additive only — no weight, routing, or pie moved. (2) Design conversation: with the per-zone data in hand, settle the shooting make-curve calibration plan. No calibration executed this session.
+
+**What shipped (build):**
+- `Core/Resolver.cs` — `RoutingOutcome` gains 8 new `init`-only fields (`RimFga`/`RimFgm`, `ShortFga`/`ShortFgm`, `MidFga`/`MidFgm`, `LongFga`/`LongFgm`), 0 defaults. `Route` bins each resolved shot into its zone at the single `IntoShotResolution` chokepoint (the same site as the v1 FGA tally), switching on `ShotLocation`. Three continues to use `ThreePa`/`ThreePm`.
+- `Core/Governor.cs` — `PossessionRecord` gains the same 8 parameters (default 0); `Run` threads them through.
+- `Harness/Program.cs` — new `SHOOTING BY ZONE (combined, per game)` section: FG% by zone and attempt share by zone. Two new mechanical checks: zone attempts sum to FGA, zone makes sum to FGM (the per-zone analog of the v1 denominator guard). DEFERRED section trimmed — full shot mix is now live; only press frequency/break rate remains.
+
+**New archive entry:** `docs/observations.md` — Run 3 prepended (same frozen-corpus-v1 run as Run 2, plus the zone section).
+
+**Harness result — ALL CHECKS PASSED:**
+- All v1/v2 checks still green (additive, nothing leaked) ✓
+- Zone-attempt bin (`Rim+Short+Mid+Long+Three == FGA`) passed 1,000/1,000 ✓
+- Zone-make bin (`== FGM`) passed 1,000/1,000 ✓
+- SHOOTING BY ZONE section finite and in range ✓
+
+**First readings — per-zone (recorded, not judged):**
+- FG% by zone: Rim 67.9%, Short 64.5%, Mid 49.3%, Long 48.5%, Three 49.7%. Combined 57.8% (reconstructs from the five exactly).
+- Attempt share: Rim 32.0%, Short 16.4%, Mid 16.3%, Long 10.0%, Three 25.3%.
+- Diagnosis: the high combined FG% is make-rate, not shot mix — every zone is above its real-D1 ballpark, and the middle three (Mid/Long/Three) cluster ~49% with no efficiency gradient.
+
+**Python Monte Carlo:** 9/9 zone-bin invariant cases passed before C# delivery.
+
+**Design conversation — shooting-curve calibration plan (settled; full detail in design.md):**
+- The Roll H make rate is a per-zone bounded logistic in `RollHConfig` (Floor/Ceiling/K/Midpoint × 5, in the class defaults). Tracing it: at an even (rating-50) matchup it ALREADY returns ~the targets (Three 34.3%, Rim 61.4%, Long 37.2%). The inflated game FG% is because the test rosters are rated ~64–67 in shooting skills, not 50 — they read off the upper part of the curve. Feeding actual roster ratings through the curve reproduces the observed per-zone FG% almost to the decimal. The matchup shift is minor.
+- **Decision — 50 is absolute average** on the 1–99 scale (25 below, 75 above). A 50 shooter vs a 50 defender cancels to the zone target (34% from three); the engine already implements this (gap-shifts are zero at 50-vs-50). This is the level-flat principle: one curve for all divisions, distributions differ.
+- **Decision — the curves are centered right but too steep.** Even-matchup, the current curve gives a 99 three-shooter ~62% and a 1-rated shooter ~6% — ~2–3× the real spread, which means dominance is partly imposed by the curve rather than emergent. Calibration = flatten all five (floors up, ceilings down, 50-anchor held). Per-zone 1/50/99 anchor table recorded in design.md; Emmett set Three's endpoints (~50% even / ~60% maxed for a 99).
+- **Principle — era lives in the shot mix, not these curves.** Make rates are ~era-invariant; "modern vs 1990s" is a Roll G location-weight profile swapped later, leaving the make curves fixed.
+- **Principle — the real at-scale calibration target is a healthy strategy space** (no style bizarre-dominant, none non-viable), which only manifests once 350 unequal teams play full schedules. Small-scale tuning has diminishing returns; settle roughly and move on. Because elite ratings will be rare, the curve endpoints barely move league aggregates.
+- **Next step:** a fresh calibration session re-fits the five logistic curves to the agreed anchors (`RollHConfig` Floor/Ceiling/K/Midpoint). Hard dependency: this session's per-zone counters must be committed first — the SHOOTING BY ZONE readout is the verification surface.
+
+**Git commit:** Emmett stamps.
+
 ## Session 49 — Counter Plumbing v1: shooting + rebounding sentinels (2026-06-16)
 
 **Scope:** Add per-possession shot and rebound counters at the resolver's existing scoring sites, thread them through to `PossessionRecord`, and emit a v2 observation block that reports the shooting splits, shot mix, ORB%, and FTr that the v1 block deferred. No probability weights moved. No outcome routing changed. The engine records more about itself; it does not play differently.
