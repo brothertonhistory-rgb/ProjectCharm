@@ -1,3 +1,31 @@
+## Session 48 — Observation Run v1: macro sentinel harness (2026-06-16)
+
+**Scope:** Stand up a repeatable observation harness. Runs N full games against a frozen scenario corpus and emits one self-describing macro-sentinel block. Recorded, not judged. No engine changes, no config changes, no calibration.
+
+**What shipped:**
+- `Harness/Program.cs` — `ObservationRunV1` method and helpers (`ObsBucket`, `ObsPrintI`, `ObsPrintD`, `ObsHistI`, `ObsHistD`); wired into `Main` after all existing phase checks; runs 1,000 full games using the real matchup-aware generators (A, B, F, G, H, I, M) and stub generators for all others.
+
+**New file:** `docs/observations.md` — flight recorder archive; Run 1 (frozen-corpus-v1) stamped.
+
+**Harness result — 1,000/1,000 games completed, all mechanics green:**
+- Scoring reconciled per game ✓
+- Count invariant held (TerminalEnded + Parked + NoShot == total) ✓
+- Zero parks — engine chain through Roll M is complete and wired ✓
+- No throws ✓
+- Loose sanity (PPP ∈ (0,3), pace ∈ (0,200)) ✓
+
+**First readings (observations only — not calibration targets):**
+- Pace: mean=133.3 total / ~67 per team — realistic (real D1 is ~65–72/team). Engine lands here naturally without calibration.
+- Combined PPP: 1.19 (real D1 ~1.0–1.1). Somewhat high; the more notable number going into calibration.
+- Combined PPP: 1.19 (real D1 ~1.0–1.1). Logged.
+- APL: 18.0s. Stable; matches prior single-game reading.
+- Fouls: ~11.3 Home / ~11.5 Away per game.
+- Zero parks confirmed.
+
+**Discipline enforced:** No config values were changed. The ~2× pace reading is logged as an observation. Calibration is a later, gated phase — the identical failure mode that sank prior attempts.
+
+**Git commit:** Emmett stamps.
+
 ## Session 47 — Phase 16: press-break fast break (2026-06-16)
 
 **Scope:** When Roll A returns `CleanEntry` under `PressMode.Standard`, stamp `FastBreak=true`, consume the press stamp (`PressMode=None`), skip Roll B, route directly to Roll E. Roll G returns a flat rim-heavy pie when `FastBreak=true`. Dead-ball re-inbounds enforce state hygiene.

@@ -133,6 +133,7 @@ internal static class Program
         ok &= Phase15PressFrequencyStandardCheck(configPath);
         ok &= Phase16PressBreakFastBreakCheck(configPath);
 
+        ObservationRunV1(configPath);
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
     }
@@ -4010,6 +4011,377 @@ internal static class Program
         Console.WriteLine($"  ==========================================");
         Console.WriteLine();
         Console.WriteLine($"  {records.Count} possessions  |  APL {result.TotalSeconds / records.Count:F1}s  |  total {result.TotalSeconds:N0}s");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Observation Run v1 — macro sentinel harness (frozen-corpus-v1)
+    //
+    // Runs N full games against a frozen scenario corpus and emits one
+    // self-describing macro-sentinel block. RECORDED, NOT JUDGED: no number
+    // triggers a realism pass/fail. Only five mechanical checks assert anything.
+    //
+    // SCOPE WALLS:
+    //   - No config values change in this method.
+    //   - No new engine fields or instrumentation.
+    //   - No judgment / target lines in the output.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static void ObservationRunV1(string configPath)
+    {
+        const string CorpusId = "frozen-corpus-v1";
+        const int    N         = 1_000;   // games per run — configurable constant
+
+        Console.WriteLine();
+        Console.WriteLine($"=== OBSERVATION RUN — {CorpusId} ===");
+
+        // ── Configs — loaded once; immutable across all N games. ─────────
+        var cfg          = RollAConfig.Load(configPath);
+        var cfgB         = RollBConfig.Load(configPath);
+        var cfgC         = RollCConfig.Load(configPath);
+        var cfgD         = RollDConfig.Load(configPath);
+        var cfgE         = RollEConfig.Load(configPath);
+        var cfgF         = RollFConfig.Load(configPath);
+        var cfgG         = RollGConfig.Load(configPath);
+        var cfgH         = RollHConfig.Load(configPath);
+        var cfgI         = RollIConfig.Load(configPath);
+        var cfgJ         = RollJConfig.Load(configPath);
+        var cfgK         = RollKConfig.Load(configPath);
+        var cfgL         = RollLConfig.Load(configPath);
+        var cfgM         = RollMConfig.Load(configPath);
+        var cfgOffFoul   = RollOffensiveFoulConfig.Load(configPath);
+        var cfgGov       = GovernorConfig.Load(configPath);
+        var cfgClock     = RollClockConfig.Load(configPath);
+        var cfgEndOfHalf = EndOfHalfConfig.Load(configPath);
+        var cfgMatchup   = MatchupConfig.Load(configPath);
+        var cfgRoster    = RosterConfig.Load(configPath);
+
+        // ── Config hash — ties every recorded number to the exact config. ─
+        var configBytes = File.ReadAllBytes(configPath);
+        var hashBytes   = System.Security.Cryptography.SHA256.HashData(configBytes);
+        var configHash  = Convert.ToHexString(hashBytes).ToLowerInvariant();
+
+        // ── Metadata header ───────────────────────────────────────────────
+        var homeFive = string.Join("/", cfgRoster.Home.Select(p => p.Name));
+        var awayFive = string.Join("/", cfgRoster.Away.Select(p => p.Name));
+
+        Console.WriteLine($"  config hash:      {configHash}");
+        Console.WriteLine($"  corpus:           {CorpusId}  (seeds 1..{N}; rosters: {homeFive} vs {awayFive})");
+        Console.WriteLine($"  sample size:      {N} games");
+        Console.WriteLine($"  strategy/context: home-press={cfgMatchup.HomePressFrequency:F1}  away-press={cfgMatchup.AwayPressFrequency:F1}  halves={cfgGov.Halves}  half={cfgGov.HalfSeconds:F0}s");
+        Console.WriteLine($"  session/commit:   <stamp at run time>");
+        Console.WriteLine();
+
+        // ── Per-game accumulators ─────────────────────────────────────────
+        var totalPossList   = new List<int>(N);
+        var homePossList    = new List<int>(N);
+        var awayPossList    = new List<int>(N);
+        var noShotList      = new List<int>(N);
+        var homePPPList     = new List<double>(N);
+        var awayPPPList     = new List<double>(N);
+        var combinedPPPList = new List<double>(N);
+        var homeScoreList   = new List<int>(N);
+        var awayScoreList   = new List<int>(N);
+        var marginList      = new List<int>(N);
+        var transFreqList   = new List<double>(N);
+        var aplList         = new List<double>(N);
+        var homeFoulsList   = new List<int>(N);
+        var awayFoulsList   = new List<int>(N);
+        var holdList        = new List<int>(N);
+        var earlyList       = new List<int>(N);
+        var noShotIntList   = new List<int>(N);
+
+        // Terminal mix — accumulated across all possessions, all games.
+        var termBuckets = new Dictionary<string, long>
+        {
+            ["Made-FG"]          = 0L,
+            ["FT-made"]          = 0L,
+            ["DefensiveRebound"] = 0L,
+            ["Turnover"]         = 0L,
+            ["OOB"]              = 0L,
+            ["JumpBall"]         = 0L,
+            ["NoShot"]           = 0L,
+            ["Parked"]           = 0L,
+            ["Other"]            = 0L,
+        };
+
+        var mechanicsOk = true;
+        var gamesRun    = 0;
+
+        var firstState = new PossessionState(
+            PossessionNumber: 1,
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
+            Entry: EntryType.DeadBallInbound);
+
+        Console.Write($"  Running {N} games");
+
+        for (var seed = 1; seed <= N; seed++)
+        {
+            if (seed % 100 == 0) Console.Write(".");
+
+            // Fresh game state per game: score, fouls, and arrow all start clean.
+            var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            SeatStartersFromConfig(game, configPath);
+            game.SetPossessionArrow(TeamSide.Home);
+
+            var resolverRng = new SystemRng(seed);
+            var governorRng = new SystemRng(seed + 1);
+
+            var resolver = new Resolver(
+                new RollAGenerator(cfg, cfgMatchup, game),
+                cfg,
+                new RollBGenerator(cfgB, cfgMatchup, game),
+                new RollCStubPieGenerator(cfgC),
+                cfgC,
+                new RollDStubPieGenerator(cfgD),
+                new RollEStubPieGenerator(cfgE),
+                new RollFGenerator(cfgF, cfgMatchup, game),
+                new RollGGenerator(cfgG, cfgMatchup, game),
+                new RollHGenerator(cfgH, cfgMatchup, game),
+                new RollIGenerator(cfgI, cfgMatchup, game),
+                new RollJStubPieGenerator(cfgJ),
+                new RollKStubPieGenerator(cfgK),
+                new RollLStubPieGenerator(cfgL),
+                new RollMGenerator(cfgM, cfgMatchup, game),
+                new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
+                cfgMatchup,
+                game,
+                resolverRng);
+
+            var governor = new Governor(resolver, game, cfgGov, cfgClock, governorRng, cfgEndOfHalf);
+
+            GovernorRunResult result;
+            try
+            {
+                result = governor.Run(firstState);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL-THROW] Seed {seed}: {ex.Message}");
+                mechanicsOk = false;
+                continue;
+            }
+            gamesRun++;
+
+            var records = result.Possessions;
+            var noShot  = records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.NoShot);
+
+            // ── Mechanical check 1: scoring reconciles ───────────────────
+            var recHome = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Points);
+            var recAway = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Points);
+            if (game.HomeScore != recHome || game.AwayScore != recAway)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: score mismatch — state=({game.HomeScore},{game.AwayScore}) records=({recHome},{recAway})");
+                mechanicsOk = false;
+            }
+
+            // ── Mechanical check 2: count invariant ─────────────────────
+            if (result.TerminalEnded + result.Parked + noShot != records.Count)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: count invariant — {result.TerminalEnded}+{result.Parked}+{noShot} != {records.Count}");
+                mechanicsOk = false;
+            }
+
+            // ── Mechanical check 3: zero parks ──────────────────────────
+            if (result.Parked > 0)
+            {
+                Console.WriteLine();
+                var stubDetail = string.Join(", ", result.PerStubParks.Select(kv => $"{kv.Key}:{kv.Value}"));
+                Console.WriteLine($"  [FINDING] Seed {seed}: {result.Parked} parked — {stubDetail}");
+                mechanicsOk = false;
+            }
+
+            // ── Mechanical check 4: loose sanity (NaN / ÷0 guard) ───────
+            if (records.Count == 0) { mechanicsOk = false; continue; }
+            if (records.Count > 200)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: pace exceeds outer bound ({records.Count})");
+                mechanicsOk = false;
+            }
+
+            var hPoss = records.Count(r => r.Offense == TeamSide.Home);
+            var aPoss = records.Count(r => r.Offense == TeamSide.Away);
+            var hPts  = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Points);
+            var aPts  = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Points);
+            var cPPP  = (double)(hPts + aPts) / records.Count;
+
+            if (double.IsNaN(cPPP) || cPPP < 0.0 || cPPP > 3.0)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: combined PPP out of outer bound ({cPPP:F4})");
+                mechanicsOk = false;
+            }
+
+            // ── Accumulate sentinels ─────────────────────────────────────
+            totalPossList.Add(records.Count);
+            homePossList.Add(hPoss);
+            awayPossList.Add(aPoss);
+            noShotList.Add(noShot);
+            homePPPList.Add(hPoss > 0 ? (double)hPts / hPoss : 0.0);
+            awayPPPList.Add(aPoss > 0 ? (double)aPts / aPoss : 0.0);
+            combinedPPPList.Add(cPPP);
+            homeScoreList.Add(game.HomeScore);
+            awayScoreList.Add(game.AwayScore);
+            marginList.Add(game.HomeScore - game.AwayScore);
+
+            var transCount = records.Count(r => r.Entry == EntryType.Transition);
+            transFreqList.Add((double)transCount / records.Count);
+            aplList.Add(result.TotalSeconds / records.Count);
+
+            homeFoulsList.Add(game.Fouls.FoulsFor(TeamSide.Home));
+            awayFoulsList.Add(game.Fouls.FoulsFor(TeamSide.Away));
+
+            holdList.Add(records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.HoldShootLast));
+            earlyList.Add(records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.ShootEarly));
+            noShotIntList.Add(noShot);
+
+            foreach (var r in records)
+            {
+                var b = ObsBucket(r.EndLabel);
+                termBuckets[b] = termBuckets[b] + 1;
+            }
+        }
+
+        Console.WriteLine($" done ({gamesRun}/{N} completed).");
+        Console.WriteLine();
+
+        // ── Mechanics verdict ─────────────────────────────────────────────
+        Console.WriteLine(mechanicsOk
+            ? "  Mechanics:  ALL OK — scoring reconciled, count invariant held, zero parks, no throws"
+            : "  Mechanics:  FAILURES ABOVE — some sentinel values may be unreliable");
+        Console.WriteLine();
+
+        if (gamesRun == 0) { Console.WriteLine("  No games completed."); return; }
+
+        // ── Sentinel block ────────────────────────────────────────────────
+
+        Console.WriteLine("--- PACE (total possessions per game) ---");
+        ObsPrintI("  Total",                              totalPossList);
+        ObsPrintI("  Home",                               homePossList);
+        ObsPrintI("  Away",                               awayPossList);
+        ObsPrintI("  NoShot (end-of-half, per game)",    noShotList);
+        Console.WriteLine("  Distribution (total):");
+        ObsHistI(totalPossList, new[] { 90, 100, 110, 120, 130, 140, 150, 160 });
+
+        Console.WriteLine();
+        Console.WriteLine("--- PPP (points per possession) ---");
+        ObsPrintD("  Home",     homePPPList);
+        ObsPrintD("  Away",     awayPPPList);
+        ObsPrintD("  Combined", combinedPPPList);
+        Console.WriteLine("  Distribution (combined):");
+        ObsHistD(combinedPPPList, new[] { 0.5, 0.7, 0.9, 1.1, 1.3, 1.5 });
+
+        Console.WriteLine();
+        Console.WriteLine("--- SCORE & MARGIN ---");
+        ObsPrintI("  Home score",         homeScoreList);
+        ObsPrintI("  Away score",         awayScoreList);
+        ObsPrintI("  Margin (Home−Away)", marginList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- TRANSITION FREQUENCY (Transition entries / total possessions) ---");
+        ObsPrintD("  Transition freq", transFreqList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- TERMINAL MIX (fractions across all possessions all games) ---");
+        var totalMix = termBuckets.Values.Sum();
+        foreach (var kv in termBuckets)
+            Console.WriteLine($"  {kv.Key,-22} {(totalMix > 0 ? (double)kv.Value / totalMix : 0.0):F4}  ({kv.Value:N0})");
+
+        Console.WriteLine();
+        Console.WriteLine("--- END-OF-HALF INTENT (counts per game) ---");
+        ObsPrintI("  HoldShootLast", holdList);
+        ObsPrintI("  ShootEarly",    earlyList);
+        ObsPrintI("  NoShot",        noShotIntList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- APL (avg possession length, seconds) ---");
+        ObsPrintD("  APL", aplList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- FOULS PER TEAM PER GAME ---");
+        ObsPrintI("  Home fouls", homeFoulsList);
+        ObsPrintI("  Away fouls", awayFoulsList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- DEFERRED SENTINELS (counter-plumbing needed — future session) ---");
+        Console.WriteLine("  FG% / 3P% / FT%  (shooting splits)");
+        Console.WriteLine("  Shot mix (per-zone attempt distribution)");
+        Console.WriteLine("  ORB% / DRB%");
+        Console.WriteLine("  FTr (FTA/FGA)");
+        Console.WriteLine("  Press frequency / break rate at game level");
+
+        Console.WriteLine();
+        Console.WriteLine($"=== END OBSERVATION RUN — {CorpusId} ===");
+    }
+
+    // ── Observation helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Classify an EndLabel into one of the terminal-mix buckets. By prefix, coarse.
+    /// "Turnover" catches all fouls, violations, and live/dead-ball turnovers — everything
+    /// that ends the possession without a made shot or defensive rebound.
+    /// </summary>
+    private static string ObsBucket(string endLabel) =>
+        endLabel == "Made"                             ? "Made-FG"
+        : endLabel == "FreeThrowsMade"                 ? "FT-made"
+        : endLabel == "DefensiveRebound"               ? "DefensiveRebound"
+        : endLabel.StartsWith("JumpBall")             ? "JumpBall"
+        : endLabel.StartsWith("MissOutOfBounds") ||
+          endLabel.StartsWith("OutOfBounds")          ? "OOB"
+        : endLabel == "endOfHalf:NoShot"              ? "NoShot"
+        : endLabel.StartsWith("parked:")              ? "Parked"
+        : "Turnover";  // fouls, violations, live/dead-ball turnovers
+
+    private static void ObsPrintI(string label, List<int> v)
+    {
+        if (v.Count == 0) return;
+        var mean = v.Average();
+        var sd   = Math.Sqrt(v.Select(x => (x - mean) * (x - mean)).Average());
+        Console.WriteLine($"  {label,-40} mean={mean,7:F1}  sd={sd,5:F1}  min={v.Min(),5}  max={v.Max(),5}");
+    }
+
+    private static void ObsPrintD(string label, List<double> v)
+    {
+        if (v.Count == 0) return;
+        var mean = v.Average();
+        var sd   = Math.Sqrt(v.Select(x => (x - mean) * (x - mean)).Average());
+        Console.WriteLine($"  {label,-40} mean={mean,7:F4}  sd={sd,6:F4}  min={v.Min(),7:F4}  max={v.Max(),7:F4}");
+    }
+
+    private static void ObsHistI(List<int> v, int[] edges)
+    {
+        var n = v.Count;
+        if (n == 0) return;
+        var under = v.Count(x => x < edges[0]);
+        if (under > 0) Console.WriteLine($"    <{edges[0],5}       {(double)under / n,6:P1}  ({under})");
+        for (var i = 0; i < edges.Length - 1; i++)
+        {
+            var lo = edges[i]; var hi = edges[i + 1];
+            var cnt = v.Count(x => x >= lo && x < hi);
+            Console.WriteLine($"    [{lo,3},{hi,3})    {(double)cnt / n,6:P1}  ({cnt})");
+        }
+        var over = v.Count(x => x >= edges[^1]);
+        if (over > 0) Console.WriteLine($"    >={edges[^1],5}     {(double)over / n,6:P1}  ({over})");
+    }
+
+    private static void ObsHistD(List<double> v, double[] edges)
+    {
+        var n = v.Count;
+        if (n == 0) return;
+        var under = v.Count(x => x < edges[0]);
+        if (under > 0) Console.WriteLine($"    <{edges[0]:F1}        {(double)under / n,6:P1}  ({under})");
+        for (var i = 0; i < edges.Length - 1; i++)
+        {
+            var lo = edges[i]; var hi = edges[i + 1];
+            var cnt = v.Count(x => x >= lo && x < hi);
+            Console.WriteLine($"    [{lo:F1},{hi:F1})    {(double)cnt / n,6:P1}  ({cnt})");
+        }
+        var over = v.Count(x => x >= edges[^1]);
+        if (over > 0) Console.WriteLine($"    >={edges[^1]:F1}      {(double)over / n,6:P1}  ({over})");
     }
 
     // -------------------------------------------------------------------------

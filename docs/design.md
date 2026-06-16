@@ -4094,3 +4094,35 @@ The stamp is written BEFORE `Generate` so the generator reads a finished decisio
 
 **Deferred.** Roll H foul-drawing tilt for transition and back-line help-rim-protector selection remain out of scope. `RollGStubPieGenerator` stays FastBreak-blind (stub path).
 
+
+---
+
+## Observation Run v1 — Macro sentinel harness (Session 48)
+
+**Purpose.** A repeatable flight recorder: N full games against a frozen scenario corpus, one self-describing sentinel block out. The block is an archive of what the engine currently produces — recorded, not judged.
+
+**The frozen-corpus-v1 contract.**
+A scenario is seed + rosters + lineups + strategy + game context. Frozen so runs are reproducible and comparable across code changes:
+- Corpus id: `"frozen-corpus-v1"` (string constant in the harness)
+- Seed set: seeds 1..N (N=1000 in v1); `new SystemRng(seed)` for the Resolver, `new SystemRng(seed+1)` for the Governor
+- Rosters/lineups: existing `config.json` starters (Webb/Pryor/Holloway/Okafor/Baptiste vs Shaw/Monroe/Dupree/Eze/Thornton)
+- Strategy/context: whatever `config.json` currently sets
+
+**Important caveat (baked into every archive entry header).** A frozen corpus stabilizes aggregate distributions across runs. It does NOT freeze individual possession outcomes when a code change alters RNG draw topology — same corpus, comparable means, not event-for-event pairing. Do not chase a "bug" that is a downstream draw shift.
+
+**Corpus versioning rule.** When the corpus changes, bump the id (`frozen-corpus-v2`). Never silently overwrite a prior benchmark.
+
+**Config hash.** Every sentinel block carries the SHA-256 hash of the loaded `config.json` bytes. This ties every recorded number to the exact configuration that produced it.
+
+**Generator selection.** `ObservationRunV1` mirrors `Main`'s construction: real generators for A, B, F, G, H, I, M; stub generators for C, D, E, J, K, L, OffensiveFoul (concrete stub type, no real alternative yet). A fresh `GameState` + fresh generators + fresh RNGs are constructed per game so fouls, score, and arrow do not bleed across games.
+
+**Mechanical checks (the only pass/fail in the method):**
+1. Scoring reconciles per game: `game.HomeScore == sum(Points where Offense==Home)`, likewise Away
+2. Count invariant: `records.Count == TerminalEnded + Parked + NoShotCount`
+3. Zero parks: `Parked == 0` across all games — engine chain is complete; a park is a genuine finding
+4. No throws: all N games complete; the Governor safety guard never hits
+5. Loose sanity: PPP ∈ (0,3), pace ∈ (0,200) — catches NaN/÷0, not realism
+
+**Deferred sentinels.** Shooting splits (FG%/3P%/FT%), shot mix, ORB%/DRB%, FTr, press rate — need counter-plumbing at the resolver's existing scoring sites. Separate session.
+
+**First reading.** Run 1 (2026-06-16) is preserved in `docs/observations.md`. Key numbers: pace ~133 total / ~67 per team is realistic (real D1 ~65–72/team); combined PPP ~1.19 is somewhat above real D1 (~1.0–1.1) and is the more notable calibration target.
