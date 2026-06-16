@@ -88,7 +88,11 @@
     "TransitionSlot3": 0.25,
     "TransitionSlot4": 0.1,
     "TransitionSlot5": 0.05,
-    "Epsilon": 1e-09
+    "Epsilon": 1e-09,
+    "UsageExponent": 2.0,
+    "UsageFloor": 0.09,
+    "UsageRail": 0.52,
+    "MinUsageScore": 1.0
   },
   "RollF": {
     "BaseShotAttempt": 0.855,

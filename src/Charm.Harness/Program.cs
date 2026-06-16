@@ -34,7 +34,7 @@ internal static class Program
         // Roll B generator constructed below after SeatStartersFromConfig (Phase 13).
         var rollCGenerator = new RollCStubPieGenerator(cfgC);
         var rollDGenerator = new RollDStubPieGenerator(cfgD);
-        var rollEGenerator = new RollEStubPieGenerator(cfgE);
+        // Roll E generator constructed below after game is created (Phase 15: needs GameState).
         // Roll F generator constructed below after SeatStartersFromConfig (Phase 12).
         // RollHGenerator, RollGGenerator, and RollIGenerator constructed below,
         // after game and cfgMatchup (need GameState and MatchupConfig).
@@ -55,6 +55,7 @@ internal static class Program
         var rollFGenerator = new RollFGenerator(cfgF, cfgMatchup, game);   // Phase 12: pressure-aware disruption
         var rollBGenerator = new RollBGenerator(cfgB, cfgMatchup, game);   // Phase 13: team-aggregate disruption
         var rollAGenerator = new RollAGenerator(cfg, cfgMatchup, game);    // Phase 14: full-court press disruption
+        var rollEGenerator = new RollEGenerator(cfgE, game);               // Phase 15: attribute-driven halfcourt selection
 
         var resolver = new Resolver(
             rollAGenerator,
@@ -95,7 +96,7 @@ internal static class Program
         ok &= PressureSignalCheck(cfgC, rollCGenerator, state);
         ok &= JumpBallCheck(cfg);
         ok &= SlotLayerCheck(game);
-        ok &= RollESelectionBatchCheck(cfg, cfgE, rollEGenerator, game, state);
+        ok &= RollESelectionBatchCheck(cfg, cfgE, cfgD, rollEGenerator, game, state);
         ok &= RollFActionBatchCheck(cfg, cfgF, new RollFStubPieGenerator(cfgF), state);
         ok &= RollFHandoffCheck(cfg, game, state);
         ok &= RollGLocationBatchCheck(cfg, cfgG, state);
@@ -141,7 +142,7 @@ internal static class Program
     // --- Observability: print a few full A->...->terminal chains. ---
     private static void ShowSamples(
         RollAConfig cfg, RollEConfig cfgE, IRollAPieGenerator genA,
-        RollEStubPieGenerator genE, Resolver resolver,
+        IRollEPieGenerator genE, Resolver resolver,
         GameState game, PossessionState state, IRng rng)
     {
         Console.WriteLine("--- Observability: sample possessions (seeded, full chain) ---");
@@ -824,43 +825,113 @@ internal static class Program
     //     every selected slot is a real slot on the OFFENSE's lineup numbered
     //     1–5, and every exit is a clean IntoPlayerAction continue carrying a
     //     stamped slot. The flat distribution is the whole point this session:
-    //     with no signal, each of the five slots is equally likely. A future
-    //     generator tilts these odds without this check's roll changing. ---
+    //     Phase 15: generator is now attribute-driven (halfcourt); the check is
+    //     retooled to assert convergence to the generator's own pie (not flat 20s)
+    //     and that the seeded alpha slot wins materially. ---
     private static bool RollESelectionBatchCheck(
-        RollAConfig cfg, RollEConfig cfgE, RollEStubPieGenerator genE,
+        RollAConfig cfg, RollEConfig cfgE, RollDConfig cfgD, IRollEPieGenerator genE,
         GameState game, PossessionState state)
     {
-        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} selections through Roll E (flat pie) ---");
+        // ── Seat a known five-man roster so the generator's pie is computable ──
+        // Alpha (Slot1): high SelfCreation + perimeter — should dominate.
+        // Slot5: Rodman-type — low scoring, should land at/near floor.
+        // Use a LOCAL game with its own roster so we don't disturb the shared
+        // game's seating (other checks read it). genE holds _game (shared game);
+        // we construct a local RollEGenerator for this check seeded with the test roster.
+        var checkGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        var checkRoster  = checkGame.RosterFor(state.Offense);
+        var checkLineup  = checkGame.LineupFor(state.Offense);
+
+        // Slot1: alpha scorer (SelfCreation=85, Close=80, Outside=75, Mid=80, Finishing=82, PostMoves=40)
+        checkRoster.SetStarter(checkLineup.SlotAt(1), new Player("Alpha")
+        {
+            SelfCreation=85, Close=80, PostMoves=40, Outside=75, Mid=80, Finishing=82,
+            FreeThrow=75, FoulDrawing=70,
+            BallHandling=70, Passing=65, Playmaking=60, OffBallMovement=60, Screening=50, OffensiveRebounding=40,
+            PerimeterDefense=55, PostDefense=45, RimProtection=30, DefensiveRebounding=40, Steals=50,
+            Height=75, Wingspan=76, Weight=60, Strength=70, Speed=75, Quickness=75, FirstStep=75, Vertical=75,
+            Endurance=75, Hustle=70, BasketballIQ=80, Discipline=70,
+            RimTendency=20, ShortTendency=15, MidTendency=30, LongTendency=15, ThreeTendency=20,
+        });
+        // Slot2: solid scorer
+        checkRoster.SetStarter(checkLineup.SlotAt(2), new Player("Solid2")
+        {
+            SelfCreation=60, Close=60, PostMoves=45, Outside=65, Mid=62, Finishing=60,
+            FreeThrow=65, FoulDrawing=55,
+            BallHandling=60, Passing=58, Playmaking=55, OffBallMovement=60, Screening=50, OffensiveRebounding=45,
+            PerimeterDefense=58, PostDefense=50, RimProtection=40, DefensiveRebounding=50, Steals=50,
+            Height=76, Wingspan=77, Weight=65, Strength=60, Speed=65, Quickness=65, FirstStep=60, Vertical=65,
+            Endurance=65, Hustle=65, BasketballIQ=65, Discipline=65,
+            RimTendency=20, ShortTendency=20, MidTendency=25, LongTendency=15, ThreeTendency=20,
+        });
+        // Slot3: solid scorer
+        checkRoster.SetStarter(checkLineup.SlotAt(3), new Player("Solid3")
+        {
+            SelfCreation=55, Close=55, PostMoves=50, Outside=60, Mid=58, Finishing=55,
+            FreeThrow=60, FoulDrawing=50,
+            BallHandling=55, Passing=55, Playmaking=50, OffBallMovement=58, Screening=55, OffensiveRebounding=50,
+            PerimeterDefense=55, PostDefense=52, RimProtection=45, DefensiveRebounding=52, Steals=48,
+            Height=78, Wingspan=79, Weight=70, Strength=62, Speed=62, Quickness=62, FirstStep=60, Vertical=62,
+            Endurance=65, Hustle=65, BasketballIQ=63, Discipline=65,
+            RimTendency=25, ShortTendency=20, MidTendency=22, LongTendency=15, ThreeTendency=18,
+        });
+        // Slot4: solid scorer
+        checkRoster.SetStarter(checkLineup.SlotAt(4), new Player("Solid4")
+        {
+            SelfCreation=50, Close=65, PostMoves=55, Outside=55, Mid=60, Finishing=60,
+            FreeThrow=60, FoulDrawing=50,
+            BallHandling=50, Passing=52, Playmaking=48, OffBallMovement=55, Screening=60, OffensiveRebounding=55,
+            PerimeterDefense=55, PostDefense=58, RimProtection=50, DefensiveRebounding=58, Steals=45,
+            Height=79, Wingspan=80, Weight=75, Strength=65, Speed=58, Quickness=55, FirstStep=55, Vertical=60,
+            Endurance=65, Hustle=70, BasketballIQ=62, Discipline=65,
+            RimTendency=30, ShortTendency=22, MidTendency=25, LongTendency=10, ThreeTendency=13,
+        });
+        // Slot5: Rodman-type (low scoring — should land at/near floor)
+        checkRoster.SetStarter(checkLineup.SlotAt(5), new Player("Rodman")
+        {
+            SelfCreation=20, Close=50, PostMoves=30, Outside=15, Mid=20, Finishing=55,
+            FreeThrow=50, FoulDrawing=30,
+            BallHandling=40, Passing=35, Playmaking=30, OffBallMovement=55, Screening=70, OffensiveRebounding=90,
+            PerimeterDefense=65, PostDefense=70, RimProtection=75, DefensiveRebounding=92, Steals=55,
+            Height=80, Wingspan=82, Weight=85, Strength=85, Speed=55, Quickness=52, FirstStep=50, Vertical=70,
+            Endurance=80, Hustle=95, BasketballIQ=70, Discipline=80,
+            RimTendency=50, ShortTendency=30, MidTendency=10, LongTendency=5, ThreeTendency=5,
+        });
+
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} selections through Roll E (attribute-driven halfcourt) ---");
         var rng = new SystemRng(cfg.Seed);
-        var pieE = genE.Generate(state);
+
+        // Construct a local generator pointed at checkGame so the pie reflects
+        // the test roster we just seated (not the shared game's roster).
+        var localGenE = new RollEGenerator(cfgE, checkGame);
+
+        // Read the generator's own pie once — empirical rates must converge to it.
+        var checkState = state with { Offense = state.Offense };
+        var pieE = localGenE.Generate(checkState);
 
         var counts = new Dictionary<SelectionOutcome, int>();
         foreach (var o in Enum.GetValues<SelectionOutcome>()) counts[o] = 0;
 
-        var anomalies = 0;   // anything that isn't a clean, slot-stamped continue
+        var anomalies = 0;
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var result = RollE.Execute(state, pieE, game, rng);
+            var result = RollE.Execute(checkState, pieE, checkGame, rng);
 
-            // Must be a Continue, into the player-action sequence, carrying a
-            // selected slot that belongs to the offense and is numbered 1–5.
             if (result is not Continue { Next: ContinuationKind.IntoPlayerAction } c
                 || c.State.SelectedSlot is not { } slot
-                || slot.Side != state.Offense
+                || slot.Side != checkState.Offense
                 || slot.Number < 1 || slot.Number > Lineup.Size)
             {
                 anomalies++;
                 continue;
             }
-
-            // Map the named slot back to its outcome bucket for the rate tally.
             counts[(SelectionOutcome)(slot.Number - 1)]++;
         }
 
         var n = (double)cfg.BatchSize;
         var ratesOk = true;
-        Console.WriteLine("  Roll E selections (expected 20.000% each):");
+        Console.WriteLine("  Roll E selections (converge to generator's own pie):");
         foreach (var (outcome, weight) in pieE.Slices)
         {
             var observed = counts[outcome] / n;
@@ -870,47 +941,43 @@ internal static class Program
             Console.WriteLine($"    {outcome,-8} observed={observed:P3}  expected={weight:P3}  gap={gap:P3}  {(pass ? "ok" : "FAIL")}");
         }
 
+        // Ordering assertion: the alpha (Slot1) must materially outpace the Rodman (Slot5).
+        // This is the regression guard — the point of the whole build.
+        var alphaShare = counts[SelectionOutcome.Slot1] / n;
+        var rodmanShare = counts[SelectionOutcome.Slot5] / n;
+        var orderOk = alphaShare > rodmanShare * 2.0;           // alpha must be more than 2x Rodman
+        Console.WriteLine($"\n  Ordering: Alpha (Slot1={alphaShare:P3}) > 2x Rodman (Slot5={rodmanShare:P3}): {(orderOk ? "ok" : "FAIL")}");
+
         var cleanOk = anomalies == 0;
-        Console.WriteLine($"\n  every exit a clean slot-stamped IntoPlayerAction: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"  every exit a clean slot-stamped IntoPlayerAction: anomalies={anomalies} -> {(cleanOk ? "ok" : "FAIL")}");
 
-        // --- FastBreak selects the transition pie (Contextification #1). The generator
-        //     reads ONE field — PossessionState.FastBreak — to choose between the flat
-        //     halfcourt pie and the transition pie. Build both states and assert each
-        //     pie's slices equal the configured weights. This is the direct proof that
-        //     the transition selection pie is drawn ONLY on the Push (FastBreak) path;
-        //     the flat batch above already covered the halfcourt path's RATES.
-        var halfcourtPie = genE.Generate(state with { FastBreak = false });
-        var transitionPie = genE.Generate(state with { FastBreak = true });
+        // ── FastBreak: transition pie must equal cfg.Transition* EXACTLY ──────
+        // Build pies from the REAL generator (genE) using states with explicit FastBreak flag.
+        var halfcourtPie  = localGenE.Generate(checkState with { FastBreak = false });
+        var transitionPie = localGenE.Generate(checkState with { FastBreak = true });
 
-        var halfcourtExpected = new Dictionary<SelectionOutcome, double>
-        {
-            [SelectionOutcome.Slot1] = cfgE.BaseSlot1, [SelectionOutcome.Slot2] = cfgE.BaseSlot2,
-            [SelectionOutcome.Slot3] = cfgE.BaseSlot3, [SelectionOutcome.Slot4] = cfgE.BaseSlot4,
-            [SelectionOutcome.Slot5] = cfgE.BaseSlot5,
-        };
         var transitionExpected = new Dictionary<SelectionOutcome, double>
         {
-            [SelectionOutcome.Slot1] = cfgE.TransitionSlot1, [SelectionOutcome.Slot2] = cfgE.TransitionSlot2,
-            [SelectionOutcome.Slot3] = cfgE.TransitionSlot3, [SelectionOutcome.Slot4] = cfgE.TransitionSlot4,
+            [SelectionOutcome.Slot1] = cfgE.TransitionSlot1,
+            [SelectionOutcome.Slot2] = cfgE.TransitionSlot2,
+            [SelectionOutcome.Slot3] = cfgE.TransitionSlot3,
+            [SelectionOutcome.Slot4] = cfgE.TransitionSlot4,
             [SelectionOutcome.Slot5] = cfgE.TransitionSlot5,
         };
 
-        bool PieMatches(Pie<SelectionOutcome> pie, Dictionary<SelectionOutcome, double> expected) =>
-            pie.Slices.All(s => Math.Abs(s.Item2 - expected[s.Item1]) <= cfgE.Epsilon);
+        // Transition pie must exactly equal the configured Transition* weights.
+        var transitionPieOk = transitionPie.Slices.All(s =>
+            Math.Abs(s.Item2 - transitionExpected[s.Item1]) <= cfgE.Epsilon);
 
-        var halfcourtPieOk = PieMatches(halfcourtPie, halfcourtExpected);
-        var transitionPieOk = PieMatches(transitionPie, transitionExpected);
-        // The two pies MUST differ — otherwise "transition pie selected" would be
-        // unobservable. The placeholder transition weights are non-flat for this reason.
+        // Halfcourt and transition pies must differ (non-flat halfcourt now makes this a real check).
         var piesDiffer = transitionPie.Slices.Any(s =>
-            Math.Abs(s.Item2 - halfcourtExpected[s.Item1]) > cfgE.Epsilon);
+            Math.Abs(s.Item2 - halfcourtPie.Slices.First(h => h.Item1 == s.Item1).Item2) > cfgE.Epsilon);
 
         Console.WriteLine("\n  FastBreak pie selection:");
-        Console.WriteLine($"    FastBreak=false -> halfcourt pie (flat 20s): {(halfcourtPieOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"    FastBreak=true  -> transition pie (30/30/25/10/5): {(transitionPieOk ? "ok" : "FAIL")}");
-        Console.WriteLine($"    the two pies differ (selection is observable): {(piesDiffer ? "ok" : "FAIL")}");
+        Console.WriteLine($"    FastBreak=true  -> transition pie exactly equals cfg.Transition* weights: {(transitionPieOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"    halfcourt and transition pies differ (selection is observable): {(piesDiffer ? "ok" : "FAIL")}");
 
-        return ratesOk && cleanOk && halfcourtPieOk && transitionPieOk && piesDiffer;
+        return ratesOk && cleanOk && orderOk && transitionPieOk && piesDiffer;
     }
 
     // --- Batch: Roll F's four-way action distribution converges within tolerance,

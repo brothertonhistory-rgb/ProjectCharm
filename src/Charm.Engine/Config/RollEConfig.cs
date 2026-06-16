@@ -40,6 +40,39 @@ public sealed class RollEConfig
 
     public double Epsilon { get; init; }
 
+    // ── Usage-driven selection parameters (Phase 15) ─────────────────────────
+    // All are calibration placeholders; tune against the harness's Roll E batch
+    // check and observed usage distributions.
+
+    /// <summary>Sharpening exponent applied to raw usage scores before normalizing.
+    /// Higher values tilt the distribution harder toward the best scorer.
+    /// Invariant: &gt; 0.
+    /// Calibration anchor: at 2.0, a realistic D1 alpha lands ~35% selection share.
+    /// Coupled with <see cref="UsageFloor"/> — raise the floor and the alpha's ceiling
+    /// falls even at a fixed exponent; calibrate together.</summary>
+    public double UsageExponent { get; init; }
+
+    /// <summary>Minimum guaranteed selection share for any populated slot.
+    /// Anchored to the Rodman-era NBA floor (~8–9% USG); college compresses toward
+    /// the mean so ~9–10% is the D1 floor. For a normal starter the floor never
+    /// binds — attributes carry him above it.
+    /// Invariant: ≥ 0. Feasibility invariant: 5 * UsageFloor &lt; 1.0.</summary>
+    public double UsageFloor { get; init; }
+
+    /// <summary>Hard cap on any single slot's selection share. Only ever reached by
+    /// absurd talent gaps (one elite among four scrubs). Realistic rosters never
+    /// approach it — the floor hands teammates enough shots to suppress the alpha's
+    /// raw ceiling naturally.
+    /// Invariant: &gt; UsageFloor and ≤ 1.0.</summary>
+    public double UsageRail { get; init; }
+
+    /// <summary>Strictly-positive guard applied to the raw usage score before the
+    /// sharpening exponent. Prevents a degenerate all-zero test player from collapsing
+    /// the power-law math (score = 0 raised to any positive exponent = 0, which is
+    /// fine, but max(score, MinUsageScore) keeps things well-behaved).
+    /// Invariant: &gt; 0.</summary>
+    public double MinUsageScore { get; init; }
+
     /// <summary>Load the <c>"RollE"</c> section from the config file at
     /// <paramref name="path"/>. Mirrors the other rolls' loaders.</summary>
     public static RollEConfig Load(string path)
@@ -47,7 +80,7 @@ public sealed class RollEConfig
         using var doc = JsonDocument.Parse(File.ReadAllText(path));
         var e = doc.RootElement.GetProperty("RollE");
 
-        return new RollEConfig
+        var cfg = new RollEConfig
         {
             BaseSlot1 = e.GetProperty("BaseSlot1").GetDouble(),
             BaseSlot2 = e.GetProperty("BaseSlot2").GetDouble(),
@@ -59,7 +92,34 @@ public sealed class RollEConfig
             TransitionSlot3 = e.GetProperty("TransitionSlot3").GetDouble(),
             TransitionSlot4 = e.GetProperty("TransitionSlot4").GetDouble(),
             TransitionSlot5 = e.GetProperty("TransitionSlot5").GetDouble(),
-            Epsilon = e.GetProperty("Epsilon").GetDouble(),
+            Epsilon       = e.GetProperty("Epsilon").GetDouble(),
+            UsageExponent = e.GetProperty("UsageExponent").GetDouble(),
+            UsageFloor    = e.GetProperty("UsageFloor").GetDouble(),
+            UsageRail     = e.GetProperty("UsageRail").GetDouble(),
+            MinUsageScore = e.GetProperty("MinUsageScore").GetDouble(),
         };
+
+        // ── Invariant validation — fail loud on bad config ───────────────────
+        if (cfg.UsageExponent <= 0)
+            throw new InvalidOperationException(
+                $"RollEConfig: UsageExponent must be > 0 (got {cfg.UsageExponent}).");
+        if (cfg.UsageFloor < 0)
+            throw new InvalidOperationException(
+                $"RollEConfig: UsageFloor must be >= 0 (got {cfg.UsageFloor}).");
+        if (cfg.UsageRail <= cfg.UsageFloor)
+            throw new InvalidOperationException(
+                $"RollEConfig: UsageRail ({cfg.UsageRail}) must be > UsageFloor ({cfg.UsageFloor}).");
+        if (cfg.UsageRail > 1.0)
+            throw new InvalidOperationException(
+                $"RollEConfig: UsageRail must be <= 1.0 (got {cfg.UsageRail}).");
+        if (cfg.MinUsageScore <= 0)
+            throw new InvalidOperationException(
+                $"RollEConfig: MinUsageScore must be > 0 (got {cfg.MinUsageScore}).");
+        if (5 * cfg.UsageFloor >= 1.0)
+            throw new InvalidOperationException(
+                $"RollEConfig: 5 * UsageFloor ({5 * cfg.UsageFloor:F4}) >= 1.0 — " +
+                "a full five-man roster cannot satisfy the floor constraint. Lower UsageFloor.");
+
+        return cfg;
     }
 }

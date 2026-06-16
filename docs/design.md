@@ -4238,3 +4238,43 @@ The plan above was executed in the same conversation. The five per-zone logistic
 - Combined FG% 57.8% → 50.4%. A rating-50 roster nets 45.1% (real D1 average); the test rosters read ~50% because their shooting ratings average ~64–67 (above average) — the intended consequence of "50 = average," not a hot curve.
 - Per-zone FG% (was → now): Rim 67.9→64.5, Short 64.5→48.3, Mid 49.3→42.3, Long 48.5→41.9, Three 49.7→41.7 — a real efficiency gradient Three < Long < Mid < Short < Rim.
 - Combined PPP 1.19 → 1.08. FT%, shot mix, ORB%, FTr unchanged (the calibration touched only the make curves).
+
+
+## Roll E: Attribute-Driven Usage Selection (Session 51)
+
+**What this is.** Roll E selection share = who takes the shot this possession, weighted by scoring ability and self-creation. Not who handles the ball — a pass-first guard who rarely shoots is correctly low here. The seam was already built; this session replaced the flat 20% placeholder with a real attribute-driven generator without touching Roll E, its interface, or the resolver.
+
+**Formula.** Per-player usage score:
+```
+score = 0.35 * SelfCreation
+      + 0.30 * (Close + PostMoves) / 2
+      + 0.35 * (Outside + Mid + Finishing) / 3
+```
+Clamped to `max(score, MinUsageScore)` before the sharpening exponent. The (Close+PostMoves)/2 term ensures a high-post-moves, high-close center earns meaningful usage even with modest SelfCreation — Emmett's explicit basketball call. Passing, Playmaking, BallHandling, BasketballIQ intentionally excluded (Roll E is who *takes* the shot).
+
+**Sharpening exponent.** Raw scores → `score^UsageExponent` → normalize. At the default (2.0) a realistic D1 alpha lands ~34% and a Rodman-type is held by the floor.
+
+**Hard constraints — constrained redistribution (water-filling).** Floor and rail are not soft nudges:
+- `UsageFloor` (default 0.09): minimum share for any populated slot. Anchored to the Rodman-era NBA floor (~8–9%), which compresses toward ~9–10% in college.
+- `UsageRail` (default 0.52): hard cap on any single slot. Only reachable by absurd talent gaps; realistic rosters never approach it (the floor hands teammates guaranteed shots, suppressing the alpha's raw ceiling).
+- Both enforced by iterative constrained redistribution. Naive double-renormalize was rejected: clamping a railed slot reduces the pie, which can push a floored slot back under the floor on renormalization.
+
+**Rail feasibility standdown.** When `populatedCount × UsageRail < 1.0` (only possible with thin test rosters), the rail is skipped. Normal five-man game: 5 × 0.52 = 2.6 ≥ 1.0 — always active.
+
+**Coupling.** `UsageExponent` and `UsageFloor` are coupled: raising the floor lowers the alpha's realistic ceiling at any fixed exponent, because floors hand teammates guaranteed shots. Calibrate them together, not independently.
+
+**FastBreak passthrough.** When `state.FastBreak == true`, the generator returns the existing `cfg.TransitionSlot1..5` pie byte-for-byte. The transition selection attribute model is deferred.
+
+**Null-slot handling.** Null/unpopulated slots receive 0.0 and can never be selected. Floor and rail apply only to populated slots. Zero-populated fallback returns the flat Base* pie (test-only; a real game always has five offense slots filled).
+
+**Roll E share ≠ box-score USG%.** Roll E fires only when a possession reaches player selection. Turnovers and violations before Roll E peel possessions off, and USG% folds in FTA and weights turnovers differently. Reconciling Roll E selection share with true USG% is a calibration job deferred to when both Roll E and the usage→efficiency curve are tuned together.
+
+**Config fields added (all calibration placeholders):**
+- `UsageExponent`: tilt strength. Invariant: > 0. Default: 2.0.
+- `UsageFloor`: guaranteed minimum share. Invariant: ≥ 0, and 5 × floor < 1.0. Default: 0.09.
+- `UsageRail`: hard cap per slot. Invariant: > UsageFloor and ≤ 1.0. Default: 0.52.
+- `MinUsageScore`: positivity guard before the exponent. Invariant: > 0. Default: 1.0.
+
+**Harness check shape.** `RollESelectionBatchCheck` now: seats a known five-man test roster in a local game, asserts empirical convergence to the generator's own pie (not a hardcoded 20%), asserts Alpha slot > 2× Rodman slot (the regression guard for "a star separates"), asserts FastBreak pie exactly equals cfg.Transition* weights. Call site takes `cfgD` to construct the local game.
+
+**Observation delta.** Aggregate stats unchanged from Session 50. Correct: Roll E changes *who* gets the ball, not *what happens* to them. The efficiency coupling arrives with the usage→efficiency curve (next build).

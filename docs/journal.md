@@ -1,3 +1,46 @@
+## Session 51 — Roll E: Attribute-Driven Usage Selection (2026-06-16)
+
+**Scope:** Replace Roll E's flat 20% halfcourt selection pie with a real attribute-driven generator so that a better scorer/creator naturally commands a larger share of shot attempts. Transition (FastBreak) pie left exactly as-is. One live dispatch site swapped; all ~20 harness stub-construction sites left untouched.
+
+**What shipped:**
+- `Generators/RollEGenerator.cs` (NEW) — attribute-driven `IRollEPieGenerator`. Halfcourt branch reads the five offense players via `GameState.RosterFor(state.Offense)` + `GameState.LineupFor(state.Offense)` + `Roster.PlayerAt(slot)` (Roll B access shape). FastBreak=true returns the existing transition pie byte-for-byte. Empty-roster fallback returns the flat Base* pie.
+- `Config/RollEConfig.cs` — four new config fields: `UsageExponent` (tilt strength, >0), `UsageFloor` (guaranteed minimum share, ≥0), `UsageRail` (hard cap, >UsageFloor, ≤1.0), `MinUsageScore` (positivity guard, >0). Config invariants validated on load — fail loud.
+- `Harness/config.json` — new RollE fields: `UsageExponent: 2.0`, `UsageFloor: 0.09`, `UsageRail: 0.52`, `MinUsageScore: 1.0`. All calibration placeholders.
+- `Harness/Program.cs` — line-37 stub comment; live construction moved after `SeatStartersFromConfig` alongside Roll B/G/H/I/M/F/A: `new RollEGenerator(cfgE, game)`. `ShowSamples` parameter retyped `RollEStubPieGenerator` → `IRollEPieGenerator`. `RollESelectionBatchCheck` reworked: interface-typed, takes `cfgD`, seats a known five-man test roster (alpha + three solids + Rodman-type) in a local `checkGame`, asserts empirical convergence to the generator's own pie, asserts Alpha > 2× Rodman, asserts FastBreak pie exactly equals cfg.Transition* weights. Call site updated to pass `cfgD`.
+
+**Usage score formula (engineering call, audited):**
+`score = 0.35 * SelfCreation + 0.30 * (Close + PostMoves) / 2 + 0.35 * (Outside + Mid + Finishing) / 3`
+Clamped to `max(score, MinUsageScore)` before the exponent. The (Close+PostMoves)/2 term gives a high-post-moves, high-close center meaningful usage even with modest SelfCreation — Emmett's basketball call. Passing, Playmaking, BallHandling, BasketballIQ explicitly excluded (Roll E is who *takes* the shot, not who *runs* the offense).
+
+**Distribution shape (constrained redistribution — not naive double-renormalize):**
+Exponentiated scores normalized to raw shares, then iterative floor application (pins below-floor slots, redistributes free mass proportionally to raw scores until stable), then water-fill rail iteration. Naive renorm was rejected because clamping the rail can push a low slot back under the floor after renormalization.
+
+**Monte Carlo pre-check results (four cases, all assertions passed):**
+- Realistic five-man (alpha/3 solids/Rodman): alpha 34.5%, Rodman 9.0% (at floor) ✓
+- Five equals: 20.0% each ✓
+- Fantasy gap (one elite, four scrubs): elite at rail (0.52), scrubs at 12% each (above floor — correctly, because (1−0.52)/4 = 0.12 > 0.09) ✓
+- Post center (Close=88, PostMoves=90, moderate SelfCreation) beats a perimeter scorer with higher SelfCreation: 25.8% vs 24.2% ✓
+
+**Rail feasibility standdown:** when `populatedCount * UsageRail < 1.0` (thin test rosters only — never in a real five-man game), the rail is skipped entirely. Normal five-man game: 5 × 0.52 = 2.6 ≥ 1.0, always active.
+
+**The coupling note (calibration):** `UsageExponent` and `UsageFloor` are coupled — raising the floor lowers the alpha's realistic ceiling even at a fixed exponent, because floors hand teammates guaranteed shots. Calibrate them together, not independently.
+
+**Important label:** Roll E selection share ≠ box-score USG%. Roll E fires only when a possession reaches player selection; turnovers/violations before Roll E peel possessions off, and USG% folds in FTA and weights turnovers differently. Reconciling Roll E share with true USG% is a later calibration job.
+
+**Observation run delta:** aggregate stats (PPP, FG%, pace, etc.) are identical to Session 50. Correct — Roll E changes *who* gets the ball, not *what happens* when they do. That delta arrives with the usage→efficiency curve (the next build). The non-flat selection is plumbed, proven, and waiting.
+
+**Bug fixed mid-session:** `RollESelectionBatchCheck` ordering assertion looked up `SelectionOutcome.Slot4` (the fourth solid, 18.6%) instead of `SelectionOutcome.Slot5` (the Rodman, 9.0%). Off-by-one in the enum key. Fixed; second harness run passed.
+
+**Harness result — ALL CHECKS PASSED (second run):**
+- Roll E batch: Slot1 33.951%, Slot2 20.451%, Slot3 18.012%, Slot4 18.593%, Slot5 8.993% — all converge to generator's own pie ✓
+- Ordering: Alpha (33.951%) > 2× Rodman (8.993%) ✓
+- FastBreak: transition pie exactly equals cfg.Transition* weights ✓
+- All ~20 stub-backed checks: unchanged ✓
+- Full-game batch closure: `ended + routed-to-stub == BatchSize`, `unrouted == 0` ✓
+- All Phase 1–16 checks green ✓
+
+**Git commit:** `Roll E: attribute-driven usage selection (halfcourt); transition unchanged`
+
 ## Session 50 — Per-zone shooting counters + shooting-curve calibration (2026-06-16)
 
 **Scope:** Three parts, one conversation. (1) Build: extend the v1 counters with a make/attempt pair per shot zone so the harness reports FG% and attempt share for Rim/Short/Mid/Long/Three separately (Three reuses the existing 3PA/3PM pair). Additive only. (2) Design conversation: with the per-zone data in hand, settle the shooting make-curve calibration. (3) Execute that calibration in-session (Emmett's call — not a separate session): re-fit the five logistic make curves, validate, ship. One harness check (Phase 6f) needed its magnitude threshold relaxed to match the now-flatter curve.
