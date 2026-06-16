@@ -230,7 +230,15 @@
     "RollBTurnoverCeiling": 0.10,
     "RollBTurnoverFloor": 0.01,
     "RollBFoulPressureCeiling": 0.22,
-    "RollBFoulPressureFloor": 0.06
+    "RollBFoulPressureFloor": 0.06,
+    "HomeFullCourtPress": 5.0,
+    "AwayFullCourtPress": 5.0,
+    "RollATurnoverCeiling": 0.20,
+    "RollATurnoverFloor": 0.005,
+    "RollADefFoulCeiling": 0.10,
+    "RollADefFoulFloor": 0.005,
+    "RollAOffFoulCeiling": 0.015,
+    "RollAOffFoulFloor": 0.001
   },
   "RollI": {
     "DefensiveRebound": 0.66,

@@ -86,23 +86,30 @@ public enum ContinuationKind
     IntoPlayerAction,
 
     /// <summary>A non-shooting defensive foul with the opponent NOT in the bonus:
-    /// the offense keeps the ball and inbounds. Hand off to the (stubbed)
-    /// resumed-inbound / possession-continues node.</summary>
+    /// the offense keeps the ball and re-inbounds. As of Contextification #6 this no
+    /// longer parks at a stub: the resolver re-runs Roll A carrying the current
+    /// court-state (a backcourt entry foul resumes backcourt; a frontcourt foul
+    /// resumes frontcourt, where the backcourt losses are unreachable). A foul on
+    /// the re-inbound can cross the bonus mid-loop, routing to
+    /// <see cref="ResolveFreeThrows"/> instead.</summary>
     ResumeInbound,
 
     /// <summary>A non-shooting defensive foul with the opponent in the bonus
-    /// (1-and-1 or double): hand off to the (stubbed) free-throw node. The
-    /// <see cref="BonusType"/> rides on the continuation as the FT node's input.
+    /// (1-and-1 or double): driven by the resolver's Roll L FT-sequence driver
+    /// (<c>DriveFreeThrows</c>). The <see cref="BonusType"/> rides on the continuation
+    /// as the FT count input.
     /// <para>NOTE: this is Roll D's (non-shooting / bonus) free-throw path. Roll H's
-    /// SHOOTING fouls route to a SEPARATE node (<see cref="ResolveShootingFreeThrows"/>)
+    /// SHOOTING fouls route to a SEPARATE kind (<see cref="ResolveShootingFreeThrows"/>)
     /// because the shot-count rules differ. Whether the two unify into one FT
     /// resolution node later is an open fork — kept separate for now.</para></summary>
     ResolveFreeThrows,
 
-    /// <summary>A shot attempt was blocked: hand off to the (stubbed)
-    /// block-recovery node. A block is a live-ball event with its own fan-out
-    /// (out of bounds off defense / off offense / scramble recovered by either
-    /// team), so it continues into its own future roll rather than terminating.</summary>
+    /// <summary>RETIRED (Contextification #2). A blocked shot no longer routes here:
+    /// Roll H's Blocked arm routes into <see cref="ResolveRebound"/> carrying
+    /// <c>ReboundSource.Block</c>, and Roll I's block-weighted pie resolves it.
+    /// The resolver throws <see cref="System.InvalidOperationException"/> if anything
+    /// routes to this kind — it is a dead wiring path, kept as a named kind so the
+    /// throw is legible.</summary>
     ResolveBlock,
 
     /// <summary>A clean shot attempt got off: hand off to Roll G (shot location),
@@ -120,55 +127,57 @@ public enum ContinuationKind
     /// next beat. (Was the chain's dead-end stub before Roll H; now live.)</summary>
     IntoShotResolution,
 
-    /// <summary>A shot missed, live: hand off to the (stubbed) rebound node. The
-    /// big dependency several stubs now wait on (block recovery, OOB-retain, the
-    /// offensive-rebound-same-possession branch, the Governor's "same team
-    /// continues"). An offensive board keeps the SAME possession — the ~67–70
-    /// accounting anchor — which the rebound roll, not Roll H, will resolve. The
-    /// stamped <see cref="ShotResult"/> rides on <see cref="PossessionState"/>.</summary>
+    /// <summary>A shot missed, live: executes Roll I (rebound resolution). Roll I is
+    /// a gate with mixed ends: TERMINALS (DefensiveRebound / LooseBallFoulOnOffense —
+    /// possession ends) and CONTINUES (ResolveOffensiveRebound / ResolveSidelineInbound
+    /// / ResolveFreeThrows) that re-enter the walk. The stamped
+    /// <see cref="ShotResult"/> rides on <see cref="PossessionState"/>. The
+    /// <c>ReboundSource</c> on the continuation selects Roll I's pie — a null stamp
+    /// (standard missed field goal) reads as LiveBall; Roll H's Blocked arm stamps
+    /// Block for the block-weighted pie.</summary>
     ResolveRebound,
 
     /// <summary>A SHOOTING foul was drawn (an and-1 on a make, or a foul on a miss):
-    /// hand off to the (stubbed) shooting-free-throw node. The free-throw COUNT
-    /// (and-1 = 1; fouled miss = 2; fouled miss on a three = 3) is derived later
-    /// from the stamped (<see cref="ShotResult"/>, <see cref="ShotLocation"/>) pair —
-    /// that is the future FT roll's job, not encoded here. Kept SEPARATE from
+    /// driven by the resolver's Roll L FT-sequence driver (<c>DriveFreeThrows</c>).
+    /// The free-throw count is derived from the stamped (<see cref="ShotResult"/>,
+    /// <see cref="ShotLocation"/>) pair: and-1 = 1, fouled miss = 2, fouled miss on a
+    /// three = 3 — never a 1-and-1. Kept SEPARATE from
     /// <see cref="ResolveFreeThrows"/> (Roll D's bonus path) for now; possible
     /// future unification is an open fork.</summary>
     ResolveShootingFreeThrows,
 
     /// <summary>A missed shot deflected out of bounds off the defender and the
-    /// offense retained it: hand off to the (stubbed) sideline-inbound node, where
-    /// the offense inbounds from the side. MAY eventually share a loose-ball /
-    /// inbound node with <see cref="ResolveBlock"/> (block recovery) — flagged, not
-    /// merged. The stamped <see cref="ShotResult"/> rides on
-    /// <see cref="PossessionState"/>.</summary>
+    /// offense retained it: as of Contextification #6, the resolver re-runs Roll A
+    /// carrying the current court-state rather than parking at a stub. Post-cross
+    /// (frontcourt is already latched), so the backcourt losses are unreachable and
+    /// the re-inbound almost always CleanEntry's back into the set. Same loop shape
+    /// as <see cref="ResumeInbound"/>.</summary>
     ResolveSidelineInbound,
 
-    /// <summary>The offense secured the offensive rebound: hand off to the
-    /// (stubbed) offensive-rebound node. The same possession stays alive — the
-    /// offense retains the ball and the rebound roll keeps the chain going. The
-    /// real offensive-rebound roll (with its own odds, one branch looping back to
-    /// the halfcourt roll → player selection) is a later session.</summary>
+    /// <summary>The offense secured the offensive rebound: executes Roll K
+    /// (offensive-rebound resolution). Roll K is a gate with mixed ends:
+    /// TERMINALS (OffensiveFoul / DeadBallTurnover / LiveBallTurnover — ball flips)
+    /// and CONTINUES (PutBack → Roll H with a putback ticket; ResetOffense → Roll E
+    /// on a blank slate; DefensiveFoul → the charge-and-fork; JumpBall → the arrow
+    /// node). PutBack and ResetOffense keep the SAME possession alive — the
+    /// re-entrant loop the Governor never sees.</summary>
     ResolveOffensiveRebound,
 
-    /// <summary>A transition possession decided to RUN (Roll J's <c>Push</c>): hand
-    /// off to the (stubbed) transition node — the future transition roll's holding
-    /// pen, where what the fast break PRODUCES (numbers, leak-outs, transition shot
-    /// mix) will resolve. An <c>Into*</c> kind (proceed DEEPER into a live beat, like
-    /// <see cref="IntoHalfcourtSet"/> / <see cref="IntoPlayerSelection"/> /
-    /// <see cref="IntoShotType"/>), not a <c>Resolve*</c> hand-off to a terminal-ish
-    /// node. The real transition roll replaces the stub without Roll J changing.</summary>
+    /// <summary>RETIRED (Contextification #1). Roll J's Push no longer emits this
+    /// kind: it routes into <see cref="IntoPlayerSelection"/> with FastBreak stamped,
+    /// so a break produces a shot through the shared rolls. The resolver throws
+    /// <see cref="System.InvalidOperationException"/> if anything routes here — it is
+    /// a dead wiring path, kept as a named kind so the throw is legible.</summary>
     IntoTransition,
 
-    /// <summary>A missed FINAL free throw left the ball live: hand off to the
-    /// (stubbed) FT-rebound node. Emitted by the resolver's FT-sequence driver (Roll
-    /// L's loop), not by a roll — the last attempt of a trip missed, so the board is
-    /// contested exactly like a missed field goal. The future FT-rebound roll owns
-    /// the offensive/defensive board split off a missed FT plus any foul on that
-    /// rebound; this kind just parks there for now. Distinct from
-    /// <see cref="ResolveRebound"/> (the field-goal rebound) because the FT-rebound
-    /// population differs (everyone lined up along the lane, no shooter crashing) —
-    /// flagged, not merged.</summary>
+    /// <summary>A missed FINAL free throw left the ball live: executes Roll M
+    /// (free-throw rebound resolution). Roll M is a gate with mixed ends (the Roll I
+    /// shape): TERMINALS (DefensiveRebound → transition; LooseBallFoulOnOffense /
+    /// OutOfBoundsOffOffense → dead ball to the defense) and CONTINUES
+    /// (OffensiveRebound → Roll K with FreeThrow source; LooseBallFoulOnDefense →
+    /// the charge-and-fork; OutOfBoundsOffDefense → sideline inbound; JumpBall →
+    /// the arrow node). Distinct from <see cref="ResolveRebound"/> (field-goal
+    /// rebound) because the FT-rebound population differs (everyone lined up along
+    /// the lane, no shooter crashing) — flagged, not merged.</summary>
     ResolveFTRebound,
 }

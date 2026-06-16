@@ -6,7 +6,7 @@ namespace Charm.Engine;
 /// carries signal. The real generator (attributes -> matchup -> weighted odds)
 /// is out of scope and will replace this without changing Roll A.
 /// </summary>
-public sealed class StubPieGenerator
+public sealed class StubPieGenerator : IRollAPieGenerator
 {
     private readonly RollAConfig _cfg;
 

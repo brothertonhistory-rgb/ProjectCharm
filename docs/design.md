@@ -383,6 +383,8 @@ ball, advance it up the floor, get set in the halfcourt. Not just the inbound pa
 everything that can happen before the offense is set at its end lives here. (See
 "The backcourt / frontcourt division" above for the organizing principle.)
 
+> ⚠ SUPERSEDED (Contextification #6): Roll A is five-arm — see the correction at the end of this doc.
+
 **Pie shape:** seven slices over `EntryOutcome` — `CleanEntry`, `Turnover`,
 `ShotClockViolation`, `FiveSecondInbound`, `TenSecondBackcourt`, `Foul`,
 `JumpBall`. (Stub weights today; see below.)
@@ -3923,3 +3925,17 @@ The generator's doc-comment states this explicitly.
 - **Physicality as a live dial.** Dormant at 0.0 from both dispatch sites. A future session
   wires a real value when the concept is ready.
 - **Slot-weight tuning.** The 0.35/0.25/0.20/0.12/0.08 split is a calibration placeholder.
+
+---
+
+## Roll A — correction: five-arm pie (Contextification #6 supersedes the "seven slices" section above)
+
+The Roll A section above (the "Pie shape: seven slices" block) describes the pre-Contextification-#6 shape and is stale. A banner on that section marks it superseded. The Contextification #6 entry later in this document documents the correct shape in full. This correction restates the key facts plainly for any reader landing on the stale section first.
+
+**Roll A's pie is five-arm.** `EntryOutcome` is: `CleanEntry`, `Turnover`, `OffensiveFoul`, `DefensiveFoul`, `JumpBall`. The three former violation terminals (`ShotClockViolation`, `FiveSecondInbound`, `TenSecondBackcourt`) are gone from Roll A's pie.
+
+**Where the violations went.** A backcourt violation is a way the possession is lost — it belongs in Roll C, the canonical home of every no-shot loss. Roll A's Turnover arm stamps `TurnoverContext.EntryBackcourt` on a backcourt bring-up; Roll C's EntryBackcourt pie resolves the type, which includes `FiveSecondInbound`, `TenSecondBackcourt`, and the backcourt shot-clock. A frontcourt re-inbound stamps `TurnoverContext.Halfcourt` instead, where those backcourt-only losses are 0.0. The invariant elapsed times formerly in `RollAConfig` now live in `RollCConfig`.
+
+**The foul split.** The old single `Foul` slice became two: `OffensiveFoul` (charge / illegal screen → offensive-foul resolution: deterministic dead-ball loss to the defense, no free throws, no bonus) and `DefensiveFoul` (reach-in / bump on the ball-handler → Roll D, which charges the team foul and forks on the bonus).
+
+See the Contextification #6 design entry for full rationale and wiring details.

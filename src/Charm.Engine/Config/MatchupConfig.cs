@@ -433,6 +433,59 @@ public sealed class MatchupConfig
     /// (enforced in Load). Calibration placeholder.</summary>
     public double RollBFoulPressureFloor { get; set; } = 0.06;
 
+    // --- Phase 14: full-court press dial (Roll A, backcourt entry).
+    //     Distinct from HomePressure/AwayPressure (halfcourt pressure used by Roll B/F).
+    //     A team can press full-court or pick up at halfcourt only -- independent decisions.
+    //     Range 1-10; neutral at PressureNeutral (= 5 by default).
+    //     Migration path: per-team CoachProfile fields own this eventually;
+    //     FullCourtPressFor(TeamSide) is the only read seam that changes. ---
+
+    /// <summary>Full-court press intensity for the HOME team (1-10; 5 = neutral).
+    /// Distinct from <see cref="HomePressure"/> (halfcourt pressure). Roll A reads
+    /// this when the defending team is Home.</summary>
+    public double HomeFullCourtPress { get; set; } = 5.0;
+
+    /// <summary>Full-court press intensity for the AWAY team (1-10; 5 = neutral).
+    /// Distinct from <see cref="AwayPressure"/> (halfcourt pressure). Roll A reads
+    /// this when the defending team is Away.</summary>
+    public double AwayFullCourtPress { get; set; } = 5.0;
+
+    /// <summary>Full-court press dial for <paramref name="side"/>. Mirrors
+    /// <see cref="PressureFor"/> but reads the full-court press knobs, not the
+    /// halfcourt pressure knobs. Roll A's only call site for this value.</summary>
+    public double FullCourtPressFor(TeamSide side) =>
+        side == TeamSide.Home ? HomeFullCourtPress : AwayFullCourtPress;
+
+    // --- Phase 14: Roll-A-specific ceilings and floors (action-mass shares).
+    //     At max press + worst matchup, shares approach (but do not exceed) the ceilings.
+    //     The sum of the three ceilings must be < 1.0 (enforced in Load). ---
+
+    /// <summary>Maximum turnover share of Roll A's action mass under maximum full-court
+    /// press + worst matchup. Must exceed <see cref="RollATurnoverFloor"/>
+    /// (enforced in Load).</summary>
+    public double RollATurnoverCeiling { get; set; } = 0.20;
+
+    /// <summary>Minimum turnover share of Roll A's action mass under minimum press.
+    /// Must be &gt;= 0 and &lt; <see cref="RollATurnoverCeiling"/> (enforced in Load).</summary>
+    public double RollATurnoverFloor { get; set; } = 0.005;
+
+    /// <summary>Maximum defensive foul share of Roll A's action mass under maximum press.
+    /// Must exceed <see cref="RollADefFoulFloor"/> (enforced in Load).</summary>
+    public double RollADefFoulCeiling { get; set; } = 0.10;
+
+    /// <summary>Minimum defensive foul share of Roll A's action mass under minimum press.
+    /// Must be &gt;= 0 and &lt; <see cref="RollADefFoulCeiling"/> (enforced in Load).</summary>
+    public double RollADefFoulFloor { get; set; } = 0.005;
+
+    /// <summary>Maximum offensive foul share of Roll A's action mass under maximum press.
+    /// Ceiling ~15% of <see cref="RollADefFoulCeiling"/> by design. Must exceed
+    /// <see cref="RollAOffFoulFloor"/> (enforced in Load).</summary>
+    public double RollAOffFoulCeiling { get; set; } = 0.015;
+
+    /// <summary>Minimum offensive foul share of Roll A's action mass under minimum press.
+    /// Must be &gt;= 0 and &lt; <see cref="RollAOffFoulCeiling"/> (enforced in Load).</summary>
+    public double RollAOffFoulFloor { get; set; } = 0.001;
+
     public static MatchupConfig Load(string path)    {
         var json = File.ReadAllText(path);
         using var doc = JsonDocument.Parse(json);
@@ -618,6 +671,43 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"RollBFoulPressureCeiling must exceed RollBFoulPressureFloor: " +
                 $"floor={cfg.RollBFoulPressureFloor}, ceiling={cfg.RollBFoulPressureCeiling}.");
+
+        // Phase 14 -- full-court press dial
+        if (cfg.HomeFullCourtPress < 1.0 || cfg.HomeFullCourtPress > 10.0)
+            throw new InvalidOperationException(
+                $"HomeFullCourtPress must be in [1, 10]: got {cfg.HomeFullCourtPress}.");
+        if (cfg.AwayFullCourtPress < 1.0 || cfg.AwayFullCourtPress > 10.0)
+            throw new InvalidOperationException(
+                $"AwayFullCourtPress must be in [1, 10]: got {cfg.AwayFullCourtPress}.");
+
+        // Phase 14 -- Roll-A-specific ceilings/floors
+        if (cfg.RollATurnoverFloor < 0.0)
+            throw new InvalidOperationException(
+                $"RollATurnoverFloor must be >= 0: got {cfg.RollATurnoverFloor}.");
+        if (cfg.RollATurnoverCeiling <= cfg.RollATurnoverFloor)
+            throw new InvalidOperationException(
+                $"RollATurnoverCeiling must exceed RollATurnoverFloor: " +
+                $"floor={cfg.RollATurnoverFloor}, ceiling={cfg.RollATurnoverCeiling}.");
+        if (cfg.RollADefFoulFloor < 0.0)
+            throw new InvalidOperationException(
+                $"RollADefFoulFloor must be >= 0: got {cfg.RollADefFoulFloor}.");
+        if (cfg.RollADefFoulCeiling <= cfg.RollADefFoulFloor)
+            throw new InvalidOperationException(
+                $"RollADefFoulCeiling must exceed RollADefFoulFloor: " +
+                $"floor={cfg.RollADefFoulFloor}, ceiling={cfg.RollADefFoulCeiling}.");
+        if (cfg.RollAOffFoulFloor < 0.0)
+            throw new InvalidOperationException(
+                $"RollAOffFoulFloor must be >= 0: got {cfg.RollAOffFoulFloor}.");
+        if (cfg.RollAOffFoulCeiling <= cfg.RollAOffFoulFloor)
+            throw new InvalidOperationException(
+                $"RollAOffFoulCeiling must exceed RollAOffFoulFloor: " +
+                $"floor={cfg.RollAOffFoulFloor}, ceiling={cfg.RollAOffFoulCeiling}.");
+        // Static twin of the generator's runtime overflow guard: the three ceilings
+        // summing to >= 1.0 would allow CleanEntry to go negative at max press.
+        if (cfg.RollATurnoverCeiling + cfg.RollADefFoulCeiling + cfg.RollAOffFoulCeiling >= 1.0)
+            throw new InvalidOperationException(
+                $"RollATurnoverCeiling + RollADefFoulCeiling + RollAOffFoulCeiling must be < 1.0: " +
+                $"got {cfg.RollATurnoverCeiling + cfg.RollADefFoulCeiling + cfg.RollAOffFoulCeiling:F4}.");
 
         return cfg;
     }

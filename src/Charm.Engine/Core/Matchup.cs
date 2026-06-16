@@ -675,4 +675,88 @@ public static class Matchup
 
         return (finalToShare, finalFoulShare);
     }
+
+    /// <summary>
+    /// Phase 14 — Roll A's four-way disruption bend (backcourt entry, full-court press).
+    /// Returns the three bent action-mass shares: turnover, defensive foul, and offensive
+    /// foul. The caller (<see cref="RollAGenerator"/>) uses these to split the four-way
+    /// mass and pin JumpBall exactly flat.
+    ///
+    /// <para><b>Input contract.</b> <paramref name="baseTurnoverShare"/>,
+    /// <paramref name="baseDefFoulShare"/>, and <paramref name="baseOffFoulShare"/> are
+    /// <b>action-mass shares, not raw pie probabilities</b>. The caller is responsible for
+    /// dividing Roll A's base masses by actionMass before calling. This mirrors the contract
+    /// of <see cref="DisruptionShares"/> and <see cref="TeamDisruptionShares"/>.</para>
+    ///
+    /// <para><b>Turnover — press + team matchup.</b> Same disruptionShift formula as
+    /// <see cref="TeamDisruptionShares"/>: pressureLift + gated matchupShift. Uses
+    /// Roll-A-specific ceiling/floor from <see cref="MatchupConfig.RollATurnoverCeiling"/>
+    /// and <see cref="MatchupConfig.RollATurnoverFloor"/>.</para>
+    ///
+    /// <para><b>DefFoul — press only, no matchup term.</b> Reach-in fouls track
+    /// defensive aggression, not skill. Uses <see cref="MatchupConfig.RollADefFoulCeiling"/>
+    /// and <see cref="MatchupConfig.RollADefFoulFloor"/>.</para>
+    ///
+    /// <para><b>OffFoul — press only, ceiling ≈ 15% of DefFoul ceiling.</b> Player-control
+    /// fouls (charges, illegal screens) also track aggression, not skill, but are far rarer
+    /// than reach-ins. Uses <see cref="MatchupConfig.RollAOffFoulCeiling"/> and
+    /// <see cref="MatchupConfig.RollAOffFoulFloor"/>.</para>
+    ///
+    /// <para><b>Plain addition throughout</b> (Session 38 lesson — tanh supplies the sign).
+    /// </para>
+    /// </summary>
+    /// <param name="offenseHandling">Slot-weighted BallHandling aggregate for the offense.</param>
+    /// <param name="defenseStealers">Slot-weighted Steals aggregate for the defense.</param>
+    /// <param name="fullCourtPress">The defending team's full-court press dial (1-10).
+    /// Read from <see cref="MatchupConfig.FullCourtPressFor"/>. Distinct from the halfcourt
+    /// pressure dial used by Roll B and Roll F.</param>
+    /// <param name="baseTurnoverShare">BaseTurnover / actionMass (normalized share).</param>
+    /// <param name="baseDefFoulShare">BaseDefensiveFoul / actionMass (normalized share).</param>
+    /// <param name="baseOffFoulShare">BaseOffensiveFoul / actionMass (normalized share).</param>
+    /// <param name="cfg">Matchup config supplying shared normalization knobs and Roll-A-specific
+    /// ceilings/floors.</param>
+    public static (double turnoverShare, double defFoulShare, double offFoulShare)
+    EntryDisruptionShares(
+        double offenseHandling, double defenseStealers, double fullCourtPress,
+        double baseTurnoverShare, double baseDefFoulShare, double baseOffFoulShare,
+        MatchupConfig cfg)
+    {
+        // Pressure normalization (shared with Phase 12/13)
+        var pUnit        = (fullCourtPress - cfg.PressureNeutral) / cfg.PressureScale;
+        var pressureLift = pUnit;
+        var pressureGate = Math.Max(0.0, pUnit);
+
+        // Turnover: press + gated team matchup
+        var teamGap         = defenseStealers - offenseHandling;
+        var matchupShift    = GapFn(teamGap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+        var disruptionShift = pressureLift + pressureGate * matchupShift;
+
+        var toCeiling    = cfg.RollATurnoverCeiling;
+        var toFloor      = cfg.RollATurnoverFloor;
+        var toSpan       = disruptionShift >= 0.0
+                           ? (toCeiling - baseTurnoverShare)
+                           : (baseTurnoverShare - toFloor);
+        var toBend       = toSpan * Math.Tanh(disruptionShift / cfg.PressureReferenceShift);
+        var finalToShare = baseTurnoverShare + toBend;   // plain addition; tanh supplies sign
+
+        // DefFoul: press only, no matchup term
+        var dfCeiling         = cfg.RollADefFoulCeiling;
+        var dfFloor           = cfg.RollADefFoulFloor;
+        var dfSpan            = pressureLift >= 0.0
+                                ? (dfCeiling - baseDefFoulShare)
+                                : (baseDefFoulShare - dfFloor);
+        var dfBend            = dfSpan * Math.Tanh(pressureLift / cfg.PressureReferenceShift);
+        var finalDefFoulShare = baseDefFoulShare + dfBend;   // plain addition
+
+        // OffFoul: press only, ceiling ~15% of DefFoul ceiling
+        var ofCeiling         = cfg.RollAOffFoulCeiling;
+        var ofFloor           = cfg.RollAOffFoulFloor;
+        var ofSpan            = pressureLift >= 0.0
+                                ? (ofCeiling - baseOffFoulShare)
+                                : (baseOffFoulShare - ofFloor);
+        var ofBend            = ofSpan * Math.Tanh(pressureLift / cfg.PressureReferenceShift);
+        var finalOffFoulShare = baseOffFoulShare + ofBend;   // plain addition
+
+        return (finalToShare, finalDefFoulShare, finalOffFoulShare);
+    }
 }

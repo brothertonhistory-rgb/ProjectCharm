@@ -1,3 +1,26 @@
+## Session 44.5 — pre-Phase-14 doc/comment tightening pass (2026-06-15)
+
+**Scope:** Documentation and code comments only. No behavior change, no logic change, no enum change, no pie weights. Harness output expected byte-for-byte identical.
+
+**What was corrected and why.** Two artifacts still described Roll A's pre-Contextification-#6 shape — the seven-arm pie with three violation terminals and a single Foul slice — and would have misled the Phase 14 build, which begins by reading docs:
+
+1. **`docs/design.md` (the "Pie shape: seven slices" block, Roll A section):** A `> ⚠ SUPERSEDED` banner line was added directly above the stale paragraph, pointing to the correction at the bottom of the file. The stale body was NOT rewritten (append-only rule; banner is the confirmed exception). A new correction section was appended at the very end of `design.md` stating the true five-arm shape, where the violations went (Roll C EntryBackcourt context), and how the foul slice split.
+
+2. **`src/Charm.Engine/Rolls/EntryOutcomes.cs` — nine `ContinuationKind` XML doc comments refreshed:**
+   - `ResumeInbound`, `ResolveSidelineInbound` — removed "(stubbed)"; now state that Contextification #6 re-runs Roll A on these edges instead of parking.
+   - `ResolveRebound` — now states it executes Roll I.
+   - `ResolveOffensiveRebound` — now states it executes Roll K.
+   - `ResolveFTRebound` — now states it executes Roll M.
+   - `ResolveFreeThrows`, `ResolveShootingFreeThrows` — now state they are driven by the Roll L FT-sequence driver (`DriveFreeThrows`).
+   - `ResolveBlock` — now marked RETIRED (Contextification #2); resolver throws.
+   - `IntoTransition` — now marked RETIRED (Contextification #1); resolver throws.
+   Enum member names, values, and declaration order are byte-for-byte unchanged.
+
+**Other stale passages noticed but deferred (not fixed this session):**
+- `design.md` lines ~224 and ~239-240: the roll routing table and "True terminals today" paragraph still list the three violation terminals as Roll A exits. These are lower-priority historical context; flagged for a future cleanup pass.
+
+---
+
 ## Session 44 — Phase 13: the pressure / disruption door (Roll B, halfcourt initiation) (2026-06-15)
 
 **A design-then-build session.** Two open design questions were settled conversationally
