@@ -80,7 +80,7 @@ public sealed class Resolver
     // Governor) can ask it to run a whole possession from a start state without
     // ever naming a roll itself. The generator + config produce Roll A's pie; the
     // resolver then walks the chain via the existing Route loop.
-    private readonly IRollAPieGenerator _rollAGenerator;
+    private readonly StubPieGenerator _rollAGenerator;
     private readonly RollAConfig _rollAConfig;
     private readonly IRollBPieGenerator _rollBGenerator;
     private readonly RollCStubPieGenerator _rollCGenerator;
@@ -100,7 +100,7 @@ public sealed class Resolver
     private readonly IRng _rng;
 
     public Resolver(
-        IRollAPieGenerator rollAGenerator,
+        StubPieGenerator rollAGenerator,
         RollAConfig rollAConfig,
         IRollBPieGenerator rollBGenerator,
         RollCStubPieGenerator rollCGenerator,
@@ -117,16 +117,7 @@ public sealed class Resolver
         IRollMPieGenerator rollMGenerator,
         RollOffensiveFoulStubPieGenerator offensiveFoulGenerator,
         GameState game,
-        IRng rng,
-        // resumeInbound / sidelineInbound are accepted but no longer stored: as of #6
-        // the live chain re-runs Roll A on those edges instead of parking, so the
-        // resolver holds no inbound stub. The params are kept so the (8) construction
-        // sites are unchanged here; the harness builds its own stub instances for its
-        // direct fact-echo checks.
-        IContinuationNode resumeInbound,
-        IContinuationNode resolveBlock,
-        IContinuationNode sidelineInbound,
-        IContinuationNode transition)
+        IRng rng)
     {
         _rollAGenerator = rollAGenerator;
         _rollAConfig = rollAConfig;

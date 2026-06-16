@@ -1,3 +1,21 @@
+## Session 44.6 — remove four unused IContinuationNode params from Resolver ctor (2026-06-15)
+
+**Scope:** Constructor signature change and matching call-site updates only. No behavior change. Harness expected to print "ALL CHECKS PASSED" with byte-for-byte identical rates to the pre-change run.
+
+**What was removed and why.** The `Resolver` constructor accepted four trailing parameters typed `IContinuationNode` — `resumeInbound`, `resolveBlock`, `sidelineInbound`, `transition` — that it never stored or used. As of Contextification #6, the live chain re-runs Roll A on the resume/sideline edges; the resolver holds no inbound stub, making those params vestigial. Phase 14 (Session 45) will touch every `new Resolver(...)` site anyway to retype the Roll A generator param; clearing the dead params now keeps Phase 14's ctor edit purely additive and makes any harness change unambiguously Phase 14's doing.
+
+**Changes:**
+- `src/Charm.Engine/Core/Resolver.cs` — removed the four trailing ctor params and the explanatory comment block above them. Final two ctor params are now `GameState game` and `IRng rng`.
+- `src/Charm.Harness/Program.cs` — removed the matching four trailing arguments (`new ResumeInboundStub()`, `new BlockRecoveryStub()`, `new SidelineInboundStub()`, `new TransitionStub()`) from all nine `new Resolver(...)` construction sites. Each closing argument (rng, rngR, or `new SystemRng(seed)`) was re-terminated with `);` instead of `,`.
+
+**Retained (not removed):**
+- All four stub class definitions in `Stubs.cs` remain (documented as "kept in the corner").
+- The three standalone `var sidelineStub = new SidelineInboundStub();` fact-echo helpers in Program.cs remain; these are not Resolver arguments.
+
+**Validation:** Dead param names (`resumeInbound`, `resolveBlock`, `sidelineInbound`) are absent from both changed files; `new TransitionStub()` is absent from Program.cs. Brace balance confirmed on both files. Three standalone `sidelineStub` constructions confirmed present.
+
+---
+
 ## Session 44.5 — pre-Phase-14 doc/comment tightening pass (2026-06-15)
 
 **Scope:** Documentation and code comments only. No behavior change, no logic change, no enum change, no pie weights. Harness output expected byte-for-byte identical.
