@@ -1,3 +1,201 @@
+## Session 44 — Phase 13: the pressure / disruption door (Roll B, halfcourt initiation) (2026-06-15)
+
+**A design-then-build session.** Two open design questions were settled conversationally
+before any code was written. Once confirmed, the build ran as a standard Phase 12-style
+retype-the-generator move: the resolver field was retyped to an interface, the stub gained
+the interface, the real generator was wired, the harness check was added. All checks green.
+
+**Scope:** Roll B's `DeadBallTurnover` slice and its `Foul` slice are now pressure-and-
+matchup-aware. `RollB.Execute` itself is untouched — only the generator changed. The
+shot-quality face of pressure is explicitly deferred.
+
+---
+
+**The reframing (CONVENTIONS §6a).** The Phase 12 plan described Roll B and Roll A as
+"the same matchup one step earlier in the chain — deliberate fast-follows for their own
+sessions." This was stale. The session prompt corrected it: Roll B runs **before** player
+selection (Roll E). `PossessionState.SelectedSlot` is null at Roll B — Roll E has not run.
+This makes the Phase 12 one-on-one handling-vs-steals contest structurally impossible at
+Roll B (no handler to read `BallHandling` from, no slot-matched defender to read `Steals`
+from). The session surfaced this as Design Question 1 rather than papering over it.
+
+---
+
+**DQ1 — Is there a per-player matchup at Roll B, or is it pressure-only?**
+
+Emmett settled on **Option B: two-sided team aggregate**. Because no individual player is
+selected yet, the matchup uses slot-weighted aggregate scores across all ten on-court
+players: the five offensive players' `BallHandling` values (weighted toward guards) vs. the
+five defensive players' `Steals` values (same weights). The basketball logic: a pressing
+defense with good thieves earns turnovers even before the ball-handler is known; guard-slot
+players dominate because they have the most opportunities to handle and steal at halfcourt
+initiation. A center with great `Steals` contributes, but with lower weight (8%) because the
+game creates fewer opportunities for them at this stage.
+
+Slot weights settled: `[0.35, 0.25, 0.20, 0.12, 0.08]` for slots 1–5, same for both offense
+(`BallHandling`) and defense (`Steals`). Stored in `MatchupConfig` as `SlotWeight1`–`SlotWeight5`
+with a `SlotWeights` array property, all tunable. `Load` enforces: each ≥ 0, sum = 1.0.
+
+The `Matchup.TeamDisruptionShares` method is the new math entry point. It receives
+pre-computed aggregate scores (not `Player` objects), runs the gap through `GapFn` with the
+shared skill parameters, and applies the same pressure-gated disruption-shift formula as
+`DisruptionShares`. The foul slice is pressure-only (no matchup term) — aggression, not skill.
+
+Roll-B-specific ceilings/floors are added to `MatchupConfig` (`RollBTurnoverCeiling` = 0.10,
+`RollBTurnoverFloor` = 0.01, `RollBFoulPressureCeiling` = 0.22, `RollBFoulPressureFloor` = 0.06).
+Roll B's baseline foul share (≈12% of the pie) is far higher than Roll F's (≈5%) and its
+baseline TO share (≈3%) is lower; using the Phase 12 Roll-F ceilings here would be wrong.
+The shared `PressureNeutral`/`PressureScale`/`PressureReferenceShift` knobs are reused — they
+describe the pressure dial's normalization, which is a global property.
+
+**DQ2 — What happens to the existing physicality wire?**
+
+Emmett settled on **keep physicality dormant** (Option ii). The `physicality` parameter
+stays in the interface and is applied as a secondary nudge on the Foul slice after the
+pressure bend, before renormalization — exactly as the stub did. Both live dispatch sites
+continue to pass `physicality: 0.0`, so it has no live effect. It is preserved because
+physicality and pressure are distinct basketball concepts (how rough/chippy the game is vs.
+how aggressively the defense hounds the ball); if the dial becomes live in a future session,
+the wire already exists.
+
+Consequence: the interface is **two-arg** `Generate(PossessionState state, double physicality)`,
+matching the existing stub's signature. `PhysicalitySignalCheck` and `RollBFoulRate` are
+unchanged. `PhysicalityFoulNudge` stays in `RollBConfig` and `config.json`.
+
+---
+
+**The changed calibration anchor.** Same as Phase 12: (neutral pressure 5.0 + even aggregate)
+= today's flat Roll B rates. A game running at neutral pressure with equal team aggregates
+reproduces the config baseline exactly. Non-neutral pressure or a team mismatch bends the
+rates. This is not a bug — pressure is the axis.
+
+**Three-way mass split — JumpBall held exactly flat.** Roll B's action mass =
+`BaseProceed + BaseFoul + BaseDeadBallTurnover` (= 0.995). `Proceed` absorbs the complement
+of the two bent arms. `JumpBall` is pinned at `BaseJumpBall` (0.005) exactly. Same discipline
+as Phase 12. After the pressure bend, the physicality nudge is applied to the raw `Foul`
+weight and the whole dict is renormalized — at physicality=0.0 this is a no-op.
+
+**Fallback: empty roster only.** Because Roll B reads no `SelectedSlot` and no per-player
+matchup (it reads all five slots via the weighted aggregate), there is no null-slot fallback
+and no absent-player fallback. The only fallback triggers when either roster has zero
+populated players (isolated test calls). Partial rosters (some slots null) proceed with
+weights renormalized over the populated slots. The generator's doc-comment states this
+explicitly so a future reader does not assume a missing guard.
+
+**Two dispatch sites in Resolver.cs** (unchanged behavior): the `BallAdvanced` entry path
+(line ~192) and the `IntoHalfcourtSet` path (line ~271) both keep `physicality: 0.0`. The
+field and ctor param were retyped from `RollBStubPieGenerator` to `IRollBPieGenerator`.
+
+**BatchCheck and PhysicalitySignalCheck** now each pass a fresh `new RollBStubPieGenerator(cfgB)`
+rather than the live generator (same cure as Phase 9/11/12 for Roll H, Roll M, Roll F). The
+8 Resolver-construction sites in isolated harness checks all pass `new RollBStubPieGenerator(cfgB)`
+unchanged — they compile through `IRollBPieGenerator` without any edits.
+
+---
+
+**What landed (8 files — 2 new + 6 edits):**
+
+- **`Generators/IRollBPieGenerator.cs` (NEW)** — two-arg interface
+  `Pie<HalfcourtOutcome> Generate(PossessionState state, double physicality)`. Carries the
+  physicality parameter since it is kept dormant (DQ2). Mirrors `IRollFPieGenerator`'s shape
+  but with the extra arg and an explicit doc-comment on why it's two-arg.
+
+- **`Generators/RollBGenerator.cs` (NEW)** — real, pressure-and-team-aggregate-aware
+  generator. Ctor `(RollBConfig cfgB, MatchupConfig matchup, GameState game)` with null
+  guards. At generate-time: reads both rosters (5 players each, null-tolerant); falls back to
+  flat baseline if either roster has 0 populated players; computes weighted-aggregate
+  `BallHandling` (offense) and `Steals` (defense) via `WeightedAggregate` (renormalizes over
+  non-null slots); reads pressure via `_matchup.PressureFor(state.Defense)`; calls
+  `Matchup.TeamDisruptionShares`; three-way mass split; `JumpBall` pinned flat; overflow
+  guard (throws if `finalToShare + finalFoulShare >= 1`); physicality nudge applied after
+  pressure bend (dormant at 0.0). Documents: no-slot fallback not needed (Roll B reads no
+  `SelectedSlot`), CoachProfile migration path, deferred shot-quality face.
+
+- **`Generators/RollBStubPieGenerator.cs` (edit)** — added `: IRollBPieGenerator`. No
+  behavior change. Used by `BatchCheck`, `PhysicalitySignalCheck`, and all 8 Resolver-
+  construction sites in isolated harness checks.
+
+- **`Core/Resolver.cs` (edit)** — two surgical type changes: `_rollBGenerator` field and
+  ctor param retyped from `RollBStubPieGenerator` to `IRollBPieGenerator`. Both dispatch
+  sites unchanged (`physicality: 0.0` kept).
+
+- **`Core/Matchup.cs` (edit)** — `TeamDisruptionShares` appended as a new `public static`
+  method. Signature: `(double offenseHandling, double defenseStealers, double pressure,
+  double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg) → (turnoverShare, foulShare)`.
+  Uses `cfg.RollBTurnoverCeiling/Floor` and `cfg.RollBFoulPressureCeiling/Floor` (not the
+  Phase 12 Roll-F keys). The team gap runs through `GapFn` with the shared skill parameters.
+  Foul bend is pressure-only. Plain addition throughout (Session 38 lesson).
+
+- **`Config/MatchupConfig.cs` (edit)** — Phase 13 block added: `SlotWeight1`–`SlotWeight5`
+  (0.35/0.25/0.20/0.12/0.08), `SlotWeights` array convenience property, `RollBTurnoverCeiling`
+  (0.10), `RollBTurnoverFloor` (0.01), `RollBFoulPressureCeiling` (0.22),
+  `RollBFoulPressureFloor` (0.06). `Load` extended with invariants: each slot weight ≥ 0;
+  sum of weights = 1.0 within 1e-6; floor ≥ 0 for both pairs; ceiling > floor for both pairs.
+
+- **`Harness/Program.cs` (edit)** — changes:
+  - Early `var rollBGenerator = new RollBStubPieGenerator(cfgB)` (pre-SeatStartersFromConfig)
+    replaced with a comment; live `var rollBGenerator = new RollBGenerator(cfgB, cfgMatchup,
+    game)` added after `SeatStartersFromConfig` alongside G/H/I/M/F.
+  - `BatchCheck` call site now passes `new RollBStubPieGenerator(cfgB)` (fresh stub).
+  - `PhysicalitySignalCheck` call site now passes `new RollBStubPieGenerator(cfgB)` (fresh
+    stub — the check tests the stub's wire, and `rollBGenerator` is now the live generator).
+  - `BatchCheck` method signature: `RollBStubPieGenerator genB` → `IRollBPieGenerator genB`.
+  - `Phase13TeamDisruptionDoorCheckRollB` registered after `Phase12DisruptionDoorCheck`.
+  - `Phase13TeamDisruptionDoorCheckRollB` method added with 7 sub-checks mirroring the
+    Phase 12 pattern. Key differences from Phase 12's check: `St()` passes `SelectedSlot: null`
+    (Roll B reads no selected slot); no `Mk(bh:, st:)` override needed for the aggregate
+    (all-50 baseline is even); sub-check (f) proves `SelectedSlot` is ignored (null vs.
+    stamped produce identical pies); sub-check (g) flips from "no roster dependence" to
+    "matchup matters" (elite defense Steals > average Steals at high pressure proves the
+    team aggregate fires).
+
+- **`Harness/config.json` (edit)** — 9 new keys added to `Matchup` section:
+  `SlotWeight1`–`SlotWeight5` (0.35/0.25/0.20/0.12/0.08), `RollBTurnoverCeiling` (0.10),
+  `RollBTurnoverFloor` (0.01), `RollBFoulPressureCeiling` (0.22), `RollBFoulPressureFloor`
+  (0.06). `RollB.PhysicalityFoulNudge` stays (DQ2: physicality kept).
+
+---
+
+**Python pre-check (all 8 cases passed before any C# was written):**
+(a) Neutral: all four arms exact baseline. (b) TO monotone rise p=2/5/9: 0.019/0.030/0.077.
+(c) Matchup matters at high pressure: off_adv 0.010 < even 0.077 < def_adv 0.100. (d) Matchup
+muted at low pressure: gap=0 at p=2 vs gap=0.090 at p=9. (e) Foul pressure-only: monotone
+0.087/0.120/0.187; flat across matchup at p=8 (0.17485 in all three cases). (f) Cap holds:
+TO share=0.100≤0.10, Foul share=0.198≤0.22, Proceed>0, sum=1. (g) JumpBall=0.005 flat, sum=1
+in all 5 cases. (h) Slot weights: slot-1 impact (14.0) > slot-5 impact (3.2), sum=1.
+
+**Harness — ALL CHECKS PASSED.** Phase 13 sub-results:
+- (a) Neutral anchor: Proceed=0.84500000, DeadBallTO=0.03000000, Foul=0.12000000,
+  JumpBall=0.00500000 — all exact.
+- (b) TO: p=2=0.018880, p=5=0.030000, p=9=0.077417 — monotone rise: True.
+- (c) Foul: p=2=0.086558, p=5=0.120000, p=9=0.187476 — monotone rise: True.
+- (d) TO share=0.100000 ≤ ceiling=0.10, Fo share=0.197988 ≤ ceiling=0.22, Proceed>0.
+- (e) All 4 cases: JumpBall=0.00500000, sum=1.0000000000.
+- (f) null slot vs stamped slot → identical pie: OK.
+- (g) elite-steal def TO=0.099500 > average-steal def TO=0.077417 — defAdv lifts: True.
+
+Existing `BatchCheck`, `PhysicalitySignalCheck`, `Phase12DisruptionDoorCheck`, and the
+full 100k chain all stayed green.
+
+**NOT changed (confirmed):** `RollB.cs`, `HalfcourtOutcomes.cs`, `RollBConfig.cs`,
+`PossessionState.cs`, `GameState.cs`, `Player.cs`, `RollC.cs`, `RollD.cs`, `DefenderPicker.cs`,
+`RollF.cs`, and all Phase 12 Roll F files.
+
+**Walls held / deferred:**
+- **Shot-quality face of pressure.** Deferred. No hooks, no stubs.
+- **Roll A.** Its own session. Note: Roll A has its own wrinkles (backcourt phase, violation
+  terminals, different turnover-type context) — it is NOT a trivial copy of this session.
+- **Roll C turnover classification / type mix.** Pressure moves the turnover RATE at Roll B.
+  The type mix stays Roll C's job, unchanged.
+- **CoachProfile migration.** `MatchupConfig.PressureFor(TeamSide)` is the only read site
+  that changes when the coach-settings layer arrives.
+- **`PossessionState.DefenderSlot` promotion.** Still deferred. Roll B reads no defender.
+- **Player/steal attribution.** Which defender gets credit for the steal, with weight toward
+  position and steal rating. Roll C's domain.
+- **Slot weights beyond v1.** The 0.35/0.25/0.20/0.12/0.08 split is a calibration placeholder;
+  Emmett can tune them in `config.json`.
+
+
 ## Session 43 — Phase 12: the pressure / disruption door (Roll F) (2026-06-15)
 
 **A build (CONVENTIONS §0–§3) — code + harness, all green.** Roll F's generator is now

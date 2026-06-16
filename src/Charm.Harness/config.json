@@ -221,7 +221,16 @@
     "TurnoverCeiling": 0.18,
     "TurnoverFloor": 0.02,
     "FoulPressureCeiling": 0.09,
-    "FoulPressureFloor": 0.01
+    "FoulPressureFloor": 0.01,
+    "SlotWeight1": 0.35,
+    "SlotWeight2": 0.25,
+    "SlotWeight3": 0.20,
+    "SlotWeight4": 0.12,
+    "SlotWeight5": 0.08,
+    "RollBTurnoverCeiling": 0.10,
+    "RollBTurnoverFloor": 0.01,
+    "RollBFoulPressureCeiling": 0.22,
+    "RollBFoulPressureFloor": 0.06
   },
   "RollI": {
     "DefensiveRebound": 0.66,

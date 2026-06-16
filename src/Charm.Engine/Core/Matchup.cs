@@ -597,4 +597,82 @@ public static class Matchup
 
         return (finalToShare, finalFoulShare);
     }
+
+    /// <summary>
+    /// Team-aggregate disruption shares for Roll B (Phase 13). Returns the pressure-
+    /// and-matchup-bent turnover and foul shares of the Roll B action mass.
+    ///
+    /// <para><b>Pressure-only foul slice.</b> The foul slice tracks defensive
+    /// aggression, not skill. <c>foulShift = pressureLift</c> with no matchup term —
+    /// identical to the foul side of <see cref="DisruptionShares"/>.</para>
+    ///
+    /// <para><b>Team-aggregate turnover slice (Roll B's distinction from Roll F).</b>
+    /// Because no individual player is selected at Roll B (Roll E runs later), the
+    /// matchup uses pre-computed slot-weighted team scores: <paramref name="offenseHandling"/>
+    /// (weighted BallHandling aggregate, offense) vs. <paramref name="defenseStealers"/>
+    /// (weighted Steals aggregate, defense). The gap runs through <see cref="GapFn"/>
+    /// with the shared skill parameters, then into the same pressure-gated
+    /// disruption-shift formula as <see cref="DisruptionShares"/>.</para>
+    ///
+    /// <para><b>Roll-B-specific ceilings/floors.</b> Roll B's baseline foul rate
+    /// (≈12% of the pie) is far higher than Roll F's (≈5%), and its baseline TO
+    /// (≈3%) is lower. Using the Phase 12 ceilings directly would be wrong — this
+    /// method reads <see cref="MatchupConfig.RollBTurnoverCeiling"/> etc. instead
+    /// of the Phase 12 <see cref="MatchupConfig.TurnoverCeiling"/>.</para>
+    ///
+    /// <para><b>Plain addition (Session 38 lesson).</b> <c>Math.Tanh</c> is odd and
+    /// already negative when the shift is negative. Do NOT flip the sign.</para>
+    ///
+    /// <para><b>Caller responsibility.</b> The generator falls back to the flat
+    /// baseline BEFORE calling this method when either roster is empty.</para>
+    /// </summary>
+    /// <param name="offenseHandling">Slot-weighted BallHandling aggregate for the
+    /// offensive team (guards weighted heaviest).</param>
+    /// <param name="defenseStealers">Slot-weighted Steals aggregate for the defensive
+    /// team (same weights as offense).</param>
+    /// <param name="pressure">The defending team's pressure dial (1–10).</param>
+    /// <param name="baseTurnoverShare">Natural TO share within action mass
+    /// (= BaseDeadBallTurnover / actionMass). Reproduced exactly at neutral pressure
+    /// + even aggregate.</param>
+    /// <param name="baseFoulShare">Natural foul share within action mass
+    /// (= BaseFoul / actionMass). Reproduced exactly at neutral pressure.</param>
+    /// <param name="cfg">Matchup config — pressure knobs, Roll-B-specific
+    /// ceilings/floors, slot weights, and shared GapFn parameters.</param>
+    public static (double turnoverShare, double foulShare) TeamDisruptionShares(
+        double offenseHandling, double defenseStealers, double pressure,
+        double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg)
+    {
+        // ── Pressure normalization ───────────────────────────────────────────
+        var pUnit        = (pressure - cfg.PressureNeutral) / cfg.PressureScale;
+        var pressureLift = pUnit;
+        var pressureGate = Math.Max(0.0, pUnit);
+
+        // ── Team aggregate steal/turnover share ──────────────────────────────
+        // Defensive steals advantage → positive gap → more turnovers.
+        // pressureGate ≈ 0 at low pressure: matchup is muted regardless of aggregates.
+        // At high pressure the gate opens and the team gap drives the outcome.
+        var teamGap        = defenseStealers - offenseHandling;
+        var matchupShift   = GapFn(teamGap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+        var disruptionShift = pressureLift + pressureGate * matchupShift;
+
+        var toCeiling  = cfg.RollBTurnoverCeiling;
+        var toFloor    = cfg.RollBTurnoverFloor;
+        var toSpan     = disruptionShift >= 0.0
+                         ? (toCeiling - baseTurnoverShare)
+                         : (baseTurnoverShare - toFloor);
+        var toBend     = toSpan * Math.Tanh(disruptionShift / cfg.PressureReferenceShift);
+        var finalToShare = baseTurnoverShare + toBend;   // plain addition; tanh supplies sign
+
+        // ── Foul share — pressure-only, no matchup term ──────────────────────
+        var foulShift   = pressureLift;
+        var foulCeiling = cfg.RollBFoulPressureCeiling;
+        var foulFloor   = cfg.RollBFoulPressureFloor;
+        var foulSpan    = foulShift >= 0.0
+                          ? (foulCeiling - baseFoulShare)
+                          : (baseFoulShare - foulFloor);
+        var foulBend    = foulSpan * Math.Tanh(foulShift / cfg.PressureReferenceShift);
+        var finalFoulShare = baseFoulShare + foulBend;   // plain addition
+
+        return (finalToShare, finalFoulShare);
+    }
 }

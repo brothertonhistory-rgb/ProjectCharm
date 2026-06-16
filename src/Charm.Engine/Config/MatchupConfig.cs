@@ -371,6 +371,68 @@ public sealed class MatchupConfig
     /// (enforced in Load). Calibration placeholder.</summary>
     public double FoulPressureFloor { get; set; } = 0.01;
 
+    // --- Phase 13 — Roll B slot weights -----------------------------------
+    // Slot-weighted team aggregates for BallHandling (offense) and Steals
+    // (defense) at Roll B. Guards are weighted heaviest because halfcourt
+    // initiation is guard-dominated on both sides of the ball.
+    // Same weights apply to both offense (BallHandling) and defense (Steals).
+    // Must be >= 0 and sum to 1.0 (enforced in Load). ---
+
+    /// <summary>Weight for slot 1 (PG) in the Roll B team aggregate.
+    /// Default 0.35 — guards handle and steal most. Must be &gt;= 0
+    /// (enforced in Load).</summary>
+    public double SlotWeight1 { get; set; } = 0.35;
+
+    /// <summary>Weight for slot 2 (SG) in the Roll B team aggregate.
+    /// Default 0.25. Must be &gt;= 0 (enforced in Load).</summary>
+    public double SlotWeight2 { get; set; } = 0.25;
+
+    /// <summary>Weight for slot 3 (SF) in the Roll B team aggregate.
+    /// Default 0.20. Must be &gt;= 0 (enforced in Load).</summary>
+    public double SlotWeight3 { get; set; } = 0.20;
+
+    /// <summary>Weight for slot 4 (PF) in the Roll B team aggregate.
+    /// Default 0.12. Must be &gt;= 0 (enforced in Load).</summary>
+    public double SlotWeight4 { get; set; } = 0.12;
+
+    /// <summary>Weight for slot 5 (C) in the Roll B team aggregate.
+    /// Default 0.08 — centers have far fewer opportunities to handle or
+    /// steal at halfcourt initiation. Must be &gt;= 0 (enforced in Load).</summary>
+    public double SlotWeight5 { get; set; } = 0.08;
+
+    /// <summary>Convenience array for iterating slot weights 1–5 (index 0 = slot 1).
+    /// Sums to 1.0 (enforced in Load).</summary>
+    public double[] SlotWeights => new[] { SlotWeight1, SlotWeight2, SlotWeight3, SlotWeight4, SlotWeight5 };
+
+    // --- Phase 13 — Roll B pressure ceilings/floors (shares of action mass) ---
+    // Roll B's baseline foul share (≈0.1206 of action mass) is much higher than
+    // Roll F's (≈0.0538), and its baseline TO share (≈0.0302) is lower. The Phase 12
+    // Roll-F ceilings/floors are wrong for Roll B — these Roll-B-specific keys are
+    // used by Matchup.TeamDisruptionShares instead.
+    // Shares of action mass (= BaseProceed + BaseFoul + BaseDeadBallTurnover).
+    // Enforced in Load: ceiling > floor >= 0. Calibration placeholders. ---
+
+    /// <summary>Upper limit on Roll B's turnover share (of action mass) under
+    /// maximum disruption. Deliberately low — nobody strips 10% of halfcourt
+    /// initiations even in a pressing scheme. Must exceed
+    /// <see cref="RollBTurnoverFloor"/> (enforced in Load).</summary>
+    public double RollBTurnoverCeiling { get; set; } = 0.10;
+
+    /// <summary>Lower limit on Roll B's turnover share (of action mass) under
+    /// minimum disruption. Must be &gt;= 0 and &lt;
+    /// <see cref="RollBTurnoverCeiling"/> (enforced in Load).</summary>
+    public double RollBTurnoverFloor { get; set; } = 0.01;
+
+    /// <summary>Upper limit on Roll B's foul share (of action mass) under maximum
+    /// pressure. Must exceed <see cref="RollBFoulPressureFloor"/>
+    /// (enforced in Load). Calibration placeholder.</summary>
+    public double RollBFoulPressureCeiling { get; set; } = 0.22;
+
+    /// <summary>Lower limit on Roll B's foul share (of action mass) under minimum
+    /// pressure. Must be &gt;= 0 and &lt; <see cref="RollBFoulPressureCeiling"/>
+    /// (enforced in Load). Calibration placeholder.</summary>
+    public double RollBFoulPressureFloor { get; set; } = 0.06;
+
     public static MatchupConfig Load(string path)    {
         var json = File.ReadAllText(path);
         using var doc = JsonDocument.Parse(json);
@@ -529,6 +591,33 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"FoulPressureCeiling must exceed FoulPressureFloor: " +
                 $"floor={cfg.FoulPressureFloor}, ceiling={cfg.FoulPressureCeiling}.");
+
+        // Phase 13 — slot weights
+        var slotWeightSum = cfg.SlotWeight1 + cfg.SlotWeight2 + cfg.SlotWeight3
+                          + cfg.SlotWeight4 + cfg.SlotWeight5;
+        if (cfg.SlotWeight1 < 0.0 || cfg.SlotWeight2 < 0.0 || cfg.SlotWeight3 < 0.0
+            || cfg.SlotWeight4 < 0.0 || cfg.SlotWeight5 < 0.0)
+            throw new InvalidOperationException(
+                "All SlotWeight values must be >= 0.");
+        if (Math.Abs(slotWeightSum - 1.0) > 1e-6)
+            throw new InvalidOperationException(
+                $"SlotWeight1–5 must sum to 1.0: got {slotWeightSum:F6}.");
+
+        // Phase 13 — Roll-B-specific ceilings/floors
+        if (cfg.RollBTurnoverFloor < 0.0)
+            throw new InvalidOperationException(
+                $"RollBTurnoverFloor must be >= 0: got {cfg.RollBTurnoverFloor}.");
+        if (cfg.RollBTurnoverCeiling <= cfg.RollBTurnoverFloor)
+            throw new InvalidOperationException(
+                $"RollBTurnoverCeiling must exceed RollBTurnoverFloor: " +
+                $"floor={cfg.RollBTurnoverFloor}, ceiling={cfg.RollBTurnoverCeiling}.");
+        if (cfg.RollBFoulPressureFloor < 0.0)
+            throw new InvalidOperationException(
+                $"RollBFoulPressureFloor must be >= 0: got {cfg.RollBFoulPressureFloor}.");
+        if (cfg.RollBFoulPressureCeiling <= cfg.RollBFoulPressureFloor)
+            throw new InvalidOperationException(
+                $"RollBFoulPressureCeiling must exceed RollBFoulPressureFloor: " +
+                $"floor={cfg.RollBFoulPressureFloor}, ceiling={cfg.RollBFoulPressureCeiling}.");
 
         return cfg;
     }

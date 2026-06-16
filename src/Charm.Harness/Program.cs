@@ -31,7 +31,7 @@ internal static class Program
 
         var rng = new SystemRng(cfg.Seed);
         var rollAGenerator = new StubPieGenerator(cfg);
-        var rollBGenerator = new RollBStubPieGenerator(cfgB);
+        // Roll B generator constructed below after SeatStartersFromConfig (Phase 13).
         var rollCGenerator = new RollCStubPieGenerator(cfgC);
         var rollDGenerator = new RollDStubPieGenerator(cfgD);
         var rollEGenerator = new RollEStubPieGenerator(cfgE);
@@ -53,6 +53,7 @@ internal static class Program
         var rollIGenerator = new RollIGenerator(cfgI, cfgMatchup, game);   // Phase 10: matchup-aware rebounding
         var rollMGenerator = new RollMGenerator(cfgM, cfgMatchup, game);   // Phase 11: matchup-aware FT rebounding
         var rollFGenerator = new RollFGenerator(cfgF, cfgMatchup, game);   // Phase 12: pressure-aware disruption
+        var rollBGenerator = new RollBGenerator(cfgB, cfgMatchup, game);   // Phase 13: team-aggregate disruption
 
         var resolver = new Resolver(
             rollAGenerator,
@@ -87,12 +88,12 @@ internal static class Program
         Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E -> F -> G -> H -> I -> J -> K Chain ===\n");
 
         ShowSamples(cfg, cfgE, rollAGenerator, rollEGenerator, resolver, game, state, rng);
-        var ok = BatchCheck(cfg, cfgB, rollAGenerator, rollBGenerator, resolver, state);
+        var ok = BatchCheck(cfg, cfgB, rollAGenerator, new RollBStubPieGenerator(cfgB), resolver, state);
         ok &= RollCBatchCheck(cfg, cfgC, rollCGenerator, state);
         ok &= RollDFlavorBatchCheck(cfg, cfgD, rollDGenerator, state);
         ok &= RollDBonusRoutingCheck(cfgD, rollDGenerator, state);
         ok &= DefensiveFoulChargeCheck(cfgD, state);
-        ok &= PhysicalitySignalCheck(cfgB, rollBGenerator, state);
+        ok &= PhysicalitySignalCheck(cfgB, new RollBStubPieGenerator(cfgB), state);
         ok &= PressureSignalCheck(cfgC, rollCGenerator, state);
         ok &= JumpBallCheck(cfg);
         ok &= SlotLayerCheck(game);
@@ -130,6 +131,7 @@ internal static class Program
         ok &= Phase10ReboundDoorCheck(configPath);
         ok &= Phase11FreeThrowReboundDoorCheck(configPath);
         ok &= Phase12DisruptionDoorCheck(configPath);
+        ok &= Phase13TeamDisruptionDoorCheckRollB(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -321,7 +323,7 @@ internal static class Program
     // --- Batch: confirm A->B rates and clean hand-offs throughout. ---
     private static bool BatchCheck(
         RollAConfig cfg, RollBConfig cfgB,
-        StubPieGenerator genA, RollBStubPieGenerator genB,
+        StubPieGenerator genA, IRollBPieGenerator genB,
         Resolver resolver, PossessionState state)
     {
         Console.WriteLine($"--- Batch: {cfg.BatchSize:N0} possessions (full chain, physicality=0.00) ---");
@@ -6351,6 +6353,233 @@ internal static class Program
         pass &= hOk;
 
         Console.WriteLine(pass ? "  Phase 12 PASSED." : "  Phase 12 FAILED.");
+        return pass;
+    }
+
+    private static bool Phase13TeamDisruptionDoorCheckRollB(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 13: Team-aggregate disruption door (Roll B) ---");
+        var pass = true;
+
+        var cfgB       = RollBConfig.Load(configPath);
+        var cfgMatchup = MatchupConfig.Load(configPath);
+        const double Eps = 1e-9;
+
+        var actionMass    = cfgB.BaseProceed + cfgB.BaseFoul + cfgB.BaseDeadBallTurnover;
+        var baseToShare   = cfgB.BaseDeadBallTurnover / actionMass;
+        var baseFoulShare = cfgB.BaseFoul             / actionMass;
+
+        // Helper: player with all attributes at b; override BallHandling and Steals.
+        static Player Mk(int b, int? bh = null, int? st = null)
+            => new Player("p")
+            {
+                Outside = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing = b, BallHandling = bh ?? b, Passing = b, Playmaking = b,
+                SelfCreation = b, PostMoves = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding = b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = b,
+                DefensiveRebounding = b,
+                Steals = st ?? b,
+                Height = b, Wingspan = b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b,
+                Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
+                Discipline = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Helper: minimal GameState with Home offense and Away defense.
+        GameState BuildGame(Player[] off, Player[] def)
+        {
+            var g = new GameState(new FoulTracker(7, 10));
+            for (var i = 0; i < 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), off[i]);
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), def[i]);
+            }
+            return g;
+        }
+
+        // Helper: PossessionState. Roll B does NOT read SelectedSlot, so null is the
+        // natural state. We also test with a stamped slot (check f).
+        static PossessionState St(Slot? slot = null)
+            => new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                SelectedSlot: slot,
+                ShotType: null);
+
+        // Helper: construct RollBGenerator, generate pie, return dict.
+        static Dictionary<HalfcourtOutcome, double> Split(
+            RollBConfig cfgB, MatchupConfig cfgMatchup, GameState g, PossessionState state)
+        {
+            var gen = new RollBGenerator(cfgB, cfgMatchup, g);
+            var pie = gen.Generate(state, physicality: 0.0);
+            return pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+        }
+
+        // Helper: MatchupConfig with Away (defense) pressure set to p.
+        MatchupConfig WithAwayPressure(double p)
+        {
+            var c = MatchupConfig.Load(configPath);
+            c.AwayPressure = p;
+            return c;
+        }
+
+        var off5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+        var def5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+
+        // ── (a) Neutral anchor ─────────────────────────────────────────────
+        Console.WriteLine("  (a) Neutral anchor (pressure=5, all-50 even aggregate): all four arms == config baseline:");
+        bool aOk;
+        try
+        {
+            var g = BuildGame(off5, def5);
+            var d = Split(cfgB, cfgMatchup, g, St());   // cfgMatchup has neutral pressure=5
+
+            var prOk = Math.Abs(d[HalfcourtOutcome.Proceed]          - cfgB.BaseProceed)          < Eps;
+            var toOk = Math.Abs(d[HalfcourtOutcome.DeadBallTurnover] - cfgB.BaseDeadBallTurnover) < Eps;
+            var foOk = Math.Abs(d[HalfcourtOutcome.Foul]             - cfgB.BaseFoul)             < Eps;
+            var juOk = Math.Abs(d[HalfcourtOutcome.JumpBall]         - cfgB.BaseJumpBall)         < Eps;
+            aOk = prOk && toOk && foOk && juOk;
+            Console.WriteLine($"    Proceed       ={d[HalfcourtOutcome.Proceed]:F8}  want={cfgB.BaseProceed:F8}  {(prOk?"OK":"FAIL")}");
+            Console.WriteLine($"    DeadBallTO    ={d[HalfcourtOutcome.DeadBallTurnover]:F8}  want={cfgB.BaseDeadBallTurnover:F8}  {(toOk?"OK":"FAIL")}");
+            Console.WriteLine($"    Foul          ={d[HalfcourtOutcome.Foul]:F8}  want={cfgB.BaseFoul:F8}  {(foOk?"OK":"FAIL")}");
+            Console.WriteLine($"    JumpBall      ={d[HalfcourtOutcome.JumpBall]:F8}  want={cfgB.BaseJumpBall:F8}  {(juOk?"OK":"FAIL")}");
+        }
+        catch (Exception ex) { aOk = false; Console.WriteLine($"  FAIL  (a) threw: {ex.Message}"); }
+        pass &= aOk;
+        Console.WriteLine($"  (a) {(aOk ? "ok" : "FAIL")}");
+
+        // ── (b) Pressure raises turnovers ──────────────────────────────────
+        Console.WriteLine("  (b) Pressure raises TO — even aggregate:");
+        bool bOk;
+        try
+        {
+            var g = BuildGame(off5, def5);
+            var dLow  = Split(cfgB, WithAwayPressure(2.0), g, St());
+            var dNeut = Split(cfgB, cfgMatchup,             g, St());
+            var dHigh = Split(cfgB, WithAwayPressure(9.0), g, St());
+            var toRise = dLow[HalfcourtOutcome.DeadBallTurnover]
+                       < dNeut[HalfcourtOutcome.DeadBallTurnover]
+                       && dNeut[HalfcourtOutcome.DeadBallTurnover]
+                       < dHigh[HalfcourtOutcome.DeadBallTurnover];
+            bOk = toRise;
+            Console.WriteLine($"    TO @ p=2: {dLow[HalfcourtOutcome.DeadBallTurnover]:F6}  p=5: {dNeut[HalfcourtOutcome.DeadBallTurnover]:F6}  p=9: {dHigh[HalfcourtOutcome.DeadBallTurnover]:F6}  rise={toRise}");
+        }
+        catch (Exception ex) { bOk = false; Console.WriteLine($"  FAIL  (b) threw: {ex.Message}"); }
+        pass &= bOk;
+        Console.WriteLine($"  (b) {(bOk ? "ok" : "FAIL")}");
+
+        // ── (c) Pressure raises fouls ──────────────────────────────────────
+        Console.WriteLine("  (c) Pressure raises Foul:");
+        bool cOk;
+        try
+        {
+            var g = BuildGame(off5, def5);
+            var fLow  = Split(cfgB, WithAwayPressure(2.0), g, St())[HalfcourtOutcome.Foul];
+            var fNeut = Split(cfgB, cfgMatchup,             g, St())[HalfcourtOutcome.Foul];
+            var fHigh = Split(cfgB, WithAwayPressure(9.0), g, St())[HalfcourtOutcome.Foul];
+            cOk = fLow < fNeut && fNeut < fHigh;
+            Console.WriteLine($"    Foul @ p=2: {fLow:F6}  p=5: {fNeut:F6}  p=9: {fHigh:F6}  rise={cOk}");
+        }
+        catch (Exception ex) { cOk = false; Console.WriteLine($"  FAIL  (c) threw: {ex.Message}"); }
+        pass &= cOk;
+        Console.WriteLine($"  (c) {(cOk ? "ok" : "FAIL")}");
+
+        // ── (d) Cap holds ──────────────────────────────────────────────────
+        Console.WriteLine("  (d) Cap holds at max pressure + worst matchup:");
+        bool dOk;
+        try
+        {
+            var offWeak  = new[] { Mk(50, bh: 1), Mk(50, bh: 1), Mk(50, bh: 1), Mk(50, bh: 1), Mk(50, bh: 1) };
+            var defElite = new[] { Mk(50, st: 99), Mk(50, st: 99), Mk(50, st: 99), Mk(50, st: 99), Mk(50, st: 99) };
+            var g   = BuildGame(offWeak, defElite);
+            var d   = Split(cfgB, WithAwayPressure(10.0), g, St());
+            var toShare  = d[HalfcourtOutcome.DeadBallTurnover] / actionMass;
+            var foShare  = d[HalfcourtOutcome.Foul]             / actionMass;
+            var capTo    = toShare  <= cfgMatchup.RollBTurnoverCeiling    + Eps;
+            var capFo    = foShare  <= cfgMatchup.RollBFoulPressureCeiling + Eps;
+            var procPos  = d[HalfcourtOutcome.Proceed] > 0.0;
+            dOk = capTo && capFo && procPos;
+            Console.WriteLine($"    TO share={toShare:F6}  ceiling={cfgMatchup.RollBTurnoverCeiling}  capped={capTo}");
+            Console.WriteLine($"    Fo share={foShare:F6}  ceiling={cfgMatchup.RollBFoulPressureCeiling}  capped={capFo}");
+            Console.WriteLine($"    Proceed > 0: {procPos}");
+        }
+        catch (Exception ex) { dOk = false; Console.WriteLine($"  FAIL  (d) threw: {ex.Message}"); }
+        pass &= dOk;
+        Console.WriteLine($"  (d) {(dOk ? "ok" : "FAIL")}");
+
+        // ── (e) JumpBall exactly flat; all arms sum to 1 ──────────────────
+        Console.WriteLine("  (e) JumpBall exactly flat, sum = 1:");
+        bool eOk = true;
+        try
+        {
+            var cases = new (string label, MatchupConfig cfg, Player[] off, Player[] def)[]
+            {
+                ("p=2 even",     WithAwayPressure(2.0),  off5, def5),
+                ("p=5 even",     cfgMatchup,              off5, def5),
+                ("p=9 even",     WithAwayPressure(9.0),  off5, def5),
+                ("p=9 def_adv",  WithAwayPressure(9.0),
+                    new[]{Mk(50,bh:20),Mk(50,bh:20),Mk(50,bh:20),Mk(50,bh:20),Mk(50,bh:20)},
+                    new[]{Mk(50,st:80),Mk(50,st:80),Mk(50,st:80),Mk(50,st:80),Mk(50,st:80)}),
+            };
+            foreach (var (label, cfg, off, def) in cases)
+            {
+                var g   = BuildGame(off, def);
+                var d   = Split(cfgB, cfg, g, St());
+                var jbOk  = Math.Abs(d[HalfcourtOutcome.JumpBall] - cfgB.BaseJumpBall) < Eps;
+                var sumOk = Math.Abs(d.Values.Sum() - 1.0) < Eps;
+                var ok2   = jbOk && sumOk;
+                eOk &= ok2;
+                Console.WriteLine($"    {label,-14}  JumpBall={d[HalfcourtOutcome.JumpBall]:F8}  sum={d.Values.Sum():F10}  {(ok2?"ok":"FAIL")}");
+            }
+        }
+        catch (Exception ex) { eOk = false; Console.WriteLine($"  FAIL  (e) threw: {ex.Message}"); }
+        pass &= eOk;
+        Console.WriteLine($"  (e) {(eOk ? "ok" : "FAIL")}");
+
+        // ── (f) SelectedSlot does not affect the aggregate ─────────────────
+        // Roll B reads all 5 slots, not the selected slot. A null SelectedSlot
+        // and a stamped SelectedSlot must produce identical pies.
+        Console.WriteLine("  (f) SelectedSlot-blind (Roll B reads all slots, not the selected one):");
+        bool fOk;
+        try
+        {
+            var g       = BuildGame(off5, def5);
+            var dNull   = Split(cfgB, cfgMatchup, g, St(null));
+            var dStamped = Split(cfgB, cfgMatchup, g, St(g.HomeLineup.SlotAt(1)));
+            var allMatch = dNull.Keys.All(k => Math.Abs(dNull[k] - dStamped[k]) < Eps);
+            fOk = allMatch;
+            Console.WriteLine($"    null slot vs stamped slot → identical pie: {(allMatch?"OK":"FAIL")}");
+        }
+        catch (Exception ex) { fOk = false; Console.WriteLine($"  FAIL  (f) threw: {ex.Message}"); }
+        pass &= fOk;
+        Console.WriteLine($"  (f) {(fOk ? "ok" : "FAIL")}");
+
+        // ── (g) Matchup matters — Option B invariant ───────────────────────
+        // Elite defense Steals vs. average BH offense at high pressure must
+        // produce more turnovers than an even matchup (proves team aggregate fires).
+        Console.WriteLine("  (g) Matchup matters (Option B): def-adv > even at high pressure:");
+        bool gOk;
+        try
+        {
+            var cfgHigh  = WithAwayPressure(9.0);
+            var offAvg   = new[] { Mk(50, bh: 50), Mk(50, bh: 50), Mk(50, bh: 50), Mk(50, bh: 50), Mk(50, bh: 50) };
+            var defElite = new[] { Mk(50, st: 80), Mk(50, st: 80), Mk(50, st: 80), Mk(50, st: 80), Mk(50, st: 80) };
+            var defAvg   = new[] { Mk(50, st: 50), Mk(50, st: 50), Mk(50, st: 50), Mk(50, st: 50), Mk(50, st: 50) };
+            var gElite = BuildGame(offAvg, defElite);
+            var gAvg   = BuildGame(offAvg, defAvg);
+            var toElite = Split(cfgB, cfgHigh, gElite, St())[HalfcourtOutcome.DeadBallTurnover];
+            var toAvg   = Split(cfgB, cfgHigh, gAvg,   St())[HalfcourtOutcome.DeadBallTurnover];
+            gOk = toElite > toAvg;
+            Console.WriteLine($"    TO @ elite-steal def={toElite:F6}  average-steal def={toAvg:F6}  defAdv lifts: {gOk}");
+        }
+        catch (Exception ex) { gOk = false; Console.WriteLine($"  FAIL  (g) threw: {ex.Message}"); }
+        pass &= gOk;
+        Console.WriteLine($"  (g) {(gOk ? "ok" : "FAIL")}");
+
+        Console.WriteLine(pass ? "  Phase 13 PASSED." : "  Phase 13 FAILED.");
         return pass;
     }
 }

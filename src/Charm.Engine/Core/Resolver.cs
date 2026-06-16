@@ -82,7 +82,7 @@ public sealed class Resolver
     // resolver then walks the chain via the existing Route loop.
     private readonly StubPieGenerator _rollAGenerator;
     private readonly RollAConfig _rollAConfig;
-    private readonly RollBStubPieGenerator _rollBGenerator;
+    private readonly IRollBPieGenerator _rollBGenerator;
     private readonly RollCStubPieGenerator _rollCGenerator;
     private readonly RollCConfig _rollCConfig;
     private readonly RollDStubPieGenerator _rollDGenerator;
@@ -102,7 +102,7 @@ public sealed class Resolver
     public Resolver(
         StubPieGenerator rollAGenerator,
         RollAConfig rollAConfig,
-        RollBStubPieGenerator rollBGenerator,
+        IRollBPieGenerator rollBGenerator,
         RollCStubPieGenerator rollCGenerator,
         RollCConfig rollCConfig,
         RollDStubPieGenerator rollDGenerator,

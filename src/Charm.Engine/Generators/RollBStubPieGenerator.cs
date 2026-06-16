@@ -11,7 +11,7 @@ namespace Charm.Engine;
 /// The jump-ball slice is a small sliver (no wire of its own); only the foul
 /// slice is nudged.
 /// </summary>
-public sealed class RollBStubPieGenerator
+public sealed class RollBStubPieGenerator : IRollBPieGenerator
 {
     private readonly RollBConfig _cfg;
 
