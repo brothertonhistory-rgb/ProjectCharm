@@ -28,6 +28,16 @@ public sealed class RollGConfig
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
+    // --- Fast-break shot location pie (Phase 16). A flat rim-heavy pie for
+    //     press-break possessions; bypasses the tendency-matchup calculation
+    //     entirely. The break dictates the shot, not the shooter's profile.
+    //     All five are calibration placeholders summing to 1.0. ---
+    public double FastBreakRim   { get; set; } = 0.70;
+    public double FastBreakShort { get; set; } = 0.10;
+    public double FastBreakMid   { get; set; } = 0.10;
+    public double FastBreakLong  { get; set; } = 0.05;
+    public double FastBreakThree { get; set; } = 0.05;
+
     public static RollGConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -36,6 +46,25 @@ public sealed class RollGConfig
         var cfg = JsonSerializer.Deserialize<RollGConfig>(
             section.GetRawText(),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        return cfg ?? throw new InvalidOperationException($"Could not parse RollG config at {path}.");
+
+        if (cfg is null)
+            throw new InvalidOperationException($"Could not parse RollG config at {path}.");
+
+        const double Eps = 1e-9;
+
+        // Phase 16 invariants: each FastBreak weight must be non-negative and
+        // the five must sum to 1.0 — same pattern as MatchupConfig block-contest weights.
+        if (cfg.FastBreakRim   < 0 || cfg.FastBreakShort < 0 || cfg.FastBreakMid   < 0 ||
+            cfg.FastBreakLong  < 0 || cfg.FastBreakThree < 0)
+            throw new InvalidOperationException(
+                "All RollG FastBreak location weights must be >= 0.");
+
+        var fastBreakSum = cfg.FastBreakRim + cfg.FastBreakShort + cfg.FastBreakMid
+                         + cfg.FastBreakLong + cfg.FastBreakThree;
+        if (Math.Abs(fastBreakSum - 1.0) > Eps)
+            throw new InvalidOperationException(
+                $"RollG FastBreak location weights must sum to 1.0: sum={fastBreakSum}.");
+
+        return cfg;
     }
 }

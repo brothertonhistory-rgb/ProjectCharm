@@ -131,6 +131,7 @@ internal static class Program
         ok &= Phase12DisruptionDoorCheck(configPath);
         ok &= Phase13TeamDisruptionDoorCheckRollB(configPath);
         ok &= Phase15PressFrequencyStandardCheck(configPath);
+        ok &= Phase16PressBreakFastBreakCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -6960,15 +6961,17 @@ internal static class Program
             resolver.Route(new Continue(ContinuationKind.ResumeInbound, stNone));
             var resumeNoneOk = spy.Log.Count > 0 && spy.Log.All(m => m == PressMode.None);
 
-            // 7c: ResolveSidelineInbound with Standard — same proof, different arm
+            // 7c: ResolveSidelineInbound with Standard — Phase 16 clears PressMode to None
+            //     before calling Generate (dead-ball re-inbound ends the press stamp).
+            //     The spy must record None, not Standard.
             spy.Log.Clear();
             resolver.Route(new Continue(ContinuationKind.ResolveSidelineInbound, stStd));
-            var sidelineStdOk = spy.Log.Count > 0 && spy.Log.All(m => m == PressMode.Standard);
+            var sidelineStdOk = spy.Log.Count > 0 && spy.Log.All(m => m == PressMode.None);
 
             t7Ok = resumeStdOk && resumeNoneOk && sidelineStdOk;
             Console.WriteLine($"    ResumeInbound(Standard)         → all spy entries Standard: {resumeStdOk}");
             Console.WriteLine($"    ResumeInbound(None)             → all spy entries None:     {resumeNoneOk}");
-            Console.WriteLine($"    ResolveSidelineInbound(Standard)→ all spy entries Standard: {sidelineStdOk}");
+            Console.WriteLine($"    ResolveSidelineInbound(Standard)→ all spy entries None (Phase 16 dead-ball clear): {sidelineStdOk}");
         }
         catch (Exception ex) { t7Ok = false; Console.WriteLine($"  FAIL  (7) threw: {ex.Message}"); }
         pass &= t7Ok;
@@ -7048,6 +7051,496 @@ internal static class Program
         return pass;
     }
 
+    private static bool Phase16PressBreakFastBreakCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 16: Press-break fast break ---");
+        var pass = true;
+        const double Eps = 1e-9;
+
+        // ── Shared helpers ─────────────────────────────────────────────────────
+        // Player builder: all attributes at b, with optional rim/three tendency overrides.
+        static Player Mk16(int b, int? rim = null, int? three = null)
+        {
+            return new Player("p")
+            {
+                Outside = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation = b, PostMoves = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding = b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = b,
+                DefensiveRebounding = b, Steals = b,
+                Height = b, Wingspan = b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b,
+                Vertical = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                RimTendency   = rim   ?? b,
+                ShortTendency = b,
+                MidTendency   = b,
+                LongTendency  = b,
+                ThreeTendency = three ?? b,
+            };
+        }
+
+        GameState BuildGame16(Player[] off, Player[] def)
+        {
+            var g = new GameState(new FoulTracker(7, 10));
+            for (var i = 0; i < 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), off[i]);
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), def[i]);
+            }
+            return g;
+        }
+
+        var even5 = new[] { Mk16(50), Mk16(50), Mk16(50), Mk16(50), Mk16(50) };
+
+        // ── (1) Standard + IntoHalfcourtSet → Roll E sees FastBreak=true, PressMode=None ──
+        Console.WriteLine("  (1) Standard press + IntoHalfcourtSet → Roll E receives FastBreak=true AND PressMode=None:");
+        bool t1Ok;
+        try
+        {
+            var cfgA = RollAConfig.Load(configPath);
+            var cfgE = RollEConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
+            var game = BuildGame16(even5, even5);
+            var rng  = new SystemRng(1);
+
+            var fixedE = new Pie<SelectionOutcome>(
+                new Dictionary<SelectionOutcome, double>
+                {
+                    [SelectionOutcome.Slot1] = cfgE.BaseSlot1,
+                    [SelectionOutcome.Slot2] = cfgE.BaseSlot2,
+                    [SelectionOutcome.Slot3] = cfgE.BaseSlot3,
+                    [SelectionOutcome.Slot4] = cfgE.BaseSlot4,
+                    [SelectionOutcome.Slot5] = cfgE.BaseSlot5,
+                }, cfgE.Epsilon);
+            var spyE = new RollESpyGenerator(fixedE);
+
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, cfgM, game), cfgA,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                spyE,
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM, game, rng);
+
+            var stStandard = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, PressMode: PressMode.Standard);
+
+            resolver.Route(new Continue(ContinuationKind.IntoHalfcourtSet, stStandard));
+
+            var fbOk = spyE.Log.Count > 0 && spyE.Log[0].FastBreak == true;
+            var pmOk = spyE.Log.Count > 0 && spyE.Log[0].Press     == PressMode.None;
+            t1Ok = fbOk && pmOk;
+            Console.WriteLine($"    spy called {spyE.Log.Count} time(s) on this routing");
+            Console.WriteLine($"    spy.Log[0].FastBreak == true:   {fbOk}");
+            Console.WriteLine($"    spy.Log[0].Press == None:       {pmOk}");
+        }
+        catch (Exception ex) { t1Ok = false; Console.WriteLine($"  FAIL  (1) threw: {ex.Message}"); }
+        pass &= t1Ok;
+        Console.WriteLine($"  (1) {(t1Ok ? "ok" : "FAIL")}");
+
+        // ── (2) None press + IntoHalfcourtSet → Roll B fires, Roll E sees FastBreak=false ──
+        Console.WriteLine("  (2) None press + IntoHalfcourtSet → Roll B fires, Roll E sees FastBreak=false:");
+        bool t2Ok;
+        try
+        {
+            var cfgA  = RollAConfig.Load(configPath);
+            var cfgB  = RollBConfig.Load(configPath);
+            var cfgE  = RollEConfig.Load(configPath);
+            var cfgM  = MatchupConfig.Load(configPath);
+            var game  = BuildGame16(even5, even5);
+            var rng   = new SystemRng(2);
+
+            var fixedE = new Pie<SelectionOutcome>(
+                new Dictionary<SelectionOutcome, double>
+                {
+                    [SelectionOutcome.Slot1] = cfgE.BaseSlot1,
+                    [SelectionOutcome.Slot2] = cfgE.BaseSlot2,
+                    [SelectionOutcome.Slot3] = cfgE.BaseSlot3,
+                    [SelectionOutcome.Slot4] = cfgE.BaseSlot4,
+                    [SelectionOutcome.Slot5] = cfgE.BaseSlot5,
+                }, cfgE.Epsilon);
+            var spyE = new RollESpyGenerator(fixedE);
+
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, cfgM, game), cfgA,
+                new AlwaysProceedRollBGenerator(cfgB),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                spyE,
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM, game, rng);
+
+            var stNone = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, PressMode: PressMode.None);
+
+            resolver.Route(new Continue(ContinuationKind.IntoHalfcourtSet, stNone));
+
+            // AlwaysProceedRollBGenerator guarantees Roll B → Proceed → IntoPlayerSelection → spy
+            var calledOk = spyE.Log.Count > 0;
+            var fbOk     = calledOk && spyE.Log[0].FastBreak == false;
+            var pmOk     = calledOk && spyE.Log[0].Press     == PressMode.None;
+            t2Ok = calledOk && fbOk && pmOk;
+            Console.WriteLine($"    Roll E spy called (confirms Roll B path taken): {calledOk}");
+            Console.WriteLine($"    spy.Log[0].FastBreak == false:  {fbOk}");
+            Console.WriteLine($"    spy.Log[0].Press == None:       {pmOk}");
+        }
+        catch (Exception ex) { t2Ok = false; Console.WriteLine($"  FAIL  (2) threw: {ex.Message}"); }
+        pass &= t2Ok;
+        Console.WriteLine($"  (2) {(t2Ok ? "ok" : "FAIL")}");
+
+        // ── (3) PressMode consumed — second IntoHalfcourtSet cannot re-fire ────
+        Console.WriteLine("  (3) PressMode consumed — second IntoHalfcourtSet with PressMode=None → Roll B fires:");
+        bool t3Ok;
+        try
+        {
+            var cfgA  = RollAConfig.Load(configPath);
+            var cfgB  = RollBConfig.Load(configPath);
+            var cfgE  = RollEConfig.Load(configPath);
+            var cfgM  = MatchupConfig.Load(configPath);
+            var game  = BuildGame16(even5, even5);
+            var rng   = new SystemRng(3);
+
+            var fixedE = new Pie<SelectionOutcome>(
+                new Dictionary<SelectionOutcome, double>
+                {
+                    [SelectionOutcome.Slot1] = cfgE.BaseSlot1,
+                    [SelectionOutcome.Slot2] = cfgE.BaseSlot2,
+                    [SelectionOutcome.Slot3] = cfgE.BaseSlot3,
+                    [SelectionOutcome.Slot4] = cfgE.BaseSlot4,
+                    [SelectionOutcome.Slot5] = cfgE.BaseSlot5,
+                }, cfgE.Epsilon);
+            var spyE = new RollESpyGenerator(fixedE);
+
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, cfgM, game), cfgA,
+                new AlwaysProceedRollBGenerator(cfgB),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                spyE,
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM, game, rng);
+
+            // First routing: Standard press → press-break fires. Spy sees (FastBreak=true, None).
+            var stStandard = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, PressMode: PressMode.Standard);
+            resolver.Route(new Continue(ContinuationKind.IntoHalfcourtSet, stStandard));
+            var firstFireFb = spyE.Log.Count > 0 && spyE.Log[0].FastBreak == true;
+            var firstFirePm = spyE.Log.Count > 0 && spyE.Log[0].Press     == PressMode.None;
+
+            // Second routing: consumed state (PressMode=None) → Roll B fires, not press-break.
+            spyE.Log.Clear();
+            var stConsumed = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, PressMode: PressMode.None);
+            resolver.Route(new Continue(ContinuationKind.IntoHalfcourtSet, stConsumed));
+            var secondFired    = spyE.Log.Count > 0;
+            var secondFbFalse  = secondFired && spyE.Log[0].FastBreak == false;
+
+            t3Ok = firstFireFb && firstFirePm && secondFired && secondFbFalse;
+            Console.WriteLine($"    first routing:  press-break fires (FastBreak=true, Press=None): {firstFireFb && firstFirePm}");
+            Console.WriteLine($"    second routing: Roll B path taken (FastBreak=false at Roll E):  {secondFired && secondFbFalse}");
+        }
+        catch (Exception ex) { t3Ok = false; Console.WriteLine($"  FAIL  (3) threw: {ex.Message}"); }
+        pass &= t3Ok;
+        Console.WriteLine($"  (3) {(t3Ok ? "ok" : "FAIL")}");
+
+        // ── (4) ResolveSidelineInbound clears both markers ────────────────────────
+        Console.WriteLine("  (4) ResolveSidelineInbound clears FastBreak and PressMode:");
+        bool t4Ok;
+        try
+        {
+            var cfgA  = RollAConfig.Load(configPath);
+            var cfgM  = MatchupConfig.Load(configPath);
+            var game  = BuildGame16(even5, even5);
+            var rng   = new SystemRng(4);
+
+            var cleanPie = new Pie<EntryOutcome>(
+                new Dictionary<EntryOutcome, double>
+                {
+                    [EntryOutcome.CleanEntry]    = 1.0,
+                    [EntryOutcome.Turnover]      = 0.0,
+                    [EntryOutcome.DefensiveFoul] = 0.0,
+                    [EntryOutcome.OffensiveFoul] = 0.0,
+                    [EntryOutcome.JumpBall]      = 0.0,
+                }, cfgA.Epsilon);
+            var spyA = new FullStateRollASpyGenerator(cleanPie);
+
+            var resolver = new Resolver(
+                spyA, cfgA,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM, game, rng);
+
+            var stBoth = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, FastBreak: true, PressMode: PressMode.Standard);
+
+            resolver.Route(new Continue(ContinuationKind.ResolveSidelineInbound, stBoth));
+
+            var fbOk = spyA.Log.Count > 0 && spyA.Log[0].FastBreak == false;
+            var pmOk = spyA.Log.Count > 0 && spyA.Log[0].Press     == PressMode.None;
+            t4Ok = fbOk && pmOk;
+            Console.WriteLine($"    Roll A sees FastBreak=false: {fbOk}");
+            Console.WriteLine($"    Roll A sees PressMode=None:  {pmOk}");
+        }
+        catch (Exception ex) { t4Ok = false; Console.WriteLine($"  FAIL  (4) threw: {ex.Message}"); }
+        pass &= t4Ok;
+        Console.WriteLine($"  (4) {(t4Ok ? "ok" : "FAIL")}");
+
+        // ── (5) ResumeInbound (frontcourt) clears both markers ────────────────────
+        Console.WriteLine("  (5) ResumeInbound (frontcourt) clears FastBreak and PressMode:");
+        bool t5Ok;
+        try
+        {
+            var cfgA  = RollAConfig.Load(configPath);
+            var cfgM  = MatchupConfig.Load(configPath);
+            var game  = BuildGame16(even5, even5);
+            var rng   = new SystemRng(5);
+
+            var cleanPie = new Pie<EntryOutcome>(
+                new Dictionary<EntryOutcome, double>
+                {
+                    [EntryOutcome.CleanEntry]    = 1.0,
+                    [EntryOutcome.Turnover]      = 0.0,
+                    [EntryOutcome.DefensiveFoul] = 0.0,
+                    [EntryOutcome.OffensiveFoul] = 0.0,
+                    [EntryOutcome.JumpBall]      = 0.0,
+                }, cfgA.Epsilon);
+            var spyA = new FullStateRollASpyGenerator(cleanPie);
+
+            var resolver = new Resolver(
+                spyA, cfgA,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM, game, rng);
+
+            var stFrontcourt = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, Frontcourt: true, FastBreak: true, PressMode: PressMode.None);
+
+            resolver.Route(new Continue(ContinuationKind.ResumeInbound, stFrontcourt));
+
+            var fbOk = spyA.Log.Count > 0 && spyA.Log[0].FastBreak == false;
+            var pmOk = spyA.Log.Count > 0 && spyA.Log[0].Press     == PressMode.None;
+            t5Ok = fbOk && pmOk;
+            Console.WriteLine($"    Roll A sees FastBreak=false: {fbOk}");
+            Console.WriteLine($"    Roll A sees PressMode=None:  {pmOk}");
+        }
+        catch (Exception ex) { t5Ok = false; Console.WriteLine($"  FAIL  (5) threw: {ex.Message}"); }
+        pass &= t5Ok;
+        Console.WriteLine($"  (5) {(t5Ok ? "ok" : "FAIL")}");
+
+        // ── (6) ResumeInbound (backcourt) preserves active Standard press ─────────
+        Console.WriteLine("  (6) ResumeInbound (backcourt) preserves active Standard press:");
+        bool t6Ok;
+        try
+        {
+            var cfgA  = RollAConfig.Load(configPath);
+            var cfgM  = MatchupConfig.Load(configPath);
+            var game  = BuildGame16(even5, even5);
+            var rng   = new SystemRng(6);
+
+            var cleanPie = new Pie<EntryOutcome>(
+                new Dictionary<EntryOutcome, double>
+                {
+                    [EntryOutcome.CleanEntry]    = 1.0,
+                    [EntryOutcome.Turnover]      = 0.0,
+                    [EntryOutcome.DefensiveFoul] = 0.0,
+                    [EntryOutcome.OffensiveFoul] = 0.0,
+                    [EntryOutcome.JumpBall]      = 0.0,
+                }, cfgA.Epsilon);
+            var spyA = new FullStateRollASpyGenerator(cleanPie);
+
+            var resolver = new Resolver(
+                spyA, cfgA,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM, game, rng);
+
+            var stBackcourt = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, Frontcourt: false, FastBreak: false, PressMode: PressMode.Standard);
+
+            resolver.Route(new Continue(ContinuationKind.ResumeInbound, stBackcourt));
+
+            // Press must survive — Roll A gets PressMode=Standard (can still be beaten on CleanEntry).
+            var pmOk = spyA.Log.Count > 0 && spyA.Log[0].Press == PressMode.Standard;
+            t6Ok = pmOk;
+            Console.WriteLine($"    Roll A sees PressMode=Standard (press survived backcourt foul): {pmOk}");
+        }
+        catch (Exception ex) { t6Ok = false; Console.WriteLine($"  FAIL  (6) threw: {ex.Message}"); }
+        pass &= t6Ok;
+        Console.WriteLine($"  (6) {(t6Ok ? "ok" : "FAIL")}");
+
+        // ── (7) Roll G with FastBreak=true → flat fast-break pie, bypasses tendencies ──
+        Console.WriteLine("  (7) Roll G with FastBreak=true → flat fast-break pie regardless of shooter tendencies:");
+        bool t7Ok;
+        try
+        {
+            var cfgG = RollGConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
+
+            var shooterA = Mk16(50, rim: 99, three: 1);
+            var shooterB = Mk16(50, rim: 1,  three: 99);
+
+            var gameA = BuildGame16(new[] { shooterA, Mk16(50), Mk16(50), Mk16(50), Mk16(50) }, even5);
+            var gameB = BuildGame16(new[] { shooterB, Mk16(50), Mk16(50), Mk16(50), Mk16(50) }, even5);
+
+            var genA = new RollGGenerator(cfgG, cfgM, gameA);
+            var genB = new RollGGenerator(cfgG, cfgM, gameB);
+
+            var slot = gameA.HomeLineup.SlotAt(1);   // Slot(Home,1) — same value type in both games
+
+            var stBreak   = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home,
+                                Defense: TeamSide.Away, Entry: EntryType.DeadBallInbound,
+                                SelectedSlot: slot, FastBreak: true);
+            var stNoBreak = stBreak with { FastBreak = false };
+
+            var pieABreak   = genA.Generate(stBreak);
+            var pieBBreak   = genB.Generate(stBreak);
+            var pieANoBreak = genA.Generate(stNoBreak);
+            var pieBNoBreak = genB.Generate(stNoBreak);
+
+            double Wt(Pie<ShotLocation> p, ShotLocation loc) =>
+                p.Slices.First(s => s.Outcome == loc).Weight;
+
+            var aRimOk   = Math.Abs(Wt(pieABreak, ShotLocation.Rim)   - cfgG.FastBreakRim)   < Eps;
+            var aThreeOk = Math.Abs(Wt(pieABreak, ShotLocation.Three) - cfgG.FastBreakThree) < Eps;
+            var aSumOk   = Math.Abs(pieABreak.Slices.Sum(s => s.Weight) - 1.0) < Eps;
+            var bRimOk   = Math.Abs(Wt(pieBBreak, ShotLocation.Rim)   - cfgG.FastBreakRim)   < Eps;
+            var bThreeOk = Math.Abs(Wt(pieBBreak, ShotLocation.Three) - cfgG.FastBreakThree) < Eps;
+            var bSumOk   = Math.Abs(pieBBreak.Slices.Sum(s => s.Weight) - 1.0) < Eps;
+            var samePie  = pieABreak.Slices.All(s => Math.Abs(s.Weight - Wt(pieBBreak, s.Outcome)) < Eps);
+            // Non-FastBreak: rim-dominant and three-dominant shooters must get different rim weights.
+            var noBreakDiffer = Math.Abs(Wt(pieANoBreak, ShotLocation.Rim) - Wt(pieBNoBreak, ShotLocation.Rim)) > 0.01;
+
+            t7Ok = aRimOk && aThreeOk && aSumOk && bRimOk && bThreeOk && bSumOk && samePie && noBreakDiffer;
+            Console.WriteLine($"    ShooterA FB: rim={Wt(pieABreak,ShotLocation.Rim):F4} want={cfgG.FastBreakRim}  three={Wt(pieABreak,ShotLocation.Three):F4} want={cfgG.FastBreakThree}  sum=1:{aSumOk}");
+            Console.WriteLine($"    ShooterB FB: rim={Wt(pieBBreak,ShotLocation.Rim):F4} want={cfgG.FastBreakRim}  three={Wt(pieBBreak,ShotLocation.Three):F4} want={cfgG.FastBreakThree}  sum=1:{bSumOk}");
+            Console.WriteLine($"    Both shooters same fast-break pie:             {samePie}");
+            Console.WriteLine($"    Non-FastBreak pies differ (tendencies active): {noBreakDiffer}");
+        }
+        catch (Exception ex) { t7Ok = false; Console.WriteLine($"  FAIL  (7) threw: {ex.Message}"); }
+        pass &= t7Ok;
+        Console.WriteLine($"  (7) {(t7Ok ? "ok" : "FAIL")}");
+
+        // ── (8) End-to-end smoke — 1 000-possession batch, unrouted == 0 ──────────
+        Console.WriteLine("  (8) End-to-end smoke (1 000 possessions, AwayPressFreq=10):");
+        bool t8Ok;
+        try
+        {
+            var cfgA  = RollAConfig.Load(configPath);
+            var cfgM  = MatchupConfig.Load(configPath);
+            cfgM.AwayPressFrequency = 10.0;   // ~80% press probability
+            var game  = BuildGame16(even5, even5);
+            var rng   = new SystemRng(cfgA.Seed);
+
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, cfgM, game), cfgA,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM, game, rng);
+
+            const int N = 1_000;
+            var st = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home,
+                         Defense: TeamSide.Away, Entry: EntryType.DeadBallInbound);
+
+            var ended    = 0;
+            var parked   = 0;
+            var unrouted = 0;
+            for (var i = 0; i < N; i++)
+            {
+                var r = resolver.RunPossession(st);
+                if (r.PossessionEnded)                  ended++;
+                else if (r.Destination.StartsWith("STUB:")) parked++;
+                else                                    unrouted++;
+            }
+
+            t8Ok = unrouted == 0;
+            Console.WriteLine($"    ended={ended:N0}  parked={parked:N0}  unrouted={unrouted} → {(t8Ok ? "ok" : "FAIL")}");
+        }
+        catch (Exception ex) { t8Ok = false; Console.WriteLine($"  FAIL  (8) threw: {ex.Message}"); }
+        pass &= t8Ok;
+        Console.WriteLine($"  (8) {(t8Ok ? "ok" : "FAIL")}");
+
+        Console.WriteLine(pass ? "  Phase 16 PASSED." : "  Phase 16 FAILED.");
+        return pass;
+    }
+
     /// <summary>
     /// Spy implementation of <see cref="IRollAPieGenerator"/> for Phase 15 testing.
     /// Records every <see cref="PossessionState.PressMode"/> it receives (proving
@@ -7068,4 +7561,69 @@ internal static class Program
             return _fixedPie;
         }
     }
+
+    /// <summary>
+    /// Spy implementation of <see cref="IRollAPieGenerator"/> for Phase 16 testing.
+    /// Records every (FastBreak, PressMode) pair it receives, then returns a caller-supplied
+    /// fixed pie. Used to verify what state the Resolver passes to Roll A at
+    /// ResumeInbound and ResolveSidelineInbound edges.
+    /// </summary>
+    private sealed class FullStateRollASpyGenerator : IRollAPieGenerator
+    {
+        private readonly Pie<EntryOutcome> _fixedPie;
+        public readonly List<(bool FastBreak, PressMode Press)> Log = new();
+
+        public FullStateRollASpyGenerator(Pie<EntryOutcome> fixedPie) => _fixedPie = fixedPie;
+
+        public Pie<EntryOutcome> Generate(PossessionState state, double pressure)
+        {
+            Log.Add((state.FastBreak, state.PressMode));
+            return _fixedPie;
+        }
+    }
+
+    /// <summary>
+    /// Spy implementation of <see cref="IRollEPieGenerator"/> for Phase 16 testing.
+    /// Records every (FastBreak, PressMode) pair it receives, then returns a caller-supplied
+    /// fixed pie. Used to verify that the Resolver stamps FastBreak=true and PressMode=None
+    /// on the breakState it passes to Roll E at the IntoHalfcourtSet press-break gate.
+    /// </summary>
+    private sealed class RollESpyGenerator : IRollEPieGenerator
+    {
+        private readonly Pie<SelectionOutcome> _fixedPie;
+        public readonly List<(bool FastBreak, PressMode Press)> Log = new();
+
+        public RollESpyGenerator(Pie<SelectionOutcome> fixedPie) => _fixedPie = fixedPie;
+
+        public Pie<SelectionOutcome> Generate(PossessionState state)
+        {
+            Log.Add((state.FastBreak, state.PressMode));
+            return _fixedPie;
+        }
+    }
+
+    /// <summary>
+    /// Test-only Roll B generator that always returns a 100% Proceed pie.
+    /// Used in Phase 16 test 2 to make the None-press halfcourt path deterministic:
+    /// Roll B always Proceeds, guaranteeing Roll E is reached exactly once so the
+    /// spy log length and content can be asserted without distributional variance.
+    /// </summary>
+    private sealed class AlwaysProceedRollBGenerator : IRollBPieGenerator
+    {
+        private readonly RollBConfig _cfg;
+        public AlwaysProceedRollBGenerator(RollBConfig cfg) => _cfg = cfg;
+
+        public Pie<HalfcourtOutcome> Generate(PossessionState state, double physicality)
+        {
+            var weights = new Dictionary<HalfcourtOutcome, double>
+            {
+                [HalfcourtOutcome.Proceed]          = 1.0,
+                [HalfcourtOutcome.Foul]             = 0.0,
+                [HalfcourtOutcome.DeadBallTurnover] = 0.0,
+                [HalfcourtOutcome.JumpBall]         = 0.0,
+            };
+            return new Pie<HalfcourtOutcome>(weights, _cfg.Epsilon);
+        }
+    }
 }
+

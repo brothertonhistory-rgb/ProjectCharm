@@ -1,3 +1,41 @@
+## Session 47 — Phase 16: press-break fast break (2026-06-16)
+
+**Scope:** When Roll A returns `CleanEntry` under `PressMode.Standard`, stamp `FastBreak=true`, consume the press stamp (`PressMode=None`), skip Roll B, route directly to Roll E. Roll G returns a flat rim-heavy pie when `FastBreak=true`. Dead-ball re-inbounds enforce state hygiene.
+
+**Pre-build audit findings (both decided/resolved):**
+- **Issue 1 — Missing `IRollEPieGenerator` interface.** `RollEStubPieGenerator` was a sealed concrete class with no interface; the Resolver held its field as the concrete type, blocking test injection. Resolution: create `Generators/IRollEPieGenerator.cs`, add `: IRollEPieGenerator` to `RollEStubPieGenerator`, retype the Resolver field and ctor param — mirrors the existing `IRollBPieGenerator` pattern exactly. Engineering judgment: right call long-term; the real Roll E generator drops in with zero Resolver changes.
+- **Issue 2 — Prompt spy used wrong type `Pie<Slot>`.** The correct type is `Pie<SelectionOutcome>`. Fixed silently in Program.cs.
+
+**What shipped:**
+- `Generators/IRollEPieGenerator.cs` — new interface (one method: `Generate(PossessionState state)`)
+- `Generators/RollEStubPieGenerator.cs` — adds `: IRollEPieGenerator`
+- `Core/Resolver.cs` — field + ctor param retyped to interface; `IntoHalfcourtSet` press-break gate (Standard → skip Roll B, call Roll E directly with `FastBreak=true, PressMode=None`); `ResumeInbound` conditional clear (frontcourt clears both, backcourt preserves); `ResolveSidelineInbound` unconditional clear (dead ball ends all markers)
+- `Config/RollGConfig.cs` — five `FastBreak*` auto-properties (sum-to-1.0 load invariant)
+- `Generators/RollGGenerator.cs` — FastBreak gate after null-guard, before shooter read; `BuildFastBreakPie()` helper
+- `Harness/config.json` — five `FastBreak*` keys under `RollG` (sum=1.00)
+- `Harness/Program.cs` — Phase 15 test 7c updated (ResolveSidelineInbound now asserts PressMode=None at Roll A, not Standard); Phase 16 check added (8 sub-tests); three new nested spy classes: `FullStateRollASpyGenerator`, `RollESpyGenerator`, `AlwaysProceedRollBGenerator`; `PressModeSpyGenerator` restored
+
+**Phase 16 harness check — 8 sub-tests:**
+1. Standard + IntoHalfcourtSet → Roll E sees FastBreak=true AND PressMode=None
+2. None + IntoHalfcourtSet → Roll B fires, Roll E sees FastBreak=false
+3. PressMode consumed — second IntoHalfcourtSet (None) routes Roll B, not press-break
+4. ResolveSidelineInbound clears both markers (Roll A spy)
+5. ResumeInbound frontcourt clears both markers
+6. ResumeInbound backcourt preserves PressMode=Standard
+7. Roll G FastBreak=true → flat cfg-value pie for both rim-dominant and three-dominant shooters; non-FastBreak pies differ
+8. 1000-possession smoke with AwayPressFreq=10.0, unrouted==0
+
+**Python Monte Carlo validation:** All 7 logic gates passed before C# delivery.
+
+**Key design clarifications locked:**
+- `IntoHalfcourtSet` is the only gate site — backcourt CleanEntry stamps `FastBreak=true` and `PressMode=None` simultaneously
+- `ResumeInbound` semantic: frontcourt dead ball (refs blow whistle on the offensive side of halfcourt) clears both; backcourt foul preserves the live press
+- `ResolveSidelineInbound` always clears: any sideline throw-in ends the break context
+- `RollGStubPieGenerator` remains FastBreak-blind by design (stub path untouched)
+- Phase 15 test 7c corrected: previous assertion was wrong (`PressMode.Standard` at Roll A after a sideline inbound); Phase 16 makes the correct behavior explicit
+
+**Git commit:** `"Phase 16: press-break fast break, state hygiene on re-inbounds"`
+
 ## Session 46 — Phase 15: press frequency + Standard mode reframe (Roll A) (2026-06-16)
 
 **Scope:** Reframe the Phase 14 full-court press from a continuous intensity dial into a per-possession frequency decision plus a fixed Standard press mode. The three-gap matchup turnover model (skill + athleticism + size) from Phase 14 is re-pointed, not rebuilt — preserve its shape. Back-end break (Phase 16) explicitly deferred.

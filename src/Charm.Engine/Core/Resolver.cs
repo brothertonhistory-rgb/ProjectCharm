@@ -86,7 +86,7 @@ public sealed class Resolver
     private readonly RollCStubPieGenerator _rollCGenerator;
     private readonly RollCConfig _rollCConfig;
     private readonly RollDStubPieGenerator _rollDGenerator;
-    private readonly RollEStubPieGenerator _rollEGenerator;
+    private readonly IRollEPieGenerator _rollEGenerator;
     private readonly IRollFPieGenerator _rollFGenerator;
     private readonly IRollGPieGenerator _rollGGenerator;
     private readonly IRollHPieGenerator _rollHGenerator;
@@ -107,7 +107,7 @@ public sealed class Resolver
         RollCStubPieGenerator rollCGenerator,
         RollCConfig rollCConfig,
         RollDStubPieGenerator rollDGenerator,
-        RollEStubPieGenerator rollEGenerator,
+        IRollEPieGenerator rollEGenerator,
         IRollFPieGenerator rollFGenerator,
         IRollGPieGenerator rollGGenerator,
         IRollHPieGenerator rollHGenerator,
@@ -272,6 +272,16 @@ public sealed class Resolver
                     {
                         // Roll A's clean entry -> execute Roll B, loop.
                         case ContinuationKind.IntoHalfcourtSet:
+                            if (c.State.PressMode == PressMode.Standard)
+                            {
+                                // Phase 16: press beaten — fast break fires. Consume the press stamp so
+                                // later re-inbounds in the same possession cannot re-trigger this gate.
+                                var breakState = c.State with { FastBreak = true, PressMode = PressMode.None };
+                                var breakPieE = _rollEGenerator.Generate(breakState);
+                                result = RollE.Execute(breakState, breakPieE, _game, _rng);
+                                continue;
+                            }
+                            // Normal halfcourt path.
                             var pieB = _rollBGenerator.Generate(c.State, physicality: 0.0);
                             result = RollB.Execute(c.State, pieB, _rng);
                             continue;
@@ -372,9 +382,18 @@ public sealed class Resolver
                         // (The resolver no longer holds an inbound stub; the harness
                         // builds its own for the direct fact-echo checks.)
                         case ContinuationKind.ResumeInbound:
-                            var pieAResume = _rollAGenerator.Generate(c.State, pressure: 0.0);
-                            result = RollA.Execute(c.State, pieAResume, _rng, _rollAConfig);
+                        {
+                            // Phase 16: backcourt re-inbound preserves the active press stamp so the
+                            // press can still be beaten on the next Roll A. Frontcourt re-inbound
+                            // clears both markers — dead ball in the frontcourt ends any break context
+                            // and the press decision cannot reach this far anyway.
+                            var inboundState = c.State.Frontcourt
+                                ? c.State with { FastBreak = false, PressMode = PressMode.None }
+                                : c.State;
+                            var pieAResume = _rollAGenerator.Generate(inboundState, pressure: 0.0);
+                            result = RollA.Execute(inboundState, pieAResume, _rng, _rollAConfig);
                             continue;
+                        }
 
                         // Bonus fork (Roll D/I/J/K), opponent in bonus -> the Roll L
                         // FT loop. The Bonus token IS the shot count: Double is a flat
@@ -517,9 +536,17 @@ public sealed class Resolver
                         // (The resolver no longer holds an inbound stub; the harness
                         // builds its own for the direct fact-echo checks.)
                         case ContinuationKind.ResolveSidelineInbound:
-                            var pieASideline = _rollAGenerator.Generate(c.State, pressure: 0.0);
-                            result = RollA.Execute(c.State, pieASideline, _rng, _rollAConfig);
+                        {
+                            // Phase 16: dead-ball re-inbound ends both the live-break context and any
+                            // active press. FastBreak=true from a prior break must not carry into the
+                            // new halfcourt set (Phase 16 makes Roll G read FastBreak, so leaking
+                            // would give the wrong location pie). PressMode consumed here too —
+                            // the press decision does not survive a dead ball.
+                            var inboundState = c.State with { FastBreak = false, PressMode = PressMode.None };
+                            var pieASideline = _rollAGenerator.Generate(inboundState, pressure: 0.0);
+                            result = RollA.Execute(inboundState, pieASideline, _rng, _rollAConfig);
                             continue;
+                        }
 
                         // Jump ball (from any feeder: Roll A, Roll B, Roll F) ->
                         // resolve against the possession arrow, then END the

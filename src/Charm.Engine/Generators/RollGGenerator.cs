@@ -79,6 +79,12 @@ public sealed class RollGGenerator : IRollGPieGenerator
             ?? throw new InvalidOperationException(
                 "RollGGenerator requires a stamped SelectedSlot — Roll E must run before Roll G.");
 
+        // Phase 16: fast-break shot location — flat rim-heavy pie, ignores
+        // tendencies and matchup entirely. The break dictates the shot, not
+        // the shooter's tendency profile.
+        if (state.FastBreak)
+            return BuildFastBreakPie();
+
         var shooter = _game.RosterFor(state.Offense).PlayerAt(slot);
         if (shooter is null)
             return BuildStubPie();
@@ -158,6 +164,22 @@ public sealed class RollGGenerator : IRollGPieGenerator
             [ShotLocation.Mid]   = _cfg.BaseMid,
             [ShotLocation.Short] = _cfg.BaseShort,
             [ShotLocation.Rim]   = _cfg.BaseRim,
+        };
+        return new Pie<ShotLocation>(weights, _cfg.Epsilon);
+    }
+
+    private Pie<ShotLocation> BuildFastBreakPie()
+    {
+        // Phase 16: flat rim-heavy pie for press-break possessions. The five
+        // weights are config-driven calibration placeholders; the Pie constructor
+        // enforces sum-to-1 (load invariant in RollGConfig.Load backs this up).
+        var weights = new Dictionary<ShotLocation, double>
+        {
+            [ShotLocation.Rim]   = _cfg.FastBreakRim,
+            [ShotLocation.Short] = _cfg.FastBreakShort,
+            [ShotLocation.Mid]   = _cfg.FastBreakMid,
+            [ShotLocation.Long]  = _cfg.FastBreakLong,
+            [ShotLocation.Three] = _cfg.FastBreakThree,
         };
         return new Pie<ShotLocation>(weights, _cfg.Epsilon);
     }

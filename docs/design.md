@@ -4071,3 +4071,26 @@ The stamp is written BEFORE `Generate` so the generator reads a finished decisio
 - **`CoachProfile` migration.** `PressProbabilityFor(side)` reads `HomePressFrequency` / `AwayPressFrequency`; the method is the read seam. Swap to per-team `CoachProfile` fields when that layer arrives.
 - **StandardLift / StandardGate calibration.** Defaults 0.5 / 0.5 are calibration placeholders.
 - **Steal attribution, changed Roll C mix under press, fatigue.** Deferred.
+
+---
+
+## Phase 16 — Press-break fast break (Session 47)
+
+**Problem being solved.** Phase 15 stamped `PressMode.Standard` on possessions where the press fires and wired the tighter matchup into Roll A's generation. But there was no "and" — when the offense beats the press, nothing different happened. Phase 16 closes that loop: a clean entry against a live press triggers a genuine fast break rather than a normal halfcourt possession.
+
+**The gate.** `IntoHalfcourtSet` is the only site. When `c.State.PressMode == PressMode.Standard`, the gate fires: `breakState = c.State with { FastBreak = true, PressMode = PressMode.None }`. Roll B is skipped; Roll E is called directly from `IntoHalfcourtSet` with `breakState`. The roll E generator reads `FastBreak=true` and can select the transition selection pie instead of the halfcourt pie (implemented in `RollEStubPieGenerator` Phase 15; Phase 16 just ensures the stamp arrives). `PressMode.None` is stamped simultaneously so later re-inbounds in the same possession cannot re-trigger the gate.
+
+**`IRollEPieGenerator` interface.** Pre-build audit found the Resolver held `_rollEGenerator` as `RollEStubPieGenerator` (concrete), blocking spy injection. Created `Generators/IRollEPieGenerator.cs` (single method: `Pie<SelectionOutcome> Generate(PossessionState state)`), added `: IRollEPieGenerator` to `RollEStubPieGenerator`, retyped the Resolver field and ctor param. Same pattern as `IRollBPieGenerator`. Zero call-site changes required (the stub still satisfies the interface).
+
+**Dead-ball state hygiene.** Two re-inbound cases needed explicit rules:
+- `ResolveSidelineInbound`: unconditionally clears both `FastBreak=false` and `PressMode=None`. Any sideline dead ball ends the break context and the press. `FastBreak=true` from a prior break must not leak into the next halfcourt set (Phase 16 makes Roll G read `FastBreak`, so leaking gives the wrong location pie).
+- `ResumeInbound`: conditional. `Frontcourt=true` clears both (dead ball in the frontcourt — press can't survive this). `Frontcourt=false` (backcourt foul) preserves state — the press is still live and can still be beaten on the next Roll A.
+
+**Phase 15 test 7c corrected.** The previous assertion (`ResolveSidelineInbound(Standard)` → spy sees `PressMode.Standard`) was wrong: `ResolveSidelineInbound` now clears `PressMode` to `None` before calling `Generate`. The test and label were updated to assert `None`.
+
+**Roll G fast-break pie.** `RollGConfig` gains five `FastBreak*` properties (default weights summing to 1.0: Rim=0.70, Short=0.10, Mid=0.10, Long=0.05, Three=0.05 — calibration placeholders). `RollGConfig.Load` validates non-negative weights and sum==1.0. `RollGGenerator.Generate` checks `state.FastBreak` after the `SelectedSlot` null-guard and before any shooter/defender read; returns `BuildFastBreakPie()` immediately. The stub path (`RollGStubPieGenerator`) is untouched — it remains FastBreak-blind by design.
+
+**`PressMode.Standard` semantic (refined).** "Press live, not yet beaten." The stamp survives backcourt dead balls (the press is still on at the re-inbound) and is consumed at the first `CleanEntry` (press beaten, break fires). Frontcourt dead balls clear it because the press decision cannot logically persist past halfcourt.
+
+**Deferred.** Roll H foul-drawing tilt for transition and back-line help-rim-protector selection remain out of scope. `RollGStubPieGenerator` stays FastBreak-blind (stub path).
+

@@ -103,7 +103,12 @@
     "BaseMid": 0.1,
     "BaseShort": 0.11,
     "BaseRim": 0.35,
-    "Epsilon": 1e-09
+    "Epsilon": 1e-09,
+    "FastBreakRim": 0.70,
+    "FastBreakShort": 0.10,
+    "FastBreakMid": 0.10,
+    "FastBreakLong": 0.05,
+    "FastBreakThree": 0.05
   },
   "RollH": {
     "BaseMade": 0.43,
