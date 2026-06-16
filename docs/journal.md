@@ -1,3 +1,36 @@
+## Session 49 — Counter Plumbing v1: shooting + rebounding sentinels (2026-06-16)
+
+**Scope:** Add per-possession shot and rebound counters at the resolver's existing scoring sites, thread them through to `PossessionRecord`, and emit a v2 observation block that reports the shooting splits, shot mix, ORB%, and FTr that the v1 block deferred. No probability weights moved. No outcome routing changed. The engine records more about itself; it does not play differently.
+
+**What shipped:**
+- `Core/Resolver.cs` — `RoutingOutcome` gains 10 new `init`-only fields (Fga, Fgm, ThreePa, ThreePm, ShotResolutions, MissFouled, Fta, Ftm, OrbChances, OrbWon) with 0 defaults; every existing positional construction untouched. `Route` initializes 10 matching locals and tallies at five sites: (1) `IntoShotResolution` — FGA/FGM/3PA/3PM/ShotResolutions/MissFouled immediately after `RollH.Execute`; (2) `ResolveFreeThrows` — FTA/FTM from `bonusFtSpins/bonusFtPoints`; (3) `ResolveShootingFreeThrows` — FTA/FTM from `shootingFtSpins/shootingFtPoints`; (4) `ResolveRebound` — ORB chance/won after `RollI.Execute`; (5) `ResolveFTRebound` — ORB chance/won after `RollM.Execute`.
+- `Core/Governor.cs` — `PossessionRecord` gains the same 10 parameters (default 0, XML-documented); `Run` zero-initializes them before the NoShot/else branch and extracts them from `outcome.*` in the else branch; passes all 10 to the `PossessionRecord` constructor.
+- `Harness/Program.cs` — two new mechanical checks per game in the observation loop: (1) counter reconciliation (`Points == 2*(FGM−3PM) + 3*3PM + FTM`); (2) denominator guard (`FGA + MissFouled == ShotResolutions`) plus five counter-sanity inequalities. Four new sentinel sections: SHOOTING SPLITS (FG%/3P%/FT% per side + combined, histograms), SHOT MIX (3PA rate), ORB%, FTr. DEFERRED section updated: FG%/3P%/FT%/ORB%/FTr removed; press frequency/break rate and full shot mix remain.
+
+**New archive entry:** `docs/observations.md` — Run 2 prepended.
+
+**Harness result — ALL CHECKS PASSED:**
+- All v1 mechanical checks still green ✓ (no behavior leaked)
+- Counter reconciliation (`Points == 2*(FGM−3PM) + 3*3PM + FTM`) passed 1,000/1,000 games ✓
+- Denominator guard (`FGA + MissFouled == ShotResolutions`) passed 1,000/1,000 games ✓
+- Counter sanity (FGM ≤ FGA, 3PM ≤ 3PA, etc.) passed 1,000/1,000 games ✓
+- All v2 sections appeared with finite, in-range numbers ✓
+
+**First readings — v2 sentinels (recorded, not judged; calibration is later):**
+- FG% ~57.8% — well above real D1 (~44–46%). Primary calibration target.
+- 3P% ~49.7% — well above real D1 (~33–36%). Same root cause: uncalibrated make pies.
+- FT% ~72.1% — matches configured Roll L make rate (72.0%) exactly. Not a calibration problem.
+- 3PA rate ~25.3% — somewhat below real D1 (~35–40%). Shot mix calibration target.
+- ORB% ~27.8% — close to real D1 (~28–30%). Encouraging.
+- FTr ~40.3% — above real D1 (~30–35%).
+- All v1 sentinels byte-identical to Run 1 — confirms counters are passive.
+
+**Python Monte Carlo:** 23/23 reconciliation cases passed before C# delivery.
+
+**Key call recorded (Emmett):** ORB% reporting is combined-only (no per-source FG-miss/block/FT breakdown printed). The counters accumulate a single `OrbChances`/`OrbWon` pair across all three sources.
+
+**Git commit:** Emmett stamps.
+
 ## Session 48 — Observation Run v1: macro sentinel harness (2026-06-16)
 
 **Scope:** Stand up a repeatable observation harness. Runs N full games against a frozen scenario corpus and emits one self-describing macro-sentinel block. Recorded, not judged. No engine changes, no config changes, no calibration.

@@ -22,6 +22,38 @@ namespace Charm.Engine;
 /// <see cref="EndOfHalfIntent.ShootEarly"/>, or <see cref="EndOfHalfIntent.NoShot"/>
 /// only when <c>halfRemaining &lt; HoldThresholdSeconds</c> at the start of the
 /// possession. Null on every normal possession; non-null only at the end of a half.</param>
+/// <param name="Fga">Field-goal attempts credited to this possession — the six-outcome
+/// box-score count (all <see cref="ShotResult"/> values except
+/// <see cref="ShotResult.MissFouled"/>, which sends the shooter to the line with no
+/// FGA charged). Credited to <see cref="Offense"/>. Zero on NoShot possessions.</param>
+/// <param name="Fgm">Field goals made on this possession —
+/// <see cref="ShotResult.Made"/> and <see cref="ShotResult.MadeAndFouled"/> only.
+/// The and-1 basket counts; the bonus free throw does not. Credited to
+/// <see cref="Offense"/>. Zero on NoShot possessions.</param>
+/// <param name="ThreePa">Three-point attempts on this possession — the subset of
+/// <see cref="Fga"/> from the <see cref="ShotLocation.Three"/> zone. A fouled missed
+/// three is NOT a 3PA. Zero on NoShot possessions.</param>
+/// <param name="ThreePm">Three-point makes on this possession — the subset of
+/// <see cref="Fgm"/> from the <see cref="ShotLocation.Three"/> zone. Zero on NoShot
+/// possessions.</param>
+/// <param name="ShotResolutions">Total Roll H resolutions on this possession — all
+/// seven <see cref="ShotResult"/> outcomes. Equals <see cref="Fga"/> +
+/// <see cref="MissFouled"/> by construction; exists solely for the denominator-guard
+/// mechanical check. Zero on NoShot possessions.</param>
+/// <param name="MissFouled">Count of <see cref="ShotResult.MissFouled"/> resolutions
+/// on this possession — the one outcome excluded from <see cref="Fga"/>. Zero on
+/// NoShot possessions.</param>
+/// <param name="Fta">Free-throw attempts on this possession — every Roll L spin across
+/// all FT trips (bonus and shooting-foul). Zero on NoShot possessions.</param>
+/// <param name="Ftm">Free throws made on this possession — each Roll L spin that
+/// resolved to a make. Zero on NoShot possessions.</param>
+/// <param name="OrbChances">Offensive-rebound chances on this possession — Roll I and
+/// Roll M resolutions that ended in either <see cref="ReboundOutcome.DefensiveRebound"/>
+/// or <see cref="ReboundOutcome.OffensiveRebound"/> (secured boards only; fouls, OOB,
+/// and jump-ball excluded). Zero on NoShot possessions.</param>
+/// <param name="OrbWon">Offensive rebounds won on this possession — Roll I or Roll M
+/// resolutions where the offense secured the board. The team offensive-rebound rate is
+/// <c>OrbWon / OrbChances</c> across possessions. Zero on NoShot possessions.</param>
 public sealed record PossessionRecord(
     int Number,
     TeamSide Offense,
@@ -33,7 +65,17 @@ public sealed record PossessionRecord(
     int Points,
     double Elapsed,
     int Half,
-    EndOfHalfIntent? EndOfHalfIntent);
+    EndOfHalfIntent? EndOfHalfIntent,
+    int Fga = 0,
+    int Fgm = 0,
+    int ThreePa = 0,
+    int ThreePm = 0,
+    int ShotResolutions = 0,
+    int MissFouled = 0,
+    int Fta = 0,
+    int Ftm = 0,
+    int OrbChances = 0,
+    int OrbWon = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -182,6 +224,11 @@ public sealed class Governor
             string endLabel;
             int pointsThisPossession;
             double applied;
+            // Shot and rebound counters — zero-initialized; set from outcome in the
+            // resolver branch, left at zero for NoShot (no resolver call was made).
+            int possessionFga = 0, possessionFgm = 0, possessionThreePa = 0, possessionThreePm = 0;
+            int possessionShotResolutions = 0, possessionMissFouled = 0;
+            int possessionFta = 0, possessionFtm = 0, possessionOrbChances = 0, possessionOrbWon = 0;
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -233,6 +280,17 @@ public sealed class Governor
                     : Math.Min(rawElapsed, halfRemaining);
 
                 pointsThisPossession = outcome.Points;
+                // Thread shot/rebound counters from the resolver's outcome.
+                possessionFga             = outcome.Fga;
+                possessionFgm             = outcome.Fgm;
+                possessionThreePa         = outcome.ThreePa;
+                possessionThreePm         = outcome.ThreePm;
+                possessionShotResolutions = outcome.ShotResolutions;
+                possessionMissFouled      = outcome.MissFouled;
+                possessionFta             = outcome.Fta;
+                possessionFtm             = outcome.Ftm;
+                possessionOrbChances      = outcome.OrbChances;
+                possessionOrbWon          = outcome.OrbWon;
             }
 
             // Shared by all three intent values + normal possessions.
@@ -245,7 +303,10 @@ public sealed class Governor
 
             records.Add(new PossessionRecord(
                 state.PossessionNumber, state.Offense, state.Defense, state.Entry,
-                endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, half, intent));
+                endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, half, intent,
+                possessionFga, possessionFgm, possessionThreePa, possessionThreePm,
+                possessionShotResolutions, possessionMissFouled,
+                possessionFta, possessionFtm, possessionOrbChances, possessionOrbWon));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition

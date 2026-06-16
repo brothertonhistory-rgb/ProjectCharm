@@ -63,6 +63,89 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// <see cref="FreeThrowSpins"/>. The Governor reads this to draw per-period time.
     /// </summary>
     public int ShotClockPeriods { get; init; }
+
+    // ── Shot and rebound counters (v2 observability) ───────────────────────────
+    // All ten are init-only with 0 defaults — a pure append following the same
+    // pattern as Points / FreeThrowSpins / ShotClockPeriods. Every existing
+    // positional construction (new RoutingOutcome(false, "STUB:…")) is untouched.
+
+    /// <summary>
+    /// Field-goal attempts on this possession — box-score definition: all six
+    /// <see cref="ShotResult"/> values EXCEPT <see cref="ShotResult.MissFouled"/>.
+    /// A fouled miss sends the shooter to the line with no FGA charged (charging
+    /// both a missed FGA and the resulting free throws would double-count the trip).
+    /// A blocked shot, an and-1, and a ball deflected OOB all count as attempts.
+    /// </summary>
+    public int Fga { get; init; }
+
+    /// <summary>
+    /// Field goals made on this possession — <see cref="ShotResult.Made"/> and
+    /// <see cref="ShotResult.MadeAndFouled"/> only. The and-1 basket counts as a
+    /// make; the bonus free throw does not (that is an FTA/FTM).
+    /// </summary>
+    public int Fgm { get; init; }
+
+    /// <summary>
+    /// Three-point attempts on this possession — the subset of <see cref="Fga"/>
+    /// whose stamped <see cref="ShotLocation"/> is <see cref="ShotLocation.Three"/>.
+    /// A fouled missed three is NOT a 3PA (MissFouled is excluded from FGA).
+    /// </summary>
+    public int ThreePa { get; init; }
+
+    /// <summary>
+    /// Three-point makes on this possession — the subset of <see cref="Fgm"/>
+    /// from the <see cref="ShotLocation.Three"/> zone.
+    /// </summary>
+    public int ThreePm { get; init; }
+
+    /// <summary>
+    /// Total Roll H resolutions on this possession — all seven
+    /// <see cref="ShotResult"/> outcomes. Used as the denominator-guard identity:
+    /// <c>Fga + MissFouled == ShotResolutions</c> (any deviation means the FGA
+    /// definition drifted). Equal to <c>Fga + MissFouled</c> by construction.
+    /// </summary>
+    public int ShotResolutions { get; init; }
+
+    /// <summary>
+    /// Count of <see cref="ShotResult.MissFouled"/> resolutions on this possession
+    /// — the one ShotResult excluded from <see cref="Fga"/>. Exists solely to close
+    /// the denominator-guard identity (the reconciliation check cannot see it because
+    /// MissFouled scores zero points).
+    /// </summary>
+    public int MissFouled { get; init; }
+
+    /// <summary>
+    /// Free-throw attempts on this possession — every Roll L spin across all FT
+    /// trips (bonus and shooting-foul). A one-and-one front-end miss is 1 FTA; a
+    /// made front end triggers a second spin (another FTA). An and-1 is 1 FTA.
+    /// A fouled two/three is 2/3 FTA.
+    /// </summary>
+    public int Fta { get; init; }
+
+    /// <summary>
+    /// Free throws made on this possession — each Roll L spin that resolves to a
+    /// make. Equal to the <c>ftPoints</c> value that <c>DriveFreeThrows</c> already
+    /// tallies internally (<c>ftPoints == ftMakes</c> — surfacing an existing count,
+    /// not deriving a new one).
+    /// </summary>
+    public int Ftm { get; init; }
+
+    /// <summary>
+    /// Offensive-rebound chances on this possession — the count of Roll I and Roll M
+    /// resolutions that ended in either <see cref="ReboundOutcome.DefensiveRebound"/>
+    /// (defense won) or <see cref="ReboundOutcome.OffensiveRebound"/> (offense won).
+    /// Loose-ball-foul, OOB, and jump-ball arms are not a secured board and are
+    /// excluded (matches the box-score convention for individual ORB%).
+    /// </summary>
+    public int OrbChances { get; init; }
+
+    /// <summary>
+    /// Offensive rebounds won on this possession — Roll I or Roll M resolutions
+    /// where the <see cref="ContinuationKind.ResolveOffensiveRebound"/> arm fired
+    /// (offense secured the board). The team rate is
+    /// <c>OrbWon / OrbChances</c> across all possessions.
+    /// </summary>
+    public int OrbWon { get; init; }
 }
 
 /// <summary>
@@ -235,6 +318,16 @@ public sealed class Resolver
         var freeThrowSpins = 0;
         var points = 0;
         var shotClockPeriods = 1;
+        var fga = 0;
+        var fgm = 0;
+        var threePa = 0;
+        var threePm = 0;
+        var shotResolutions = 0;
+        var missFouled = 0;
+        var fta = 0;
+        var ftm = 0;
+        var orbChances = 0;
+        var orbWon = 0;
         var iterations = 0;
         const int IterationCeiling = 10_000;
 
@@ -265,7 +358,10 @@ public sealed class Resolver
                     if (t.Reason == "Made")
                         points += Scoring.FieldGoalPoints(t.State.ShotType!.Value);
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
-                        { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods };
+                        { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods,
+                          Fga = fga, Fgm = fgm, ThreePa = threePa, ThreePm = threePm,
+                          ShotResolutions = shotResolutions, MissFouled = missFouled,
+                          Fta = fta, Ftm = ftm, OrbChances = orbChances, OrbWon = orbWon };
 
                 case Continue c:
                     switch (c.Next)
@@ -409,7 +505,9 @@ public sealed class Resolver
                                 oneAndOne: c.Bonus == BonusType.OneAndOne,
                                 out var bonusFtSpins, out var bonusFtPoints);
                             freeThrowSpins += bonusFtSpins;
-                            points += bonusFtPoints;
+                            points        += bonusFtPoints;
+                            fta           += bonusFtSpins;   // each spin is one attempt
+                            ftm           += bonusFtPoints;  // ftPoints == ftMakes (verified)
                             continue;
 
                         // RETIRED (Contextification #2): Roll H's Blocked no longer emits
@@ -451,6 +549,32 @@ public sealed class Resolver
                             if (c.Putback) putbackAttempts++;
                             var pieH = _rollHGenerator.Generate(c.State, c.Putback);
                             result = RollH.Execute(c.State, pieH, _rng);
+                            // FGA/FGM/3PA/3PM counters — the single Roll H chokepoint every
+                            // field-goal attempt passes through, including putbacks. Read the
+                            // stamped ShotResult and ShotLocation off the returned result's
+                            // State (both Terminal and Continue expose .State).
+                            {
+                                var shotSt = result is Terminal tH ? tH.State : ((Continue)result).State;
+                                shotResolutions++;
+                                if (shotSt.Result == ShotResult.MissFouled)
+                                {
+                                    // MissFouled is NOT an FGA (box-score definition): shooting
+                                    // foul on a missed shot sends the shooter to the line with
+                                    // no FGA charged. Track separately for the denominator guard.
+                                    missFouled++;
+                                }
+                                else
+                                {
+                                    // All six remaining outcomes are a field-goal attempt.
+                                    fga++;
+                                    if (shotSt.ShotType == ShotLocation.Three) threePa++;
+                                    if (shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled)
+                                    {
+                                        fgm++;
+                                        if (shotSt.ShotType == ShotLocation.Three) threePm++;
+                                    }
+                                }
+                            }
                             continue;
 
                         // Roll H, missed shot (live) -> execute Roll I (rebound
@@ -476,6 +600,17 @@ public sealed class Resolver
                                 c.State,
                                 c.ReboundSource ?? ReboundSource.LiveBall);
                             result = RollI.Execute(c.State, pieI, _game, _rng);
+                            // ORB counters — tallied exactly once per Roll I resolution.
+                            // Terminal("DefensiveRebound") = board secured by defense.
+                            // Continue(ResolveOffensiveRebound) = board secured by offense.
+                            // All other arms (fouls, OOB, jump-ball) are NOT a secured
+                            // board and are excluded (matches box-score ORB% convention).
+                            {
+                                if (result is Terminal tI && tI.Reason == "DefensiveRebound")
+                                    orbChances++;
+                                else if (result is Continue cI && cI.Next == ContinuationKind.ResolveOffensiveRebound)
+                                { orbChances++; orbWon++; }
+                            }
                             continue;
 
                         // Roll I, offense secures the offensive board -> execute
@@ -521,7 +656,9 @@ public sealed class Resolver
                                 points += Scoring.FieldGoalPoints(c.State.ShotType!.Value);
                             result = DriveFreeThrows(c.State, ShootingFoulShots(c.State), oneAndOne: false, out var shootingFtSpins, out var shootingFtPoints);
                             freeThrowSpins += shootingFtSpins;
-                            points += shootingFtPoints;
+                            points         += shootingFtPoints;
+                            fta            += shootingFtSpins;   // each spin is one attempt
+                            ftm            += shootingFtPoints;  // ftPoints == ftMakes (verified)
                             continue;
 
                         // OOB off the defender, offense RETAINS (Roll H's
@@ -593,6 +730,16 @@ public sealed class Resolver
                         case ContinuationKind.ResolveFTRebound:
                             var pieM = _rollMGenerator.Generate(c.State);
                             result = RollM.Execute(c.State, pieM, _game, _rng);
+                            // ORB counters — same shape as ResolveRebound (Roll I).
+                            // Roll M fires once per FT trip; a missed putback off its
+                            // offensive board re-enters Roll I, not Roll M, so there is
+                            // no double-count with the ResolveRebound site.
+                            {
+                                if (result is Terminal tM && tM.Reason == "DefensiveRebound")
+                                    orbChances++;
+                                else if (result is Continue cM && cM.Next == ContinuationKind.ResolveOffensiveRebound)
+                                { orbChances++; orbWon++; }
+                            }
                             continue;
 
                         default:

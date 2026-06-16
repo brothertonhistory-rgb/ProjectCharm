@@ -4126,3 +4126,42 @@ A scenario is seed + rosters + lineups + strategy + game context. Frozen so runs
 **Deferred sentinels.** Shooting splits (FG%/3P%/FT%), shot mix, ORB%/DRB%, FTr, press rate — need counter-plumbing at the resolver's existing scoring sites. Separate session.
 
 **First reading.** Run 1 (2026-06-16) is preserved in `docs/observations.md`. Key numbers: pace ~133 total / ~67 per team is realistic (real D1 ~65–72/team); combined PPP ~1.19 is somewhat above real D1 (~1.0–1.1) and is the more notable calibration target.
+
+---
+
+## Counter Plumbing v1 — Per-possession shot and rebound counters (Session 49)
+
+**What this session adds.** Ten integer counters ride alongside the existing `Points` / `FreeThrowSpins` / `PutbackAttempts` / `ShotClockPeriods` fields: `Fga`, `Fgm`, `ThreePa`, `ThreePm`, `ShotResolutions`, `MissFouled`, `Fta`, `Ftm`, `OrbChances`, `OrbWon`. They accumulate in the resolver's `Route` walk and surface on `RoutingOutcome` as init-only fields (0 defaults, pure append). The Governor threads them through to `PossessionRecord`. The observation harness reduces them per game and reports four new sentinel sections. No probability weight moved.
+
+**The FGA definition (box-score).**
+Six of the seven `ShotResult` values count as a field-goal attempt: `Made`, `MadeAndFouled`, `Miss`, `MissOutOfBoundsLost`, `MissOutOfBoundsRetained`, `Blocked`. The one exclusion is `MissFouled` — a shooting foul on a missed shot sends the shooter to the free-throw line with no FGA charged. Charging both a missed FGA and the resulting free throws would double-count the trip. This matches NCAA/NBA box-score convention.
+
+**The single Roll H chokepoint.**
+Every field-goal attempt passes through `IntoShotResolution` in the resolver (the case that calls `RollH.Execute`). The FGA/FGM/3PA/3PM/ShotResolutions/MissFouled tally happens immediately after `RollH.Execute` at that single site, reading the stamped `ShotResult` and `ShotLocation` off `result.State`. This is the design discipline from CONVENTIONS §2a: one counter, one site, not spread across four arms. The prompt identified this chokepoint explicitly: "Do NOT try to tally FGA at the Made terminal or the ResolveShootingFreeThrows case individually — that splits one count across four sites and is exactly the multi-site-drop bug class."
+
+**The denominator guard.**
+`ShotResolutions` counts all seven Roll H outcomes (FGA + MissFouled = ShotResolutions). This guard exists because the points reconciliation check (`Points == 2*(FGM−3PM) + 3*3PM + FTM`) is blind to the attempts denominator — `MissFouled` scores zero, so a wrong FGA definition cannot be caught by the reconciliation alone. If FGA ever drifts to include a fouled miss, `FGA + MissFouled` overshoots `ShotResolutions` and the denominator guard fails loud.
+
+**FTA/FTM at two sites.**
+Free-throw attempts and makes are tallied at the two `DriveFreeThrows` call sites: `ResolveFreeThrows` (bonus/non-shooting FT trips) and `ResolveShootingFreeThrows` (shooting foul trips). In both cases `ftPoints == ftMakes` inside `DriveFreeThrows` (confirmed in source), so the spin count is FTA and the returned `ftPoints` is FTM — no new out-parameter needed.
+
+**ORB% — combined-only.**
+The ORB counters tally at the two rebound-resolution sites: `ResolveRebound` (Roll I, after `RollI.Execute`) and `ResolveFTRebound` (Roll M, after `RollM.Execute`). At each site:
+- `Terminal("DefensiveRebound")` → `orbChances++` (defense won)
+- `Continue(ResolveOffensiveRebound)` → `orbChances++; orbWon++` (offense won)
+- All other arms (fouls, OOB, jump-ball) → not counted (not a secured board)
+
+Emmett's call: the print section reports the combined headline rate only (`OrbWon / OrbChances` summed across all sources). No per-source breakdown (FG-miss / block / FT) is printed. The counters accumulate a single pair — not three separate pairs — since the breakdown lines were dropped. The combined rate is the box-score-comparable figure: standard ORB% already includes rebounds off missed free throws, so the combined number is the one to aim at calibration.
+
+**Governor pass-through.**
+The Governor does not add the counters to `GovernorRunResult`'s aggregate fields. The observation harness sums them across `records` itself (matching how every existing sentinel is computed). `PossessionRecord` gains 10 new positional parameters with default values of 0; the `NoShot` synthesized possession (no resolver call) stays at 0 naturally.
+
+**The reconciliation identity.**
+`Points == 2*(FGM − 3PM) + 3*3PM + FTM` holds because:
+- A clean made basket: FGM=1, points=2 or 3 depending on zone
+- An and-1 (`MadeAndFouled`): FGM=1, FTM=0 or 1, points= basket + FT
+- A `MissFouled`: FGA=0 (excluded), FTM=k, points=k
+- Every other FGA (Miss, Blocked, OOB): FGM=0, FTM=0, points=0
+- Bonus FT trip (ResolveFreeThrows): FGA=0, FTM=k, points=k
+
+The identity was validated by Python Monte Carlo (23/23 cases) before any C# was written.

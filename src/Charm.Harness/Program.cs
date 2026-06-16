@@ -4090,6 +4090,20 @@ internal static class Program
         var earlyList       = new List<int>(N);
         var noShotIntList   = new List<int>(N);
 
+        // ── v2 shooting / rebounding sentinel accumulators ──────────────
+        var homeFgPctList     = new List<double>(N);
+        var awayFgPctList     = new List<double>(N);
+        var combinedFgPctList = new List<double>(N);
+        var home3pPctList     = new List<double>(N);
+        var away3pPctList     = new List<double>(N);
+        var combined3pPctList = new List<double>(N);
+        var homeFtPctList     = new List<double>(N);
+        var awayFtPctList     = new List<double>(N);
+        var combinedFtPctList = new List<double>(N);
+        var threePaRateList   = new List<double>(N);  // 3PA / FGA combined
+        var orbPctList        = new List<double>(N);  // ORB won / ORB chances combined
+        var ftrList           = new List<double>(N);  // FTA / FGA combined
+
         // Terminal mix — accumulated across all possessions, all games.
         var termBuckets = new Dictionary<string, long>
         {
@@ -4203,6 +4217,47 @@ internal static class Program
                 mechanicsOk = false;
             }
 
+            // ── Mechanical check — v2 counter reconciliation ────────────────────
+            // Points == 2*(FGM - 3PM) + 3*3PM + FTM  (per game, summed across records)
+            // This is the load-bearing check: proves new counters and the existing
+            // points accumulator agree — every scoring event is tagged exactly once.
+            var recFgm  = records.Sum(r => r.Fgm);
+            var rec3pm  = records.Sum(r => r.ThreePm);
+            var recFtm  = records.Sum(r => r.Ftm);
+            var recPts  = records.Sum(r => r.Points);
+            var expPts  = 2 * (recFgm - rec3pm) + 3 * rec3pm + recFtm;
+            if (recPts != expPts)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: counter reconciliation — Points={recPts} expected={expPts} (FGM={recFgm} 3PM={rec3pm} FTM={recFtm})");
+                mechanicsOk = false;
+            }
+
+            // ── Mechanical check — v2 denominator guard ─────────────────────────
+            // FGA + MissFouled == ShotResolutions  (per game)
+            // Also assert the per-counter inequalities.  These checks are blind to
+            // the points reconciliation above (MissFouled scores zero), so they are
+            // required to catch a wrong FGA definition.
+            var recFga  = records.Sum(r => r.Fga);
+            var recMf   = records.Sum(r => r.MissFouled);
+            var recSr   = records.Sum(r => r.ShotResolutions);
+            var rec3pa  = records.Sum(r => r.ThreePa);
+            var recFta  = records.Sum(r => r.Fta);
+            var recOrbW = records.Sum(r => r.OrbWon);
+            var recOrbC = records.Sum(r => r.OrbChances);
+            if (recFga + recMf != recSr)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: denominator guard — FGA({recFga}) + MissFouled({recMf}) != ShotResolutions({recSr})");
+                mechanicsOk = false;
+            }
+            if (recFgm > recFga || rec3pm > rec3pa || rec3pa > recFga || recFtm > recFta || recOrbW > recOrbC)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: counter sanity — FGM={recFgm} FGA={recFga} 3PM={rec3pm} 3PA={rec3pa} FTM={recFtm} FTA={recFta} ORBwon={recOrbW} ORBchances={recOrbC}");
+                mechanicsOk = false;
+            }
+
             var hPoss = records.Count(r => r.Offense == TeamSide.Home);
             var aPoss = records.Count(r => r.Offense == TeamSide.Away);
             var hPts  = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Points);
@@ -4238,6 +4293,41 @@ internal static class Program
             holdList.Add(records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.HoldShootLast));
             earlyList.Add(records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.ShootEarly));
             noShotIntList.Add(noShot);
+
+            // ── v2 shooting / rebounding sentinel accumulation ───────────────────
+            var hFga = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Fga);
+            var aFga = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Fga);
+            var hFgm = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Fgm);
+            var aFgm = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Fgm);
+            var h3pa = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.ThreePa);
+            var a3pa = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.ThreePa);
+            var h3pm = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.ThreePm);
+            var a3pm = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.ThreePm);
+            var hFta = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Fta);
+            var aFta = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Fta);
+            var hFtm = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Ftm);
+            var aFtm = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Ftm);
+            var tFga     = hFga + aFga;
+            var t3pa     = h3pa + a3pa;
+            var tFgm     = hFgm + aFgm;
+            var t3pm     = h3pm + a3pm;
+            var tFta     = hFta + aFta;
+            var tFtm     = hFtm + aFtm;
+            var tOrbWon  = records.Sum(r => r.OrbWon);
+            var tOrbCh   = records.Sum(r => r.OrbChances);
+
+            homeFgPctList.Add(hFga > 0     ? (double)hFgm / hFga     : 0.0);
+            awayFgPctList.Add(aFga > 0     ? (double)aFgm / aFga     : 0.0);
+            combinedFgPctList.Add(tFga > 0 ? (double)tFgm / tFga     : 0.0);
+            home3pPctList.Add(h3pa > 0     ? (double)h3pm / h3pa     : 0.0);
+            away3pPctList.Add(a3pa > 0     ? (double)a3pm / a3pa     : 0.0);
+            combined3pPctList.Add(t3pa > 0 ? (double)t3pm / t3pa     : 0.0);  // 0.0 when zero 3PA (documented)
+            homeFtPctList.Add(hFta > 0     ? (double)hFtm / hFta     : 0.0);
+            awayFtPctList.Add(aFta > 0     ? (double)aFtm / aFta     : 0.0);
+            combinedFtPctList.Add(tFta > 0 ? (double)tFtm / tFta     : 0.0);
+            threePaRateList.Add(tFga > 0   ? (double)t3pa / tFga     : 0.0);
+            orbPctList.Add(tOrbCh > 0      ? (double)tOrbWon / tOrbCh : 0.0);
+            ftrList.Add(tFga > 0           ? (double)tFta / tFga     : 0.0);
 
             foreach (var r in records)
             {
@@ -4307,11 +4397,40 @@ internal static class Program
         ObsPrintI("  Away fouls", awayFoulsList);
 
         Console.WriteLine();
+        Console.WriteLine("--- SHOOTING SPLITS ---");
+        Console.WriteLine("  FG%:");
+        ObsPrintD("    Home",     homeFgPctList);
+        ObsPrintD("    Away",     awayFgPctList);
+        ObsPrintD("    Combined", combinedFgPctList);
+        Console.WriteLine("  Distribution (FG% combined):");
+        ObsHistD(combinedFgPctList, new[] { 0.20, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60 });
+        Console.WriteLine("  3P%:  (games with zero 3PA report 0.0 — possible in principle)");
+        ObsPrintD("    Home",     home3pPctList);
+        ObsPrintD("    Away",     away3pPctList);
+        ObsPrintD("    Combined", combined3pPctList);
+        Console.WriteLine("  FT%:");
+        ObsPrintD("    Home",     homeFtPctList);
+        ObsPrintD("    Away",     awayFtPctList);
+        ObsPrintD("    Combined", combinedFtPctList);
+        Console.WriteLine("  Distribution (FT% combined):");
+        ObsHistD(combinedFtPctList, new[] { 0.40, 0.50, 0.60, 0.70, 0.80, 0.90 });
+
+        Console.WriteLine();
+        Console.WriteLine("--- SHOT MIX ---");
+        ObsPrintD("  3PA rate (3PA/FGA, combined)", threePaRateList);
+        Console.WriteLine("  (Full per-zone distribution deferred — needs per-zone counter beyond Three-vs-not)");
+
+        Console.WriteLine();
+        Console.WriteLine("--- ORB% (offensive rebound rate, FG-miss + block + FT misses combined) ---");
+        ObsPrintD("  Combined", orbPctList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- FTr (free-throw rate = FTA/FGA, combined) ---");
+        ObsPrintD("  Combined", ftrList);
+
+        Console.WriteLine();
         Console.WriteLine("--- DEFERRED SENTINELS (counter-plumbing needed — future session) ---");
-        Console.WriteLine("  FG% / 3P% / FT%  (shooting splits)");
-        Console.WriteLine("  Shot mix (per-zone attempt distribution)");
-        Console.WriteLine("  ORB% / DRB%");
-        Console.WriteLine("  FTr (FTA/FGA)");
+        Console.WriteLine("  Full shot mix (per-zone attempt distribution beyond Three-vs-not)");
         Console.WriteLine("  Press frequency / break rate at game level");
 
         Console.WriteLine();
