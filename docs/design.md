@@ -4002,3 +4002,72 @@ When `Frontcourt = true`, the offense has already crossed half — the full-cour
 - **`CoachProfile` migration.** `MatchupConfig.FullCourtPressFor(TeamSide)` is the only read site that changes. Swap to per-team `CoachProfile` fields when that layer arrives.
 - **Gap weight tuning.** The 0.50 / 0.35 / 0.15 split is a calibration placeholder.
 - **`FullCourtPressReferenceShift` tuning.** Default 1.2 (same as `PressureReferenceShift`). Independent knob — calibration pass tunes separately from halfcourt.
+
+## Phase 15 — Press frequency + Standard mode (Roll A reframe of Phase 14)
+
+### What this phase is and is not
+
+Phase 15 substantially revises Phase 14's intensity model. The full-court press dial stops being an intensity knob (how hard) and becomes a frequency dial (how often). A per-possession yes/no press decision fires once per dead-ball possession in the Resolver, and when it fires, the possession runs in **Standard** mode — a fixed disruption profile. The three-gap matchup model (skill + athleticism + size) from Phase 14 is re-pointed into this Standard profile, not rebuilt.
+
+**What it is not — Phase 16 (the back-end break).** When the offense beats a Standard press it gets a genuine fast break the other way, mitigated by the defense's back-line rim protection. That is a separate session. No stub, no hook, no break arm was carved here. **Desperate mode** is similarly deferred: declared in the enum, reserved, the generator throws if it ever receives it.
+
+### The confirmed design
+
+**The dial is frequency.** Each team has `HomePressFrequency` / `AwayPressFrequency` (1–10). The mapping to a per-possession press probability is a simple linear interpolation via `PressProbabilityFor(side)`:
+
+```
+prob = PressProbabilityAtOne + (freq − 1) / 9 × (PressProbabilityAtTen − PressProbabilityAtOne)
+```
+
+Default frequency is **1.0** (LOW) — most teams do not full-court press as a base strategy. Defaults: `PressProbabilityAtOne = 0.05`, `PressProbabilityAtTen = 0.80`.
+
+**The press/no-press roll lives in the Resolver, above the generator.** The generator is a pure pie builder (no RNG, read-only `GameState`). The Resolver draws one RNG value per dead-ball possession against `PressProbabilityFor(start.Defense)` and stamps the result as `PossessionState.PressMode` before calling `Generate`:
+
+```
+var probability = _matchup.PressProbabilityFor(start.Defense);
+var mode        = _rng.NextUnitInterval() < probability ? PressMode.Standard : PressMode.None;
+start           = start with { PressMode = mode };
+var pieA = _rollAGenerator.Generate(start, pressure: 0.0);
+```
+
+The stamp is written BEFORE `Generate` so the generator reads a finished decision.
+
+**PressMode enum.** `None` → flat baseline; `Standard` → Standard press pie; `Desperate` → reserved (throws). Default on `PossessionState` is `None`; safe because `RunPossession` is called exactly once per possession and stamps before any generator call. The field survives every `with` in the possession chain — `ResumeInbound` and `ResolveSidelineInbound` both use `c.State`, which carries `PressMode` through all continuation derivations.
+
+**Standard mode — fixed lift + the three-gap matchup.** When `PressMode == Standard`, the generator reads the roster aggregates and calls `Matchup.EntryDisruptionShares`:
+
+- **Turnover:** `disruptionShift = cfg.StandardLift + cfg.StandardGate × (skillWeight·skillShift + athWeight·athShift + sizeWeight·sizeShift)`. The tanh saturation still uses `FullCourtPressReferenceShift`.
+- **DefFoul:** `cfg.StandardLift` only (no gap terms). Ceiling / floor from `StandardDefFoulCeiling / Floor`.
+- **OffFoul:** `cfg.StandardLift` only (no gap terms, ceiling ≈ 15% of DefFoul ceiling). Ceiling / floor from `StandardOffFoulCeiling / Floor`.
+- **JumpBall:** pinned flat. **CleanEntry:** absorbs complement.
+
+`StandardLift` and `StandardGate` are **fixed config constants**, not functions of the frequency dial. The dial is consumed entirely by the upstream press-roll; it never enters the pie math.
+
+**What changed from Phase 14's formula.** Phase 14 used `pressureLift = pUnit` and `pressureGate = max(0, pUnit)` derived from the dial value via `PressureNeutral / PressureScale`. Phase 15 replaces that with `cfg.StandardLift` (fixed) and `cfg.StandardGate` (fixed). There is no `pUnit`, no neutral point, no `PressureNeutral/Scale` normalization in Roll A math anymore. The halfcourt normalization stays confined to Roll B/F.
+
+**Key behavioral difference vs Phase 14.** In Phase 14, every possession saw a blend of press and no-press (dial = 5 → average). In Phase 15, possessions are binary: some are fully pressed Standard, the rest are pure baseline. The continuum lives in the *frequency* of pressed possessions, not in the *magnitude* of each one.
+
+**Court-state gate survives.** `Frontcourt == true` fires first — before the PressMode switch, before any roster read. The press is irrelevant once the offense has crossed half; `FlatBaseline()` is returned immediately.
+
+**PressMode.None → FlatBaseline immediately** — before any roster read. Non-pressed possessions are byte-identical to today's pre-Phase-14 baseline.
+
+### Architecture after Phase 15
+
+- **`PressMode.cs` (new)** — `enum PressMode { None, Standard, Desperate }`. `None` is the default on `PossessionState`.
+- **`PossessionState`** — trailing positional param `PressMode PressMode = PressMode.None` added. All 30 existing construction sites use named args; trailing default is safe. Survives every `with` in the chain.
+- **`Resolver.cs`** — adds `MatchupConfig _matchup` field and ctor param (between `offensiveFoulGenerator` and `game`). The Roll A else-branch adds the press roll: one `_rng.NextUnitInterval()` draw, one `with` stamp, then `Generate`. All 9 `new Resolver(...)` sites updated.
+- **`RollAGenerator.cs`** — switch on `state.PressMode`: `None` → `FlatBaseline()` (before roster read); `Standard` → break (proceed to six-aggregate computation); `Desperate` → `throw InvalidOperationException`; `default` → `throw ArgumentOutOfRangeException`. The `FullCourtPressFor` call is gone; the `pressureLift` / `pressureGate` pUnit derivation is gone.
+- **`Matchup.EntryDisruptionShares`** — signature drops `double fullCourtPress`. Method reads `cfg.StandardLift` and `cfg.StandardGate` instead of `pressureLift` / `pressureGate`. All `cfg.RollA*` references renamed to `cfg.Standard*`.
+- **`MatchupConfig.cs`** — Phase 14 block replaced with Phase 15 block: `HomePressFrequency` / `AwayPressFrequency` (default 1.0); `PressProbabilityFor(TeamSide)` (linear interpolation); `PressProbabilityAtOne=0.05` / `PressProbabilityAtTen=0.80`; `StandardLift=0.5` / `StandardGate=0.5`; `Standard*Ceiling/Floor` properties; `FullCourtPressReferenceShift` retained unchanged; `Standard*Weight` properties. All Load invariants updated.
+- **`IRollAPieGenerator.cs`** — doc comment updated to describe `PossessionState.PressMode` stamp rather than `MatchupConfig.FullCourtPressFor`.
+- **`StubPieGenerator`** — unchanged; ignores `PressMode` and returns flat baseline. Used by all 8 isolated-check Resolver construction sites.
+- **`RollA.cs`, `Governor.cs`** — unchanged.
+- **`config.json`** — Phase 14 key names replaced with Phase 15 key names; two new keys added (`PressProbabilityAtOne`, `PressProbabilityAtTen`, `StandardLift`, `StandardGate`).
+
+### Parked items
+
+- **Phase 16 — back-end break.** When the offense beats a press it gets a genuine fast break the other way, mitigated by back-line rim protection. No carve, no stub. Own session.
+- **Desperate mode.** Situational end-game press (down late, before intentional fouling). Needs score-and-clock-aware module that doesn't exist. Declared in enum only.
+- **`CoachProfile` migration.** `PressProbabilityFor(side)` reads `HomePressFrequency` / `AwayPressFrequency`; the method is the read seam. Swap to per-team `CoachProfile` fields when that layer arrives.
+- **StandardLift / StandardGate calibration.** Defaults 0.5 / 0.5 are calibration placeholders.
+- **Steal attribution, changed Roll C mix under press, fatigue.** Deferred.

@@ -677,7 +677,7 @@ public static class Matchup
     }
 
     /// <summary>
-    /// Phase 14 — Roll A's four-way disruption bend (backcourt entry, full-court press).
+    /// Phase 15 — Roll A's four-way disruption bend (backcourt entry, Standard press).
     /// Returns the three bent action-mass shares: turnover, defensive foul, and offensive
     /// foul. The caller (<see cref="RollAGenerator"/>) uses these to split the four-way
     /// mass and pin JumpBall exactly flat.
@@ -688,26 +688,30 @@ public static class Matchup
     /// dividing Roll A's base masses by actionMass before calling. This mirrors the contract
     /// of <see cref="DisruptionShares"/> and <see cref="TeamDisruptionShares"/>.</para>
     ///
-    /// <para><b>Turnover — press + three-gap matchup (Phase 14).</b>
-    /// Three gap terms compose additively into one matchupShift, then gate against pressure:
-    /// <c>disruptionShift = pressureLift + pressureGate × (skillWeight·skillShift + athWeight·athShift + sizeWeight·sizeShift)</c>.
+    /// <para><b>Turnover — Standard lift + three-gap matchup (Phase 15).</b>
+    /// The press decision (whether to press) is made upstream by the Resolver and stamped
+    /// on <see cref="PossessionState.PressMode"/> — this method is only called when
+    /// <c>PressMode == Standard</c>. Three gap terms compose additively into one
+    /// matchupShift, then the full disruption shift is:
+    /// <c>disruptionShift = cfg.StandardLift + cfg.StandardGate × (skillWeight·skillShift
+    /// + athWeight·athShift + sizeWeight·sizeShift)</c>.
     /// (1) <b>Skill</b>: slot-weighted Steals − BallHandling → <see cref="GapFn"/> with skill params.
     /// (2) <b>Athleticism</b>: slot-weighted Athleticism composite gap → GapFn with physical params.
     /// (3) <b>Size</b>: slot-weighted <see cref="LengthRating"/> gap → GapFn with physical params;
-    /// weight is the smallest of the three (<see cref="MatchupConfig.RollASizeWeight"/>).
+    /// weight is the smallest of the three (<see cref="MatchupConfig.StandardSizeWeight"/>).
     /// The tanh saturation uses <see cref="MatchupConfig.FullCourtPressReferenceShift"/> — a
     /// separate constant from the halfcourt <see cref="MatchupConfig.PressureReferenceShift"/>
-    /// so the two dials stay fully independent.</para>
+    /// so the two layers stay fully independent.</para>
     ///
-    /// <para><b>DefFoul — press only, no matchup term.</b> Reach-in fouls track
-    /// defensive aggression, not skill. Uses <see cref="MatchupConfig.RollADefFoulCeiling"/>
-    /// and <see cref="MatchupConfig.RollADefFoulFloor"/>. Saturation via
+    /// <para><b>DefFoul — Standard lift only, no matchup term.</b> Reach-in fouls track
+    /// defensive aggression, not skill. Uses <see cref="MatchupConfig.StandardDefFoulCeiling"/>
+    /// and <see cref="MatchupConfig.StandardDefFoulFloor"/>. Saturation via
     /// <see cref="MatchupConfig.FullCourtPressReferenceShift"/>.</para>
     ///
-    /// <para><b>OffFoul — press only, ceiling ≈ 15% of DefFoul ceiling.</b> Player-control
-    /// fouls (charges, illegal screens) also track aggression, not skill, but are far rarer
-    /// than reach-ins. Uses <see cref="MatchupConfig.RollAOffFoulCeiling"/> and
-    /// <see cref="MatchupConfig.RollAOffFoulFloor"/>. Same saturation constant.</para>
+    /// <para><b>OffFoul — Standard lift only, ceiling ≈ 15% of DefFoul ceiling.</b> Player-
+    /// control fouls also track aggression, not skill, but are far rarer than reach-ins.
+    /// Uses <see cref="MatchupConfig.StandardOffFoulCeiling"/> and
+    /// <see cref="MatchupConfig.StandardOffFoulFloor"/>. Same saturation constant.</para>
     ///
     /// <para><b>Plain addition throughout</b> (Session 38 lesson — tanh supplies the sign).
     /// </para>
@@ -722,65 +726,55 @@ public static class Matchup
     /// the offense.</param>
     /// <param name="defenseLength">Slot-weighted <see cref="LengthRating"/> composite for
     /// the defense.</param>
-    /// <param name="fullCourtPress">The defending team's full-court press dial (1-10).
-    /// Read from <see cref="MatchupConfig.FullCourtPressFor"/>. Distinct from the halfcourt
-    /// pressure dial used by Roll B and Roll F.</param>
     /// <param name="baseTurnoverShare">BaseTurnover / actionMass (normalized share).</param>
     /// <param name="baseDefFoulShare">BaseDefensiveFoul / actionMass (normalized share).</param>
     /// <param name="baseOffFoulShare">BaseOffensiveFoul / actionMass (normalized share).</param>
-    /// <param name="cfg">Matchup config supplying shared normalization knobs, Roll-A-specific
+    /// <param name="cfg">Matchup config supplying shared normalization knobs, Standard-specific
     /// ceilings/floors, gap weights, and the separate full-court saturation constant.</param>
     public static (double turnoverShare, double defFoulShare, double offFoulShare)
     EntryDisruptionShares(
         double offenseHandling, double defenseStealers,
         double offenseAthletic, double defenseAthletic,
         double offenseLength, double defenseLength,
-        double fullCourtPress,
         double baseTurnoverShare, double baseDefFoulShare, double baseOffFoulShare,
         MatchupConfig cfg)
     {
-        // ── Pressure normalization — same PressureNeutral/Scale as halfcourt;
-        //    SATURATION CONSTANT is separate (FullCourtPressReferenceShift).
-        var pUnit        = (fullCourtPress - cfg.PressureNeutral) / cfg.PressureScale;
-        var pressureLift = pUnit;
-        var pressureGate = Math.Max(0.0, pUnit);
-
-        // ── Turnover: press + gated THREE-GAP matchup ────────────────────────
+        // ── Turnover: Standard lift + gated THREE-GAP matchup ────────────────
         var skillShift = GapFn(defenseStealers - offenseHandling,
                                cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
         var athShift   = GapFn(defenseAthletic - offenseAthletic,
                                cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
         var sizeShift  = GapFn(defenseLength   - offenseLength,
                                cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
-        var matchupShift    = cfg.RollASkillWeight       * skillShift
-                            + cfg.RollAAthleticismWeight * athShift
-                            + cfg.RollASizeWeight        * sizeShift;
-        var disruptionShift = pressureLift + pressureGate * matchupShift;
+        var matchupShift    = cfg.StandardSkillWeight       * skillShift
+                            + cfg.StandardAthleticismWeight * athShift
+                            + cfg.StandardSizeWeight        * sizeShift;
+        var disruptionShift = cfg.StandardLift + cfg.StandardGate * matchupShift;
 
-        var toCeiling    = cfg.RollATurnoverCeiling;
-        var toFloor      = cfg.RollATurnoverFloor;
+        var toCeiling    = cfg.StandardTurnoverCeiling;
+        var toFloor      = cfg.StandardTurnoverFloor;
         var toSpan       = disruptionShift >= 0.0
                            ? (toCeiling - baseTurnoverShare)
                            : (baseTurnoverShare - toFloor);
         var toBend       = toSpan * Math.Tanh(disruptionShift / cfg.FullCourtPressReferenceShift);
         var finalToShare = baseTurnoverShare + toBend;   // plain addition; tanh supplies sign
 
-        // ── DefFoul: press only, no matchup term ──────────────────────────────
-        var dfCeiling         = cfg.RollADefFoulCeiling;
-        var dfFloor           = cfg.RollADefFoulFloor;
-        var dfSpan            = pressureLift >= 0.0
+        // ── DefFoul: Standard lift only, no matchup term ──────────────────────
+        var dfCeiling         = cfg.StandardDefFoulCeiling;
+        var dfFloor           = cfg.StandardDefFoulFloor;
+        var dfSpan            = cfg.StandardLift >= 0.0
                                 ? (dfCeiling - baseDefFoulShare)
                                 : (baseDefFoulShare - dfFloor);
-        var dfBend            = dfSpan * Math.Tanh(pressureLift / cfg.FullCourtPressReferenceShift);
+        var dfBend            = dfSpan * Math.Tanh(cfg.StandardLift / cfg.FullCourtPressReferenceShift);
         var finalDefFoulShare = baseDefFoulShare + dfBend;   // plain addition
 
-        // ── OffFoul: press only, ceiling ~15% of DefFoul ceiling ──────────────
-        var ofCeiling         = cfg.RollAOffFoulCeiling;
-        var ofFloor           = cfg.RollAOffFoulFloor;
-        var ofSpan            = pressureLift >= 0.0
+        // ── OffFoul: Standard lift only, ceiling ~15% of DefFoul ceiling ──────
+        var ofCeiling         = cfg.StandardOffFoulCeiling;
+        var ofFloor           = cfg.StandardOffFoulFloor;
+        var ofSpan            = cfg.StandardLift >= 0.0
                                 ? (ofCeiling - baseOffFoulShare)
                                 : (baseOffFoulShare - ofFloor);
-        var ofBend            = ofSpan * Math.Tanh(pressureLift / cfg.FullCourtPressReferenceShift);
+        var ofBend            = ofSpan * Math.Tanh(cfg.StandardLift / cfg.FullCourtPressReferenceShift);
         var finalOffFoulShare = baseOffFoulShare + ofBend;   // plain addition
 
         return (finalToShare, finalDefFoulShare, finalOffFoulShare);

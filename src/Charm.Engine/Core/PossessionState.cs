@@ -131,6 +131,26 @@ public enum EntryType
 /// bool, the same "single bit suffices" shape as <see cref="FastBreak"/>; the finer
 /// spot-flip (the OTHER team starting in front after a backcourt turnover) is deferred
 /// to a later task.</para></param>
+/// <param name="PressMode">Whether the defending team is applying a full-court press
+/// on this specific possession, and with what profile. Stamped ONCE per possession by
+/// <see cref="Resolver.RunPossession"/> before invoking
+/// <see cref="IRollAPieGenerator.Generate"/> — the generator reads this stamp and
+/// never draws its own RNG to decide.
+/// <para>Defaults to <see cref="Charm.Engine.PressMode.None"/> so every possession
+/// that is not a fresh dead-ball (Transition, BallAdvanced) and every continuation
+/// state created via <c>with</c> from a brand-new possession arrives as non-pressed
+/// until the Resolver stamps it. Because <see cref="Resolver.RunPossession"/> is
+/// called exactly once per possession, the stamp is always set before any generator
+/// is invoked, making the default safe and making an <c>Unassigned</c> sentinel
+/// unnecessary. The field survives every <c>with</c> in the possession chain
+/// (including the re-inbound paths <c>ResumeInbound</c> and
+/// <c>ResolveSidelineInbound</c>) so Roll A at a re-inbound reads the same mode
+/// the possession started with — the press decision does not change mid-possession.
+/// </para>
+/// <para>On Transition and BallAdvanced entries, <c>RunPossession</c> never stamps
+/// the field (those entries skip the press roll entirely); the default <c>None</c>
+/// is the correct value because a live-ball transition or a frontcourt inbound is
+/// never preceded by a full-court press decision.</para></param>
 public sealed record PossessionState(
     int PossessionNumber,
     TeamSide Offense,
@@ -141,4 +161,5 @@ public sealed record PossessionState(
     ShotResult? Result = null,
     TransitionContext? TransitionContext = null,
     bool FastBreak = false,
-    bool Frontcourt = false);
+    bool Frontcourt = false,
+    PressMode PressMode = PressMode.None);

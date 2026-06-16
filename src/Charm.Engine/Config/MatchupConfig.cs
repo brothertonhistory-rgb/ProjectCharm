@@ -433,96 +433,150 @@ public sealed class MatchupConfig
     /// (enforced in Load). Calibration placeholder.</summary>
     public double RollBFoulPressureFloor { get; set; } = 0.06;
 
-    // --- Phase 14: full-court press dial (Roll A, backcourt entry).
+    // --- Phase 15: full-court press frequency dial (Roll A, backcourt entry).
     //     Distinct from HomePressure/AwayPressure (halfcourt pressure used by Roll B/F).
-    //     A team can press full-court or pick up at halfcourt only -- independent decisions.
-    //     Range 1-10; neutral at PressureNeutral (= 5 by default).
-    //     Migration path: per-team CoachProfile fields own this eventually;
-    //     FullCourtPressFor(TeamSide) is the only read seam that changes. ---
+    //     A team can press full-court or pick up at halfcourt — independent decisions.
+    //     The dial (1–10) is FREQUENCY: how often the team presses per possession,
+    //     not how hard. It maps via PressProbabilityFor to a per-possession probability
+    //     drawn by the Resolver. The dial does NOT enter the pie math; it is consumed
+    //     entirely by the upstream press-roll.
+    //     Default is LOW (1.0) — most teams do not full-court press as a base strategy;
+    //     a default game stays close to today's baseline (few pressed possessions). ---
 
-    /// <summary>Full-court press intensity for the HOME team (1-10; 5 = neutral).
-    /// Distinct from <see cref="HomePressure"/> (halfcourt pressure). Roll A reads
-    /// this when the defending team is Home.</summary>
-    public double HomeFullCourtPress { get; set; } = 5.0;
+    /// <summary>Home team's full-court press FREQUENCY (1–10 scale). Frequency, not
+    /// intensity — the dial controls how often the team presses, not how hard.
+    /// Distinct from <see cref="HomePressure"/> (halfcourt pressure). Maps to a
+    /// per-possession press probability via <see cref="PressProbabilityFor"/>.
+    /// Default 1.0 (low — most teams do not full-court press as a base strategy).
+    /// Must be in [1, 10] (enforced in Load).</summary>
+    public double HomePressFrequency { get; set; } = 1.0;
 
-    /// <summary>Full-court press intensity for the AWAY team (1-10; 5 = neutral).
-    /// Distinct from <see cref="AwayPressure"/> (halfcourt pressure). Roll A reads
-    /// this when the defending team is Away.</summary>
-    public double AwayFullCourtPress { get; set; } = 5.0;
+    /// <summary>Away team's full-court press FREQUENCY (1–10 scale). Frequency, not
+    /// intensity. Distinct from <see cref="AwayPressure"/> (halfcourt pressure). Maps
+    /// to a per-possession press probability via <see cref="PressProbabilityFor"/>.
+    /// Default 1.0 (low). Must be in [1, 10] (enforced in Load).</summary>
+    public double AwayPressFrequency { get; set; } = 1.0;
 
-    /// <summary>Full-court press dial for <paramref name="side"/>. Mirrors
-    /// <see cref="PressureFor"/> but reads the full-court press knobs, not the
-    /// halfcourt pressure knobs. Roll A's only call site for this value.</summary>
-    public double FullCourtPressFor(TeamSide side) =>
-        side == TeamSide.Home ? HomeFullCourtPress : AwayFullCourtPress;
+    /// <summary>Per-possession press probability for <paramref name="side"/>, derived
+    /// by linear interpolation from <see cref="PressProbabilityAtOne"/> (at frequency 1)
+    /// to <see cref="PressProbabilityAtTen"/> (at frequency 10). The Resolver calls this
+    /// for <c>state.Defense</c> and makes one RNG draw against the result — the ONLY
+    /// place frequency math lives. The generator never sees the dial value.</summary>
+    public double PressProbabilityFor(TeamSide side)
+    {
+        var freq = side == TeamSide.Home ? HomePressFrequency : AwayPressFrequency;
+        return PressProbabilityAtOne
+             + (freq - 1.0) / 9.0 * (PressProbabilityAtTen - PressProbabilityAtOne);
+    }
 
-    // --- Phase 14: Roll-A-specific ceilings and floors (action-mass shares).
-    //     At max press + worst matchup, shares approach (but do not exceed) the ceilings.
+    // --- Phase 15: frequency → probability map endpoints.
+    //     Linear interpolation: prob = AtOne + (freq − 1) / 9 × (AtTen − AtOne).
+    //     AtTen >= AtOne (enforced in Load); both in [0, 1] (enforced in Load).
+    //     Calibration placeholders. ---
+
+    /// <summary>Per-possession press probability when frequency = 1 (the minimum).
+    /// Default 0.05 — a frequency-1 defense presses about 5% of possessions.
+    /// Must be in [0, 1] and ≤ <see cref="PressProbabilityAtTen"/> (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double PressProbabilityAtOne { get; set; } = 0.05;
+
+    /// <summary>Per-possession press probability when frequency = 10 (the maximum).
+    /// Default 0.80 — a frequency-10 defense presses 80% of possessions.
+    /// Must be in [0, 1] and ≥ <see cref="PressProbabilityAtOne"/> (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double PressProbabilityAtTen { get; set; } = 0.80;
+
+    // --- Phase 15: Standard-mode fixed lift and gate.
+    //     StandardLift is the flat lift applied to ALL THREE disruption arms under a
+    //     Standard press (turnover, DefFoul, OffFoul). It is a FIXED CONFIG CONSTANT,
+    //     not a function of the dial — the dial is consumed entirely by the upstream
+    //     press-roll (PressProbabilityFor) and does NOT enter the pie math.
+    //     StandardGate scales the three-gap matchup term on the TURNOVER arm only;
+    //     DefFoul and OffFoul receive only the fixed StandardLift.
+    //     Both must be >= 0 (enforced in Load). Calibration placeholders. ---
+
+    /// <summary>Fixed flat lift applied to all three disruption arms (TO, DefFoul,
+    /// OffFoul) when a Standard press is in effect. The turnover arm also gets
+    /// StandardGate × matchupShift on top. NOT a function of the frequency dial.
+    /// Default 0.5. Must be ≥ 0 (enforced in Load). Calibration placeholder.</summary>
+    public double StandardLift { get; set; } = 0.5;
+
+    /// <summary>Scales the three-gap matchup term on the turnover arm in Standard
+    /// press mode. Larger values → matchup gaps bend TO more; 0 = lift-only (matchup
+    /// blind). NOT a function of the frequency dial. Default 0.5. Must be ≥ 0
+    /// (enforced in Load). Calibration placeholder.</summary>
+    public double StandardGate { get; set; } = 0.5;
+
+    // --- Phase 15: Standard-mode Roll-A-specific ceilings and floors (action-mass shares).
+    //     At max-matchup-advantage the bent share approaches (but does not exceed) the ceiling.
     //     The sum of the three ceilings must be < 1.0 (enforced in Load). ---
 
-    /// <summary>Maximum turnover share of Roll A's action mass under maximum full-court
-    /// press + worst matchup. Must exceed <see cref="RollATurnoverFloor"/>
+    /// <summary>Maximum turnover share of Roll A's action mass under Standard press +
+    /// worst matchup. Must exceed <see cref="StandardTurnoverFloor"/>
     /// (enforced in Load).</summary>
-    public double RollATurnoverCeiling { get; set; } = 0.20;
+    public double StandardTurnoverCeiling { get; set; } = 0.20;
 
-    /// <summary>Minimum turnover share of Roll A's action mass under minimum press.
-    /// Must be &gt;= 0 and &lt; <see cref="RollATurnoverCeiling"/> (enforced in Load).</summary>
-    public double RollATurnoverFloor { get; set; } = 0.005;
+    /// <summary>Minimum turnover share of Roll A's action mass under Standard press.
+    /// Must be ≥ 0 and &lt; <see cref="StandardTurnoverCeiling"/> (enforced in Load).
+    /// </summary>
+    public double StandardTurnoverFloor { get; set; } = 0.005;
 
-    /// <summary>Maximum defensive foul share of Roll A's action mass under maximum press.
-    /// Must exceed <see cref="RollADefFoulFloor"/> (enforced in Load).</summary>
-    public double RollADefFoulCeiling { get; set; } = 0.10;
+    /// <summary>Maximum defensive foul share of Roll A's action mass under Standard press.
+    /// Must exceed <see cref="StandardDefFoulFloor"/> (enforced in Load).</summary>
+    public double StandardDefFoulCeiling { get; set; } = 0.10;
 
-    /// <summary>Minimum defensive foul share of Roll A's action mass under minimum press.
-    /// Must be &gt;= 0 and &lt; <see cref="RollADefFoulCeiling"/> (enforced in Load).</summary>
-    public double RollADefFoulFloor { get; set; } = 0.005;
+    /// <summary>Minimum defensive foul share of Roll A's action mass under Standard press.
+    /// Must be ≥ 0 and &lt; <see cref="StandardDefFoulCeiling"/> (enforced in Load).
+    /// </summary>
+    public double StandardDefFoulFloor { get; set; } = 0.005;
 
-    /// <summary>Maximum offensive foul share of Roll A's action mass under maximum press.
-    /// Ceiling ~15% of <see cref="RollADefFoulCeiling"/> by design. Must exceed
-    /// <see cref="RollAOffFoulFloor"/> (enforced in Load).</summary>
-    public double RollAOffFoulCeiling { get; set; } = 0.015;
+    /// <summary>Maximum offensive foul share of Roll A's action mass under Standard press.
+    /// Ceiling ≈ 15% of <see cref="StandardDefFoulCeiling"/> by design. Must exceed
+    /// <see cref="StandardOffFoulFloor"/> (enforced in Load).</summary>
+    public double StandardOffFoulCeiling { get; set; } = 0.015;
 
-    /// <summary>Minimum offensive foul share of Roll A's action mass under minimum press.
-    /// Must be &gt;= 0 and &lt; <see cref="RollAOffFoulCeiling"/> (enforced in Load).</summary>
-    public double RollAOffFoulFloor { get; set; } = 0.001;
+    /// <summary>Minimum offensive foul share of Roll A's action mass under Standard press.
+    /// Must be ≥ 0 and &lt; <see cref="StandardOffFoulCeiling"/> (enforced in Load).
+    /// </summary>
+    public double StandardOffFoulFloor { get; set; } = 0.001;
 
-    // --- Phase 14: full-court press saturation constant.
+    // --- Phase 15: full-court press saturation constant.
     //     The tanh divisor for ALL THREE Roll A bends (turnover, DefFoul, OffFoul).
-    //     SEPARATE from PressureReferenceShift (halfcourt) so the two dials are
+    //     SEPARATE from PressureReferenceShift (halfcourt) so the two layers are
     //     fully independent — neither the normalization nor the saturation speed of
     //     full-court press is coupled to halfcourt.
     //     Must be > 0 (enforced in Load). Same default as PressureReferenceShift
     //     (1.2) as a calibration placeholder. ---
 
-    /// <summary>Tanh saturation divisor for Roll A's full-court press bends (Phase 14).
+    /// <summary>Tanh saturation divisor for Roll A's Standard press bends (Phase 15).
     /// Governs how fast turnover, DefFoul, and OffFoul shares approach their ceilings/floors
-    /// as pUnit grows. SEPARATE from <see cref="PressureReferenceShift"/> (halfcourt) —
-    /// the two dials stay fully independent. Must be &gt; 0 (enforced in Load).
-    /// Calibration placeholder.</summary>
+    /// as the matchup shift grows. SEPARATE from <see cref="PressureReferenceShift"/>
+    /// (halfcourt) — the two layers stay fully independent. Must be &gt; 0 (enforced in
+    /// Load). Calibration placeholder.</summary>
     public double FullCourtPressReferenceShift { get; set; } = 1.2;
 
-    // --- Phase 14: turnover gap weights.
+    // --- Phase 15: turnover gap weights.
     //     Three sources compose into the team matchup shift for Roll A's TO slice:
-    //       matchupShift = SkillWeight*skillShift + AthleticismWeight*athShift + SizeWeight*sizeShift
+    //       matchupShift = SkillWeight·skillShift + AthleticismWeight·athShift + SizeWeight·sizeShift
     //     SizeWeight is the smallest (size matters least in backcourt press).
     //     All three must be >= 0 (enforced in Load). Need not sum to 1. ---
 
     /// <summary>Weight of the skill gap (Steals − BallHandling) in Roll A's turnover
-    /// matchup shift. The largest of the three — backcourt press is primarily a
-    /// ball-handling skill contest. Must be &gt;= 0 (enforced in Load).
+    /// matchup shift under Standard press. The largest of the three — backcourt press
+    /// is primarily a ball-handling skill contest. Must be ≥ 0 (enforced in Load).
     /// Calibration placeholder.</summary>
-    public double RollASkillWeight { get; set; } = 0.50;
+    public double StandardSkillWeight { get; set; } = 0.50;
 
     /// <summary>Weight of the athleticism gap (Athleticism − Athleticism) in Roll A's
-    /// turnover matchup shift. Middle of the three. Must be &gt;= 0 (enforced in Load).
-    /// Calibration placeholder.</summary>
-    public double RollAAthleticismWeight { get; set; } = 0.35;
+    /// turnover matchup shift under Standard press. Middle of the three.
+    /// Must be ≥ 0 (enforced in Load). Calibration placeholder.</summary>
+    public double StandardAthleticismWeight { get; set; } = 0.35;
 
     /// <summary>Weight of the size gap (LengthRating − LengthRating) in Roll A's
-    /// turnover matchup shift. Smallest of the three — size matters, but least for
-    /// backcourt press disruption. Must be &gt;= 0 (enforced in Load).
-    /// Calibration placeholder.</summary>
-    public double RollASizeWeight { get; set; } = 0.15;
+    /// turnover matchup shift under Standard press. Smallest of the three — size
+    /// matters, but least for backcourt press disruption.
+    /// Must be ≥ 0 (enforced in Load). Calibration placeholder.</summary>
+    public double StandardSizeWeight { get; set; } = 0.15;
 
     public static MatchupConfig Load(string path)    {
         var json = File.ReadAllText(path);
@@ -710,58 +764,78 @@ public sealed class MatchupConfig
                 $"RollBFoulPressureCeiling must exceed RollBFoulPressureFloor: " +
                 $"floor={cfg.RollBFoulPressureFloor}, ceiling={cfg.RollBFoulPressureCeiling}.");
 
-        // Phase 14 -- full-court press dial
-        if (cfg.HomeFullCourtPress < 1.0 || cfg.HomeFullCourtPress > 10.0)
+        // Phase 15 -- full-court press frequency dial
+        if (cfg.HomePressFrequency < 1.0 || cfg.HomePressFrequency > 10.0)
             throw new InvalidOperationException(
-                $"HomeFullCourtPress must be in [1, 10]: got {cfg.HomeFullCourtPress}.");
-        if (cfg.AwayFullCourtPress < 1.0 || cfg.AwayFullCourtPress > 10.0)
+                $"HomePressFrequency must be in [1, 10]: got {cfg.HomePressFrequency}.");
+        if (cfg.AwayPressFrequency < 1.0 || cfg.AwayPressFrequency > 10.0)
             throw new InvalidOperationException(
-                $"AwayFullCourtPress must be in [1, 10]: got {cfg.AwayFullCourtPress}.");
+                $"AwayPressFrequency must be in [1, 10]: got {cfg.AwayPressFrequency}.");
 
-        // Phase 14 -- Roll-A-specific ceilings/floors
-        if (cfg.RollATurnoverFloor < 0.0)
+        // Phase 15 -- frequency → probability map endpoints
+        if (cfg.PressProbabilityAtOne < 0.0 || cfg.PressProbabilityAtOne > 1.0)
             throw new InvalidOperationException(
-                $"RollATurnoverFloor must be >= 0: got {cfg.RollATurnoverFloor}.");
-        if (cfg.RollATurnoverCeiling <= cfg.RollATurnoverFloor)
+                $"PressProbabilityAtOne must be in [0, 1]: got {cfg.PressProbabilityAtOne}.");
+        if (cfg.PressProbabilityAtTen < 0.0 || cfg.PressProbabilityAtTen > 1.0)
             throw new InvalidOperationException(
-                $"RollATurnoverCeiling must exceed RollATurnoverFloor: " +
-                $"floor={cfg.RollATurnoverFloor}, ceiling={cfg.RollATurnoverCeiling}.");
-        if (cfg.RollADefFoulFloor < 0.0)
+                $"PressProbabilityAtTen must be in [0, 1]: got {cfg.PressProbabilityAtTen}.");
+        if (cfg.PressProbabilityAtTen < cfg.PressProbabilityAtOne)
             throw new InvalidOperationException(
-                $"RollADefFoulFloor must be >= 0: got {cfg.RollADefFoulFloor}.");
-        if (cfg.RollADefFoulCeiling <= cfg.RollADefFoulFloor)
+                $"PressProbabilityAtTen must be >= PressProbabilityAtOne: " +
+                $"AtOne={cfg.PressProbabilityAtOne}, AtTen={cfg.PressProbabilityAtTen}.");
+
+        // Phase 15 -- Standard lift and gate
+        if (cfg.StandardLift < 0.0)
             throw new InvalidOperationException(
-                $"RollADefFoulCeiling must exceed RollADefFoulFloor: " +
-                $"floor={cfg.RollADefFoulFloor}, ceiling={cfg.RollADefFoulCeiling}.");
-        if (cfg.RollAOffFoulFloor < 0.0)
+                $"StandardLift must be >= 0: got {cfg.StandardLift}.");
+        if (cfg.StandardGate < 0.0)
             throw new InvalidOperationException(
-                $"RollAOffFoulFloor must be >= 0: got {cfg.RollAOffFoulFloor}.");
-        if (cfg.RollAOffFoulCeiling <= cfg.RollAOffFoulFloor)
+                $"StandardGate must be >= 0: got {cfg.StandardGate}.");
+
+        // Phase 15 -- Standard-mode Roll-A-specific ceilings/floors
+        if (cfg.StandardTurnoverFloor < 0.0)
             throw new InvalidOperationException(
-                $"RollAOffFoulCeiling must exceed RollAOffFoulFloor: " +
-                $"floor={cfg.RollAOffFoulFloor}, ceiling={cfg.RollAOffFoulCeiling}.");
+                $"StandardTurnoverFloor must be >= 0: got {cfg.StandardTurnoverFloor}.");
+        if (cfg.StandardTurnoverCeiling <= cfg.StandardTurnoverFloor)
+            throw new InvalidOperationException(
+                $"StandardTurnoverCeiling must exceed StandardTurnoverFloor: " +
+                $"floor={cfg.StandardTurnoverFloor}, ceiling={cfg.StandardTurnoverCeiling}.");
+        if (cfg.StandardDefFoulFloor < 0.0)
+            throw new InvalidOperationException(
+                $"StandardDefFoulFloor must be >= 0: got {cfg.StandardDefFoulFloor}.");
+        if (cfg.StandardDefFoulCeiling <= cfg.StandardDefFoulFloor)
+            throw new InvalidOperationException(
+                $"StandardDefFoulCeiling must exceed StandardDefFoulFloor: " +
+                $"floor={cfg.StandardDefFoulFloor}, ceiling={cfg.StandardDefFoulCeiling}.");
+        if (cfg.StandardOffFoulFloor < 0.0)
+            throw new InvalidOperationException(
+                $"StandardOffFoulFloor must be >= 0: got {cfg.StandardOffFoulFloor}.");
+        if (cfg.StandardOffFoulCeiling <= cfg.StandardOffFoulFloor)
+            throw new InvalidOperationException(
+                $"StandardOffFoulCeiling must exceed StandardOffFoulFloor: " +
+                $"floor={cfg.StandardOffFoulFloor}, ceiling={cfg.StandardOffFoulCeiling}.");
         // Static twin of the generator's runtime overflow guard: the three ceilings
         // summing to >= 1.0 would allow CleanEntry to go negative at max press.
-        if (cfg.RollATurnoverCeiling + cfg.RollADefFoulCeiling + cfg.RollAOffFoulCeiling >= 1.0)
+        if (cfg.StandardTurnoverCeiling + cfg.StandardDefFoulCeiling + cfg.StandardOffFoulCeiling >= 1.0)
             throw new InvalidOperationException(
-                $"RollATurnoverCeiling + RollADefFoulCeiling + RollAOffFoulCeiling must be < 1.0: " +
-                $"got {cfg.RollATurnoverCeiling + cfg.RollADefFoulCeiling + cfg.RollAOffFoulCeiling:F4}.");
+                $"StandardTurnoverCeiling + StandardDefFoulCeiling + StandardOffFoulCeiling must be < 1.0: " +
+                $"got {cfg.StandardTurnoverCeiling + cfg.StandardDefFoulCeiling + cfg.StandardOffFoulCeiling:F4}.");
 
-        // Phase 14 -- full-court press saturation constant (SEPARATE from halfcourt)
+        // Phase 15 -- full-court press saturation constant (SEPARATE from halfcourt)
         if (cfg.FullCourtPressReferenceShift <= 0.0)
             throw new InvalidOperationException(
                 $"FullCourtPressReferenceShift must be > 0: got {cfg.FullCourtPressReferenceShift}.");
 
-        // Phase 14 -- turnover gap weights (must be >= 0; need not sum to 1)
-        if (cfg.RollASkillWeight < 0.0)
+        // Phase 15 -- Standard turnover gap weights (must be >= 0; need not sum to 1)
+        if (cfg.StandardSkillWeight < 0.0)
             throw new InvalidOperationException(
-                $"RollASkillWeight must be >= 0: got {cfg.RollASkillWeight}.");
-        if (cfg.RollAAthleticismWeight < 0.0)
+                $"StandardSkillWeight must be >= 0: got {cfg.StandardSkillWeight}.");
+        if (cfg.StandardAthleticismWeight < 0.0)
             throw new InvalidOperationException(
-                $"RollAAthleticismWeight must be >= 0: got {cfg.RollAAthleticismWeight}.");
-        if (cfg.RollASizeWeight < 0.0)
+                $"StandardAthleticismWeight must be >= 0: got {cfg.StandardAthleticismWeight}.");
+        if (cfg.StandardSizeWeight < 0.0)
             throw new InvalidOperationException(
-                $"RollASizeWeight must be >= 0: got {cfg.RollASizeWeight}.");
+                $"StandardSizeWeight must be >= 0: got {cfg.StandardSizeWeight}.");
 
         return cfg;
     }

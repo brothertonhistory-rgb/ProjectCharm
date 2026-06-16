@@ -1,41 +1,51 @@
 namespace Charm.Engine;
 
 /// <summary>
-/// Real, press-and-matchup-aware Roll A generator (Phase 14). Backcourt entry's
-/// turnover and foul rates now reflect the defending team's
-/// <b>full-court press setting</b> and the <b>slot-weighted aggregate Steals vs.
-/// BallHandling matchup</b> across all ten on-court players.
+/// Real, press-and-matchup-aware Roll A generator (Phase 15). Backcourt entry's
+/// turnover and foul rates now reflect the defending team's per-possession
+/// <b>press decision</b> (<see cref="PossessionState.PressMode"/>) and the
+/// <b>slot-weighted aggregate three-gap matchup</b> across all ten on-court players.
 ///
-/// <para><b>Phase 14 — disruption face only.</b> Press has two faces. This generator
-/// builds only the disruption face: full-court press raises the <c>Turnover</c>,
-/// <c>DefensiveFoul</c>, and <c>OffensiveFoul</c> slices. The shot-quality face
-/// (beat-the-press transition shots) is deliberately deferred. No hooks, no stubs.</para>
+/// <para><b>Phase 15 — disruption face, frequency + Standard mode.</b> The press
+/// decision is made upstream in the Resolver once per possession (a single RNG draw
+/// against <see cref="MatchupConfig.PressProbabilityFor"/>) and stamped as
+/// <see cref="PressMode"/> on the state. This generator is a pure pie builder —
+/// it reads the stamp, never rolls RNG itself.</para>
 ///
-/// <para><b>Full-court press vs. halfcourt pressure (separate dials).</b>
+/// <para><b>PressMode switch.</b>
+/// <list type="bullet">
+/// <item><term>None</term><description> → flat config baseline (early return, no
+/// roster read).</description></item>
+/// <item><term>Standard</term><description> → read six slot-weighted aggregates,
+/// call <see cref="Matchup.EntryDisruptionShares"/> with the Standard lift/gate
+/// constants (<see cref="MatchupConfig.StandardLift"/> /
+/// <see cref="MatchupConfig.StandardGate"/>), build the four-way bent
+/// pie.</description></item>
+/// <item><term>Desperate</term><description> → throw
+/// <see cref="InvalidOperationException"/> (reserved; must never be produced by
+/// any live path in Phase 15).</description></item>
+/// <item><term>default</term><description> → throw
+/// <see cref="ArgumentOutOfRangeException"/> (unrecognized value; wiring
+/// bug).</description></item>
+/// </list></para>
+///
+/// <para><b>Court-state gate (survives Phase 15).</b> <c>Frontcourt == true</c>
+/// returns the flat config baseline immediately, even under Standard — the press
+/// is irrelevant once the offense has crossed half. Gate fires BEFORE the PressMode
+/// switch and before any roster read.</para>
+///
+/// <para><b>Full-court vs. halfcourt (separate layers).</b>
 /// Roll B and Roll F read <see cref="MatchupConfig.HomePressure"/> /
-/// <see cref="MatchupConfig.AwayPressure"/> — how hard the defense guards in
-/// the halfcourt. Roll A reads <see cref="MatchupConfig.HomeFullCourtPress"/> /
-/// <see cref="MatchupConfig.AwayFullCourtPress"/> — the distinct, independent
-/// tactical decision to press the full court. The two dials share the same
-/// PressureNeutral/PressureScale/PressureReferenceShift normalization (which
-/// describes the dial, not the roll) but are otherwise completely independent.</para>
+/// <see cref="MatchupConfig.AwayPressure"/> — halfcourt pressure. Roll A reads
+/// <see cref="PossessionState.PressMode"/> stamped by the Resolver — the per-
+/// possession result of the frequency dial. The two layers are fully independent.
+/// </para>
 ///
-/// <para><b>Court-state gating.</b> Roll A fires at three moments: initial entry
-/// (Frontcourt=false), ResumeInbound (may be either), and SidelineInbound (always
-/// Frontcourt=true). When <see cref="PossessionState.Frontcourt"/> is <c>true</c>,
-/// the offense has already crossed half — the press is irrelevant. The generator
-/// returns the flat config baseline immediately. When <c>false</c>, the full
-/// press+matchup computation runs.</para>
-///
-/// <para><b>Four-way bend (three rising arms).</b> Unlike Roll B (two rising arms),
-/// Roll A has three: <c>Turnover</c> (press + team matchup), <c>DefensiveFoul</c>
-/// (press only — reach-ins), and <c>OffensiveFoul</c> (press only, ceiling ≈ 15%
-/// of DefFoul ceiling). <c>CleanEntry</c> absorbs the complement.
+/// <para><b>Four-way bend (three rising arms).</b> Unlike Roll B (two arms), Roll A
+/// has three: <c>Turnover</c> (StandardLift + gate × three-gap matchup),
+/// <c>DefensiveFoul</c> (StandardLift only), and <c>OffensiveFoul</c> (StandardLift
+/// only, ceiling ≈ 15% of DefFoul ceiling). <c>CleanEntry</c> absorbs the complement.
 /// <c>JumpBall</c> is pinned exactly flat.</para>
-///
-/// <para><b>Near-zero floors.</b> Backcourt turnovers and fouls are near-zero
-/// without a press. All floors are set low (configurable in
-/// <see cref="MatchupConfig"/>).</para>
 ///
 /// <para><b>Why team aggregate, not per-player (same as Phase 13).</b>
 /// Roll A runs before player selection (Roll E). <see cref="PossessionState.SelectedSlot"/>
@@ -45,23 +55,14 @@ namespace Charm.Engine;
 ///
 /// <para><b>Action-mass normalization.</b> Base shares are normalized over
 /// <c>actionMass = BaseClean + BaseTurnover + BaseOffFoul + BaseDefFoul</c> (= 0.99).
-/// The bends operate on shares, not raw masses, so the neutral anchor (press 5.0 +
-/// even aggregate) reproduces the config baseline exactly.</para>
+/// The bends operate on shares, not raw masses, so the neutral anchor (even aggregate,
+/// StandardLift at its midpoint) reproduces the expected Standard baseline exactly.
+/// </para>
 ///
-/// <para><b>Dormant <c>pressure</c> parameter — stricter than Roll B.</b>
+/// <para><b>Dormant <c>pressure</c> parameter.</b>
 /// The interface parameter is validated with the same [0,1] guard as the stub,
-/// then DISCARDED via <c>_ = pressure</c>. Unlike <see cref="RollBGenerator"/>,
-/// which applies its dormant <c>physicality</c> as a zero-valued nudge, this
-/// generator does not let the placeholder touch the press math at all. Allowing
-/// it would create a second, accidental pressure input on top of the real
-/// <see cref="MatchupConfig.FullCourtPressFor"/> dial, with no defined semantics.
-/// See <see cref="IRollAPieGenerator"/> for the full rationale.</para>
-///
-/// <para><b>Pressure home — v1 config scalar.</b>
-/// <see cref="MatchupConfig.HomeFullCourtPress"/> / <see cref="MatchupConfig.AwayFullCourtPress"/>.
-/// <see cref="CoachProfile"/> is the eventual owner; migration: swap
-/// <see cref="MatchupConfig.FullCourtPressFor"/> to read per-team CoachProfile fields.
-/// Only that one call site changes.</para>
+/// then discarded via <c>_ = pressure</c>. The press decision comes from
+/// <see cref="PossessionState.PressMode"/>, not from this parameter.</para>
 ///
 /// Implements <see cref="IRollAPieGenerator"/>.
 /// </summary>
@@ -82,19 +83,44 @@ public sealed class RollAGenerator : IRollAPieGenerator
     {
         // ── [0,1] pressure guard — FIRST, before any early return ───────────
         // Preserves the same interface contract as the stub in every code path,
-        // including the Frontcourt=true and empty-roster flat-baseline paths.
+        // including the Frontcourt=true and PressMode.None early-return paths.
         if (pressure < 0.0 || pressure > 1.0)
             throw new ArgumentOutOfRangeException(nameof(pressure), pressure,
                 "Pressure must be in [0, 1].");
-        _ = pressure;   // dormant seam; real press comes from MatchupConfig.FullCourtPressFor
+        _ = pressure;   // dormant seam; the press decision comes from state.PressMode
 
         // ── Court-state gate ─────────────────────────────────────────────────
         // Once the offense has crossed half, the full-court press is irrelevant.
-        // Return the flat config baseline immediately.
+        // Return the flat config baseline immediately — before reading PressMode,
+        // before reading rosters.
         if (state.Frontcourt)
             return FlatBaseline();
 
-        // ── Read both rosters — null-tolerant ───────────────────────────────
+        // ── PressMode switch ─────────────────────────────────────────────────
+        // None  : no press this possession → flat baseline, no roster read.
+        // Standard : fixed StandardLift + three-gap matchup within Standard band.
+        // Desperate: reserved for the late-game module — must never arrive here.
+        // default  : unrecognized value — wiring bug, fail loud.
+        switch (state.PressMode)
+        {
+            case PressMode.None:
+                return FlatBaseline();
+
+            case PressMode.Standard:
+                break;   // fall through to the full computation below
+
+            case PressMode.Desperate:
+                throw new InvalidOperationException(
+                    "PressMode.Desperate reached RollAGenerator.Generate — Desperate is " +
+                    "reserved for the late-game module and must never be stamped by any live " +
+                    "code path in Phase 15. This is a wiring bug.");
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(state),
+                    $"Unrecognized PressMode '{state.PressMode}' in RollAGenerator.Generate.");
+        }
+
+        // ── Standard mode: read both rosters — null-tolerant ────────────────
         var offRoster = _game.RosterFor(state.Offense);
         var defRoster = _game.RosterFor(state.Defense);
         var offLineup = _game.LineupFor(state.Offense);
@@ -141,17 +167,10 @@ public sealed class RollAGenerator : IRollAPieGenerator
         var offLength    = WeightedAggregate(offPlayers, p => Matchup.LengthRating(p, _matchup));
         var defLength    = WeightedAggregate(defPlayers, p => Matchup.LengthRating(p, _matchup));
 
-        // ── Full-court press for the DEFENDING team ──────────────────────────
-        // Distinct from the halfcourt pressure dial (PressureFor) used by Roll B/F.
-        // Migration path: when CoachProfile is plumbed, swap to
-        //   _game.CoachProfileFor(state.Defense).FullCourtPress
-        var fullCourtPress = _matchup.FullCourtPressFor(state.Defense);
-
         // ── Action-mass normalization ────────────────────────────────────────
         // Shares are normalized over actionMass (= 0.99), not over the full pie.
-        // At neutral press + even aggregate the generator reproduces the config
-        // baseline exactly: newTO = actionMass × baseTOShare = BaseTurnover = 0.08.
-        // Do NOT pass raw BaseTurnover as baseTOShare — that breaks the neutral anchor.
+        // The Standard bends operate on shares so they compose correctly with the
+        // JumpBall pin (which is held at BaseJumpBall regardless of the bend).
         var actionMass       = _cfgA.BaseClean + _cfgA.BaseTurnover
                              + _cfgA.BaseOffensiveFoul + _cfgA.BaseDefensiveFoul;
         var baseTurnoverShare = _cfgA.BaseTurnover      / actionMass;
@@ -159,26 +178,26 @@ public sealed class RollAGenerator : IRollAPieGenerator
         var baseOffFoulShare  = _cfgA.BaseOffensiveFoul / actionMass;
 
         // ── Four-way disruption shares (three bends) ─────────────────────────
+        // StandardLift and StandardGate are fixed config constants — the dial
+        // (frequency) was consumed entirely by the upstream press-roll in the
+        // Resolver and does NOT enter this math.
         var (finalToShare, finalDefFoulShare, finalOffFoulShare) =
             Matchup.EntryDisruptionShares(
                 offHandling, defStealers,
                 offAthletic, defAthletic,
                 offLength, defLength,
-                fullCourtPress,
                 baseTurnoverShare, baseDefFoulShare, baseOffFoulShare,
                 _matchup);
 
         // ── Overflow guard ───────────────────────────────────────────────────
-        // With sane Roll-A-specific ceilings (sum = 0.315) this never fires.
+        // With sane Standard ceilings (sum < 1.0 enforced at Load) this never fires.
         // A misconfigured ceiling set with sum >= 1 would make CleanEntry negative.
-        // The Load invariant (RollATurnoverCeiling + RollADefFoulCeiling +
-        // RollAOffFoulCeiling < 1.0) is the static twin of this runtime guard.
         if (finalToShare + finalDefFoulShare + finalOffFoulShare >= 1.0)
             throw new InvalidOperationException(
                 $"RollAGenerator: finalTurnoverShare ({finalToShare:F6}) + " +
                 $"finalDefFoulShare ({finalDefFoulShare:F6}) + " +
                 $"finalOffFoulShare ({finalOffFoulShare:F6}) >= 1.0 — " +
-                "RollATurnoverCeiling + RollADefFoulCeiling + RollAOffFoulCeiling are " +
+                "StandardTurnoverCeiling + StandardDefFoulCeiling + StandardOffFoulCeiling are " +
                 "misconfigured (CleanEntry share would be negative). Lower the ceilings.");
 
         // ── Four-way mass split; JumpBall held exactly flat ──────────────────
@@ -222,8 +241,8 @@ public sealed class RollAGenerator : IRollAPieGenerator
 
     /// <summary>Flat config baseline pie — byte-for-byte identical to
     /// <see cref="StubPieGenerator"/>'s output at pressure=0.0. Returned when
-    /// the offense has already crossed (Frontcourt=true) or when either roster
-    /// is completely empty (isolated test path).</summary>
+    /// the offense has already crossed (Frontcourt=true), PressMode is None, or
+    /// either roster is completely empty (isolated test path).</summary>
     private Pie<EntryOutcome> FlatBaseline()
     {
         var weights = new Dictionary<EntryOutcome, double>

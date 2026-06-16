@@ -96,6 +96,7 @@ public sealed class Resolver
     private readonly RollLStubPieGenerator _rollLGenerator;
     private readonly IRollMPieGenerator _rollMGenerator;
     private readonly RollOffensiveFoulStubPieGenerator _offensiveFoulGenerator;
+    private readonly MatchupConfig _matchup;
     private readonly GameState _game;
     private readonly IRng _rng;
 
@@ -116,6 +117,7 @@ public sealed class Resolver
         RollLStubPieGenerator rollLGenerator,
         IRollMPieGenerator rollMGenerator,
         RollOffensiveFoulStubPieGenerator offensiveFoulGenerator,
+        MatchupConfig matchup,
         GameState game,
         IRng rng)
     {
@@ -135,6 +137,7 @@ public sealed class Resolver
         _rollLGenerator = rollLGenerator;
         _rollMGenerator = rollMGenerator;
         _offensiveFoulGenerator = offensiveFoulGenerator;
+        _matchup = matchup;
         _game = game;
         _rng = rng;
     }
@@ -198,6 +201,16 @@ public sealed class Resolver
                     "Rebound, FreeThrowRebound, or Steal — a null-context transition is a wiring bug.");
 
             // Legacy entry: Roll A (the generator + config produce its pie).
+            // ── Per-possession press roll (Phase 15) ─────────────────────────
+            // The defending team's frequency dial maps to a per-possession press
+            // probability (pure helper on MatchupConfig — no math in the Resolver).
+            // One RNG draw decides: pressed → Standard; not pressed → None.
+            // The stamp is written to the state BEFORE Generate is called so the
+            // generator reads a finished decision, never rolls itself.
+            // (§2a: one new RNG draw per dead-ball possession — accounted for.)
+            var probability = _matchup.PressProbabilityFor(start.Defense);
+            var mode        = _rng.NextUnitInterval() < probability ? PressMode.Standard : PressMode.None;
+            start           = start with { PressMode = mode };
             var pieA = _rollAGenerator.Generate(start, pressure: 0.0);
             result = RollA.Execute(start, pieA, _rng, _rollAConfig);
         }

@@ -73,6 +73,7 @@ internal static class Program
             rollLGenerator,
             rollMGenerator,
             offensiveFoulGenerator,
+            cfgMatchup,
             game,
             rng);
 
@@ -129,7 +130,7 @@ internal static class Program
         ok &= Phase11FreeThrowReboundDoorCheck(configPath);
         ok &= Phase12DisruptionDoorCheck(configPath);
         ok &= Phase13TeamDisruptionDoorCheckRollB(configPath);
-        ok &= Phase14FullCourtPressDoorCheckRollA(configPath);
+        ok &= Phase15PressFrequencyStandardCheck(configPath);
 
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
@@ -1016,6 +1017,7 @@ internal static class Program
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            MatchupConfig.Load(configPath),
             game,
             rng);
 
@@ -1191,6 +1193,7 @@ internal static class Program
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            MatchupConfig.Load(configPath),
             game,
             rng);
 
@@ -1505,6 +1508,7 @@ internal static class Program
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            MatchupConfig.Load(configPath),
             game,
             rng);
 
@@ -2112,6 +2116,7 @@ internal static class Program
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            MatchupConfig.Load(configPath),
             game,
             rngR);
 
@@ -2243,6 +2248,7 @@ internal static class Program
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            MatchupConfig.Load(configPath),
             game,
             rng);
 
@@ -3194,6 +3200,7 @@ internal static class Program
                 OutOfBoundsOffOffense = 0, OutOfBoundsOffDefense = 0, JumpBall = 0
             }),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            MatchupConfig.Load(configPath),
             game,
             rng);
 
@@ -3633,6 +3640,7 @@ internal static class Program
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            MatchupConfig.Load(configPath),
             game,
             rng);
 
@@ -3937,6 +3945,7 @@ internal static class Program
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            MatchupConfig.Load(configPath),
             game,
             new SystemRng(seed));
 
@@ -6557,24 +6566,14 @@ internal static class Program
     // (j) SelectedSlot-blind (Roll A is pre-selection);
     // (k) per-axis wiring: skill, athleticism, size each move TO when varied alone,
     //     and size produces the smallest movement of the three.
-    private static bool Phase14FullCourtPressDoorCheckRollA(string configPath)
+    private static bool Phase15PressFrequencyStandardCheck(string configPath)
     {
-        Console.WriteLine("\n--- Phase 14: Full-court press disruption door (Roll A) ---");
+        Console.WriteLine("\n--- Phase 15: Press frequency + Standard mode (Roll A) ---");
         var pass = true;
-
-        var cfgA       = RollAConfig.Load(configPath);
-        var cfgMatchup = MatchupConfig.Load(configPath);
         const double Eps = 1e-9;
 
-        // Action mass and base shares for the neutral anchor assertion.
-        var actionMass        = cfgA.BaseClean + cfgA.BaseTurnover
-                              + cfgA.BaseOffensiveFoul + cfgA.BaseDefensiveFoul;
-        var baseTOShare       = cfgA.BaseTurnover      / actionMass;
-        var baseDefFoulShare  = cfgA.BaseDefensiveFoul / actionMass;
-        var baseOffFoulShare  = cfgA.BaseOffensiveFoul / actionMass;
-
+        // ── Shared helpers ────────────────────────────────────────────────────
         // Player builder: all attributes at b; override as needed.
-        // BH=BallHandling, ST=Steals, ATH=Speed/Strength/etc, LEN=Height/Wingspan/Vertical.
         static Player Mk(int b, int? bh = null, int? st = null,
                          int? ath = null, int? len = null)
         {
@@ -6590,7 +6589,7 @@ internal static class Program
                 DefensiveRebounding = b, Steals = st ?? b,
                 Height = l, Wingspan = l, Weight = b,
                 Strength = a, Speed = a, Quickness = a, FirstStep = a,
-                Vertical = l,   // Vertical contributes to both Athleticism and LengthRating
+                Vertical = l,
                 Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
@@ -6598,7 +6597,7 @@ internal static class Program
         }
 
         // GameState builder: Home offense slots 1-5, Away defense slots 1-5.
-        // Harness team-side: Defense = Away, so FullCourtPressFor reads AwayFullCourtPress.
+        // Defense = Away, so PressProbabilityFor reads AwayPressFrequency.
         GameState BuildGame(Player[] off, Player[] def)
         {
             var g = new GameState(new FoulTracker(7, 10));
@@ -6610,44 +6609,130 @@ internal static class Program
             return g;
         }
 
-        // PossessionState: Home offense, Away defense.
-        // Frontcourt=false (default) — the backcourt bring-up where press fires.
-        static PossessionState St(bool frontcourt = false, Slot? slot = null)
-            => new PossessionState(
-                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
-                Entry: EntryType.DeadBallInbound,
-                SelectedSlot: slot,
-                ShotType: null,
-                Frontcourt: frontcourt);
-
-        // Generator helper: build RollAGenerator, produce pie, return weight dict.
-        // AwayFullCourtPress must be set before calling (Away = defense in our setup).
-        static Dictionary<EntryOutcome, double> Split(
-            RollAConfig cfgA, MatchupConfig cfgMatchup, GameState g, PossessionState state)
-        {
-            var gen = new RollAGenerator(cfgA, cfgMatchup, g);
-            var pie = gen.Generate(state, pressure: 0.0);
-            return pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
-        }
-
-        // Config helper: fresh MatchupConfig with Away full-court press set to p.
-        MatchupConfig WithAwayPress(double p)
-        {
-            var c = MatchupConfig.Load(configPath);
-            c.AwayFullCourtPress = p;
-            return c;
-        }
-
         var even5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
 
-        // ── (a) Neutral anchor ────────────────────────────────────────────────
-        // press=5 + all-50 players → generator reproduces exact config baseline masses.
-        Console.WriteLine("  (a) Neutral anchor (press=5, all-50): all five arms == config baseline:");
-        bool aOk;
+        // ── (1) PressProbabilityFor — pure function ───────────────────────────
+        Console.WriteLine("  (1) PressProbabilityFor — pure function (no simulation):");
+        bool t1Ok;
         try
         {
-            var g = BuildGame(even5, even5);
-            var d = Split(cfgA, cfgMatchup, g, St());   // cfgMatchup has AwayFullCourtPress=5
+            var cfgM = MatchupConfig.Load(configPath);
+
+            cfgM.AwayPressFrequency = 1.0;
+            var atOne = cfgM.PressProbabilityFor(TeamSide.Away);
+            cfgM.AwayPressFrequency = 10.0;
+            var atTen = cfgM.PressProbabilityFor(TeamSide.Away);
+            cfgM.AwayPressFrequency = 5.5;
+            var atMid = cfgM.PressProbabilityFor(TeamSide.Away);
+            var expectedMid = cfgM.PressProbabilityAtOne
+                            + 4.5 / 9.0 * (cfgM.PressProbabilityAtTen - cfgM.PressProbabilityAtOne);
+
+            var atOneOk = Math.Abs(atOne - cfgM.PressProbabilityAtOne) < Eps;
+            var atTenOk = Math.Abs(atTen - cfgM.PressProbabilityAtTen) < Eps;
+            var midOk   = Math.Abs(atMid - expectedMid)                  < Eps;
+            var rangeOk = atOne >= 0.0 && atOne <= 1.0 && atTen >= 0.0 && atTen <= 1.0;
+            var monoOk  = atOne <= atMid && atMid <= atTen;
+
+            t1Ok = atOneOk && atTenOk && midOk && rangeOk && monoOk;
+            Console.WriteLine($"    freq=1  → {atOne:F6}  want={cfgM.PressProbabilityAtOne:F6}  {(atOneOk?"OK":"FAIL")}");
+            Console.WriteLine($"    freq=5.5→ {atMid:F6}  want={expectedMid:F6}  {(midOk?"OK":"FAIL")}");
+            Console.WriteLine($"    freq=10 → {atTen:F6}  want={cfgM.PressProbabilityAtTen:F6}  {(atTenOk?"OK":"FAIL")}");
+            Console.WriteLine($"    in [0,1]={rangeOk}  monotone={monoOk}");
+        }
+        catch (Exception ex) { t1Ok = false; Console.WriteLine($"  FAIL  (1) threw: {ex.Message}"); }
+        pass &= t1Ok;
+        Console.WriteLine($"  (1) {(t1Ok ? "ok" : "FAIL")}");
+
+        // ── (2) Frequency gates pressed fraction — spy captures PressMode ─────
+        Console.WriteLine("  (2) Frequency gates pressed fraction (spy-based):");
+        bool t2Ok;
+        try
+        {
+            const double TestFreq = 5.0;
+            const int    N        = 5000;
+
+            var cfgA = RollAConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
+            cfgM.AwayPressFrequency = TestFreq;
+            var expectedProb = cfgM.PressProbabilityFor(TeamSide.Away);
+
+            var safePie = new Pie<EntryOutcome>(
+                new Dictionary<EntryOutcome, double>
+                {
+                    [EntryOutcome.CleanEntry]    = cfgA.BaseClean,
+                    [EntryOutcome.Turnover]      = cfgA.BaseTurnover,
+                    [EntryOutcome.DefensiveFoul] = cfgA.BaseDefensiveFoul,
+                    [EntryOutcome.OffensiveFoul] = cfgA.BaseOffensiveFoul,
+                    [EntryOutcome.JumpBall]      = cfgA.BaseJumpBall,
+                }, cfgA.Epsilon);
+
+            var spy  = new PressModeSpyGenerator(safePie);
+            var game = new GameState(new FoulTracker(7, 10));
+            var rng  = new SystemRng(cfgA.Seed);
+
+            var resolver = new Resolver(
+                spy,
+                cfgA,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM,
+                game,
+                rng);
+
+            var state = new PossessionState(
+                PossessionNumber: 1,
+                Offense: TeamSide.Home,
+                Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+
+            for (var i = 0; i < N; i++)
+                resolver.RunPossession(state);
+
+            var standardCount  = spy.Log.Count(m => m == PressMode.Standard);
+            var noneCount      = spy.Log.Count(m => m == PressMode.None);
+            var desperateCount = spy.Log.Count(m => m == PressMode.Desperate);
+            var total          = spy.Log.Count;
+
+            var observedFrac = (double)standardCount / total;
+            // Tolerance: 5σ of binomial + 0.02 slack for re-inbound ratio bias
+            var sigma5 = 5.0 * Math.Sqrt(expectedProb * (1.0 - expectedProb) / total);
+            var fracOk = Math.Abs(observedFrac - expectedProb) < sigma5 + 0.02;
+            var noDesperateLive = desperateCount == 0;
+
+            t2Ok = fracOk && noDesperateLive;
+            Console.WriteLine($"    freq={TestFreq}  expectedProb={expectedProb:F4}  observed={observedFrac:F4}  5σ={sigma5:F4}  fracOk={fracOk}");
+            Console.WriteLine($"    logLen={total}  Standard={standardCount}  None={noneCount}  Desperate={desperateCount}  noDesperate={noDesperateLive}");
+        }
+        catch (Exception ex) { t2Ok = false; Console.WriteLine($"  FAIL  (2) threw: {ex.Message}"); }
+        pass &= t2Ok;
+        Console.WriteLine($"  (2) {(t2Ok ? "ok" : "FAIL")}");
+
+        // ── (3) PressMode.None → exact config baseline ────────────────────────
+        Console.WriteLine("  (3) PressMode.None → exact config baseline:");
+        bool t3Ok;
+        try
+        {
+            var cfgA = RollAConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
+            var g    = BuildGame(even5, even5);
+            var gen  = new RollAGenerator(cfgA, cfgM, g);
+            var st   = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, PressMode: PressMode.None);
+
+            var d = gen.Generate(st, pressure: 0.0).Slices.ToDictionary(s => s.Outcome, s => s.Weight);
 
             var clOk = Math.Abs(d[EntryOutcome.CleanEntry]    - cfgA.BaseClean)         < Eps;
             var toOk = Math.Abs(d[EntryOutcome.Turnover]      - cfgA.BaseTurnover)      < Eps;
@@ -6655,262 +6740,332 @@ internal static class Program
             var ofOk = Math.Abs(d[EntryOutcome.OffensiveFoul] - cfgA.BaseOffensiveFoul) < Eps;
             var jbOk = Math.Abs(d[EntryOutcome.JumpBall]      - cfgA.BaseJumpBall)      < Eps;
 
-            aOk = clOk && toOk && dfOk && ofOk && jbOk;
-            Console.WriteLine($"    CleanEntry   ={d[EntryOutcome.CleanEntry]:F8}  want={cfgA.BaseClean:F8}  {(clOk?"OK":"FAIL")}");
-            Console.WriteLine($"    Turnover     ={d[EntryOutcome.Turnover]:F8}  want={cfgA.BaseTurnover:F8}  {(toOk?"OK":"FAIL")}");
-            Console.WriteLine($"    DefFoul      ={d[EntryOutcome.DefensiveFoul]:F8}  want={cfgA.BaseDefensiveFoul:F8}  {(dfOk?"OK":"FAIL")}");
-            Console.WriteLine($"    OffFoul      ={d[EntryOutcome.OffensiveFoul]:F8}  want={cfgA.BaseOffensiveFoul:F8}  {(ofOk?"OK":"FAIL")}");
-            Console.WriteLine($"    JumpBall     ={d[EntryOutcome.JumpBall]:F8}  want={cfgA.BaseJumpBall:F8}  {(jbOk?"OK":"FAIL")}");
+            t3Ok = clOk && toOk && dfOk && ofOk && jbOk;
+            Console.WriteLine($"    CleanEntry={d[EntryOutcome.CleanEntry]:F8}  want={cfgA.BaseClean:F8}  {(clOk?"OK":"FAIL")}");
+            Console.WriteLine($"    Turnover  ={d[EntryOutcome.Turnover]:F8}  want={cfgA.BaseTurnover:F8}  {(toOk?"OK":"FAIL")}");
+            Console.WriteLine($"    DefFoul   ={d[EntryOutcome.DefensiveFoul]:F8}  want={cfgA.BaseDefensiveFoul:F8}  {(dfOk?"OK":"FAIL")}");
+            Console.WriteLine($"    OffFoul   ={d[EntryOutcome.OffensiveFoul]:F8}  want={cfgA.BaseOffensiveFoul:F8}  {(ofOk?"OK":"FAIL")}");
+            Console.WriteLine($"    JumpBall  ={d[EntryOutcome.JumpBall]:F8}  want={cfgA.BaseJumpBall:F8}  {(jbOk?"OK":"FAIL")}");
         }
-        catch (Exception ex) { aOk = false; Console.WriteLine($"  FAIL  (a) threw: {ex.Message}"); }
-        pass &= aOk;
-        Console.WriteLine($"  (a) {(aOk ? "ok" : "FAIL")}");
+        catch (Exception ex) { t3Ok = false; Console.WriteLine($"  FAIL  (3) threw: {ex.Message}"); }
+        pass &= t3Ok;
+        Console.WriteLine($"  (3) {(t3Ok ? "ok" : "FAIL")}");
 
-        // ── (b) Press raises turnovers ────────────────────────────────────────
-        Console.WriteLine("  (b) Press raises TO — even matchup:");
-        bool bOk;
+        // ── (4) Standard pie shape ────────────────────────────────────────────
+        Console.WriteLine("  (4) Standard pie shape:");
+        bool t4Ok;
         try
         {
-            var g    = BuildGame(even5, even5);
-            var dLow = Split(cfgA, WithAwayPress(2.0), g, St());
-            var dNeut= Split(cfgA, cfgMatchup,          g, St());
-            var dHigh= Split(cfgA, WithAwayPress(9.0), g, St());
-            var toRise = dLow[EntryOutcome.Turnover] < dNeut[EntryOutcome.Turnover]
-                      && dNeut[EntryOutcome.Turnover] < dHigh[EntryOutcome.Turnover];
-            bOk = toRise;
-            Console.WriteLine($"    TO: p=2={dLow[EntryOutcome.Turnover]:F6}  p=5={dNeut[EntryOutcome.Turnover]:F6}  p=9={dHigh[EntryOutcome.Turnover]:F6}  rise={toRise}");
-        }
-        catch (Exception ex) { bOk = false; Console.WriteLine($"  FAIL  (b) threw: {ex.Message}"); }
-        pass &= bOk;
-        Console.WriteLine($"  (b) {(bOk ? "ok" : "FAIL")}");
+            var cfgA = RollAConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
+            const int Gap = 20;
+            var actionMass = cfgA.BaseClean + cfgA.BaseTurnover
+                           + cfgA.BaseOffensiveFoul + cfgA.BaseDefensiveFoul;
 
-        // ── (c) Press raises defensive fouls ─────────────────────────────────
-        Console.WriteLine("  (c) Press raises DefFoul:");
-        bool cOk;
-        try
-        {
-            var g    = BuildGame(even5, even5);
-            var fLow = Split(cfgA, WithAwayPress(2.0), g, St())[EntryOutcome.DefensiveFoul];
-            var fNeut= Split(cfgA, cfgMatchup,          g, St())[EntryOutcome.DefensiveFoul];
-            var fHigh= Split(cfgA, WithAwayPress(9.0), g, St())[EntryOutcome.DefensiveFoul];
-            cOk = fLow < fNeut && fNeut < fHigh;
-            Console.WriteLine($"    DF: p=2={fLow:F6}  p=5={fNeut:F6}  p=9={fHigh:F6}  rise={cOk}");
-        }
-        catch (Exception ex) { cOk = false; Console.WriteLine($"  FAIL  (c) threw: {ex.Message}"); }
-        pass &= cOk;
-        Console.WriteLine($"  (c) {(cOk ? "ok" : "FAIL")}");
-
-        // ── (d) Press raises offensive fouls ─────────────────────────────────
-        Console.WriteLine("  (d) Press raises OffFoul:");
-        bool dOk;
-        try
-        {
-            var g    = BuildGame(even5, even5);
-            var oLow = Split(cfgA, WithAwayPress(2.0), g, St())[EntryOutcome.OffensiveFoul];
-            var oNeut= Split(cfgA, cfgMatchup,          g, St())[EntryOutcome.OffensiveFoul];
-            var oHigh= Split(cfgA, WithAwayPress(9.0), g, St())[EntryOutcome.OffensiveFoul];
-            dOk = oLow < oNeut && oNeut < oHigh;
-            Console.WriteLine($"    OF: p=2={oLow:F6}  p=5={oNeut:F6}  p=9={oHigh:F6}  rise={dOk}");
-        }
-        catch (Exception ex) { dOk = false; Console.WriteLine($"  FAIL  (d) threw: {ex.Message}"); }
-        pass &= dOk;
-        Console.WriteLine($"  (d) {(dOk ? "ok" : "FAIL")}");
-
-        // ── (e) OffFoul stays well below DefFoul at every press level ─────────
-        Console.WriteLine("  (e) OffFoul < DefFoul at every press level:");
-        bool eOk = true;
-        try
-        {
-            var g = BuildGame(even5, even5);
-            foreach (var p in new[] { 1.0, 2.0, 5.0, 7.0, 9.0, 10.0 })
+            // Helper: build pie with PressMode.Standard for a given game.
+            Dictionary<EntryOutcome, double> StdSplit(GameState gg)
             {
-                var d   = Split(cfgA, WithAwayPress(p), g, St());
-                var ok2 = d[EntryOutcome.OffensiveFoul] < d[EntryOutcome.DefensiveFoul];
-                eOk &= ok2;
-                Console.WriteLine($"    p={p}: OF={d[EntryOutcome.OffensiveFoul]:F6}  DF={d[EntryOutcome.DefensiveFoul]:F6}  OF<DF={ok2}");
+                var gen = new RollAGenerator(cfgA, cfgM, gg);
+                var st  = new PossessionState(
+                    PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                    Entry: EntryType.DeadBallInbound, PressMode: PressMode.Standard);
+                return gen.Generate(st, pressure: 0.0)
+                          .Slices.ToDictionary(s => s.Outcome, s => s.Weight);
             }
-        }
-        catch (Exception ex) { eOk = false; Console.WriteLine($"  FAIL  (e) threw: {ex.Message}"); }
-        pass &= eOk;
-        Console.WriteLine($"  (e) {(eOk ? "ok" : "FAIL")}");
 
-        // ── (f) Cap/overflow sanity ───────────────────────────────────────────
-        Console.WriteLine("  (f) Cap holds at max press + worst matchup; CleanEntry > 0:");
-        bool fOk;
+            // 4a: even agg — StandardLift lifts all three arms above baseline
+            var dEven   = StdSplit(BuildGame(even5, even5));
+            var toAbove = dEven[EntryOutcome.Turnover]      / actionMass > cfgA.BaseTurnover      / actionMass;
+            var dfAbove = dEven[EntryOutcome.DefensiveFoul] / actionMass > cfgA.BaseDefensiveFoul / actionMass;
+            var ofAbove = dEven[EntryOutcome.OffensiveFoul] / actionMass > cfgA.BaseOffensiveFoul / actionMass;
+            Console.WriteLine($"    (4a) StandardLift lifts: TO={toAbove}  DF={dfAbove}  OF={ofAbove}");
+
+            // 4b: per-axis: each gap lifts TO; size produces smallest lift
+            var toEven  = dEven[EntryOutcome.Turnover];
+            var toSkill = StdSplit(BuildGame(
+                new[] { Mk(50,bh:50-Gap), Mk(50,bh:50-Gap), Mk(50,bh:50-Gap), Mk(50,bh:50-Gap), Mk(50,bh:50-Gap) },
+                new[] { Mk(50,st:50+Gap), Mk(50,st:50+Gap), Mk(50,st:50+Gap), Mk(50,st:50+Gap), Mk(50,st:50+Gap) }
+            ))[EntryOutcome.Turnover];
+            var toAth = StdSplit(BuildGame(
+                new[] { Mk(50,ath:50-Gap), Mk(50,ath:50-Gap), Mk(50,ath:50-Gap), Mk(50,ath:50-Gap), Mk(50,ath:50-Gap) },
+                new[] { Mk(50,ath:50+Gap), Mk(50,ath:50+Gap), Mk(50,ath:50+Gap), Mk(50,ath:50+Gap), Mk(50,ath:50+Gap) }
+            ))[EntryOutcome.Turnover];
+            var toSz = StdSplit(BuildGame(
+                new[] { Mk(50,len:50-Gap), Mk(50,len:50-Gap), Mk(50,len:50-Gap), Mk(50,len:50-Gap), Mk(50,len:50-Gap) },
+                new[] { Mk(50,len:50+Gap), Mk(50,len:50+Gap), Mk(50,len:50+Gap), Mk(50,len:50+Gap), Mk(50,len:50+Gap) }
+            ))[EntryOutcome.Turnover];
+
+            var skillLifts   = toSkill > toEven;
+            var athLifts     = toAth   > toEven;
+            var sizeLifts    = toSz    > toEven;
+            var sizeSmallest = (toSz - toEven) < (toAth - toEven) && (toSz - toEven) < (toSkill - toEven);
+            Console.WriteLine($"    (4b) even={toEven:F6}  +skill={toSkill-toEven:F6}lifts={skillLifts}  +ath={toAth-toEven:F6}lifts={athLifts}  +sz={toSz-toEven:F6}lifts={sizeLifts}  szSmallest={sizeSmallest}");
+
+            // 4c: OffFoul < DefFoul at even
+            var ofLtDf = dEven[EntryOutcome.OffensiveFoul] < dEven[EntryOutcome.DefensiveFoul];
+            Console.WriteLine($"    (4c) OffFoul<DefFoul: {ofLtDf}  ({dEven[EntryOutcome.OffensiveFoul]:F6} < {dEven[EntryOutcome.DefensiveFoul]:F6})");
+
+            // 4d: ceilings hold at worst matchup; CleanEntry > 0
+            var offWeak  = new[] { Mk(50,bh:1,st:1,ath:1,len:1), Mk(50,bh:1,st:1,ath:1,len:1),
+                                    Mk(50,bh:1,st:1,ath:1,len:1), Mk(50,bh:1,st:1,ath:1,len:1), Mk(50,bh:1,st:1,ath:1,len:1) };
+            var defElite = new[] { Mk(50,bh:99,st:99,ath:99,len:99), Mk(50,bh:99,st:99,ath:99,len:99),
+                                    Mk(50,bh:99,st:99,ath:99,len:99), Mk(50,bh:99,st:99,ath:99,len:99), Mk(50,bh:99,st:99,ath:99,len:99) };
+            var dWorst  = StdSplit(BuildGame(offWeak, defElite));
+            var toShare = dWorst[EntryOutcome.Turnover]      / actionMass;
+            var dfShare = dWorst[EntryOutcome.DefensiveFoul] / actionMass;
+            var ofShare = dWorst[EntryOutcome.OffensiveFoul] / actionMass;
+            var capTO   = toShare <= cfgM.StandardTurnoverCeiling  + Eps;
+            var capDF   = dfShare <= cfgM.StandardDefFoulCeiling   + Eps;
+            var capOF   = ofShare <= cfgM.StandardOffFoulCeiling   + Eps;
+            var cleanOk = dWorst[EntryOutcome.CleanEntry] > 0.0;
+            Console.WriteLine($"    (4d) worst: TO={toShare:F4}<={cfgM.StandardTurnoverCeiling}={capTO}  DF={dfShare:F4}<={cfgM.StandardDefFoulCeiling}={capDF}  OF={ofShare:F4}<={cfgM.StandardOffFoulCeiling}={capOF}  cleanPos={cleanOk}");
+
+            // 4e: five arms sum to 1; JumpBall exactly flat
+            var sumEven = dEven.Values.Sum();
+            var sumOk   = Math.Abs(sumEven - 1.0) < Eps;
+            var jbOk    = Math.Abs(dEven[EntryOutcome.JumpBall] - cfgA.BaseJumpBall) < Eps;
+            Console.WriteLine($"    (4e) sum={sumEven:F12}={sumOk}  JumpBall={dEven[EntryOutcome.JumpBall]:F10}=base={jbOk}");
+
+            t4Ok = toAbove && dfAbove && ofAbove
+                && skillLifts && athLifts && sizeLifts && sizeSmallest
+                && ofLtDf
+                && capTO && capDF && capOF && cleanOk
+                && sumOk && jbOk;
+        }
+        catch (Exception ex) { t4Ok = false; Console.WriteLine($"  FAIL  (4) threw: {ex.Message}"); }
+        pass &= t4Ok;
+        Console.WriteLine($"  (4) {(t4Ok ? "ok" : "FAIL")}");
+
+        // ── (5) Frontcourt=true gates Standard → exact baseline ────────────────
+        Console.WriteLine("  (5) Frontcourt=true gates Standard (high-freq, worst matchup):");
+        bool t5Ok;
         try
         {
-            var offWeak  = new[] { Mk(50, bh:1, st:1, ath:1, len:1), Mk(50, bh:1, st:1, ath:1, len:1),
-                                   Mk(50, bh:1, st:1, ath:1, len:1), Mk(50, bh:1, st:1, ath:1, len:1),
-                                   Mk(50, bh:1, st:1, ath:1, len:1) };
-            var defElite = new[] { Mk(50, bh:99, st:99, ath:99, len:99), Mk(50, bh:99, st:99, ath:99, len:99),
-                                   Mk(50, bh:99, st:99, ath:99, len:99), Mk(50, bh:99, st:99, ath:99, len:99),
-                                   Mk(50, bh:99, st:99, ath:99, len:99) };
-            var g   = BuildGame(offWeak, defElite);
-            var d   = Split(cfgA, WithAwayPress(10.0), g, St());
-            var toShare  = d[EntryOutcome.Turnover]      / actionMass;
-            var dfShare  = d[EntryOutcome.DefensiveFoul] / actionMass;
-            var ofShare  = d[EntryOutcome.OffensiveFoul] / actionMass;
-            var capTO    = toShare  <= cfgMatchup.RollATurnoverCeiling  + Eps;
-            var capDF    = dfShare  <= cfgMatchup.RollADefFoulCeiling   + Eps;
-            var capOF    = ofShare  <= cfgMatchup.RollAOffFoulCeiling   + Eps;
-            var cleanPos = d[EntryOutcome.CleanEntry] > 0.0;
-            fOk = capTO && capDF && capOF && cleanPos;
-            Console.WriteLine($"    TO share={toShare:F6}  ceiling={cfgMatchup.RollATurnoverCeiling}  capped={capTO}");
-            Console.WriteLine($"    DF share={dfShare:F6}  ceiling={cfgMatchup.RollADefFoulCeiling}  capped={capDF}");
-            Console.WriteLine($"    OF share={ofShare:F6}  ceiling={cfgMatchup.RollAOffFoulCeiling}  capped={capOF}");
-            Console.WriteLine($"    CleanEntry > 0: {cleanPos}");
-        }
-        catch (Exception ex) { fOk = false; Console.WriteLine($"  FAIL  (f) threw: {ex.Message}"); }
-        pass &= fOk;
-        Console.WriteLine($"  (f) {(fOk ? "ok" : "FAIL")}");
+            var cfgA = RollAConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
+            cfgM.AwayPressFrequency = 10.0;
 
-        // ── (g) JumpBall exactly flat off-neutral — the key assertion ─────────
-        // This is the stronger test: if the generator renormalized all five arms,
-        // JumpBall would shrink when the other arms rise. It must stay exactly flat.
-        Console.WriteLine("  (g) JumpBall exactly flat off-neutral (catches all-five renorm):");
-        bool gOk = true;
-        try
-        {
-            var g = BuildGame(even5, even5);
-            var cases = new (string label, MatchupConfig cfg, bool fc)[]
-            {
-                ("p=2 fc=false", WithAwayPress(2.0), false),
-                ("p=5 fc=false", cfgMatchup,          false),
-                ("p=9 fc=false", WithAwayPress(9.0), false),
-                ("p=9 fc=true",  WithAwayPress(9.0), true ),
-            };
-            foreach (var (label, cfg, fc) in cases)
-            {
-                var d   = Split(cfgA, cfg, g, St(frontcourt: fc));
-                var jbOk = Math.Abs(d[EntryOutcome.JumpBall] - cfgA.BaseJumpBall) < Eps;
-                gOk &= jbOk;
-                Console.WriteLine($"    {label,-18}  JumpBall={d[EntryOutcome.JumpBall]:F10}  flat={jbOk}");
-            }
-        }
-        catch (Exception ex) { gOk = false; Console.WriteLine($"  FAIL  (g) threw: {ex.Message}"); }
-        pass &= gOk;
-        Console.WriteLine($"  (g) {(gOk ? "ok" : "FAIL")}");
-
-        // ── (h) Five arms sum to 1 ────────────────────────────────────────────
-        Console.WriteLine("  (h) Five arms sum to 1:");
-        bool hOk = true;
-        try
-        {
-            var g = BuildGame(even5, even5);
-            foreach (var p in new[] { 2.0, 5.0, 9.0 })
-            {
-                var d   = Split(cfgA, WithAwayPress(p), g, St());
-                var sum = d.Values.Sum();
-                var ok2 = Math.Abs(sum - 1.0) < Eps;
-                hOk &= ok2;
-                Console.WriteLine($"    p={p}: sum={sum:F12}  ok={ok2}");
-            }
-        }
-        catch (Exception ex) { hOk = false; Console.WriteLine($"  FAIL  (h) threw: {ex.Message}"); }
-        pass &= hOk;
-        Console.WriteLine($"  (h) {(hOk ? "ok" : "FAIL")}");
-
-        // ── (i) Frontcourt=true returns exact baseline ────────────────────────
-        // The press is irrelevant once the offense has crossed half. High press +
-        // worst matchup + Frontcourt=true MUST still equal baseline exactly.
-        Console.WriteLine("  (i) Frontcourt=true gates press — returns exact baseline:");
-        bool iOk;
-        try
-        {
             var offWeak  = new[] { Mk(1), Mk(1), Mk(1), Mk(1), Mk(1) };
             var defElite = new[] { Mk(99), Mk(99), Mk(99), Mk(99), Mk(99) };
-            var g = BuildGame(offWeak, defElite);
-            var d = Split(cfgA, WithAwayPress(10.0), g, St(frontcourt: true));
+            var g   = BuildGame(offWeak, defElite);
+            var gen = new RollAGenerator(cfgA, cfgM, g);
+            var st  = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                Frontcourt: true, PressMode: PressMode.Standard);
+
+            var d = gen.Generate(st, pressure: 0.0).Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+
             var clOk = Math.Abs(d[EntryOutcome.CleanEntry]    - cfgA.BaseClean)         < Eps;
             var toOk = Math.Abs(d[EntryOutcome.Turnover]      - cfgA.BaseTurnover)      < Eps;
             var dfOk = Math.Abs(d[EntryOutcome.DefensiveFoul] - cfgA.BaseDefensiveFoul) < Eps;
             var ofOk = Math.Abs(d[EntryOutcome.OffensiveFoul] - cfgA.BaseOffensiveFoul) < Eps;
             var jbOk = Math.Abs(d[EntryOutcome.JumpBall]      - cfgA.BaseJumpBall)      < Eps;
-            iOk = clOk && toOk && dfOk && ofOk && jbOk;
-            Console.WriteLine($"    CleanEntry  match={clOk}  Turnover match={toOk}  " +
-                              $"DefFoul match={dfOk}  OffFoul match={ofOk}  JumpBall match={jbOk}");
-        }
-        catch (Exception ex) { iOk = false; Console.WriteLine($"  FAIL  (i) threw: {ex.Message}"); }
-        pass &= iOk;
-        Console.WriteLine($"  (i) {(iOk ? "ok" : "FAIL")}");
 
-        // ── (j) SelectedSlot-blind (Roll A is pre-selection) ─────────────────
-        Console.WriteLine("  (j) SelectedSlot-blind — null vs stamped slot gives identical pie:");
-        bool jOk;
+            t5Ok = clOk && toOk && dfOk && ofOk && jbOk;
+            Console.WriteLine($"    CL={clOk}  TO={toOk}  DF={dfOk}  OF={ofOk}  JB={jbOk}  (all must be true)");
+        }
+        catch (Exception ex) { t5Ok = false; Console.WriteLine($"  FAIL  (5) threw: {ex.Message}"); }
+        pass &= t5Ok;
+        Console.WriteLine($"  (5) {(t5Ok ? "ok" : "FAIL")}");
+
+        // ── (6) SelectedSlot-blind — null vs stamped slot gives identical pie ──
+        Console.WriteLine("  (6) SelectedSlot-blind (Standard: null vs stamped slot):");
+        bool t6Ok;
         try
         {
-            var g        = BuildGame(even5, even5);
-            var dNull    = Split(cfgA, WithAwayPress(9.0), g, St(slot: null));
-            var dStamped = Split(cfgA, WithAwayPress(9.0), g, St(slot: g.HomeLineup.SlotAt(1)));
-            var allMatch = dNull.Keys.All(k => Math.Abs(dNull[k] - dStamped[k]) < Eps);
-            jOk = allMatch;
+            var cfgA = RollAConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
+            var g    = BuildGame(even5, even5);
+            var gen  = new RollAGenerator(cfgA, cfgM, g);
+
+            var stNull = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, PressMode: PressMode.Standard);
+            var stSlot = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, PressMode: PressMode.Standard,
+                SelectedSlot: g.HomeLineup.SlotAt(1));
+
+            var dNull = gen.Generate(stNull, pressure: 0.0).Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+            var dSlot = gen.Generate(stSlot, pressure: 0.0).Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+
+            var allMatch = dNull.Keys.All(k => Math.Abs(dNull[k] - dSlot[k]) < Eps);
+            t6Ok = allMatch;
             Console.WriteLine($"    null slot vs stamped slot → identical pie: {(allMatch?"OK":"FAIL")}");
         }
-        catch (Exception ex) { jOk = false; Console.WriteLine($"  FAIL  (j) threw: {ex.Message}"); }
-        pass &= jOk;
-        Console.WriteLine($"  (j) {(jOk ? "ok" : "FAIL")}");
+        catch (Exception ex) { t6Ok = false; Console.WriteLine($"  FAIL  (6) threw: {ex.Message}"); }
+        pass &= t6Ok;
+        Console.WriteLine($"  (6) {(t6Ok ? "ok" : "FAIL")}");
 
-        // ── (k) Per-axis wiring: each gap moves TO when varied alone ─────────
-        // Hold two axes even at 50; vary the third (defense advantage → more TO).
-        // Also confirms size produces the smallest movement of the three.
-        Console.WriteLine("  (k) Per-axis generator wiring + size-smallest (press=9):");
-        bool kOk;
+        // ── (7) PressMode threads through re-inbounds ─────────────────────────
+        // Route a ResumeInbound/ResolveSidelineInbound Continue directly — the spy
+        // records which PressMode c.State carries. This directly verifies that the
+        // stamp placed in RunPossession survives every `with` in the chain.
+        Console.WriteLine("  (7) PressMode threads through ResumeInbound and ResolveSidelineInbound:");
+        bool t7Ok;
         try
         {
-            const int Gap = 20;   // same 20-pt gap for all three axes
-            var cfgHigh = WithAwayPress(9.0);
+            var cfgA = RollAConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
 
-            // Baseline: all 50, all three axes even
-            var gEven = BuildGame(
-                new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) },
-                new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) });
-            var toEven = Split(cfgA, cfgHigh, gEven, St())[EntryOutcome.Turnover];
+            var fixedPie = new Pie<EntryOutcome>(
+                new Dictionary<EntryOutcome, double>
+                {
+                    [EntryOutcome.CleanEntry]    = cfgA.BaseClean,
+                    [EntryOutcome.Turnover]      = cfgA.BaseTurnover,
+                    [EntryOutcome.DefensiveFoul] = cfgA.BaseDefensiveFoul,
+                    [EntryOutcome.OffensiveFoul] = cfgA.BaseOffensiveFoul,
+                    [EntryOutcome.JumpBall]      = cfgA.BaseJumpBall,
+                }, cfgA.Epsilon);
 
-            // (a) Skill only: def Steals=50+Gap, off BH=50-Gap; ath+size both even
-            var gSkill = BuildGame(
-                new[] { Mk(50, bh: 50-Gap), Mk(50, bh: 50-Gap), Mk(50, bh: 50-Gap),
-                        Mk(50, bh: 50-Gap), Mk(50, bh: 50-Gap) },
-                new[] { Mk(50, st: 50+Gap), Mk(50, st: 50+Gap), Mk(50, st: 50+Gap),
-                        Mk(50, st: 50+Gap), Mk(50, st: 50+Gap) });
-            var toSkill = Split(cfgA, cfgHigh, gSkill, St())[EntryOutcome.Turnover];
-            var skillLifts = toSkill > toEven;
+            var spy  = new PressModeSpyGenerator(fixedPie);
+            var game = new GameState(new FoulTracker(7, 10));
+            var rng  = new SystemRng(42);
 
-            // (b) Athleticism only: def ath=50+Gap, off ath=50-Gap; skill+size even
-            var gAth = BuildGame(
-                new[] { Mk(50, ath: 50-Gap), Mk(50, ath: 50-Gap), Mk(50, ath: 50-Gap),
-                        Mk(50, ath: 50-Gap), Mk(50, ath: 50-Gap) },
-                new[] { Mk(50, ath: 50+Gap), Mk(50, ath: 50+Gap), Mk(50, ath: 50+Gap),
-                        Mk(50, ath: 50+Gap), Mk(50, ath: 50+Gap) });
-            var toAth = Split(cfgA, cfgHigh, gAth, St())[EntryOutcome.Turnover];
-            var athLifts = toAth > toEven;
+            var resolver = new Resolver(
+                spy,
+                cfgA,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM,
+                game,
+                rng);
 
-            // (c) Size only: def len=50+Gap, off len=50-Gap; skill+ath even
-            var gSz = BuildGame(
-                new[] { Mk(50, len: 50-Gap), Mk(50, len: 50-Gap), Mk(50, len: 50-Gap),
-                        Mk(50, len: 50-Gap), Mk(50, len: 50-Gap) },
-                new[] { Mk(50, len: 50+Gap), Mk(50, len: 50+Gap), Mk(50, len: 50+Gap),
-                        Mk(50, len: 50+Gap), Mk(50, len: 50+Gap) });
-            var toSz = Split(cfgA, cfgHigh, gSz, St())[EntryOutcome.Turnover];
-            var sizeLifts = toSz > toEven;
+            // State stamped Standard; state stamped None.
+            var stStd  = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                             Entry: EntryType.DeadBallInbound, PressMode: PressMode.Standard);
+            var stNone = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                             Entry: EntryType.DeadBallInbound, PressMode: PressMode.None);
 
-            // (d) Size produces smallest movement
-            var skillDelta = toSkill - toEven;
-            var athDelta   = toAth   - toEven;
-            var szDelta    = toSz    - toEven;
-            var sizeSmallest = szDelta < athDelta && szDelta < skillDelta;
+            // 7a: ResumeInbound with Standard — spy must record Standard on every call
+            spy.Log.Clear();
+            resolver.Route(new Continue(ContinuationKind.ResumeInbound, stStd));
+            var resumeStdOk = spy.Log.Count > 0 && spy.Log.All(m => m == PressMode.Standard);
 
-            kOk = skillLifts && athLifts && sizeLifts && sizeSmallest;
-            Console.WriteLine($"    even TO={toEven:F6}");
-            Console.WriteLine($"    (a) skill-only  TO={toSkill:F6}  Δ={skillDelta:F6}  lifts={skillLifts}");
-            Console.WriteLine($"    (b) ath-only    TO={toAth:F6}  Δ={athDelta:F6}  lifts={athLifts}");
-            Console.WriteLine($"    (c) size-only   TO={toSz:F6}  Δ={szDelta:F6}  lifts={sizeLifts}");
-            Console.WriteLine($"    (d) size produces smallest Δ: {sizeSmallest}");
+            // 7b: ResumeInbound with None — spy must record None on every call
+            spy.Log.Clear();
+            resolver.Route(new Continue(ContinuationKind.ResumeInbound, stNone));
+            var resumeNoneOk = spy.Log.Count > 0 && spy.Log.All(m => m == PressMode.None);
+
+            // 7c: ResolveSidelineInbound with Standard — same proof, different arm
+            spy.Log.Clear();
+            resolver.Route(new Continue(ContinuationKind.ResolveSidelineInbound, stStd));
+            var sidelineStdOk = spy.Log.Count > 0 && spy.Log.All(m => m == PressMode.Standard);
+
+            t7Ok = resumeStdOk && resumeNoneOk && sidelineStdOk;
+            Console.WriteLine($"    ResumeInbound(Standard)         → all spy entries Standard: {resumeStdOk}");
+            Console.WriteLine($"    ResumeInbound(None)             → all spy entries None:     {resumeNoneOk}");
+            Console.WriteLine($"    ResolveSidelineInbound(Standard)→ all spy entries Standard: {sidelineStdOk}");
         }
-        catch (Exception ex) { kOk = false; Console.WriteLine($"  FAIL  (k) threw: {ex.Message}"); }
-        pass &= kOk;
-        Console.WriteLine($"  (k) {(kOk ? "ok" : "FAIL")}");
+        catch (Exception ex) { t7Ok = false; Console.WriteLine($"  FAIL  (7) threw: {ex.Message}"); }
+        pass &= t7Ok;
+        Console.WriteLine($"  (7) {(t7Ok ? "ok" : "FAIL")}");
 
-        Console.WriteLine(pass ? "  Phase 14 PASSED." : "  Phase 14 FAILED.");
+        // ── (8) Desperate fail-loud — reserved, must never be produced live ────
+        Console.WriteLine("  (8) Desperate fail-loud:");
+        bool t8Ok;
+        try
+        {
+            var cfgA = RollAConfig.Load(configPath);
+            var cfgM = MatchupConfig.Load(configPath);
+            var g    = BuildGame(even5, even5);
+            var gen  = new RollAGenerator(cfgA, cfgM, g);
+
+            // 8a: stamping Desperate and calling Generate must throw
+            var stDesp = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, PressMode: PressMode.Desperate);
+            bool threwOk;
+            try
+            {
+                gen.Generate(stDesp, pressure: 0.0);
+                threwOk = false;   // should have thrown
+            }
+            catch (InvalidOperationException) { threwOk = true; }
+            catch { threwOk = false; }
+
+            // 8b: the live path (low frequency → RunPossession) never produces Desperate.
+            // Use the spy over N possessions and assert desperateCount == 0 (verified in (2) above,
+            // re-confirmed here for clarity).
+            var cfgA2 = RollAConfig.Load(configPath);
+            var cfgM2 = MatchupConfig.Load(configPath);
+            var safePie2 = new Pie<EntryOutcome>(
+                new Dictionary<EntryOutcome, double>
+                {
+                    [EntryOutcome.CleanEntry]    = cfgA2.BaseClean,
+                    [EntryOutcome.Turnover]      = cfgA2.BaseTurnover,
+                    [EntryOutcome.DefensiveFoul] = cfgA2.BaseDefensiveFoul,
+                    [EntryOutcome.OffensiveFoul] = cfgA2.BaseOffensiveFoul,
+                    [EntryOutcome.JumpBall]      = cfgA2.BaseJumpBall,
+                }, cfgA2.Epsilon);
+            var spy2  = new PressModeSpyGenerator(safePie2);
+            var game2 = new GameState(new FoulTracker(7, 10));
+            var rng2  = new SystemRng(cfgA2.Seed);
+            var res2  = new Resolver(
+                spy2, cfgA2,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgM2, game2, rng2);
+            var st2 = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home,
+                         Defense: TeamSide.Away, Entry: EntryType.DeadBallInbound);
+            for (var i = 0; i < 1000; i++) res2.RunPossession(st2);
+            var noDesperateLive = spy2.Log.All(m => m != PressMode.Desperate);
+
+            t8Ok = threwOk && noDesperateLive;
+            Console.WriteLine($"    Desperate stamp → Generate throws InvalidOperationException: {threwOk}");
+            Console.WriteLine($"    Live RunPossession (1000×) never produces Desperate:         {noDesperateLive}");
+        }
+        catch (Exception ex) { t8Ok = false; Console.WriteLine($"  FAIL  (8) threw: {ex.Message}"); }
+        pass &= t8Ok;
+        Console.WriteLine($"  (8) {(t8Ok ? "ok" : "FAIL")}");
+
+        Console.WriteLine(pass ? "  Phase 15 PASSED." : "  Phase 15 FAILED.");
         return pass;
+    }
+
+    /// <summary>
+    /// Spy implementation of <see cref="IRollAPieGenerator"/> for Phase 15 testing.
+    /// Records every <see cref="PossessionState.PressMode"/> it receives (proving
+    /// the Resolver stamped BEFORE calling Generate), then returns a caller-supplied
+    /// fixed pie. Injected in place of <see cref="RollAGenerator"/> so the press
+    /// roll can be observed directly without inferring it from possession outcomes.
+    /// </summary>
+    private sealed class PressModeSpyGenerator : IRollAPieGenerator
+    {
+        private readonly Pie<EntryOutcome> _fixedPie;
+        public readonly List<PressMode> Log = new();
+
+        public PressModeSpyGenerator(Pie<EntryOutcome> fixedPie) => _fixedPie = fixedPie;
+
+        public Pie<EntryOutcome> Generate(PossessionState state, double pressure)
+        {
+            Log.Add(state.PressMode);
+            return _fixedPie;
+        }
     }
 }
