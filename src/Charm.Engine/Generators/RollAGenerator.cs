@@ -130,11 +130,16 @@ public sealed class RollAGenerator : IRollAPieGenerator
             return FlatBaseline();
 
         // ── Slot-weighted team aggregates ────────────────────────────────────
-        // Offense: weighted BallHandling (guards dominate — slot 1 = 35%).
-        // Defense: weighted Steals (same guard-heavy weights).
+        // Six aggregates cover the three gap terms: BallHandling vs. Steals (skill),
+        // Athleticism composite vs. Athleticism (physical), LengthRating vs. LengthRating (size).
+        // All use the same guard-heavy weights [0.35, 0.25, 0.20, 0.12, 0.08].
         // Same DQ2 Option B resolution as Phase 13 (Roll B).
-        var offHandling = WeightedAggregate(offPlayers, p => p.BallHandling);
-        var defStealers = WeightedAggregate(defPlayers, p => p.Steals);
+        var offHandling  = WeightedAggregate(offPlayers, p => p.BallHandling);
+        var defStealers  = WeightedAggregate(defPlayers, p => p.Steals);
+        var offAthletic  = WeightedAggregate(offPlayers, p => p.Athleticism);
+        var defAthletic  = WeightedAggregate(defPlayers, p => p.Athleticism);
+        var offLength    = WeightedAggregate(offPlayers, p => Matchup.LengthRating(p, _matchup));
+        var defLength    = WeightedAggregate(defPlayers, p => Matchup.LengthRating(p, _matchup));
 
         // ── Full-court press for the DEFENDING team ──────────────────────────
         // Distinct from the halfcourt pressure dial (PressureFor) used by Roll B/F.
@@ -156,7 +161,10 @@ public sealed class RollAGenerator : IRollAPieGenerator
         // ── Four-way disruption shares (three bends) ─────────────────────────
         var (finalToShare, finalDefFoulShare, finalOffFoulShare) =
             Matchup.EntryDisruptionShares(
-                offHandling, defStealers, fullCourtPress,
+                offHandling, defStealers,
+                offAthletic, defAthletic,
+                offLength, defLength,
+                fullCourtPress,
                 baseTurnoverShare, baseDefFoulShare, baseOffFoulShare,
                 _matchup);
 

@@ -3939,3 +3939,66 @@ The Roll A section above (the "Pie shape: seven slices" block) describes the pre
 **The foul split.** The old single `Foul` slice became two: `OffensiveFoul` (charge / illegal screen → offensive-foul resolution: deterministic dead-ball loss to the defense, no free throws, no bonus) and `DefensiveFoul` (reach-in / bump on the ball-handler → Roll D, which charges the team foul and forks on the bonus).
 
 See the Contextification #6 design entry for full rationale and wiring details.
+
+---
+
+## Phase 14 — Full-court press disruption door (Roll A, backcourt entry)
+
+### What this phase is and is not
+
+Phase 14 wires the **disruption face** of full-court press on Roll A — the moment the offense is still bringing the ball up the floor. The press bends Roll A's pie toward more turnovers and more fouls. It is the third sibling of the disruption door family: Roll F (Phase 12, individual player vs. defender, halfcourt) and Roll B (Phase 13, team aggregate, halfcourt) are the existing siblings.
+
+**What it is not.** The press-break → transition face — when the offense beats the press and gets a high-quality transition look the other way — is the reward side of pressing. It lives in the transition machinery (`FastBreak` / transition path) and is deferred to its own next session. No hooks, no stubs for that face exist in this phase.
+
+### The confirmed design
+
+**Two independent dials.** Roll B and Roll F read `HomePressure` / `AwayPressure` — how hard the defense guards in the halfcourt. Roll A reads `HomeFullCourtPress` / `AwayFullCourtPress` — the distinct, independent tactical decision to press the full court. A team can press full-court then fall back into a halfcourt zone: the two dials are independent. `FullCourtPressFor(state.Defense)` is the only Roll A read site; migrating to per-team `CoachProfile` fields changes only that one call.
+
+**The turnover slice — three gaps, additively composed.** Like `EffectiveRating` (Phase 6), the disruption effect composes additively. A baseline set by how hard the team presses, plus three weighted gap terms:
+
+1. **Skill gap**: slot-weighted `Steals` (defense) − `BallHandling` (offense). `GapFn` with SKILL steepness/exponent. Same axis as Roll B.
+2. **Athleticism gap**: slot-weighted `Athleticism` composite (defense) − offense. `GapFn` with PHYSICAL steepness/exponent.
+3. **Size gap**: slot-weighted `LengthRating` composite (defense) − offense. `GapFn` with PHYSICAL steepness/exponent. Weight is smallest of the three.
+
+Formula: `disruptionShift = pressureLift + pressureGate × (skillWeight·skillShift + athWeight·athShift + sizeWeight·sizeShift)`. The gate is `max(0, pUnit)`, so backed off, all three gaps stop mattering and the TO rate sits at the press-only baseline.
+
+Basketball intent: a big, skilled, athletic backcourt against a small, slow, low-steal press drives turnovers toward the floor (the press gets burned). A long, quick, ball-hawking press against shaky guards drives them toward the ceiling. Size matters, but least of the three, and it is symmetric (a rangy press forces more; a big backcourt coughs up fewer).
+
+**Both foul slices are press-only.** `DefensiveFoul` (reach-ins) and `OffensiveFoul` (charges / player-control fouls) track defensive aggression, not who is on the floor. No gap terms. `OffensiveFoul` ceiling is set low (≈15% of DefFoul ceiling): backcourt player-control fouls are rare. Both use `FullCourtPressReferenceShift` for tanh saturation.
+
+**Separate saturation constant.** `EntryDisruptionShares` uses `cfg.FullCourtPressReferenceShift` — NOT `cfg.PressureReferenceShift` (halfcourt). This is a named architectural choice: the two dials are fully independent, so neither the normalization (same `PressureNeutral` / `PressureScale`, since both are 1–10 dials) nor the saturation speed of full-court press is coupled to halfcourt. A future calibration pass can tune them independently.
+
+**Action-mass normalization.** `actionMass = BaseClean + BaseTurnover + BaseOffensiveFoul + BaseDefensiveFoul = 0.99`. Shares are normalized over `actionMass` before entering `EntryDisruptionShares`, then multiplied back out. `JumpBall` is pinned outside the action mass at `BaseJumpBall` exactly — it is NOT subject to the bend, NOT renormalized, and does NOT shrink when disruption rises. `CleanEntry` absorbs the complement of the three bent shares within the action mass.
+
+**Court-state gating.** Roll A fires at three moments:
+- Initial dead-ball entry: `Frontcourt = false` → full press + matchup computation runs.
+- `ResumeInbound`: carries current `Frontcourt`; may be either.
+- `SidelineInbound` post-crossing: always `Frontcourt = true` → `FlatBaseline()` returned immediately.
+
+When `Frontcourt = true`, the offense has already crossed half — the full-court press is irrelevant. The generator returns the flat config baseline without reading the dial or the rosters. This is the reason court-state is checked first, before the roster read.
+
+**Why team aggregate, not per-player.** Roll A runs before player selection (Roll E). `PossessionState.SelectedSlot` is null — no individual handler or defender is known. The slot-weighted aggregate (same guard-heavy weights [0.35, 0.25, 0.20, 0.12, 0.08] as Roll B) is the DQ2 Option B resolution.
+
+**Six slot-weighted aggregates.** The generator computes: offense `BallHandling`, defense `Steals`, offense `Athleticism`, defense `Athleticism`, offense `LengthRating`, defense `LengthRating`. The athleticism and length selectors read the existing composites already on `Player` (`Athleticism` is a computed property; `LengthRating` calls `Matchup.LengthRating(p, _matchup)`).
+
+**Gap weights — calibration placeholders.** `RollASkillWeight = 0.50`, `RollAAthleticismWeight = 0.35`, `RollASizeWeight = 0.15`. These need not sum to 1; they are tunable independently. Size is smallest. Harness check (k) confirms the ordering holds at the code level.
+
+### Architecture after Phase 14
+
+- `IRollAPieGenerator` — `Generate(PossessionState state, double pressure)` interface. The `pressure` parameter is validated `[0,1]` then discarded (`_ = pressure`); the real dial is read from `MatchupConfig.FullCourtPressFor(state.Defense)`. Documented as dormant — allowing the parameter to influence the press math would create a second accidental pressure input.
+- `StubPieGenerator` — still `: IRollAPieGenerator`. Used by `BatchCheck` and all 8 isolated-check `Resolver` construction sites. Returns the flat baseline-with-dormant-nudge the batch checks rely on; not affected by rosters or the full-court press dial.
+- `RollAGenerator` — real generator, `(RollAConfig, MatchupConfig, GameState)` ctor. Court-state gate first; empty-roster fallback second; six aggregates; `Matchup.EntryDisruptionShares`; overflow guard; four-way mass split + pinned JumpBall. `FlatBaseline()` helper for gate and fallback paths.
+- `Matchup.EntryDisruptionShares` — new pure static method alongside `DisruptionShares` (Phase 12) and `TeamDisruptionShares` (Phase 13). Takes six pre-computed aggregates. Three gap terms compose into the TO shift; two press-only bends for DefFoul and OffFoul. Uses `FullCourtPressReferenceShift` (separate from `PressureReferenceShift`). Roll-A-specific ceilings/floors from `MatchupConfig`.
+- `MatchupConfig` — new Phase 14 block: `HomeFullCourtPress` / `AwayFullCourtPress` / `FullCourtPressFor(TeamSide)` (existing), `FullCourtPressReferenceShift`, `RollASkillWeight`, `RollAAthleticismWeight`, `RollASizeWeight`, and the existing Roll-A ceilings/floors. All Load invariants added.
+- `Resolver.cs` — `_rollAGenerator` field and ctor param retyped from `StubPieGenerator` to `IRollAPieGenerator`. Three Roll A dispatch sites (`RunPossession`, `ResumeInbound`, `ResolveSidelineInbound`) pass `pressure: 0.0` unchanged.
+- **`RollA.cs` unchanged.** `RollA.Execute` still takes `(state, pie, rng, cfg)`.
+
+### Parked items
+
+- **Press-break → transition face.** The reward side of pressing. Lives in the transition machinery. Deferred to its own next session. No hooks, no stubs.
+- **Steal attribution at Roll A turnovers.** Which defender gets credit. Deferred.
+- **Changed turnover-type mix in Roll C under full-court press.** A full-court press turns more backcourt turnovers into steals vs. violations. Deferred.
+- **Fatigue effects.** Deferred.
+- **`CoachProfile` migration.** `MatchupConfig.FullCourtPressFor(TeamSide)` is the only read site that changes. Swap to per-team `CoachProfile` fields when that layer arrives.
+- **Gap weight tuning.** The 0.50 / 0.35 / 0.15 split is a calibration placeholder.
+- **`FullCourtPressReferenceShift` tuning.** Default 1.2 (same as `PressureReferenceShift`). Independent knob — calibration pass tunes separately from halfcourt.

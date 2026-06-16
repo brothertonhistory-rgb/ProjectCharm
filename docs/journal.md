@@ -1,3 +1,54 @@
+## Session 45 — Phase 14: full-court press disruption door (Roll A) (2026-06-15)
+
+**Scope:** Wire the disruption face of full-court press on Roll A (the dead-ball / backcourt entry). At neutral press (5) + even aggregates, Roll A reproduces today's config baseline exactly. Above neutral, the `Turnover`, `DefensiveFoul`, and `OffensiveFoul` slices rise toward their Roll-A-specific ceilings. `JumpBall` is pinned flat. `CleanEntry` absorbs the complement. `Frontcourt = true` returns the flat baseline immediately (press is irrelevant once the offense has crossed half). Press-break → transition face is explicitly deferred.
+
+**What the repo already had on entry.** Sessions 44.5 and 44.6 had landed. A prior partial build had committed `IRollAPieGenerator`, a one-gap `RollAGenerator` (Steals vs. BallHandling only), and the base `MatchupConfig` fields for full-court press — but it was missing three things the confirmed design requires: the three-gap turnover model (skill + athleticism + size), a separate `FullCourtPressReferenceShift` tanh saturation constant, and the three gap weights. This session completes all three.
+
+**The turnover model — three gaps, additively composed.** Unlike Roll B (one skill gap, gated by pressure), Roll A's turnover disruption composes three weighted gap terms:
+1. **Skill**: slot-weighted `Steals` (defense) − `BallHandling` (offense) → `GapFn` with SKILL params
+2. **Athleticism**: slot-weighted `Athleticism` composite (defense) − offense → `GapFn` with PHYSICAL params
+3. **Size**: slot-weighted `LengthRating` composite (defense) − offense → `GapFn` with PHYSICAL params; `RollASizeWeight` is the smallest of the three
+
+`disruptionShift = pressureLift + pressureGate × (skillWeight·skillShift + athWeight·athShift + sizeWeight·sizeShift)`. The gate is `max(0, pUnit)`, so backed off, the team matchup contributes nothing regardless of aggregates.
+
+**Why the saturation constant is separate.** `EntryDisruptionShares` uses `cfg.FullCourtPressReferenceShift` (new, default 1.2) — NOT `cfg.PressureReferenceShift` (halfcourt). The two dials must stay fully independent; coupling the tanh saturation speed would couple their tuning behavior in the calibration pass.
+
+**Both foul slices are press-only.** `DefensiveFoul` (reach-ins) and `OffensiveFoul` (charges / player-control fouls) track how hard the defense presses, not who is on the floor. No gap terms. `OffensiveFoul` ceiling is set low (≈15% of `DefFoul` ceiling) because backcourt charges are rare. Both use `FullCourtPressReferenceShift` for saturation.
+
+**Action-mass normalization.** `actionMass = BaseClean + BaseTurnover + BaseOffensiveFoul + BaseDefensiveFoul = 0.99`. The generator passes base shares normalized over actionMass (`BaseTurnover / actionMass`, etc.) to `EntryDisruptionShares`, then multiplies the returned shares back by actionMass. This is why neutral press + even aggregates reproduces the exact config baseline.
+
+**Court-state gating.** Roll A fires at three moments: initial dead-ball entry (`Frontcourt = false`), `ResumeInbound` (may be either), and `SidelineInbound` (always `Frontcourt = true`). The generator checks `state.Frontcourt` first; if true, it returns `FlatBaseline()` immediately — no roster read, no dial read.
+
+**Separate dials confirmed.** Roll B and Roll F read `HomePressure` / `AwayPressure` (halfcourt). Roll A reads `HomeFullCourtPress` / `AwayFullCourtPress`. A team can press full-court and fall back into a zone — the two dials are independent, confirmed by `FullCourtPressFor(state.Defense)` reading a different field than `PressureFor(state.Defense)`.
+
+**Changes delivered.**
+- `Matchup.cs` — `EntryDisruptionShares` updated: signature adds `offenseAthletic, defenseAthletic, offenseLength, defenseLength`; body replaced with three-gap model; all three tanh calls use `cfg.FullCourtPressReferenceShift`.
+- `RollAGenerator.cs` — computes six slot-weighted aggregates (handling, stealers, offAthletic, defAthletic, offLength, defLength) and passes all six to `EntryDisruptionShares`.
+- `MatchupConfig.cs` — adds `FullCourtPressReferenceShift` (tanh saturation, default 1.2), `RollASkillWeight` (0.50), `RollAAthleticismWeight` (0.35), `RollASizeWeight` (0.15); Load invariants: `FullCourtPressReferenceShift > 0`, all three gap weights `>= 0`.
+- `config.json` — adds the four new Matchup keys.
+- `Resolver.cs` — `_rollAGenerator` field and ctor param retyped from `StubPieGenerator` to `IRollAPieGenerator`.
+- `Program.cs` — `RollAGenerator(cfg, cfgMatchup, game)` constructed after `SeatStartersFromConfig`; `BatchCheck` and `ShowSamples` signatures widened to `IRollAPieGenerator`; `BatchCheck` call passes `new StubPieGenerator(cfg)` (fresh flat baseline, not the live generator with roster state); `Phase14FullCourtPressDoorCheckRollA` added with 11 assertions; call added after Phase 13.
+
+**Harness result.** ALL CHECKS PASSED. Phase 14 results:
+- (a) Neutral anchor exact: all five arms match config baseline to float precision.
+- (b/c/d) Press raises TO (0.038→0.161), DefFoul (0.014→0.076), OffFoul (0.003→0.012).
+- (e) OffFoul < DefFoul at all six press levels (p=1 through 10).
+- (f) Cap holds at max press + worst matchup; CleanEntry > 0 (TO at ceiling 0.20, others below ceiling).
+- (g) JumpBall exactly flat at all four test cases including Frontcourt=true.
+- (h) Five arms sum to 1 at all press levels.
+- (i) Frontcourt=true + worst matchup + max press still returns exact baseline.
+- (j) Null vs stamped SelectedSlot → identical pie.
+- (k) Skill, athleticism, and size each independently lift TO when varied alone at high press; size produces the smallest delta of the three (Δ=0.037311 vs ath=0.037444, skill=0.037493) — the weight ordering is correct.
+
+**Deferred (explicitly out of scope).**
+- Press-break → transition face: the reward side of pressing (beat-the-press transition shots), deferred to its own next session. Touches the `FastBreak` / transition machinery, not Roll A's pie.
+- Steal attribution at Roll A turnovers.
+- Fatigue effects.
+- Changed turnover-type mix in Roll C under full-court press.
+- `CoachProfile` migration (swap `FullCourtPressFor` to read per-team coach fields at that seam only).
+
+---
+
 ## Session 44.6 — remove four unused IContinuationNode params from Resolver ctor (2026-06-15)
 
 **Scope:** Constructor signature change and matching call-site updates only. No behavior change. Harness expected to print "ALL CHECKS PASSED" with byte-for-byte identical rates to the pre-change run.

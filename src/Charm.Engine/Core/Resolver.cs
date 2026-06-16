@@ -80,7 +80,7 @@ public sealed class Resolver
     // Governor) can ask it to run a whole possession from a start state without
     // ever naming a roll itself. The generator + config produce Roll A's pie; the
     // resolver then walks the chain via the existing Route loop.
-    private readonly StubPieGenerator _rollAGenerator;
+    private readonly IRollAPieGenerator _rollAGenerator;
     private readonly RollAConfig _rollAConfig;
     private readonly IRollBPieGenerator _rollBGenerator;
     private readonly RollCStubPieGenerator _rollCGenerator;
@@ -100,7 +100,7 @@ public sealed class Resolver
     private readonly IRng _rng;
 
     public Resolver(
-        StubPieGenerator rollAGenerator,
+        IRollAPieGenerator rollAGenerator,
         RollAConfig rollAConfig,
         IRollBPieGenerator rollBGenerator,
         RollCStubPieGenerator rollCGenerator,

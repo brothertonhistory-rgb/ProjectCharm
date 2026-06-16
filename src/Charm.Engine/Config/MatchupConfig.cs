@@ -486,6 +486,44 @@ public sealed class MatchupConfig
     /// Must be &gt;= 0 and &lt; <see cref="RollAOffFoulCeiling"/> (enforced in Load).</summary>
     public double RollAOffFoulFloor { get; set; } = 0.001;
 
+    // --- Phase 14: full-court press saturation constant.
+    //     The tanh divisor for ALL THREE Roll A bends (turnover, DefFoul, OffFoul).
+    //     SEPARATE from PressureReferenceShift (halfcourt) so the two dials are
+    //     fully independent — neither the normalization nor the saturation speed of
+    //     full-court press is coupled to halfcourt.
+    //     Must be > 0 (enforced in Load). Same default as PressureReferenceShift
+    //     (1.2) as a calibration placeholder. ---
+
+    /// <summary>Tanh saturation divisor for Roll A's full-court press bends (Phase 14).
+    /// Governs how fast turnover, DefFoul, and OffFoul shares approach their ceilings/floors
+    /// as pUnit grows. SEPARATE from <see cref="PressureReferenceShift"/> (halfcourt) —
+    /// the two dials stay fully independent. Must be &gt; 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double FullCourtPressReferenceShift { get; set; } = 1.2;
+
+    // --- Phase 14: turnover gap weights.
+    //     Three sources compose into the team matchup shift for Roll A's TO slice:
+    //       matchupShift = SkillWeight*skillShift + AthleticismWeight*athShift + SizeWeight*sizeShift
+    //     SizeWeight is the smallest (size matters least in backcourt press).
+    //     All three must be >= 0 (enforced in Load). Need not sum to 1. ---
+
+    /// <summary>Weight of the skill gap (Steals − BallHandling) in Roll A's turnover
+    /// matchup shift. The largest of the three — backcourt press is primarily a
+    /// ball-handling skill contest. Must be &gt;= 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double RollASkillWeight { get; set; } = 0.50;
+
+    /// <summary>Weight of the athleticism gap (Athleticism − Athleticism) in Roll A's
+    /// turnover matchup shift. Middle of the three. Must be &gt;= 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double RollAAthleticismWeight { get; set; } = 0.35;
+
+    /// <summary>Weight of the size gap (LengthRating − LengthRating) in Roll A's
+    /// turnover matchup shift. Smallest of the three — size matters, but least for
+    /// backcourt press disruption. Must be &gt;= 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double RollASizeWeight { get; set; } = 0.15;
+
     public static MatchupConfig Load(string path)    {
         var json = File.ReadAllText(path);
         using var doc = JsonDocument.Parse(json);
@@ -708,6 +746,22 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"RollATurnoverCeiling + RollADefFoulCeiling + RollAOffFoulCeiling must be < 1.0: " +
                 $"got {cfg.RollATurnoverCeiling + cfg.RollADefFoulCeiling + cfg.RollAOffFoulCeiling:F4}.");
+
+        // Phase 14 -- full-court press saturation constant (SEPARATE from halfcourt)
+        if (cfg.FullCourtPressReferenceShift <= 0.0)
+            throw new InvalidOperationException(
+                $"FullCourtPressReferenceShift must be > 0: got {cfg.FullCourtPressReferenceShift}.");
+
+        // Phase 14 -- turnover gap weights (must be >= 0; need not sum to 1)
+        if (cfg.RollASkillWeight < 0.0)
+            throw new InvalidOperationException(
+                $"RollASkillWeight must be >= 0: got {cfg.RollASkillWeight}.");
+        if (cfg.RollAAthleticismWeight < 0.0)
+            throw new InvalidOperationException(
+                $"RollAAthleticismWeight must be >= 0: got {cfg.RollAAthleticismWeight}.");
+        if (cfg.RollASizeWeight < 0.0)
+            throw new InvalidOperationException(
+                $"RollASizeWeight must be >= 0: got {cfg.RollASizeWeight}.");
 
         return cfg;
     }

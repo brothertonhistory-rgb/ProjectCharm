@@ -238,7 +238,11 @@
     "RollADefFoulCeiling": 0.10,
     "RollADefFoulFloor": 0.005,
     "RollAOffFoulCeiling": 0.015,
-    "RollAOffFoulFloor": 0.001
+    "RollAOffFoulFloor": 0.001,
+    "FullCourtPressReferenceShift": 1.2,
+    "RollASkillWeight": 0.50,
+    "RollAAthleticismWeight": 0.35,
+    "RollASizeWeight": 0.15
   },
   "RollI": {
     "DefensiveRebound": 0.66,
