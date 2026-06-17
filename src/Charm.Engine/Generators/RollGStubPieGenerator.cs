@@ -17,11 +17,20 @@ namespace Charm.Engine;
 /// later WITHOUT touching Roll G or the resolver — it just hands back a non-flat
 /// pie over the same enum.
 /// </summary>
-public sealed class RollGStubPieGenerator : IRollGPieGenerator
+public sealed class RollGStubPieGenerator : IRollGGenerationProvider
 {
     private readonly RollGConfig _cfg;
 
     public RollGStubPieGenerator(RollGConfig cfg) => _cfg = cfg;
+
+    /// <summary>
+    /// Richer provider method — returns the existing flat pie plus residual 0.0.
+    /// Called by the resolver so all 20 harness Resolver construction sites compile
+    /// against the widened interface type. The stub has no usage-pressure logic;
+    /// residual is always zero.
+    /// </summary>
+    public RollGGeneration GenerateWithResidual(PossessionState state) =>
+        new(Generate(state), 0.0);
 
     /// <param name="state">Carried for signature parity with real generators; the
     /// stub does not read it yet. The real generator will use it (and the selected

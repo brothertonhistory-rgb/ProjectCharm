@@ -194,9 +194,9 @@ public sealed class Resolver
     private readonly RollCStubPieGenerator _rollCGenerator;
     private readonly RollCConfig _rollCConfig;
     private readonly RollDStubPieGenerator _rollDGenerator;
-    private readonly IRollEPieGenerator _rollEGenerator;
+    private readonly IRollEGenerationProvider _rollEGenerator;
     private readonly IRollFPieGenerator _rollFGenerator;
-    private readonly IRollGPieGenerator _rollGGenerator;
+    private readonly IRollGGenerationProvider _rollGGenerator;
     private readonly IRollHPieGenerator _rollHGenerator;
     private readonly IRollIPieGenerator _rollIGenerator;
     private readonly RollJStubPieGenerator _rollJGenerator;
@@ -215,9 +215,9 @@ public sealed class Resolver
         RollCStubPieGenerator rollCGenerator,
         RollCConfig rollCConfig,
         RollDStubPieGenerator rollDGenerator,
-        IRollEPieGenerator rollEGenerator,
+        IRollEGenerationProvider rollEGenerator,
         IRollFPieGenerator rollFGenerator,
-        IRollGPieGenerator rollGGenerator,
+        IRollGGenerationProvider rollGGenerator,
         IRollHPieGenerator rollHGenerator,
         IRollIPieGenerator rollIGenerator,
         RollJStubPieGenerator rollJGenerator,
@@ -408,8 +408,8 @@ public sealed class Resolver
                                 // Phase 16: press beaten — fast break fires. Consume the press stamp so
                                 // later re-inbounds in the same possession cannot re-trigger this gate.
                                 var breakState = c.State with { FastBreak = true, PressMode = PressMode.None };
-                                var breakPieE = _rollEGenerator.Generate(breakState);
-                                result = RollE.Execute(breakState, breakPieE, _game, _rng);
+                                var breakGenE  = _rollEGenerator.GenerateWithPressure(breakState);
+                                result = RollE.Execute(breakState, breakGenE.Pie, breakGenE.Pressures, _game, _rng);
                                 continue;
                             }
                             // Normal halfcourt path.
@@ -451,8 +451,8 @@ public sealed class Resolver
                         // generator selects the pie from the carried state; the edge is
                         // marker-blind, exactly the Roll C/K ticket pattern.
                         case ContinuationKind.IntoPlayerSelection:
-                            var pieE = _rollEGenerator.Generate(c.State);
-                            result = RollE.Execute(c.State, pieE, _game, _rng);
+                            var genE  = _rollEGenerator.GenerateWithPressure(c.State);
+                            result = RollE.Execute(c.State, genE.Pie, genE.Pressures, _game, _rng);
                             continue;
 
                         // Roll E's selection -> execute Roll F (player action),
@@ -562,8 +562,8 @@ public sealed class Resolver
                         // GameState (a zone is just an enum value), so it takes only
                         // (state, pie, rng) — like Roll F, not Roll E.
                         case ContinuationKind.IntoShotType:
-                            var pieG = _rollGGenerator.Generate(c.State);
-                            result = RollG.Execute(c.State, pieG, _rng);
+                            var genG  = _rollGGenerator.GenerateWithResidual(c.State);
+                            result = RollG.Execute(c.State, genG.Pie, genG.ResidualPressure, _rng);
                             continue;
 
                         // Roll G's stamped shot -> execute Roll H (make/miss), loop.

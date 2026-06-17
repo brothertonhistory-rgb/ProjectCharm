@@ -205,6 +205,22 @@ public sealed class RollHConfig
     // placeholder wire here would pantomime the exact signal that is deliberately
     // deferred. Ships flat-ish; the real generator drops in later.
 
+    // --- Usage-pressure efficiency penalty dials (Phase 17). Applied by
+    //     RollHGenerator to makePct before BuildRealPie.
+    //
+    //     PressureVolumeTaxScale — the small all-shots reduction: makePct is
+    //     multiplied by (1 − pressure × scale). Represents the baseline difficulty
+    //     of sustaining a larger share. Tuned so a versatile player at the rail
+    //     (~0.32 pressure) loses ~2–4 pts. Default 0.12. Named "volume-tax" NOT
+    //     "attention" — attention is the deferred gravity layer.
+    //
+    //     PressureResidualPenaltyScale — the larger reduction for specialists:
+    //     makePct -= residual × scale. Represents the efficiency loss of load
+    //     that could not shift to alternate zones. Tuned so a specialist at the
+    //     rail loses ~10–15 pts total. Default 2.0. ---
+    public double PressureVolumeTaxScale        { get; set; } = 0.12;
+    public double PressureResidualPenaltyScale  { get; set; } = 2.0;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
@@ -216,6 +232,17 @@ public sealed class RollHConfig
         var cfg = JsonSerializer.Deserialize<RollHConfig>(
             section.GetRawText(),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        return cfg ?? throw new InvalidOperationException($"Could not parse RollH config at {path}.");
+        if (cfg is null)
+            throw new InvalidOperationException($"Could not parse RollH config at {path}.");
+
+        // Phase 17 invariants: both penalty scales must be non-negative.
+        if (cfg.PressureVolumeTaxScale < 0)
+            throw new InvalidOperationException(
+                "RollH PressureVolumeTaxScale must be >= 0.");
+        if (cfg.PressureResidualPenaltyScale < 0)
+            throw new InvalidOperationException(
+                "RollH PressureResidualPenaltyScale must be >= 0.");
+
+        return cfg;
     }
 }

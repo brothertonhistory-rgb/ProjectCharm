@@ -45,20 +45,23 @@ namespace Charm.Engine;
 public static class RollG
 {
     public static RollResult Execute(
-        PossessionState state, Pie<ShotLocation> pie, IRng rng)
+        PossessionState state, Pie<ShotLocation> pie, double residualPressure, IRng rng)
     {
         // 1. Roll the pie to a shot location.
         var zone = pie.Roll(rng.NextUnitInterval());
 
-        // 2. Stamp the chosen zone onto the possession as a per-possession fact.
-        //    PossessionState is an immutable record, so this is a `with`-expression
-        //    producing a NEW state (not a mutation) — exactly how Roll E stamped
-        //    SelectedSlot and how the resolver threads state through its loop.
-        var stampedState = state with { ShotType = zone };
+        // 2. Stamp both the chosen zone AND the residual pressure onto the possession
+        //    as per-possession facts (ShotType and UsageResidualPressure). One `with`
+        //    keeps both writes atomic — mirrors how Roll E stamps SelectedSlot and
+        //    UsagePressure together.
+        var stampedState = state with
+        {
+            ShotType              = zone,
+            UsageResidualPressure = residualPressure,
+        };
 
-        // 3. Hand off to the (future) make/miss beat (Roll H). Names the KIND, not
-        //    the node; the resolver maps it. The stamped zone rides on the carried
-        //    state, not as a Continue payload.
+        // 3. Hand off to the make/miss beat (Roll H). Names the KIND, not
+        //    the node; the resolver maps it.
         return new Continue(ContinuationKind.IntoShotResolution, stampedState);
     }
 }

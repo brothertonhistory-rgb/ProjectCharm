@@ -60,7 +60,7 @@ namespace Charm.Engine;
 ///
 /// Implements <see cref="IRollGPieGenerator"/>.
 /// </summary>
-public sealed class RollGGenerator : IRollGPieGenerator
+public sealed class RollGGenerator : IRollGGenerationProvider
 {
     private readonly RollGConfig  _cfg;
     private readonly MatchupConfig _matchup;
@@ -73,21 +73,26 @@ public sealed class RollGGenerator : IRollGPieGenerator
         _game    = game    ?? throw new ArgumentNullException(nameof(game));
     }
 
-    public Pie<ShotLocation> Generate(PossessionState state)
+    /// <summary>
+    /// Generate the shot-location pie (matchup-bent, then usage-shifted) AND the
+    /// residual pressure in one pass. The residual is the volume load that could not
+    /// be absorbed into a wider shot diet this possession. Delegates the base
+    /// interface's <see cref="Generate"/> here.
+    /// </summary>
+    public RollGGeneration GenerateWithResidual(PossessionState state)
     {
         var slot = state.SelectedSlot
             ?? throw new InvalidOperationException(
                 "RollGGenerator requires a stamped SelectedSlot — Roll E must run before Roll G.");
 
-        // Phase 16: fast-break shot location — flat rim-heavy pie, ignores
-        // tendencies and matchup entirely. The break dictates the shot, not
-        // the shooter's tendency profile.
+        // Phase 16: fast-break shot location — flat rim-heavy pie, no diet shift,
+        // residual 0.0 (no volume load on a transition possession).
         if (state.FastBreak)
-            return BuildFastBreakPie();
+            return new RollGGeneration(BuildFastBreakPie(), 0.0);
 
         var shooter = _game.RosterFor(state.Offense).PlayerAt(slot);
         if (shooter is null)
-            return BuildStubPie();
+            return new RollGGeneration(BuildStubPie(), 0.0);
 
         // Read all five defending slots; some may be null.
         var defendingRoster = _game.RosterFor(state.Defense);
@@ -102,21 +107,32 @@ public sealed class RollGGenerator : IRollGPieGenerator
         };
 
         var populated = 0;
-        foreach (var d in defenders)
-            if (d is not null) populated++;
+        foreach (var d in defenders) if (d is not null) populated++;
 
         // Baseline tendencies through the coaching seam (identity in v1).
         var (tRim, tShort, tMid, tLong, tThree) =
             CoachingPull.Apply(shooter, coach: null, malleability: null);
 
-        // Zero defenders populated: short-circuit. Player tendencies normalized,
-        // no matchup multiplier applied. Player identity preserved.
+        // Zero defenders populated: short-circuit to pure-tendency pie.
+        // Implementer's call: the shooter IS real and IS under load, so the
+        // volume-driven diet shift still applies (the load is real even when
+        // defensive data is incomplete). Flag: this is the zero-defender fallback.
         if (populated == 0)
-            return BuildPureTendencyPie(tRim, tShort, tMid, tLong, tThree);
+        {
+            var purePie = BuildPureTendencyPie(tRim, tShort, tMid, tLong, tThree);
+            var pureBent = new double[]
+            {
+                purePie.Slices.First(s => s.Outcome == ShotLocation.Rim).Weight,
+                purePie.Slices.First(s => s.Outcome == ShotLocation.Short).Weight,
+                purePie.Slices.First(s => s.Outcome == ShotLocation.Mid).Weight,
+                purePie.Slices.First(s => s.Outcome == ShotLocation.Long).Weight,
+                purePie.Slices.First(s => s.Outcome == ShotLocation.Three).Weight,
+            };
+            var (shiftedPurePie, pureResidual) = ApplyDietShift(state, shooter, pureBent);
+            return new RollGGeneration(shiftedPurePie, pureResidual);
+        }
 
-        // 1–5 defenders populated: bend tendencies by per-zone multipliers.
-        // v3: calls public Matchup.LocationMultiplier — same pattern as
-        // RollHGenerator calling Matchup.BlockWeight and Matchup.FoulRate.
+        // 1–5 defenders: bend tendencies by per-zone multipliers (existing Phase 9 math).
         var rimMult   = Matchup.LocationMultiplier(ShotLocation.Rim,   shooter, defenders, _matchup);
         var shortMult = Matchup.LocationMultiplier(ShotLocation.Short, shooter, defenders, _matchup);
         var midMult   = Matchup.LocationMultiplier(ShotLocation.Mid,   shooter, defenders, _matchup);
@@ -135,20 +151,151 @@ public sealed class RollGGenerator : IRollGPieGenerator
                 $"RollGGenerator: bent tendency total <= 0 ({total}). " +
                 "Should be unreachable — multipliers are bounded strictly positive by the ratio form.");
 
-        var weights = new Dictionary<ShotLocation, double>
+        var bentNorm = new double[]
         {
-            [ShotLocation.Rim]   = bentRim   / total,
-            [ShotLocation.Short] = bentShort / total,
-            [ShotLocation.Mid]   = bentMid   / total,
-            [ShotLocation.Long]  = bentLong  / total,
-            [ShotLocation.Three] = bentThree / total,
+            bentRim   / total,
+            bentShort / total,
+            bentMid   / total,
+            bentLong  / total,
+            bentThree / total,
         };
 
+        // Apply usage-driven diet shift (Phase 17 addition).
+        // Insert AFTER matchup multiply+renormalize, BEFORE building the final pie.
+        var (finalPie, residual) = ApplyDietShift(state, shooter, bentNorm);
+        return new RollGGeneration(finalPie, residual);
+    }
+
+    /// <inheritdoc cref="IRollGPieGenerator.Generate"/>
+    public Pie<ShotLocation> Generate(PossessionState state) =>
+        GenerateWithResidual(state).Pie;
+
+    // -------------------------------------------------------------------------
+    // Diet shift — usage pressure → bounded shot-diet expansion
+    // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// Apply the usage-driven diet shift to the already-bent profile and return
+    /// the resulting pie plus the residual pressure.
+    ///
+    /// <para><b>Zero-pressure short-circuit.</b> When <see cref="PossessionState.UsagePressure"/>
+    /// is null or zero, the bent profile is returned unchanged and residual is 0.0.
+    /// This is an EXACT branch-skip — zero-pressure possessions are numerically
+    /// identical to pre-build behavior.</para>
+    ///
+    /// <para><b>Bounded shift math (§4a):</b>
+    /// <list type="bullet">
+    ///   <item>Authored tendencies are normalized to [0,1] (sum 1) — mandatory; the
+    ///   0–99 scale is 100× off without this step.</item>
+    ///   <item><c>intrinsicCapacity = 1 − a[authoredDom]</c> — how much the player
+    ///   CAN diversify, from his authored tendency profile. A one-zone player ≈ 0;
+    ///   a spread player ≈ 0.77 or higher.</item>
+    ///   <item><c>requestedShift = pressure × PressureShiftScale</c></item>
+    ///   <item><c>availableMass = bentDom × PressureShiftCapFraction</c> (cap so the
+    ///   dominant zone is never completely emptied).</item>
+    ///   <item><b>Zero-destination guard:</b> if the sum of all non-dominant bent zone
+    ///   weights ≤ Epsilon, set absorbed = 0 (nowhere to redistribute; residual =
+    ///   requestedShift). Never divide by zero; never count a shift as absorbed with
+    ///   no destination.</item>
+    ///   <item><c>absorbed = min(requested, intrinsic, available)</c></item>
+    ///   <item><c>residual = requested − absorbed</c></item>
+    /// </list></para>
+    /// </summary>
+    private (Pie<ShotLocation> pie, double residual) ApplyDietShift(
+        PossessionState state, Player shooter, double[] bentNorm)
+    {
+        const double Eps = 1e-9;
+        var pressure = state.UsagePressure ?? 0.0;
+
+        // Zero-pressure branch-skip: return exact bent profile, residual 0.
+        if (pressure <= 0.0)
+            return (BuildPieFromNorm(bentNorm), 0.0);
+
+        // Normalize authored tendencies to [0,1] — mandatory before any math.
+        double tendencyTotal = shooter.RimTendency + shooter.ShortTendency
+                             + shooter.MidTendency + shooter.LongTendency
+                             + shooter.ThreeTendency;
+        if (tendencyTotal <= 0.0)
+            return (BuildPieFromNorm(bentNorm), 0.0);  // degenerate player; no shift
+
+        var aNorm = new double[]
+        {
+            shooter.RimTendency   / tendencyTotal,
+            shooter.ShortTendency / tendencyTotal,
+            shooter.MidTendency   / tendencyTotal,
+            shooter.LongTendency  / tendencyTotal,
+            shooter.ThreeTendency / tendencyTotal,
+        };
+
+        // Authored dominant zone = the zone the player WANTS to shoot from.
+        var authoredDomIdx    = Array.IndexOf(aNorm, aNorm.Max());
+        var intrinsicCapacity = 1.0 - aNorm[authoredDomIdx];
+
+        // Requested shift (how much the load demands).
+        var requestedShift = pressure * _cfg.PressureShiftScale;
+
+        // Bent-profile dominant zone = the zone with the most mass AFTER the matchup bend.
+        var bentDomIdx  = Array.IndexOf(bentNorm, bentNorm.Max());
+        var bentDomMass = bentNorm[bentDomIdx];
+
+        // Zero-destination guard: if nothing exists to redistribute into, the full
+        // request becomes residual (no crash, no silent mis-count).
+        var destinationMass = 0.0;
+        for (var i = 0; i < 5; i++)
+            if (i != bentDomIdx) destinationMass += bentNorm[i];
+
+        double absorbed;
+        if (destinationMass <= Eps)
+        {
+            // Nowhere to send the mass — full residual.
+            absorbed = 0.0;
+        }
+        else
+        {
+            var availableMass = bentDomMass * _cfg.PressureShiftCapFraction;
+            absorbed = Math.Min(requestedShift, Math.Min(intrinsicCapacity, availableMass));
+        }
+
+        var residual = requestedShift - absorbed;
+
+        // If nothing was absorbed, return the original bent pie unchanged.
+        if (absorbed <= Eps)
+            return (BuildPieFromNorm(bentNorm), residual);
+
+        // Apply shift: remove from dominant zone, redistribute proportionally to others.
+        var shifted = (double[])bentNorm.Clone();
+        shifted[bentDomIdx] -= absorbed;
+        for (var i = 0; i < 5; i++)
+        {
+            if (i != bentDomIdx)
+                shifted[i] += absorbed * (bentNorm[i] / destinationMass);
+        }
+
+        // Renormalize (floating-point safety).
+        var shiftedTotal = 0.0;
+        foreach (var v in shifted) shiftedTotal += v;
+        for (var i = 0; i < 5; i++) shifted[i] /= shiftedTotal;
+
+        return (BuildPieFromNorm(shifted), residual);
+    }
+
+    /// <summary>Build a <see cref="Pie{ShotLocation}"/> from an already-normalized
+    /// five-element array indexed [Rim, Short, Mid, Long, Three].</summary>
+    private Pie<ShotLocation> BuildPieFromNorm(double[] norm)
+    {
+        var weights = new Dictionary<ShotLocation, double>
+        {
+            [ShotLocation.Rim]   = norm[0],
+            [ShotLocation.Short] = norm[1],
+            [ShotLocation.Mid]   = norm[2],
+            [ShotLocation.Long]  = norm[3],
+            [ShotLocation.Three] = norm[4],
+        };
         return new Pie<ShotLocation>(weights, _cfg.Epsilon);
     }
 
     // -------------------------------------------------------------------------
-    // Helpers
+    // Helpers (BuildStubPie, BuildFastBreakPie, BuildPureTendencyPie)
     // -------------------------------------------------------------------------
 
     // v3 fix: NO private Multiplier helper here. The multiplier math lives on

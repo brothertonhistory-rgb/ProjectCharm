@@ -133,6 +133,7 @@ internal static class Program
         ok &= Phase13TeamDisruptionDoorCheckRollB(configPath);
         ok &= Phase15PressFrequencyStandardCheck(configPath);
         ok &= Phase16PressBreakFastBreakCheck(configPath);
+        ok &= Phase17UsageEfficiencyCheck(configPath);
 
         ObservationRunV1(configPath);
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
@@ -215,7 +216,7 @@ internal static class Program
         var selRng = new SystemRng(cfg.Seed);
         for (var i = 0; i < 8; i++)
         {
-            var r = (Continue)RollE.Execute(state, pieE, game, selRng);
+            var r = (Continue)RollE.Execute(state, pieE, new double[5], game, selRng);
             var s = r.State.SelectedSlot!.Value;
             Console.WriteLine(
                 $"  proceed -> selected {s.Side} slot {s.Number} | next={r.Next}");
@@ -237,7 +238,7 @@ internal static class Program
         for (var i = 0; i < 8; i++)
         {
             // Select a player first (Roll E), then resolve the action (Roll F).
-            var selected = ((Continue)RollE.Execute(state, pieE, game, actRng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, actRng)).State;
             var r = (Continue)RollF.Execute(selected, pieF, actRng);
             var s = r.State.SelectedSlot!.Value;
             Console.WriteLine(
@@ -265,8 +266,8 @@ internal static class Program
         {
             // Walk E -> G to deliver a fully-stamped pre-H state, generate the pie
             // for THAT shot's zone, then resolve H.
-            var selectedH = ((Continue)RollE.Execute(state, pieE, game, shotRng)).State;
-            var withZone = ((Continue)RollG.Execute(selectedH, genGForH.Generate(selectedH), shotRng)).State;
+            var selectedH = ((Continue)RollE.Execute(state, pieE, new double[5], game, shotRng)).State;
+            var withZone = ((Continue)RollG.Execute(selectedH, genGForH.Generate(selectedH), 0.0, shotRng)).State;
             var pieH = genH.Generate(withZone);
             var hr = RollH.Execute(withZone, pieH, shotRng);
             var carried = hr switch { Terminal t => t.State, Continue c => c.State, _ => withZone };
@@ -301,8 +302,8 @@ internal static class Program
         while (shown < 8 && guard++ < 100000)
         {
             // Walk E -> G -> H; only act on a Miss (the one outcome that feeds I).
-            var sel = ((Continue)RollE.Execute(state, pieE, obsGameI, reboundRng)).State;
-            var zoned = ((Continue)RollG.Execute(sel, genGForH.Generate(sel), reboundRng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], obsGameI, reboundRng)).State;
+            var zoned = ((Continue)RollG.Execute(sel, genGForH.Generate(sel), 0.0, reboundRng)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), reboundRng);
             if (hRes is not Continue { Next: ContinuationKind.ResolveRebound } missCont) continue;
 
@@ -916,7 +917,7 @@ internal static class Program
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var result = RollE.Execute(checkState, pieE, checkGame, rng);
+            var result = RollE.Execute(checkState, pieE, new double[5], checkGame, rng);
 
             if (result is not Continue { Next: ContinuationKind.IntoPlayerAction } c
                 || c.State.SelectedSlot is not { } slot
@@ -1105,7 +1106,7 @@ internal static class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Select a player (Roll E), resolve the action (Roll F), then route.
-            var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
             var fResult = RollF.Execute(selected, pieF, rng);
             var routing = resolver.Route(fResult);
             var d = routing.Destination;
@@ -1184,7 +1185,7 @@ internal static class Program
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var result = RollG.Execute(state, pieG, rng);
+            var result = RollG.Execute(state, pieG, 0.0, rng);
 
             // Must be a Continue, into shot resolution, carrying a stamped zone on
             // the forwarded state (confirms ShotType is actually set, not just the
@@ -1304,7 +1305,7 @@ internal static class Program
         {
             // Select a real slot (Roll E), then hand the resolver a clean
             // IntoShotType continuation — exactly what Roll F emits on a ShotAttempt.
-            var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
             var shotTicket = new Continue(ContinuationKind.IntoShotType, selected);
             var d = resolver.Route(shotTicket).Destination;
 
@@ -1397,8 +1398,8 @@ internal static class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Fresh slot + zone, then the zone-aware pie for THAT zone.
-            var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
-            var preH = ((Continue)RollG.Execute(selected, genG.Generate(selected), rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var preH = ((Continue)RollG.Execute(selected, genG.Generate(selected), 0.0, rng)).State;
             var zone = preH.ShotType!.Value;
             var pieH = isolatedGenH.Generate(preH);
 
@@ -1616,8 +1617,8 @@ internal static class Program
             // Select a slot (Roll E) and stamp a zone (Roll G), then hand the
             // resolver a clean IntoShotResolution continuation — exactly what Roll G
             // emits — to isolate the Roll H hop.
-            var selected = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
-            var withZone = ((Continue)RollG.Execute(selected, genG.Generate(selected), rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var withZone = ((Continue)RollG.Execute(selected, genG.Generate(selected), 0.0, rng)).State;
             var shotTicket = new Continue(ContinuationKind.IntoShotResolution, withZone);
             var d = resolver.Route(shotTicket).Destination;
 
@@ -1726,8 +1727,8 @@ internal static class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Walk E -> G -> H; keep only the misses (the one feed into Roll I).
-            var sel = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
-            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), rng);
             if (hRes is not Continue { Next: ContinuationKind.ResolveRebound } miss) continue;
 
@@ -2202,8 +2203,8 @@ internal static class Program
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var sel = ((Continue)RollE.Execute(state, pieE, game, rngR)).State;
-            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), rngR)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], game, rngR)).State;
+            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rngR)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), rngR);
 
             // Keep only the BLOCKED shots — the arm this check is about.
@@ -2947,8 +2948,8 @@ internal static class Program
             // and the ResetOffense arm's wipe are both observable. FastBreak=true
             // simulates a possession that PUSHED, missed, and grabbed its own board —
             // so the ResetOffense leak-guard (FastBreak must clear) is exercised.
-            var sel = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
-            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var stamped = zoned with { Result = ShotResult.Miss, FastBreak = true };
 
             var kRes = RollK.Execute(stamped, pieK, game, rng);
@@ -3726,8 +3727,8 @@ internal static class Program
             // Build a fully-stamped post-miss state and ENTER Roll K directly by
             // handing the resolver the offensive-rebound continuation — the resolver
             // then walks the whole loop internally and returns once it ends/parks.
-            var sel = ((Continue)RollE.Execute(state, pieE, game, rng)).State;
-            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var stamped = zoned with { Result = ShotResult.Miss };
             var entry = new Continue(ContinuationKind.ResolveOffensiveRebound, stamped);
 
@@ -8219,12 +8220,14 @@ internal static class Program
     }
 
     /// <summary>
-    /// Spy implementation of <see cref="IRollEPieGenerator"/> for Phase 16 testing.
+    /// Spy implementation of <see cref="IRollEGenerationProvider"/> for Phase 16 testing.
     /// Records every (FastBreak, PressMode) pair it receives, then returns a caller-supplied
     /// fixed pie. Used to verify that the Resolver stamps FastBreak=true and PressMode=None
     /// on the breakState it passes to Roll E at the IntoHalfcourtSet press-break gate.
+    /// Implements the full provider interface so it can be passed to the widened Resolver
+    /// constructor without a cast.
     /// </summary>
-    private sealed class RollESpyGenerator : IRollEPieGenerator
+    private sealed class RollESpyGenerator : IRollEGenerationProvider
     {
         private readonly Pie<SelectionOutcome> _fixedPie;
         public readonly List<(bool FastBreak, PressMode Press)> Log = new();
@@ -8235,6 +8238,14 @@ internal static class Program
         {
             Log.Add((state.FastBreak, state.PressMode));
             return _fixedPie;
+        }
+
+        // Provider method: spy always returns zero pressures (no usage modelling).
+        public RollEGeneration GenerateWithPressure(PossessionState state)
+        {
+            var pie = Generate(state);
+            var finalShares = new double[] { 0.2, 0.2, 0.2, 0.2, 0.2 };
+            return new RollEGeneration(pie, finalShares, new double[5]);
         }
     }
 
@@ -8260,6 +8271,305 @@ internal static class Program
             };
             return new Pie<HalfcourtOutcome>(weights, _cfg.Epsilon);
         }
+    }
+
+    // ── Phase 17: Usage → Efficiency curve ──────────────────────────────────
+    private static bool Phase17UsageEfficiencyCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 17: Usage→Efficiency curve ---");
+        var pass = true;
+        const double Eps = 1e-6;
+
+        var cfgG       = RollGConfig.Load(configPath);
+        var cfgH       = RollHConfig.Load(configPath);
+        var cfgE       = RollEConfig.Load(configPath);
+        var cfgMatchup = MatchupConfig.Load(configPath);
+
+        static Player Mk(int b,
+                         int? fin = null, int? outside = null, int? mid = null, int? close = null,
+                         int? rimT = null, int? shortT = null, int? midT = null,
+                         int? longT = null, int? threeT = null,
+                         int? selfC = null, int? postM = null)
+            => new Player("p")
+            {
+                Outside = outside ?? b, Mid = mid ?? b, Close = close ?? b,
+                Finishing = fin ?? b, FreeThrow = b, FoulDrawing = b,
+                BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation = selfC ?? b, PostMoves = postM ?? b,
+                OffBallMovement = b, Screening = b, OffensiveRebounding = b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = b,
+                DefensiveRebounding = b, Steals = b,
+                Height = b, Wingspan = b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b,
+                Vertical = b, Endurance = b, Hustle = b,
+                BasketballIQ = b, Discipline = b,
+                RimTendency   = rimT   ?? b,
+                ShortTendency = shortT ?? b,
+                MidTendency   = midT   ?? b,
+                LongTendency  = longT  ?? b,
+                ThreeTendency = threeT ?? b,
+            };
+
+        static Player NeutralDef()
+            => new Player("def")
+            {
+                Outside=50, Mid=50, Close=50, Finishing=50, FreeThrow=50, FoulDrawing=50,
+                BallHandling=50, Passing=50, Playmaking=50, SelfCreation=50, PostMoves=50,
+                OffBallMovement=50, Screening=50, OffensiveRebounding=50,
+                PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50,
+                Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+                Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+                BasketballIQ=50, Discipline=50,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+
+        // Build game with shooter in Home slot 1, 5 neutral defenders in Away slots.
+        GameState BuildGame(Player shooter)
+        {
+            var fouls = new FoulTracker(7, 10);
+            var game  = new GameState(fouls);
+            game.HomeRoster.SetStarter(game.HomeLineup.SlotAt(1), shooter);
+            var def = NeutralDef();
+            for (var i = 1; i <= 5; i++)
+                game.AwayRoster.SetStarter(game.AwayLineup.SlotAt(i), def);
+            return game;
+        }
+
+        // Observed FG% from RollHGenerator for a state with zone already stamped.
+        double MakePct(GameState game, PossessionState stateWithZone)
+        {
+            var genH = new RollHGenerator(cfgH, cfgMatchup, game);
+            var pie  = genH.Generate(stateWithZone, putback: false);
+            var made = pie.Slices.First(s => s.Outcome == ShotResult.Made).Weight
+                     + pie.Slices.First(s => s.Outcome == ShotResult.MadeAndFouled).Weight;
+            var fga  = pie.Slices.Where(s => s.Outcome != ShotResult.MissFouled).Sum(s => s.Weight);
+            return fga > Eps ? made / fga : 0.0;
+        }
+
+        // ── (a) Zero-pressure regression ──────────────────────────────────────
+        {
+            var t = true;
+            Console.WriteLine("\n  (a) Zero-pressure regression");
+            var shooter = Mk(50, rimT:20, shortT:20, midT:20, longT:20, threeT:20);
+            var game    = BuildGame(shooter);
+            var slot    = game.HomeLineup.SlotAt(1);
+
+            foreach (ShotLocation zone in Enum.GetValues<ShotLocation>())
+            {
+                var stateNull = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                    EntryType.DeadBallInbound, SelectedSlot: slot, ShotType: zone);
+                var stateZero = stateNull with { UsagePressure = 0.0, UsageResidualPressure = 0.0 };
+                var baseVal   = MakePct(game, stateNull);
+                var zeroVal   = MakePct(game, stateZero);
+                var ok = Math.Abs(baseVal - zeroVal) < Eps;
+                if (!ok) { Console.WriteLine($"    FAIL zone {zone}: null={baseVal:F4} zero={zeroVal:F4}"); t = false; }
+            }
+            if (t) Console.WriteLine("    ok — zero-pressure state identical to null state");
+            pass &= t;
+            Console.WriteLine($"  (a) {(t ? "ok" : "FAIL")}");
+        }
+
+        // ── (b) Specialist efficiency drop ────────────────────────────────────
+        double specialistDrop = 0;
+        {
+            var t = true;
+            Console.WriteLine("\n  (b) Specialist efficiency drop");
+            var shooter = Mk(50, fin:65, rimT:90, shortT:3, midT:3, longT:2, threeT:2);
+            var game    = BuildGame(shooter);
+            var slot    = game.HomeLineup.SlotAt(1);
+
+            var genG      = new RollGGenerator(cfgG, cfgMatchup, game);
+            var stateP0   = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                EntryType.DeadBallInbound, SelectedSlot: slot,
+                UsagePressure: 0.32, UsageResidualPressure: 0.0);
+            var genResult = genG.GenerateWithResidual(stateP0);
+            var residual  = genResult.ResidualPressure;
+
+            var stateBase = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                EntryType.DeadBallInbound, SelectedSlot: slot, ShotType: ShotLocation.Rim,
+                UsagePressure: 0.0, UsageResidualPressure: 0.0);
+            var stateP    = stateBase with { UsagePressure = 0.32, UsageResidualPressure = residual };
+
+            var makeBase = MakePct(game, stateBase);
+            var makeP    = MakePct(game, stateP);
+            specialistDrop = makeBase - makeP;
+
+            Console.WriteLine($"    Specialist Rim: base={makeBase:F4} pressured={makeP:F4} drop={specialistDrop*100:F1}pts residual={residual:F4}");
+            var ok = specialistDrop > 0.05;
+            if (!ok) Console.WriteLine("    FAIL — specialist drop too small");
+            t &= ok;
+
+            var volTax  = makeBase * (0.32 * cfgH.PressureVolumeTaxScale);
+            var resPen  = residual * cfgH.PressureResidualPenaltyScale;
+            Console.WriteLine($"    Attribution: vol-tax={volTax*100:F1}pts  residual-penalty={resPen*100:F1}pts");
+
+            pass &= t;
+            Console.WriteLine($"  (b) {(t ? "ok" : "FAIL")}");
+        }
+
+        // ── (c) Versatile player absorbs; ordering assertion ──────────────────
+        {
+            var t = true;
+            Console.WriteLine("\n  (c) Versatile player absorbs; specialist drop >> versatile drop");
+            var shooter = Mk(50, fin:55, mid:55, rimT:22, shortT:20, midT:25, longT:18, threeT:15);
+            var game    = BuildGame(shooter);
+            var slot    = game.HomeLineup.SlotAt(1);
+
+            var genG      = new RollGGenerator(cfgG, cfgMatchup, game);
+            var stateP0   = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                EntryType.DeadBallInbound, SelectedSlot: slot,
+                UsagePressure: 0.32, UsageResidualPressure: 0.0);
+            var genResult = genG.GenerateWithResidual(stateP0);
+            var residual  = genResult.ResidualPressure;
+
+            var stateBase = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                EntryType.DeadBallInbound, SelectedSlot: slot, ShotType: ShotLocation.Mid,
+                UsagePressure: 0.0, UsageResidualPressure: 0.0);
+            var stateP    = stateBase with { UsagePressure = 0.32, UsageResidualPressure = residual };
+
+            var makeBase = MakePct(game, stateBase);
+            var makeP    = MakePct(game, stateP);
+            var drop     = makeBase - makeP;
+
+            Console.WriteLine($"    Versatile Mid: base={makeBase:F4} pressured={makeP:F4} drop={drop*100:F1}pts residual={residual:F4}");
+
+            var residualOk  = residual < 0.02;
+            var orderingOk  = specialistDrop > drop * 2.0;
+            Console.WriteLine($"    Residual near-zero: {(residualOk ? "ok" : "FAIL")} ({residual:F4})");
+            Console.WriteLine($"    Specialist drop ({specialistDrop*100:F1}pts) >> versatile drop ({drop*100:F1}pts): {(orderingOk ? "ok" : "FAIL")}");
+            t &= residualOk && orderingOk;
+
+            pass &= t;
+            Console.WriteLine($"  (c) {(t ? "ok" : "FAIL")}");
+        }
+
+        // ── (d) Below-comfort no-op ───────────────────────────────────────────
+        {
+            var t = true;
+            Console.WriteLine("\n  (d) Below-comfort slot unchanged");
+            var shooter = Mk(50, rimT:20, shortT:20, midT:20, longT:20, threeT:20);
+            var game    = BuildGame(shooter);
+            var slot    = game.HomeLineup.SlotAt(1);
+
+            foreach (ShotLocation zone in Enum.GetValues<ShotLocation>())
+            {
+                var stateBase  = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                    EntryType.DeadBallInbound, SelectedSlot: slot, ShotType: zone,
+                    UsagePressure: 0.0, UsageResidualPressure: 0.0);
+                var stateBelow = stateBase;  // pressure=0 IS the below-comfort case
+                var base_ = MakePct(game, stateBase);
+                var below = MakePct(game, stateBelow);
+                var ok    = Math.Abs(base_ - below) < Eps;
+                if (!ok) { Console.WriteLine($"    FAIL zone {zone}"); t = false; }
+            }
+            if (t) Console.WriteLine("    ok — below-comfort (pressure=0) unchanged");
+            pass &= t;
+            Console.WriteLine($"  (d) {(t ? "ok" : "FAIL")}");
+        }
+
+        // ── (e) Natural-dominance cost ────────────────────────────────────────
+        {
+            var t = true;
+            Console.WriteLine("\n  (e) Naturally dominant star pays a real cost");
+            var star = Mk(50, fin:80, outside:75, mid:70, selfC:80, postM:70,
+                          rimT:35, shortT:20, midT:20, longT:12, threeT:13);
+            var game = BuildGame(star);
+            var slot = game.HomeLineup.SlotAt(1);
+
+            var stateBase    = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                EntryType.DeadBallInbound, SelectedSlot: slot, ShotType: ShotLocation.Rim,
+                UsagePressure: 0.0, UsageResidualPressure: 0.0);
+            var stateNatural = stateBase with { UsagePressure = 0.20, UsageResidualPressure = 0.0 };
+
+            var makeBase    = MakePct(game, stateBase);
+            var makeNatural = MakePct(game, stateNatural);
+            var drop        = makeBase - makeNatural;
+            Console.WriteLine($"    Star Rim: base={makeBase:F4} natural-load={makeNatural:F4} drop={drop*100:F1}pts");
+            var ok = drop > 0.005;
+            if (!ok) Console.WriteLine("    FAIL — star shows no cost at natural load");
+            t &= ok;
+            pass &= t;
+            Console.WriteLine($"  (e) {(t ? "ok" : "FAIL")}");
+        }
+
+        // ── (f) FastBreak exemption ───────────────────────────────────────────
+        {
+            var t = true;
+            Console.WriteLine("\n  (f) FastBreak exemption");
+            var shooter = Mk(50, rimT:20, shortT:20, midT:20, longT:20, threeT:20);
+            var game    = BuildGame(shooter);
+            var slot    = game.HomeLineup.SlotAt(1);
+
+            var genG   = new RollGGenerator(cfgG, cfgMatchup, game);
+            var stateFB = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                EntryType.Transition, SelectedSlot: slot, FastBreak: true,
+                UsagePressure: 0.0, UsageResidualPressure: 0.0);
+            var genRes    = genG.GenerateWithResidual(stateFB);
+            var residualOk = Math.Abs(genRes.ResidualPressure) < Eps;
+            Console.WriteLine($"    Roll G residual on FastBreak: {genRes.ResidualPressure:F6} → {(residualOk ? "ok" : "FAIL")}");
+            t &= residualOk;
+
+            // Roll H: FastBreak with 0.0/0.0 scalars should match null scalars
+            var stateH_FB   = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                EntryType.Transition, SelectedSlot: slot, ShotType: ShotLocation.Rim,
+                FastBreak: true, UsagePressure: 0.0, UsageResidualPressure: 0.0);
+            var stateH_null = new PossessionState(1, TeamSide.Home, TeamSide.Away,
+                EntryType.Transition, SelectedSlot: slot, ShotType: ShotLocation.Rim,
+                FastBreak: true);
+            var makeFB   = MakePct(game, stateH_FB);
+            var makeNull = MakePct(game, stateH_null);
+            var makeOk   = Math.Abs(makeFB - makeNull) < Eps;
+            Console.WriteLine($"    Roll H make (0.0 vs null scalars): {makeFB:F4} vs {makeNull:F4} → {(makeOk ? "ok" : "FAIL")}");
+            t &= makeOk;
+
+            pass &= t;
+            Console.WriteLine($"  (f) {(t ? "ok" : "FAIL")}");
+        }
+
+        // ── (g) Plumbing: null→non-null seams, ResetOffense clears ────────────
+        {
+            var t = true;
+            Console.WriteLine("\n  (g) Plumbing: null→non-null seams; ResetOffense clears both");
+
+            // Fresh PossessionState must have null for both fields
+            var fresh = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound);
+            var freshOk = !fresh.UsagePressure.HasValue && !fresh.UsageResidualPressure.HasValue;
+            Console.WriteLine($"    Fresh state: UsagePressure=null, UsageResidualPressure=null → {(freshOk ? "ok" : "FAIL")}");
+            t &= freshOk;
+
+            // After Roll E stamps pressure, field is non-null
+            var afterE = fresh with { UsagePressure = 0.25 };
+            var afterEOk = afterE.UsagePressure.HasValue && afterE.UsagePressure.Value == 0.25;
+            Console.WriteLine($"    After Roll E stamp (0.25): UsagePressure={afterE.UsagePressure} → {(afterEOk ? "ok" : "FAIL")}");
+            t &= afterEOk;
+
+            // After Roll G stamps residual, field is non-null
+            var afterG = afterE with { UsageResidualPressure = 0.06 };
+            var afterGOk = afterG.UsageResidualPressure.HasValue && afterG.UsageResidualPressure.Value == 0.06;
+            Console.WriteLine($"    After Roll G stamp (0.06): UsageResidualPressure={afterG.UsageResidualPressure} → {(afterGOk ? "ok" : "FAIL")}");
+            t &= afterGOk;
+
+            // ResetOffense with-expression must clear both
+            var reset = afterG with
+            {
+                SelectedSlot          = null,
+                ShotType              = null,
+                Result                = null,
+                FastBreak             = false,
+                UsagePressure         = null,
+                UsageResidualPressure = null,
+            };
+            var resetOk = !reset.UsagePressure.HasValue && !reset.UsageResidualPressure.HasValue;
+            Console.WriteLine($"    After ResetOffense-style with: both null → {(resetOk ? "ok" : "FAIL")}");
+            t &= resetOk;
+
+            pass &= t;
+            Console.WriteLine($"  (g) {(t ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine(pass ? "  Phase 17 PASSED." : "  Phase 17 FAILED.");
+        return pass;
     }
 }
 

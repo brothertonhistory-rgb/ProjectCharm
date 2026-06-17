@@ -38,6 +38,20 @@ public sealed class RollGConfig
     public double FastBreakLong  { get; set; } = 0.05;
     public double FastBreakThree { get; set; } = 0.05;
 
+    // --- Usage-pressure diet-shift dials (Phase 17). Control how far Roll G
+    //     bends the shot diet when a shooter is carrying above an equal load.
+    //
+    //     PressureShiftScale — requestedShift = pressure × scale. At 0.5, a
+    //     player at the rail (~0.32 pressure) requests a 0.16 shift in his shot
+    //     diet. Calibration placeholder; 0 = ablation (no shift, no residual).
+    //
+    //     PressureShiftCapFraction — the fraction of the bent-dominant zone's
+    //     mass that may be moved off in one possession. Prevents the diet from
+    //     being fully emptied even under maximum load. Default 0.8 (80%).
+    //     Invariant > 0 and ≤ 1. ---
+    public double PressureShiftScale        { get; set; } = 0.5;
+    public double PressureShiftCapFraction  { get; set; } = 0.8;
+
     public static RollGConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -64,6 +78,14 @@ public sealed class RollGConfig
         if (Math.Abs(fastBreakSum - 1.0) > Eps)
             throw new InvalidOperationException(
                 $"RollG FastBreak location weights must sum to 1.0: sum={fastBreakSum}.");
+
+        // Phase 17 invariants: shift scale non-negative; cap fraction in (0, 1].
+        if (cfg.PressureShiftScale < 0)
+            throw new InvalidOperationException(
+                "RollG PressureShiftScale must be >= 0 (0 = no diet shift, ablation-friendly).");
+        if (cfg.PressureShiftCapFraction <= 0 || cfg.PressureShiftCapFraction > 1.0)
+            throw new InvalidOperationException(
+                $"RollG PressureShiftCapFraction must be > 0 and <= 1 (got {cfg.PressureShiftCapFraction}).");
 
         return cfg;
     }

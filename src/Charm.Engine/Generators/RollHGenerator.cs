@@ -109,6 +109,41 @@ public sealed class RollHGenerator : IRollHPieGenerator
 
         var makePct = _cfg.MakeProbability(zone, effectiveRating);
 
+        // Phase 17 — usage-pressure efficiency penalties. Applied AFTER the matchup
+        // logistic and BEFORE BuildRealPie so a lower makePct correctly raises the
+        // miss slices through the carve-then-convert math.
+        //
+        // Read the two stamped scalars (null = Roll E/G has not run = 0.0 safe default).
+        // If BOTH are zero, this block is branch-skipped — zero-pressure possessions
+        // are numerically identical to pre-build behavior (the regression guard).
+        //
+        // Attribution note (§5 observability):
+        //   (a) existing matchup adjustment → already baked into makePct via logistic
+        //   (b) volume-tax term       → matchupMakePct × (1 − pressure × taxScale)
+        //   (c) residual-penalty term → makePct -= residual × residualScale
+        // Keeping all three contributions derivable from the harness output prevents
+        // accidental double-punishment going unnoticed.
+        var usagePressure = state.UsagePressure         ?? 0.0;
+        var usageResidual = state.UsageResidualPressure ?? 0.0;
+
+        if (usagePressure > 0.0 || usageResidual > 0.0)
+        {
+            // (b) Volume-tax: small all-shots reduction scaled by volume pressure.
+            // A versatile player feels this almost exclusively (residual ≈ 0).
+            makePct *= (1.0 - usagePressure * _cfg.PressureVolumeTaxScale);
+
+            // (c) Residual penalty: larger reduction for the load that could not
+            // shift to alternate zones. A forced specialist feels this heavily.
+            // Applied to whatever zone was actually taken (including the preferred
+            // zone — Shaq's penalty lands on Rim).
+            makePct -= usageResidual * _cfg.PressureResidualPenaltyScale;
+
+            // Clamp to [0, 1] — a heavily-pressured specialist approaches but
+            // cannot cross zero. Clamp is flagged; reaching 0 means over-tuning.
+            if (makePct < 0.0) makePct = 0.0;
+            if (makePct > 1.0) makePct = 1.0;
+        }
+
         // Phase 7 — matchup-aware block door. Compute the bent block weight from the
         // matchup, or fall back to the configured baseline if the defending slot is empty
         // (DEC-6, same guard as the make door above).

@@ -40,7 +40,7 @@ namespace Charm.Engine;
 public static class RollE
 {
     public static RollResult Execute(
-        PossessionState state, Pie<SelectionOutcome> pie, GameState game, IRng rng)
+        PossessionState state, Pie<SelectionOutcome> pie, double[] pressures, GameState game, IRng rng)
     {
         // 1. Roll the pie to a selection outcome.
         var outcome = pie.Roll(rng.NextUnitInterval());
@@ -51,15 +51,19 @@ public static class RollE
         var slotNumber = (int)outcome + 1;                       // Slot1 -> 1, ... Slot5 -> 5
         var slot = game.LineupFor(state.Offense).SlotAt(slotNumber);
 
-        // 3. Stamp the chosen slot onto the possession as a per-possession fact.
-        //    PossessionState is an immutable record, so this is a `with`-expression
-        //    producing a NEW state (not a mutation) — exactly how the resolver
-        //    already threads state through its loop.
-        var selectedState = state with { SelectedSlot = slot };
+        // 3. Stamp both the chosen slot AND the volume pressure onto the possession
+        //    as per-possession facts (the THIRD and FOURTH — SelectedSlot and
+        //    UsagePressure). One `with` keeps both writes atomic.
+        //    pressures[] is indexed by slotNumber - 1 (0-based), matching the
+        //    Slot1–Slot5 ordering in the generator's output.
+        var selectedState = state with
+        {
+            SelectedSlot   = slot,
+            UsagePressure  = pressures[slotNumber - 1],
+        };
 
-        // 4. Hand off to the (future) player-action sequence. Names the KIND, not
-        //    the node; the resolver maps it. The selected slot rides on the
-        //    carried state, not as a Continue payload.
+        // 4. Hand off to the player-action sequence. Names the KIND, not
+        //    the node; the resolver maps it.
         return new Continue(ContinuationKind.IntoPlayerAction, selectedState);
     }
 }

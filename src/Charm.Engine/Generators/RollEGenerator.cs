@@ -47,7 +47,7 @@ namespace Charm.Engine;
 ///
 /// Implements <see cref="IRollEPieGenerator"/>.
 /// </summary>
-public sealed class RollEGenerator : IRollEPieGenerator
+public sealed class RollEGenerator : IRollEGenerationProvider
 {
     private readonly RollEConfig _cfg;
     private readonly GameState   _game;
@@ -58,9 +58,15 @@ public sealed class RollEGenerator : IRollEPieGenerator
         _game = game ?? throw new ArgumentNullException(nameof(game));
     }
 
-    public Pie<SelectionOutcome> Generate(PossessionState state)
+    /// <summary>
+    /// Generate the selection pie AND per-slot volume pressures in one pass.
+    /// Pressure[i] = max(0, finalShares[i] − 1.0/populatedCount). Zero for
+    /// null/FastBreak slots. This is the method the resolver calls; the base
+    /// interface's <see cref="Generate"/> delegates here.
+    /// </summary>
+    public RollEGeneration GenerateWithPressure(PossessionState state)
     {
-        // ── FastBreak passthrough — byte-for-byte stub behaviour ────────────
+        // FastBreak passthrough — all pressures zero (no volume load on a transition).
         if (state.FastBreak)
         {
             var transWeights = new Dictionary<SelectionOutcome, double>
@@ -71,10 +77,16 @@ public sealed class RollEGenerator : IRollEPieGenerator
                 [SelectionOutcome.Slot4] = _cfg.TransitionSlot4,
                 [SelectionOutcome.Slot5] = _cfg.TransitionSlot5,
             };
-            return new Pie<SelectionOutcome>(transWeights, _cfg.Epsilon);
+            var transPie = new Pie<SelectionOutcome>(transWeights, _cfg.Epsilon);
+            // Extract shares from the transition pie for the FinalShares array
+            var outcomes    = Enum.GetValues<SelectionOutcome>();
+            var transShares = new double[5];
+            for (var i = 0; i < 5; i++)
+                transShares[i] = transWeights[outcomes[i]];
+            return new RollEGeneration(transPie, transShares, new double[5]);
         }
 
-        // ── Read five offense players (Roll B access shape) ─────────────────
+        // Read five offense players
         var offRoster = _game.RosterFor(state.Offense);
         var offLineup = _game.LineupFor(state.Offense);
 
@@ -87,7 +99,7 @@ public sealed class RollEGenerator : IRollEPieGenerator
             offRoster.PlayerAt(offLineup.SlotAt(5)),
         };
 
-        // ── Fallback: zero populated slots → flat Base* pie ─────────────────
+        // Count populated slots
         var populated = 0;
         foreach (var p in players) if (p is not null) populated++;
 
@@ -101,11 +113,15 @@ public sealed class RollEGenerator : IRollEPieGenerator
                 [SelectionOutcome.Slot4] = _cfg.BaseSlot4,
                 [SelectionOutcome.Slot5] = _cfg.BaseSlot5,
             };
-            return new Pie<SelectionOutcome>(baseWeights, _cfg.Epsilon);
+            var basePie      = new Pie<SelectionOutcome>(baseWeights, _cfg.Epsilon);
+            var outcomes2    = Enum.GetValues<SelectionOutcome>();
+            var baseShares   = new double[5];
+            for (var i = 0; i < 5; i++)
+                baseShares[i] = baseWeights[outcomes2[i]];
+            return new RollEGeneration(basePie, baseShares, new double[5]);
         }
 
-        // ── Compute raw usage scores ─────────────────────────────────────────
-        // Null slots get score 0.0 — they are excluded from all subsequent math.
+        // Compute raw usage scores
         var rawScores = new double[5];
         for (var i = 0; i < 5; i++)
         {
@@ -116,10 +132,9 @@ public sealed class RollEGenerator : IRollEPieGenerator
                           + (p.Outside + p.Mid + p.Finishing) / 3.0 * 0.35;
                 rawScores[i] = Math.Max(score, _cfg.MinUsageScore);
             }
-            // else stays 0.0
         }
 
-        // ── Apply sharpening exponent ────────────────────────────────────────
+        // Apply sharpening exponent
         var expScores = new double[5];
         var expTotal  = 0.0;
         for (var i = 0; i < 5; i++)
@@ -131,22 +146,35 @@ public sealed class RollEGenerator : IRollEPieGenerator
             }
         }
 
-        // ── Normalize to initial shares ──────────────────────────────────────
+        // Normalize to initial shares
         var shares = new double[5];
         for (var i = 0; i < 5; i++)
             shares[i] = expTotal > 0.0 ? expScores[i] / expTotal : 0.0;
 
-        // ── Apply floor + rail (hard constraints, constrained redistribution) ─
+        // Apply floor + rail (constrained redistribution)
         shares = ApplyFloorAndRail(shares, expScores, populated);
 
-        // ── Build the pie ────────────────────────────────────────────────────
-        var outcomes = Enum.GetValues<SelectionOutcome>();
-        var weights  = new Dictionary<SelectionOutcome, double>();
+        // ── Compute volume pressures (one pass, same shares array) ────────────
+        // pressure[i] = max(0, finalShare[i] − equalShare)
+        // equalShare  = 1.0 / populated. Null/empty slots stay 0.
+        var comfortShare = 1.0 / populated;
+        var pressures    = new double[5];
         for (var i = 0; i < 5; i++)
-            weights[outcomes[i]] = shares[i];
+            pressures[i] = players[i] is not null ? Math.Max(0.0, shares[i] - comfortShare) : 0.0;
 
-        return new Pie<SelectionOutcome>(weights, _cfg.Epsilon);
+        // Build the pie
+        var allOutcomes = Enum.GetValues<SelectionOutcome>();
+        var weights     = new Dictionary<SelectionOutcome, double>();
+        for (var i = 0; i < 5; i++)
+            weights[allOutcomes[i]] = shares[i];
+
+        var pie = new Pie<SelectionOutcome>(weights, _cfg.Epsilon);
+        return new RollEGeneration(pie, shares, pressures);
     }
+
+    /// <inheritdoc cref="IRollEPieGenerator.Generate"/>
+    public Pie<SelectionOutcome> Generate(PossessionState state) =>
+        GenerateWithPressure(state).Pie;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Constrained redistribution (water-filling)

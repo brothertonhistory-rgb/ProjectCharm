@@ -162,4 +162,33 @@ public sealed record PossessionState(
     TransitionContext? TransitionContext = null,
     bool FastBreak = false,
     bool Frontcourt = false,
-    PressMode PressMode = PressMode.None);
+    PressMode PressMode = PressMode.None,
+    /// <param name="UsagePressure">The FOURTH per-possession fact, stamped by Roll E
+    /// alongside <see cref="SelectedSlot"/>. The selected shooter's <b>volume
+    /// pressure</b> — <c>max(0, finalShare − equalShare)</c> — where
+    /// <c>equalShare = 1.0 / populatedCount</c> (five on-court players → 0.20).
+    /// <para>Null until Roll E runs (and on possessions that divert before
+    /// selection — a turnover or foul at entry — it is never set). Non-null means
+    /// Roll E ran: zero when the selected slot is at or below the equal share, or
+    /// on a FastBreak (no volume load on a transition possession). Positive when
+    /// the shooter is carrying above an even load.</para>
+    /// <para>This is the shooter's OWN volume load. Gravity and spacing layers
+    /// (deferred) will contribute their own NAMED components alongside this one —
+    /// they are NOT merged into this field.</para>
+    /// <para><b>Leak guard:</b> cleared to null by Roll K's <c>ResetOffense</c>
+    /// — a reset restarts selection from scratch, so the stale pressure must
+    /// not ride through.</para></param>
+    double? UsagePressure = null,
+    /// <param name="UsageResidualPressure">The FIFTH per-possession fact, stamped
+    /// by Roll G alongside <see cref="ShotType"/>. The volume load Roll G could
+    /// NOT absorb into a wider shot diet this possession — the load that stayed
+    /// stuck after the bounded diet expansion.
+    /// <para>Null until Roll G runs. After Roll G: <c>0.0</c> when the load was
+    /// fully absorbed (a versatile shooter under ordinary defense), when there was
+    /// no pressure (<see cref="UsagePressure"/> was zero), or on a FastBreak.
+    /// Positive for a forced specialist (the load that could not drain into
+    /// alternate zones). Read ONLY by Roll H's residual-penalty term.</para>
+    /// <para><b>Leak guard:</b> cleared to null by Roll K's <c>ResetOffense</c>
+    /// alongside <see cref="UsagePressure"/> — a reset restarts the shot-diet
+    /// calculation from scratch.</para></param>
+    double? UsageResidualPressure = null);
