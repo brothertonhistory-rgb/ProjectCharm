@@ -4469,3 +4469,36 @@ For weighted-credit families, the check is simpler but exact: every draw fires e
 ### Upward vs. downward validation
 
 The BLK check proves downward (every `BlkCount` credit was distributed to a player) but not upward (the Resolver captured every blocked shot in `blkCount`). The upward invariant is protected by code placement — `blkCount++` sits in the `ShotResult.Blocked` arm of the `IntoShotResolution` block, which is the single Roll H chokepoint every field-goal attempt passes through. There is no independent block-event total in the current record from which upward validation could be computed mechanically; this limitation is documented in the journal and in the harness comment.
+
+---
+
+## Phase 24 — Attribution sanity check: controlled roster validation
+
+### What this session validates and what it does not
+
+The Phase 23 attribution machinery assigns probabilistic credit for weighted stats (rebounds, steals, blocks, pre-Roll-E turnovers) via `WeightedDraw` — a single-event lottery whose outcome depends on the weight function applied to each slot's player. Phase 23 proved the arithmetic is correct: counts are conserved, named-player totals reconcile with event totals, same-seed inputs produce identical outputs. What it did not prove is that the weight functions are pulling the right attributes.
+
+Phase 24 answers that question with a controlled experiment rather than a proof of any individual event. No causal player exists for a defensive rebound — the engine has no rebound resolver that picks a named player mid-possession. `WeightedDraw` runs after the game, against the game's possession log. The sanity check proves that when extreme attribute contrasts are authored, extreme box-score contrasts appear in the expected direction. That is the strongest claim available given the architecture.
+
+### Controlled roster design
+
+Two symmetric teams (Rim Anchor in Slot 1, four perimeter role players in Slots 2–5) remove team-level confounds. Only within-team attribute spread drives the box-score contrast. The key weight function inputs:
+
+- **DReb** (`Height + Strength + Wingspan + DefensiveRebounding`): Anchor = 367, Role = 105, ratio 3.50×
+- **OReb** (`Height + Strength + Wingspan + OffensiveRebounding`): Anchor = 362, Role = 105, ratio 3.45×
+- **BLK** (`RimProtection + Height + Wingspan + Vertical`): Anchor = 324, Role = 110, ratio 2.95×
+
+Pre-validated at prompt-drafting time; re-confirmed against live source at build time. All three ratios exceed their thresholds by a comfortable margin, making the directional assertions conservative.
+
+The 3PA assertion is not a pure attribution check — it is an integrated test of Roll E usage selection (who gets the possession), Roll G shot-type selection (what kind of shot), and exact 3PA slot attribution. A role player with ThreeTendency=60 and the anchor with ThreeTendency=1 produce a 39× ratio in 3PA, which validates that all three layers are connected and pulling the authored attributes.
+
+### FT% as exact attribution verification
+
+FreeThrow is the cleanest 1:1 in the model (`makeProbability = player.FreeThrow / 100.0` in RollLGenerator.cs). FTA/FTM are exact per-slot stats: the engine knows which slot was at the line from the possession record. The FT% directional assertion (Anchor FT% < 65% on FreeThrow=55; Role combined FT% > 72% on FreeThrow=78) therefore tests whether the exact slot attribution is correctly threaded end-to-end from Roll L through the possession record through `AttributeGame`. Any wiring break — wrong slot index, off-by-one, incorrect PlayerId — would deflect FT% toward 72% (the config fallback) and fail the assertion.
+
+FoulDrawing is set asymmetrically (Anchor=30, Role=65) to ensure both sample gates are reachable in 200 games: anchor FTA ≈372 >> gate of 50; role FTA ≈3,228 >> gate of 200. Insufficient sample is a hard failure, not a silent pass.
+
+### Duplication note
+
+The invariant checks inside `AttributionSanityCheck` duplicate logic from `ObservationRunV1`. This is accepted for Phase 24 scope — the two call sites can diverge over time as rosters evolve. A future `ValidateAttributionTotals` shared-helper extraction is logged as a candidate refactor.
+

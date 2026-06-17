@@ -1,3 +1,43 @@
+## Session 58 — Phase 24: Attribution Sanity Check (controlled roster, 200 games) (2026-06-17)
+
+**Scope:** Verify that the weighting system preferentially credits players with the intended attributes. One new harness check (`AttributionSanityCheck`) — no engine changes, no config changes, no new rolls. The check constructs a controlled 10-player roster, runs 200 games, and tests directional assertions against the Phase 23 attribution machinery.
+
+**What shipped (1 file):**
+- `src/Charm.Harness/Program.cs` — new `private static bool AttributionSanityCheck(string configPath)` method wired into `Main` via `ok &= AttributionSanityCheck(configPath)` before `ObservationRunV1`. The method:
+  - Constructs a controlled roster inline: Slot 1 is a Rim Anchor (Height=92, Wingspan=92, DefensiveRebounding=95, OffensiveRebounding=90, RimProtection=90, FreeThrow=55, FoulDrawing=30, RimTendency=80, ThreeTendency=1); Slots 2–5 are perimeter role players (Height=35, Wingspan=35, DefensiveRebounding=5, OffensiveRebounding=5, RimProtection=5, FreeThrow=78, FoulDrawing=65, ThreeTendency=60, RimTendency=10). Same template both sides — symmetric by design.
+  - Runs 200 games using the same Governor/Resolver construction as `ObservationRunV1` (same configs, `SystemRng(seed)` / `SystemRng(seed+1)`, same `firstState`). Calls `AttributeGame` per game and accumulates into `long[10]` arrays.
+  - Runs 13 invariant checks copied verbatim from `ObservationRunV1`: exact-family reconciliation (FGA/FGM/3PA/3PM/FTA/FTM named == total − unattributed for Home and Away), weighted-credit identity checks (OReb/DReb/BLK/STL/TO per-player sums == engine event counts), and per-possession per-slot subset checks (3PM ≤ 3PA, 3PA ≤ FGA, FTM ≤ FTA, for all 6 slot indices).
+  - Runs directional assertions per side (Home and Away): DReb anchor/role ratio > 3.0×, OReb ratio > 3.0×, BLK ratio > 2.0×, 3PA role/anchor ratio > 3.0× (integrated selection + attribution check), Anchor FT% < 65% (authored FreeThrow=55), Role combined FT% > 72% (authored FreeThrow=78). FT% assertions include minimum-sample gates (Anchor FTA ≥ 50, Role FTA ≥ 200) — insufficient sample is a hard failure.
+  - Runs no-zero FGA check (all 10 players must have FGA > 0 over 200 games — wiring health check).
+  - Returns `true` only if all invariants and all directional assertions pass. Local summary line `Attribution sanity check: PASSED/FAILED`. Authoritative final verdict owned by `Main`'s single banner.
+
+**Design note — this is not causal attribution:** For weighted stats (rebounds, steals, blocks, some turnovers) no causal player exists in the engine. The check proves the weighting system preferentially credits players with the intended attributes — extreme attribute contrasts produce extreme box-score contrasts in the expected direction. That is what this session validates, not that any specific player caused any specific event.
+
+**Python pre-validation (run before writing C#):**
+- DReb weight (Anchor vs. individual role): 367 vs. 105 → ratio 3.50× > threshold 3.0× ✓
+- OReb weight: 362 vs. 105 → ratio 3.45× > threshold 3.0× ✓
+- BLK weight: 324 vs. 110 → ratio 2.95× > threshold 2.0× ✓
+- FreeThrow=55 → 55.0%, FreeThrow=78 → 78.0% (1:1 formula confirmed live in RollLGenerator.cs) ✓
+- FTA sample over 200 games: Anchor ≈372 (gate: 50), Role ≈3,228 (gate: 200) — both clear comfortably ✓
+
+**Harness output — key results:**
+
+*Phase 24 directional assertions (Home side, 200-game averages):*
+
+| Player | DReb/g | OReb/g | BLK/g | 3PA/g | FT% |
+|---|---|---|---|---|---|
+| RimAnchor | 9.09 | 3.65 | 1.15 | 0.14 | 56.8% |
+| PerimRole (avg) | 2.51 | 1.01 | 0.38 | 5.39 | 81.2% |
+| Ratio | 3.62× | 3.61× | 3.00× | 39.96× role/anchor | — |
+
+Away side ratios: DReb 3.58×, OReb 3.34×, BLK 3.04×, 3PA 45.81×. All thresholds cleared on both sides.
+
+All 13 invariant checks: [OK]. All 12 directional assertions: [OK].
+
+**ALL CHECKS PASSED.**
+
+**Deferred (unchanged):** True per-player attribution across substitutions; assists; fouls per player; per-player StressTest box score; `MakePlayer` PlayerId assignment.
+
 ## Session 57 — Phase 23: Named Player Attribution Under Fixed Lineups (2026-06-17)
 
 **Scope:** Credit each team-level event to a named player across 1,000 games. With fixed lineups, per-slot and per-player attribution are equivalent — this is the prerequisite layer, not the final substitution-aware thing. Attribution for stats the engine directly knows (which slot shot, which slot was fouled) is exact. Attribution for stats without a specific actor (defensive rebounder, steal, block, turnover on pre-Roll-E possessions) is probabilistic credit via weighted draws.

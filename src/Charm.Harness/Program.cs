@@ -134,6 +134,7 @@ internal static class Program
         ok &= Phase15PressFrequencyStandardCheck(configPath);
         ok &= Phase16PressBreakFastBreakCheck(configPath);
         ok &= Phase17UsageEfficiencyCheck(configPath);
+        ok &= AttributionSanityCheck(configPath);
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -10711,6 +10712,464 @@ internal static class Program
             Passing:D(11), Playmaking:D(12), BallHandling:D(13), BasketballIQ:D(14),
             PerimeterDefense:D(15), PostDefense:D(16), RimProtection:D(17),
             OffensiveRebounding:D(18), DefensiveRebounding:D(19));
+    }
+
+    // ── Phase 24: Attribution Sanity Check ────────────────────────────────────
+    // Constructs a controlled 10-player roster (1 Rim Anchor + 4 perimeter role
+    // players per side, symmetric), runs 200 games, and verifies:
+    //   (a) All Phase 23 attribution invariants hold under this roster.
+    //   (b) Extreme attribute contrasts produce extreme box-score contrasts in the
+    //       expected direction (DReb/OReb/BLK anchor dominance; 3PA role dominance;
+    //       FT% tracks authored FreeThrow ratings 1:1).
+    // This proves the weighting system preferentially credits players with the
+    // intended attributes — not causal attribution of individual events.
+    private static bool AttributionSanityCheck(string configPath)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- Phase 24: Attribution Sanity Check (controlled roster, 200 games) ---");
+        Console.WriteLine("  NOTE: weighted stats (DReb, OReb, BLK, STL, TO) prove the weighting system");
+        Console.WriteLine("  preferentially credits players with the intended attributes — not causal attribution.");
+        Console.WriteLine("  Exact stats (FGA, FGM, 3PA, 3PM, FTA, FTM) are slot-exact.");
+        Console.WriteLine();
+
+        var sanityOk = true;
+
+        // ── Configs (same pattern as ObservationRunV1) ────────────────────────
+        var cfg        = RollAConfig.Load(configPath);
+        var cfgB       = RollBConfig.Load(configPath);
+        var cfgC       = RollCConfig.Load(configPath);
+        var cfgD       = RollDConfig.Load(configPath);
+        var cfgE       = RollEConfig.Load(configPath);
+        var cfgF       = RollFConfig.Load(configPath);
+        var cfgG       = RollGConfig.Load(configPath);
+        var cfgH       = RollHConfig.Load(configPath);
+        var cfgI       = RollIConfig.Load(configPath);
+        var cfgJ       = RollJConfig.Load(configPath);
+        var cfgK       = RollKConfig.Load(configPath);
+        var cfgL       = RollLConfig.Load(configPath);
+        var cfgM       = RollMConfig.Load(configPath);
+        var cfgOffFoul = RollOffensiveFoulConfig.Load(configPath);
+        var cfgGov     = GovernorConfig.Load(configPath);
+        var cfgClock   = RollClockConfig.Load(configPath);
+        var cfgEndHalf = EndOfHalfConfig.Load(configPath);
+        var cfgMatchup = MatchupConfig.Load(configPath);
+
+        // ── Controlled roster construction ───────────────────────────────────
+        // Slot 1 — Rim Anchor (Home PlayerId=1, Away PlayerId=6)
+        // Big, dominant rebounder and shot blocker; poor FT% (FreeThrow=55); rarely shoots threes.
+        var anchorTemplate = new Player("RimAnchor")
+        {
+            Height              = 92, Wingspan            = 92, Strength            = 88, Vertical            = 50,
+            DefensiveRebounding = 95, OffensiveRebounding = 90,
+            RimProtection       = 90,
+            Finishing           = 90, FreeThrow           = 55,
+            Outside             = 10, ThreeTendency       = 1,  RimTendency         = 80,
+            BallHandling        = 40, FoulDrawing         = 30,
+            // All other authored attributes default to 0; set to 50 for non-zero realism.
+            Close = 50, Mid = 50, ShortTendency = 10, MidTendency = 5, LongTendency = 4,
+            Passing = 50, Playmaking = 50, SelfCreation = 50, PostMoves = 50,
+            OffBallMovement = 50, Screening = 50,
+            PerimeterDefense = 50, PostDefense = 50, Steals = 50,
+            Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
+            Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50,
+        };
+
+        // Slots 2–5 — Perimeter role players (Home PlayerId=2–5, Away PlayerId=7–10)
+        // Small, poor rebounder; good FT% (FreeThrow=78); heavy three-point shooter.
+        var roleTemplate = new Player("PerimRole")
+        {
+            Height              = 35, Wingspan            = 35, Strength            = 30, Vertical            = 35,
+            DefensiveRebounding = 5,  OffensiveRebounding = 5,
+            RimProtection       = 5,
+            Finishing           = 35, FreeThrow           = 78,
+            Outside             = 75, ThreeTendency       = 60, RimTendency         = 10,
+            BallHandling        = 65, FoulDrawing         = 65,
+            // All other authored attributes default to 50.
+            Close = 50, Mid = 50, ShortTendency = 10, MidTendency = 15, LongTendency = 15,
+            Passing = 50, Playmaking = 50, SelfCreation = 50, PostMoves = 50,
+            OffBallMovement = 50, Screening = 50,
+            PerimeterDefense = 50, PostDefense = 50, Steals = 50,
+            Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
+            Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50,
+        };
+
+        // ── Per-player box score accumulators (indexed PlayerId-1, 0..9) ─────
+        var bsFga  = new long[10]; var bsFgm  = new long[10];
+        var bs3pa  = new long[10]; var bs3pm  = new long[10];
+        var bsFta  = new long[10]; var bsFtm  = new long[10];
+        var bsTo   = new long[10]; var bsOReb = new long[10];
+        var bsDReb = new long[10]; var bsStl  = new long[10];
+        var bsBlk  = new long[10];
+
+        // ── Invariant totals ─────────────────────────────────────────────────
+        long totalHomeFga = 0L, totalAwayFga = 0L;
+        long totalHomeUnattr = 0L, totalAwayUnattr = 0L;
+        long totalHomeFgm = 0L, totalAwayFgm = 0L;
+        long totalHomeUnattrFgm = 0L, totalAwayUnattrFgm = 0L;
+        long totalHome3pa = 0L, totalAway3pa = 0L;
+        long totalHomeUnattr3pa = 0L, totalAwayUnattr3pa = 0L;
+        long totalHome3pm = 0L, totalAway3pm = 0L;
+        long totalHomeUnattr3pm = 0L, totalAwayUnattr3pm = 0L;
+        long totalHomeFta = 0L, totalAwayFta = 0L;
+        long totalHomeUnattrFta = 0L, totalAwayUnattrFta = 0L;
+        long totalHomeFtm = 0L, totalAwayFtm = 0L;
+        long totalHomeUnattrFtm = 0L, totalAwayUnattrFtm = 0L;
+        long totalOrbWon = 0L, totalDrebPoss = 0L;
+        long totalBlkCount = 0L, totalStlPoss = 0L, totalToPoss = 0L;
+
+        const int Games = 200;
+
+        var firstState = new PossessionState(
+            PossessionNumber: 1,
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
+            Entry: EntryType.DeadBallInbound);
+
+        Console.Write($"  Running {Games} games");
+
+        for (var seed = 1; seed <= Games; seed++)
+        {
+            if (seed % 50 == 0) Console.Write(".");
+
+            // Fresh game state per game.
+            var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+
+            // Seat controlled roster — StampPlayerId before SetStarter (Phase 23 pattern).
+            // Home: Slot1=Anchor(ID=1), Slots2-5=Role(ID=2-5)
+            // Away: Slot1=Anchor(ID=6), Slots2-5=Role(ID=7-10)
+            foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
+            {
+                var lineup  = game.LineupFor(side);
+                var roster  = game.RosterFor(side);
+                var idBase  = side == TeamSide.Home ? 1 : 6;
+
+                // Slot 1 — Anchor
+                roster.SetStarter(lineup.SlotAt(1), StampPlayerId(anchorTemplate, idBase));
+                // Slots 2–5 — Role players
+                for (var i = 1; i <= 4; i++)
+                    roster.SetStarter(lineup.SlotAt(i + 1), StampPlayerId(roleTemplate, idBase + i));
+            }
+
+            game.SetPossessionArrow(TeamSide.Home);
+
+            var resolverRng = new SystemRng(seed);
+            var governorRng = new SystemRng(seed + 1);
+
+            var resolver = new Resolver(
+                new RollAGenerator(cfg, cfgMatchup, game),
+                cfg,
+                new RollBGenerator(cfgB, cfgMatchup, game),
+                new RollCStubPieGenerator(cfgC),
+                cfgC,
+                new RollDStubPieGenerator(cfgD),
+                new RollEGenerator(cfgE, game),
+                new RollFGenerator(cfgF, cfgMatchup, game),
+                new RollGGenerator(cfgG, cfgMatchup, game),
+                new RollHGenerator(cfgH, cfgMatchup, game),
+                new RollIGenerator(cfgI, cfgMatchup, game),
+                new RollJStubPieGenerator(cfgJ),
+                new RollKStubPieGenerator(cfgK),
+                new RollLGenerator(cfgL, game),
+                new RollMGenerator(cfgM, cfgMatchup, game),
+                new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
+                cfgMatchup,
+                game,
+                resolverRng);
+
+            var governor = new Governor(resolver, game, cfgGov, cfgClock, governorRng, cfgEndHalf);
+
+            GovernorRunResult result;
+            try
+            {
+                result = governor.Run(firstState);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL-THROW] Seed {seed}: {ex.Message}");
+                sanityOk = false;
+                continue;
+            }
+
+            var records = result.Possessions;
+
+            // ── Accumulate invariant totals ───────────────────────────────────
+            foreach (var r in records)
+            {
+                if (r.Offense == TeamSide.Home)
+                {
+                    totalHomeFga       += r.Fga;
+                    totalHomeUnattr    += r.SlotUnattributedFga;
+                    totalHomeFgm       += r.Fgm;
+                    totalHomeUnattrFgm += r.SlotUnattributedFgm;
+                    totalHome3pa       += r.ThreePa;
+                    totalHomeUnattr3pa += r.ThreePaBySlot[0];
+                    totalHome3pm       += r.ThreePm;
+                    totalHomeUnattr3pm += r.ThreePmBySlot[0];
+                    totalHomeFta       += r.Fta;
+                    totalHomeUnattrFta += r.FtaBySlot[0];
+                    totalHomeFtm       += r.Ftm;
+                    totalHomeUnattrFtm += r.FtmBySlot[0];
+                }
+                else
+                {
+                    totalAwayFga       += r.Fga;
+                    totalAwayUnattr    += r.SlotUnattributedFga;
+                    totalAwayFgm       += r.Fgm;
+                    totalAwayUnattrFgm += r.SlotUnattributedFgm;
+                    totalAway3pa       += r.ThreePa;
+                    totalAwayUnattr3pa += r.ThreePaBySlot[0];
+                    totalAway3pm       += r.ThreePm;
+                    totalAwayUnattr3pm += r.ThreePmBySlot[0];
+                    totalAwayFta       += r.Fta;
+                    totalAwayUnattrFta += r.FtaBySlot[0];
+                    totalAwayFtm       += r.Ftm;
+                    totalAwayUnattrFtm += r.FtmBySlot[0];
+                }
+                totalOrbWon    += r.OrbWon;
+                totalDrebPoss  += r.EndLabel == "DefensiveRebound" ? 1 : 0;
+                totalBlkCount  += r.BlkCount;
+                totalStlPoss   += r.TurnoverWasLiveBall ? 1 : 0;
+                totalToPoss    += IsTurnoverPossession(r) ? 1 : 0;
+            }
+
+            // ── Per-slot subset checks (verbatim from ObservationRunV1) ───────
+            for (var chkSlot = 0; chkSlot <= 5; chkSlot++)
+            {
+                var slotFailed = false;
+                foreach (var r in records)
+                {
+                    var slotFga = chkSlot == 0 ? r.SlotUnattributedFga : GetSlotFga(r, chkSlot);
+                    var slotFgm = chkSlot == 0 ? r.SlotUnattributedFgm : GetSlotFgm(r, chkSlot);
+                    if (r.ThreePmBySlot[chkSlot] > r.ThreePaBySlot[chkSlot])
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine($"  [FAIL] Seed {seed}: slot {chkSlot} 3PM > 3PA in a possession");
+                        sanityOk = false; slotFailed = true; break;
+                    }
+                    if (r.ThreePaBySlot[chkSlot] > slotFga)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine($"  [FAIL] Seed {seed}: slot {chkSlot} 3PA > FGA in a possession");
+                        sanityOk = false; slotFailed = true; break;
+                    }
+                    if (r.ThreePmBySlot[chkSlot] > slotFgm)
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine($"  [FAIL] Seed {seed}: slot {chkSlot} 3PM > FGM in a possession");
+                        sanityOk = false; slotFailed = true; break;
+                    }
+                    if (r.FtmBySlot[chkSlot] > r.FtaBySlot[chkSlot])
+                    {
+                        Console.WriteLine();
+                        Console.WriteLine($"  [FAIL] Seed {seed}: slot {chkSlot} FTM > FTA in a possession");
+                        sanityOk = false; slotFailed = true; break;
+                    }
+                }
+                if (slotFailed) break;
+            }
+
+            // ── Attribution pass ──────────────────────────────────────────────
+            var attributed = AttributeGame(result, game, seed);
+            for (var i = 0; i < 10; i++)
+            {
+                bsFga [i] += attributed.Fga [i]; bsFgm [i] += attributed.Fgm [i];
+                bs3pa [i] += attributed.Tpa [i]; bs3pm [i] += attributed.Tpm [i];
+                bsFta [i] += attributed.Fta [i]; bsFtm [i] += attributed.Ftm [i];
+                bsTo  [i] += attributed.To  [i]; bsOReb[i] += attributed.OReb[i];
+                bsDReb[i] += attributed.DReb[i]; bsStl [i] += attributed.Stl [i];
+                bsBlk [i] += attributed.Blk [i];
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine();
+
+        // ── Box score ─────────────────────────────────────────────────────────
+        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"TO",5}");
+        Console.WriteLine(new string('─', 115));
+        string[] playerNames = {
+            "[Home] RimAnchor", "[Home] PerimRole2", "[Home] PerimRole3", "[Home] PerimRole4", "[Home] PerimRole5",
+            "[Away] RimAnchor", "[Away] PerimRole2", "[Away] PerimRole3", "[Away] PerimRole4", "[Away] PerimRole5",
+        };
+        for (var i = 0; i < 10; i++)
+        {
+            double g   = Games;
+            var fga    = bsFga [i] / g; var fgm  = bsFgm [i] / g;
+            var tpa    = bs3pa [i] / g; var tpm  = bs3pm [i] / g;
+            var fta    = bsFta [i] / g; var ftm  = bsFtm [i] / g;
+            var orb    = bsOReb[i] / g; var drb  = bsDReb[i] / g;
+            var stl    = bsStl [i] / g; var blk  = bsBlk [i] / g;
+            var to     = bsTo  [i] / g;
+            var pts    = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
+            var fgPct  = fga > 0 ? fgm / fga * 100 : 0.0;
+            var tpPct  = tpa > 0 ? tpm / tpa * 100 : 0.0;
+            var ftPct  = fta > 0 ? ftm / fta * 100 : 0.0;
+            Console.WriteLine(
+                $"  {playerNames[i],-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
+                $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
+                $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {to,5:F1}");
+        }
+
+        // ── Invariant checks ─────────────────────────────────────────────────
+        Console.WriteLine();
+        Console.WriteLine("  --- Invariant checks ---");
+
+        void CheckExact(string label, long named, long total, long unattr)
+        {
+            if (named != total - unattr)
+            {
+                Console.WriteLine($"  [FAIL] {label}: named={named} != total-unattr={total - unattr}");
+                sanityOk = false;
+            }
+            else Console.WriteLine($"  [OK] {label}");
+        }
+
+        long NamedHome(long[] arr) => arr[0]+arr[1]+arr[2]+arr[3]+arr[4];
+        long NamedAway(long[] arr) => arr[5]+arr[6]+arr[7]+arr[8]+arr[9];
+
+        var totalHomeFgmFull = bsFgm[0]+bsFgm[1]+bsFgm[2]+bsFgm[3]+bsFgm[4] + totalHomeUnattrFgm;
+        var totalAwayFgmFull = bsFgm[5]+bsFgm[6]+bsFgm[7]+bsFgm[8]+bsFgm[9] + totalAwayUnattrFgm;
+
+        CheckExact("FGA Home",    NamedHome(bsFga), totalHomeFga, totalHomeUnattr);
+        CheckExact("FGA Away",    NamedAway(bsFga), totalAwayFga, totalAwayUnattr);
+        CheckExact("FGM Home",    NamedHome(bsFgm), totalHomeFgmFull, totalHomeUnattrFgm);
+        CheckExact("FGM Away",    NamedAway(bsFgm), totalAwayFgmFull, totalAwayUnattrFgm);
+        CheckExact("3PA Home",    NamedHome(bs3pa), totalHome3pa, totalHomeUnattr3pa);
+        CheckExact("3PA Away",    NamedAway(bs3pa), totalAway3pa, totalAwayUnattr3pa);
+        CheckExact("3PM Home",    NamedHome(bs3pm), totalHome3pm, totalHomeUnattr3pm);
+        CheckExact("3PM Away",    NamedAway(bs3pm), totalAway3pm, totalAwayUnattr3pm);
+        CheckExact("FTA Home",    NamedHome(bsFta), totalHomeFta, totalHomeUnattrFta);
+        CheckExact("FTA Away",    NamedAway(bsFta), totalAwayFta, totalAwayUnattrFta);
+        CheckExact("FTM Home",    NamedHome(bsFtm), totalHomeFtm, totalHomeUnattrFtm);
+        CheckExact("FTM Away",    NamedAway(bsFtm), totalAwayFtm, totalAwayUnattrFtm);
+
+        var bsORebTotal = bsOReb.Sum();
+        var bsDRebTotal = bsDReb.Sum();
+        var bsBlkTotal  = bsBlk.Sum();
+        var bsStlTotal  = bsStl.Sum();
+        var bsToTotal   = bsTo.Sum();
+
+        if (bsORebTotal != totalOrbWon)
+        { Console.WriteLine($"  [FAIL] OReb: Σ per-player {bsORebTotal} != OrbWon {totalOrbWon}"); sanityOk = false; }
+        else Console.WriteLine($"  [OK] OReb: Σ per-player == total OrbWon ({totalOrbWon})");
+
+        if (bsDRebTotal != totalDrebPoss)
+        { Console.WriteLine($"  [FAIL] DReb: Σ per-player {bsDRebTotal} != DReb possessions {totalDrebPoss}"); sanityOk = false; }
+        else Console.WriteLine($"  [OK] DReb: Σ per-player == total DReb possessions ({totalDrebPoss})");
+
+        if (bsBlkTotal != totalBlkCount)
+        { Console.WriteLine($"  [FAIL] BLK: Σ per-player {bsBlkTotal} != BlkCount {totalBlkCount}"); sanityOk = false; }
+        else Console.WriteLine($"  [OK] BLK: Σ per-player == total BlkCount ({totalBlkCount})");
+
+        if (bsStlTotal != totalStlPoss)
+        { Console.WriteLine($"  [FAIL] STL: Σ per-player {bsStlTotal} != live-TO possessions {totalStlPoss}"); sanityOk = false; }
+        else Console.WriteLine($"  [OK] STL: Σ per-player == total live-TO possessions ({totalStlPoss})");
+
+        if (bsToTotal != totalToPoss)
+        { Console.WriteLine($"  [FAIL] TO: Σ per-player {bsToTotal} != TO possessions {totalToPoss}"); sanityOk = false; }
+        else Console.WriteLine($"  [OK] TO: Σ per-player == total TO possessions ({totalToPoss})");
+
+        // ── Directional assertions ────────────────────────────────────────────
+        Console.WriteLine();
+        Console.WriteLine("  --- Directional assertions ---");
+
+        double AnchorVal(long[] arr, int side) => arr[side * 5 + 0] / (double)Games;
+        double RoleAvg(long[] arr, int side)   =>
+            (arr[side*5+1] + arr[side*5+2] + arr[side*5+3] + arr[side*5+4]) / 4.0 / Games;
+
+        for (var side = 0; side < 2; side++)
+        {
+            var sideLabel = side == 0 ? "Home" : "Away";
+
+            // DReb dominance
+            var ancDReb = AnchorVal(bsDReb, side);
+            var roleDReb = RoleAvg(bsDReb, side);
+            var drebRatio = roleDReb > 0 ? ancDReb / roleDReb : double.PositiveInfinity;
+            if (ancDReb <= roleDReb * 3.0)
+            { Console.WriteLine($"  [FAIL] {sideLabel} DReb: Anchor {ancDReb:F2}/g vs Role {roleDReb:F2}/g — ratio {drebRatio:F2}× < 3.0×"); sanityOk = false; }
+            else Console.WriteLine($"  [OK] {sideLabel} DReb: Anchor {ancDReb:F2}/g vs Role {roleDReb:F2}/g — ratio {drebRatio:F2}× > 3.0×");
+
+            // OReb dominance
+            var ancOReb = AnchorVal(bsOReb, side);
+            var roleOReb = RoleAvg(bsOReb, side);
+            var orebRatio = roleOReb > 0 ? ancOReb / roleOReb : double.PositiveInfinity;
+            if (ancOReb <= roleOReb * 3.0)
+            { Console.WriteLine($"  [FAIL] {sideLabel} OReb: Anchor {ancOReb:F2}/g vs Role {roleOReb:F2}/g — ratio {orebRatio:F2}× < 3.0×"); sanityOk = false; }
+            else Console.WriteLine($"  [OK] {sideLabel} OReb: Anchor {ancOReb:F2}/g vs Role {roleOReb:F2}/g — ratio {orebRatio:F2}× > 3.0×");
+
+            // BLK dominance
+            var ancBlk = AnchorVal(bsBlk, side);
+            var roleBlk = RoleAvg(bsBlk, side);
+            var blkRatio = roleBlk > 0 ? ancBlk / roleBlk : double.PositiveInfinity;
+            if (ancBlk <= roleBlk * 2.0)
+            { Console.WriteLine($"  [FAIL] {sideLabel} BLK: Anchor {ancBlk:F2}/g vs Role {roleBlk:F2}/g — ratio {blkRatio:F2}× < 2.0×"); sanityOk = false; }
+            else Console.WriteLine($"  [OK] {sideLabel} BLK: Anchor {ancBlk:F2}/g vs Role {roleBlk:F2}/g — ratio {blkRatio:F2}× > 2.0×");
+
+            // 3PA role dominance (integrated selection-plus-attribution check)
+            var ancTpa = AnchorVal(bs3pa, side);
+            var roleTpa = RoleAvg(bs3pa, side);
+            var tpaRatio = ancTpa > 0 ? roleTpa / ancTpa : double.PositiveInfinity;
+            if (roleTpa <= ancTpa * 3.0)
+            { Console.WriteLine($"  [FAIL] {sideLabel} 3PA (integrated): Role {roleTpa:F2}/g vs Anchor {ancTpa:F2}/g — ratio {tpaRatio:F2}× < 3.0× [integrated selection+attribution check]"); sanityOk = false; }
+            else Console.WriteLine($"  [OK] {sideLabel} 3PA (integrated): Role {roleTpa:F2}/g vs Anchor {ancTpa:F2}/g — ratio {tpaRatio:F2}× > 3.0× [integrated selection+attribution check]");
+
+            // FT% — exact attribution check
+            long anchorFta     = bsFta[side * 5];
+            long anchorFtm     = bsFtm[side * 5];
+            long roleFtaTotal  = bsFta[side*5+1]+bsFta[side*5+2]+bsFta[side*5+3]+bsFta[side*5+4];
+            long roleFtmTotal  = bsFtm[side*5+1]+bsFtm[side*5+2]+bsFtm[side*5+3]+bsFtm[side*5+4];
+
+            if (anchorFta < 50)
+            {
+                Console.WriteLine($"  [FAIL] {sideLabel} Anchor FT sample too small: FTA={anchorFta}, required >= 50");
+                sanityOk = false;
+            }
+            else
+            {
+                var ancFtPct = anchorFtm / (double)anchorFta;
+                if (ancFtPct >= 0.65)
+                {
+                    Console.WriteLine($"  [FAIL] {sideLabel} Anchor FT%: {ancFtPct:P1} >= 65% (FreeThrow=55, expect ≈55%)");
+                    sanityOk = false;
+                }
+                else Console.WriteLine($"  [OK] {sideLabel} Anchor FT%: {ancFtPct:P1} < 65% (FreeThrow=55, expect ≈55%)");
+            }
+
+            if (roleFtaTotal < 200)
+            {
+                Console.WriteLine($"  [FAIL] {sideLabel} Role FT sample too small: FTA={roleFtaTotal}, required >= 200");
+                sanityOk = false;
+            }
+            else
+            {
+                var roleFtPct = roleFtmTotal / (double)roleFtaTotal;
+                if (roleFtPct <= 0.72)
+                {
+                    Console.WriteLine($"  [FAIL] {sideLabel} Role combined FT%: {roleFtPct:P1} <= 72% (FreeThrow=78, expect ≈78%)");
+                    sanityOk = false;
+                }
+                else Console.WriteLine($"  [OK] {sideLabel} Role combined FT%: {roleFtPct:P1} > 72% (FreeThrow=78, expect ≈78%)");
+            }
+        }
+
+        // ── No-zero FGA check (wiring health) ────────────────────────────────
+        for (var i = 0; i < 10; i++)
+        {
+            if (bsFga[i] == 0)
+            {
+                Console.WriteLine($"  [FAIL] Player index {i} has 0 FGA across {Games} games — PlayerId wiring issue");
+                sanityOk = false;
+            }
+        }
+
+        // ── Local summary ─────────────────────────────────────────────────────
+        Console.WriteLine();
+        Console.WriteLine(sanityOk
+            ? "  Attribution sanity check: PASSED"
+            : "  Attribution sanity check: FAILED (see [FAIL] lines above)");
+
+        return sanityOk;
     }
 }
 
