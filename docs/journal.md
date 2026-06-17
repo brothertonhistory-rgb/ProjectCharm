@@ -1,3 +1,46 @@
+## Session 54 — Phase 19: Roll E Live in ObservationRunV1 + StressTest (2026-06-17)
+
+**Scope:** Swap `RollEStubPieGenerator` → `RollEGenerator` at exactly two harness construction sites — `ObservationRunV1` and `StressTestArchetypeRosters` — so the Phase 17 usage→efficiency chain fires at game scale for the first time. No engine file changes. No new generator, config, roll, enum, or `ContinuationKind`.
+
+**Why this was a dormant subsystem.** `RollEStubPieGenerator.GenerateWithPressure` returns an all-zeros pressures array (`new double[5]`). The Resolver calls `GenerateWithPressure` (not `Generate`) at both Roll E dispatch sites. So even after Phase 17 wired the penalty into Roll G and Roll H, `UsagePressure` was always 0.0 at game scale — the Phase 17 branch in `RollHGenerator` was a complete branch-skip in every observation and stress test run. Swapping the two sites activates the full chain: Roll E stamps real pressures → Roll G bends the shot diet → Roll H penalizes the make rate.
+
+**What shipped (1 file — 2 surgical line changes):**
+- `Harness/Program.cs` — two substitutions only:
+  - `ObservationRunV1` (~line 4299): `new RollEStubPieGenerator(cfgE),` → `new RollEGenerator(cfgE, game),  // Phase 19: attribute-driven usage selection`
+  - `StressTestArchetypeRosters` (~line 9423): same swap, deeper indentation.
+  - Diff: exactly 2 changed lines. Brace balance verified (2170/2170).
+  - Stub count: baseline 21 → 19 remaining; real count: 2 → 4.
+
+**Sites that stayed stub (19 remaining):** all isolation checks (which assert flat, known selection shares) and `RunGame` (the dev-only single-game printer). Both are correct: isolation checks need a flat pie to assert against; `RunGame`'s fidelity question is open (see below).
+
+**No Monte Carlo this session.** No new math was introduced. `RollEGenerator`'s selection and pressure math shipped in Phase 15/17 and is proven by `RollESelectionBatchCheck` and `Phase17UsageEfficiencyCheck`, both of which run every harness pass.
+
+**Harness results — ALL CHECKS PASSED:**
+- All Phase 1–18 isolated checks: green and unchanged. None route through the two swapped sites.
+- `RollESelectionBatchCheck`: green — confirms `RollEGenerator` itself is untouched.
+- `Phase17UsageEfficiencyCheck`: green — confirms usage→efficiency math is untouched.
+- `ObservationRunV1`: mechanics OK, zero parks, zero throws, scoring reconciled, count invariant held.
+- `StressTestArchetypeRosters`: all 8 buckets, validGames=500/500. Mirror gap 3.4% (small).
+
+**Key observations (record; do not grade):**
+
+*ObservationRunV1 (frozen corpus, 1000 games):*
+- PPP combined: 1.072, FG% 50.3% — both within a realistic D1 band.
+- Shot mix: Rim 33%, Short 17%, Mid 17%, Long 10%, Three 23%.
+
+*StarVsBalanced — the most informative bucket:*
+- Team A (star) wins 60.4%, PPP 1.041 vs 0.987. The star team benefits net.
+- Shot mix shift visible: star team Rim 36% / Three 23% vs balanced team Rim 29% / Three 26%. The alpha is commanding a larger share of rim attempts — exactly what the usage-weighted selection pie predicts.
+- The two effects that were uncertain before the run (usage concentration raises efficiency by routing to a better scorer; efficiency penalty lowers it) resolved in favor of the star team. Whether that net is calibrated correctly is a separate question; the direction is basketball-coherent.
+
+*Mirror gap (Buckets 7/8 — AthleticVsSkill):* 3.4% — consistent with a side-neutral engine.
+
+**Named finding from this run — FreeThrow attribute authoring:** FT% in the average and weak stress-test buckets (AverageVsAverage ~53%, WeakVsWeak ~47–48%) is far below real basketball (~68–70% D1 average). The cause: the archetype roster generator scales FreeThrow down with the talent tier, which is wrong. FreeThrow is **completely independent of athletic ability and overall skill level** — not merely roughly independent. The only real relationship in the attribute is a weak positive correlation with Outside shooting (shared shooting mechanics), but the best free-throw shooter in the world could be playing D3. No other attribute in the model works this way. The fix: FreeThrow should be drawn from its own independent distribution in the archetype generator, regardless of tier, with at most a mild skew toward high-Outside players. This is a calibration/authoring session in its own right; nothing in the engine changes.
+
+**Open question (journal only — not acted on):** `RunGame` (the dev-only printer, not in the `ok &=` chain) now has an arbitrary fidelity mix: Roll L real (Phase 18), Roll E stub (this session leaves it), everything else stub. Whether it should be consistently all-stub (a clean flat-pie baseline demo) or consistently production-like (matching the observation run) is Emmett's design call.
+
+**Git commit:** `Phase 19: Roll E live in ObservationRunV1 + StressTest (usage→efficiency now fires at game scale)`
+
 ## Session 53 — Phase 18: Roll L Real Generator (FreeThrow attribute wired) (2026-06-17)
 
 **Scope:** Replace `RollLStubPieGenerator` with an attribute-driven `RollLGenerator` that reads the shooter's `FreeThrow` rating and uses it directly as the make probability (`FreeThrow / 100.0`). Introduce `IRollLPieGenerator` so the Resolver field is typed to an interface rather than the concrete stub. Update the four real-game construction sites in the harness to use the real generator. All other construction sites keep the stub.

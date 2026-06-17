@@ -4296,7 +4296,7 @@ internal static class Program
                 new RollCStubPieGenerator(cfgC),
                 cfgC,
                 new RollDStubPieGenerator(cfgD),
-                new RollEStubPieGenerator(cfgE),
+                new RollEGenerator(cfgE, game),                        // Phase 19: attribute-driven usage selection
                 new RollFGenerator(cfgF, cfgMatchup, game),
                 new RollGGenerator(cfgG, cfgMatchup, game),
                 new RollHGenerator(cfgH, cfgMatchup, game),
@@ -9420,7 +9420,7 @@ internal static class Program
                         new RollCStubPieGenerator(cfgC),
                         cfgC,
                         new RollDStubPieGenerator(cfgD),
-                        new RollEStubPieGenerator(cfgE),
+                        new RollEGenerator(cfgE, game),                    // Phase 19: attribute-driven usage selection
                         new RollFGenerator(cfgF, cfgMatchup, game),
                         new RollGGenerator(cfgG, cfgMatchup, game),
                         new RollHGenerator(cfgH, cfgMatchup, game),
