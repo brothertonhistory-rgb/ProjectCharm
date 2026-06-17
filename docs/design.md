@@ -4365,3 +4365,26 @@ Clamped to `max(score, MinUsageScore)` before the sharpening exponent. The (Clos
 **Sites that stayed stub — why each is correct.** Isolation checks (e.g. `RollFActionBatchCheck`) construct a Resolver with a stub Roll E because they assert rates against a flat, known selection pie. A real, roster-dependent Roll E would make the selection share depend on whichever players happen to be seated, breaking fixed expectations. The stub is the right instrument for an isolation test — same principle that kept 18 stub sites in Phase 18. `RunGame` stays stub because its fidelity question (consistently all-stub vs consistently production-like) is a design call deferred to Emmett.
 
 **What remains after Phase 19.** The usage→efficiency chain is live and directionally validated. The calibration question — whether the current scalar defaults produce realistic per-player efficiency curves at actual D1 usage loads — is entirely open. The FreeThrow authoring fix is a named follow-on. The `RunGame` fidelity question is parked for Emmett's decision.
+
+
+## Phase 21: Per-Slot FGA Usage Readout (Session 55)
+
+**What this is.** Phase 21 makes the Phase 17 usage→efficiency chain directly observable: instead of inferring slot concentration from PPP and FG% shifts, the harness now prints exactly what fraction of each team's FGA each slot took. The instrumentation is purely additive — no engine math changes.
+
+**Attribution chokepoint.** The slot-binning switch lives at the single `IntoShotResolution` case in `Route()` — the only path every field-goal attempt passes through, including putbacks. Placement here gives completeness automatically: every FGA that the engine counts must increment exactly one slot counter (or the unattributed counter).
+
+**Normal-shot identity chain.** Roll E stamps `SelectedSlot` when the shooter is selected. No intermediate routing case (IntoHalfcourtSet, IntoPlayerAction, IntoShotType) clears it. `SelectedSlot` is non-null and correct at IntoShotResolution for normal possessions.
+
+**Putback identity (Roll K carry-through).** On a putback, Roll K's PutBack arm uses `state with { ShotType = ShotLocation.Rim }` — only `ShotType` is modified. `SelectedSlot` is not in the `with` expression and carries through unchanged. Contrast: the `ResetOffense` arm explicitly wipes `SelectedSlot = null` — preserve-vs-wipe is intentional and symmetric. Putback FGAs are credited to the original Roll E shooter's slot.
+
+**The `SlotUnattributedFga` counter.** The slot-binning switch has a `default: slotUnattributedFga++; break;` arm that fires when `SelectedSlot` is null. This scenario is exclusively the bonus-free-throw putback path: a pre-shot foul sends the team to the line before Roll E runs → last FT missed → Roll M offensive rebound → Roll K PutBack → IntoShotResolution with null SelectedSlot. Roll K correctly preserves null; the unattributed counter captures it. The completeness invariant holds: `Slot1Fga+…+Slot5Fga+SlotUnattributedFga == Fga` for every possession. In practice, ~0.2% of FGAs are unattributed.
+
+**Plumbing layers.**
+- `RoutingOutcome` (Resolver.cs): 6 new init-only fields (`Slot1Fga`–`Slot5Fga`, `SlotUnattributedFga`). All default 0 — same pure-append pattern as every prior observability field. One new local per counter in `Route()`; extended return statement.
+- `PossessionRecord` (Governor.cs): 6 new defaulted params threaded from `RoutingOutcome` via the existing `possessionX` local pattern. No positional deconstruction exists anywhere in the codebase, so trailing defaulted params are backward-compatible.
+- `ObservationRunV1` (harness): 12 running total accumulators (6 slot buckets × 2 sides); per-game slot-bin integrity check asserts `recS1+…+recS5+recSU == recFga`; USAGE section prints slot percentages and Unattr.
+- `StressTestArchetypeRosters` (harness): `VariantStats` gains 12 fields; game-loop accumulates all 12; per-bucket reconciliation check asserts `slotSum+unattr == aggFga` and feeds `failures` on mismatch; usage output lines.
+
+**Not per-player — a named seam.** The slot counters are correct under fixed lineups. When substitutions arrive, a slot may be occupied by different players across a game and the counter will combine them. A separate player-ID attribution layer is required at that point. The per-slot counters are the designed foundation for that future layer.
+
+**Bucket 5 (StarVsBalanced) as calibration reference.** Team A Slot 1 carries 29% of FGA vs ~16–23% for the balanced roster slots — the star's usage concentration is now directly readable. This is the input the Phase 17 efficiency penalty was designed to respond to.

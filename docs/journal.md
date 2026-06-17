@@ -1,3 +1,44 @@
+## Session 55 — Phase 21: Per-Slot FGA Usage Readout + TBase Removal (2026-06-17)
+
+**Scope:** Two independent changes. (1) Remove one dead-code line (`TBase()` in `MakePlayer`) to eliminate the CS8321 compiler warning. (2) Wire per-slot FGA counters from the Roll H chokepoint through `RoutingOutcome` → `PossessionRecord` → both harness output sections, making slot concentration directly visible. No new generator, config key, roll, enum, or `ContinuationKind`.
+
+**What shipped (3 files):**
+- `Resolver.cs` — `RoutingOutcome` gains 6 new init-only fields: `Slot1Fga`–`Slot5Fga` and `SlotUnattributedFga` (all 0 default — existing constructions untouched). `Route()` gains 6 locals and a slot-binning `switch` inside the `IntoShotResolution` else block with a `default` arm for null `SelectedSlot`. Return statement extended with all 6 new fields.
+- `Governor.cs` — `PossessionRecord` gains 6 new defaulted params (`Slot1Fga`–`Slot5Fga`, `SlotUnattributedFga`). `Run()` gains 6 locals, threads them from outcome, adds them to `records.Add(...)`.
+- `Program.cs` — (a) TBase one-line delete. (b) `ObservationRunV1`: 12 running totals (6 slot buckets × 2 sides), per-game slot-bin integrity check, accumulation, new USAGE output section. (c) `StressTestArchetypeRosters`: 12 new `VariantStats` fields, 12 game-loop accumulation lines, per-bucket reconciliation check, usage output.
+
+**Mid-build finding: `SlotUnattributedFga`.**
+
+The initial build omitted a `default` arm from the slot-binning switch. The first harness run fired `[FAIL] Seed N: slot-attempt bin` in ~18% of ObsRun games and `[FAIL] Bucket N: slot-sum` in all 8 StressTest buckets. Every mismatch was `slot-sum < FGA` by a small count (~0.1–0.2 FGA per team per game).
+
+Diagnosis: bonus-free-throw possessions where Roll E was never called arrive at Roll K's PutBack arm with `SelectedSlot = null`. Roll K correctly preserves null (only `ShotType` is modified; the preserve-vs-wipe is explicit and symmetric with `ResetOffense`). The putback reaches IntoShotResolution, `fga++` fires, but the switch falls through with no increment.
+
+Fix: `default: slotUnattributedFga++; break;` arm added to the slot-binning switch; `SlotUnattributedFga` threaded through `RoutingOutcome` → `PossessionRecord` → both harness sections. The completeness invariant is now `Slot1Fga+…+Slot5Fga+SlotUnattributedFga == Fga` — every FGA accounted for. The reconciliation assertion in both harness sections uses the full sum.
+
+**Harness results — ALL CHECKS PASSED (second run, after fix):**
+- ObsRun: mechanics ALL OK; no slot-bin [FAIL] lines across all 1000 games; USAGE section prints cleanly.
+- StressTest: all 8 buckets clean; no slot-sum [FAIL] lines; STRESS TEST PASSED.
+- All Phase 1–17 checks unchanged.
+- CS8321 TBase warning: absent.
+
+**Key observations (record; do not grade):**
+
+*ObservationRunV1 (balanced frozen corpus, 1000 games):*
+- Home: Slot1=21.4%  Slot2=24.7%  Slot3=23.0%  Slot4=16.7%  Slot5=14.0%  Unattr=0.2%
+- Away: Slot1=20.7%  Slot2=25.5%  Slot3=22.9%  Slot4=17.9%  Slot5=12.9%  Unattr=0.2%
+- Modest spread consistent with a balanced roster. Slots 2 and 3 carry slightly more; slots 4 and 5 less — plausible for the frozen corpus's mix of guards and wings.
+
+*Bucket 5 (StarVsBalanced) — the key signal:*
+- Team A (star at Slot 1): Slot1=**29.0%** Slot2=20.2% Slot3=20.1% Slot4=19.0% Slot5=11.5% Unattr=0.2%
+- Team B (balanced): Slot1=16.5% Slot2=21.4% Slot3=19.3% Slot4=22.3% Slot5=20.3% Unattr=0.2%
+- Slot 1 on the star team carries 29% — materially above the 20% equal-share baseline. The usage concentration that Phase 17 modeled as the driver of efficiency penalties is now directly readable. The balanced roster shows near-equal shares across all five slots as expected.
+
+*Unattr across all buckets:* consistently 0.2%, confirming the unattributed population is entirely the bonus-FT-putback scenario. No signal of a gap in the normal shot path.
+
+**Git commit:** `Phase 21: Per-slot FGA usage readout in ObservationRunV1 and StressTest + TBase removal`
+
+---
+
 ## Session 54 — Phase 19: Roll E Live in ObservationRunV1 + StressTest (2026-06-17)
 
 **Scope:** Swap `RollEStubPieGenerator` → `RollEGenerator` at exactly two harness construction sites — `ObservationRunV1` and `StressTestArchetypeRosters` — so the Phase 17 usage→efficiency chain fires at game scale for the first time. No engine file changes. No new generator, config, roll, enum, or `ContinuationKind`.

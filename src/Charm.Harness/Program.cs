@@ -4252,6 +4252,18 @@ internal static class Program
         var longShareList   = new List<double>(N);
         var threeShareList  = new List<double>(N);
 
+        // Per-slot FGA running totals (aggregate, not per-game lists).
+        // Aggregate ratio matches the stress-test calculation and reconciles
+        // naturally: slot shares sum to exactly 100%.
+        long totalHomeFga   = 0L;
+        long totalHomeFgaS1 = 0L, totalHomeFgaS2 = 0L, totalHomeFgaS3 = 0L,
+             totalHomeFgaS4 = 0L, totalHomeFgaS5 = 0L;
+        long totalHomeUnattr = 0L;
+        long totalAwayFga   = 0L;
+        long totalAwayFgaS1 = 0L, totalAwayFgaS2 = 0L, totalAwayFgaS3 = 0L,
+             totalAwayFgaS4 = 0L, totalAwayFgaS5 = 0L;
+        long totalAwayUnattr = 0L;
+
         // Terminal mix — accumulated across all possessions, all games.
         var termBuckets = new Dictionary<string, long>
         {
@@ -4433,6 +4445,26 @@ internal static class Program
                 mechanicsOk = false;
             }
 
+            // ── Per-slot bin integrity ────────────────────────────────────────
+            // Proves every FGA received exactly one valid slot bin (completeness).
+            // Does NOT prove shooter identity — that is established by the Roll E
+            // selection contract for normal attempts and the Roll K carry-through
+            // contract for putbacks, as documented in the RoutingOutcome comment.
+            var recS1 = records.Sum(r => r.Slot1Fga);
+            var recS2 = records.Sum(r => r.Slot2Fga);
+            var recS3 = records.Sum(r => r.Slot3Fga);
+            var recS4 = records.Sum(r => r.Slot4Fga);
+            var recS5 = records.Sum(r => r.Slot5Fga);
+            var recSU = records.Sum(r => r.SlotUnattributedFga);
+            if (recS1 + recS2 + recS3 + recS4 + recS5 + recSU != recFga)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: slot-attempt bin — " +
+                    $"Slot1({recS1})+Slot2({recS2})+Slot3({recS3})+Slot4({recS4})+Slot5({recS5})+Unattr({recSU}) " +
+                    $"!= FGA({recFga})");
+                mechanicsOk = false;
+            }
+
             var hPoss = records.Count(r => r.Offense == TeamSide.Home);
             var aPoss = records.Count(r => r.Offense == TeamSide.Away);
             var hPts  = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Points);
@@ -4524,6 +4556,22 @@ internal static class Program
             midShareList.Add(tFga > 0      ? (double)tMidA / tFga      : 0.0);
             longShareList.Add(tFga > 0     ? (double)tLongA / tFga     : 0.0);
             threeShareList.Add(tFga > 0    ? (double)t3pa / tFga       : 0.0);
+
+            // Per-slot FGA running totals — accumulate for aggregate share.
+            totalHomeFga   += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Fga);
+            totalHomeFgaS1 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot1Fga);
+            totalHomeFgaS2 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot2Fga);
+            totalHomeFgaS3 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot3Fga);
+            totalHomeFgaS4 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot4Fga);
+            totalHomeFgaS5 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot5Fga);
+            totalHomeUnattr += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.SlotUnattributedFga);
+            totalAwayFga   += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Fga);
+            totalAwayFgaS1 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot1Fga);
+            totalAwayFgaS2 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot2Fga);
+            totalAwayFgaS3 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot3Fga);
+            totalAwayFgaS4 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot4Fga);
+            totalAwayFgaS5 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot5Fga);
+            totalAwayUnattr += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.SlotUnattributedFga);
 
             foreach (var r in records)
             {
@@ -4632,6 +4680,24 @@ internal static class Program
         ObsPrintD("    Mid",   midShareList);
         ObsPrintD("    Long",  longShareList);
         ObsPrintD("    Three", threeShareList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- USAGE (per-slot FGA share, aggregate across all games) ---");
+        var hS1sh = totalHomeFga > 0 ? (double)totalHomeFgaS1 / totalHomeFga : 0.0;
+        var hS2sh = totalHomeFga > 0 ? (double)totalHomeFgaS2 / totalHomeFga : 0.0;
+        var hS3sh = totalHomeFga > 0 ? (double)totalHomeFgaS3 / totalHomeFga : 0.0;
+        var hS4sh = totalHomeFga > 0 ? (double)totalHomeFgaS4 / totalHomeFga : 0.0;
+        var hS5sh = totalHomeFga > 0 ? (double)totalHomeFgaS5 / totalHomeFga : 0.0;
+        var hSUsh = totalHomeFga > 0 ? (double)totalHomeUnattr  / totalHomeFga : 0.0;
+        var aS1sh = totalAwayFga > 0 ? (double)totalAwayFgaS1 / totalAwayFga : 0.0;
+        var aS2sh = totalAwayFga > 0 ? (double)totalAwayFgaS2 / totalAwayFga : 0.0;
+        var aS3sh = totalAwayFga > 0 ? (double)totalAwayFgaS3 / totalAwayFga : 0.0;
+        var aS4sh = totalAwayFga > 0 ? (double)totalAwayFgaS4 / totalAwayFga : 0.0;
+        var aS5sh = totalAwayFga > 0 ? (double)totalAwayFgaS5 / totalAwayFga : 0.0;
+        var aSUsh = totalAwayFga > 0 ? (double)totalAwayUnattr  / totalAwayFga : 0.0;
+        Console.WriteLine($"  Home: Slot1={hS1sh:P1}  Slot2={hS2sh:P1}  Slot3={hS3sh:P1}  Slot4={hS4sh:P1}  Slot5={hS5sh:P1}  Unattr={hSUsh:P1}");
+        Console.WriteLine($"  Away: Slot1={aS1sh:P1}  Slot2={aS2sh:P1}  Slot3={aS3sh:P1}  Slot4={aS4sh:P1}  Slot5={aS5sh:P1}  Unattr={aSUsh:P1}");
+        Console.WriteLine("  NOTE: per-slot, not per-player — valid while lineups are fixed. Unattr = bonus-FT putbacks (Roll E never ran).");
 
         Console.WriteLine();
         Console.WriteLine("--- ORB% (offensive rebound rate, FG-miss + block + FT misses combined) ---");
@@ -8731,7 +8797,6 @@ internal static class Program
 
         // Tendency helpers — independent of elevated/weakness
         int TStr(int lo, int hi) => Clamp(rng.Next(lo, hi + 1));
-        int TBase()              => Clamp(AtBaseline());
 
         // ── Attribute assignment by archetype ─────────────────────────────
         Player p;
@@ -9219,6 +9284,13 @@ internal static class Program
         // Transition: per-game
         public readonly List<double> TeamATransFreq = new();
         public readonly List<double> TeamBTransFreq = new();
+        // Per-slot FGA (usage observability): aggregate FGA per slot per logical team.
+        // Per-slot, not per-player — valid under fixed lineups.
+        public long TeamASlot1Fga, TeamASlot2Fga, TeamASlot3Fga, TeamASlot4Fga, TeamASlot5Fga;
+        public long TeamBSlot1Fga, TeamBSlot2Fga, TeamBSlot3Fga, TeamBSlot4Fga, TeamBSlot5Fga;
+        // Unattributed slot FGAs: bonus-FT putbacks where Roll E was never called.
+        public long TeamASlotUnattributedFga;
+        public long TeamBSlotUnattributedFga;
     }
 
     // ── Per-variant game outcomes for the bucket-7/8 paired diagnostic ────────
@@ -9570,6 +9642,20 @@ internal static class Program
                     vs.TeamALongA  += records.Where(r => r.Offense == teamASide).Sum(r => r.LongFga);
                     vs.TeamBLongA  += records.Where(r => r.Offense == teamBSide).Sum(r => r.LongFga);
 
+                    // Per-slot FGA (usage)
+                    vs.TeamASlot1Fga += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot1Fga);
+                    vs.TeamBSlot1Fga += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot1Fga);
+                    vs.TeamASlot2Fga += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot2Fga);
+                    vs.TeamBSlot2Fga += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot2Fga);
+                    vs.TeamASlot3Fga += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot3Fga);
+                    vs.TeamBSlot3Fga += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot3Fga);
+                    vs.TeamASlot4Fga += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot4Fga);
+                    vs.TeamBSlot4Fga += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot4Fga);
+                    vs.TeamASlot5Fga += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot5Fga);
+                    vs.TeamBSlot5Fga += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot5Fga);
+                    vs.TeamASlotUnattributedFga += records.Where(r => r.Offense == teamASide).Sum(r => r.SlotUnattributedFga);
+                    vs.TeamBSlotUnattributedFga += records.Where(r => r.Offense == teamBSide).Sum(r => r.SlotUnattributedFga);
+
                     // ORB — attribute to the offense on each possession
                     vs.TeamAOrbW += records.Where(r => r.Offense == teamASide).Sum(r => r.OrbWon);
                     vs.TeamBOrbW += records.Where(r => r.Offense == teamBSide).Sum(r => r.OrbWon);
@@ -9706,6 +9792,50 @@ internal static class Program
 
             Console.WriteLine($"  Shot mix Team A: Rim={rimShareA:P0} Short={shortShareA:P0} Mid={midShareA:P0} Long={longShareA:P0} Three={threePaRateA:P0}");
             Console.WriteLine($"  Shot mix Team B: Rim={rimShareB:P0} Short={shortShareB:P0} Mid={midShareB:P0} Long={longShareB:P0} Three={threePaRateB:P0}");
+
+            // Slot FGA share (usage)
+            long aggASlot1 = allVariantStats.Sum(v => v.TeamASlot1Fga);
+            long aggASlot2 = allVariantStats.Sum(v => v.TeamASlot2Fga);
+            long aggASlot3 = allVariantStats.Sum(v => v.TeamASlot3Fga);
+            long aggASlot4 = allVariantStats.Sum(v => v.TeamASlot4Fga);
+            long aggASlot5 = allVariantStats.Sum(v => v.TeamASlot5Fga);
+            long aggASlotU = allVariantStats.Sum(v => v.TeamASlotUnattributedFga);
+            long aggBSlot1 = allVariantStats.Sum(v => v.TeamBSlot1Fga);
+            long aggBSlot2 = allVariantStats.Sum(v => v.TeamBSlot2Fga);
+            long aggBSlot3 = allVariantStats.Sum(v => v.TeamBSlot3Fga);
+            long aggBSlot4 = allVariantStats.Sum(v => v.TeamBSlot4Fga);
+            long aggBSlot5 = allVariantStats.Sum(v => v.TeamBSlot5Fga);
+            long aggBSlotU = allVariantStats.Sum(v => v.TeamBSlotUnattributedFga);
+            // Aggregate slot-to-FGA reconciliation: slot1+…+slot5+unattributed must equal FGA.
+            // Print before shares so a mismatch is visible alongside the slot values.
+            var slotSumA = aggASlot1 + aggASlot2 + aggASlot3 + aggASlot4 + aggASlot5 + aggASlotU;
+            var slotSumB = aggBSlot1 + aggBSlot2 + aggBSlot3 + aggBSlot4 + aggBSlot5 + aggBSlotU;
+            if (slotSumA != aggAFga)
+            {
+                var msg = $"Bucket {bucketNum} {bucketName}: slot-sum Team A ({slotSumA}) != FGA ({aggAFga})";
+                failures.Add(msg);
+                Console.WriteLine($"  [FAIL] {msg}");
+            }
+            if (slotSumB != aggBFga)
+            {
+                var msg = $"Bucket {bucketNum} {bucketName}: slot-sum Team B ({slotSumB}) != FGA ({aggBFga})";
+                failures.Add(msg);
+                Console.WriteLine($"  [FAIL] {msg}");
+            }
+            double slotA1 = aggAFga > 0 ? (double)aggASlot1 / aggAFga : 0.0;
+            double slotA2 = aggAFga > 0 ? (double)aggASlot2 / aggAFga : 0.0;
+            double slotA3 = aggAFga > 0 ? (double)aggASlot3 / aggAFga : 0.0;
+            double slotA4 = aggAFga > 0 ? (double)aggASlot4 / aggAFga : 0.0;
+            double slotA5 = aggAFga > 0 ? (double)aggASlot5 / aggAFga : 0.0;
+            double slotAU = aggAFga > 0 ? (double)aggASlotU / aggAFga : 0.0;
+            double slotB1 = aggBFga > 0 ? (double)aggBSlot1 / aggBFga : 0.0;
+            double slotB2 = aggBFga > 0 ? (double)aggBSlot2 / aggBFga : 0.0;
+            double slotB3 = aggBFga > 0 ? (double)aggBSlot3 / aggBFga : 0.0;
+            double slotB4 = aggBFga > 0 ? (double)aggBSlot4 / aggBFga : 0.0;
+            double slotB5 = aggBFga > 0 ? (double)aggBSlot5 / aggBFga : 0.0;
+            double slotBU = aggBFga > 0 ? (double)aggBSlotU / aggBFga : 0.0;
+            Console.WriteLine($"  Usage Team A: Slot1={slotA1:P1} Slot2={slotA2:P1} Slot3={slotA3:P1} Slot4={slotA4:P1} Slot5={slotA5:P1} Unattr={slotAU:P1}");
+            Console.WriteLine($"  Usage Team B: Slot1={slotB1:P1} Slot2={slotB2:P1} Slot3={slotB3:P1} Slot4={slotB4:P1} Slot5={slotB5:P1} Unattr={slotBU:P1}");
 
             // ORB%
             long aggAOrbW = allVariantStats.Sum(v => v.TeamAOrbW);

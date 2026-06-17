@@ -171,6 +171,41 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     public int LongFga { get; init; }
     /// <summary>Long-two-zone field goals made (the <see cref="ShotLocation.Long"/> subset of <see cref="Fgm"/>).</summary>
     public int LongFgm { get; init; }
+
+    // ── Per-slot FGA counters (usage observability) ──────────────────────────
+    // One counter per on-court slot (1–5): the count of FGAs taken by that
+    // slot on this possession. Accumulated at the Roll H chokepoint (the single
+    // path every field-goal attempt passes through, including putbacks).
+    //
+    // Putback attribution: on a putback, Roll K's PutBack arm carries SelectedSlot
+    // untouched by design ("same-player rebound tilt" — Roll K comment). So putback
+    // FGAs are credited to the original Roll E selection, which is the correct
+    // behavior for this model. This is slot observability under a fixed-lineup
+    // assumption; it is NOT durable per-player identity tracking. When substitutions
+    // arrive, a slot may be occupied by different players across a game, and this
+    // counter will combine all of them — a separate player-ID layer is required then.
+    //
+    // Sums to Fga (the harness asserts this — slot-bin integrity check). That check
+    // proves every FGA received exactly one valid slot bin (completeness). Shooter-
+    // identity correctness is established by the Roll K source proof (see §0).
+    // Init-only with 0 defaults — existing constructions untouched.
+    public int Slot1Fga { get; init; }
+    public int Slot2Fga { get; init; }
+    public int Slot3Fga { get; init; }
+    public int Slot4Fga { get; init; }
+    public int Slot5Fga { get; init; }
+    /// <summary>
+    /// FGAs on this possession where <see cref="PossessionState.SelectedSlot"/> was null
+    /// at the Roll H chokepoint — the shooter's slot could not be attributed. Occurs
+    /// exclusively on bonus-free-throw possessions where Roll E was never called (a
+    /// pre-shot foul sent the team to the line before a shooter was selected) and the
+    /// last free throw was missed, producing an offensive rebound (Roll M) and a
+    /// putback (Roll K PutBack arm). Tracked separately so the completeness invariant
+    /// holds: Slot1Fga+…+Slot5Fga+SlotUnattributedFga == Fga (every FGA is accounted
+    /// for even when no slot can be named). When per-player identity tracking lands,
+    /// these will be attributed to whoever took the putback.
+    /// </summary>
+    public int SlotUnattributedFga { get; init; }
 }
 
 /// <summary>
@@ -361,6 +396,12 @@ public sealed class Resolver
         var midFgm = 0;
         var longFga = 0;
         var longFgm = 0;
+        var slot1Fga = 0;
+        var slot2Fga = 0;
+        var slot3Fga = 0;
+        var slot4Fga = 0;
+        var slot5Fga = 0;
+        var slotUnattributedFga = 0;
         var iterations = 0;
         const int IterationCeiling = 10_000;
 
@@ -396,7 +437,10 @@ public sealed class Resolver
                           ShotResolutions = shotResolutions, MissFouled = missFouled,
                           Fta = fta, Ftm = ftm, OrbChances = orbChances, OrbWon = orbWon,
                           RimFga = rimFga, RimFgm = rimFgm, ShortFga = shortFga, ShortFgm = shortFgm,
-                          MidFga = midFga, MidFgm = midFgm, LongFga = longFga, LongFgm = longFgm };
+                          MidFga = midFga, MidFgm = midFgm, LongFga = longFga, LongFgm = longFgm,
+                          Slot1Fga = slot1Fga, Slot2Fga = slot2Fga, Slot3Fga = slot3Fga,
+                          Slot4Fga = slot4Fga, Slot5Fga = slot5Fga,
+                          SlotUnattributedFga = slotUnattributedFga };
 
                 case Continue c:
                     switch (c.Next)
@@ -623,6 +667,21 @@ public sealed class Resolver
                                             case ShotLocation.Short: shortFgm++; break;
                                             case ShotLocation.Rim:   rimFgm++;   break;
                                         }
+                                    }
+                                    // Per-slot FGA: credit the shooter's slot.
+                                    // On a normal possession: SelectedSlot was stamped by Roll E.
+                                    // On a putback: SelectedSlot carries the original Roll E
+                                    // selection untouched (Roll K PutBack arm by design — same-
+                                    // player rebound tilt). Null guard is defensive; should not
+                                    // fire in a fully-routed possession.
+                                    switch (shotSt.SelectedSlot?.Number)
+                                    {
+                                        case 1: slot1Fga++; break;
+                                        case 2: slot2Fga++; break;
+                                        case 3: slot3Fga++; break;
+                                        case 4: slot4Fga++; break;
+                                        case 5: slot5Fga++; break;
+                                        default: slotUnattributedFga++; break; // SelectedSlot null — bonus-FT putback (Roll E never ran)
                                     }
                                 }
                             }
