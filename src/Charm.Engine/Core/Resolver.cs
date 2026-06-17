@@ -201,7 +201,7 @@ public sealed class Resolver
     private readonly IRollIPieGenerator _rollIGenerator;
     private readonly RollJStubPieGenerator _rollJGenerator;
     private readonly RollKStubPieGenerator _rollKGenerator;
-    private readonly RollLStubPieGenerator _rollLGenerator;
+    private readonly IRollLPieGenerator _rollLGenerator;
     private readonly IRollMPieGenerator _rollMGenerator;
     private readonly RollOffensiveFoulStubPieGenerator _offensiveFoulGenerator;
     private readonly MatchupConfig _matchup;
@@ -222,7 +222,7 @@ public sealed class Resolver
         IRollIPieGenerator rollIGenerator,
         RollJStubPieGenerator rollJGenerator,
         RollKStubPieGenerator rollKGenerator,
-        RollLStubPieGenerator rollLGenerator,
+        IRollLPieGenerator rollLGenerator,
         IRollMPieGenerator rollMGenerator,
         RollOffensiveFoulStubPieGenerator offensiveFoulGenerator,
         MatchupConfig matchup,
@@ -826,7 +826,7 @@ public sealed class Resolver
     /// </summary>
     private RollResult DriveFreeThrows(PossessionState state, int shots, bool oneAndOne, out int spinCount, out int ftPoints)
     {
-        var pie = _rollLGenerator.Generate();
+        var pie = _rollLGenerator.Generate(state);
         var spins = 0;
         var ftMakes = 0;
 

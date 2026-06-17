@@ -1,3 +1,48 @@
+## Session 53 — Phase 18: Roll L Real Generator (FreeThrow attribute wired) (2026-06-17)
+
+**Scope:** Replace `RollLStubPieGenerator` with an attribute-driven `RollLGenerator` that reads the shooter's `FreeThrow` rating and uses it directly as the make probability (`FreeThrow / 100.0`). Introduce `IRollLPieGenerator` so the Resolver field is typed to an interface rather than the concrete stub. Update the four real-game construction sites in the harness to use the real generator. All other construction sites keep the stub.
+
+**What shipped (5 files — 2 new + 3 edits):**
+- `Generators/IRollLPieGenerator.cs` (NEW) — interface mirroring `IRollMPieGenerator`. Single one-arg method `Pie<FreeThrowOutcome> Generate(PossessionState state)`. Null-slot and unpopulated-slot fallback behavior documented explicitly: both fall back to `config.MakeProbability` (72%), not to a throw. The stub ignores the state parameter entirely; the real generator reads `SelectedSlot` off it.
+- `Generators/RollLGenerator.cs` (NEW) — the real, attribute-driven generator. Ctor `(RollLConfig config, GameState game)`. `Generate(state)` walks `game.RosterFor(state.Offense).PlayerAt(state.SelectedSlot.Value)` when `SelectedSlot` is non-null and the slot is populated; uses `player.FreeThrow / 100.0` as the make probability directly. Two fallback paths use `config.MakeProbability`: null slot (bonus foul before Roll E ran, shooter unknown) and unpopulated slot (isolation-test game). `RoadMakePenalty` is a documented seam — NOT read, not applied. `Math.Clamp` applied as a safety net before building the pie. `Player.Validate()` is the upstream guard for invalid authored ratings; the clamp is the last resort.
+- `Generators/RollLStubPieGenerator.cs` (edit) — adds `: IRollLPieGenerator`. Changes `Generate()` → `Generate(PossessionState state)`; `state` is accepted but intentionally ignored (documented). No behavior change.
+- `Core/Resolver.cs` (edit) — three surgical changes: `_rollLGenerator` field retyped from `RollLStubPieGenerator` to `IRollLPieGenerator`; ctor param likewise; `DriveFreeThrows` call site `_rollLGenerator.Generate()` → `_rollLGenerator.Generate(state)`. `DriveFreeThrows` already received `state` as its first parameter — no signature change needed.
+- `Harness/Program.cs` (edit) — four generator swaps; stub signature fix; extended check; null-slot fallback notes. In detail:
+  - **Main (~line 43):** Stub declaration removed from before game construction; `new RollLGenerator(cfgL, game)` added after `SeatStartersFromConfig` alongside other real generators (matching the Phase 11/13/14 pattern — `game` must exist first).
+  - **RunGame (~line 4083):** `new RollLStubPieGenerator(RollLConfig.Load(configPath))` → `new RollLGenerator(RollLConfig.Load(configPath), game)`.
+  - **ObservationRunV1 (~line 4306):** `new RollLStubPieGenerator(cfgL)` → `new RollLGenerator(cfgL, game)`.
+  - **StressTestArchetypeRosters (~line 9427):** `new RollLStubPieGenerator(cfgL)` → `new RollLGenerator(cfgL, game)`.
+  - **`RollLFreeThrowCheck` part-a stub call (~line 3226):** `new RollLStubPieGenerator(cfgL).Generate()` → `new RollLStubPieGenerator(cfgL).Generate(new PossessionState(...))` — a signature fix, not a generator swap; keeps the stub.
+  - **`RollLFreeThrowCheck` part-b (extended):** new section proving the real generator: p72 (FreeThrow=72) → make=0.720000; p85 (FreeThrow=85) → make=0.850000; null-slot fallback → make=config.MakeProbability (0.720000); empty-slot fallback → make=config.MakeProbability. All four confirm within epsilon; `realGenOk` folds into the check's return value.
+  - **Null-slot fallback note:** added after the FT% histogram in `ObservationRunV1` and after the FT% Team B lines in each `StressTestArchetypeRosters` bucket: *"FT% reflects authored FreeThrow ratings where SelectedSlot is non-null. Bonus trips before Roll E retain the config.MakeProbability (72%) fallback. This is a named remaining loose end — not a bug."*
+  - **All 18 remaining stub sites** (isolation checks constructing empty-roster GameState objects) keep the stub. Confirmed: 22 total construction sites audited; 4 swapped; 18 retained.
+
+**The FreeThrow attribute is unique in the model.** Every other attribute is relative (50 = average). FreeThrow is absolute: the authored value IS the make percentage × 100. A 72-rated shooter makes exactly 72% of free throws. No logistic, no matchup, no context modifier of any kind. This is the cleanest 1:1 in the model.
+
+**`RoadMakePenalty` remains dormant and unread.** The `RollLConfig` field exists as a documented seam (set to 0.0). The real generator does NOT read it — not even conditionally. Home/road free-throw effects are outside Phase 18. The principle: do not introduce a contextual modifier in the same build that establishes FreeThrow as an absolute attribute.
+
+**The null-slot fallback is a named loose end, not a bug.** Bonus free throws that fire before Roll E has selected a shooter arrive with `SelectedSlot = null`. The generator falls back to `config.MakeProbability` (72%) for these trips. This means the reported FT% is a blend of player-attributed ratings (shooting-foul trips and post-Roll-E bonus trips) and the 72% flat fallback (pre-Roll-E bonus trips). The fallback note in the observation run and stress test makes this visible rather than hidden contamination.
+
+**Python Monte Carlo (run before any C#):** all six test ratings (45, 60, 72, 80, 90, 99) confirmed `make = rating / 100.0`, `miss = 1.0 − make`, both in [0.0, 1.0], sum == 1.0. Null-slot and unpopulated-slot fallbacks both produce valid pies. Clamp boundary tests pass.
+
+**Harness results — ALL CHECKS PASSED:**
+- `RollLFreeThrowCheck` part (b): p72 0.720000 ✓, p85 0.850000 ✓, null-slot fallback 0.720000 ✓, empty-slot fallback 0.720000 ✓
+- All existing part (a) and trip-type checks: unchanged (still use the stub; rates stay at 0.72)
+- Observation run FT%: shifted from flat 0.72 toward test roster's authored FreeThrow ratings; fallback note printed
+- Stress test: all 8 buckets passed, validGames=500/500 in all buckets; FT% per bucket reflects archetype FreeThrow ratings on attributed trips; fallback note printed in each bucket's cross-bucket summary; mirror gap 1.4% (tight)
+- Zero parks, zero throws, mechanics OK across all runs
+
+**FT% readings from the harness (selected):**
+- AverageVsAverage: FT% ~53% (average-archetype FreeThrow ratings in the ~50s range)
+- EliteVsWeak: Elite team ~68%, Weak team ~47% — clear separation driven by authored ratings
+- EliteVsElite: both teams ~64–65%
+- ShootingVsAthletic: Shooting team ~60%, Athletic team ~47% (different archetype FreeThrow ratings)
+- FT% differentiates meaningfully across all 8 buckets — the attribute is live and working
+
+**NOT changed:** `RollL.cs`, `RollLConfig.cs`, `config.json`, any other engine roll/config/generator.
+
+**Git commit:** `Phase 18: Roll L real generator — FreeThrow attribute wired (rating / 100 direct)`
+
 ## Session 52 — Phase 17: Usage → Efficiency Curve (2026-06-16)
 
 **Scope:** Wire the Roll E volume pressure into Roll G and Roll H so that a shooter carrying above an equal share pays a real efficiency cost. Two new per-possession facts stamped (`UsagePressure` at Roll E, `UsageResidualPressure` at Roll G`); Roll H reads both to apply a volume-tax and a residual-penalty term before `BuildRealPie`. FastBreak is fully exempt throughout.

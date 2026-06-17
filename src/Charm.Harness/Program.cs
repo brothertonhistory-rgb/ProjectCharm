@@ -40,7 +40,6 @@ internal static class Program
         // after game and cfgMatchup (need GameState and MatchupConfig).
         var rollJGenerator = new RollJStubPieGenerator(cfgJ);
         var rollKGenerator = new RollKStubPieGenerator(cfgK);
-        var rollLGenerator = new RollLStubPieGenerator(cfgL);
         var offensiveFoulGenerator = new RollOffensiveFoulStubPieGenerator(cfgOffFoul);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
@@ -52,6 +51,7 @@ internal static class Program
         var rollHGenerator = new RollHGenerator(cfgH, cfgMatchup, game);
         var rollIGenerator = new RollIGenerator(cfgI, cfgMatchup, game);   // Phase 10: matchup-aware rebounding
         var rollMGenerator = new RollMGenerator(cfgM, cfgMatchup, game);   // Phase 11: matchup-aware FT rebounding
+        var rollLGenerator = new RollLGenerator(cfgL, game);               // Phase 18: attribute-driven FT make%
         var rollFGenerator = new RollFGenerator(cfgF, cfgMatchup, game);   // Phase 12: pressure-aware disruption
         var rollBGenerator = new RollBGenerator(cfgB, cfgMatchup, game);   // Phase 13: team-aggregate disruption
         var rollAGenerator = new RollAGenerator(cfg, cfgMatchup, game);    // Phase 14: full-court press disruption
@@ -3223,7 +3223,11 @@ internal static class Program
 
         // (a) Raw make/miss rate — spin Roll L directly against its flat pie.
         var rngRaw = new SystemRng(cfg.Seed);
-        var pieL = new RollLStubPieGenerator(cfgL).Generate();
+        var pieL = new RollLStubPieGenerator(cfgL).Generate(new PossessionState(
+            PossessionNumber: 0,
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
+            Entry: EntryType.DeadBallInbound));
         var rawMakes = 0;
         for (var i = 0; i < cfg.BatchSize; i++)
             if (RollL.Execute(pieL, rngRaw) == FreeThrowOutcome.Make) rawMakes++;
@@ -3336,7 +3340,70 @@ internal static class Program
         var boundOk = globalMaxSpins <= 3;
         Console.WriteLine($"  spin count never exceeded 3: max={globalMaxSpins} -> {(boundOk ? "ok" : "FAIL")}");
 
-        var ok = rawOk && allTripsOk && boundOk;
+        // (b) Real generator — attribute-driven make%
+        Console.WriteLine("  (b) RollLGenerator — attribute-driven make%:");
+        var cfgLb  = RollLConfig.Load(configPath);
+        var gameB  = new GameState(new FoulTracker(RollDConfig.Load(configPath).BonusThreshold,
+                                                    RollDConfig.Load(configPath).DoubleBonusThreshold));
+        var homeLineup = gameB.LineupFor(TeamSide.Home);
+        var homeRoster = gameB.RosterFor(TeamSide.Home);
+        var slot1 = homeLineup.SlotAt(1);
+
+        // p72: FreeThrow = 72
+        var p72 = new Player("TestShooter72") { FreeThrow = 72 };
+        homeRoster.SetStarter(slot1, p72);
+        var genB72 = new RollLGenerator(cfgLb, gameB);
+        var stateSlot1 = new PossessionState(
+            PossessionNumber: 0,
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
+            Entry: EntryType.DeadBallInbound,
+            SelectedSlot: slot1);
+        var pie72  = genB72.Generate(stateSlot1);
+        var make72 = pie72.Slices.First(s => s.Outcome == FreeThrowOutcome.Make).Weight;
+        var b72ok  = Math.Abs(make72 - 0.72) <= cfgLb.Epsilon;
+        Console.WriteLine($"    p72 (FreeThrow=72): make={make72:F6}  expected=0.720000  -> {(b72ok ? "ok" : "FAIL")}");
+
+        // p85: FreeThrow = 85 — fresh game, fresh roster
+        var gameB2 = new GameState(new FoulTracker(RollDConfig.Load(configPath).BonusThreshold,
+                                                    RollDConfig.Load(configPath).DoubleBonusThreshold));
+        var homeLineup2 = gameB2.LineupFor(TeamSide.Home);
+        var homeRoster2 = gameB2.RosterFor(TeamSide.Home);
+        var slot1b = homeLineup2.SlotAt(1);
+        var p85 = new Player("TestShooter85") { FreeThrow = 85 };
+        homeRoster2.SetStarter(slot1b, p85);
+        var genB85      = new RollLGenerator(cfgLb, gameB2);
+        var stateSlot1b = stateSlot1 with { SelectedSlot = slot1b };
+        var pie85  = genB85.Generate(stateSlot1b);
+        var make85 = pie85.Slices.First(s => s.Outcome == FreeThrowOutcome.Make).Weight;
+        var b85ok  = Math.Abs(make85 - 0.85) <= cfgLb.Epsilon;
+        Console.WriteLine($"    p85 (FreeThrow=85): make={make85:F6}  expected=0.850000  -> {(b85ok ? "ok" : "FAIL")}");
+
+        // Null-slot fallback
+        var gameB3   = new GameState(new FoulTracker(RollDConfig.Load(configPath).BonusThreshold,
+                                                      RollDConfig.Load(configPath).DoubleBonusThreshold));
+        var genBNull = new RollLGenerator(cfgLb, gameB3);
+        var stateNull = stateSlot1 with { SelectedSlot = null };
+        var pieNull  = genBNull.Generate(stateNull);
+        var makeNull = pieNull.Slices.First(s => s.Outcome == FreeThrowOutcome.Make).Weight;
+        var nullOk   = Math.Abs(makeNull - cfgLb.MakeProbability) <= cfgLb.Epsilon;
+        Console.WriteLine($"    null-slot fallback: make={makeNull:F6}  expected={cfgLb.MakeProbability:F6}  -> {(nullOk ? "ok" : "FAIL")}");
+
+        // Unpopulated-slot fallback (fresh game, no player seated in slot1)
+        var gameB4     = new GameState(new FoulTracker(RollDConfig.Load(configPath).BonusThreshold,
+                                                        RollDConfig.Load(configPath).DoubleBonusThreshold));
+        var genBEmpty  = new RollLGenerator(cfgLb, gameB4);
+        var slot1Empty = gameB4.LineupFor(TeamSide.Home).SlotAt(1);
+        var stateEmpty = stateSlot1 with { SelectedSlot = slot1Empty };
+        var pieEmpty   = genBEmpty.Generate(stateEmpty);
+        var makeEmpty  = pieEmpty.Slices.First(s => s.Outcome == FreeThrowOutcome.Make).Weight;
+        var emptyOk    = Math.Abs(makeEmpty - cfgLb.MakeProbability) <= cfgLb.Epsilon;
+        Console.WriteLine($"    empty-slot fallback: make={makeEmpty:F6}  expected={cfgLb.MakeProbability:F6}  -> {(emptyOk ? "ok" : "FAIL")}");
+
+        var realGenOk = b72ok && b85ok && nullOk && emptyOk;
+        Console.WriteLine($"  real generator check: {(realGenOk ? "ok" : "FAIL")}");
+
+        var ok = rawOk && allTripsOk && boundOk && realGenOk;
         Console.WriteLine($"  Roll L free-throw resolution: {(ok ? "ok" : "FAIL")}");
         return ok;
     }
@@ -4013,7 +4080,7 @@ internal static class Program
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
             new RollJStubPieGenerator(RollJConfig.Load(configPath)),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
-            new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+            new RollLGenerator(RollLConfig.Load(configPath), game),    // Phase 18: attribute-driven FT make%
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
             new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
@@ -4236,7 +4303,7 @@ internal static class Program
                 new RollIGenerator(cfgI, cfgMatchup, game),
                 new RollJStubPieGenerator(cfgJ),
                 new RollKStubPieGenerator(cfgK),
-                new RollLStubPieGenerator(cfgL),
+                new RollLGenerator(cfgL, game),                        // Phase 18: attribute-driven FT make%
                 new RollMGenerator(cfgM, cfgMatchup, game),
                 new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
                 cfgMatchup,
@@ -4543,6 +4610,9 @@ internal static class Program
         ObsPrintD("    Combined", combinedFtPctList);
         Console.WriteLine("  Distribution (FT% combined):");
         ObsHistD(combinedFtPctList, new[] { 0.40, 0.50, 0.60, 0.70, 0.80, 0.90 });
+        Console.WriteLine("  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.");
+        Console.WriteLine("  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.");
+        Console.WriteLine("  This is a named remaining loose end — not a bug.");
 
         Console.WriteLine();
         Console.WriteLine("--- SHOT MIX ---");
@@ -9357,7 +9427,7 @@ internal static class Program
                         new RollIGenerator(cfgI, cfgMatchup, game),
                         new RollJStubPieGenerator(cfgJ),
                         new RollKStubPieGenerator(cfgK),
-                        new RollLStubPieGenerator(cfgL),
+                        new RollLGenerator(cfgL, game),                    // Phase 18: attribute-driven FT make%
                         new RollMGenerator(cfgM, cfgMatchup, game),
                         new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
                         cfgMatchup,
@@ -9606,6 +9676,9 @@ internal static class Program
             var allBFt = allVariantStats.SelectMany(v => v.TeamBFtPct).ToList();
             Console.WriteLine($"  FT%  Team A: agg={aggFtA:P1}  mean-game={Mean(allAFt):P1}  sd={Sd(allAFt):P1}");
             Console.WriteLine($"  FT%  Team B: agg={aggFtB:P1}  mean-game={Mean(allBFt):P1}  sd={Sd(allBFt):P1}");
+            Console.WriteLine("  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.");
+            Console.WriteLine("  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.");
+            Console.WriteLine("  This is a named remaining loose end — not a bug.");
 
             // 3PA rate (3PA/FGA aggregate) — per team
             double threePaRateA = aggAFga > 0 ? (double)aggA3pa / aggAFga : 0.0;
