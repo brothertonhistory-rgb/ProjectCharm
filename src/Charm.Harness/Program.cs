@@ -4263,6 +4263,12 @@ internal static class Program
         long totalAwayFgaS1 = 0L, totalAwayFgaS2 = 0L, totalAwayFgaS3 = 0L,
              totalAwayFgaS4 = 0L, totalAwayFgaS5 = 0L;
         long totalAwayUnattr = 0L;
+        long totalHomeFgmS1 = 0L, totalHomeFgmS2 = 0L, totalHomeFgmS3 = 0L,
+             totalHomeFgmS4 = 0L, totalHomeFgmS5 = 0L;
+        long totalHomeUnattrFgm = 0L;
+        long totalAwayFgmS1 = 0L, totalAwayFgmS2 = 0L, totalAwayFgmS3 = 0L,
+             totalAwayFgmS4 = 0L, totalAwayFgmS5 = 0L;
+        long totalAwayUnattrFgm = 0L;
 
         // Terminal mix — accumulated across all possessions, all games.
         var termBuckets = new Dictionary<string, long>
@@ -4465,6 +4471,39 @@ internal static class Program
                 mechanicsOk = false;
             }
 
+            // ── Per-slot FGM bin integrity (Phase 22) ─────────────────────────
+            // Makes-only completeness: Slot1Fgm+…+Slot5Fgm+SlotUnattributedFgm == FGM.
+            var recM1 = records.Sum(r => r.Slot1Fgm);
+            var recM2 = records.Sum(r => r.Slot2Fgm);
+            var recM3 = records.Sum(r => r.Slot3Fgm);
+            var recM4 = records.Sum(r => r.Slot4Fgm);
+            var recM5 = records.Sum(r => r.Slot5Fgm);
+            var recMU = records.Sum(r => r.SlotUnattributedFgm);
+            if (recM1 + recM2 + recM3 + recM4 + recM5 + recMU != recFgm)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: slot-make bin — " +
+                    $"Slot1({recM1})+Slot2({recM2})+Slot3({recM3})+Slot4({recM4})+Slot5({recM5})+Unattr({recMU}) " +
+                    $"!= FGM({recFgm})");
+                mechanicsOk = false;
+            }
+            // ── Per-slot subset invariant (Phase 22) ──────────────────────────
+            // STRUCTURAL, not a sanity bound: a make cannot exist without an attempt,
+            // so per slot FGM <= FGA, and unattributed FGM <= unattributed FGA.
+            // Completeness alone does NOT catch slot-level mis-attribution that nets
+            // to the right global FGM (e.g. Slot1 FGM=6 > FGA=5 while Slot2 under-
+            // counts); this subset check does. (recS1…recSU are the Phase 21 per-slot
+            // FGA sums computed just above.)
+            if (recM1 > recS1 || recM2 > recS2 || recM3 > recS3 ||
+                recM4 > recS4 || recM5 > recS5 || recMU > recSU)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: slot FGM>FGA subset violation — " +
+                    $"FGM(S1..S5,U)=({recM1},{recM2},{recM3},{recM4},{recM5},{recMU}) " +
+                    $"FGA(S1..S5,U)=({recS1},{recS2},{recS3},{recS4},{recS5},{recSU})");
+                mechanicsOk = false;
+            }
+
             var hPoss = records.Count(r => r.Offense == TeamSide.Home);
             var aPoss = records.Count(r => r.Offense == TeamSide.Away);
             var hPts  = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Points);
@@ -4572,6 +4611,18 @@ internal static class Program
             totalAwayFgaS4 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot4Fga);
             totalAwayFgaS5 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot5Fga);
             totalAwayUnattr += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.SlotUnattributedFga);
+            totalHomeFgmS1 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot1Fgm);
+            totalHomeFgmS2 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot2Fgm);
+            totalHomeFgmS3 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot3Fgm);
+            totalHomeFgmS4 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot4Fgm);
+            totalHomeFgmS5 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot5Fgm);
+            totalHomeUnattrFgm += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.SlotUnattributedFgm);
+            totalAwayFgmS1 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot1Fgm);
+            totalAwayFgmS2 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot2Fgm);
+            totalAwayFgmS3 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot3Fgm);
+            totalAwayFgmS4 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot4Fgm);
+            totalAwayFgmS5 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot5Fgm);
+            totalAwayUnattrFgm += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.SlotUnattributedFgm);
 
             foreach (var r in records)
             {
@@ -4697,6 +4748,19 @@ internal static class Program
         var aSUsh = totalAwayFga > 0 ? (double)totalAwayUnattr  / totalAwayFga : 0.0;
         Console.WriteLine($"  Home: Slot1={hS1sh:P1}  Slot2={hS2sh:P1}  Slot3={hS3sh:P1}  Slot4={hS4sh:P1}  Slot5={hS5sh:P1}  Unattr={hSUsh:P1}");
         Console.WriteLine($"  Away: Slot1={aS1sh:P1}  Slot2={aS2sh:P1}  Slot3={aS3sh:P1}  Slot4={aS4sh:P1}  Slot5={aS5sh:P1}  Unattr={aSUsh:P1}");
+        Console.WriteLine("  Per-slot FG% (SlotFgm / SlotFga):");
+        var hF1 = totalHomeFgaS1 > 0 ? (double)totalHomeFgmS1 / totalHomeFgaS1 : 0.0;
+        var hF2 = totalHomeFgaS2 > 0 ? (double)totalHomeFgmS2 / totalHomeFgaS2 : 0.0;
+        var hF3 = totalHomeFgaS3 > 0 ? (double)totalHomeFgmS3 / totalHomeFgaS3 : 0.0;
+        var hF4 = totalHomeFgaS4 > 0 ? (double)totalHomeFgmS4 / totalHomeFgaS4 : 0.0;
+        var hF5 = totalHomeFgaS5 > 0 ? (double)totalHomeFgmS5 / totalHomeFgaS5 : 0.0;
+        var aF1 = totalAwayFgaS1 > 0 ? (double)totalAwayFgmS1 / totalAwayFgaS1 : 0.0;
+        var aF2 = totalAwayFgaS2 > 0 ? (double)totalAwayFgmS2 / totalAwayFgaS2 : 0.0;
+        var aF3 = totalAwayFgaS3 > 0 ? (double)totalAwayFgmS3 / totalAwayFgaS3 : 0.0;
+        var aF4 = totalAwayFgaS4 > 0 ? (double)totalAwayFgmS4 / totalAwayFgaS4 : 0.0;
+        var aF5 = totalAwayFgaS5 > 0 ? (double)totalAwayFgmS5 / totalAwayFgaS5 : 0.0;
+        Console.WriteLine($"  Home: Slot1={hF1:P1}  Slot2={hF2:P1}  Slot3={hF3:P1}  Slot4={hF4:P1}  Slot5={hF5:P1}");
+        Console.WriteLine($"  Away: Slot1={aF1:P1}  Slot2={aF2:P1}  Slot3={aF3:P1}  Slot4={aF4:P1}  Slot5={aF5:P1}");
         Console.WriteLine("  NOTE: per-slot, not per-player — valid while lineups are fixed. Unattr = bonus-FT putbacks (Roll E never ran).");
 
         Console.WriteLine();
@@ -8784,6 +8848,55 @@ internal static class Program
 
     // ── Player factory ────────────────────────────────────────────────────────
 
+    // Phase 22: tier-DECOUPLED FreeThrow draw. Distribution centered at 70, clamped
+    // to [45, 95]. Two soft center-nudges, both measured against a FIXED pivot of 50
+    // (NOT the tier center). This removes the DIRECT tier coupling of the old
+    // Clamp(AtBaseline()/AtStrength()) authoring. A MILD INDIRECT tier correlation
+    // may remain because Outside/Height are themselves tier-scaled, but it is
+    // negligible (measured corr(FT,tier) ≈ 0.016, ~0.5pt mean spread Elite→Weak —
+    // §4d tier-leak experiment). This is NOT "utterly independent"; it is direct
+    // decoupling with a mild, intended position/shooting correlation.
+    //   - Outside nudge UP   (±FtOutsideNudgeMax at the extremes), stronger input.
+    //   - Height  nudge DOWN (±FtHeightNudgeMax  at the extremes), weaker input.
+    // The nudges shift the center only; the spread is identical for every player, so
+    // the extremes (a 95-shooting non-prospect, an 80%-shooting stiff) stay reachable
+    // — but note the clamp piles small mass at exactly 45 and 95 (§4d). All six
+    // constants (center, min, max, two nudges, plus `half` below) are placeholders.
+    private const int FtCenter        = 72;
+    private const int FtMin           = 45;
+    private const int FtMax           = 95;
+    private const int FtPivot         = 50;   // fixed yardstick — NOT the tier center
+    private const double FtOutsideNudgeMax = 4.0;
+    private const double FtHeightNudgeMax  = 1.0;
+
+    private static int DrawFreeThrow(int outsideRating, int heightRating, Random rng)
+    {
+        // Center nudges, fixed-pivot (range of (rating - 50) is roughly [-40, +49];
+        // divide by ~49 to map the extreme to ±1, then scale by the max nudge).
+        double outsideNudge =  ((outsideRating - FtPivot) / 49.0) * FtOutsideNudgeMax;
+        double heightNudge  = -((heightRating  - FtPivot) / 49.0) * FtHeightNudgeMax;
+        double center = FtCenter + outsideNudge + heightNudge;
+
+        // Spread via mean of 3 independent uniform draws (~bell), centered on
+        // `center`. The summed-uniform mean has SD ≈ half/3, so the spread is set by
+        // `half`. half=30 → SD ≈ 10, which (clamped to [45,95]) gives a clear peak
+        // near 70 (~40% in [65,75]) with the distribution reaching both bounds.
+        //
+        // NOTE: the clamp piles a small amount of mass at exactly 45 and exactly 95
+        // (values that would fall outside the range collapse to the bound). This is
+        // accepted for a first-pass authoring model; the Python validation (§4d)
+        // reports the exact-45/exact-95 pile sizes to confirm they are small.
+        // DO NOT use a small half (e.g. 12 gives SD≈4, so the distribution never
+        // reaches 45/95 and the extremes vanish entirely — the failure to avoid).
+        double half = 30.0;   // Python-validated starting value (§4d); a calibration placeholder
+        double sum = 0.0;
+        for (var i = 0; i < 3; i++)
+            sum += center + (rng.NextDouble() * 2.0 - 1.0) * half;
+        double draw = sum / 3.0;
+
+        return Math.Max(FtMin, Math.Min(FtMax, (int)Math.Round(draw)));
+    }
+
     private static Player MakePlayer(PlayerArchetype archetype, TalentTier tier, int playerSeed, string name)
     {
         var rng    = new Random(playerSeed);
@@ -8803,11 +8916,13 @@ internal static class Program
         switch (archetype)
         {
             case PlayerArchetype.RimRunner:
+                int rrOutside = Clamp(AtWeakness());
+                int rrHeight  = Clamp(AtStrength());
                 p = new Player(name)
                 {
                     Finishing          = Clamp(AtStrength()),
                     Close              = Clamp(AtStrength()),
-                    Height             = Clamp(AtStrength()),
+                    Height             = rrHeight,
                     Wingspan           = Clamp(AtStrength()),
                     Weight             = Clamp(AtStrength()),
                     Strength           = Clamp(AtStrength()),
@@ -8816,9 +8931,9 @@ internal static class Program
                     DefensiveRebounding= Clamp(AtStrength()),
                     OffensiveRebounding= Clamp(AtStrength()),
                     PostDefense        = Clamp(AtStrength()),
-                    Outside            = Clamp(AtWeakness()),
+                    Outside            = rrOutside,
                     Mid                = Clamp(AtBaseline()),
-                    FreeThrow          = Clamp(AtBaseline()),
+                    FreeThrow          = DrawFreeThrow(rrOutside, rrHeight, rng),
                     FoulDrawing        = Clamp(AtBaseline()),
                     BallHandling       = Clamp(AtBaseline()),
                     Passing            = Clamp(AtBaseline()),
@@ -8845,15 +8960,17 @@ internal static class Program
                 break;
 
             case PlayerArchetype.PerimeterShooter:
+                int psOutside = Clamp(AtStrength());
+                int psHeight  = Clamp(AtWeakness());
                 p = new Player(name)
                 {
-                    Outside            = Clamp(AtStrength()),
-                    FreeThrow          = Clamp(AtStrength()),
+                    Outside            = psOutside,
+                    FreeThrow          = DrawFreeThrow(psOutside, psHeight, rng),
                     Speed              = Clamp(AtStrength()),
                     Quickness          = Clamp(AtStrength()),
                     OffBallMovement    = Clamp(AtStrength()),
                     FoulDrawing        = Clamp(AtStrength()),
-                    Height             = Clamp(AtWeakness()),
+                    Height             = psHeight,
                     Weight             = Clamp(AtWeakness()),
                     Strength           = Clamp(AtWeakness()),
                     RimProtection      = Clamp(AtWeakness()),
@@ -8887,6 +9004,8 @@ internal static class Program
                 break;
 
             case PlayerArchetype.Slasher:
+                int slOutside = Clamp(AtWeakness());
+                int slHeight  = Clamp(AtWeakness());
                 p = new Player(name)
                 {
                     Speed              = Clamp(AtStrength()),
@@ -8896,12 +9015,12 @@ internal static class Program
                     FoulDrawing        = Clamp(AtStrength()),
                     SelfCreation       = Clamp(AtStrength()),
                     Vertical           = Clamp(AtStrength()),
-                    Outside            = Clamp(AtWeakness()),
+                    Outside            = slOutside,
                     PostMoves          = Clamp(AtWeakness()),
-                    Height             = Clamp(AtWeakness()),
+                    Height             = slHeight,
                     Close              = Clamp(AtBaseline()),
                     Mid                = Clamp(AtBaseline()),
-                    FreeThrow          = Clamp(AtBaseline()),
+                    FreeThrow          = DrawFreeThrow(slOutside, slHeight, rng),
                     BallHandling       = Clamp(AtBaseline()),
                     Passing            = Clamp(AtBaseline()),
                     Playmaking         = Clamp(AtBaseline()),
@@ -8929,23 +9048,25 @@ internal static class Program
                 break;
 
             case PlayerArchetype.PostScorer:
+                int poscOutside = Clamp(AtWeakness());
+                int poscHeight  = Clamp(AtStrength());
                 p = new Player(name)
                 {
                     PostMoves          = Clamp(AtStrength()),
                     Close              = Clamp(AtStrength()),
                     Strength           = Clamp(AtStrength()),
                     Weight             = Clamp(AtStrength()),
-                    Height             = Clamp(AtStrength()),
+                    Height             = poscHeight,
                     Wingspan           = Clamp(AtStrength()),
                     FoulDrawing        = Clamp(AtStrength()),
                     OffensiveRebounding= Clamp(AtStrength()),
                     PostDefense        = Clamp(AtStrength()),
                     Speed              = Clamp(AtWeakness()),
                     Quickness          = Clamp(AtWeakness()),
-                    Outside            = Clamp(AtWeakness()),
+                    Outside            = poscOutside,
                     Mid                = Clamp(AtBaseline()),
                     Finishing          = Clamp(AtBaseline()),
-                    FreeThrow          = Clamp(AtBaseline()),
+                    FreeThrow          = DrawFreeThrow(poscOutside, poscHeight, rng),
                     BallHandling       = Clamp(AtBaseline()),
                     Passing            = Clamp(AtBaseline()),
                     Playmaking         = Clamp(AtBaseline()),
@@ -8971,14 +9092,16 @@ internal static class Program
                 break;
 
             case PlayerArchetype.ThreeAndDWing:
+                int tdwOutside = Clamp(AtStrength());
+                int tdwHeight  = Clamp(AtStrength());
                 p = new Player(name)
                 {
-                    Outside            = Clamp(AtStrength()),
+                    Outside            = tdwOutside,
                     PerimeterDefense   = Clamp(AtStrength()),
-                    Height             = Clamp(AtStrength()),
+                    Height             = tdwHeight,
                     Wingspan           = Clamp(AtStrength()),
                     Speed              = Clamp(AtStrength()),
-                    FreeThrow          = Clamp(AtStrength()),
+                    FreeThrow          = DrawFreeThrow(tdwOutside, tdwHeight, rng),
                     PostMoves          = Clamp(AtWeakness()),
                     PostDefense        = Clamp(AtWeakness()),
                     RimProtection      = Clamp(AtWeakness()),
@@ -9013,6 +9136,8 @@ internal static class Program
                 break;
 
             case PlayerArchetype.PassFirstGuard:
+                int pfgOutside = Clamp(AtWeakness());
+                int pfgHeight  = Clamp(AtWeakness());
                 p = new Player(name)
                 {
                     Playmaking         = Clamp(AtStrength()),
@@ -9023,12 +9148,12 @@ internal static class Program
                     Quickness          = Clamp(AtStrength()),
                     Discipline         = Clamp(AtStrength()),
                     SelfCreation       = Clamp(AtWeakness()),
-                    Outside            = Clamp(AtWeakness()),
-                    Height             = Clamp(AtWeakness()),
+                    Outside            = pfgOutside,
+                    Height             = pfgHeight,
                     Finishing          = Clamp(AtWeakness()),
                     Close              = Clamp(AtBaseline()),
                     Mid                = Clamp(AtBaseline()),
-                    FreeThrow          = Clamp(AtBaseline()),
+                    FreeThrow          = DrawFreeThrow(pfgOutside, pfgHeight, rng),
                     FoulDrawing        = Clamp(AtBaseline()),
                     PostMoves          = Clamp(AtBaseline()),
                     OffBallMovement    = Clamp(AtBaseline()),
@@ -9056,6 +9181,8 @@ internal static class Program
                 break;
 
             case PlayerArchetype.AthleticBig:
+                int abOutside = Clamp(AtWeakness());
+                int abHeight  = Clamp(AtStrength());
                 p = new Player(name)
                 {
                     Speed              = Clamp(AtStrength()),
@@ -9063,21 +9190,21 @@ internal static class Program
                     FirstStep          = Clamp(AtStrength()),
                     Vertical           = Clamp(AtStrength()),
                     Strength           = Clamp(AtStrength()),
-                    Height             = Clamp(AtStrength()),
+                    Height             = abHeight,
                     Wingspan           = Clamp(AtStrength()),
                     Finishing          = Clamp(AtStrength()),
                     RimProtection      = Clamp(AtStrength()),
                     DefensiveRebounding= Clamp(AtStrength()),
                     OffensiveRebounding= Clamp(AtStrength()),
                     // Explicit weaknesses — critical for contrast
-                    Outside            = Clamp(AtWeakness()),
+                    Outside            = abOutside,
                     Mid                = Clamp(AtWeakness()),
                     PostMoves          = Clamp(AtWeakness()),
                     Playmaking         = Clamp(AtWeakness()),
                     BallHandling       = Clamp(AtWeakness()),
                     Passing            = Clamp(AtWeakness()),
                     Close              = Clamp(AtBaseline()),
-                    FreeThrow          = Clamp(AtBaseline()),
+                    FreeThrow          = DrawFreeThrow(abOutside, abHeight, rng),
                     FoulDrawing        = Clamp(AtBaseline()),
                     SelfCreation       = Clamp(AtBaseline()),
                     OffBallMovement    = Clamp(AtBaseline()),
@@ -9099,6 +9226,8 @@ internal static class Program
                 break;
 
             case PlayerArchetype.FloorGeneral:
+                int fgOutside = Clamp(AtStrength());
+                int fgHeight  = Clamp(AtWeakness());
                 p = new Player(name)
                 {
                     BasketballIQ       = Clamp(AtStrength()),
@@ -9106,15 +9235,15 @@ internal static class Program
                     Playmaking         = Clamp(AtStrength()),
                     BallHandling       = Clamp(AtStrength()),
                     Discipline         = Clamp(AtStrength()),
-                    FreeThrow          = Clamp(AtStrength()),
-                    Outside            = Clamp(AtStrength()),
+                    FreeThrow          = DrawFreeThrow(fgOutside, fgHeight, rng),
+                    Outside            = fgOutside,
                     // Explicit weaknesses — critical for contrast
                     Speed              = Clamp(AtWeakness()),
                     Quickness          = Clamp(AtWeakness()),
                     FirstStep          = Clamp(AtWeakness()),
                     Vertical           = Clamp(AtWeakness()),
                     Strength           = Clamp(AtWeakness()),
-                    Height             = Clamp(AtWeakness()),
+                    Height             = fgHeight,
                     Close              = Clamp(AtBaseline()),
                     Mid                = Clamp(AtBaseline()),
                     Finishing          = Clamp(AtBaseline()),
@@ -9291,6 +9420,11 @@ internal static class Program
         // Unattributed slot FGAs: bonus-FT putbacks where Roll E was never called.
         public long TeamASlotUnattributedFga;
         public long TeamBSlotUnattributedFga;
+        // Per-slot FGM (Phase 22): aggregate makes per slot per logical team.
+        public long TeamASlot1Fgm, TeamASlot2Fgm, TeamASlot3Fgm, TeamASlot4Fgm, TeamASlot5Fgm;
+        public long TeamBSlot1Fgm, TeamBSlot2Fgm, TeamBSlot3Fgm, TeamBSlot4Fgm, TeamBSlot5Fgm;
+        public long TeamASlotUnattributedFgm;
+        public long TeamBSlotUnattributedFgm;
     }
 
     // ── Per-variant game outcomes for the bucket-7/8 paired diagnostic ────────
@@ -9655,6 +9789,18 @@ internal static class Program
                     vs.TeamBSlot5Fga += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot5Fga);
                     vs.TeamASlotUnattributedFga += records.Where(r => r.Offense == teamASide).Sum(r => r.SlotUnattributedFga);
                     vs.TeamBSlotUnattributedFga += records.Where(r => r.Offense == teamBSide).Sum(r => r.SlotUnattributedFga);
+                    vs.TeamASlot1Fgm += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot1Fgm);
+                    vs.TeamBSlot1Fgm += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot1Fgm);
+                    vs.TeamASlot2Fgm += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot2Fgm);
+                    vs.TeamBSlot2Fgm += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot2Fgm);
+                    vs.TeamASlot3Fgm += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot3Fgm);
+                    vs.TeamBSlot3Fgm += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot3Fgm);
+                    vs.TeamASlot4Fgm += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot4Fgm);
+                    vs.TeamBSlot4Fgm += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot4Fgm);
+                    vs.TeamASlot5Fgm += records.Where(r => r.Offense == teamASide).Sum(r => r.Slot5Fgm);
+                    vs.TeamBSlot5Fgm += records.Where(r => r.Offense == teamBSide).Sum(r => r.Slot5Fgm);
+                    vs.TeamASlotUnattributedFgm += records.Where(r => r.Offense == teamASide).Sum(r => r.SlotUnattributedFgm);
+                    vs.TeamBSlotUnattributedFgm += records.Where(r => r.Offense == teamBSide).Sum(r => r.SlotUnattributedFgm);
 
                     // ORB — attribute to the offense on each possession
                     vs.TeamAOrbW += records.Where(r => r.Offense == teamASide).Sum(r => r.OrbWon);
@@ -9837,7 +9983,64 @@ internal static class Program
             Console.WriteLine($"  Usage Team A: Slot1={slotA1:P1} Slot2={slotA2:P1} Slot3={slotA3:P1} Slot4={slotA4:P1} Slot5={slotA5:P1} Unattr={slotAU:P1}");
             Console.WriteLine($"  Usage Team B: Slot1={slotB1:P1} Slot2={slotB2:P1} Slot3={slotB3:P1} Slot4={slotB4:P1} Slot5={slotB5:P1} Unattr={slotBU:P1}");
 
-            // ORB%
+            // Slot FGM aggregates + reconciliation (Phase 22)
+            long aggASlot1Fgm = allVariantStats.Sum(v => v.TeamASlot1Fgm);
+            long aggASlot2Fgm = allVariantStats.Sum(v => v.TeamASlot2Fgm);
+            long aggASlot3Fgm = allVariantStats.Sum(v => v.TeamASlot3Fgm);
+            long aggASlot4Fgm = allVariantStats.Sum(v => v.TeamASlot4Fgm);
+            long aggASlot5Fgm = allVariantStats.Sum(v => v.TeamASlot5Fgm);
+            long aggASlotUFgm = allVariantStats.Sum(v => v.TeamASlotUnattributedFgm);
+            long aggBSlot1Fgm = allVariantStats.Sum(v => v.TeamBSlot1Fgm);
+            long aggBSlot2Fgm = allVariantStats.Sum(v => v.TeamBSlot2Fgm);
+            long aggBSlot3Fgm = allVariantStats.Sum(v => v.TeamBSlot3Fgm);
+            long aggBSlot4Fgm = allVariantStats.Sum(v => v.TeamBSlot4Fgm);
+            long aggBSlot5Fgm = allVariantStats.Sum(v => v.TeamBSlot5Fgm);
+            long aggBSlotUFgm = allVariantStats.Sum(v => v.TeamBSlotUnattributedFgm);
+            var slotFgmSumA = aggASlot1Fgm + aggASlot2Fgm + aggASlot3Fgm + aggASlot4Fgm + aggASlot5Fgm + aggASlotUFgm;
+            var slotFgmSumB = aggBSlot1Fgm + aggBSlot2Fgm + aggBSlot3Fgm + aggBSlot4Fgm + aggBSlot5Fgm + aggBSlotUFgm;
+            if (slotFgmSumA != aggAFgm)
+            {
+                var msg = $"Bucket {bucketNum} {bucketName}: slot-FGM-sum Team A ({slotFgmSumA}) != FGM ({aggAFgm})";
+                failures.Add(msg);
+                Console.WriteLine($"  [FAIL] {msg}");
+            }
+            if (slotFgmSumB != aggBFgm)
+            {
+                var msg = $"Bucket {bucketNum} {bucketName}: slot-FGM-sum Team B ({slotFgmSumB}) != FGM ({aggBFgm})";
+                failures.Add(msg);
+                Console.WriteLine($"  [FAIL] {msg}");
+            }
+            // Subset invariant (Phase 22): per-slot FGM <= per-slot FGA (aggregate),
+            // and unattributed FGM <= unattributed FGA. Structural — catches slot-level
+            // over-crediting that completeness alone would miss. aggASlot1… are the
+            // Phase 21 per-slot FGA aggregates; aggASlotU/aggBSlotU the unattributed FGA.
+            if (aggASlot1Fgm > aggASlot1 || aggASlot2Fgm > aggASlot2 || aggASlot3Fgm > aggASlot3 ||
+                aggASlot4Fgm > aggASlot4 || aggASlot5Fgm > aggASlot5 || aggASlotUFgm > aggASlotU)
+            {
+                var msg = $"Bucket {bucketNum} {bucketName}: Team A slot FGM>FGA subset violation";
+                failures.Add(msg);
+                Console.WriteLine($"  [FAIL] {msg}");
+            }
+            if (aggBSlot1Fgm > aggBSlot1 || aggBSlot2Fgm > aggBSlot2 || aggBSlot3Fgm > aggBSlot3 ||
+                aggBSlot4Fgm > aggBSlot4 || aggBSlot5Fgm > aggBSlot5 || aggBSlotUFgm > aggBSlotU)
+            {
+                var msg = $"Bucket {bucketNum} {bucketName}: Team B slot FGM>FGA subset violation";
+                failures.Add(msg);
+                Console.WriteLine($"  [FAIL] {msg}");
+            }
+            // Per-slot FG% = SlotFgm / SlotFga (Phase 21 FGA aggregates as denominators)
+            double fgA1 = aggASlot1 > 0 ? (double)aggASlot1Fgm / aggASlot1 : 0.0;
+            double fgA2 = aggASlot2 > 0 ? (double)aggASlot2Fgm / aggASlot2 : 0.0;
+            double fgA3 = aggASlot3 > 0 ? (double)aggASlot3Fgm / aggASlot3 : 0.0;
+            double fgA4 = aggASlot4 > 0 ? (double)aggASlot4Fgm / aggASlot4 : 0.0;
+            double fgA5 = aggASlot5 > 0 ? (double)aggASlot5Fgm / aggASlot5 : 0.0;
+            double fgB1 = aggBSlot1 > 0 ? (double)aggBSlot1Fgm / aggBSlot1 : 0.0;
+            double fgB2 = aggBSlot2 > 0 ? (double)aggBSlot2Fgm / aggBSlot2 : 0.0;
+            double fgB3 = aggBSlot3 > 0 ? (double)aggBSlot3Fgm / aggBSlot3 : 0.0;
+            double fgB4 = aggBSlot4 > 0 ? (double)aggBSlot4Fgm / aggBSlot4 : 0.0;
+            double fgB5 = aggBSlot5 > 0 ? (double)aggBSlot5Fgm / aggBSlot5 : 0.0;
+            Console.WriteLine($"  Slot FG% Team A: Slot1={fgA1:P1} Slot2={fgA2:P1} Slot3={fgA3:P1} Slot4={fgA4:P1} Slot5={fgA5:P1}");
+            Console.WriteLine($"  Slot FG% Team B: Slot1={fgB1:P1} Slot2={fgB2:P1} Slot3={fgB3:P1} Slot4={fgB4:P1} Slot5={fgB5:P1}");            // ORB%
             long aggAOrbW = allVariantStats.Sum(v => v.TeamAOrbW);
             long aggBOrbW = allVariantStats.Sum(v => v.TeamBOrbW);
             long aggAOrbC = allVariantStats.Sum(v => v.TeamAOrbC);

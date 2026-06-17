@@ -4388,3 +4388,35 @@ Clamped to `max(score, MinUsageScore)` before the sharpening exponent. The (Clos
 **Not per-player — a named seam.** The slot counters are correct under fixed lineups. When substitutions arrive, a slot may be occupied by different players across a game and the counter will combine them. A separate player-ID attribution layer is required at that point. The per-slot counters are the designed foundation for that future layer.
 
 **Bucket 5 (StarVsBalanced) as calibration reference.** Team A Slot 1 carries 29% of FGA vs ~16–23% for the balanced roster slots — the star's usage concentration is now directly readable. This is the input the Phase 17 efficiency penalty was designed to respond to.
+
+
+## Phase 22: Per-Slot FGM Readout + Tier-Decoupled FreeThrow Authoring (Session 56)
+
+### Item 1: Per-Slot FGM — the efficiency half of per-slot FGA
+
+**What this is.** Phase 21 made slot concentration visible (FGA share per slot). Phase 22 adds the other half: FGM per slot, so `per-slot FG% = SlotNFgm / SlotNFga` falls out directly without any new rate-tracking machinery. The architecture is identical to Phase 21 — one new counter family threaded `RoutingOutcome → PossessionRecord → harness`, with two invariants and an unattributed bucket.
+
+**Placement discipline.** The per-slot FGM switch lives INSIDE the `Made or MadeAndFouled` block in `Route()`'s IntoShotResolution case — makes only. The Phase 21 FGA switch stays OUTSIDE that block, in the non-MissFouled else scope — all official FGAs. This placement is load-bearing: it is what makes the subset invariant (FGM ≤ FGA per slot) a structural truth rather than a sanity bound.
+
+**Two invariants, both asserted.**
+- *Make completeness:* `Slot1Fgm+…+Slot5Fgm+SlotUnattributedFgm == Fgm`. Asserted per-game in ObsRun and per-bucket in StressTest.
+- *Subset invariant:* per-slot `SlotNFgm ≤ SlotNFga` and `SlotUnattributedFgm ≤ SlotUnattributedFga`. This is the diagnostic completeness alone misses: a mismatch that nets to the correct global FGM (one slot over-credited, another under) would pass completeness but fail the subset check. Asserted as a hard failure in both harness sections.
+
+**`SlotUnattributedFgm`** is the exact analog of Phase 21's `SlotUnattributedFga` — it fires when a bonus-FT putback (the only null-SelectedSlot path) makes its shot. Without the `default` arm the make completeness invariant fails, identical to the Phase 21 lesson. The arm is present.
+
+**Ceiling note.** Per-slot FG% is the honest ceiling of what this session can deliver. A real box score is per-*player* (points/reb/ast tied to a named person across a whole game, surviving substitutions). Per-slot counters blend all players who occupied a slot — a limitation only the future per-player identity layer resolves.
+
+### Item 2: Tier-Decoupled FreeThrow Authoring
+
+**The problem (established in Phase 19).** The archetype generator's original FreeThrow assignments used `Clamp(AtBaseline())` or `Clamp(AtStrength())` — both of which read the tier-scaled distribution center. The result was an artificially strong tier gradient: Weak teams shot ~47–48% at the line; Elite teams ~64–65%. Real-world top-50 team FT% shows D1, D2, and D3 leaders clustered in the same 75–81% band (2025–26 NCAA data), which does not support a large direct tier coupling.
+
+**The model.** `DrawFreeThrow(outsideRating, heightRating, rng)` in the harness:
+- **Base draw:** mean of 3 independent uniform draws on `[center±half]`, giving a bell-shaped distribution centered at `center`. `half=30` → SD≈10 → clear peak near 70 with the distribution reaching both bounds [45,95].
+- **Center nudges (fixed-pivot, not tier-pivot):** `outsideNudge = ((Outside−50)/49) × 4.0` (up) and `heightNudge = −((Height−50)/49) × 3.0` (down). Both measured against the fixed constant 50, NOT the tier distribution center. This removes the direct read of `tp` (tier params) from the FreeThrow draw.
+- **Clamp:** `Math.Max(45, Math.Min(95, (int)Math.Round(draw)))`. Creates small point-mass piles at exactly 45 and exactly 95 (confirmed small, ≤2.1% for the shapes tested).
+
+**Why "tier-decoupled" not "tier-independent."** Because Outside and Height are themselves tier-scaled (they read `tp` for their own draws), a faint residual tier correlation survives through the nudge inputs. Measured before build: corr(FT, tier-rank) ≈ 0.016, Elite→Weak mean spread ≈ 0.4pt. This passes the stop condition (spread ≤2pt, |corr|≤0.10) and matches the basketball principle Emmett stated: the best free-throw shooter in the nation could be a D3 point guard. DATA PROVENANCE: 2025-26 NCAA top-50 team FT% (D1/D2/D3) supplied by Emmett; used only to justify removing strong direct tier coupling; full-population quantiles for calibrating any residual division effect are a future calibration-pass input.
+
+**Option A hoisting — rng-stream implication.** `Player` is a `sealed class` with `{get; init;}` properties — not a record, so `with` expressions don't compile and `init` properties can't be reassigned post-construction. Passing `p.Outside` or `p.Height` inside the same `new Player(name) { … }` initializer is also illegal (properties are not yet assigned). Solution: hoist the two attribute draws to named locals at the top of each case, before `new Player(name)`. The locals are used both at their property assignment positions in the initializer and as arguments to `DrawFreeThrow`. Side-effect: the rng stream shifts for every attribute in every archetype (Outside and Height draws now happen first, before the initializer's other draws). This is accepted because the frozen corpus uses the hardcoded named roster (unaffected) and the stress test asserts on distributional aggregates (no per-player golden-output dependency).
+
+**Six calibration placeholders.** Center (70), min (45), max (95), Outside nudge max (±4), Height nudge max (±3), and `half` (30) are all first-pass values. The harness histograms and team-level FT% distribution (particularly whether the top-team FT% band reaches 75–81% as in real data) will inform tuning. One named finding from this run: Elite tier's mean FT% runs ~66–68%, below the average-tier ~70–71%. The mechanism is correct — Elite bigs have high AtStrength Height values (75–88 range), producing larger downward Height nudges — but whether the real FT% distribution should show this gradient requires full-population data.

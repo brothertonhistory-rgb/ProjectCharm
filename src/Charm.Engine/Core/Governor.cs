@@ -101,7 +101,13 @@ public sealed record PossessionRecord(
     int Slot3Fga = 0,
     int Slot4Fga = 0,
     int Slot5Fga = 0,
-    int SlotUnattributedFga = 0);
+    int SlotUnattributedFga = 0,
+    int Slot1Fgm = 0,
+    int Slot2Fgm = 0,
+    int Slot3Fgm = 0,
+    int Slot4Fgm = 0,
+    int Slot5Fgm = 0,
+    int SlotUnattributedFgm = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -260,6 +266,9 @@ public sealed class Governor
             int possessionSlot1Fga = 0, possessionSlot2Fga = 0, possessionSlot3Fga = 0,
                 possessionSlot4Fga = 0, possessionSlot5Fga = 0;
             int possessionSlotUnattributedFga = 0;
+            int possessionSlot1Fgm = 0, possessionSlot2Fgm = 0, possessionSlot3Fgm = 0,
+                possessionSlot4Fgm = 0, possessionSlot5Fgm = 0;
+            int possessionSlotUnattributedFgm = 0;
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -336,6 +345,12 @@ public sealed class Governor
                 possessionSlot4Fga        = outcome.Slot4Fga;
                 possessionSlot5Fga        = outcome.Slot5Fga;
                 possessionSlotUnattributedFga = outcome.SlotUnattributedFga;
+                possessionSlot1Fgm        = outcome.Slot1Fgm;
+                possessionSlot2Fgm        = outcome.Slot2Fgm;
+                possessionSlot3Fgm        = outcome.Slot3Fgm;
+                possessionSlot4Fgm        = outcome.Slot4Fgm;
+                possessionSlot5Fgm        = outcome.Slot5Fgm;
+                possessionSlotUnattributedFgm = outcome.SlotUnattributedFgm;
             }
 
             // Shared by all three intent values + normal possessions.
@@ -356,7 +371,10 @@ public sealed class Governor
                 possessionMidFga, possessionMidFgm, possessionLongFga, possessionLongFgm,
                 possessionSlot1Fga, possessionSlot2Fga, possessionSlot3Fga,
                 possessionSlot4Fga, possessionSlot5Fga,
-                possessionSlotUnattributedFga));
+                possessionSlotUnattributedFga,
+                possessionSlot1Fgm, possessionSlot2Fgm, possessionSlot3Fgm,
+                possessionSlot4Fgm, possessionSlot5Fgm,
+                possessionSlotUnattributedFgm));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition

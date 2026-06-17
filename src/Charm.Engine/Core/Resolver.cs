@@ -206,6 +206,30 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// these will be attributed to whoever took the putback.
     /// </summary>
     public int SlotUnattributedFga { get; init; }
+
+    // ── Per-slot FGM counters (efficiency observability — Phase 22) ───────────
+    // One counter per on-court slot (1–5): the count of FGMs by that slot on this
+    // possession. Accumulated at the same Roll H chokepoint as the per-slot FGA
+    // counters, inside the Made/MadeAndFouled branch (makes only). Combined with
+    // the Phase 21 per-slot FGA counters, per-slot FG% = SlotNFgm / SlotNFga.
+    //
+    // Same attribution model and same fixed-lineup caveat as the FGA counters:
+    // a putback make is credited to the original Roll E shooter's slot (Roll K
+    // carries SelectedSlot untouched). Null-slot makes (bonus-FT putback where
+    // Roll E never ran) land in SlotUnattributedFgm — the make-side analog of
+    // SlotUnattributedFga.
+    //
+    // Completeness invariant (harness-asserted): Slot1Fgm+…+Slot5Fgm+
+    // SlotUnattributedFgm == Fgm. Subset invariant (ASSERTED in harness):
+    // SlotUnattributedFgm <= SlotUnattributedFga and per-slot Fgm <= Fga (a make
+    // requires an attempt; catches slot-level mis-attribution completeness misses).
+    // Init-only with 0 defaults — existing constructions untouched.
+    public int Slot1Fgm { get; init; }
+    public int Slot2Fgm { get; init; }
+    public int Slot3Fgm { get; init; }
+    public int Slot4Fgm { get; init; }
+    public int Slot5Fgm { get; init; }
+    public int SlotUnattributedFgm { get; init; }
 }
 
 /// <summary>
@@ -402,6 +426,12 @@ public sealed class Resolver
         var slot4Fga = 0;
         var slot5Fga = 0;
         var slotUnattributedFga = 0;
+        var slot1Fgm = 0;
+        var slot2Fgm = 0;
+        var slot3Fgm = 0;
+        var slot4Fgm = 0;
+        var slot5Fgm = 0;
+        var slotUnattributedFgm = 0;
         var iterations = 0;
         const int IterationCeiling = 10_000;
 
@@ -440,7 +470,10 @@ public sealed class Resolver
                           MidFga = midFga, MidFgm = midFgm, LongFga = longFga, LongFgm = longFgm,
                           Slot1Fga = slot1Fga, Slot2Fga = slot2Fga, Slot3Fga = slot3Fga,
                           Slot4Fga = slot4Fga, Slot5Fga = slot5Fga,
-                          SlotUnattributedFga = slotUnattributedFga };
+                          SlotUnattributedFga = slotUnattributedFga,
+                          Slot1Fgm = slot1Fgm, Slot2Fgm = slot2Fgm, Slot3Fgm = slot3Fgm,
+                          Slot4Fgm = slot4Fgm, Slot5Fgm = slot5Fgm,
+                          SlotUnattributedFgm = slotUnattributedFgm };
 
                 case Continue c:
                     switch (c.Next)
@@ -666,6 +699,18 @@ public sealed class Resolver
                                             case ShotLocation.Mid:   midFgm++;   break;
                                             case ShotLocation.Short: shortFgm++; break;
                                             case ShotLocation.Rim:   rimFgm++;   break;
+                                        }
+                                        // Per-slot FGM: credit the shooter's slot on a make.
+                                        // Mirrors the per-slot FGA switch; same null-slot handling
+                                        // (bonus-FT putback where Roll E never ran → unattributed).
+                                        switch (shotSt.SelectedSlot?.Number)
+                                        {
+                                            case 1: slot1Fgm++; break;
+                                            case 2: slot2Fgm++; break;
+                                            case 3: slot3Fgm++; break;
+                                            case 4: slot4Fgm++; break;
+                                            case 5: slot5Fgm++; break;
+                                            default: slotUnattributedFgm++; break; // SelectedSlot null — bonus-FT putback make
                                         }
                                     }
                                     // Per-slot FGA: credit the shooter's slot.
