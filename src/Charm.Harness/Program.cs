@@ -136,6 +136,7 @@ internal static class Program
         ok &= Phase17UsageEfficiencyCheck(configPath);
 
         ObservationRunV1(configPath);
+        StressTestArchetypeRosters(configPath);
         Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
         return ok ? 0 : 1;
     }
@@ -8570,6 +8571,1232 @@ internal static class Program
 
         Console.WriteLine(pass ? "  Phase 17 PASSED." : "  Phase 17 FAILED.");
         return pass;
+    }
+
+    // =========================================================================
+    // Stress-Test: Archetype Generator + Multi-Bucket Simulation
+    // 8 buckets × 10 variants × 50 games = 4,000 games
+    // Harness-only; no engine files changed.
+    // =========================================================================
+
+    // ── Enums ─────────────────────────────────────────────────────────────────
+
+    private enum PlayerArchetype
+    {
+        RimRunner,
+        PerimeterShooter,
+        Slasher,
+        PostScorer,
+        ThreeAndDWing,
+        PassFirstGuard,
+        AthleticBig,
+        FloorGeneral,
+    }
+
+    private enum TalentTier { Elite, Good, Average, Weak }
+
+    // ── Tier parameters ───────────────────────────────────────────────────────
+
+    private readonly record struct TierParams(int BaseCenter, int StrMin, int StrMax, int WeaknessPenalty);
+
+    private static TierParams GetTierParams(TalentTier tier) => tier switch
+    {
+        TalentTier.Elite   => new TierParams(55, 75, 88, 15),
+        TalentTier.Good    => new TierParams(48, 63, 76, 12),
+        TalentTier.Average => new TierParams(40, 50, 63, 10),
+        TalentTier.Weak    => new TierParams(28, 35, 48,  8),
+        _                  => throw new ArgumentOutOfRangeException(nameof(tier)),
+    };
+
+    // ── Standard roster compositions ─────────────────────────────────────────
+
+    private static readonly PlayerArchetype[] BalancedRoster =
+    {
+        PlayerArchetype.PassFirstGuard,
+        PlayerArchetype.PerimeterShooter,
+        PlayerArchetype.ThreeAndDWing,
+        PlayerArchetype.PostScorer,
+        PlayerArchetype.RimRunner,
+    };
+
+    private static readonly PlayerArchetype[] ShootingRoster =
+    {
+        PlayerArchetype.PassFirstGuard,
+        PlayerArchetype.PerimeterShooter,
+        PlayerArchetype.PerimeterShooter,
+        PlayerArchetype.ThreeAndDWing,
+        PlayerArchetype.FloorGeneral,
+    };
+
+    private static readonly PlayerArchetype[] AthleticRoster =
+    {
+        PlayerArchetype.Slasher,
+        PlayerArchetype.AthleticBig,
+        PlayerArchetype.Slasher,
+        PlayerArchetype.RimRunner,
+        PlayerArchetype.AthleticBig,
+    };
+
+    private static readonly PlayerArchetype[] SkillRoster =
+    {
+        PlayerArchetype.FloorGeneral,
+        PlayerArchetype.PerimeterShooter,
+        PlayerArchetype.ThreeAndDWing,
+        PlayerArchetype.PostScorer,
+        PlayerArchetype.FloorGeneral,
+    };
+
+    // ── Player factory ────────────────────────────────────────────────────────
+
+    private static Player MakePlayer(PlayerArchetype archetype, TalentTier tier, int playerSeed, string name)
+    {
+        var rng    = new Random(playerSeed);
+        var tp     = GetTierParams(tier);
+
+        int AtStrength() => rng.Next(tp.StrMin,          tp.StrMax + 1);
+        int AtBaseline() => rng.Next(tp.BaseCenter - 8,  tp.BaseCenter + 8 + 1);
+        int AtWeakness() => Math.Max(10, rng.Next(tp.BaseCenter - tp.WeaknessPenalty - 6,
+                                                   tp.BaseCenter - tp.WeaknessPenalty + 6 + 1));
+        int Clamp(int v) => Math.Max(10, Math.Min(99, v));
+
+        // Tendency helpers — independent of elevated/weakness
+        int TStr(int lo, int hi) => Clamp(rng.Next(lo, hi + 1));
+        int TBase()              => Clamp(AtBaseline());
+
+        // ── Attribute assignment by archetype ─────────────────────────────
+        Player p;
+        switch (archetype)
+        {
+            case PlayerArchetype.RimRunner:
+                p = new Player(name)
+                {
+                    Finishing          = Clamp(AtStrength()),
+                    Close              = Clamp(AtStrength()),
+                    Height             = Clamp(AtStrength()),
+                    Wingspan           = Clamp(AtStrength()),
+                    Weight             = Clamp(AtStrength()),
+                    Strength           = Clamp(AtStrength()),
+                    Vertical           = Clamp(AtStrength()),
+                    RimProtection      = Clamp(AtStrength()),
+                    DefensiveRebounding= Clamp(AtStrength()),
+                    OffensiveRebounding= Clamp(AtStrength()),
+                    PostDefense        = Clamp(AtStrength()),
+                    Outside            = Clamp(AtWeakness()),
+                    Mid                = Clamp(AtBaseline()),
+                    FreeThrow          = Clamp(AtBaseline()),
+                    FoulDrawing        = Clamp(AtBaseline()),
+                    BallHandling       = Clamp(AtBaseline()),
+                    Passing            = Clamp(AtBaseline()),
+                    Playmaking         = Clamp(AtBaseline()),
+                    SelfCreation       = Clamp(AtBaseline()),
+                    PostMoves          = Clamp(AtBaseline()),
+                    OffBallMovement    = Clamp(AtBaseline()),
+                    Screening          = Clamp(AtBaseline()),
+                    PerimeterDefense   = Clamp(AtBaseline()),
+                    Steals             = Clamp(AtBaseline()),
+                    Speed              = Clamp(AtBaseline()),
+                    Quickness          = Clamp(AtBaseline()),
+                    FirstStep          = Clamp(AtBaseline()),
+                    Endurance          = Clamp(AtBaseline()),
+                    Hustle             = Clamp(AtBaseline()),
+                    BasketballIQ       = Clamp(AtBaseline()),
+                    Discipline         = Clamp(AtBaseline()),
+                    RimTendency        = TStr(65, 85),
+                    ShortTendency      = TStr(35, 50),
+                    MidTendency        = TStr(15, 25),
+                    LongTendency       = TStr(5,  10),
+                    ThreeTendency      = Clamp(AtWeakness()),  // weakness
+                };
+                break;
+
+            case PlayerArchetype.PerimeterShooter:
+                p = new Player(name)
+                {
+                    Outside            = Clamp(AtStrength()),
+                    FreeThrow          = Clamp(AtStrength()),
+                    Speed              = Clamp(AtStrength()),
+                    Quickness          = Clamp(AtStrength()),
+                    OffBallMovement    = Clamp(AtStrength()),
+                    FoulDrawing        = Clamp(AtStrength()),
+                    Height             = Clamp(AtWeakness()),
+                    Weight             = Clamp(AtWeakness()),
+                    Strength           = Clamp(AtWeakness()),
+                    RimProtection      = Clamp(AtWeakness()),
+                    PostMoves          = Clamp(AtWeakness()),
+                    PostDefense        = Clamp(AtWeakness()),
+                    OffensiveRebounding= Clamp(AtWeakness()),
+                    DefensiveRebounding= Clamp(AtWeakness()),
+                    Close              = Clamp(AtBaseline()),
+                    Mid                = Clamp(AtBaseline()),
+                    Finishing          = Clamp(AtBaseline()),
+                    BallHandling       = Clamp(AtBaseline()),
+                    Passing            = Clamp(AtBaseline()),
+                    Playmaking         = Clamp(AtBaseline()),
+                    SelfCreation       = Clamp(AtBaseline()),
+                    Screening          = Clamp(AtBaseline()),
+                    Wingspan           = Clamp(AtBaseline()),
+                    PerimeterDefense   = Clamp(AtBaseline()),
+                    Steals             = Clamp(AtBaseline()),
+                    FirstStep          = Clamp(AtBaseline()),
+                    Vertical           = Clamp(AtBaseline()),
+                    Endurance          = Clamp(AtBaseline()),
+                    Hustle             = Clamp(AtBaseline()),
+                    BasketballIQ       = Clamp(AtBaseline()),
+                    Discipline         = Clamp(AtBaseline()),
+                    ThreeTendency      = TStr(65, 85),
+                    LongTendency       = TStr(30, 45),
+                    MidTendency        = TStr(15, 25),
+                    ShortTendency      = TStr(5,  10),
+                    RimTendency        = TStr(5,  10),
+                };
+                break;
+
+            case PlayerArchetype.Slasher:
+                p = new Player(name)
+                {
+                    Speed              = Clamp(AtStrength()),
+                    FirstStep          = Clamp(AtStrength()),
+                    Quickness          = Clamp(AtStrength()),
+                    Finishing          = Clamp(AtStrength()),
+                    FoulDrawing        = Clamp(AtStrength()),
+                    SelfCreation       = Clamp(AtStrength()),
+                    Vertical           = Clamp(AtStrength()),
+                    Outside            = Clamp(AtWeakness()),
+                    PostMoves          = Clamp(AtWeakness()),
+                    Height             = Clamp(AtWeakness()),
+                    Close              = Clamp(AtBaseline()),
+                    Mid                = Clamp(AtBaseline()),
+                    FreeThrow          = Clamp(AtBaseline()),
+                    BallHandling       = Clamp(AtBaseline()),
+                    Passing            = Clamp(AtBaseline()),
+                    Playmaking         = Clamp(AtBaseline()),
+                    OffBallMovement    = Clamp(AtBaseline()),
+                    Screening          = Clamp(AtBaseline()),
+                    OffensiveRebounding= Clamp(AtBaseline()),
+                    Wingspan           = Clamp(AtBaseline()),
+                    Weight             = Clamp(AtBaseline()),
+                    Strength           = Clamp(AtBaseline()),
+                    PerimeterDefense   = Clamp(AtBaseline()),
+                    PostDefense        = Clamp(AtBaseline()),
+                    RimProtection      = Clamp(AtBaseline()),
+                    DefensiveRebounding= Clamp(AtBaseline()),
+                    Steals             = Clamp(AtBaseline()),
+                    Endurance          = Clamp(AtBaseline()),
+                    Hustle             = Clamp(AtBaseline()),
+                    BasketballIQ       = Clamp(AtBaseline()),
+                    Discipline         = Clamp(AtBaseline()),
+                    RimTendency        = TStr(65, 85),
+                    ShortTendency      = TStr(30, 45),
+                    MidTendency        = TStr(15, 25),
+                    LongTendency       = TStr(5,  10),
+                    ThreeTendency      = TStr(5,  10),
+                };
+                break;
+
+            case PlayerArchetype.PostScorer:
+                p = new Player(name)
+                {
+                    PostMoves          = Clamp(AtStrength()),
+                    Close              = Clamp(AtStrength()),
+                    Strength           = Clamp(AtStrength()),
+                    Weight             = Clamp(AtStrength()),
+                    Height             = Clamp(AtStrength()),
+                    Wingspan           = Clamp(AtStrength()),
+                    FoulDrawing        = Clamp(AtStrength()),
+                    OffensiveRebounding= Clamp(AtStrength()),
+                    PostDefense        = Clamp(AtStrength()),
+                    Speed              = Clamp(AtWeakness()),
+                    Quickness          = Clamp(AtWeakness()),
+                    Outside            = Clamp(AtWeakness()),
+                    Mid                = Clamp(AtBaseline()),
+                    Finishing          = Clamp(AtBaseline()),
+                    FreeThrow          = Clamp(AtBaseline()),
+                    BallHandling       = Clamp(AtBaseline()),
+                    Passing            = Clamp(AtBaseline()),
+                    Playmaking         = Clamp(AtBaseline()),
+                    SelfCreation       = Clamp(AtBaseline()),
+                    OffBallMovement    = Clamp(AtBaseline()),
+                    Screening          = Clamp(AtBaseline()),
+                    PerimeterDefense   = Clamp(AtBaseline()),
+                    RimProtection      = Clamp(AtBaseline()),
+                    DefensiveRebounding= Clamp(AtBaseline()),
+                    Steals             = Clamp(AtBaseline()),
+                    FirstStep          = Clamp(AtBaseline()),
+                    Vertical           = Clamp(AtBaseline()),
+                    Endurance          = Clamp(AtBaseline()),
+                    Hustle             = Clamp(AtBaseline()),
+                    BasketballIQ       = Clamp(AtBaseline()),
+                    Discipline         = Clamp(AtBaseline()),
+                    ShortTendency      = TStr(65, 85),
+                    RimTendency        = TStr(30, 45),
+                    MidTendency        = TStr(15, 25),
+                    LongTendency       = TStr(5,  10),
+                    ThreeTendency      = Clamp(AtWeakness()),  // weakness
+                };
+                break;
+
+            case PlayerArchetype.ThreeAndDWing:
+                p = new Player(name)
+                {
+                    Outside            = Clamp(AtStrength()),
+                    PerimeterDefense   = Clamp(AtStrength()),
+                    Height             = Clamp(AtStrength()),
+                    Wingspan           = Clamp(AtStrength()),
+                    Speed              = Clamp(AtStrength()),
+                    FreeThrow          = Clamp(AtStrength()),
+                    PostMoves          = Clamp(AtWeakness()),
+                    PostDefense        = Clamp(AtWeakness()),
+                    RimProtection      = Clamp(AtWeakness()),
+                    Weight             = Clamp(AtWeakness()),
+                    Close              = Clamp(AtBaseline()),
+                    Mid                = Clamp(AtBaseline()),
+                    Finishing          = Clamp(AtBaseline()),
+                    FoulDrawing        = Clamp(AtBaseline()),
+                    BallHandling       = Clamp(AtBaseline()),
+                    Passing            = Clamp(AtBaseline()),
+                    Playmaking         = Clamp(AtBaseline()),
+                    SelfCreation       = Clamp(AtBaseline()),
+                    OffBallMovement    = Clamp(AtBaseline()),
+                    Screening          = Clamp(AtBaseline()),
+                    OffensiveRebounding= Clamp(AtBaseline()),
+                    DefensiveRebounding= Clamp(AtBaseline()),
+                    Steals             = Clamp(AtBaseline()),
+                    Strength           = Clamp(AtBaseline()),
+                    Quickness          = Clamp(AtBaseline()),
+                    FirstStep          = Clamp(AtBaseline()),
+                    Vertical           = Clamp(AtBaseline()),
+                    Endurance          = Clamp(AtBaseline()),
+                    Hustle             = Clamp(AtBaseline()),
+                    BasketballIQ       = Clamp(AtBaseline()),
+                    Discipline         = Clamp(AtBaseline()),
+                    ThreeTendency      = TStr(65, 85),
+                    LongTendency       = TStr(30, 45),
+                    MidTendency        = TStr(15, 25),
+                    ShortTendency      = TStr(5,  10),
+                    RimTendency        = TStr(5,  10),
+                };
+                break;
+
+            case PlayerArchetype.PassFirstGuard:
+                p = new Player(name)
+                {
+                    Playmaking         = Clamp(AtStrength()),
+                    Passing            = Clamp(AtStrength()),
+                    BallHandling       = Clamp(AtStrength()),
+                    BasketballIQ       = Clamp(AtStrength()),
+                    Speed              = Clamp(AtStrength()),
+                    Quickness          = Clamp(AtStrength()),
+                    Discipline         = Clamp(AtStrength()),
+                    SelfCreation       = Clamp(AtWeakness()),
+                    Outside            = Clamp(AtWeakness()),
+                    Height             = Clamp(AtWeakness()),
+                    Finishing          = Clamp(AtWeakness()),
+                    Close              = Clamp(AtBaseline()),
+                    Mid                = Clamp(AtBaseline()),
+                    FreeThrow          = Clamp(AtBaseline()),
+                    FoulDrawing        = Clamp(AtBaseline()),
+                    PostMoves          = Clamp(AtBaseline()),
+                    OffBallMovement    = Clamp(AtBaseline()),
+                    Screening          = Clamp(AtBaseline()),
+                    OffensiveRebounding= Clamp(AtBaseline()),
+                    Wingspan           = Clamp(AtBaseline()),
+                    Weight             = Clamp(AtBaseline()),
+                    Strength           = Clamp(AtBaseline()),
+                    PerimeterDefense   = Clamp(AtBaseline()),
+                    PostDefense        = Clamp(AtBaseline()),
+                    RimProtection      = Clamp(AtBaseline()),
+                    DefensiveRebounding= Clamp(AtBaseline()),
+                    Steals             = Clamp(AtBaseline()),
+                    FirstStep          = Clamp(AtBaseline()),
+                    Vertical           = Clamp(AtBaseline()),
+                    Endurance          = Clamp(AtBaseline()),
+                    Hustle             = Clamp(AtBaseline()),
+                    // Spread tendencies — mild ThreeTendency bias
+                    RimTendency        = TStr(15, 25),
+                    ShortTendency      = TStr(15, 25),
+                    MidTendency        = TStr(15, 25),
+                    LongTendency       = TStr(15, 25),
+                    ThreeTendency      = TStr(20, 30),
+                };
+                break;
+
+            case PlayerArchetype.AthleticBig:
+                p = new Player(name)
+                {
+                    Speed              = Clamp(AtStrength()),
+                    Quickness          = Clamp(AtStrength()),
+                    FirstStep          = Clamp(AtStrength()),
+                    Vertical           = Clamp(AtStrength()),
+                    Strength           = Clamp(AtStrength()),
+                    Height             = Clamp(AtStrength()),
+                    Wingspan           = Clamp(AtStrength()),
+                    Finishing          = Clamp(AtStrength()),
+                    RimProtection      = Clamp(AtStrength()),
+                    DefensiveRebounding= Clamp(AtStrength()),
+                    OffensiveRebounding= Clamp(AtStrength()),
+                    // Explicit weaknesses — critical for contrast
+                    Outside            = Clamp(AtWeakness()),
+                    Mid                = Clamp(AtWeakness()),
+                    PostMoves          = Clamp(AtWeakness()),
+                    Playmaking         = Clamp(AtWeakness()),
+                    BallHandling       = Clamp(AtWeakness()),
+                    Passing            = Clamp(AtWeakness()),
+                    Close              = Clamp(AtBaseline()),
+                    FreeThrow          = Clamp(AtBaseline()),
+                    FoulDrawing        = Clamp(AtBaseline()),
+                    SelfCreation       = Clamp(AtBaseline()),
+                    OffBallMovement    = Clamp(AtBaseline()),
+                    Screening          = Clamp(AtBaseline()),
+                    Weight             = Clamp(AtBaseline()),
+                    PerimeterDefense   = Clamp(AtBaseline()),
+                    PostDefense        = Clamp(AtBaseline()),
+                    Steals             = Clamp(AtBaseline()),
+                    Endurance          = Clamp(AtBaseline()),
+                    Hustle             = Clamp(AtBaseline()),
+                    BasketballIQ       = Clamp(AtBaseline()),
+                    Discipline         = Clamp(AtBaseline()),
+                    RimTendency        = TStr(75, 88),   // top of elevated range
+                    ShortTendency      = TStr(10, 20),
+                    MidTendency        = TStr(5,  10),
+                    LongTendency       = TStr(5,  10),
+                    ThreeTendency      = TStr(5,  10),
+                };
+                break;
+
+            case PlayerArchetype.FloorGeneral:
+                p = new Player(name)
+                {
+                    BasketballIQ       = Clamp(AtStrength()),
+                    Passing            = Clamp(AtStrength()),
+                    Playmaking         = Clamp(AtStrength()),
+                    BallHandling       = Clamp(AtStrength()),
+                    Discipline         = Clamp(AtStrength()),
+                    FreeThrow          = Clamp(AtStrength()),
+                    Outside            = Clamp(AtStrength()),
+                    // Explicit weaknesses — critical for contrast
+                    Speed              = Clamp(AtWeakness()),
+                    Quickness          = Clamp(AtWeakness()),
+                    FirstStep          = Clamp(AtWeakness()),
+                    Vertical           = Clamp(AtWeakness()),
+                    Strength           = Clamp(AtWeakness()),
+                    Height             = Clamp(AtWeakness()),
+                    Close              = Clamp(AtBaseline()),
+                    Mid                = Clamp(AtBaseline()),
+                    Finishing          = Clamp(AtBaseline()),
+                    FoulDrawing        = Clamp(AtBaseline()),
+                    SelfCreation       = Clamp(AtBaseline()),
+                    PostMoves          = Clamp(AtBaseline()),
+                    OffBallMovement    = Clamp(AtBaseline()),
+                    Screening          = Clamp(AtBaseline()),
+                    OffensiveRebounding= Clamp(AtBaseline()),
+                    Wingspan           = Clamp(AtBaseline()),
+                    Weight             = Clamp(AtBaseline()),
+                    PerimeterDefense   = Clamp(AtBaseline()),
+                    PostDefense        = Clamp(AtBaseline()),
+                    RimProtection      = Clamp(AtBaseline()),
+                    DefensiveRebounding= Clamp(AtBaseline()),
+                    Steals             = Clamp(AtBaseline()),
+                    Endurance          = Clamp(AtBaseline()),
+                    Hustle             = Clamp(AtBaseline()),
+                    // Spread with ThreeTendency and MidTendency slightly elevated
+                    RimTendency        = TStr(10, 20),
+                    ShortTendency      = TStr(15, 25),
+                    MidTendency        = TStr(20, 30),
+                    LongTendency       = TStr(15, 25),
+                    ThreeTendency      = TStr(20, 30),
+                };
+                break;
+
+            default:
+                throw new ArgumentOutOfRangeException(nameof(archetype));
+        }
+
+        var violations = p.Validate();
+        if (violations.Count > 0)
+            throw new InvalidOperationException(
+                $"Player {name} failed Validate(): {string.Join("; ", violations)}");
+
+        return p;
+    }
+
+    // ── Roster builders ───────────────────────────────────────────────────────
+
+    private static Player[] BuildArchetypeRoster(
+        PlayerArchetype[] archetypes,
+        TalentTier        tier,
+        int               baseSeed,
+        string            logicalTeamLabel)
+    {
+        var players = new Player[5];
+        for (var i = 0; i < 5; i++)
+            players[i] = MakePlayer(archetypes[i], tier, baseSeed + i, $"{logicalTeamLabel}_Slot{i + 1}");
+        return players;
+    }
+
+    private static Player[] BuildStarDrivenRoster(
+        PlayerArchetype   starArchetype,
+        PlayerArchetype[] roleArchetypes,   // length 4
+        int               baseSeed,
+        string            logicalTeamLabel)
+    {
+        var players = new Player[5];
+        players[0] = MakePlayer(starArchetype, TalentTier.Elite, baseSeed,     $"{logicalTeamLabel}_Slot1");
+        for (var i = 0; i < 4; i++)
+            players[i + 1] = MakePlayer(roleArchetypes[i], TalentTier.Good, baseSeed + i + 1,
+                                        $"{logicalTeamLabel}_Slot{i + 2}");
+        return players;
+    }
+
+    // ── Roster seating ────────────────────────────────────────────────────────
+
+    private static void SeatRoster(GameState game, TeamSide physicalSide, IReadOnlyList<Player> players)
+    {
+        var lineup = game.LineupFor(physicalSide);
+        var roster = game.RosterFor(physicalSide);
+        for (var i = 0; i < 5; i++)
+            roster.SetStarter(lineup.SlotAt(i + 1), players[i]);
+    }
+
+    // ── Roster fingerprint ────────────────────────────────────────────────────
+
+    private readonly record struct RosterFingerprint(
+        double Outside, double Finishing, double Mid, double Close, double SelfCreation,
+        double Speed, double Quickness, double Vertical, double Strength,
+        double Height, double Wingspan,
+        double Passing, double Playmaking, double BallHandling, double BasketballIQ,
+        double PerimeterDefense, double PostDefense, double RimProtection,
+        double OffensiveRebounding, double DefensiveRebounding);
+
+    private static RosterFingerprint ComputeFingerprint(IReadOnlyList<Player> players)
+    {
+        double Avg(Func<Player, int> f) => players.Average(p => (double)f(p));
+        return new RosterFingerprint(
+            Outside:            Avg(p => p.Outside),
+            Finishing:          Avg(p => p.Finishing),
+            Mid:                Avg(p => p.Mid),
+            Close:              Avg(p => p.Close),
+            SelfCreation:       Avg(p => p.SelfCreation),
+            Speed:              Avg(p => p.Speed),
+            Quickness:          Avg(p => p.Quickness),
+            Vertical:           Avg(p => p.Vertical),
+            Strength:           Avg(p => p.Strength),
+            Height:             Avg(p => p.Height),
+            Wingspan:           Avg(p => p.Wingspan),
+            Passing:            Avg(p => p.Passing),
+            Playmaking:         Avg(p => p.Playmaking),
+            BallHandling:       Avg(p => p.BallHandling),
+            BasketballIQ:       Avg(p => p.BasketballIQ),
+            PerimeterDefense:   Avg(p => p.PerimeterDefense),
+            PostDefense:        Avg(p => p.PostDefense),
+            RimProtection:      Avg(p => p.RimProtection),
+            OffensiveRebounding:Avg(p => p.OffensiveRebounding),
+            DefensiveRebounding:Avg(p => p.DefensiveRebounding));
+    }
+
+    private static void PrintFingerprint(string label, RosterFingerprint fp)
+    {
+        Console.WriteLine($"  {label}:");
+        Console.WriteLine($"    Scoring:  Outside={fp.Outside:F0}  Finishing={fp.Finishing:F0}  Mid={fp.Mid:F0}  Close={fp.Close:F0}  SelfCreation={fp.SelfCreation:F0}");
+        Console.WriteLine($"    Athletic: Speed={fp.Speed:F0}  Quickness={fp.Quickness:F0}  Vertical={fp.Vertical:F0}  Strength={fp.Strength:F0}");
+        Console.WriteLine($"    Physical: Height={fp.Height:F0}  Wingspan={fp.Wingspan:F0}");
+        Console.WriteLine($"    Skill:    Passing={fp.Passing:F0}  Playmaking={fp.Playmaking:F0}  BallHandling={fp.BallHandling:F0}  BasketballIQ={fp.BasketballIQ:F0}");
+        Console.WriteLine($"    Defense:  PerimeterDefense={fp.PerimeterDefense:F0}  PostDefense={fp.PostDefense:F0}  RimProtection={fp.RimProtection:F0}");
+        Console.WriteLine($"    Boards:   OffensiveRebounding={fp.OffensiveRebounding:F0}  DefensiveRebounding={fp.DefensiveRebounding:F0}");
+    }
+
+    // ── Per-variant stat accumulator ──────────────────────────────────────────
+
+    private sealed class VariantStats
+    {
+        public int     ValidGames;
+        // Win/tie tracking for Team A (logical)
+        public int     TeamAWins, TeamBWins, Ties;
+        // Physical home wins (for side-neutrality diagnostic)
+        public int     PhysicalHomeWins;
+        // Score lists (per game, Team A and Team B logical scores)
+        public readonly List<int>    TeamAScores = new();
+        public readonly List<int>    TeamBScores = new();
+        public readonly List<int>    Margins     = new();   // A - B
+        // Per-team offensive possession and points totals (aggregate)
+        public long    TeamAOffPoss, TeamBOffPoss;
+        public long    TeamAPoints,  TeamBPoints;
+        // PPP per game (for mean/sd)
+        public readonly List<double> TeamAPPP = new();
+        public readonly List<double> TeamBPPP = new();
+        // FG: aggregate attempts/makes per team
+        public long    TeamAFga, TeamBFga, TeamAFgm, TeamBFgm;
+        // FG% per game
+        public readonly List<double> TeamAFgPct = new();
+        public readonly List<double> TeamBFgPct = new();
+        // 3P: aggregate
+        public long    TeamA3pa, TeamB3pa, TeamA3pm, TeamB3pm;
+        // 3P% per game
+        public readonly List<double> TeamA3pPct = new();
+        public readonly List<double> TeamB3pPct = new();
+        // FT: aggregate
+        public long    TeamAFta, TeamBFta, TeamAFtm, TeamBFtm;
+        // FT% per game
+        public readonly List<double> TeamAFtPct = new();
+        public readonly List<double> TeamBFtPct = new();
+        // Shot mix: aggregate zone attempts per team
+        public long    TeamARimA,  TeamBRimA;
+        public long    TeamAShortA,TeamBShortA;
+        public long    TeamAMidA,  TeamBMidA;
+        public long    TeamALongA, TeamBLongA;
+        // ORB: aggregate
+        public long    TeamAOrbW, TeamBOrbW, TeamAOrbC, TeamBOrbC;
+        // FTr: FTA/FGA aggregate (combined team A + B together — computed from totals)
+        // Transition: per-game
+        public readonly List<double> TeamATransFreq = new();
+        public readonly List<double> TeamBTransFreq = new();
+    }
+
+    // ── Per-variant game outcomes for the bucket-7/8 paired diagnostic ────────
+
+    private sealed record GameOutcome(int GameIndex, bool TeamAWon, bool TeamBWon, bool Tied, bool Failed);
+
+    // ── The main stress-test entry point ─────────────────────────────────────
+
+    private static void StressTestArchetypeRosters(string configPath)
+    {
+        Console.WriteLine();
+        Console.WriteLine("=== STRESS TEST: Archetype Generator + Multi-Bucket Simulation (4,000 games) ===");
+        Console.WriteLine();
+
+        // ── Load configs once ─────────────────────────────────────────────────
+        var cfg          = RollAConfig.Load(configPath);
+        var cfgB         = RollBConfig.Load(configPath);
+        var cfgC         = RollCConfig.Load(configPath);
+        var cfgD         = RollDConfig.Load(configPath);
+        var cfgE         = RollEConfig.Load(configPath);
+        var cfgF         = RollFConfig.Load(configPath);
+        var cfgG         = RollGConfig.Load(configPath);
+        var cfgH         = RollHConfig.Load(configPath);
+        var cfgI         = RollIConfig.Load(configPath);
+        var cfgJ         = RollJConfig.Load(configPath);
+        var cfgK         = RollKConfig.Load(configPath);
+        var cfgL         = RollLConfig.Load(configPath);
+        var cfgM         = RollMConfig.Load(configPath);
+        var cfgOffFoul   = RollOffensiveFoulConfig.Load(configPath);
+        var cfgGov       = GovernorConfig.Load(configPath);
+        var cfgClock     = RollClockConfig.Load(configPath);
+        var cfgEndOfHalf = EndOfHalfConfig.Load(configPath);
+        var cfgMatchup   = MatchupConfig.Load(configPath);
+
+        // ── Hypotheses block — printed before results ─────────────────────────
+        Console.WriteLine("--- HYPOTHESES (observe, do not grade) ---");
+        Console.WriteLine("  EliteVsWeak: expect Team A win rate substantially above 50%. Magnitude unknown.");
+        Console.WriteLine("  ShootingVsAthletic: expect Shooting higher Three%, lower Rim% than Athletic.");
+        Console.WriteLine("  AthleticVsSkill (buckets 7+8): DEC-5 physical exponent may produce an athletic edge,");
+        Console.WriteLine("    but rosters also differ across many attributes. Reports what engine currently expresses.");
+        Console.WriteLine("  StarVsBalanced: PPP SD may be higher or lower than AverageVsAverage.");
+        Console.WriteLine("  PassFirstGuard/FloorGeneral: deferred channels (playmaking, IQ) not fully wired;");
+        Console.WriteLine("    underperformance is a finding, not a failure.");
+        Console.WriteLine("  Mirror gap (buckets 7/8): aggregate win-rate gap near 0% expected.");
+        Console.WriteLine("    Individual game disagreement is expected even in a side-neutral engine.");
+        Console.WriteLine();
+
+        // ── Failure log ───────────────────────────────────────────────────────
+        var failures = new List<string>();
+
+        // ── Role archetypes for star-driven roster ────────────────────────────
+        var starRoleArchetypes = new PlayerArchetype[]
+        {
+            PlayerArchetype.ThreeAndDWing,
+            PlayerArchetype.PerimeterShooter,
+            PlayerArchetype.RimRunner,
+            PlayerArchetype.PassFirstGuard,
+        };
+
+        // ── Bucket definitions ────────────────────────────────────────────────
+        // Each bucket: (name, buildTeamA, buildTeamB)
+        // buildTeamA/B: Func<int variantSeed, string label, Player[]>
+        // Buckets 7 and 8 share roster pairs (see §2c logic below)
+
+        // ── Storage for cross-bucket summary table ────────────────────────────
+        var summaryRows = new List<(string Name, double WinARate, double TieRate,
+            double PppA, double PppB, double FgA, double FgB,
+            double ThreePaRateA, double ThreePaRateB,
+            double RimShareA, double RimShareB,
+            double OrbA, double OrbB,
+            double Pace, double TransA, double TransB)>();
+
+        // ── Per-game outcomes for bucket 7 and 8 (paired diagnostic) ─────────
+        // Key: variantIndex * 50 + (gameIndex-1) → GameOutcome
+        var bucket7Outcomes = new Dictionary<int, GameOutcome>();
+        var bucket8Outcomes = new Dictionary<int, GameOutcome>();
+
+        // ── Bucket 7/8 aggregate stats (needed for paired diagnostic) ─────────
+        // We'll collect these during bucket runs
+        int b7ValidGames = 0, b8ValidGames = 0;
+        int b7TeamAWins  = 0, b8TeamAWins  = 0;
+        int b7TeamBWins  = 0, b8TeamBWins  = 0;
+
+        // ── Run all 8 buckets ─────────────────────────────────────────────────
+        for (var bucketNum = 1; bucketNum <= 8; bucketNum++)
+        {
+            // Bucket seed base
+            // Buckets 7 and 8 both use bucket 7's seed space (§2c)
+            int bucketSeedBase = bucketNum == 8 ? 7 * 10_000 : bucketNum * 10_000;
+
+            string bucketName = bucketNum switch
+            {
+                1 => "AverageVsAverage",
+                2 => "EliteVsWeak",
+                3 => "EliteVsElite",
+                4 => "WeakVsWeak",
+                5 => "StarVsBalanced",
+                6 => "ShootingVsAthletic",
+                7 => "AthleticVsSkill",
+                8 => "SkillVsAthletic",
+                _ => "Unknown",
+            };
+
+            Console.WriteLine($"--- BUCKET {bucketNum}: {bucketName} ---");
+            Console.WriteLine($"  Running 10 variants × 50 games ...");
+
+            // Accumulators across all variants for this bucket
+            var allVariantStats = new List<VariantStats>();
+
+            // For fingerprint averaging
+            var fpA_acc = new double[20];
+            var fpB_acc = new double[20];
+
+            for (var variantIdx = 0; variantIdx < 10; variantIdx++)
+            {
+                int variantSeed = bucketSeedBase + variantIdx * 100;
+
+                // ── Build rosters for this variant ─────────────────────────
+                Player[] teamAPlayers, teamBPlayers;
+
+                switch (bucketNum)
+                {
+                    case 1: // AverageVsAverage
+                        teamAPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Average, variantSeed,      "TeamA");
+                        teamBPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Average, variantSeed + 50, "TeamB");
+                        break;
+                    case 2: // EliteVsWeak
+                        teamAPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Elite, variantSeed,      "TeamA");
+                        teamBPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Weak,  variantSeed + 50, "TeamB");
+                        break;
+                    case 3: // EliteVsElite
+                        teamAPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Elite, variantSeed,      "TeamA");
+                        teamBPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Elite, variantSeed + 50, "TeamB");
+                        break;
+                    case 4: // WeakVsWeak
+                        teamAPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Weak, variantSeed,      "TeamA");
+                        teamBPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Weak, variantSeed + 50, "TeamB");
+                        break;
+                    case 5: // StarVsBalanced
+                        teamAPlayers = BuildStarDrivenRoster(PlayerArchetype.Slasher, starRoleArchetypes, variantSeed, "TeamA");
+                        teamBPlayers = BuildArchetypeRoster(BalancedRoster, TalentTier.Good, variantSeed + 50, "TeamB");
+                        break;
+                    case 6: // ShootingVsAthletic
+                        teamAPlayers = BuildArchetypeRoster(ShootingRoster,  TalentTier.Average, variantSeed,      "TeamA");
+                        teamBPlayers = BuildArchetypeRoster(AthleticRoster,  TalentTier.Average, variantSeed + 50, "TeamB");
+                        break;
+                    case 7: // AthleticVsSkill — Athletic=TeamA, Skill=TeamB, shared seeds
+                    {
+                        var athleticPlayers = BuildArchetypeRoster(AthleticRoster, TalentTier.Average, variantSeed,      "TeamA");
+                        var skillPlayers    = BuildArchetypeRoster(SkillRoster,    TalentTier.Average, variantSeed + 50, "TeamB");
+                        teamAPlayers = athleticPlayers;
+                        teamBPlayers = skillPlayers;
+                        break;
+                    }
+                    case 8: // SkillVsAthletic — Skill=TeamA, Athletic=TeamB, SAME players as bucket 7
+                    {
+                        // Rebuild from bucket 7's seed space using same seeds — same players
+                        var athleticPlayers = BuildArchetypeRoster(AthleticRoster, TalentTier.Average, variantSeed,      "TeamB");
+                        var skillPlayers    = BuildArchetypeRoster(SkillRoster,    TalentTier.Average, variantSeed + 50, "TeamA");
+                        teamAPlayers = skillPlayers;    // Skill is Team A in bucket 8
+                        teamBPlayers = athleticPlayers; // Athletic is Team B in bucket 8
+                        break;
+                    }
+                    default:
+                        throw new InvalidOperationException($"Unknown bucket {bucketNum}");
+                }
+
+                // ── Accumulate fingerprint ─────────────────────────────────
+                var fpA = ComputeFingerprint(teamAPlayers);
+                var fpB = ComputeFingerprint(teamBPlayers);
+                AccumulateFingerprint(fpA_acc, fpA);
+                AccumulateFingerprint(fpB_acc, fpB);
+
+                // ── Play 50 games for this variant ─────────────────────────
+                var vs = new VariantStats();
+
+                for (var gameIndex = 1; gameIndex <= 50; gameIndex++)
+                {
+                    int gameSeed = variantSeed + gameIndex;
+
+                    // Physical home/away assignment for this game
+                    bool teamAIsHome = gameIndex % 2 == 1;
+                    TeamSide teamASide = teamAIsHome ? TeamSide.Home : TeamSide.Away;
+                    TeamSide teamBSide = teamAIsHome ? TeamSide.Away : TeamSide.Home;
+
+                    // Build fresh GameState
+                    var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+                    SeatRoster(game, teamASide, teamAPlayers);
+                    SeatRoster(game, teamBSide, teamBPlayers);
+                    game.SetPossessionArrow(TeamSide.Home);
+
+                    var resolverRng = new SystemRng(gameSeed);
+                    var governorRng = new SystemRng(gameSeed + 1);
+
+                    var resolver = new Resolver(
+                        new RollAGenerator(cfg, cfgMatchup, game),
+                        cfg,
+                        new RollBGenerator(cfgB, cfgMatchup, game),
+                        new RollCStubPieGenerator(cfgC),
+                        cfgC,
+                        new RollDStubPieGenerator(cfgD),
+                        new RollEStubPieGenerator(cfgE),
+                        new RollFGenerator(cfgF, cfgMatchup, game),
+                        new RollGGenerator(cfgG, cfgMatchup, game),
+                        new RollHGenerator(cfgH, cfgMatchup, game),
+                        new RollIGenerator(cfgI, cfgMatchup, game),
+                        new RollJStubPieGenerator(cfgJ),
+                        new RollKStubPieGenerator(cfgK),
+                        new RollLStubPieGenerator(cfgL),
+                        new RollMGenerator(cfgM, cfgMatchup, game),
+                        new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
+                        cfgMatchup,
+                        game,
+                        resolverRng);
+
+                    var governor = new Governor(resolver, game, cfgGov, cfgClock, governorRng, cfgEndOfHalf);
+
+                    var firstState = new PossessionState(
+                        PossessionNumber: 1,
+                        Offense: TeamSide.Home,
+                        Defense: TeamSide.Away,
+                        Entry: EntryType.DeadBallInbound);
+
+                    GovernorRunResult result;
+                    try
+                    {
+                        result = governor.Run(firstState);
+                    }
+                    catch (Exception ex)
+                    {
+                        var msg = $"B{bucketNum} V{variantIdx} seed={gameSeed}: {ex.Message}";
+                        failures.Add(msg);
+                        // Record failure in paired diagnostic structures
+                        if (bucketNum == 7) bucket7Outcomes[variantIdx * 50 + (gameIndex - 1)] =
+                            new GameOutcome(gameIndex, false, false, false, true);
+                        if (bucketNum == 8) bucket8Outcomes[variantIdx * 50 + (gameIndex - 1)] =
+                            new GameOutcome(gameIndex, false, false, false, true);
+                        continue;
+                    }
+
+                    var records = result.Possessions;
+
+                    // ── Mechanical checks ──────────────────────────────────
+                    var noShot = records.Count(r => r.EndOfHalfIntent == EndOfHalfIntent.NoShot);
+
+                    // Score reconciliation
+                    var recHome = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Points);
+                    var recAway = records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Points);
+                    if (game.HomeScore != recHome || game.AwayScore != recAway)
+                    {
+                        failures.Add($"B{bucketNum} V{variantIdx} seed={gameSeed}: score mismatch state=({game.HomeScore},{game.AwayScore}) records=({recHome},{recAway})");
+                        continue;
+                    }
+
+                    // Zero parks
+                    if (result.Parked > 0)
+                    {
+                        failures.Add($"B{bucketNum} V{variantIdx} seed={gameSeed}: {result.Parked} parked possessions");
+                        continue;
+                    }
+
+                    // Count invariant
+                    if (result.TerminalEnded + result.Parked + noShot != records.Count)
+                    {
+                        failures.Add($"B{bucketNum} V{variantIdx} seed={gameSeed}: count invariant failed");
+                        continue;
+                    }
+
+                    vs.ValidGames++;
+
+                    // ── Logical team scores ────────────────────────────────
+                    // Map physical home/away scores to logical team A/B
+                    int teamAScore = teamAIsHome ? game.HomeScore : game.AwayScore;
+                    int teamBScore = teamAIsHome ? game.AwayScore : game.HomeScore;
+
+                    // Win/tie
+                    bool teamAWon  = teamAScore > teamBScore;
+                    bool teamBWon  = teamBScore > teamAScore;
+                    bool tied      = teamAScore == teamBScore;
+                    bool physHomeWon = game.HomeScore > game.AwayScore;
+
+                    if (teamAWon)  vs.TeamAWins++;
+                    else if (teamBWon) vs.TeamBWins++;
+                    else           vs.Ties++;
+                    if (physHomeWon) vs.PhysicalHomeWins++;
+
+                    vs.TeamAScores.Add(teamAScore);
+                    vs.TeamBScores.Add(teamBScore);
+                    vs.Margins.Add(teamAScore - teamBScore);
+
+                    // Store for paired diagnostic (buckets 7/8)
+                    if (bucketNum == 7) bucket7Outcomes[variantIdx * 50 + (gameIndex - 1)] =
+                        new GameOutcome(gameIndex, teamAWon, teamBWon, tied, false);
+                    if (bucketNum == 8) bucket8Outcomes[variantIdx * 50 + (gameIndex - 1)] =
+                        new GameOutcome(gameIndex, teamAWon, teamBWon, tied, false);
+
+                    // ── Per-team possession stats ──────────────────────────
+                    // "Team A's offensive possessions" = possessions where offense was teamASide
+                    var teamAPoss = records.Count(r => r.Offense == teamASide);
+                    var teamBPoss = records.Count(r => r.Offense == teamBSide);
+                    var teamAPts  = records.Where(r => r.Offense == teamASide).Sum(r => r.Points);
+                    var teamBPts  = records.Where(r => r.Offense == teamBSide).Sum(r => r.Points);
+
+                    vs.TeamAOffPoss += teamAPoss;
+                    vs.TeamBOffPoss += teamBPoss;
+                    vs.TeamAPoints  += teamAPts;
+                    vs.TeamBPoints  += teamBPts;
+
+                    vs.TeamAPPP.Add(teamAPoss > 0 ? (double)teamAPts / teamAPoss : 0.0);
+                    vs.TeamBPPP.Add(teamBPoss > 0 ? (double)teamBPts / teamBPoss : 0.0);
+
+                    // FG
+                    var aFga = records.Where(r => r.Offense == teamASide).Sum(r => r.Fga);
+                    var bFga = records.Where(r => r.Offense == teamBSide).Sum(r => r.Fga);
+                    var aFgm = records.Where(r => r.Offense == teamASide).Sum(r => r.Fgm);
+                    var bFgm = records.Where(r => r.Offense == teamBSide).Sum(r => r.Fgm);
+                    vs.TeamAFga += aFga; vs.TeamBFga += bFga;
+                    vs.TeamAFgm += aFgm; vs.TeamBFgm += bFgm;
+                    vs.TeamAFgPct.Add(aFga > 0 ? (double)aFgm / aFga : 0.0);
+                    vs.TeamBFgPct.Add(bFga > 0 ? (double)bFgm / bFga : 0.0);
+
+                    // 3P
+                    var a3pa = records.Where(r => r.Offense == teamASide).Sum(r => r.ThreePa);
+                    var b3pa = records.Where(r => r.Offense == teamBSide).Sum(r => r.ThreePa);
+                    var a3pm = records.Where(r => r.Offense == teamASide).Sum(r => r.ThreePm);
+                    var b3pm = records.Where(r => r.Offense == teamBSide).Sum(r => r.ThreePm);
+                    vs.TeamA3pa += a3pa; vs.TeamB3pa += b3pa;
+                    vs.TeamA3pm += a3pm; vs.TeamB3pm += b3pm;
+                    vs.TeamA3pPct.Add(a3pa > 0 ? (double)a3pm / a3pa : 0.0);
+                    vs.TeamB3pPct.Add(b3pa > 0 ? (double)b3pm / b3pa : 0.0);
+
+                    // FT
+                    var aFta = records.Where(r => r.Offense == teamASide).Sum(r => r.Fta);
+                    var bFta = records.Where(r => r.Offense == teamBSide).Sum(r => r.Fta);
+                    var aFtm = records.Where(r => r.Offense == teamASide).Sum(r => r.Ftm);
+                    var bFtm = records.Where(r => r.Offense == teamBSide).Sum(r => r.Ftm);
+                    vs.TeamAFta += aFta; vs.TeamBFta += bFta;
+                    vs.TeamAFtm += aFtm; vs.TeamBFtm += bFtm;
+                    vs.TeamAFtPct.Add(aFta > 0 ? (double)aFtm / aFta : 0.0);
+                    vs.TeamBFtPct.Add(bFta > 0 ? (double)bFtm / bFta : 0.0);
+
+                    // Zone shot mix (attempts only — shares computed from FGA total)
+                    vs.TeamARimA   += records.Where(r => r.Offense == teamASide).Sum(r => r.RimFga);
+                    vs.TeamBRimA   += records.Where(r => r.Offense == teamBSide).Sum(r => r.RimFga);
+                    vs.TeamAShortA += records.Where(r => r.Offense == teamASide).Sum(r => r.ShortFga);
+                    vs.TeamBShortA += records.Where(r => r.Offense == teamBSide).Sum(r => r.ShortFga);
+                    vs.TeamAMidA   += records.Where(r => r.Offense == teamASide).Sum(r => r.MidFga);
+                    vs.TeamBMidA   += records.Where(r => r.Offense == teamBSide).Sum(r => r.MidFga);
+                    vs.TeamALongA  += records.Where(r => r.Offense == teamASide).Sum(r => r.LongFga);
+                    vs.TeamBLongA  += records.Where(r => r.Offense == teamBSide).Sum(r => r.LongFga);
+
+                    // ORB — attribute to the offense on each possession
+                    vs.TeamAOrbW += records.Where(r => r.Offense == teamASide).Sum(r => r.OrbWon);
+                    vs.TeamBOrbW += records.Where(r => r.Offense == teamBSide).Sum(r => r.OrbWon);
+                    vs.TeamAOrbC += records.Where(r => r.Offense == teamASide).Sum(r => r.OrbChances);
+                    vs.TeamBOrbC += records.Where(r => r.Offense == teamBSide).Sum(r => r.OrbChances);
+
+                    // Transition frequency per team
+                    var transA = records.Count(r => r.Offense == teamASide && r.Entry == EntryType.Transition);
+                    var transB = records.Count(r => r.Offense == teamBSide && r.Entry == EntryType.Transition);
+                    vs.TeamATransFreq.Add(teamAPoss > 0 ? (double)transA / teamAPoss : 0.0);
+                    vs.TeamBTransFreq.Add(teamBPoss > 0 ? (double)transB / teamBPoss : 0.0);
+                }   // end game loop
+
+                allVariantStats.Add(vs);
+            }   // end variant loop
+
+            // ── Aggregate across all 10 variants ──────────────────────────────
+            int totalValid  = allVariantStats.Sum(v => v.ValidGames);
+            int totalAWins  = allVariantStats.Sum(v => v.TeamAWins);
+            int totalBWins  = allVariantStats.Sum(v => v.TeamBWins);
+            int totalTies   = allVariantStats.Sum(v => v.Ties);
+            int physHomeWins= allVariantStats.Sum(v => v.PhysicalHomeWins);
+
+            // ── Store for paired diagnostic ────────────────────────────────────
+            if (bucketNum == 7) { b7ValidGames = totalValid; b7TeamAWins = totalAWins; b7TeamBWins = totalBWins; }
+            if (bucketNum == 8) { b8ValidGames = totalValid; b8TeamAWins = totalAWins; b8TeamBWins = totalBWins; }
+
+            // ── Print roster fingerprints (averaged across 10 variants) ────────
+            var fpA_mean = DivideFingerprint(fpA_acc, 10);
+            var fpB_mean = DivideFingerprint(fpB_acc, 10);
+            Console.WriteLine();
+            PrintFingerprint("Team A roster profile (mean across 10 variants)", fpA_mean);
+            PrintFingerprint("Team B roster profile (mean across 10 variants)", fpB_mean);
+            Console.WriteLine();
+
+            // ── Print per-bucket results ──────────────────────────────────────
+            Console.WriteLine($"  validGames={totalValid}/500");
+
+            if (totalValid == 0) { Console.WriteLine("  No valid games."); continue; }
+
+            double vg = totalValid;
+            double wARt = totalAWins / vg;
+            double wBRt = totalBWins / vg;
+            double tieRt = totalTies / vg;
+            double physHomeRt = physHomeWins / vg;
+
+            Console.WriteLine($"  Team A wins: {totalAWins}/{totalValid} = {wARt:P1}");
+            Console.WriteLine($"  Team B wins: {totalBWins}/{totalValid} = {wBRt:P1}");
+            Console.WriteLine($"  Ties:        {totalTies}/{totalValid} = {tieRt:P1}");
+            Console.WriteLine($"  Physical home win rate: {physHomeRt:P1}  (side-neutrality diagnostic)");
+
+            // Score/margin
+            var allAScores = allVariantStats.SelectMany(v => v.TeamAScores).ToList();
+            var allBScores = allVariantStats.SelectMany(v => v.TeamBScores).ToList();
+            var allMargins = allVariantStats.SelectMany(v => v.Margins).ToList();
+            Console.WriteLine($"  Team A score: mean={Mean(allAScores):F1}  sd={Sd(allAScores):F1}  min={allAScores.Min()}  max={allAScores.Max()}");
+            Console.WriteLine($"  Team B score: mean={Mean(allBScores):F1}  sd={Sd(allBScores):F1}  min={allBScores.Min()}  max={allBScores.Max()}");
+            Console.WriteLine($"  Margin (A-B): mean={Mean(allMargins):F1}  sd={Sd(allMargins):F1}");
+
+            // PPP aggregate
+            long aggAOff = allVariantStats.Sum(v => v.TeamAOffPoss);
+            long aggBOff = allVariantStats.Sum(v => v.TeamBOffPoss);
+            long aggAPts = allVariantStats.Sum(v => v.TeamAPoints);
+            long aggBPts = allVariantStats.Sum(v => v.TeamBPoints);
+            double aggPppA = aggAOff > 0 ? (double)aggAPts / aggAOff : 0.0;
+            double aggPppB = aggBOff > 0 ? (double)aggBPts / aggBOff : 0.0;
+            var allAPpp = allVariantStats.SelectMany(v => v.TeamAPPP).ToList();
+            var allBPpp = allVariantStats.SelectMany(v => v.TeamBPPP).ToList();
+            Console.WriteLine($"  PPP Team A: agg={aggPppA:F3}  mean-game={Mean(allAPpp):F3}  sd={Sd(allAPpp):F3}");
+            Console.WriteLine($"  PPP Team B: agg={aggPppB:F3}  mean-game={Mean(allBPpp):F3}  sd={Sd(allBPpp):F3}");
+
+            // FG%
+            long aggAFga = allVariantStats.Sum(v => v.TeamAFga);
+            long aggBFga = allVariantStats.Sum(v => v.TeamBFga);
+            long aggAFgm = allVariantStats.Sum(v => v.TeamAFgm);
+            long aggBFgm = allVariantStats.Sum(v => v.TeamBFgm);
+            double aggFgA = aggAFga > 0 ? (double)aggAFgm / aggAFga : 0.0;
+            double aggFgB = aggBFga > 0 ? (double)aggBFgm / aggBFga : 0.0;
+            var allAFg = allVariantStats.SelectMany(v => v.TeamAFgPct).ToList();
+            var allBFg = allVariantStats.SelectMany(v => v.TeamBFgPct).ToList();
+            Console.WriteLine($"  FG%  Team A: agg={aggFgA:P1}  mean-game={Mean(allAFg):P1}  sd={Sd(allAFg):P1}");
+            Console.WriteLine($"  FG%  Team B: agg={aggFgB:P1}  mean-game={Mean(allBFg):P1}  sd={Sd(allBFg):P1}");
+
+            // 3P%
+            long aggA3pa = allVariantStats.Sum(v => v.TeamA3pa);
+            long aggB3pa = allVariantStats.Sum(v => v.TeamB3pa);
+            long aggA3pm = allVariantStats.Sum(v => v.TeamA3pm);
+            long aggB3pm = allVariantStats.Sum(v => v.TeamB3pm);
+            double agg3pA = aggA3pa > 0 ? (double)aggA3pm / aggA3pa : 0.0;
+            double agg3pB = aggB3pa > 0 ? (double)aggB3pm / aggB3pa : 0.0;
+            var allA3p = allVariantStats.SelectMany(v => v.TeamA3pPct).ToList();
+            var allB3p = allVariantStats.SelectMany(v => v.TeamB3pPct).ToList();
+            Console.WriteLine($"  3P%  Team A: agg={agg3pA:P1}  mean-game={Mean(allA3p):P1}  sd={Sd(allA3p):P1}");
+            Console.WriteLine($"  3P%  Team B: agg={agg3pB:P1}  mean-game={Mean(allB3p):P1}  sd={Sd(allB3p):P1}");
+
+            // FT%
+            long aggAFta = allVariantStats.Sum(v => v.TeamAFta);
+            long aggBFta = allVariantStats.Sum(v => v.TeamBFta);
+            long aggAFtm = allVariantStats.Sum(v => v.TeamAFtm);
+            long aggBFtm = allVariantStats.Sum(v => v.TeamBFtm);
+            double aggFtA = aggAFta > 0 ? (double)aggAFtm / aggAFta : 0.0;
+            double aggFtB = aggBFta > 0 ? (double)aggBFtm / aggBFta : 0.0;
+            var allAFt = allVariantStats.SelectMany(v => v.TeamAFtPct).ToList();
+            var allBFt = allVariantStats.SelectMany(v => v.TeamBFtPct).ToList();
+            Console.WriteLine($"  FT%  Team A: agg={aggFtA:P1}  mean-game={Mean(allAFt):P1}  sd={Sd(allAFt):P1}");
+            Console.WriteLine($"  FT%  Team B: agg={aggFtB:P1}  mean-game={Mean(allBFt):P1}  sd={Sd(allBFt):P1}");
+
+            // 3PA rate (3PA/FGA aggregate) — per team
+            double threePaRateA = aggAFga > 0 ? (double)aggA3pa / aggAFga : 0.0;
+            double threePaRateB = aggBFga > 0 ? (double)aggB3pa / aggBFga : 0.0;
+            Console.WriteLine($"  3PA rate  Team A: {threePaRateA:P1}  Team B: {threePaRateB:P1}");
+
+            // Shot mix (aggregate share of FGA by zone, per team)
+            long aggARimA   = allVariantStats.Sum(v => v.TeamARimA);
+            long aggBRimA   = allVariantStats.Sum(v => v.TeamBRimA);
+            long aggAShortA = allVariantStats.Sum(v => v.TeamAShortA);
+            long aggBShortA = allVariantStats.Sum(v => v.TeamBShortA);
+            long aggAMidA   = allVariantStats.Sum(v => v.TeamAMidA);
+            long aggBMidA   = allVariantStats.Sum(v => v.TeamBMidA);
+            long aggALongA  = allVariantStats.Sum(v => v.TeamALongA);
+            long aggBLongA  = allVariantStats.Sum(v => v.TeamBLongA);
+
+            double rimShareA   = aggAFga > 0 ? (double)aggARimA   / aggAFga : 0.0;
+            double rimShareB   = aggBFga > 0 ? (double)aggBRimA   / aggBFga : 0.0;
+            double shortShareA = aggAFga > 0 ? (double)aggAShortA / aggAFga : 0.0;
+            double shortShareB = aggBFga > 0 ? (double)aggBShortA / aggBFga : 0.0;
+            double midShareA   = aggAFga > 0 ? (double)aggAMidA   / aggAFga : 0.0;
+            double midShareB   = aggBFga > 0 ? (double)aggBMidA   / aggBFga : 0.0;
+            double longShareA  = aggAFga > 0 ? (double)aggALongA  / aggAFga : 0.0;
+            double longShareB  = aggBFga > 0 ? (double)aggBLongA  / aggBFga : 0.0;
+
+            Console.WriteLine($"  Shot mix Team A: Rim={rimShareA:P0} Short={shortShareA:P0} Mid={midShareA:P0} Long={longShareA:P0} Three={threePaRateA:P0}");
+            Console.WriteLine($"  Shot mix Team B: Rim={rimShareB:P0} Short={shortShareB:P0} Mid={midShareB:P0} Long={longShareB:P0} Three={threePaRateB:P0}");
+
+            // ORB%
+            long aggAOrbW = allVariantStats.Sum(v => v.TeamAOrbW);
+            long aggBOrbW = allVariantStats.Sum(v => v.TeamBOrbW);
+            long aggAOrbC = allVariantStats.Sum(v => v.TeamAOrbC);
+            long aggBOrbC = allVariantStats.Sum(v => v.TeamBOrbC);
+            double orbA = aggAOrbC > 0 ? (double)aggAOrbW / aggAOrbC : 0.0;
+            double orbB = aggBOrbC > 0 ? (double)aggBOrbW / aggBOrbC : 0.0;
+            Console.WriteLine($"  ORB%  Team A: {orbA:P1}  Team B: {orbB:P1}");
+
+            // FTr (FTA/FGA aggregate, per team)
+            double ftrA = aggAFga > 0 ? (double)aggAFta / aggAFga : 0.0;
+            double ftrB = aggBFga > 0 ? (double)aggBFta / aggBFga : 0.0;
+            Console.WriteLine($"  FTr   Team A: {ftrA:F3}  Team B: {ftrB:F3}");
+
+            // Transition frequency
+            var allATransFreq = allVariantStats.SelectMany(v => v.TeamATransFreq).ToList();
+            var allBTransFreq = allVariantStats.SelectMany(v => v.TeamBTransFreq).ToList();
+            // Pace = mean total possessions per game (both teams)
+            double pace = (aggAOff + aggBOff) / (double)Math.Max(1, totalValid);
+            Console.WriteLine($"  Transition Team A: {Mean(allATransFreq):P1}  Team B: {Mean(allBTransFreq):P1}");
+            Console.WriteLine($"  Pace (total poss/game): {pace:F1}");
+
+            // Between-variant diagnostic (per-variant win rates and PPP ranges)
+            var variantWinRatesA = allVariantStats.Select(v =>
+                v.ValidGames > 0 ? (double)v.TeamAWins / v.ValidGames : 0.0).ToList();
+            var variantPppB = allVariantStats.SelectMany(v => v.TeamBPPP).ToList();
+            // Per-variant means for Team B PPP
+            var variantMeanPppB = allVariantStats.Select(v =>
+                v.TeamBPPP.Count > 0 ? v.TeamBPPP.Average() : 0.0).ToList();
+            Console.WriteLine($"  Between-variant:  Team A win-rate range: min={variantWinRatesA.Min():P0}  max={variantWinRatesA.Max():P0}");
+            Console.WriteLine($"  Between-variant:  Team B PPP range: min={variantMeanPppB.Min():F3}  max={variantMeanPppB.Max():F3}");
+
+            Console.WriteLine();
+
+            // ── Accumulate summary row ─────────────────────────────────────────
+            summaryRows.Add((bucketName,
+                wARt, tieRt,
+                aggPppA, aggPppB,
+                aggFgA, aggFgB,
+                threePaRateA, threePaRateB,
+                rimShareA, rimShareB,
+                orbA, orbB,
+                pace,
+                Mean(allATransFreq), Mean(allBTransFreq)));
+        }   // end bucket loop
+
+        // ── Buckets 7/8 paired diagnostic ─────────────────────────────────────
+        Console.WriteLine("--- BUCKETS 7/8 PAIRED DIAGNOSTIC ---");
+
+        double b7WinRateAthletic = b7ValidGames > 0 ? (double)b7TeamAWins / b7ValidGames : 0.0;
+        double b8WinRateAthletic = b8ValidGames > 0 ? (double)b8TeamBWins / b8ValidGames : 0.0;
+        double mirrorGap = Math.Abs(b7WinRateAthletic - b8WinRateAthletic);
+
+        Console.WriteLine($"  Athletic paired win rate:");
+        Console.WriteLine($"    As Team A (Bucket 7): {b7WinRateAthletic:P1}   (= Bucket 7 Team A wins / Bucket 7 validGames)");
+        Console.WriteLine($"    As Team B (Bucket 8): {b8WinRateAthletic:P1}   (= Bucket 8 Team B wins / Bucket 8 validGames)");
+        Console.WriteLine($"    NOTE: Bucket 8 Athletic win rate computed directly from Team B wins — NOT 1 − TeamAWinRate.");
+        Console.WriteLine($"  Mirror gap: abs(B7_AthleticWinRate − B8_AthleticWinRate) = {mirrorGap:P1}");
+        Console.WriteLine($"  (A large gap suggests physical-side asymmetry, seed-stream sensitivity, or remapping error;");
+        Console.WriteLine($"   it does not by itself identify which cause is responsible.)");
+
+        // Paired game outcome agreement
+        int pairedValid      = 0;
+        int mirrored         = 0;
+        int disagreement     = 0;
+        int unpairedFailures = 0;
+
+        for (var variantIdx = 0; variantIdx < 10; variantIdx++)
+        {
+            for (var gameIndex = 1; gameIndex <= 50; gameIndex++)
+            {
+                int key = variantIdx * 50 + (gameIndex - 1);
+                bool has7 = bucket7Outcomes.TryGetValue(key, out var g7);
+                bool has8 = bucket8Outcomes.TryGetValue(key, out var g8);
+
+                if (!has7 || !has8)                      { unpairedFailures++; continue; }
+                if (g7!.Failed || g8!.Failed)             { unpairedFailures++; continue; }
+
+                pairedValid++;
+
+                // In bucket 7: Athletic = Team A.  In bucket 8: Athletic = Team B.
+                // "Athletic won" in bucket 7 means TeamAWon.
+                // "Athletic won" in bucket 8 means TeamBWon (NOT TeamAWon).
+                bool athleticWon7  = g7.TeamAWon;
+                bool athleticWon8  = g8.TeamBWon;
+                bool skillWon7     = g7.TeamBWon;
+                bool skillWon8     = g8.TeamAWon;
+                bool tied7         = g7.Tied;
+                bool tied8         = g8.Tied;
+
+                // Mirrored: same team wins both, or both tie
+                bool sameMirror =
+                    (athleticWon7 && athleticWon8) ||
+                    (skillWon7    && skillWon8)    ||
+                    (tied7        && tied8);
+
+                if (sameMirror) mirrored++;
+                else            disagreement++;
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"  Paired-game outcome agreement (same game seed, rosters swapped):");
+        Console.WriteLine($"    Mirrored result (Athletic wins both, Skill wins both, or both tie): {mirrored} / {pairedValid}");
+        Console.WriteLine($"    Disagreement (changing presentation changes the winner):             {disagreement} / {pairedValid}");
+        Console.WriteLine($"    Unpaired failures (one bucket game failed, no match):                {unpairedFailures}");
+        Console.WriteLine($"    (pairedValidGames = games where both Bucket 7 and Bucket 8 game N succeeded)");
+        Console.WriteLine($"    (Disagreement count is a sensitivity diagnostic, not a pass/fail condition.)");
+        Console.WriteLine($"  Interpretation: a large mirror gap or high disagreement count suggests physical-side");
+        Console.WriteLine($"    asymmetry, seed-stream sensitivity, or an incorrect logical remapping.");
+        Console.WriteLine();
+
+        // ── Cross-bucket summary table ────────────────────────────────────────
+        Console.WriteLine("--- CROSS-BUCKET SUMMARY TABLE ---");
+        Console.WriteLine($"  {"Bucket",-22} {"WinA%",6} {"Ties%",6} {"PPP_A",6} {"PPP_B",6} {"FG%_A",6} {"FG%_B",6} {"3PA%A",6} {"3PA%B",6} {"Rim%A",6} {"Rim%B",6} {"ORB%A",6} {"ORB%B",6} {"Pace",5} {"Tr%A",5} {"Tr%B",5}");
+        foreach (var r in summaryRows)
+        {
+            Console.WriteLine($"  {r.Name,-22} {r.WinARate,6:P0} {r.TieRate,6:P0} {r.PppA,6:F3} {r.PppB,6:F3} {r.FgA,6:P0} {r.FgB,6:P0} {r.ThreePaRateA,6:P0} {r.ThreePaRateB,6:P0} {r.RimShareA,6:P0} {r.RimShareB,6:P0} {r.OrbA,6:P0} {r.OrbB,6:P0} {r.Pace,5:F0} {r.TransA,5:P0} {r.TransB,5:P0}");
+        }
+        Console.WriteLine();
+
+        // ── Final verdict ─────────────────────────────────────────────────────
+        if (failures.Count == 0)
+        {
+            Console.WriteLine("STRESS TEST PASSED");
+        }
+        else
+        {
+            Console.WriteLine($"STRESS TEST FAILED — {failures.Count} failure(s):");
+            foreach (var f in failures)
+                Console.WriteLine($"  {f}");
+        }
+        Console.WriteLine("=== END STRESS TEST ===");
+    }
+
+    // ── Stress-test helpers ────────────────────────────────────────────────────
+
+    private static double Mean(List<int>    v) => v.Count > 0 ? v.Average()                                         : 0.0;
+    private static double Mean(List<double> v) => v.Count > 0 ? v.Average()                                         : 0.0;
+    private static double Sd(List<int>      v) { if (v.Count < 2) return 0.0; var m = v.Average(); return Math.Sqrt(v.Average(x => (x - m) * (x - m))); }
+    private static double Sd(List<double>   v) { if (v.Count < 2) return 0.0; var m = v.Average(); return Math.Sqrt(v.Average(x => (x - m) * (x - m))); }
+
+    // Fingerprint accumulation helpers (indexed array matching RosterFingerprint field order)
+    private static void AccumulateFingerprint(double[] acc, RosterFingerprint fp)
+    {
+        acc[0]  += fp.Outside;  acc[1]  += fp.Finishing; acc[2]  += fp.Mid;     acc[3]  += fp.Close;
+        acc[4]  += fp.SelfCreation; acc[5] += fp.Speed;  acc[6]  += fp.Quickness; acc[7] += fp.Vertical;
+        acc[8]  += fp.Strength; acc[9]  += fp.Height;    acc[10] += fp.Wingspan;
+        acc[11] += fp.Passing;  acc[12] += fp.Playmaking; acc[13] += fp.BallHandling; acc[14] += fp.BasketballIQ;
+        acc[15] += fp.PerimeterDefense; acc[16] += fp.PostDefense; acc[17] += fp.RimProtection;
+        acc[18] += fp.OffensiveRebounding; acc[19] += fp.DefensiveRebounding;
+    }
+
+    private static RosterFingerprint DivideFingerprint(double[] acc, int n)
+    {
+        double D(int i) => acc[i] / n;
+        return new RosterFingerprint(
+            Outside:D(0), Finishing:D(1), Mid:D(2), Close:D(3), SelfCreation:D(4),
+            Speed:D(5), Quickness:D(6), Vertical:D(7), Strength:D(8),
+            Height:D(9), Wingspan:D(10),
+            Passing:D(11), Playmaking:D(12), BallHandling:D(13), BasketballIQ:D(14),
+            PerimeterDefense:D(15), PostDefense:D(16), RimProtection:D(17),
+            OffensiveRebounding:D(18), DefensiveRebounding:D(19));
     }
 }
 
