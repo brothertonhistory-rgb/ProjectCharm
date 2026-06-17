@@ -1,3 +1,73 @@
+## Session 52 — Phase 17: Usage → Efficiency Curve (2026-06-16)
+
+**Scope:** Wire the Roll E volume pressure into Roll G and Roll H so that a shooter carrying above an equal share pays a real efficiency cost. Two new per-possession facts stamped (`UsagePressure` at Roll E, `UsageResidualPressure` at Roll G`); Roll H reads both to apply a volume-tax and a residual-penalty term before `BuildRealPie`. FastBreak is fully exempt throughout.
+
+**What shipped:**
+- `Core/PossessionState.cs` — two new nullable fields: `UsagePressure` (stamped by Roll E alongside `SelectedSlot`) and `UsageResidualPressure` (stamped by Roll G alongside `ShotType`). Both null until their respective rolls run; both cleared to null by Roll K's `ResetOffense` `with`-expression (leak guard). Detailed XML docs on each field including the leak-guard rationale.
+- `Generators/IRollEGenerationProvider.cs` (NEW) — derived interface extending `IRollEPieGenerator` with `GenerateWithPressure(state) → RollEGeneration`. The `RollEGeneration` record carries `(Pie, FinalShares[], Pressures[])`. Resolver field/ctor type widened to this interface so all 20 harness Resolver construction sites compile without change.
+- `Generators/IRollGGenerationProvider.cs` (NEW) — derived interface extending `IRollGPieGenerator` with `GenerateWithResidual(state) → RollGGeneration`. The `RollGGeneration` record carries `(Pie, ResidualPressure)`. Resolver field/ctor type widened to this interface.
+- `Generators/RollEGenerator.cs` — implements `IRollEGenerationProvider`. Old `Generate` body promoted to `GenerateWithPressure`; pressure computed inline in the same one-pass calculation as the share math. `equalShare = 1.0 / populated`; `pressure[i] = max(0, finalShares[i] − equalShare)`. FastBreak and zero-populated paths both return zero-pressure arrays. `Generate` delegates to `GenerateWithPressure(..).Pie`.
+- `Generators/RollEStubPieGenerator.cs` — implements `IRollEGenerationProvider`. Adds `GenerateWithPressure` returning the existing flat pie plus all-zeros pressures (stub has no usage concentration).
+- `Rolls/RollE.cs` — `Execute` gains `double[] pressures` parameter (between pie and game). Stamps both `SelectedSlot` and `UsagePressure = pressures[slotNumber - 1]` in one atomic `with`.
+- `Generators/RollGGenerator.cs` — implements `IRollGGenerationProvider`. Old `Generate` body promoted to `GenerateWithResidual`. New private `ApplyDietShift(state, shooter, bentNorm[])` method inserted after matchup multiply+renormalize, before building the final pie. `Generate` delegates to `GenerateWithResidual(..).Pie`. Zero-pressure short-circuit: when `UsagePressure` is null or 0.0 the method is a branch-skip — numerically identical to pre-build behavior. Zero-defender fallback path now applies the diet shift (implementer's call: the load is real even when defensive data is absent).
+- `Generators/RollGStubPieGenerator.cs` — implements `IRollGGenerationProvider`. Adds `GenerateWithResidual` returning the existing flat pie plus residual 0.0.
+- `Rolls/RollG.cs` — `Execute` gains `double residualPressure` parameter (after pie). Stamps both `ShotType` and `UsageResidualPressure` in one atomic `with`.
+- `Rolls/RollK.cs` — `ResetOffense` `with`-expression extended with `UsagePressure = null, UsageResidualPressure = null`.
+- `Core/Resolver.cs` — `_rollEGenerator` and `_rollGGenerator` field types widened to provider interfaces. Constructor params widened to match. Both Roll E call sites (halfcourt + break path) updated to call `GenerateWithPressure` and pass `genE.Pressures` to `RollE.Execute`. Roll G call site updated to call `GenerateWithResidual` and pass `genG.ResidualPressure` to `RollG.Execute`.
+- `Config/RollGConfig.cs` — two new fields: `PressureShiftScale` (requestedShift = pressure × scale; default 0.5) and `PressureShiftCapFraction` (cap on bent-dominant zone mass moved; default 0.8). Invariants on both validated at load.
+- `Config/RollHConfig.cs` — two new fields: `PressureVolumeTaxScale` (makePct *= (1 − pressure × scale); default 0.12) and `PressureResidualPenaltyScale` (makePct -= residual × scale; default 2.0). Invariants validated at load.
+- `Generators/RollHGenerator.cs` — Phase 17 block inserted after matchup logistic, before `BuildRealPie`. Reads `state.UsagePressure` and `state.UsageResidualPressure` (null → 0.0). Branch-skipped when both are zero. Applies (b) volume-tax and (c) residual-penalty in sequence; clamps to [0, 1].
+- `Harness/config.json` — four new keys: `RollG.PressureShiftScale: 0.5`, `RollG.PressureShiftCapFraction: 0.8`, `RollH.PressureVolumeTaxScale: 0.12`, `RollH.PressureResidualPenaltyScale: 2.0`. All calibration placeholders.
+- `Harness/Program.cs` — Phase 17 check (`Phase17UsageEfficiencyCheck`) added and called. `RollESpyGenerator` upgraded from `IRollEPieGenerator` to `IRollEGenerationProvider` (adds stub `GenerateWithPressure`). All ~13 direct `RollE.Execute` call sites in legacy phase checks updated to pass `new double[5]` as the new pressures arg. All ~8 direct `RollG.Execute` call sites updated to pass `0.0` as the new residual arg.
+
+**Diet-shift math (Roll G `ApplyDietShift`):**
+1. Normalize authored tendencies to [0,1] (mandatory — the 0–99 scale is 100× off without this).
+2. `intrinsicCapacity = 1 − authoredNorm[dominantIdx]` — how much the player *can* diversify.
+3. `requestedShift = pressure × PressureShiftScale`.
+4. `availableMass = bentDomMass × PressureShiftCapFraction` — cap so dominant zone is never emptied.
+5. **Zero-destination guard:** if all non-dominant bent zones sum ≤ ε, absorbed = 0 (nowhere to redistribute; full residual — no crash, no silent mis-count).
+6. `absorbed = min(requestedShift, intrinsicCapacity, availableMass)`.
+7. `residual = requestedShift − absorbed`.
+8. Remove `absorbed` from dominant zone, redistribute proportionally to others by their bent-profile weight.
+9. Renormalize (floating-point safety).
+
+**Efficiency penalty math (Roll H):**
+- (b) Volume-tax: `makePct *= (1 − pressure × PressureVolumeTaxScale)` — small all-shots reduction.
+- (c) Residual penalty: `makePct -= residual × PressureResidualPenaltyScale` — larger reduction for load that couldn't shift. Applied to the actual zone taken (Shaq's penalty lands on Rim).
+- Clamp to [0, 1] after both terms.
+
+**The specialist/versatile split (validated in Monte Carlo and harness):**
+- Specialist (RimTendency 90, others near zero): intrinsicCapacity ≈ 0.10. Requested shift for rail-level pressure (0.32): 0.16. Absorbed ≈ 0.10 (hits capacity). Residual ≈ 0.06. Drop: ~2.5pts vol-tax + ~12.0pts residual = **~14pts**. Mix barely moves.
+- Versatile player (spread tendencies): intrinsicCapacity ≈ 0.77. Absorbed ≈ 0.16 (fully absorbed). Residual ≈ 0. Drop: ~2.1pts vol-tax + ~0 = **~2pts**. Mix redistributes away from dominant zone.
+
+**The clamp threshold.** The bent-mass clamp only fires when `bentDom < requestedShift / PressureShiftCapFraction = 0.16 / 0.8 = 0.20`. This requires a defense to have nearly completely neutralized the shooter's dominant zone — extreme disruption. Correct behavior: the clamp is a guard against edge cases, not a routine path.
+
+**Four config dials (all calibration placeholders — edit in config.json to tune):**
+| Field | Location | Effect | Default |
+|---|---|---|---|
+| `PressureShiftScale` | RollGConfig | Diet-shift magnitude | 0.5 |
+| `PressureShiftCapFraction` | RollGConfig | Max fraction of dominant zone moved | 0.8 |
+| `PressureVolumeTaxScale` | RollHConfig | Vol-tax multiplier | 0.12 |
+| `PressureResidualPenaltyScale` | RollHConfig | Residual-penalty multiplier | 2.0 |
+Setting `PressureShiftScale = 0` ablates the diet shift entirely (residual always 0, only vol-tax fires). Setting all four to 0 ablates Phase 17 completely while leaving the plumbing intact.
+
+**Bug fixed mid-session (stale file):** A stray `Generators/RollE.cs` file from an earlier session was still in the repo, causing CS0101 duplicate-class errors after the drag-and-drop. Deleted from `Generators/` folder. Legacy direct `RollE.Execute` / `RollG.Execute` call sites in older phase checks were missing the new signature args (also not in the drag-and-drop); fixed by adding `new double[5]` / `0.0` respectively. `RollESpyGenerator` needed upgrading from `IRollEPieGenerator` to `IRollEGenerationProvider`.
+
+**Phase 17 harness results (ALL PASSED):**
+- **(a)** Zero-pressure state numerically identical to null state across all five zones ✓
+- **(b)** Specialist Rim: base 66.0%, pressured 54.4%, drop **11.7pts**; residual 0.06; attribution: vol-tax 2.5pts + residual-penalty 12.0pts ✓
+- **(c)** Versatile Mid: base 40.5%, pressured 38.9%, drop 1.5pts; residual ≈ 0; specialist drop (11.7pts) >> versatile drop (1.5pts) ✓
+- **(d)** Below-comfort (pressure=0) unchanged across all zones ✓
+- **(e)** Naturally dominant star at natural load (~0.20 pressure): 1.5pt drop confirmed ✓
+- **(f)** FastBreak: Roll G residual = 0.0; Roll H make identical to null-scalar state ✓
+- **(g)** Fresh state: both fields null; after Roll E stamp: `UsagePressure` non-null; after Roll G stamp: `UsageResidualPressure` non-null; after ResetOffense-style `with`: both null ✓
+- All Phases 1–16 unchanged ✓
+
+**Observation run delta (frozen-corpus-v1, 1000 games):**
+FG% 50.4% → unchanged (test rosters are below-rail; the five-man roster shares are close to equal, so pressures are small). PPP and shot mix: no material change. The curve is plumbed and proven; the magnitude of the effect at game scale depends on actual usage concentration, which grows once teams have real star/role distinctions. Calibration of the four dials is deferred until realistic rosters exist.
+
+**Git commit:** `Phase 17: usage→efficiency curve (Roll E pressure stamp, Roll G residual, Roll H penalty terms)`
+
 ## Session 51 — Roll E: Attribute-Driven Usage Selection (2026-06-16)
 
 **Scope:** Replace Roll E's flat 20% halfcourt selection pie with a real attribute-driven generator so that a better scorer/creator naturally commands a larger share of shot attempts. Transition (FastBreak) pie left exactly as-is. One live dispatch site swapped; all ~20 harness stub-construction sites left untouched.

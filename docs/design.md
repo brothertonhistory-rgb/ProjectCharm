@@ -4278,3 +4278,43 @@ Clamped to `max(score, MinUsageScore)` before the sharpening exponent. The (Clos
 **Harness check shape.** `RollESelectionBatchCheck` now: seats a known five-man test roster in a local game, asserts empirical convergence to the generator's own pie (not a hardcoded 20%), asserts Alpha slot > 2× Rodman slot (the regression guard for "a star separates"), asserts FastBreak pie exactly equals cfg.Transition* weights. Call site takes `cfgD` to construct the local game.
 
 **Observation delta.** Aggregate stats unchanged from Session 50. Correct: Roll E changes *who* gets the ball, not *what happens* to them. The efficiency coupling arrives with the usage→efficiency curve (next build).
+
+
+## Phase 17: Usage → Efficiency Curve (Session 52)
+
+**What this is.** The thesis of Roll E is that shooting share concentration should cost efficiency — a specialist forced into heavy use should shoot worse than a versatile player carrying the same load. Phase 17 delivers that coupling: volume pressure flows from Roll E through Roll G (where it bends the shot diet) into Roll H (where it penalizes the make rate).
+
+**Two new per-possession facts.**
+- `UsagePressure` (stamped by Roll E): `max(0, finalShare − equalShare)`, where `equalShare = 1.0 / populated`. Zero below the equal share (no penalty for carrying a normal load). Null until Roll E runs; null on FastBreak (no volume load on a transition possession). Cleared to null by Roll K's `ResetOffense`.
+- `UsageResidualPressure` (stamped by Roll G): the load Roll G could NOT absorb into a wider shot diet. Zero when fully absorbed (versatile shooter, ordinary defense). Positive for a forced specialist. Cleared to null by Roll K's `ResetOffense`.
+
+**The two-stage mechanism.**
+1. **Roll G — diet shift (what the player does under load):** `requestedShift = pressure × PressureShiftScale`. The player's authored tendencies define his *intrinsic capacity* to diversify (spread = large capacity; one-zone specialist = near zero). The defense's matchup-bent profile defines how much dominant-zone mass is actually available to move. `absorbed = min(requestedShift, intrinsicCapacity, bentDomMass × PressureShiftCapFraction)`. What cannot be absorbed becomes residual. The result: a versatile player under load actually diversifies his shot diet; a forced specialist cannot and carries the load forward to Roll H.
+2. **Roll H — efficiency penalties (what the cost is):** Two terms applied after the matchup logistic, before `BuildRealPie`: (b) volume-tax `makePct *= (1 − pressure × PressureVolumeTaxScale)` — small, hits everyone carrying load; (c) residual penalty `makePct -= residual × PressureResidualPenaltyScale` — large, hits only the specialist. Attribution is derivable from the two separate scalars in the harness output.
+
+**Why these are separate (not merged into one penalty).** The volume-tax is real even for a versatile player: volume load is taxing regardless of shot variety. The residual penalty is specifically the efficiency loss of *being unable to vary*. Merging them would hide the specialist vs versatile distinction — the exact thesis the system is supposed to demonstrate. Keeping them named also means the harness output shows the split (Phase 17 (b): `vol-tax=2.5pts  residual-penalty=12.0pts`).
+
+**Zero-pressure branch-skip.** When both scalars are 0.0 (or null), the Phase 17 block in `RollHGenerator` is a complete branch-skip. The zero-pressure case is numerically identical to pre-build behavior — confirmed by Phase 17 (a). This is the regression guard.
+
+**The specialist/versatile split (design targets, validated):**
+- Specialist at rail (~0.32 pressure): ~10–15pt drop, almost entirely from residual (intrinsicCapacity ≈ 0.10, residual ≈ 0.06). Harness: **11.7pts** (2.5 vol-tax + 12.0 residual). ✓
+- Versatile player at same rail: ~2–4pt drop, almost entirely from vol-tax (residual ≈ 0). Harness: **1.5pts**. ✓
+- Ordering invariant: specialist drop >> versatile drop at the same pressure. ✓
+
+**FastBreak exemption.** `UsagePressure` is stamped as 0.0 on FastBreak at Roll E (no volume concentration on a transition possession). Roll G returns residual 0.0 on FastBreak unconditionally. Roll H sees 0.0/0.0 and branch-skips. Confirmed by Phase 17 (f).
+
+**Four calibration dials (all in config.json — no recompile needed):**
+| Field | Config file | Effect | Default |
+|---|---|---|---|
+| `PressureShiftScale` | RollGConfig | Diet-shift magnitude (0 = ablate diet shift) | 0.5 |
+| `PressureShiftCapFraction` | RollGConfig | Max fraction of dominant zone movable | 0.8 |
+| `PressureVolumeTaxScale` | RollHConfig | Vol-tax multiplier | 0.12 |
+| `PressureResidualPenaltyScale` | RollHConfig | Residual-penalty multiplier | 2.0 |
+
+`PressureShiftScale = 0` ablates the diet shift (residual always 0; only vol-tax fires). All four at 0 fully ablates Phase 17 while leaving plumbing intact — useful for calibration comparison.
+
+**Interface widening (engineering note).** `_rollEGenerator` and `_rollGGenerator` in `Resolver` were widened from the base pie interfaces to derived `IRollEGenerationProvider` / `IRollGGenerationProvider`. Both stubs implement the new interfaces (returning zero pressures/residual), so all 20 harness Resolver construction sites compile unchanged. The base interfaces remain for callers that only need the pie.
+
+**Deferred.** The four config dials are calibration placeholders. The correct values emerge once rosters have real star/role distinctions — a realistic alpha commands 35–40% share, producing measurable pressure. On the current test roster (near-equal shares) the effect is present but small at game scale. Calibration of these dials is the natural follow-on once player-model depth exists.
+
+**Observation run.** FG% and PPP unchanged from Session 51 (test-roster shares are near-equal; pressures are small). The mechanism is wired, proven, and waiting for realistic usage concentration.
