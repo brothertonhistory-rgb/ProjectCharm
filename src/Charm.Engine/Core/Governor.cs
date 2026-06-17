@@ -107,7 +107,14 @@ public sealed record PossessionRecord(
     int Slot3Fgm = 0,
     int Slot4Fgm = 0,
     int Slot5Fgm = 0,
-    int SlotUnattributedFgm = 0);
+    int SlotUnattributedFgm = 0,
+    SlotGroup ThreePaBySlot  = default,
+    SlotGroup ThreePmBySlot  = default,
+    SlotGroup FtaBySlot      = default,
+    SlotGroup FtmBySlot      = default,
+    int       BlkCount            = 0,
+    int?      TurnoverOffSlot     = null,
+    bool      TurnoverWasLiveBall = false);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -269,6 +276,14 @@ public sealed class Governor
             int possessionSlot1Fgm = 0, possessionSlot2Fgm = 0, possessionSlot3Fgm = 0,
                 possessionSlot4Fgm = 0, possessionSlot5Fgm = 0;
             int possessionSlotUnattributedFgm = 0;
+            // Phase 23 per-slot attribution locals
+            var possessionThreePaBySlot      = new SlotGroup();
+            var possessionThreePmBySlot      = new SlotGroup();
+            var possessionFtaBySlot          = new SlotGroup();
+            var possessionFtmBySlot          = new SlotGroup();
+            var possessionBlkCount           = 0;
+            int?  possessionTurnoverOffSlot    = null;
+            var   possessionTurnoverWasLiveBall = false;
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -351,6 +366,14 @@ public sealed class Governor
                 possessionSlot4Fgm        = outcome.Slot4Fgm;
                 possessionSlot5Fgm        = outcome.Slot5Fgm;
                 possessionSlotUnattributedFgm = outcome.SlotUnattributedFgm;
+                // Phase 23 threading
+                possessionThreePaBySlot      = outcome.ThreePaBySlot;
+                possessionThreePmBySlot      = outcome.ThreePmBySlot;
+                possessionFtaBySlot          = outcome.FtaBySlot;
+                possessionFtmBySlot          = outcome.FtmBySlot;
+                possessionBlkCount           = outcome.BlkCount;
+                possessionTurnoverOffSlot     = outcome.TurnoverOffSlot;
+                possessionTurnoverWasLiveBall = outcome.TurnoverWasLiveBall;
             }
 
             // Shared by all three intent values + normal possessions.
@@ -374,7 +397,11 @@ public sealed class Governor
                 possessionSlotUnattributedFga,
                 possessionSlot1Fgm, possessionSlot2Fgm, possessionSlot3Fgm,
                 possessionSlot4Fgm, possessionSlot5Fgm,
-                possessionSlotUnattributedFgm));
+                possessionSlotUnattributedFgm,
+                possessionThreePaBySlot, possessionThreePmBySlot,
+                possessionFtaBySlot,     possessionFtmBySlot,
+                possessionBlkCount,
+                possessionTurnoverOffSlot, possessionTurnoverWasLiveBall));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition

@@ -4420,3 +4420,52 @@ Clamped to `max(score, MinUsageScore)` before the sharpening exponent. The (Clos
 **Option A hoisting — rng-stream implication.** `Player` is a `sealed class` with `{get; init;}` properties — not a record, so `with` expressions don't compile and `init` properties can't be reassigned post-construction. Passing `p.Outside` or `p.Height` inside the same `new Player(name) { … }` initializer is also illegal (properties are not yet assigned). Solution: hoist the two attribute draws to named locals at the top of each case, before `new Player(name)`. The locals are used both at their property assignment positions in the initializer and as arguments to `DrawFreeThrow`. Side-effect: the rng stream shifts for every attribute in every archetype (Outside and Height draws now happen first, before the initializer's other draws). This is accepted because the frozen corpus uses the hardcoded named roster (unaffected) and the stress test asserts on distributional aggregates (no per-player golden-output dependency).
 
 **Six calibration placeholders.** Center (70), min (45), max (95), Outside nudge max (±4), Height nudge max (±3), and `half` (30) are all first-pass values. The harness histograms and team-level FT% distribution (particularly whether the top-team FT% band reaches 75–81% as in real data) will inform tuning. One named finding from this run: Elite tier's mean FT% runs ~66–68%, below the average-tier ~70–71%. The mechanism is correct — Elite bigs have high AtStrength Height values (75–88 range), producing larger downward Height nudges — but whether the real FT% distribution should show this gradient requires full-population data.
+
+---
+
+## Phase 23: Named Player Attribution Under Fixed Lineups
+
+### The attribution model — exact vs. probabilistic
+
+Attribution runs as a post-game pass over the completed `GovernorRunResult`. It divides into two families:
+
+**Exact attribution** (no draws): stats the engine already records to a specific slot — FGA, FGM, 3PA, 3PM, FTA, FTM. The engine knows which slot shot and which slot was fouled. Phase 23 adds four new `SlotGroup` fields to `RoutingOutcome` (and threads them through `PossessionRecord`) to carry this information. Zero new `IRng` calls.
+
+**Probabilistic credit** (weighted draws): stats where the engine does not track a specific actor — defensive rebounder, stealer, blocker, turnover on pre-Roll-E possessions. The harness draws from a weighted distribution after the game completes. Weights are attribute composites (e.g. DReb weight = Height + Strength + Wingspan + DefensiveRebounding). These are credit assignments, not proof of who produced the event. The journal and box-score header document this distinction explicitly.
+
+**TO is hybrid:** if Roll E had already selected a player when the turnover fired, `TurnoverOffSlot` carries that slot number and the credit is exact. If the turnover fired before Roll E (backcourt violation, entry turnover), `TurnoverOffSlot` is null and the harness draws by `BallHandling` weight.
+
+### Attribution RNG isolation
+
+The attribution `Random(seed + 2)` is constructed fresh per game inside `AttributeGame`, after `governor.Run()` returns. It is never used during gameplay. Because it is seeded deterministically and called in a fixed order (same possession loop, same event sequence within each possession), `AttributeGame(result, game, seed)` is deterministic: the same inputs always produce the same `PlayerBoxTotals`. The same-seed reproducibility check (§5g) proves this mechanically: two calls on identical inputs produce `AllEqual` output.
+
+The three RNGs per game are:
+- `SystemRng(seed)` → Resolver (gameplay rolls)
+- `SystemRng(seed + 1)` → Governor (end-of-half intent, clock draws)
+- `Random(seed + 2)` → Attribution (post-run weighted draws only)
+
+### PlayerId assignment — class vs. record
+
+`Player` is a `sealed class`, not a record. `with` expressions and post-construction `init` reassignment both fail to compile. The correct pattern for stamping `PlayerId` is to construct the player with the ID already set, before the first `Roster.SetStarter` call. `StampPlayerId(Player p, int id)` is the harness helper that copies all 37 authored attributes into a new `Player(p.Name) { PlayerId = id, Close = p.Close, … }` initializer. The inline seating loop in `ObservationRunV1` calls `StampPlayerId(configs[i].ToPlayer(), newId)` and passes the result directly to `SetStarter` — no re-seating needed.
+
+This pattern generalizes to substitutions: whoever constructs the incoming player is responsible for assigning their ID. `SeatStartersFromConfig` itself stays ID-agnostic (it is a config reader used in multiple contexts that do not need attribution); only the Phase 23 seating path in `ObservationRunV1` stamps IDs.
+
+### SlotGroup
+
+A `readonly record struct` carrying six counters: S1–S5 (the five on-court slots) plus `Unattr` (the unattributed bucket for null-SelectedSlot paths, e.g. bonus-FT putbacks where Roll E never ran). `Total` sums all six. The indexer `this[int slot]` maps 1–5 to S1–S5 and anything else to `Unattr`. `WithSlot(int slot, int delta)` returns a new `SlotGroup` with one bucket incremented — immutable accumulation pattern matching how the existing Phase 21/22 scalar counters work in `Route()`.
+
+### The completeness invariant
+
+For each exact-attribution family, the harness verifies:
+
+```
+Σ named-player counts == total − unattributed
+```
+
+This is an integer identity: every event either lands in a named slot or the unattributed bucket, with no rounding. Any deviation is a coding bug. The per-slot subset checks add a second layer: for each slot index (including Unattr), `3PM ≤ 3PA`, `3PA ≤ FGA` (possession-level), `FTM ≤ FTA`. These catch slot-level corruptions that aggregate completeness misses — the same lesson as Phase 22's subset invariant.
+
+For weighted-credit families, the check is simpler but exact: every draw fires exactly one credit, so the sum of per-player credits must equal the engine event count (OReb won, DReb possessions, BlkCount, live-TO possessions, TO possessions). Any mismatch means a credit was silently dropped or doubled.
+
+### Upward vs. downward validation
+
+The BLK check proves downward (every `BlkCount` credit was distributed to a player) but not upward (the Resolver captured every blocked shot in `blkCount`). The upward invariant is protected by code placement — `blkCount++` sits in the `ShotResult.Blocked` arm of the `IntoShotResolution` block, which is the single Roll H chokepoint every field-goal attempt passes through. There is no independent block-event total in the current record from which upward validation could be computed mechanically; this limitation is documented in the journal and in the harness comment.

@@ -4287,6 +4287,42 @@ internal static class Program
         var mechanicsOk = true;
         var gamesRun    = 0;
 
+        // ── Phase 23 per-player box score accumulators ──────────────────────
+        // Indexed by PlayerId - 1 (0..4 = Home S1–S5; 5..9 = Away S1–S5).
+        // Exact stats (FGA/FGM/3PA/3PM/FTA/FTM): summed from PossessionRecord.
+        // Weighted-credit stats (OReb/DReb/BLK/STL/TO): drawn post-run with
+        //   attributionRng = new Random(seed + 2) — separate from all gameplay RNGs.
+        var bsFga  = new long[10]; var bsFgm  = new long[10];
+        var bs3pa  = new long[10]; var bs3pm  = new long[10];
+        var bsFta  = new long[10]; var bsFtm  = new long[10];
+        var bsTo   = new long[10]; var bsOReb = new long[10];
+        var bsDReb = new long[10]; var bsStl  = new long[10];
+        var bsBlk  = new long[10];
+        var bsGames = 0;
+        var attributionOk = true;   // hard-fail flag for post-loop attribution checks
+        GovernorRunResult? seedOneResult = null;  // captured for reproducibility check
+
+        // ── Frozen-corpus player display map ─────────────────────────────────
+        // game is loop-scoped, so capture the 10 players on seed==1.
+        // The frozen corpus is identical across all 1,000 games.
+        var boxPlayers = new Player?[10];
+
+        // ── Phase 23 unattributed running totals (for §5f CheckExact) ────────
+        long totalHome3pa = 0L, totalAway3pa = 0L;
+        long totalHome3pm = 0L, totalAway3pm = 0L;
+        long totalHomeFta = 0L, totalAwayFta = 0L;
+        long totalHomeFtm = 0L, totalAwayFtm = 0L;
+        long totalHomeUnattr3pa = 0L, totalAwayUnattr3pa = 0L;
+        long totalHomeUnattr3pm = 0L, totalAwayUnattr3pm = 0L;
+        long totalHomeUnattrFta = 0L, totalAwayUnattrFta = 0L;
+        long totalHomeUnattrFtm = 0L, totalAwayUnattrFtm = 0L;
+        // Weighted-credit event totals
+        long totalOrbWon   = 0L;
+        long totalDrebPoss = 0L;
+        long totalBlkCount = 0L;
+        long totalStlPoss  = 0L;
+        long totalToPoss   = 0L;
+
         var firstState = new PossessionState(
             PossessionNumber: 1,
             Offense: TeamSide.Home,
@@ -4301,7 +4337,39 @@ internal static class Program
 
             // Fresh game state per game: score, fouls, and arrow all start clean.
             var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
-            SeatStartersFromConfig(game, configPath);
+            // Phase 23: seat starters with PlayerId stamped at construction time.
+            // Home S1–S5 → IDs 1–5; Away S1–S5 → IDs 6–10.
+            // IDs are set before SetStarter so no re-seating is needed.
+            foreach (var idSide in new[] { TeamSide.Home, TeamSide.Away })
+            {
+                var idLineup  = game.LineupFor(idSide);
+                var idRoster  = game.RosterFor(idSide);
+                var idConfigs = idSide == TeamSide.Home ? cfgRoster.Home : cfgRoster.Away;
+                for (var i = 0; i < Lineup.Size; i++)
+                {
+                    var newId = idSide == TeamSide.Home ? i + 1 : i + 6;
+                    var player = StampPlayerId(idConfigs[i].ToPlayer(), newId);
+                    idRoster.SetStarter(idLineup.SlotAt(i + 1), player);
+                }
+            }
+            // Validate PlayerId contract once (seed==1) — catches unset IDs or duplicates
+            // before 1,000 games run.
+            if (seed == 1)
+            {
+                var seenIds = new HashSet<int>();
+                foreach (var vs in new[] { TeamSide.Home, TeamSide.Away })
+                    for (var vslot = 1; vslot <= 5; vslot++)
+                    {
+                        var p = game.RosterFor(vs).PlayerAt(new Slot(vs, vslot));
+                        if (p is null) continue;
+                        if (p.PlayerId < 1 || p.PlayerId > 10)
+                            throw new InvalidOperationException($"Player {p.Name} has PlayerId {p.PlayerId} — must be 1–10");
+                        if (!seenIds.Add(p.PlayerId))
+                            throw new InvalidOperationException($"Duplicate PlayerId {p.PlayerId} ({p.Name})");
+                    }
+                if (seenIds.Count != 10)
+                    throw new InvalidOperationException($"Expected 10 unique PlayerIds 1–10; got {seenIds.Count}");
+            }
             game.SetPossessionArrow(TeamSide.Home);
 
             var resolverRng = new SystemRng(seed);
@@ -4504,6 +4572,110 @@ internal static class Program
                 mechanicsOk = false;
             }
 
+            // ── Phase 23 attribution invariants ─────────────────────────────
+            // 3PA completeness and subset
+            var rec3paSlots = records.Sum(r => r.ThreePaBySlot.Total);
+            var rec3pmSlots = records.Sum(r => r.ThreePmBySlot.Total);
+            var rec3paCheck = records.Sum(r => r.ThreePa);
+            var rec3pmCheck = records.Sum(r => r.ThreePm);
+            if (rec3paSlots != rec3paCheck)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: 3PA slot total {rec3paSlots} != ThreePa {rec3paCheck}");
+                mechanicsOk = false;
+            }
+            if (rec3pmSlots != rec3pmCheck)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: 3PM slot total {rec3pmSlots} != ThreePm {rec3pmCheck}");
+                mechanicsOk = false;
+            }
+            if (rec3pmSlots > rec3paSlots)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: 3PM slots {rec3pmSlots} > 3PA slots {rec3paSlots}");
+                mechanicsOk = false;
+            }
+            // FTA/FTM completeness and subset
+            var recFtaSlots = records.Sum(r => r.FtaBySlot.Total);
+            var recFtmSlots = records.Sum(r => r.FtmBySlot.Total);
+            var recFtaCheck = records.Sum(r => r.Fta);
+            var recFtmCheck = records.Sum(r => r.Ftm);
+            if (recFtaSlots != recFtaCheck)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: FTA slot total {recFtaSlots} != Fta {recFtaCheck}");
+                mechanicsOk = false;
+            }
+            if (recFtmSlots != recFtmCheck)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: FTM slot total {recFtmSlots} != Ftm {recFtmCheck}");
+                mechanicsOk = false;
+            }
+            if (recFtmSlots > recFtaSlots)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: FTM slots {recFtmSlots} > FTA slots {recFtaSlots}");
+                mechanicsOk = false;
+            }
+            // TurnoverWasLiveBall must match live-TO EndLabel exactly
+            var recLiveToPoss = records.Count(r => r.TurnoverWasLiveBall);
+            var recLiveToEndLabel = records.Count(r =>
+                r.EndLabel is "BadPassIntercepted" or "LostBallLiveBall");
+            if (recLiveToPoss != recLiveToEndLabel)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: TurnoverWasLiveBall count {recLiveToPoss} != live-TO endlabel count {recLiveToEndLabel}");
+                mechanicsOk = false;
+            }
+            // Non-TO records must have null metadata — no leakage from prior possessions
+            var nonToWithMeta = records.Count(r =>
+                r.EndLabel is not ("BadPassDeadBall" or "BadPassIntercepted"
+                    or "LostBallDeadBall" or "LostBallLiveBall" or "OffensiveFoul"
+                    or "Travel" or "DoubleDribble" or "Carry" or "ThreeSecondViolation"
+                    or "FiveSecondCloselyGuarded" or "OffensiveGoaltending"
+                    or "BackcourtViolation" or "ShotClockViolation"
+                    or "FiveSecondInbound" or "TenSecondBackcourt") &&
+                (r.TurnoverOffSlot != null || r.TurnoverWasLiveBall));
+            if (nonToWithMeta > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: {nonToWithMeta} non-TO records have turnover metadata set");
+                mechanicsOk = false;
+            }
+            // Per-slot subset checks — catches slot-level corruption that aggregate totals miss
+            for (var chkSlot = 0; chkSlot <= 5; chkSlot++)
+            {
+                var failed = false;
+                foreach (var r in records)
+                {
+                    var slotFga = chkSlot == 0 ? r.SlotUnattributedFga : GetSlotFga(r, chkSlot);
+                    var slotFgm = chkSlot == 0 ? r.SlotUnattributedFgm : GetSlotFgm(r, chkSlot);
+                    if (r.ThreePmBySlot[chkSlot] > r.ThreePaBySlot[chkSlot])
+                    {
+                        Console.WriteLine(); Console.WriteLine($"  [FAIL] Seed {seed}: slot {chkSlot} 3PM > 3PA in a possession");
+                        mechanicsOk = false; failed = true; break;
+                    }
+                    if (r.ThreePaBySlot[chkSlot] > slotFga)
+                    {
+                        Console.WriteLine(); Console.WriteLine($"  [FAIL] Seed {seed}: slot {chkSlot} 3PA > FGA in a possession");
+                        mechanicsOk = false; failed = true; break;
+                    }
+                    if (r.ThreePmBySlot[chkSlot] > slotFgm)
+                    {
+                        Console.WriteLine(); Console.WriteLine($"  [FAIL] Seed {seed}: slot {chkSlot} 3PM > FGM in a possession");
+                        mechanicsOk = false; failed = true; break;
+                    }
+                    if (r.FtmBySlot[chkSlot] > r.FtaBySlot[chkSlot])
+                    {
+                        Console.WriteLine(); Console.WriteLine($"  [FAIL] Seed {seed}: slot {chkSlot} FTM > FTA in a possession");
+                        mechanicsOk = false; failed = true; break;
+                    }
+                }
+                if (failed) break;
+            }
+
             var hPoss = records.Count(r => r.Offense == TeamSide.Home);
             var aPoss = records.Count(r => r.Offense == TeamSide.Away);
             var hPts  = records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Points);
@@ -4623,6 +4795,57 @@ internal static class Program
             totalAwayFgmS4 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot4Fgm);
             totalAwayFgmS5 += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Slot5Fgm);
             totalAwayUnattrFgm += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.SlotUnattributedFgm);
+
+            // ── Phase 23: unattributed running totals for §5f CheckExact ─────
+            totalHome3pa += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.ThreePa);
+            totalAway3pa += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.ThreePa);
+            totalHome3pm += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.ThreePm);
+            totalAway3pm += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.ThreePm);
+            totalHomeFta += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Fta);
+            totalAwayFta += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Fta);
+            totalHomeFtm += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Ftm);
+            totalAwayFtm += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.Ftm);
+            totalHomeUnattr3pa += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.ThreePaBySlot.Unattr);
+            totalAwayUnattr3pa += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.ThreePaBySlot.Unattr);
+            totalHomeUnattr3pm += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.ThreePmBySlot.Unattr);
+            totalAwayUnattr3pm += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.ThreePmBySlot.Unattr);
+            totalHomeUnattrFta += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.FtaBySlot.Unattr);
+            totalAwayUnattrFta += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.FtaBySlot.Unattr);
+            totalHomeUnattrFtm += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.FtmBySlot.Unattr);
+            totalAwayUnattrFtm += records.Where(r => r.Offense == TeamSide.Away).Sum(r => r.FtmBySlot.Unattr);
+            // Weighted-credit event totals
+            totalOrbWon   += records.Sum(r => r.OrbWon);
+            totalDrebPoss += records.Count(r => r.EndLabel == "DefensiveRebound");
+            totalBlkCount += records.Sum(r => r.BlkCount);
+            totalStlPoss  += records.Count(r => r.TurnoverWasLiveBall);
+            totalToPoss   += records.Count(IsTurnoverPossession);
+
+            // ── Phase 23: capture player display map on seed==1 ──────────────
+            if (seed == 1)
+            {
+                for (var slot = 1; slot <= 5; slot++)
+                {
+                    boxPlayers[slot - 1] = game.RosterFor(TeamSide.Home)
+                                               .PlayerAt(new Slot(TeamSide.Home, slot));
+                    boxPlayers[slot + 4] = game.RosterFor(TeamSide.Away)
+                                               .PlayerAt(new Slot(TeamSide.Away, slot));
+                }
+                seedOneResult = result;
+            }
+
+            // ── Phase 23: per-game attribution ───────────────────────────────
+            // AttributeGame uses Random(seed+2) — independent of all gameplay RNGs.
+            bsGames++;
+            var attributed = AttributeGame(result, game, seed);
+            for (var i = 0; i < 10; i++)
+            {
+                bsFga [i] += attributed.Fga [i]; bsFgm [i] += attributed.Fgm [i];
+                bs3pa [i] += attributed.Tpa [i]; bs3pm [i] += attributed.Tpm [i];
+                bsFta [i] += attributed.Fta [i]; bsFtm [i] += attributed.Ftm [i];
+                bsOReb[i] += attributed.OReb[i]; bsDReb[i] += attributed.DReb[i];
+                bsBlk [i] += attributed.Blk [i]; bsStl [i] += attributed.Stl [i];
+                bsTo  [i] += attributed.To  [i];
+            }
 
             foreach (var r in records)
             {
@@ -4775,11 +4998,296 @@ internal static class Program
         Console.WriteLine("--- DEFERRED SENTINELS (counter-plumbing needed — future session) ---");
         Console.WriteLine("  Press frequency / break rate at game level");
 
+        // ── Phase 23 §5f: post-loop exact-stat reconciliation ────────────────
+        Console.WriteLine();
+        Console.WriteLine("--- PHASE 23 ATTRIBUTION CHECKS ---");
+        void CheckExact(string label, long named, long total, long unattr) {
+            if (named != total - unattr)
+            { Console.WriteLine($"  [FAIL] {label}: named={named} != total-unattr={total - unattr}"); attributionOk = false; }
+        }
+        long NamedHome(long[] arr) => arr[0]+arr[1]+arr[2]+arr[3]+arr[4];
+        long NamedAway(long[] arr) => arr[5]+arr[6]+arr[7]+arr[8]+arr[9];
+
+        // FGA/FGM use Phase 21 unattributed scalars
+        CheckExact("FGA Home", NamedHome(bsFga), totalHomeFga, totalHomeUnattr);
+        CheckExact("FGA Away", NamedAway(bsFga), totalAwayFga, totalAwayUnattr);
+        // FGM total = named S1..S5 + unattr; CheckExact verifies named == total - unattr
+        var totalHomeFgm = totalHomeFgmS1+totalHomeFgmS2+totalHomeFgmS3+totalHomeFgmS4+totalHomeFgmS5+totalHomeUnattrFgm;
+        var totalAwayFgm = totalAwayFgmS1+totalAwayFgmS2+totalAwayFgmS3+totalAwayFgmS4+totalAwayFgmS5+totalAwayUnattrFgm;
+        CheckExact("FGM Home", NamedHome(bsFgm), totalHomeFgm, totalHomeUnattrFgm);
+        CheckExact("FGM Away", NamedAway(bsFgm), totalAwayFgm, totalAwayUnattrFgm);
+        CheckExact("3PA Home", NamedHome(bs3pa), totalHome3pa, totalHomeUnattr3pa);
+        CheckExact("3PA Away", NamedAway(bs3pa), totalAway3pa, totalAwayUnattr3pa);
+        CheckExact("3PM Home", NamedHome(bs3pm), totalHome3pm, totalHomeUnattr3pm);
+        CheckExact("3PM Away", NamedAway(bs3pm), totalAway3pm, totalAwayUnattr3pm);
+        CheckExact("FTA Home", NamedHome(bsFta), totalHomeFta, totalHomeUnattrFta);
+        CheckExact("FTA Away", NamedAway(bsFta), totalAwayFta, totalAwayUnattrFta);
+        CheckExact("FTM Home", NamedHome(bsFtm), totalHomeFtm, totalHomeUnattrFtm);
+        CheckExact("FTM Away", NamedAway(bsFtm), totalAwayFtm, totalAwayUnattrFtm);
+
+        // Weighted-credit totals: every event fires exactly one credit
+        var bsORebTotal = bsOReb.Sum();
+        var bsDRebTotal = bsDReb.Sum();
+        var bsBlkTotal  = bsBlk.Sum();
+        var bsStlTotal  = bsStl.Sum();
+        var bsToTotal   = bsTo.Sum();
+        if (bsORebTotal  != totalOrbWon)   { Console.WriteLine($"  [FAIL] Per-player OReb {bsORebTotal} != OrbWon {totalOrbWon}");   attributionOk = false; }
+        if (bsDRebTotal  != totalDrebPoss) { Console.WriteLine($"  [FAIL] Per-player DReb {bsDRebTotal} != DReb possessions {totalDrebPoss}"); attributionOk = false; }
+        if (bsBlkTotal   != totalBlkCount) { Console.WriteLine($"  [FAIL] Per-player BLK {bsBlkTotal} != BlkCount {totalBlkCount}");    attributionOk = false; }
+        // NOTE: BLK proves downward (every BlkCount credit distributed) but not upward
+        // (Resolver captured every block in BlkCount). Upward validation is by code placement.
+        if (bsStlTotal   != totalStlPoss)  { Console.WriteLine($"  [FAIL] Per-player STL {bsStlTotal} != live-TO possessions {totalStlPoss}");  attributionOk = false; }
+        if (bsToTotal    != totalToPoss)   { Console.WriteLine($"  [FAIL] Per-player TO {bsToTotal} != TO possessions {totalToPoss}");   attributionOk = false; }
+
+        // ── Phase 23 §5g: same-seed reproducibility ───────────────────────────
+        if (seedOneResult != null)
+        {
+            var repGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            // Seat with PlayerId stamped at construction — same pattern as main loop.
+            foreach (var repSide in new[] { TeamSide.Home, TeamSide.Away })
+            {
+                var repLineup  = repGame.LineupFor(repSide);
+                var repRoster  = repGame.RosterFor(repSide);
+                var repConfigs = repSide == TeamSide.Home ? cfgRoster.Home : cfgRoster.Away;
+                for (var i = 0; i < Lineup.Size; i++)
+                {
+                    var newId = repSide == TeamSide.Home ? i + 1 : i + 6;
+                    repRoster.SetStarter(repLineup.SlotAt(i + 1), StampPlayerId(repConfigs[i].ToPlayer(), newId));
+                }
+            }
+            var rep1 = AttributeGame(seedOneResult, repGame, 1);
+            var rep2 = AttributeGame(seedOneResult, repGame, 1);
+            if (!PlayerBoxTotals.AllEqual(rep1, rep2))
+            {
+                Console.WriteLine("  [FAIL] Same-seed reproducibility: AttributeGame produced different results on identical inputs");
+                attributionOk = false;
+            }
+            else
+            {
+                Console.WriteLine("  [OK] Same-seed reproducibility confirmed.");
+            }
+        }
+
+        // ── Phase 23 §5h: per-player box score ───────────────────────────────
+        Console.WriteLine();
+        Console.WriteLine($"=== PER-PLAYER BOX SCORE (per-game averages, {bsGames} games) ===");
+        Console.WriteLine("  Exact attribution: FGA, FGM, 3PA, 3PM, FTA, FTM.");
+        Console.WriteLine("  Weighted credit (probabilistic): ORB, DRB, REB, STL, BLK, TO (post-Roll-E exact; pre-Roll-E by BallHandling weight).");
+        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"TO",5}");
+        Console.WriteLine(new string('─', 115));
+        for (var i = 0; i < 10; i++)
+        {
+            var player = boxPlayers[i];
+            if (player is null) continue;
+            {
+                double g = bsGames;
+                var fga  = bsFga[i]  / g;  var fgm  = bsFgm[i]  / g;
+                var tpa  = bs3pa[i]  / g;  var tpm  = bs3pm[i]  / g;
+                var fta  = bsFta[i]  / g;  var ftm  = bsFtm[i]  / g;
+                var orb  = bsOReb[i] / g;  var drb  = bsDReb[i] / g;
+                var stl  = bsStl[i]  / g;  var blk  = bsBlk[i]  / g;
+                var to   = bsTo[i]   / g;
+                var pts  = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
+                var fgPct  = fga  > 0 ? fgm  / fga  * 100 : 0.0;
+                var tpPct  = tpa  > 0 ? tpm  / tpa  * 100 : 0.0;
+                var ftPct  = fta  > 0 ? ftm  / fta  * 100 : 0.0;
+                var side = i < 5 ? TeamSide.Home : TeamSide.Away;
+                var label = $"[{(side == TeamSide.Home ? "Home" : "Away")}] {player.Name}";
+                Console.WriteLine(
+                    $"  {label,-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
+                    $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
+                    $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {to,5:F1}");
+            }
+        }
+        Console.WriteLine($"=== END PER-PLAYER BOX SCORE ===");
+
+        // ── Combined pass/fail banner ─────────────────────────────────────────
+        Console.WriteLine();
+        if (mechanicsOk && attributionOk)
+            Console.WriteLine("  ALL CHECKS PASSED");
+        else
+            Console.WriteLine("  ONE OR MORE CHECKS FAILED — see [FAIL] lines above");
+
         Console.WriteLine();
         Console.WriteLine($"=== END OBSERVATION RUN — {CorpusId} ===");
     }
 
-    // ── Observation helpers ───────────────────────────────────────────────────
+    // ── Phase 23 static helpers ──────────────────────────────────────────────
+
+    private static int GetSlotFga(PossessionRecord r, int slot) => slot switch
+    {
+        1 => r.Slot1Fga, 2 => r.Slot2Fga, 3 => r.Slot3Fga,
+        4 => r.Slot4Fga, 5 => r.Slot5Fga, _ => 0
+    };
+    private static int GetSlotFgm(PossessionRecord r, int slot) => slot switch
+    {
+        1 => r.Slot1Fgm, 2 => r.Slot2Fgm, 3 => r.Slot3Fgm,
+        4 => r.Slot4Fgm, 5 => r.Slot5Fgm, _ => 0
+    };
+    private static bool IsTurnoverPossession(PossessionRecord r) =>
+        r.EndLabel is "BadPassDeadBall" or "BadPassIntercepted"
+            or "LostBallDeadBall" or "LostBallLiveBall" or "OffensiveFoul"
+            or "Travel" or "DoubleDribble" or "Carry" or "ThreeSecondViolation"
+            or "FiveSecondCloselyGuarded" or "OffensiveGoaltending"
+            or "BackcourtViolation" or "ShotClockViolation"
+            or "FiveSecondInbound" or "TenSecondBackcourt";
+
+    private static int BoxIdx(TeamSide side, int slot) =>
+        side == TeamSide.Home ? slot - 1 : slot + 4;
+
+    /// <summary>Return a new Player identical to <paramref name="p"/> but with
+    /// <see cref="Player.PlayerId"/> set to <paramref name="id"/>. Player is a
+    /// sealed class (not a record), so 'with' is unavailable — copy all authored
+    /// attributes explicitly via init-setters.</summary>
+    private static Player StampPlayerId(Player p, int id) => new Player(p.Name)
+    {
+        PlayerId            = id,
+        Close               = p.Close,
+        Mid                 = p.Mid,
+        Outside             = p.Outside,
+        Finishing           = p.Finishing,
+        FreeThrow           = p.FreeThrow,
+        FoulDrawing         = p.FoulDrawing,
+        RimTendency         = p.RimTendency,
+        ShortTendency       = p.ShortTendency,
+        MidTendency         = p.MidTendency,
+        LongTendency        = p.LongTendency,
+        ThreeTendency       = p.ThreeTendency,
+        BallHandling        = p.BallHandling,
+        Passing             = p.Passing,
+        Playmaking          = p.Playmaking,
+        SelfCreation        = p.SelfCreation,
+        PostMoves           = p.PostMoves,
+        OffBallMovement     = p.OffBallMovement,
+        Screening           = p.Screening,
+        OffensiveRebounding = p.OffensiveRebounding,
+        PerimeterDefense    = p.PerimeterDefense,
+        PostDefense         = p.PostDefense,
+        RimProtection       = p.RimProtection,
+        DefensiveRebounding = p.DefensiveRebounding,
+        Steals              = p.Steals,
+        Height              = p.Height,
+        Wingspan            = p.Wingspan,
+        Weight              = p.Weight,
+        Strength            = p.Strength,
+        Speed               = p.Speed,
+        Quickness           = p.Quickness,
+        FirstStep           = p.FirstStep,
+        Vertical            = p.Vertical,
+        Endurance           = p.Endurance,
+        Hustle              = p.Hustle,
+        BasketballIQ        = p.BasketballIQ,
+        Discipline          = p.Discipline,
+    };
+
+    /// <summary>Per-player stat totals for one game. Indexed by PlayerId - 1 (0–9).</summary>
+    private sealed class PlayerBoxTotals
+    {
+        public long[] Fga  = new long[10]; public long[] Fgm  = new long[10];
+        public long[] Tpa  = new long[10]; public long[] Tpm  = new long[10];
+        public long[] Fta  = new long[10]; public long[] Ftm  = new long[10];
+        public long[] OReb = new long[10]; public long[] DReb = new long[10];
+        public long[] Blk  = new long[10]; public long[] Stl  = new long[10];
+        public long[] To   = new long[10];
+        public static bool AllEqual(PlayerBoxTotals a, PlayerBoxTotals b) =>
+            a.Fga.SequenceEqual(b.Fga)   && a.Fgm.SequenceEqual(b.Fgm) &&
+            a.Tpa.SequenceEqual(b.Tpa)   && a.Tpm.SequenceEqual(b.Tpm) &&
+            a.Fta.SequenceEqual(b.Fta)   && a.Ftm.SequenceEqual(b.Ftm) &&
+            a.OReb.SequenceEqual(b.OReb) && a.DReb.SequenceEqual(b.DReb) &&
+            a.Blk.SequenceEqual(b.Blk)   && a.Stl.SequenceEqual(b.Stl) &&
+            a.To.SequenceEqual(b.To);
+    }
+
+    /// <summary>Run the full per-game attribution pass. Calling twice with the same
+    /// (result, game, seed) must produce AllEqual output — that is the reproducibility contract.</summary>
+    private static PlayerBoxTotals AttributeGame(
+        GovernorRunResult result, GameState game, int seed)
+    {
+        var t = new PlayerBoxTotals();
+        var rng = new Random(seed + 2);
+        var homeRoster = game.RosterFor(TeamSide.Home);
+        var awayRoster = game.RosterFor(TeamSide.Away);
+        Roster RosterFor(TeamSide s) => s == TeamSide.Home ? homeRoster : awayRoster;
+
+        foreach (var r in result.Possessions)
+        {
+            var offRoster = RosterFor(r.Offense);
+            var defRoster = RosterFor(r.Defense);
+
+            // Exact per-slot stats (offense side)
+            for (var slot = 1; slot <= 5; slot++)
+            {
+                var op = offRoster.PlayerAt(new Slot(r.Offense, slot));
+                if (op is null) continue;
+                var oi = op.PlayerId - 1;
+                if (oi < 0 || oi >= 10) continue; // guard: unset PlayerId
+                t.Fga [oi] += GetSlotFga(r, slot); t.Fgm [oi] += GetSlotFgm(r, slot);
+                t.Tpa [oi] += r.ThreePaBySlot[slot]; t.Tpm [oi] += r.ThreePmBySlot[slot];
+                t.Fta [oi] += r.FtaBySlot[slot];    t.Ftm [oi] += r.FtmBySlot[slot];
+            }
+            // TO
+            if (IsTurnoverPossession(r))
+            {
+                var toSlot = r.TurnoverOffSlot is { } s ? s
+                    : WeightedDraw(rng, r.Offense, offRoster, p => p.BallHandling);
+                var top = offRoster.PlayerAt(new Slot(r.Offense, toSlot));
+                if (top != null && top.PlayerId >= 1 && top.PlayerId <= 10) t.To[top.PlayerId - 1]++;
+            }
+            // STL
+            if (r.TurnoverWasLiveBall)
+            {
+                var stlSlot = WeightedDraw(rng, r.Defense, defRoster, p => p.Steals + p.Speed + p.Quickness);
+                var stlp = defRoster.PlayerAt(new Slot(r.Defense, stlSlot));
+                if (stlp != null && stlp.PlayerId >= 1 && stlp.PlayerId <= 10) t.Stl[stlp.PlayerId - 1]++;
+            }
+            // DReb
+            if (r.EndLabel == "DefensiveRebound")
+            {
+                var dSlot = WeightedDraw(rng, r.Defense, defRoster, p => p.Height + p.Strength + p.Wingspan + p.DefensiveRebounding);
+                var dp = defRoster.PlayerAt(new Slot(r.Defense, dSlot));
+                if (dp != null && dp.PlayerId >= 1 && dp.PlayerId <= 10) t.DReb[dp.PlayerId - 1]++;
+            }
+            // OReb
+            for (var i = 0; i < r.OrbWon; i++)
+            {
+                var oSlot = WeightedDraw(rng, r.Offense, offRoster, p => p.Height + p.Strength + p.Wingspan + p.OffensiveRebounding);
+                var op2 = offRoster.PlayerAt(new Slot(r.Offense, oSlot));
+                if (op2 != null && op2.PlayerId >= 1 && op2.PlayerId <= 10) t.OReb[op2.PlayerId - 1]++;
+            }
+            // BLK
+            for (var i = 0; i < r.BlkCount; i++)
+            {
+                var bSlot = WeightedDraw(rng, r.Defense, defRoster, p => p.RimProtection + p.Height + p.Wingspan + p.Vertical);
+                var bp = defRoster.PlayerAt(new Slot(r.Defense, bSlot));
+                if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 10) t.Blk[bp.PlayerId - 1]++;
+            }
+        }
+        return t;
+    }
+
+    private static int WeightedDraw(Random rng, TeamSide side, Roster roster,
+        Func<Player, double> weightFn)
+    {
+        Span<double> weights = stackalloc double[5];
+        var total = 0.0;
+        for (var i = 0; i < 5; i++)
+        {
+            var p = roster.PlayerAt(new Slot(side, i + 1));
+            weights[i] = p is null ? 0.0 : Math.Max(1.0, weightFn(p));
+            total += weights[i];
+        }
+        if (total <= 0.0)
+            throw new InvalidOperationException(
+                $"WeightedDraw: team {side} has no populated slots — cannot attribute event.");
+        var r = rng.NextDouble() * total;
+        var cum = 0.0;
+        for (var i = 0; i < 5; i++)
+        {
+            cum += weights[i];
+            if (r < cum) return i + 1;
+        }
+        return 5;
+    }
 
     /// <summary>
     /// Classify an EndLabel into one of the terminal-mix buckets. By prefix, coarse.

@@ -1,3 +1,55 @@
+## Session 57 — Phase 23: Named Player Attribution Under Fixed Lineups (2026-06-17)
+
+**Scope:** Credit each team-level event to a named player across 1,000 games. With fixed lineups, per-slot and per-player attribution are equivalent — this is the prerequisite layer, not the final substitution-aware thing. Attribution for stats the engine directly knows (which slot shot, which slot was fouled) is exact. Attribution for stats without a specific actor (defensive rebounder, steal, block, turnover on pre-Roll-E possessions) is probabilistic credit via weighted draws.
+
+**What shipped (5 files):**
+- `src/Charm.Engine/Core/SlotGroup.cs` — new `readonly record struct` carrying five per-slot counters plus an unattributed bucket; `Total`, indexer, and `WithSlot` immutable-update method.
+- `src/Charm.Engine/Core/Player.cs` — added `PlayerId { get; init; }` (stable harness-assigned int, 0 = unset sentinel; not read by any engine roll; not in `Validate()`).
+- `src/Charm.Engine/Core/Resolver.cs` — `RoutingOutcome` gains 7 new init-only fields: `ThreePaBySlot`, `ThreePmBySlot`, `FtaBySlot`, `FtmBySlot` (exact per-slot counters, zero new IRng calls), `BlkCount` (int, count of blocked shots), `TurnoverOffSlot` (nullable int, the offensive slot that committed the TO if Roll E had already fired), `TurnoverWasLiveBall` (bool, true on `BadPassIntercepted` and `LostBallLiveBall`). `Route()` gains 7 matching locals and 5 attribution hooks: 3PA in the non-MissFouled else block after the FGA switch; 3PM inside the Made/MadeAndFouled block after the FGM switch; `blkCount++` on `ShotResult.Blocked`; FTA/FTM slots in both FT entry cases (`ResolveFreeThrows` and `ResolveShootingFreeThrows`); TO metadata in the Terminal case before the return statement. Return statement extended with all 7 new fields.
+- `src/Charm.Engine/Core/Governor.cs` — `PossessionRecord` gains the same 7 fields as trailing optional params (defaulting to `default`/`0`/`null`/`false`). `Run()` gains 7 matching per-possession locals, threads them from `outcome.*` in the normal-possession branch, and passes them positionally to `records.Add(...)`.
+- `src/Charm.Harness/Program.cs` — extensive additions to `ObservationRunV1`:
+  - Inline seating loop replaces `SeatStartersFromConfig` call — stamps `PlayerId` at construction time (Home S1→1..S5→5, Away S1→6..S5→10) using the new `StampPlayerId` helper before the first `SetStarter` call, sidestepping the `Roster.SetStarter` occupied-slot guard.
+  - PlayerId uniqueness validation (seed==1 only): throws on any unset ID, duplicate, or count ≠ 10.
+  - Phase 23 per-player accumulators (`bsFga`…`bsTo`, 11 families × 10 slots), cross-game running totals for exact-family reconciliation (3PA/3PM/FTA/FTM + their unattributed buckets, 5 weighted-credit event totals), and `attributionOk` flag.
+  - Per-game Phase 23 invariants (inside the 1,000-game loop): 3PA/3PM/FTA/FTM slot-total completeness and subset checks; `TurnoverWasLiveBall` vs EndLabel consistency; non-TO metadata leakage check; per-slot subset checks for all 6 slot indices (0=Unattr, 1–5).
+  - `AttributeGame` static helper: takes `(GovernorRunResult, GameState, int seed)`, constructs `Random(seed+2)` as the attribution RNG, runs exact per-slot stats (FGA/FGM/3PA/3PM/FTA/FTM) and probabilistic `WeightedDraw` credits (TO, STL, DReb, OReb, BLK); returns `PlayerBoxTotals`. Called once per game in the loop, twice on seed-1 data after the loop for reproducibility.
+  - Post-loop §5f reconciliation: `CheckExact` verifies named-player totals equal total-minus-unattributed for all 6 exact families; 5 weighted-credit identity checks (per-player sum == event count).
+  - §5g same-seed reproducibility: `AttributeGame` called twice on seed-1 data → `PlayerBoxTotals.AllEqual` must hold.
+  - §5h per-player box score: 10 rows × 16 columns (PTS/FGA/FGM/FG%/3PA/3PM/3P%/FTA/FTM/FT%/ORB/DRB/REB/STL/BLK/TO), per-game averages over 1,000 games.
+  - Combined `if (mechanicsOk && attributionOk) Console.WriteLine("  ALL CHECKS PASSED")` banner after the box score.
+  - New static helpers: `GetSlotFga`, `GetSlotFgm`, `IsTurnoverPossession`, `BoxIdx`, `StampPlayerId` (copies all 37 authored attributes plus new `PlayerId`), `WeightedDraw` (attribution-only, uses `Random` not `IRng`), `AttributeGame`, `PlayerBoxTotals` (sealed class with 11 `long[10]` arrays and static `AllEqual`).
+
+**Build issues resolved:**
+1. `with { PlayerId = newId }` on a `sealed class` — C# `with` only works on records. Fixed by introducing `StampPlayerId` helper that copies all 37 authored attributes plus the new ID, and calling it before `SetStarter`.
+2. `Roster.SetStarter` throws if the slot is already occupied — the initial design tried to re-seat after `SeatStartersFromConfig`, which hit the guard. Fixed by inlining the seating loop in `ObservationRunV1` and stamping `PlayerId` at construction time, before the first `SetStarter` call.
+
+**Harness output — key results:**
+
+*Phase 23 attribution checks:* All exact-family reconciliation checks passed (FGA/FGM/3PA/3PM/FTA/FTM named-player totals equal total-minus-unattributed for both Home and Away). All five weighted-credit identity checks passed (per-player OReb/DReb/BLK/STL/TO sums equal the engine event counts). Same-seed reproducibility confirmed.
+
+*Per-player box score (1,000-game averages, frozen corpus):*
+
+| Player | PTS | FGA | FGM | FG% | 3PA | 3PM | FT% | ORB | DRB | STL | BLK | TO |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| [Home] Marcus Webb | 14.1 | 11.1 | 5.4 | 48.6% | 3.2 | 1.3 | 74.9% | 1.1 | 3.0 | 1.0 | 0.6 | 3.0 |
+| [Home] DeShawn Pryor | 16.8 | 12.7 | 6.5 | 51.1% | 2.6 | 1.1 | 79.8% | 1.3 | 3.3 | 0.9 | 0.6 | 2.7 |
+| [Home] Trey Holloway | 14.5 | 11.9 | 5.8 | 48.4% | 2.6 | 0.9 | 66.0% | 1.5 | 4.1 | 0.8 | 0.6 | 2.7 |
+| [Home] Javon Okafor | 11.5 | 8.6 | 4.7 | 55.0% | 0.3 | 0.1 | 54.8% | 1.9 | 4.9 | 0.6 | 0.9 | 2.1 |
+| [Home] Cory Baptiste | 9.8 | 7.2 | 3.5 | 47.9% | 3.6 | 1.7 | 83.7% | 1.3 | 3.2 | 0.8 | 0.6 | 1.9 |
+| [Away] Kendrick Shaw | 13.4 | 10.5 | 5.2 | 49.2% | 2.7 | 1.1 | 70.2% | 1.0 | 2.9 | 1.0 | 0.5 | 2.7 |
+| [Away] Rashid Monroe | 16.1 | 13.0 | 6.4 | 49.0% | 2.7 | 0.9 | 68.9% | 1.3 | 3.6 | 1.0 | 0.6 | 2.9 |
+| [Away] Antoine Dupree | 14.8 | 11.7 | 5.8 | 50.1% | 2.4 | 1.0 | 71.8% | 1.5 | 4.0 | 0.8 | 0.7 | 2.6 |
+| [Away] Darius Eze | 12.4 | 9.1 | 5.1 | 55.7% | 0.4 | 0.1 | 58.5% | 2.1 | 5.2 | 0.6 | 0.8 | 2.0 |
+| [Away] Malik Thornton | 9.0 | 6.6 | 3.1 | 47.9% | 3.5 | 1.6 | 89.3% | 1.2 | 3.2 | 0.8 | 0.6 | 2.0 |
+
+Plausibility checks passed: bigs (Okafor S4, Baptiste S5 on Home; Eze S4, Thornton S5 on Away) lead DReb and OReb; guards lead STL; per-player FT% tracks authored FreeThrow ratings; no player has 0 DReb per game.
+
+**ALL CHECKS PASSED.**
+
+**Stress test:** All 8 buckets passed, 4,000 games. Athletic outperforms Skill 73%/27% (Buckets 7/8), mirror gap 3.2% (side-neutral). Star beats Balanced 57%/41%. Elite dominates Weak 99.2%/0.6%. Average vs Average 48%/48%.
+
+**Deferred (unchanged):** True per-player attribution across substitutions; assists (own session); fouls per player; per-player StressTest box score; `MakePlayer` PlayerId assignment.
+
 ## Session 56 — Phase 22: Per-Slot FGM Readout + Tier-Decoupled FreeThrow Authoring (2026-06-17)
 
 **Scope:** Two deliberate bundled changes: (1) per-slot FGM counters at the same Roll H chokepoint as Phase 21's FGA counters, making per-slot FG% directly derivable; (2) tier-decoupled FreeThrow authoring in `MakePlayer`, fixing the Phase 19 finding that `Clamp(AtBaseline()/AtStrength())` imposed an unrealistically strong tier gradient on free-throw percentage. No new generator, config key, roll, enum, or `ContinuationKind`.

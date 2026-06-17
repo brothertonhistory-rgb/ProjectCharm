@@ -230,6 +230,27 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     public int Slot4Fgm { get; init; }
     public int Slot5Fgm { get; init; }
     public int SlotUnattributedFgm { get; init; }
+
+    // ── Phase 23 attribution support ──────────────────────────────────────────
+    // 3PA/3PM/FTA/FTM: exact per-slot counters (no draws — same pattern as FGA/FGM).
+    // BlkCount / TurnoverOffSlot / TurnoverWasLiveBall: metadata for harness draws.
+    // No IRng is consumed anywhere in this group.
+    public SlotGroup ThreePaBySlot  { get; init; }  // offense: 3PA per slot
+    public SlotGroup ThreePmBySlot  { get; init; }  // offense: 3PM per slot
+    public SlotGroup FtaBySlot      { get; init; }  // offense: FTA per slot
+    public SlotGroup FtmBySlot      { get; init; }  // offense: FTM per slot
+    /// <summary>How many shots were blocked this possession. Used by the harness
+    /// to issue exactly this many BLK credits via weighted draw.</summary>
+    public int BlkCount { get; init; }
+    /// <summary>The offensive slot that committed the turnover, if Roll E had
+    /// already selected a player when the TO fired. Null means the TO occurred
+    /// before Roll E (backcourt/entry turnover); the harness draws from BallHandling
+    /// weights in that case.</summary>
+    public int? TurnoverOffSlot { get; init; }
+    /// <summary>True if the possession ended on a live-ball steal terminal
+    /// (BadPassIntercepted or LostBallLiveBall). The harness issues exactly one STL
+    /// credit when this is true.</summary>
+    public bool TurnoverWasLiveBall { get; init; }
 }
 
 /// <summary>
@@ -435,6 +456,15 @@ public sealed class Resolver
         var iterations = 0;
         const int IterationCeiling = 10_000;
 
+        // Phase 23 per-slot accumulators (exact counters — no IRng)
+        var threePaBySlot = new SlotGroup();
+        var threePmBySlot = new SlotGroup();
+        var ftaBySlot     = new SlotGroup();
+        var ftmBySlot     = new SlotGroup();
+        var blkCount      = 0;
+        int? turnoverOffSlot   = null;
+        var turnoverWasLiveBall = false;
+
         while (true)
         {
             if (++iterations > IterationCeiling)
@@ -461,6 +491,21 @@ public sealed class Resolver
                     // it upstream before Roll H could resolve a make.
                     if (t.Reason == "Made")
                         points += Scoring.FieldGoalPoints(t.State.ShotType!.Value);
+                    // Phase 23: TO metadata — set only for Roll C turnover terminals.
+                    // If Roll E had already selected a player, credit that slot directly.
+                    // Null TurnoverOffSlot means pre-Roll-E TO; harness draws by BallHandling.
+                    if (t.Reason is "BadPassDeadBall" or "BadPassIntercepted"
+                                 or "LostBallDeadBall" or "LostBallLiveBall"
+                                 or "OffensiveFoul" or "Travel" or "DoubleDribble"
+                                 or "Carry" or "ThreeSecondViolation"
+                                 or "FiveSecondCloselyGuarded" or "OffensiveGoaltending"
+                                 or "BackcourtViolation" or "ShotClockViolation"
+                                 or "FiveSecondInbound" or "TenSecondBackcourt")
+                    {
+                        turnoverOffSlot = t.State.SelectedSlot?.Number;
+                        turnoverWasLiveBall =
+                            t.Reason is "BadPassIntercepted" or "LostBallLiveBall";
+                    }
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
                         { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods,
                           Fga = fga, Fgm = fgm, ThreePa = threePa, ThreePm = threePm,
@@ -473,7 +518,14 @@ public sealed class Resolver
                           SlotUnattributedFga = slotUnattributedFga,
                           Slot1Fgm = slot1Fgm, Slot2Fgm = slot2Fgm, Slot3Fgm = slot3Fgm,
                           Slot4Fgm = slot4Fgm, Slot5Fgm = slot5Fgm,
-                          SlotUnattributedFgm = slotUnattributedFgm };
+                          SlotUnattributedFgm = slotUnattributedFgm,
+                          ThreePaBySlot  = threePaBySlot,
+                          ThreePmBySlot  = threePmBySlot,
+                          FtaBySlot      = ftaBySlot,
+                          FtmBySlot      = ftmBySlot,
+                          BlkCount       = blkCount,
+                          TurnoverOffSlot     = turnoverOffSlot,
+                          TurnoverWasLiveBall = turnoverWasLiveBall };
 
                 case Continue c:
                     switch (c.Next)
@@ -620,6 +672,12 @@ public sealed class Resolver
                             points        += bonusFtPoints;
                             fta           += bonusFtSpins;   // each spin is one attempt
                             ftm           += bonusFtPoints;  // ftPoints == ftMakes (verified)
+                            // Phase 23: FTA/FTM per slot for bonus free throws.
+                            {
+                                var ftSlot = c.State.SelectedSlot?.Number ?? 0;
+                                ftaBySlot = ftaBySlot.WithSlot(ftSlot, bonusFtSpins);
+                                ftmBySlot = ftmBySlot.WithSlot(ftSlot, bonusFtPoints);
+                            }
                             continue;
 
                         // RETIRED (Contextification #2): Roll H's Blocked no longer emits
@@ -712,6 +770,12 @@ public sealed class Resolver
                                             case 5: slot5Fgm++; break;
                                             default: slotUnattributedFgm++; break; // SelectedSlot null — bonus-FT putback make
                                         }
+                                        // Phase 23: 3PM per slot — subset of per-slot FGM for three-point makes.
+                                        if (shotSt.ShotType == ShotLocation.Three)
+                                        {
+                                            var s = shotSt.SelectedSlot?.Number ?? 0;
+                                            threePmBySlot = threePmBySlot.WithSlot(s, 1);
+                                        }
                                     }
                                     // Per-slot FGA: credit the shooter's slot.
                                     // On a normal possession: SelectedSlot was stamped by Roll E.
@@ -728,6 +792,15 @@ public sealed class Resolver
                                         case 5: slot5Fga++; break;
                                         default: slotUnattributedFga++; break; // SelectedSlot null — bonus-FT putback (Roll E never ran)
                                     }
+                                    // Phase 23: 3PA per slot — subset of per-slot FGA for three-point attempts.
+                                    if (shotSt.ShotType == ShotLocation.Three)
+                                    {
+                                        var s = shotSt.SelectedSlot?.Number ?? 0;
+                                        threePaBySlot = threePaBySlot.WithSlot(s, 1);
+                                    }
+                                    // Phase 23: count blocks for harness BLK-credit draws.
+                                    if (shotSt.Result == ShotResult.Blocked)
+                                        blkCount++;
                                 }
                             }
                             continue;
@@ -814,6 +887,13 @@ public sealed class Resolver
                             points         += shootingFtPoints;
                             fta            += shootingFtSpins;   // each spin is one attempt
                             ftm            += shootingFtPoints;  // ftPoints == ftMakes (verified)
+                            // Phase 23: FTA/FTM per slot for shooting-foul free throws.
+                            // SelectedSlot is non-null here (shooting foul requires Roll E fired first).
+                            {
+                                var ftSlotS = c.State.SelectedSlot?.Number ?? 0;
+                                ftaBySlot = ftaBySlot.WithSlot(ftSlotS, shootingFtSpins);
+                                ftmBySlot = ftmBySlot.WithSlot(ftSlotS, shootingFtPoints);
+                            }
                             continue;
 
                         // OOB off the defender, offense RETAINS (Roll H's

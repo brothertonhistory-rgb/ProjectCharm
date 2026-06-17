@@ -51,6 +51,13 @@ public sealed class Player
 
     public string Name { get; }
 
+    /// <summary>Stable numeric identity within the frozen observation corpus. Never
+    /// read by any engine roll. Used by the attribution layer to index per-player stat
+    /// arrays. 0 = unset sentinel. No global allocation policy exists yet — IDs are
+    /// assigned sequentially by the harness when constructing the frozen-corpus roster.
+    /// Uniqueness is the harness's responsibility, not the engine's.</summary>
+    public int PlayerId { get; init; }
+
     // -------------------------------------------------------------------------
     // Offense — authored individual
     // -------------------------------------------------------------------------
