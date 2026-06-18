@@ -4597,3 +4597,76 @@ A side-reversal bug would pass a global check but fail a side check. Both sides 
 All five matched-share values, all five signedK values, and SCALE=40.0 are calibration placeholders. With the Phase 24 controlled roster (Anchor interior=230, Perim interior=115, meanInt=138), SCALE=40 gives the interior big ~58% of the rim-shot residual probability. This is strong — the Anchor almost always gets blamed when a guard drives the rim without his matched defender available. Calibration should probably raise SCALE (weakening the tilt) once realistic rosters are in use. The first calibration target is to match real shot-chart fouling tendencies by zone.
 
 The draft prompt estimated ~37% of the rim residual going to the big (computed at SCALE≈100). The chosen SCALE=40 is deliberate — erring toward a visible, measurable effect that will show up in box scores and can be tuned down. Invisible effects are harder to calibrate.
+
+
+---
+
+## Phase 26 — Slot/Archetype Cohort Box Scores + Slasher Shooting Floor
+
+### What this session adds and what it does not
+
+Phase 26 makes archetype-level stat distributions readable in the stress test by adding per-slot/archetype cohort box scores to every bucket. It also fixes the Slasher archetype's shooting floor so it functions as a below-average-but-functional perimeter threat. No engine changes. All changes are in `src/Charm.Harness/Program.cs`.
+
+### Slasher shooting floor fix
+
+Two changes to the `case PlayerArchetype.Slasher:` block in `MakePlayer`:
+- `int slOutside = Clamp(AtBaseline())` (was `AtWeakness()`) — raises Outside from ~30 mean to ~50 mean
+- `ThreeTendency = TStr(25, 40)` (was `TStr(5, 10)`) — raises ThreeTendency mean from ~7.5 to ~32.5
+
+`FreeThrow = DrawFreeThrow(slOutside, slHeight, rng)` is unchanged; it automatically reads the higher `slOutside`. The design intent is "hits the open one" — below-average shooting skill but enough tendency to be a genuine floor spacing threat.
+
+Blast radius: Buckets 5 (Slasher Elite star in StarVsBalanced), 6/7/8 (AthleticRoster has two Slashers). Buckets 1–4 unaffected.
+
+### PlayerId stamping by logical team
+
+**The problem.** The stress test alternates physical home/away every other game (`gameIndex % 2 == 1`). Before Phase 26, no PlayerId was ever assigned in the stress-test path — all players had PlayerId=0. `AttributeGame` guards `if (oi < 0 || oi >= 10) continue`, so PlayerId=0 → oi=-1 → every player is silently skipped → all-zero box score, no crash.
+
+**The fix.** After the bucket→roster dispatch switch (once per variant, before any game is played), Team A players are stamped with PlayerId 1–5 and Team B players with PlayerId 6–10, using the existing `StampPlayerId` helper. The stamped `Player[]` arrays are what `SeatRoster` seats into the `GameState` every game. Because the ID is on the `Player` object (not derived from physical side), the same logical player lands in the same `AttributeGame` accumulator index regardless of which physical side they drew that game.
+
+**Convention.** In all stress-test contexts: Team A = IDs 1–5, Team B = IDs 6–10. This is per-bucket; Buckets 7 and 8 are independent (in Bucket 8, Skill is Team A and gets IDs 1–5, Athletic is Team B and gets IDs 6–10 — the reverse of Bucket 7).
+
+### Per-variant PlayerId contract validation
+
+Immediately after stamping, before the first game of the variant, the code validates:
+- Exactly 10 unique IDs across both arrays
+- Min=1, max=10
+- Team A array holds exactly {1, 2, 3, 4, 5}
+- Team B array holds exactly {6, 7, 8, 9, 10}
+
+A violation is a hard failure into `failures` (the variant is excluded). This catch is per-variant by design: a bucket-level no-zero check cannot detect a single mis-stamped variant hidden among nine good ones.
+
+### Cohort accumulator scoping
+
+Per-bucket cohort accumulators (`long[10]` arrays for all 12 stat families: FGA, FGM, 3PA, 3PM, FTA, FTM, OReb, DReb, Blk, Stl, To, ShFoul) are declared as locals inside the bucket loop, before the variant loop. They reset naturally when the bucket loop moves to the next bucket. They are NOT fields on `VariantStats` — cohort data is bucket-level reporting state, not per-variant team-performance state.
+
+A per-variant `variantFga[10]` (declared inside the variant loop) resets each variant and serves as the primary per-slot corruption check after the variant's games complete.
+
+### Atomic acceptance boundary
+
+Within the game loop, the attribution and accumulation block sits between the mechanical checks and `vs.ValidGames++`:
+
+```
+count invariant check → continue on fail
+AttributeGame() → continue on throw (game excluded from everything)
+variantFga accumulation
+cohort accumulation        ← no possible continue between here and ValidGames++
+vs.ValidGames++
+team-level accumulation (unchanged)
+```
+
+A game that fails attribution is excluded from both the cohort numerator and the `ValidGames` denominator. This ensures every denominator (team-level and cohort) is the same accepted-game set.
+
+### What "cohort box score" means
+
+Each bucket generates 10 different rosters from different seeds. A cohort row pools all 10 variants: it is the per-game average for one logical slot/archetype across 500 combined games (10 variants × 50 games). This is genuinely useful — it shows how an archetype performs in a matchup — but it is not an individual player's line (each variant generated a different player for that slot). Every cohort table carries a mandatory caveat header stating this.
+
+True per-player box scores (one persistent player's line) await a single-roster context or the future persistent-universe layer.
+
+### Cohort table format
+
+Mirrors ObservationRunV1's per-player box score column set:
+`PTS / FGA / FGM / FG% / 3PA / 3PM / 3P% / FTA / FTM / FT% / ORB / DRB / REB / STL / BLK / TO / SFL`
+
+Rows labeled `[A] Slot1 — Slasher`, `[B] Slot2 — AthleticBig`, etc. The archetype name comes from the bucket's fixed composition array (not from any single player's generated Name). Bucket 5 prints a note that Slot 1 is the Elite-tier star.
+
+Denominator: `totalValid` (total attribution-accepted games across all 10 variants), the same denominator used for team-level stats.

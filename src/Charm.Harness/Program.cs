@@ -9724,7 +9724,7 @@ internal static class Program
                 break;
 
             case PlayerArchetype.Slasher:
-                int slOutside = Clamp(AtWeakness());
+                int slOutside = Clamp(AtBaseline()); // Phase 26: raised from AtWeakness — "hits the open one"
                 int slHeight  = Clamp(AtWeakness());
                 p = new Player(name)
                 {
@@ -9763,7 +9763,7 @@ internal static class Program
                     ShortTendency      = TStr(30, 45),
                     MidTendency        = TStr(15, 25),
                     LongTendency       = TStr(5,  10),
-                    ThreeTendency      = TStr(5,  10),
+                    ThreeTendency      = TStr(25, 40), // Phase 26: raised from TStr(5,10) — takes open corner threes
                 };
                 break;
 
@@ -10258,6 +10258,28 @@ internal static class Program
             var fpA_acc = new double[20];
             var fpB_acc = new double[20];
 
+            // ── Archetype composition for cohort box score labels (fixed per bucket) ──────
+            PlayerArchetype[] teamAArchetypes, teamBArchetypes;
+            switch (bucketNum)
+            {
+                case 5: // StarVsBalanced — Slot 1 is the Slasher star; slots 2–5 are starRoleArchetypes
+                    teamAArchetypes = new[] { PlayerArchetype.Slasher, starRoleArchetypes[0], starRoleArchetypes[1], starRoleArchetypes[2], starRoleArchetypes[3] };
+                    teamBArchetypes = BalancedRoster;
+                    break;
+                case 6: teamAArchetypes = ShootingRoster; teamBArchetypes = AthleticRoster; break;
+                case 7: teamAArchetypes = AthleticRoster; teamBArchetypes = SkillRoster;    break;
+                case 8: teamAArchetypes = SkillRoster;    teamBArchetypes = AthleticRoster; break;
+                default: teamAArchetypes = BalancedRoster; teamBArchetypes = BalancedRoster; break;
+            }
+
+            // ── Per-bucket cohort accumulators (indexed by PlayerId-1; reset per bucket) ──
+            var cohortFga    = new long[10]; var cohortFgm    = new long[10];
+            var cohortTpa    = new long[10]; var cohortTpm    = new long[10];
+            var cohortFta    = new long[10]; var cohortFtm    = new long[10];
+            var cohortOReb   = new long[10]; var cohortDReb   = new long[10];
+            var cohortBlk    = new long[10]; var cohortStl    = new long[10];
+            var cohortTo     = new long[10]; var cohortShFoul = new long[10];
+
             for (var variantIdx = 0; variantIdx < 10; variantIdx++)
             {
                 int variantSeed = bucketSeedBase + variantIdx * 100;
@@ -10311,6 +10333,29 @@ internal static class Program
                     default:
                         throw new InvalidOperationException($"Unknown bucket {bucketNum}");
                 }
+
+                // ── Stamp PlayerId by LOGICAL team (Team A → 1–5, Team B → 6–10) ──────────
+                // Done once per variant at build time so the ID is stable across the home/away
+                // flip. The stamped Player[] arrays are what SeatRoster seats every game (A1, A3).
+                for (var si = 0; si < 5; si++) teamAPlayers[si] = StampPlayerId(teamAPlayers[si], si + 1);
+                for (var si = 0; si < 5; si++) teamBPlayers[si] = StampPlayerId(teamBPlayers[si], si + 6);
+
+                // ── Per-variant PlayerId contract validation (A2) ─────────────────────────
+                {
+                    var seenIds = new HashSet<int>();
+                    foreach (var p in teamAPlayers) seenIds.Add(p.PlayerId);
+                    foreach (var p in teamBPlayers) seenIds.Add(p.PlayerId);
+                    var aIds = teamAPlayers.Select(p => p.PlayerId).OrderBy(x => x).ToList();
+                    var bIds = teamBPlayers.Select(p => p.PlayerId).OrderBy(x => x).ToList();
+                    bool contractOk = seenIds.Count == 10 && seenIds.Min() == 1 && seenIds.Max() == 10
+                        && aIds.SequenceEqual(new[] { 1, 2, 3, 4, 5 })
+                        && bIds.SequenceEqual(new[] { 6, 7, 8, 9, 10 });
+                    if (!contractOk)
+                        failures.Add($"B{bucketNum} V{variantIdx}: PlayerId contract violated — A=[{string.Join(",", aIds)}] B=[{string.Join(",", bIds)}]");
+                }
+
+                // Per-variant FGA tracker (reset each variant; primary corruption catch — A2)
+                var variantFga = new long[10];
 
                 // ── Accumulate fingerprint ─────────────────────────────────
                 var fpA = ComputeFingerprint(teamAPlayers);
@@ -10411,6 +10456,31 @@ internal static class Program
                     {
                         failures.Add($"B{bucketNum} V{variantIdx} seed={gameSeed}: count invariant failed");
                         continue;
+                    }
+
+                    // ── Attribution — atomic acceptance boundary ────────────────────────────
+                    // AttributeGame must succeed before any accumulator (cohort or team-level)
+                    // is touched, and before vs.ValidGames is incremented. A throw here causes
+                    // a continue so the game contributes to neither numerator nor denominator.
+                    PlayerBoxTotals attributed;
+                    try { attributed = AttributeGame(result, game, gameSeed); }
+                    catch (Exception attrEx)
+                    {
+                        failures.Add($"B{bucketNum} V{variantIdx} seed={gameSeed}: AttributeGame failed: {attrEx.Message}");
+                        continue;  // game touches neither denominator nor any accumulator
+                    }
+
+                    // Accumulate per-variant FGA gate and per-bucket cohort totals.
+                    // No continue/failure branch is possible between here and vs.ValidGames++.
+                    for (var i = 0; i < 10; i++)
+                    {
+                        variantFga  [i] += attributed.Fga  [i];
+                        cohortFga   [i] += attributed.Fga  [i]; cohortFgm   [i] += attributed.Fgm  [i];
+                        cohortTpa   [i] += attributed.Tpa  [i]; cohortTpm   [i] += attributed.Tpm  [i];
+                        cohortFta   [i] += attributed.Fta  [i]; cohortFtm   [i] += attributed.Ftm  [i];
+                        cohortOReb  [i] += attributed.OReb [i]; cohortDReb  [i] += attributed.DReb [i];
+                        cohortBlk   [i] += attributed.Blk  [i]; cohortStl   [i] += attributed.Stl  [i];
+                        cohortTo    [i] += attributed.To   [i]; cohortShFoul[i] += attributed.ShFoul[i];
                     }
 
                     vs.ValidGames++;
@@ -10534,6 +10604,28 @@ internal static class Program
                     vs.TeamATransFreq.Add(teamAPoss > 0 ? (double)transA / teamAPoss : 0.0);
                     vs.TeamBTransFreq.Add(teamBPoss > 0 ? (double)transB / teamBPoss : 0.0);
                 }   // end game loop
+
+                // ── Per-variant FGA gate (primary PlayerId/seating corruption catch — A2) ──
+                // Zero valid games is already captured as a failure upstream; skip per-slot
+                // messages in that case to avoid 10 misleading zero-FGA reports.
+                if (vs.ValidGames == 0)
+                {
+                    failures.Add($"B{bucketNum} V{variantIdx}: zero valid games — skipping per-slot FGA check");
+                }
+                else
+                {
+                    for (var i = 0; i < 10; i++)
+                    {
+                        if (variantFga[i] == 0)
+                        {
+                            var side = i < 5 ? "A" : "B";
+                            var slot = i < 5 ? i + 1 : i - 4;
+                            failures.Add($"B{bucketNum} V{variantIdx} [{side}]Slot{slot}: zero FGA across " +
+                                $"{vs.ValidGames} valid games — indicates probable seating/PlayerId corruption " +
+                                "or an unexpectedly unreachable slot; inspect before accepting the run.");
+                        }
+                    }
+                }
 
                 allVariantStats.Add(vs);
             }   // end variant loop
@@ -10793,6 +10885,56 @@ internal static class Program
             Console.WriteLine($"  Between-variant:  Team B PPP range: min={variantMeanPppB.Min():F3}  max={variantMeanPppB.Max():F3}");
 
             Console.WriteLine();
+
+            // ── Bucket-level no-zero FGA gate (redundant outer protection — A2) ─────────
+            for (var i = 0; i < 10; i++)
+            {
+                if (cohortFga[i] == 0)
+                {
+                    var side = i < 5 ? "A" : "B";
+                    var slot = i < 5 ? i + 1 : i - 4;
+                    var msg  = $"Bucket {bucketNum} {bucketName}: [{side}]Slot{slot} has 0 FGA across {totalValid} games — PlayerId wiring issue";
+                    failures.Add(msg);
+                    Console.WriteLine($"  [FAIL] {msg}");
+                }
+            }
+
+            // ── Slot/archetype cohort box score (per-game averages over bucket valid games) ─
+            if (totalValid > 0)
+            {
+                Console.WriteLine($"=== COHORT BOX SCORE — Bucket {bucketNum}: {bucketName} ===");
+                Console.WriteLine("  Rows pool 10 generated roster variants. Each row is the per-game average");
+                Console.WriteLine($"  for one logical slot/archetype cohort, not one persistent named player. ({totalValid} accepted games)");
+                if (bucketNum == 5)
+                    Console.WriteLine("  Note: Team A Slot 1 is an Elite-tier Slasher star; all other Team A slots are Good tier.");
+                Console.WriteLine($"  {"Row",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"TO",5} {"SFL",5}");
+                Console.WriteLine(new string('─', 121));
+                double g = totalValid;
+                for (var i = 0; i < 10; i++)
+                {
+                    var side      = i < 5 ? "A" : "B";
+                    var slotNum   = i < 5 ? i + 1 : i - 4;
+                    var archetype = i < 5 ? teamAArchetypes[i] : teamBArchetypes[i - 5];
+                    var label     = $"[{side}] Slot{slotNum} — {archetype}";
+
+                    var fga  = cohortFga  [i] / g; var fgm  = cohortFgm  [i] / g;
+                    var tpa  = cohortTpa  [i] / g; var tpm  = cohortTpm  [i] / g;
+                    var fta  = cohortFta  [i] / g; var ftm  = cohortFtm  [i] / g;
+                    var orb  = cohortOReb [i] / g; var drb  = cohortDReb [i] / g;
+                    var blk  = cohortBlk  [i] / g; var stl  = cohortStl  [i] / g;
+                    var to   = cohortTo   [i] / g; var sfl  = cohortShFoul[i] / g;
+                    var pts  = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
+                    var fgPct = fga > 0 ? fgm / fga * 100 : 0.0;
+                    var tpPct = tpa > 0 ? tpm / tpa * 100 : 0.0;
+                    var ftPct = fta > 0 ? ftm / fta * 100 : 0.0;
+                    Console.WriteLine(
+                        $"  {label,-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
+                        $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
+                        $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {to,5:F1} {sfl,5:F1}");
+                }
+                Console.WriteLine($"=== END COHORT BOX SCORE — Bucket {bucketNum} ===");
+                Console.WriteLine();
+            }
 
             // ── Accumulate summary row ─────────────────────────────────────────
             summaryRows.Add((bucketName,

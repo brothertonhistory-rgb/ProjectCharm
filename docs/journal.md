@@ -1,3 +1,81 @@
+## Session 60 — Phase 26: Slot/Archetype Cohort Box Scores + Slasher Shooting Floor (2026-06-17)
+
+**Scope:** Two changes, one file (`src/Charm.Harness/Program.cs`). (1) Raise the Slasher archetype's shooting floor so it can function as a perimeter threat. (2) Add a slot/archetype cohort box score to every stress-test bucket, backed by a full PlayerId-by-logical-team stamping and per-variant corruption detection scheme. Engine untouched.
+
+**What shipped (1 file):**
+
+`src/Charm.Harness/Program.cs` — six surgical additions:
+
+- **Slasher floor fix (A4):** `slOutside` changed from `Clamp(AtWeakness())` to `Clamp(AtBaseline())` (~30 → ~50 mean); `ThreeTendency` changed from `TStr(5, 10)` to `TStr(25, 40)`. `FreeThrow = DrawFreeThrow(slOutside, slHeight, rng)` left unchanged — it automatically reads the higher `slOutside`. Blast radius: Buckets 5 (Slasher star), 6, 7, 8 (AthleticRoster has two Slashers); Buckets 1–4 unchanged.
+
+- **Archetype label arrays + per-bucket cohort accumulators (before variant loop):** `teamAArchetypes` / `teamBArchetypes` as `PlayerArchetype[]` locals (switch on `bucketNum`; Bucket 5's star slot explicitly `PlayerArchetype.Slasher` from `starRoleArchetypes`). Twelve `long[10]` cohort accumulator arrays (`cohortFga` … `cohortShFoul`) declared before the variant loop and reset naturally per bucket.
+
+- **PlayerId stamping by logical team (after build switch, A1/A3):** `StampPlayerId(teamAPlayers[si], si + 1)` for si=0..4 and `StampPlayerId(teamBPlayers[si], si + 6)` for si=0..4. Done once per variant at build time; the stamped `Player[]` arrays are what `SeatRoster` re-seats each game, so the ID follows the logical team across the home/away flip.
+
+- **Per-variant PlayerId contract validation (A2):** After stamping, validates: exactly 10 unique IDs in combined set; min=1, max=10; Team A holds exactly {1,2,3,4,5}; Team B holds exactly {6,7,8,9,10}. Violations → hard failure into `failures` list (the variant cannot produce trustworthy attribution).
+
+- **Atomic attribution + cohort accumulation (game loop, before `vs.ValidGames++`):** `AttributeGame` wrapped in try/catch immediately after the count-invariant check. On throw → `continue` (game excluded from both denominator and all accumulators). On success → accumulate `variantFga[10]` (per-variant corruption tracker) and all twelve cohort arrays, then `vs.ValidGames++`. No possible `continue` or failure branch between cohort accumulation and the denominator increment.
+
+- **Per-variant FGA gate (after game loop, before `allVariantStats.Add`):** If a variant produced zero valid games, records that and skips the per-slot check (avoids 10 misleading zero-FGA reports). Otherwise, checks every slot: zero FGA across the variant's valid games → hard failure with the message "indicates probable seating/PlayerId corruption or an unexpectedly unreachable slot; inspect before accepting the run."
+
+- **Bucket-level no-zero FGA gate + cohort box score (after team-level output):** No-zero gate mirrors `AttributionSanityCheck`'s pattern (FGA only, hard failure into `failures`). Cohort box score prints under `=== COHORT BOX SCORE — Bucket N: Name ===` with a mandatory pooling-caveat header; 10 rows labeled `[A] Slot1 — Slasher`, `[B] Slot2 — AthleticBig`, etc.; full ObservationRunV1 column set (PTS/FGA/FGM/FG%/3PA/3PM/3P%/FTA/FTM/FT%/ORB/DRB/REB/STL/BLK/TO/SFL); per-game averages using `totalValid` as the denominator (same accepted-game set as team-level stats). Bucket 5 prints a note that Slot 1 is the Elite-tier star.
+
+**Key design decisions:**
+
+- **Cohort, not per-player.** Each bucket generates 10 different rosters from different seeds. The pooled rows are a slot/archetype cohort average — how a given archetype performs in this matchup — not a persistent named player's line. The caveat header prevents misreading.
+
+- **PlayerId by LOGICAL team, not physical side.** The stress test flips physical home/away every other game. Stamping by physical side would split one logical player's contributions across two accumulator indices. Stamping at build time (before seating) ensures Team A's player in Slot 1 always accumulates into `cohortFga[0]` regardless of which physical side they drew.
+
+- **Atomic acceptance boundary.** `AttributeGame` succeeds or the game is excluded from everything — cohort numerator, team-level numerator, and `ValidGames` denominator all move together or not at all. This preserves the invariant that every denominator is the same accepted-game set.
+
+- **Per-bucket cohort locals, not `VariantStats` fields.** Cohort accumulators are bucket-level reporting state, not per-variant team-performance state. Storing them in `VariantStats` would blur the responsibility boundary. Twelve `long[10]` locals inside the bucket loop, reset per bucket.
+
+- **Bucket 7/8 PlayerId independence.** In Bucket 8, Skill is Team A (IDs 1–5) and Athletic is Team B (IDs 6–10) — the opposite assignment from Bucket 7. This is correct: each bucket's box score is self-contained. The prompt's design note (do not try to make IDs consistent across 7 and 8) was followed.
+
+**Python pre-check (directional, not pass/fail):**
+- Slasher Outside mean: ~30 → ~50. ThreeTendency mean: ~7.5 → ~32.5. Athletic roster mean ThreeTendency: ~7.5 → ~17.5 (two Slashers at ~32.5, three others at ~7.5). Directional claim confirmed: the authored distributions rose, realized three-rate should rise materially from prior ~7.7%.
+
+**Harness output — key results:**
+
+*All structural checks: STRESS TEST PASSED, ALL CHECKS PASSED. 500/500 valid games each bucket. Zero failures on contract validation, per-variant FGA gate, bucket no-zero gate, or attribution.*
+
+*Slasher fix (Buckets 5, 6, 7, 8):*
+
+| Bucket | Context | Three-rate (team with Slashers) | Prior |
+|---|---|---|---|
+| 5 | StarVsBalanced | Slasher star: 2.9 3PA/g, 35.4% 3P% | n/a (per-team) |
+| 6 | ShootingVsAthletic | Athletic Team B: 12.4% | ~7.7% |
+| 7 | AthleticVsSkill | Athletic Team A: 12.5% | ~7.7% |
+| 8 | SkillVsAthletic | Athletic Team B: 12.6% | ~7.7% |
+
+The three-rate rose materially across all affected buckets. Buckets 1–4 unchanged (no Slasher).
+
+*Cohort box scores — selected observations:*
+
+**PassFirstGuard / FloorGeneral underperform.** PTS ~9–10/game across most buckets, lowest of any archetype. Consistent with the standing note that playmaking and IQ channels are not yet fully wired — these players score little because their value is deferred.
+
+**PostScorer and RimRunner are the most efficient.** FG% 47–48% and 45–49% respectively (weighted toward close/rim), leading DRB and ORB per game. SFL (fouls committed) highest at 1.3–1.8/game, reflecting their interior positioning.
+
+**PerimeterShooter and ThreeAndDWing dominate 3PA.** 4–5 3PA/game, 38–45% 3P%. These two archetypes drive the Shooting roster's 35.3% aggregate three-rate.
+
+**AthleticBig posts the highest FG% (54–57%).** Pure inside-the-paint tendencies (RimTendency and close bias) and strong Finishing. Low 3PA (0.5–0.6/game) confirms no perimeter presence, as designed.
+
+**Slasher box line (Bucket 6 [B]):** 15.6–15.7 PTS, ~12-13 FGA, 48–50% FG%, 2.0 3PA, 30–32% 3P%, 3.6–4.1 FTA/g. The Slasher now reads as a well-rounded slashing scorer who can hit the open three — not a non-shooter.
+
+**Bucket 5 star Slasher:** 21.9 PTS, 15.8 FGA, 54.1%, 2.9 3PA. Usage at 30.8% (Slot 1), well above the 20% equal-share baseline. The usage concentration from Phase 17/21 is directly visible in the star's cohort line.
+
+**SFL directional pattern.** Interior players (PostScorer, RimRunner, AthleticBig) commit 1.3–2.0 SFL/game; perimeter players (PerimeterShooter, FloorGeneral) commit 0.7–1.0 SFL/game. Pattern matches Phase 25's interior-tilt formula.
+
+**Calibration roadmap (observations, not grades):**
+
+1. **PassFirstGuard / FloorGeneral scoring floor** — deferred channel (playmaking, IQ) is the root cause. Until those routes are wired, these archetypes underperform as scorers. Structural, not a calibration dial.
+2. **PostScorer FT% lower in Elite tier** — noted in Phase 22 as a consequence of the Height nudge in `DrawFreeThrow`. Elite bigs have very high Height (AtStrength), creating a large downward nudge. Needs full-population data to determine whether this is realistic or over-penalizing.
+3. **Slasher 3P% (30–35%)** — now in a plausible range for a "hits the open one" player. The exact rate can be calibrated via `ThreeTendency` range and the location matchup bends. Leave as-is until team-level calibration sets anchors.
+4. **Athletic roster win dominance (70% vs Skill)** — large gap across Buckets 7/8. Either the DEC-5 physical exponent is producing a very strong Athletic advantage, or these particular roster compositions have a structural mismatch. Record; investigate at team-level calibration.
+5. **Shooting roster losing badly to Athletic (28%)** — the Athletic roster has strong Finishing (rim conversion) and the Shooting roster has lower rim protection. Worth tracking whether this gap narrows after calibrating the block/foul matchup parameters.
+
+**ALL CHECKS PASSED.**
+
 ## Session 59 — Phase 25: Shooting Foul Attribution (2026-06-17)
 
 **Scope:** Wire a shooting-foul event list from the resolver walk through to the harness attribution pass, then draw a weighted-credit fouling defender for each event using a matched-man + interior-tilt residual formula. No engine rolls changed, no config keys changed. Four files.
