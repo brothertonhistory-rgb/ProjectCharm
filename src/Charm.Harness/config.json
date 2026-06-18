@@ -92,7 +92,9 @@
     "UsageExponent": 2.0,
     "UsageFloor": 0.09,
     "UsageRail": 0.52,
-    "MinUsageScore": 1.0
+    "MinUsageScore": 1.0,
+    "MaxTiltMultiplier": 1.5,
+    "TiltReferenceShift": 0.08
   },
   "RollF": {
     "BaseShotAttempt": 0.855,
@@ -148,7 +150,9 @@
     "PressureResidualPenaltyScale": 2.0,
     "C1ReliefScale": 2.0,
     "C2ImbalanceScale": 0.08,
-    "C3AttentionAmplifier": 1.5
+    "C3AttentionAmplifier": 1.5,
+    "PassingOpportunityFloor": 0.10,
+    "MaxPassingBonus": 0.08
   },
   "Attention": {
     "GravityBlendWeight": 0.5,
@@ -159,7 +163,15 @@
     "SecondGravityFraction": 0.12,
     "GravityAloneYield": 0.25,
     "SpacingMultiplier": 0.75,
-    "Epsilon": 1e-09
+    "Epsilon": 1e-09,
+    "IqMin": 0.85,
+    "IqMax": 1.15,
+    "ConversionFloor": 0.05,
+    "DirectPassingScale": 0.10,
+    "ActivationScale": 0.20,
+    "PlaymakingDecay": 0.80,
+    "OpportunityFloor": 0.10,
+    "MaxPassingBonus": 0.08
   },
   "Matchup": {
     "SkillSteepness": 6.0,

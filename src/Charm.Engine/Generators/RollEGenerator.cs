@@ -176,6 +176,67 @@ public sealed class RollEGenerator : IRollEGenerationProvider
     public Pie<SelectionOutcome> Generate(PossessionState state) =>
         GenerateWithPressure(state).Pie;
 
+    /// <summary>
+    /// Phase 27 Session 2 — selection tilt. Bends the usage pie by the gap between
+    /// usage intent (<paramref name="gen"/>.FinalShares) and defensive attention
+    /// (<paramref name="attentionShares"/>), then re-enforces the floor/rail constraint
+    /// using the TILTED weights as the redistribution basis (not the original expScores —
+    /// that would partially undo the tilt).
+    ///
+    /// <para>Tilt math: <c>multiplier[i] = exp(log(MaxTiltMultiplier) × tanh(gap[i] /
+    /// TiltReferenceShift))</c> where <c>gap[i] = FinalShares[i] − attentionShares[i]</c>.
+    /// Strictly bounded in (1/MaxTiltMultiplier, MaxTiltMultiplier); exactly 1.0 at zero
+    /// gap (neutral anchor: usage == attention reproduces the pre-tilt pie).</para>
+    ///
+    /// <para>Halfcourt-only: caller must NOT call this on the FastBreak branch. The
+    /// FastBreak branch passes <paramref name="gen"/>.Pie directly into RollE.Execute
+    /// untilted.</para>
+    ///
+    /// <para>One-pass: attention (<paramref name="attentionShares"/>) is computed from
+    /// the pre-tilt FinalShares and never recomputed from the result. Pressures
+    /// (<paramref name="gen"/>.Pressures) are pre-tilt and passed unchanged to
+    /// RollE.Execute — the tilt changes WHICH slot is rolled, not the pressure each
+    /// slot carries.</para>
+    /// </summary>
+    public Pie<SelectionOutcome> BendByAttention(RollEGeneration gen, double[] attentionShares)
+    {
+        var finalShares = gen.FinalShares;
+
+        // Per-slot gap and bounded multiplier
+        var tilted = new double[5];
+        for (var i = 0; i < 5; i++)
+        {
+            var gap        = finalShares[i] - attentionShares[i];
+            var multiplier = Math.Exp(Math.Log(_cfg.MaxTiltMultiplier)
+                                    * Math.Tanh(gap / _cfg.TiltReferenceShift));
+            tilted[i] = finalShares[i] * multiplier;
+        }
+
+        // Normalize
+        var total = 0.0;
+        foreach (var v in tilted) total += v;
+        if (total > 0.0)
+            for (var i = 0; i < 5; i++) tilted[i] /= total;
+
+        // Count populated slots (same definition as GenerateWithPressure)
+        var populatedCount = 0;
+        for (var i = 0; i < 5; i++) if (finalShares[i] > 0.0) populatedCount++;
+        if (populatedCount == 0) populatedCount = 5;
+
+        // Re-apply floor/rail using TILTED weights as the redistribution basis —
+        // NOT the original expScores. Using the original would pull mass back toward
+        // pre-tilt proportions and partially undo the tilt.
+        var constrained = ApplyFloorAndRail(tilted, tilted, populatedCount);
+
+        // Build the new pie from the constrained tilted shares
+        var allOutcomes = Enum.GetValues<SelectionOutcome>();
+        var weights     = new Dictionary<SelectionOutcome, double>();
+        for (var i = 0; i < 5; i++)
+            weights[allOutcomes[i]] = constrained[i];
+
+        return new Pie<SelectionOutcome>(weights, _cfg.Epsilon);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Constrained redistribution (water-filling)
     // ─────────────────────────────────────────────────────────────────────────

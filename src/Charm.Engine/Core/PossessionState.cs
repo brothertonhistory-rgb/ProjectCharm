@@ -227,4 +227,12 @@ public sealed record PossessionState(
     /// shooters.
     /// <para>Null until Roll E runs. Cleared by Roll K's <c>ResetOffense</c>.</para>
     /// </param>
-    double? TeamSpacingLevel = null);
+    double? TeamSpacingLevel = null,
+    /// <param name="TeamConversionQuality">The passing/playmaking conversion quality
+    /// for this possession's offense [0,1]. Stamped by Roll E alongside
+    /// <see cref="TeamBaseOpenness"/> (Phase 27 Session 2). Used by Roll H's bonus-only
+    /// passing-converter block — a separate, attention-independent make% consequence
+    /// distinct from C1. Neutral (0.0) when the formula placeholder is in effect.
+    /// <para>Null until Roll E runs. Cleared by Roll K's <c>ResetOffense</c>.</para>
+    /// </param>
+    double? TeamConversionQuality = null);

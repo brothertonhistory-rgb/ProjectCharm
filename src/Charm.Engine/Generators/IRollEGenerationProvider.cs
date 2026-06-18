@@ -43,4 +43,15 @@ public interface IRollEGenerationProvider : IRollEPieGenerator
     /// for each populated slot.
     /// </summary>
     RollEGeneration GenerateWithPressure(PossessionState state);
+
+    /// <summary>
+    /// Phase 27 Session 2 — selection tilt. Bends the usage pie produced by
+    /// <see cref="GenerateWithPressure"/> by the gap between usage intent
+    /// (FinalShares) and defensive attention, re-enforcing the floor/rail
+    /// constraint using the TILTED weights as the redistribution basis.
+    /// Halfcourt-only: caller must NOT call this on the FastBreak branch.
+    /// <para>The stub implementation returns the pie unchanged (no tilt in
+    /// isolated harness checks that don't wire the full attention path).</para>
+    /// </summary>
+    Pie<SelectionOutcome> BendByAttention(RollEGeneration gen, double[] attentionShares);
 }

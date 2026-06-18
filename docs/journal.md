@@ -1,3 +1,73 @@
+## Session 62 — Phase 27 Session 2: Selection Tilt + Passing Converter (2026-06-18)
+
+**Scope:** Second and final session of the gravity/spacing/attention layer. Selection tilt and passing converter only — shot location (Roll G) deferred as planned. Fourteen files changed.
+
+**What shipped (14 files):**
+
+`src/Charm.Engine/Config/RollEConfig.cs` — two new tilt knobs: `MaxTiltMultiplier` (1.5 placeholder) and `TiltReferenceShift` (0.08 placeholder). Both loaded and invariant-validated in `Load`.
+
+`src/Charm.Engine/Config/AttentionConfig.cs` — eight new conversion knobs: `IqMin`, `IqMax`, `ConversionFloor`, `DirectPassingScale`, `ActivationScale`, `PlaymakingDecay`, `OpportunityFloor`, `MaxPassingBonus`. Loaded via `JsonSerializer.Deserialize` (auto-map); invariants for `PlaymakingDecay ∈ (0,1]`, `OpportunityFloor ∈ [0,1)`, `MaxPassingBonus ∈ (0,1]` added to `Load`.
+
+`src/Charm.Engine/Config/RollHConfig.cs` — two new passing converter knobs: `PassingOpportunityFloor` (0.10 placeholder) and `MaxPassingBonus` (0.08 placeholder). Invariants added to `Load`.
+
+`src/Charm.Engine/Generators/AttentionGenerator.cs` — three changes: (1) `PassingAmp` constant removed — `TeamBaseOpenness` now stamps the PURE gravity×spacing value; (2) conversion quality block added before the `return`, computing `PlaymakingActivation` (top-down geometric decay across five players), `PassingCompound` (flat mean of Passing/100), and `conversionQuality = ConversionFloor + DirectPassingScale × PassingCompound + ActivationScale × PlaymakingActivation × PassingCompound`; (3) `AttentionResult` record gains fifth field `TeamConversionQuality`.
+
+`src/Charm.Engine/Generators/IRollEGenerationProvider.cs` — `BendByAttention(RollEGeneration gen, double[] attentionShares)` added to the interface.
+
+`src/Charm.Engine/Generators/RollEGenerator.cs` — `BendByAttention` implemented: computes per-slot gap (`FinalShares[i] − attentionShares[i]`), applies bounded multiplier (`exp(log(MaxTiltMultiplier) × tanh(gap / TiltReferenceShift))`), normalizes, re-applies floor/rail using TILTED weights as the redistribution basis (not the original `expScores` — critical: using originals would partially undo the tilt). Placed between `GenerateWithPressure` and `Generate`.
+
+`src/Charm.Engine/Generators/RollEStubPieGenerator.cs` — `BendByAttention` passthrough added: returns `gen.Pie` unchanged. Correct for isolated harness checks that don't wire the full attention path.
+
+`src/Charm.Engine/Generators/RollHGenerator.cs` — new C4 passing bonus block after C3: `PassingBonus = MaxPassingBonus × conversionQuality × opportunityGate` where `opportunityGate = PassingOpportunityFloor + (1 − PassingOpportunityFloor) × teamOpenness`. Bonus-only (`Math.Max(0.0)`), halfcourt + non-putback only (putback short-circuit at line 81 precedes; explicit `!state.FastBreak` guard added). Reads `state.TeamConversionQuality ?? 0.0`.
+
+`src/Charm.Engine/Core/PossessionState.cs` — `TeamConversionQuality` nullable trailing field added. Same lifecycle as `TeamBaseOpenness` — null until Roll E runs, cleared by Roll K's `ResetOffense`.
+
+`src/Charm.Engine/Rolls/RollE.cs` — `teamConversionQuality` parameter added to `Execute`; stamped in the atomic `with` block alongside `TeamBaseOpenness`.
+
+`src/Charm.Engine/Rolls/RollK.cs` — `TeamConversionQuality = null` added to `ResetOffense` blank-slate `with`.
+
+`src/Charm.Engine/Core/Resolver.cs` — halfcourt Roll E site: `BendByAttention` called between `Generate` and `RollE.Execute`; tilted pie passed to Execute; pre-tilt pressures passed unchanged (tilt changes which slot is rolled, not the pressure each slot carries). FastBreak site: `breakGenE.Pie` passed directly (untilted); `TeamConversionQuality` added to both call sites. One-pass dependency maintained throughout.
+
+`src/Charm.Harness/Program.cs` — `RollESpyGenerator.BendByAttention` passthrough added (compile fix); all 13 direct `RollE.Execute` harness calls updated with `0.0` for `teamConversionQuality`.
+
+`src/Charm.Harness/config.json` — tilt knobs in `"RollE"` section; conversion knobs in `"Attention"` section; passing knobs in `"RollH"` section.
+
+**Key design decisions:**
+
+- **PassingAmp removed from TeamBaseOpenness (bug fix from v1–v3 of the prompt).** Folding passing into the openness field caused the passing bonus to vanish whenever the defense played evenly (C1 relief = 0 at equal-share attention). The fix: `TeamBaseOpenness` reverts to the pure gravity×spacing value C1 reads; the conversion bonus lives in a fully separate Roll H block (C4) that fires regardless of attention allocation.
+
+- **Passing CONVERTS, not GENERATES.** The converter rewards lineups that can exploit the gravity/spacing advantage already created — it does not create the advantage. Hence the opportunity gate: `opportunityGate = lerp(OpportunityFloor, 1.0, TeamBaseOpenness)`. At near-zero openness the bonus collapses to a small floor; it grows as the gravity/spacing engine creates more to exploit. Elite passers behind a dominant rim threat with four shooters get the largest payoff.
+
+- **Direct passing term prevents vanishing at zero activation.** `conversionQuality = ConversionFloor + DirectPassingScale × PassingCompound + ActivationScale × PlaymakingActivation × PassingCompound`. The direct term lifts make% modestly even when `PlaymakingActivation ≈ 0` (a lineup of great passers who can't collapse a defense through the perimeter/post routes). Without it, Passing is only useful through the activation gate — the v4 wording fix that became a code fix.
+
+- **Tilt re-constrains on TILTED weights.** `BendByAttention` calls `ApplyFloorAndRail(tilted, tilted, ...)` — the tilted shares serve as both the input AND the redistribution basis. Using the original `expScores` would pull redistributed mass back toward pre-tilt proportions and partially undo the tilt. Python gate test 1a confirmed the neutral anchor (usage == attention → zero drift); test 1d confirmed floor/rail hold under extreme gaps.
+
+- **Pre-tilt pressures passed unchanged.** The selection tilt changes WHICH slot gets the ball; it does not change the volume load each slot was already carrying into this possession. Pressures (which feed the C3 penalty) are computed pre-tilt by `GenerateWithPressure` and passed to `RollE.Execute` as-is.
+
+- **One-pass feedback-loop guard honored.** Attention is computed once from the pre-tilt `FinalShares` and never recomputed from the tilted result. The guard recorded in Session 1's design section is confirmed closed here.
+
+- **Engineering call: tilt knobs in RollEConfig.** Selection-shaping knobs all live in one place (`UsageFloor`, `UsageRail`, `UsageExponent`, now `MaxTiltMultiplier`, `TiltReferenceShift`). AttentionConfig stays focused on how the defense allocates attention, not how the offense reacts to it.
+
+- **Engineering call: single `TeamConversionQuality` field.** Roll H only needs the scalar to compute the bonus; the per-component decomposition (PlaymakingActivation, PassingCompound) lives in the generator and is not surfaced on PossessionState. A future attribution session can add components if needed without tearing down the field.
+
+- **Discrepancy flagged at check-in:** prompt said 16 harness + 2 Resolver = 18 call sites; actual count was 13 + 2 = 15. Stale-reference sweep covered all 15. No effect on correctness.
+
+**Python pre-check (mandatory hard gate — Step 0):**
+
+All 17 checks passed across both gates:
+- Gate 1 (selection tilt): neutral anchor (0 drift at usage == attention), directional shift, floor/rail satisfied post-tilt, extreme-gap feasibility, multiplier bounds `(1/1.5, 1.5)`, at-zero identity.
+- Gate 2 (passing converter): attention-independence at equal share, opportunity gating (high > low; floor > 0), direct passing term lift with near-zero activation, five-vs-two partial lift, no playmaking excess penalty (monotone), bonus-only guarantee, ceiling at `MaxPassingBonus`.
+
+**Harness output — key results:**
+
+All checks passed. STRESS TEST PASSED.
+
+Selection tilt visible in Bucket 5 (StarVsBalanced): star slot usage 35.0% vs 9.9–20.7% for supporting cast — tilt pushing under-attended high-usage slot higher, as intended.
+
+ShootingVsAthletic win rate held at ~74% athletic — passing converter did not reward the pure-spacing team enough to overcome their gravity deficit. Correct behavior: spacing without gravity generates near-floor-level bonus.
+
+Frozen corpus PPP 1.097 (slight lift vs Session 1 from passing bonus). All prior regression anchors (Phase 17, Phase 24, Phase 25) passed.
+
 ## Session 61 — Phase 27 Session 1: Defensive Attention Pie + Gravity/Spacing Rework + Roll H Make% (2026-06-18)
 
 **Scope:** First session of the two-session gravity/spacing/attention layer. Make% only — no selection, no location, no live passing. Six files changed in the engine; harness updated throughout.

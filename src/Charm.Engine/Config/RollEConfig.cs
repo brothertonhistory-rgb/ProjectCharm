@@ -73,6 +73,23 @@ public sealed class RollEConfig
     /// Invariant: &gt; 0.</summary>
     public double MinUsageScore { get; init; }
 
+    // ── Selection tilt parameters (Phase 27 Session 2) ───────────────────
+    // Bounded multiplier form: exp(log(MaxTiltMultiplier) × tanh(gap / TiltReferenceShift)).
+    // Strictly bounded in (1/MaxTiltMultiplier, MaxTiltMultiplier); exactly 1.0 at gap=0
+    // (neutral anchor — usage == attention reproduces the pre-tilt pie for free).
+
+    /// <summary>Maximum multiplier applied to a slot's usage share when the attention
+    /// gap is large and favorable. Slot receives at most (share × MaxTiltMultiplier)
+    /// before renormalization. Reciprocal is the minimum multiplier (maximum suppression).
+    /// Invariant: &gt; 1.0. [CALIBRATION PLACEHOLDER]</summary>
+    public double MaxTiltMultiplier { get; init; } = 1.5;
+
+    /// <summary>Gap magnitude at which the tilt reaches ~76% of its maximum effect
+    /// (tanh(1) ≈ 0.76). Expressed in the same units as the gap (usage share − attention
+    /// share, both in [0,1]). Smaller = steeper; larger = gentler.
+    /// Invariant: &gt; 0. [CALIBRATION PLACEHOLDER]</summary>
+    public double TiltReferenceShift { get; init; } = 0.08;
+
     /// <summary>Load the <c>"RollE"</c> section from the config file at
     /// <paramref name="path"/>. Mirrors the other rolls' loaders.</summary>
     public static RollEConfig Load(string path)
@@ -97,6 +114,8 @@ public sealed class RollEConfig
             UsageFloor    = e.GetProperty("UsageFloor").GetDouble(),
             UsageRail     = e.GetProperty("UsageRail").GetDouble(),
             MinUsageScore = e.GetProperty("MinUsageScore").GetDouble(),
+            MaxTiltMultiplier  = e.GetProperty("MaxTiltMultiplier").GetDouble(),
+            TiltReferenceShift = e.GetProperty("TiltReferenceShift").GetDouble(),
         };
 
         // ── Invariant validation — fail loud on bad config ───────────────────
@@ -119,6 +138,12 @@ public sealed class RollEConfig
             throw new InvalidOperationException(
                 $"RollEConfig: 5 * UsageFloor ({5 * cfg.UsageFloor:F4}) >= 1.0 — " +
                 "a full five-man roster cannot satisfy the floor constraint. Lower UsageFloor.");
+        if (cfg.MaxTiltMultiplier <= 1.0)
+            throw new InvalidOperationException(
+                $"RollEConfig: MaxTiltMultiplier must be > 1.0 (got {cfg.MaxTiltMultiplier}).");
+        if (cfg.TiltReferenceShift <= 0)
+            throw new InvalidOperationException(
+                $"RollEConfig: TiltReferenceShift must be > 0 (got {cfg.TiltReferenceShift}).");
 
         return cfg;
     }

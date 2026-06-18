@@ -35,10 +35,12 @@ namespace Charm.Engine;
 /// without a dominant gravity source, spacing contributes little regardless of
 /// quantity.</para>
 ///
-/// <para><b>Passing seam (neutral-pinned this session).</b> The Openness formula
-/// includes a PassingAmp term pinned at 1 (no effect). Session 2 makes it live by
-/// computing PassingAmp from Passing/Playmaking/Vision — never reshaping the
-/// formula.</para>
+/// <para><b>Passing converter (Phase 27 Session 2).</b> Computes
+/// <c>TeamConversionQuality</c> from the five offensive players' Passing/Playmaking/IQ/
+/// Quickness/FirstStep/GravityContribution ratings — the conversion quality that Roll H's
+/// bonus-only passing block uses. Stamped separately from <c>TeamBaseOpenness</c>, which
+/// reverts to the pure gravity×spacing value. Perimeter breakdown route is flat
+/// (level-agnostic) this session; matchup-relative is the next session.</para>
 /// </summary>
 public sealed class AttentionGenerator
 {
@@ -153,18 +155,72 @@ public sealed class AttentionGenerator
         var spacField = spacCount > 0 ? Math.Min(spacingSum / (spacCount * 99.0), 1.0) : 0.0;
 
         // BaseOpenness: gravity enables spacing — asymmetric product form (§2.4)
-        // PassingAmp = 1 (neutral-pinned seam; Session 2 makes it live)
-        const double PassingAmp = 1.0;
+        // PassingAmp removed (Phase 27 Session 2 bug fix): passing no longer multiplies
+        // into TeamBaseOpenness. TeamBaseOpenness stamps the PURE gravity/spacing value
+        // that C1 reads. The conversion signal rides a separate field (TeamConversionQuality).
         var baseOpenness = gravSource * (_cfg.GravityAloneYield + _cfg.SpacingMultiplier * spacField);
         baseOpenness     = Math.Min(baseOpenness, 1.0);
-        // Passing amplifier (neutral-pinned: × 1 = no effect this session)
-        var openness = baseOpenness * PassingAmp;
 
         var teamGravLevel  = gravSource;   // [0,1]
         var teamSpacLevel  = spacField;    // [0,1]
-        var teamBaseOpen   = Math.Min(Math.Max(openness, 0.0), 1.0);
+        var teamBaseOpen   = Math.Min(Math.Max(baseOpenness, 0.0), 1.0);
 
-        return new AttentionResult(shares, teamBaseOpen, teamGravLevel, teamSpacLevel);
+        // ── Passing converter — conversion quality (§2.3) ────────────────────
+        // Computed here because this generator already has the full offensive lineup.
+        // ConversionQuality = ConversionFloor
+        //   + DirectPassingScale × PassingCompound             (direct: modest lift even with no activation)
+        //   + ActivationScale × PlaymakingActivation × PassingCompound  (compounding: activation unlocks big term)
+        // Clamped to [0,1].
+        //
+        // Perimeter route: flat authored quickness/first-step — level-agnostic this session.
+        //   (Matchup-relative vs. the matched defender is DEFERRED to the next session —
+        //   DefenderPicker.Pick throws pre-selection while this runs pre-selection.)
+        // Post route: the player's own gravity contribution (already computed above).
+        // Activation per player: effPlaymaking × max(perimeterRoute, postRoute).
+        // Playmaking summed top-down with gentle geometric decay (PlaymakingDecay).
+        // Passing: flat average of Passing/100 across five. BallHandling excluded.
+
+        var activations = new double[5];
+        var passingSum  = 0.0;
+        var passingCount = 0;
+        for (var i = 0; i < 5; i++)
+        {
+            if (players[i] is Player pp)
+            {
+                var iqFactor      = _cfg.IqMin + (_cfg.IqMax - _cfg.IqMin) * (pp.BasketballIQ / 100.0);
+                var effPlaymaking = Math.Min(Math.Max((pp.Playmaking / 100.0) * iqFactor, 0.0), 1.0);
+
+                // Perimeter route: flat quickness/first-step mean (level-agnostic)
+                var perimeterRoute = ((pp.Quickness + pp.FirstStep) / 2.0) / 100.0;
+                // Post route: player's own gravity draw (already computed; re-read here)
+                var postRoute = pp.GravityContribution / 100.0;
+
+                activations[i] = effPlaymaking * Math.Max(perimeterRoute, postRoute);
+
+                passingSum += pp.Passing / 100.0;
+                passingCount++;
+            }
+        }
+
+        // Gentle top-down decay on playmaking (redundancy saturation)
+        var sortedActivations = (double[])activations.Clone();
+        Array.Sort(sortedActivations, (a, b) => b.CompareTo(a));  // high → low
+        var playmakingActivation = 0.0;
+        var decay = 1.0;
+        for (var i = 0; i < 5; i++)
+        {
+            playmakingActivation += sortedActivations[i] * decay;
+            decay *= _cfg.PlaymakingDecay;
+        }
+
+        var passingCompound = passingCount > 0 ? passingSum / passingCount : 0.0;
+
+        var conversionQuality = _cfg.ConversionFloor
+            + _cfg.DirectPassingScale * passingCompound
+            + _cfg.ActivationScale * playmakingActivation * passingCompound;
+        conversionQuality = Math.Min(Math.Max(conversionQuality, 0.0), 1.0);
+
+        return new AttentionResult(shares, teamBaseOpen, teamGravLevel, teamSpacLevel, conversionQuality);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -232,13 +288,20 @@ public sealed class AttentionGenerator
 /// <param name="TeamBaseOpenness">The asymmetric gravity×spacing openness scalar,
 /// normalized [0,1]. Low for both pure-gravity and pure-spacing lineups; peaks for
 /// a lineup with both a dominant gravity source and high perimeter spacing.
-/// Includes the neutral-pinned passing amplifier (× 1 this session).</param>
+/// PURE gravity×spacing value — passing no longer multiplies into this field
+/// (Phase 27 Session 2 bug fix). C1 in Roll H reads this field.</param>
 /// <param name="TeamGravityLevel">Normalized gravity-source term [0,1]. High when
 /// the offense has at least one dominant rim-pressure threat.</param>
 /// <param name="TeamSpacingLevel">Normalized spacing-field term [0,1]. Accumulates
 /// across the four non-primary-gravity players.</param>
+/// <param name="TeamConversionQuality">The passing/playmaking conversion quality
+/// for this possession's offense, normalized [0,1]. Stamped by Roll E alongside
+/// <see cref="TeamBaseOpenness"/>. Used by Roll H's bonus-only passing-converter
+/// block (separate from C1; attention-independent). Neutral placeholder (0.0) until
+/// Step 3 wires the full formula.</param>
 public readonly record struct AttentionResult(
     double[] AttentionShares,
     double   TeamBaseOpenness,
     double   TeamGravityLevel,
-    double   TeamSpacingLevel);
+    double   TeamSpacingLevel,
+    double   TeamConversionQuality);

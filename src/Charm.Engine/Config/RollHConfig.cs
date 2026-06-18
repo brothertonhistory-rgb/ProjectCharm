@@ -244,6 +244,21 @@ public sealed class RollHConfig
     //     [CALIBRATION PLACEHOLDER]
     public double C3AttentionAmplifier { get; set; } = 1.5;
 
+    // ── Passing converter (Phase 27 Session 2) ────────────────────────────────
+    // PassingBonus = MaxPassingBonus × conversionQuality × opportunityGate
+    //   opportunityGate = lerp(PassingOpportunityFloor, 1.0, TeamBaseOpenness)
+    // Bonus-only; attention-independent; halfcourt + non-putback only.
+
+    /// <summary>Floor of the opportunity gate. When TeamBaseOpenness ≈ 0, the gate
+    /// collapses to this floor (allows a small passing bonus even with no gravity/spacing
+    /// engine). Invariant: in [0, 1). [CALIBRATION PLACEHOLDER]</summary>
+    public double PassingOpportunityFloor { get; set; } = 0.10;
+
+    /// <summary>Maximum absolute passing bonus added to makePct. Explicit ceiling on
+    /// the converter's contribution to make%. Invariant: in (0, 1].
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double MaxPassingBonus { get; set; } = 0.08;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
@@ -273,6 +288,12 @@ public sealed class RollHConfig
             throw new InvalidOperationException("RollH C2ImbalanceScale must be >= 0.");
         if (cfg.C3AttentionAmplifier < 0)
             throw new InvalidOperationException("RollH C3AttentionAmplifier must be >= 0.");
+        if (cfg.PassingOpportunityFloor < 0 || cfg.PassingOpportunityFloor >= 1.0)
+            throw new InvalidOperationException(
+                $"RollH PassingOpportunityFloor must be in [0, 1) (got {cfg.PassingOpportunityFloor}).");
+        if (cfg.MaxPassingBonus <= 0 || cfg.MaxPassingBonus > 1.0)
+            throw new InvalidOperationException(
+                $"RollH MaxPassingBonus must be in (0, 1] (got {cfg.MaxPassingBonus}).");
 
         return cfg;
     }

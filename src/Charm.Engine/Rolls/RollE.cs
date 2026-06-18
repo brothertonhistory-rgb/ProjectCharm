@@ -42,6 +42,7 @@ public static class RollE
     public static RollResult Execute(
         PossessionState state, Pie<SelectionOutcome> pie, double[] pressures,
         double[] attentionShares, double teamBaseOpenness, double teamGravityLevel, double teamSpacingLevel,
+        double teamConversionQuality,
         GameState game, IRng rng)
     {
         // 1. Roll the pie to a selection outcome.
@@ -54,18 +55,19 @@ public static class RollE
         var slot = game.LineupFor(state.Offense).SlotAt(slotNumber);
 
         // 3. Stamp the chosen slot, volume pressure, attention share for the selected
-        //    shooter, and team-level openness scalars onto the possession as
-        //    per-possession facts. One `with` keeps all writes atomic.
+        //    shooter, team-level openness scalars, and conversion quality onto the
+        //    possession as per-possession facts. One `with` keeps all writes atomic.
         //    pressures[] and attentionShares[] are indexed by slotNumber - 1 (0-based),
         //    matching the Slot1–Slot5 ordering in the generators' output.
         var selectedState = state with
         {
-            SelectedSlot          = slot,
-            UsagePressure         = pressures[slotNumber - 1],
-            ShooterAttentionShare = attentionShares[slotNumber - 1],
-            TeamBaseOpenness      = teamBaseOpenness,
-            TeamGravityLevel      = teamGravityLevel,
-            TeamSpacingLevel      = teamSpacingLevel,
+            SelectedSlot             = slot,
+            UsagePressure            = pressures[slotNumber - 1],
+            ShooterAttentionShare    = attentionShares[slotNumber - 1],
+            TeamBaseOpenness         = teamBaseOpenness,
+            TeamGravityLevel         = teamGravityLevel,
+            TeamSpacingLevel         = teamSpacingLevel,
+            TeamConversionQuality    = teamConversionQuality,
         };
 
         // 4. Hand off to the player-action sequence. Names the KIND, not

@@ -100,4 +100,13 @@ public sealed class RollEStubPieGenerator : IRollEGenerationProvider
         // weights that don't add up fail loud rather than rolling skewed.
         return new Pie<SelectionOutcome>(weights, _cfg.Epsilon);
     }
+
+    /// <summary>
+    /// Stub passthrough — returns the pie from the generation result unchanged.
+    /// Isolated harness checks that use the stub (without a full attention path)
+    /// get no tilt; the real generator's implementation applies the bounded-multiplier
+    /// form. Halfcourt-only by contract; the stub does not check.
+    /// </summary>
+    public Pie<SelectionOutcome> BendByAttention(RollEGeneration gen, double[] attentionShares)
+        => gen.Pie;
 }

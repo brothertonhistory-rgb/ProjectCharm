@@ -560,7 +560,8 @@ public sealed class Resolver
                                 var breakAttn  = _attentionGenerator.Generate(breakState, breakGenE.FinalShares);
                                 result = RollE.Execute(breakState, breakGenE.Pie, breakGenE.Pressures,
                                     breakAttn.AttentionShares, breakAttn.TeamBaseOpenness,
-                                    breakAttn.TeamGravityLevel, breakAttn.TeamSpacingLevel, _game, _rng);
+                                    breakAttn.TeamGravityLevel, breakAttn.TeamSpacingLevel,
+                                    breakAttn.TeamConversionQuality, _game, _rng);
                                 continue;
                             }
                             // Normal halfcourt path.
@@ -604,9 +605,16 @@ public sealed class Resolver
                         case ContinuationKind.IntoPlayerSelection:
                             var genE  = _rollEGenerator.GenerateWithPressure(c.State);
                             var attn  = _attentionGenerator.Generate(c.State, genE.FinalShares);
-                            result = RollE.Execute(c.State, genE.Pie, genE.Pressures,
+                            // Phase 27 Session 2 — selection tilt (halfcourt only).
+                            // Bends the usage pie by the (usage intent − defensive attention) gap.
+                            // FastBreak: not reached here (handled at IntoHalfcourtSet above).
+                            // Pre-tilt pressures passed unchanged — tilt changes WHICH slot is rolled,
+                            // not the pressure each slot carries (one-pass, no feedback loop).
+                            var tiltedPieE = _rollEGenerator.BendByAttention(genE, attn.AttentionShares);
+                            result = RollE.Execute(c.State, tiltedPieE, genE.Pressures,
                                 attn.AttentionShares, attn.TeamBaseOpenness,
-                                attn.TeamGravityLevel, attn.TeamSpacingLevel, _game, _rng);
+                                attn.TeamGravityLevel, attn.TeamSpacingLevel,
+                                attn.TeamConversionQuality, _game, _rng);
                             continue;
 
                         // Roll E's selection -> execute Roll F (player action),

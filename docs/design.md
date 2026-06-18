@@ -4784,3 +4784,90 @@ C3 amplifies both Phase 17 terms. A forced specialist under defensive attention 
 - Passing made live — `PassingAmp` computed from Passing/Playmaking/Vision
 
 **Session 2 feedback-loop guard (recorded):** Attention is computed once from Roll E's pre-attention `FinalShares`. Session 2 may use that fixed attention array to bend the final selection pie but must not recompute attention recursively from the attention-adjusted shares. One-pass dependency only.
+
+## Phase 27 Session 2: Selection Tilt + Passing Converter (Session 62, 2026-06-18)
+
+### What this is
+
+The second half of the gravity/spacing/attention layer — closes Phase 27. Session 1 built the attention pie and wired its consequences into Roll H make% (C1/C2/C3). Session 2 threads the same attention signal into selection (Roll E) and makes passing live as a separate make% consequence.
+
+Shot location tilt (Roll G) remains deferred; it was always listed as a separate future task, not a Phase 27 deliverable.
+
+### Selection tilt (BendByAttention)
+
+The attention pie now bends the usage pie before the slot is rolled. A slot the defense under-attends relative to its usage intent gets more attempts; a slot the defense over-attends gets fewer.
+
+**Formula (bounded multiplier, same primitive as LocationMultiplier and BlockWeight):**
+```
+gap[i]        = FinalShares[i] − attentionShares[i]
+multiplier[i] = exp(log(MaxTiltMultiplier) × tanh(gap[i] / TiltReferenceShift))
+```
+Strictly bounded in `(1/MaxTiltMultiplier, MaxTiltMultiplier)`; exactly 1.0 at zero gap (neutral anchor: usage == attention reproduces the pre-tilt pie). After applying multipliers and normalizing, `ApplyFloorAndRail` is called with the TILTED shares as both input and redistribution basis — using the original `expScores` would pull mass back toward pre-tilt proportions and partially undo the tilt.
+
+**Wiring:** `BendByAttention` is added to `IRollEGenerationProvider`, implemented in `RollEGenerator`, and stub-passthroughed in `RollEStubPieGenerator` and `RollESpyGenerator`. The Resolver calls it at the halfcourt `IntoPlayerSelection` site only. The FastBreak site (`IntoHalfcourtSet`) passes the transition pie directly — untilted, as before.
+
+**Pre-tilt pressures unchanged.** The tilt changes which slot is rolled; it does not change the volume load each slot was carrying. Pressures (fed to C3) are computed pre-tilt by `GenerateWithPressure` and passed to `RollE.Execute` unchanged.
+
+**One-pass dependency.** Attention is computed once from the pre-tilt `FinalShares`. The tilt may use that fixed array to bend the final pie; it does not recompute attention from the tilted result. The feedback-loop guard recorded at the end of Session 1's design section is confirmed closed here.
+
+### PassingAmp removal (bug fix)
+
+`TeamBaseOpenness` reverts to the pure gravity×spacing value. `PassingAmp` (the neutral-pinned `const double = 1.0`) is removed from `AttentionGenerator`. The bug it would have caused: folding passing into the openness field caused the conversion bonus to vanish whenever the defense played evenly (C1 relief = 0 at equal-share attention = 0.20). Fix: passing has its own separate consequence (C4), fully independent of attention allocation.
+
+### Passing converter (C4 in RollHGenerator)
+
+Passing **converts** the gravity/spacing advantage — it does not generate it. A lineup of elite passers behind a dominant rim threat with four shooters converts more of their open looks into makes. A lineup of elite passers with no gravity source gets a modest floor-level lift from the direct term only.
+
+**TeamConversionQuality (stamped on PossessionState at Roll E time):**
+
+Computed in `AttentionGenerator.Generate` after the attention and openness blocks:
+```
+IQ-adjusted effective playmaking per player:
+  effPlaymaking[i] = (Playmaking[i]/100) × lerp(IqMin, IqMax, BasketballIQ[i]/100)
+
+Collapse route (flat, level-agnostic this session):
+  perimeterRoute[i] = avg(Quickness[i], FirstStep[i]) / 100
+  postRoute[i]      = GravityContribution[i] / 100
+
+PlaymakingActivation per player (higher collapse route wins):
+  activation[i] = effPlaymaking[i] × max(perimeterRoute[i], postRoute[i])
+
+Top-down geometric decay (redundancy saturation):
+  PlaymakingActivation = Σ activation[sorted high→low, i] × PlaymakingDecay^i
+
+PassingCompound = mean(Passing[i]/100) across five players
+
+conversionQuality = ConversionFloor
+                  + DirectPassingScale × PassingCompound
+                  + ActivationScale × PlaymakingActivation × PassingCompound
+```
+Clamped to [0,1]. The direct term lifts make% modestly even when `PlaymakingActivation ≈ 0` (good passers who lack a collapse route). Without it, Passing would only matter inside the activation gate — erasing its value for lineups that pass well but don't generate gravity or quickness.
+
+**Passing bonus in Roll H (C4):**
+```
+opportunityGate = PassingOpportunityFloor + (1 − PassingOpportunityFloor) × TeamBaseOpenness
+passingBonus    = MaxPassingBonus × conversionQuality × opportunityGate
+makePct        += max(0, passingBonus)
+```
+Bonus-only; halfcourt and non-putback only (putback short-circuit precedes; explicit FastBreak guard). Reads `state.TeamConversionQuality ?? 0.0`.
+
+**Leak guard:** `TeamConversionQuality = null` added to Roll K's `ResetOffense` blank-slate `with`, alongside all other per-possession attention fields.
+
+### Engineering calls
+
+**Tilt knobs in RollEConfig** (not AttentionConfig). Selection-shaping decisions all live in one config: `UsageFloor`, `UsageRail`, `UsageExponent`, `MaxTiltMultiplier`, `TiltReferenceShift`. AttentionConfig stays focused on defensive attention allocation.
+
+**Single `TeamConversionQuality` field** (not the pair `PlaymakingActivation`/`PassingCompound`). Roll H needs the scalar only. The components live in the generator. A future attribution session can surface them if needed without tearing down the field.
+
+### Calibration placeholders
+
+All magnitudes are provisional and consistent with the "wire the form, tune later" mandate:
+- `MaxTiltMultiplier = 1.5`, `TiltReferenceShift = 0.08`
+- `ConversionFloor = 0.05`, `DirectPassingScale = 0.10`, `ActivationScale = 0.20`, `PlaymakingDecay = 0.80`, `OpportunityFloor = 0.10`, `MaxPassingBonus = 0.08` (AttentionConfig)
+- `PassingOpportunityFloor = 0.10`, `MaxPassingBonus = 0.08` (RollHConfig)
+
+### What is not this session
+
+- Shot location tilt (Roll G): deferred, never part of Phase 27
+- Matchup-relative collapse route in the converter (defender quickness vs. attacker): deferred — DefenderPicker.Pick throws pre-selection, and the flat authored route is the correct placeholder
+- Calibration passes: correctness before calibration is the standing sequencing principle

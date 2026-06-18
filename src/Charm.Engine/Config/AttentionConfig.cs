@@ -87,6 +87,54 @@ public sealed class AttentionConfig
     /// <summary>Tolerance for the attention-share sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
+    // ── Passing converter parameters (Phase 27 Session 2) ────────────────────
+    // These knobs govern the conversion quality formula:
+    //   conversionQuality = ConversionFloor
+    //     + DirectPassingScale × PassingCompound
+    //     + ActivationScale × f(PlaymakingActivation) × g(PassingCompound)
+    // All magnitudes are CALIBRATION PLACEHOLDERS; architectural shapes are locked.
+
+    /// <summary>Minimum IQ multiplier on effective playmaking (IQ at 0 → IqMin).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double IqMin { get; set; } = 0.85;
+
+    /// <summary>Maximum IQ multiplier on effective playmaking (IQ at 99 → IqMax).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double IqMax { get; set; } = 1.15;
+
+    /// <summary>Universal small floor on conversion quality — every lineup gets a
+    /// non-zero minimum regardless of passing/playmaking ability.
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double ConversionFloor { get; set; } = 0.05;
+
+    /// <summary>Scale on the DIRECT passing term — passing lifts make% modestly
+    /// even with zero playmaking activation (the v5 bug fix: prevents passing from
+    /// vanishing entirely when PlaymakingActivation = 0).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double DirectPassingScale { get; set; } = 0.10;
+
+    /// <summary>Scale on the activation-gated compounding term — the larger payoff
+    /// that playmaking activation unlocks, intensified by passing quality.
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double ActivationScale { get; set; } = 0.20;
+
+    /// <summary>Geometric decay factor applied to playmaking activation contributions
+    /// ranked high-to-low. 1.0 = flat (all five contribute equally); lower values
+    /// increase the saturation-by-redundancy effect (the 5th playmaker counts less).
+    /// Invariant: in (0, 1]. [CALIBRATION PLACEHOLDER]</summary>
+    public double PlaymakingDecay { get; set; } = 0.80;
+
+    /// <summary>Floor of the opportunity gate at zero BaseOpenness. Allows a small
+    /// passing bonus even when gravity/spacing produce no engine (the v4 wording fix —
+    /// "strongly SCALED by opportunity with a small positive floor").
+    /// Invariant: in [0, 1). [CALIBRATION PLACEHOLDER]</summary>
+    public double OpportunityFloor { get; set; } = 0.10;
+
+    /// <summary>Maximum absolute passing bonus added to makePct in Roll H.
+    /// Provides an explicit ceiling on the converter's contribution.
+    /// Invariant: in (0, 1]. [CALIBRATION PLACEHOLDER]</summary>
+    public double MaxPassingBonus { get; set; } = 0.08;
+
     public static AttentionConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -123,6 +171,15 @@ public sealed class AttentionConfig
             throw new InvalidOperationException(
                 $"AttentionConfig: GravityAloneYield + SpacingMultiplier must equal 1.0 " +
                 $"(got {cfg.GravityAloneYield + cfg.SpacingMultiplier:F6}).");
+        if (cfg.PlaymakingDecay <= 0 || cfg.PlaymakingDecay > 1.0)
+            throw new InvalidOperationException(
+                $"AttentionConfig: PlaymakingDecay must be in (0, 1] (got {cfg.PlaymakingDecay}).");
+        if (cfg.OpportunityFloor < 0 || cfg.OpportunityFloor >= 1.0)
+            throw new InvalidOperationException(
+                $"AttentionConfig: OpportunityFloor must be in [0, 1) (got {cfg.OpportunityFloor}).");
+        if (cfg.MaxPassingBonus <= 0 || cfg.MaxPassingBonus > 1.0)
+            throw new InvalidOperationException(
+                $"AttentionConfig: MaxPassingBonus must be in (0, 1] (got {cfg.MaxPassingBonus}).");
 
         return cfg;
     }

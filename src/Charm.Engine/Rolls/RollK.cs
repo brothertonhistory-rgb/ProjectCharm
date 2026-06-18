@@ -117,7 +117,7 @@ public static class RollK
             // possession number does NOT increment (this is resolver-internal).
             OffensiveReboundOutcome.ResetOffense =>
                 new Continue(ContinuationKind.IntoPlayerSelection,
-                    state with { SelectedSlot = null, ShotType = null, Result = null, FastBreak = false, UsagePressure = null, UsageResidualPressure = null, ShooterAttentionShare = null, TeamBaseOpenness = null, TeamGravityLevel = null, TeamSpacingLevel = null }),
+                    state with { SelectedSlot = null, ShotType = null, Result = null, FastBreak = false, UsagePressure = null, UsageResidualPressure = null, ShooterAttentionShare = null, TeamBaseOpenness = null, TeamGravityLevel = null, TeamSpacingLevel = null, TeamConversionQuality = null }),
 
             _ => throw new InvalidOperationException($"Unhandled offensive-rebound outcome '{outcome}'.")
         };

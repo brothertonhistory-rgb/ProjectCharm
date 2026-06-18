@@ -204,6 +204,32 @@ public sealed class RollHGenerator : IRollHPieGenerator
             if (makePct > 1.0) makePct = 1.0;
         }
 
+        // ── Passing converter: bonus-only, attention-independent (C4) ─────────
+        // Passing CONVERTS the gravity/spacing advantage into a made shot — it does
+        // NOT generate the advantage (that is C1's domain via teamOpenness).
+        // Therefore this bonus fires regardless of attention allocation and is
+        // SEPARATE from C1 (folding it into C1 would zero it whenever the defense
+        // plays evenly — the v1–v3 bug fixed in v4).
+        //
+        // PassingBonus = MaxPassingBonus × conversionQuality × opportunityGate
+        //   opportunityGate = lerp(OpportunityFloor, 1.0, BaseOpenness)
+        //     — small floor at zero opportunity; → 1.0 as the gravity/spacing engine roars
+        //   conversionQuality = DIRECT term (passing × floor) + activation-gated compound
+        //     — stamped on PossessionState at Roll E time
+        //
+        // Putback: already short-circuited above (line 81) — never reached here.
+        // FastBreak: skipped — halfcourt converter only (no gravity/spacing engine on a break).
+        if (!state.FastBreak)
+        {
+            var conversionQuality = state.TeamConversionQuality ?? 0.0;
+            var opportunityGate   = _cfg.PassingOpportunityFloor
+                                  + (1.0 - _cfg.PassingOpportunityFloor) * teamOpenness;
+            var passingBonus      = _cfg.MaxPassingBonus * conversionQuality * opportunityGate;
+            passingBonus          = Math.Max(passingBonus, 0.0);   // bonus-only guarantee
+            makePct              += passingBonus;
+            if (makePct > 1.0) makePct = 1.0;
+        }
+
         // Phase 7 — matchup-aware block door. Compute the bent block weight from the
         // matchup, or fall back to the configured baseline if the defending slot is empty
         // (DEC-6, same guard as the make door above).
