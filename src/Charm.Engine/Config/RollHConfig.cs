@@ -221,6 +221,29 @@ public sealed class RollHConfig
     public double PressureVolumeTaxScale        { get; set; } = 0.12;
     public double PressureResidualPenaltyScale  { get; set; } = 2.0;
 
+    // ── Phase 27 — attention/openness make% knobs ────────────────────────────
+    // C1: bonus-only openness nudge. AttentionRelief = max(0, 0.20 − a).
+    //     ShooterOpenness = clamp(TeamBaseOpenness × AttentionRelief × ReliefScale, 0, 1).
+    //     A well-spaced floor + under-attended shooter → positive make% lift.
+    //     Equal-share or above → zero (bonus-only, never docks).
+    //     [CALIBRATION PLACEHOLDER]
+    public double C1ReliefScale { get; set; } = 2.0;
+
+    // C2: zone-specific imbalance penalty.
+    //     spacingExcess = max(0, TeamSpacingLevel − TeamGravityLevel)  → docks Three/Long
+    //     gravityExcess = max(0, TeamGravityLevel − TeamSpacingLevel)  → docks Rim/Short
+    //     penalty = excess × C2ImbalanceScale. Halfcourt and non-putback only (A5).
+    //     [CALIBRATION PLACEHOLDER]
+    public double C2ImbalanceScale { get; set; } = 0.08;
+
+    // C3: amplifier on the Phase 17 usage penalty.
+    //     AttentionPressure = max(0, attentionShare − 0.20).
+    //     Both Phase 17 terms are multiplied by (1 + AttentionPressure × C3AttentionAmplifier).
+    //     Equal-share neutral (multiplier = ×1); above-share amplifies both penalties.
+    //     Zero usage pressure → zero penalty regardless of attention (C3 cannot create a penalty).
+    //     [CALIBRATION PLACEHOLDER]
+    public double C3AttentionAmplifier { get; set; } = 1.5;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
@@ -242,6 +265,14 @@ public sealed class RollHConfig
         if (cfg.PressureResidualPenaltyScale < 0)
             throw new InvalidOperationException(
                 "RollH PressureResidualPenaltyScale must be >= 0.");
+
+        // Phase 27 invariants
+        if (cfg.C1ReliefScale < 0)
+            throw new InvalidOperationException("RollH C1ReliefScale must be >= 0.");
+        if (cfg.C2ImbalanceScale < 0)
+            throw new InvalidOperationException("RollH C2ImbalanceScale must be >= 0.");
+        if (cfg.C3AttentionAmplifier < 0)
+            throw new InvalidOperationException("RollH C3AttentionAmplifier must be >= 0.");
 
         return cfg;
     }

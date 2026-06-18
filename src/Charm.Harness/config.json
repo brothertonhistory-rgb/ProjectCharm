@@ -145,7 +145,21 @@
     "MafFractionLong": 0.12,
     "MafFractionThree": 0.1,
     "PressureVolumeTaxScale": 0.12,
-    "PressureResidualPenaltyScale": 2.0
+    "PressureResidualPenaltyScale": 2.0,
+    "C1ReliefScale": 2.0,
+    "C2ImbalanceScale": 0.08,
+    "C3AttentionAmplifier": 1.5
+  },
+  "Attention": {
+    "GravityBlendWeight": 0.5,
+    "UsageBlendWeight": 0.5,
+    "AttentionFloor": 0.05,
+    "GravitySigmoidCenter": 60.0,
+    "GravitySigmoidSteepness": 15.0,
+    "SecondGravityFraction": 0.12,
+    "GravityAloneYield": 0.25,
+    "SpacingMultiplier": 0.75,
+    "Epsilon": 1e-09
   },
   "Matchup": {
     "SkillSteepness": 6.0,

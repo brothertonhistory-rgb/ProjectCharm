@@ -288,6 +288,7 @@ public sealed class Resolver
     private readonly RollCConfig _rollCConfig;
     private readonly RollDStubPieGenerator _rollDGenerator;
     private readonly IRollEGenerationProvider _rollEGenerator;
+    private readonly AttentionGenerator _attentionGenerator;
     private readonly IRollFPieGenerator _rollFGenerator;
     private readonly IRollGGenerationProvider _rollGGenerator;
     private readonly IRollHPieGenerator _rollHGenerator;
@@ -309,6 +310,7 @@ public sealed class Resolver
         RollCConfig rollCConfig,
         RollDStubPieGenerator rollDGenerator,
         IRollEGenerationProvider rollEGenerator,
+        AttentionGenerator attentionGenerator,
         IRollFPieGenerator rollFGenerator,
         IRollGGenerationProvider rollGGenerator,
         IRollHPieGenerator rollHGenerator,
@@ -329,6 +331,7 @@ public sealed class Resolver
         _rollCConfig = rollCConfig;
         _rollDGenerator = rollDGenerator;
         _rollEGenerator = rollEGenerator;
+        _attentionGenerator = attentionGenerator;
         _rollFGenerator = rollFGenerator;
         _rollGGenerator = rollGGenerator;
         _rollHGenerator = rollHGenerator;
@@ -554,7 +557,10 @@ public sealed class Resolver
                                 // later re-inbounds in the same possession cannot re-trigger this gate.
                                 var breakState = c.State with { FastBreak = true, PressMode = PressMode.None };
                                 var breakGenE  = _rollEGenerator.GenerateWithPressure(breakState);
-                                result = RollE.Execute(breakState, breakGenE.Pie, breakGenE.Pressures, _game, _rng);
+                                var breakAttn  = _attentionGenerator.Generate(breakState, breakGenE.FinalShares);
+                                result = RollE.Execute(breakState, breakGenE.Pie, breakGenE.Pressures,
+                                    breakAttn.AttentionShares, breakAttn.TeamBaseOpenness,
+                                    breakAttn.TeamGravityLevel, breakAttn.TeamSpacingLevel, _game, _rng);
                                 continue;
                             }
                             // Normal halfcourt path.
@@ -597,7 +603,10 @@ public sealed class Resolver
                         // marker-blind, exactly the Roll C/K ticket pattern.
                         case ContinuationKind.IntoPlayerSelection:
                             var genE  = _rollEGenerator.GenerateWithPressure(c.State);
-                            result = RollE.Execute(c.State, genE.Pie, genE.Pressures, _game, _rng);
+                            var attn  = _attentionGenerator.Generate(c.State, genE.FinalShares);
+                            result = RollE.Execute(c.State, genE.Pie, genE.Pressures,
+                                attn.AttentionShares, attn.TeamBaseOpenness,
+                                attn.TeamGravityLevel, attn.TeamSpacingLevel, _game, _rng);
                             continue;
 
                         // Roll E's selection -> execute Roll F (player action),

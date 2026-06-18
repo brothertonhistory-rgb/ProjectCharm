@@ -109,34 +109,94 @@ public sealed class RollHGenerator : IRollHPieGenerator
 
         var makePct = _cfg.MakeProbability(zone, effectiveRating);
 
-        // Phase 17 — usage-pressure efficiency penalties. Applied AFTER the matchup
-        // logistic and BEFORE BuildRealPie so a lower makePct correctly raises the
-        // miss slices through the carve-then-convert math.
+        // Phase 27 — attention/openness make% adjustments (C1, C2, C3).
+        // FastBreak: C1 and C2 are halfcourt effects only — skip on breaks.
+        //   C3 is skipped automatically because UsagePressure = 0.0 on FastBreak.
+        // Putback: already short-circuited above (line 81) — never reached here.
+        //
+        // Read the four stamped attention scalars (null = Roll E has not run = 0.0/safe default).
+        var shooterAttn   = state.ShooterAttentionShare ?? 0.0;
+        var teamOpenness  = state.TeamBaseOpenness      ?? 0.0;
+        var teamSpac      = state.TeamSpacingLevel      ?? 0.0;
+        var teamGrav      = state.TeamGravityLevel      ?? 0.0;
+
+        // ── C1: bonus-only openness nudge ────────────────────────────────────
+        // Measures attention against the equal-share neutral point (0.20).
+        // AttentionRelief = max(0, 0.20 − a)  →  a=0.10 → relief; a=0.20 → 0; a=0.35 → 0.
+        // ShooterOpenness = clamp(TeamBaseOpenness × AttentionRelief × ReliefScale, 0, 1).
+        // Adjustment is ALWAYS ≥ 0 (bonus-only; never docks make% on a heavily-attended shooter).
+        // Gravity is NOT re-read here — it has already done its work upstream through
+        // TeamGravityLevel, TeamBaseOpenness, the attention pie, and C2. Reading raw
+        // GravityContribution in C1 would be a fifth bite at the same input.
+        // Slots between the matchup logistic and the Phase 17 block (A4).
+        const double EqualShare = 0.20;
+        var c1Bonus = 0.0;
+        if (!state.FastBreak)
+        {
+            var relief     = Math.Max(0.0, EqualShare - shooterAttn);
+            var c1Openness = Math.Min(teamOpenness * relief * _cfg.C1ReliefScale, 1.0);
+            c1Bonus        = Math.Max(c1Openness, 0.0);   // guaranteed non-negative
+            makePct       += c1Bonus;
+            if (makePct > 1.0) makePct = 1.0;
+        }
+
+        // ── C2: zone-specific imbalance penalty ──────────────────────────────
+        // Spacing-heavy lineup (spac > grav): halfcourt threes contested — no gravity
+        //   scrambles the defense; perimeter shots below open rate.
+        // Gravity-heavy lineup (grav > spac): packed paint — rim attempts suffer.
+        // Halfcourt + non-putback only (A5 — putback already short-circuited above).
+        var c2Penalty = 0.0;
+        if (!state.FastBreak)
+        {
+            var imbalance = teamSpac - teamGrav;   // positive = spacing-heavy; negative = gravity-heavy
+            if (zone == ShotLocation.Three || zone == ShotLocation.Long)
+                c2Penalty = Math.Max(0.0, imbalance) * _cfg.C2ImbalanceScale;
+            else if (zone == ShotLocation.Rim || zone == ShotLocation.Short)
+                c2Penalty = Math.Max(0.0, -imbalance) * _cfg.C2ImbalanceScale;
+            // Mid: no zone-imbalance penalty
+            makePct -= c2Penalty;
+            if (makePct < 0.0) makePct = 0.0;
+        }
+
+        // Phase 17 — usage-pressure efficiency penalties (C3 amplification on both terms).
+        // C3: AttentionPressure = max(0, a − 0.20). Both Phase 17 terms are multiplied
+        // by (1 + AttentionPressure × C3AttentionAmplifier):
+        //   - Equal/below-share attention → amplifier = ×1 → Phase 17 penalty unchanged (anchor).
+        //   - Above-share attention → amplifier > ×1 → both penalties amplified.
+        //   - Zero usage pressure → zero penalty regardless of attention (C3 cannot create a penalty).
+        //   - Attention alone → no C3 penalty (only fires inside the usage-pressure gate).
         //
         // Read the two stamped scalars (null = Roll E/G has not run = 0.0 safe default).
         // If BOTH are zero, this block is branch-skipped — zero-pressure possessions
         // are numerically identical to pre-build behavior (the regression guard).
         //
-        // Attribution note (§5 observability):
-        //   (a) existing matchup adjustment → already baked into makePct via logistic
-        //   (b) volume-tax term       → matchupMakePct × (1 − pressure × taxScale)
-        //   (c) residual-penalty term → makePct -= residual × residualScale
-        // Keeping all three contributions derivable from the harness output prevents
-        // accidental double-punishment going unnoticed.
+        // Attribution note (§5 / §6 observability — six separable values):
+        //   (1) matchup baseline     → makePct after logistic (before C1/C2/C3)
+        //   (2) C1 bonus             → c1Bonus (≥ 0)
+        //   (3) C2 zone penalty      → c2Penalty (≥ 0)
+        //   (4) Phase 17 base penalty → without C3: pressure × taxScale + residual × residualScale
+        //   (5) C3 incremental       → (amplifier − 1) × base penalty
+        //   (6) final make%          → makePct after all adjustments
         var usagePressure = state.UsagePressure         ?? 0.0;
         var usageResidual = state.UsageResidualPressure ?? 0.0;
 
         if (usagePressure > 0.0 || usageResidual > 0.0)
         {
+            // C3 amplifier: above equal-share attention amplifies both penalty terms.
+            // At equal/below share, AttentionPressure = 0 → amplifier = ×1 → Phase 17 unchanged.
+            var attentionPressure = Math.Max(0.0, shooterAttn - EqualShare);
+            var c3Amplifier       = 1.0 + attentionPressure * _cfg.C3AttentionAmplifier;
+
             // (b) Volume-tax: small all-shots reduction scaled by volume pressure.
             // A versatile player feels this almost exclusively (residual ≈ 0).
-            makePct *= (1.0 - usagePressure * _cfg.PressureVolumeTaxScale);
+            // C3 amplifies: high usage + above-share attention → larger vol-tax.
+            makePct *= (1.0 - usagePressure * _cfg.PressureVolumeTaxScale * c3Amplifier);
 
             // (c) Residual penalty: larger reduction for the load that could not
             // shift to alternate zones. A forced specialist feels this heavily.
-            // Applied to whatever zone was actually taken (including the preferred
-            // zone — Shaq's penalty lands on Rim).
-            makePct -= usageResidual * _cfg.PressureResidualPenaltyScale;
+            // Applied to whatever zone was actually taken (including the preferred zone).
+            // C3 amplifies: a forced specialist under defensive attention takes the biggest hit.
+            makePct -= usageResidual * _cfg.PressureResidualPenaltyScale * c3Amplifier;
 
             // Clamp to [0, 1] — a heavily-pressured specialist approaches but
             // cannot cross zero. Clamp is flagged; reaching 0 means over-tuning.

@@ -40,7 +40,9 @@ namespace Charm.Engine;
 public static class RollE
 {
     public static RollResult Execute(
-        PossessionState state, Pie<SelectionOutcome> pie, double[] pressures, GameState game, IRng rng)
+        PossessionState state, Pie<SelectionOutcome> pie, double[] pressures,
+        double[] attentionShares, double teamBaseOpenness, double teamGravityLevel, double teamSpacingLevel,
+        GameState game, IRng rng)
     {
         // 1. Roll the pie to a selection outcome.
         var outcome = pie.Roll(rng.NextUnitInterval());
@@ -51,15 +53,19 @@ public static class RollE
         var slotNumber = (int)outcome + 1;                       // Slot1 -> 1, ... Slot5 -> 5
         var slot = game.LineupFor(state.Offense).SlotAt(slotNumber);
 
-        // 3. Stamp both the chosen slot AND the volume pressure onto the possession
-        //    as per-possession facts (the THIRD and FOURTH — SelectedSlot and
-        //    UsagePressure). One `with` keeps both writes atomic.
-        //    pressures[] is indexed by slotNumber - 1 (0-based), matching the
-        //    Slot1–Slot5 ordering in the generator's output.
+        // 3. Stamp the chosen slot, volume pressure, attention share for the selected
+        //    shooter, and team-level openness scalars onto the possession as
+        //    per-possession facts. One `with` keeps all writes atomic.
+        //    pressures[] and attentionShares[] are indexed by slotNumber - 1 (0-based),
+        //    matching the Slot1–Slot5 ordering in the generators' output.
         var selectedState = state with
         {
-            SelectedSlot   = slot,
-            UsagePressure  = pressures[slotNumber - 1],
+            SelectedSlot          = slot,
+            UsagePressure         = pressures[slotNumber - 1],
+            ShooterAttentionShare = attentionShares[slotNumber - 1],
+            TeamBaseOpenness      = teamBaseOpenness,
+            TeamGravityLevel      = teamGravityLevel,
+            TeamSpacingLevel      = teamSpacingLevel,
         };
 
         // 4. Hand off to the player-action sequence. Names the KIND, not

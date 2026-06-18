@@ -191,4 +191,40 @@ public sealed record PossessionState(
     /// <para><b>Leak guard:</b> cleared to null by Roll K's <c>ResetOffense</c>
     /// alongside <see cref="UsagePressure"/> — a reset restarts the shot-diet
     /// calculation from scratch.</para></param>
-    double? UsageResidualPressure = null);
+    double? UsageResidualPressure = null,
+    /// <param name="ShooterAttentionShare">The SIXTH per-possession fact, stamped
+    /// by Roll E alongside <see cref="UsagePressure"/>. The defensive attention
+    /// share allocated to the selected shooter — the selected slot's value from
+    /// the five-player attention pie (normalized [0,1]; equal share = 0.20).
+    /// <para>Null until Roll E runs (same lifecycle as <see cref="UsagePressure"/>).
+    /// Non-null means Roll E ran and the attention generator has allocated its
+    /// 100-point pie. Values above 0.20 indicate above-average defensive focus;
+    /// below 0.20 indicate the shooter was left relatively open.</para>
+    /// <para><b>Leak guard:</b> cleared to null by Roll K's <c>ResetOffense</c>
+    /// alongside <see cref="UsagePressure"/> — a reset restarts selection and
+    /// the attention allocation from scratch.</para></param>
+    double? ShooterAttentionShare = null,
+    /// <param name="TeamBaseOpenness">The team-level openness scalar for this
+    /// possession's offense, stamped by Roll E alongside
+    /// <see cref="ShooterAttentionShare"/>. The asymmetric gravity×spacing
+    /// interaction result normalized to [0,1]: low for both pure-spacing and
+    /// pure-gravity lineups, high for a lineup with a dominant gravity source and
+    /// four perimeter threats around it.
+    /// <para>Null until Roll E runs. Cleared by Roll K's <c>ResetOffense</c>.</para>
+    /// </param>
+    double? TeamBaseOpenness = null,
+    /// <param name="TeamGravityLevel">Normalized gravity-source term for the
+    /// offensive lineup this possession [0,1]. Stamped by Roll E alongside
+    /// <see cref="TeamBaseOpenness"/>. High when the offense has at least one
+    /// dominant rim-pressure threat; near-zero for a pure-spacing lineup.
+    /// <para>Null until Roll E runs. Cleared by Roll K's <c>ResetOffense</c>.</para>
+    /// </param>
+    double? TeamGravityLevel = null,
+    /// <param name="TeamSpacingLevel">Normalized spacing-field term for the
+    /// offensive lineup this possession [0,1]. Stamped by Roll E alongside
+    /// <see cref="TeamBaseOpenness"/>. Accumulates across the four non-primary-
+    /// gravity players; high when the floor is surrounded by credible perimeter
+    /// shooters.
+    /// <para>Null until Roll E runs. Cleared by Roll K's <c>ResetOffense</c>.</para>
+    /// </param>
+    double? TeamSpacingLevel = null);

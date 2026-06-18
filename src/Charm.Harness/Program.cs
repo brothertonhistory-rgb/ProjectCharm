@@ -56,6 +56,8 @@ internal static class Program
         var rollBGenerator = new RollBGenerator(cfgB, cfgMatchup, game);   // Phase 13: team-aggregate disruption
         var rollAGenerator = new RollAGenerator(cfg, cfgMatchup, game);    // Phase 14: full-court press disruption
         var rollEGenerator = new RollEGenerator(cfgE, game);               // Phase 15: attribute-driven halfcourt selection
+        var cfgAttention   = AttentionConfig.Load(configPath);
+        var attentionGenerator = new AttentionGenerator(cfgAttention, game); // Phase 27: defensive attention pie
 
         var resolver = new Resolver(
             rollAGenerator,
@@ -65,6 +67,7 @@ internal static class Program
             cfgC,
             rollDGenerator,
             rollEGenerator,
+            attentionGenerator,
             rollFGenerator,
             rollGGenerator,
             rollHGenerator,
@@ -219,7 +222,7 @@ internal static class Program
         var selRng = new SystemRng(cfg.Seed);
         for (var i = 0; i < 8; i++)
         {
-            var r = (Continue)RollE.Execute(state, pieE, new double[5], game, selRng);
+            var r = (Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, selRng);
             var s = r.State.SelectedSlot!.Value;
             Console.WriteLine(
                 $"  proceed -> selected {s.Side} slot {s.Number} | next={r.Next}");
@@ -241,7 +244,7 @@ internal static class Program
         for (var i = 0; i < 8; i++)
         {
             // Select a player first (Roll E), then resolve the action (Roll F).
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, actRng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, actRng)).State;
             var r = (Continue)RollF.Execute(selected, pieF, actRng);
             var s = r.State.SelectedSlot!.Value;
             Console.WriteLine(
@@ -269,7 +272,7 @@ internal static class Program
         {
             // Walk E -> G to deliver a fully-stamped pre-H state, generate the pie
             // for THAT shot's zone, then resolve H.
-            var selectedH = ((Continue)RollE.Execute(state, pieE, new double[5], game, shotRng)).State;
+            var selectedH = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, shotRng)).State;
             var withZone = ((Continue)RollG.Execute(selectedH, genGForH.Generate(selectedH), 0.0, shotRng)).State;
             var pieH = genH.Generate(withZone);
             var hr = RollH.Execute(withZone, pieH, shotRng);
@@ -305,7 +308,7 @@ internal static class Program
         while (shown < 8 && guard++ < 100000)
         {
             // Walk E -> G -> H; only act on a Miss (the one outcome that feeds I).
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], obsGameI, reboundRng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, obsGameI, reboundRng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genGForH.Generate(sel), 0.0, reboundRng)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), reboundRng);
             if (hRes is not Continue { Next: ContinuationKind.ResolveRebound } missCont) continue;
@@ -920,7 +923,7 @@ internal static class Program
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var result = RollE.Execute(checkState, pieE, new double[5], checkGame, rng);
+            var result = RollE.Execute(checkState, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, checkGame, rng);
 
             if (result is not Continue { Next: ContinuationKind.IntoPlayerAction } c
                 || c.State.SelectedSlot is not { } slot
@@ -1081,6 +1084,7 @@ internal static class Program
             cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
+            new AttentionGenerator(AttentionConfig.Load(configPath), game),
             genF,
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -1109,7 +1113,7 @@ internal static class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Select a player (Roll E), resolve the action (Roll F), then route.
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, rng)).State;
             var fResult = RollF.Execute(selected, pieF, rng);
             var routing = resolver.Route(fResult);
             var d = routing.Destination;
@@ -1257,6 +1261,7 @@ internal static class Program
             cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
+            new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -1308,7 +1313,7 @@ internal static class Program
         {
             // Select a real slot (Roll E), then hand the resolver a clean
             // IntoShotType continuation — exactly what Roll F emits on a ShotAttempt.
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, rng)).State;
             var shotTicket = new Continue(ContinuationKind.IntoShotType, selected);
             var d = resolver.Route(shotTicket).Destination;
 
@@ -1401,7 +1406,7 @@ internal static class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Fresh slot + zone, then the zone-aware pie for THAT zone.
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, rng)).State;
             var preH = ((Continue)RollG.Execute(selected, genG.Generate(selected), 0.0, rng)).State;
             var zone = preH.ShotType!.Value;
             var pieH = isolatedGenH.Generate(preH);
@@ -1572,6 +1577,7 @@ internal static class Program
             cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
+            new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
             genG,
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -1620,7 +1626,7 @@ internal static class Program
             // Select a slot (Roll E) and stamp a zone (Roll G), then hand the
             // resolver a clean IntoShotResolution continuation — exactly what Roll G
             // emits — to isolate the Roll H hop.
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, rng)).State;
             var withZone = ((Continue)RollG.Execute(selected, genG.Generate(selected), 0.0, rng)).State;
             var shotTicket = new Continue(ContinuationKind.IntoShotResolution, withZone);
             var d = resolver.Route(shotTicket).Destination;
@@ -1730,7 +1736,7 @@ internal static class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Walk E -> G -> H; keep only the misses (the one feed into Roll I).
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, rng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), rng);
             if (hRes is not Continue { Next: ContinuationKind.ResolveRebound } miss) continue;
@@ -2180,6 +2186,7 @@ internal static class Program
             cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
+            new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(cfgH),
@@ -2206,7 +2213,7 @@ internal static class Program
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], game, rngR)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, rngR)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rngR)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), rngR);
 
@@ -2312,6 +2319,7 @@ internal static class Program
             cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
+            new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -2951,7 +2959,7 @@ internal static class Program
             // and the ResetOffense arm's wipe are both observable. FastBreak=true
             // simulates a possession that PUSHED, missed, and grabbed its own board —
             // so the ResetOffense leak-guard (FastBreak must clear) is exercised.
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, rng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var stamped = zoned with { Result = ShotResult.Miss, FastBreak = true };
 
@@ -3255,6 +3263,7 @@ internal static class Program
             cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
+            new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -3771,6 +3780,7 @@ internal static class Program
             cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
+            new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
             genG,
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -3797,7 +3807,7 @@ internal static class Program
             // Build a fully-stamped post-miss state and ENTER Roll K directly by
             // handing the resolver the offensive-rebound continuation — the resolver
             // then walks the whole loop internally and returns once it ends/parks.
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], game, rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, game, rng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var stamped = zoned with { Result = ShotResult.Miss };
             var entry = new Continue(ContinuationKind.ResolveOffensiveRebound, stamped);
@@ -4076,6 +4086,7 @@ internal static class Program
             cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
+            new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -4387,6 +4398,7 @@ internal static class Program
                 cfgC,
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, game),                        // Phase 19: attribute-driven usage selection
+                new AttentionGenerator(AttentionConfig.Load(configPath), game), // Phase 27: defensive attention pie
                 new RollFGenerator(cfgF, cfgMatchup, game),
                 new RollGGenerator(cfgG, cfgMatchup, game),
                 new RollHGenerator(cfgH, cfgMatchup, game),
@@ -8237,6 +8249,7 @@ internal static class Program
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -8490,6 +8503,7 @@ internal static class Program
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -8582,6 +8596,7 @@ internal static class Program
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game2),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -8680,6 +8695,7 @@ internal static class Program
                 new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 spyE,
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -8737,6 +8753,7 @@ internal static class Program
                 new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 spyE,
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -8796,6 +8813,7 @@ internal static class Program
                 new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 spyE,
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -8859,6 +8877,7 @@ internal static class Program
                 new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -8913,6 +8932,7 @@ internal static class Program
                 new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -8967,6 +8987,7 @@ internal static class Program
                 new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -9062,6 +9083,7 @@ internal static class Program
                 new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
@@ -10392,6 +10414,7 @@ internal static class Program
                         cfgC,
                         new RollDStubPieGenerator(cfgD),
                         new RollEGenerator(cfgE, game),                    // Phase 19: attribute-driven usage selection
+                        new AttentionGenerator(AttentionConfig.Load(configPath), game), // Phase 27: defensive attention pie
                         new RollFGenerator(cfgF, cfgMatchup, game),
                         new RollGGenerator(cfgG, cfgMatchup, game),
                         new RollHGenerator(cfgH, cfgMatchup, game),
@@ -11216,6 +11239,7 @@ internal static class Program
                 cfgC,
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, game),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFGenerator(cfgF, cfgMatchup, game),
                 new RollGGenerator(cfgG, cfgMatchup, game),
                 new RollHGenerator(cfgH, cfgMatchup, game),
@@ -11715,6 +11739,7 @@ internal static class Program
                 new RollCStubPieGenerator(cfgC), cfgC,
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, game),
+                new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFGenerator(cfgF, cfgMatchup, game),
                 new RollGGenerator(cfgG, cfgMatchup, game),
                 new RollHGenerator(cfgH, cfgMatchup, game),

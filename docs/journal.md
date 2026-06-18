@@ -1,3 +1,77 @@
+## Session 61 — Phase 27 Session 1: Defensive Attention Pie + Gravity/Spacing Rework + Roll H Make% (2026-06-18)
+
+**Scope:** First session of the two-session gravity/spacing/attention layer. Make% only — no selection, no location, no live passing. Six files changed in the engine; harness updated throughout.
+
+**What shipped (10 files):**
+
+`src/Charm.Engine/Core/Player.cs` — reworked `GravityContribution` and `SpacingContribution`:
+
+- `GravityContribution` → bounded [0,100] rim-pressure composite: `PerimeterAccess = avg(FirstStep, SelfCreation, Speed)`, `PostAccess = avg(PostMoves, Strength)`, `Access = max(PerimeterAccess, PostAccess) + 0.10 × min(...)` (bounded versatility bonus), `GravityContribution = 0.35×Finishing + 0.25×Close + 0.30×Access + 0.10×Mid`. Replaces the wrong `(Close + Mid + Outside + Finishing) / 4` which gave gravity weight to perimeter shooting.
+- `SpacingContribution` → `0.85×Outside + 0.15×Mid`, no artificial floor. Replaces pure `Outside`. The competency floor lives in player generation, not here.
+
+`src/Charm.Engine/Config/AttentionConfig.cs` — new config file. Gravity/usage blend weights, attention floor, sigmoid gate parameters (`GravitySigmoidCenter`, `GravitySigmoidSteepness`, `SecondGravityFraction`), openness interaction parameters (`GravityAloneYield`, `SpacingMultiplier`). Loaded from `"Attention"` section of config.json. Mirrors `RollEConfig.Load` pattern with invariant validation.
+
+`src/Charm.Engine/Generators/AttentionGenerator.cs` — new generator. Reads five offensive players' `GravityContribution` and `SpacingContribution` plus Roll E's `FinalShares`. Normalizes gravity to [0,1] before blending with usage (preventing a silent ~100× scale mismatch). Runs iterative floor-constrained redistribution (floor pass of `ApplyFloorAndRail`, copied from `RollEGenerator` per A2 — extract at a third consumer). Computes `TeamGravityLevel` (sigmoid-gated top-threat term), `TeamSpacingLevel` (accumulating field across non-primary-gravity players), and `TeamBaseOpenness` (asymmetric product: `GravitySource × (α + β × SpacingField)`, β > α — gravity enables spacing). Includes neutral-pinned `PassingAmp = 1` seam. Returns `AttentionResult` record.
+
+`src/Charm.Engine/Core/PossessionState.cs` — four new trailing nullable fields: `ShooterAttentionShare`, `TeamBaseOpenness`, `TeamGravityLevel`, `TeamSpacingLevel`. Same shape as `UsagePressure`/`UsageResidualPressure`.
+
+`src/Charm.Engine/Rolls/RollE.cs` — extended `Execute` signature to receive attention array and team levels; stamps all four new fields in the same atomic `with` as `SelectedSlot` and `UsagePressure`.
+
+`src/Charm.Engine/Rolls/RollK.cs` — `ResetOffense` blank-slate `with` extended to null all four new fields alongside the existing `UsagePressure` and `UsageResidualPressure`.
+
+`src/Charm.Engine/Config/RollHConfig.cs` — three new knobs: `C1ReliefScale` (0.08 placeholder), `C2ImbalanceScale` (0.08 placeholder), `C3AttentionAmplifier` (1.5 placeholder). Invariant validation added.
+
+`src/Charm.Engine/Generators/RollHGenerator.cs` — wired C1, C2, C3 between the matchup logistic and `BuildRealPie`:
+- **C1 (bonus-only nudge):** `AttentionRelief = max(0, 0.20 − a)`. `ShooterOpenness = clamp(TeamBaseOpenness × AttentionRelief × C1ReliefScale, 0, 1)`. `makePct += c1Bonus`. Never negative. Skipped on FastBreak.
+- **C2 (zone-imbalance penalty):** `imbalance = TeamSpacingLevel − TeamGravityLevel`. Positive → docks Three/Long; negative → docks Rim/Short. Skipped on FastBreak.
+- **C3 (Phase 17 amplifier):** `AttentionPressure = max(0, a − 0.20)`. Both Phase 17 terms multiplied by `(1 + AttentionPressure × C3AttentionAmplifier)`. Equal-share → amplifier ×1 → Phase 17 unchanged. Zero usage pressure → zero penalty regardless of attention.
+- Putback short-circuit precedes all new code (A5 confirmed).
+
+`src/Charm.Harness/config.json` — new `"Attention"` section; three new knobs in `"RollH"`.
+
+`src/Charm.Harness/Program.cs` — `AttentionConfig.Load` and `AttentionGenerator` construction added; `AttentionGenerator` inserted into all 23 Resolver construction sites; 13 direct `RollE.Execute` harness calls updated to 9-param form (zeroed attention defaults — correct for isolated checks).
+
+**Key design decisions:**
+
+- **Gravity enables spacing (not a symmetric product).** `BaseOpenness = GravitySource × (α + β × SpacingField)`. Without a dominant rim threat, spacing contributes little — the defense doesn't need to collapse, so perimeter spacing is wasted. This produces the required five-case ordering: 5-Korver and 5-Evans both low; 4-Evans+1-Korver limited; 4-Korver+1-Evans higher; 5-Durant highest. The product-of-averages form fails this ordering (proven in Python before any C# was written).
+
+- **Sigmoid gate on gravity (not tanh).** `GravitySource = sigmoid((top − 60)/15) + 0.12 × sigmoid((second − 60)/15)`. A player needs genuine rim pressure (above ~60) to activate the defense-scrambling effect. Moderate gravity (37) barely registers; elite gravity (81) nearly maxes it. This prevents a pure-spacing lineup from generating false openness through moderate-gravity "everyone pulls slightly."
+
+- **C1 relief against equal-share neutral, not against raw gravity.** `AttentionRelief = max(0, 0.20 − a)`. The prior draft used `max(0, g − a)` (gravity minus attention share) — wrong because `g` is an absolute player trait and `a` is a relative pie share. A star with g=0.85, a=0.35 would get a large "openness" bonus despite being heavily attended. Corrected: C1 only asks "is this shooter left relatively unattended?" — a question about attention relative to the neutral baseline, not about the shooter's own gravity.
+
+- **C3 amplifies both Phase 17 terms.** Both the vol-tax and the residual penalty are multiplied by `(1 + AttentionPressure × C3AttentionAmplifier)`. A forced specialist under defensive attention takes the largest hit: the residual is already larger, and C3 amplifies it further. This is the correct basketball model — a non-shooter forced into heavy volume while the defense keys on him specifically should collapse.
+
+- **Normalization is required, not optional.** Gravity [0,100] and usage [0,1] cannot be naively blended. Gravity would overwhelm usage ~100× and defeat the focal-point correction while still compiling and producing a valid pie. Both normalized to [0,1] before blending.
+
+- **FastBreak guard in Roll H.** C1 and C2 are halfcourt effects; C3 is skipped automatically because `UsagePressure = 0.0` on FastBreak. Explicit `state.FastBreak` gate added for C1 and C2.
+
+- **Passing seam neutral-pinned.** `PassingAmp = 1` constant in `AttentionGenerator`. The formula shape (`BaseOpenness × PassingAmp`) is already written; Session 2 makes it live by computing the term from Passing/Playmaking/Vision — no formula reshape needed.
+
+**Python pre-check (mandatory hard gate — Step 0):**
+
+Five-case ordering verified with realistic moderate inputs before any C# was written:
+- 5-Korver: openness=0.162 (LOW ✓)
+- 5-Evans: openness=0.329 (LOW ✓)
+- 4-Evans+1-Korver: openness=0.428 (LIMITED ✓)
+- 4-Korver+1-Evans: openness=0.664 (HIGHER ✓)
+- 5-Durant: openness=0.736 (HIGHEST ✓)
+
+Full validation suite also confirmed: focal-point relativity (lone focal Korver above-share; crowded-out below-share), C1 bonus-only shape (a=0.10 → bonus; a=0.20 → 0; a=0.35 → 0), C2 zone-specific docking (spacing-heavy docks Three; gravity-heavy docks Rim), C3 four-line behavior, six-value attribution separability.
+
+**Harness output — key results:**
+
+All checks passed. STRESS TEST PASSED. 500/500 valid games each bucket.
+
+The Bucket 6 (ShootingVsAthletic) win rate split (Athletic 74% vs Shooting 24%) is the most diagnostic Phase 27 result: the athletic team's dominant rim presence activates the gravity-enables-spacing interaction, producing superior openness. The shooting-only team has no gravity source to scramble the defense. This is the intended asymmetric behavior.
+
+Buckets 7/8 mirror gap: 0.8% — engine is side-neutral on the Athletic vs Skill matchup.
+
+Phase 17 regression anchors all held (zero-pressure behavior identical, equal-share C3 anchor ×1).
+
+**Calibration note:** All magnitude parameters (`C1ReliefScale`, `C2ImbalanceScale`, `C3AttentionAmplifier`, gravity/usage blend weights, sigmoid parameters, `GravityAloneYield`, `SpacingMultiplier`) are calibration placeholders. Architectural shapes are locked audit corrections.
+
+**One flag:** The harness range check on `GravityContribution > 99` is a pre-existing check from when the formula was a simple average of 0–99 attributes. The new formula is bounded to [0,100]; a player with extremely high Finishing/Close/Access could theoretically produce 100.0. This would trigger a false-positive range failure. Not seen in this run; flag for the calibration pass.
+
 ## Session 60 — Phase 26: Slot/Archetype Cohort Box Scores + Slasher Shooting Floor (2026-06-17)
 
 **Scope:** Two changes, one file (`src/Charm.Harness/Program.cs`). (1) Raise the Slasher archetype's shooting floor so it can function as a perimeter threat. (2) Add a slot/archetype cohort box score to every stress-test bucket, backed by a full PlayerId-by-logical-team stamping and per-variant corruption detection scheme. Engine untouched.

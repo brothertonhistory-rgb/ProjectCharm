@@ -4670,3 +4670,117 @@ Mirrors ObservationRunV1's per-player box score column set:
 Rows labeled `[A] Slot1 — Slasher`, `[B] Slot2 — AthleticBig`, etc. The archetype name comes from the bucket's fixed composition array (not from any single player's generated Name). Bucket 5 prints a note that Slot 1 is the Elite-tier star.
 
 Denominator: `totalValid` (total attribution-accepted games across all 10 variants), the same denominator used for team-level stats.
+
+## Phase 27 Session 1: Defensive Attention Pie + Gravity/Spacing Rework + Roll H Make% (Session 61, 2026-06-18)
+
+### What this is
+
+The first half of the team-aggregate ("gravity") layer — the first session that gives the offensive five a collective identity beyond the sum of individual matchups. Builds the defensive attention pie (a 100-point allocation across the five offensive players), reworks gravity and spacing into real bounded formulas, computes an asymmetric team-openness interaction, and feeds these into Roll H (make/miss) three ways. Session 2 threads the same attention signal into selection (Roll E) and shot location (Roll G), and makes passing live.
+
+### The two-pie model
+
+The offense allocates a **usage pie** (Roll E — who shoots). The defense allocates an **attention pie** — 100 points across the five offensive players. They collide through the make-odds.
+
+Attention is allocated by two drivers: **gravity** (rim pressure, which creates help/collapse attention) and **usage** (focal-point role — the defense keys on whoever the offense runs through, regardless of his gravity). Both are required: gravity-only allocation cannot represent a defense keying on a low-gravity focal shooter. The fixed-100-point pie produces the focal-point relativity (same player, opposite outcomes depending on what surrounds him) for free.
+
+Attention is **relative allocation** — where the defense spends its 100 points. Absolute offensive danger lives in the team gravity/spacing aggregates and the openness interaction, not in the attention shares.
+
+### Gravity formula (Player.cs, reworked)
+
+`GravityContribution` replaced the wrong `(Close + Mid + Outside + Finishing) / 4` (which gave gravity weight to perimeter shooting) with a bounded [0,100] rim-pressure composite:
+
+```
+PerimeterAccess = avg(FirstStep, SelfCreation, Speed)
+PostAccess      = avg(PostMoves, Strength)
+Access          = max(PerimeterAccess, PostAccess) + 0.10 × min(PerimeterAccess, PostAccess)
+GravityContribution = 0.35×Finishing + 0.25×Close + 0.30×Access + 0.10×Mid
+```
+
+Finishing and Close carry the highest weight (converting near the basket IS the threat). Access uses `max` of two routes (one route suffices) plus a small bounded versatility bonus. Mid has moderate weight. Outside near-zero — perimeter shooting is spacing, not gravity.
+
+### Spacing formula (Player.cs, reworked)
+
+`SpacingContribution` replaced the pure `Outside` with:
+
+```
+SpacingContribution = 0.85×Outside + 0.15×Mid
+```
+
+No artificial floor. A big who can step to 16 feet has real spacing value. The D1 competency floor is a player-generation constraint, not a formula clamp. Gravity and spacing are independent per-player values — one player can be high on both.
+
+### Team-openness interaction (AttentionGenerator.cs)
+
+**Asymmetric form: gravity enables spacing.** The key basketball truth is that spacing only helps when gravity forces the defense to collapse first. Without a dominant rim threat, the defense can wall up a perimeter lineup without paying a price.
+
+```
+GravitySource = sigmoid((top − 60)/15) + 0.12 × sigmoid((second − 60)/15)   → [0,1]
+SpacingField  = mean spacing of the four non-primary-gravity players / 99     → [0,1]
+BaseOpenness  = GravitySource × (GravityAloneYield + SpacingMultiplier × SpacingField)
+              = GravitySource × (0.25 + 0.75 × SpacingField)   [placeholders]
+```
+
+The sigmoid gate is centered at 60: a player needs genuine rim presence to activate the defense-scrambling effect. Moderate gravity (~37) barely registers; elite gravity (~81) nearly maxes it. `SecondGravityFraction = 0.12` captures diminishing returns on additional gravity sources (the rim absorbs only so much).
+
+**Required five-case ordering (verified by Python before any C# was written):**
+
+| Lineup | Openness | Label |
+|---|---|---|
+| 5-Korver (pure spacing, no gravity) | 0.162 | LOW |
+| 5-Evans (pure gravity, no spacing) | 0.329 | LOW |
+| 4-Evans+1-Korver (gravity source, limited spacing) | 0.428 | LIMITED |
+| 4-Korver+1-Evans (one gravity source + four spacers) | 0.664 | HIGHER |
+| 5-Durant (elite on both axes) | 0.736 | HIGHEST |
+
+The product-of-averages form cannot produce this ordering (5-Korver and 4-Korver+1-Evans would be indistinguishable). The asymmetric product form achieves it with realistic moderate inputs.
+
+**Stamped team levels:** Roll H needs the signed imbalance, not just openness, to dock the correct zone under C2. Three separate scalars are stamped on `PossessionState`: `TeamBaseOpenness`, `TeamGravityLevel`, `TeamSpacingLevel`.
+
+**Passing seam (neutral-pinned):** The formula includes `× PassingAmp` (currently pinned at 1). Session 2 computes PassingAmp from Passing/Playmaking/Vision — no formula reshape needed.
+
+### Attention allocation (AttentionGenerator.cs)
+
+Scores each player by `GravityBlendWeight × (gravity/100) + UsageBlendWeight × FinalShares[i]`. Normalization to [0,1] before blending is required — a naive weighted sum lets gravity (~100 scale) overwhelm usage (~1 scale) ~100× and defeats the focal-point correction while still compiling. After scoring, normalized to a pie and floor-constrained (floor pass of `ApplyFloorAndRail`, copied from `RollEGenerator` per A2).
+
+The seam: `AttentionGenerator.Generate` is called at both Roll E dispatch sites in the Resolver, immediately after `GenerateWithPressure`. Results are threaded through the extended `RollE.Execute` signature and stamped atomically alongside `SelectedSlot` and `UsagePressure`.
+
+### Roll H make% consequences (RollHGenerator.cs)
+
+Three separable adjustments, all labeled for harness-attributable six-value output:
+
+**C1 — bonus-only openness nudge (≥ 0).** Between the matchup logistic and the Phase 17 block:
+```
+AttentionRelief = max(0, 0.20 − a)   // a = ShooterAttentionShare
+ShooterOpenness = clamp(TeamBaseOpenness × AttentionRelief × C1ReliefScale, 0, 1)
+makePct += ShooterOpenness
+```
+The prior draft used `max(0, g − a)` (gravity minus attention share) — wrong because `g` is an absolute trait and `a` is a relative share. A star with g=0.85, a=0.35 would get a large bonus despite being heavily attended. Corrected: C1 measures attention relative to the equal-share neutral point only. Gravity has already done its work upstream.
+
+**C2 — zone-specific imbalance penalty.** Also halfcourt-only (FastBreak guard):
+```
+imbalance = TeamSpacingLevel − TeamGravityLevel
+Three/Long: penalty = max(0, imbalance) × C2ImbalanceScale
+Rim/Short:  penalty = max(0, −imbalance) × C2ImbalanceScale
+makePct -= penalty
+```
+Spacing-heavy lineup (five Korvers): contested threes. Gravity-heavy lineup (five Evanses): packed paint.
+
+**C3 — amplifier on the Phase 17 usage penalty.** Inside the Phase 17 block:
+```
+AttentionPressure = max(0, a − 0.20)
+c3Amplifier       = 1 + AttentionPressure × C3AttentionAmplifier
+makePct *= (1 − usagePressure × volTaxScale × c3Amplifier)
+makePct -= usageResidual × residualScale × c3Amplifier
+```
+C3 amplifies both Phase 17 terms. A forced specialist under defensive attention takes the largest hit — residual is already larger, and C3 amplifies it further. Equal-share attention → amplifier ×1 → Phase 17 unchanged (regression anchor). Zero usage pressure → zero penalty regardless of attention.
+
+**Exemptions (A5):** Putback short-circuit precedes all new code (existing architectural guarantee). FastBreak guard added for C1 and C2 explicitly.
+
+**Leak guard:** `ResetOffense` in Roll K clears all four new `PossessionState` fields alongside `UsagePressure` and `UsageResidualPressure`.
+
+### What is Session 2 (not this session)
+
+- Attention tilting selection (Roll E): low attention → more attempts
+- Attention tilting shot location (Roll G): low attention → preferred zones; high attention → improvise to rim
+- Passing made live — `PassingAmp` computed from Passing/Playmaking/Vision
+
+**Session 2 feedback-loop guard (recorded):** Attention is computed once from Roll E's pre-attention `FinalShares`. Session 2 may use that fixed attention array to bend the final selection pie but must not recompute attention recursively from the attention-adjusted shares. One-pass dependency only.

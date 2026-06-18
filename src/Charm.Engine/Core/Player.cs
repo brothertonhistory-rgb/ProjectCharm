@@ -296,40 +296,75 @@ public sealed class Player
         (Athleticism + Finishing) / 2.0;
 
     /// <summary>
-    /// The defensive attention this player's scoring threat commands — the
-    /// per-player contribution to the team-aggregate gravity value.
+    /// The rim pressure this player generates — the per-player input to the
+    /// team-aggregate gravity value. <b>Gravity = does this player put pressure on
+    /// the rim?</b> Route-agnostic: a modern rim-attacking guard and a Shaq-era
+    /// post scorer generate the same gravity because the rim is constant.
     ///
-    /// <para>Gravity is a team-aggregate whose effect is distributional: five
-    /// credible threats distribute defensive attention so nobody can be doubled;
-    /// one star concentrates attention and that is where help defense bites. This
-    /// property is the per-player INPUT to that aggregation, not the aggregated
-    /// team value itself (which is Phase 4 work).</para>
+    /// <para><b>Formula (Phase 27, bounded [0,100]).</b>
+    /// <code>
+    /// PerimeterAccess = avg(FirstStep, SelfCreation, Speed)
+    /// PostAccess      = avg(PostMoves, Strength)
+    /// Access          = max(PerimeterAccess, PostAccess)
+    ///                   + 0.10 × min(PerimeterAccess, PostAccess)   // bounded versatility bonus
+    /// GravityContribution = 0.35×Finishing + 0.25×Close + 0.30×Access + 0.10×Mid
+    /// </code>
+    /// Weights sum to 1; result clamped to [0,100]. Finishing and Close carry the
+    /// highest weight (converting near the basket IS the threat); Access captures
+    /// the ability to reach the paint via either route (one route suffices; a
+    /// two-route player receives a small — bounded — versatility bonus); Mid has
+    /// moderate weight; Outside near-zero (perimeter shooting is spacing, not
+    /// gravity).</para>
     ///
-    /// <para><b>Dormant-pending-module:</b> no generator reads this yet.</para>
+    /// <para><b>Realistic, overlapping distributions.</b> No real player is 0 or
+    /// 100. A Korver-type generates some gravity (backdoor cut / foul-line touch);
+    /// an Evans-type generates some spacing (can step to 16 feet). The formula
+    /// produces moderate overlapping values, not a bipolar split.</para>
     ///
-    /// <para><b>Placeholder formula.</b> Average of the three scoring zones and
-    /// finishing — a rough "how dangerous is this player as a scorer." Phase 6
-    /// tunes, and the real formula may weight zones differently.</para>
+    /// <para>Read by <see cref="AttentionGenerator"/> (Phase 27). The team-aggregate
+    /// interaction (saturating top-threat × accumulating spacing environment) lives
+    /// in the generator, not here.</para>
     /// </summary>
-    public double GravityContribution =>
-        (Close + Mid + Outside + Finishing) / 4.0;
+    public double GravityContribution
+    {
+        get
+        {
+            var perimeterAccess = (FirstStep + SelfCreation + Speed) / 3.0;
+            var postAccess      = (PostMoves  + Strength) / 2.0;
+            var access          = Math.Max(perimeterAccess, postAccess)
+                                + 0.10 * Math.Min(perimeterAccess, postAccess);
+            var g = 0.35 * Finishing + 0.25 * Close + 0.30 * access + 0.10 * Mid;
+            return Math.Min(Math.Max(g, 0.0), 100.0);
+        }
+    }
 
     /// <summary>
-    /// How much this player opens the floor for teammates — the per-player
-    /// contribution to the team-aggregate spacing value.
+    /// The perimeter shooting threat this player projects — the per-player input
+    /// to the team-aggregate spacing value. <b>Spacing = does this player punish
+    /// a defense that collapses?</b>
     ///
-    /// <para>Spacing is about shooting THREAT on the floor: a non-shooter does not
-    /// space the floor regardless of other attributes. The team aggregate is
-    /// non-linear (count of credible threats matters more than flat mean). This
-    /// property is the per-player INPUT to that aggregation.</para>
+    /// <para><b>Formula (Phase 27, bounded [0,100], honest — no artificial floor).</b>
+    /// <code>
+    /// SpacingContribution = 0.85×Outside + 0.15×Mid
+    /// </code>
+    /// Outside carries the dominant weight: the primary spacing threat is the
+    /// three-point line. Mid has modest weight: a big who can step to 16 feet
+    /// has real spacing value (the defense must respect it). Result clamped to
+    /// [0,100].</para>
     ///
-    /// <para><b>Dormant-pending-module:</b> no generator reads this yet.</para>
+    /// <para><b>No artificial floor.</b> This property honestly represents the
+    /// player's authored shooting threat. A genuine non-shooting center should
+    /// return a low value — giving him fake spacing would pollute the gravity×spacing
+    /// interaction. The D1 competency floor (a wide-open D1 guard hits ~30%+) is a
+    /// <b>player-generation constraint</b>, not a clamp here.</para>
     ///
-    /// <para><b>Placeholder formula.</b> The player's outside shooting rating —
-    /// spacing is directly whether the defense must stay honest on the perimeter.
-    /// Phase 6 tunes (may fold in mid-range to credit stretch bigs, etc.).</para>
+    /// <para><b>Independent of gravity.</b> Gravity and spacing are separate axes.
+    /// A Harden/Durant type can be high on both. Do not collapse them.</para>
+    ///
+    /// <para>Read by <see cref="AttentionGenerator"/> (Phase 27).</para>
     /// </summary>
-    public double SpacingContribution => Outside;
+    public double SpacingContribution =>
+        Math.Min(Math.Max(0.85 * Outside + 0.15 * Mid, 0.0), 100.0);
 
     // -------------------------------------------------------------------------
     // Validation
