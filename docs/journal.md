@@ -1,3 +1,83 @@
+## Session 59 — Phase 25: Shooting Foul Attribution (2026-06-17)
+
+**Scope:** Wire a shooting-foul event list from the resolver walk through to the harness attribution pass, then draw a weighted-credit fouling defender for each event using a matched-man + interior-tilt residual formula. No engine rolls changed, no config keys changed. Four files.
+
+**What shipped:**
+
+- `src/Charm.Engine/Core/ShootingFoulEvent.cs` (NEW) — `readonly record struct ShootingFoulEvent(ShotLocation Zone, int ShooterSlot)`. One event per `MadeAndFouled` / `MissFouled` resolution. `ShooterSlot` is 1–5 on the overwhelming majority of possessions (Roll E ran); 0 on the rare bonus-FT putback path where Roll E never fired (`SelectedSlot` was null). The 0 value is the "no matched man" sentinel that routes the harness draw to the flat fallback.
+
+- `src/Charm.Engine/Core/Resolver.cs` — three surgical additions:
+  - `var shootingFouls = new List<ShootingFoulEvent>();` alongside the other Phase 23 locals in `Route()`.
+  - Inside the `ResolveShootingFreeThrows` case (before `DriveFreeThrows`): `shootingFouls.Add(new ShootingFoulEvent(c.State.ShotType!.Value, c.State.SelectedSlot?.Number ?? 0))`. Uses `!` on `ShotType` (Roll G stamped the zone; non-null) and `?? 0` on `SelectedSlot` (may be null on bonus-FT putback path). The existing Phase 23 code already used `?? 0` here; this is consistent and not a new assumption. A misleading comment in the same block ("SelectedSlot is non-null here") was left as-is — the code is correct, the comment is wrong; correcting misleading comments is a future cleanup, not a scope violation.
+  - `ShootingFouls = shootingFouls.ToArray()` added to the single Terminal `RoutingOutcome` return. `RoutingOutcome` gains `public IReadOnlyList<ShootingFoulEvent> ShootingFouls { get; init; } = Array.Empty<ShootingFoulEvent>();` as a trailing init-only field with an empty-array default — pure append, no existing construction affected.
+
+- `src/Charm.Engine/Core/Governor.cs` — same pattern as Phase 23 additions: `PossessionRecord` gains `IReadOnlyList<ShootingFoulEvent>? ShootingFouls = null` as a trailing optional param; `Run()` gains `IReadOnlyList<ShootingFoulEvent>? possessionShootingFouls = null` local, threaded from `outcome.ShootingFouls` in the resolver branch, passed positionally to `records.Add(...)`.
+
+- `src/Charm.Harness/Program.cs` — six addition groups:
+  - `PlayerBoxTotals.ShFoul = new long[10]` field added; `AllEqual` extended with `a.ShFoul.SequenceEqual(b.ShFoul)`.
+  - `var foulRng = new Random(seed + 3)` in `AttributeGame` — a separate RNG so the `seed+2` draw stream (TO → STL → DReb → OReb → BLK, in that exact order) is consumed identically and all prior numbers are bit-for-bit unchanged.
+  - Foul-draw block in `AttributeGame` after the BLK block: `if (r.ShootingFouls is { } sfs) foreach (var sf in sfs) { var fSlot = DrawFoulingDefender(foulRng, ...); ... t.ShFoul[fp.PlayerId - 1]++; }`.
+  - `private static int DrawFoulingDefender(Random rng, TeamSide side, Roster roster, ShotLocation zone, int shooterSlot)` — new helper implementing the matched-man + interior-tilt residual formula. See design.md for the formula detail. Interior proxy: `p.Height + p.Strength + p.PostDefense`. The `shooterSlot == 0` path (bonus-FT putback) and any path where the matched slot is unpopulated both use a flat fallback over all populated defenders.
+  - `ObservationRunV1`: `var bsShFoul = new long[10]` accumulator, per-game accumulation loop, Phase 25 summary diagnostic block (total events, slot-0 event count, total SFL credits, non-zero gate), SFL column in the per-player box score header and rows.
+  - `Phase25ShootingFoulAttributionCheck(string configPath)` — new check wired into `Main` via `ok &= Phase25ShootingFoulAttributionCheck(configPath)` immediately after the Phase 24 call. Two sub-tests: directional (100k draws × 4 scenarios, no end-to-end confound) and end-to-end completeness (200 games, controlled roster, side-specific reconciliation, no-zero defender).
+
+**Key design decisions:**
+
+- **A possession can carry more than one shooting foul.** Confirmed in source: Roll K's PutBack arm routes back to `ContinuationKind.IntoShotResolution` with zone forced to `ShotLocation.Rim`. A putback can be fouled, creating a second `ResolveShootingFreeThrows` edge hit in the same walk. The event list (not a scalar) naturally handles this.
+
+- **`?? 0` / `!` asymmetry at the edge.** `ShotType!.Value` asserts non-null because Roll G always stamps the zone before Roll H fires the foul. `SelectedSlot?.Number ?? 0` defends against null because the bonus-FT putback path (Roll K → `IntoShotResolution` when Roll E never ran) is a legitimate game path where `SelectedSlot` is null. This asymmetry was pre-existing in the Phase 23 FTA/FTM slot reads; Phase 25 copies the same pattern.
+
+- **Interior proxy = `Height + Strength + PostDefense` (unweighted).** These are the same three attributes `Matchup.Postness` uses; the unweighted sum avoids a `MatchupConfig` dependency in `AttributeGame`. The same three attributes that distinguish an interior big from a perimeter player.
+
+- **Matched-man share is zone-exact; residual is interior-tilted.** The defender at the same slot index as the shooter gets a fixed zone-dependent share (`Rim: 50%, Short: 65%, Mid: 70%, Long: 80%, Three: 80%`). The remaining probability is distributed across the other four defenders via `exp(signedK × (interior − meanInt) / SCALE)` where `signedK` is `+0.50` at Rim (interior-favoring) and `-0.50` at Three (perimeter-favoring). SCALE=40.0. All values are calibration placeholders.
+
+- **seed+3 RNG isolation.** The existing draw order in `AttributeGame` is TO → STL → DReb → OReb (loop) → BLK (loop), all on `Random(seed+2)`. Adding fouls to that stream would shift every prior draw. The fix is a separate `Random(seed+3)` for fouls only. Confirmed by code read: `seed+2` stream draw order is fixed, nothing else consumes it.
+
+**Python pre-validation (run before any C#):**
+
+All four scenarios (guard shoots three, guard drives rim, big shoots three, big at rim) verified with the Phase 24 controlled roster (Anchor interior=230, Perim interior=115, meanInt=138):
+
+- All distributions sum to 1.0 ✓, all weights ≥ 0 ✓
+- Matched-man shares exact (80%, 50%, 80%, 50%) ✓
+- Three residual: perimeter slots > interior slot ✓ (ratio ~9×)
+- Rim residual: interior slot > each perimeter slot ✓ (interior gets ~58% of the residual with SCALE=40)
+
+Note: the draft prompt estimated ~37% of the rim residual going to the big (likely computed with SCALE≈100). The actual formula with SCALE=40 gives ~58% — stronger than estimated. The "too strong" characterization still holds, just more so. Flagged in journal and in `DrawFoulingDefender` as the first calibration target.
+
+**Harness output — key results:**
+
+*Phase 25 directional test (100k draws × 4 scenarios):*
+
+| Scenario | Matched slot | Observed share | Direction |
+|---|---|---|---|
+| Guard shoots three (slot=2, zone=Three) | Slot 2 | 0.8001 | Perim (3,4,5) > interior (1): 0.0619 vs 0.0148 ✓ |
+| Guard drives rim (slot=2, zone=Rim) | Slot 2 | 0.5001 | Interior (1) > perim: 0.2929 vs 0.0682–0.0699 ✓ |
+| Big shoots three (slot=1, zone=Three) | Slot 1 | 0.7999 | Residual (2–5) all perim, roughly equal ✓ |
+| Big at rim (slot=1, zone=Rim) | Slot 1 | 0.5007 | Residual (2–5) all perim, roughly equal ✓ |
+
+All four matched-share assertions: [OK]. Directional assertions (scenarios 1 and 2): [OK].
+
+*Phase 25 end-to-end (200 games, controlled roster):*
+
+- Home defense shooting-foul events: 1,030 | SFL credits: 1,030 ✓ (exact)
+- Away defense shooting-foul events: 1,039 | SFL credits: 1,039 ✓ (exact)
+- Global completeness: 2,069 events == 2,069 credits ✓
+- No-zero defender: all 10 players > 0 SFL over 200 games ✓
+
+*ObservationRunV1 (1,000 games, frozen corpus):*
+
+Phase 25 summary: 12,105 total SFL credits across 1,000 games. Slot-0 events (bonus-FT putback path): 1 — very rare, as expected.
+
+Per-player SFL per game (selected): Javon Okafor (big) 1.8, Darius Eze (big) 1.7, Cory Baptiste (perimeter) 0.7, Malik Thornton (perimeter) 0.7. Interior players commit more shooting fouls — directionally correct.
+
+*Phase 24:* still PASSED — no regression. *Stress test:* all 8 buckets still PASSED — no regression.
+
+**ALL CHECKS PASSED.**
+
+**Calibration note (first target):** The matched-man share (50–80% by zone) and the interior tilt strength (`signedK ±0.50`, `SCALE=40`) are placeholders. With the Phase 24 controlled roster, the big defender gets ~58% of the rim-shot residual — stronger than a typical game would produce. Calibration should start here, likely by raising SCALE (weakening the interior tilt) or lowering `signedK`, once realistic rosters are in use.
+
+**Deferred (unchanged):** True per-player attribution across substitutions; non-shooting fouls (team foul rate, offensive fouls, loose-ball fouls); calibration of the zone tables and tilt parameters; per-player foul tracking (individual foul ledger — requires a separate session).
+
 ## Session 58 — Phase 24: Attribution Sanity Check (controlled roster, 200 games) (2026-06-17)
 
 **Scope:** Verify that the weighting system preferentially credits players with the intended attributes. One new harness check (`AttributionSanityCheck`) — no engine changes, no config changes, no new rolls. The check constructs a controlled 10-player roster, runs 200 games, and tests directional assertions against the Phase 23 attribution machinery.

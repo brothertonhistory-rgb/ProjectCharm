@@ -134,7 +134,8 @@ internal static class Program
         ok &= Phase15PressFrequencyStandardCheck(configPath);
         ok &= Phase16PressBreakFastBreakCheck(configPath);
         ok &= Phase17UsageEfficiencyCheck(configPath);
-        ok &= AttributionSanityCheck(configPath);
+        ok &= AttributionSanityCheck(configPath);            // Phase 24
+        ok &= Phase25ShootingFoulAttributionCheck(configPath); // Phase 25
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -4299,6 +4300,8 @@ internal static class Program
         var bsTo   = new long[10]; var bsOReb = new long[10];
         var bsDReb = new long[10]; var bsStl  = new long[10];
         var bsBlk  = new long[10];
+        // Phase 25: shooting fouls committed (SFL) per player — weighted draw, seed+3 RNG.
+        var bsShFoul = new long[10];
         var bsGames = 0;
         var attributionOk = true;   // hard-fail flag for post-loop attribution checks
         GovernorRunResult? seedOneResult = null;  // captured for reproducibility check
@@ -4846,6 +4849,29 @@ internal static class Program
                 bsOReb[i] += attributed.OReb[i]; bsDReb[i] += attributed.DReb[i];
                 bsBlk [i] += attributed.Blk [i]; bsStl [i] += attributed.Stl [i];
                 bsTo  [i] += attributed.To  [i];
+                // Phase 25: accumulate shooting-foul credits (seed+3 RNG — seed+2 unchanged).
+                bsShFoul[i] += attributed.ShFoul[i];
+            }
+
+            // ── Phase 25: shooting-foul per-possession validity checks ────────
+            // ShooterSlot must be 0–5; zone must be a defined ShotLocation enum value.
+            // These are event-level checks (per-possession); completeness is below.
+            foreach (var r in records)
+            {
+                if (r.ShootingFouls is null) continue;
+                foreach (var sf in r.ShootingFouls)
+                {
+                    if (sf.ShooterSlot < 0 || sf.ShooterSlot > 5)
+                    {
+                        Console.WriteLine($"  [FAIL] Seed {seed}: ShooterSlot {sf.ShooterSlot} outside 0–5");
+                        attributionOk = false;
+                    }
+                    if (!Enum.IsDefined(typeof(ShotLocation), sf.Zone))
+                    {
+                        Console.WriteLine($"  [FAIL] Seed {seed}: ShootingFoulEvent.Zone {sf.Zone} is not a defined ShotLocation");
+                        attributionOk = false;
+                    }
+                }
             }
 
             foreach (var r in records)
@@ -5069,25 +5095,65 @@ internal static class Program
             }
         }
 
+        // ── Phase 25: shooting-foul completeness invariant ────────────────────
+        // Side-specific reconciliation: credited fouls for each team must equal the
+        // total shooting-foul events where that team was on defense. A global check
+        // alone would pass a side-reversal bug; per-side checks catch it.
+        {
+            long totalHomeShFoulEvents = 0L;   // possessions where Home defended
+            long totalAwayShFoulEvents = 0L;   // possessions where Away defended
+            foreach (var r in seedOneResult!.Possessions)
+            {
+                if (r.ShootingFouls is null) continue;
+                if (r.Defense == TeamSide.Home) totalHomeShFoulEvents += r.ShootingFouls.Count;
+                else                            totalAwayShFoulEvents += r.ShootingFouls.Count;
+            }
+            // Note: bsShFoul is an aggregate across all 1,000 games, so we cannot
+            // do a per-seed side check here without re-running attribution. The
+            // invariant below therefore checks totals across all games. The strong
+            // per-side check (requiring game-level defense side access) runs in
+            // Phase25ShootingFoulAttributionCheck's 200-game end-to-end path.
+            var creditedTotal = bsShFoul.Sum();
+            // Re-compute total shooting-foul events across all games from accumulated data.
+            // (ObservationRunV1 does not maintain a running total, so we rely on the
+            // Phase 25 check's 200-game path for the hard per-side assertion.)
+            Console.WriteLine();
+            Console.WriteLine($"  Phase 25 shooting-foul summary (1,000 games):");
+            Console.WriteLine($"    Seed-1 game — Home defense events: {totalHomeShFoulEvents}, Away defense events: {totalAwayShFoulEvents}");
+            Console.WriteLine($"    Slot-0 events (bonus-FT putback, expected small): {seedOneResult.Possessions.Where(r => r.ShootingFouls != null).SelectMany(r => r.ShootingFouls!).Count(sf => sf.ShooterSlot == 0)}");
+            Console.WriteLine($"    Total SFL credits across all 1,000 games: {creditedTotal}");
+            if (creditedTotal == 0 && bsGames > 0)
+            {
+                Console.WriteLine("  [FAIL] Phase 25: zero SFL credits across all games — wiring break");
+                attributionOk = false;
+            }
+            else
+            {
+                Console.WriteLine("  [OK] Phase 25: SFL credits populated (full per-side invariant in Phase25ShootingFoulAttributionCheck).");
+            }
+        }
+
         // ── Phase 23 §5h: per-player box score ───────────────────────────────
         Console.WriteLine();
         Console.WriteLine($"=== PER-PLAYER BOX SCORE (per-game averages, {bsGames} games) ===");
         Console.WriteLine("  Exact attribution: FGA, FGM, 3PA, 3PM, FTA, FTM.");
         Console.WriteLine("  Weighted credit (probabilistic): ORB, DRB, REB, STL, BLK, TO (post-Roll-E exact; pre-Roll-E by BallHandling weight).");
-        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"TO",5}");
-        Console.WriteLine(new string('─', 115));
+        Console.WriteLine("  SFL = shooting fouls committed; excludes all non-shooting and offensive fouls.");
+        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"TO",5} {"SFL",5}");
+        Console.WriteLine(new string('─', 121));
         for (var i = 0; i < 10; i++)
         {
             var player = boxPlayers[i];
             if (player is null) continue;
             {
                 double g = bsGames;
-                var fga  = bsFga[i]  / g;  var fgm  = bsFgm[i]  / g;
-                var tpa  = bs3pa[i]  / g;  var tpm  = bs3pm[i]  / g;
-                var fta  = bsFta[i]  / g;  var ftm  = bsFtm[i]  / g;
-                var orb  = bsOReb[i] / g;  var drb  = bsDReb[i] / g;
-                var stl  = bsStl[i]  / g;  var blk  = bsBlk[i]  / g;
-                var to   = bsTo[i]   / g;
+                var fga  = bsFga[i]   / g;  var fgm  = bsFgm[i]   / g;
+                var tpa  = bs3pa[i]   / g;  var tpm  = bs3pm[i]   / g;
+                var fta  = bsFta[i]   / g;  var ftm  = bsFtm[i]   / g;
+                var orb  = bsOReb[i]  / g;  var drb  = bsDReb[i]  / g;
+                var stl  = bsStl[i]   / g;  var blk  = bsBlk[i]   / g;
+                var to   = bsTo[i]    / g;
+                var sfl  = bsShFoul[i]/ g;
                 var pts  = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
                 var fgPct  = fga  > 0 ? fgm  / fga  * 100 : 0.0;
                 var tpPct  = tpa  > 0 ? tpm  / tpa  * 100 : 0.0;
@@ -5097,7 +5163,7 @@ internal static class Program
                 Console.WriteLine(
                     $"  {label,-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
                     $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
-                    $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {to,5:F1}");
+                    $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {to,5:F1} {sfl,5:F1}");
             }
         }
         Console.WriteLine($"=== END PER-PLAYER BOX SCORE ===");
@@ -5190,13 +5256,15 @@ internal static class Program
         public long[] OReb = new long[10]; public long[] DReb = new long[10];
         public long[] Blk  = new long[10]; public long[] Stl  = new long[10];
         public long[] To   = new long[10];
+        // Phase 25: shooting fouls committed (SFL) — weighted draw, separate seed+3 RNG.
+        public long[] ShFoul = new long[10];
         public static bool AllEqual(PlayerBoxTotals a, PlayerBoxTotals b) =>
             a.Fga.SequenceEqual(b.Fga)   && a.Fgm.SequenceEqual(b.Fgm) &&
             a.Tpa.SequenceEqual(b.Tpa)   && a.Tpm.SequenceEqual(b.Tpm) &&
             a.Fta.SequenceEqual(b.Fta)   && a.Ftm.SequenceEqual(b.Ftm) &&
             a.OReb.SequenceEqual(b.OReb) && a.DReb.SequenceEqual(b.DReb) &&
             a.Blk.SequenceEqual(b.Blk)   && a.Stl.SequenceEqual(b.Stl) &&
-            a.To.SequenceEqual(b.To);
+            a.To.SequenceEqual(b.To)     && a.ShFoul.SequenceEqual(b.ShFoul);
     }
 
     /// <summary>Run the full per-game attribution pass. Calling twice with the same
@@ -5206,6 +5274,9 @@ internal static class Program
     {
         var t = new PlayerBoxTotals();
         var rng = new Random(seed + 2);
+        // Phase 25: separate RNG for shooting-foul draws so the seed+2 stream
+        // (TO/STL/DReb/OReb/BLK) is consumed identically — those numbers do not move.
+        var foulRng = new Random(seed + 3);
         var homeRoster = game.RosterFor(TeamSide.Home);
         var awayRoster = game.RosterFor(TeamSide.Away);
         Roster RosterFor(TeamSide s) => s == TeamSide.Home ? homeRoster : awayRoster;
@@ -5262,8 +5333,148 @@ internal static class Program
                 var bp = defRoster.PlayerAt(new Slot(r.Defense, bSlot));
                 if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 10) t.Blk[bp.PlayerId - 1]++;
             }
+            // Phase 25: shooting-foul attribution. Separate RNG (seed+3) so the seed+2
+            // stream (TO/STL/DReb/OReb/BLK) is consumed identically — those numbers do not move.
+            if (r.ShootingFouls is { } sfs)
+                foreach (var sf in sfs)
+                {
+                    var fSlot = DrawFoulingDefender(foulRng, r.Defense, defRoster, sf.Zone, sf.ShooterSlot);
+                    var fp = defRoster.PlayerAt(new Slot(r.Defense, fSlot));
+                    if (fp != null && fp.PlayerId >= 1 && fp.PlayerId <= 10) t.ShFoul[fp.PlayerId - 1]++;
+                }
         }
         return t;
+    }
+
+    /// <summary>
+    /// Draw the defending slot that committed a shooting foul, given the shot zone and
+    /// the shooter's slot number. Returns a slot 1–5 for the defending team.
+    ///
+    /// <para>Logic: the defender at the same slot index as the shooter (the "matched man")
+    /// gets a fixed share of the probability determined by zone alone. The remaining
+    /// probability is spread across the other four defenders with an interior-ness tilt
+    /// whose direction flips by zone — rim fouls favor the interior big helping late,
+    /// three-point fouls favor the perimeter defenders closing out or switching.</para>
+    ///
+    /// <para>Interior proxy: <c>Height + Strength + PostDefense</c> (unweighted, no
+    /// MatchupConfig dependency). The exponential form is the same shape as the existing
+    /// STL/BLK/DReb weighted draws but with a signed coefficient.</para>
+    ///
+    /// <para>Placeholders (calibration targets — wire the form, tune in a later session):
+    /// matched-share table, signedK table, SCALE = 40.0.</para>
+    /// </summary>
+    private static int DrawFoulingDefender(
+        Random rng, TeamSide side, Roster roster,
+        ShotLocation zone, int shooterSlot)
+    {
+        // ── Zone lookup tables (CALIBRATION PLACEHOLDERS) ────────────────────
+        // matchedShare: fraction of probability given to the defender at the same slot
+        //   index as the shooter. Fixed by zone regardless of shooter's interior-ness.
+        // signedK: controls direction and strength of the interior tilt on the residual.
+        //   Positive = favor interior (rim); negative = favor perimeter (three).
+        // SCALE: denominator for the interior-deviation term. Larger → weaker tilt.
+        // NOTE: with the Phase 24 roster (Anchor interior=230, Perim interior=115,
+        // meanInt=138), SCALE=40 gives the Anchor ~58% of the rim residual — stronger
+        // than the ~37% estimated at draft time (which assumed SCALE≈100). Flagged for
+        // calibration; wire-the-form session does not tune these values.
+        static double MatchedShare(ShotLocation z) => z switch
+        {
+            ShotLocation.Rim   => 0.50,
+            ShotLocation.Short => 0.65,
+            ShotLocation.Mid   => 0.70,
+            ShotLocation.Long  => 0.80,
+            ShotLocation.Three => 0.80,
+            _ => throw new InvalidOperationException($"DrawFoulingDefender: unmapped zone '{z}'.")
+        };
+        static double SignedK(ShotLocation z) => z switch
+        {
+            ShotLocation.Rim   => +0.50,
+            ShotLocation.Short => +0.25,
+            ShotLocation.Mid   =>  0.00,
+            ShotLocation.Long  => -0.25,
+            ShotLocation.Three => -0.50,
+            _ => throw new InvalidOperationException($"DrawFoulingDefender: unmapped zone '{z}'.")
+        };
+        const double Scale = 40.0;
+
+        // ── Populate the five defending slots ────────────────────────────────
+        // Gather (slot index, interior score) for every populated slot.
+        var slots = new List<(int Slot, double Interior)>(5);
+        for (var s = 1; s <= 5; s++)
+        {
+            var p = roster.PlayerAt(new Slot(side, s));
+            if (p != null)
+                slots.Add((s, p.Height + p.Strength + p.PostDefense));
+        }
+
+        if (slots.Count == 0)
+            throw new InvalidOperationException(
+                $"DrawFoulingDefender: team {side} has no populated slots — cannot attribute shooting foul.");
+
+        // ── Fail-soft fallback: shooterSlot == 0 (bonus-FT putback, Roll E never ─
+        // ran) or its defending slot is unpopulated. Draw flat over all populated
+        // defenders — attribution must never crash a completed game.
+        bool matcherPopulated = shooterSlot >= 1 && shooterSlot <= 5
+            && slots.Any(x => x.Slot == shooterSlot);
+
+        double[] weights = new double[slots.Count];
+        if (shooterSlot == 0 || !matcherPopulated)
+        {
+            // Flat fallback.
+            for (var i = 0; i < slots.Count; i++) weights[i] = 1.0;
+        }
+        else
+        {
+            // ── Normal path: matched man + interior-tilt residual ────────────
+            var ms       = MatchedShare(zone);
+            var k        = SignedK(zone);
+            var residual = 1.0 - ms;
+
+            // Mean interior-ness over all populated slots (denominator for deviation).
+            var meanInt = slots.Average(x => x.Interior);
+
+            // Residual slots = everyone except the matched man.
+            var residualSlots = slots.Where(x => x.Slot != shooterSlot).ToList();
+
+            if (residualSlots.Count == 0)
+            {
+                // Edge: matched man is the only populated defender — give them 100%.
+                for (var i = 0; i < slots.Count; i++)
+                    weights[i] = slots[i].Slot == shooterSlot ? 1.0 : 0.0;
+            }
+            else
+            {
+                // Compute raw exponential weights for residual defenders.
+                var rawResidual = residualSlots
+                    .Select(x => Math.Exp(k * (x.Interior - meanInt) / Scale))
+                    .ToArray();
+                var sumRaw = rawResidual.Sum();
+
+                for (var i = 0; i < slots.Count; i++)
+                {
+                    if (slots[i].Slot == shooterSlot)
+                    {
+                        weights[i] = ms;
+                    }
+                    else
+                    {
+                        var ri = residualSlots.FindIndex(x => x.Slot == slots[i].Slot);
+                        weights[i] = residual * rawResidual[ri] / sumRaw;
+                    }
+                }
+            }
+        }
+
+        // ── Cumulative draw (same shape as WeightedDraw) ─────────────────────
+        var total = weights.Sum();
+        var draw  = rng.NextDouble() * total;
+        var cumul = 0.0;
+        for (var i = 0; i < slots.Count - 1; i++)
+        {
+            cumul += weights[i];
+            if (draw < cumul) return slots[i].Slot;
+        }
+        return slots[slots.Count - 1].Slot;
     }
 
     private static int WeightedDraw(Random rng, TeamSide side, Roster roster,
@@ -11171,5 +11382,266 @@ internal static class Program
 
         return sanityOk;
     }
-}
 
+    // ── Phase 25: Shooting-Foul Attribution Check ─────────────────────────────
+
+    // ── Phase 25: Shooting-Foul Attribution Check ─────────────────────────────
+
+    private static bool Phase25ShootingFoulAttributionCheck(string configPath)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- Phase 25: Shooting-Foul Attribution Check ---");
+        Console.WriteLine("  Directional test: draws DrawFoulingDefender directly (100k draws per scenario, no end-to-end confound).");
+        Console.WriteLine("  End-to-end test: 200 games with the Phase 24 controlled roster (completeness + no-zero check).");
+        Console.WriteLine();
+
+        var checkOk = true;
+
+        // ── Load configs (same pattern as AttributionSanityCheck) ─────────────
+        var cfg        = RollAConfig.Load(configPath);
+        var cfgB       = RollBConfig.Load(configPath);
+        var cfgC       = RollCConfig.Load(configPath);
+        var cfgD       = RollDConfig.Load(configPath);
+        var cfgE       = RollEConfig.Load(configPath);
+        var cfgF       = RollFConfig.Load(configPath);
+        var cfgG       = RollGConfig.Load(configPath);
+        var cfgH       = RollHConfig.Load(configPath);
+        var cfgI       = RollIConfig.Load(configPath);
+        var cfgJ       = RollJConfig.Load(configPath);
+        var cfgK       = RollKConfig.Load(configPath);
+        var cfgL       = RollLConfig.Load(configPath);
+        var cfgM       = RollMConfig.Load(configPath);
+        var cfgOffFoul = RollOffensiveFoulConfig.Load(configPath);
+        var cfgGov     = GovernorConfig.Load(configPath);
+        var cfgClock   = RollClockConfig.Load(configPath);
+        var cfgEndHalf = EndOfHalfConfig.Load(configPath);
+        var cfgMatchup = MatchupConfig.Load(configPath);
+
+        // ── Controlled roster templates (identical to AttributionSanityCheck) ──
+        var anchorTemplate = new Player("RimAnchor")
+        {
+            Height=92, Wingspan=92, Strength=88, Vertical=50,
+            DefensiveRebounding=95, OffensiveRebounding=90,
+            RimProtection=90, Finishing=90, FreeThrow=55,
+            Outside=10, ThreeTendency=1, RimTendency=80,
+            BallHandling=40, FoulDrawing=30,
+            Close=50, Mid=50, ShortTendency=10, MidTendency=5, LongTendency=4,
+            Passing=50, Playmaking=50, SelfCreation=50, PostMoves=50,
+            OffBallMovement=50, Screening=50,
+            PerimeterDefense=50, PostDefense=50, Steals=50,
+            Weight=50, Speed=50, Quickness=50, FirstStep=50,
+            Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50,
+        };
+        var roleTemplate = new Player("PerimRole")
+        {
+            Height=35, Wingspan=35, Strength=30, Vertical=35,
+            DefensiveRebounding=5, OffensiveRebounding=5,
+            RimProtection=5, Finishing=35, FreeThrow=78,
+            Outside=75, ThreeTendency=60, RimTendency=10,
+            BallHandling=65, FoulDrawing=65,
+            Close=50, Mid=50, ShortTendency=10, MidTendency=15, LongTendency=15,
+            Passing=50, Playmaking=50, SelfCreation=50, PostMoves=50,
+            OffBallMovement=50, Screening=50,
+            PerimeterDefense=50, PostDefense=50, Steals=50,
+            Weight=50, Speed=50, Quickness=50, FirstStep=50,
+            Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50,
+        };
+
+        // ── §4.2 Directional test ─────────────────────────────────────────────
+        // Build a minimal GameState for the directional test — just need a Roster
+        // seeded with the five controlled players. No resolver or governor needed.
+        const int DrawN = 100_000;
+        const double Tol = 0.02;
+
+        var dtGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        {
+            var lineup = dtGame.LineupFor(TeamSide.Home);
+            var roster = dtGame.RosterFor(TeamSide.Home);
+            roster.SetStarter(lineup.SlotAt(1), StampPlayerId(anchorTemplate, 1));
+            for (var i = 1; i <= 4; i++)
+                roster.SetStarter(lineup.SlotAt(i + 1), StampPlayerId(roleTemplate, i + 1));
+        }
+        var dtRoster = dtGame.RosterFor(TeamSide.Home);
+
+        static long[] TallyDraw(Random rng, TeamSide side, Roster roster,
+            ShotLocation zone, int shooterSlot)
+        {
+            var counts = new long[6];
+            for (var n = 0; n < DrawN; n++)
+            {
+                var s = DrawFoulingDefender(rng, side, roster, zone, shooterSlot);
+                if (s >= 1 && s <= 5) counts[s]++;
+            }
+            return counts;
+        }
+
+        // Scenario 1: Guard shoots three (shooterSlot=2, zone=Three)
+        {
+            var rng = new Random(25001);
+            var c = TallyDraw(rng, TeamSide.Home, dtRoster, ShotLocation.Three, 2);
+            double ms = c[2]/(double)DrawN, s1 = c[1]/(double)DrawN;
+            double s3 = c[3]/(double)DrawN, s4 = c[4]/(double)DrawN, s5 = c[5]/(double)DrawN;
+            Console.WriteLine("  Scenario 1: guard shoots three (slot=2, zone=Three, seed=25001)");
+            Console.WriteLine($"    Slot 1(int)={s1:F4}  Slot 2(mtch)={ms:F4}  Slot 3={s3:F4}  Slot 4={s4:F4}  Slot 5={s5:F4}");
+            bool mOk = Math.Abs(ms - 0.80) <= Tol;
+            bool dOk = s3 > s1 && s4 > s1 && s5 > s1;
+            Console.WriteLine($"    [{(mOk ? "OK" : "FAIL")}] Matched share ~0.80 (observed {ms:F4})");
+            Console.WriteLine($"    [{(dOk ? "OK" : "FAIL")}] Three residual: perimeter (3,4,5) > interior (1)");
+            if (!mOk || !dOk) checkOk = false;
+        }
+
+        // Scenario 2: Guard drives rim (shooterSlot=2, zone=Rim)
+        {
+            var rng = new Random(25002);
+            var c = TallyDraw(rng, TeamSide.Home, dtRoster, ShotLocation.Rim, 2);
+            double ms = c[2]/(double)DrawN, s1 = c[1]/(double)DrawN;
+            double s3 = c[3]/(double)DrawN, s4 = c[4]/(double)DrawN, s5 = c[5]/(double)DrawN;
+            Console.WriteLine("  Scenario 2: guard drives rim (slot=2, zone=Rim, seed=25002)");
+            Console.WriteLine($"    Slot 1(int)={s1:F4}  Slot 2(mtch)={ms:F4}  Slot 3={s3:F4}  Slot 4={s4:F4}  Slot 5={s5:F4}");
+            bool mOk = Math.Abs(ms - 0.50) <= Tol;
+            bool dOk = s1 > s3 && s1 > s4 && s1 > s5;
+            Console.WriteLine($"    [{(mOk ? "OK" : "FAIL")}] Matched share ~0.50 (observed {ms:F4})");
+            Console.WriteLine($"    [{(dOk ? "OK" : "FAIL")}] Rim residual: interior (1) > each perimeter (3,4,5)");
+            if (!mOk || !dOk) checkOk = false;
+        }
+
+        // Scenario 3: Big shoots three (shooterSlot=1, zone=Three)
+        {
+            var rng = new Random(25003);
+            var c = TallyDraw(rng, TeamSide.Home, dtRoster, ShotLocation.Three, 1);
+            double ms = c[1]/(double)DrawN;
+            double s2 = c[2]/(double)DrawN, s3 = c[3]/(double)DrawN, s4 = c[4]/(double)DrawN, s5 = c[5]/(double)DrawN;
+            Console.WriteLine("  Scenario 3: big shoots three (slot=1, zone=Three, seed=25003)");
+            Console.WriteLine($"    Slot 1(mtch)={ms:F4}  Slot 2={s2:F4}  Slot 3={s3:F4}  Slot 4={s4:F4}  Slot 5={s5:F4}");
+            bool mOk = Math.Abs(ms - 0.80) <= Tol;
+            Console.WriteLine($"    [{(mOk ? "OK" : "FAIL")}] Matched share ~0.80 (observed {ms:F4})");
+            Console.WriteLine("    [NOTE] Residual (2-5) all perimeter — roughly equal expected.");
+            if (!mOk) checkOk = false;
+        }
+
+        // Scenario 4: Big at rim (shooterSlot=1, zone=Rim)
+        {
+            var rng = new Random(25004);
+            var c = TallyDraw(rng, TeamSide.Home, dtRoster, ShotLocation.Rim, 1);
+            double ms = c[1]/(double)DrawN;
+            double s2 = c[2]/(double)DrawN, s3 = c[3]/(double)DrawN, s4 = c[4]/(double)DrawN, s5 = c[5]/(double)DrawN;
+            Console.WriteLine("  Scenario 4: big at rim (slot=1, zone=Rim, seed=25004)");
+            Console.WriteLine($"    Slot 1(mtch)={ms:F4}  Slot 2={s2:F4}  Slot 3={s3:F4}  Slot 4={s4:F4}  Slot 5={s5:F4}");
+            bool mOk = Math.Abs(ms - 0.50) <= Tol;
+            Console.WriteLine($"    [{(mOk ? "OK" : "FAIL")}] Matched share ~0.50 (observed {ms:F4})");
+            Console.WriteLine("    [NOTE] Residual (2-5) all perimeter — roughly equal expected.");
+            if (!mOk) checkOk = false;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("  --- End-to-end completeness (200 games, controlled roster) ---");
+
+        const int Games25 = 200;
+        var bsShFoul25 = new long[10];
+        long totalHomeDefEvents = 0L;
+        long totalAwayDefEvents = 0L;
+
+        var firstState25 = new PossessionState(
+            PossessionNumber: 1,
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
+            Entry: EntryType.DeadBallInbound);
+
+        Console.Write($"  Running {Games25} games");
+
+        for (var seed = 1; seed <= Games25; seed++)
+        {
+            if (seed % 50 == 0) Console.Write(".");
+
+            var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+
+            foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
+            {
+                var lineup = game.LineupFor(side);
+                var roster = game.RosterFor(side);
+                var idBase = side == TeamSide.Home ? 1 : 6;
+                roster.SetStarter(lineup.SlotAt(1), StampPlayerId(anchorTemplate, idBase));
+                for (var i = 1; i <= 4; i++)
+                    roster.SetStarter(lineup.SlotAt(i + 1), StampPlayerId(roleTemplate, idBase + i));
+            }
+
+            game.SetPossessionArrow(TeamSide.Home);
+
+            var resolver = new Resolver(
+                new RollAGenerator(cfg, cfgMatchup, game), cfg,
+                new RollBGenerator(cfgB, cfgMatchup, game),
+                new RollCStubPieGenerator(cfgC), cfgC,
+                new RollDStubPieGenerator(cfgD),
+                new RollEGenerator(cfgE, game),
+                new RollFGenerator(cfgF, cfgMatchup, game),
+                new RollGGenerator(cfgG, cfgMatchup, game),
+                new RollHGenerator(cfgH, cfgMatchup, game),
+                new RollIGenerator(cfgI, cfgMatchup, game),
+                new RollJStubPieGenerator(cfgJ),
+                new RollKStubPieGenerator(cfgK),
+                new RollLGenerator(cfgL, game),
+                new RollMGenerator(cfgM, cfgMatchup, game),
+                new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
+                cfgMatchup, game, new SystemRng(seed));
+
+            var governor = new Governor(resolver, game, cfgGov, cfgClock, new SystemRng(seed + 1), cfgEndHalf);
+            var result   = governor.Run(firstState25);
+
+            foreach (var r in result.Possessions)
+            {
+                if (r.ShootingFouls is null) continue;
+                if (r.Defense == TeamSide.Home) totalHomeDefEvents += r.ShootingFouls.Count;
+                else                             totalAwayDefEvents += r.ShootingFouls.Count;
+            }
+
+            var attributed = AttributeGame(result, game, seed);
+            for (var i = 0; i < 10; i++) bsShFoul25[i] += attributed.ShFoul[i];
+        }
+
+        Console.WriteLine($" done ({Games25}/{Games25} completed).");
+        Console.WriteLine();
+
+        var creditedHome = bsShFoul25[0]+bsShFoul25[1]+bsShFoul25[2]+bsShFoul25[3]+bsShFoul25[4];
+        var creditedAway = bsShFoul25[5]+bsShFoul25[6]+bsShFoul25[7]+bsShFoul25[8]+bsShFoul25[9];
+        var globalCred   = creditedHome + creditedAway;
+        var globalEvts   = totalHomeDefEvents + totalAwayDefEvents;
+
+        Console.WriteLine($"    Shooting-foul events — Home defense: {totalHomeDefEvents}, Away defense: {totalAwayDefEvents}");
+        Console.WriteLine($"    SFL credits — Home players: {creditedHome}, Away players: {creditedAway}");
+
+        if (creditedHome == totalHomeDefEvents && creditedAway == totalAwayDefEvents)
+            Console.WriteLine("  [OK] Side-specific reconciliation: creditedHome == totalHome AND creditedAway == totalAway");
+        else
+        {
+            Console.WriteLine($"  [FAIL] Side-specific reconciliation: Home {creditedHome} != {totalHomeDefEvents} OR Away {creditedAway} != {totalAwayDefEvents}");
+            checkOk = false;
+        }
+
+        if (globalCred == globalEvts)
+            Console.WriteLine($"  [OK] Global completeness: total SFL == total events ({globalEvts})");
+        else
+        {
+            Console.WriteLine($"  [FAIL] Global completeness: {globalCred} != {globalEvts}");
+            checkOk = false;
+        }
+
+        var noZero = true;
+        for (var i = 0; i < 10; i++)
+        {
+            if (bsShFoul25[i] == 0)
+            {
+                Console.WriteLine($"  [FAIL] Player index {i} (PlayerId {i+1}) has 0 SFL across {Games25} games");
+                checkOk = false; noZero = false;
+            }
+        }
+        if (noZero)
+            Console.WriteLine($"  [OK] No-zero defender: all 10 players > 0 SFL across {Games25} games");
+
+        Console.WriteLine();
+        Console.WriteLine(checkOk
+            ? "  Shooting-foul attribution check: PASSED"
+            : "  Shooting-foul attribution check: FAILED (see [FAIL] lines above)");
+
+        return checkOk;
+    }
+}

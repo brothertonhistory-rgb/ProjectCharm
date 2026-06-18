@@ -4502,3 +4502,98 @@ FoulDrawing is set asymmetrically (Anchor=30, Role=65) to ensure both sample gat
 
 The invariant checks inside `AttributionSanityCheck` duplicate logic from `ObservationRunV1`. This is accepted for Phase 24 scope — the two call sites can diverge over time as rosters evolve. A future `ValidateAttributionTotals` shared-helper extraction is logged as a candidate refactor.
 
+
+---
+
+## Phase 25 — Shooting Foul Attribution
+
+### What this session adds and what it does not
+
+Phase 25 wires shooting-foul events from the resolver walk to the attribution pass and draws a weighted-credit fouling defender for each event. It does NOT introduce per-player foul tracking (individual foul ledger, foul-trouble logic), does NOT cover non-shooting fouls (team fouls, offensive fouls, loose-ball fouls), and does NOT calibrate the formula parameters.
+
+### ShootingFoulEvent — the record
+
+`ShootingFoulEvent(ShotLocation Zone, int ShooterSlot)` is a `readonly record struct` appended to the walk's `shootingFouls` list each time the resolver hits `ContinuationKind.ResolveShootingFreeThrows`. One event per `MadeAndFouled` / `MissFouled` resolution.
+
+`ShooterSlot` is 1–5 when Roll E ran (the normal path) and 0 on the rare bonus-FT putback path where Roll E never fired (`PossessionState.SelectedSlot` was null at the edge). The 0 value is the "no matched man" sentinel; `DrawFoulingDefender` routes it to a flat fallback.
+
+### Why a possession can carry more than one event
+
+Roll K's PutBack arm routes back to `ContinuationKind.IntoShotResolution` with zone forced to `ShotLocation.Rim`. A putback can itself be fouled, generating a second `ResolveShootingFreeThrows` hit in the same resolver walk. The `List<ShootingFoulEvent>` in the walk accumulator (snapshotted to an array at the Terminal return) handles this naturally; a scalar count would not.
+
+### The `?? 0` / `!` asymmetry at the edge
+
+At `ResolveShootingFreeThrows`:
+
+```csharp
+shootingFouls.Add(new ShootingFoulEvent(
+    c.State.ShotType!.Value,          // non-null: Roll G always stamps zone
+    c.State.SelectedSlot?.Number ?? 0 // may be null: bonus-FT putback
+));
+```
+
+`ShotType` is asserted non-null (`!`) because Roll G stamps the zone before Roll H fires the foul — this is always true on this edge. `SelectedSlot` is null-safe (`?? 0`) because the bonus-FT putback path (Roll K PutBack → `IntoShotResolution`, where Roll E never ran) reaches this edge with `SelectedSlot` null. This is a legitimate game path, not a bug; 0 is the sentinel, not a throw.
+
+This pattern matches the pre-existing Phase 23 FTA/FTM slot reads in the same block.
+
+### DrawFoulingDefender — the formula
+
+```
+interior(p) = p.Height + p.Strength + p.PostDefense   (unweighted; no MatchupConfig dependency)
+meanInt = mean interior across all populated defending slots
+```
+
+**Matched-man weight** (slot index equals shooter's slot index):
+
+| Zone | matchedShare | signedK |
+|---|---|---|
+| Rim | 0.50 | +0.50 |
+| Short | 0.65 | +0.25 |
+| Mid | 0.70 | 0.00 |
+| Long | 0.80 | −0.25 |
+| Three | 0.80 | −0.50 |
+
+**Residual weight** (all other populated slots):
+
+```
+raw_i = exp(signedK × (interior_i − meanInt) / SCALE)
+weight_i = (1 − matchedShare) × raw_i / Σraw
+```
+
+SCALE = 40.0. All zone values and SCALE are calibration placeholders.
+
+**Direction:** positive `signedK` favors interior defenders on the residual (rim fouls — the help big rotates late); negative `signedK` favors perimeter defenders (three-point fouls — the closeout or switching guard is most likely to foul). Mid is zone-neutral (K=0, flat exponential, equal residual weight).
+
+**Fallbacks (flat distribution over all populated defenders):**
+- `shooterSlot == 0` (bonus-FT putback, no matched man)
+- Matched slot is unpopulated
+
+**Cumulative draw:** same shape as `WeightedDraw` (the existing TO/STL/DReb/OReb/BLK draws), using the separate `seed+3` RNG.
+
+### RNG isolation: seed+3
+
+The existing `AttributeGame` attribution draws all consume `Random(seed+2)` in a fixed order: TO → STL → DReb → OReb loop → BLK loop. Adding shooting-foul draws to that stream would shift every prior draw number. Phase 25 introduces `var foulRng = new Random(seed+3)` for the foul draws only, leaving the `seed+2` stream bit-for-bit unchanged. The reproducibility contract (`AllEqual` on two calls with identical inputs) is extended to include `ShFoul`.
+
+### Completeness invariants
+
+Two checks in `Phase25ShootingFoulAttributionCheck`:
+
+**Side-specific reconciliation (exact integer identity):**
+```
+Σ ShFoul[Home player indices] == totalHomeDefEvents
+Σ ShFoul[Away player indices] == totalAwayDefEvents
+```
+A side-reversal bug would pass a global check but fail a side check. Both sides are verified independently.
+
+**Global completeness:**
+```
+Σ ShFoul[0..9] == Σ r.ShootingFouls.Count over all possessions
+```
+
+**No-zero defender:** every player must accrue > 0 SFL across 200 games. Zero fouls for a populated player indicates a dead draw path or wiring break.
+
+### Calibration targets (first session)
+
+All five matched-share values, all five signedK values, and SCALE=40.0 are calibration placeholders. With the Phase 24 controlled roster (Anchor interior=230, Perim interior=115, meanInt=138), SCALE=40 gives the interior big ~58% of the rim-shot residual probability. This is strong — the Anchor almost always gets blamed when a guard drives the rim without his matched defender available. Calibration should probably raise SCALE (weakening the tilt) once realistic rosters are in use. The first calibration target is to match real shot-chart fouling tendencies by zone.
+
+The draft prompt estimated ~37% of the rim residual going to the big (computed at SCALE≈100). The chosen SCALE=40 is deliberate — erring toward a visible, measurable effect that will show up in box scores and can be tuned down. Invisible effects are harder to calibrate.

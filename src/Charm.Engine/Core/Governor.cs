@@ -114,7 +114,12 @@ public sealed record PossessionRecord(
     SlotGroup FtmBySlot      = default,
     int       BlkCount            = 0,
     int?      TurnoverOffSlot     = null,
-    bool      TurnoverWasLiveBall = false);
+    bool      TurnoverWasLiveBall = false,
+    // Phase 25: shooting-foul events recorded by the resolver walk. Null on NoShot
+    // possessions (no resolver call); empty list on possessions with no shooting foul;
+    // one or more entries when MadeAndFouled / MissFouled fired. Nullable to mirror the
+    // Phase 23 additions pattern and to keep the NoShot path zero-allocation.
+    IReadOnlyList<ShootingFoulEvent>? ShootingFouls = null);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -284,6 +289,8 @@ public sealed class Governor
             var possessionBlkCount           = 0;
             int?  possessionTurnoverOffSlot    = null;
             var   possessionTurnoverWasLiveBall = false;
+            // Phase 25: shooting-foul events — null until the resolver branch sets it.
+            IReadOnlyList<ShootingFoulEvent>? possessionShootingFouls = null;
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -374,6 +381,8 @@ public sealed class Governor
                 possessionBlkCount           = outcome.BlkCount;
                 possessionTurnoverOffSlot     = outcome.TurnoverOffSlot;
                 possessionTurnoverWasLiveBall = outcome.TurnoverWasLiveBall;
+                // Phase 25 threading — already a snapshot array from the resolver walk.
+                possessionShootingFouls       = outcome.ShootingFouls;
             }
 
             // Shared by all three intent values + normal possessions.
@@ -401,7 +410,8 @@ public sealed class Governor
                 possessionThreePaBySlot, possessionThreePmBySlot,
                 possessionFtaBySlot,     possessionFtmBySlot,
                 possessionBlkCount,
-                possessionTurnoverOffSlot, possessionTurnoverWasLiveBall));
+                possessionTurnoverOffSlot, possessionTurnoverWasLiveBall,
+                possessionShootingFouls));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition

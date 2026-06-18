@@ -251,6 +251,19 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// (BadPassIntercepted or LostBallLiveBall). The harness issues exactly one STL
     /// credit when this is true.</summary>
     public bool TurnoverWasLiveBall { get; init; }
+
+    // ── Phase 25: shooting-foul events ───────────────────────────────────────
+    /// <summary>
+    /// Every shooting-foul event that occurred during this possession's walk —
+    /// one entry per <see cref="ShotResult.MadeAndFouled"/> or
+    /// <see cref="ShotResult.MissFouled"/> resolution. Empty (never null) on the
+    /// overwhelming majority of possessions. A possession extended by a putback
+    /// (Roll K → Roll H) can carry more than one entry.
+    /// <para>Init-only with an empty-array default, so every existing positional
+    /// construction (<c>new RoutingOutcome(false, "STUB:…")</c>) is untouched —
+    /// a pure append, like every prior init field.</para>
+    /// </summary>
+    public IReadOnlyList<ShootingFoulEvent> ShootingFouls { get; init; } = Array.Empty<ShootingFoulEvent>();
 }
 
 /// <summary>
@@ -464,7 +477,9 @@ public sealed class Resolver
         var blkCount      = 0;
         int? turnoverOffSlot   = null;
         var turnoverWasLiveBall = false;
-
+        // Phase 25: shooting-foul events (one per MadeAndFouled / MissFouled edge hit).
+        // A possession with no shooting foul stays empty; a putback possession can carry two.
+        var shootingFouls = new List<ShootingFoulEvent>();
         while (true)
         {
             if (++iterations > IterationCeiling)
@@ -525,7 +540,8 @@ public sealed class Resolver
                           FtmBySlot      = ftmBySlot,
                           BlkCount       = blkCount,
                           TurnoverOffSlot     = turnoverOffSlot,
-                          TurnoverWasLiveBall = turnoverWasLiveBall };
+                          TurnoverWasLiveBall = turnoverWasLiveBall,
+                          ShootingFouls  = shootingFouls.ToArray() };
 
                 case Continue c:
                     switch (c.Next)
@@ -882,6 +898,15 @@ public sealed class Resolver
                             // the shot resolved, so Roll G stamped the zone.
                             if (c.State.Result == ShotResult.MadeAndFouled)
                                 points += Scoring.FieldGoalPoints(c.State.ShotType!.Value);
+                            // Phase 25: record the shooting-foul event. ShotType is non-null
+                            // (Roll G stamped the zone before Roll H resolved the foul).
+                            // SelectedSlot MAY be null on a bonus-FT putback (Roll E never
+                            // ran) — 0 is the "no matched man" sentinel, NOT a throw, because
+                            // a bonus-FT-putback shot is a legitimate game path. The ?? 0
+                            // here matches the existing Phase 23 FTA/FTM slot reads below.
+                            shootingFouls.Add(new ShootingFoulEvent(
+                                c.State.ShotType!.Value,
+                                c.State.SelectedSlot?.Number ?? 0));
                             result = DriveFreeThrows(c.State, ShootingFoulShots(c.State), oneAndOne: false, out var shootingFtSpins, out var shootingFtPoints);
                             freeThrowSpins += shootingFtSpins;
                             points         += shootingFtPoints;
