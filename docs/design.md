@@ -5329,3 +5329,75 @@ All three share the same cumulative-walk structure and one-draw-per-possession c
 - **Reason-aware committer mapping** — every pre-selection turnover is attributed to the picked ball-handler-ish slot; no per-reason differentiation this session.
 - **Defensive rebounder picker** — DReb credit remains a post-hoc `WeightedDraw`; no in-possession consumer yet.
 - **Calibration of `PostFloor`, `PostnessScale`, or weight magnitudes** — correctness before calibration is the standing sequencing principle.
+
+---
+
+## Phase 34 — Turnover Attribution Completion (2026-06-19)
+
+### Type-aware committer dispatch
+
+Phase 33 attributed every turnover uniformly via `TurnoverCommitterPicker` (handling-weighted, perimeter-gated). Phase 34 replaces that single call with a three-branch type dispatch in `Resolver.Route()`:
+
+| Branch | Reasons (3) | Picker | TurnoverOffSlot |
+|---|---|---|---|
+| Team violations | FiveSecondInbound, TenSecondBackcourt, ShotClockViolation | — | null |
+| Interior violations + offensive foul | ThreeSecondViolation, OffensiveGoaltending, OffensiveFoul | TurnoverInteriorPicker | non-null |
+| Ball-handler violations | BadPassDeadBall, BadPassIntercepted, LostBallDeadBall, LostBallLiveBall, Travel, DoubleDribble, Carry, FiveSecondCloselyGuarded, BackcourtViolation | TurnoverCommitterPicker | non-null |
+
+`IsTurnoverPossession` is unchanged — all 15 reasons still return true. Team violations increment aggregate TO counts but carry no per-player attribution.
+
+### TurnoverInteriorPicker
+
+Post-weighted attribution helper for interior violations and offensive fouls. Same 3-stage structure as `TurnoverCommitterPicker`; the only formula difference is `(raw + 1) / 2` instead of `1 − (raw + 1) / 2`:
+
+```
+raw  = tanh((postness[i] − lineupMean) / TurnoverInteriorPostnessScale)
+mult = TurnoverInteriorGuardFloor + (1 − GuardFloor) × ((raw + 1) / 2)   // NOT inverted
+weight[i] = max(1, Strength × mult)
+```
+
+A post (raw > 0) gets `(raw+1)/2 > 0.5` → mult high. A guard (raw < 0) gets mult near `TurnoverInteriorGuardFloor`. Config keys: `TurnoverInteriorGuardFloor` (0.10), `TurnoverInteriorPostnessScale` (40.0).
+
+### StealerPicker
+
+Guard-favored attribution helper for live-ball turnovers (BadPassIntercepted, LostBallLiveBall). Reads the **defensive** lineup — the first picker to operate on the defense side. Formula is identical to `TurnoverCommitterPicker` (perimeter-favored); only the side, base attribute, and config keys differ:
+
+```
+raw  = tanh((defPostness[i] − defLineupMean) / StealerPostnessScale)
+mult = StealerPostFloor + (1 − PostFloor) × (1 − (raw + 1) / 2)
+weight[i] = max(1, Steals × mult)
+```
+
+Config keys: `StealerPostFloor` (0.10), `StealerPostnessScale` (40.0).
+
+### StealerSlot threading
+
+`int? stealerSlot = null` is declared alongside `turnoverOffSlot` in `Resolver.Route()`. It is set only inside the ball-handler branch when `turnoverWasLiveBall = true`, immediately after the `turnoverWasLiveBall` assignment:
+
+```csharp
+if (turnoverWasLiveBall)
+    stealerSlot = StealerPicker.Pick(t.State, _game, _matchup, _rng).Number;
+```
+
+`RoutingOutcome.StealerSlot` (int?, init) appends after `OrbBySlot`. `PossessionRecord.StealerSlot` (int?, null default) appends as the last positional parameter. Harness reads it as exact attribution with a throw on null for live-ball possessions.
+
+### RNG stream
+
+`StealerPicker` consumes one `_rng.NextUnitInterval()` draw per live-ball turnover possession. Every downstream draw on those possessions shifts — the same documented consequence as Phase 31 (OffensiveRebounderPicker) and Phase 33 (TurnoverCommitterPicker). Only DReb and BLK remain as harness `WeightedDraw` calls.
+
+### Picker family (updated)
+
+| Picker | Side | Attributes | Direction |
+|---|---|---|---|
+| `DefenderPicker` | Defense | Steals/Speed/... | perimeter favored |
+| `OffensiveRebounderPicker` | Offense | OffensiveRebounding × PositionalWeight | posts favored |
+| `TurnoverCommitterPicker` | Offense | BallHandling × perimeterMult | perimeter favored |
+| `TurnoverInteriorPicker` | Offense | Strength × interiorMult | posts favored |
+| `StealerPicker` | Defense | Steals × perimeterMult | perimeter favored |
+
+### What is not this session
+
+- **Offensive foul sub-type** (illegal screen vs. charge) — committer is now attributed; distinguishing the flavor is a future session.
+- **Team rebounds** — ball out of bounds off a miss; no individual defensive rebounder. Deferred.
+- **Defensive rebounder picker** — DReb credit remains a post-hoc `WeightedDraw`.
+- **Calibration** of any weight, floor, or scale — correctness before calibration is the standing sequencing principle.

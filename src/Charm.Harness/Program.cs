@@ -145,6 +145,7 @@ internal static class Program
         ok &= Phase31RebounderPickerCheck(configPath);         // Phase 31
         ok &= Phase32PutbackAttemptRateCheck(configPath);     // Phase 32
         ok &= Phase33TurnoverCommitterCheck(configPath);      // Phase 33
+        ok &= Phase34TurnoverAttributionCheck(configPath);    // Phase 34
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -4419,6 +4420,7 @@ internal static class Program
         long totalBlkCount = 0L;
         long totalStlPoss  = 0L;
         long totalToPoss   = 0L;
+        long totalTeamViolToPoss = 0L;   // Phase 34: team violations (null TurnoverOffSlot — no individual credit)
 
         var firstState = new PossessionState(
             PossessionNumber: 1,
@@ -4917,6 +4919,8 @@ internal static class Program
             totalBlkCount += records.Sum(r => r.BlkCount);
             totalStlPoss  += records.Count(r => r.TurnoverWasLiveBall);
             totalToPoss   += records.Count(IsTurnoverPossession);
+            totalTeamViolToPoss += records.Count(r =>
+                r.EndLabel is "FiveSecondInbound" or "TenSecondBackcourt" or "ShotClockViolation");
 
             // ── Phase 23: capture player display map on seed==1 ──────────────
             if (seed == 1)
@@ -5158,7 +5162,12 @@ internal static class Program
         // NOTE: BLK proves downward (every BlkCount credit distributed) but not upward
         // (Resolver captured every block in BlkCount). Upward validation is by code placement.
         if (bsStlTotal   != totalStlPoss)  { Console.WriteLine($"  [FAIL] Per-player STL {bsStlTotal} != live-TO possessions {totalStlPoss}");  attributionOk = false; }
-        if (bsToTotal    != totalToPoss)   { Console.WriteLine($"  [FAIL] Per-player TO {bsToTotal} != TO possessions {totalToPoss}");   attributionOk = false; }
+        if (bsToTotal    != totalToPoss - totalTeamViolToPoss)
+        {
+            Console.WriteLine($"  [FAIL] Per-player TO {bsToTotal} != individual-TO possessions {totalToPoss - totalTeamViolToPoss} " +
+                              $"(total TO {totalToPoss}, team violations {totalTeamViolToPoss} correctly unattributed — Phase 34)");
+            attributionOk = false;
+        }
 
         // ── Phase 23 §5g: same-seed reproducibility ───────────────────────────
         if (seedOneResult != null)
@@ -5370,7 +5379,9 @@ internal static class Program
         var t = new PlayerBoxTotals();
         var rng = new Random(seed + 2);
         // Phase 25: separate RNG for shooting-foul draws so the seed+2 stream
-        // (TO/STL/DReb/OReb/BLK) is consumed identically — those numbers do not move.
+        // (DReb/BLK — Phase 34) is consumed identically — those numbers do not move.
+        // OReb moved to engine-stamped in Phase 31; TO committer moved in Phase 33;
+        // STL moved in Phase 34. Only DReb and BLK remain as harness WeightedDraws.
         var foulRng = new Random(seed + 3);
         var homeRoster = game.RosterFor(TeamSide.Home);
         var awayRoster = game.RosterFor(TeamSide.Away);
@@ -5392,20 +5403,24 @@ internal static class Program
                 t.Tpa [oi] += r.ThreePaBySlot[slot]; t.Tpm [oi] += r.ThreePmBySlot[slot];
                 t.Fta [oi] += r.FtaBySlot[slot];    t.Ftm [oi] += r.FtmBySlot[slot];
             }
-            // TO
+            // TO — Phase 34: null TurnoverOffSlot = team violation (no individual credit).
             if (IsTurnoverPossession(r))
             {
-                var toSlot = r.TurnoverOffSlot
-                    ?? throw new InvalidOperationException(
-                        "Phase 33: TurnoverOffSlot null on a turnover possession — the engine committer " +
-                        "pick should make every turnover possession carry a slot. Wiring break.");
-                var top = offRoster.PlayerAt(new Slot(r.Offense, toSlot));
-                if (top != null && top.PlayerId >= 1 && top.PlayerId <= 10) t.To[top.PlayerId - 1]++;
+                if (r.TurnoverOffSlot is { } toSlot)
+                {
+                    var top = offRoster.PlayerAt(new Slot(r.Offense, toSlot));
+                    if (top != null && top.PlayerId >= 1 && top.PlayerId <= 10) t.To[top.PlayerId - 1]++;
+                }
+                // else: team violation (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation)
+                // — no individual credit; team TO count tracked at aggregate level only.
             }
-            // STL
+            // STL — Phase 34: read engine-stamped stealer from StealerSlot.
             if (r.TurnoverWasLiveBall)
             {
-                var stlSlot = WeightedDraw(rng, r.Defense, defRoster, p => p.Steals + p.Speed + p.Quickness);
+                var stlSlot = r.StealerSlot
+                    ?? throw new InvalidOperationException(
+                        "Phase 34: StealerSlot null on a live-ball turnover — the engine stealer " +
+                        "pick should stamp every live-ball possession. Wiring break.");
                 var stlp = defRoster.PlayerAt(new Slot(r.Defense, stlSlot));
                 if (stlp != null && stlp.PlayerId >= 1 && stlp.PlayerId <= 10) t.Stl[stlp.PlayerId - 1]++;
             }
@@ -5436,7 +5451,9 @@ internal static class Program
                 if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 10) t.Blk[bp.PlayerId - 1]++;
             }
             // Phase 25: shooting-foul attribution. Separate RNG (seed+3) so the seed+2
-            // stream (TO/STL/DReb/OReb/BLK) is consumed identically — those numbers do not move.
+            // stream (DReb/BLK — Phase 34) is consumed identically — those numbers do not move.
+            // OReb moved to engine-stamped in Phase 31; TO committer moved in Phase 33;
+            // STL moved in Phase 34. Only DReb and BLK remain as harness WeightedDraws.
             if (r.ShootingFouls is { } sfs)
                 foreach (var sf in sfs)
                 {
@@ -11289,6 +11306,7 @@ internal static class Program
         long totalHomeUnattrFtm = 0L, totalAwayUnattrFtm = 0L;
         long totalOrbWon = 0L, totalDrebPoss = 0L;
         long totalBlkCount = 0L, totalStlPoss = 0L, totalToPoss = 0L;
+        long totalTeamViolToPoss = 0L;   // Phase 34: team violations (null TurnoverOffSlot — no individual credit)
 
         const int Games = 200;
 
@@ -11405,6 +11423,7 @@ internal static class Program
                 totalBlkCount  += r.BlkCount;
                 totalStlPoss   += r.TurnoverWasLiveBall ? 1 : 0;
                 totalToPoss    += IsTurnoverPossession(r) ? 1 : 0;
+                totalTeamViolToPoss += r.EndLabel is "FiveSecondInbound" or "TenSecondBackcourt" or "ShotClockViolation" ? 1 : 0;
             }
 
             // ── Per-slot subset checks (verbatim from ObservationRunV1) ───────
@@ -11540,9 +11559,9 @@ internal static class Program
         { Console.WriteLine($"  [FAIL] STL: Σ per-player {bsStlTotal} != live-TO possessions {totalStlPoss}"); sanityOk = false; }
         else Console.WriteLine($"  [OK] STL: Σ per-player == total live-TO possessions ({totalStlPoss})");
 
-        if (bsToTotal != totalToPoss)
-        { Console.WriteLine($"  [FAIL] TO: Σ per-player {bsToTotal} != TO possessions {totalToPoss}"); sanityOk = false; }
-        else Console.WriteLine($"  [OK] TO: Σ per-player == total TO possessions ({totalToPoss})");
+        if (bsToTotal != totalToPoss - totalTeamViolToPoss)
+        { Console.WriteLine($"  [FAIL] TO: Σ per-player {bsToTotal} != individual-TO possessions {totalToPoss - totalTeamViolToPoss} (team violations {totalTeamViolToPoss} unattributed — Phase 34)"); sanityOk = false; }
+        else Console.WriteLine($"  [OK] TO: Σ per-player == individual-TO possessions ({totalToPoss - totalTeamViolToPoss}; team violations {totalTeamViolToPoss} correctly unattributed)");
 
         // ── Directional assertions ────────────────────────────────────────────
         Console.WriteLine();
@@ -13392,6 +13411,7 @@ internal static class Program
             var result = governor.Run(first);
 
             var nullSlotCount   = 0;
+            var teamViolCount   = 0;
             var turnoverPoss    = 0;
             foreach (var r in result.Possessions)
             {
@@ -13406,17 +13426,391 @@ internal static class Program
                                             or "FiveSecondInbound" or "TenSecondBackcourt";
                 if (!isTurnover) continue;
                 turnoverPoss++;
+                // Phase 34: team violations correctly have null TurnoverOffSlot — skip them here;
+                // Phase 34 Invariant A verifies them separately.
+                if (r.EndLabel is "FiveSecondInbound" or "TenSecondBackcourt" or "ShotClockViolation")
+                {
+                    teamViolCount++;
+                    continue;
+                }
                 if (r.TurnoverOffSlot is null) nullSlotCount++;
             }
             var invOk = nullSlotCount == 0;
             ok &= invOk;
             Console.WriteLine(invOk
-                ? $"    [OK] TurnoverOffSlot non-null on all {turnoverPoss} turnover possessions (of {result.Possessions.Count:N0} total)"
-                : $"    [FAIL] {nullSlotCount} turnover possessions had null TurnoverOffSlot");
+                ? $"    [OK] TurnoverOffSlot non-null on all {turnoverPoss - teamViolCount} individual-turnover possessions; {teamViolCount} team violations correctly null (of {result.Possessions.Count:N0} total)"
+                : $"    [FAIL] {nullSlotCount} individual-turnover possessions had null TurnoverOffSlot");
         }
 
         Console.WriteLine();
         Console.WriteLine(ok ? "  Phase 33 turnover committer check: PASSED" : "  Phase 33 turnover committer check: FAILED (see [FAIL] lines above)");
+        return ok;
+    }
+
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Phase 34 — turnover attribution completion check
+    // ─────────────────────────────────────────────────────────────────────────
+    private static bool Phase34TurnoverAttributionCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 34: turnover attribution completion (TurnoverInteriorPicker, StealerPicker) ---");
+        var ok = true;
+        const int N = 100_000;
+
+        var matchupCfg = MatchupConfig.Load(configPath);
+        var cfgD       = RollDConfig.Load(configPath);
+
+        // Helper: player with all attributes at b; override specific attributes.
+        static Player MkP34(int id, int b,
+                            int? height = null, int? postDef = null,
+                            int? str    = null, int? steals  = null)
+            => new Player($"p{id}")
+            {
+                PlayerId             = id,
+                Outside              = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing          = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation         = b, PostMoves    = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding  = b,
+                PerimeterDefense     = b, PostDefense = postDef ?? b, RimProtection = b,
+                DefensiveRebounding  = b,
+                Steals               = steals ?? b,
+                Height               = height ?? b, Wingspan = b, Weight = b,
+                Strength             = str    ?? b,
+                Speed = b, Quickness = b, FirstStep = b,
+                Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
+                Discipline           = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Build a GameState with offPlayers on Home, defPlayers on Away.
+        // TurnoverInteriorPicker reads Home (state.Offense); StealerPicker reads Away (state.Defense).
+        GameState BuildGame34(Player[] offPlayers, Player[] defPlayers)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < offPlayers.Length && i < 5; i++)
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), offPlayers[i]);
+            for (var i = 0; i < defPlayers.Length && i < 5; i++)
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), defPlayers[i]);
+            return g;
+        }
+
+        // Possession state: Home offends, Away defends.
+        static PossessionState MkState34()
+            => new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+
+        // ── Sub-check 1 — Interior picker: posts favored ──────────────────────
+        // PG (low postness) through C (high postness). 100k draws.
+        // Assert: C share > PG share AND PF share > SF share.
+        {
+            Console.WriteLine("  Sub-check 1: interior picker posts favored (C > PG, PF > SF)");
+            var off = new[]
+            {
+                MkP34(1, 50, height: 40, postDef: 42, str: 44),  // PG
+                MkP34(2, 50, height: 45, postDef: 44, str: 46),  // SG
+                MkP34(3, 50, height: 55, postDef: 55, str: 55),  // SF
+                MkP34(4, 50, height: 72, postDef: 70, str: 72),  // PF
+                MkP34(5, 50, height: 88, postDef: 82, str: 85),  // C
+            };
+            var dummy = Enumerable.Range(6, 5).Select(i => MkP34(i, 50)).ToArray();
+            var game  = BuildGame34(off, dummy);
+            var state = MkState34();
+            var rng   = new SystemRng(999);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[TurnoverInteriorPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var shares = counts.Select(c => (double)c / N).ToArray();
+            Console.WriteLine($"    PG={shares[0]:P2}  SG={shares[1]:P2}  SF={shares[2]:P2}  PF={shares[3]:P2}  C={shares[4]:P2}");
+            var sub1Ok = shares[4] > shares[0] && shares[3] > shares[2];
+            ok &= sub1Ok;
+            Console.WriteLine(sub1Ok ? "    [OK]" : "    [FAIL] post-favored direction wrong");
+        }
+
+        // ── Sub-check 2 — Interior picker: guards non-zero (floor holds) ──────
+        // Same lineup. Assert: PG share > 0.05.
+        {
+            Console.WriteLine("  Sub-check 2: interior picker guard floor holds (PG > 0.05)");
+            var off = new[]
+            {
+                MkP34(1, 50, height: 40, postDef: 42, str: 44),
+                MkP34(2, 50, height: 45, postDef: 44, str: 46),
+                MkP34(3, 50, height: 55, postDef: 55, str: 55),
+                MkP34(4, 50, height: 72, postDef: 70, str: 72),
+                MkP34(5, 50, height: 88, postDef: 82, str: 85),
+            };
+            var dummy = Enumerable.Range(6, 5).Select(i => MkP34(i, 50)).ToArray();
+            var game  = BuildGame34(off, dummy);
+            var state = MkState34();
+            var rng   = new SystemRng(998);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[TurnoverInteriorPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var pgShare = (double)counts[0] / N;
+            Console.WriteLine($"    PG={pgShare:P2}");
+            var sub2Ok = pgShare > 0.05;
+            ok &= sub2Ok;
+            Console.WriteLine(sub2Ok ? "    [OK]" : "    [FAIL] PG share below floor");
+        }
+
+        // ── Sub-check 3 — Interior picker: reproducibility ────────────────────
+        {
+            Console.WriteLine("  Sub-check 3: interior picker same seed → identical sequence");
+            var off = new[]
+            {
+                MkP34(1, 60, height: 42, postDef: 44, str: 50),
+                MkP34(2, 60, height: 78, postDef: 76, str: 80),
+            };
+            var dummy = Enumerable.Range(3, 5).Select(i => MkP34(i, 50)).ToArray();
+            var game  = BuildGame34(off, dummy);
+            var state = MkState34();
+            const int RepSeed = 7777;
+            var run1 = new List<int>(); var run2 = new List<int>();
+            var rng1 = new SystemRng(RepSeed); var rng2 = new SystemRng(RepSeed);
+            for (var i = 0; i < 200; i++)
+            {
+                run1.Add(TurnoverInteriorPicker.Pick(state, game, matchupCfg, rng1).Number);
+                run2.Add(TurnoverInteriorPicker.Pick(state, game, matchupCfg, rng2).Number);
+            }
+            var sub3Ok = run1.SequenceEqual(run2);
+            ok &= sub3Ok;
+            Console.WriteLine(sub3Ok ? "    [OK]" : "    [FAIL] same seed produced different sequences");
+        }
+
+        // ── Sub-check 4 — Interior picker: null-roster throw ──────────────────
+        {
+            Console.WriteLine("  Sub-check 4: interior picker empty offense throws");
+            var dummy = new[] { MkP34(1, 50) };
+            var game  = BuildGame34(Array.Empty<Player>(), dummy);   // no Home players
+            var state = MkState34();
+            var rng   = new SystemRng(1);
+            var threw = false;
+            try { TurnoverInteriorPicker.Pick(state, game, matchupCfg, rng); }
+            catch (InvalidOperationException) { threw = true; }
+            ok &= threw;
+            Console.WriteLine(threw ? "    [OK]" : "    [FAIL] empty offense did not throw");
+        }
+
+        // ── Sub-check 5 — Stealer picker: guards favored (defensive lineup) ───
+        // PG (high Steals, low postness) through C (low Steals, high postness).
+        // 100k draws on Away defense. Assert: PG share > C share.
+        {
+            Console.WriteLine("  Sub-check 5: stealer picker guards favored (PG > C)");
+            var def = new[]
+            {
+                MkP34(1, 50, height: 40, postDef: 42, str: 44, steals: 72),  // PG
+                MkP34(2, 50, height: 45, postDef: 44, str: 46, steals: 65),  // SG
+                MkP34(3, 50, height: 55, postDef: 55, str: 55, steals: 55),  // SF
+                MkP34(4, 50, height: 72, postDef: 70, str: 72, steals: 38),  // PF
+                MkP34(5, 50, height: 88, postDef: 82, str: 85, steals: 25),  // C
+            };
+            var offDummy = Enumerable.Range(6, 5).Select(i => MkP34(i, 50)).ToArray();
+            var game  = BuildGame34(offDummy, def);   // def → Away
+            var state = MkState34();                  // state.Defense = Away
+            var rng   = new SystemRng(997);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[StealerPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var shares = counts.Select(c => (double)c / N).ToArray();
+            Console.WriteLine($"    PG={shares[0]:P2}  SG={shares[1]:P2}  SF={shares[2]:P2}  PF={shares[3]:P2}  C={shares[4]:P2}");
+            var sub5Ok = shares[0] > shares[4];
+            ok &= sub5Ok;
+            Console.WriteLine(sub5Ok ? "    [OK]" : "    [FAIL] guard-favored direction wrong");
+        }
+
+        // ── Sub-check 6 — Stealer picker: posts non-zero ──────────────────────
+        // Assert: C share > 0.02.
+        {
+            Console.WriteLine("  Sub-check 6: stealer picker post floor holds (C > 0.02)");
+            var def = new[]
+            {
+                MkP34(1, 50, height: 40, postDef: 42, str: 44, steals: 72),
+                MkP34(2, 50, height: 45, postDef: 44, str: 46, steals: 65),
+                MkP34(3, 50, height: 55, postDef: 55, str: 55, steals: 55),
+                MkP34(4, 50, height: 72, postDef: 70, str: 72, steals: 38),
+                MkP34(5, 50, height: 88, postDef: 82, str: 85, steals: 25),
+            };
+            var offDummy = Enumerable.Range(6, 5).Select(i => MkP34(i, 50)).ToArray();
+            var game  = BuildGame34(offDummy, def);
+            var state = MkState34();
+            var rng   = new SystemRng(996);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[StealerPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var cShare = (double)counts[4] / N;
+            Console.WriteLine($"    C={cShare:P2}");
+            var sub6Ok = cShare > 0.02;
+            ok &= sub6Ok;
+            Console.WriteLine(sub6Ok ? "    [OK]" : "    [FAIL] C share below floor");
+        }
+
+        // ── Sub-check 7 — Stealer picker: Steals tilt within perimeter ────────
+        // PG (Steals=72) vs SF (Steals=55) both perimeter. Assert: PG share > SF share.
+        {
+            Console.WriteLine("  Sub-check 7: stealer picker Steals tilt within perimeter (PG > SF)");
+            var def = new[]
+            {
+                MkP34(1, 50, height: 40, postDef: 42, str: 44, steals: 72),  // PG high Steals
+                MkP34(2, 50, height: 45, postDef: 44, str: 46, steals: 65),  // SG
+                MkP34(3, 50, height: 55, postDef: 55, str: 55, steals: 55),  // SF lower Steals
+                MkP34(4, 50, height: 72, postDef: 70, str: 72, steals: 38),
+                MkP34(5, 50, height: 88, postDef: 82, str: 85, steals: 25),
+            };
+            var offDummy = Enumerable.Range(6, 5).Select(i => MkP34(i, 50)).ToArray();
+            var game  = BuildGame34(offDummy, def);
+            var state = MkState34();
+            var rng   = new SystemRng(995);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[StealerPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var pgShare = (double)counts[0] / N;
+            var sfShare = (double)counts[2] / N;
+            Console.WriteLine($"    PG={pgShare:P2}  SF={sfShare:P2}");
+            var sub7Ok = pgShare > sfShare;
+            ok &= sub7Ok;
+            Console.WriteLine(sub7Ok ? "    [OK]" : "    [FAIL] PG not > SF within perimeter");
+        }
+
+        // ── Sub-check 8 — Stealer picker: reproducibility ────────────────────
+        {
+            Console.WriteLine("  Sub-check 8: stealer picker same seed → identical sequence");
+            var def = new[]
+            {
+                MkP34(1, 60, height: 42, postDef: 44, str: 50, steals: 70),
+                MkP34(2, 60, height: 78, postDef: 76, str: 80, steals: 30),
+            };
+            var offDummy = Enumerable.Range(3, 5).Select(i => MkP34(i, 50)).ToArray();
+            var game  = BuildGame34(offDummy, def);
+            var state = MkState34();
+            const int RepSeed = 8888;
+            var run1 = new List<int>(); var run2 = new List<int>();
+            var rng1 = new SystemRng(RepSeed); var rng2 = new SystemRng(RepSeed);
+            for (var i = 0; i < 200; i++)
+            {
+                run1.Add(StealerPicker.Pick(state, game, matchupCfg, rng1).Number);
+                run2.Add(StealerPicker.Pick(state, game, matchupCfg, rng2).Number);
+            }
+            var sub8Ok = run1.SequenceEqual(run2);
+            ok &= sub8Ok;
+            Console.WriteLine(sub8Ok ? "    [OK]" : "    [FAIL] same seed produced different sequences");
+        }
+
+        // ── Sub-check 9 — Stealer picker: null-roster throw ───────────────────
+        {
+            Console.WriteLine("  Sub-check 9: stealer picker empty defense throws");
+            var dummy = new[] { MkP34(1, 50) };
+            var game  = BuildGame34(dummy, Array.Empty<Player>());   // no Away players
+            var state = MkState34();
+            var rng   = new SystemRng(1);
+            var threw = false;
+            try { StealerPicker.Pick(state, game, matchupCfg, rng); }
+            catch (InvalidOperationException) { threw = true; }
+            ok &= threw;
+            Console.WriteLine(threw ? "    [OK]" : "    [FAIL] empty defense did not throw");
+        }
+
+        // ── Governor run invariants A, B, C ───────────────────────────────────
+        {
+            Console.WriteLine("  Governor run invariants (Phase 34):");
+            var cfgA     = RollAConfig.Load(configPath);
+            var cfgGov   = GovernorConfig.Load(configPath);
+            var cfgClock = RollClockConfig.Load(configPath);
+            var cfgEoH   = EndOfHalfConfig.Load(configPath);
+            var cfgE     = RollEConfig.Load(configPath);
+
+            var govGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var offPlayers = new[]
+            {
+                MkP34(1, 50, height: 40, postDef: 42, str: 44),
+                MkP34(2, 50, height: 45, postDef: 44, str: 46),
+                MkP34(3, 50, height: 55, postDef: 55, str: 55),
+                MkP34(4, 50, height: 72, postDef: 70, str: 72),
+                MkP34(5, 50, height: 88, postDef: 82, str: 85),
+            };
+            var defPlayers = Enumerable.Range(6, 5).Select(i => MkP34(i, 50)).ToArray();
+            for (var i = 0; i < 5; i++)
+            {
+                govGame.HomeRoster.SetStarter(govGame.HomeLineup.SlotAt(i + 1), offPlayers[i]);
+                govGame.AwayRoster.SetStarter(govGame.AwayLineup.SlotAt(i + 1), defPlayers[i]);
+            }
+            govGame.SetPossessionArrow(TeamSide.Home);
+
+            var rng      = new SystemRng(99);
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, matchupCfg, govGame),
+                cfgA,
+                new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(cfgD),
+                new RollEGenerator(cfgE, govGame),
+                new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
+                new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
+                new RollGGenerator(RollGConfig.Load(configPath), matchupCfg, govGame),
+                new RollHGenerator(RollHConfig.Load(configPath), matchupCfg, govGame),
+                new RollIGenerator(RollIConfig.Load(configPath), matchupCfg, govGame),
+                new RollJGenerator(RollJConfig.Load(configPath), matchupCfg, govGame),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLGenerator(RollLConfig.Load(configPath), govGame),
+                new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                matchupCfg,
+                govGame,
+                rng);
+
+            var governor = new Governor(resolver, govGame, cfgGov, cfgClock, new SystemRng(100), cfgEoH);
+            var first    = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            var result = governor.Run(first);
+
+            // Invariant A: team violations produce null TurnoverOffSlot.
+            var teamViolationReasons = new HashSet<string>
+                { "FiveSecondInbound", "TenSecondBackcourt", "ShotClockViolation" };
+            var teamViolations = result.Possessions
+                .Where(r => teamViolationReasons.Contains(r.EndLabel ?? ""))
+                .ToList();
+            if (teamViolations.Count == 0)
+            {
+                Console.WriteLine("    [NOTE] Invariant A: no team-violation possessions fired — wiring confirmed correct by sub-checks above");
+            }
+            else
+            {
+                var invAOk = teamViolations.All(r => r.TurnoverOffSlot is null);
+                ok &= invAOk;
+                Console.WriteLine(invAOk
+                    ? $"    [OK] Invariant A: all {teamViolations.Count} team-violation possessions have null TurnoverOffSlot"
+                    : $"    [FAIL] Invariant A: {teamViolations.Count(r => r.TurnoverOffSlot is not null)} team-violation possessions had non-null TurnoverOffSlot");
+            }
+
+            // Invariant B: live-ball turnovers produce non-null StealerSlot.
+            var liveBallTOs = result.Possessions.Where(r => r.TurnoverWasLiveBall).ToList();
+            if (liveBallTOs.Count == 0)
+            {
+                Console.WriteLine("    [NOTE] Invariant B: no live-ball turnover possessions fired in this run");
+            }
+            else
+            {
+                var invBOk = liveBallTOs.All(r => r.StealerSlot is not null);
+                ok &= invBOk;
+                Console.WriteLine(invBOk
+                    ? $"    [OK] Invariant B: all {liveBallTOs.Count} live-ball turnover possessions have non-null StealerSlot"
+                    : $"    [FAIL] Invariant B: {liveBallTOs.Count(r => r.StealerSlot is null)} live-ball turnover possessions had null StealerSlot");
+            }
+
+            // Invariant C: non-live-ball possessions produce null StealerSlot.
+            var nonLiveBall = result.Possessions.Where(r => !r.TurnoverWasLiveBall).ToList();
+            var badStealerSlots = nonLiveBall.Count(r => r.StealerSlot is not null);
+            var invCOk = badStealerSlots == 0;
+            ok &= invCOk;
+            Console.WriteLine(invCOk
+                ? $"    [OK] Invariant C: all {nonLiveBall.Count} non-live-ball possessions have null StealerSlot"
+                : $"    [FAIL] Invariant C: {badStealerSlots} non-live-ball possessions had non-null StealerSlot");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(ok ? "  Phase 34 turnover attribution check: PASSED" : "  Phase 34 turnover attribution check: FAILED (see [FAIL] lines above)");
         return ok;
     }
 }

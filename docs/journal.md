@@ -1,3 +1,63 @@
+## Session 69 — Phase 34: Turnover Attribution Completion — Type-Aware Committer Dispatch + StealerPicker (2026-06-19)
+
+**Scope:** Two pieces completing the turnover accounting chapter. Piece 1: type-aware committer dispatch — replaced the Phase 33 uniform `TurnoverCommitterPicker` call with a three-branch resolver dispatch that correctly handles all 15 turnover reasons. Piece 2: `StealerPicker` on-walk — moved STL credit from a harness `WeightedDraw` into the engine, stamped on `RoutingOutcome.StealerSlot`, threaded through `PossessionRecord`, read as exact attribution in the harness. A third pass updated two stale harness checks whose assumptions the Phase 34 changes invalidated. 7 files changed, 2 new.
+
+**What shipped (7 files):**
+
+`src/Charm.Engine/Core/TurnoverInteriorPicker.cs` — NEW. Static class, structurally identical to `TurnoverCommitterPicker`, handling ThreeSecondViolation, OffensiveGoaltending, and OffensiveFoul — events where post players are disproportionately likely committers. Weight formula: `max(1, Strength × interiorMult)` where `interiorMult = TurnoverInteriorGuardFloor + (1 − GuardFloor) × ((raw + 1) / 2)`. The `(raw + 1) / 2` (not inverted) is the key difference from `TurnoverCommitterPicker` — a post (raw > 0) gets mult near 1.0 while a guard (raw < 0) gets mult near `TurnoverInteriorGuardFloor`. Same 3-stage structure and one-draw contract. Throws on empty offense.
+
+`src/Charm.Engine/Core/StealerPicker.cs` — NEW. Static class, reads the **defensive** lineup (`state.Defense`). Base attribute: `Steals`. Direction: same perimeter-favored formula as `TurnoverCommitterPicker` — `mult = StealerPostFloor + (1 − PostFloor) × (1 − (raw + 1) / 2)` — guards favored, posts suppressed. The only differences from `TurnoverCommitterPicker` are the defensive side, the `Steals` base attribute, and the config keys (`StealerPostFloor`, `StealerPostnessScale`). Same 3-stage structure and one-draw contract. Throws on empty defense.
+
+`src/Charm.Engine/Core/Resolver.cs` — EDIT (surgical, three changes). Change 1: replaced the Phase 33 uniform 15-reason `if` block with a three-branch dispatch — team violations (`FiveSecondInbound`, `TenSecondBackcourt`, `ShotClockViolation`) set `turnoverWasLiveBall = false` and leave `turnoverOffSlot` null; interior violations + offensive foul route to `TurnoverInteriorPicker`; ball-handler violations route to `TurnoverCommitterPicker` unchanged. Change 2: added `int? stealerSlot = null` local variable and a `StealerPicker.Pick(...)` call inside the ball-handler branch on the `turnoverWasLiveBall = true` paths. Change 3: appended `StealerSlot { get; init; }` property to `RoutingOutcome` and added `StealerSlot = stealerSlot` to the Terminal return.
+
+`src/Charm.Engine/Core/Governor.cs` — EDIT (surgical, four sub-edits). Appended `int? StealerSlot = null` as the last parameter of `PossessionRecord`; added `int? possessionStealerSlot = null` local accumulator; threaded `possessionStealerSlot = outcome.StealerSlot`; passed `possessionStealerSlot` as the last argument in `records.Add(...)`.
+
+`src/Charm.Engine/Config/MatchupConfig.cs` — EDIT (surgical). Appended Phase 34 property block: `TurnoverInteriorGuardFloor` (0.10), `TurnoverInteriorPostnessScale` (40.0), `StealerPostFloor` (0.10), `StealerPostnessScale` (40.0). Load invariants added for all four.
+
+`src/Charm.Harness/Program.cs` — EDIT (three passes). Pass 1 (Phase 34 engine): retired Phase 33 throw on null `TurnoverOffSlot`, replaced with null-safe pattern; retired STL `WeightedDraw`, replaced with engine-stamped `StealerSlot` read with throw on null; wired `Phase34TurnoverAttributionCheck`; updated two stale seed+2 stream comments. `Phase34TurnoverAttributionCheck` method added (9 sub-checks + 3 governor invariants). `WeightedDraw` not deleted — DReb and BLK remain as harness draws. Pass 2/3 (harness fixes after first run): updated Phase 33 invariant to exclude team violations from null-slot check (they're correctly null — Phase 34 Invariant A already verifies them); updated Phase 23 attribution check to compare per-player TOs against `totalToPoss − totalTeamViolToPoss` in both the observation run and sanity check paths.
+
+`src/Charm.Harness/config.json` — EDIT. Four new keys in `Matchup` section: `TurnoverInteriorGuardFloor` (0.10), `TurnoverInteriorPostnessScale` (40.0), `StealerPostFloor` (0.10), `StealerPostnessScale` (40.0).
+
+**Key design decisions:**
+
+- **Type-aware dispatch with three branches, not one.** Phase 33 treated all 15 turnover reasons identically. Phase 34 separates them: team violations get no individual credit (the team committed this), interior violations and offensive fouls tilt toward posts, ball-handler violations stay with Phase 33's handling-weighted logic. The separation lives in the Resolver dispatch block — neither picker knows about reasons; the caller decides which picker to invoke.
+
+- **Team violations are still turnovers; they just get no per-player credit.** `IsTurnoverPossession` returns true for all 15 reasons including the three team types. Aggregate TO counts are unaffected. Only the per-player attribution skips team violations. This required updating two harness checks (Phase 33 invariant, Phase 23 attribution check) that previously assumed all TOs carry individual credit.
+
+- **Interior picker inverts the tanh direction, not a separate formula.** The multiplier formula is identical to `TurnoverCommitterPicker` except `(raw + 1) / 2` replaces `1 − (raw + 1) / 2`. One sign flip is the entire difference between "posts suppressed" and "posts favored." Both pickers read the same `Matchup.Postness` coefficients with no new postness math.
+
+- **StealerPicker reads the defensive lineup.** This is the first attribution picker that works on the defense side rather than the offense side. The `state.Defense` field is the correct lookup; `game.LineupFor(state.Defense)` and `game.RosterFor(state.Defense)` return the defensive lineup and roster. The guard-favored formula direction is the same as `TurnoverCommitterPicker` — guards defend ball-handlers and generate steals — applied to the defensive side's postness distribution.
+
+- **`stealerSlot` is inside the ball-handler branch, not a shared accumulator.** Because `turnoverWasLiveBall` can only be true on `BadPassIntercepted` and `LostBallLiveBall`, the `StealerPicker.Pick(...)` call lives immediately after the `turnoverWasLiveBall` assignment inside the ball-handler branch. It is never called on team or interior violation paths. `stealerSlot` is initialized to null and remains null on all non-live-ball possessions — Invariant C asserts this in the governor run.
+
+- **RNG stream shift is documented and expected (A5).** `StealerPicker` moving on-walk consumes one `_rng.NextUnitInterval()` draw per live-ball turnover possession. Every downstream engine draw on those possessions shifts — the same documented consequence as Phase 31 and Phase 33. The config hash is unchanged (`421d916...`); same-seed reproducibility within Phase 34 holds.
+
+**Python pre-validation (mandatory Step 0 — all 5 checks passed):**
+
+Interior picker: C=0.382 > PG=0.090 (posts dominant); PF=0.274 > SF=0.153 ✓; PG=0.090 > 0 (floor holds) ✓.
+Stealer picker: PG=0.341 > C=0.048 (guards dominant); SG=0.296 > PF=0.103 ✓; C=0.048 > 0 (floor holds) ✓; PG=0.341 > SF=0.213 (Steals tilt within perimeter) ✓.
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED. (Required two Program.cs deliveries — engine pass, then harness-check fixes.)
+
+Phase 34 check (9 sub-checks + 3 governor invariants):
+- Interior Sub-check 1: C=38.03%, PF=27.42%, SF=15.28%, PG=9.10% — posts favored. [OK]
+- Interior Sub-check 2: PG=8.97% > 0.05 — floor holds. [OK]
+- Interior Sub-checks 3–4: reproducibility, empty-offense throw. [OK]
+- Stealer Sub-check 5: PG=34.01% > C=4.77% — guards favored. [OK]
+- Stealer Sub-check 6: C=4.77% > 0.02 — floor holds. [OK]
+- Stealer Sub-check 7: PG=34.15% > SF=21.20% — Steals tilt within perimeter. [OK]
+- Stealer Sub-checks 8–9: reproducibility, empty-defense throw. [OK]
+- Invariant A: 3 team-violation possessions have null TurnoverOffSlot. [OK]
+- Invariant B: 15 live-ball turnover possessions have non-null StealerSlot. [OK]
+- Invariant C: 116 non-live-ball possessions have null StealerSlot. [OK]
+
+Phase 33 invariant (updated): TurnoverOffSlot non-null on all 27 individual-turnover possessions; 3 team violations correctly null. [OK]
+Phase 23 attribution check: per-player TO 21653 == individual-TO possessions 21653 (team violations 2766 correctly unattributed). [OK]
+
+Observation run (1,000 games, frozen corpus): config hash `421d9161...`. All mechanics OK. Stream shift from Phase 34 means corpus output differs from Phase 33 for same seeds — expected. All prior checks passed. Stress test: all 8 buckets passed; cross-bucket patterns stable and unchanged.
+
 ## Session 68 — Phase 33: Roll C Session 1 — Turnover Committer Picker (2026-06-19)
 
 **Scope:** Promoted the pre-selection turnover-committer attribution from a post-hoc harness `WeightedDraw` into an engine-side `TurnoverCommitterPicker`, stamped onto `RoutingOutcome.TurnoverOffSlot` during the possession walk. Mirrors the Phase 31 move exactly: an attribution that was a harness draw becomes part of the engine, computed once, on the walk. The picker decides which offensive player committed a turnover on the paths where Roll E had not yet selected a player (Roll A entry/bring-up and Roll B halfcourt-initiation turnovers). The post-selection path (Roll F, where `SelectedSlot` is already non-null) is unchanged — no RNG draw, direct credit stands. 5 files changed, 1 new.

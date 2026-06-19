@@ -278,6 +278,11 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// like every prior init field.</para>
     /// </summary>
     public SlotGroup OrbBySlot { get; init; }
+
+    /// <summary>The defensive slot that earned the steal on a live-ball turnover possession
+    /// (BadPassIntercepted or LostBallLiveBall). Null on all other possession endings.
+    /// Stamped by <see cref="StealerPicker"/> at the Terminal stamp block (Phase 34).</summary>
+    public int? StealerSlot { get; init; }
 }
 
 /// <summary>
@@ -494,6 +499,7 @@ public sealed class Resolver
         var blkCount      = 0;
         int? turnoverOffSlot   = null;
         var turnoverWasLiveBall = false;
+        int? stealerSlot        = null;
         // Phase 31: per-slot offensive-rebound accumulator (one entry per picker fire,
         // i.e. one per ResolveOffensiveRebound case hit). Total == OrbWon at possession end.
         var orbBySlot = new SlotGroup();
@@ -527,25 +533,35 @@ public sealed class Resolver
                     if (t.Reason == "Made")
                         points += Scoring.FieldGoalPoints(t.State.ShotType!.Value);
                     // Phase 23: TO metadata — set only for Roll C turnover terminals.
-                    // Phase 33: pre-selection turnovers (SelectedSlot null — Roll A/B feeders, no
-                    // shooter chosen yet) get an engine-side committer pick (handling-weighted,
-                    // perimeter-gated), replacing the post-hoc harness BallHandling draw.
-                    // Post-selection turnovers (Roll F, SelectedSlot non-null) credit that slot
-                    // directly — NO rng draw, stream unchanged for those possessions.
-                    // Consumes one _rng draw ONLY on the pre-selection branch (documented stream
-                    // shift, A2). TurnoverOffSlot is now always non-null on turnover possessions.
-                    if (t.Reason is "BadPassDeadBall" or "BadPassIntercepted"
-                                 or "LostBallDeadBall" or "LostBallLiveBall"
-                                 or "OffensiveFoul" or "Travel" or "DoubleDribble"
-                                 or "Carry" or "ThreeSecondViolation"
-                                 or "FiveSecondCloselyGuarded" or "OffensiveGoaltending"
-                                 or "BackcourtViolation" or "ShotClockViolation"
-                                 or "FiveSecondInbound" or "TenSecondBackcourt")
+                    // Phase 34: type-aware committer dispatch.
+                    // Team violations → null (no individual credit; team turnover only).
+                    // Interior violations + offensive foul → TurnoverInteriorPicker (post-weighted).
+                    // Ball-handler violations → TurnoverCommitterPicker (Phase 33, unchanged).
+                    if (t.Reason is "FiveSecondInbound" or "TenSecondBackcourt" or "ShotClockViolation")
                     {
+                        // Team violation: the team committed this, not one player.
+                        // TurnoverOffSlot stays null; no individual credit issued.
+                        turnoverWasLiveBall = false;   // team violations are never live-ball steals
+                    }
+                    else if (t.Reason is "ThreeSecondViolation" or "OffensiveGoaltending" or "OffensiveFoul")
+                    {
+                        // Interior / post-skewed: post-weighted picker.
+                        turnoverOffSlot = t.State.SelectedSlot?.Number
+                            ?? TurnoverInteriorPicker.Pick(t.State, _game, _matchup, _rng).Number;
+                        turnoverWasLiveBall = false;   // interior violations are never live-ball steals
+                    }
+                    else if (t.Reason is "BadPassDeadBall" or "BadPassIntercepted"
+                                      or "LostBallDeadBall" or "LostBallLiveBall"
+                                      or "Travel" or "DoubleDribble" or "Carry"
+                                      or "FiveSecondCloselyGuarded" or "BackcourtViolation")
+                    {
+                        // Ball-handler violations: Phase 33 handling-weighted picker (unchanged).
                         turnoverOffSlot = t.State.SelectedSlot?.Number
                             ?? TurnoverCommitterPicker.Pick(t.State, _game, _matchup, _rng).Number;
                         turnoverWasLiveBall =
                             t.Reason is "BadPassIntercepted" or "LostBallLiveBall";
+                        if (turnoverWasLiveBall)
+                            stealerSlot = StealerPicker.Pick(t.State, _game, _matchup, _rng).Number;
                     }
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
                         { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods,
@@ -568,7 +584,8 @@ public sealed class Resolver
                           TurnoverOffSlot     = turnoverOffSlot,
                           TurnoverWasLiveBall = turnoverWasLiveBall,
                           ShootingFouls  = shootingFouls.ToArray(),
-                          OrbBySlot      = orbBySlot };
+                          OrbBySlot      = orbBySlot,
+                          StealerSlot    = stealerSlot };
 
                 case Continue c:
                     switch (c.Next)

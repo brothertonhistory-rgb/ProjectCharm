@@ -865,6 +865,19 @@ public sealed class MatchupConfig
         if (cfg.TurnoverCommitterPostnessScale <= 0.0)
             throw new InvalidOperationException(
                 $"TurnoverCommitterPostnessScale must be > 0: got {cfg.TurnoverCommitterPostnessScale}.");
+        // Phase 34
+        if (cfg.TurnoverInteriorGuardFloor <= 0.0 || cfg.TurnoverInteriorGuardFloor > 1.0)
+            throw new InvalidOperationException(
+                $"TurnoverInteriorGuardFloor must be in (0, 1]: got {cfg.TurnoverInteriorGuardFloor}.");
+        if (cfg.TurnoverInteriorPostnessScale <= 0.0)
+            throw new InvalidOperationException(
+                $"TurnoverInteriorPostnessScale must be > 0: got {cfg.TurnoverInteriorPostnessScale}.");
+        if (cfg.StealerPostFloor <= 0.0 || cfg.StealerPostFloor > 1.0)
+            throw new InvalidOperationException(
+                $"StealerPostFloor must be in (0, 1]: got {cfg.StealerPostFloor}.");
+        if (cfg.StealerPostnessScale <= 0.0)
+            throw new InvalidOperationException(
+                $"StealerPostnessScale must be > 0: got {cfg.StealerPostnessScale}.");
 
         return cfg;
     }
@@ -1065,4 +1078,38 @@ public sealed class MatchupConfig
     /// <see cref="TurnoverCommitterPostFloor"/>. Must be &gt; 0 (enforced in Load).
     /// Calibration placeholder.</summary>
     public double TurnoverCommitterPostnessScale { get; set; } = 40.0;
+
+    // =========================================================================
+    // Phase 34 — turnover attribution completion
+    // =========================================================================
+
+    // --- Phase 34: TurnoverInteriorPicker (ThreeSecondViolation, OffensiveGoaltending,
+    //     OffensiveFoul). Inverted direction: posts favored, guards suppressed.
+    //     Mirrors Phase 33 shape with (raw+1)/2 instead of 1-(raw+1)/2. ---
+
+    /// <summary>The positional-weight floor a maximally perimeter player reaches in the
+    /// interior-violation committer pick (guards can commit offensive fouls, but rarely
+    /// 3-second violations). Must be in (0, 1] (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double TurnoverInteriorGuardFloor { get; set; } = 0.10;
+
+    /// <summary>Postness spread (rating points, relative to lineup mean) over which the
+    /// interior-violation committer multiplier slides from ~1.0 (big) down toward
+    /// <see cref="TurnoverInteriorGuardFloor"/> (guard). Must be &gt; 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double TurnoverInteriorPostnessScale { get; set; } = 40.0;
+
+    // --- Phase 34: StealerPicker (live-ball turnovers — BadPassIntercepted,
+    //     LostBallLiveBall). Guards favored; same direction as TurnoverCommitterPicker. ---
+
+    /// <summary>The positional-weight floor a maximally post defender reaches in the
+    /// stealer pick (posts can get steals, but rarely). Must be in (0, 1] (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double StealerPostFloor { get; set; } = 0.10;
+
+    /// <summary>Postness spread (rating points, relative to defensive lineup mean) over which
+    /// the stealer perimeter multiplier slides from ~1.0 (guard) down toward
+    /// <see cref="StealerPostFloor"/> (post). Must be &gt; 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double StealerPostnessScale { get; set; } = 40.0;
 }

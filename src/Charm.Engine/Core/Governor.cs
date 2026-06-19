@@ -123,7 +123,9 @@ public sealed record PossessionRecord(
     // Phase 31: per-slot offensive-rebound counts. OrbBySlot.Total == OrbWon on every
     // possession (harness-asserted). Default (all zeros) on NoShot possessions and any
     // possession that secured no offensive board.
-    SlotGroup OrbBySlot = default);
+    SlotGroup OrbBySlot = default,
+    // Phase 34: engine-stamped stealer slot for live-ball turnovers.
+    int? StealerSlot = null);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -297,6 +299,8 @@ public sealed class Governor
             IReadOnlyList<ShootingFoulEvent>? possessionShootingFouls = null;
             // Phase 31: per-slot ORB counts threaded from RoutingOutcome.OrbBySlot.
             var possessionOrbBySlot = new SlotGroup();
+            // Phase 34: engine-stamped stealer slot for live-ball turnovers.
+            int? possessionStealerSlot = null;
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -391,6 +395,8 @@ public sealed class Governor
                 possessionShootingFouls       = outcome.ShootingFouls;
                 // Phase 31 threading — stamped per-slot ORB counts from the picker.
                 possessionOrbBySlot           = outcome.OrbBySlot;
+                // Phase 34 threading — stamped defensive stealer slot (live-ball TOs only).
+                possessionStealerSlot         = outcome.StealerSlot;
             }
 
             // Shared by all three intent values + normal possessions.
@@ -420,7 +426,8 @@ public sealed class Governor
                 possessionBlkCount,
                 possessionTurnoverOffSlot, possessionTurnoverWasLiveBall,
                 possessionShootingFouls,
-                possessionOrbBySlot));
+                possessionOrbBySlot,
+                possessionStealerSlot));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition
