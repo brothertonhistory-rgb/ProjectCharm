@@ -5022,3 +5022,89 @@ At `HierarchyExponentMax = 2.0` and bias 9.0, a high-attribute rank-10 player in
 - Max-3-per-number authoring enforcement — belongs to the future roster authoring layer
 - Coaching/offensive-hierarchy layer beyond usage bias (freelance, shot selection, pace) — separate sessions
 - Calibration passes: correctness before calibration is the standing sequencing principle
+
+## Phase 30 — ShotSelectionBias + PaceBias (Coaching Layer 2)
+
+### ShotSelectionBias nudge math
+
+`CoachingPull.Apply` now holds real nudge math. The formula:
+
+```
+nudge = (ShotSelectionBias − 5.0) / 5.0   // [1,10] → [−0.8, +1.0]
+adjRim   = rim   × (1 − nudge × 0.40)
+adjShort = short × (1 − nudge × 0.40)
+adjMid   = mid                              // neutral zone — unchanged
+adjLong  = long  × (1 + nudge × 0.40)
+adjThree = three × (1 + nudge × 0.40)
+// floor clamp: max(1.0, adj) per zone
+```
+
+Inside coach (bias 1, nudge = −0.8): Rim/Short boosted ×1.32, Long/Three suppressed ×0.68.
+Outside coach (bias 10, nudge = +1.0): Long/Three boosted ×1.40, Rim/Short suppressed ×0.60.
+Neutral (bias 5, nudge = 0.0): all five returned unchanged — identity.
+
+The formula is intentionally asymmetric: the inside ceiling (−0.8) is slightly weaker than the outside ceiling (+1.0). This was flagged and accepted; 5.0 is the neutral point regardless. A symmetric mapping would require a different formula.
+
+**Mid is neutral by design.** Redistributing to/from mid would require a separate bias axis and risks the five-zone coherence problem (deferred). Inside/outside coaches can only move volume between the rim/short cluster and the long/three cluster.
+
+**Player identity preserved.** Floor clamp (1.0) ensures no zone is fully suppressed. Shaq test (Rim=80, Three=10, bias=10): rim 48.0 > three 14.0. Korver test (Three=80, Rim=10, bias=1): three 54.4 > rim 13.2. Dominant zone stays dominant at every bias value.
+
+**No normalization in `Apply`.** Returns raw adjusted tendencies. `RollGGenerator` owns normalization, which it already does after the matchup multipliers. Normalizing inside `Apply` would interfere with those multipliers.
+
+**Null-coach fallback = 5.0 = identity.** Any call site that passes `coach: null` (or a coach not yet authored) produces the same output as the v1 identity stub. The Phase 9 harness check (identity sub-case) still passes unchanged.
+
+### RollGGenerator wiring
+
+One surgical change: `CoachingPull.Apply(shooter, coach: null, ...)` replaced by `CoachingPull.Apply(shooter, _game.CoachFor(state.Offense), ...)`. One new local `offCoach`. Everything downstream (matchup multipliers, diet shift, pie construction) is unchanged.
+
+### PaceBias in Roll J
+
+`rawPaceBias` reads `_game.CoachFor(ctx.OffenseSide.Value).PaceBias` when the offense side is stamped on the ticket; falls back to `_cfg.TeamPaceBias + 5.0` (→ neutral) when null. Mapped pace `= (rawPaceBias − 5.0) / 5.0`. `paceLift = mappedPace × PaceScale`. The two modifiers (pace, athleticism gap) remain independent inputs to the same Push/Settle adjustment — never pre-fused, per the standing rule.
+
+**`_cfg.TeamPaceBias` role change.** Now a signed fallback knob used only when `OffenseSide` is null. Not removed — still the regression anchor for isolated harness checks. `PaceScale` is unchanged.
+
+### Roll J clamp-asymmetry bug fix
+
+The pre-existing modifier-application block:
+```csharp
+// OLD (buggy):
+var modifiedPush   = Math.Max(0.0, basePush   + paceLift + athlLift);
+var modifiedSettle = Math.Max(0.0, baseSettle - paceLift - athlLift);
+```
+When `FreeThrowPush=0.08` minus a slow-pace lift of 0.09 went negative and clamped to 0, `modifiedSettle` still received the full +0.09 boost. Pie summed to 1.01, throwing `PieValidationException`. Fix:
+```csharp
+// NEW (correct):
+var rawPush      = basePush + paceLift + athlLift;
+var modifiedPush = Math.Max(0.0, rawPush);
+var actualDelta  = modifiedPush - basePush;         // what Push actually changed
+var modifiedSettle = Math.Max(0.0, baseSettle - actualDelta);
+```
+`actualDelta` mirrors only the delta that Push actually moved, so the pie always sums to 1.0 regardless of which source and which bias. Affects the FreeThrow source at slow pace (bias ≤ ~3 with PaceScale=0.15). The bug was latent before Phase 30 because `TeamPaceBias = 0.0` never produced a lift large enough to floor Push.
+
+### PaceBias in Governor
+
+`DrawPossessionSeconds` gains a `TeamSide offense` parameter. Center shift:
+
+```
+paceAdj = (5.0 − PaceBias) / 5.0 × PaceCenterScale
+center  = max(Floor + 1.0, Center + paceAdj)
+```
+
+Fast coach (bias > 5): paceAdj negative → shorter possessions. Slow coach (bias < 5): paceAdj positive → longer possessions. Neutral (5.0): paceAdj = 0, center unchanged. Floor guard prevents center from dropping below Floor + 1.0. At PaceCenterScale=1.5: bias 10 → center 15.5s; bias 1 → center 18.2s; bias 5 → center 17.0s (unchanged).
+
+`PaceCenterScale` lives in `RollClockConfig` (not `RollJConfig`) because it controls the Governor's draw, not Roll J's pie weights. [CALIBRATION PLACEHOLDER — default 1.5]
+
+### APL timing gap (deferred)
+
+`ElapsedSeconds` is stamped on exactly three terminal outcomes in Roll C: `ShotClockViolation`, `FiveSecondInbound`, `TenSecondBackcourt`. Every other terminal returns `null`, causing the Governor to draw from the full shot-clock distribution (center ~17s). Early-exit possessions — turnovers on Roll A/B, press-break fouls, live-ball turnovers — receive a full-clock time draw instead of the short one they actually consumed (~4–8s). This is the primary reason APL runs ~18s vs the real D1 average of ~14–15s.
+
+This is not a wiring bug. The seam is correct and the machinery works. The fix requires per-terminal-type elapsed distributions (short-TO draw, foul draw, etc.) or a possession-phase model that conditions the time draw on where in the shot clock the terminating event typically fires. Deferred to after all rolls are wired — designing and tuning the time-draw model once against a stable, fully-wired possession chain is the right sequencing.
+
+### What is not this session
+
+- Per-player `Malleability` attribute — deferred; `malleability: null` treated as 1.0; documented in `CoachingPull` for the session that adds it
+- `FreelanceDial` — not yet designed
+- System-identity constraint (five zones as a coherent system) — future design
+- `HierarchyRank` calibration — separate pass
+- Roll G location tilt from attention — already deferred from Phase 27/28
+- APL timing gap (early-exit possessions) — deferred to post-wiring calibration pass

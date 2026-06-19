@@ -3,7 +3,7 @@ namespace Charm.Engine;
 /// <summary>
 /// Real, attribute-driven Roll G generator (Phase 9). Reads the shooter's
 /// authored per-zone tendencies, runs each tendency through the coaching
-/// seam (identity in v1), then bends them by the defending team's per-zone
+/// seam (live in Phase 30 — applies ShotSelectionBias nudge), then bends them by the defending team's per-zone
 /// resistance and renormalizes.
 ///
 /// <para><b>Phase 9 — matchup-aware shot location.</b> The first matchup-
@@ -17,8 +17,8 @@ namespace Charm.Engine;
 /// <para><b>The math (settled in design conversation, v2 ratio form):</b>
 /// <list type="number">
 ///   <item>Baseline: read the shooter's five tendency attributes. Route
-///         through <see cref="CoachingPull.Apply"/> (identity in v1 —
-///         coaching layer not yet built).</item>
+///         through <see cref="CoachingPull.Apply"/> (live in Phase 30 —
+///         applies the coach's ShotSelectionBias nudge).</item>
 ///   <item>For each zone, compute the defending team's resistance via
 ///         <see cref="Matchup.DefensiveResistance"/>.</item>
 ///   <item>For each zone, compute the offensive capability via
@@ -109,9 +109,11 @@ public sealed class RollGGenerator : IRollGGenerationProvider
         var populated = 0;
         foreach (var d in defenders) if (d is not null) populated++;
 
-        // Baseline tendencies through the coaching seam (identity in v1).
+        // Baseline tendencies through the coaching seam (live in Phase 30).
+        // Pass the offensive coach so CoachingPull can apply ShotSelectionBias nudge.
+        var offCoach = _game.CoachFor(state.Offense);
         var (tRim, tShort, tMid, tLong, tThree) =
-            CoachingPull.Apply(shooter, coach: null, malleability: null);
+            CoachingPull.Apply(shooter, offCoach, malleability: null);
 
         // Zero defenders populated: short-circuit to pure-tendency pie.
         // Implementer's call: the shooter IS real and IS under load, so the

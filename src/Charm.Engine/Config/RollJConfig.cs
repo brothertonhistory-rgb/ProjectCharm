@@ -85,15 +85,14 @@ public sealed class RollJConfig
     //     Push/Settle balance; never pre-fused (each contributes its own additive
     //     delta, applied to Push and subtracted from Settle before the Pie clamp).
     //
-    //     TeamPaceBias — neutral scalar in RollJConfig ONLY (not CoachProfile, not
-    //     Team, not Player, not PossessionState). Default 0.0 = neutral (no effect).
-    //     Positive = up-tempo bias (more Push); negative = slow-tempo bias.
-    //     A future coaching session replaces this config-only knob with a real team/
-    //     coach source; harness scenarios vary pace by constructing RollJConfig variants.
+    //     TeamPaceBias — signed fallback scalar (not CoachProfile, not Team, not Player).
+    //     Default 0.0 = neutral. Only used when TransitionContext.OffenseSide is null
+    //     (isolated harness checks without a stamped game context). Phase 30 live:
+    //     real coaching source reads CoachProfile.PaceBias via GameState.CoachFor.
     //     Invariant: no enforced sign restriction (both directions are valid).
     //
-    //     PaceScale — converts TeamPaceBias into a Push delta.
-    //     PaceLift = TeamPaceBias × PaceScale.
+    //     PaceScale — converts the mapped [−0.8,+1.0] pace value into a Push delta.
+    //     PaceLift = mappedPace × PaceScale.
     //
     //     AthleticismGapScale — converts the signed athleticism gap
     //     (offenseFiveAthl − defenseFiveAthl, derived Athleticism mean of active five)

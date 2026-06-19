@@ -387,7 +387,8 @@
     "StdDev": 4.5,
     "Floor": 4.0,
     "FullClockSeconds": 30.0,
-    "ResetClockSeconds": 20.0
+    "ResetClockSeconds": 20.0,
+    "PaceCenterScale": 1.5
   },
   "EndOfHalf": {
     "HoldThresholdSeconds": 30.0,

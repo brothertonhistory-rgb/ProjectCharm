@@ -11,16 +11,14 @@ namespace Charm.Engine;
 /// to roughly 12% of possessions; Emmett tunes <see cref="Center"/> down to hit a
 /// target blended APL by watching the harness histogram.</para>
 ///
-/// <para>FUTURE SEAM — coach pace attribute. A future pace (1–10) per team shifts the
-/// center passed to <see cref="ClockDraw.Sample"/>: pace 1 → ~19s, pace 5 → ~17s,
-/// pace 10 → ~14s. No engine change at that point; only the center received here
-/// changes.</para>
+/// <para>FUTURE SEAM — coach pace attribute. Live in Phase 30: <see cref="PaceCenterScale"/>
+/// controls how far the center shifts per coach pace unit. Calibration placeholder default.</para>
 /// </summary>
 public sealed class RollClockConfig
 {
     /// <summary>The pace-5 (average) center of the full-clock draw in seconds.
-    /// The pace seam: a future coach pace attribute shifts this per team; today it
-    /// is the stub average for all teams.</summary>
+    /// Shifted per-possession by the offensive coach's PaceBias (via
+    /// <see cref="PaceCenterScale"/>) before passing to <see cref="ClockDraw.Sample"/>.</summary>
     public double Center { get; set; } = 17.0;
 
     /// <summary>Spread of the truncated normal; tunes how fat the tails are (how
@@ -44,6 +42,13 @@ public sealed class RollClockConfig
     /// (≈ 0.667), so a ~17-of-30 segment becomes a ~11-of-20 segment.</summary>
     public double ResetClockSeconds { get; set; } = 20.0;
 
+    /// <summary>Maximum center adjustment (seconds) applied by the offensive coach's
+    /// <see cref="CoachProfile.PaceBias"/>. At PaceBias=10 (fastest): center shifts
+    /// by −1.0 × PaceCenterScale. At PaceBias=1 (slowest): center shifts by +0.8 ×
+    /// PaceCenterScale. At PaceBias=5 (neutral): no shift.
+    /// Invariant: &gt;= 0. [CALIBRATION PLACEHOLDER]</summary>
+    public double PaceCenterScale { get; set; } = 1.5;
+
     public static RollClockConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -51,7 +56,11 @@ public sealed class RollClockConfig
         var section = doc.RootElement.GetProperty("Clock");
         var cfg = JsonSerializer.Deserialize<RollClockConfig>(
             section.GetRawText(),
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        return cfg ?? throw new InvalidOperationException($"Could not parse Clock config at {path}.");
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidOperationException($"Could not parse Clock config at {path}.");
+        if (cfg.PaceCenterScale < 0)
+            throw new InvalidOperationException(
+                $"Clock PaceCenterScale must be >= 0 (got {cfg.PaceCenterScale}).");
+        return cfg;
     }
 }

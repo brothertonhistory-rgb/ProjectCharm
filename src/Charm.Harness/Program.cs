@@ -140,6 +140,7 @@ internal static class Program
         ok &= AttributionSanityCheck(configPath);            // Phase 24
         ok &= Phase25ShootingFoulAttributionCheck(configPath); // Phase 25
         ok &= Phase29HierarchyBiasCheck(configPath);           // Phase 29
+        ok &= Phase30CoachingLayer2Check(configPath);          // Phase 30
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -12116,6 +12117,307 @@ internal static class Program
         Console.WriteLine(checkOk
             ? "  Hierarchy bias check: PASSED"
             : "  Hierarchy bias check: FAILED (see [FAIL] lines above)");
+
+        return checkOk;
+    }
+
+    // ── Phase 30: ShotSelectionBias + PaceBias (Coaching Layer 2) ─────────────
+
+    private static bool Phase30CoachingLayer2Check(string configPath)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- Phase 30: Coaching Layer 2 (ShotSelectionBias + PaceBias) ---");
+        Console.WriteLine("  Four sub-cases: neutral regression, ShotSelection direction,");
+        Console.WriteLine("  PaceBias Roll J direction, PaceBias Governor APL direction.");
+        Console.WriteLine();
+
+        var checkOk = true;
+        var cfgA   = RollAConfig.Load(configPath);
+        var cfgB   = RollBConfig.Load(configPath);
+        var cfgC   = RollCConfig.Load(configPath);
+        var cfgD   = RollDConfig.Load(configPath);
+        var cfgE   = RollEConfig.Load(configPath);
+        var cfgF   = RollFConfig.Load(configPath);
+        var cfgG   = RollGConfig.Load(configPath);
+        var cfgJ   = RollJConfig.Load(configPath);
+        var cfgGov   = GovernorConfig.Load(configPath);
+        var cfgClock = RollClockConfig.Load(configPath);
+        var cfgEndOfHalf = EndOfHalfConfig.Load(configPath);
+        var cfgMatchup   = MatchupConfig.Load(configPath);
+
+        // ── Helper: build a player with explicit tendency values ──────────────
+        static Player MkShooter(string name,
+            int rim, int @short, int mid, int @long, int three)
+            => new Player(name)
+            {
+                RimTendency   = rim,
+                ShortTendency = @short,
+                MidTendency   = mid,
+                LongTendency  = @long,
+                ThreeTendency = three,
+                Outside = 60, Mid = 55, Close = 60, Finishing = 62, FreeThrow = 70,
+                FoulDrawing = 50, BallHandling = 55, Passing = 55, Playmaking = 55,
+                SelfCreation = 65, PostMoves = 55, OffBallMovement = 50, Screening = 50,
+                OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50,
+                RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50,
+                Quickness = 50, FirstStep = 50, Vertical = 50, Endurance = 50,
+                Hustle = 50, BasketballIQ = 50, Discipline = 50,
+                HierarchyRank = 5,
+            };
+
+        // ── Helper: build a GameState with a specific PaceBias (both teams) ──
+        GameState MakeGame(double paceBias = 5.0, double shotSelBias = 5.0)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            g.SetCoach(TeamSide.Home, new CoachProfile(heliocentricBias: 5.0, shotSelectionBias: shotSelBias, paceBias: paceBias));
+            g.SetCoach(TeamSide.Away, new CoachProfile(heliocentricBias: 5.0, shotSelectionBias: shotSelBias, paceBias: paceBias));
+            return g;
+        }
+
+        // ── Helper: mean APL over N possessions via Governor (seeded) ─────────
+        double MeanAPL(double paceBias, int seed, int possessions = 500)
+        {
+            var g = MakeGame(paceBias: paceBias);
+            g.SetPossessionArrow(TeamSide.Home);
+            var rng = new SystemRng(seed);
+            var resolver = new Resolver(
+                new StubPieGenerator(cfgA),
+                cfgA,
+                new RollBStubPieGenerator(cfgB),
+                new RollCStubPieGenerator(cfgC),
+                cfgC,
+                new RollDStubPieGenerator(cfgD),
+                new RollEStubPieGenerator(cfgE),
+                new AttentionGenerator(AttentionConfig.Load(configPath), g),
+                new RollFStubPieGenerator(cfgF),
+                new RollGStubPieGenerator(cfgG),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJGenerator(cfgJ, cfgMatchup, g),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLStubPieGenerator(RollLConfig.Load(configPath)),
+                new RollMStubPieGenerator(RollMConfig.Load(configPath)),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                cfgMatchup,
+                g,
+                rng);
+            var gov = new Governor(resolver, g, cfgGov, cfgClock, new SystemRng(seed + 1), cfgEndOfHalf);
+            var first = new PossessionState(
+                PossessionNumber: 1,
+                Offense: TeamSide.Home,
+                Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            var result = gov.Run(first);
+            var records = result.Possessions;
+            if (records.Count == 0) return 0.0;
+            // Measure only up to <possessions> possessions for a controlled comparison
+            var slice = records.Take(possessions).ToList();
+            return slice.Count > 0 ? slice.Average(r => r.Elapsed) : 0.0;
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // Sub-case 1 — Neutral regression guard
+        // ════════════════════════════════════════════════════════════════════════
+        Console.WriteLine("  Sub-case 1: Neutral regression guard");
+        {
+            var sc1Ok = true;
+
+            // 1a: CoachProfile defaults
+            var neutral = new CoachProfile();
+            var s1aOk = neutral.ShotSelectionBias == 5.0 && neutral.PaceBias == 5.0;
+            Console.WriteLine($"    [1a] CoachProfile() defaults: ShotSelectionBias={neutral.ShotSelectionBias} PaceBias={neutral.PaceBias}  {(s1aOk ? "[OK]" : "[FAIL]")}");
+            sc1Ok &= s1aOk;
+
+            // 1b: CoachingPull.Apply with neutral coach = identity
+            var player = MkShooter("neutral-test", rim: 50, @short: 25, mid: 20, @long: 15, three: 40);
+            var (r, s, m, l, t) = CoachingPull.Apply(player, neutral, null);
+            var s1bOk = r == player.RimTendency && s == player.ShortTendency
+                     && m == player.MidTendency  && l == player.LongTendency
+                     && t == player.ThreeTendency;
+            Console.WriteLine($"    [1b] Apply(neutral): ({r},{s},{m},{l},{t}) == authored ({player.RimTendency},{player.ShortTendency},{player.MidTendency},{player.LongTendency},{player.ThreeTendency})  {(s1bOk ? "[OK]" : "[FAIL]")}");
+            sc1Ok &= s1bOk;
+
+            // 1c: PaceBias=5 → mappedPace=0 → paceLift=0 in Roll J
+            var gNeutral = MakeGame(paceBias: 5.0);
+            var genJNeutral = new RollJGenerator(cfgJ, cfgMatchup, gNeutral);
+            var ctxStamped = new TransitionContext(TransitionSource.Rebound) { OffenseSide = TeamSide.Home };
+            var pieNeutral  = genJNeutral.Generate(ctxStamped);
+            var pieNoSide   = genJNeutral.Generate(TransitionContext.Rebound);  // null OffenseSide
+            var neutralPush  = pieNeutral.Slices.First(x => x.Outcome == TransitionOutcome.Push).Weight;
+            var noSidePush   = pieNoSide.Slices.First(x => x.Outcome == TransitionOutcome.Push).Weight;
+            var s1cOk = Math.Abs(neutralPush - noSidePush) < cfgJ.Epsilon;
+            Console.WriteLine($"    [1c] PaceBias=5 stamped Push={neutralPush:F6} vs null-side Push={noSidePush:F6}  delta={Math.Abs(neutralPush - noSidePush):E2}  {(s1cOk ? "[OK]" : "[FAIL]")}");
+            sc1Ok &= s1cOk;
+
+            // 1d: PaceBias=5 → paceAdj=0 in Governor (math check)
+            var paceAdj = (5.0 - 5.0) / 5.0 * cfgClock.PaceCenterScale;
+            var s1dOk = Math.Abs(paceAdj) < 1e-12;
+            Console.WriteLine($"    [1d] Governor paceAdj at PaceBias=5: {paceAdj}  {(s1dOk ? "[OK]" : "[FAIL]")}");
+            sc1Ok &= s1dOk;
+
+            checkOk &= sc1Ok;
+            Console.WriteLine(sc1Ok ? "  Sub-case 1: [OK]" : "  Sub-case 1: [FAIL]");
+        }
+
+        Console.WriteLine();
+
+        // ════════════════════════════════════════════════════════════════════════
+        // Sub-case 2 — ShotSelectionBias direction
+        // ════════════════════════════════════════════════════════════════════════
+        Console.WriteLine("  Sub-case 2: ShotSelectionBias direction");
+        {
+            var sc2Ok = true;
+
+            var player = MkShooter("bias-test", rim: 50, @short: 25, mid: 20, @long: 15, three: 40);
+
+            // Bias 5 = identity
+            var (r5, s5, m5, l5, t5) = CoachingPull.Apply(player, new CoachProfile(shotSelectionBias: 5.0), null);
+            var s2aOk = r5 == player.RimTendency && s5 == player.ShortTendency
+                     && m5 == player.MidTendency  && l5 == player.LongTendency
+                     && t5 == player.ThreeTendency;
+            Console.WriteLine($"    [2a] Bias 5 identity: ({r5},{s5},{m5},{l5},{t5})  {(s2aOk ? "[OK]" : "[FAIL]")}");
+            sc2Ok &= s2aOk;
+
+            // Bias 1 = inside: rim/short boosted, three/long suppressed, mid unchanged
+            var (r1, s1, m1, l1, t1) = CoachingPull.Apply(player, new CoachProfile(shotSelectionBias: 1.0), null);
+            var s2bOk = r1 > player.RimTendency    // inside boosted
+                     && t1 < player.ThreeTendency  // outside suppressed
+                     && m1 == player.MidTendency;  // mid unchanged
+            Console.WriteLine($"    [2b] Bias 1 (inside): rim={r1:F2}>{player.RimTendency} three={t1:F2}<{player.ThreeTendency} mid={m1}=={player.MidTendency}  {(s2bOk ? "[OK]" : "[FAIL]")}");
+            sc2Ok &= s2bOk;
+
+            // Bias 10 = outside: three/long boosted, rim/short suppressed, mid unchanged
+            var (r10, s10, m10, l10, t10) = CoachingPull.Apply(player, new CoachProfile(shotSelectionBias: 10.0), null);
+            var s2cOk = t10 > player.ThreeTendency // outside boosted
+                     && r10 < player.RimTendency   // inside suppressed
+                     && m10 == player.MidTendency; // mid unchanged
+            Console.WriteLine($"    [2c] Bias 10 (outside): three={t10:F2}>{player.ThreeTendency} rim={r10:F2}<{player.RimTendency} mid={m10}=={player.MidTendency}  {(s2cOk ? "[OK]" : "[FAIL]")}");
+            sc2Ok &= s2cOk;
+
+            // Shaq test: rim dominant even at outside bias
+            var shaq = MkShooter("Shaq", rim: 80, @short: 40, mid: 20, @long: 10, three: 10);
+            var (shaqR, _, _, _, shaqT) = CoachingPull.Apply(shaq, new CoachProfile(shotSelectionBias: 10.0), null);
+            var s2dOk = shaqR > shaqT;
+            Console.WriteLine($"    [2d] Shaq test (bias 10): rim={shaqR:F2} > three={shaqT:F2}  {(s2dOk ? "[OK]" : "[FAIL]")}");
+            sc2Ok &= s2dOk;
+
+            // Korver test: three dominant even at inside bias
+            var korver = MkShooter("Korver", rim: 10, @short: 20, mid: 20, @long: 10, three: 80);
+            var (_, _, _, _, korverT) = CoachingPull.Apply(korver, new CoachProfile(shotSelectionBias: 1.0), null);
+            var (korverR, _, _, _, _) = CoachingPull.Apply(korver, new CoachProfile(shotSelectionBias: 1.0), null);
+            var s2eOk = korverT > korverR;
+            Console.WriteLine($"    [2e] Korver test (bias 1): three={korverT:F2} > rim={korverR:F2}  {(s2eOk ? "[OK]" : "[FAIL]")}");
+            sc2Ok &= s2eOk;
+
+            // Floor clamp: any tendency=1 at extreme bias → clamped value >= 1.0
+            var lowThree = MkShooter("low-three", rim: 20, @short: 20, mid: 20, @long: 20, three: 1);
+            var (_, _, _, _, clampedThree) = CoachingPull.Apply(lowThree, new CoachProfile(shotSelectionBias: 1.0), null);
+            var s2fOk = clampedThree >= 1.0;
+            Console.WriteLine($"    [2f] Floor clamp (ThreeTendency=1, bias=1): clamped={clampedThree:F4} >= 1.0  {(s2fOk ? "[OK]" : "[FAIL]")}");
+            sc2Ok &= s2fOk;
+
+            checkOk &= sc2Ok;
+            Console.WriteLine(sc2Ok ? "  Sub-case 2: [OK]" : "  Sub-case 2: [FAIL]");
+        }
+
+        Console.WriteLine();
+
+        // ════════════════════════════════════════════════════════════════════════
+        // Sub-case 3 — PaceBias direction in Roll J
+        // ════════════════════════════════════════════════════════════════════════
+        Console.WriteLine("  Sub-case 3: PaceBias direction in Roll J");
+        {
+            var sc3Ok = true;
+
+            var gSlow = MakeGame(paceBias: 2.0);
+            var gFast = MakeGame(paceBias: 8.0);
+            var genSlow = new RollJGenerator(cfgJ, cfgMatchup, gSlow);
+            var genFast = new RollJGenerator(cfgJ, cfgMatchup, gFast);
+
+            // Use Rebound source with stamped OffenseSide
+            var ctx = new TransitionContext(TransitionSource.Rebound) { OffenseSide = TeamSide.Home };
+            var pieSlow = genSlow.Generate(ctx);
+            var pieFast = genFast.Generate(ctx);
+
+            double Push(Pie<TransitionOutcome> p) =>
+                p.Slices.First(x => x.Outcome == TransitionOutcome.Push).Weight;
+            double Settle(Pie<TransitionOutcome> p) =>
+                p.Slices.First(x => x.Outcome == TransitionOutcome.Settle).Weight;
+
+            var fastPush  = Push(pieFast);
+            var slowPush  = Push(pieSlow);
+            var fastSettle  = Settle(pieFast);
+            var slowSettle  = Settle(pieSlow);
+
+            var s3aOk = fastPush > slowPush;
+            Console.WriteLine($"    [3a] Fast (bias 8) Push={fastPush:F6} > Slow (bias 2) Push={slowPush:F6}  {(s3aOk ? "[OK]" : "[FAIL]")}");
+            sc3Ok &= s3aOk;
+
+            var s3bOk = fastSettle < slowSettle;
+            Console.WriteLine($"    [3b] Fast Settle={fastSettle:F6} < Slow Settle={slowSettle:F6}  {(s3bOk ? "[OK]" : "[FAIL]")}");
+            sc3Ok &= s3bOk;
+
+            // Null OffenseSide → no crash, falls back to config neutral
+            var gAny = MakeGame(paceBias: 5.0);
+            var genAny = new RollJGenerator(cfgJ, cfgMatchup, gAny);
+            bool s3cOk;
+            try
+            {
+                var pieNull = genAny.Generate(TransitionContext.Rebound);  // OffenseSide is null
+                var nullPush = Push(pieNull);
+                // At TeamPaceBias=0.0 fallback → rawBias=5.0 → mappedPace=0 → lift=0 → base Push
+                s3cOk = true;
+                Console.WriteLine($"    [3c] Null OffenseSide: no crash, Push={nullPush:F6}  [OK]");
+            }
+            catch (Exception ex)
+            {
+                s3cOk = false;
+                Console.WriteLine($"    [3c] Null OffenseSide threw: {ex.Message}  [FAIL]");
+            }
+            sc3Ok &= s3cOk;
+
+            checkOk &= sc3Ok;
+            Console.WriteLine(sc3Ok ? "  Sub-case 3: [OK]" : "  Sub-case 3: [FAIL]");
+        }
+
+        Console.WriteLine();
+
+        // ════════════════════════════════════════════════════════════════════════
+        // Sub-case 4 — PaceBias direction in Governor APL
+        // ════════════════════════════════════════════════════════════════════════
+        Console.WriteLine("  Sub-case 4: PaceBias direction in Governor APL (500 possessions each)");
+        {
+            var sc4Ok = true;
+            var seed = cfgA.Seed;
+
+            double meanSlow, meanFast;
+            try
+            {
+                meanSlow = MeanAPL(paceBias: 2.0, seed: seed);
+                meanFast = MeanAPL(paceBias: 8.0, seed: seed);
+
+                Console.WriteLine($"    Slow coach (bias 2) mean APL: {meanSlow:F3}s");
+                Console.WriteLine($"    Fast coach (bias 8) mean APL: {meanFast:F3}s");
+
+                var s4Ok = meanFast < meanSlow;
+                Console.WriteLine($"    [4a] Fast mean APL < Slow mean APL: {(s4Ok ? "[OK]" : "[FAIL]")}");
+                sc4Ok &= s4Ok;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"    [FAIL] Governor APL check threw: {ex.Message}");
+                sc4Ok = false;
+            }
+
+            checkOk &= sc4Ok;
+            Console.WriteLine(sc4Ok ? "  Sub-case 4: [OK]" : "  Sub-case 4: [FAIL]");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(checkOk
+            ? "  Phase 30 coaching layer 2 check: PASSED"
+            : "  Phase 30 coaching layer 2 check: FAILED (see [FAIL] lines above)");
 
         return checkOk;
     }

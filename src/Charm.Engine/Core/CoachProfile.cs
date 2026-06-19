@@ -1,7 +1,7 @@
 namespace Charm.Engine;
 
 /// <summary>
-/// Coaching configuration — first real properties land in Phase 29.
+/// Coaching configuration — properties expand with each coaching-layer session.
 ///
 /// <para><b>HeliocentricBias (1.0–10.0, default 5.0).</b>
 /// Controls how strongly the coach amplifies the authored player-hierarchy
@@ -22,22 +22,59 @@ namespace Charm.Engine;
 /// [0, Neutral]; bias [5,10] maps to exponent [Neutral, Max]. Monotone and
 /// continuous through bias = 5 — no discontinuity.</para>
 ///
-/// <para><b>Deferred seams (no code yet — documented for future sessions).</b>
-/// ShotSelectionBias, FreelanceDial, and PaceBias will live here when their
-/// respective coaching layers land. They are absent from this record deliberately;
-/// adding a comment-only stub would produce dead weight without the generator
-/// that reads it.</para>
+/// <para><b>ShotSelectionBias (1.0–10.0, default 5.0).</b>
+/// Controls how strongly the coach bends a shooter's authored per-zone tendencies
+/// toward an inside or outside system. Applied in <see cref="CoachingPull.Apply"/>
+/// before Roll G's matchup multipliers run.
+/// <list type="bullet">
+///   <item><description><b>1.0 = most inside.</b> Rim and Short tendencies boosted
+///   by ×1.32; Long and Three suppressed by ×0.68.</description></item>
+///   <item><description><b>5.0 = neutral.</b> Returns authored tendencies exactly —
+///   zero behavior change relative to an uncoached player.</description></item>
+///   <item><description><b>10.0 = most outside.</b> Long and Three tendencies boosted
+///   by ×1.40; Rim and Short suppressed by ×0.60.</description></item>
+/// </list>
+/// Mid is a neutral zone — unchanged at any bias value. A floor clamp of 1.0
+/// prevents any zone from being suppressed to zero. Player identity is preserved:
+/// a Shaq-style post player does not become a three-point shooter even at bias 10.</para>
+///
+/// <para><b>PaceBias (1.0–10.0, default 5.0).</b>
+/// Controls the team's tempo preference. Wired into two seams:
+/// <list type="bullet">
+///   <item>Roll J transition modifier — fast coach (bias 10) increases Push share;
+///   slow coach (bias 1) reduces it.</item>
+///   <item>Governor possession-length draw — fast coach shifts the center down
+///   (shorter possessions); slow coach shifts it up (longer possessions).</item>
+/// </list>
+/// Neutral (5.0) produces zero adjustment at both seams — byte-for-byte identical
+/// to Phase 29 behavior.</para>
+///
+/// <para><b>Deferred seams.</b> FreelanceDial is not yet designed; it is absent
+/// from this record deliberately.</para>
 /// </summary>
 public sealed record CoachProfile
 {
-    public CoachProfile(double heliocentricBias = 5.0)
+    public CoachProfile(
+        double heliocentricBias  = 5.0,
+        double shotSelectionBias = 5.0,
+        double paceBias          = 5.0)
     {
-        if (heliocentricBias < 1.0 || heliocentricBias > 10.0)
-            throw new ArgumentOutOfRangeException(
-                nameof(heliocentricBias),
-                $"HeliocentricBias must be in [1.0, 10.0] (got {heliocentricBias}).");
-        HeliocentricBias = heliocentricBias;
+        ValidateBias(heliocentricBias,  nameof(HeliocentricBias));
+        ValidateBias(shotSelectionBias, nameof(ShotSelectionBias));
+        ValidateBias(paceBias,          nameof(PaceBias));
+        HeliocentricBias  = heliocentricBias;
+        ShotSelectionBias = shotSelectionBias;
+        PaceBias          = paceBias;
     }
 
-    public double HeliocentricBias { get; init; }
+    public double HeliocentricBias  { get; init; }
+    public double ShotSelectionBias { get; init; }
+    public double PaceBias          { get; init; }
+
+    private static void ValidateBias(double value, string name)
+    {
+        if (value < 1.0 || value > 10.0)
+            throw new ArgumentOutOfRangeException(
+                name, $"{name} must be in [1.0, 10.0] (got {value}).");
+    }
 }

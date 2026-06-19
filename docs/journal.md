@@ -1,3 +1,65 @@
+## Session 65 — Phase 30: ShotSelectionBias + PaceBias (Coaching Layer 2) (2026-06-18)
+
+**Scope:** Two new `CoachProfile` fields — `ShotSelectionBias` (1–10) and `PaceBias` (1–10) — wired into the engine. `ShotSelectionBias` fills in the `CoachingPull.Apply` seam so Roll G's shot-zone distribution reflects the coach's offensive system. `PaceBias` wires into two existing seams: Roll J's transition-frequency modifier and the Governor's possession-length draw. Nine files changed. One latent bug in Roll J's modifier application fixed as a consequence of testing.
+
+**What shipped (9 files):**
+
+`src/Charm.Engine/Core/CoachProfile.cs` — REPLACED. Two new properties added after `HeliocentricBias`: `ShotSelectionBias` and `PaceBias` (both double, 1.0–10.0, default 5.0). Constructor expanded to three parameters (all defaulting to 5.0) with a shared private `ValidateBias` helper to avoid repeated validation blocks. Class-level doc updated: deferred seams section revised to remove `ShotSelectionBias` and `PaceBias` (now live), retain `FreelanceDial` (still undesigned). All existing `new CoachProfile()` and `new CoachProfile(bias)` call sites compile unchanged — defaults carry forward.
+
+`src/Charm.Engine/Core/CoachingPull.cs` — REPLACED (was identity stub). Real nudge math wired. `nudge = (ShotSelectionBias − 5.0) / 5.0`, mapping [1,10] → [−0.8, +1.0]. Inside zones (Rim, Short): multiplied by `(1 − nudge × 0.40)`. Outside zones (Long, Three): multiplied by `(1 + nudge × 0.40)`. Mid: neutral zone, unchanged. Floor clamp of 1.0 per zone. Null-coach fallback = 5.0 = identity. Returns raw adjusted tendencies (not normalized) — normalization is `RollGGenerator`'s responsibility. Malleability still null/1.0 (deferred seam, documented for next session).
+
+`src/Charm.Engine/Generators/RollGGenerator.cs` — Surgical: two doc-comment updates (`identity in v1` → `live in Phase 30`) and the `CoachingPull.Apply` call site updated to pass the real offensive coach (`_game.CoachFor(state.Offense)`) instead of `coach: null`. One new local (`offCoach`). No other changes.
+
+`src/Charm.Engine/Generators/RollJGenerator.cs` — Two changes. (1) Class-level doc updated: pace modifier described as live (was "config-only seam / future coaching session"). (2) Pace block replaced: `rawPaceBias` reads `_game.CoachFor(ctx.OffenseSide.Value).PaceBias` when `OffenseSide` is stamped, falls back to `_cfg.TeamPaceBias + 5.0` (→ neutral lift = 0) when null. Mapped pace `= (rawPaceBias − 5.0) / 5.0`; `paceLift = mappedPace × PaceScale`. **Bug fix also in this file:** the original modifier-application block subtracted the full `paceLift + athlLift` from Settle regardless of whether Push had clamped — when `FreeThrowPush=0.08` minus a slow-pace lift of 0.09 went negative and clamped to 0, the pie summed to 1.01 and threw `PieValidationException`. Fix: compute `actualDelta = clampedPush − basePush`, then subtract `actualDelta` from Settle (not the raw lift). All five Roll J source pies now sum to exactly 1.0 at any bias value. This was a latent bug that only surfaced when PaceBias pushed the lift large enough to floor the FreeThrow source's Push weight.
+
+`src/Charm.Engine/Core/Governor.cs` — `DrawPossessionSeconds` gains a `TeamSide offense` parameter. Reads `_game.CoachFor(offense).PaceBias`, computes `paceAdj = (5.0 − PaceBias) / 5.0 × PaceCenterScale`, shifts the draw center: `center = max(Floor + 1.0, Center + paceAdj)`. Fast coach (bias > 5) → negative adj → shorter possessions. Slow coach (bias < 5) → positive adj → longer possessions. Neutral (5.0) → zero adj → center unchanged. Single call site at Governor line 339 updated to pass `state.Offense`.
+
+`src/Charm.Engine/Config/RollClockConfig.cs` — `PaceCenterScale` (double, default 1.5, invariant `>= 0`) added after `ResetClockSeconds`. Load method restructured: null-coalesce throws first, then `PaceCenterScale < 0` throws, then `return cfg`. Class-level doc updated: "future seam" note replaced with "live in Phase 30." Center property doc updated to reflect per-possession shift. [CALIBRATION PLACEHOLDER]
+
+`src/Charm.Engine/Config/RollJConfig.cs` — Comment block for `TeamPaceBias` and `PaceScale` updated: "future coaching session replaces this" language removed; now accurately describes the knob as a signed fallback used only when `OffenseSide` is null.
+
+`src/Charm.Harness/Program.cs` — `Phase30CoachingLayer2Check` added with four sub-cases. Wired into main pass via `ok &= Phase30CoachingLayer2Check(configPath)`. Two field-name bugs fixed en route: `PossessionRecord.ElapsedSeconds` (does not exist) → `PossessionRecord.Elapsed`.
+
+`src/Charm.Harness/config.json` — `"PaceCenterScale": 1.5` added to the `Clock` section.
+
+**Key design decisions:**
+
+- **Nudge formula is intentionally asymmetric.** `(bias − 5.0) / 5.0` maps bias 1 → −0.8 and bias 10 → +1.0. The inside-system ceiling (−0.8) is slightly less than the outside-system ceiling (+1.0). Accepted: the asymmetry is small and 5 is the neutral point regardless. A symmetric mapping would require changing the formula; the asymmetry was flagged in the prompt and carried forward deliberately.
+
+- **Mid is a neutral zone at every bias.** Only Rim/Short and Long/Three move. A coach cannot redistribute volume to or from the mid-range zone via `ShotSelectionBias` — that would require a separate mid-bias axis. This simplification avoids the five-zone coherence problem that's explicitly deferred.
+
+- **Player identity is preserved at extreme bias.** The floor clamp (1.0 per zone) ensures no zone is fully suppressed. The Shaq test (Rim=80, Three=10, bias=10) confirms rim (48.0) stays dominant over three (14.0) even in a maximum outside system. The Korver test (Three=80, Rim=10, bias=1) confirms three (54.4) stays dominant over rim (13.2) even in a maximum inside system.
+
+- **`CoachingPull.Apply` does not normalize.** It returns raw adjusted tendency values. `RollGGenerator` owns normalization — inserting it here would interfere with the matchup multipliers that run after the coaching nudge.
+
+- **`_cfg.TeamPaceBias` role changed but not removed.** It is now a signed fallback scalar used only when `TransitionContext.OffenseSide` is null (isolated harness checks without a stamped game context). Its comment block was updated to reflect this. `PaceScale` is unchanged.
+
+- **Roll J clamp-asymmetry bug.** The pre-existing modifier block clamped Push to 0 but still subtracted the full intended lift from Settle. When FreeThrowPush (0.08) plus a slow-pace lift (−0.09) went negative and floored at 0, Settle received the full +0.09 boost, producing a pie summing to 1.01. The fix uses `actualDelta = clampedPush − basePush` to drive Settle — only the amount Push actually changed is mirrored. This bug was latent before Phase 30; pace lifts from the config-only `TeamPaceBias = 0.0` never exposed it.
+
+**APL timing gap (deferred — documented here for the record):**
+
+`ElapsedSeconds` is set on exactly three terminal outcomes: `ShotClockViolation`, `FiveSecondInbound`, and `TenSecondBackcourt` (all in Roll C). Every other terminal — turnovers, made baskets, fouls, OOB, jump balls — returns `ElapsedSeconds = null`, causing the Governor to fall back to `DrawPossessionSeconds` (full shot-clock distribution, center ~17s). Early-exit possessions (turnovers on Roll A/B, press-break fouls) receive a full-clock time draw instead of the short one they actually consumed. This is the primary driver of APL running ~18s vs the real D1 average of ~14–15s. Not a wiring bug — the seam is correct and the machinery works. Fix deferred to after all rolls are wired, when the time-draw model can be designed and tuned once against a stable possession chain.
+
+**Python pre-validation (mandatory Step 0 hard gate — all 7 checks passed):**
+1. Neutral identity: `ShotSelectionBias=5.0` → nudge=0.0 → all five return values equal authored inputs exactly.
+2. Nudge math at bias 1/5/10 with equal tendencies (20 each): bias 5 → identity; bias 1 → rim/short=26.4, three/long=13.6, mid=20; bias 10 → three/long=28.0, rim/short=12.0, mid=20.
+3. Shaq test (Rim=80, Three=10, bias=10): rim=48.0 > three=14.0 (player identity preserved).
+4. Korver test (Three=80, Rim=10, bias=1): three=54.4 > rim=13.2 (player identity preserved).
+5. Floor clamp (ThreeTendency=1, bias=1): raw=0.68 → clamped to 1.0.
+6. PaceBias → PaceLift at bias 1/5/10 (PaceScale=0.15): bias 5 → lift=0.0; bias 10 → lift=0.15; bias 1 → lift=−0.12.
+7. Clock center adjustment at bias 1/5/10 (Center=17.0, PaceCenterScale=1.5): bias 5 → center=17.0; bias 10 → center=15.5; bias 1 → center=18.2.
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED.
+
+Phase 30 signals in `Phase30CoachingLayer2Check`:
+- Neutral regression [1a–1d]: defaults confirmed, identity confirmed, Roll J null-side Push matches stamped neutral Push, Governor paceAdj at bias 5 = 0 exactly.
+- ShotSelectionBias direction [2a–2f]: bias 5 identity confirmed; bias 1 boosts rim (66.0 > 50) and suppresses three (27.2 < 40), mid unchanged (20==20); bias 10 boosts three (56.0 > 40) and suppresses rim (30.0 < 50); Shaq test passes; Korver test passes; floor clamp confirmed (1.0000).
+- PaceBias Roll J direction [3a–3c]: fast coach (bias 8) Push 0.390 > slow coach (bias 2) Push 0.210; fast Settle 0.510 < slow Settle 0.690; null OffenseSide no crash.
+- PaceBias APL direction [4a]: slow coach (bias 2) mean APL 18.898s > fast coach (bias 8) mean APL 17.266s — 1.6s spread at PaceCenterScale=1.5.
+
+Frozen corpus observation run (1,000 games) output **identical to Phase 29** — all frozen corpus players use `new CoachProfile()` (all three fields = 5.0 = neutral), zero behavior change anywhere.
 ## Session 64 — Phase 29 Session 1: Player Hierarchy + Heliocentric Bias in Roll E (2026-06-18)
 
 **Scope:** First coaching layer. Each player carries an authored `HierarchyRank` (1–10); each team's coach carries a `HeliocentricBias` (1–10); `RollEGenerator` blends these with the existing attribute-based usage scores to produce a usage pie that reflects both who the players are and how the coach wants to use them. Seven files changed.

@@ -26,10 +26,11 @@ namespace Charm.Engine;
 /// Each contributes an additive delta to Push; Settle absorbs the mirror.
 /// Turnover, DefensiveFoul, and JumpBall are fixed to their base values.
 /// <list type="number">
-///   <item><b>Coach pace</b> — config-only seam (<see cref="RollJConfig.TeamPaceBias"/>
-///   × <see cref="RollJConfig.PaceScale"/>). Neutral at <c>0.0</c>; positive =
-///   up-tempo; negative = slow. A future coaching session replaces this with a real
-///   team/coach source.</item>
+///   <item><b>Coach pace</b> — live in Phase 30. Reads <see cref="CoachProfile.PaceBias"/>
+///   from the offensive coach via <see cref="GameState.CoachFor"/>. Maps [1,10] to a signed
+///   lift: neutral (5.0) → 0.0; up-tempo (10) → positive lift; slow (1) → negative lift.
+///   Null <see cref="TransitionContext.OffenseSide"/> falls back to the config knob
+///   (<see cref="RollJConfig.TeamPaceBias"/> + 5.0 → neutral lift = 0.0).</item>
 ///   <item><b>Team athleticism-gap</b> — relative:
 ///   <c>offenseFiveAthl − defenseFiveAthl</c> (mean of active five players' derived
 ///   <see cref="Player.Athleticism"/>). Read from <see cref="GameState"/> via the
@@ -112,10 +113,17 @@ public sealed class RollJGenerator : IRollJPieGenerator
                     "Rebound, FreeThrowRebound, and Steal are modelled.");
         }
 
-        // ── 2. Modifier 1: Coach pace (config-only scalar, independent) ───────
-        // PaceLift = TeamPaceBias × PaceScale. Default 0.0 → lift = 0 (neutral).
-        // Positive → up-tempo → more Push; negative → slow → less Push.
-        var paceLift = _cfg.TeamPaceBias * _cfg.PaceScale;
+        // ── 2. Modifier 1: Coach pace (live in Phase 30, independent) ─────────
+        // Normal path: read PaceBias from the offensive coach stamped on the ticket.
+        // Fallback / isolated harness path: if OffenseSide is null, fall back to the
+        // config knob (TeamPaceBias=0.0 → rawBias=5.0 → mappedPace=0.0 → lift=0.0).
+        // _cfg.TeamPaceBias remains a signed fallback knob — NOT a coach-scale knob.
+        var rawPaceBias = ctx.OffenseSide.HasValue
+            ? _game.CoachFor(ctx.OffenseSide.Value).PaceBias
+            : _cfg.TeamPaceBias + 5.0;
+        // Map [1,10] to signed pace domain. Neutral (5.0) → 0.0.
+        var mappedPace = (rawPaceBias - 5.0) / 5.0;
+        var paceLift   = mappedPace * _cfg.PaceScale;
 
         // ── 3. Modifier 2: Team athleticism-gap (relative, directional) ───────
         // Gap = offenseFiveAthl − defenseFiveAthl (mean of active five).
@@ -134,9 +142,12 @@ public sealed class RollJGenerator : IRollJPieGenerator
         // ── 4. Apply both modifiers to Push/Settle (NEVER pre-fused) ─────────
         // Additive: each modifier contributes independently.
         // Push increases → Settle decreases by the same amount.
-        // Clamp to [0, ∞) before building the pie (Pie ctor enforces non-negative).
-        var modifiedPush   = Math.Max(0.0, basePush   + paceLift + athlLift);
-        var modifiedSettle = Math.Max(0.0, baseSettle - paceLift - athlLift);
+        // Use the ACTUAL applied delta (post-clamp on Push) to drive Settle,
+        // so the pie always sums to exactly 1 even when Push floors at 0.
+        var rawPush        = basePush   + paceLift + athlLift;
+        var modifiedPush   = Math.Max(0.0, rawPush);
+        var actualDelta    = modifiedPush - basePush;          // what Push actually changed by
+        var modifiedSettle = Math.Max(0.0, baseSettle - actualDelta);
 
         var weights = new Dictionary<TransitionOutcome, double>
         {

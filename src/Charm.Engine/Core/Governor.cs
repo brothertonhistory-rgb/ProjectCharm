@@ -336,7 +336,7 @@ public sealed class Governor
                 // elapsed, because the milk intent dominates). ShootEarly and normal
                 // draw elapsed the S29 way (invariant terminal wins; otherwise truncated-
                 // normal draw) and cap at halfRemaining.
-                var rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(outcome.ShotClockPeriods);
+                var rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(outcome.ShotClockPeriods, state.Offense);
                 applied = intent == EndOfHalfIntent.HoldShootLast
                     ? halfRemaining
                     : Math.Min(rawElapsed, halfRemaining);
@@ -444,14 +444,26 @@ public sealed class Governor
     /// <summary>Sum the truncated-normal draws for a possession's shot-clock periods:
     /// period 1 on the full clock, each offensive-rebound reset on the 20s clock (center
     /// and sd scaled to the shorter window). Outcome-blind — the draw never depends on how
-    /// a period ended; an invariant terminal (handled by the caller) overrides this.</summary>
-    private double DrawPossessionSeconds(int shotClockPeriods)
+    /// a period ended; an invariant terminal (handled by the caller) overrides this.
+    ///
+    /// <para><b>Phase 30 — coach pace adjustment.</b> The offensive coach's
+    /// <see cref="CoachProfile.PaceBias"/> shifts the center before sampling.
+    /// Neutral (5.0) → zero shift; fast (10) → center down; slow (1) → center up.
+    /// The floor guard ensures center never drops below <c>Floor + 1.0</c>.</para></summary>
+    private double DrawPossessionSeconds(int shotClockPeriods, TeamSide offense)
     {
-        var periods = Math.Max(1, shotClockPeriods);
-        var seconds = ClockDraw.Sample(_rng, _clock.Center, _clock.StdDev, _clock.Floor, _clock.FullClockSeconds);
+        var coach   = _game.CoachFor(offense);
+        // Map PaceBias [1,10] to a center shift. Neutral (5.0) → 0.0.
+        // (5.0 - bias) / 5.0 → positive for slow (bias < 5), negative for fast (bias > 5).
+        var paceAdj = (5.0 - coach.PaceBias) / 5.0 * _clock.PaceCenterScale;
+        var center  = Math.Max(_clock.Floor + 1.0, _clock.Center + paceAdj);
+
+        var periods    = Math.Max(1, shotClockPeriods);
+        var seconds    = ClockDraw.Sample(_rng, center, _clock.StdDev, _clock.Floor, _clock.FullClockSeconds);
         var resetScale = _clock.ResetClockSeconds / _clock.FullClockSeconds;
         for (var p = 2; p <= periods; p++)
-            seconds += ClockDraw.Sample(_rng, _clock.Center * resetScale, _clock.StdDev * resetScale, _clock.Floor, _clock.ResetClockSeconds);
+            seconds += ClockDraw.Sample(_rng, center * resetScale, _clock.StdDev * resetScale,
+                                        _clock.Floor, _clock.ResetClockSeconds);
         return seconds;
     }
 
