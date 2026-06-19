@@ -15,7 +15,7 @@ namespace Charm.Engine;
 /// construction, so any misconfigured weights fail loudly here rather than silently
 /// warping odds.
 /// </summary>
-public sealed class RollKStubPieGenerator
+public sealed class RollKStubPieGenerator : IRollKPieGenerator
 {
     private readonly RollKConfig _config;
 
@@ -34,8 +34,11 @@ public sealed class RollKStubPieGenerator
     /// <see cref="Pie{TOutcome}"/> constructor walks the enum in declaration order, so
     /// slice order is fixed for reproducibility regardless of dictionary iteration
     /// order, and validates sum-to-one so any misconfigured weights fail loud here.</summary>
+    /// <param name="state">Possession state — provided to satisfy <see cref="IRollKPieGenerator"/>;
+    /// ignored by this stub. The real generator reads <c>ReboundSlot</c> and <c>ShotType</c>
+    /// from state to tilt the pie; the stub returns flat config weights regardless.</param>
     /// <param name="source">Which board the offense secured — selects the weight set.</param>
-    public Pie<OffensiveReboundOutcome> Generate(OffensiveReboundSource source)
+    public Pie<OffensiveReboundOutcome> Generate(PossessionState state, OffensiveReboundSource source)
     {
         var weights = source switch
         {

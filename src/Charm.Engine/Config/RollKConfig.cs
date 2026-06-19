@@ -55,6 +55,21 @@ public sealed class RollKConfig
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
+    // --- Phase 32: putback attempt rate floor and ceiling.
+    //     The tanh tilt asymptotes toward these without crossing.
+    //     floor >= 0, ceiling <= 1.0, floor < ceiling (enforced in Load).
+    //     Calibration placeholders — direction is what matters now. ---
+
+    /// <summary>The minimum putback weight the tilt can reach (defense-dominant
+    /// asymptote). Must be &gt;= 0 and &lt; PutbackCeiling (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double PutbackFloor   { get; set; } = 0.15;
+
+    /// <summary>The maximum putback weight the tilt can reach (offense-dominant
+    /// asymptote). Must be &lt;= 1.0 and &gt; PutbackFloor (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double PutbackCeiling { get; set; } = 0.70;
+
     public static RollKConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -62,7 +77,36 @@ public sealed class RollKConfig
         var section = doc.RootElement.GetProperty("RollK");
         var cfg = JsonSerializer.Deserialize<RollKConfig>(
             section.GetRawText(),
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        return cfg ?? throw new InvalidOperationException($"Could not parse RollK config at {path}.");
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            ?? throw new InvalidOperationException($"Could not parse RollK config at {path}.");
+
+        // Phase 32: floor/ceiling invariants
+        if (cfg.PutbackFloor < 0.0)
+            throw new InvalidOperationException(
+                $"PutbackFloor must be >= 0: got {cfg.PutbackFloor}.");
+        if (cfg.PutbackCeiling > 1.0)
+            throw new InvalidOperationException(
+                $"PutbackCeiling must be <= 1.0: got {cfg.PutbackCeiling}.");
+        if (cfg.PutbackFloor >= cfg.PutbackCeiling)
+            throw new InvalidOperationException(
+                $"PutbackFloor must be < PutbackCeiling: floor={cfg.PutbackFloor}, ceiling={cfg.PutbackCeiling}.");
+
+        // Phase 32: startup overflow guards — the ceiling plus the five flat arms
+        // must leave room for a non-negative ResetOffense in both source modes.
+        var liveFlatTotal = cfg.JumpBall + cfg.DefensiveFoul + cfg.OffensiveFoul
+                          + cfg.DeadBallTurnover + cfg.LiveBallTurnover;
+        if (cfg.PutbackCeiling + liveFlatTotal >= 1.0)
+            throw new InvalidOperationException(
+                $"LiveBall: PutbackCeiling ({cfg.PutbackCeiling:F4}) + flat arms ({liveFlatTotal:F4}) " +
+                $">= 1.0 — no room for ResetOffense. Reduce PutbackCeiling or flat arm weights.");
+
+        var ftFlatTotal = cfg.FreeThrowJumpBall + cfg.FreeThrowDefensiveFoul + cfg.FreeThrowOffensiveFoul
+                        + cfg.FreeThrowDeadBallTurnover + cfg.FreeThrowLiveBallTurnover;
+        if (cfg.PutbackCeiling + ftFlatTotal >= 1.0)
+            throw new InvalidOperationException(
+                $"FreeThrow: PutbackCeiling ({cfg.PutbackCeiling:F4}) + flat arms ({ftFlatTotal:F4}) " +
+                $">= 1.0 — no room for FreeThrowResetOffense. Reduce PutbackCeiling or FreeThrow flat arm weights.");
+
+        return cfg;
     }
 }

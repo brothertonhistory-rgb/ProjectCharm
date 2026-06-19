@@ -38,7 +38,7 @@ internal static class Program
         // Roll F generator constructed below after SeatStartersFromConfig (Phase 12).
         // RollHGenerator, RollGGenerator, and RollIGenerator constructed below,
         // after game and cfgMatchup (need GameState and MatchupConfig).
-        var rollKGenerator = new RollKStubPieGenerator(cfgK);
+        // RollKGenerator constructed below after SeatStartersFromConfig (Phase 32: needs game + cfgMatchup).
         var offensiveFoulGenerator = new RollOffensiveFoulStubPieGenerator(cfgOffFoul);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
@@ -54,6 +54,7 @@ internal static class Program
         var rollLGenerator = new RollLGenerator(cfgL, game);               // Phase 18: attribute-driven FT make%
         var rollFGenerator = new RollFGenerator(cfgF, cfgMatchup, game);   // Phase 12: pressure-aware disruption
         var rollBGenerator = new RollBGenerator(cfgB, cfgMatchup, game);   // Phase 13: team-aggregate disruption
+        var rollKGenerator = new RollKGenerator(cfgK, cfgMatchup, game);   // Phase 32: putback attempt rate
         var rollAGenerator = new RollAGenerator(cfg, cfgMatchup, game);    // Phase 14: full-court press disruption
         var rollEGenerator = new RollEGenerator(cfgE, game);               // Phase 15: attribute-driven halfcourt selection
         var cfgAttention   = AttentionConfig.Load(configPath);
@@ -142,6 +143,7 @@ internal static class Program
         ok &= Phase29HierarchyBiasCheck(configPath);           // Phase 29
         ok &= Phase30CoachingLayer2Check(configPath);          // Phase 30
         ok &= Phase31RebounderPickerCheck(configPath);         // Phase 31
+        ok &= Phase32PutbackAttemptRateCheck(configPath);     // Phase 32
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -2935,7 +2937,7 @@ internal static class Program
     //     prior shot's facts WIPED (ShotType and Result null) AND FastBreak cleared (a
     //     reset off a missed break is a fresh halfcourt play — the marker leak guard). ---
     private static bool RollKReboundBatchCheck(
-        RollAConfig cfg, RollKConfig cfgK, RollKStubPieGenerator genK,
+        RollAConfig cfg, RollKConfig cfgK, IRollKPieGenerator genK,
         GameState sharedGame, PossessionState state)
     {
         Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} offensive rebounds routed through Roll K ---");
@@ -2953,7 +2955,7 @@ internal static class Program
         var genE = new RollEStubPieGenerator(cfgE);
         var genG = new RollGStubPieGenerator(cfgG);
         var pieE = genE.Generate(state);
-        var pieK = genK.Generate(OffensiveReboundSource.LiveBall);
+        var pieK = genK.Generate(state, OffensiveReboundSource.LiveBall);
 
         var counts = new Dictionary<OffensiveReboundOutcome, int>();
         foreach (var o in Enum.GetValues<OffensiveReboundOutcome>()) counts[o] = 0;
@@ -3172,10 +3174,8 @@ internal static class Program
     //     thresholds. Mirrors RollIBonusForkCheck / RollJBonusForkCheck. ---
     private static bool RollKBonusForkCheck(
         RollAConfig cfg, RollDConfig cfgD, RollKConfig cfgK,
-        RollKStubPieGenerator genK, PossessionState state)
+        IRollKPieGenerator genK, PossessionState state)
     {
-        Console.WriteLine($"\n--- Bonus fork: Roll K defensive foul across the thresholds ---");
-
         var foulOnlyPie = new Pie<OffensiveReboundOutcome>(new Dictionary<OffensiveReboundOutcome, double>
         {
             [OffensiveReboundOutcome.PutBack] = 0.0,
@@ -3654,11 +3654,11 @@ internal static class Program
         };
 
         double KPutBack(OffensiveReboundSource s) =>
-            genK.Generate(s).Slices.First(x => x.Outcome == OffensiveReboundOutcome.PutBack).Weight;
+            genK.Generate(state, s).Slices.First(x => x.Outcome == OffensiveReboundOutcome.PutBack).Weight;
 
         foreach (var (src, expected) in kContexts)
         {
-            var pie = genK.Generate(src);
+            var pie = genK.Generate(state, src);
             var pieMap = pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
 
             var selectionOk = true;
@@ -12790,6 +12790,266 @@ internal static class Program
 
         Console.WriteLine();
         Console.WriteLine(ok ? "  Phase 31 rebounder picker check: PASSED" : "  Phase 31 rebounder picker check: FAILED (see [FAIL] lines above)");
+        return ok;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Phase 32 — putback attempt rate check
+    // ─────────────────────────────────────────────────────────────────────────
+    private static bool Phase32PutbackAttemptRateCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 32: putback attempt rate (RollKGenerator) ---");
+        var ok = true;
+
+        var cfgK     = RollKConfig.Load(configPath);
+        var cfgMatch = MatchupConfig.Load(configPath);
+        var cfgD     = RollDConfig.Load(configPath);
+
+        // Helper: build a player with specified key attributes; all others at base b.
+        // spdBase controls Speed/Quickness/FirstStep/Vertical (Athleticism composite).
+        static Player MkP32(int id, int b,
+            int? str = null, int? ht = null, int? spdBase = null,
+            int? fin = null, int? rimProt = null)
+            => new Player($"p{id}")
+            {
+                PlayerId            = id,
+                Outside = b, Mid = b, Close = b, Finishing = fin ?? b, FreeThrow = b,
+                FoulDrawing = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation = b, PostMoves = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding = b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = rimProt ?? b,
+                DefensiveRebounding = b, Steals = b,
+                Height = ht ?? b, Wingspan = b, Weight = b,
+                Strength = str ?? b,
+                Speed = spdBase ?? b, Quickness = spdBase ?? b,
+                FirstStep = spdBase ?? b, Vertical = spdBase ?? b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Helper: seat five offensive (Home) and five defensive (Away) players.
+        GameState BuildGame(Player[] off, Player[] def)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), off[i]);
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), def[i]);
+            }
+            return g;
+        }
+
+        // Helper: state with rebounder in Home slot 1.
+        static PossessionState MkState(GameState g, ShotLocation? zone)
+            => new PossessionState(
+                PossessionNumber: 1,
+                Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                ShotType: zone,
+                ReboundSlot: g.HomeLineup.SlotAt(1));
+
+        // Helper: flat-arms sum for a given source.
+        static double FlatArmsSum(RollKConfig cfg, OffensiveReboundSource src)
+            => src == OffensiveReboundSource.FreeThrow
+                ? cfg.FreeThrowJumpBall + cfg.FreeThrowDefensiveFoul + cfg.FreeThrowOffensiveFoul
+                  + cfg.FreeThrowDeadBallTurnover + cfg.FreeThrowLiveBallTurnover
+                : cfg.JumpBall + cfg.DefensiveFoul + cfg.OffensiveFoul
+                  + cfg.DeadBallTurnover + cfg.LiveBallTurnover;
+
+        // Helper: get PutBack weight from a pie.
+        static double PBWeight(Pie<OffensiveReboundOutcome> pie)
+            => pie.Slices.First(x => x.Outcome == OffensiveReboundOutcome.PutBack).Weight;
+
+        // ── Sub-check 1: Offense dominant (Short, pure matchup) ──────────────────
+        // Big rebounder (Str=90, Ht=92, spdBase→Athl≈80, Fin=55) vs 5 weak guards
+        // (RimProt=10, Ht=65, Str=30). Short modifier=1.0 isolates the matchup.
+        // Assert: PutBack > cfg.PutBack (baseline).
+        {
+            Console.WriteLine("  Sub-check 1: offense dominant — big rebounder vs weak guards (Short)");
+            var rebounder = MkP32(1, 50, str: 90, ht: 92, spdBase: 78, fin: 55);
+            var off = new[] { rebounder, MkP32(2,50), MkP32(3,50), MkP32(4,50), MkP32(5,50) };
+            var def = Enumerable.Range(0, 5).Select(i => MkP32(10+i, 50, str: 30, ht: 65, rimProt: 10)).ToArray();
+            var game  = BuildGame(off, def);
+            var state = MkState(game, ShotLocation.Short);
+            var gen   = new RollKGenerator(cfgK, cfgMatch, game);
+            var putback = PBWeight(gen.Generate(state, OffensiveReboundSource.LiveBall));
+            var pass = putback > cfgK.PutBack;
+            ok &= pass;
+            Console.WriteLine(pass
+                ? $"    [OK]   PutBack={putback:F4} > baseline {cfgK.PutBack:F4}"
+                : $"    [FAIL] PutBack={putback:F4} not > baseline {cfgK.PutBack:F4}");
+        }
+
+        // ── Sub-check 2: Defense dominant (Short, pure matchup) ──────────────────
+        // Guard rebounder (Str=30, Ht=72, spdBase=72, Fin=40) vs 5 elite rim protectors
+        // (RimProt=88, Ht=90, Str=82). Assert: PutBack < cfg.PutBack.
+        {
+            Console.WriteLine("  Sub-check 2: defense dominant — guard rebounder vs elite rim protectors (Short)");
+            var rebounder = MkP32(1, 50, str: 30, ht: 72, spdBase: 72, fin: 40);
+            var off = new[] { rebounder, MkP32(2,50), MkP32(3,50), MkP32(4,50), MkP32(5,50) };
+            var def = Enumerable.Range(0, 5).Select(i => MkP32(10+i, 50, str: 82, ht: 90, rimProt: 88)).ToArray();
+            var game  = BuildGame(off, def);
+            var state = MkState(game, ShotLocation.Short);
+            var gen   = new RollKGenerator(cfgK, cfgMatch, game);
+            var putback = PBWeight(gen.Generate(state, OffensiveReboundSource.LiveBall));
+            var pass = putback < cfgK.PutBack;
+            ok &= pass;
+            Console.WriteLine(pass
+                ? $"    [OK]   PutBack={putback:F4} < baseline {cfgK.PutBack:F4}"
+                : $"    [FAIL] PutBack={putback:F4} not < baseline {cfgK.PutBack:F4}");
+        }
+
+        // ── Sub-check 3: Neutral baseline at Short ───────────────────────────────
+        // All-50 rebounder vs all-50 defense. Short modifier=1.0.
+        // Assert: |PutBack - cfg.PutBack| < 0.02.
+        {
+            Console.WriteLine("  Sub-check 3: neutral all-50 at Short ≈ baseline");
+            var off = Enumerable.Range(0, 5).Select(i => MkP32(i+1, 50)).ToArray();
+            var def = Enumerable.Range(0, 5).Select(i => MkP32(10+i, 50)).ToArray();
+            var game  = BuildGame(off, def);
+            var state = MkState(game, ShotLocation.Short);
+            var gen   = new RollKGenerator(cfgK, cfgMatch, game);
+            var putback = PBWeight(gen.Generate(state, OffensiveReboundSource.LiveBall));
+            var pass = Math.Abs(putback - cfgK.PutBack) < 0.02;
+            ok &= pass;
+            Console.WriteLine(pass
+                ? $"    [OK]   PutBack={putback:F4} ≈ baseline {cfgK.PutBack:F4} (|diff|<0.02)"
+                : $"    [FAIL] PutBack={putback:F4} vs baseline {cfgK.PutBack:F4} (|diff|={Math.Abs(putback-cfgK.PutBack):F4})");
+        }
+
+        // ── Sub-check 3b: Neutral at Rim is above baseline ───────────────────────
+        // Same all-50 lineup, but ShotType=Rim (modifier 1.10 > 1.0).
+        // Assert: PutBack > cfg.PutBack and PutBack ≤ PutbackCeiling.
+        {
+            Console.WriteLine("  Sub-check 3b: neutral all-50 at Rim > baseline (rim-board boost)");
+            var off = Enumerable.Range(0, 5).Select(i => MkP32(i+1, 50)).ToArray();
+            var def = Enumerable.Range(0, 5).Select(i => MkP32(10+i, 50)).ToArray();
+            var game  = BuildGame(off, def);
+            var state = MkState(game, ShotLocation.Rim);
+            var gen   = new RollKGenerator(cfgK, cfgMatch, game);
+            var putback = PBWeight(gen.Generate(state, OffensiveReboundSource.LiveBall));
+            var pass = putback > cfgK.PutBack && putback <= cfgK.PutbackCeiling;
+            ok &= pass;
+            Console.WriteLine(pass
+                ? $"    [OK]   PutBack={putback:F4} > baseline {cfgK.PutBack:F4}, ≤ ceiling {cfgK.PutbackCeiling:F4}"
+                : $"    [FAIL] PutBack={putback:F4} (baseline={cfgK.PutBack:F4}, ceiling={cfgK.PutbackCeiling:F4})");
+        }
+
+        // ── Sub-check 4: Zone modifier — Three < Rim ─────────────────────────────
+        // Moderate rebounder (Str=80, Ht=85, spdBase=75, Fin=50) vs moderate defense
+        // (RimProt=40, Ht=75, Str=45 × 5). Same matchup, different zones.
+        // Assert: PutBack(Three) < PutBack(Rim).
+        {
+            Console.WriteLine("  Sub-check 4: zone modifier — Three < Rim for same matchup");
+            var rebounder = MkP32(1, 50, str: 80, ht: 85, spdBase: 75, fin: 50);
+            var off = new[] { rebounder, MkP32(2,50), MkP32(3,50), MkP32(4,50), MkP32(5,50) };
+            var def = Enumerable.Range(0, 5).Select(i => MkP32(10+i, 50, str: 45, ht: 75, rimProt: 40)).ToArray();
+            var game      = BuildGame(off, def);
+            var stateThree = MkState(game, ShotLocation.Three);
+            var stateRim   = MkState(game, ShotLocation.Rim);
+            var gen        = new RollKGenerator(cfgK, cfgMatch, game);
+            var pbThree = PBWeight(gen.Generate(stateThree, OffensiveReboundSource.LiveBall));
+            var pbRim   = PBWeight(gen.Generate(stateRim,   OffensiveReboundSource.LiveBall));
+            var pass = pbThree < pbRim;
+            ok &= pass;
+            Console.WriteLine(pass
+                ? $"    [OK]   Three={pbThree:F4} < Rim={pbRim:F4}"
+                : $"    [FAIL] Three={pbThree:F4} not < Rim={pbRim:F4}");
+        }
+
+        // ── Sub-check 5: Null ShotType (FT board) ────────────────────────────────
+        // Same rebounder as sub-check 1. ShotType=null → zone modifier 1.0.
+        // Assert: no crash; result in [PutbackFloor, PutbackCeiling].
+        {
+            Console.WriteLine("  Sub-check 5: null ShotType (FT board) → valid range, no crash");
+            var rebounder = MkP32(1, 50, str: 90, ht: 92, spdBase: 78, fin: 55);
+            var off = new[] { rebounder, MkP32(2,50), MkP32(3,50), MkP32(4,50), MkP32(5,50) };
+            var def = Enumerable.Range(0, 5).Select(i => MkP32(10+i, 50, str: 30, ht: 65, rimProt: 10)).ToArray();
+            var game  = BuildGame(off, def);
+            var state = MkState(game, null);   // null ShotType
+            var gen   = new RollKGenerator(cfgK, cfgMatch, game);
+            var putback = PBWeight(gen.Generate(state, OffensiveReboundSource.LiveBall));
+            var pass = putback >= cfgK.PutbackFloor && putback <= cfgK.PutbackCeiling;
+            ok &= pass;
+            Console.WriteLine(pass
+                ? $"    [OK]   PutBack={putback:F4} in [{cfgK.PutbackFloor:F4}, {cfgK.PutbackCeiling:F4}]"
+                : $"    [FAIL] PutBack={putback:F4} out of [{cfgK.PutbackFloor:F4}, {cfgK.PutbackCeiling:F4}]");
+        }
+
+        // ── Sub-check 6: Null ReboundSlot fallback (both sources) ────────────────
+        // ReboundSlot=null → generator short-circuits to flat config pie.
+        // LiveBall: PutBack == cfg.PutBack exactly.
+        // FreeThrow: PutBack == cfg.FreeThrowPutBack exactly.
+        {
+            Console.WriteLine("  Sub-check 6: null ReboundSlot → flat config fallback (both sources)");
+            var off = Enumerable.Range(0, 5).Select(i => MkP32(i+1, 50)).ToArray();
+            var def = Enumerable.Range(0, 5).Select(i => MkP32(10+i, 50)).ToArray();
+            var game = BuildGame(off, def);
+
+            // null ReboundSlot state — ReboundSlot defaults to null
+            var stateNull = new PossessionState(
+                PossessionNumber: 1,
+                Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                ShotType: ShotLocation.Short
+                // ReboundSlot: null (default)
+            );
+            var gen = new RollKGenerator(cfgK, cfgMatch, game);
+
+            var pbLive = PBWeight(gen.Generate(stateNull, OffensiveReboundSource.LiveBall));
+            var pbFT   = PBWeight(gen.Generate(stateNull, OffensiveReboundSource.FreeThrow));
+
+            var passLive = pbLive == cfgK.PutBack;
+            var passFT   = pbFT   == cfgK.FreeThrowPutBack;
+            ok &= passLive && passFT;
+
+            Console.WriteLine(passLive
+                ? $"    [OK]   LiveBall fallback PutBack={pbLive:F4} == cfg.PutBack={cfgK.PutBack:F4}"
+                : $"    [FAIL] LiveBall fallback PutBack={pbLive:F4} != cfg.PutBack={cfgK.PutBack:F4}");
+            Console.WriteLine(passFT
+                ? $"    [OK]   FreeThrow fallback PutBack={pbFT:F4} == cfg.FreeThrowPutBack={cfgK.FreeThrowPutBack:F4}"
+                : $"    [FAIL] FreeThrow fallback PutBack={pbFT:F4} != cfg.FreeThrowPutBack={cfgK.FreeThrowPutBack:F4}");
+        }
+
+        // ── Sub-check 7: Flat arms unchanged across sub-checks 1–5 ───────────────
+        // The five non-PutBack/non-ResetOffense arms must equal the config sum in all runs.
+        {
+            Console.WriteLine("  Sub-check 7: flat arms unchanged across sub-checks 1–5");
+            var cfgFlatLive = FlatArmsSum(cfgK, OffensiveReboundSource.LiveBall);
+            var off = Enumerable.Range(0, 5).Select(i => MkP32(i+1, 50)).ToArray();
+            var def = Enumerable.Range(0, 5).Select(i => MkP32(10+i, 50)).ToArray();
+            var game = BuildGame(off, def);
+            var gen  = new RollKGenerator(cfgK, cfgMatch, game);
+
+            var zones = new[] {
+                ShotLocation.Three, ShotLocation.Long, ShotLocation.Mid,
+                ShotLocation.Short, ShotLocation.Rim };
+            var allPass = true;
+            foreach (var zone in zones)
+            {
+                var state = MkState(game, zone);
+                var pie   = gen.Generate(state, OffensiveReboundSource.LiveBall);
+                var pieMap = pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+                var flatInPie = pieMap[OffensiveReboundOutcome.JumpBall]
+                              + pieMap[OffensiveReboundOutcome.DefensiveFoul]
+                              + pieMap[OffensiveReboundOutcome.OffensiveFoul]
+                              + pieMap[OffensiveReboundOutcome.DeadBallTurnover]
+                              + pieMap[OffensiveReboundOutcome.LiveBallTurnover];
+                if (Math.Abs(flatInPie - cfgFlatLive) > cfgK.Epsilon * 10)
+                {
+                    Console.WriteLine($"    [FAIL] {zone}: flat arms sum={flatInPie:F6} != config {cfgFlatLive:F6}");
+                    allPass = false;
+                }
+            }
+            ok &= allPass;
+            Console.WriteLine(allPass
+                ? $"    [OK]   Flat arms sum={cfgFlatLive:F6} constant across all zones"
+                : "    (see FAIL lines above)");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(ok ? "  Phase 32 putback attempt rate check: PASSED" : "  Phase 32 putback attempt rate check: FAILED (see [FAIL] lines above)");
         return ok;
     }
 }

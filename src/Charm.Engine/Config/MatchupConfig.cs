@@ -837,6 +837,27 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"StandardSizeWeight must be >= 0: got {cfg.StandardSizeWeight}.");
 
+        // Phase 32 invariants — putback attempt rate (Roll K real generator).
+        if (cfg.PutbackReferenceShift <= 0.0)
+            throw new InvalidOperationException(
+                $"PutbackReferenceShift must be > 0: got {cfg.PutbackReferenceShift}.");
+
+        if (cfg.PutbackZoneModifierThree <= 0.0)
+            throw new InvalidOperationException(
+                $"PutbackZoneModifierThree must be > 0: got {cfg.PutbackZoneModifierThree}.");
+        if (cfg.PutbackZoneModifierLong <= 0.0)
+            throw new InvalidOperationException(
+                $"PutbackZoneModifierLong must be > 0: got {cfg.PutbackZoneModifierLong}.");
+        if (cfg.PutbackZoneModifierMid <= 0.0)
+            throw new InvalidOperationException(
+                $"PutbackZoneModifierMid must be > 0: got {cfg.PutbackZoneModifierMid}.");
+        if (cfg.PutbackZoneModifierShort <= 0.0)
+            throw new InvalidOperationException(
+                $"PutbackZoneModifierShort must be > 0: got {cfg.PutbackZoneModifierShort}.");
+        if (cfg.PutbackZoneModifierRim <= 0.0)
+            throw new InvalidOperationException(
+                $"PutbackZoneModifierRim must be > 0: got {cfg.PutbackZoneModifierRim}.");
+
         return cfg;
     }
 
@@ -939,4 +960,80 @@ public sealed class MatchupConfig
     /// needed for a large shift). Must be &gt; 0 (enforced in Load).
     /// Calibration placeholder.</summary>
     public double ReboundReferenceShift { get; set; } = 20.0;
+
+    // =========================================================================
+    // Phase 32 — putback attempt rate (Roll K real generator)
+    // =========================================================================
+
+    // --- Phase 32: offense composite weights.
+    //     offScore = PutbackOffStrengthWeight × Strength + ...
+    //     Calibration placeholders. ---
+
+    /// <summary>Weight of the rebounder's Strength in the offense composite.
+    /// Calibration placeholder.</summary>
+    public double PutbackOffStrengthWeight    { get; set; } = 0.40;
+
+    /// <summary>Weight of the rebounder's Height in the offense composite.
+    /// Calibration placeholder.</summary>
+    public double PutbackOffHeightWeight      { get; set; } = 0.40;
+
+    /// <summary>Weight of the rebounder's Athleticism in the offense composite.
+    /// Calibration placeholder.</summary>
+    public double PutbackOffAthleticismWeight { get; set; } = 0.15;
+
+    /// <summary>Weight of the rebounder's Finishing in the offense composite.
+    /// Calibration placeholder.</summary>
+    public double PutbackOffFinishingWeight   { get; set; } = 0.05;
+
+    // --- Phase 32: defense interior composite weights (for the self-weighted team mean).
+    //     interiorScore[i] = PutbackDefRimProtectionWeight × RimProtection + ...
+    //     RimProtection is the primary deterrent. Calibration placeholders. ---
+
+    /// <summary>Weight of RimProtection in each defender's interior composite.
+    /// Primary deterrent. Calibration placeholder.</summary>
+    public double PutbackDefRimProtectionWeight { get; set; } = 0.55;
+
+    /// <summary>Weight of Height in each defender's interior composite.
+    /// Calibration placeholder.</summary>
+    public double PutbackDefHeightWeight        { get; set; } = 0.25;
+
+    /// <summary>Weight of Strength in each defender's interior composite.
+    /// Calibration placeholder.</summary>
+    public double PutbackDefStrengthWeight      { get; set; } = 0.20;
+
+    // --- Phase 32: tanh saturation speed for the putback attempt tilt.
+    //     Used ONLY as the tanh denominator (shift / PutbackReferenceShift), NOT as the
+    //     GapFn rating-point scale — GapFn uses the shared ReferenceScale, same as every
+    //     other matchup door. A net shift of PutbackReferenceShift reaches tanh(1) ≈ 76%
+    //     of span. Must be > 0 (enforced in Load). Calibration placeholder. ---
+
+    /// <summary>Tanh saturation denominator for the putback tilt. A net GapFn shift
+    /// equal to this value reaches tanh(1) ≈ 76% of span. Must be &gt; 0.
+    /// Calibration placeholder.</summary>
+    public double PutbackReferenceShift { get; set; } = 20.0;
+
+    // --- Phase 32: zone modifiers — scale finalPutback down for perimeter shots.
+    //     A Three miss bounces further from the basket; even a big is less likely
+    //     to go straight back up. Null ShotType (FT board) → 1.0 in code.
+    //     All must be > 0 (enforced in Load). Calibration placeholders. ---
+
+    /// <summary>Zone modifier for a Three-point miss. Must be &gt; 0.
+    /// Calibration placeholder.</summary>
+    public double PutbackZoneModifierThree { get; set; } = 0.50;
+
+    /// <summary>Zone modifier for a Long two miss. Must be &gt; 0.
+    /// Calibration placeholder.</summary>
+    public double PutbackZoneModifierLong  { get; set; } = 0.70;
+
+    /// <summary>Zone modifier for a Mid-range miss. Must be &gt; 0.
+    /// Calibration placeholder.</summary>
+    public double PutbackZoneModifierMid   { get; set; } = 0.85;
+
+    /// <summary>Zone modifier for a Short miss. Must be &gt; 0.
+    /// Calibration placeholder.</summary>
+    public double PutbackZoneModifierShort { get; set; } = 1.00;
+
+    /// <summary>Zone modifier for a Rim miss. Must be &gt; 0.
+    /// Calibration placeholder.</summary>
+    public double PutbackZoneModifierRim   { get; set; } = 1.10;
 }

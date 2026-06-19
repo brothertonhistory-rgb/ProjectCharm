@@ -1,4 +1,66 @@
+## Session 67 — Phase 32: Roll K Real Generator — Putback Attempt Rate (2026-06-19)
+
+**Scope:** Replaced `RollKStubPieGenerator` with a real, attribute-driven `RollKGenerator`. The generator is the first consumer of `PossessionState.ReboundSlot` (stamped by Phase 31) and tilts the `PutBack`/`ResetOffense` mass split based on the rebounder's physical profile versus the defensive team's interior deterrence, with a per-zone modifier scaling putback weight down for perimeter misses. The five minority arms (`DefensiveFoul`, `OffensiveFoul`, `DeadBallTurnover`, `LiveBallTurnover`, `JumpBall`) stay flat at config. Follows the standard interface + retype pattern. 8 files changed, 2 new.
+
+**What shipped (8 files):**
+
+`src/Charm.Engine/Generators/IRollKPieGenerator.cs` — NEW. Two-arg interface mirroring `IRollIPieGenerator`: `Generate(PossessionState state, OffensiveReboundSource source)`. `state` provides `ReboundSlot` and `ShotType`; `source` selects LiveBall or FreeThrow base weight set. Null `ReboundSlot` → flat config fallback; null `ShotType` → zone modifier 1.0.
+
+`src/Charm.Engine/Generators/RollKGenerator.cs` — NEW. Ctor: `(RollKConfig cfg, MatchupConfig matchup, GameState game)`. Offense composite: `offScore = Σ(PutbackOff*Weight × rebounder attribute)` over Strength, Height, Athleticism (computed property), Finishing. Defense composite: self-weighted team mean where each defender's interior score is its own weight, so elite rim protectors dominate non-linearly. Gap → shift via `Matchup.GapFn` (shared ReferenceScale). Shift → bend via `tanh(shift / PutbackReferenceShift)` — the `PutbackReferenceShift` is the tanh denominator only, not the GapFn scale. Zone modifier applied after the tanh bend; result clamped to `[PutbackFloor, PutbackCeiling]`. Null-rebounder fallback (DEC-6 equivalent) returns flat config pie. Runtime overflow guard: throws if `finalPutback + flatTotal >= 1.0`.
+
+`src/Charm.Engine/Generators/RollKStubPieGenerator.cs` — EDIT. Added `: IRollKPieGenerator`; widened `Generate` to `Generate(PossessionState state, OffensiveReboundSource source)`. State accepted but ignored; behavior unchanged.
+
+`src/Charm.Engine/Core/Resolver.cs` — EDIT. Three surgical changes: `_rollKGenerator` field retyped `RollKStubPieGenerator` → `IRollKPieGenerator`; ctor param retyped same; dispatch call updated to `_rollKGenerator.Generate(reboundState31, c.OffensiveReboundSource ?? OffensiveReboundSource.LiveBall)` — passes the state that already carries `ReboundSlot` from the Phase 31 picker.
+
+`src/Charm.Engine/Config/MatchupConfig.cs` — EDIT. Appended Phase 32 property block: 4 offense composite weights, 3 defense composite weights, `PutbackReferenceShift`, 5 zone modifiers. Load invariants added: `PutbackReferenceShift > 0`; all five zone modifiers `> 0`.
+
+`src/Charm.Engine/Config/RollKConfig.cs` — EDIT. Appended `PutbackFloor` (0.15) and `PutbackCeiling` (0.70). Load invariants added: floor/ceiling validity; startup overflow guards confirming `PutbackCeiling + flat-arm-sum < 1.0` for both LiveBall and FreeThrow source modes. Load method restructured from single-expression return to guarded block.
+
+`src/Charm.Harness/Program.cs` — EDIT. Live generator swapped to `new RollKGenerator(cfgK, cfgMatchup, game)` after `SeatStartersFromConfig` (alongside other real-generator constructions). Two method signatures widened: `RollKReboundBatchCheck` and `RollKBonusForkCheck` — `RollKStubPieGenerator genK` → `IRollKPieGenerator genK`. Three `genK.Generate(src)` call sites updated to `genK.Generate(state, src)` in `RollKReboundBatchCheck` and `RollMContextSelectionCheck`. `Phase32PutbackAttemptRateCheck` added (8 sub-checks); wired via `ok &= Phase32PutbackAttemptRateCheck(configPath)`.
+
+`src/Charm.Harness/config.json` — EDIT. 13 new keys in `Matchup` section (offense weights ×4, defense weights ×3, `PutbackReferenceShift`, zone modifiers ×5). 2 new keys in `RollK` section (`PutbackFloor`, `PutbackCeiling`).
+
+**Key design decisions:**
+
+- **`PutbackReferenceShift` is the tanh denominator only — not the GapFn scale.** GapFn uses the shared `ReferenceScale` (25.0, same as every other matchup door). `PutbackReferenceShift` (20.0) is used only in `tanh(shift / PutbackReferenceShift)` to control how quickly the tilt saturates toward the floor/ceiling. This mirrors the existing block/foul pattern in `Matchup.cs` and is what makes the C# match the Python pre-validation exactly.
+
+- **Self-weighted defense composite.** Each defender's interior score (`RimProtection × 0.55 + Height × 0.25 + Strength × 0.20`) is used as its own weight in the team mean: `defScore = Σ(score²) / Σ(score)`. A single elite rim protector dominates the team score non-linearly. Five identical all-50 defenders produce a team score equal to a single all-50 defender's score — neutral reference point.
+
+- **Null `ReboundSlot` short-circuits to flat config.** If Phase 31 didn't stamp a rebounder (or the slot is unpopulated), the generator returns the same flat-weight pie as the stub. This is the DEC-6 equivalent for this generator — correctness without crashing on uninitialized state.
+
+- **Zone modifier applies after the tanh bend, before the clamp.** `finalPutback = Clamp(adjustedPutback × zoneMod, floor, ceiling)`. The zone modifier can push an offense-dominant matchup below the natural adjusted value, or pull an already-high value up to the ceiling — the clamp is the safety net.
+
+- **FreeThrow source uses `cfg.FreeThrowPutBack` as its base.** The `basePutback` variable branches on source before the tanh calculation, so the same formula runs for both source modes with different starting points. The five flat arms are also source-selected from config. Null fallback returns the appropriate flat-source pie.
+
+**Python pre-validation (mandatory Step 0 — all 8 checks passed):**
+
+1. Offense dominant (big vs weak guards, Short): 0.6812 > 0.40 baseline. ✓
+2. Defense dominant (guard vs elite rim protectors, Short): 0.2740 < 0.40 baseline. ✓
+3. Neutral at Short: 0.4000 ≈ 0.40 (|diff| < 0.01). ✓
+4. Neutral at Rim > baseline: 0.4400 > 0.40 (rim-board boost). ✓
+5. Zone modifier: Three=0.2610 < Rim=0.5743 for same matchup. ✓
+6. Self-weighted defense dominates simple mean (55.23 > 34.00 for one-elite-rest-weak). ✓
+7. Null ShotType (FT board): 0.5221, in valid range. ✓
+8. Null-rebounder fallback confirmed by design; generator short-circuits before formula. ✓
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED.
+
+Phase 32 check (8 sub-checks):
+- Offense dominant (Short): PutBack=0.6814 > baseline 0.4000. [OK]
+- Defense dominant (Short): PutBack=0.2681 < baseline 0.4000. [OK]
+- Neutral at Short: PutBack=0.4000 ≈ baseline (|diff|<0.02). [OK]
+- Neutral at Rim > baseline: 0.4400 > 0.4000, ≤ ceiling 0.7000. [OK]
+- Zone modifier: Three=0.2616 < Rim=0.5755. [OK]
+- Null ShotType (FT board): 0.6814 in [0.1500, 0.7000]. [OK]
+- Null ReboundSlot fallback: LiveBall=0.4000 exactly, FreeThrow=0.5500 exactly. [OK]
+- Flat arms sum=0.130000 constant across all zones. [OK]
+
+Observation run (1,000 games, frozen corpus): all mechanics OK; config hash updated. Prior per-player box score columns unchanged. Stress test: all 8 buckets passed; Athletic over Skill advantage (72.8%) confirmed symmetric across mirror buckets (gap 0.2%) — side neutrality holding.
+
 ## Session 66 — Phase 31: Offensive Rebounder Picker (2026-06-19)
+
 
 **Scope:** The first in-possession picker: engine-side attribution of which offensive player secured the offensive rebound, conditional on Roll I having already awarded the board to the offense. Previously ORB credit in the box score was assigned via a post-hoc `WeightedDraw` in the harness. Phase 31 stamps the result onto `PossessionState.ReboundSlot` (a new nullable `Slot?` field, separate from `SelectedSlot`) and threads `OrbBySlot` (a `SlotGroup`) from the resolver walk out through `RoutingOutcome` → `PossessionRecord` → harness attribution. Six files changed: one new (`OffensiveRebounderPicker.cs`), five modified.
 

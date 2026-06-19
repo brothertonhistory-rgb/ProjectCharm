@@ -5182,3 +5182,76 @@ The interior anchor at `SCALE=40` captures ~58% of rim residual probability (the
 - Option B (unified 10-player contest) — the named future fix for within-side inflation; deferred to the calibration phase
 - Per-player foul ledger, coaching/offensive-hierarchy layer, deferred roll faces (C, D, J, K) — unbuilt chapters, not cleanup debt
 - Calibration of `SCALE`, `ReboundShooterNerf`, or picker weight magnitudes — correctness before calibration is the standing sequencing principle
+
+---
+
+## Phase 32 — Roll K Real Generator: Putback Attempt Rate
+
+### Scope
+
+Replaces `RollKStubPieGenerator` with `RollKGenerator`, the first consumer of `PossessionState.ReboundSlot` (stamped by Phase 31). The generator tilts the `PutBack`/`ResetOffense` mass split using the rebounder's physical profile, the defensive team's interior deterrence composite, and a per-zone modifier. The five minority arms stay flat at config. Follows the standard interface + retype pattern introduced in Phase 9.
+
+### The formula
+
+```
+offScore  = PutbackOffStrengthWeight    × rebounder.Strength
+          + PutbackOffHeightWeight      × rebounder.Height
+          + PutbackOffAthleticismWeight × rebounder.Athleticism   // computed: (Str+Spd+Qck+FS+Vert)/5
+          + PutbackOffFinishingWeight   × rebounder.Finishing
+
+interiorScore[i] = PutbackDefRimProtectionWeight × defender.RimProtection
+                 + PutbackDefHeightWeight         × defender.Height
+                 + PutbackDefStrengthWeight       × defender.Strength
+
+defScore  = Σ(interiorScore[i]²) / Σ(interiorScore[i])   // self-weighted mean
+
+gap       = offScore − defScore
+shift     = Matchup.GapFn(gap, SkillSteepness, SkillExponent, ReferenceScale)
+
+basePutback = source == FreeThrow ? cfg.FreeThrowPutBack : cfg.PutBack
+span        = shift >= 0 ? (PutbackCeiling − basePutback)
+                         : (basePutback − PutbackFloor)
+bend        = span × tanh(shift / PutbackReferenceShift)
+
+adjustedPutback = basePutback + bend
+finalPutback    = Clamp(adjustedPutback × zoneMod, PutbackFloor, PutbackCeiling)
+```
+
+### Two separate rate parameters
+
+`ReferenceScale` (25.0, shared across all matchup doors) is the GapFn rating-point unit: a gap of 25 rating points reaches `GapFn = SkillSteepness`. `PutbackReferenceShift` (20.0, Roll K only) is the tanh saturation denominator: a net shift of 20.0 rating points reaches `tanh(1) ≈ 76%` of span. The two parameters are independent and serve different purposes; conflating them is the named failure mode documented in the adversarial preamble. This mirrors the existing block/foul pattern in `Matchup.cs`.
+
+### Self-weighted defense composite
+
+The formula `Σ(score²) / Σ(score)` ensures that a single elite interior defender disproportionately raises the team score. Five identical all-50 defenders produce a team score of 50 (the same as each individual); one elite (interior=85) among four weak (interior=20) produces a score of ~55, well above the arithmetic mean of 33. This reflects the basketball reality that one dominant rim protector changes the putback calculus for the entire defense.
+
+### Zone modifier
+
+| ShotType | Modifier |
+|---|---|
+| Three | 0.50 |
+| Long | 0.70 |
+| Mid | 0.85 |
+| Short | 1.00 |
+| Rim | 1.10 |
+| null (FT board) | 1.00 |
+
+The modifier applies after the tanh bend and before the floor/ceiling clamp. The Short modifier is 1.0 (no zone effect) so sub-checks that want to isolate the matchup component use Short. The Rim modifier exceeds 1.0 — even a neutral matchup generates a slight putback boost on a rim miss because the board is right there.
+
+### Null-rebounder fallback
+
+If `PossessionState.ReboundSlot` is null (Phase 31 not yet run, or the slot is unpopulated), the generator returns the flat config pie for the given source — identical to `RollKStubPieGenerator`. This is the DEC-6 equivalent for Roll K: correctness without crashing on uninitialized state.
+
+### Config additions
+
+**`MatchupConfig` (13 new properties):** `PutbackOffStrengthWeight` (0.40), `PutbackOffHeightWeight` (0.40), `PutbackOffAthleticismWeight` (0.15), `PutbackOffFinishingWeight` (0.05), `PutbackDefRimProtectionWeight` (0.55), `PutbackDefHeightWeight` (0.25), `PutbackDefStrengthWeight` (0.20), `PutbackReferenceShift` (20.0), `PutbackZoneModifierThree` (0.50), `PutbackZoneModifierLong` (0.70), `PutbackZoneModifierMid` (0.85), `PutbackZoneModifierShort` (1.00), `PutbackZoneModifierRim` (1.10). Load invariants: `PutbackReferenceShift > 0`; all five zone modifiers `> 0`.
+
+**`RollKConfig` (2 new properties):** `PutbackFloor` (0.15), `PutbackCeiling` (0.70). Load invariants: floor ≥ 0; ceiling ≤ 1.0; floor < ceiling. Startup overflow guards: `PutbackCeiling + flatArmSum < 1.0` enforced at Load time for both LiveBall and FreeThrow source modes (in addition to the runtime overflow guard in the generator).
+
+### What is not this session
+
+- Putback conversion rate tilt in Roll H — Roll H already handles the make/miss/foul resolution of a putback attempt; a putback-specific attribute tilt there is a future session
+- Defensive rebounder picker — no in-possession consumer; DReb credit remains a post-hoc `WeightedDraw`
+- Separate `PutbackCeiling`/`PutbackFloor` per source (FreeThrow vs LiveBall) — single pair for now; calibration can split later
+- Calibration of all weights, zone modifiers, reference shift — placeholders only; direction is what Phase 32 validates
+- Deferred roll faces (Rolls C, D, J, K minority arms) — unbuilt chapters, not cleanup debt

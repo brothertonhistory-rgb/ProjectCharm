@@ -308,7 +308,7 @@ public sealed class Resolver
     private readonly IRollHPieGenerator _rollHGenerator;
     private readonly IRollIPieGenerator _rollIGenerator;
     private readonly IRollJPieGenerator _rollJGenerator;
-    private readonly RollKStubPieGenerator _rollKGenerator;
+    private readonly IRollKPieGenerator _rollKGenerator;
     private readonly IRollLPieGenerator _rollLGenerator;
     private readonly IRollMPieGenerator _rollMGenerator;
     private readonly RollOffensiveFoulStubPieGenerator _offensiveFoulGenerator;
@@ -330,7 +330,7 @@ public sealed class Resolver
         IRollHPieGenerator rollHGenerator,
         IRollIPieGenerator rollIGenerator,
         IRollJPieGenerator rollJGenerator,
-        RollKStubPieGenerator rollKGenerator,
+        IRollKPieGenerator rollKGenerator,
         IRollLPieGenerator rollLGenerator,
         IRollMPieGenerator rollMGenerator,
         RollOffensiveFoulStubPieGenerator offensiveFoulGenerator,
@@ -923,6 +923,7 @@ public sealed class Resolver
                             // reads as LiveBall, so the field-goal path is byte-for-byte
                             // unchanged. Roll M stamps FreeThrow for its FT-specific pie.
                             var pieK = _rollKGenerator.Generate(
+                                reboundState31,
                                 c.OffensiveReboundSource ?? OffensiveReboundSource.LiveBall);
                             result = RollK.Execute(reboundState31, pieK, _game, _rng);
                             continue;
