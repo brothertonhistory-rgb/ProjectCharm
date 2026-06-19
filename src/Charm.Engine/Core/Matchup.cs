@@ -811,4 +811,25 @@ public static class Matchup
 
         return (finalToShare, finalDefFoulShare, finalOffFoulShare);
     }
+
+    // ── Phase 36: BLK attribution weight ─────────────────────────────────────
+
+    /// <summary>
+    /// Returns the raw (pre-floor) block-attribution weight for one defensive player
+    /// at a given shot zone. A straight weighted sum of six blocking attributes with
+    /// zone-specific coefficients from config. The floor of 1 is applied by the
+    /// caller (<see cref="BlockerPicker"/>), not here.
+    ///
+    /// <para>Rim/Short: RimProtection and Height dominate — help-side bigs rotating.
+    /// Three/Long: PerimeterDefense leads — perimeter closeout. Wingspan is meaningful
+    /// at every zone (reach that deflects the ball). Mid is between the two extremes.
+    /// </para>
+    /// </summary>
+    public static double BlockerWeight(ShotLocation zone, Player p, MatchupConfig cfg)
+        =>   cfg.BlkRimProtection(zone)    * p.RimProtection
+           + cfg.BlkPerimeterDefense(zone) * p.PerimeterDefense
+           + cfg.BlkPostDefense(zone)      * p.PostDefense
+           + cfg.BlkHeight(zone)           * p.Height
+           + cfg.BlkWingspan(zone)         * p.Wingspan
+           + cfg.BlkVertical(zone)         * p.Vertical;
 }

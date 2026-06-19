@@ -1,3 +1,63 @@
+## Session 71 — Phase 36: BlockerPicker — BLK Attribution On-Walk, Retire Last Harness WeightedDraw (2026-06-19)
+
+**Scope:** Create `BlockerPicker` — a zone-aware weighted draw across all five defenders — stamp it on-walk at every `ShotResult.Blocked` exit, thread `BlkBySlot` (a `SlotGroup`) through `RoutingOutcome` → `Governor` → harness, and retire the last remaining harness `WeightedDraw` (the seed+2 BLK stream). 7 files changed, 1 new.
+
+**What shipped (7 files):**
+
+`src/Charm.Engine/Core/BlockerPicker.cs` — NEW. Static class on the `DefensiveRebounderPicker` structural pattern (populate → weights with floor-of-1 → cumulative walk). Signature: `Pick(PossessionState state, GameState game, MatchupConfig matchupCfg, IRng rng)`. Zone read from `state.ShotType ?? ShotLocation.Rim` — null falls back to Rim (defensive guard; in current routing `ShotType` is never null at a block site because Roll K's PutBack arm forces `ShotLocation.Rim` before re-entering Roll H, and Roll G stamps it on all other paths). Does not read `SelectedSlot` — BLK attribution is a pure all-five-defenders draw; `SelectedSlot` is offense-side shooter attribution and is irrelevant here. Stage 2 weight: `max(1, Matchup.BlockerWeight(zone, player, cfg))`. Throws on empty defense.
+
+`src/Charm.Engine/Core/Matchup.cs` — EDIT. New public static method `BlockerWeight(ShotLocation zone, Player p, MatchupConfig cfg)` appended before the closing brace. A straight weighted sum of six blocking attributes with zone-specific coefficients from config: `BlkRimProtection(zone) * p.RimProtection + BlkPerimeterDefense(zone) * p.PerimeterDefense + BlkPostDefense(zone) * p.PostDefense + BlkHeight(zone) * p.Height + BlkWingspan(zone) * p.Wingspan + BlkVertical(zone) * p.Vertical`. No tanh, no gap function — unlike the shot-block door (`BlockWeight`) which models the contest probability, this is an attribution weight. The floor of 1 is applied by the caller, not here.
+
+`src/Charm.Engine/Config/MatchupConfig.cs` — EDIT. 30 new auto-properties (6 attributes × 5 zones) + 6 switch methods (`BlkRimProtection(zone)`, `BlkPerimeterDefense(zone)`, `BlkPostDefense(zone)`, `BlkHeight(zone)`, `BlkWingspan(zone)`, `BlkVertical(zone)`) + Phase 36 Load invariants (all 30 coefficients must be `>= 0`; no sum-to-one constraint — same convention as `ReboundPhysical`). Properties appended after `StealerPostnessScale`; invariants appended before `return cfg`. Calibration placeholders — shape is what matters: RimProtection and Height lead at Rim/Short; PerimeterDefense leads at Three/Long; Wingspan meaningful everywhere; Mid between the two extremes.
+
+`src/Charm.Engine/Core/Resolver.cs` — EDIT (surgical, five changes). Change 1: `var blkBySlot = new SlotGroup()` declared alongside `var blkCount = 0` (line ~509 area). Change 2: replaced `blkCount++` (and its stale comment "Phase 23: count blocks for harness BLK-credit draws") with the Phase 36 stamp block — `blkCount++; blkBySlot = blkBySlot.WithSlot(BlockerPicker.Pick(shotSt, _game, _matchup, _rng).Number, 1)`. Change 3: stale comment on `BlkCount` in `RoutingOutcome` record updated — removed "harness still issues BLK credits via weighted draw". Change 4: `BlkCount` XML doc updated to describe its role as the reconciliation invariant target. Change 5: `public SlotGroup BlkBySlot { get; init; }` appended to `RoutingOutcome` record; `BlkBySlot = blkBySlot` appended to the Terminal return. `BlkCount` stays — the harness still asserts `BlkBySlot.Total == BlkCount`.
+
+`src/Charm.Engine/Core/Governor.cs` — EDIT (surgical, four sub-edits). `SlotGroup BlkBySlot = default` appended as the last parameter of `PossessionRecord` (after `DefensiveRebounderSlot`). `var possessionBlkBySlot = new SlotGroup()` added alongside `possessionDefensiveRebounderSlot`. `possessionBlkBySlot = outcome.BlkBySlot` threaded in the resolver branch. `possessionBlkBySlot` passed last in `records.Add(...)`.
+
+`src/Charm.Harness/Program.cs` — EDIT (six passes). Pass 1: retired BLK `WeightedDraw` loop; replaced with engine-stamped `BlkBySlot` read (slot loop `s=1..5`, `r.BlkBySlot[s]`). Pass 2: removed `var rng = new Random(seed + 2)` declaration and its 4-line comment block; updated `foulRng` comment to note seed+2 is retired and seed+3 (shooting fouls) is the only remaining harness-side draw. Pass 3: updated stale Phase 25 comment near shooting-foul attribution that still said "BLK — the one remaining post-hoc WeightedDraw". Pass 4: updated `AttributionSanityCheck` NOTE line to state BLK is now engine-stamped. Pass 5: deleted `WeightedDraw` method definition (zero callers confirmed before deletion). Pass 6: `Phase36BlockerCheck` added (7 sub-checks + 2 governor invariants); wired after `Phase35DefensiveReboundCheck`.
+
+`src/Charm.Harness/config.json` — EDIT. 30 new keys in `Matchup` section, mirroring `MatchupConfig` defaults exactly.
+
+**Key design decisions:**
+
+- **`BlkBySlot` is a `SlotGroup`, not `int?`.** BLK can fire multiple times per possession — a putback can be blocked, and a possession can contain multiple field-goal attempts. `StealerSlot` and `DefensiveRebounderSlot` are `int?` because each fires at most once. `BlkBySlot` mirrors `OrbBySlot` for the same reason: it accumulates across all block events in the possession via `WithSlot(slot, 1)` on each fire.
+
+- **`BlockerPicker` does not read `SelectedSlot`.** `SelectedSlot` is offense-side shooter attribution stamped by Roll E. The BLK picker is a pure five-defender weighted draw — the zone (`ShotType`) determines which defensive attributes are weighted most, not which offensive slot took the shot. The prompt's claim that Roll K's PutBack arm nulls `SelectedSlot` is incorrect per live source — PutBack does `state with { ShotType = ShotLocation.Rim }` only; it is the ResetOffense arm that nulls both. On a blocked putback, `SelectedSlot` is therefore not null, but it is still irrelevant to the picker.
+
+- **`BlockerWeight` is a straight weighted sum, not a tanh.** The existing `Matchup.BlockWeight` (the shot-block door in Roll H's generator) models the probability a block occurs given a specific matchup. `Matchup.BlockerWeight` is an attribution weight — given a block has already occurred, which defender is credited. These are distinct quantities and deliberately separate methods.
+
+- **The null-ShotType guard in `BlockerPicker` is a defensive fallback only.** In current routing, `ShotType` is never null at a block site: Roll G stamps it on all non-putback paths; Roll K's PutBack arm forces `ShotLocation.Rim`. The null fallback (→ Rim) is correct if it ever fires — putbacks are forced Rim — but it cannot fire today.
+
+- **`BlkCount` is retained.** The harness still uses it as the reconciliation target: `BlkBySlot.Total == BlkCount` is asserted on every possession in `Phase36BlockerCheck` Invariant A. Removing it would lose the cross-check.
+
+- **This is the last harness `WeightedDraw`.** After Phase 36: ORB moved engine-side in Phase 31; TO committer in Phase 33; STL in Phase 34; DRB in Phase 35; BLK in Phase 36. The seed+2 RNG stream (`var rng = new Random(seed + 2)`) is removed entirely. `foulRng` (seed+3, shooting fouls) is the only remaining harness-side attribution draw.
+
+**Python pre-validation (all 4 checks passed):**
+
+- Zone-aware direction: rim protector (RimProtection=85) share at Rim=24.2%, Three=19.4%; perimeter defender (PerimeterDefense=85) share at Rim=19.1%, Three=24.0%. Correct direction at both poles.
+- Wingspan meaningful at all zones: Wingspan=85 beats Wingspan=50 at every zone (Rim through Three). All 5 zones OK.
+- Floor holds: guard in dominant-big lineup gets 9.6% at Rim, 20.0% at Three — both > 0.
+- Null ShotType fallback: rim_protector weight at Rim=64.0 vs Three=51.0 — Rim fallback correct.
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED.
+
+Phase 36 check (7 sub-checks + 2 governor invariants):
+- Sub-check 1: RimProtector(s1)=24.07%, others ~19% — rim protector leads at Rim. [OK]
+- Sub-check 2: PerimDefender(s1)=24.16%, others ~19% — perimeter defender leads at Three. [OK]
+- Sub-check 3: Wingspan=85 > Wingspan=50 at all five zones (Rim through Three). [OK]
+- Sub-check 4: guard floor at Rim=9.13%, Three=15.10% — both > 0. [OK]
+- Sub-check 5: same seed → identical sequence. [OK]
+- Sub-check 6: empty defense throws. [OK]
+- Sub-check 7: null ShotType → Rim fallback; results identical to explicit Rim. [OK]
+- Invariant A: all 6 block possessions have BlkBySlot.Total == BlkCount (1:1). [OK]
+- Invariant B: all 123 non-block possessions have BlkBySlot default (all zeros). [OK]
+
+Existing BLK reconciliation (`bsBlkTotal == totalBlkCount`) in `AttributionSanityCheck` and stress-test sanity check: still [OK] — now reading from engine-stamped `BlkBySlot` instead of post-hoc draws.
+
+Observation run (1,000 games, frozen corpus): all mechanics OK. Corpus hash shifted as expected — `BlockerPicker` consumes one `_rng` draw per block per possession; all downstream engine draws on those possessions shift. All prior checks passed. Stress test: all 8 buckets passed; cross-bucket patterns stable. BLK rates in the per-player box score are low (Okafor leads home at 0.9/game, others 0.5–0.7) — noted as a calibration observation, not a bug; BLK calibration is deferred until all generators are wired.
+
 ## Session 70 — Phase 35: Rebounding — Wingspan in Battle + Attribution, Defensive Rebound Attribution On-Walk (2026-06-19)
 
 **Scope:** Three tightly coupled changes to the rebounding layer. (1) Wingspan added to `ReboundPhysical` — the team-size composite used in the battle's Stage 1 size shift. (2) A shared `ReboundWingspanMultiplier` helper added to `Matchup.cs`, applied to both pickers so within-team wingspan tilts ORB and DRB attribution identically. (3) `DefensiveRebounderPicker` created on the Phase 34 / `StealerPicker` pattern, stamped on-walk at every `DefensiveRebound` terminal — retiring the last post-hoc rebound `WeightedDraw`. 8 files changed, 1 new.

@@ -890,6 +890,30 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"ReboundWingspanScale must be > 0: got {cfg.ReboundWingspanScale}.");
 
+        // Phase 36 — BLK attribution: all 30 blocker weight coefficients must be >= 0.
+        foreach (var zone in new[] { ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid,
+                                     ShotLocation.Long, ShotLocation.Three })
+        {
+            if (cfg.BlkRimProtection(zone) < 0.0)
+                throw new InvalidOperationException(
+                    $"BlkRimProtection for zone {zone} must be >= 0: got {cfg.BlkRimProtection(zone)}.");
+            if (cfg.BlkPerimeterDefense(zone) < 0.0)
+                throw new InvalidOperationException(
+                    $"BlkPerimeterDefense for zone {zone} must be >= 0: got {cfg.BlkPerimeterDefense(zone)}.");
+            if (cfg.BlkPostDefense(zone) < 0.0)
+                throw new InvalidOperationException(
+                    $"BlkPostDefense for zone {zone} must be >= 0: got {cfg.BlkPostDefense(zone)}.");
+            if (cfg.BlkHeight(zone) < 0.0)
+                throw new InvalidOperationException(
+                    $"BlkHeight for zone {zone} must be >= 0: got {cfg.BlkHeight(zone)}.");
+            if (cfg.BlkWingspan(zone) < 0.0)
+                throw new InvalidOperationException(
+                    $"BlkWingspan for zone {zone} must be >= 0: got {cfg.BlkWingspan(zone)}.");
+            if (cfg.BlkVertical(zone) < 0.0)
+                throw new InvalidOperationException(
+                    $"BlkVertical for zone {zone} must be >= 0: got {cfg.BlkVertical(zone)}.");
+        }
+
         return cfg;
     }
 
@@ -1145,4 +1169,191 @@ public sealed class MatchupConfig
     /// <see cref="StealerPostFloor"/> (post). Must be &gt; 0 (enforced in Load).
     /// Calibration placeholder.</summary>
     public double StealerPostnessScale { get; set; } = 40.0;
+
+    // =========================================================================
+    // Phase 36 — BLK attribution: zone-aware blocker weight coefficients
+    // =========================================================================
+
+    // --- Per-zone coefficients for six blocking attributes (6 attributes × 5 zones = 30 weights).
+    //     Formula (in Matchup.BlockerWeight):
+    //       BlockerWeight = BlkRimProtection(zone) * p.RimProtection
+    //                     + BlkPerimeterDefense(zone) * p.PerimeterDefense
+    //                     + BlkPostDefense(zone)      * p.PostDefense
+    //                     + BlkHeight(zone)           * p.Height
+    //                     + BlkWingspan(zone)         * p.Wingspan
+    //                     + BlkVertical(zone)         * p.Vertical
+    //     No sum-to-one constraint — this is a weighted read, not a distribution
+    //     (same convention as ReboundPhysical). All weights >= 0 (enforced in Load).
+    //     Calibration placeholders — shape (not magnitude) is what matters now.
+    //
+    //     Direction:
+    //       Rim/Short: bigs favored — RimProtection and Height dominate.
+    //       Three/Long: perimeter favored — PerimeterDefense leads.
+    //       Wingspan meaningful everywhere (the reach that deflects the ball).
+    //       Mid: between the two extremes. ---
+
+    /// <summary>RimProtection coefficient for block attribution at Rim zone.
+    /// Default 0.40. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkRimProtectionRim   { get; set; } = 0.40;
+    /// <summary>RimProtection coefficient for block attribution at Short zone.
+    /// Default 0.35. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkRimProtectionShort { get; set; } = 0.35;
+    /// <summary>RimProtection coefficient for block attribution at Mid zone.
+    /// Default 0.20. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkRimProtectionMid   { get; set; } = 0.20;
+    /// <summary>RimProtection coefficient for block attribution at Long zone.
+    /// Default 0.05. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkRimProtectionLong  { get; set; } = 0.05;
+    /// <summary>RimProtection coefficient for block attribution at Three zone.
+    /// Default 0.03. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkRimProtectionThree { get; set; } = 0.03;
+
+    /// <summary>PerimeterDefense coefficient for block attribution at Rim zone.
+    /// Default 0.03. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPerimeterDefenseRim   { get; set; } = 0.03;
+    /// <summary>PerimeterDefense coefficient for block attribution at Short zone.
+    /// Default 0.05. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPerimeterDefenseShort { get; set; } = 0.05;
+    /// <summary>PerimeterDefense coefficient for block attribution at Mid zone.
+    /// Default 0.15. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPerimeterDefenseMid   { get; set; } = 0.15;
+    /// <summary>PerimeterDefense coefficient for block attribution at Long zone.
+    /// Default 0.30. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPerimeterDefenseLong  { get; set; } = 0.30;
+    /// <summary>PerimeterDefense coefficient for block attribution at Three zone.
+    /// Default 0.40. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPerimeterDefenseThree { get; set; } = 0.40;
+
+    /// <summary>PostDefense coefficient for block attribution at Rim zone.
+    /// Default 0.07. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPostDefenseRim   { get; set; } = 0.07;
+    /// <summary>PostDefense coefficient for block attribution at Short zone.
+    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPostDefenseShort { get; set; } = 0.10;
+    /// <summary>PostDefense coefficient for block attribution at Mid zone.
+    /// Default 0.15. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPostDefenseMid   { get; set; } = 0.15;
+    /// <summary>PostDefense coefficient for block attribution at Long zone.
+    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPostDefenseLong  { get; set; } = 0.10;
+    /// <summary>PostDefense coefficient for block attribution at Three zone.
+    /// Default 0.05. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkPostDefenseThree { get; set; } = 0.05;
+
+    /// <summary>Height coefficient for block attribution at Rim zone.
+    /// Default 0.20. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkHeightRim   { get; set; } = 0.20;
+    /// <summary>Height coefficient for block attribution at Short zone.
+    /// Default 0.18. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkHeightShort { get; set; } = 0.18;
+    /// <summary>Height coefficient for block attribution at Mid zone.
+    /// Default 0.15. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkHeightMid   { get; set; } = 0.15;
+    /// <summary>Height coefficient for block attribution at Long zone.
+    /// Default 0.12. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkHeightLong  { get; set; } = 0.12;
+    /// <summary>Height coefficient for block attribution at Three zone.
+    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkHeightThree { get; set; } = 0.10;
+
+    /// <summary>Wingspan coefficient for block attribution at Rim zone.
+    /// Default 0.20. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkWingspanRim   { get; set; } = 0.20;
+    /// <summary>Wingspan coefficient for block attribution at Short zone.
+    /// Default 0.22. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkWingspanShort { get; set; } = 0.22;
+    /// <summary>Wingspan coefficient for block attribution at Mid zone.
+    /// Default 0.25. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkWingspanMid   { get; set; } = 0.25;
+    /// <summary>Wingspan coefficient for block attribution at Long zone.
+    /// Default 0.28. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkWingspanLong  { get; set; } = 0.28;
+    /// <summary>Wingspan coefficient for block attribution at Three zone.
+    /// Default 0.30. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkWingspanThree { get; set; } = 0.30;
+
+    /// <summary>Vertical coefficient for block attribution at Rim zone.
+    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkVerticalRim   { get; set; } = 0.10;
+    /// <summary>Vertical coefficient for block attribution at Short zone.
+    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkVerticalShort { get; set; } = 0.10;
+    /// <summary>Vertical coefficient for block attribution at Mid zone.
+    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkVerticalMid   { get; set; } = 0.10;
+    /// <summary>Vertical coefficient for block attribution at Long zone.
+    /// Default 0.15. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkVerticalLong  { get; set; } = 0.15;
+    /// <summary>Vertical coefficient for block attribution at Three zone.
+    /// Default 0.12. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double BlkVerticalThree { get; set; } = 0.12;
+
+    // --- Switch helpers: return the per-zone coefficient for each attribute.
+    //     Same pattern as BlockContestWeights, BlockFloor, BlockCeiling. ---
+
+    /// <summary>Per-zone RimProtection coefficient for block attribution.</summary>
+    public double BlkRimProtection(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => BlkRimProtectionRim,
+        ShotLocation.Short => BlkRimProtectionShort,
+        ShotLocation.Mid   => BlkRimProtectionMid,
+        ShotLocation.Long  => BlkRimProtectionLong,
+        ShotLocation.Three => BlkRimProtectionThree,
+        _                  => BlkRimProtectionRim,
+    };
+
+    /// <summary>Per-zone PerimeterDefense coefficient for block attribution.</summary>
+    public double BlkPerimeterDefense(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => BlkPerimeterDefenseRim,
+        ShotLocation.Short => BlkPerimeterDefenseShort,
+        ShotLocation.Mid   => BlkPerimeterDefenseMid,
+        ShotLocation.Long  => BlkPerimeterDefenseLong,
+        ShotLocation.Three => BlkPerimeterDefenseThree,
+        _                  => BlkPerimeterDefenseRim,
+    };
+
+    /// <summary>Per-zone PostDefense coefficient for block attribution.</summary>
+    public double BlkPostDefense(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => BlkPostDefenseRim,
+        ShotLocation.Short => BlkPostDefenseShort,
+        ShotLocation.Mid   => BlkPostDefenseMid,
+        ShotLocation.Long  => BlkPostDefenseLong,
+        ShotLocation.Three => BlkPostDefenseThree,
+        _                  => BlkPostDefenseRim,
+    };
+
+    /// <summary>Per-zone Height coefficient for block attribution.</summary>
+    public double BlkHeight(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => BlkHeightRim,
+        ShotLocation.Short => BlkHeightShort,
+        ShotLocation.Mid   => BlkHeightMid,
+        ShotLocation.Long  => BlkHeightLong,
+        ShotLocation.Three => BlkHeightThree,
+        _                  => BlkHeightRim,
+    };
+
+    /// <summary>Per-zone Wingspan coefficient for block attribution.</summary>
+    public double BlkWingspan(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => BlkWingspanRim,
+        ShotLocation.Short => BlkWingspanShort,
+        ShotLocation.Mid   => BlkWingspanMid,
+        ShotLocation.Long  => BlkWingspanLong,
+        ShotLocation.Three => BlkWingspanThree,
+        _                  => BlkWingspanRim,
+    };
+
+    /// <summary>Per-zone Vertical coefficient for block attribution.</summary>
+    public double BlkVertical(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => BlkVerticalRim,
+        ShotLocation.Short => BlkVerticalShort,
+        ShotLocation.Mid   => BlkVerticalMid,
+        ShotLocation.Long  => BlkVerticalLong,
+        ShotLocation.Three => BlkVerticalThree,
+        _                  => BlkVerticalRim,
+    };
 }

@@ -147,6 +147,7 @@ internal static class Program
         ok &= Phase33TurnoverCommitterCheck(configPath);      // Phase 33
         ok &= Phase34TurnoverAttributionCheck(configPath);    // Phase 34
         ok &= Phase35DefensiveReboundCheck(configPath);       // Phase 35
+        ok &= Phase36BlockerCheck(configPath);                 // Phase 36
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -5378,12 +5379,8 @@ internal static class Program
         GovernorRunResult result, GameState game, int seed)
     {
         var t = new PlayerBoxTotals();
-        var rng = new Random(seed + 2);
-        // Phase 25: separate RNG for shooting-foul draws so the seed+2 stream
-        // (BLK — the one remaining post-hoc WeightedDraw after Phase 35) is consumed
-        // identically — those numbers do not move.
-        // OReb moved to engine-stamped in Phase 31; TO committer moved in Phase 33;
-        // STL moved in Phase 34; DReb moved in Phase 35. Only BLK remains as a harness WeightedDraw.
+        // Phase 36: seed+2 RNG (BLK WeightedDraw) retired — BlockerPicker now runs engine-side.
+        // seed+3 (shooting fouls) is the only remaining harness-side attribution draw.
         var foulRng = new Random(seed + 3);
         var homeRoster = game.RosterFor(TeamSide.Home);
         var awayRoster = game.RosterFor(TeamSide.Away);
@@ -5447,18 +5444,19 @@ internal static class Program
                 if (op2 != null && op2.PlayerId >= 1 && op2.PlayerId <= 10)
                     t.OReb[op2.PlayerId - 1] += orbCount;
             }
-            // BLK
-            for (var i = 0; i < r.BlkCount; i++)
+            // BLK — Phase 36: read engine-stamped slots from BlkBySlot (BlockerPicker).
+            for (var s = 1; s <= 5; s++)
             {
-                var bSlot = WeightedDraw(rng, r.Defense, defRoster, p => p.RimProtection + p.Height + p.Wingspan + p.Vertical);
-                var bp = defRoster.PlayerAt(new Slot(r.Defense, bSlot));
-                if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 10) t.Blk[bp.PlayerId - 1]++;
+                var blkCount36 = r.BlkBySlot[s];
+                if (blkCount36 <= 0) continue;
+                var bp = defRoster.PlayerAt(new Slot(r.Defense, s));
+                if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 10)
+                    t.Blk[bp.PlayerId - 1] += blkCount36;
             }
-            // Phase 25: shooting-foul attribution. Separate RNG (seed+3) so the seed+2
-            // stream (BLK — the one remaining post-hoc WeightedDraw after Phase 35) is
-            // consumed identically — those numbers do not move.
+            // Phase 25: shooting-foul attribution. seed+3 RNG (foulRng). seed+2 stream
+            // (BLK WeightedDraw) retired in Phase 36 — BlockerPicker now runs engine-side.
             // OReb moved to engine-stamped in Phase 31; TO committer moved in Phase 33;
-            // STL moved in Phase 34; DReb moved in Phase 35. Only BLK remains.
+            // STL moved in Phase 34; DReb moved in Phase 35; BLK moved in Phase 36.
             if (r.ShootingFouls is { } sfs)
                 foreach (var sf in sfs)
                 {
@@ -5599,30 +5597,6 @@ internal static class Program
             if (draw < cumul) return slots[i].Slot;
         }
         return slots[slots.Count - 1].Slot;
-    }
-
-    private static int WeightedDraw(Random rng, TeamSide side, Roster roster,
-        Func<Player, double> weightFn)
-    {
-        Span<double> weights = stackalloc double[5];
-        var total = 0.0;
-        for (var i = 0; i < 5; i++)
-        {
-            var p = roster.PlayerAt(new Slot(side, i + 1));
-            weights[i] = p is null ? 0.0 : Math.Max(1.0, weightFn(p));
-            total += weights[i];
-        }
-        if (total <= 0.0)
-            throw new InvalidOperationException(
-                $"WeightedDraw: team {side} has no populated slots — cannot attribute event.");
-        var r = rng.NextDouble() * total;
-        var cum = 0.0;
-        for (var i = 0; i < 5; i++)
-        {
-            cum += weights[i];
-            if (r < cum) return i + 1;
-        }
-        return 5;
     }
 
     /// <summary>
@@ -11266,6 +11240,7 @@ internal static class Program
         Console.WriteLine("  NOTE: weighted stats (DReb, OReb, BLK, STL, TO) prove the weighting system");
         Console.WriteLine("  preferentially credits players with the intended attributes — not causal attribution.");
         Console.WriteLine("  Exact stats (FGA, FGM, 3PA, 3PM, FTA, FTM) are slot-exact.");
+        Console.WriteLine("  BLK moved engine-side in Phase 36 (BlockerPicker) — no longer a harness WeightedDraw.");
         Console.WriteLine();
 
         var sanityOk = true;
@@ -14213,6 +14188,321 @@ internal static class Program
 
         Console.WriteLine();
         Console.WriteLine(ok ? "  Phase 35 defensive rebound check: PASSED" : "  Phase 35 defensive rebound check: FAILED (see [FAIL] lines above)");
+        return ok;
+    }
+
+    private static bool Phase36BlockerCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 36: blocker picker (BlockerPicker) + on-walk attribution ---");
+        var ok = true;
+        const int N = 100_000;
+
+        var matchupCfg = MatchupConfig.Load(configPath);
+        var cfgD       = RollDConfig.Load(configPath);
+
+        // Helper: player with all attributes at b; override specific attributes.
+        static Player MkP36(int id, int b,
+                            int? rimProt  = null, int? perimDef = null,
+                            int? postDef  = null, int? height   = null,
+                            int? wingspan = null, int? vertical = null)
+            => new Player($"p{id}")
+            {
+                PlayerId             = id,
+                Outside              = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing          = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation         = b, PostMoves    = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding  = b,
+                PerimeterDefense = perimDef ?? b, PostDefense = postDef ?? b,
+                RimProtection    = rimProt  ?? b,
+                DefensiveRebounding  = b,
+                Steals               = b,
+                Height               = height   ?? b, Wingspan = wingspan ?? b, Weight = b,
+                Strength             = b,
+                Speed = b, Quickness = b, FirstStep = b,
+                Vertical = vertical ?? b, Endurance = b, Hustle = b, BasketballIQ = b,
+                Discipline           = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Build a GameState with defPlayers on Away (state.Defense = Away).
+        GameState BuildGame36(Player[] offPlayers, Player[] defPlayers)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < offPlayers.Length && i < 5; i++)
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), offPlayers[i]);
+            for (var i = 0; i < defPlayers.Length && i < 5; i++)
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), defPlayers[i]);
+            return g;
+        }
+
+        // Possession state: Home offends, Away defends, with specified ShotType.
+        static PossessionState MkState36(ShotLocation? shotType = null)
+            => new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                ShotType: shotType);
+
+        var offDummy = Enumerable.Range(6, 5).Select(i => MkP36(i, 50)).ToArray();
+
+        // ── Sub-check 1 — Zone-aware direction (Rim): rim protector dominant ─────
+        {
+            Console.WriteLine("  Sub-check 1: zone-aware direction (Rim) — rim protector leads at Rim zone");
+            var def = new[]
+            {
+                MkP36(1, 50, rimProt: 85),  // dominant rim protector
+                MkP36(2, 50),
+                MkP36(3, 50),
+                MkP36(4, 50),
+                MkP36(5, 50),
+            };
+            var game  = BuildGame36(offDummy, def);
+            var state = MkState36(ShotLocation.Rim);
+            var rng   = new SystemRng(36101);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[BlockerPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var shares = counts.Select(c => (double)c / N).ToArray();
+            Console.WriteLine($"    RimProtector(s1)={shares[0]:P2}  others={shares[1]:P2}/{shares[2]:P2}/{shares[3]:P2}/{shares[4]:P2}");
+            var sub1Ok = shares[0] > shares[1] && shares[0] > shares[2]
+                      && shares[0] > shares[3] && shares[0] > shares[4];
+            ok &= sub1Ok;
+            Console.WriteLine(sub1Ok ? "    [OK]" : "    [FAIL] rim protector did not lead at Rim zone");
+        }
+
+        // ── Sub-check 2 — Zone-aware direction (Three): perimeter defender dominant
+        {
+            Console.WriteLine("  Sub-check 2: zone-aware direction (Three) — perimeter defender leads at Three zone");
+            var def = new[]
+            {
+                MkP36(1, 50, perimDef: 85),  // dominant perimeter defender
+                MkP36(2, 50),
+                MkP36(3, 50),
+                MkP36(4, 50),
+                MkP36(5, 50),
+            };
+            var game  = BuildGame36(offDummy, def);
+            var state = MkState36(ShotLocation.Three);
+            var rng   = new SystemRng(36102);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[BlockerPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var shares = counts.Select(c => (double)c / N).ToArray();
+            Console.WriteLine($"    PerimDefender(s1)={shares[0]:P2}  others={shares[1]:P2}/{shares[2]:P2}/{shares[3]:P2}/{shares[4]:P2}");
+            var sub2Ok = shares[0] > shares[1] && shares[0] > shares[2]
+                      && shares[0] > shares[3] && shares[0] > shares[4];
+            ok &= sub2Ok;
+            Console.WriteLine(sub2Ok ? "    [OK]" : "    [FAIL] perimeter defender did not lead at Three zone");
+        }
+
+        // ── Sub-check 3 — Wingspan meaningful at all zones ────────────────────────
+        {
+            Console.WriteLine("  Sub-check 3: Wingspan meaningful at all zones (Wingspan=85 > Wingspan=50 at every zone)");
+            var sub3Ok = true;
+            foreach (var zone in new[] { ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid,
+                                         ShotLocation.Long, ShotLocation.Three })
+            {
+                var def = new[]
+                {
+                    MkP36(1, 50, wingspan: 85),  // long-armed
+                    MkP36(2, 50),                // baseline
+                    MkP36(3, 50), MkP36(4, 50), MkP36(5, 50),
+                };
+                var game  = BuildGame36(offDummy, def);
+                var state = MkState36(zone);
+                var rng   = new SystemRng(36103 + (int)zone);
+                var counts = new int[5];
+                for (var i = 0; i < N; i++)
+                    counts[BlockerPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+                var longShare  = (double)counts[0] / N;
+                var shortShare = (double)counts[1] / N;
+                var zoneOk = longShare > shortShare;
+                sub3Ok &= zoneOk;
+                Console.WriteLine($"    {zone}: wingspan85={longShare:P2} > wingspan50={shortShare:P2}  {(zoneOk ? "[OK]" : "[FAIL]")}");
+            }
+            ok &= sub3Ok;
+            Console.WriteLine(sub3Ok ? "    [OK] all zones" : "    [FAIL] see zone detail above");
+        }
+
+        // ── Sub-check 4 — Floor holds: guard floor > 0 in big-dominant lineup ─────
+        {
+            Console.WriteLine("  Sub-check 4: floor holds — guard gets nonzero share in big-dominant lineup");
+            var def = new[]
+            {
+                MkP36(1, 50, rimProt: 95, height: 95, wingspan: 90, vertical: 85),  // dominant big
+                MkP36(2, 50, rimProt: 95, height: 95, wingspan: 90, vertical: 85),
+                MkP36(3, 50, rimProt: 95, height: 95, wingspan: 90, vertical: 85),
+                MkP36(4, 50, rimProt: 95, height: 95, wingspan: 90, vertical: 85),
+                MkP36(5, 50, rimProt: 10, height: 55, wingspan: 55, vertical: 50),  // guard
+            };
+            var game  = BuildGame36(offDummy, def);
+            var stateRim   = MkState36(ShotLocation.Rim);
+            var stateThree = MkState36(ShotLocation.Three);
+            var rngRim   = new SystemRng(36104);
+            var rngThree = new SystemRng(36105);
+            var countsRim   = new int[5];
+            var countsThree = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                countsRim[BlockerPicker.Pick(stateRim,   game, matchupCfg, rngRim).Number   - 1]++;
+                countsThree[BlockerPicker.Pick(stateThree, game, matchupCfg, rngThree).Number - 1]++;
+            }
+            var guardRimShare   = (double)countsRim[4]   / N;
+            var guardThreeShare = (double)countsThree[4] / N;
+            Console.WriteLine($"    guard share at Rim={guardRimShare:P2}  Three={guardThreeShare:P2}  (both must be > 0)");
+            var sub4Ok = guardRimShare > 0.0 && guardThreeShare > 0.0;
+            ok &= sub4Ok;
+            Console.WriteLine(sub4Ok ? "    [OK]" : "    [FAIL] guard floor was zero");
+        }
+
+        // ── Sub-check 5 — Reproducibility ────────────────────────────────────────
+        {
+            Console.WriteLine("  Sub-check 5: same seed → identical sequence");
+            var def = new[]
+            {
+                MkP36(1, 50, rimProt: 80, height: 75),
+                MkP36(2, 50, perimDef: 80, wingspan: 75),
+            };
+            var game  = BuildGame36(offDummy, def);
+            var state = MkState36(ShotLocation.Mid);
+            const int RepSeed = 36200;
+            var run1 = new List<int>(); var run2 = new List<int>();
+            var rng1 = new SystemRng(RepSeed); var rng2 = new SystemRng(RepSeed);
+            for (var i = 0; i < 200; i++)
+            {
+                run1.Add(BlockerPicker.Pick(state, game, matchupCfg, rng1).Number);
+                run2.Add(BlockerPicker.Pick(state, game, matchupCfg, rng2).Number);
+            }
+            var sub5Ok = run1.SequenceEqual(run2);
+            ok &= sub5Ok;
+            Console.WriteLine(sub5Ok ? "    [OK]" : "    [FAIL] same seed produced different sequences");
+        }
+
+        // ── Sub-check 6 — Empty-defense throw ────────────────────────────────────
+        {
+            Console.WriteLine("  Sub-check 6: empty defense throws");
+            var game  = BuildGame36(offDummy, Array.Empty<Player>());
+            var state = MkState36(ShotLocation.Rim);
+            var rng   = new SystemRng(1);
+            var threw = false;
+            try { BlockerPicker.Pick(state, game, matchupCfg, rng); }
+            catch (InvalidOperationException) { threw = true; }
+            ok &= threw;
+            Console.WriteLine(threw ? "    [OK]" : "    [FAIL] empty defense did not throw");
+        }
+
+        // ── Sub-check 7 — Null ShotType fallback: no throw, Rim blend fires ───────
+        {
+            Console.WriteLine("  Sub-check 7: null ShotType fallback — no throw, result matches Rim zone");
+            var def = new[]
+            {
+                MkP36(1, 50, rimProt: 85),  // rim protector
+                MkP36(2, 50), MkP36(3, 50), MkP36(4, 50), MkP36(5, 50),
+            };
+            var game       = BuildGame36(offDummy, def);
+            var stateNull  = MkState36(null);              // ShotType == null
+            var stateRim   = MkState36(ShotLocation.Rim);  // explicit Rim
+
+            var countsNull = new int[5];
+            var countsRim  = new int[5];
+            var rngNull = new SystemRng(36301);
+            var rngRim  = new SystemRng(36301);  // same seed — results must match
+            var threw = false;
+            try
+            {
+                for (var i = 0; i < N; i++)
+                {
+                    countsNull[BlockerPicker.Pick(stateNull, game, matchupCfg, rngNull).Number - 1]++;
+                    countsRim [BlockerPicker.Pick(stateRim,  game, matchupCfg, rngRim ).Number - 1]++;
+                }
+            }
+            catch (Exception) { threw = true; }
+
+            var sharesMatch = !threw && Enumerable.Range(0, 5).All(i => countsNull[i] == countsRim[i]);
+            ok &= sharesMatch;
+            Console.WriteLine(threw
+                ? "    [FAIL] null ShotType threw an exception"
+                : sharesMatch
+                    ? "    [OK] null ShotType → Rim fallback; results identical to explicit Rim"
+                    : "    [FAIL] null ShotType results differ from Rim zone results");
+        }
+
+        // ── Governor run invariants A and B ───────────────────────────────────────
+        {
+            Console.WriteLine("  Governor run invariants (Phase 36):");
+            var cfgA     = RollAConfig.Load(configPath);
+            var cfgGov   = GovernorConfig.Load(configPath);
+            var cfgClock = RollClockConfig.Load(configPath);
+            var cfgEoH   = EndOfHalfConfig.Load(configPath);
+            var cfgE     = RollEConfig.Load(configPath);
+
+            var govGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var homePlayers = new[]
+            {
+                MkP36(1, 50, rimProt: 40, height: 40),
+                MkP36(2, 50, rimProt: 45, height: 45),
+                MkP36(3, 50, rimProt: 55, height: 55),
+                MkP36(4, 50, rimProt: 72, height: 72),
+                MkP36(5, 50, rimProt: 86, height: 86),
+            };
+            var awayPlayers = Enumerable.Range(6, 5).Select(i => MkP36(i, 50)).ToArray();
+            for (var i = 0; i < 5; i++)
+            {
+                govGame.HomeRoster.SetStarter(govGame.HomeLineup.SlotAt(i + 1), homePlayers[i]);
+                govGame.AwayRoster.SetStarter(govGame.AwayLineup.SlotAt(i + 1), awayPlayers[i]);
+            }
+            govGame.SetPossessionArrow(TeamSide.Home);
+
+            var rng      = new SystemRng(36400);
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, matchupCfg, govGame),
+                cfgA,
+                new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(cfgD),
+                new RollEGenerator(cfgE, govGame),
+                new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
+                new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
+                new RollGGenerator(RollGConfig.Load(configPath), matchupCfg, govGame),
+                new RollHGenerator(RollHConfig.Load(configPath), matchupCfg, govGame),
+                new RollIGenerator(RollIConfig.Load(configPath), matchupCfg, govGame),
+                new RollJGenerator(RollJConfig.Load(configPath), matchupCfg, govGame),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLGenerator(RollLConfig.Load(configPath), govGame),
+                new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                matchupCfg,
+                govGame,
+                rng);
+
+            var governor = new Governor(resolver, govGame, cfgGov, cfgClock, new SystemRng(36401), cfgEoH);
+            var first    = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            var result = governor.Run(first);
+
+            // Invariant A: BlkBySlot.Total == BlkCount on every possession with BlkCount > 0.
+            var blkPossessions = result.Possessions.Where(r => r.BlkCount > 0).ToList();
+            var invAFails = blkPossessions.Count(r => r.BlkBySlot.Total != r.BlkCount);
+            var invAOk = invAFails == 0;
+            ok &= invAOk;
+            Console.WriteLine(invAOk
+                ? $"    [OK] Invariant A: all {blkPossessions.Count} block possessions have BlkBySlot.Total == BlkCount"
+                : $"    [FAIL] Invariant A: {invAFails} possessions had BlkBySlot.Total != BlkCount");
+
+            // Invariant B: BlkBySlot is default (all zeros) on every possession with BlkCount == 0.
+            var noBlkPossessions = result.Possessions.Where(r => r.BlkCount == 0).ToList();
+            var invBFails = noBlkPossessions.Count(r => r.BlkBySlot.Total != 0);
+            var invBOk = invBFails == 0;
+            ok &= invBOk;
+            Console.WriteLine(invBOk
+                ? $"    [OK] Invariant B: all {noBlkPossessions.Count} non-block possessions have BlkBySlot default (all zeros)"
+                : $"    [FAIL] Invariant B: {invBFails} non-block possessions had non-zero BlkBySlot");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(ok ? "  Phase 36 blocker check: PASSED" : "  Phase 36 blocker check: FAILED (see [FAIL] lines above)");
         return ok;
     }
 }

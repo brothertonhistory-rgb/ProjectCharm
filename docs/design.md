@@ -5497,3 +5497,69 @@ All three are calibration placeholders. Direction and shape are what Phase 35 va
 - **Unifying the battle's two stages into one shared composite.** The two-stage structure stays; this session only adds wingspan to Stage 1.
 - **Team rebounds (ball out of bounds off a miss).** No individual rebounder credited; deferred.
 - **Calibration** of any rebound weight, floor, swing, or scale. Correctness before calibration is the standing sequencing principle.
+
+---
+
+## Phase 36 — BlockerPicker: BLK Attribution On-Walk (Session 71, 2026-06-19)
+
+### Problem
+
+BLK attribution was the last remaining post-hoc harness `WeightedDraw`. After a possession resolved, the harness looped `for (var i = 0; i < r.BlkCount; i++)` and drew a slot from a flat attribute-sum (`RimProtection + Height + Wingspan + Vertical`) with no zone awareness — the same weight formula regardless of whether the block came on a Rim put-back or a Three-point closeout. This was Phase 23 scaffolding: correct enough to validate plumbing, wrong for anything resembling real basketball.
+
+### Design
+
+**Zone-aware weight formula.** Each defensive player's weight is `max(1, BlockerWeight(zone, player, cfg))` where `BlockerWeight` is a straight weighted sum of six attributes with zone-specific coefficients:
+
+```
+BlockerWeight = BlkRimProtection(zone) * p.RimProtection
+              + BlkPerimeterDefense(zone) * p.PerimeterDefense
+              + BlkPostDefense(zone)      * p.PostDefense
+              + BlkHeight(zone)           * p.Height
+              + BlkWingspan(zone)         * p.Wingspan
+              + BlkVertical(zone)         * p.Vertical
+```
+
+Direction: Rim/Short blocks favor help-side bigs — RimProtection and Height dominate, PostDefense contributes. Three/Long blocks favor perimeter defenders — PerimeterDefense leads, Wingspan remains high (the reach that contests). Wingspan is meaningful at every zone; it is the one attribute that bridges rim protection and perimeter contests. Vertical contributes everywhere for timing. Mid is between the two extremes.
+
+No tanh, no gap function. `Matchup.BlockerWeight` (Phase 36, attribution) is intentionally distinct from `Matchup.BlockWeight` (Phase 7, shot-block door) — the former asks "given a block occurred, who gets credit?" while the latter asks "does this matchup produce a block?" Conflating them would be incorrect.
+
+**All five defenders eligible.** Unlike some attribution pickers that narrow the draw (e.g. steals favor guards), every defensive slot is in the pool on every block. A help-side big can block a three-point attempt by rotating in time; a rangy wing can block a post shot by rotating baseline. The zone weighting handles the probability differential without hard exclusions.
+
+**Floor of 1.** The floor is applied by `BlockerPicker`, not by `BlockerWeight`. This follows the existing picker convention (same as `OffensiveRebounderPicker`, `DefensiveRebounderPicker`) and keeps `BlockerWeight` a pure computation.
+
+**`BlkBySlot` is a `SlotGroup`, not `int?`.** BLK can fire multiple times per possession. A possession can contain a primary shot, an ORB, a putback attempt, another ORB, another putback — each of which can be blocked. `StealerSlot` and `DefensiveRebounderSlot` are `int?` because those events fire at most once per possession. `BlkBySlot` mirrors `OrbBySlot` by accumulating via `blkBySlot.WithSlot(slot, 1)` on each block. `BlkCount` is retained as the reconciliation target: `BlkBySlot.Total == BlkCount` is asserted on every possession.
+
+**`SelectedSlot` is irrelevant.** BLK attribution is a defensive question; `SelectedSlot` is offense-side shooter attribution stamped by Roll E. The zone (`ShotType`) from `shotSt` — not the offensive slot — determines which defensive attributes are weighted. Note: the prompt's claim that Roll K's PutBack arm nulls `SelectedSlot` was incorrect per live source. PutBack does `state with { ShotType = ShotLocation.Rim }`; it is the ResetOffense arm that nulls `SelectedSlot`. The design conclusion is unchanged (BlockerPicker does not use `SelectedSlot`), but the reasoning differs.
+
+**Null `ShotType` fallback → Rim.** Roll G stamps `ShotType` on all non-putback paths; Roll K's PutBack arm forces `ShotLocation.Rim`. In current routing, `ShotType` is never null at a block site. The fallback is a defensive guard for future routing changes. Rim is the correct fallback because all putbacks are Rim zone by forcing.
+
+### Structural location
+
+`BlockerPicker.cs` lives in `src/Charm.Engine/Core/` alongside `DefensiveRebounderPicker.cs`, `StealerPicker.cs`, `TurnoverCommitterPicker.cs`, and `TurnoverInteriorPicker.cs`. `Matchup.BlockerWeight` is appended to `Matchup.cs` as a public static helper, following the existing pattern (`Matchup.BlockWeight`, `Matchup.FoulRate`, `Matchup.ReboundWingspanMultiplier`).
+
+### Config additions
+
+**`MatchupConfig` (30 new properties):** Six attributes × five zones = 30 `Blk{Attr}{Zone}` properties (e.g. `BlkRimProtectionRim`, `BlkWingspanThree`). Six switch helpers (`BlkRimProtection(zone)`, etc.) follow the `BlockContestWeights`/`BlockFloor`/`BlockCeiling` pattern. All 30 coefficients must be `>= 0` (enforced in Load). No sum-to-one constraint — these are weighted reads, not distributions. All defaults are calibration placeholders.
+
+### Attribution family: complete
+
+All six on-walk pickers are now wired. Every post-hoc harness `WeightedDraw` has been retired:
+
+| Phase | Picker | Attribute basis | Moved from |
+|---|---|---|---|
+| 31 | `OffensiveRebounderPicker` | OffensiveRebounding × PositionalWeight × WingspanMultiplier | harness WeightedDraw |
+| 33 | `TurnoverCommitterPicker` | BallHandling × perimeterMult | harness WeightedDraw |
+| 34 | `TurnoverInteriorPicker` | Strength × interiorMult | harness dispatch |
+| 34 | `StealerPicker` | Steals × perimeterMult | harness WeightedDraw (seed+1) |
+| 35 | `DefensiveRebounderPicker` | DefensiveRebounding × PositionalWeight × WingspanMultiplier | harness WeightedDraw (seed+2 DReb) |
+| 36 | `BlockerPicker` | Zone-weighted sum of 6 blocking attributes | harness WeightedDraw (seed+2 BLK) |
+
+`foulRng` (seed+3, shooting fouls via `DrawFoulingDefender`) is the only remaining harness-side attribution draw; it is intentionally harness-side because shooting-foul attribution is not yet a first-class resolved event in the engine.
+
+### What is not this session
+
+- **Calibration** of any blocker weight. Block rates in the frozen corpus are low (per-player BLK ~0.5–0.9/game) and will need tuning once all generators are real.
+- **Roll C real generator** (turnover type-mix). Next session.
+- **Roll D real generator** (defensive foul flavor). Future session.
+- **Mismatch-hunting / help-defense model for DefenderPicker.** Noted in `DefenderPicker.cs` itself; a future session.
+- **Team rebounds** (ball out of bounds off a miss). No individual credited; deferred.

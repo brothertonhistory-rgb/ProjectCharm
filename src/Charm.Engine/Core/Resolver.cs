@@ -233,7 +233,7 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
 
     // ── Phase 23 attribution support ──────────────────────────────────────────
     // 3PA/3PM/FTA/FTM: exact per-slot counters (no draws — same pattern as FGA/FGM).
-    // BlkCount: how many shots were blocked (harness still issues BLK credits via weighted draw).
+    // BlkCount: how many shots were blocked (used for reconciliation — BlkBySlot.Total == BlkCount).
     // TurnoverOffSlot / TurnoverWasLiveBall: metadata for TO attribution.
     // No IRng is consumed anywhere in this group.
     public SlotGroup ThreePaBySlot  { get; init; }  // offense: 3PA per slot
@@ -241,9 +241,18 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     public SlotGroup FtaBySlot      { get; init; }  // offense: FTA per slot
     public SlotGroup FtmBySlot      { get; init; }  // offense: FTM per slot
     /// <summary>How many shots were blocked this possession. Used by the harness
-    /// to issue exactly this many BLK credits via weighted draw (the one remaining
-    /// post-hoc draw after Phase 35 retires DReb).</summary>
+    /// for the reconciliation invariant: <see cref="BlkBySlot"/>.Total == BlkCount
+    /// on every possession.</summary>
     public int BlkCount { get; init; }
+    /// <summary>Per-slot block counts for this possession — stamped by
+    /// <see cref="BlockerPicker"/> at the <c>ShotResult.Blocked</c> site (Phase 36),
+    /// retiring the last harness <c>WeightedDraw</c>.
+    /// <para><c>BlkBySlot.Total</c> equals <see cref="BlkCount"/> on every possession
+    /// (the harness asserts this). Init-only with a <c>default</c> (all-zero)
+    /// SlotGroup, so every existing positional construction
+    /// (<c>new RoutingOutcome(false, "STUB:…")</c>) is untouched — a pure append,
+    /// like every prior init field.</para></summary>
+    public SlotGroup BlkBySlot { get; init; }
     /// <summary>The offensive slot that committed the turnover. Null for team
     /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
     /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for
@@ -507,6 +516,8 @@ public sealed class Resolver
         var ftaBySlot     = new SlotGroup();
         var ftmBySlot     = new SlotGroup();
         var blkCount      = 0;
+        // Phase 36: per-slot block accumulator. Total == BlkCount on every possession.
+        var blkBySlot     = new SlotGroup();
         int? turnoverOffSlot   = null;
         var turnoverWasLiveBall = false;
         int? stealerSlot        = null;
@@ -595,6 +606,7 @@ public sealed class Resolver
                           FtaBySlot      = ftaBySlot,
                           FtmBySlot      = ftmBySlot,
                           BlkCount       = blkCount,
+                          BlkBySlot      = blkBySlot,
                           TurnoverOffSlot     = turnoverOffSlot,
                           TurnoverWasLiveBall = turnoverWasLiveBall,
                           ShootingFouls  = shootingFouls.ToArray(),
@@ -887,9 +899,13 @@ public sealed class Resolver
                                         var s = shotSt.SelectedSlot?.Number ?? 0;
                                         threePaBySlot = threePaBySlot.WithSlot(s, 1);
                                     }
-                                    // Phase 23: count blocks for harness BLK-credit draws.
+                                    // Phase 36: count blocks and stamp per-slot blocker attribution on-walk.
                                     if (shotSt.Result == ShotResult.Blocked)
+                                    {
                                         blkCount++;
+                                        blkBySlot = blkBySlot.WithSlot(
+                                            BlockerPicker.Pick(shotSt, _game, _matchup, _rng).Number, 1);
+                                    }
                                 }
                             }
                             continue;

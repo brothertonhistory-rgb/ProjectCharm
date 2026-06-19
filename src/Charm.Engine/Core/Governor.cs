@@ -128,7 +128,10 @@ public sealed record PossessionRecord(
     int? StealerSlot = null,
     // Phase 35: engine-stamped defensive rebounder slot. Non-null on every
     // DefensiveRebound possession; null on all others.
-    int? DefensiveRebounderSlot = null);
+    int? DefensiveRebounderSlot = null,
+    // Phase 36: engine-stamped per-slot block counts. BlkBySlot.Total == BlkCount on every
+    // possession (harness-asserted). Default (all zeros) on possessions with no blocks.
+    SlotGroup BlkBySlot = default);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -306,6 +309,8 @@ public sealed class Governor
             int? possessionStealerSlot = null;
             // Phase 35: engine-stamped defensive rebounder slot.
             int? possessionDefensiveRebounderSlot = null;
+            // Phase 36: engine-stamped per-slot block counts.
+            var possessionBlkBySlot = new SlotGroup();
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -404,6 +409,8 @@ public sealed class Governor
                 possessionStealerSlot         = outcome.StealerSlot;
                 // Phase 35 threading — stamped defensive rebounder slot (DefensiveRebound only).
                 possessionDefensiveRebounderSlot = outcome.DefensiveRebounderSlot;
+                // Phase 36 threading — stamped per-slot BLK counts from BlockerPicker.
+                possessionBlkBySlot = outcome.BlkBySlot;
             }
 
             // Shared by all three intent values + normal possessions.
@@ -435,7 +442,8 @@ public sealed class Governor
                 possessionShootingFouls,
                 possessionOrbBySlot,
                 possessionStealerSlot,
-                possessionDefensiveRebounderSlot));
+                possessionDefensiveRebounderSlot,
+                possessionBlkBySlot));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition
