@@ -1,3 +1,40 @@
+## Session 72 — Phase 37: RollCGenerator — Flat Context-Driven Type-Mix, Activate EntryBackcourt, Retire Pressure Wire (2026-06-19)
+
+**Scope:** Replace `RollCStubPieGenerator` with `RollCGenerator` (flat, no pressure wire, no matchup signal), activate the `EntryBackcourt` context in `RollCContextCheck`, and delete `PressureSignalCheck` and its helper `RollCLiveStripRate`. Roll C's resolver and Roll C itself untouched. 5 files changed, 1 new, 1 deleted.
+
+**What shipped (5 files changed, 1 new, 1 deleted):**
+
+`src/Charm.Engine/Generators/RollCGenerator.cs` — NEW. Sealed class, same `(RollCConfig cfg)` constructor as the stub. `Generate` signature: `(PossessionState state, TurnoverContext context = TurnoverContext.Halfcourt)`. Three-arm context switch identical to the stub — Halfcourt, Transition, EntryBackcourt — returning `new Pie<TurnoverOutcome>(weights, _cfg.Epsilon)` directly. The nudge-and-renormalize block is gone entirely: pressure was always hardcoded 0.0 at every call site, so removing it is a mathematical no-op (confirmed by corpus hash stability). `state` is carried for signature parity only. Class doc explains: flat context-driven weights, no player-attribute tilt; pressure changes turnover rate (Roll A/B/F), not turnover type.
+
+`src/Charm.Engine/Generators/RollCStubPieGenerator.cs` — DELETED.
+
+`src/Charm.Engine/Core/Resolver.cs` — EDIT (surgical, three changes). Field and constructor parameter renamed `RollCStubPieGenerator` → `RollCGenerator`. `pressure: 0.0` removed from the `Generate` call in `ResolveTurnoverType`; comment updated to note the pressure parameter has been retired (Phase 37).
+
+`src/Charm.Engine/Config/RollCConfig.cs` — EDIT (surgical, one removal). `PressureLostBallLiveBallNudge` property and its doc comment removed. The "live wire" language in the surrounding comment block removed. All other properties (15-per-context weights × 3 contexts, 3 elapsed-time properties, `Epsilon`) untouched.
+
+`src/Charm.Harness/Program.cs` — EDIT (five passes). Pass 1: mechanical rename of all 35 `RollCStubPieGenerator` occurrences to `RollCGenerator`. Pass 2: `pressure: 0.0` removed from all four Roll C `Generate` call sites (observability block, `RollCBatchCheck`, `RollCContextCheck` foreach loop, `RollCExpansionCheck` EntryBackcourt call). Pass 3: `PressureSignalCheck` and `RollCLiveStripRate` method definitions deleted; `ok &= PressureSignalCheck(...)` call removed from main wiring block. Pass 4: `RollCBatchCheck` label cleaned — `(pressure=0.00)` removed. Pass 5: `EntryBackcourt` added as third entry in `RollCContextCheck` contexts array, covering the seven non-zero outcomes (BadPassDeadBall, BadPassIntercepted, LostBallDeadBall, LostBallLiveBall, ShotClockViolation, FiveSecondInbound, TenSecondBackcourt).
+
+`src/Charm.Harness/config.json` — EDIT. `PressureLostBallLiveBallNudge` key removed from `RollC` section.
+
+**Key design decisions:**
+
+- **No pressure parameter on the real generator.** The stub's pressure wire was a seam-test placeholder — it proved the generator→roll seam could carry signal, not that pressure should tilt the type-mix. Pressure changes how often a team turns it over (Roll A/B/F). Once you turn it over, it's a bad pass or a lost ball because of what happened on that play, not because of how pressured the ball-handler was. The parameter was always called at 0.0; its removal is a no-op, confirmed by the corpus hash being unchanged (`e48085ff...`).
+
+- **EntryBackcourt is now live in `RollCContextCheck`.** Roll A already stamps `TurnoverContext.EntryBackcourt` when `state.Frontcourt == false` (wired prior sessions). This session activates the corresponding harness sub-check. The seven non-zero EntryBackcourt outcomes are: the four universal types (BadPassDeadBall, BadPassIntercepted, LostBallDeadBall, LostBallLiveBall) plus the three backcourt-only violations (FiveSecondInbound, TenSecondBackcourt, ShotClockViolation). Halfcourt-only types (Travel, ThreeSecondViolation, Carry, OffensiveFoul, OffensiveGoaltending) and BackcourtViolation are zero — you haven't crossed halfcourt yet.
+
+- **`RollCExpansionCheck` required no structural changes.** It already exercised EntryBackcourt in Part 1 (drives `TurnoverContext.EntryBackcourt` directly). The only touch was the type rename and stripping `pressure: 0.0` from call sites.
+
+- **Corpus hash stable.** `config hash: e48085ff2196764bcca5512258050a4beb3609f8af74c767fd5acb8e8b46ec26` — identical to Phase 36. The mathematical no-op prediction held.
+
+**Harness results (all checks passed):**
+
+- `RollCBatchCheck`: Halfcourt rates within tolerance; label now `Roll C` without `pressure=0.00`.
+- `RollCContextCheck`: all three contexts passing — Halfcourt, Transition, EntryBackcourt all `selection ok`, all seven EntryBackcourt rates within tolerance.
+- `RollCExpansionCheck`: unchanged behavior, all passes.
+- `PressureSignalCheck`: gone — no missing-check failures.
+- Corpus hash: unchanged.
+- ALL CHECKS PASSED.
+
 ## Session 71 — Phase 36: BlockerPicker — BLK Attribution On-Walk, Retire Last Harness WeightedDraw (2026-06-19)
 
 **Scope:** Create `BlockerPicker` — a zone-aware weighted draw across all five defenders — stamp it on-walk at every `ShotResult.Blocked` exit, thread `BlkBySlot` (a `SlotGroup`) through `RoutingOutcome` → `Governor` → harness, and retire the last remaining harness `WeightedDraw` (the seed+2 BLK stream). 7 files changed, 1 new.

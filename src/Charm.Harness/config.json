@@ -66,7 +66,6 @@
     "ShotClockViolationElapsedSeconds": 30.0,
     "FiveSecondInboundElapsedSeconds": 0.0,
     "TenSecondBackcourtElapsedSeconds": 10.0,
-    "PressureLostBallLiveBallNudge": 0.1,
     "Epsilon": 1e-09
   },
   "RollD": {

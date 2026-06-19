@@ -32,7 +32,7 @@ internal static class Program
         var rng = new SystemRng(cfg.Seed);
         // Roll A generator constructed below after SeatStartersFromConfig (Phase 14).
         // Roll B generator constructed below after SeatStartersFromConfig (Phase 13).
-        var rollCGenerator = new RollCStubPieGenerator(cfgC);
+        var rollCGenerator = new RollCGenerator(cfgC);
         var rollDGenerator = new RollDStubPieGenerator(cfgD);
         // Roll E generator constructed below after game is created (Phase 15: needs GameState).
         // Roll F generator constructed below after SeatStartersFromConfig (Phase 12).
@@ -97,7 +97,6 @@ internal static class Program
         ok &= RollDBonusRoutingCheck(cfgD, rollDGenerator, state);
         ok &= DefensiveFoulChargeCheck(cfgD, state);
         ok &= PhysicalitySignalCheck(cfgB, new RollBStubPieGenerator(cfgB), state);
-        ok &= PressureSignalCheck(cfgC, rollCGenerator, state);
         ok &= JumpBallCheck(cfg);
         ok &= SlotLayerCheck(game);
         ok &= RollESelectionBatchCheck(cfg, cfgE, cfgD, rollEGenerator, game, state);
@@ -182,8 +181,8 @@ internal static class Program
         Console.WriteLine("--- Observability: Roll C (turnover classification) ---");
         var cfgCForObs = RollCConfig.Load(
             Path.Combine(AppContext.BaseDirectory, "config.json"));
-        var genC = new RollCStubPieGenerator(cfgCForObs);
-        var pieC = genC.Generate(state, pressure: 0.0);
+        var genC = new RollCGenerator(cfgCForObs);
+        var pieC = genC.Generate(state);
         Console.WriteLine($"  pie: {pieC}");
         var sampleRng = new SystemRng(cfg.Seed);
         for (var i = 0; i < 5; i++)
@@ -440,11 +439,11 @@ internal static class Program
     //     terminal. As of #6 the Halfcourt context is the full live 15-way loss set,
     //     so this now exercises every halfcourt-natural turnover type, not just five. ---
     private static bool RollCBatchCheck(
-        RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
+        RollAConfig cfg, RollCConfig cfgC, RollCGenerator genC, PossessionState state)
     {
-        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} turnovers through Roll C (pressure=0.00) ---");
+        Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} turnovers through Roll C ---");
         var rng = new SystemRng(cfg.Seed);
-        var pieC = genC.Generate(state, pressure: 0.0);
+        var pieC = genC.Generate(state);
 
         var counts = new Dictionary<TurnoverOutcome, int>();
         foreach (var o in Enum.GetValues<TurnoverOutcome>()) counts[o] = 0;
@@ -703,35 +702,6 @@ internal static class Program
             if (RollB.Execute(state, pie, rng) is Continue { Next: ContinuationKind.ResolveFoulType })
                 fouls++;
         return fouls / (double)n;
-    }
-
-    // --- Prove Roll C's seam carries signal: live-strip rate must rise with pressure. ---
-    private static bool PressureSignalCheck(RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
-    {
-        Console.WriteLine("\n--- Seam signal: Roll C live-strip rate vs. pressure ---");
-        var rng = new SystemRng(42);
-        var low = RollCLiveStripRate(genC, state, rng, pressure: 0.0, cfgC);
-        rng = new SystemRng(42);
-        var high = RollCLiveStripRate(genC, state, rng, pressure: 1.0, cfgC);
-
-        Console.WriteLine($"  live-strip rate @ pressure 0.00 = {low:P3}");
-        Console.WriteLine($"  live-strip rate @ pressure 1.00 = {high:P3}");
-
-        var moved = high > low;
-        Console.WriteLine($"  signal is live (high > low): {(moved ? "ok" : "FAIL")}");
-        return moved;
-    }
-
-    private static double RollCLiveStripRate(
-        RollCStubPieGenerator genC, PossessionState state, IRng rng, double pressure, RollCConfig cfgC)
-    {
-        var pie = genC.Generate(state, pressure);
-        var strips = 0;
-        const int n = 100_000;
-        for (var i = 0; i < n; i++)
-            if (RollC.Execute(state, pie, rng, cfgC) is Terminal { Reason: "LostBallLiveBall" })
-                strips++;
-        return strips / (double)n;
     }
 
     // --- Jump ball: verify the three arrow behaviors directly. ---
@@ -1092,7 +1062,7 @@ internal static class Program
             new StubPieGenerator(cfg),
             cfg,
             new RollBStubPieGenerator(cfgB),
-            new RollCStubPieGenerator(cfgC),
+            new RollCGenerator(cfgC),
             cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
@@ -1270,7 +1240,7 @@ internal static class Program
             new StubPieGenerator(cfg),
             cfg,
             new RollBStubPieGenerator(cfgB),
-            new RollCStubPieGenerator(cfgC),
+            new RollCGenerator(cfgC),
             cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
@@ -1587,7 +1557,7 @@ internal static class Program
             new StubPieGenerator(cfg),
             cfg,
             new RollBStubPieGenerator(cfgB),
-            new RollCStubPieGenerator(cfgC),
+            new RollCGenerator(cfgC),
             cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
@@ -2200,7 +2170,7 @@ internal static class Program
             new StubPieGenerator(cfg),
             cfg,
             new RollBStubPieGenerator(cfgB),
-            new RollCStubPieGenerator(cfgC),
+            new RollCGenerator(cfgC),
             cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
@@ -2334,7 +2304,7 @@ internal static class Program
             new StubPieGenerator(cfg),
             cfg,
             new RollBStubPieGenerator(cfgB),
-            new RollCStubPieGenerator(cfgC),
+            new RollCGenerator(cfgC),
             cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
@@ -2863,7 +2833,7 @@ internal static class Program
     //     context is no longer the legacy 30/22/18/20/10 — the five mains now read
     //     24/18/14/16/9 with the expanded minor types live alongside them. ---
     private static bool RollCContextCheck(
-        RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
+        RollAConfig cfg, RollCConfig cfgC, RollCGenerator genC, PossessionState state)
     {
         Console.WriteLine($"\n--- Context: Roll C pie selection by turnover context ---");
 
@@ -2885,12 +2855,22 @@ internal static class Program
                 (TurnoverOutcome.LostBallLiveBall,   cfgC.TransitionLostBallLiveBall),
                 (TurnoverOutcome.OffensiveFoul,      cfgC.TransitionOffensiveFoul),
             }),
+            (TurnoverContext.EntryBackcourt, new[]
+            {
+                (TurnoverOutcome.BadPassDeadBall,    cfgC.EntryBackcourtBadPassDeadBall),
+                (TurnoverOutcome.BadPassIntercepted, cfgC.EntryBackcourtBadPassIntercepted),
+                (TurnoverOutcome.LostBallDeadBall,   cfgC.EntryBackcourtLostBallDeadBall),
+                (TurnoverOutcome.LostBallLiveBall,   cfgC.EntryBackcourtLostBallLiveBall),
+                (TurnoverOutcome.ShotClockViolation, cfgC.EntryBackcourtShotClockViolation),
+                (TurnoverOutcome.FiveSecondInbound,  cfgC.EntryBackcourtFiveSecondInbound),
+                (TurnoverOutcome.TenSecondBackcourt, cfgC.EntryBackcourtTenSecondBackcourt),
+            }),
         };
 
         var ok = true;
         foreach (var (ctx, expected) in contexts)
         {
-            var pie = genC.Generate(state, pressure: 0.0, context: ctx);
+            var pie = genC.Generate(state, context: ctx);
             var pieMap = pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
 
             // 1) The SELECTED pie equals the expected configured weights for this
@@ -3282,7 +3262,7 @@ internal static class Program
             new StubPieGenerator(cfg),
             cfg,
             new RollBStubPieGenerator(cfgB),
-            new RollCStubPieGenerator(cfgC),
+            new RollCGenerator(cfgC),
             cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
@@ -3832,7 +3812,7 @@ internal static class Program
             new StubPieGenerator(cfg),
             cfg,
             new RollBStubPieGenerator(cfgB),
-            new RollCStubPieGenerator(cfgC),
+            new RollCGenerator(cfgC),
             cfgC,
             new RollDStubPieGenerator(cfgD),
             genE,
@@ -3918,7 +3898,7 @@ internal static class Program
     //     EntryBackcourt + uniform pies, independent of that.) Keeps its own full
     //     reason map local; the shared MapTurnover is now full too. ---
     private static bool RollCExpansionCheck(
-        RollAConfig cfg, RollCConfig cfgC, RollCStubPieGenerator genC, PossessionState state)
+        RollAConfig cfg, RollCConfig cfgC, RollCGenerator genC, PossessionState state)
     {
         Console.WriteLine("\n--- Expansion: Roll C expanded loss types resolve in isolation ---");
         var rng = new SystemRng(cfg.Seed);
@@ -3972,7 +3952,7 @@ internal static class Program
             (TurnoverOutcome.FiveSecondInbound,  cfgC.EntryBackcourtFiveSecondInbound),
             (TurnoverOutcome.TenSecondBackcourt, cfgC.EntryBackcourtTenSecondBackcourt),
         };
-        var pieEB = genC.Generate(state, pressure: 0.0, context: TurnoverContext.EntryBackcourt);
+        var pieEB = genC.Generate(state, context: TurnoverContext.EntryBackcourt);
         var pieMapEB = pieEB.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
 
         var selOk = true;
@@ -4167,7 +4147,7 @@ internal static class Program
             new StubPieGenerator(cfg),
             cfg,
             new RollBStubPieGenerator(cfgB),
-            new RollCStubPieGenerator(cfgC),
+            new RollCGenerator(cfgC),
             cfgC,
             new RollDStubPieGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
@@ -4480,7 +4460,7 @@ internal static class Program
                 new RollAGenerator(cfg, cfgMatchup, game),
                 cfg,
                 new RollBGenerator(cfgB, cfgMatchup, game),
-                new RollCStubPieGenerator(cfgC),
+                new RollCGenerator(cfgC),
                 cfgC,
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, game),                        // Phase 19: attribute-driven usage selection
@@ -8373,7 +8353,7 @@ internal static class Program
                 spy,
                 cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
@@ -8628,7 +8608,7 @@ internal static class Program
                 spy,
                 cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
@@ -8722,7 +8702,7 @@ internal static class Program
             var res2  = new Resolver(
                 spy2, cfgA2,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
@@ -8822,7 +8802,7 @@ internal static class Program
             var resolver = new Resolver(
                 new RollAGenerator(cfgA, cfgM, game), cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 spyE,
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
@@ -8880,7 +8860,7 @@ internal static class Program
             var resolver = new Resolver(
                 new RollAGenerator(cfgA, cfgM, game), cfgA,
                 new AlwaysProceedRollBGenerator(cfgB),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 spyE,
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
@@ -8940,7 +8920,7 @@ internal static class Program
             var resolver = new Resolver(
                 new RollAGenerator(cfgA, cfgM, game), cfgA,
                 new AlwaysProceedRollBGenerator(cfgB),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 spyE,
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
@@ -9004,7 +8984,7 @@ internal static class Program
             var resolver = new Resolver(
                 spyA, cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
@@ -9059,7 +9039,7 @@ internal static class Program
             var resolver = new Resolver(
                 spyA, cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
@@ -9114,7 +9094,7 @@ internal static class Program
             var resolver = new Resolver(
                 spyA, cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
@@ -9210,7 +9190,7 @@ internal static class Program
             var resolver = new Resolver(
                 new RollAGenerator(cfgA, cfgM, game), cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
+                new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
@@ -10544,7 +10524,7 @@ internal static class Program
                         new RollAGenerator(cfg, cfgMatchup, game),
                         cfg,
                         new RollBGenerator(cfgB, cfgMatchup, game),
-                        new RollCStubPieGenerator(cfgC),
+                        new RollCGenerator(cfgC),
                         cfgC,
                         new RollDStubPieGenerator(cfgD),
                         new RollEGenerator(cfgE, game),                    // Phase 19: attribute-driven usage selection
@@ -11371,7 +11351,7 @@ internal static class Program
                 new RollAGenerator(cfg, cfgMatchup, game),
                 cfg,
                 new RollBGenerator(cfgB, cfgMatchup, game),
-                new RollCStubPieGenerator(cfgC),
+                new RollCGenerator(cfgC),
                 cfgC,
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, game),
@@ -11873,7 +11853,7 @@ internal static class Program
             var resolver = new Resolver(
                 new RollAGenerator(cfg, cfgMatchup, game), cfg,
                 new RollBGenerator(cfgB, cfgMatchup, game),
-                new RollCStubPieGenerator(cfgC), cfgC,
+                new RollCGenerator(cfgC), cfgC,
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, game),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
@@ -12285,7 +12265,7 @@ internal static class Program
                 new StubPieGenerator(cfgA),
                 cfgA,
                 new RollBStubPieGenerator(cfgB),
-                new RollCStubPieGenerator(cfgC),
+                new RollCGenerator(cfgC),
                 cfgC,
                 new RollDStubPieGenerator(cfgD),
                 new RollEStubPieGenerator(cfgE),
@@ -12793,7 +12773,7 @@ internal static class Program
                 new RollAGenerator(cfgA, matchupCfg, govGame),
                 cfgA,
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
@@ -13438,7 +13418,7 @@ internal static class Program
                 new RollAGenerator(cfgA, matchupCfg, govGame),
                 cfgA,
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
@@ -13793,7 +13773,7 @@ internal static class Program
                 new RollAGenerator(cfgA, matchupCfg, govGame),
                 cfgA,
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
@@ -14138,7 +14118,7 @@ internal static class Program
                 new RollAGenerator(cfgA, matchupCfg, govGame),
                 cfgA,
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
@@ -14458,7 +14438,7 @@ internal static class Program
                 new RollAGenerator(cfgA, matchupCfg, govGame),
                 cfgA,
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
-                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
                 new RollDStubPieGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),

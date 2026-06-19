@@ -322,7 +322,7 @@ public sealed class Resolver
     private readonly IRollAPieGenerator _rollAGenerator;
     private readonly RollAConfig _rollAConfig;
     private readonly IRollBPieGenerator _rollBGenerator;
-    private readonly RollCStubPieGenerator _rollCGenerator;
+    private readonly RollCGenerator _rollCGenerator;
     private readonly RollCConfig _rollCConfig;
     private readonly RollDStubPieGenerator _rollDGenerator;
     private readonly IRollEGenerationProvider _rollEGenerator;
@@ -344,7 +344,7 @@ public sealed class Resolver
         IRollAPieGenerator rollAGenerator,
         RollAConfig rollAConfig,
         IRollBPieGenerator rollBGenerator,
-        RollCStubPieGenerator rollCGenerator,
+        RollCGenerator rollCGenerator,
         RollCConfig rollCConfig,
         RollDStubPieGenerator rollDGenerator,
         IRollEGenerationProvider rollEGenerator,
@@ -651,9 +651,10 @@ public sealed class Resolver
                             // byte-for-byte unchanged. The RollCConfig is passed (it was
                             // not before #6): the now-LIVE violation arms read their
                             // invariant elapsed through it, and would FAIL LOUD without it.
+                            // The pressure parameter has been retired (Phase 37): pressure
+                            // changes turnover RATE (Roll A/B/F), not turnover TYPE.
                             var pieC = _rollCGenerator.Generate(
                                 c.State,
-                                pressure: 0.0,
                                 context: c.TurnoverContext ?? TurnoverContext.Halfcourt);
                             result = RollC.Execute(c.State, pieC, _rng, _rollCConfig);
                             continue;

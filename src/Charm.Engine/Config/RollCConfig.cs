@@ -97,12 +97,6 @@ public sealed class RollCConfig
     public double FiveSecondInboundElapsedSeconds { get; set; } = 0.0;
     public double TenSecondBackcourtElapsedSeconds { get; set; } = 10.0;
 
-    /// <summary>The single live wire proving the seam carries signal: how much a
-    /// pressure of 1.0 adds to the live-strip weight before renormalization.
-    /// Defensive ball pressure -> more live strips. Placeholder — not basketball
-    /// logic.</summary>
-    public double PressureLostBallLiveBallNudge { get; set; } = 0.10;
-
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 

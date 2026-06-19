@@ -4,11 +4,11 @@
   rollA=CONTINUE | elapsed=deferred | final -> END:JumpBallTip:Away (possession ended)
   rollA=CONTINUE | elapsed=deferred | final -> END:LostBallDeadBall (possession ended)
   rollA=CONTINUE | elapsed=deferred | final -> END:OutOfBoundsOffOffense (possession ended)
-  rollA=CONTINUE | elapsed=deferred | final -> END:JumpBallArrow:Home (possession ended)
-  rollA=CONTINUE | elapsed=deferred | final -> END:FreeThrowsMade (possession ended)
-  rollA=CONTINUE | elapsed=deferred | final -> END:FreeThrowsMade (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:DefensiveRebound (possession ended)
   rollA=CONTINUE | elapsed=deferred | final -> END:Made (possession ended)
-  rollA=CONTINUE | elapsed=deferred | final -> END:LostBallDeadBall (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:DefensiveRebound (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:Made (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:Made (possession ended)
 
 --- Observability: Roll C (turnover classification) ---
   pie: BadPassDeadBall=24.00%, BadPassIntercepted=18.00%, LostBallDeadBall=14.00%, LostBallLiveBall=16.00%, OffensiveFoul=9.00%, Travel=8.00%, DoubleDribble=1.50%, Carry=1.50%, ThreeSecondViolation=2.50%, FiveSecondCloselyGuarded=0.50%, OffensiveGoaltending=0.50%, BackcourtViolation=2.00%, ShotClockViolation=2.50%, FiveSecondInbound=0.00%, TenSecondBackcourt=0.00%
@@ -34,24 +34,24 @@
   foul#11: 10->11 | flavor=ReachIn  | bonus=Double    | route=ResolveFreeThrows(Double)
 
 --- Observability: Roll E (player selection) ---
-  selection pie (flat, no signal yet): Slot1=17.94%, Slot2=52.00%, Slot3=11.36%, Slot4=9.16%, Slot5=9.55%
+  selection pie (flat, no signal yet): Slot1=20.06%, Slot2=23.89%, Slot3=22.76%, Slot4=18.45%, Slot5=14.84%
   proceed -> selected Home slot 2 | next=IntoPlayerAction
   proceed -> selected Home slot 5 | next=IntoPlayerAction
   proceed -> selected Home slot 4 | next=IntoPlayerAction
-  proceed -> selected Home slot 2 | next=IntoPlayerAction
   proceed -> selected Home slot 3 | next=IntoPlayerAction
-  proceed -> selected Home slot 2 | next=IntoPlayerAction
+  proceed -> selected Home slot 4 | next=IntoPlayerAction
+  proceed -> selected Home slot 1 | next=IntoPlayerAction
   proceed -> selected Home slot 5 | next=IntoPlayerAction
-  proceed -> selected Home slot 2 | next=IntoPlayerAction
+  proceed -> selected Home slot 3 | next=IntoPlayerAction
 
 --- Observability: Roll F (player action) ---
   action pie (flat-ish, no signal yet): ShotAttempt=85.50%, Turnover=9.00%, NonShootingFoul=5.00%, JumpBall=0.50%
   Home slot 2 action -> ResolveJumpBall
   Home slot 4 action -> IntoShotType
-  Home slot 3 action -> IntoShotType
+  Home slot 4 action -> IntoShotType
   Home slot 5 action -> IntoShotType
-  Home slot 3 action -> IntoShotType
-  Home slot 2 action -> IntoShotType
+  Home slot 4 action -> IntoShotType
+  Home slot 1 action -> IntoShotType
   Home slot 2 action -> IntoShotType
   Home slot 5 action -> IntoShotType
 
@@ -63,9 +63,9 @@
     Long   2.00%
     Three  1.00%
   Home slot 2 Rim shot -> MissFouled -> CONTINUE -> ResolveShootingFreeThrows
-  Home slot 2 Rim shot -> Made -> TERMINAL (Made)
+  Home slot 3 Rim shot -> Made -> TERMINAL (Made)
   Home slot 5 Mid shot -> Miss -> CONTINUE -> ResolveRebound
-  Home slot 2 Three shot -> Made -> TERMINAL (Made)
+  Home slot 3 Three shot -> Made -> TERMINAL (Made)
   Home slot 2 Short shot -> Blocked -> CONTINUE -> ResolveRebound
   Home slot 2 Three shot -> Miss -> CONTINUE -> ResolveRebound
   Home slot 2 Long shot -> MissOutOfBoundsRetained -> CONTINUE -> ResolveSidelineInbound
@@ -98,7 +98,7 @@
 
   handoff: ended=100,000, routed-to-stub=0, unrouted=0 -> ok
 
---- Batch: 100,000 turnovers through Roll C (pressure=0.00) ---
+--- Batch: 100,000 turnovers through Roll C ---
   Roll C outcomes:
     BadPassDeadBall      observed=23.888%  expected=24.000%  gap=0.112%  ok
     BadPassIntercepted   observed=18.188%  expected=18.000%  gap=0.188%  ok
@@ -141,11 +141,6 @@
 --- Seam signal: Roll B foul rate vs. physicality ---
   foul rate @ physicality 0.00 = 12.126%
   foul rate @ physicality 1.00 = 20.199%
-  signal is live (high > low): ok
-
---- Seam signal: Roll C live-strip rate vs. pressure ---
-  live-strip rate @ pressure 0.00 = 15.844%
-  live-strip rate @ pressure 1.00 = 23.380%
   signal is live (high > low): ok
 
 --- Jump ball: possession arrow behavior ---
@@ -197,10 +192,10 @@
 
 --- Clean handoff: 100,000 E->F exits routed through the resolver ---
   destinations reached:
-    turnover -> Roll C terminal        11,014  ok
-    shot -> Roll G -> Roll H -> resolved   75,344  ok
-    free throws -> resolved            12,591  ok
-    jump ball -> terminal               1,051  ok
+    turnover -> Roll C terminal        10,884  ok
+    shot -> Roll G -> Roll H -> resolved   75,477  ok
+    free throws -> resolved            12,584  ok
+    jump ball -> terminal               1,055  ok
 
   zero unrouted exits: unrecognized=0 -> ok
   all four resolved destinations reached: ok
@@ -216,13 +211,13 @@
   every exit a clean zone-stamped IntoShotResolution: anomalies=0 -> ok
 
 --- G->H integration: 100,000 IntoShotType exits routed through Roll G then Roll H ---
-  landed at a CORE post-shot destination: 84,892
-  routed DEEPER via Roll K / reset (terminals 15,108, stubs 0)
+  landed at a CORE post-shot destination: 84,912
+  routed DEEPER via Roll K / reset (terminals 15,088, stubs 0)
   core destinations reached:
-    END:Made                     41,950  ok
-    END:MissOutOfBoundsLost       2,156  ok
-    END:DefensiveRebound         40,139  ok
-    END:LooseBallFoulOnOffense      647  ok
+    END:Made                     42,025  ok
+    END:MissOutOfBoundsLost       2,161  ok
+    END:DefensiveRebound         40,061  ok
+    END:LooseBallFoulOnOffense      665  ok
 
   zero unrouted exits: unrecognized=0 -> ok
   all core G->H->I destinations reached (offensive rebound now executes Roll K; OOB-retained re-runs Roll A and lands deeper): ok
@@ -250,13 +245,13 @@
   slot+zone+result ride through every exit: fails=0 -> ok
 
 --- Clean handoff: 100,000 IntoShotResolution exits routed through Roll H ---
-  landed at a CORE post-shot destination: 84,892
-  routed DEEPER via Roll K / reset (terminals 15,108, stubs 0)
+  landed at a CORE post-shot destination: 84,912
+  routed DEEPER via Roll K / reset (terminals 15,088, stubs 0)
   core destinations reached:
-    END:Made                     41,950  ok
-    END:MissOutOfBoundsLost       2,156  ok
-    END:DefensiveRebound         40,139  ok
-    END:LooseBallFoulOnOffense      647  ok
+    END:Made                     42,025  ok
+    END:MissOutOfBoundsLost       2,161  ok
+    END:DefensiveRebound         40,061  ok
+    END:LooseBallFoulOnOffense      665  ok
 
   zero unrouted exits: unrecognized=0 -> ok
   all core Roll H->I destinations reached (offensive rebound now executes Roll K; OOB-retained re-runs Roll A and lands deeper): ok
@@ -348,9 +343,9 @@
     OutOfBoundsOffDefense    observed=5.062%  expected=5.000%  ok
     JumpBall                 observed=0.982%  expected=1.000%  ok
   block pie differs from live-miss pie (DefensiveRebound): ok
-  blocked shots observed: 5,645
-  each Blocked emits Continue(ResolveRebound) + ReboundSource.Block: 5,645/5,645 -> ok
-  blocked shots routed to a Roll-I destination: 5,645
+  blocked shots observed: 5,687
+  each Blocked emits Continue(ResolveRebound) + ReboundSource.Block: 5,687/5,687 -> ok
+  blocked shots routed to a Roll-I destination: 5,687
   blocked shots landing at the retired STUB:BlockRecovery: 0 -> ok
   zero unrouted blocked shots: 0 -> ok
   Roll I block context selection + routing: ok
@@ -448,8 +443,6 @@
     MissOutOfBoundsRetained    observed=1.182%  expected=1.217%  normal=0.775%  ok
     Blocked                    observed=7.040%  expected=7.000%  normal=12.000%  ok
   putback ticket selects its own pie: ok
-
---- Bonus fork: Roll K defensive foul across the thresholds ---
   thresholds: bonus>=7, double>=10
   foul# 1: 0->1 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
   foul# 2: 1->2 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
@@ -467,11 +460,11 @@
 --- Roll L: free-throw resolution (100,000 trips per type) ---
   raw make rate: observed=72.035%  expected=72.000%  -> ok
   per-trip: shot count, last-shot routing, made-FT consequence:
-    and-1         spins=[1-1] (want 1-1) | END=71.77% (want 72.00%)  FTReb=28.23% | unrouted=0 wrongCons=0 -> ok
-    fouled two    spins=[2-2] (want 2-2) | END=71.77% (want 72.00%)  FTReb=28.23% | unrouted=0 wrongCons=0 -> ok
-    fouled three  spins=[3-3] (want 3-3) | END=72.02% (want 72.00%)  FTReb=27.98% | unrouted=0 wrongCons=0 -> ok
-    double bonus  spins=[2-2] (want 2-2) | END=71.80% (want 72.00%)  FTReb=28.20% | unrouted=0 wrongCons=0 -> ok
-    one-and-one   spins=[1-2] (want 1-2) | END=51.86% (want 51.84%)  FTReb=48.14% | unrouted=0 wrongCons=0 -> ok
+    and-1         spins=[1-1] (want 1-1) | END=71.83% (want 72.00%)  FTReb=28.17% | unrouted=0 wrongCons=0 -> ok
+    fouled two    spins=[2-2] (want 2-2) | END=71.92% (want 72.00%)  FTReb=28.08% | unrouted=0 wrongCons=0 -> ok
+    fouled three  spins=[3-3] (want 3-3) | END=72.01% (want 72.00%)  FTReb=27.99% | unrouted=0 wrongCons=0 -> ok
+    double bonus  spins=[2-2] (want 2-2) | END=71.74% (want 72.00%)  FTReb=28.26% | unrouted=0 wrongCons=0 -> ok
+    one-and-one   spins=[1-2] (want 1-2) | END=51.67% (want 51.84%)  FTReb=48.33% | unrouted=0 wrongCons=0 -> ok
   spin count never exceeded 3: max=3 -> ok
   (b) RollLGenerator ΓÇö attribute-driven make%:
     p72 (FreeThrow=72): make=0.720000  expected=0.720000  -> ok
@@ -564,11 +557,11 @@
 
 --- Convergence: 100,000 offensive rebounds driven through the resolver loop ---
   putback-depth distribution (exactly n / at least n):
-    n= 0: exactly   57,399   at-least  100,000
-    n= 1: exactly   40,139   at-least   42,601
-    n= 2: exactly    2,329   at-least    2,462
-    n= 3: exactly      127   at-least      133
-    n= 4: exactly        6   at-least        6
+    n= 0: exactly   57,363   at-least  100,000
+    n= 1: exactly   40,234   at-least   42,637
+    n= 2: exactly    2,237   at-least    2,403
+    n= 3: exactly      159   at-least      166
+    n= 4: exactly        7   at-least        7
 
   max putback depth observed: 4 -> ok (< 20)
   survival strictly decreasing on populated levels: ok
@@ -587,6 +580,14 @@
     LostBallDeadBall     observed=19.937%  expected=20.000%  gap=0.063%  ok
     LostBallLiveBall     observed=34.972%  expected=35.000%  gap=0.028%  ok
     OffensiveFoul        observed=5.013%  expected=5.000%  gap=0.013%  ok
+  context=EntryBackcourt (selection ok):
+    BadPassDeadBall      observed=19.933%  expected=20.000%  gap=0.067%  ok
+    BadPassIntercepted   observed=15.178%  expected=15.000%  gap=0.178%  ok
+    LostBallDeadBall     observed=14.987%  expected=15.000%  gap=0.013%  ok
+    LostBallLiveBall     observed=14.924%  expected=15.000%  gap=0.076%  ok
+    ShotClockViolation   observed=10.015%  expected=10.000%  gap=0.015%  ok
+    FiveSecondInbound    observed=10.025%  expected=10.000%  gap=0.025%  ok
+    TenSecondBackcourt   observed=14.938%  expected=15.000%  gap=0.062%  ok
   Roll C context selection: ok
 
 --- Expansion: Roll C expanded loss types resolve in isolation ---
@@ -614,17 +615,17 @@
     NoShot           observed=9.963%  expected=10.000%  gap=0.037%  ok
 
 --- Governor loop: two 1,200s halves ---
-  resolved=133 | terminal-ended=132 | parked=0 | noShot=1 | terminal+parked+noShot==total -> ok
-  possession numbers contiguous 1..133 -> ok
+  resolved=134 | terminal-ended=134 | parked=0 | noShot=0 | terminal+parked+noShot==total -> ok
+  possession numbers contiguous 1..134 -> ok
   offense/defense flips match applied consequence -> ok
   first possession = Home, DeadBallInbound -> ok
-  arrow: jump balls=5 | final=Away | expected=Away -> ok
-  fouls(Home): 7(OneAndOne) -> 18(Double) | monotonic + bonus stays crossed -> ok
+  arrow: jump balls=7 | final=Away | expected=Away -> ok
+  fouls(Home): 7(OneAndOne) -> 16(Double) | monotonic + bonus stays crossed -> ok
   lineups survive (same objects, 5 slots each) -> ok
-  rebound -> Roll J: possessions entering J=35 (Push now flows into Roll E) -> ok
-  steal -> Roll J: possessions entering J=7 (live turnovers now feed Roll J; observability ΓÇö rigorous proof is RollJStealBatchCheck)
+  rebound -> Roll J: possessions entering J=42 (Push now flows into Roll E) -> ok
+  steal -> Roll J: possessions entering J=10 (live turnovers now feed Roll J; observability ΓÇö rigorous proof is RollJStealBatchCheck)
   half 1: 1,200s / half 2: 1,200s | each drains to 1,200 -> ok
-  possessions=133 (~66 per half) | realized APL=18.0s -> ok
+  possessions=134 (~67 per half) | realized APL=17.9s -> ok
   tempo histogram (100k samples, center=17 sd=4.5 floor=4 ceiling<30):
     [0,5): 193
     [5,10): 5,655
@@ -633,21 +634,21 @@
     [20,25): 21,663
     [25,30): 3,574
   min=4.01 / max=30.00 | truncation holds (>= floor, < ceiling) -> ok
-  end-of-half: HoldShootLast=1 ShootEarly=0 NoShot=1
-  score: Home 80 / Away 64 | accumulates per-possession tally -> ok
+  end-of-half: HoldShootLast=1 ShootEarly=0 NoShot=0
+  score: Home 68 / Away 52 | accumulates per-possession tally -> ok
   FG rule (Three=3, others=2) -> ok
   per-stub park breakdown:
   first 10 possessions:
     #1   Home entry=DeadBallInbound end=JumpBallArrow:Home                 -> next=Home/DeadBallInbound
     #2   Home entry=DeadBallInbound end=LostBallDeadBall                   -> next=Away/DeadBallInbound
     #3   Away entry=DeadBallInbound end=DefensiveRebound                   -> next=Home/Transition
-    #4   Home entry=Transition      end=JumpBallArrow:Away                 -> next=Away/DeadBallInbound
-    #5   Away entry=DeadBallInbound end=FreeThrowsMade                     -> next=Home/DeadBallInbound
-    #6   Home entry=DeadBallInbound end=Made                               -> next=Away/DeadBallInbound
-    #7   Away entry=DeadBallInbound end=MissOutOfBoundsLost                -> next=Home/DeadBallInbound
-    #8   Home entry=DeadBallInbound end=Made                               -> next=Away/DeadBallInbound
-    #9   Away entry=DeadBallInbound end=JumpBallArrow:Home                 -> next=Home/DeadBallInbound
-    #10  Home entry=DeadBallInbound end=DefensiveRebound                   -> next=Away/Transition
+    #4   Home entry=Transition      end=MissOutOfBoundsLost                -> next=Away/DeadBallInbound
+    #5   Away entry=DeadBallInbound end=DefensiveRebound                   -> next=Home/Transition
+    #6   Home entry=Transition      end=Made                               -> next=Away/DeadBallInbound
+    #7   Away entry=DeadBallInbound end=LostBallDeadBall                   -> next=Home/BallAdvanced
+    #8   Home entry=BallAdvanced    end=Made                               -> next=Away/DeadBallInbound
+    #9   Away entry=DeadBallInbound end=JumpBallArrow:Away                 -> next=Away/DeadBallInbound
+    #10  Away entry=DeadBallInbound end=DefensiveRebound                   -> next=Home/Transition
   Governor loop: ok
 
 --- Phase 1: Player object & Roster seam ---
@@ -859,6 +860,10 @@
   (g) Block source baseline (neutral matchup):
     block off-share=0.39024390  blockBase=0.39024390  matches? OK
     block baseline distinct from live-miss (>0.05 gap): OK
+  (h) Phase 35 wingspan direction (battle): longer defense lowers off-share; longer offense raises it:
+    neutral off-share=0.290323
+    longer defense:    off-share=0.283177  (should be < neutral: OK)
+    longer offense:    off-share=0.299145  (should be > neutral: OK)
   Phase 10 PASSED.
 
 --- Phase 11: FT rebound door (Roll M matchup-aware) ---
@@ -955,8 +960,8 @@
     in [0,1]=True  monotone=True
   (1) ok
   (2) Frequency gates pressed fraction (spy-based):
-    freq=5  expectedProb=0.3833  observed=0.3729  5╧â=0.0341  fracOk=True
-    logLen=5068  Standard=1890  None=3178  Desperate=0  noDesperate=True
+    freq=5  expectedProb=0.3833  observed=0.3773  5╧â=0.0340  fracOk=True
+    logLen=5099  Standard=1924  None=3175  Desperate=0  noDesperate=True
   (2) ok
   (3) PressMode.None ΓåÆ exact config baseline:
     CleanEntry=0.88000000  want=0.88000000  OK
@@ -1068,21 +1073,22 @@
   NOTE: weighted stats (DReb, OReb, BLK, STL, TO) prove the weighting system
   preferentially credits players with the intended attributes ΓÇö not causal attribution.
   Exact stats (FGA, FGM, 3PA, 3PM, FTA, FTM) are slot-exact.
+  BLK moved engine-side in Phase 36 (BlockerPicker) ΓÇö no longer a harness WeightedDraw.
 
   Running 200 games....
 
   Player                   PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [Home] RimAnchor        12.2   7.8   5.2  67.5   0.1   0.0  22.2   3.2   1.8  54.6   3.6   8.8  12.3   0.9   1.0   1.8
-  [Home] PerimRole2       16.9  12.4   6.1  48.7   6.0   2.8  47.3   2.5   1.9  78.2   1.0   2.4   3.4   0.7   0.4   2.6
-  [Home] PerimRole3       15.8  11.6   5.6  48.2   5.9   2.7  45.9   2.4   2.0  82.7   0.9   2.5   3.4   0.8   0.4   2.8
-  [Home] PerimRole4       14.3  10.5   5.0  47.8   5.6   2.5  45.0   2.2   1.8  78.9   1.0   2.5   3.4   0.8   0.4   2.5
-  [Home] PerimRole5       13.7  10.4   4.7  45.0   5.7   2.4  42.8   2.3   1.9  82.0   0.9   2.5   3.5   0.8   0.4   2.4
-  [Away] RimAnchor        12.0   7.8   5.1  64.7   0.1   0.0  13.3   3.3   1.8  54.4   3.4   8.8  12.3   0.8   1.1   1.9
-  [Away] PerimRole2       16.1  12.0   5.6  46.9   5.8   2.6  44.5   2.8   2.3  82.4   1.0   2.5   3.5   0.7   0.3   2.6
-  [Away] PerimRole3       14.9  11.4   5.3  46.7   5.7   2.5  43.6   2.3   1.8  76.2   1.1   2.4   3.5   0.9   0.3   2.5
-  [Away] PerimRole4       14.0  10.8   5.0  46.9   5.7   2.5  43.8   1.9   1.4  75.3   1.1   2.3   3.4   0.9   0.4   2.4
-  [Away] PerimRole5       13.6  10.4   4.7  45.5   5.9   2.6  43.9   2.0   1.6  77.6   1.0   2.3   3.3   0.8   0.4   2.5
+  [Home] RimAnchor        12.3   7.6   5.2  68.2   0.1   0.0  30.0   3.4   1.9  55.8   6.4  15.7  22.1   0.4   1.0   1.6
+  [Home] PerimRole2       16.3  12.0   5.8  48.5   5.9   2.8  46.5   2.5   1.9  76.7   0.2   0.5   0.7   0.9   0.4   2.4
+  [Home] PerimRole3       16.2  11.5   5.7  49.5   5.7   2.7  48.2   2.6   2.1  80.7   0.3   0.6   0.8   1.0   0.4   2.4
+  [Home] PerimRole4       15.1  10.9   5.4  49.1   6.0   2.9  48.3   1.8   1.4  77.5   0.3   0.5   0.7   1.0   0.4   2.3
+  [Home] PerimRole5       14.1  10.6   4.8  45.4   6.0   2.8  46.0   2.1   1.6  76.9   0.3   0.6   0.8   1.1   0.3   2.1
+  [Away] RimAnchor        11.3   7.4   4.7  63.7   0.1   0.0  26.7   3.2   1.8  56.3   6.4  16.0  22.4   0.5   1.0   1.5
+  [Away] PerimRole2       15.8  11.8   5.5  46.5   5.9   2.7  45.4   2.8   2.1  77.5   0.2   0.5   0.7   0.8   0.4   2.5
+  [Away] PerimRole3       15.6  11.5   5.7  49.2   5.5   2.5  46.3   2.3   1.8  76.3   0.2   0.6   0.8   0.8   0.3   2.5
+  [Away] PerimRole4       14.5  10.6   5.2  49.0   5.8   2.7  47.4   1.9   1.4  74.1   0.2   0.6   0.8   1.0   0.3   2.2
+  [Away] PerimRole5       13.7  10.0   4.9  49.1   5.4   2.5  46.8   1.7   1.3  77.2   0.2   0.6   0.8   0.8   0.3   2.5
 
   --- Invariant checks ---
   [OK] FGA Home
@@ -1097,25 +1103,25 @@
   [OK] FTA Away
   [OK] FTM Home
   [OK] FTM Away
-  [OK] OReb: ╬ú per-player == total OrbWon (2993)
-  [OK] DReb: ╬ú per-player == total DReb possessions (7411)
-  [OK] BLK: ╬ú per-player == total BlkCount (984)
-  [OK] STL: ╬ú per-player == total live-TO possessions (1592)
-  [OK] TO: ╬ú per-player == total TO possessions (4790)
+  [OK] OReb: ╬ú per-player == total OrbWon (2928)
+  [OK] DReb: ╬ú per-player == total DReb possessions (7197)
+  [OK] BLK: ╬ú per-player == total BlkCount (977)
+  [OK] STL: ╬ú per-player == total live-TO possessions (1635)
+  [OK] TO: ╬ú per-player == individual-TO possessions (4399; team violations 570 correctly unattributed)
 
   --- Directional assertions ---
-  [OK] Home DReb: Anchor 8.77/g vs Role 2.47/g ΓÇö ratio 3.55├ù > 3.0├ù
-  [OK] Home OReb: Anchor 3.57/g vs Role 0.96/g ΓÇö ratio 3.71├ù > 3.0├ù
-  [OK] Home BLK: Anchor 1.01/g vs Role 0.38/g ΓÇö ratio 2.64├ù > 2.0├ù
-  [OK] Home 3PA (integrated): Role 5.80/g vs Anchor 0.09/g ΓÇö ratio 64.47├ù > 3.0├ù [integrated selection+attribution check]
-  [OK] Home Anchor FT%: 54.6% < 65% (FreeThrow=55, expect Γëê55%)
-  [OK] Home Role combined FT%: 80.4% > 72% (FreeThrow=78, expect Γëê78%)
-  [OK] Away DReb: Anchor 8.84/g vs Role 2.39/g ΓÇö ratio 3.69├ù > 3.0├ù
-  [OK] Away OReb: Anchor 3.44/g vs Role 1.03/g ΓÇö ratio 3.34├ù > 3.0├ù
-  [OK] Away BLK: Anchor 1.05/g vs Role 0.33/g ΓÇö ratio 3.16├ù > 2.0├ù
-  [OK] Away 3PA (integrated): Role 5.75/g vs Anchor 0.15/g ΓÇö ratio 38.30├ù > 3.0├ù [integrated selection+attribution check]
-  [OK] Away Anchor FT%: 54.4% < 65% (FreeThrow=55, expect Γëê55%)
-  [OK] Away Role combined FT%: 78.2% > 72% (FreeThrow=78, expect Γëê78%)
+  [OK] Home DReb: Anchor 15.69/g vs Role 0.53/g ΓÇö ratio 29.88├ù > 3.0├ù
+  [OK] Home OReb: Anchor 6.40/g vs Role 0.25/g ΓÇö ratio 25.47├ù > 3.0├ù
+  [OK] Home BLK: Anchor 1.04/g vs Role 0.36/g ΓÇö ratio 2.89├ù > 2.0├ù
+  [OK] Home 3PA (integrated): Role 5.93/g vs Anchor 0.10/g ΓÇö ratio 59.30├ù > 3.0├ù [integrated selection+attribution check]
+  [OK] Home Anchor FT%: 55.8% < 65% (FreeThrow=55, expect Γëê55%)
+  [OK] Home Role combined FT%: 78.1% > 72% (FreeThrow=78, expect Γëê78%)
+  [OK] Away DReb: Anchor 15.99/g vs Role 0.55/g ΓÇö ratio 29.02├ù > 3.0├ù
+  [OK] Away OReb: Anchor 6.37/g vs Role 0.22/g ΓÇö ratio 29.46├ù > 3.0├ù
+  [OK] Away BLK: Anchor 1.04/g vs Role 0.34/g ΓÇö ratio 3.10├ù > 2.0├ù
+  [OK] Away 3PA (integrated): Role 5.63/g vs Anchor 0.15/g ΓÇö ratio 37.53├ù > 3.0├ù [integrated selection+attribution check]
+  [OK] Away Anchor FT%: 56.3% < 65% (FreeThrow=55, expect Γëê55%)
+  [OK] Away Role combined FT%: 76.4% > 72% (FreeThrow=78, expect Γëê78%)
 
   Attribution sanity check: PASSED
 
@@ -1143,10 +1149,10 @@
   --- End-to-end completeness (200 games, controlled roster) ---
   Running 200 games.... done (200/200 completed).
 
-    Shooting-foul events ΓÇö Home defense: 975, Away defense: 1000
-    SFL credits ΓÇö Home players: 975, Away players: 1000
+    Shooting-foul events ΓÇö Home defense: 908, Away defense: 985
+    SFL credits ΓÇö Home players: 908, Away players: 985
   [OK] Side-specific reconciliation: creditedHome == totalHome AND creditedAway == totalAway
-  [OK] Global completeness: total SFL == total events (1975)
+  [OK] Global completeness: total SFL == total events (1893)
   [OK] No-zero defender: all 10 players > 0 SFL across 200 games
 
   Shooting-foul attribution check: PASSED
@@ -1179,8 +1185,207 @@
 
   Hierarchy bias check: PASSED
 
+--- Phase 30: Coaching Layer 2 (ShotSelectionBias + PaceBias) ---
+  Four sub-cases: neutral regression, ShotSelection direction,
+  PaceBias Roll J direction, PaceBias Governor APL direction.
+
+  Sub-case 1: Neutral regression guard
+    [1a] CoachProfile() defaults: ShotSelectionBias=5 PaceBias=5  [OK]
+    [1b] Apply(neutral): (50,25,20,15,40) == authored (50,25,20,15,40)  [OK]
+    [1c] PaceBias=5 stamped Push=0.300000 vs null-side Push=0.300000  delta=0.00E+000  [OK]
+    [1d] Governor paceAdj at PaceBias=5: 0  [OK]
+  Sub-case 1: [OK]
+
+  Sub-case 2: ShotSelectionBias direction
+    [2a] Bias 5 identity: (50,25,20,15,40)  [OK]
+    [2b] Bias 1 (inside): rim=66.00>50 three=27.20<40 mid=20==20  [OK]
+    [2c] Bias 10 (outside): three=56.00>40 rim=30.00<50 mid=20==20  [OK]
+    [2d] Shaq test (bias 10): rim=48.00 > three=14.00  [OK]
+    [2e] Korver test (bias 1): three=54.40 > rim=13.20  [OK]
+    [2f] Floor clamp (ThreeTendency=1, bias=1): clamped=1.0000 >= 1.0  [OK]
+  Sub-case 2: [OK]
+
+  Sub-case 3: PaceBias direction in Roll J
+    [3a] Fast (bias 8) Push=0.390000 > Slow (bias 2) Push=0.210000  [OK]
+    [3b] Fast Settle=0.510000 < Slow Settle=0.690000  [OK]
+    [3c] Null OffenseSide: no crash, Push=0.300000  [OK]
+  Sub-case 3: [OK]
+
+  Sub-case 4: PaceBias direction in Governor APL (500 possessions each)
+    Slow coach (bias 2) mean APL: 19.200s
+    Fast coach (bias 8) mean APL: 17.391s
+    [4a] Fast mean APL < Slow mean APL: [OK]
+  Sub-case 4: [OK]
+
+  Phase 30 coaching layer 2 check: PASSED
+
+--- Phase 31: offensive rebounder picker (OffensiveRebounderPicker) ---
+  Sub-check 1: direction (dominant Γëê70%, each weak Γëê7%, multiplier >> 3├ù)
+    dominant (slot 5): 71.53%  max-weak: 7.20%  mult: 9.94├ù
+    [OK]
+  Sub-check 2: neutral (5 identical ΓåÆ ~20% each)
+    slot 1: 20.13%
+    slot 2: 19.94%
+    slot 3: 19.97%
+    slot 4: 19.83%
+    slot 5: 20.12%
+    [OK]
+  Sub-check 3: buried guard (share < 6%)
+    buried guard (slot 1) share: 1.88%  (bound: < 6%)
+    [OK]
+  Sub-check 4: shooter nerf (share drops on Three vs Rim/FT board)
+    slot-5 share ΓÇö Rim (un-nerfed): 35.78%  Three (nerfed): 16.36%  FT board (un-nerfed): 35.78%
+    [OK]
+  Sub-check 5: floor (null slots skipped) and throw (all-null offense)
+    slot distribution (only 1&3 seated): s1=49,973 s2=0 s3=50,027 s4=0 s5=0
+    floor [OK]
+    throw  [OK]
+  Sub-check 6: reproducibility (same seed ΓåÆ identical sequence)
+    [OK]
+  OrbBySlot.Total == OrbWon invariant (governor run)
+    [OK] OrbBySlot.Total == OrbWon on all 129 possessions (15 with ORB > 0)
+  Sub-check 7 (Phase 35): wingspan tilt ΓÇö long-armed offensive rebounder gets larger share
+    short-arm (wingspan=50) share: 19.59%
+    long-arm  (wingspan=70) share: 21.73%
+    [OK] long-armed player gets larger share
+
+  Phase 31 rebounder picker check: PASSED
+
+--- Phase 32: putback attempt rate (RollKGenerator) ---
+  Sub-check 1: offense dominant ΓÇö big rebounder vs weak guards (Short)
+    [OK]   PutBack=0.6814 > baseline 0.4000
+  Sub-check 2: defense dominant ΓÇö guard rebounder vs elite rim protectors (Short)
+    [OK]   PutBack=0.2681 < baseline 0.4000
+  Sub-check 3: neutral all-50 at Short Γëê baseline
+    [OK]   PutBack=0.4000 Γëê baseline 0.4000 (|diff|<0.02)
+  Sub-check 3b: neutral all-50 at Rim > baseline (rim-board boost)
+    [OK]   PutBack=0.4400 > baseline 0.4000, Γëñ ceiling 0.7000
+  Sub-check 4: zone modifier ΓÇö Three < Rim for same matchup
+    [OK]   Three=0.2616 < Rim=0.5755
+  Sub-check 5: null ShotType (FT board) ΓåÆ valid range, no crash
+    [OK]   PutBack=0.6814 in [0.1500, 0.7000]
+  Sub-check 6: null ReboundSlot ΓåÆ flat config fallback (both sources)
+    [OK]   LiveBall fallback PutBack=0.4000 == cfg.PutBack=0.4000
+    [OK]   FreeThrow fallback PutBack=0.5500 == cfg.FreeThrowPutBack=0.5500
+  Sub-check 7: flat arms unchanged across sub-checks 1ΓÇô5
+    [OK]   Flat arms sum=0.130000 constant across all zones
+
+  Phase 32 putback attempt rate check: PASSED
+
+--- Phase 33: turnover committer picker (TurnoverCommitterPicker) ---
+  Sub-check 1: posts suppressed (C < PG, PF < SF)
+    PG=33.58%  SG=29.08%  SF=20.50%  PF=10.97%  C=5.88%
+    [OK]
+  Sub-check 2: combo guards split evenly (ratio 0.85ΓÇô1.20)
+    G1=31.60%  G2=30.33%  ratio=1.042
+    [OK]
+  Sub-check 3: perimeter floor (SF share > 0.10)
+    SF share=20.50%  (bound: > 0.10)
+    [OK]
+  Sub-check 4: post suppressed but non-zero (0 < C < 0.10)
+    C share=5.88%  (bound: 0 < C < 0.10)
+    [OK]
+  Sub-check 5: handling tilt within perimeter (PG > SF)
+    PG=33.58%  SF=20.50%
+    [OK]
+  Sub-check 6: floor of 1 (BH=0 player still receives draws)
+    BH=0 slot share=0.83%  threw=False
+    [OK]
+  Sub-check 7: reproducibility (same seed ΓåÆ same pick)
+    [OK]
+  Sub-check 8: null-roster throw (empty offense ΓåÆ throws)
+    [OK]
+  Invariant: every turnover possession has TurnoverOffSlot != null
+    [OK] TurnoverOffSlot non-null on all 22 individual-turnover possessions; 1 team violations correctly null (of 133 total)
+
+  Phase 33 turnover committer check: PASSED
+
+--- Phase 34: turnover attribution completion (TurnoverInteriorPicker, StealerPicker) ---
+  Sub-check 1: interior picker posts favored (C > PG, PF > SF)
+    PG=9.10%  SG=10.16%  SF=15.28%  PF=27.42%  C=38.03%
+    [OK]
+  Sub-check 2: interior picker guard floor holds (PG > 0.05)
+    PG=8.97%
+    [OK]
+  Sub-check 3: interior picker same seed ΓåÆ identical sequence
+    [OK]
+  Sub-check 4: interior picker empty offense throws
+    [OK]
+  Sub-check 5: stealer picker guards favored (PG > C)
+    PG=34.01%  SG=29.79%  SF=21.28%  PF=10.14%  C=4.77%
+    [OK]
+  Sub-check 6: stealer picker post floor holds (C > 0.02)
+    C=4.77%
+    [OK]
+  Sub-check 7: stealer picker Steals tilt within perimeter (PG > SF)
+    PG=34.15%  SF=21.20%
+    [OK]
+  Sub-check 8: stealer picker same seed ΓåÆ identical sequence
+    [OK]
+  Sub-check 9: stealer picker empty defense throws
+    [OK]
+  Governor run invariants (Phase 34):
+    [OK] Invariant A: all 1 team-violation possessions have null TurnoverOffSlot
+    [OK] Invariant B: all 8 live-ball turnover possessions have non-null StealerSlot
+    [OK] Invariant C: all 125 non-live-ball possessions have null StealerSlot
+
+  Phase 34 turnover attribution check: PASSED
+
+--- Phase 35: defensive rebounder picker (DefensiveRebounderPicker) + on-walk attribution ---
+  Sub-check 1: defensive picker bigs favored (C > PG, PF > SF)
+    PG=9.83%  SG=12.38%  SF=16.55%  PF=27.50%  C=33.73%
+    [OK]
+  Sub-check 2: defensive picker guard floor holds (PG > 1%)
+    PG share=10.04%  (bound: > 1%)
+    [OK]
+  Sub-check 3: wingspan tilt ΓÇö long-armed defender > short-armed identical teammate
+    short-arm (wingspan=50) share=19.60%  long-arm (wingspan=70) share=21.74%
+    [OK]
+  Sub-check 4: same seed ΓåÆ identical sequence
+    [OK]
+  Sub-check 5: empty defense throws
+    [OK]
+  Sub-check 6: defensive and offensive share ordering agree (same roster, no nerf)
+    ORB shares: s1=9.0%  s2=16.7%  s3=28.8%  s4=36.5%  s5=9.0%
+    DRB shares: s1=9.1%  s2=16.9%  s3=29.0%  s4=35.9%  s5=9.1%
+    [OK] dominant slot leads on both sides; shares agree within 3%
+  Governor run invariants (Phase 35):
+    [OK] Invariant A: all 46 DefensiveRebound possessions have non-null DefensiveRebounderSlot
+    [OK] Invariant B: all 91 non-DReb possessions have null DefensiveRebounderSlot
+
+  Phase 35 defensive rebound check: PASSED
+
+--- Phase 36: blocker picker (BlockerPicker) + on-walk attribution ---
+  Sub-check 1: zone-aware direction (Rim) ΓÇö rim protector leads at Rim zone
+    RimProtector(s1)=24.07%  others=19.06%/18.89%/19.05%/18.93%
+    [OK]
+  Sub-check 2: zone-aware direction (Three) ΓÇö perimeter defender leads at Three zone
+    PerimDefender(s1)=24.16%  others=18.89%/18.83%/19.14%/18.97%
+    [OK]
+  Sub-check 3: Wingspan meaningful at all zones (Wingspan=85 > Wingspan=50 at every zone)
+    Rim: wingspan85=22.31% > wingspan50=19.30%  [OK]
+    Short: wingspan85=22.40% > wingspan50=19.66%  [OK]
+    Mid: wingspan85=22.57% > wingspan50=18.91%  [OK]
+    Long: wingspan85=22.97% > wingspan50=19.29%  [OK]
+    Three: wingspan85=23.29% > wingspan50=19.02%  [OK]
+    [OK] all zones
+  Sub-check 4: floor holds ΓÇö guard gets nonzero share in big-dominant lineup
+    guard share at Rim=9.13%  Three=15.10%  (both must be > 0)
+    [OK]
+  Sub-check 5: same seed ΓåÆ identical sequence
+    [OK]
+  Sub-check 6: empty defense throws
+    [OK]
+  Sub-check 7: null ShotType fallback ΓÇö no throw, result matches Rim zone
+    [OK] null ShotType ΓåÆ Rim fallback; results identical to explicit Rim
+  Governor run invariants (Phase 36):
+    [OK] Invariant A: all 6 block possessions have BlkBySlot.Total == BlkCount
+    [OK] Invariant B: all 123 non-block possessions have BlkBySlot default (all zeros)
+
+  Phase 36 blocker check: PASSED
+
 === OBSERVATION RUN ΓÇö frozen-corpus-v1 ===
-  config hash:      fb5c0ebae15d26e33f2e4fb4902673641c215759af54553f5670f985ae667127
+  config hash:      e48085ff2196764bcca5512258050a4beb3609f8af74c767fd5acb8e8b46ec26
   corpus:           frozen-corpus-v1  (seeds 1..1000; rosters: Marcus Webb/DeShawn Pryor/Trey Holloway/Javon Okafor/Cory Baptiste vs Kendrick Shaw/Rashid Monroe/Antoine Dupree/Darius Eze/Malik Thornton)
   sample size:      1000 games
   strategy/context: home-press=1.0  away-press=1.0  halves=2  half=1200s
@@ -1191,124 +1396,124 @@
   Mechanics:  ALL OK ΓÇö scoring reconciled, count invariant held, zero parks, no throws
 
 --- PACE (total possessions per game) ---
-    Total                                  mean=  132.1  sd=  4.0  min=  120  max=  146
-    Home                                   mean=   66.4  sd=  2.1  min=   60  max=   74
-    Away                                   mean=   65.7  sd=  2.0  min=   60  max=   72
+    Total                                  mean=  132.2  sd=  4.0  min=  121  max=  143
+    Home                                   mean=   66.5  sd=  2.0  min=   61  max=   72
+    Away                                   mean=   65.7  sd=  2.1  min=   60  max=   71
     NoShot (end-of-half, per game)         mean=    0.2  sd=  0.4  min=    0  max=    2
   Distribution (total):
     [ 90,100)      0.0%  (0)
     [100,110)      0.0%  (0)
     [110,120)      0.0%  (0)
-    [120,130)     27.6%  (276)
-    [130,140)     69.3%  (693)
-    [140,150)      3.1%  (31)
+    [120,130)     25.5%  (255)
+    [130,140)     71.5%  (715)
+    [140,150)      3.0%  (30)
     [150,160)      0.0%  (0)
 
 --- PPP (points per possession) ---
-    Home                                   mean= 1.0860  sd=0.1365  min= 0.7121  max= 1.4769
-    Away                                   mean= 1.0641  sd=0.1420  min= 0.5625  max= 1.5692
-    Combined                               mean= 1.0750  sd=0.0929  min= 0.7302  max= 1.4015
+    Home                                   mean= 1.1008  sd=0.1375  min= 0.6364  max= 1.6000
+    Away                                   mean= 1.0937  sd=0.1358  min= 0.7313  max= 1.4493
+    Combined                               mean= 1.0971  sd=0.0908  min= 0.7955  max= 1.3636
   Distribution (combined):
     [0.5,0.7)      0.0%  (0)
-    [0.7,0.9)      3.0%  (30)
-    [0.9,1.1)     57.9%  (579)
-    [1.1,1.3)     38.5%  (385)
-    [1.3,1.5)      0.6%  (6)
+    [0.7,0.9)      1.2%  (12)
+    [0.9,1.1)     49.9%  (499)
+    [1.1,1.3)     47.7%  (477)
+    [1.3,1.5)      1.2%  (12)
 
 --- SCORE & MARGIN ---
-    Home score                             mean=   72.1  sd=  9.3  min=   47  max=  103
-    Away score                             mean=   69.9  sd=  9.5  min=   36  max=  103
-    Margin (HomeΓêÆAway)                     mean=    2.3  sd= 13.6  min=  -46  max=   41
+    Home score                             mean=   73.2  sd=  9.4  min=   42  max=  104
+    Away score                             mean=   71.9  sd=  9.3  min=   47  max=  100
+    Margin (HomeΓêÆAway)                     mean=    1.3  sd= 13.4  min=  -40  max=   45
 
 --- TRANSITION FREQUENCY (Transition entries / total possessions) ---
-    Transition freq                        mean= 0.3383  sd=0.0414  min= 0.2279  max= 0.4769
+    Transition freq                        mean= 0.3338  sd=0.0410  min= 0.1985  max= 0.4646
 
 --- TERMINAL MIX (fractions across all possessions all games) ---
-  Made-FG                0.3687  (48,711)
-  FT-made                0.1121  (14,807)
-  DefensiveRebound       0.2756  (36,414)
-  Turnover               0.1957  (25,854)
-  OOB                    0.0256  (3,387)
-  JumpBall               0.0205  (2,714)
-  NoShot                 0.0017  (228)
+  Made-FG                0.3744  (49,479)
+  FT-made                0.1117  (14,759)
+  DefensiveRebound       0.2709  (35,806)
+  Turnover               0.1956  (25,845)
+  OOB                    0.0249  (3,290)
+  JumpBall               0.0207  (2,735)
+  NoShot                 0.0018  (237)
   Parked                 0.0000  (0)
   Other                  0.0000  (0)
 
 --- END-OF-HALF INTENT (counts per game) ---
     HoldShootLast                          mean=    1.5  sd=  0.6  min=    0  max=    2
-    ShootEarly                             mean=    0.4  sd=  0.7  min=    0  max=    3
+    ShootEarly                             mean=    0.5  sd=  0.7  min=    0  max=    3
     NoShot                                 mean=    0.2  sd=  0.4  min=    0  max=    2
 
 --- APL (avg possession length, seconds) ---
-    APL                                    mean=18.1827  sd=0.5517  min=16.4384  max=20.0000
+    APL                                    mean=18.1777  sd=0.5510  min=16.7832  max=19.8347
 
 --- FOULS PER TEAM PER GAME ---
-    Home fouls                             mean=   11.3  sd=  3.2  min=    3  max=   21
-    Away fouls                             mean=   11.1  sd=  3.2  min=    1  max=   22
+    Home fouls                             mean=   11.2  sd=  3.2  min=    2  max=   24
+    Away fouls                             mean=   11.4  sd=  3.2  min=    1  max=   21
 
 --- SHOOTING SPLITS ---
   FG%:
-      Home                                 mean= 0.5223  sd=0.0693  min= 0.3200  max= 0.6964
-      Away                                 mean= 0.4947  sd=0.0687  min= 0.2600  max= 0.7551
-      Combined                             mean= 0.5083  sd=0.0478  min= 0.3069  max= 0.6635
+      Home                                 mean= 0.5191  sd=0.0696  min= 0.2857  max= 0.7143
+      Away                                 mean= 0.5213  sd=0.0682  min= 0.3095  max= 0.7447
+      Combined                             mean= 0.5199  sd=0.0481  min= 0.3444  max= 0.6632
   Distribution (FG% combined):
     [0.2,0.3)      0.0%  (0)
     [0.3,0.3)      0.1%  (1)
-    [0.3,0.4)      1.6%  (16)
-    [0.4,0.5)      9.7%  (97)
-    [0.5,0.5)     29.3%  (293)
-    [0.5,0.6)     38.6%  (386)
-    [0.6,0.6)     17.9%  (179)
-    >=0.6        2.8%  (28)
+    [0.3,0.4)      0.4%  (4)
+    [0.4,0.5)      6.3%  (63)
+    [0.5,0.5)     26.6%  (266)
+    [0.5,0.6)     39.8%  (398)
+    [0.6,0.6)     21.3%  (213)
+    >=0.6        5.5%  (55)
   3P%:  (games with zero 3PA report 0.0 ΓÇö possible in principle)
-      Home                                 mean= 0.4555  sd=0.1774  min= 0.0000  max= 1.0000
-      Away                                 mean= 0.4064  sd=0.1416  min= 0.0000  max= 0.8571
-      Combined                             mean= 0.4265  sd=0.1043  min= 0.0556  max= 0.7500
+      Home                                 mean= 0.4388  sd=0.1474  min= 0.0000  max= 1.0000
+      Away                                 mean= 0.4300  sd=0.1485  min= 0.0000  max= 1.0000
+      Combined                             mean= 0.4352  sd=0.1005  min= 0.1481  max= 0.7600
   FT%:
-      Home                                 mean= 0.7333  sd=0.1103  min= 0.2222  max= 1.0000
-      Away                                 mean= 0.7013  sd=0.1159  min= 0.1818  max= 1.0000
-      Combined                             mean= 0.7182  sd=0.0747  min= 0.4444  max= 0.9545
+      Home                                 mean= 0.7095  sd=0.1101  min= 0.3000  max= 1.0000
+      Away                                 mean= 0.6941  sd=0.1125  min= 0.1538  max= 1.0000
+      Combined                             mean= 0.7017  sd=0.0755  min= 0.4400  max= 0.9200
   Distribution (FT% combined):
-    [0.4,0.5)      0.7%  (7)
-    [0.5,0.6)      4.9%  (49)
-    [0.6,0.7)     33.6%  (336)
-    [0.7,0.8)     48.3%  (483)
-    [0.8,0.9)     11.3%  (113)
-    >=0.9        1.2%  (12)
+    [0.4,0.5)      0.3%  (3)
+    [0.5,0.6)      8.3%  (83)
+    [0.6,0.7)     37.9%  (379)
+    [0.7,0.8)     44.3%  (443)
+    [0.8,0.9)      8.9%  (89)
+    >=0.9        0.3%  (3)
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
 
 --- SHOT MIX ---
-    3PA rate (3PA/FGA, combined)           mean= 0.2115  sd=0.0388  min= 0.0935  max= 0.3302
+    3PA rate (3PA/FGA, combined)           mean= 0.2349  sd=0.0432  min= 0.1009  max= 0.3882
 
 --- SHOOTING BY ZONE (combined, per game) ---
   FG% by zone:
-      Rim                                  mean= 0.6439  sd=0.0885  min= 0.3333  max= 0.9474
-      Short                                mean= 0.4951  sd=0.1174  min= 0.0556  max= 0.8462
-      Mid                                  mean= 0.4376  sd=0.1156  min= 0.1000  max= 0.7778
-      Long                                 mean= 0.4351  sd=0.1466  min= 0.0000  max= 1.0000
-      Three                                mean= 0.4265  sd=0.1043  min= 0.0556  max= 0.7500
+      Rim                                  mean= 0.6543  sd=0.0877  min= 0.3125  max= 0.8947
+      Short                                mean= 0.4975  sd=0.1281  min= 0.1111  max= 0.9167
+      Mid                                  mean= 0.4551  sd=0.1226  min= 0.1250  max= 0.8667
+      Long                                 mean= 0.4348  sd=0.1646  min= 0.0000  max= 1.0000
+      Three                                mean= 0.4352  sd=0.1005  min= 0.1481  max= 0.7600
   Attempt share by zone (fraction of FGA from each zone):
-      Rim                                  mean= 0.3045  sd=0.0438  min= 0.1565  max= 0.4423
-      Short                                mean= 0.1782  sd=0.0374  min= 0.0598  max= 0.3048
-      Mid                                  mean= 0.1861  sd=0.0376  min= 0.0619  max= 0.3107
-      Long                                 mean= 0.1196  sd=0.0319  min= 0.0206  max= 0.2294
-      Three                                mean= 0.2115  sd=0.0388  min= 0.0935  max= 0.3302
+      Rim                                  mean= 0.3248  sd=0.0475  min= 0.1531  max= 0.4688
+      Short                                mean= 0.1652  sd=0.0362  min= 0.0543  max= 0.3019
+      Mid                                  mean= 0.1704  sd=0.0375  min= 0.0625  max= 0.3030
+      Long                                 mean= 0.1047  sd=0.0304  min= 0.0288  max= 0.2021
+      Three                                mean= 0.2349  sd=0.0432  min= 0.1009  max= 0.3882
 
 --- USAGE (per-slot FGA share, aggregate across all games) ---
-  Home: Slot1=18.3%  Slot2=48.7%  Slot3=12.5%  Slot4=9.9%  Slot5=10.4%  Unattr=0.2%
-  Away: Slot1=18.0%  Slot2=49.7%  Slot3=12.4%  Slot4=9.4%  Slot5=10.3%  Unattr=0.2%
+  Home: Slot1=21.8%  Slot2=27.3%  Slot3=23.7%  Slot4=14.1%  Slot5=12.8%  Unattr=0.2%
+  Away: Slot1=20.6%  Slot2=27.3%  Slot3=24.5%  Slot4=15.2%  Slot5=12.1%  Unattr=0.3%
   Per-slot FG% (SlotFgm / SlotFga):
-  Home: Slot1=51.3%  Slot2=51.6%  Slot3=51.3%  Slot4=56.5%  Slot5=53.7%
-  Away: Slot1=51.2%  Slot2=44.9%  Slot3=54.2%  Slot4=56.5%  Slot5=55.8%
+  Home: Slot1=49.7%  Slot2=52.6%  Slot3=49.6%  Slot4=57.1%  Slot5=52.3%
+  Away: Slot1=50.9%  Slot2=50.9%  Slot3=50.4%  Slot4=56.9%  Slot5=54.0%
   NOTE: per-slot, not per-player ΓÇö valid while lineups are fixed. Unattr = bonus-FT putbacks (Roll E never ran).
 
 --- ORB% (offensive rebound rate, FG-miss + block + FT misses combined) ---
-    Combined                               mean= 0.2780  sd=0.0627  min= 0.0811  max= 0.5000
+    Combined                               mean= 0.2797  sd=0.0635  min= 0.1000  max= 0.5098
 
 --- FTr (free-throw rate = FTA/FGA, combined) ---
-    Combined                               mean= 0.3879  sd=0.1162  min= 0.0965  max= 0.8276
+    Combined                               mean= 0.4008  sd=0.1150  min= 0.1368  max= 0.8675
 
 --- DEFERRED SENTINELS (counter-plumbing needed ΓÇö future session) ---
   Press frequency / break rate at game level
@@ -1317,9 +1522,9 @@
   [OK] Same-seed reproducibility confirmed.
 
   Phase 25 shooting-foul summary (1,000 games):
-    Seed-1 game ΓÇö Home defense events: 4, Away defense events: 3
-    Slot-0 events (bonus-FT putback, expected small): 1
-    Total SFL credits across all 1,000 games: 11604
+    Seed-1 game ΓÇö Home defense events: 8, Away defense events: 4
+    Slot-0 events (bonus-FT putback, expected small): 0
+    Total SFL credits across all 1,000 games: 11891
   [OK] Phase 25: SFL credits populated (full per-side invariant in Phase25ShootingFoulAttributionCheck).
 
 === PER-PLAYER BOX SCORE (per-game averages, 1000 games) ===
@@ -1328,16 +1533,16 @@
   SFL = shooting fouls committed; excludes all non-shooting and offensive fouls.
   Player                   PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [Home] Marcus Webb      12.5   9.4   4.8  51.3   2.6   1.1  43.5   2.4   1.8  73.6   1.1   3.0   4.1   1.1   0.5   2.8   0.9
-  [Home] DeShawn Pryor    32.1  24.9  12.8  51.6   2.0   0.9  46.0   6.9   5.5  79.7   1.3   3.5   4.8   0.9   0.5   4.4   1.7
-  [Home] Trey Holloway     8.2   6.4   3.3  51.3   1.3   0.5  38.6   1.7   1.1  65.1   1.5   4.2   5.6   0.8   0.6   2.0   1.0
-  [Home] Javon Okafor      6.9   5.1   2.9  56.5   0.2   0.1  34.6   2.0   1.1  55.3   1.8   5.0   6.9   0.6   0.7   1.6   1.3
-  [Home] Cory Baptiste     8.0   5.3   2.8  53.7   2.5   1.3  52.6   1.1   1.0  85.7   1.2   3.2   4.4   0.9   0.5   1.7   0.6
-  [Away] Kendrick Shaw    12.3   9.3   4.8  51.2   2.4   1.0  41.9   2.5   1.7  70.2   1.0   2.7   3.8   1.0   0.5   2.6   0.9
-  [Away] Rashid Monroe    29.3  25.6  11.5  44.9   6.7   2.3  33.8   5.8   4.0  68.8   1.3   3.3   4.7   0.9   0.6   4.2   2.1
-  [Away] Antoine Dupree    8.7   6.4   3.5  54.2   1.2   0.5  43.5   1.7   1.2  72.5   1.5   3.7   5.3   0.8   0.7   1.9   1.1
-  [Away] Darius Eze        6.7   4.8   2.7  56.5   0.2   0.1  28.0   2.0   1.2  57.7   2.1   4.8   7.0   0.6   0.9   1.5   1.6
-  [Away] Malik Thornton    8.3   5.3   3.0  55.8   2.7   1.5  56.3   1.0   0.9  88.3   1.2   2.9   4.1   0.8   0.6   1.8   0.6
+  [Home] Marcus Webb      14.6  11.2   5.6  49.7   3.2   1.4  42.0   2.9   2.1  74.2   0.6   2.1   2.6   1.2   0.5   2.8   1.0
+  [Home] DeShawn Pryor    19.2  14.0   7.4  52.6   3.0   1.3  45.1   3.9   3.1  79.8   1.0   2.9   3.8   0.9   0.6   2.7   1.3
+  [Home] Trey Holloway    15.1  12.2   6.0  49.6   2.6   1.0  38.2   3.2   2.0  64.8   1.9   4.5   6.3   0.7   0.7   2.3   1.4
+  [Home] Javon Okafor     10.0   7.2   4.1  57.1   0.3   0.1  30.8   3.0   1.6  54.4   2.9   6.4   9.3   0.4   0.9   1.4   1.7
+  [Home] Cory Baptiste     9.6   6.6   3.4  52.3   3.2   1.6  51.7   1.3   1.1  85.0   0.8   2.1   2.8   0.9   0.5   1.8   0.7
+  [Away] Kendrick Shaw    13.7  10.5   5.3  50.9   2.7   1.1  42.5   2.7   1.9  70.0   0.5   1.9   2.5   1.3   0.5   2.7   1.0
+  [Away] Rashid Monroe    17.7  13.9   7.1  50.9   3.0   1.0  34.9   3.7   2.5  67.5   1.1   3.2   4.4   0.9   0.6   2.8   1.4
+  [Away] Antoine Dupree   15.9  12.5   6.3  50.4   2.6   1.1  40.9   3.2   2.3  71.4   1.7   4.3   6.0   0.7   0.7   2.3   1.4
+  [Away] Darius Eze       10.7   7.7   4.4  56.9   0.3   0.1  34.7   3.1   1.8  59.6   3.0   6.6   9.5   0.3   0.8   1.4   1.6
+  [Away] Malik Thornton    9.3   6.2   3.3  54.0   3.1   1.7  53.4   1.1   1.0  87.4   0.6   1.9   2.5   0.9   0.5   1.8   0.6
 === END PER-PLAYER BOX SCORE ===
 
   ALL CHECKS PASSED
@@ -1376,53 +1581,53 @@
     Boards:   OffensiveRebounding=44  DefensiveRebounding=41
 
   validGames=500/500
-  Team A wins: 243/500 = 48.6%
-  Team B wins: 240/500 = 48.0%
-  Ties:        17/500 = 3.4%
-  Physical home win rate: 50.2%  (side-neutrality diagnostic)
-  Team A score: mean=64.8  sd=9.6  min=39  max=96
-  Team B score: mean=64.5  sd=9.7  min=38  max=100
-  Margin (A-B): mean=0.3  sd=13.5
-  PPP Team A: agg=0.997  mean-game=0.997  sd=0.143
-  PPP Team B: agg=0.992  mean-game=0.992  sd=0.145
-  FG%  Team A: agg=43.9%  mean-game=44.0%  sd=6.9%
-  FG%  Team B: agg=43.8%  mean-game=43.8%  sd=7.0%
-  3P%  Team A: agg=35.7%  mean-game=35.6%  sd=13.5%
-  3P%  Team B: agg=35.5%  mean-game=35.4%  sd=13.4%
-  FT%  Team A: agg=71.8%  mean-game=71.8%  sd=11.4%
-  FT%  Team B: agg=72.2%  mean-game=71.9%  sd=11.9%
+  Team A wins: 227/500 = 45.4%
+  Team B wins: 257/500 = 51.4%
+  Ties:        16/500 = 3.2%
+  Physical home win rate: 52.8%  (side-neutrality diagnostic)
+  Team A score: mean=63.7  sd=9.3  min=39  max=94
+  Team B score: mean=64.3  sd=9.1  min=36  max=88
+  Margin (A-B): mean=-0.7  sd=12.8
+  PPP Team A: agg=0.978  mean-game=0.979  sd=0.141
+  PPP Team B: agg=0.990  mean-game=0.990  sd=0.136
+  FG%  Team A: agg=43.1%  mean-game=43.2%  sd=7.0%
+  FG%  Team B: agg=43.5%  mean-game=43.5%  sd=7.0%
+  3P%  Team A: agg=35.1%  mean-game=35.2%  sd=14.1%
+  3P%  Team B: agg=34.2%  mean-game=34.3%  sd=13.2%
+  FT%  Team A: agg=72.3%  mean-game=71.8%  sd=12.4%
+  FT%  Team B: agg=72.2%  mean-game=72.2%  sd=11.9%
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
-  3PA rate  Team A: 25.9%  Team B: 26.1%
-  Shot mix Team A: Rim=29% Short=19% Mid=13% Long=13% Three=26%
-  Shot mix Team B: Rim=30% Short=18% Mid=12% Long=14% Three=26%
-  Usage Team A: Slot1=16.8% Slot2=22.0% Slot3=19.8% Slot4=22.1% Slot5=19.1% Unattr=0.2%
-  Usage Team B: Slot1=16.0% Slot2=22.1% Slot3=20.4% Slot4=21.7% Slot5=19.6% Unattr=0.2%
-  Slot FG% Team A: Slot1=41.1% Slot2=43.6% Slot3=42.1% Slot4=44.2% Slot5=48.2%
-  Slot FG% Team B: Slot1=42.4% Slot2=42.3% Slot3=41.7% Slot4=44.1% Slot5=48.2%
-  ORB%  Team A: 29.2%  Team B: 29.7%
-  FTr   Team A: 0.351  Team B: 0.363
-  Transition Team A: 37.5%  Team B: 37.6%
-  Pace (total poss/game): 130.1
-  Between-variant:  Team A win-rate range: min=42%  max=56%
-  Between-variant:  Team B PPP range: min=0.969  max=1.012
+  3PA rate  Team A: 26.5%  Team B: 26.3%
+  Shot mix Team A: Rim=30% Short=18% Mid=13% Long=13% Three=27%
+  Shot mix Team B: Rim=30% Short=19% Mid=12% Long=13% Three=26%
+  Usage Team A: Slot1=17.0% Slot2=22.4% Slot3=20.0% Slot4=21.6% Slot5=18.9% Unattr=0.2%
+  Usage Team B: Slot1=15.6% Slot2=22.4% Slot3=20.3% Slot4=22.0% Slot5=19.7% Unattr=0.2%
+  Slot FG% Team A: Slot1=40.2% Slot2=41.6% Slot3=41.3% Slot4=43.9% Slot5=48.3%
+  Slot FG% Team B: Slot1=42.2% Slot2=42.3% Slot3=41.1% Slot4=44.4% Slot5=47.4%
+  ORB%  Team A: 29.4%  Team B: 29.6%
+  FTr   Team A: 0.348  Team B: 0.353
+  Transition Team A: 38.0%  Team B: 38.0%
+  Pace (total poss/game): 130.0
+  Between-variant:  Team A win-rate range: min=26%  max=60%
+  Between-variant:  Team B PPP range: min=0.934  max=1.028
 
 === COHORT BOX SCORE ΓÇö Bucket 1: AverageVsAverage ===
   Rows pool 10 generated roster variants. Each row is the per-game average
   for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
   Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [A] Slot1 ΓÇö PassFirstGuard   9.2   8.9   3.7  41.1   1.7   0.5  27.6   2.1   1.4  66.6   1.3   3.2   4.5   1.0   0.5   2.5   0.8
-  [A] Slot2 ΓÇö PerimeterShooter  13.9  11.7   5.1  43.6   4.8   1.9  39.7   2.4   1.8  74.4   1.1   2.9   4.0   1.0   0.5   2.4   0.8
-  [A] Slot3 ΓÇö ThreeAndDWing  12.1  10.5   4.4  42.1   4.2   1.7  39.2   2.1   1.6  74.8   1.9   4.4   6.3   0.9   0.6   2.3   0.9
-  [A] Slot4 ΓÇö PostScorer  13.4  11.7   5.2  44.2   1.7   0.5  30.2   3.2   2.6  78.8   2.1   4.6   6.7   0.5   0.7   2.7   1.5
-  [A] Slot5 ΓÇö RimRunner   12.2  10.1   4.9  48.2   1.4   0.4  27.4   3.0   2.0  66.5   2.0   5.1   7.1   0.8   0.8   2.1   1.3
-  [B] Slot1 ΓÇö PassFirstGuard   9.0   8.4   3.5  42.4   1.4   0.4  28.4   2.2   1.5  67.7   1.4   3.4   4.7   0.9   0.5   2.4   0.9
-  [B] Slot2 ΓÇö PerimeterShooter  13.3  11.6   4.9  42.3   4.6   1.8  38.2   2.3   1.7  75.0   1.1   2.8   3.9   1.0   0.5   2.5   0.9
-  [B] Slot3 ΓÇö ThreeAndDWing  12.2  10.7   4.5  41.7   4.4   1.7  39.1   2.2   1.6  73.6   1.9   4.3   6.1   0.8   0.6   2.4   0.8
-  [B] Slot4 ΓÇö PostScorer  13.3  11.4   5.0  44.1   1.9   0.6  32.5   3.3   2.6  79.5   2.1   5.0   7.1   0.6   0.7   2.6   1.4
-  [B] Slot5 ΓÇö RimRunner   12.3  10.3   4.9  48.2   1.4   0.4  26.4   3.1   2.0  64.2   2.1   5.0   7.1   0.7   0.8   2.3   1.4
+  [A] Slot1 ΓÇö PassFirstGuard   9.2   9.0   3.6  40.2   1.7   0.5  28.7   2.2   1.5  66.8   1.2   3.5   4.7   1.0   0.6   2.3   0.9
+  [A] Slot2 ΓÇö PerimeterShooter  13.6  11.8   4.9  41.6   4.9   1.9  38.4   2.5   1.9  77.2   0.8   2.4   3.2   1.0   0.5   2.4   0.8
+  [A] Slot3 ΓÇö ThreeAndDWing  11.9  10.5   4.3  41.3   4.4   1.7  39.1   2.1   1.5  72.0   1.4   4.2   5.6   0.9   0.6   2.1   0.9
+  [A] Slot4 ΓÇö PostScorer  13.0  11.4   5.0  43.9   1.6   0.5  28.0   3.2   2.5  79.6   2.5   4.4   6.9   0.6   0.7   2.2   1.4
+  [A] Slot5 ΓÇö RimRunner   11.9   9.9   4.8  48.3   1.4   0.4  26.4   3.0   2.0  66.0   2.5   6.0   8.6   0.7   0.7   2.0   1.4
+  [B] Slot1 ΓÇö PassFirstGuard   9.0   8.2   3.5  42.2   1.5   0.4  28.3   2.3   1.6  69.8   1.3   3.5   4.8   1.0   0.5   2.4   0.9
+  [B] Slot2 ΓÇö PerimeterShooter  13.6  11.8   5.0  42.3   4.8   1.8  37.4   2.4   1.8  75.2   0.8   2.4   3.2   1.0   0.5   2.2   0.9
+  [B] Slot3 ΓÇö ThreeAndDWing  12.0  10.7   4.4  41.1   4.3   1.6  37.4   2.1   1.5  74.9   1.5   3.7   5.2   0.8   0.6   2.0   0.9
+  [B] Slot4 ΓÇö PostScorer  13.3  11.6   5.2  44.4   1.8   0.5  29.0   3.1   2.5  79.2   2.6   4.4   7.0   0.6   0.7   2.2   1.4
+  [B] Slot5 ΓÇö RimRunner   12.3  10.4   4.9  47.4   1.5   0.4  27.1   3.2   2.1  64.3   2.5   6.5   9.0   0.7   0.8   2.0   1.3
 === END COHORT BOX SCORE ΓÇö Bucket 1 ===
 
 --- BUCKET 2: EliteVsWeak ---
@@ -1444,53 +1649,53 @@
     Boards:   OffensiveRebounding=31  DefensiveRebounding=30
 
   validGames=500/500
-  Team A wins: 497/500 = 99.4%
-  Team B wins: 2/500 = 0.4%
+  Team A wins: 499/500 = 99.8%
+  Team B wins: 0/500 = 0.0%
   Ties:        1/500 = 0.2%
-  Physical home win rate: 49.4%  (side-neutrality diagnostic)
-  Team A score: mean=82.3  sd=9.9  min=55  max=110
-  Team B score: mean=49.7  sd=9.2  min=20  max=77
-  Margin (A-B): mean=32.6  sd=12.9
-  PPP Team A: agg=1.260  mean-game=1.261  sd=0.151
-  PPP Team B: agg=0.762  mean-game=0.761  sd=0.139
-  FG%  Team A: agg=56.7%  mean-game=56.8%  sd=7.2%
-  FG%  Team B: agg=32.3%  mean-game=32.3%  sd=6.8%
-  3P%  Team A: agg=49.8%  mean-game=49.6%  sd=13.8%
-  3P%  Team B: agg=24.0%  mean-game=24.1%  sd=12.5%
-  FT%  Team A: agg=72.0%  mean-game=71.9%  sd=10.9%
-  FT%  Team B: agg=72.0%  mean-game=71.5%  sd=11.8%
+  Physical home win rate: 49.8%  (side-neutrality diagnostic)
+  Team A score: mean=85.0  sd=9.5  min=57  max=125
+  Team B score: mean=47.1  sd=8.6  min=23  max=77
+  Margin (A-B): mean=37.9  sd=13.0
+  PPP Team A: agg=1.300  mean-game=1.301  sd=0.144
+  PPP Team B: agg=0.721  mean-game=0.721  sd=0.130
+  FG%  Team A: agg=56.5%  mean-game=56.6%  sd=6.6%
+  FG%  Team B: agg=31.7%  mean-game=31.8%  sd=6.9%
+  3P%  Team A: agg=49.8%  mean-game=50.2%  sd=13.6%
+  3P%  Team B: agg=24.3%  mean-game=24.4%  sd=12.6%
+  FT%  Team A: agg=72.5%  mean-game=72.3%  sd=11.3%
+  FT%  Team B: agg=71.1%  mean-game=71.1%  sd=10.9%
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
-  3PA rate  Team A: 26.8%  Team B: 25.3%
-  Shot mix Team A: Rim=30% Short=19% Mid=11% Long=13% Three=27%
-  Shot mix Team B: Rim=27% Short=20% Mid=12% Long=15% Three=25%
-  Usage Team A: Slot1=16.3% Slot2=22.6% Slot3=22.1% Slot4=20.4% Slot5=18.3% Unattr=0.3%
-  Usage Team B: Slot1=15.2% Slot2=22.3% Slot3=21.3% Slot4=20.7% Slot5=20.3% Unattr=0.2%
-  Slot FG% Team A: Slot1=53.4% Slot2=59.0% Slot3=55.6% Slot4=53.1% Slot5=62.5%
-  Slot FG% Team B: Slot1=32.2% Slot2=32.6% Slot3=29.8% Slot4=31.6% Slot5=35.1%
-  ORB%  Team A: 40.4%  Team B: 20.5%
-  FTr   Team A: 0.363  Team B: 0.379
-  Transition Team A: 46.6%  Team B: 27.6%
-  Pace (total poss/game): 130.6
+  3PA rate  Team A: 26.6%  Team B: 25.6%
+  Shot mix Team A: Rim=31% Short=19% Mid=10% Long=13% Three=27%
+  Shot mix Team B: Rim=26% Short=21% Mid=13% Long=15% Three=26%
+  Usage Team A: Slot1=15.7% Slot2=22.8% Slot3=21.9% Slot4=21.1% Slot5=18.0% Unattr=0.5%
+  Usage Team B: Slot1=15.3% Slot2=22.0% Slot3=21.1% Slot4=20.7% Slot5=20.8% Unattr=0.1%
+  Slot FG% Team A: Slot1=52.0% Slot2=58.5% Slot3=56.0% Slot4=53.6% Slot5=62.1%
+  Slot FG% Team B: Slot1=32.1% Slot2=32.7% Slot3=28.2% Slot4=31.1% Slot5=34.5%
+  ORB%  Team A: 48.9%  Team B: 12.7%
+  FTr   Team A: 0.366  Team B: 0.373
+  Transition Team A: 48.8%  Team B: 25.4%
+  Pace (total poss/game): 130.7
   Between-variant:  Team A win-rate range: min=98%  max=100%
-  Between-variant:  Team B PPP range: min=0.706  max=0.799
+  Between-variant:  Team B PPP range: min=0.692  max=0.746
 
 === COHORT BOX SCORE ΓÇö Bucket 2: EliteVsWeak ===
   Rows pool 10 generated roster variants. Each row is the per-game average
   for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
   Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [A] Slot1 ΓÇö PassFirstGuard  11.6   8.8   4.7  53.4   1.3   0.5  41.6   2.3   1.7  73.0   1.6   4.2   5.9   1.0   0.9   2.4   0.7
-  [A] Slot2 ΓÇö PerimeterShooter  19.6  12.1   7.2  59.0   5.1   3.0  58.0   3.0   2.3  76.2   1.2   3.6   4.8   1.0   0.8   2.4   0.6
-  [A] Slot3 ΓÇö ThreeAndDWing  17.7  11.9   6.6  55.6   5.0   2.6  53.2   2.5   1.9  75.2   2.0   5.8   7.8   0.9   1.3   2.3   0.8
-  [A] Slot4 ΓÇö PostScorer  14.8  11.0   5.8  53.1   1.7   0.5  32.1   3.7   2.6  69.1   2.3   6.1   8.4   0.6   1.3   2.5   1.4
-  [A] Slot5 ΓÇö RimRunner   14.9   9.9   6.2  62.5   1.3   0.5  35.9   3.1   2.1  70.0   2.4   6.6   8.9   0.7   1.5   2.1   1.4
-  [B] Slot1 ΓÇö PassFirstGuard   6.6   7.7   2.5  32.2   1.5   0.3  19.5   1.9   1.3  70.6   1.1   2.4   3.5   0.8   0.3   2.7   1.1
-  [B] Slot2 ΓÇö PerimeterShooter  10.3  11.3   3.7  32.6   4.7   1.3  27.2   2.2   1.6  71.2   0.8   1.8   2.7   0.9   0.4   2.5   1.1
-  [B] Slot3 ΓÇö ThreeAndDWing   9.2  10.8   3.2  29.8   4.6   1.1  24.4   2.2   1.6  73.0   1.6   3.2   4.8   0.9   0.5   2.3   1.1
-  [B] Slot4 ΓÇö PostScorer   9.0  10.5   3.3  31.6   1.1   0.2  17.8   3.0   2.2  73.1   1.6   3.2   4.8   0.6   0.4   2.6   1.7
-  [B] Slot5 ΓÇö RimRunner    9.8  10.3   3.6  35.1   0.9   0.2  19.3   3.5   2.4  69.3   1.6   3.4   5.1   0.6   0.6   2.4   1.4
+  [A] Slot1 ΓÇö PassFirstGuard  11.4   8.7   4.5  52.0   1.3   0.5  38.9   2.5   1.9  72.6   1.6   4.3   5.9   1.0   0.9   2.4   0.7
+  [A] Slot2 ΓÇö PerimeterShooter  20.3  12.7   7.4  58.5   5.3   3.1  57.9   3.1   2.3  75.8   0.9   2.9   3.8   1.2   0.8   2.5   0.7
+  [A] Slot3 ΓÇö ThreeAndDWing  18.4  12.2   6.8  56.0   5.1   2.8  53.9   2.6   1.9  75.4   1.9   5.1   7.0   0.8   1.1   2.2   0.7
+  [A] Slot4 ΓÇö PostScorer  16.0  11.8   6.3  53.6   1.8   0.6  33.9   4.0   2.8  69.3   3.7   6.3   9.9   0.5   1.2   1.9   1.2
+  [A] Slot5 ΓÇö RimRunner   15.2  10.0   6.2  62.1   1.3   0.4  33.1   3.2   2.3  71.6   3.9   9.6  13.5   0.5   1.4   1.8   1.3
+  [B] Slot1 ΓÇö PassFirstGuard   6.4   7.5   2.4  32.1   1.4   0.3  22.3   1.8   1.3  72.0   0.6   2.2   2.8   0.8   0.4   2.3   1.1
+  [B] Slot2 ΓÇö PerimeterShooter   9.8  10.8   3.5  32.7   4.6   1.3  28.0   2.0   1.4  68.7   0.3   1.3   1.6   1.1   0.4   2.2   1.1
+  [B] Slot3 ΓÇö ThreeAndDWing   8.2  10.3   2.9  28.2   4.6   1.0  22.6   1.8   1.3  73.9   0.7   2.6   3.3   0.8   0.5   2.0   1.2
+  [B] Slot4 ΓÇö PostScorer   8.5  10.2   3.2  31.1   1.0   0.2  21.0   2.8   2.0  70.5   1.3   2.6   3.9   0.7   0.5   2.2   1.8
+  [B] Slot5 ΓÇö RimRunner    9.4  10.2   3.5  34.5   1.0   0.2  20.2   3.2   2.2  68.2   1.1   3.8   4.9   0.7   0.6   2.0   1.5
 === END COHORT BOX SCORE ΓÇö Bucket 2 ===
 
 --- BUCKET 3: EliteVsElite ---
@@ -1512,53 +1717,53 @@
     Boards:   OffensiveRebounding=63  DefensiveRebounding=58
 
   validGames=500/500
-  Team A wins: 238/500 = 47.6%
-  Team B wins: 242/500 = 48.4%
-  Ties:        20/500 = 4.0%
-  Physical home win rate: 53.0%  (side-neutrality diagnostic)
-  Team A score: mean=71.8  sd=9.7  min=47  max=108
-  Team B score: mean=72.0  sd=10.0  min=42  max=107
-  Margin (A-B): mean=-0.2  sd=13.9
-  PPP Team A: agg=1.092  mean-game=1.092  sd=0.142
-  PPP Team B: agg=1.093  mean-game=1.093  sd=0.150
-  FG%  Team A: agg=50.6%  mean-game=50.6%  sd=6.9%
-  FG%  Team B: agg=50.2%  mean-game=50.3%  sd=6.9%
-  3P%  Team A: agg=44.0%  mean-game=44.0%  sd=14.5%
-  3P%  Team B: agg=43.6%  mean-game=43.4%  sd=13.7%
-  FT%  Team A: agg=68.8%  mean-game=68.6%  sd=12.0%
-  FT%  Team B: agg=70.0%  mean-game=69.5%  sd=11.8%
+  Team A wins: 256/500 = 51.2%
+  Team B wins: 229/500 = 45.8%
+  Ties:        15/500 = 3.0%
+  Physical home win rate: 53.4%  (side-neutrality diagnostic)
+  Team A score: mean=72.0  sd=9.2  min=35  max=96
+  Team B score: mean=70.4  sd=9.2  min=43  max=98
+  Margin (A-B): mean=1.5  sd=13.1
+  PPP Team A: agg=1.094  mean-game=1.095  sd=0.138
+  PPP Team B: agg=1.070  mean-game=1.071  sd=0.139
+  FG%  Team A: agg=50.2%  mean-game=50.3%  sd=7.1%
+  FG%  Team B: agg=49.1%  mean-game=49.2%  sd=6.9%
+  3P%  Team A: agg=44.0%  mean-game=44.0%  sd=14.3%
+  3P%  Team B: agg=41.8%  mean-game=41.7%  sd=13.4%
+  FT%  Team A: agg=70.3%  mean-game=70.3%  sd=11.3%
+  FT%  Team B: agg=69.3%  mean-game=69.0%  sd=12.6%
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
-  3PA rate  Team A: 27.1%  Team B: 26.9%
-  Shot mix Team A: Rim=29% Short=19% Mid=13% Long=13% Three=27%
+  3PA rate  Team A: 27.3%  Team B: 27.3%
+  Shot mix Team A: Rim=28% Short=19% Mid=13% Long=13% Three=27%
   Shot mix Team B: Rim=29% Short=19% Mid=12% Long=13% Three=27%
-  Usage Team A: Slot1=15.6% Slot2=21.2% Slot3=21.7% Slot4=22.2% Slot5=19.2% Unattr=0.2%
-  Usage Team B: Slot1=14.7% Slot2=21.7% Slot3=20.9% Slot4=22.7% Slot5=19.7% Unattr=0.3%
-  Slot FG% Team A: Slot1=48.2% Slot2=52.5% Slot3=49.3% Slot4=48.6% Slot5=54.0%
-  Slot FG% Team B: Slot1=47.8% Slot2=50.9% Slot3=49.4% Slot4=49.2% Slot5=53.3%
-  ORB%  Team A: 28.8%  Team B: 29.3%
-  FTr   Team A: 0.377  Team B: 0.384
-  Transition Team A: 34.1%  Team B: 34.1%
+  Usage Team A: Slot1=15.5% Slot2=21.2% Slot3=21.5% Slot4=22.6% Slot5=19.0% Unattr=0.3%
+  Usage Team B: Slot1=15.0% Slot2=22.2% Slot3=20.8% Slot4=22.5% Slot5=19.3% Unattr=0.2%
+  Slot FG% Team A: Slot1=45.5% Slot2=52.8% Slot3=49.0% Slot4=48.6% Slot5=54.2%
+  Slot FG% Team B: Slot1=46.5% Slot2=50.4% Slot3=49.4% Slot4=46.7% Slot5=52.0%
+  ORB%  Team A: 28.5%  Team B: 29.4%
+  FTr   Team A: 0.387  Team B: 0.379
+  Transition Team A: 34.8%  Team B: 34.1%
   Pace (total poss/game): 131.6
-  Between-variant:  Team A win-rate range: min=32%  max=54%
-  Between-variant:  Team B PPP range: min=1.064  max=1.141
+  Between-variant:  Team A win-rate range: min=40%  max=60%
+  Between-variant:  Team B PPP range: min=1.029  max=1.105
 
 === COHORT BOX SCORE ΓÇö Bucket 3: EliteVsElite ===
   Rows pool 10 generated roster variants. Each row is the per-game average
   for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
   Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [A] Slot1 ΓÇö PassFirstGuard   9.5   8.1   3.9  48.2   1.4   0.5  40.0   2.2   1.2  56.1   1.1   3.1   4.2   0.9   0.5   2.6   0.9
-  [A] Slot2 ΓÇö PerimeterShooter  15.7  10.9   5.7  52.5   4.5   2.3  52.2   2.6   1.8  69.5   1.1   2.5   3.6   1.0   0.4   2.4   0.8
-  [A] Slot3 ΓÇö ThreeAndDWing  14.9  11.2   5.5  49.3   4.8   2.3  48.0   2.0   1.5  74.8   1.6   3.9   5.4   0.9   0.6   2.5   0.9
-  [A] Slot4 ΓÇö PostScorer  14.0  11.5   5.6  48.6   2.0   0.6  28.8   3.6   2.2  62.2   1.8   4.2   6.1   0.6   0.7   2.6   1.7
-  [A] Slot5 ΓÇö RimRunner   13.4   9.9   5.4  54.0   1.4   0.4  29.1   3.0   2.3  76.2   1.9   4.5   6.4   0.7   0.9   2.3   1.5
-  [B] Slot1 ΓÇö PassFirstGuard   9.0   7.6   3.6  47.8   1.3   0.5  38.5   2.0   1.2  59.3   1.2   3.1   4.3   1.0   0.5   2.5   0.9
-  [B] Slot2 ΓÇö PerimeterShooter  15.6  11.2   5.7  50.9   4.6   2.2  48.3   2.6   2.0  75.2   1.1   2.4   3.5   0.9   0.5   2.4   0.8
-  [B] Slot3 ΓÇö ThreeAndDWing  14.4  10.8   5.4  49.4   4.7   2.3  48.0   2.0   1.5  71.6   1.5   3.9   5.4   0.8   0.6   2.4   0.8
-  [B] Slot4 ΓÇö PostScorer  14.7  11.8   5.8  49.2   1.8   0.6  33.1   3.9   2.5  64.4   1.7   4.2   6.0   0.6   0.7   2.6   1.7
-  [B] Slot5 ΓÇö RimRunner   13.7  10.2   5.4  53.3   1.5   0.5  32.5   3.1   2.3  75.3   1.9   4.7   6.7   0.8   0.8   2.2   1.5
+  [A] Slot1 ΓÇö PassFirstGuard   9.1   8.0   3.6  45.5   1.4   0.5  33.9   2.3   1.3  58.5   0.9   2.8   3.8   1.0   0.5   2.6   0.8
+  [A] Slot2 ΓÇö PerimeterShooter  15.8  10.9   5.8  52.8   4.5   2.4  52.8   2.5   1.9  75.7   0.7   1.9   2.6   1.3   0.4   2.3   0.9
+  [A] Slot3 ΓÇö ThreeAndDWing  14.7  11.1   5.4  49.0   4.8   2.3  47.4   2.2   1.6  75.3   1.2   3.4   4.6   0.9   0.6   2.1   0.9
+  [A] Slot4 ΓÇö PostScorer  14.4  11.7   5.7  48.6   1.9   0.6  33.2   3.9   2.5  64.3   2.2   4.3   6.5   0.4   0.7   2.1   1.6
+  [A] Slot5 ΓÇö RimRunner   13.4   9.8   5.3  54.2   1.5   0.5  30.1   3.1   2.4  77.3   2.3   6.3   8.6   0.5   0.8   1.7   1.4
+  [B] Slot1 ΓÇö PassFirstGuard   8.8   7.8   3.6  46.5   1.3   0.5  35.4   2.0   1.1  56.5   1.1   2.9   3.9   1.1   0.6   2.6   0.9
+  [B] Slot2 ΓÇö PerimeterShooter  15.9  11.5   5.8  50.4   4.9   2.3  47.8   2.6   1.9  74.5   0.8   1.8   2.6   1.1   0.5   2.4   0.8
+  [B] Slot3 ΓÇö ThreeAndDWing  14.2  10.8   5.3  49.4   4.6   2.1  46.6   2.0   1.4  69.7   1.3   3.3   4.6   0.8   0.6   2.2   0.9
+  [B] Slot4 ΓÇö PostScorer  13.7  11.7   5.5  46.7   1.9   0.5  29.3   3.8   2.3  60.3   2.3   4.2   6.5   0.5   0.7   2.1   1.8
+  [B] Slot5 ΓÇö RimRunner   13.2  10.0   5.2  52.0   1.5   0.4  29.0   3.1   2.4  77.2   2.4   6.3   8.6   0.5   0.8   1.9   1.4
 === END COHORT BOX SCORE ΓÇö Bucket 3 ===
 
 --- BUCKET 4: WeakVsWeak ---
@@ -1580,53 +1785,53 @@
     Boards:   OffensiveRebounding=32  DefensiveRebounding=31
 
   validGames=500/500
-  Team A wins: 262/500 = 52.4%
-  Team B wins: 227/500 = 45.4%
-  Ties:        11/500 = 2.2%
-  Physical home win rate: 49.2%  (side-neutrality diagnostic)
-  Team A score: mean=61.2  sd=8.8  min=37  max=90
-  Team B score: mean=59.9  sd=9.3  min=34  max=90
-  Margin (A-B): mean=1.2  sd=12.5
-  PPP Team A: agg=0.944  mean-game=0.944  sd=0.132
-  PPP Team B: agg=0.924  mean-game=0.924  sd=0.141
-  FG%  Team A: agg=40.2%  mean-game=40.3%  sd=6.6%
-  FG%  Team B: agg=39.6%  mean-game=39.6%  sd=6.6%
-  3P%  Team A: agg=29.2%  mean-game=29.4%  sd=13.6%
-  3P%  Team B: agg=28.6%  mean-game=28.7%  sd=13.0%
-  FT%  Team A: agg=75.9%  mean-game=75.8%  sd=11.6%
-  FT%  Team B: agg=75.8%  mean-game=76.0%  sd=11.1%
+  Team A wins: 247/500 = 49.4%
+  Team B wins: 240/500 = 48.0%
+  Ties:        13/500 = 2.6%
+  Physical home win rate: 52.6%  (side-neutrality diagnostic)
+  Team A score: mean=60.6  sd=9.1  min=35  max=90
+  Team B score: mean=59.6  sd=8.6  min=32  max=85
+  Margin (A-B): mean=1.0  sd=12.5
+  PPP Team A: agg=0.934  mean-game=0.934  sd=0.136
+  PPP Team B: agg=0.920  mean-game=0.921  sd=0.132
+  FG%  Team A: agg=39.8%  mean-game=39.9%  sd=6.5%
+  FG%  Team B: agg=39.5%  mean-game=39.5%  sd=5.9%
+  3P%  Team A: agg=29.7%  mean-game=29.9%  sd=12.7%
+  3P%  Team B: agg=29.5%  mean-game=29.3%  sd=13.3%
+  FT%  Team A: agg=76.6%  mean-game=76.4%  sd=11.7%
+  FT%  Team B: agg=75.8%  mean-game=75.7%  sd=11.7%
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
-  3PA rate  Team A: 24.9%  Team B: 24.6%
-  Shot mix Team A: Rim=30% Short=19% Mid=13% Long=13% Three=25%
-  Shot mix Team B: Rim=30% Short=19% Mid=13% Long=13% Three=25%
-  Usage Team A: Slot1=16.2% Slot2=23.1% Slot3=21.3% Slot4=20.9% Slot5=18.4% Unattr=0.2%
-  Usage Team B: Slot1=15.1% Slot2=23.0% Slot3=21.2% Slot4=21.7% Slot5=18.7% Unattr=0.2%
-  Slot FG% Team A: Slot1=39.2% Slot2=37.9% Slot3=36.4% Slot4=41.9% Slot5=46.5%
-  Slot FG% Team B: Slot1=37.5% Slot2=37.6% Slot3=36.4% Slot4=40.7% Slot5=45.8%
-  ORB%  Team A: 29.5%  Team B: 28.9%
-  FTr   Team A: 0.360  Team B: 0.362
-  Transition Team A: 39.6%  Team B: 39.1%
+  3PA rate  Team A: 25.4%  Team B: 24.0%
+  Shot mix Team A: Rim=30% Short=18% Mid=13% Long=13% Three=25%
+  Shot mix Team B: Rim=30% Short=19% Mid=13% Long=14% Three=24%
+  Usage Team A: Slot1=16.3% Slot2=23.5% Slot3=20.9% Slot4=20.8% Slot5=18.3% Unattr=0.2%
+  Usage Team B: Slot1=15.2% Slot2=22.9% Slot3=20.8% Slot4=21.9% Slot5=19.0% Unattr=0.2%
+  Slot FG% Team A: Slot1=37.9% Slot2=38.1% Slot3=37.3% Slot4=40.5% Slot5=45.8%
+  Slot FG% Team B: Slot1=37.2% Slot2=37.8% Slot3=36.4% Slot4=40.9% Slot5=44.9%
+  ORB%  Team A: 29.4%  Team B: 28.6%
+  FTr   Team A: 0.352  Team B: 0.352
+  Transition Team A: 40.0%  Team B: 39.4%
   Pace (total poss/game): 129.6
-  Between-variant:  Team A win-rate range: min=42%  max=62%
-  Between-variant:  Team B PPP range: min=0.892  max=0.968
+  Between-variant:  Team A win-rate range: min=34%  max=60%
+  Between-variant:  Team B PPP range: min=0.893  max=0.947
 
 === COHORT BOX SCORE ΓÇö Bucket 4: WeakVsWeak ===
   Rows pool 10 generated roster variants. Each row is the per-game average
   for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
   Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [A] Slot1 ΓÇö PassFirstGuard   8.9   8.6   3.4  39.2   1.6   0.4  25.3   2.2   1.8  81.4   1.4   3.7   5.1   0.9   0.5   2.6   0.9
-  [A] Slot2 ΓÇö PerimeterShooter  12.7  12.3   4.7  37.9   4.8   1.5  32.3   2.5   1.8  72.5   1.2   2.9   4.1   0.9   0.5   2.4   0.9
-  [A] Slot3 ΓÇö ThreeAndDWing  11.2  11.3   4.1  36.4   4.7   1.4  30.5   2.2   1.6  72.0   1.9   4.5   6.4   0.8   0.7   2.1   0.9
-  [A] Slot4 ΓÇö PostScorer  12.2  11.1   4.7  41.9   1.2   0.3  20.9   3.3   2.6  80.6   2.2   4.9   7.1   0.6   0.7   2.4   1.4
-  [A] Slot5 ΓÇö RimRunner   11.8   9.8   4.5  46.5   1.0   0.2  24.6   3.1   2.5  81.0   2.3   5.6   7.9   0.7   0.8   2.3   1.3
-  [B] Slot1 ΓÇö PassFirstGuard   8.3   8.0   3.0  37.5   1.5   0.4  25.2   2.3   1.9  83.7   1.4   3.6   5.0   0.9   0.5   2.5   0.9
-  [B] Slot2 ΓÇö PerimeterShooter  12.5  12.2   4.6  37.6   4.9   1.4  29.4   2.6   1.9  72.6   1.1   2.8   3.9   0.9   0.4   2.4   0.9
-  [B] Slot3 ΓÇö ThreeAndDWing  11.1  11.2   4.1  36.4   4.4   1.3  30.1   2.3   1.6  70.9   1.8   4.5   6.3   0.7   0.6   2.1   0.9
-  [B] Slot4 ΓÇö PostScorer  12.3  11.4   4.7  40.7   1.2   0.3  24.4   3.3   2.7  81.0   2.3   5.2   7.4   0.6   0.7   2.7   1.5
-  [B] Slot5 ΓÇö RimRunner   11.7   9.9   4.5  45.8   1.0   0.3  28.3   3.0   2.4  80.3   2.2   5.4   7.6   0.8   0.8   2.2   1.2
+  [A] Slot1 ΓÇö PassFirstGuard   8.9   8.7   3.3  37.9   1.6   0.4  27.8   2.3   1.9  83.7   1.4   4.1   5.5   0.9   0.5   2.3   0.9
+  [A] Slot2 ΓÇö PerimeterShooter  12.9  12.5   4.8  38.1   5.0   1.6  31.7   2.5   1.8  74.1   0.8   2.5   3.3   0.9   0.4   2.4   0.9
+  [A] Slot3 ΓÇö ThreeAndDWing  11.3  11.1   4.1  37.3   4.6   1.5  31.8   2.1   1.5  71.1   1.4   3.7   5.1   0.9   0.6   2.0   1.0
+  [A] Slot4 ΓÇö PostScorer  11.7  11.0   4.5  40.5   1.2   0.3  20.6   3.0   2.5  80.9   2.7   4.4   7.1   0.8   0.6   2.2   1.4
+  [A] Slot5 ΓÇö RimRunner   11.8   9.7   4.4  45.8   1.0   0.2  24.7   3.3   2.7  81.6   2.6   7.2   9.8   0.7   0.9   1.9   1.4
+  [B] Slot1 ΓÇö PassFirstGuard   8.2   8.1   3.0  37.2   1.5   0.4  28.5   2.1   1.7  81.4   1.3   4.0   5.3   1.0   0.5   2.3   1.0
+  [B] Slot2 ΓÇö PerimeterShooter  12.4  12.1   4.6  37.8   4.7   1.5  31.5   2.4   1.7  73.1   0.8   2.3   3.1   0.9   0.5   2.4   0.9
+  [B] Slot3 ΓÇö ThreeAndDWing  10.8  11.0   4.0  36.4   4.3   1.3  29.8   2.2   1.6  71.0   1.5   4.1   5.6   0.8   0.6   2.0   0.9
+  [B] Slot4 ΓÇö PostScorer  12.5  11.6   4.7  40.9   1.3   0.3  25.0   3.3   2.7  82.6   2.5   4.5   7.1   0.6   0.8   2.2   1.4
+  [B] Slot5 ΓÇö RimRunner   11.8  10.1   4.5  44.9   1.0   0.3  26.8   3.3   2.5  78.1   2.6   6.5   9.1   0.6   0.8   1.9   1.4
 === END COHORT BOX SCORE ΓÇö Bucket 4 ===
 
 --- BUCKET 5: StarVsBalanced ---
@@ -1648,37 +1853,37 @@
     Boards:   OffensiveRebounding=54  DefensiveRebounding=51
 
   validGames=500/500
-  Team A wins: 288/500 = 57.6%
-  Team B wins: 202/500 = 40.4%
-  Ties:        10/500 = 2.0%
-  Physical home win rate: 54.0%  (side-neutrality diagnostic)
-  Team A score: mean=71.1  sd=9.7  min=40  max=99
-  Team B score: mean=68.1  sd=9.8  min=35  max=101
-  Margin (A-B): mean=3.0  sd=13.9
-  PPP Team A: agg=1.082  mean-game=1.082  sd=0.145
-  PPP Team B: agg=1.036  mean-game=1.036  sd=0.146
-  FG%  Team A: agg=49.7%  mean-game=49.8%  sd=7.2%
-  FG%  Team B: agg=47.3%  mean-game=47.3%  sd=6.9%
-  3P%  Team A: agg=40.5%  mean-game=40.8%  sd=14.5%
-  3P%  Team B: agg=38.3%  mean-game=38.2%  sd=13.5%
-  FT%  Team A: agg=73.5%  mean-game=73.3%  sd=11.0%
-  FT%  Team B: agg=70.8%  mean-game=70.6%  sd=12.0%
+  Team A wins: 299/500 = 59.8%
+  Team B wins: 180/500 = 36.0%
+  Ties:        21/500 = 4.2%
+  Physical home win rate: 55.4%  (side-neutrality diagnostic)
+  Team A score: mean=71.8  sd=10.0  min=41  max=106
+  Team B score: mean=68.0  sd=9.4  min=44  max=92
+  Margin (A-B): mean=3.8  sd=13.6
+  PPP Team A: agg=1.092  mean-game=1.092  sd=0.148
+  PPP Team B: agg=1.035  mean-game=1.035  sd=0.142
+  FG%  Team A: agg=50.2%  mean-game=50.3%  sd=7.1%
+  FG%  Team B: agg=46.9%  mean-game=47.0%  sd=6.6%
+  3P%  Team A: agg=40.6%  mean-game=40.4%  sd=14.3%
+  3P%  Team B: agg=38.6%  mean-game=38.6%  sd=13.1%
+  FT%  Team A: agg=72.4%  mean-game=72.4%  sd=12.3%
+  FT%  Team B: agg=70.8%  mean-game=70.6%  sd=11.1%
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
-  3PA rate  Team A: 26.3%  Team B: 26.7%
-  Shot mix Team A: Rim=33% Short=15% Mid=13% Long=13% Three=26%
-  Shot mix Team B: Rim=29% Short=19% Mid=12% Long=13% Three=27%
-  Usage Team A: Slot1=35.0% Slot2=20.9% Slot3=18.4% Slot4=15.6% Slot5=9.9% Unattr=0.3%
-  Usage Team B: Slot1=15.1% Slot2=21.7% Slot3=20.4% Slot4=22.6% Slot5=19.9% Unattr=0.2%
-  Slot FG% Team A: Slot1=54.0% Slot2=47.8% Slot3=46.1% Slot4=51.3% Slot5=43.1%
-  Slot FG% Team B: Slot1=42.8% Slot2=46.2% Slot3=46.9% Slot4=46.4% Slot5=53.1%
-  ORB%  Team A: 28.5%  Team B: 28.8%
-  FTr   Team A: 0.380  Team B: 0.353
-  Transition Team A: 35.9%  Team B: 34.1%
-  Pace (total poss/game): 131.5
-  Between-variant:  Team A win-rate range: min=38%  max=70%
-  Between-variant:  Team B PPP range: min=0.999  max=1.084
+  3PA rate  Team A: 26.3%  Team B: 26.8%
+  Shot mix Team A: Rim=34% Short=15% Mid=12% Long=13% Three=26%
+  Shot mix Team B: Rim=28% Short=19% Mid=12% Long=13% Three=27%
+  Usage Team A: Slot1=34.9% Slot2=20.3% Slot3=18.5% Slot4=15.6% Slot5=10.4% Unattr=0.3%
+  Usage Team B: Slot1=14.9% Slot2=22.4% Slot3=20.8% Slot4=22.6% Slot5=19.1% Unattr=0.2%
+  Slot FG% Team A: Slot1=54.3% Slot2=49.8% Slot3=47.0% Slot4=51.2% Slot5=42.2%
+  Slot FG% Team B: Slot1=41.7% Slot2=46.1% Slot3=46.5% Slot4=46.3% Slot5=53.1%
+  ORB%  Team A: 29.0%  Team B: 28.5%
+  FTr   Team A: 0.378  Team B: 0.374
+  Transition Team A: 35.8%  Team B: 33.8%
+  Pace (total poss/game): 131.4
+  Between-variant:  Team A win-rate range: min=52%  max=66%
+  Between-variant:  Team B PPP range: min=1.005  max=1.073
 
 === COHORT BOX SCORE ΓÇö Bucket 5: StarVsBalanced ===
   Rows pool 10 generated roster variants. Each row is the per-game average
@@ -1686,16 +1891,16 @@
   Note: Team A Slot 1 is an Elite-tier Slasher star; all other Team A slots are Good tier.
   Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [A] Slot1 ΓÇö Slasher     25.0  18.0   9.7  54.0   3.4   1.2  36.7   6.0   4.3  72.1   1.4   3.7   5.1   1.0   0.6   3.6   1.0
-  [A] Slot2 ΓÇö ThreeAndDWing  13.6  10.8   5.1  47.8   4.1   1.8  44.6   2.1   1.6  73.8   1.6   4.3   5.9   0.7   0.6   2.2   1.0
-  [A] Slot3 ΓÇö PerimeterShooter  11.9   9.5   4.4  46.1   3.8   1.7  44.1   2.0   1.5  75.7   1.2   2.9   4.1   0.9   0.5   2.2   0.7
-  [A] Slot4 ΓÇö RimRunner   10.7   8.0   4.1  51.3   1.3   0.4  31.8   2.5   2.0  80.3   1.9   5.2   7.1   0.7   0.8   2.2   1.5
-  [A] Slot5 ΓÇö PassFirstGuard   5.5   5.1   2.2  43.1   1.0   0.3  34.7   1.2   0.8  67.3   1.2   3.2   4.4   0.8   0.5   2.1   1.0
-  [B] Slot1 ΓÇö PassFirstGuard   8.6   7.9   3.4  42.8   1.3   0.4  28.7   2.1   1.5  70.9   1.2   3.0   4.2   0.9   0.5   2.5   1.8
-  [B] Slot2 ΓÇö PerimeterShooter  14.4  11.4   5.3  46.2   4.7   2.0  43.8   2.4   1.8  74.5   1.0   2.6   3.7   1.0   0.5   2.4   0.8
-  [B] Slot3 ΓÇö ThreeAndDWing  13.5  10.7   5.0  46.9   4.5   1.9  42.2   2.0   1.5  72.5   1.6   3.9   5.5   0.8   0.7   2.5   0.8
-  [B] Slot4 ΓÇö PostScorer  13.7  11.9   5.5  46.4   1.9   0.6  29.7   3.2   2.2  67.8   2.0   4.3   6.3   0.7   0.7   2.6   1.4
-  [B] Slot5 ΓÇö RimRunner   13.6  10.5   5.5  53.1   1.6   0.5  29.4   3.1   2.0  65.2   2.0   4.5   6.5   0.7   0.8   2.3   1.1
+  [A] Slot1 ΓÇö Slasher     25.1  18.1   9.8  54.3   3.3   1.2  37.1   5.9   4.2  71.4   1.5   4.3   5.7   0.8   0.6   3.1   1.0
+  [A] Slot2 ΓÇö ThreeAndDWing  13.9  10.5   5.2  49.8   4.1   1.9  46.1   2.2   1.6  70.8   1.4   3.8   5.2   0.8   0.6   2.0   1.0
+  [A] Slot3 ΓÇö PerimeterShooter  12.3   9.6   4.5  47.0   3.9   1.7  42.8   2.1   1.6  76.2   0.9   2.1   3.0   1.1   0.5   2.0   0.8
+  [A] Slot4 ΓÇö RimRunner   10.5   8.1   4.1  51.2   1.3   0.4  30.5   2.3   1.8  77.8   2.4   6.4   8.8   0.5   0.8   1.7   1.6
+  [A] Slot5 ΓÇö PassFirstGuard   5.8   5.4   2.3  42.2   1.0   0.3  34.0   1.3   0.9  68.4   1.2   3.0   4.2   0.8   0.5   1.9   1.1
+  [B] Slot1 ΓÇö PassFirstGuard   8.3   7.7   3.2  41.7   1.3   0.4  30.9   2.1   1.4  68.9   1.1   2.9   3.9   0.9   0.5   2.4   1.7
+  [B] Slot2 ΓÇö PerimeterShooter  14.6  11.7   5.4  46.1   4.7   2.0  42.5   2.4   1.8  75.5   0.7   2.0   2.7   1.2   0.5   2.4   0.8
+  [B] Slot3 ΓÇö ThreeAndDWing  13.6  10.8   5.0  46.5   4.6   2.0  43.2   2.1   1.5  72.2   1.3   3.1   4.3   0.8   0.7   2.3   0.9
+  [B] Slot4 ΓÇö PostScorer  13.9  11.8   5.4  46.3   1.9   0.6  31.5   3.4   2.4  69.4   2.3   4.2   6.5   0.6   0.7   2.1   1.3
+  [B] Slot5 ΓÇö RimRunner   13.0   9.9   5.3  53.1   1.4   0.4  27.7   3.2   2.1  67.0   2.4   6.0   8.4   0.5   0.8   1.8   1.1
 === END COHORT BOX SCORE ΓÇö Bucket 5 ===
 
 --- BUCKET 6: ShootingVsAthletic ---
@@ -1717,53 +1922,53 @@
     Boards:   OffensiveRebounding=51  DefensiveRebounding=49
 
   validGames=500/500
-  Team A wins: 126/500 = 25.2%
-  Team B wins: 360/500 = 72.0%
-  Ties:        14/500 = 2.8%
-  Physical home win rate: 50.0%  (side-neutrality diagnostic)
-  Team A score: mean=61.4  sd=9.9  min=35  max=95
-  Team B score: mean=70.0  sd=9.0  min=48  max=94
-  Margin (A-B): mean=-8.6  sd=13.5
-  PPP Team A: agg=0.940  mean-game=0.940  sd=0.148
-  PPP Team B: agg=1.072  mean-game=1.072  sd=0.133
-  FG%  Team A: agg=39.7%  mean-game=39.7%  sd=6.6%
-  FG%  Team B: agg=51.1%  mean-game=51.3%  sd=7.1%
-  3P%  Team A: agg=35.0%  mean-game=34.7%  sd=11.0%
-  3P%  Team B: agg=31.1%  mean-game=31.3%  sd=20.0%
-  FT%  Team A: agg=72.8%  mean-game=72.4%  sd=12.6%
-  FT%  Team B: agg=71.9%  mean-game=71.9%  sd=11.7%
+  Team A wins: 110/500 = 22.0%
+  Team B wins: 380/500 = 76.0%
+  Ties:        10/500 = 2.0%
+  Physical home win rate: 51.0%  (side-neutrality diagnostic)
+  Team A score: mean=60.3  sd=9.8  min=37  max=91
+  Team B score: mean=69.8  sd=8.8  min=36  max=102
+  Margin (A-B): mean=-9.5  sd=13.2
+  PPP Team A: agg=0.922  mean-game=0.922  sd=0.148
+  PPP Team B: agg=1.068  mean-game=1.068  sd=0.129
+  FG%  Team A: agg=39.3%  mean-game=39.3%  sd=6.7%
+  FG%  Team B: agg=50.7%  mean-game=50.8%  sd=6.7%
+  3P%  Team A: agg=34.1%  mean-game=34.0%  sd=11.3%
+  3P%  Team B: agg=29.9%  mean-game=29.3%  sd=19.0%
+  FT%  Team A: agg=73.0%  mean-game=73.0%  sd=11.8%
+  FT%  Team B: agg=71.6%  mean-game=71.7%  sd=12.1%
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
-  3PA rate  Team A: 35.2%  Team B: 12.7%
-  Shot mix Team A: Rim=21% Short=10% Mid=14% Long=21% Three=35%
-  Shot mix Team B: Rim=54% Short=18% Mid=10% Long=6% Three=13%
-  Usage Team A: Slot1=16.3% Slot2=22.1% Slot3=19.9% Slot4=20.2% Slot5=21.2% Unattr=0.3%
-  Usage Team B: Slot1=27.2% Slot2=16.4% Slot3=25.1% Slot4=17.9% Slot5=13.1% Unattr=0.2%
-  Slot FG% Team A: Slot1=41.1% Slot2=41.4% Slot3=39.8% Slot4=39.1% Slot5=37.3%
-  Slot FG% Team B: Slot1=48.3% Slot2=55.2% Slot3=49.7% Slot4=50.1% Slot5=55.9%
-  ORB%  Team A: 27.1%  Team B: 30.7%
-  FTr   Team A: 0.327  Team B: 0.413
-  Transition Team A: 33.4%  Team B: 40.7%
-  Pace (total poss/game): 130.7
-  Between-variant:  Team A win-rate range: min=12%  max=42%
-  Between-variant:  Team B PPP range: min=1.013  max=1.118
+  3PA rate  Team A: 35.4%  Team B: 13.0%
+  Shot mix Team A: Rim=20% Short=10% Mid=14% Long=21% Three=35%
+  Shot mix Team B: Rim=54% Short=17% Mid=10% Long=6% Three=13%
+  Usage Team A: Slot1=16.4% Slot2=22.3% Slot3=19.5% Slot4=20.1% Slot5=21.6% Unattr=0.2%
+  Usage Team B: Slot1=26.7% Slot2=16.7% Slot3=25.7% Slot4=18.3% Slot5=12.3% Unattr=0.2%
+  Slot FG% Team A: Slot1=40.1% Slot2=40.1% Slot3=40.6% Slot4=38.9% Slot5=37.0%
+  Slot FG% Team B: Slot1=47.8% Slot2=56.0% Slot3=48.7% Slot4=48.9% Slot5=57.0%
+  ORB%  Team A: 25.5%  Team B: 31.7%
+  FTr   Team A: 0.327  Team B: 0.424
+  Transition Team A: 33.4%  Team B: 41.2%
+  Pace (total poss/game): 130.8
+  Between-variant:  Team A win-rate range: min=14%  max=34%
+  Between-variant:  Team B PPP range: min=1.031  max=1.107
 
 === COHORT BOX SCORE ΓÇö Bucket 6: ShootingVsAthletic ===
   Rows pool 10 generated roster variants. Each row is the per-game average
   for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
   Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [A] Slot1 ΓÇö PassFirstGuard   9.3   8.7   3.6  41.1   1.6   0.5  31.9   2.3   1.7  73.1   1.7   3.6   5.3   1.0   0.9   2.5   1.8
-  [A] Slot2 ΓÇö PerimeterShooter  13.2  11.7   4.9  41.4   4.9   1.8  36.2   2.4   1.7  71.9   1.6   3.1   4.7   0.9   0.8   2.5   1.4
-  [A] Slot3 ΓÇö PerimeterShooter  11.5  10.6   4.2  39.8   4.5   1.6  35.3   2.0   1.5  74.6   1.5   3.2   4.8   0.9   0.8   2.2   1.6
-  [A] Slot4 ΓÇö ThreeAndDWing  11.5  10.8   4.2  39.1   5.1   1.8  36.0   1.9   1.3  69.4   2.1   4.5   6.6   0.8   1.0   2.4   1.5
-  [A] Slot5 ΓÇö FloorGeneral  11.2  11.3   4.2  37.3   2.6   0.8  31.9   2.7   2.0  74.9   1.5   3.2   4.7   0.6   0.8   2.6   1.2
-  [B] Slot1 ΓÇö Slasher     17.0  14.0   6.8  48.3   2.1   0.7  30.4   4.1   2.8  68.5   1.3   3.5   4.8   0.9   0.4   2.9   0.8
-  [B] Slot2 ΓÇö AthleticBig  11.6   8.5   4.7  55.2   0.6   0.2  27.8   3.0   2.2  72.7   1.8   5.2   7.0   0.8   0.6   1.9   0.9
-  [B] Slot3 ΓÇö Slasher     16.5  12.9   6.4  49.7   2.2   0.7  32.0   3.8   3.0  77.6   1.3   3.5   4.7   0.9   0.4   2.8   0.7
-  [B] Slot4 ΓÇö RimRunner   11.7   9.2   4.6  50.1   1.2   0.4  32.9   3.0   2.1  69.5   1.7   5.1   6.8   0.7   0.6   2.5   0.9
-  [B] Slot5 ΓÇö AthleticBig   9.2   6.8   3.8  55.9   0.4   0.1  30.1   2.2   1.5  68.1   1.7   5.3   7.0   0.8   0.6   1.8   0.9
+  [A] Slot1 ΓÇö PassFirstGuard   9.0   8.6   3.5  40.1   1.8   0.5  26.3   2.3   1.7  73.6   1.6   3.9   5.4   0.8   0.8   2.2   1.8
+  [A] Slot2 ΓÇö PerimeterShooter  12.8  11.8   4.7  40.1   4.8   1.7  34.7   2.4   1.7  71.2   1.4   2.7   4.1   0.8   0.8   2.3   1.5
+  [A] Slot3 ΓÇö PerimeterShooter  11.4  10.2   4.2  40.6   4.4   1.6  35.5   2.1   1.5  73.0   1.2   2.8   4.1   0.8   0.7   2.1   1.6
+  [A] Slot4 ΓÇö ThreeAndDWing  11.4  10.6   4.1  38.9   5.0   1.8  36.8   1.8   1.3  73.5   2.0   4.7   6.7   0.8   1.0   1.8   1.6
+  [A] Slot5 ΓÇö FloorGeneral  11.2  11.4   4.2  37.0   2.7   0.8  31.1   2.6   1.9  75.9   1.6   3.5   5.1   0.9   0.8   2.5   1.2
+  [B] Slot1 ΓÇö Slasher     16.9  13.7   6.6  47.8   2.2   0.6  29.3   4.4   3.1  71.3   1.1   3.2   4.3   0.9   0.4   2.9   0.8
+  [B] Slot2 ΓÇö AthleticBig  11.9   8.6   4.8  56.0   0.5   0.2  30.4   3.0   2.1  70.5   2.0   5.5   7.5   0.7   0.6   1.7   0.8
+  [B] Slot3 ΓÇö Slasher     16.7  13.2   6.5  48.7   2.2   0.7  32.4   4.0   3.0  76.5   1.1   2.7   3.7   1.0   0.4   2.8   0.7
+  [B] Slot4 ΓÇö RimRunner   11.5   9.4   4.6  48.9   1.4   0.4  25.7   2.9   2.0  66.9   2.0   5.8   7.7   0.7   0.6   2.1   0.8
+  [B] Slot5 ΓÇö AthleticBig   8.8   6.3   3.6  57.0   0.4   0.1  34.0   2.2   1.5  67.6   2.0   5.7   7.7   0.8   0.6   1.4   0.9
 === END COHORT BOX SCORE ΓÇö Bucket 6 ===
 
 --- BUCKET 7: AthleticVsSkill ---
@@ -1786,52 +1991,52 @@
 
   validGames=500/500
   Team A wins: 369/500 = 73.8%
-  Team B wins: 122/500 = 24.4%
-  Ties:        9/500 = 1.8%
-  Physical home win rate: 51.8%  (side-neutrality diagnostic)
-  Team A score: mean=69.9  sd=8.8  min=46  max=98
-  Team B score: mean=61.0  sd=9.8  min=34  max=88
-  Margin (A-B): mean=8.9  sd=13.1
-  PPP Team A: agg=1.069  mean-game=1.069  sd=0.133
-  PPP Team B: agg=0.931  mean-game=0.931  sd=0.146
-  FG%  Team A: agg=51.5%  mean-game=51.6%  sd=7.1%
-  FG%  Team B: agg=40.8%  mean-game=40.9%  sd=6.8%
-  3P%  Team A: agg=31.0%  mean-game=31.2%  sd=19.9%
-  3P%  Team B: agg=33.7%  mean-game=33.6%  sd=12.5%
-  FT%  Team A: agg=69.3%  mean-game=69.5%  sd=10.3%
-  FT%  Team B: agg=71.5%  mean-game=71.5%  sd=12.7%
+  Team B wins: 123/500 = 24.6%
+  Ties:        8/500 = 1.6%
+  Physical home win rate: 50.8%  (side-neutrality diagnostic)
+  Team A score: mean=69.3  sd=8.7  min=45  max=94
+  Team B score: mean=61.1  sd=9.2  min=36  max=89
+  Margin (A-B): mean=8.1  sd=12.6
+  PPP Team A: agg=1.058  mean-game=1.059  sd=0.131
+  PPP Team B: agg=0.934  mean-game=0.934  sd=0.138
+  FG%  Team A: agg=51.3%  mean-game=51.4%  sd=6.9%
+  FG%  Team B: agg=40.7%  mean-game=40.8%  sd=6.7%
+  3P%  Team A: agg=29.7%  mean-game=30.0%  sd=20.3%
+  3P%  Team B: agg=34.2%  mean-game=34.2%  sd=12.9%
+  FT%  Team A: agg=69.3%  mean-game=69.2%  sd=11.2%
+  FT%  Team B: agg=71.9%  mean-game=71.2%  sd=13.5%
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
-  3PA rate  Team A: 12.8%  Team B: 28.5%
+  3PA rate  Team A: 12.7%  Team B: 28.4%
   Shot mix Team A: Rim=54% Short=17% Mid=10% Long=6% Three=13%
   Shot mix Team B: Rim=22% Short=17% Mid=15% Long=17% Three=28%
-  Usage Team A: Slot1=27.3% Slot2=16.1% Slot3=25.8% Slot4=17.9% Slot5=12.6% Unattr=0.2%
-  Usage Team B: Slot1=21.9% Slot2=19.2% Slot3=19.4% Slot4=19.6% Slot5=19.5% Unattr=0.2%
-  Slot FG% Team A: Slot1=50.7% Slot2=54.6% Slot3=49.1% Slot4=49.2% Slot5=57.6%
-  Slot FG% Team B: Slot1=41.8% Slot2=40.5% Slot3=40.5% Slot4=42.6% Slot5=38.4%
-  ORB%  Team A: 29.6%  Team B: 27.8%
-  FTr   Team A: 0.429  Team B: 0.335
-  Transition Team A: 39.9%  Team B: 33.4%
+  Usage Team A: Slot1=27.3% Slot2=16.1% Slot3=25.6% Slot4=18.0% Slot5=12.8% Unattr=0.2%
+  Usage Team B: Slot1=22.0% Slot2=19.6% Slot3=19.5% Slot4=18.9% Slot5=19.9% Unattr=0.2%
+  Slot FG% Team A: Slot1=50.7% Slot2=55.0% Slot3=49.2% Slot4=48.4% Slot5=56.3%
+  Slot FG% Team B: Slot1=41.4% Slot2=40.0% Slot3=40.2% Slot4=44.1% Slot5=37.9%
+  ORB%  Team A: 29.8%  Team B: 27.9%
+  FTr   Team A: 0.424  Team B: 0.338
+  Transition Team A: 39.7%  Team B: 33.5%
   Pace (total poss/game): 130.9
-  Between-variant:  Team A win-rate range: min=64%  max=82%
-  Between-variant:  Team B PPP range: min=0.851  max=0.997
+  Between-variant:  Team A win-rate range: min=56%  max=88%
+  Between-variant:  Team B PPP range: min=0.902  max=0.986
 
 === COHORT BOX SCORE ΓÇö Bucket 7: AthleticVsSkill ===
   Rows pool 10 generated roster variants. Each row is the per-game average
   for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
   Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [A] Slot1 ΓÇö Slasher     18.1  14.0   7.1  50.7   2.2   0.7  32.4   4.4   3.2  72.6   1.1   3.3   4.4   0.9   0.4   3.0   1.0
-  [A] Slot2 ΓÇö AthleticBig  11.1   8.2   4.5  54.6   0.5   0.1  28.9   2.9   2.0  70.1   1.7   5.0   6.8   0.9   0.5   1.9   0.8
-  [A] Slot3 ΓÇö Slasher     16.5  13.2   6.5  49.1   2.2   0.7  31.0   4.2   2.9  68.5   1.1   3.4   4.5   0.9   0.5   2.7   0.8
-  [A] Slot4 ΓÇö RimRunner   11.1   9.2   4.5  49.2   1.2   0.4  30.2   2.8   1.7  59.1   1.7   5.0   6.8   0.7   0.6   2.4   1.0
-  [A] Slot5 ΓÇö AthleticBig   9.2   6.4   3.7  57.6   0.4   0.1  28.5   2.4   1.7  70.9   1.7   5.1   6.9   0.9   0.7   1.7   0.9
-  [B] Slot1 ΓÇö FloorGeneral  12.7  11.6   4.9  41.8   2.6   0.9  33.4   2.9   2.1  72.3   1.4   3.2   4.6   0.7   0.8   3.0   1.6
-  [B] Slot2 ΓÇö PerimeterShooter  11.2  10.2   4.1  40.5   4.0   1.4  35.4   2.0   1.5  73.1   1.3   2.7   4.0   1.1   0.7   2.1   1.2
-  [B] Slot3 ΓÇö ThreeAndDWing  11.5  10.3   4.2  40.5   4.4   1.6  36.6   2.1   1.6  75.0   1.9   4.1   6.0   0.9   1.0   2.0   1.7
-  [B] Slot4 ΓÇö PostScorer  10.9  10.4   4.4  42.6   1.7   0.4  24.3   2.5   1.6  63.1   2.3   4.6   6.9   0.6   1.0   2.4   2.0
-  [B] Slot5 ΓÇö FloorGeneral  10.4  10.3   4.0  38.4   2.4   0.8  32.2   2.2   1.7  76.6   1.4   3.2   4.7   0.7   0.8   2.8   1.3
+  [A] Slot1 ΓÇö Slasher     17.9  13.9   7.1  50.7   2.1   0.7  32.6   4.3   3.1  72.3   0.9   2.8   3.8   1.0   0.4   2.8   0.9
+  [A] Slot2 ΓÇö AthleticBig  11.3   8.2   4.5  55.0   0.5   0.1  27.3   3.1   2.1  69.9   2.0   5.3   7.3   0.8   0.7   1.7   0.9
+  [A] Slot3 ΓÇö Slasher     16.2  13.0   6.4  49.2   2.2   0.6  27.6   4.0   2.7  68.5   1.0   2.7   3.7   0.9   0.4   2.8   0.7
+  [A] Slot4 ΓÇö RimRunner   10.9   9.2   4.4  48.4   1.3   0.4  28.6   2.7   1.6  60.1   1.8   5.7   7.5   0.7   0.7   2.1   1.1
+  [A] Slot5 ΓÇö AthleticBig   9.1   6.5   3.7  56.3   0.4   0.1  32.1   2.2   1.5  69.9   1.8   5.4   7.2   0.7   0.6   1.5   1.0
+  [B] Slot1 ΓÇö FloorGeneral  12.4  11.7   4.8  41.4   2.4   0.8  34.3   2.7   2.0  73.5   1.4   3.3   4.7   1.0   0.8   2.7   1.6
+  [B] Slot2 ΓÇö PerimeterShooter  11.4  10.4   4.2  40.0   4.1   1.5  37.0   2.2   1.6  72.2   1.0   2.4   3.4   0.9   0.7   2.1   1.3
+  [B] Slot3 ΓÇö ThreeAndDWing  11.4  10.3   4.1  40.2   4.4   1.6  36.5   1.9   1.5  76.0   1.6   3.8   5.5   0.7   0.9   1.9   1.8
+  [B] Slot4 ΓÇö PostScorer  10.9  10.0   4.4  44.1   1.6   0.4  26.0   2.6   1.6  62.7   2.8   4.6   7.5   0.6   0.9   2.1   1.9
+  [B] Slot5 ΓÇö FloorGeneral  10.5  10.5   4.0  37.9   2.5   0.8  30.8   2.3   1.8  77.4   1.6   3.6   5.2   0.9   0.8   2.3   1.2
 === END COHORT BOX SCORE ΓÇö Bucket 7 ===
 
 --- BUCKET 8: SkillVsAthletic ---
@@ -1853,67 +2058,67 @@
     Boards:   OffensiveRebounding=50  DefensiveRebounding=49
 
   validGames=500/500
-  Team A wins: 115/500 = 23.0%
-  Team B wins: 368/500 = 73.6%
-  Ties:        17/500 = 3.4%
-  Physical home win rate: 49.2%  (side-neutrality diagnostic)
-  Team A score: mean=61.4  sd=9.4  min=31  max=93
-  Team B score: mean=69.5  sd=8.8  min=48  max=95
-  Margin (A-B): mean=-8.1  sd=13.0
-  PPP Team A: agg=0.939  mean-game=0.939  sd=0.144
-  PPP Team B: agg=1.063  mean-game=1.063  sd=0.133
-  FG%  Team A: agg=41.2%  mean-game=41.2%  sd=6.8%
-  FG%  Team B: agg=51.1%  mean-game=51.2%  sd=7.0%
-  3P%  Team A: agg=33.6%  mean-game=33.4%  sd=12.4%
-  3P%  Team B: agg=30.2%  mean-game=29.8%  sd=18.7%
-  FT%  Team A: agg=71.2%  mean-game=71.0%  sd=12.4%
-  FT%  Team B: agg=68.9%  mean-game=68.8%  sd=11.3%
+  Team A wins: 122/500 = 24.4%
+  Team B wins: 364/500 = 72.8%
+  Ties:        14/500 = 2.8%
+  Physical home win rate: 50.0%  (side-neutrality diagnostic)
+  Team A score: mean=61.6  sd=9.4  min=36  max=94
+  Team B score: mean=69.8  sd=8.5  min=50  max=96
+  Margin (A-B): mean=-8.2  sd=12.7
+  PPP Team A: agg=0.941  mean-game=0.941  sd=0.141
+  PPP Team B: agg=1.065  mean-game=1.065  sd=0.127
+  FG%  Team A: agg=41.0%  mean-game=41.1%  sd=6.7%
+  FG%  Team B: agg=51.6%  mean-game=51.7%  sd=7.0%
+  3P%  Team A: agg=33.5%  mean-game=33.4%  sd=12.3%
+  3P%  Team B: agg=31.2%  mean-game=31.4%  sd=19.8%
+  FT%  Team A: agg=72.0%  mean-game=71.6%  sd=12.4%
+  FT%  Team B: agg=69.8%  mean-game=69.6%  sd=11.7%
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
-  3PA rate  Team A: 28.2%  Team B: 13.0%
-  Shot mix Team A: Rim=23% Short=17% Mid=15% Long=17% Three=28%
-  Shot mix Team B: Rim=54% Short=17% Mid=10% Long=6% Three=13%
-  Usage Team A: Slot1=21.9% Slot2=19.4% Slot3=19.7% Slot4=19.4% Slot5=19.5% Unattr=0.2%
-  Usage Team B: Slot1=27.4% Slot2=16.2% Slot3=25.6% Slot4=18.2% Slot5=12.4% Unattr=0.3%
-  Slot FG% Team A: Slot1=42.2% Slot2=40.3% Slot3=40.7% Slot4=43.8% Slot5=38.7%
-  Slot FG% Team B: Slot1=50.8% Slot2=54.8% Slot3=47.4% Slot4=49.4% Slot5=56.8%
-  ORB%  Team A: 27.8%  Team B: 30.0%
-  FTr   Team A: 0.343  Team B: 0.423
-  Transition Team A: 33.9%  Team B: 39.7%
-  Pace (total poss/game): 130.8
-  Between-variant:  Team A win-rate range: min=16%  max=34%
-  Between-variant:  Team B PPP range: min=1.012  max=1.099
+  3PA rate  Team A: 28.8%  Team B: 12.7%
+  Shot mix Team A: Rim=22% Short=17% Mid=15% Long=17% Three=29%
+  Shot mix Team B: Rim=55% Short=17% Mid=10% Long=6% Three=13%
+  Usage Team A: Slot1=22.2% Slot2=19.5% Slot3=19.4% Slot4=19.2% Slot5=19.5% Unattr=0.2%
+  Usage Team B: Slot1=26.8% Slot2=16.4% Slot3=25.7% Slot4=18.1% Slot5=12.8% Unattr=0.2%
+  Slot FG% Team A: Slot1=41.5% Slot2=40.0% Slot3=40.3% Slot4=44.0% Slot5=39.5%
+  Slot FG% Team B: Slot1=51.0% Slot2=55.5% Slot3=49.2% Slot4=48.9% Slot5=56.5%
+  ORB%  Team A: 27.6%  Team B: 29.7%
+  FTr   Team A: 0.346  Team B: 0.427
+  Transition Team A: 33.6%  Team B: 39.5%
+  Pace (total poss/game): 131.0
+  Between-variant:  Team A win-rate range: min=12%  max=34%
+  Between-variant:  Team B PPP range: min=1.040  max=1.107
 
 === COHORT BOX SCORE ΓÇö Bucket 8: SkillVsAthletic ===
   Rows pool 10 generated roster variants. Each row is the per-game average
   for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
   Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [A] Slot1 ΓÇö FloorGeneral  12.7  11.5   4.9  42.2   2.5   0.9  33.4   2.9   2.1  71.6   1.5   3.1   4.6   0.7   0.8   2.9   1.7
-  [A] Slot2 ΓÇö PerimeterShooter  11.1  10.3   4.1  40.3   4.0   1.4  34.6   2.0   1.5  73.1   1.3   2.9   4.2   1.1   0.8   2.1   1.2
-  [A] Slot3 ΓÇö ThreeAndDWing  11.6  10.4   4.2  40.7   4.4   1.6  36.1   2.1   1.6  73.1   1.8   4.2   6.0   1.0   1.0   2.2   1.7
-  [A] Slot4 ΓÇö PostScorer  11.0  10.2   4.5  43.8   1.6   0.4  24.6   2.7   1.7  61.8   2.2   4.6   6.8   0.7   1.0   2.3   1.9
-  [A] Slot5 ΓÇö FloorGeneral  10.6  10.3   4.0  38.7   2.4   0.8  33.6   2.4   1.8  75.5   1.6   3.3   4.9   0.7   0.8   2.8   1.2
-  [B] Slot1 ΓÇö Slasher     18.1  14.1   7.2  50.8   2.2   0.7  31.7   4.3   3.1  72.2   1.2   3.3   4.5   0.9   0.4   3.0   1.0
-  [B] Slot2 ΓÇö AthleticBig  11.3   8.3   4.6  54.8   0.5   0.1  28.9   2.9   2.0  70.3   1.8   5.0   6.8   0.9   0.6   1.8   1.0
-  [B] Slot3 ΓÇö Slasher     15.9  13.1   6.2  47.4   2.3   0.7  29.1   4.0   2.7  69.0   1.2   3.3   4.5   0.8   0.5   2.8   0.8
-  [B] Slot4 ΓÇö RimRunner   11.3   9.3   4.6  49.4   1.3   0.4  30.7   2.9   1.7  58.8   1.7   5.0   6.8   0.8   0.7   2.5   1.1
-  [B] Slot5 ΓÇö AthleticBig   8.9   6.4   3.6  56.8   0.4   0.1  28.6   2.2   1.5  69.4   1.8   5.0   6.8   0.9   0.6   1.6   1.0
+  [A] Slot1 ΓÇö FloorGeneral  12.6  11.7   4.9  41.5   2.6   0.8  32.5   2.7   2.0  73.7   1.3   3.4   4.7   1.0   0.7   2.6   1.6
+  [A] Slot2 ΓÇö PerimeterShooter  11.3  10.3   4.1  40.0   4.2   1.5  35.4   2.2   1.6  73.2   1.0   2.5   3.5   1.0   0.8   2.1   1.3
+  [A] Slot3 ΓÇö ThreeAndDWing  11.4  10.2   4.1  40.3   4.4   1.6  35.7   2.0   1.5  76.7   1.6   3.9   5.5   0.8   0.9   1.9   1.6
+  [A] Slot4 ΓÇö PostScorer  10.9  10.1   4.5  44.0   1.6   0.4  24.3   2.7   1.6  61.5   2.7   4.4   7.2   0.6   1.0   2.0   2.0
+  [A] Slot5 ΓÇö FloorGeneral  10.6  10.3   4.1  39.5   2.4   0.8  33.1   2.2   1.7  75.0   1.6   3.5   5.1   0.9   0.9   2.4   1.2
+  [B] Slot1 ΓÇö Slasher     17.7  13.6   7.0  51.0   1.9   0.6  33.5   4.3   3.1  73.2   0.9   2.8   3.7   0.9   0.5   2.8   0.9
+  [B] Slot2 ΓÇö AthleticBig  11.8   8.4   4.6  55.5   0.6   0.2  30.3   3.3   2.3  70.6   1.9   5.3   7.3   0.8   0.6   1.7   0.9
+  [B] Slot3 ΓÇö Slasher     16.2  13.1   6.4  49.2   2.2   0.7  31.8   3.9   2.6  67.9   0.9   2.6   3.6   1.0   0.4   2.8   0.7
+  [B] Slot4 ΓÇö RimRunner   11.0   9.2   4.5  48.9   1.3   0.3  26.7   2.7   1.6  61.4   1.8   5.8   7.6   0.7   0.7   2.1   1.1
+  [B] Slot5 ΓÇö AthleticBig   9.1   6.5   3.7  56.5   0.5   0.1  33.2   2.2   1.6  72.0   1.9   5.3   7.2   0.7   0.7   1.5   1.0
 === END COHORT BOX SCORE ΓÇö Bucket 8 ===
 
 --- BUCKETS 7/8 PAIRED DIAGNOSTIC ---
   Athletic paired win rate:
     As Team A (Bucket 7): 73.8%   (= Bucket 7 Team A wins / Bucket 7 validGames)
-    As Team B (Bucket 8): 73.6%   (= Bucket 8 Team B wins / Bucket 8 validGames)
+    As Team B (Bucket 8): 72.8%   (= Bucket 8 Team B wins / Bucket 8 validGames)
     NOTE: Bucket 8 Athletic win rate computed directly from Team B wins ΓÇö NOT 1 ΓêÆ TeamAWinRate.
-  Mirror gap: abs(B7_AthleticWinRate ΓêÆ B8_AthleticWinRate) = 0.2%
+  Mirror gap: abs(B7_AthleticWinRate ΓêÆ B8_AthleticWinRate) = 1.0%
   (A large gap suggests physical-side asymmetry, seed-stream sensitivity, or remapping error;
    it does not by itself identify which cause is responsible.)
 
   Paired-game outcome agreement (same game seed, rosters swapped):
-    Mirrored result (Athletic wins both, Skill wins both, or both tie): 356 / 500
-    Disagreement (changing presentation changes the winner):             144 / 500
+    Mirrored result (Athletic wins both, Skill wins both, or both tie): 345 / 500
+    Disagreement (changing presentation changes the winner):             155 / 500
     Unpaired failures (one bucket game failed, no match):                0
     (pairedValidGames = games where both Bucket 7 and Bucket 8 game N succeeded)
     (Disagreement count is a sensitivity diagnostic, not a pass/fail condition.)
@@ -1922,14 +2127,14 @@
 
 --- CROSS-BUCKET SUMMARY TABLE ---
   Bucket                  WinA%  Ties%  PPP_A  PPP_B  FG%_A  FG%_B  3PA%A  3PA%B  Rim%A  Rim%B  ORB%A  ORB%B  Pace  Tr%A  Tr%B
-  AverageVsAverage          49%     3%  0.997  0.992    44%    44%    26%    26%    29%    30%    29%    30%   130   37%   38%
-  EliteVsWeak               99%     0%  1.260  0.762    57%    32%    27%    25%    30%    27%    40%    20%   131   47%   28%
-  EliteVsElite              48%     4%  1.092  1.093    51%    50%    27%    27%    29%    29%    29%    29%   132   34%   34%
-  WeakVsWeak                52%     2%  0.944  0.924    40%    40%    25%    25%    30%    30%    29%    29%   130   40%   39%
-  StarVsBalanced            58%     2%  1.082  1.036    50%    47%    26%    27%    33%    29%    28%    29%   131   36%   34%
-  ShootingVsAthletic        25%     3%  0.940  1.072    40%    51%    35%    13%    21%    54%    27%    31%   131   33%   41%
-  AthleticVsSkill           74%     2%  1.069  0.931    51%    41%    13%    28%    54%    22%    30%    28%   131   40%   33%
-  SkillVsAthletic           23%     3%  0.939  1.063    41%    51%    28%    13%    23%    54%    28%    30%   131   34%   40%
+  AverageVsAverage          45%     3%  0.978  0.990    43%    43%    27%    26%    30%    30%    29%    30%   130   38%   38%
+  EliteVsWeak              100%     0%  1.300  0.721    56%    32%    27%    26%    31%    26%    49%    13%   131   49%   25%
+  EliteVsElite              51%     3%  1.094  1.070    50%    49%    27%    27%    28%    29%    28%    29%   132   35%   34%
+  WeakVsWeak                49%     3%  0.934  0.920    40%    39%    25%    24%    30%    30%    29%    29%   130   40%   39%
+  StarVsBalanced            60%     4%  1.092  1.035    50%    47%    26%    27%    34%    28%    29%    29%   131   36%   34%
+  ShootingVsAthletic        22%     2%  0.922  1.068    39%    51%    35%    13%    20%    54%    25%    32%   131   33%   41%
+  AthleticVsSkill           74%     2%  1.058  0.934    51%    41%    13%    28%    54%    22%    30%    28%   131   40%   33%
+  SkillVsAthletic           24%     3%  0.941  1.065    41%    52%    29%    13%    22%    55%    28%    30%   131   34%   39%
 
 STRESS TEST PASSED
 === END STRESS TEST ===

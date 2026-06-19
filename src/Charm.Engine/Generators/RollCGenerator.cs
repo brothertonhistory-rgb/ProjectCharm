@@ -1,47 +1,42 @@
 namespace Charm.Engine;
 
 /// <summary>
-/// Stub pie generator for Roll C. Returns the configured weights for the turnover
+/// Real pie generator for Roll C. Returns the configured weights for the turnover
 /// CONTEXT the ticket arrived with — the ticket/station mechanism: a feeding
 /// station stamps <see cref="TurnoverContext"/> on the <see cref="Continue"/>, and
 /// this node reads it to pick a parameter set, NEVER querying who fed it.
 ///
-/// <para>Two context sets this session: <see cref="TurnoverContext.Halfcourt"/>
-/// (the legacy/default 30/22/18/20/10 — every pre-Roll-J feeder, stamping nothing,
-/// lands here) and <see cref="TurnoverContext.Transition"/> (Roll J's outlet/push
-/// set: more live strips going the other way). The Halfcourt path is byte-for-byte
-/// unchanged.</para>
+/// <para>Three context sets: <see cref="TurnoverContext.Halfcourt"/> (the default;
+/// every feeder that stamps nothing lands here), <see cref="TurnoverContext.Transition"/>
+/// (Roll J's outlet/push set: more live strips), and
+/// <see cref="TurnoverContext.EntryBackcourt"/> (the backcourt bring-up: bad passes,
+/// live strips, and the three backcourt-only violations — 5-second inbound,
+/// 10-second backcourt, shot-clock on the way up). The Halfcourt and Transition
+/// paths are byte-for-byte unchanged from the stub.</para>
 ///
-/// <para>One live wire on top of the selected set: a single 0–1 <c>pressure</c>
-/// scalar nudges the live-strip slice (then renormalizes) — placeholder proving the
-/// generator->roll seam carries signal, NOT basketball logic. The real
-/// attribute-driven generator replaces this without touching Roll C or the
-/// resolver.</para>
+/// <para>Flat weights: no player-attribute tilt, no pressure parameter. Pressure
+/// changes how often a team turns it over (Roll A / Roll B / Roll F), not what
+/// KIND of turnover results. A player who rarely turns it over turns it over the
+/// same way as one who does — just less often. The pressure parameter that existed
+/// in the stub was a seam-test placeholder and has been retired.</para>
 /// </summary>
-public sealed class RollCStubPieGenerator
+public sealed class RollCGenerator
 {
     private readonly RollCConfig _cfg;
 
-    public RollCStubPieGenerator(RollCConfig cfg) => _cfg = cfg;
+    public RollCGenerator(RollCConfig cfg) => _cfg = cfg;
 
     /// <param name="state">Carried for signature parity with real generators;
-    /// the stub does not read it yet.</param>
-    /// <param name="pressure">0–1 live wire. Higher pressure nudges the
-    /// live-strip (LostBallLiveBall) slice up before renormalization. Applies to
-    /// whichever context set was selected.</param>
+    /// not read by this generator.</param>
     /// <param name="context">The turnover CONTEXT TICKET that selects the base
     /// weight set. Defaults to <see cref="TurnoverContext.Halfcourt"/> so a feeder
     /// that stamps nothing (a null ticket on the <see cref="Continue"/>) gets the
-    /// legacy pie — placed last with a default so the legacy call sites need no
-    /// change.</param>
+    /// legacy pie.</param>
     public Pie<TurnoverOutcome> Generate(
         PossessionState state,
-        double pressure = 0.0,
         TurnoverContext context = TurnoverContext.Halfcourt)
     {
-        var clamped = Math.Clamp(pressure, 0.0, 1.0);
-
-        // Select the base weight set by the ticket's context. The node reads the
+        // Select the weight set by the ticket's context. The node reads the
         // stamped context; it never queries the feeding station.
         var weights = context switch
         {
@@ -52,7 +47,7 @@ public sealed class RollCStubPieGenerator
                 [TurnoverOutcome.LostBallDeadBall]   = _cfg.BaseLostBallDeadBall,
                 [TurnoverOutcome.LostBallLiveBall]   = _cfg.BaseLostBallLiveBall,
                 [TurnoverOutcome.OffensiveFoul]      = _cfg.BaseOffensiveFoul,
-                // #5a expanded set, DORMANT here (all 0.0 — pie requires every member).
+                // expanded set, dormant in Halfcourt (all 0.0 — pie requires every member).
                 [TurnoverOutcome.Travel]                   = _cfg.BaseTravel,
                 [TurnoverOutcome.DoubleDribble]            = _cfg.BaseDoubleDribble,
                 [TurnoverOutcome.Carry]                    = _cfg.BaseCarry,
@@ -72,7 +67,7 @@ public sealed class RollCStubPieGenerator
                 [TurnoverOutcome.LostBallDeadBall]   = _cfg.TransitionLostBallDeadBall,
                 [TurnoverOutcome.LostBallLiveBall]   = _cfg.TransitionLostBallLiveBall,
                 [TurnoverOutcome.OffensiveFoul]      = _cfg.TransitionOffensiveFoul,
-                // #5a expanded set, DORMANT here (all 0.0 — pie requires every member).
+                // expanded set, dormant in Transition (all 0.0 — pie requires every member).
                 [TurnoverOutcome.Travel]                   = _cfg.TransitionTravel,
                 [TurnoverOutcome.DoubleDribble]            = _cfg.TransitionDoubleDribble,
                 [TurnoverOutcome.Carry]                    = _cfg.TransitionCarry,
@@ -85,10 +80,11 @@ public sealed class RollCStubPieGenerator
                 [TurnoverOutcome.TenSecondBackcourt]       = _cfg.TransitionTenSecondBackcourt,
             },
 
-            // #5a: the Entry/Backcourt context (DORMANT — nothing routes here yet).
-            // The only context giving the new types real weight; exercised solely by
-            // the isolation check until #5b wires Roll A's loss exit into it. Lists
-            // every member, as Pie requires.
+            // EntryBackcourt: the backcourt bring-up context, now live.
+            // Gives real weight to the three backcourt-only violations (5-second
+            // inbound, 10-second backcourt, shot-clock on the way up). Halfcourt-only
+            // types (travel, 3-second, carry, offensive foul, offensive goaltending)
+            // and over-and-back are 0.0 — you haven't crossed halfcourt yet.
             TurnoverContext.EntryBackcourt => new Dictionary<TurnoverOutcome, double>
             {
                 [TurnoverOutcome.BadPassDeadBall]    = _cfg.EntryBackcourtBadPassDeadBall,
@@ -111,14 +107,6 @@ public sealed class RollCStubPieGenerator
             _ => throw new InvalidOperationException(
                 $"No Roll C pie for turnover context '{context}'.")
         };
-
-        // Live wire: pressure nudges the live-strip slice up on the SELECTED set,
-        // then renormalize so the pie sums to 1 (the Pie constructor validates it).
-        weights[TurnoverOutcome.LostBallLiveBall] += clamped * _cfg.PressureLostBallLiveBallNudge;
-
-        var total = weights.Values.Sum();
-        foreach (var key in weights.Keys.ToList())
-            weights[key] /= total;
 
         return new Pie<TurnoverOutcome>(weights, _cfg.Epsilon);
     }

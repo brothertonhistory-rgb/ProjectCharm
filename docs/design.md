@@ -5563,3 +5563,35 @@ All six on-walk pickers are now wired. Every post-hoc harness `WeightedDraw` has
 - **Roll D real generator** (defensive foul flavor). Future session.
 - **Mismatch-hunting / help-defense model for DefenderPicker.** Noted in `DefenderPicker.cs` itself; a future session.
 - **Team rebounds** (ball out of bounds off a miss). No individual credited; deferred.
+
+---
+
+## Phase 37 — Roll C Real Generator: Flat Context-Driven Type-Mix (2026-06-19)
+
+### What Roll C models
+
+Roll C answers one question: given that a possession ended in a turnover, what *kind* was it? The answer depends on the game situation — where the ball was and what the offense was trying to do — not on individual player attributes. A sure-handed guard who rarely turns it over turns it over the same *way* as a turnover-prone one; it's just rarer.
+
+### Three flat pies, one per context
+
+Roll C selects one of three fixed weight sets based on the `TurnoverContext` ticket stamped on the incoming `Continue`:
+
+- **Halfcourt** — the default. Every turnover that doesn't arrive with a context ticket (Roll B's loss, Roll F's player-action turnovers, Roll A's frontcourt re-inbound) lands here. Bad passes, lost balls, travels, carries, violations — the full menu of halfcourt turnovers. Backcourt-only types (FiveSecondInbound, TenSecondBackcourt) are zero.
+- **Transition** — stamped by Roll J's Turnover arm. More live strips (LostBallLiveBall 35%) than Halfcourt (16%); offensive fouls nearly vanish (5%). The live/dead split is higher because transition turnovers are more often contested breaks, not set-play mistakes.
+- **EntryBackcourt** — stamped by Roll A when `state.Frontcourt == false`. The backcourt bring-up context, now live. Only types that can happen before crossing halfcourt: bad passes, lost balls, and the three backcourt-only violations (FiveSecondInbound, TenSecondBackcourt, ShotClockViolation on the way up). Travels, carries, 3-second violations, offensive fouls, and over-and-back are zero — you haven't crossed halfcourt yet.
+
+### No pressure parameter
+
+The stub's pressure wire (`PressureLostBallLiveBallNudge`) was a seam-test placeholder — it proved the generator→roll seam could carry signal, not that pressure should influence the type-mix. Pressure changes how often a team turns it over (Roll A/B/F), not what kind of turnover results when they do. The parameter was always called at 0.0 in every call site; its removal is a mathematical no-op, confirmed by the corpus hash being unchanged.
+
+### No player-attribute tilt
+
+Turnover type is context-driven, not player-driven. This is a deliberate design call: the type depends on the phase of play (bring-up, halfcourt set, transition break), not on who has the ball. Player attributes tilt how often a turnover happens and who commits it (Roll A/B/F and `TurnoverCommitterPicker`), not what form it takes once it happens.
+
+Calibration of all three pies is explicitly deferred until all generators are wired. Current weights are shape-appropriate placeholders.
+
+### What is not this session
+
+- **Calibration** of any Roll C weight. Live/dead split calibration is deferred.
+- **Roll D real generator** (defensive foul flavor). Future session.
+- **Transition expanded types** (Travel, DoubleDribble in Transition). Currently zero; a calibration-session question.
