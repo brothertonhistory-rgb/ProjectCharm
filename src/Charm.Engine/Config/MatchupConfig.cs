@@ -879,6 +879,17 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"StealerPostnessScale must be > 0: got {cfg.StealerPostnessScale}.");
 
+        // Phase 35 — wingspan in rebound battle and attribution.
+        if (cfg.ReboundWingspanWeight < 0.0)
+            throw new InvalidOperationException(
+                $"ReboundWingspanWeight must be >= 0: got {cfg.ReboundWingspanWeight}.");
+        if (cfg.ReboundWingspanSwing < 0.0 || cfg.ReboundWingspanSwing >= 1.0)
+            throw new InvalidOperationException(
+                $"ReboundWingspanSwing must be in [0, 1): got {cfg.ReboundWingspanSwing}.");
+        if (cfg.ReboundWingspanScale <= 0.0)
+            throw new InvalidOperationException(
+                $"ReboundWingspanScale must be > 0: got {cfg.ReboundWingspanScale}.");
+
         return cfg;
     }
 
@@ -887,7 +898,8 @@ public sealed class MatchupConfig
     // =========================================================================
 
     // --- Phase 10: pre-staging team-size composite blend.
-    //     ReboundPhysical(p) = ReboundStrengthWeight * p.Strength + ReboundHeightWeight * p.Height.
+    //     ReboundPhysical(p) = ReboundStrengthWeight * p.Strength + ReboundHeightWeight * p.Height
+    //                        + ReboundWingspanWeight * p.Wingspan   (Phase 35).
     //     Weights need not sum to 1 (a weighted read, like LengthRating). Placeholders. ---
 
     /// <summary>Weight of <see cref="Player.Strength"/> in the pre-staging size composite.
@@ -897,6 +909,11 @@ public sealed class MatchupConfig
     /// <summary>Weight of <see cref="Player.Height"/> in the pre-staging size composite.
     /// Calibration placeholder — equal thirds for now.</summary>
     public double ReboundHeightWeight { get; set; } = 0.5;
+
+    /// <summary>Weight of <see cref="Player.Wingspan"/> in the pre-staging size composite
+    /// (Phase 35). A longer-armed team wins more boards at the team level.
+    /// Calibration placeholder — matches existing equal-ish weight convention.</summary>
+    public double ReboundWingspanWeight { get; set; } = 0.5;
 
     // --- Phase 10: positional composite (Postness) blend.
     //     Postness(p) = PostnessHeight * p.Height + PostnessPostDefense * p.PostDefense
@@ -954,6 +971,22 @@ public sealed class MatchupConfig
     /// and can't crash his own miss as easily. Default 0.35 (significant but not zeroed).
     /// Must be in [0.0, 1.0] (enforced in Load). Calibration placeholder.</summary>
     public double ReboundShooterNerf { get; set; } = 0.35;
+
+    // --- Phase 35: within-team wingspan attribution tilt (for both pickers).
+    //     ReboundWingspanMultiplier(ws, meanWs) = 1 + Swing * tanh((ws − meanWs) / Scale).
+    //     Swing < 1.0 keeps the multiplier strictly positive; Scale > 0 required.
+    //     This is REBOUNDING-SPECIFIC — not folded into Postness, to avoid touching
+    //     turnover pickers and steals (Phase 35 invariant #4). Calibration placeholders. ---
+
+    /// <summary>Half-amplitude of the wingspan attribution multiplier. Default 0.10 →
+    /// range (0.90, 1.10) — a gentle secondary tilt within a team.
+    /// Must be in [0, 1) (enforced in Load). Calibration placeholder.</summary>
+    public double ReboundWingspanSwing { get; set; } = 0.10;
+
+    /// <summary>Rating-point wingspan spread at which one Swing unit is reached (tanh
+    /// saturation knob). Default 15.0 — mirrors <see cref="ReboundPositionalScale"/>.
+    /// Must be &gt; 0 (enforced in Load). Calibration placeholder.</summary>
+    public double ReboundWingspanScale { get; set; } = 15.0;
 
     // --- Phase 10: off-share floor and ceiling.
     //     The tanh saturation asymptotes toward these values without crossing.

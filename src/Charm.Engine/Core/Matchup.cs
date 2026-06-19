@@ -335,19 +335,51 @@ public static class Matchup
     // =========================================================================
 
     /// <summary>
-    /// The pre-staging team-size composite for rebounding (Phase 10, stage 1).
-    /// A weighted read of a player's physical presence on the glass — height and
-    /// strength. Mirrors <see cref="LengthRating"/> in shape; blend weights live
-    /// in config so the "tune the size composite" pass is trivial.
+    /// The pre-staging team-size composite for rebounding (Phase 10, stage 1;
+    /// extended Phase 35 to include wingspan).
+    /// A weighted read of a player's physical presence on the glass — height,
+    /// strength, and wingspan. Mirrors <see cref="LengthRating"/> in shape;
+    /// blend weights live in config so the "tune the size composite" pass is
+    /// trivial.
     ///
     /// <para>Used as the external comparison (team A's mean vs team B's mean) to
     /// decide which team physically wins the board before skill enters. A 7-footer
-    /// helps his team against a small lineup and hurts it against giants because
-    /// the comparison is <em>relative</em>.</para>
+    /// with long arms helps his team against a small lineup and hurts it against
+    /// giants because the comparison is <em>relative</em>.</para>
     /// </summary>
     public static double ReboundPhysical(Player p, MatchupConfig cfg)
-        => cfg.ReboundStrengthWeight * p.Strength
-         + cfg.ReboundHeightWeight   * p.Height;
+        => cfg.ReboundStrengthWeight  * p.Strength
+         + cfg.ReboundHeightWeight    * p.Height
+         + cfg.ReboundWingspanWeight  * p.Wingspan;
+
+    /// <summary>
+    /// The within-team wingspan tilt for individual rebound attribution (Phase 35).
+    /// Returns a multiplier centered at 1.0: a player with longer arms than his
+    /// lineup average pulls a slightly larger share; one with shorter arms pulls
+    /// slightly less. The tanh asymptote keeps the effect gentle regardless of
+    /// how extreme the wingspan gap is.
+    ///
+    /// <para><b>Formula.</b>
+    /// <c>1 + ReboundWingspanSwing · tanh((playerWingspan − lineupMeanWingspan) / ReboundWingspanScale)</c>.
+    /// At the default Swing = 0.10 the range is (0.90, 1.10) — a 10 % tilt at
+    /// most. <see cref="MatchupConfig.ReboundWingspanSwing"/> and
+    /// <see cref="MatchupConfig.ReboundWingspanScale"/> govern the magnitude.</para>
+    ///
+    /// <para><b>Rebounding-specific.</b> This helper is intentionally separate from
+    /// <see cref="Postness"/> and <see cref="PositionalWeight"/> — adding it there
+    /// would silently change turnover pickers and steals, which must not be touched
+    /// here (Phase 35 invariant #4).</para>
+    ///
+    /// <para>Used by <see cref="OffensiveRebounderPicker"/> and
+    /// <c>DefensiveRebounderPicker</c> at the attribution layer — not in the team
+    /// battle, where wingspan already enters via <see cref="ReboundPhysical"/>.</para>
+    /// </summary>
+    public static double ReboundWingspanMultiplier(
+        double playerWingspan,
+        double lineupMeanWingspan,
+        MatchupConfig cfg)
+        => 1.0 + cfg.ReboundWingspanSwing
+               * Math.Tanh((playerWingspan - lineupMeanWingspan) / cfg.ReboundWingspanScale);
 
     /// <summary>
     /// The positional composite for rebounding (Phase 10, stage 2). A weighted

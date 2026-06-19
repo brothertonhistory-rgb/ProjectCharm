@@ -2,17 +2,19 @@ namespace Charm.Engine;
 
 /// <summary>
 /// Picks WHICH offensive player secured an offensive rebound, conditional on
-/// Roll I already awarding the board to the offense (Phase 31, v1).
+/// Roll I already awarding the board to the offense (Phase 31, v1; Phase 35
+/// adds the wingspan factor).
 ///
 /// <para><b>Weight formula — echoes the team math exactly.</b> Each offensive
 /// player's pick weight is
-/// <c>OffensiveRebounding × PositionalWeight(Postness) × shooterNerf</c> —
+/// <c>OffensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier × shooterNerf</c> —
 /// the identical per-player term that <see cref="Matchup.OffensiveReboundShare"/>
-/// sums to produce the team weighted-mean. Using the same
-/// <see cref="Matchup"/> statics (not a re-implementation) keeps the two layers
-/// provably consistent: whoever the team battle treats as the dominant rebounder
-/// is also whom this pick favors. The shooter nerf fires only on perimeter zones
-/// (Three / Long / Mid), matching the team math's offense loop exactly.</para>
+/// sums to produce the team weighted-mean, now extended with the same
+/// <see cref="Matchup.ReboundWingspanMultiplier"/> added to the battle in Phase 35.
+/// Using the same <see cref="Matchup"/> statics (not a re-implementation) keeps the
+/// two layers provably consistent: whoever the team battle treats as the dominant
+/// rebounder is also whom this pick favors. The shooter nerf fires only on perimeter
+/// zones (Three / Long / Mid), matching the team math's offense loop exactly.</para>
 ///
 /// <para><b>Conditional-within-side (Option A).</b> The pick fires DOWNSTREAM of
 /// Roll I's offense-vs-defense verdict — it never re-litigates whether the offense
@@ -38,7 +40,7 @@ public static class OffensiveRebounderPicker
     /// Consumes exactly one <paramref name="rng"/> draw.
     ///
     /// <para>Weight per populated offensive player:
-    /// <c>max(1, OffensiveRebounding × PositionalWeight(Postness) × shooterNerf)</c>,
+    /// <c>max(1, OffensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier × shooterNerf)</c>,
     /// normalized among the five slots. Null slots contribute 0.
     /// Throws <see cref="InvalidOperationException"/> if no offensive slot is
     /// populated — an offensive rebound with zero offensive players is an
@@ -50,8 +52,10 @@ public static class OffensiveRebounderPicker
     /// null or Rim / Short means no nerf, matching the team math).</param>
     /// <param name="game">Live game state — provides the offensive lineup and roster.</param>
     /// <param name="matchupCfg">Matchup configuration — supplies the Postness coefficients,
-    /// PositionalWeight swing/scale, and ReboundShooterNerf. Same config the team battle uses,
-    /// so the two layers are definitionally consistent.</param>
+    /// PositionalWeight swing/scale, ReboundShooterNerf, and the Phase 35 wingspan
+    /// parameters (<see cref="MatchupConfig.ReboundWingspanSwing"/>,
+    /// <see cref="MatchupConfig.ReboundWingspanScale"/>). Same config the team battle
+    /// uses, so the two layers are definitionally consistent.</param>
     /// <param name="rng">RNG source. Consumes exactly one NextUnitInterval draw.</param>
     public static Slot Pick(
         PossessionState state,
@@ -69,10 +73,11 @@ public static class OffensiveRebounderPicker
                                        or ShotLocation.Long
                                        or ShotLocation.Mid;
 
-        // ── Stage 1: compute postness for each populated offensive player ─────────
+        // ── Stage 1: compute postness and wingspan for each populated offensive player ──
         // Mirrors the offense loop in Matchup.OffensiveReboundShare: same per-player
         // term, same lineup-mean baseline, same Matchup statics.
         var postnesses  = new double[5];
+        var wingspans   = new double[5];
         var populated   = new bool[5];
         var playerCount = 0;
 
@@ -82,6 +87,7 @@ public static class OffensiveRebounderPicker
             var p    = roster.PlayerAt(slot);
             if (p is null) continue;
             postnesses[i] = Matchup.Postness(p, matchupCfg);
+            wingspans[i]  = p.Wingspan;
             populated[i]  = true;
             playerCount++;
         }
@@ -96,8 +102,15 @@ public static class OffensiveRebounderPicker
             if (populated[i]) meanPostness += postnesses[i];
         meanPostness /= playerCount;
 
+        var meanWingspan = 0.0;
+        for (var i = 0; i < 5; i++)
+            if (populated[i]) meanWingspan += wingspans[i];
+        meanWingspan /= playerCount;
+
         // ── Stage 2: compute per-player pick weights ──────────────────────────────
-        // weight = max(1, OffensiveRebounding × PositionalWeight(postness) × shooterNerf)
+        // weight = max(1, OffensiveRebounding × PositionalWeight(postness)
+        //                                     × ReboundWingspanMultiplier
+        //                                     × shooterNerf)
         // The floor of 1 ensures every populated slot has a positive (if tiny) draw
         // probability, matching the intent of the team math's positional weighting.
         var weights   = new double[5];
@@ -111,12 +124,13 @@ public static class OffensiveRebounderPicker
             var p    = roster.PlayerAt(slot)!;   // non-null: populated[i] is true
 
             var pw         = Matchup.PositionalWeight(postnesses[i], meanPostness, matchupCfg);
+            var wm         = Matchup.ReboundWingspanMultiplier(wingspans[i], meanWingspan, matchupCfg);
             var isShooter  = state.SelectedSlot is { } sel
                              && sel.Side   == offense
                              && sel.Number == slot.Number;
             var shooterNerf = isShooter && nerfZones ? matchupCfg.ReboundShooterNerf : 1.0;
 
-            weights[i]   = Math.Max(1.0, p.OffensiveRebounding * pw * shooterNerf);
+            weights[i]   = Math.Max(1.0, p.OffensiveRebounding * pw * wm * shooterNerf);
             totalWeight += weights[i];
         }
 

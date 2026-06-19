@@ -146,6 +146,7 @@ internal static class Program
         ok &= Phase32PutbackAttemptRateCheck(configPath);     // Phase 32
         ok &= Phase33TurnoverCommitterCheck(configPath);      // Phase 33
         ok &= Phase34TurnoverAttributionCheck(configPath);    // Phase 34
+        ok &= Phase35DefensiveReboundCheck(configPath);       // Phase 35
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -5379,9 +5380,10 @@ internal static class Program
         var t = new PlayerBoxTotals();
         var rng = new Random(seed + 2);
         // Phase 25: separate RNG for shooting-foul draws so the seed+2 stream
-        // (DReb/BLK — Phase 34) is consumed identically — those numbers do not move.
+        // (BLK — the one remaining post-hoc WeightedDraw after Phase 35) is consumed
+        // identically — those numbers do not move.
         // OReb moved to engine-stamped in Phase 31; TO committer moved in Phase 33;
-        // STL moved in Phase 34. Only DReb and BLK remain as harness WeightedDraws.
+        // STL moved in Phase 34; DReb moved in Phase 35. Only BLK remains as a harness WeightedDraw.
         var foulRng = new Random(seed + 3);
         var homeRoster = game.RosterFor(TeamSide.Home);
         var awayRoster = game.RosterFor(TeamSide.Away);
@@ -5424,17 +5426,19 @@ internal static class Program
                 var stlp = defRoster.PlayerAt(new Slot(r.Defense, stlSlot));
                 if (stlp != null && stlp.PlayerId >= 1 && stlp.PlayerId <= 10) t.Stl[stlp.PlayerId - 1]++;
             }
-            // DReb
+            // DReb — Phase 35: read engine-stamped slot from DefensiveRebounderSlot.
             if (r.EndLabel == "DefensiveRebound")
             {
-                var dSlot = WeightedDraw(rng, r.Defense, defRoster, p => p.Height + p.Strength + p.Wingspan + p.DefensiveRebounding);
-                var dp = defRoster.PlayerAt(new Slot(r.Defense, dSlot));
+                var drebSlot = r.DefensiveRebounderSlot
+                    ?? throw new InvalidOperationException(
+                        "Phase 35: DefensiveRebounderSlot null on a defensive-rebound possession — " +
+                        "the engine defensive-rebound pick should stamp every DReb possession. Wiring break.");
+                var dp = defRoster.PlayerAt(new Slot(r.Defense, drebSlot));
                 if (dp != null && dp.PlayerId >= 1 && dp.PlayerId <= 10) t.DReb[dp.PlayerId - 1]++;
             }
             // OReb — Phase 31: read engine-stamped picks from OrbBySlot rather than
             // drawing post-hoc. OrbBySlot.Total == r.OrbWon on every possession
-            // (asserted in Phase31RebounderPickerCheck). The DReb draw stays a
-            // WeightedDraw (no in-possession consumer; out of scope).
+            // (asserted in Phase31RebounderPickerCheck). DReb moved engine-side in Phase 35.
             for (var s = 1; s <= 5; s++)
             {
                 var orbCount = r.OrbBySlot[s];
@@ -5451,9 +5455,10 @@ internal static class Program
                 if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 10) t.Blk[bp.PlayerId - 1]++;
             }
             // Phase 25: shooting-foul attribution. Separate RNG (seed+3) so the seed+2
-            // stream (DReb/BLK — Phase 34) is consumed identically — those numbers do not move.
+            // stream (BLK — the one remaining post-hoc WeightedDraw after Phase 35) is
+            // consumed identically — those numbers do not move.
             // OReb moved to engine-stamped in Phase 31; TO committer moved in Phase 33;
-            // STL moved in Phase 34. Only DReb and BLK remain as harness WeightedDraws.
+            // STL moved in Phase 34; DReb moved in Phase 35. Only BLK remains.
             if (r.ShootingFouls is { } sfs)
                 foreach (var sf in sfs)
                 {
@@ -7087,7 +7092,7 @@ internal static class Program
         // Helper: build a player with all attributes at baseline b; override specific ones.
         static Player Mk(int b,
                          int? str = null, int? height = null, int? offReb = null,
-                         int? defReb = null, int? postDef = null)
+                         int? defReb = null, int? postDef = null, int? wingspan = null)
             => new Player("p")
             {
                 Outside = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
@@ -7097,7 +7102,7 @@ internal static class Program
                 PerimeterDefense = b, PostDefense = postDef ?? b, RimProtection = b,
                 DefensiveRebounding  = defReb  ?? b,
                 Steals = b,
-                Height = height ?? b, Wingspan = b, Weight = b,
+                Height = height ?? b, Wingspan = wingspan ?? b, Weight = b,
                 Strength = str ?? b, Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
                 Discipline = b,
@@ -7344,6 +7349,47 @@ internal static class Program
         }
         catch (Exception ex) { gOk = false; Console.WriteLine($"  FAIL  (g) threw: {ex.Message}"); }
         pass &= gOk;
+
+        // ── (h) Wingspan direction in the battle (Phase 35) ─────────────────────
+        // Two otherwise-identical all-50 lineups; vary ONLY wingspan between them.
+        // Longer DEFENSE (wingspan=80) vs baseline offense (50) → off-share DROPS.
+        // Longer OFFENSE (wingspan=80) vs baseline defense (50) → off-share RISES.
+        // (All other attributes equal, so ReboundPhysical height/strength cancel out.)
+        Console.WriteLine("  (h) Phase 35 wingspan direction (battle): longer defense lowers off-share; longer offense raises it:");
+        bool hOk;
+        try
+        {
+            var baseOff5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+            var baseDef5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
+            var longDef5 = new[] { Mk(50, wingspan: 80), Mk(50, wingspan: 80), Mk(50, wingspan: 80),
+                                   Mk(50, wingspan: 80), Mk(50, wingspan: 80) };
+            var longOff5 = new[] { Mk(50, wingspan: 80), Mk(50, wingspan: 80), Mk(50, wingspan: 80),
+                                   Mk(50, wingspan: 80), Mk(50, wingspan: 80) };
+
+            var stRim = ShotLocation.Rim;
+
+            var gNeutral   = BuildGame(baseOff5, baseDef5);
+            var stNeutral  = St(gNeutral, stRim);
+            var dNeutral   = Split(cfgI, cfgMatchup, gNeutral, stNeutral);
+            var shareNeutral = dNeutral[ReboundOutcome.OffensiveRebound] / liveMass;
+
+            var gLongDef   = BuildGame(baseOff5, longDef5);
+            var stLongDef  = St(gLongDef, stRim);
+            var dLongDef   = Split(cfgI, cfgMatchup, gLongDef, stLongDef);
+            var shareLongDef = dLongDef[ReboundOutcome.OffensiveRebound] / liveMass;
+
+            var gLongOff   = BuildGame(longOff5, baseDef5);
+            var stLongOff  = St(gLongOff, stRim);
+            var dLongOff   = Split(cfgI, cfgMatchup, gLongOff, stLongOff);
+            var shareLongOff = dLongOff[ReboundOutcome.OffensiveRebound] / liveMass;
+
+            hOk = shareLongDef < shareNeutral && shareLongOff > shareNeutral;
+            Console.WriteLine($"    neutral off-share={shareNeutral:F6}");
+            Console.WriteLine($"    longer defense:    off-share={shareLongDef:F6}  (should be < neutral: {(shareLongDef < shareNeutral ? "OK" : "FAIL")})");
+            Console.WriteLine($"    longer offense:    off-share={shareLongOff:F6}  (should be > neutral: {(shareLongOff > shareNeutral ? "OK" : "FAIL")})");
+        }
+        catch (Exception ex) { hOk = false; Console.WriteLine($"  FAIL  (h) threw: {ex.Message}"); }
+        pass &= hOk;
 
         Console.WriteLine(pass ? "  Phase 10 PASSED." : "  Phase 10 FAILED.");
         return pass;
@@ -12514,7 +12560,7 @@ internal static class Program
         // Helper: player with all attributes at b; override specific rebounding attributes.
         static Player MkP(int id, int b,
                           int? height = null, int? postDef = null,
-                          int? str    = null, int? orb     = null)
+                          int? str    = null, int? orb     = null, int? wingspan = null)
             => new Player($"p{id}")
             {
                 PlayerId             = id,
@@ -12525,7 +12571,7 @@ internal static class Program
                 PerimeterDefense     = b, PostDefense = postDef ?? b, RimProtection = b,
                 DefensiveRebounding  = b,
                 Steals               = b,
-                Height               = height  ?? b, Wingspan = b, Weight = b,
+                Height               = height  ?? b, Wingspan = wingspan ?? b, Weight = b,
                 Strength             = str     ?? b,
                 Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
@@ -12808,6 +12854,37 @@ internal static class Program
             Console.WriteLine(invOk
                 ? $"    [OK] OrbBySlot.Total == OrbWon on all {result.Possessions.Count:N0} possessions ({orbPossessions} with ORB > 0)"
                 : $"    [FAIL] {invariantFails} possessions violated OrbBySlot.Total == OrbWon");
+        }
+
+        // ── Sub-check 7 — Phase 35 wingspan tilt in offensive picker ─────────────
+        // Two otherwise-identical offensive players, one with longer arms. After the
+        // wingspan factor is added, the long-armed player's share must exceed the
+        // short-armed player's share. Shooter nerf is off (Rim zone, slot 1 is not
+        // long-armed). Confirms wingspan is rebounding-specific and in the right direction.
+        {
+            Console.WriteLine("  Sub-check 7 (Phase 35): wingspan tilt — long-armed offensive rebounder gets larger share");
+            var off = new[]
+            {
+                MkP(1, 50, height: 60, postDef: 60, str: 60, orb: 60, wingspan: 50),  // short-armed
+                MkP(2, 50, height: 60, postDef: 60, str: 60, orb: 60, wingspan: 70),  // long-armed
+                MkP(3, 50, height: 60, postDef: 60, str: 60, orb: 60, wingspan: 50),
+                MkP(4, 50, height: 60, postDef: 60, str: 60, orb: 60, wingspan: 50),
+                MkP(5, 50, height: 60, postDef: 60, str: 60, orb: 60, wingspan: 50),
+            };
+            var game  = BuildGame(off);
+            // Shooter is slot 3 (average-wingspan player) so the two test players are not nerfed.
+            var state = MkState(game, ShotLocation.Rim, shooterSlot: 3);
+            var rng   = new SystemRng(35001);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[OffensiveRebounderPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var shortArmShare = (double)counts[0] / N;  // slot 1: wingspan 50
+            var longArmShare  = (double)counts[1] / N;  // slot 2: wingspan 70
+            Console.WriteLine($"    short-arm (wingspan=50) share: {shortArmShare:P2}");
+            Console.WriteLine($"    long-arm  (wingspan=70) share: {longArmShare:P2}");
+            var sub7Ok = longArmShare > shortArmShare;
+            ok &= sub7Ok;
+            Console.WriteLine(sub7Ok ? "    [OK] long-armed player gets larger share" : "    [FAIL] wingspan tilt wrong direction");
         }
 
         Console.WriteLine();
@@ -13811,6 +13888,331 @@ internal static class Program
 
         Console.WriteLine();
         Console.WriteLine(ok ? "  Phase 34 turnover attribution check: PASSED" : "  Phase 34 turnover attribution check: FAILED (see [FAIL] lines above)");
+        return ok;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Phase 35 — defensive-rebound attribution on-walk (DefensiveRebounderPicker)
+    // ─────────────────────────────────────────────────────────────────────────
+    private static bool Phase35DefensiveReboundCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 35: defensive rebounder picker (DefensiveRebounderPicker) + on-walk attribution ---");
+        var ok = true;
+        const int N = 100_000;
+
+        var matchupCfg = MatchupConfig.Load(configPath);
+        var cfgD       = RollDConfig.Load(configPath);
+
+        // Helper: player with all attributes at b; override specific attributes.
+        static Player MkP35(int id, int b,
+                            int? height = null, int? postDef = null,
+                            int? str    = null, int? drb     = null, int? wingspan = null)
+            => new Player($"p{id}")
+            {
+                PlayerId             = id,
+                Outside              = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing          = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation         = b, PostMoves    = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding  = b,
+                PerimeterDefense     = b, PostDefense = postDef ?? b, RimProtection = b,
+                DefensiveRebounding  = drb ?? b,
+                Steals               = b,
+                Height               = height  ?? b, Wingspan = wingspan ?? b, Weight = b,
+                Strength             = str     ?? b,
+                Speed = b, Quickness = b, FirstStep = b,
+                Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
+                Discipline           = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Build a GameState with defPlayers on Away (state.Defense = Away).
+        GameState BuildGame35(Player[] offPlayers, Player[] defPlayers)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < offPlayers.Length && i < 5; i++)
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), offPlayers[i]);
+            for (var i = 0; i < defPlayers.Length && i < 5; i++)
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), defPlayers[i]);
+            return g;
+        }
+
+        // Possession state: Home offends, Away defends.
+        static PossessionState MkState35()
+            => new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+
+        var offDummy = Enumerable.Range(6, 5).Select(i => MkP35(i, 50)).ToArray();
+
+        // ── Sub-check 1 — Bigs favored (C/PF pull disproportionate share) ────────
+        {
+            Console.WriteLine("  Sub-check 1: defensive picker bigs favored (C > PG, PF > SF)");
+            var def = new[]
+            {
+                MkP35(1, 50, height: 40, postDef: 42, str: 44, drb: 35),  // PG
+                MkP35(2, 50, height: 45, postDef: 44, str: 46, drb: 42),  // SG
+                MkP35(3, 50, height: 55, postDef: 55, str: 55, drb: 52),  // SF
+                MkP35(4, 50, height: 72, postDef: 70, str: 72, drb: 72),  // PF
+                MkP35(5, 50, height: 86, postDef: 82, str: 82, drb: 85),  // C
+            };
+            var game  = BuildGame35(offDummy, def);
+            var state = MkState35();
+            var rng   = new SystemRng(35101);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[DefensiveRebounderPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var shares = counts.Select(c => (double)c / N).ToArray();
+            Console.WriteLine($"    PG={shares[0]:P2}  SG={shares[1]:P2}  SF={shares[2]:P2}  PF={shares[3]:P2}  C={shares[4]:P2}");
+            var sub1Ok = shares[4] > shares[0] && shares[3] > shares[2];
+            ok &= sub1Ok;
+            Console.WriteLine(sub1Ok ? "    [OK]" : "    [FAIL] big-favored direction wrong");
+        }
+
+        // ── Sub-check 2 — Guard floor holds ──────────────────────────────────────
+        {
+            Console.WriteLine("  Sub-check 2: defensive picker guard floor holds (PG > 1%)");
+            var def = new[]
+            {
+                MkP35(1, 50, height: 40, postDef: 42, str: 44, drb: 35),
+                MkP35(2, 50, height: 45, postDef: 44, str: 46, drb: 42),
+                MkP35(3, 50, height: 55, postDef: 55, str: 55, drb: 52),
+                MkP35(4, 50, height: 72, postDef: 70, str: 72, drb: 72),
+                MkP35(5, 50, height: 86, postDef: 82, str: 82, drb: 85),
+            };
+            var game  = BuildGame35(offDummy, def);
+            var state = MkState35();
+            var rng   = new SystemRng(35102);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[DefensiveRebounderPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var pgShare = (double)counts[0] / N;
+            Console.WriteLine($"    PG share={pgShare:P2}  (bound: > 1%)");
+            var sub2Ok = pgShare > 0.01;
+            ok &= sub2Ok;
+            Console.WriteLine(sub2Ok ? "    [OK]" : "    [FAIL] PG share below floor");
+        }
+
+        // ── Sub-check 3 — Wingspan tilt ───────────────────────────────────────────
+        {
+            Console.WriteLine("  Sub-check 3: wingspan tilt — long-armed defender > short-armed identical teammate");
+            var def = new[]
+            {
+                MkP35(1, 50, height: 60, postDef: 60, str: 60, drb: 60, wingspan: 50),  // short-armed
+                MkP35(2, 50, height: 60, postDef: 60, str: 60, drb: 60, wingspan: 70),  // long-armed
+                MkP35(3, 50, height: 60, postDef: 60, str: 60, drb: 60, wingspan: 50),
+                MkP35(4, 50, height: 60, postDef: 60, str: 60, drb: 60, wingspan: 50),
+                MkP35(5, 50, height: 60, postDef: 60, str: 60, drb: 60, wingspan: 50),
+            };
+            var game  = BuildGame35(offDummy, def);
+            var state = MkState35();
+            var rng   = new SystemRng(35103);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+                counts[DefensiveRebounderPicker.Pick(state, game, matchupCfg, rng).Number - 1]++;
+            var shortShare = (double)counts[0] / N;
+            var longShare  = (double)counts[1] / N;
+            Console.WriteLine($"    short-arm (wingspan=50) share={shortShare:P2}  long-arm (wingspan=70) share={longShare:P2}");
+            var sub3Ok = longShare > shortShare;
+            ok &= sub3Ok;
+            Console.WriteLine(sub3Ok ? "    [OK]" : "    [FAIL] wingspan tilt wrong direction");
+        }
+
+        // ── Sub-check 4 — Reproducibility ────────────────────────────────────────
+        {
+            Console.WriteLine("  Sub-check 4: same seed → identical sequence");
+            var def = new[]
+            {
+                MkP35(1, 60, height: 42, postDef: 44, str: 50, drb: 35),
+                MkP35(2, 60, height: 78, postDef: 76, str: 80, drb: 85),
+            };
+            var game  = BuildGame35(offDummy, def);
+            var state = MkState35();
+            const int RepSeed = 35104;
+            var run1 = new List<int>(); var run2 = new List<int>();
+            var rng1 = new SystemRng(RepSeed); var rng2 = new SystemRng(RepSeed);
+            for (var i = 0; i < 200; i++)
+            {
+                run1.Add(DefensiveRebounderPicker.Pick(state, game, matchupCfg, rng1).Number);
+                run2.Add(DefensiveRebounderPicker.Pick(state, game, matchupCfg, rng2).Number);
+            }
+            var sub4Ok = run1.SequenceEqual(run2);
+            ok &= sub4Ok;
+            Console.WriteLine(sub4Ok ? "    [OK]" : "    [FAIL] same seed produced different sequences");
+        }
+
+        // ── Sub-check 5 — Empty-defense throw ────────────────────────────────────
+        {
+            Console.WriteLine("  Sub-check 5: empty defense throws");
+            var game  = BuildGame35(offDummy, Array.Empty<Player>());  // no Away players
+            var state = MkState35();
+            var rng   = new SystemRng(1);
+            var threw = false;
+            try { DefensiveRebounderPicker.Pick(state, game, matchupCfg, rng); }
+            catch (InvalidOperationException) { threw = true; }
+            ok &= threw;
+            Console.WriteLine(threw ? "    [OK]" : "    [FAIL] empty defense did not throw");
+        }
+
+        // ── Sub-check 6 — Defensive matches offensive shape (minus shooterNerf) ───
+        // Same roster through both pickers. Ordering of shares must agree:
+        // whoever ranks highest on the offense side also ranks highest on the defense side
+        // (both are driven by the same DefReb=DRb / OffReb=ORb placeholder; set them equal).
+        {
+            Console.WriteLine("  Sub-check 6: defensive and offensive share ordering agree (same roster, no nerf)");
+            var players = new[]
+            {
+                MkP35(1, 50, height: 40, postDef: 42, str: 44, drb: 35, wingspan: 50),
+                MkP35(2, 50, height: 55, postDef: 55, str: 55, drb: 55, wingspan: 55),
+                MkP35(3, 50, height: 72, postDef: 70, str: 70, drb: 72, wingspan: 70),
+                MkP35(4, 50, height: 86, postDef: 82, str: 82, drb: 85, wingspan: 80),
+                MkP35(5, 50, height: 40, postDef: 42, str: 44, drb: 35, wingspan: 50),
+            };
+            // Mirror OffReb = DRb so the two pickers see identical skill inputs.
+            var playersOffSide = players.Select((p, i) =>
+                new Player($"p{i + 1}")
+                {
+                    PlayerId = p.PlayerId, Outside = p.Outside, Mid = p.Mid, Close = p.Close,
+                    Finishing = p.Finishing, FreeThrow = p.FreeThrow, FoulDrawing = p.FoulDrawing,
+                    BallHandling = p.BallHandling, Passing = p.Passing, Playmaking = p.Playmaking,
+                    SelfCreation = p.SelfCreation, PostMoves = p.PostMoves,
+                    OffBallMovement = p.OffBallMovement, Screening = p.Screening,
+                    OffensiveRebounding = p.DefensiveRebounding,  // mirror DRb as ORb
+                    PerimeterDefense = p.PerimeterDefense, PostDefense = p.PostDefense,
+                    RimProtection = p.RimProtection, DefensiveRebounding = p.DefensiveRebounding,
+                    Steals = p.Steals, Height = p.Height, Wingspan = p.Wingspan, Weight = p.Weight,
+                    Strength = p.Strength, Speed = p.Speed, Quickness = p.Quickness,
+                    FirstStep = p.FirstStep, Vertical = p.Vertical, Endurance = p.Endurance,
+                    Hustle = p.Hustle, BasketballIQ = p.BasketballIQ, Discipline = p.Discipline,
+                    RimTendency = p.RimTendency, ShortTendency = p.ShortTendency,
+                    MidTendency = p.MidTendency, LongTendency = p.LongTendency,
+                    ThreeTendency = p.ThreeTendency,
+                }).ToArray();
+
+            var game = BuildGame35(playersOffSide, players);
+            // Offense = Home (playersOffSide), Defense = Away (players).
+            // Rim zone, no shooter-nerf triggering slot (use slot 1 which is a guard).
+            var stateOff = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                SelectedSlot: game.HomeLineup.SlotAt(1),
+                ShotType: ShotLocation.Rim);   // nerf off: Rim zone
+            var stateDef = MkState35();
+
+            var orbRng = new SystemRng(35106); var drbRng = new SystemRng(35107);
+            var orbCounts = new int[5]; var drbCounts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                orbCounts[OffensiveRebounderPicker.Pick(stateOff, game, matchupCfg, orbRng).Number - 1]++;
+                drbCounts[DefensiveRebounderPicker.Pick(stateDef, game, matchupCfg, drbRng).Number - 1]++;
+            }
+            var orbShares = orbCounts.Select(c => (double)c / N).ToArray();
+            var drbShares = drbCounts.Select(c => (double)c / N).ToArray();
+            Console.WriteLine($"    ORB shares: {string.Join("  ", orbShares.Select((s, i) => $"s{i + 1}={s:P1}"))}");
+            Console.WriteLine($"    DRB shares: {string.Join("  ", drbShares.Select((s, i) => $"s{i + 1}={s:P1}"))}");
+            // Robust check: the dominant slot (slot 4 — tallest, strongest, most wingspan)
+            // must lead on BOTH sides. Slots 1 and 5 are intentionally identical so a
+            // rank-ordering comparison would be tie-sensitive; checking the dominant slot
+            // is the right level of assertion here.
+            var orbDominantLeads = orbShares[3] > orbShares[0] && orbShares[3] > orbShares[1]
+                                && orbShares[3] > orbShares[2] && orbShares[3] > orbShares[4];
+            var drbDominantLeads = drbShares[3] > drbShares[0] && drbShares[3] > drbShares[1]
+                                && drbShares[3] > drbShares[2] && drbShares[3] > drbShares[4];
+            // Shares should also be close between the two pickers (within 3%) for each slot,
+            // confirming the two formulas agree quantitatively, not just directionally.
+            var sharesClose = Enumerable.Range(0, 5).All(i => Math.Abs(orbShares[i] - drbShares[i]) < 0.03);
+            var sub6Ok = orbDominantLeads && drbDominantLeads && sharesClose;
+            ok &= sub6Ok;
+            if (!sub6Ok)
+            {
+                if (!orbDominantLeads) Console.WriteLine("    [FAIL] ORB dominant slot (4) does not lead");
+                if (!drbDominantLeads) Console.WriteLine("    [FAIL] DRB dominant slot (4) does not lead");
+                if (!sharesClose)      Console.WriteLine("    [FAIL] ORB/DRB shares diverge > 3% for some slot");
+            }
+            Console.WriteLine(sub6Ok ? "    [OK] dominant slot leads on both sides; shares agree within 3%" : "    [FAIL] see detail above");
+        }
+
+        // ── Governor run invariants A and B ───────────────────────────────────────
+        {
+            Console.WriteLine("  Governor run invariants (Phase 35):");
+            var cfgA     = RollAConfig.Load(configPath);
+            var cfgGov   = GovernorConfig.Load(configPath);
+            var cfgClock = RollClockConfig.Load(configPath);
+            var cfgEoH   = EndOfHalfConfig.Load(configPath);
+            var cfgE     = RollEConfig.Load(configPath);
+
+            var govGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var homePlayers = new[]
+            {
+                MkP35(1, 50, height: 40, postDef: 42, str: 44, drb: 35),
+                MkP35(2, 50, height: 45, postDef: 44, str: 46, drb: 42),
+                MkP35(3, 50, height: 55, postDef: 55, str: 55, drb: 52),
+                MkP35(4, 50, height: 72, postDef: 70, str: 72, drb: 72),
+                MkP35(5, 50, height: 86, postDef: 82, str: 82, drb: 85),
+            };
+            var awayPlayers = Enumerable.Range(6, 5).Select(i => MkP35(i, 50)).ToArray();
+            for (var i = 0; i < 5; i++)
+            {
+                govGame.HomeRoster.SetStarter(govGame.HomeLineup.SlotAt(i + 1), homePlayers[i]);
+                govGame.AwayRoster.SetStarter(govGame.AwayLineup.SlotAt(i + 1), awayPlayers[i]);
+            }
+            govGame.SetPossessionArrow(TeamSide.Home);
+
+            var rng      = new SystemRng(35200);
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, matchupCfg, govGame),
+                cfgA,
+                new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(cfgD),
+                new RollEGenerator(cfgE, govGame),
+                new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
+                new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
+                new RollGGenerator(RollGConfig.Load(configPath), matchupCfg, govGame),
+                new RollHGenerator(RollHConfig.Load(configPath), matchupCfg, govGame),
+                new RollIGenerator(RollIConfig.Load(configPath), matchupCfg, govGame),
+                new RollJGenerator(RollJConfig.Load(configPath), matchupCfg, govGame),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLGenerator(RollLConfig.Load(configPath), govGame),
+                new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                matchupCfg,
+                govGame,
+                rng);
+
+            var governor = new Governor(resolver, govGame, cfgGov, cfgClock, new SystemRng(35201), cfgEoH);
+            var first    = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            var result = governor.Run(first);
+
+            // Invariant A: every DefensiveRebound possession has a non-null DefensiveRebounderSlot,
+            // and the count equals the count of DefensiveRebound terminals (1:1).
+            var drebPossessions = result.Possessions
+                .Where(r => r.EndLabel == "DefensiveRebound")
+                .ToList();
+            var nullSlotCount = drebPossessions.Count(r => r.DefensiveRebounderSlot is null);
+            var invAOk = nullSlotCount == 0;
+            ok &= invAOk;
+            Console.WriteLine(invAOk
+                ? $"    [OK] Invariant A: all {drebPossessions.Count} DefensiveRebound possessions have non-null DefensiveRebounderSlot"
+                : $"    [FAIL] Invariant A: {nullSlotCount} DefensiveRebound possessions had null DefensiveRebounderSlot");
+
+            // Invariant B: every non-DefensiveRebound possession has a null DefensiveRebounderSlot.
+            var nonDreb = result.Possessions
+                .Where(r => r.EndLabel != "DefensiveRebound")
+                .ToList();
+            var badNonDrebSlots = nonDreb.Count(r => r.DefensiveRebounderSlot is not null);
+            var invBOk = badNonDrebSlots == 0;
+            ok &= invBOk;
+            Console.WriteLine(invBOk
+                ? $"    [OK] Invariant B: all {nonDreb.Count} non-DReb possessions have null DefensiveRebounderSlot"
+                : $"    [FAIL] Invariant B: {badNonDrebSlots} non-DReb possessions had non-null DefensiveRebounderSlot");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(ok ? "  Phase 35 defensive rebound check: PASSED" : "  Phase 35 defensive rebound check: FAILED (see [FAIL] lines above)");
         return ok;
     }
 }

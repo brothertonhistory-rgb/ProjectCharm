@@ -5401,3 +5401,99 @@ if (turnoverWasLiveBall)
 - **Team rebounds** — ball out of bounds off a miss; no individual defensive rebounder. Deferred.
 - **Defensive rebounder picker** — DReb credit remains a post-hoc `WeightedDraw`.
 - **Calibration** of any weight, floor, or scale — correctness before calibration is the standing sequencing principle.
+
+---
+
+## Phase 35 — Rebounding: Wingspan in Battle + Attribution, Defensive Rebound Attribution On-Walk (2026-06-19)
+
+### Wingspan in the team battle (`ReboundPhysical`)
+
+The team-size composite used in Roll I's Stage 1 size shift is extended:
+
+```
+ReboundPhysical(p) = ReboundStrengthWeight * p.Strength
+                   + ReboundHeightWeight   * p.Height
+                   + ReboundWingspanWeight * p.Wingspan
+```
+
+`ReboundWingspanWeight` (default 0.5, matching the equal-ish convention of the existing weights) lives in `MatchupConfig` alongside the other rebound-battle knobs. Because `ReboundPhysical` is called only inside `OffensiveReboundShare`'s Stage 1 (team-vs-team mean comparison) and nowhere else, adding wingspan there changes the battle outcome without touching any attribution picker. A longer-armed team earns more boards at the team level; the defense benefits from long arms equally.
+
+### Shared wingspan attribution helper (`ReboundWingspanMultiplier`)
+
+A second, distinct wingspan term operates at the attribution (within-team) level:
+
+```csharp
+public static double ReboundWingspanMultiplier(
+    double playerWingspan,
+    double lineupMeanWingspan,
+    MatchupConfig cfg)
+    => 1.0 + cfg.ReboundWingspanSwing
+           * Math.Tanh((playerWingspan - lineupMeanWingspan) / cfg.ReboundWingspanScale);
+```
+
+This is a multiplier centered at 1.0, bounded by the tanh asymptote to the range `(1 − Swing, 1 + Swing)`. At the defaults (Swing = 0.10, Scale = 15.0) the maximum tilt is ±10% — wingspan is a gentle secondary factor, not a dominant one. The helper lives on `Matchup` (parallel to `Postness` and `PositionalWeight`) so both pickers call the same math. The design invariant: **wingspan is rebounding-specific**. It is not folded into `Postness`, which would silently change turnover pickers and steals.
+
+### Offensive picker extended (`OffensiveRebounderPicker`)
+
+Weight formula after Phase 35:
+
+```
+max(1, OffensiveRebounding × PositionalWeight(postness) × ReboundWingspanMultiplier × shooterNerf)
+```
+
+Stage 1 now collects wingspan alongside postness and computes the lineup-mean wingspan. The multiplier is applied in Stage 2 after positional weight and before (or alongside) the shooter nerf. All existing behavior — the nerf on Three/Long/Mid, the floor of 1, the cumulative walk — is unchanged.
+
+### Defensive rebounder picker (`DefensiveRebounderPicker`)
+
+New static class on the Phase 34 `StealerPicker` pattern. Reads `state.Defense`. Weight:
+
+```
+max(1, DefensiveRebounding × PositionalWeight(postness) × ReboundWingspanMultiplier)
+```
+
+This is the offensive picker's formula with two changes: `DefensiveRebounding` replaces `OffensiveRebounding`, and `shooterNerf` is absent (the defense has no shooter). The same `Matchup.PositionalWeight` and `Matchup.ReboundWingspanMultiplier` calls are made with the defensive lineup's means. Throws on empty defense lineup. One `IRng.NextUnitInterval()` draw consumed per DReb possession.
+
+### Threading (`DefensiveRebounderSlot`)
+
+Mirrors the Phase 34 `StealerSlot` pattern exactly:
+
+- `Resolver.Route()`: `int? defensiveRebounderSlot = null` declared; stamped in `case Terminal t:` when `t.Reason == "DefensiveRebound"`; appended to `RoutingOutcome` as `DefensiveRebounderSlot`.
+- `RoutingOutcome`: `public int? DefensiveRebounderSlot { get; init; }` field appended after `StealerSlot`.
+- `Governor.cs`: `int? DefensiveRebounderSlot = null` appended as last parameter of `PossessionRecord`; local + threading + `records.Add(...)` updated.
+- Harness: retired DReb `WeightedDraw`; reads `r.DefensiveRebounderSlot` with throw on null for DReb possessions; Phase35 governor invariants assert 1:1 count and null-on-non-DReb.
+
+### RNG stream
+
+`DefensiveRebounderPicker` consumes one engine `_rng` draw per `DefensiveRebound` terminal (from both Roll I and Roll M feeders). Every downstream engine draw on those possessions shifts — the same documented consequence as Phase 31 (OffReb picker), Phase 33 (TO committer), and Phase 34 (stealer). Only BLK remains as a harness `WeightedDraw`. Config hash `50cd44d7...`; same-seed reproducibility within Phase 35 holds.
+
+### Stale comment cleanup (documentation only)
+
+`RoutingOutcome` XML comments updated: removed "metadata for harness draws" framing of the TO-attribution fields (Phase 33/34 moved those engine-side); updated `TurnoverOffSlot` comment to remove "harness draws from BallHandling"; updated `TurnoverWasLiveBall` comment to remove "harness issues exactly one STL" (Phase 34 moved STL engine-side via `StealerSlot`); updated `BlkCount` comment to note BLK is the one remaining harness draw.
+
+### Config additions
+
+**`MatchupConfig` (3 new properties):**
+- `ReboundWingspanWeight` (0.5) — weight of Wingspan in `ReboundPhysical` (battle). Non-negative.
+- `ReboundWingspanSwing` (0.10) — half-amplitude of the within-team wingspan multiplier. Must be in [0, 1).
+- `ReboundWingspanScale` (15.0) — tanh saturation knob for the multiplier, in rating points. Must be > 0. Mirrors `ReboundPositionalScale`.
+
+All three are calibration placeholders. Direction and shape are what Phase 35 validates.
+
+### Picker family (updated)
+
+| Picker | Side | Base attribute | Positional tilt | Wingspan tilt | Shooter nerf |
+|---|---|---|---|---|---|
+| `DefenderPicker` | Defense | Steals/Speed/... | — | — | — |
+| `OffensiveRebounderPicker` | Offense | OffensiveRebounding | PositionalWeight | ReboundWingspanMultiplier | ✓ (Three/Long/Mid) |
+| `DefensiveRebounderPicker` | Defense | DefensiveRebounding | PositionalWeight | ReboundWingspanMultiplier | — |
+| `TurnoverCommitterPicker` | Offense | BallHandling | perimeterMult (suppressed posts) | — | — |
+| `TurnoverInteriorPicker` | Offense | Strength | interiorMult (favored posts) | — | — |
+| `StealerPicker` | Defense | Steals | perimeterMult (suppressed posts) | — | — |
+
+### What is not this session
+
+- **Blocks (BLK).** Still a post-hoc `WeightedDraw`. Its own future pass; a natural piece of the attribute-coverage audit.
+- **Wingspan in steals / shot contests / perimeter defense.** Part of the attribute-coverage audit, after remaining generators (Roll C type-mix, Roll D fouls) are real.
+- **Unifying the battle's two stages into one shared composite.** The two-stage structure stays; this session only adds wingspan to Stage 1.
+- **Team rebounds (ball out of bounds off a miss).** No individual rebounder credited; deferred.
+- **Calibration** of any rebound weight, floor, swing, or scale. Correctness before calibration is the standing sequencing principle.

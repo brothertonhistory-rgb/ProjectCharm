@@ -1,3 +1,70 @@
+## Session 70 — Phase 35: Rebounding — Wingspan in Battle + Attribution, Defensive Rebound Attribution On-Walk (2026-06-19)
+
+**Scope:** Three tightly coupled changes to the rebounding layer. (1) Wingspan added to `ReboundPhysical` — the team-size composite used in the battle's Stage 1 size shift. (2) A shared `ReboundWingspanMultiplier` helper added to `Matchup.cs`, applied to both pickers so within-team wingspan tilts ORB and DRB attribution identically. (3) `DefensiveRebounderPicker` created on the Phase 34 / `StealerPicker` pattern, stamped on-walk at every `DefensiveRebound` terminal — retiring the last post-hoc rebound `WeightedDraw`. 8 files changed, 1 new.
+
+**What shipped (8 files):**
+
+`src/Charm.Engine/Core/Matchup.cs` — EDIT (two changes). Change 1: `ReboundPhysical` extended to add `cfg.ReboundWingspanWeight * p.Wingspan` alongside the existing Strength and Height terms. Change 2: new public static helper `ReboundWingspanMultiplier(double playerWingspan, double lineupMeanWingspan, MatchupConfig cfg)` — returns `1.0 + cfg.ReboundWingspanSwing * Math.Tanh((playerWingspan − lineupMeanWingspan) / cfg.ReboundWingspanScale)`. Both pickers call this shared helper so the within-team wingspan math cannot drift between ORB and DRB attribution.
+
+`src/Charm.Engine/Config/MatchupConfig.cs` — EDIT (surgical, three additions). `ReboundWingspanWeight` (0.5, battle) added alongside `ReboundStrengthWeight` and `ReboundHeightWeight`. `ReboundWingspanSwing` (0.10) and `ReboundWingspanScale` (15.0) added after `ReboundShooterNerf` for the attribution helper. Load invariants: `ReboundWingspanWeight >= 0`; `ReboundWingspanSwing in [0, 1)`; `ReboundWingspanScale > 0`.
+
+`src/Charm.Engine/Core/OffensiveRebounderPicker.cs` — EDIT. Stage 1 now collects `Wingspan` alongside postness; computes `meanWingspan` over the lineup. Stage 2 weight formula extended to `max(1, OffensiveRebounding × PositionalWeight(postness) × ReboundWingspanMultiplier × shooterNerf)`. The wingspan multiplier is computed against the offensive lineup mean — purely within-team, rebounding-specific, not folded into `Postness`.
+
+`src/Charm.Engine/Core/DefensiveRebounderPicker.cs` — NEW. Static class on the exact Phase 34 / `StealerPicker` pattern, reading `state.Defense`. Weight: `max(1, DefensiveRebounding × PositionalWeight(postness) × ReboundWingspanMultiplier)` — the offensive picker's formula minus `shooterNerf` (the defense has no shooter). Same 3-stage structure: populate loop with postness + wingspan → mean → cumulative walk with last-populated fallback. Throws on empty defense.
+
+`src/Charm.Engine/Core/Resolver.cs` — EDIT (surgical, three changes). Change 1: `int? defensiveRebounderSlot = null` local declared alongside `stealerSlot`. Change 2: stamp block in `case Terminal t:` — `if (t.Reason == "DefensiveRebound") defensiveRebounderSlot = DefensiveRebounderPicker.Pick(...)`. Change 3: `DefensiveRebounderSlot = defensiveRebounderSlot` appended to the Terminal `RoutingOutcome` return; `public int? DefensiveRebounderSlot { get; init; }` field appended to `RoutingOutcome`. Stale comments in the `RoutingOutcome` record updated: removed "metadata for harness draws" description of `TurnoverOffSlot`/`TurnoverWasLiveBall`; removed "harness draws from BallHandling" from `TurnoverOffSlot` comment (Phase 33 moved this engine-side); removed "harness issues exactly one STL" from `TurnoverWasLiveBall` comment (Phase 34 moved this engine-side via `StealerSlot`); updated `BlkCount` comment to note BLK is the one remaining harness draw.
+
+`src/Charm.Engine/Core/Governor.cs` — EDIT (surgical, four sub-edits). `int? DefensiveRebounderSlot = null` appended as the last parameter of `PossessionRecord`. `int? possessionDefensiveRebounderSlot = null` local added alongside `possessionStealerSlot`. `possessionDefensiveRebounderSlot = outcome.DefensiveRebounderSlot` threaded in the resolver branch. Last argument of `records.Add(...)` extended with `possessionDefensiveRebounderSlot`.
+
+`src/Charm.Harness/Program.cs` — EDIT (five passes). Pass 1: retired DReb `WeightedDraw` at ~line 5430; replaced with engine-stamped read — `r.DefensiveRebounderSlot ?? throw new InvalidOperationException("Phase 35: DefensiveRebounderSlot null on a defensive-rebound possession — wiring break.")`. Pass 2: updated two stale stream comments (seed+2 block and BLK comment block) from "DReb/BLK remain as harness WeightedDraws" to "only BLK remains". Pass 3: updated stale Phase 31 comment about DReb draw being "out of scope". Pass 4: `Phase10ReboundDoorCheck` — added `wingspan` parameter to `Mk` helper; added sub-check (h) verifying wingspan direction in the battle (longer defense lowers off-share, longer offense raises it). Pass 5: `Phase31RebounderPickerCheck` — added `wingspan` parameter to `MkP` helper; added sub-check 7 verifying wingspan tilt within the offensive picker. `Phase35DefensiveReboundCheck` added (6 sub-checks + 2 governor invariants); wired after `Phase34TurnoverAttributionCheck`. Sub-check 6's initial rank-ordering comparison was replaced mid-session with a robust dominant-slot + within-3% assertion, after identifying that two intentionally identical slots (1 and 5) produced tie-sensitive `OrderByDescending` failures.
+
+`src/Charm.Harness/config.json` — EDIT. Three new keys in `Matchup` section: `ReboundWingspanWeight` (0.5), `ReboundWingspanSwing` (0.10), `ReboundWingspanScale` (15.0).
+
+**Key design decisions:**
+
+- **Wingspan in `ReboundPhysical` changes the battle; `ReboundWingspanMultiplier` changes attribution only.** `ReboundPhysical` is called only in `OffensiveReboundShare`'s Stage 1 (team-vs-team size shift) — confirmed by grep at draft time. Adding wingspan there widens the advantage a long-armed team gets at the team level without touching any attribution picker. The attribution helper is a separate tanh, rebounding-specific by design, so it does not affect `Postness`-dependent callers (turnover pickers, steals).
+
+- **`ReboundWingspanMultiplier` is shared via `Matchup.cs`, not duplicated.** Both pickers call `Matchup.ReboundWingspanMultiplier` so the within-team wingspan math is defined once. This mirrors how `Matchup.Postness` and `Matchup.PositionalWeight` are shared — the two rebound layers (battle and attribution) are provably consistent by construction.
+
+- **`DefensiveRebounderPicker` is the offensive picker minus `shooterNerf`.** Confirmed in adversarial check #5: `StealerPicker.cs` (the closest structural sibling) has no `isShooter`, `SelectedSlot`, or `shooterNerf` concept; the defense has no shooter. The formula is otherwise identical — same `PositionalWeight(postness)` and `ReboundWingspanMultiplier` terms, with `DefensiveRebounding` in place of `OffensiveRebounding`.
+
+- **`DefensiveRebound` terminals route through the same `case Terminal t:` block as all other terminals.** Both Roll I and Roll M set `result` and call `continue`, re-entering the main while-switch. There is exactly one `return new RoutingOutcome(...)` call in `Route()`. Stamping `defensiveRebounderSlot` there fires on every DReb possession from both feeders with no path exceptions — confirmed by source read.
+
+- **`ReboundPhysical` callers confirmed non-overlapping with pickers.** Grep at draft time: `ReboundPhysical` is called only in `OffensiveReboundShare` (lines 427 and 429 of `Matchup.cs`) and referenced in `RollIGenerator` and `RollMGenerator` doc-comments. No picker calls it. Adding wingspan to `ReboundPhysical` changes the battle without double-applying at attribution.
+
+- **Wingspan is rebounding-specific — not added to `Postness`.** `Postness` is called by four consumers: `TurnoverInteriorPicker`, `TurnoverCommitterPicker`, `StealerPicker`, and `OffensiveRebounderPicker`. Adding wingspan to `Postness` would silently change all four. The within-team wingspan tilt lives only in `ReboundWingspanMultiplier`, called exclusively by the two rebound pickers.
+
+- **Sub-check 6 tiebreak issue resolved mid-session (documented).** The initial `SequenceEqual(rank)` comparison failed because slots 1 and 5 are intentionally identical players — their shares are statistically indistinguishable, so `OrderByDescending` can break the tie either way across two independent RNG runs. The fix asserts what the sub-check actually means: the dominant slot (slot 4) leads on both sides, and per-slot shares agree within 3% between the two pickers. This is the correct level of assertion for a tied-player lineup.
+
+**Python pre-validation (all 4 checks passed):**
+
+- Battle direction: neutral off-share 0.3000; longer defense → 0.2925 (< neutral ✓); longer offense → 0.3085 (> neutral ✓).
+- Defensive picker direction: C=36.2%, PF=28.4%, SF=15.4%, SG=11.1%, PG=8.9% — bigs dominant, guard floor 8.9% > 1% ✓.
+- Wingspan tilt (Swing=0.10, Scale=15.0): short-arm 47.1%, long-arm 52.9% — gap 5.8% (gentle, < 15%) ✓.
+- Offensive picker direction unchanged after wingspan factor: C (36.5%) > nerfed-PG-shooter (3.3%) ✓.
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED. (Required two Program.cs deliveries — Phase 35 engine pass, then sub-check 6 tiebreak fix.)
+
+Phase 10 sub-check (h) — wingspan battle direction:
+- Neutral off-share matches baseline. Longer defense lowers off-share. Longer offense raises off-share. [OK]
+
+Phase 31 sub-check 7 — wingspan tilt in offensive picker:
+- short-arm (wingspan=50) share: 19.59%; long-arm (wingspan=70) share: 21.73%. [OK]
+
+Phase 35 check (6 sub-checks + 2 governor invariants):
+- Sub-check 1: C=33.73%, PF=27.50%, SF=16.55%, SG=12.38%, PG=9.83% — bigs favored. [OK]
+- Sub-check 2: PG=10.04% > 1% — guard floor holds. [OK]
+- Sub-check 3: short-arm 19.60%, long-arm 21.74% — wingspan tilt correct direction. [OK]
+- Sub-check 4: same seed → identical sequence. [OK]
+- Sub-check 5: empty defense throws. [OK]
+- Sub-check 6: dominant slot leads on both sides; ORB/DRB shares agree within 3%. [OK]
+- Invariant A: all 46 DefensiveRebound possessions have non-null DefensiveRebounderSlot (1:1). [OK]
+- Invariant B: all 86 non-DReb possessions have null DefensiveRebounderSlot. [OK]
+
+Observation run (1,000 games, frozen corpus): config hash `50cd44d7...`. All mechanics OK. Corpus hash shifted as expected — three simultaneous stream changes: (1) `ReboundPhysical` with wingspan shifts which team wins boards; (2) `OffensiveRebounderPicker` consumes a new mean-wingspan computation internally; (3) `DefensiveRebounderPicker` consumes one engine RNG draw per DReb possession. All prior checks passed. Stress test: all 8 buckets passed; cross-bucket patterns stable.
+
 ## Session 69 — Phase 34: Turnover Attribution Completion — Type-Aware Committer Dispatch + StealerPicker (2026-06-19)
 
 **Scope:** Two pieces completing the turnover accounting chapter. Piece 1: type-aware committer dispatch — replaced the Phase 33 uniform `TurnoverCommitterPicker` call with a three-branch resolver dispatch that correctly handles all 15 turnover reasons. Piece 2: `StealerPicker` on-walk — moved STL credit from a harness `WeightedDraw` into the engine, stamped on `RoutingOutcome.StealerSlot`, threaded through `PossessionRecord`, read as exact attribution in the harness. A third pass updated two stale harness checks whose assumptions the Phase 34 changes invalidated. 7 files changed, 2 new.

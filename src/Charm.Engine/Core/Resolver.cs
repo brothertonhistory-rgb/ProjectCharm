@@ -233,23 +233,27 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
 
     // ── Phase 23 attribution support ──────────────────────────────────────────
     // 3PA/3PM/FTA/FTM: exact per-slot counters (no draws — same pattern as FGA/FGM).
-    // BlkCount / TurnoverOffSlot / TurnoverWasLiveBall: metadata for harness draws.
+    // BlkCount: how many shots were blocked (harness still issues BLK credits via weighted draw).
+    // TurnoverOffSlot / TurnoverWasLiveBall: metadata for TO attribution.
     // No IRng is consumed anywhere in this group.
     public SlotGroup ThreePaBySlot  { get; init; }  // offense: 3PA per slot
     public SlotGroup ThreePmBySlot  { get; init; }  // offense: 3PM per slot
     public SlotGroup FtaBySlot      { get; init; }  // offense: FTA per slot
     public SlotGroup FtmBySlot      { get; init; }  // offense: FTM per slot
     /// <summary>How many shots were blocked this possession. Used by the harness
-    /// to issue exactly this many BLK credits via weighted draw.</summary>
+    /// to issue exactly this many BLK credits via weighted draw (the one remaining
+    /// post-hoc draw after Phase 35 retires DReb).</summary>
     public int BlkCount { get; init; }
-    /// <summary>The offensive slot that committed the turnover, if Roll E had
-    /// already selected a player when the TO fired. Null means the TO occurred
-    /// before Roll E (backcourt/entry turnover); the harness draws from BallHandling
-    /// weights in that case.</summary>
+    /// <summary>The offensive slot that committed the turnover. Null for team
+    /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
+    /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for
+    /// ball-handler violations and by TurnoverInteriorPicker (Phase 34) for
+    /// interior/post violations. When Roll E already selected a player the slot
+    /// is read directly from SelectedSlot.</summary>
     public int? TurnoverOffSlot { get; init; }
     /// <summary>True if the possession ended on a live-ball steal terminal
-    /// (BadPassIntercepted or LostBallLiveBall). The harness issues exactly one STL
-    /// credit when this is true.</summary>
+    /// (BadPassIntercepted or LostBallLiveBall). When true, <see cref="StealerSlot"/>
+    /// carries the engine-stamped stealer credit (Phase 34).</summary>
     public bool TurnoverWasLiveBall { get; init; }
 
     // ── Phase 25: shooting-foul events ───────────────────────────────────────
@@ -283,6 +287,12 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// (BadPassIntercepted or LostBallLiveBall). Null on all other possession endings.
     /// Stamped by <see cref="StealerPicker"/> at the Terminal stamp block (Phase 34).</summary>
     public int? StealerSlot { get; init; }
+
+    /// <summary>The defensive slot that earned the defensive rebound. Non-null on every
+    /// possession ending on <c>"DefensiveRebound"</c>; null on all other endings.
+    /// Stamped by <see cref="DefensiveRebounderPicker"/> at the Terminal stamp block
+    /// (Phase 35) — retires the last post-hoc rebound draw.</summary>
+    public int? DefensiveRebounderSlot { get; init; }
 }
 
 /// <summary>
@@ -500,6 +510,7 @@ public sealed class Resolver
         int? turnoverOffSlot   = null;
         var turnoverWasLiveBall = false;
         int? stealerSlot        = null;
+        int? defensiveRebounderSlot = null;
         // Phase 31: per-slot offensive-rebound accumulator (one entry per picker fire,
         // i.e. one per ResolveOffensiveRebound case hit). Total == OrbWon at possession end.
         var orbBySlot = new SlotGroup();
@@ -563,6 +574,9 @@ public sealed class Resolver
                         if (turnoverWasLiveBall)
                             stealerSlot = StealerPicker.Pick(t.State, _game, _matchup, _rng).Number;
                     }
+                    // Phase 35: defensive-rebound attribution — stamp which defender got it.
+                    if (t.Reason == "DefensiveRebound")
+                        defensiveRebounderSlot = DefensiveRebounderPicker.Pick(t.State, _game, _matchup, _rng).Number;
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
                         { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods,
                           Fga = fga, Fgm = fgm, ThreePa = threePa, ThreePm = threePm,
@@ -585,7 +599,8 @@ public sealed class Resolver
                           TurnoverWasLiveBall = turnoverWasLiveBall,
                           ShootingFouls  = shootingFouls.ToArray(),
                           OrbBySlot      = orbBySlot,
-                          StealerSlot    = stealerSlot };
+                          StealerSlot    = stealerSlot,
+                          DefensiveRebounderSlot = defensiveRebounderSlot };
 
                 case Continue c:
                     switch (c.Next)
