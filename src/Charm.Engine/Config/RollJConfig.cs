@@ -60,6 +60,49 @@ public sealed class RollJConfig
     public double StealDefensiveFoul { get; set; } = 0.035;
     public double StealJumpBall { get; set; } = 0.005;
 
+    // --- Phase 28: steal-origin split. Two new weight sets replacing the single
+    //     Steal set for classified steal tickets. The old Steal* set remains as a
+    //     null-origin fallback (legacy tickets and isolated harness checks).
+    //
+    //     Required direction: BackcourtVictimPush > FrontcourtVictimPush >= Rebound.Push.
+    //     BackcourtVictim: victim in backcourt → thief near basket → HIGH run.
+    //     FrontcourtVictim: victim in halfcourt set → thief goes full court → LOW run.
+    //     Both ≥ Rebound baseline (a steal still runs more than a board).
+    //     Combined behavior near old Steal baseline (0.50) — not a strict midpoint. ---
+    public double BackcourtVictimSettle { get; set; } = 0.35;
+    public double BackcourtVictimPush { get; set; } = 0.55;
+    public double BackcourtVictimTurnover { get; set; } = 0.06;
+    public double BackcourtVictimDefensiveFoul { get; set; } = 0.035;
+    public double BackcourtVictimJumpBall { get; set; } = 0.005;
+
+    public double FrontcourtVictimSettle { get; set; } = 0.55;
+    public double FrontcourtVictimPush { get; set; } = 0.35;
+    public double FrontcourtVictimTurnover { get; set; } = 0.06;
+    public double FrontcourtVictimDefensiveFoul { get; set; } = 0.035;
+    public double FrontcourtVictimJumpBall { get; set; } = 0.005;
+
+    // --- Phase 28: real-generator modifier seams. Two INDEPENDENT tilts on the
+    //     Push/Settle balance; never pre-fused (each contributes its own additive
+    //     delta, applied to Push and subtracted from Settle before the Pie clamp).
+    //
+    //     TeamPaceBias — neutral scalar in RollJConfig ONLY (not CoachProfile, not
+    //     Team, not Player, not PossessionState). Default 0.0 = neutral (no effect).
+    //     Positive = up-tempo bias (more Push); negative = slow-tempo bias.
+    //     A future coaching session replaces this config-only knob with a real team/
+    //     coach source; harness scenarios vary pace by constructing RollJConfig variants.
+    //     Invariant: no enforced sign restriction (both directions are valid).
+    //
+    //     PaceScale — converts TeamPaceBias into a Push delta.
+    //     PaceLift = TeamPaceBias × PaceScale.
+    //
+    //     AthleticismGapScale — converts the signed athleticism gap
+    //     (offenseFiveAthl − defenseFiveAthl, derived Athleticism mean of active five)
+    //     into a Push delta. Gap is positive when offense is more athletic (more Push),
+    //     negative when less athletic (less Push). Placeholder: 1 unit gap ≈ 0.001 Push. ---
+    public double TeamPaceBias { get; set; } = 0.0;
+    public double PaceScale { get; set; } = 0.15;
+    public double AthleticismGapScale { get; set; } = 0.001;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
@@ -71,6 +114,26 @@ public sealed class RollJConfig
         var cfg = JsonSerializer.Deserialize<RollJConfig>(
             section.GetRawText(),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        return cfg ?? throw new InvalidOperationException($"Could not parse RollJ config at {path}.");
+        if (cfg is null)
+            throw new InvalidOperationException($"Could not parse RollJ config at {path}.");
+
+        // Phase 28: direction invariants for the steal-origin split.
+        // BackcourtVictimPush > FrontcourtVictimPush and both >= Rebound Push.
+        if (cfg.BackcourtVictimPush <= cfg.FrontcourtVictimPush)
+            throw new InvalidOperationException(
+                $"RollJ BackcourtVictimPush ({cfg.BackcourtVictimPush}) must be > FrontcourtVictimPush ({cfg.FrontcourtVictimPush}).");
+        if (cfg.FrontcourtVictimPush < cfg.Push)
+            throw new InvalidOperationException(
+                $"RollJ FrontcourtVictimPush ({cfg.FrontcourtVictimPush}) must be >= Rebound Push ({cfg.Push}).");
+
+        // Phase 28: modifier scales must be >= 0 (negative is a basketball non-sequitur).
+        if (cfg.PaceScale < 0)
+            throw new InvalidOperationException(
+                $"RollJ PaceScale must be >= 0 (got {cfg.PaceScale}).");
+        if (cfg.AthleticismGapScale < 0)
+            throw new InvalidOperationException(
+                $"RollJ AthleticismGapScale must be >= 0 (got {cfg.AthleticismGapScale}).");
+
+        return cfg;
     }
 }

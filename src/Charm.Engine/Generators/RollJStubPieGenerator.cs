@@ -18,7 +18,7 @@ namespace Charm.Engine;
 /// rebounder tilt (attribute) and coach tempo (strategy). The real attribute/
 /// strategy generator replaces this without touching Roll J or the resolver.
 /// </summary>
-public sealed class RollJStubPieGenerator
+public sealed class RollJStubPieGenerator : IRollJPieGenerator
 {
     private readonly RollJConfig _config;
 

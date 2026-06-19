@@ -73,32 +73,54 @@ public sealed record PossessionConsequence(TeamSide NextOffense, EntryType NextE
     /// <summary>Ball to <paramref name="team"/> on a live-ball / transition start off a
     /// STEAL — a live-ball interception or a strip of a live dribble (Roll C's
     /// <c>BadPassIntercepted</c> / <c>LostBallLiveBall</c>, Roll K's
-    /// <c>LiveBallTurnover</c>). Carries the <see cref="TransitionContext.Steal"/>
-    /// ticket so the resolver routes it to Roll J (live transition entry) and Roll J
-    /// selects its most run-happy pie (the highest Push of the three sources). As of
-    /// Contextification #3 every one of its three callers is a steal, so this is the
-    /// single steal helper — there is no bare null-context transition helper (the
-    /// promote-not-add decision: a transition with a null context is no longer produced
-    /// by anything). Parallel to <see cref="TransitionReboundTo"/> /
+    /// <c>LiveBallTurnover</c>). Carries a <see cref="TransitionContext"/> ticket
+    /// (Source=Steal) stamped with the steal <paramref name="origin"/> (Phase 28:
+    /// BackcourtVictim = high-run odds; FrontcourtVictim = low-run odds) and the new
+    /// offense's <see cref="TransitionContext.OffenseSide"/> so Roll J's real generator
+    /// can compute the directional athleticism-gap modifier. As of Contextification #3
+    /// every one of its three callers is a steal; the origin further discriminates the
+    /// two sub-cases. Parallel to <see cref="TransitionReboundTo"/> /
     /// <see cref="TransitionFreeThrowReboundTo"/>.</summary>
-    public static PossessionConsequence TransitionStealTo(TeamSide team) =>
-        new(team, EntryType.Transition) { TransitionContext = TransitionContext.Steal };
+    public static PossessionConsequence TransitionStealTo(TeamSide team, StealOrigin origin) =>
+        new(team, EntryType.Transition)
+        {
+            TransitionContext = new TransitionContext(TransitionSource.Steal)
+            {
+                Origin      = origin,
+                OffenseSide = team
+            }
+        };
 
     /// <summary>Ball to <paramref name="team"/> on a live-ball transition start off a
     /// DEFENSIVE REBOUND of a field-goal miss — carrying the
     /// <see cref="TransitionContext.Rebound"/> ticket so the resolver routes it to Roll
-    /// J (live transition entry) and Roll J selects the rebound run-or-not pie.</summary>
+    /// J (live transition entry) and Roll J selects the rebound run-or-not pie.
+    /// Phase 28: stamps <see cref="TransitionContext.OffenseSide"/> so Roll J's real
+    /// generator can compute the directional athleticism-gap modifier.</summary>
     public static PossessionConsequence TransitionReboundTo(TeamSide team) =>
-        new(team, EntryType.Transition) { TransitionContext = TransitionContext.Rebound };
+        new(team, EntryType.Transition)
+        {
+            TransitionContext = new TransitionContext(TransitionSource.Rebound)
+            {
+                OffenseSide = team
+            }
+        };
 
     /// <summary>Ball to <paramref name="team"/> on a live-ball transition start off a
     /// DEFENSIVE REBOUND of a missed FREE THROW (Roll M's DefensiveRebound arm) —
     /// carrying the <see cref="TransitionContext.FreeThrowRebound"/> ticket so the
     /// resolver routes it to Roll J and Roll J selects its tamer, conservative pie (off
     /// an FT the break is less likely to run). Parallel to
-    /// <see cref="TransitionReboundTo"/>; the second transition source wired.</summary>
+    /// <see cref="TransitionReboundTo"/>; the second transition source wired.
+    /// Phase 28: stamps <see cref="TransitionContext.OffenseSide"/>.</summary>
     public static PossessionConsequence TransitionFreeThrowReboundTo(TeamSide team) =>
-        new(team, EntryType.Transition) { TransitionContext = TransitionContext.FreeThrowRebound };
+        new(team, EntryType.Transition)
+        {
+            TransitionContext = new TransitionContext(TransitionSource.FreeThrowRebound)
+            {
+                OffenseSide = team
+            }
+        };
 }
 
 /// <summary>The possession is over. The ball will change hands.</summary>

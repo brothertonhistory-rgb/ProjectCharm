@@ -116,7 +116,8 @@
     "FastBreakLong": 0.05,
     "FastBreakThree": 0.05,
     "PressureShiftScale": 0.5,
-    "PressureShiftCapFraction": 0.8
+    "PressureShiftCapFraction": 0.8,
+    "AttentionShiftAmplifier": 1.0
   },
   "RollH": {
     "BaseMade": 0.43,
@@ -318,6 +319,19 @@
     "StealTurnover": 0.06,
     "StealDefensiveFoul": 0.035,
     "StealJumpBall": 0.005,
+    "BackcourtVictimSettle": 0.35,
+    "BackcourtVictimPush": 0.55,
+    "BackcourtVictimTurnover": 0.06,
+    "BackcourtVictimDefensiveFoul": 0.035,
+    "BackcourtVictimJumpBall": 0.005,
+    "FrontcourtVictimSettle": 0.55,
+    "FrontcourtVictimPush": 0.35,
+    "FrontcourtVictimTurnover": 0.06,
+    "FrontcourtVictimDefensiveFoul": 0.035,
+    "FrontcourtVictimJumpBall": 0.005,
+    "TeamPaceBias": 0.0,
+    "PaceScale": 0.15,
+    "AthleticismGapScale": 0.001,
     "Epsilon": 1e-09
   },
   "RollK": {

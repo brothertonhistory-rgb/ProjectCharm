@@ -231,8 +231,27 @@ public sealed class RollGGenerator : IRollGGenerationProvider
         var authoredDomIdx    = Array.IndexOf(aNorm, aNorm.Max());
         var intrinsicCapacity = 1.0 - aNorm[authoredDomIdx];
 
-        // Requested shift (how much the load demands).
+        // Base requested shift (how much the load demands).
         var requestedShift = pressure * _cfg.PressureShiftScale;
+
+        // Phase 28 — attention-location tilt (A1/A2/A3/A4).
+        // Amplify the requested shift by the shooter's above-equal attention.
+        // Insertion point is HERE — inside the pressure gate, BEFORE the
+        // intrinsicCapacity cap — so a one-trick player's larger amplified request
+        // spills to residual rather than being absorbed silently.
+        //
+        // EqualShare = 0.20: reuse the SAME named constant Roll H uses for C1/C3
+        // so selection-tilt, C1, C3, and this tilt all share one neutral point.
+        // Stale-reference note: a future cleanup should centralize EqualShare across
+        // C1/C3/selection-tilt/Roll G into one shared named constant; it is
+        // intentionally local-but-acknowledged until then.
+        //
+        // Bonus-only: attention below EqualShare → attentionPressure = 0 → amplifier ×1.
+        const double EqualShare = 0.20;
+        var attentionShare   = state.ShooterAttentionShare ?? 0.0;
+        var attnPressure     = Math.Max(0.0, attentionShare - EqualShare);
+        var attnAmplifier    = 1.0 + attnPressure * _cfg.AttentionShiftAmplifier;
+        requestedShift      *= attnAmplifier;
 
         // Bent-profile dominant zone = the zone with the most mass AFTER the matchup bend.
         var bentDomIdx  = Array.IndexOf(bentNorm, bentNorm.Max());

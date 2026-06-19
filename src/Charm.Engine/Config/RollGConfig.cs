@@ -52,6 +52,20 @@ public sealed class RollGConfig
     public double PressureShiftScale        { get; set; } = 0.5;
     public double PressureShiftCapFraction  { get; set; } = 0.8;
 
+    // --- Attention-location tilt (Phase 28). Amplifies the requested diet-shift
+    //     magnitude when the selected shooter is carrying ABOVE-EQUAL defensive
+    //     attention (attention > EqualShare = 0.20). The amplifier scales
+    //     requestedShift BEFORE the intrinsicCapacity cap, so a one-trick player's
+    //     larger amplified request spills to residual rather than being clamped away.
+    //
+    //     AttentionShiftAmplifier — scale factor for the attention-pressure term.
+    //     amplifier = 1 + max(0, ShooterAttentionShare - 0.20) * AttentionShiftAmplifier.
+    //     At equal/below-share attention: attentionPressure = 0 → amplifier = ×1 →
+    //     Phase 17 diet-shift unchanged (regression anchor).
+    //     Bonus-only: attention below EqualShare can never REDUCE the shift.
+    //     0 = ablation (attention has no location effect). Default: 1.0 placeholder. ---
+    public double AttentionShiftAmplifier   { get; set; } = 1.0;
+
     public static RollGConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -86,6 +100,11 @@ public sealed class RollGConfig
         if (cfg.PressureShiftCapFraction <= 0 || cfg.PressureShiftCapFraction > 1.0)
             throw new InvalidOperationException(
                 $"RollG PressureShiftCapFraction must be > 0 and <= 1 (got {cfg.PressureShiftCapFraction}).");
+
+        // Phase 28: AttentionShiftAmplifier >= 0 (0 = ablation, no location effect from attention).
+        if (cfg.AttentionShiftAmplifier < 0)
+            throw new InvalidOperationException(
+                "RollG AttentionShiftAmplifier must be >= 0 (0 = ablation-friendly: attention has no location effect).");
 
         return cfg;
     }

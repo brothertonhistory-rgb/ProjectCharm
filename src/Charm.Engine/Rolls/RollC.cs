@@ -72,9 +72,13 @@ public static class RollC
                         ? PossessionConsequence.DeadBallTo(state.Defense)
                         : PossessionConsequence.BallAdvancedTo(state.Defense)),
 
+            // Phase 28: stamp steal origin from the VICTIM's Frontcourt flag (role-flip).
+            // Frontcourt == false (victim in backcourt) → thief near scoring basket → BackcourtVictim (high run).
+            // Frontcourt == true  (victim in halfcourt set) → thief must go full court → FrontcourtVictim (low run).
             TurnoverOutcome.BadPassIntercepted =>
                 new Terminal("BadPassIntercepted", state,
-                    PossessionConsequence.TransitionStealTo(state.Defense)),
+                    PossessionConsequence.TransitionStealTo(state.Defense,
+                        state.Frontcourt ? StealOrigin.FrontcourtVictim : StealOrigin.BackcourtVictim)),
 
             TurnoverOutcome.LostBallDeadBall =>
                 new Terminal("LostBallDeadBall", state,
@@ -82,9 +86,11 @@ public static class RollC
                         ? PossessionConsequence.DeadBallTo(state.Defense)
                         : PossessionConsequence.BallAdvancedTo(state.Defense)),
 
+            // Phase 28: same role-flip as BadPassIntercepted above.
             TurnoverOutcome.LostBallLiveBall =>
                 new Terminal("LostBallLiveBall", state,
-                    PossessionConsequence.TransitionStealTo(state.Defense)),
+                    PossessionConsequence.TransitionStealTo(state.Defense,
+                        state.Frontcourt ? StealOrigin.FrontcourtVictim : StealOrigin.BackcourtVictim)),
 
             TurnoverOutcome.OffensiveFoul =>
                 new Terminal("OffensiveFoul", state,

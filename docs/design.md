@@ -4871,3 +4871,96 @@ All magnitudes are provisional and consistent with the "wire the form, tune late
 - Shot location tilt (Roll G): deferred, never part of Phase 27
 - Matchup-relative collapse route in the converter (defender quickness vs. attacker): deferred — DefenderPicker.Pick throws pre-selection, and the flat authored route is the correct placeholder
 - Calibration passes: correctness before calibration is the standing sequencing principle
+
+## Phase 28 — Attention-Location Tilt + Steal-Origin Split + Roll J Real Generator
+
+### Overview
+
+Three scopes in one session. All three close open calibration seams rather than building new game structure.
+
+### Scope 1: Attention-location tilt (Roll G)
+
+**Problem:** The existing `ApplyDietShift` already handles volume-driven location shift (`UsagePressure → requestedShift → absorbed → residual`). But it had no signal from defensive attention: a star getting double-teamed shifted his shot mix the same amount as an unguarded role player at the same usage pressure. The attention tilt fixes this.
+
+**Formula (inside `ApplyDietShift`, after `requestedShift` is computed, before the `intrinsicCapacity` cap):**
+```
+EqualShare = 0.20   (same neutral point as Roll H C1/C3)
+attnPressure     = max(0, ShooterAttentionShare − EqualShare)
+attnAmplifier    = 1 + attnPressure × AttentionShiftAmplifier
+requestedShift  *= attnAmplifier
+```
+
+**Why before the cap:** placing the amplifier before `min(requestedShift, intrinsicCapacity, availableMass)` means the amplified request hits the same ceiling. For a one-trick player (`intrinsicCapacity ≈ 0`), the amplified request is still capped — `absorbed` stays constant — but `residual = requestedShift − absorbed` grows. Location barely moves; make% falls. This is A4 behavior: defensive attention does not move a player off his comfort zone, but it makes him less efficient when he stays there.
+
+**Bonus-only:** `attnPressure = max(0, ...)` — below-equal-share attention never reduces the shift. At exactly equal-share attention, `amplifier = 1.0`, reproducing Phase 17 output byte-for-byte (regression anchor).
+
+**Harness confirmation:** Phase 17 check (b) specialist residual = 0.0600 = exact `intrinsicCapacity`. Residual-penalty attribution = 12.0pts vs vol-tax = 2.5pts — residual is the dominant efficiency cost for a specialist under high attention.
+
+**Config knob:** `AttentionShiftAmplifier` in `RollGConfig` (default 1.0, invariant `>= 0`). Zero = ablation mode (attention has no location effect). Calibration placeholder pending the full attribute calibration pass.
+
+### Scope 2: Steal-origin split (`TransitionContext` extension)
+
+**Problem:** All live-ball steals arrived at Roll J on a single `Steal` context, selecting the same run-or-not pie regardless of where on the court the steal happened. A half-court turnover strip is not the same fast-break opportunity as an intercepted outlet pass.
+
+**Role-flip wire:** `PossessionState.Frontcourt` belongs to the VICTIM (the team that lost the ball). The run odds belong to the THIEF (the new offense), and the mapping is inverted:
+
+- `Frontcourt == false` (victim still in backcourt) → thief already near his scoring basket → `BackcourtVictim` (high run)
+- `Frontcourt == true` (victim in halfcourt set) → thief must go the full court → `FrontcourtVictim` (low run)
+
+**Three steal sites:**
+- `RollC.BadPassIntercepted` → ternary from `state.Frontcourt`
+- `RollC.LostBallLiveBall` → same ternary
+- `RollK.LiveBallTurnover` → fixed `FrontcourtVictim` (not a ternary; proven by source: the offense had crossed halfcourt, shot, and rebounded before losing the ball live — `Frontcourt == true` on every Roll K path)
+
+**`TransitionContext` extension:** Two optional fields appended to the record (the "grows by append" design):
+- `StealOrigin? Origin` — the steal-origin discriminator
+- `TeamSide? OffenseSide` — the new offense team identity, stamped by all three transition helpers (`TransitionStealTo`, `TransitionReboundTo`, `TransitionFreeThrowReboundTo`) where the new offense is already known
+
+`OffenseSide` is the architectural answer to a generator constraint: `IRollJPieGenerator.Generate(TransitionContext)` must remain the per-call interface (no `TeamSide` parameter added). Stamping `OffenseSide` on the ticket lets the real generator compute the directional athleticism gap — "the ticket carries what the node needs."
+
+**Config:** `BackcourtVictimPush = 0.55`, `FrontcourtVictimPush = 0.35` (both ≥ `Push = 0.30` Rebound baseline; old `StealPush = 0.50` retained as null-origin fallback). Load-time invariants enforce direction.
+
+### Scope 3: Roll J real generator
+
+**`IRollJPieGenerator` interface:** Created following the codebase pattern (all real generators implement interfaces). `Generate(TransitionContext)` is the single method. Both `RollJStubPieGenerator` (unchanged behavior) and `RollJGenerator` (new) implement it. Resolver and all harness construction sites hold the interface.
+
+**`RollJGenerator` — base weight selection:**
+
+| Source | Origin | Weight set |
+|---|---|---|
+| Rebound | — | `Push`, `Settle`, … |
+| FreeThrowRebound | — | `FreeThrowPush`, `FreeThrowSettle`, … |
+| Steal | `BackcourtVictim` | `BackcourtVictimPush`, `BackcourtVictimSettle`, … |
+| Steal | `FrontcourtVictim` | `FrontcourtVictimPush`, `FrontcourtVictimSettle`, … |
+| Steal | null | `StealPush`, `StealSettle`, … (fallback) |
+
+**Two independent modifiers — never pre-fused:**
+
+1. **Coach pace (config-only seam):** `PaceLift = TeamPaceBias × PaceScale`. Neutral at `TeamPaceBias = 0.0`. Positive = up-tempo (more Push); negative = slow. A future coaching session replaces this config-only knob with a real team/coach source; harness scenarios vary pace by constructing `RollJConfig` variants.
+
+2. **Team athleticism-gap (relative, directional):** `AthlLift = (offenseFiveAthl − defenseFiveAthl) × AthleticismGapScale`. `offenseFiveAthl` = mean derived `Player.Athleticism` of the active five for `ctx.OffenseSide`. Null `OffenseSide` → gap = 0, regression anchor (isolated harness tests that do not seat full rosters).
+
+**Modifier application:**
+```
+modifiedPush   = max(0, basePush   + PaceLift + AthlLift)
+modifiedSettle = max(0, baseSettle − PaceLift − AthlLift)
+```
+Turnover, DefensiveFoul, JumpBall are fixed to their base values.
+
+**Regression anchor:** At neutral pace (`TeamPaceBias = 0.0`) and neutral athleticism gap (0 — empty lineups in harness checks), Rebound and FreeThrowRebound pies reproduce configured weights exactly. Confirmed by `RollMContextSelectionCheck`.
+
+**Harness observation:** Athleticism-gap modifier visible in stress test. AthleticVsSkill bucket: Athletic Tr%=39.9% vs Skill Tr%=33.4%. SkillVsAthletic (mirrored): Athletic Tr%=39.7% vs Skill Tr%=33.9%. Mirror gap = 0.2% — directional and side-neutral. Pace knob at neutral (0.0); all signal is from athleticism gap.
+
+### Calibration placeholders
+
+All magnitudes provisional (wire-the-form mandate):
+- `AttentionShiftAmplifier = 1.0`
+- `BackcourtVictimPush = 0.55`, `FrontcourtVictimPush = 0.35`
+- `TeamPaceBias = 0.0`, `PaceScale = 0.15`, `AthleticismGapScale = 0.001`
+
+### What is not this session
+
+- Coaching/offensive-hierarchy layer: `TeamPaceBias` is the seam; wiring it to a real `CoachProfile` field is a future coaching session
+- Defender picker architecture: athleticism gap uses team-level means (active five), not individual matchup gaps — the per-slot defender attribution layer is a deferred chapter
+- Calibration passes: correctness before calibration is the standing sequencing principle
+- Deferred roll faces (C, D, J putback-loop, K): unbuilt chapters, not cleanup debt

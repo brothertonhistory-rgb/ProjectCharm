@@ -38,7 +38,6 @@ internal static class Program
         // Roll F generator constructed below after SeatStartersFromConfig (Phase 12).
         // RollHGenerator, RollGGenerator, and RollIGenerator constructed below,
         // after game and cfgMatchup (need GameState and MatchupConfig).
-        var rollJGenerator = new RollJStubPieGenerator(cfgJ);
         var rollKGenerator = new RollKStubPieGenerator(cfgK);
         var offensiveFoulGenerator = new RollOffensiveFoulStubPieGenerator(cfgOffFoul);
 
@@ -48,6 +47,7 @@ internal static class Program
         var cfgMatchup = MatchupConfig.Load(configPath);
         SeatStartersFromConfig(game, configPath);       // v2 fix: seat real rosters before generators
         var rollGGenerator = new RollGGenerator(cfgG, cfgMatchup, game);   // Phase 9: matchup-aware location
+        var rollJGenerator = new RollJGenerator(cfgJ, cfgMatchup, game);   // Phase 28: real transition run decision
         var rollHGenerator = new RollHGenerator(cfgH, cfgMatchup, game);
         var rollIGenerator = new RollIGenerator(cfgI, cfgMatchup, game);   // Phase 10: matchup-aware rebounding
         var rollMGenerator = new RollMGenerator(cfgM, cfgMatchup, game);   // Phase 11: matchup-aware FT rebounding
@@ -118,7 +118,7 @@ internal static class Program
         ok &= RollKBonusForkCheck(cfg, cfgD, cfgK, rollKGenerator, state);
         ok &= RollLFreeThrowCheck(cfg, state);
         ok &= RollMReboundBatchCheck(cfg, cfgM, new RollMStubPieGenerator(cfgM), game, state);
-        ok &= RollMContextSelectionCheck(cfg, cfgK, cfgJ, state);
+        ok &= RollMContextSelectionCheck(cfg, cfgK, cfgJ, rollJGenerator, state);
         ok &= OffensiveReboundConvergenceCheck(cfg, state);
         ok &= RollCContextCheck(cfg, cfgC, rollCGenerator, state);
         ok &= RollCExpansionCheck(cfg, cfgC, rollCGenerator, state);
@@ -1089,7 +1089,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -1266,7 +1266,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -1582,7 +1582,7 @@ internal static class Program
             genG,
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -2191,7 +2191,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(cfgH),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -2324,7 +2324,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -2563,7 +2563,7 @@ internal static class Program
     //     game crosses the threshold partway, exercising the §2a crossing). ---
     private static bool RollJBatchCheck(
         RollAConfig cfg, RollDConfig cfgD, RollJConfig cfgJ,
-        RollJStubPieGenerator genJ, PossessionState state)
+        IRollJPieGenerator genJ, PossessionState state)
     {
         Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} transition entries through Roll J (rebound context) ---");
 
@@ -2731,7 +2731,7 @@ internal static class Program
     //     rebound DefensiveFoul arm feeds. ---
     private static bool RollJStealBatchCheck(
         RollAConfig cfg, RollDConfig cfgD, RollJConfig cfgJ,
-        RollJStubPieGenerator genJ, PossessionState state)
+        IRollJPieGenerator genJ, PossessionState state)
     {
         Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} transition entries through Roll J (STEAL context) ---");
 
@@ -3268,7 +3268,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(cfgL),
             // Roll M PINNED to its DefensiveRebound terminal for this check: a missed
@@ -3602,7 +3602,7 @@ internal static class Program
     //     those weights (the pie is actually consumed). The two sources must also DIFFER
     //     (a null/legacy stamp can never accidentally get the FT odds). ---
     private static bool RollMContextSelectionCheck(
-        RollAConfig cfg, RollKConfig cfgK, RollJConfig cfgJ, PossessionState state)
+        RollAConfig cfg, RollKConfig cfgK, RollJConfig cfgJ, IRollJPieGenerator genJ, PossessionState state)
     {
         Console.WriteLine($"\n--- Context: Roll K + Roll J pie selection by the FT tickets ---");
         var ok = true;
@@ -3665,8 +3665,7 @@ internal static class Program
         Console.WriteLine($"  Roll K FT pie differs from live-ball pie (PutBack): {(kDiffer ? "ok" : "FAIL")}");
         ok &= kDiffer;
 
-        // ---- Roll J: Rebound vs FreeThrowRebound ----
-        var genJ = new RollJStubPieGenerator(cfgJ);
+        // ---- Roll J: Rebound vs FreeThrowRebound vs Steal (at neutral modifiers) ----
         var jContexts = new (TransitionContext ctx, (TransitionOutcome o, double w)[] expected)[]
         {
             (TransitionContext.Rebound, new[]
@@ -3677,6 +3676,7 @@ internal static class Program
                 (TransitionOutcome.DefensiveFoul, cfgJ.DefensiveFoul),
                 (TransitionOutcome.JumpBall,      cfgJ.JumpBall),
             }),
+
             (TransitionContext.FreeThrowRebound, new[]
             {
                 (TransitionOutcome.Settle,        cfgJ.FreeThrowSettle),
@@ -3685,6 +3685,8 @@ internal static class Program
                 (TransitionOutcome.DefensiveFoul, cfgJ.FreeThrowDefensiveFoul),
                 (TransitionOutcome.JumpBall,      cfgJ.FreeThrowJumpBall),
             }),
+
+            // Null-origin steal → legacy StealPush/StealSettle fallback.
             (TransitionContext.Steal, new[]
             {
                 (TransitionOutcome.Settle,        cfgJ.StealSettle),
@@ -3692,6 +3694,26 @@ internal static class Program
                 (TransitionOutcome.Turnover,      cfgJ.StealTurnover),
                 (TransitionOutcome.DefensiveFoul, cfgJ.StealDefensiveFoul),
                 (TransitionOutcome.JumpBall,      cfgJ.StealJumpBall),
+            }),
+
+            // Phase 28 split: BackcourtVictim (high-run) baseline.
+            (new TransitionContext(TransitionSource.Steal) { Origin = StealOrigin.BackcourtVictim }, new[]
+            {
+                (TransitionOutcome.Settle,        cfgJ.BackcourtVictimSettle),
+                (TransitionOutcome.Push,          cfgJ.BackcourtVictimPush),
+                (TransitionOutcome.Turnover,      cfgJ.BackcourtVictimTurnover),
+                (TransitionOutcome.DefensiveFoul, cfgJ.BackcourtVictimDefensiveFoul),
+                (TransitionOutcome.JumpBall,      cfgJ.BackcourtVictimJumpBall),
+            }),
+
+            // Phase 28 split: FrontcourtVictim (low-run) baseline.
+            (new TransitionContext(TransitionSource.Steal) { Origin = StealOrigin.FrontcourtVictim }, new[]
+            {
+                (TransitionOutcome.Settle,        cfgJ.FrontcourtVictimSettle),
+                (TransitionOutcome.Push,          cfgJ.FrontcourtVictimPush),
+                (TransitionOutcome.Turnover,      cfgJ.FrontcourtVictimTurnover),
+                (TransitionOutcome.DefensiveFoul, cfgJ.FrontcourtVictimDefensiveFoul),
+                (TransitionOutcome.JumpBall,      cfgJ.FrontcourtVictimJumpBall),
             }),
         };
 
@@ -3739,6 +3761,15 @@ internal static class Program
             $"> FT({JPush(TransitionContext.FreeThrowRebound):P1}): {(jPushOrderOk ? "ok" : "FAIL")}");
         ok &= jStealDiffer && jPushOrderOk;
 
+        // Phase 28: steal-split direction — BackcourtVictim > FrontcourtVictim >= Rebound (A5 / role-flip).
+        var bcCtx = new TransitionContext(TransitionSource.Steal) { Origin = StealOrigin.BackcourtVictim };
+        var fcCtx = new TransitionContext(TransitionSource.Steal) { Origin = StealOrigin.FrontcourtVictim };
+        var jSplitOk = JPush(bcCtx) > JPush(fcCtx) && JPush(fcCtx) >= JPush(TransitionContext.Rebound);
+        Console.WriteLine(
+            $"  Phase 28 steal split: BC({JPush(bcCtx):P1}) > FC({JPush(fcCtx):P1}) >= Rebound({JPush(TransitionContext.Rebound):P1}): " +
+            $"{(jSplitOk ? "ok" : "FAIL")}");
+        ok &= jSplitOk;
+
         Console.WriteLine($"  Roll M context selection: {(ok ? "ok" : "FAIL")}");
         return ok;
     }
@@ -3785,7 +3816,7 @@ internal static class Program
             genG,
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -4091,7 +4122,7 @@ internal static class Program
             new RollGStubPieGenerator(cfgG),
             new RollHStubPieGenerator(RollHConfig.Load(configPath)),
             new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-            new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+            new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLGenerator(RollLConfig.Load(configPath), game),    // Phase 18: attribute-driven FT make%
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -4403,7 +4434,7 @@ internal static class Program
                 new RollGGenerator(cfgG, cfgMatchup, game),
                 new RollHGenerator(cfgH, cfgMatchup, game),
                 new RollIGenerator(cfgI, cfgMatchup, game),
-                new RollJStubPieGenerator(cfgJ),
+                new RollJGenerator(cfgJ, cfgMatchup, game),
                 new RollKStubPieGenerator(cfgK),
                 new RollLGenerator(cfgL, game),                        // Phase 18: attribute-driven FT make%
                 new RollMGenerator(cfgM, cfgMatchup, game),
@@ -8254,7 +8285,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -8508,7 +8539,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -8601,7 +8632,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game2),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -8700,7 +8731,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -8758,7 +8789,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -8818,7 +8849,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -8882,7 +8913,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -8937,7 +8968,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -8992,7 +9023,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -9088,7 +9119,7 @@ internal static class Program
                 new RollGStubPieGenerator(RollGConfig.Load(configPath)),
                 new RollHStubPieGenerator(RollHConfig.Load(configPath)),
                 new RollIStubPieGenerator(RollIConfig.Load(configPath)),
-                new RollJStubPieGenerator(RollJConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), game),
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
@@ -10423,7 +10454,7 @@ internal static class Program
                         new RollGGenerator(cfgG, cfgMatchup, game),
                         new RollHGenerator(cfgH, cfgMatchup, game),
                         new RollIGenerator(cfgI, cfgMatchup, game),
-                        new RollJStubPieGenerator(cfgJ),
+                        new RollJGenerator(cfgJ, cfgMatchup, game),
                         new RollKStubPieGenerator(cfgK),
                         new RollLGenerator(cfgL, game),                    // Phase 18: attribute-driven FT make%
                         new RollMGenerator(cfgM, cfgMatchup, game),
@@ -11248,7 +11279,7 @@ internal static class Program
                 new RollGGenerator(cfgG, cfgMatchup, game),
                 new RollHGenerator(cfgH, cfgMatchup, game),
                 new RollIGenerator(cfgI, cfgMatchup, game),
-                new RollJStubPieGenerator(cfgJ),
+                new RollJGenerator(cfgJ, cfgMatchup, game),
                 new RollKStubPieGenerator(cfgK),
                 new RollLGenerator(cfgL, game),
                 new RollMGenerator(cfgM, cfgMatchup, game),
@@ -11748,7 +11779,7 @@ internal static class Program
                 new RollGGenerator(cfgG, cfgMatchup, game),
                 new RollHGenerator(cfgH, cfgMatchup, game),
                 new RollIGenerator(cfgI, cfgMatchup, game),
-                new RollJStubPieGenerator(cfgJ),
+                new RollJGenerator(cfgJ, cfgMatchup, game),
                 new RollKStubPieGenerator(cfgK),
                 new RollLGenerator(cfgL, game),
                 new RollMGenerator(cfgM, cfgMatchup, game),

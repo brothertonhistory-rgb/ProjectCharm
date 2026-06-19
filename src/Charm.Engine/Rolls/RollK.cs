@@ -102,14 +102,14 @@ public static class RollK
                 new Terminal("DeadBallTurnover", state,
                     PossessionConsequence.DeadBallTo(state.Defense)),
 
-            // Live-ball turnover off the board. Ball to the defense on a live push —
-            // TERMINAL. As of Contextification #3 this carries TransitionContext.Steal
-            // (the same steal helper Roll C's two live arms use), so the resolver routes
-            // the spawned possession to Roll J on the steal pie — no longer temp-routed
-            // through Roll A.
+            // Phase 28: stamp FrontcourtVictim — a live turnover off an offensive rebound
+            // happens in the frontcourt (state.Frontcourt == true): the offense had already
+            // crossed halfcourt, shot, and rebounded before losing the ball live. The new
+            // defense (thief) must go the full court → low-run odds. High-run requires proof;
+            // a putback-traffic turnover is not a pick-six.
             OffensiveReboundOutcome.LiveBallTurnover =>
                 new Terminal("LiveBallTurnover", state,
-                    PossessionConsequence.TransitionStealTo(state.Defense)),
+                    PossessionConsequence.TransitionStealTo(state.Defense, StealOrigin.FrontcourtVictim)),
 
             // Kick it back out and run a fresh play. Same possession stays alive —
             // CONTINUE back to Roll E (player selection). Wipe the prior shot's facts

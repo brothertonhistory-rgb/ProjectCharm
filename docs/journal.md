@@ -1,3 +1,63 @@
+## Session 63 — Phase 28: Attention-Location Tilt + Steal-Origin Split + Roll J Real Generator (2026-06-18)
+
+**Scope:** Three scopes in one session. Roll G attention-location tilt (amplifier inside `ApplyDietShift`), steal-origin split wiring (`TransitionContext` extension + three steal-site updates), and Roll J real generator (`IRollJPieGenerator` interface + `RollJGenerator` with two independent modifiers). Thirteen files changed.
+
+**What shipped (13 files):**
+
+`src/Charm.Engine/Generators/IRollJPieGenerator.cs` — NEW. The generation contract for Roll J's run-or-not pie. Single per-call input: `Generate(TransitionContext)`. All game context (config, lineups, matchup) injected through the implementing class's constructor, mirroring `RollGGenerator`. Two implementations: `RollJStubPieGenerator` (existing, now implements the interface) and `RollJGenerator` (new, Phase 28).
+
+`src/Charm.Engine/Core/TransitionContext.cs` — Rewritten. Adds `StealOrigin` enum (`BackcourtVictim`, `FrontcourtVictim`) and two new optional fields on the record: `Origin?` (the steal-origin split field, Phase 28) and `OffenseSide?` (the new offense team identity, stamped by all three transition helpers). The static `Steal` shorthand remains as a null-origin fallback for legacy/test tickets. Full design rationale in comments.
+
+`src/Charm.Engine/Core/RollResult.cs` — `TransitionStealTo` signature changed from `(TeamSide team)` to `(TeamSide team, StealOrigin origin)`. All three transition helpers (`TransitionStealTo`, `TransitionReboundTo`, `TransitionFreeThrowReboundTo`) now stamp `OffenseSide = team` on the ticket so the real generator can compute the directional athleticism gap without adding `TeamSide` to the `Generate` interface.
+
+`src/Charm.Engine/Rolls/RollC.cs` — Both live steal arms updated. `BadPassIntercepted` and `LostBallLiveBall` now call `TransitionStealTo(state.Defense, state.Frontcourt ? StealOrigin.FrontcourtVictim : StealOrigin.BackcourtVictim)`. The role-flip: `Frontcourt == false` (victim still in backcourt) → thief near basket → `BackcourtVictim` (high run); `Frontcourt == true` (victim in halfcourt set) → thief goes full court → `FrontcourtVictim` (low run).
+
+`src/Charm.Engine/Rolls/RollK.cs` — `LiveBallTurnover` updated to `TransitionStealTo(state.Defense, StealOrigin.FrontcourtVictim)`. Fixed stamp, not a ternary: proven by source that `state.Frontcourt == true` when Roll K fires (offense had already crossed halfcourt, shot, and rebounded before losing the ball live — a putback-traffic turnover is not a pick-six).
+
+`src/Charm.Engine/Config/RollGConfig.cs` — `AttentionShiftAmplifier` added (default `1.0`, load invariant `>= 0`). Zero = ablation mode; positive = attention tilt active. Calibration placeholder.
+
+`src/Charm.Engine/Generators/RollGGenerator.cs` — Attention-location tilt wired inside `ApplyDietShift`. Insertion point: AFTER the `requestedShift = pressure × PressureShiftScale` line, BEFORE the `intrinsicCapacity` cap. Formula: `requestedShift *= (1 + max(0, ShooterAttentionShare − 0.20) × AttentionShiftAmplifier)`. Uses `const double EqualShare = 0.20` matching Roll H's C1/C3 neutral point. Bonus-only: attention at or below equal share leaves the shift unchanged (regression anchor). A one-trick player's amplified request hits the `intrinsicCapacity` cap, leaving location stable while spilling the excess to residual — the A4 invariant confirmed in harness.
+
+`src/Charm.Engine/Config/RollJConfig.cs` — Three new weight sets appended. `BackcourtVictim*` (five weights, Push=0.55) and `FrontcourtVictim*` (five weights, Push=0.35) replace the single `Steal*` set for classified steal tickets; old `Steal*` set remains as null-origin fallback. Three modifier knobs added: `TeamPaceBias` (default 0.0, neutral), `PaceScale` (0.15 placeholder), `AthleticismGapScale` (0.001 placeholder). Load-time direction invariants: `BackcourtVictimPush > FrontcourtVictimPush` and `FrontcourtVictimPush >= Push` (Rebound baseline).
+
+`src/Charm.Engine/Generators/RollJGenerator.cs` — NEW. Real generator implementing `IRollJPieGenerator`. Source selection: Rebound → existing weights; FreeThrowRebound → existing weights; Steal → `BackcourtVictim*`, `FrontcourtVictim*`, or null-origin `Steal*` fallback by `ctx.Origin`. Two INDEPENDENT modifiers applied to Push/Settle (Turnover/DefFoul/JumpBall fixed): `PaceLift = TeamPaceBias × PaceScale`; `AthlLift = (offenseFiveAthl − defenseFiveAthl) × AthleticismGapScale` where team athleticism is the mean derived `Athleticism` of the active five, read via `ctx.OffenseSide` (null → gap = 0, regression anchor). Modifiers additive, never pre-fused. Constructor: `(RollJConfig, MatchupConfig, GameState)`.
+
+`src/Charm.Engine/Generators/RollJStubPieGenerator.cs` — Adds `: IRollJPieGenerator` to the class declaration. No behavioral change.
+
+`src/Charm.Engine/Core/Resolver.cs` — Field and constructor parameter changed from `RollJStubPieGenerator` to `IRollJPieGenerator`.
+
+`src/Charm.Harness/Program.cs` — 24 `RollJStubPieGenerator` construction sites changed to `new RollJGenerator(cfg, matchup, game)`. Two function parameter type declarations changed to `IRollJPieGenerator`. `RollMContextSelectionCheck` gains `IRollJPieGenerator genJ` parameter (local stub construction removed); jContexts array extended with `BackcourtVictim` and `FrontcourtVictim` exact-weight entries; Phase 28 direction check added: `BC.Push > FC.Push >= Rebound.Push`. One site corrected post-build (`game` → `game2` in the Phase 15 isolated scope).
+
+`src/Charm.Harness/config.json` — `AttentionShiftAmplifier: 1.0` added to `RollG` section. Twelve new keys added to `RollJ` section: both steal-split weight sets, `TeamPaceBias`, `PaceScale`, `AthleticismGapScale`.
+
+**Key design decisions:**
+
+- **`OffenseSide?` on `TransitionContext` (second optional append).** The real generator needs to know which team is the new offense to compute the directional athleticism gap — but the `Generate(TransitionContext)` interface must remain unchanged (no per-call `TeamSide` parameter). The ticket already grows by append; `OffenseSide` is the second such field alongside `Origin`. Stamped by all three transition helpers where the new offense is already known (`team` parameter). Null on hand-constructed test tickets → gap = 0, preserving the regression anchor on every isolated harness check.
+
+- **`FrontcourtVictim` fixed for Roll K (not a ternary).** Source audit proved `state.Frontcourt == true` on every Roll K `LiveBallTurnover` path (the offense had already crossed halfcourt, attempted a shot, and rebounded before losing the ball live). A putback-traffic turnover is not a pick-six. Using the ternary from Roll C here would be technically safe but semantically wrong — the ball is always in the frontcourt at Roll K.
+
+- **Attention amplifier placed before the `intrinsicCapacity` cap, not after.** This is the load-bearing insertion point. Placing it after the cap would mean a one-trick player's location shifts more under high attention — wrong behavior. Placing it before means the amplified request hits the same cap and spills to residual — location stable, make% drops. Confirmed by harness: Phase 17 specialist residual reads exactly 0.0600 (= intrinsicCapacity = 1 − 0.94).
+
+- **`IRollJPieGenerator` interface created (not a concrete-type swap).** All real generators in this codebase implement interfaces; the stub and real generator are interchangeable through the interface. Resolver and every harness construction site hold the interface. The concrete-type-swap alternative was rejected as non-idiomatic.
+
+- **Null-origin `Steal*` fallback preserved.** The old `Steal*` weight set in config is retained as the null-origin fallback for the `TransitionContext.Steal` static shorthand. This lets existing isolated harness checks (`RollJBatchCheck`, `RollJStealBatchCheck`) continue working against `TransitionContext.Steal` (null origin) without modification — regression-anchored at the weight level.
+
+**Python pre-check (mandatory hard gate — Step 0):**
+
+35 checks across three scopes, 0 failures. Scope 1: neutral anchor (EqualShare attention = no-attn identical), directional shift (stretch-4 confirmed), one-trick residual monotone and location constant, zero-pressure gate, bonus-only amplifier. Scope 2: role-flip direction, Roll K FrontcourtVictim proven by source, both steal origins ≥ Rebound baseline. Scope 3: neutral regression anchors on Rebound/FTRebound, pace lift across all sources, athleticism-gap directional, modifiers additive (not pre-fused), pie valid across modifier range.
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED.
+
+Phase 28 signals visible in output:
+
+- **Attention amplifier confirmed (Phase 17 check b):** Specialist residual = 0.0600 exactly = intrinsicCapacity (1 − 0.94). Amplified requested shift hits the cap; excess routes to residual. Residual-penalty attribution = 12.0pts vs vol-tax = 2.5pts — residual channel is now the dominant efficiency cost for a one-trick specialist under high defensive attention. Regression anchors (zero-pressure, FastBreak exemption) hold byte-for-byte.
+
+- **Steal-split direction confirmed (`RollMContextSelectionCheck`):** BackcourtVictim (55%) > FrontcourtVictim (35%) ≥ Rebound (30%) at the weight level. Three steal sites compiled and ran without issue.
+
+- **Athleticism-gap modifier visible in stress test:** AthleticVsSkill bucket: Athletic Tr%=39.9% vs Skill Tr%=33.4%. SkillVsAthletic (mirrored): Athletic Tr%=39.7% vs Skill Tr%=33.9%. Win rates: 73.8% / 73.6%, mirror gap 0.2%. More-athletic offense runs more, directional and side-neutral. Pace knob at neutral (0.0) — all signal is from athleticism gap.
+
 ## Session 62 — Phase 27 Session 2: Selection Tilt + Passing Converter (2026-06-18)
 
 **Scope:** Second and final session of the gravity/spacing/attention layer. Selection tilt and passing converter only — shot location (Roll G) deferred as planned. Fourteen files changed.
