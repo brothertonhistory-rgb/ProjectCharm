@@ -144,6 +144,7 @@ internal static class Program
         ok &= Phase30CoachingLayer2Check(configPath);          // Phase 30
         ok &= Phase31RebounderPickerCheck(configPath);         // Phase 31
         ok &= Phase32PutbackAttemptRateCheck(configPath);     // Phase 32
+        ok &= Phase33TurnoverCommitterCheck(configPath);      // Phase 33
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -5394,8 +5395,10 @@ internal static class Program
             // TO
             if (IsTurnoverPossession(r))
             {
-                var toSlot = r.TurnoverOffSlot is { } s ? s
-                    : WeightedDraw(rng, r.Offense, offRoster, p => p.BallHandling);
+                var toSlot = r.TurnoverOffSlot
+                    ?? throw new InvalidOperationException(
+                        "Phase 33: TurnoverOffSlot null on a turnover possession — the engine committer " +
+                        "pick should make every turnover possession carry a slot. Wiring break.");
                 var top = offRoster.PlayerAt(new Slot(r.Offense, toSlot));
                 if (top != null && top.PlayerId >= 1 && top.PlayerId <= 10) t.To[top.PlayerId - 1]++;
             }
@@ -13050,6 +13053,370 @@ internal static class Program
 
         Console.WriteLine();
         Console.WriteLine(ok ? "  Phase 32 putback attempt rate check: PASSED" : "  Phase 32 putback attempt rate check: FAILED (see [FAIL] lines above)");
+        return ok;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Phase 33 — turnover committer picker check
+    // ─────────────────────────────────────────────────────────────────────────
+    private static bool Phase33TurnoverCommitterCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 33: turnover committer picker (TurnoverCommitterPicker) ---");
+        var ok = true;
+        const int N = 100_000;
+
+        var matchupCfg = MatchupConfig.Load(configPath);
+        var cfgD       = RollDConfig.Load(configPath);
+
+        // Helper: player with all attributes at b; override specific attributes.
+        static Player MkP33(int id, int b,
+                            int? bh     = null, int? height = null,
+                            int? postDef = null, int? str   = null)
+            => new Player($"p{id}")
+            {
+                PlayerId             = id,
+                Outside              = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing          = b, BallHandling = bh ?? b, Passing = b, Playmaking = b,
+                SelfCreation         = b, PostMoves    = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding  = b,
+                PerimeterDefense     = b, PostDefense = postDef ?? b, RimProtection = b,
+                DefensiveRebounding  = b,
+                Steals               = b,
+                Height               = height ?? b, Wingspan = b, Weight = b,
+                Strength             = str    ?? b,
+                Speed = b, Quickness = b, FirstStep = b,
+                Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
+                Discipline           = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Helper: seat five offensive players in Home 1-5; minimal away side.
+        GameState BuildGame(Player[] off)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < off.Length && i < 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), off[i]);
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), MkP33(i + 6, 50));
+            }
+            return g;
+        }
+
+        // Helper: build a pre-selection possession state (no SelectedSlot, no ShotType).
+        static PossessionState MkState(GameState g)
+            => new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+
+        // ── Sub-check 1: Posts suppressed ────────────────────────────────────────
+        // PG (BH=80, low postness) + SG (BH=72) + SF (BH=60) + PF (BH=45, high postness) + C (BH=35).
+        // 100k draws. Assert: C share < PG share AND PF share < SF share.
+        // Python-confirmed: PG≈0.336, SG≈0.290, SF≈0.206, PF≈0.108, C≈0.059.
+        {
+            Console.WriteLine("  Sub-check 1: posts suppressed (C < PG, PF < SF)");
+            var off = new[]
+            {
+                MkP33(1, 50, bh: 80, height: 40, postDef: 42, str: 44),  // PG
+                MkP33(2, 50, bh: 72, height: 45, postDef: 44, str: 46),  // SG
+                MkP33(3, 50, bh: 60, height: 55, postDef: 55, str: 55),  // SF
+                MkP33(4, 50, bh: 45, height: 72, postDef: 70, str: 72),  // PF
+                MkP33(5, 50, bh: 35, height: 88, postDef: 82, str: 85),  // C
+            };
+            var game   = BuildGame(off);
+            var state  = MkState(game);
+            var rng    = new SystemRng(42);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = TurnoverCommitterPicker.Pick(state, game, matchupCfg, rng);
+                counts[pick.Number - 1]++;
+            }
+            var shares = counts.Select(c => (double)c / N).ToArray();
+            Console.WriteLine($"    PG={shares[0]:P2}  SG={shares[1]:P2}  SF={shares[2]:P2}  PF={shares[3]:P2}  C={shares[4]:P2}");
+            var sub1Ok = shares[4] < shares[0]   // C < PG
+                      && shares[3] < shares[2];  // PF < SF
+            ok &= sub1Ok;
+            Console.WriteLine(sub1Ok ? "    [OK]" : "    [FAIL] post suppression direction wrong");
+        }
+
+        // ── Sub-check 2: Combo guards split evenly ───────────────────────────────
+        // Two near-identical guards (BH=75/73, equal postness) + wing + two bigs.
+        // 100k draws. Assert: |G1 share − G2 share| within tolerance (ratio 0.85–1.20).
+        {
+            Console.WriteLine("  Sub-check 2: combo guards split evenly (ratio 0.85–1.20)");
+            var off = new[]
+            {
+                MkP33(1, 50, bh: 75, height: 44, postDef: 44, str: 45),  // G1
+                MkP33(2, 50, bh: 73, height: 45, postDef: 45, str: 46),  // G2
+                MkP33(3, 50, bh: 58, height: 55, postDef: 55, str: 55),  // W
+                MkP33(4, 50, bh: 45, height: 72, postDef: 70, str: 72),  // PF
+                MkP33(5, 50, bh: 35, height: 88, postDef: 82, str: 85),  // C
+            };
+            var game   = BuildGame(off);
+            var state  = MkState(game);
+            var rng    = new SystemRng(42);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = TurnoverCommitterPicker.Pick(state, game, matchupCfg, rng);
+                counts[pick.Number - 1]++;
+            }
+            var g1Share = (double)counts[0] / N;
+            var g2Share = (double)counts[1] / N;
+            var ratio   = g2Share > 0 ? g1Share / g2Share : double.PositiveInfinity;
+            Console.WriteLine($"    G1={g1Share:P2}  G2={g2Share:P2}  ratio={ratio:F3}");
+            var sub2Ok = ratio is > 0.85 and < 1.20;
+            ok &= sub2Ok;
+            Console.WriteLine(sub2Ok ? "    [OK]" : "    [FAIL] combo guards ratio outside 0.85–1.20");
+        }
+
+        // ── Sub-check 3: Perimeter floor ─────────────────────────────────────────
+        // In sub-check 1's lineup, assert SF share > 0.10.
+        {
+            Console.WriteLine("  Sub-check 3: perimeter floor (SF share > 0.10)");
+            var off = new[]
+            {
+                MkP33(1, 50, bh: 80, height: 40, postDef: 42, str: 44),
+                MkP33(2, 50, bh: 72, height: 45, postDef: 44, str: 46),
+                MkP33(3, 50, bh: 60, height: 55, postDef: 55, str: 55),  // SF
+                MkP33(4, 50, bh: 45, height: 72, postDef: 70, str: 72),
+                MkP33(5, 50, bh: 35, height: 88, postDef: 82, str: 85),
+            };
+            var game   = BuildGame(off);
+            var state  = MkState(game);
+            var rng    = new SystemRng(42);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = TurnoverCommitterPicker.Pick(state, game, matchupCfg, rng);
+                counts[pick.Number - 1]++;
+            }
+            var sfShare = (double)counts[2] / N;
+            Console.WriteLine($"    SF share={sfShare:P2}  (bound: > 0.10)");
+            var sub3Ok = sfShare > 0.10;
+            ok &= sub3Ok;
+            Console.WriteLine(sub3Ok ? "    [OK]" : "    [FAIL] SF share too low for a perimeter player");
+        }
+
+        // ── Sub-check 4: Post suppressed but non-zero ────────────────────────────
+        // In sub-check 1's lineup, assert 0 < C share < 0.10.
+        {
+            Console.WriteLine("  Sub-check 4: post suppressed but non-zero (0 < C < 0.10)");
+            var off = new[]
+            {
+                MkP33(1, 50, bh: 80, height: 40, postDef: 42, str: 44),
+                MkP33(2, 50, bh: 72, height: 45, postDef: 44, str: 46),
+                MkP33(3, 50, bh: 60, height: 55, postDef: 55, str: 55),
+                MkP33(4, 50, bh: 45, height: 72, postDef: 70, str: 72),
+                MkP33(5, 50, bh: 35, height: 88, postDef: 82, str: 85),
+            };
+            var game   = BuildGame(off);
+            var state  = MkState(game);
+            var rng    = new SystemRng(42);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = TurnoverCommitterPicker.Pick(state, game, matchupCfg, rng);
+                counts[pick.Number - 1]++;
+            }
+            var cShare = (double)counts[4] / N;
+            Console.WriteLine($"    C share={cShare:P2}  (bound: 0 < C < 0.10)");
+            var sub4Ok = cShare > 0.0 && cShare < 0.10;
+            ok &= sub4Ok;
+            Console.WriteLine(sub4Ok ? "    [OK]" : "    [FAIL] C share out of (0, 0.10)");
+        }
+
+        // ── Sub-check 5: Handling tilt within perimeter ──────────────────────────
+        // In sub-check 1's lineup, assert high-BH PG share > lower-BH SF share.
+        {
+            Console.WriteLine("  Sub-check 5: handling tilt within perimeter (PG > SF)");
+            var off = new[]
+            {
+                MkP33(1, 50, bh: 80, height: 40, postDef: 42, str: 44),  // PG
+                MkP33(2, 50, bh: 72, height: 45, postDef: 44, str: 46),
+                MkP33(3, 50, bh: 60, height: 55, postDef: 55, str: 55),  // SF
+                MkP33(4, 50, bh: 45, height: 72, postDef: 70, str: 72),
+                MkP33(5, 50, bh: 35, height: 88, postDef: 82, str: 85),
+            };
+            var game   = BuildGame(off);
+            var state  = MkState(game);
+            var rng    = new SystemRng(42);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = TurnoverCommitterPicker.Pick(state, game, matchupCfg, rng);
+                counts[pick.Number - 1]++;
+            }
+            var pgShare = (double)counts[0] / N;
+            var sfShare = (double)counts[2] / N;
+            Console.WriteLine($"    PG={pgShare:P2}  SF={sfShare:P2}");
+            var sub5Ok = pgShare > sfShare;
+            ok &= sub5Ok;
+            Console.WriteLine(sub5Ok ? "    [OK]" : "    [FAIL] PG share not > SF share");
+        }
+
+        // ── Sub-check 6: Floor of 1 / no zero-weight slot ────────────────────────
+        // Lineup with a BH=0 player; assert no throw and that slot still receives draws.
+        {
+            Console.WriteLine("  Sub-check 6: floor of 1 (BH=0 player still receives draws)");
+            var off = new[]
+            {
+                MkP33(1, 50, bh: 0,  height: 40, postDef: 42, str: 44),  // BH=0
+                MkP33(2, 50, bh: 72, height: 45, postDef: 44, str: 46),
+                MkP33(3, 50, bh: 60, height: 55, postDef: 55, str: 55),
+                MkP33(4, 50, bh: 45, height: 72, postDef: 70, str: 72),
+                MkP33(5, 50, bh: 35, height: 88, postDef: 82, str: 85),
+            };
+            var game   = BuildGame(off);
+            var state  = MkState(game);
+            var rng    = new SystemRng(42);
+            var counts = new int[5];
+            bool threw = false;
+            try
+            {
+                for (var i = 0; i < N; i++)
+                {
+                    var pick = TurnoverCommitterPicker.Pick(state, game, matchupCfg, rng);
+                    counts[pick.Number - 1]++;
+                }
+            }
+            catch (Exception) { threw = true; }
+            var bhZeroShare = (double)counts[0] / N;
+            Console.WriteLine($"    BH=0 slot share={bhZeroShare:P2}  threw={threw}");
+            var sub6Ok = !threw && bhZeroShare > 0.0;
+            ok &= sub6Ok;
+            Console.WriteLine(sub6Ok ? "    [OK]" : "    [FAIL] BH=0 slot got zero draws or threw");
+        }
+
+        // ── Sub-check 7: Reproducibility ─────────────────────────────────────────
+        // Two identical draws from the same seed produce the same slot.
+        {
+            Console.WriteLine("  Sub-check 7: reproducibility (same seed → same pick)");
+            var off = new[]
+            {
+                MkP33(1, 50, bh: 80, height: 40, postDef: 42, str: 44),
+                MkP33(2, 50, bh: 72, height: 45, postDef: 44, str: 46),
+                MkP33(3, 50, bh: 60, height: 55, postDef: 55, str: 55),
+                MkP33(4, 50, bh: 45, height: 72, postDef: 70, str: 72),
+                MkP33(5, 50, bh: 35, height: 88, postDef: 82, str: 85),
+            };
+            var game  = BuildGame(off);
+            var state = MkState(game);
+            const int Rep = 1_000;
+            var seq1 = new int[Rep];
+            var seq2 = new int[Rep];
+            var rngA = new SystemRng(77);
+            var rngB = new SystemRng(77);
+            for (var i = 0; i < Rep; i++) seq1[i] = TurnoverCommitterPicker.Pick(state, game, matchupCfg, rngA).Number;
+            for (var i = 0; i < Rep; i++) seq2[i] = TurnoverCommitterPicker.Pick(state, game, matchupCfg, rngB).Number;
+            var sub7Ok = seq1.SequenceEqual(seq2);
+            ok &= sub7Ok;
+            Console.WriteLine(sub7Ok ? "    [OK]" : "    [FAIL] sequences diverged");
+        }
+
+        // ── Sub-check 8: Null-roster throw ───────────────────────────────────────
+        // Empty offense lineup → Pick throws InvalidOperationException.
+        {
+            Console.WriteLine("  Sub-check 8: null-roster throw (empty offense → throws)");
+            var gameEmpty = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            gameEmpty.AwayRoster.SetStarter(gameEmpty.AwayLineup.SlotAt(1), MkP33(6, 50));
+            var stateEmpty = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            bool threwOk;
+            try
+            {
+                TurnoverCommitterPicker.Pick(stateEmpty, gameEmpty, matchupCfg, new SystemRng(1));
+                threwOk = false;
+            }
+            catch (InvalidOperationException) { threwOk = true; }
+            ok &= threwOk;
+            Console.WriteLine(threwOk ? "    [OK]" : "    [FAIL] did not throw on all-null offense");
+        }
+
+        // ── Invariant: every turnover possession carries a committer ──────────────
+        // Governor run with real generators; assert TurnoverOffSlot != null on every
+        // turnover possession. This is the post-condition the harness fallback retirement depends on.
+        {
+            Console.WriteLine("  Invariant: every turnover possession has TurnoverOffSlot != null");
+            var cfgA     = RollAConfig.Load(configPath);
+            var cfgGov   = GovernorConfig.Load(configPath);
+            var cfgClock = RollClockConfig.Load(configPath);
+            var cfgEoH   = EndOfHalfConfig.Load(configPath);
+            var cfgE     = RollEConfig.Load(configPath);
+
+            var govGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var offPlayers = new[]
+            {
+                MkP33(1, 50, bh: 75), MkP33(2, 50, bh: 68),
+                MkP33(3, 50, bh: 58),
+                MkP33(4, 50, bh: 42, height: 72, postDef: 70, str: 72),
+                MkP33(5, 50, bh: 32, height: 85, postDef: 80, str: 82),
+            };
+            var defPlayers = Enumerable.Range(6, 5).Select(i => MkP33(i, 50)).ToArray();
+            for (var i = 0; i < 5; i++)
+            {
+                govGame.HomeRoster.SetStarter(govGame.HomeLineup.SlotAt(i + 1), offPlayers[i]);
+                govGame.AwayRoster.SetStarter(govGame.AwayLineup.SlotAt(i + 1), defPlayers[i]);
+            }
+            govGame.SetPossessionArrow(TeamSide.Home);
+
+            var rng = new SystemRng(99);
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, matchupCfg, govGame),
+                cfgA,
+                new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(cfgD),
+                new RollEGenerator(cfgE, govGame),
+                new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
+                new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
+                new RollGGenerator(RollGConfig.Load(configPath), matchupCfg, govGame),
+                new RollHGenerator(RollHConfig.Load(configPath), matchupCfg, govGame),
+                new RollIGenerator(RollIConfig.Load(configPath), matchupCfg, govGame),
+                new RollJGenerator(RollJConfig.Load(configPath), matchupCfg, govGame),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLGenerator(RollLConfig.Load(configPath), govGame),
+                new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                matchupCfg,
+                govGame,
+                rng);
+
+            var governor = new Governor(resolver, govGame, cfgGov, cfgClock, new SystemRng(100), cfgEoH);
+            var first    = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            var result = governor.Run(first);
+
+            var nullSlotCount   = 0;
+            var turnoverPoss    = 0;
+            foreach (var r in result.Possessions)
+            {
+                if (r.EndLabel is null) continue;
+                // IsTurnoverPossession check mirrors the harness helper
+                var isTurnover = r.EndLabel is "BadPassDeadBall" or "BadPassIntercepted"
+                                            or "LostBallDeadBall" or "LostBallLiveBall"
+                                            or "OffensiveFoul" or "Travel" or "DoubleDribble"
+                                            or "Carry" or "ThreeSecondViolation"
+                                            or "FiveSecondCloselyGuarded" or "OffensiveGoaltending"
+                                            or "BackcourtViolation" or "ShotClockViolation"
+                                            or "FiveSecondInbound" or "TenSecondBackcourt";
+                if (!isTurnover) continue;
+                turnoverPoss++;
+                if (r.TurnoverOffSlot is null) nullSlotCount++;
+            }
+            var invOk = nullSlotCount == 0;
+            ok &= invOk;
+            Console.WriteLine(invOk
+                ? $"    [OK] TurnoverOffSlot non-null on all {turnoverPoss} turnover possessions (of {result.Possessions.Count:N0} total)"
+                : $"    [FAIL] {nullSlotCount} turnover possessions had null TurnoverOffSlot");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(ok ? "  Phase 33 turnover committer check: PASSED" : "  Phase 33 turnover committer check: FAILED (see [FAIL] lines above)");
         return ok;
     }
 }

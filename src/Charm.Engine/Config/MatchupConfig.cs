@@ -858,6 +858,14 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"PutbackZoneModifierRim must be > 0: got {cfg.PutbackZoneModifierRim}.");
 
+        // Phase 33: turnover committer picker
+        if (cfg.TurnoverCommitterPostFloor <= 0.0 || cfg.TurnoverCommitterPostFloor > 1.0)
+            throw new InvalidOperationException(
+                $"TurnoverCommitterPostFloor must be in (0, 1]: got {cfg.TurnoverCommitterPostFloor}.");
+        if (cfg.TurnoverCommitterPostnessScale <= 0.0)
+            throw new InvalidOperationException(
+                $"TurnoverCommitterPostnessScale must be > 0: got {cfg.TurnoverCommitterPostnessScale}.");
+
         return cfg;
     }
 
@@ -1036,4 +1044,25 @@ public sealed class MatchupConfig
     /// <summary>Zone modifier for a Rim miss. Must be &gt; 0.
     /// Calibration placeholder.</summary>
     public double PutbackZoneModifierRim   { get; set; } = 1.10;
+
+    // =========================================================================
+    // Phase 33 — turnover committer picker (Roll C Session 1)
+    // =========================================================================
+
+    // --- Phase 33: perimeter gating for the pre-selection turnover-committer pick.
+    //     A high-postness (big) player's positional weight is suppressed toward PostFloor;
+    //     a low-postness (perimeter) player keeps ~full weight. Reuses the shared
+    //     Matchup.Postness (same coefficients the rebound battle uses). Calibration
+    //     placeholders — direction (posts suppressed) is what matters now. ---
+
+    /// <summary>The positional-weight floor a maximally post player reaches in the
+    /// turnover-committer pick (posts commit few turnovers, but not zero). Must be
+    /// in (0, 1] (enforced in Load). Calibration placeholder.</summary>
+    public double TurnoverCommitterPostFloor { get; set; } = 0.10;
+
+    /// <summary>Postness spread (rating points, relative to lineup mean) over which the
+    /// committer perimeter multiplier slides from ~1.0 down toward
+    /// <see cref="TurnoverCommitterPostFloor"/>. Must be &gt; 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double TurnoverCommitterPostnessScale { get; set; } = 40.0;
 }

@@ -527,8 +527,13 @@ public sealed class Resolver
                     if (t.Reason == "Made")
                         points += Scoring.FieldGoalPoints(t.State.ShotType!.Value);
                     // Phase 23: TO metadata — set only for Roll C turnover terminals.
-                    // If Roll E had already selected a player, credit that slot directly.
-                    // Null TurnoverOffSlot means pre-Roll-E TO; harness draws by BallHandling.
+                    // Phase 33: pre-selection turnovers (SelectedSlot null — Roll A/B feeders, no
+                    // shooter chosen yet) get an engine-side committer pick (handling-weighted,
+                    // perimeter-gated), replacing the post-hoc harness BallHandling draw.
+                    // Post-selection turnovers (Roll F, SelectedSlot non-null) credit that slot
+                    // directly — NO rng draw, stream unchanged for those possessions.
+                    // Consumes one _rng draw ONLY on the pre-selection branch (documented stream
+                    // shift, A2). TurnoverOffSlot is now always non-null on turnover possessions.
                     if (t.Reason is "BadPassDeadBall" or "BadPassIntercepted"
                                  or "LostBallDeadBall" or "LostBallLiveBall"
                                  or "OffensiveFoul" or "Travel" or "DoubleDribble"
@@ -537,7 +542,8 @@ public sealed class Resolver
                                  or "BackcourtViolation" or "ShotClockViolation"
                                  or "FiveSecondInbound" or "TenSecondBackcourt")
                     {
-                        turnoverOffSlot = t.State.SelectedSlot?.Number;
+                        turnoverOffSlot = t.State.SelectedSlot?.Number
+                            ?? TurnoverCommitterPicker.Pick(t.State, _game, _matchup, _rng).Number;
                         turnoverWasLiveBall =
                             t.Reason is "BadPassIntercepted" or "LostBallLiveBall";
                     }

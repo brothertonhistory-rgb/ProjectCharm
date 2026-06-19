@@ -266,6 +266,8 @@
     "PutbackZoneModifierMid": 0.85,
     "PutbackZoneModifierShort": 1.00,
     "PutbackZoneModifierRim": 1.10,
+    "TurnoverCommitterPostFloor": 0.10,
+    "TurnoverCommitterPostnessScale": 40.0,
     "HomePressure": 5.0,
     "AwayPressure": 5.0,
     "PressureNeutral": 5.0,

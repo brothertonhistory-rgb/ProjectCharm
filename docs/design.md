@@ -5255,3 +5255,77 @@ If `PossessionState.ReboundSlot` is null (Phase 31 not yet run, or the slot is u
 - Separate `PutbackCeiling`/`PutbackFloor` per source (FreeThrow vs LiveBall) — single pair for now; calibration can split later
 - Calibration of all weights, zone modifiers, reference shift — placeholders only; direction is what Phase 32 validates
 - Deferred roll faces (Rolls C, D, J, K minority arms) — unbuilt chapters, not cleanup debt
+
+---
+
+## Phase 33 — Turnover Committer Picker (Roll C Session 1)
+
+### Scope
+
+Promotes the pre-selection turnover-committer attribution from a post-hoc harness `WeightedDraw` into an engine-side `TurnoverCommitterPicker`, stamped onto `RoutingOutcome.TurnoverOffSlot` during the possession walk. This is the exact move Phase 31 made for offensive rebounds: an attribution that lived in the harness becomes part of the engine, computed once, on the walk.
+
+The picker decides which offensive player committed a turnover on the **pre-selection** paths (Roll A entry/bring-up, Roll B halfcourt-initiation) — the paths where Roll E had not yet named a shooter. The **post-selection** path (Roll F, `SelectedSlot` non-null) is unchanged and untouched.
+
+This session is the committer (WHO), not the type tilt (WHAT). The type-mix tilt — the committer's Passing/BallHandling/IQ bending which kind of turnover it was — is Roll C Session 2.
+
+### The picker
+
+`TurnoverCommitterPicker` is a static class (not an `I...Generator` interface) mirroring `OffensiveRebounderPicker` exactly in structure. Weight per populated offensive slot:
+
+```
+raw  = tanh((postness[i] − lineupMeanPostness) / TurnoverCommitterPostnessScale)
+mult = TurnoverCommitterPostFloor + (1 − PostFloor) × (1 − (raw + 1) / 2)
+weight[i] = max(1.0, BallHandling × mult)
+```
+
+The perimeter multiplier maps postness the **opposite direction** from `Matchup.PositionalWeight`. `PositionalWeight` gives posts weight above 1.0 (rebounding: posts dominate). Here the direction inverts: a guard (raw < 0) gets mult near 1.0; a post (raw > 0) gets mult toward `PostFloor`. The same `Matchup.Postness` coefficients are reused — no new postness math, only a new consumer.
+
+The floor of 1 ensures every populated slot has a positive draw probability even for a BH=0 player or a maximally-suppressed post. The three-stage structure is identical to `OffensiveRebounderPicker`: populate loop → mean → one RNG draw cumulative walk with last-populated fallback.
+
+### Resolver seam
+
+```csharp
+turnoverOffSlot = t.State.SelectedSlot?.Number
+    ?? TurnoverCommitterPicker.Pick(t.State, _game, _matchup, _rng).Number;
+```
+
+The null-coalescing pattern is the correct seam between the two paths:
+
+- **Post-selection (Roll F):** `SelectedSlot` is non-null. The `??` short-circuits — no draw consumed, stream unchanged for those possessions.
+- **Pre-selection (Roll A / Roll B):** `SelectedSlot` is null. One `_rng.NextUnitInterval()` draw is consumed.
+
+The draw is placed inside the turnover-reason branch only. Non-turnover possessions are unaffected.
+
+### `TurnoverOffSlot` as universal post-condition
+
+After Phase 33, every turnover possession exits the engine with a non-null `TurnoverOffSlot`. The harness fallback is retired and replaced with a loud `InvalidOperationException` throw — making a null slot a detectable wiring break rather than a silent fallback. This mirrors the Phase 31 `OrbBySlot.Total == OrbWon` invariant: both promote a "null means unknown" state to "null is impossible, throw if reached."
+
+The invariant is asserted in a controlled governor run as a harness sub-check.
+
+### RNG stream shift (documented consequence)
+
+The draw is consumed from the engine's `_rng`, not from the harness's separate `new Random(seed + 2)` (which handles post-hoc STL/DReb/BLK draws). Moving the pick on-walk shifts every downstream engine draw on pre-selection turnover possessions. This is the identical stream shift Phase 31 documented when `OffensiveRebounderPicker` moved on-walk. The corpus hash changes; same-seed reproducibility within Phase 33 holds.
+
+### Config additions
+
+**`MatchupConfig` (2 new properties):** `TurnoverCommitterPostFloor` (0.10) — the positional-weight floor a maximally post player reaches; must be in (0, 1]. `TurnoverCommitterPostnessScale` (40.0) — the postness spread (rating points, relative to lineup mean) over which the multiplier slides; must be > 0. Both are calibration placeholders — direction (posts suppressed, handling tilts within perimeter) is what Phase 33 validates.
+
+### Picker family
+
+Three pickers now exist as static attribution helpers:
+
+| Picker | Attributes | Direction |
+|---|---|---|
+| `DefenderPicker` | Steals/Speed/... | perimeter favored |
+| `OffensiveRebounderPicker` | OffensiveRebounding × PositionalWeight | posts favored |
+| `TurnoverCommitterPicker` | BallHandling × perimeterMult | perimeter favored, posts suppressed |
+
+All three share the same cumulative-walk structure and one-draw-per-possession contract.
+
+### What is not this session
+
+- **Type-mix tilt (WHAT kind of turnover)** — committer's Passing/BallHandling/IQ bending the per-context type pie. Roll C Session 2, the direct sequel.
+- **Illegal-screen → screener redirect** — per-player screener attribution. Deferred to the Roll D foul-attribution session.
+- **Reason-aware committer mapping** — every pre-selection turnover is attributed to the picked ball-handler-ish slot; no per-reason differentiation this session.
+- **Defensive rebounder picker** — DReb credit remains a post-hoc `WeightedDraw`; no in-possession consumer yet.
+- **Calibration of `PostFloor`, `PostnessScale`, or weight magnitudes** — correctness before calibration is the standing sequencing principle.

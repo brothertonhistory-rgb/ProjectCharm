@@ -1,3 +1,58 @@
+## Session 68 — Phase 33: Roll C Session 1 — Turnover Committer Picker (2026-06-19)
+
+**Scope:** Promoted the pre-selection turnover-committer attribution from a post-hoc harness `WeightedDraw` into an engine-side `TurnoverCommitterPicker`, stamped onto `RoutingOutcome.TurnoverOffSlot` during the possession walk. Mirrors the Phase 31 move exactly: an attribution that was a harness draw becomes part of the engine, computed once, on the walk. The picker decides which offensive player committed a turnover on the paths where Roll E had not yet selected a player (Roll A entry/bring-up and Roll B halfcourt-initiation turnovers). The post-selection path (Roll F, where `SelectedSlot` is already non-null) is unchanged — no RNG draw, direct credit stands. 5 files changed, 1 new.
+
+**What shipped (5 files):**
+
+`src/Charm.Engine/Core/TurnoverCommitterPicker.cs` — NEW. Static class, mirroring `OffensiveRebounderPicker` exactly in structure. Signature: `Pick(PossessionState state, GameState game, MatchupConfig matchupCfg, IRng rng)`. Weight per populated offensive slot: `max(1, BallHandling × perimeterMult(postness, lineupMeanPostness))`. The perimeter multiplier slides from ~1.0 for low-postness (guard) toward `TurnoverCommitterPostFloor` for high-postness (post) via the same `Matchup.Postness` and tanh formula used across all matchup math — no new postness logic, only a new consumer mapping it the opposite direction (posts suppressed, not favored). Same 3-stage structure: populate loop → mean → cumulative walk with last-populated fallback. Throws on empty offense lineup.
+
+`src/Charm.Engine/Core/Resolver.cs` — EDIT (surgical). In the Phase 23 TO stamp block, replaced the single-line direct credit with a null-coalescing call: `turnoverOffSlot = t.State.SelectedSlot?.Number ?? TurnoverCommitterPicker.Pick(t.State, _game, _matchup, _rng).Number`. Post-selection turnovers (SelectedSlot non-null) credit that slot with no draw; pre-selection turnovers consume one `_rng` draw. Placement is inside the turnover-reason branch only, so non-turnover possessions are unaffected.
+
+`src/Charm.Engine/Config/MatchupConfig.cs` — EDIT (surgical). Appended Phase 33 property block after Phase 32 putback section: `TurnoverCommitterPostFloor` (0.10), `TurnoverCommitterPostnessScale` (40.0). Load invariants added: `PostFloor` in (0, 1]; `PostnessScale > 0`.
+
+`src/Charm.Harness/Program.cs` — EDIT. Retired the post-hoc TO `WeightedDraw` fallback — replaced with a throw on null `TurnoverOffSlot` (the post-condition the engine now guarantees). `Phase33TurnoverCommitterCheck` added (8 sub-checks + invariant governor run); wired via `ok &= Phase33TurnoverCommitterCheck(configPath)` after the Phase 32 call. `WeightedDraw` not deleted — 3 surviving callers remain (STL, DReb, BLK).
+
+`src/Charm.Harness/config.json` — EDIT. Two new keys in `Matchup` section: `TurnoverCommitterPostFloor` (0.10), `TurnoverCommitterPostnessScale` (40.0).
+
+**Key design decisions:**
+
+- **Static class, not `I...Generator` interface.** The committer picker is not a swappable generator — it is an attribution helper with a fixed formula, like `OffensiveRebounderPicker` and `DefenderPicker`. No interface created. A future reason-aware committer model (illegal-screen → screener, Roll C Session 2 / Roll D foul-attribution work) drops in adjacent to this picker without touching it.
+
+- **Pre-selection only; post-selection path unchanged.** The `SelectedSlot?.Number ?? Pick(...)` null-coalescing pattern is the correct seam. When `SelectedSlot` is non-null (Roll F path), no draw is consumed and the stream is unaffected. When `SelectedSlot` is null (Roll A / Roll B feeders), one `_rng` draw is consumed. Roll A and Roll B are confirmed to reach `ResolveTurnoverType` without passing through Roll E, so `SelectedSlot` is always null on those paths.
+
+- **RNG stream shift is documented and expected (A2).** The draw is consumed from the engine's `_rng`, not from the harness's separate `new Random(seed + 2)`. Moving the pick on-walk therefore shifts every downstream draw on pre-selection turnover possessions — the same documented stream shift Phase 31 produced when `OffensiveRebounderPicker` moved on-walk. The corpus hash changed (`936d978d...`); same-seed reproducibility within Phase 33 holds.
+
+- **Perimeter multiplier maps postness the opposite direction from `PositionalWeight`.** `Matchup.PositionalWeight` gives posts a weight above 1.0 (for rebounding, posts dominate). For turnovers the direction inverts: `raw = tanh((postness − mean) / Scale)`, `mult = PostFloor + (1 − PostFloor) × (1 − (raw + 1) / 2)`. A guard (raw < 0) gets mult near 1.0; a post (raw > 0) gets mult near `PostFloor`. The floor of 1 on the full weight ensures a maximally-suppressed post with high BallHandling still has a positive draw probability.
+
+- **`TurnoverOffSlot` is now a universal post-condition.** Every turnover possession exits the engine with a non-null `TurnoverOffSlot`. The harness fallback is retired and replaced with a loud throw, mirroring the Phase 31 `OrbBySlot.Total == OrbWon` invariant. The invariant is asserted in a controlled governor run as a harness sub-check.
+
+**Python pre-validation (mandatory Step 0 — all 7 checks passed):**
+
+1. Posts suppressed: C share < PG share AND PF share < SF share. PG=0.336, SG=0.290, SF=0.206, PF=0.108, C=0.059. ✓
+2. Combo guards split evenly: G1/G2 ratio = 1.041 (within 0.85–1.20). ✓
+3. Perimeter floor: SF=0.206 > 0.10. ✓
+4. Post suppressed but non-zero: C=0.059 in (0, 0.10). ✓
+5. Handling tilt within perimeter: PG=0.336 > SF=0.206. ✓
+6. Floor of 1 holds: zero-BH weight = 1.000. ✓
+7. Same-seed pick reproducible (→ PG). ✓
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED.
+
+Phase 33 check (8 sub-checks + invariant):
+- Posts suppressed (C < PG, PF < SF): PG=33.58%, SG=29.08%, SF=20.50%, PF=10.97%, C=5.88%. [OK]
+- Combo guards split evenly: G1=31.60%, G2=30.33%, ratio=1.042. [OK]
+- Perimeter floor (SF > 10%): 20.50%. [OK]
+- Post suppressed but non-zero (0 < C < 10%): 5.88%. [OK]
+- Handling tilt within perimeter (PG > SF): 33.58% > 20.50%. [OK]
+- Floor of 1 (BH=0 slot still receives draws): 0.83%, no throw. [OK]
+- Reproducibility (same seed → same pick sequence). [OK]
+- Null-roster throw. [OK]
+- Invariant: TurnoverOffSlot non-null on all 23 turnover possessions (of 133 total). [OK]
+
+Observation run (1,000 games, frozen corpus): all mechanics OK. New corpus hash `936d978d...` — expected A2 stream shift. All prior checks passed. Stress test: all 8 buckets passed; cross-bucket patterns stable.
+
 ## Session 67 — Phase 32: Roll K Real Generator — Putback Attempt Rate (2026-06-19)
 
 **Scope:** Replaced `RollKStubPieGenerator` with a real, attribute-driven `RollKGenerator`. The generator is the first consumer of `PossessionState.ReboundSlot` (stamped by Phase 31) and tilts the `PutBack`/`ResetOffense` mass split based on the rebounder's physical profile versus the defensive team's interior deterrence, with a per-zone modifier scaling putback weight down for perimeter misses. The five minority arms (`DefensiveFoul`, `OffensiveFoul`, `DeadBallTurnover`, `LiveBallTurnover`, `JumpBall`) stay flat at config. Follows the standard interface + retype pattern. 8 files changed, 2 new.
