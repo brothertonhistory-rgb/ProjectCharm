@@ -1,0 +1,1938 @@
+﻿=== Project Charm :: Roll A -> B -> C -> D -> E -> F -> G -> H -> I -> J -> K Chain ===
+
+--- Observability: sample possessions (seeded, full chain) ---
+  rollA=CONTINUE | elapsed=deferred | final -> END:JumpBallTip:Away (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:LostBallDeadBall (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:OutOfBoundsOffOffense (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:JumpBallArrow:Home (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:FreeThrowsMade (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:FreeThrowsMade (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:Made (possession ended)
+  rollA=CONTINUE | elapsed=deferred | final -> END:LostBallDeadBall (possession ended)
+
+--- Observability: Roll C (turnover classification) ---
+  pie: BadPassDeadBall=24.00%, BadPassIntercepted=18.00%, LostBallDeadBall=14.00%, LostBallLiveBall=16.00%, OffensiveFoul=9.00%, Travel=8.00%, DoubleDribble=1.50%, Carry=1.50%, ThreeSecondViolation=2.50%, FiveSecondCloselyGuarded=0.50%, OffensiveGoaltending=0.50%, BackcourtViolation=2.00%, ShotClockViolation=2.50%, FiveSecondInbound=0.00%, TenSecondBackcourt=0.00%
+  input=turnover | result=TERMINAL | reason=BadPassIntercepted | elapsed=deferred
+  input=turnover | result=TERMINAL | reason=ShotClockViolation | elapsed=30s
+  input=turnover | result=TERMINAL | reason=Travel             | elapsed=deferred
+  input=turnover | result=TERMINAL | reason=LostBallDeadBall   | elapsed=deferred
+  input=turnover | result=TERMINAL | reason=LostBallLiveBall   | elapsed=deferred
+
+--- Observability: Roll D (non-shooting defensive foul) ---
+  flavor pie (theater, does not route): ReachIn=60.00%, Blocking=30.00%, OffBall=10.00%
+  thresholds: bonus>=7, double>=10
+  foul# 1: 0->1 | flavor=ReachIn  | bonus=None      | route=ResumeInbound
+  foul# 2: 1->2 | flavor=OffBall  | bonus=None      | route=ResumeInbound
+  foul# 3: 2->3 | flavor=Blocking | bonus=None      | route=ResumeInbound
+  foul# 4: 3->4 | flavor=ReachIn  | bonus=None      | route=ResumeInbound
+  foul# 5: 4->5 | flavor=Blocking | bonus=None      | route=ResumeInbound
+  foul# 6: 5->6 | flavor=ReachIn  | bonus=None      | route=ResumeInbound
+  foul# 7: 6->7 | flavor=OffBall  | bonus=OneAndOne | route=ResolveFreeThrows(OneAndOne)
+  foul# 8: 7->8 | flavor=ReachIn  | bonus=OneAndOne | route=ResolveFreeThrows(OneAndOne)
+  foul# 9: 8->9 | flavor=Blocking | bonus=OneAndOne | route=ResolveFreeThrows(OneAndOne)
+  foul#10: 9->10 | flavor=ReachIn  | bonus=Double    | route=ResolveFreeThrows(Double)
+  foul#11: 10->11 | flavor=ReachIn  | bonus=Double    | route=ResolveFreeThrows(Double)
+
+--- Observability: Roll E (player selection) ---
+  selection pie (flat, no signal yet): Slot1=20.06%, Slot2=23.89%, Slot3=22.76%, Slot4=18.45%, Slot5=14.84%
+  proceed -> selected Home slot 2 | next=IntoPlayerAction
+  proceed -> selected Home slot 5 | next=IntoPlayerAction
+  proceed -> selected Home slot 4 | next=IntoPlayerAction
+  proceed -> selected Home slot 3 | next=IntoPlayerAction
+  proceed -> selected Home slot 4 | next=IntoPlayerAction
+  proceed -> selected Home slot 1 | next=IntoPlayerAction
+  proceed -> selected Home slot 5 | next=IntoPlayerAction
+  proceed -> selected Home slot 3 | next=IntoPlayerAction
+
+--- Observability: Roll F (player action) ---
+  action pie (flat-ish, no signal yet): ShotAttempt=85.50%, Turnover=9.00%, NonShootingFoul=5.00%, JumpBall=0.50%
+  Home slot 2 action -> ResolveJumpBall
+  Home slot 4 action -> IntoShotType
+  Home slot 4 action -> IntoShotType
+  Home slot 5 action -> IntoShotType
+  Home slot 4 action -> IntoShotType
+  Home slot 1 action -> IntoShotType
+  Home slot 2 action -> IntoShotType
+  Home slot 5 action -> IntoShotType
+
+--- Observability: Roll H (make/miss) ---
+  per-zone block weight b(zone) (Rim highest, Three lowest):
+    Rim    12.00%
+    Short  6.00%
+    Mid    3.00%
+    Long   2.00%
+    Three  1.00%
+  Home slot 2 Rim shot -> MissFouled -> CONTINUE -> ResolveShootingFreeThrows
+  Home slot 3 Rim shot -> Made -> TERMINAL (Made)
+  Home slot 5 Mid shot -> Miss -> CONTINUE -> ResolveRebound
+  Home slot 3 Three shot -> Made -> TERMINAL (Made)
+  Home slot 2 Short shot -> Blocked -> CONTINUE -> ResolveRebound
+  Home slot 2 Three shot -> Miss -> CONTINUE -> ResolveRebound
+  Home slot 2 Long shot -> MissOutOfBoundsRetained -> CONTINUE -> ResolveSidelineInbound
+  Home slot 5 Short shot -> Miss -> CONTINUE -> ResolveRebound
+
+--- Observability: Roll I (rebound resolution) ---
+  live-miss rebound pie (flat, no signal yet): DefensiveRebound=66.00%, OffensiveRebound=27.00%, LooseBallFoulOnDefense=2.00%, LooseBallFoulOnOffense=1.00%, OutOfBoundsOffOffense=2.50%, OutOfBoundsOffDefense=1.00%, JumpBall=0.50%
+  miss rebounded -> TERMINAL (DefensiveRebound)
+  miss rebounded -> TERMINAL (DefensiveRebound)
+  miss rebounded -> TERMINAL (OutOfBoundsOffOffense)
+  miss rebounded -> TERMINAL (DefensiveRebound)
+  miss rebounded -> TERMINAL (DefensiveRebound)
+  miss rebounded -> TERMINAL (DefensiveRebound)
+  miss rebounded -> CONTINUE -> OffensiveRebound (same possession)
+  miss rebounded -> TERMINAL (DefensiveRebound)
+
+--- Batch: 100,000 possessions (full chain, physicality=0.00) ---
+  Roll A outcomes:
+    CleanEntry         observed=88.115%  expected=88.000%  gap=0.115%  ok
+    Turnover           observed=8.009%  expected=8.000%  gap=0.009%  ok
+    OffensiveFoul      observed=0.445%  expected=0.450%  gap=0.005%  ok
+    DefensiveFoul      observed=2.416%  expected=2.550%  gap=0.134%  ok
+    JumpBall           observed=1.015%  expected=1.000%  gap=0.015%  ok
+
+  Roll B outcomes (of 88,115 clean entries):
+    Proceed            observed=84.374%  expected=84.500%  gap=0.126%  ok
+    Foul               observed=12.101%  expected=12.000%  gap=0.101%  ok
+    DeadBallTurnover   observed=3.048%  expected=3.000%  gap=0.048%  ok
+    JumpBall           observed=0.477%  expected=0.500%  gap=0.023%  ok
+
+  handoff: ended=100,000, routed-to-stub=0, unrouted=0 -> ok
+
+--- Batch: 100,000 turnovers through Roll C (pressure=0.00) ---
+  Roll C outcomes:
+    BadPassDeadBall      observed=23.888%  expected=24.000%  gap=0.112%  ok
+    BadPassIntercepted   observed=18.188%  expected=18.000%  gap=0.188%  ok
+    LostBallDeadBall     observed=13.988%  expected=14.000%  gap=0.012%  ok
+    LostBallLiveBall     observed=15.971%  expected=16.000%  gap=0.029%  ok
+    OffensiveFoul        observed=9.062%  expected=9.000%  gap=0.062%  ok
+    Travel               observed=7.909%  expected=8.000%  gap=0.091%  ok
+    DoubleDribble        observed=1.522%  expected=1.500%  gap=0.022%  ok
+    Carry                observed=1.455%  expected=1.500%  gap=0.045%  ok
+    ThreeSecondViolation observed=2.497%  expected=2.500%  gap=0.003%  ok
+    FiveSecondCloselyGuarded observed=0.507%  expected=0.500%  gap=0.007%  ok
+    OffensiveGoaltending observed=0.516%  expected=0.500%  gap=0.016%  ok
+    BackcourtViolation   observed=2.068%  expected=2.000%  gap=0.068%  ok
+    ShotClockViolation   observed=2.429%  expected=2.500%  gap=0.071%  ok
+    FiveSecondInbound    observed=0.000%  expected=0.000%  gap=0.000%  ok
+    TenSecondBackcourt   observed=0.000%  expected=0.000%  gap=0.000%  ok
+
+  every exit is a clean terminal: non-terminal=0 -> ok
+  live arms carry Steal context (-> Roll J): ok=34,159 bad=0 -> ok
+  dead arms carry DeadBallInbound or BallAdvanced, no transition context: ok=65,841 bad=0 -> ok
+
+--- Batch: 100,000 fouls through Roll D (flavor rates) ---
+  Roll D flavors:
+    ReachIn    observed=60.015%  expected=60.000%  gap=0.015%  ok
+    Blocking   observed=30.022%  expected=30.000%  gap=0.022%  ok
+    OffBall    observed=9.963%  expected=10.000%  gap=0.037%  ok
+
+  every exit a clean below-bonus Continue: anomalies=0 -> ok
+
+--- Bonus routing: Roll D route vs. foul count ---
+  routes match thresholds 7/10 across the climb -> ok
+  fouls charged to defense only (offense stayed 0): ok
+  final: defense fouls=12, bonus=Double
+
+--- Shared node: DefensiveFoulCharge charge + fork + payload ---
+  [D: ResumeInbound+flavor] below->ResumeInbound, in-bonus->ResolveFreeThrows, flavor=ReachIn, charged defense only -> ok
+  [I/J/K/M: SidelineInbound] below->ResolveSidelineInbound, in-bonus->ResolveFreeThrows, flavor=<none>, charged defense only -> ok
+  shared node reproduces BOTH caller shapes across the climb -> ok
+
+--- Seam signal: Roll B foul rate vs. physicality ---
+  foul rate @ physicality 0.00 = 12.126%
+  foul rate @ physicality 1.00 = 20.199%
+  signal is live (high > low): ok
+
+--- Seam signal: Roll C live-strip rate vs. pressure ---
+  live-strip rate @ pressure 0.00 = 15.844%
+  live-strip rate @ pressure 1.00 = 23.380%
+  signal is live (high > low): ok
+
+--- Jump ball: possession arrow behavior ---
+  tip coin-flip: home wins 50.098% (expected 50.000%) -> ok
+  arrow set to tip-loser every time: 100,000/100,000 -> ok
+  on-arrow(Home): awarded=Home contest=False -> ok
+  arrow flipped Home->Away: ok
+  five awards strictly alternate from Home: ok
+  flipping an Off arrow throws: ok
+
+--- Slot layer: on-court identities ---
+  Home slot 1
+  Home slot 2
+  Home slot 3
+  Home slot 4
+  Home slot 5
+  Home: five slots, numbered 1ΓÇô5, all on Home -> ok
+  Away slot 1
+  Away slot 2
+  Away slot 3
+  Away slot 4
+  Away slot 5
+  Away: five slots, numbered 1ΓÇô5, all on Away -> ok
+  named attribution target: Home slot 3 (a stat would credit here; nothing fills it yet) -> ok
+
+--- Batch: 100,000 selections through Roll E (attribute-driven halfcourt) ---
+  Roll E selections (converge to generator's own pie):
+    Slot1    observed=33.951%  expected=33.842%  gap=0.109%  ok
+    Slot2    observed=20.451%  expected=20.418%  gap=0.033%  ok
+    Slot3    observed=18.012%  expected=18.127%  gap=0.115%  ok
+    Slot4    observed=18.593%  expected=18.612%  gap=0.019%  ok
+    Slot5    observed=8.993%  expected=9.000%  gap=0.007%  ok
+
+  Ordering: Alpha (Slot1=33.951%) > 2x Rodman (Slot5=8.993%): ok
+  every exit a clean slot-stamped IntoPlayerAction: anomalies=0 -> ok
+
+  FastBreak pie selection:
+    FastBreak=true  -> transition pie exactly equals cfg.Transition* weights: ok
+    halfcourt and transition pies differ (selection is observable): ok
+
+--- Batch: 100,000 actions through Roll F (flat-ish pie) ---
+  Roll F actions:
+    ShotAttempt      observed=85.552%  expected=85.500%  gap=0.052%  ok
+    Turnover         observed=8.928%  expected=9.000%  gap=0.072%  ok
+    NonShootingFoul  observed=5.019%  expected=5.000%  gap=0.019%  ok
+    JumpBall         observed=0.501%  expected=0.500%  gap=0.001%  ok
+
+  every exit a clean Continue with an expected kind: anomalies=0 -> ok
+
+--- Clean handoff: 100,000 E->F exits routed through the resolver ---
+  destinations reached:
+    turnover -> Roll C terminal        11,014  ok
+    shot -> Roll G -> Roll H -> resolved   75,344  ok
+    free throws -> resolved            12,591  ok
+    jump ball -> terminal               1,051  ok
+
+  zero unrouted exits: unrecognized=0 -> ok
+  all four resolved destinations reached: ok
+
+--- Batch: 100,000 locations through Roll G (flat-ish pie) ---
+  Roll G locations:
+    Three  observed=36.094%  expected=36.000%  gap=0.094%  ok
+    Long   observed=7.988%  expected=8.000%  gap=0.012%  ok
+    Mid    observed=10.070%  expected=10.000%  gap=0.070%  ok
+    Short  observed=10.870%  expected=11.000%  gap=0.130%  ok
+    Rim    observed=34.978%  expected=35.000%  gap=0.022%  ok
+
+  every exit a clean zone-stamped IntoShotResolution: anomalies=0 -> ok
+
+--- G->H integration: 100,000 IntoShotType exits routed through Roll G then Roll H ---
+  landed at a CORE post-shot destination: 84,892
+  routed DEEPER via Roll K / reset (terminals 15,108, stubs 0)
+  core destinations reached:
+    END:Made                     41,950  ok
+    END:MissOutOfBoundsLost       2,156  ok
+    END:DefensiveRebound         40,139  ok
+    END:LooseBallFoulOnOffense      647  ok
+
+  zero unrouted exits: unrecognized=0 -> ok
+  all core G->H->I destinations reached (offensive rebound now executes Roll K; OOB-retained re-runs Roll A and lands deeper): ok
+
+--- Batch: 100,000 shots through Roll H (zone-aware seven-way pie) ---
+  Roll H outcomes (observed vs. zone-blended expectation):
+    Made                     observed=36.337%  expected=36.524%  gap=0.187%  ok
+    MadeAndFouled            observed=2.944%  expected=2.931%  gap=0.013%  ok
+    Miss                     observed=45.539%  expected=45.511%  gap=0.028%  ok
+    MissFouled               observed=6.600%  expected=6.449%  gap=0.151%  ok
+    MissOutOfBoundsLost      observed=1.997%  expected=1.937%  gap=0.060%  ok
+    MissOutOfBoundsRetained  observed=0.993%  expected=0.968%  gap=0.025%  ok
+    Blocked                  observed=5.590%  expected=5.680%  gap=0.090%  ok
+
+  block rate by zone (observed vs. configured b(zone)):
+    Rim    block observed=11.670%  configured=12.000%  gap=0.330%  ok
+    Short  block observed=5.872%  configured=6.000%  gap=0.128%  ok
+    Mid    block observed=3.149%  configured=3.000%  gap=0.149%  ok
+    Long   block observed=1.945%  configured=2.000%  gap=0.055%  ok
+    Three  block observed=1.019%  configured=1.000%  gap=0.019%  ok
+  block gradient Rim >= ... >= Three: ok
+  zone-blended block rate: observed=5.590%  expected=5.680%  gap=0.090%  ok
+
+  every exit a stamped Result matching its arm: anomalies=0 -> ok
+  slot+zone+result ride through every exit: fails=0 -> ok
+
+--- Clean handoff: 100,000 IntoShotResolution exits routed through Roll H ---
+  landed at a CORE post-shot destination: 84,892
+  routed DEEPER via Roll K / reset (terminals 15,108, stubs 0)
+  core destinations reached:
+    END:Made                     41,950  ok
+    END:MissOutOfBoundsLost       2,156  ok
+    END:DefensiveRebound         40,139  ok
+    END:LooseBallFoulOnOffense      647  ok
+
+  zero unrouted exits: unrecognized=0 -> ok
+  all core Roll H->I destinations reached (offensive rebound now executes Roll K; OOB-retained re-runs Roll A and lands deeper): ok
+
+--- Batch: 100,000 rebounds routed through Roll I ---
+  misses resolved through Roll I: 51,358
+  Roll I outcomes:
+    DefensiveRebound         observed=66.071%  expected=66.000%  gap=0.071%  ok
+    OffensiveRebound         observed=27.022%  expected=27.000%  gap=0.022%  ok
+    LooseBallFoulOnDefense   observed=1.953%  expected=2.000%  gap=0.047%  ok
+    LooseBallFoulOnOffense   observed=0.933%  expected=1.000%  gap=0.067%  ok
+    OutOfBoundsOffOffense    observed=2.541%  expected=2.500%  gap=0.041%  ok
+    OutOfBoundsOffDefense    observed=0.991%  expected=1.000%  gap=0.009%  ok
+    JumpBall                 observed=0.489%  expected=0.500%  gap=0.011%  ok
+
+  routing per outcome:
+    DefensiveRebound       -> END terminal         33,933  ok
+    LooseBallFoulOnOffense -> END terminal            479  ok
+    OutOfBoundsOffOffense  -> END terminal          1,305  ok
+    OffensiveRebound       -> STUB (same poss.)    13,878  ok
+    OutOfBoundsOffDefense  -> SidelineInbound          509  ok  (no charge)
+    LooseBallFoulOnDefense -> SidelineInbound            6  (below bonus)
+                           -> ResolveFreeThrows      997  (in bonus)
+    JumpBall               -> arrow node              251  ok
+
+  zero unrouted / unexpected exits: 0 -> ok
+  slot+zone+result intact on stub landings: missing=0 -> ok
+  foul-charge discipline (only loose-ball-defense charges): bad=0 -> ok
+  ┬º2a: loose-ball-defense crossed the bonus mid-batch (sideline -> FT): ok
+  all seven Roll I arms reached: ok
+
+--- Bonus fork: Roll I loose-ball-defense foul across the thresholds ---
+  thresholds: bonus>=7, double>=10
+  foul# 1: 0->1 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 2: 1->2 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 3: 2->3 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 4: 3->4 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 5: 4->5 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 6: 5->6 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 7: 6->7 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul# 8: 7->8 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul# 9: 8->9 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul#10: 9->10 | route=ResolveFreeThrows(Double)    | expected=ResolveFreeThrows (Double) -> ok
+  foul#11: 10->11 | route=ResolveFreeThrows(Double)    | expected=ResolveFreeThrows (Double) -> ok
+  bonus fork charges the defense and routes correctly: ok
+
+--- Batch: 100,000 BLOCK recoveries routed through Roll I ---
+  Roll I block outcomes:
+    DefensiveRebound         observed=50.098%  expected=50.000%  gap=0.098%  ok
+    OffensiveRebound         observed=31.986%  expected=32.000%  gap=0.014%  ok
+    LooseBallFoulOnDefense   observed=2.978%  expected=3.000%  gap=0.022%  ok
+    LooseBallFoulOnOffense   observed=1.950%  expected=2.000%  gap=0.050%  ok
+    OutOfBoundsOffOffense    observed=6.944%  expected=7.000%  gap=0.056%  ok
+    OutOfBoundsOffDefense    observed=5.062%  expected=5.000%  gap=0.062%  ok
+    JumpBall                 observed=0.982%  expected=1.000%  gap=0.018%  ok
+
+  routing per outcome:
+    DefensiveRebound       -> transition terminal (defense)   50,098  ok
+    OffensiveRebound       -> Roll K cont (no source stamp)    31,986  ok
+    LooseBallFoulOnOffense -> dead-ball terminal (defense)      1,950  ok
+    OutOfBoundsOffOffense  -> dead-ball terminal (defense)      6,944  ok
+    OutOfBoundsOffDefense  -> sideline inbound (no charge)      5,062  ok
+    LooseBallFoulOnDefense -> SidelineInbound (below bonus)         6
+                           -> ResolveFreeThrows (in bonus)      2,972
+    JumpBall               -> arrow node                          982  ok
+
+  zero unrouted / unexpected exits: 0 -> ok
+  consequence/ticket correct on every terminal+continue: bad=0 -> ok
+  foul-charge discipline (only loose-ball-defense charges): bad=0 -> ok
+  ┬º2a: loose-ball-defense crossed the bonus mid-batch (sideline -> FT): ok
+  all seven Roll I block arms reached: ok
+  Roll I block-recovery resolution: ok
+
+--- Context: Roll I block pie selection + Blocked -> Roll I routing ---
+  Roll I source=LiveBall (selection ok):
+    DefensiveRebound         observed=66.053%  expected=66.000%  ok
+    OffensiveRebound         observed=26.907%  expected=27.000%  ok
+    LooseBallFoulOnDefense   observed=2.027%  expected=2.000%  ok
+    LooseBallFoulOnOffense   observed=0.998%  expected=1.000%  ok
+    OutOfBoundsOffOffense    observed=2.542%  expected=2.500%  ok
+    OutOfBoundsOffDefense    observed=0.972%  expected=1.000%  ok
+    JumpBall                 observed=0.501%  expected=0.500%  ok
+  Roll I source=Block (selection ok):
+    DefensiveRebound         observed=50.098%  expected=50.000%  ok
+    OffensiveRebound         observed=31.986%  expected=32.000%  ok
+    LooseBallFoulOnDefense   observed=2.978%  expected=3.000%  ok
+    LooseBallFoulOnOffense   observed=1.950%  expected=2.000%  ok
+    OutOfBoundsOffOffense    observed=6.944%  expected=7.000%  ok
+    OutOfBoundsOffDefense    observed=5.062%  expected=5.000%  ok
+    JumpBall                 observed=0.982%  expected=1.000%  ok
+  block pie differs from live-miss pie (DefensiveRebound): ok
+  blocked shots observed: 5,645
+  each Blocked emits Continue(ResolveRebound) + ReboundSource.Block: 5,645/5,645 -> ok
+  blocked shots routed to a Roll-I destination: 5,645
+  blocked shots landing at the retired STUB:BlockRecovery: 0 -> ok
+  zero unrouted blocked shots: 0 -> ok
+  Roll I block context selection + routing: ok
+
+--- Batch: 100,000 transition entries through Roll J (rebound context) ---
+  Roll J outcomes:
+    Settle           observed=60.015%  expected=60.000%  gap=0.015%  ok
+    Push             observed=30.022%  expected=30.000%  gap=0.022%  ok
+    Turnover         observed=5.948%  expected=6.000%  gap=0.052%  ok
+    DefensiveFoul    observed=3.514%  expected=3.500%  gap=0.014%  ok
+    JumpBall         observed=0.501%  expected=0.500%  gap=0.001%  ok
+
+  routing per outcome:
+    Settle        -> IntoPlayerSelection (halfcourt)   60,015  ok
+    Push          -> IntoPlayerSelection (FastBreak)    30,022  ok
+      of which carry FastBreak=true:   30,022 / 30,022  ok
+    Turnover      -> Roll C (stamped)       5,948  ok
+    DefensiveFoul -> SidelineInbound            6  (below bonus)
+                  -> ResolveFreeThrows      3,508  (in bonus)
+    JumpBall      -> ResolveJumpBall          501  ok
+
+  zero unrouted exits: 0 -> ok
+  every Turnover stamped Transition for Roll C: unstamped=0 -> ok
+  all five Roll J arms reached: ok
+
+--- Bonus fork: Roll J defensive foul across the thresholds ---
+  thresholds: bonus>=7, double>=10
+  foul# 1: 0->1 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 2: 1->2 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 3: 2->3 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 4: 3->4 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 5: 4->5 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 6: 5->6 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 7: 6->7 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul# 8: 7->8 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul# 9: 8->9 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul#10: 9->10 | route=ResolveFreeThrows(Double)    | expected=ResolveFreeThrows (Double) -> ok
+  foul#11: 10->11 | route=ResolveFreeThrows(Double)    | expected=ResolveFreeThrows (Double) -> ok
+  bonus fork charges the defense and routes correctly: ok
+
+--- Batch: 100,000 transition entries through Roll J (STEAL context) ---
+  Roll J outcomes (steal pie):
+    Settle           observed=40.078%  expected=40.000%  gap=0.078%  ok
+    Push             observed=49.959%  expected=50.000%  gap=0.041%  ok
+    Turnover         observed=5.948%  expected=6.000%  gap=0.052%  ok
+    DefensiveFoul    observed=3.514%  expected=3.500%  gap=0.014%  ok
+    JumpBall         observed=0.501%  expected=0.500%  gap=0.001%  ok
+
+  routing per outcome:
+    Settle        -> IntoPlayerSelection (halfcourt)   40,078  ok
+    Push          -> IntoPlayerSelection (FastBreak)    49,959  ok
+      of which carry FastBreak=true:   49,959 / 49,959  ok
+    Turnover      -> Roll C (stamped)       5,948  ok
+    DefensiveFoul -> SidelineInbound            6  (below bonus)
+                  -> ResolveFreeThrows      3,508  (in bonus)
+    JumpBall      -> ResolveJumpBall          501  ok
+
+  zero unrouted exits: 0 -> ok
+  every Turnover stamped Transition for Roll C: unstamped=0 -> ok
+  ┬º2a: steal DefensiveFoul crossed the bonus mid-batch (sideline -> FT): ok
+  all five Roll J steal arms reached: ok
+
+--- Batch: 100,000 offensive rebounds routed through Roll K ---
+  Roll K outcomes:
+    PutBack              observed=39.869%  expected=40.000%  gap=0.131%  ok
+    JumpBall             observed=0.983%  expected=1.000%  gap=0.017%  ok
+    DefensiveFoul        observed=5.096%  expected=5.000%  gap=0.096%  ok
+    OffensiveFoul        observed=2.027%  expected=2.000%  gap=0.027%  ok
+    DeadBallTurnover     observed=2.894%  expected=3.000%  gap=0.106%  ok
+    LiveBallTurnover     observed=2.024%  expected=2.000%  gap=0.024%  ok
+    ResetOffense         observed=47.107%  expected=47.000%  gap=0.107%  ok
+
+  routing per arm:
+    PutBack        -> Roll H, putback ticket + Rim forced    39,869 / 39,869
+    ResetOffense   -> Roll E, facts wiped (zone+result null, FastBreak cleared)  47,107 / 47,107
+                      FastBreak cleared (leak guard)   47,107 / 47,107  ok
+    DefensiveFoul  -> SidelineInbound        6 (below bonus) / ResolveFreeThrows   5,090 (in bonus)
+    terminals flip ball to defense:    6,945
+
+  every PutBack carries the ticket + Rim: ok
+  every ResetOffense wipes the prior shot: ok
+  every flip terminal hands the ball to the defense: ok
+  DefensiveFoul fork exercises both branches: ok
+  all seven Roll K arms reached: ok
+  zero unrouted / unexpected exits: 0 -> ok
+  LiveBallTurnover carries Steal context (-> Roll J): ok=2,024 bad=0 -> ok
+
+--- Context: Roll H putback pie selected by the putback ticket ---
+  putback pie (selection ok, distinct from rim pie ok):
+    Made                       observed=36.623%  expected=36.500%  normal=29.240%  ok
+    MadeAndFouled              observed=6.935%  expected=7.000%  normal=7.000%  ok
+    Miss                       observed=34.131%  expected=34.067%  normal=36.434%  ok
+    MissFouled                 observed=12.907%  expected=13.000%  normal=13.000%  ok
+    MissOutOfBoundsLost        observed=1.182%  expected=1.217%  normal=1.550%  ok
+    MissOutOfBoundsRetained    observed=1.182%  expected=1.217%  normal=0.775%  ok
+    Blocked                    observed=7.040%  expected=7.000%  normal=12.000%  ok
+  putback ticket selects its own pie: ok
+
+--- Bonus fork: Roll K defensive foul across the thresholds ---
+  thresholds: bonus>=7, double>=10
+  foul# 1: 0->1 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 2: 1->2 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 3: 2->3 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 4: 3->4 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 5: 4->5 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 6: 5->6 | route=SidelineInbound(None)        | expected=ResolveSidelineInbound (None) -> ok
+  foul# 7: 6->7 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul# 8: 7->8 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul# 9: 8->9 | route=ResolveFreeThrows(OneAndOne) | expected=ResolveFreeThrows (OneAndOne) -> ok
+  foul#10: 9->10 | route=ResolveFreeThrows(Double)    | expected=ResolveFreeThrows (Double) -> ok
+  foul#11: 10->11 | route=ResolveFreeThrows(Double)    | expected=ResolveFreeThrows (Double) -> ok
+  bonus fork charges the defense and routes correctly: ok
+
+--- Roll L: free-throw resolution (100,000 trips per type) ---
+  raw make rate: observed=72.035%  expected=72.000%  -> ok
+  per-trip: shot count, last-shot routing, made-FT consequence:
+    and-1         spins=[1-1] (want 1-1) | END=71.77% (want 72.00%)  FTReb=28.23% | unrouted=0 wrongCons=0 -> ok
+    fouled two    spins=[2-2] (want 2-2) | END=71.77% (want 72.00%)  FTReb=28.23% | unrouted=0 wrongCons=0 -> ok
+    fouled three  spins=[3-3] (want 3-3) | END=72.02% (want 72.00%)  FTReb=27.98% | unrouted=0 wrongCons=0 -> ok
+    double bonus  spins=[2-2] (want 2-2) | END=71.80% (want 72.00%)  FTReb=28.20% | unrouted=0 wrongCons=0 -> ok
+    one-and-one   spins=[1-2] (want 1-2) | END=51.86% (want 51.84%)  FTReb=48.14% | unrouted=0 wrongCons=0 -> ok
+  spin count never exceeded 3: max=3 -> ok
+  (b) RollLGenerator ΓÇö attribute-driven make%:
+    p72 (FreeThrow=72): make=0.720000  expected=0.720000  -> ok
+    p85 (FreeThrow=85): make=0.850000  expected=0.850000  -> ok
+    null-slot fallback: make=0.720000  expected=0.720000  -> ok
+    empty-slot fallback: make=0.720000  expected=0.720000  -> ok
+  real generator check: ok
+  Roll L free-throw resolution: ok
+
+--- Batch: 100,000 free-throw rebounds routed through Roll M ---
+  Roll M outcomes:
+    DefensiveRebound         observed=73.534%  expected=73.500%  gap=0.034%  ok
+    OffensiveRebound         observed=17.970%  expected=18.000%  gap=0.030%  ok
+    LooseBallFoulOnDefense   observed=1.943%  expected=2.000%  gap=0.057%  ok
+    LooseBallFoulOnOffense   observed=1.033%  expected=1.000%  gap=0.033%  ok
+    OutOfBoundsOffOffense    observed=2.028%  expected=2.000%  gap=0.028%  ok
+    OutOfBoundsOffDefense    observed=2.991%  expected=3.000%  gap=0.009%  ok
+    JumpBall                 observed=0.501%  expected=0.500%  gap=0.001%  ok
+
+  routing per outcome:
+    DefensiveRebound       -> transition terminal (defense)   73,534  ok
+    OffensiveRebound       -> Roll K cont (FreeThrow source)   17,970  ok
+    LooseBallFoulOnOffense -> dead-ball terminal (defense)      1,033  ok
+    OutOfBoundsOffOffense  -> dead-ball terminal (defense)      2,028  ok
+    OutOfBoundsOffDefense  -> sideline inbound (no charge)      2,991  ok
+    LooseBallFoulOnDefense -> SidelineInbound (below bonus)         6
+                           -> ResolveFreeThrows (in bonus)      1,937
+    JumpBall               -> arrow node                          501  ok
+
+  zero unrouted / unexpected exits: 0 -> ok
+  consequence/ticket correct on every terminal+continue: bad=0 -> ok
+  foul-charge discipline (only loose-ball-defense charges): bad=0 -> ok
+  ┬º2a: loose-ball-defense crossed the bonus mid-batch (sideline -> FT): ok
+  all seven Roll M arms reached: ok
+  Roll M free-throw rebound resolution: ok
+
+--- Context: Roll K + Roll J pie selection by the FT tickets ---
+  Roll K source=LiveBall (selection ok):
+    PutBack            observed=40.078%  expected=40.000%  ok
+    JumpBall           observed=0.994%  expected=1.000%  ok
+    DefensiveFoul      observed=5.049%  expected=5.000%  ok
+    OffensiveFoul      observed=2.022%  expected=2.000%  ok
+    DeadBallTurnover   observed=2.971%  expected=3.000%  ok
+    LiveBallTurnover   observed=2.028%  expected=2.000%  ok
+    ResetOffense       observed=46.858%  expected=47.000%  ok
+  Roll K source=FreeThrow (selection ok):
+    PutBack            observed=55.076%  expected=55.000%  ok
+    JumpBall           observed=0.988%  expected=1.000%  ok
+    DefensiveFoul      observed=4.928%  expected=5.000%  ok
+    OffensiveFoul      observed=1.952%  expected=2.000%  ok
+    DeadBallTurnover   observed=3.109%  expected=3.000%  ok
+    LiveBallTurnover   observed=2.028%  expected=2.000%  ok
+    ResetOffense       observed=31.919%  expected=32.000%  ok
+  Roll K FT pie differs from live-ball pie (PutBack): ok
+  Roll J source=Rebound (selection ok):
+    Settle             observed=60.015%  expected=60.000%  ok
+    Push               observed=30.022%  expected=30.000%  ok
+    Turnover           observed=5.948%  expected=6.000%  ok
+    DefensiveFoul      observed=3.514%  expected=3.500%  ok
+    JumpBall           observed=0.501%  expected=0.500%  ok
+  Roll J source=FreeThrowRebound (selection ok):
+    Settle             observed=82.084%  expected=82.000%  ok
+    Push               observed=7.953%  expected=8.000%  ok
+    Turnover           observed=4.950%  expected=5.000%  ok
+    DefensiveFoul      observed=4.031%  expected=4.000%  ok
+    JumpBall           observed=0.982%  expected=1.000%  ok
+  Roll J source=Steal (selection ok):
+    Settle             observed=40.078%  expected=40.000%  ok
+    Push               observed=49.959%  expected=50.000%  ok
+    Turnover           observed=5.948%  expected=6.000%  ok
+    DefensiveFoul      observed=3.514%  expected=3.500%  ok
+    JumpBall           observed=0.501%  expected=0.500%  ok
+  Roll J source=Steal (selection ok):
+    Settle             observed=35.111%  expected=35.000%  ok
+    Push               observed=54.926%  expected=55.000%  ok
+    Turnover           observed=5.948%  expected=6.000%  ok
+    DefensiveFoul      observed=3.514%  expected=3.500%  ok
+    JumpBall           observed=0.501%  expected=0.500%  ok
+  Roll J source=Steal (selection ok):
+    Settle             observed=55.076%  expected=55.000%  ok
+    Push               observed=34.961%  expected=35.000%  ok
+    Turnover           observed=5.948%  expected=6.000%  ok
+    DefensiveFoul      observed=3.514%  expected=3.500%  ok
+    JumpBall           observed=0.501%  expected=0.500%  ok
+  Roll J FT pie differs from rebound pie (Push): ok
+  Roll J Steal pie differs from rebound pie (Push): ok
+  Roll J Push order Steal(50.0%) > Rebound(30.0%) > FT(8.0%): ok
+  Phase 28 steal split: BC(55.0%) > FC(35.0%) >= Rebound(30.0%): ok
+  Roll M context selection: ok
+
+--- Convergence: 100,000 offensive rebounds driven through the resolver loop ---
+  putback-depth distribution (exactly n / at least n):
+    n= 0: exactly   57,399   at-least  100,000
+    n= 1: exactly   40,139   at-least   42,601
+    n= 2: exactly    2,329   at-least    2,462
+    n= 3: exactly      127   at-least      133
+    n= 4: exactly        6   at-least        6
+
+  max putback depth observed: 4 -> ok (< 20)
+  survival strictly decreasing on populated levels: ok
+  iteration guard never hit (harness reached here): ok
+
+--- Context: Roll C pie selection by turnover context ---
+  context=Halfcourt (selection ok):
+    BadPassDeadBall      observed=23.888%  expected=24.000%  gap=0.112%  ok
+    BadPassIntercepted   observed=18.188%  expected=18.000%  gap=0.188%  ok
+    LostBallDeadBall     observed=13.988%  expected=14.000%  gap=0.012%  ok
+    LostBallLiveBall     observed=15.971%  expected=16.000%  gap=0.029%  ok
+    OffensiveFoul        observed=9.062%  expected=9.000%  gap=0.062%  ok
+  context=Transition (selection ok):
+    BadPassDeadBall      observed=24.886%  expected=25.000%  gap=0.114%  ok
+    BadPassIntercepted   observed=15.192%  expected=15.000%  gap=0.192%  ok
+    LostBallDeadBall     observed=19.937%  expected=20.000%  gap=0.063%  ok
+    LostBallLiveBall     observed=34.972%  expected=35.000%  gap=0.028%  ok
+    OffensiveFoul        observed=5.013%  expected=5.000%  gap=0.013%  ok
+  Roll C context selection: ok
+
+--- Expansion: Roll C expanded loss types resolve in isolation ---
+  Entry/Backcourt context (selection ok):
+    BadPassDeadBall            observed=19.933%  expected=20.000%  ok
+    BadPassIntercepted         observed=15.178%  expected=15.000%  ok
+    LostBallDeadBall           observed=14.987%  expected=15.000%  ok
+    LostBallLiveBall           observed=14.924%  expected=15.000%  ok
+    ShotClockViolation         observed=10.015%  expected=10.000%  ok
+    FiveSecondInbound          observed=10.025%  expected=10.000%  ok
+    TenSecondBackcourt         observed=14.938%  expected=15.000%  ok
+  zero-weight members unreachable in context: ok
+  uniform pie over all 15 types (expected 6.667% each):
+    all types reachable: ok
+    rates within tolerance: ok
+    consequences correct (DeadBallInbound or BallAdvanced to defense; steal only on the two live): bad=0 -> ok
+    elapsed correct (violations 30/0/10, turnovers deferred): bad=0 -> ok
+    no NEW type leaks a steal: leaks=0 -> ok
+  Roll C expansion: ok
+
+--- Batch: 100,000 end-of-half intent draws (flat, score-blind) ---
+  end-of-half intent rates:
+    HoldShootLast    observed=70.067%  expected=70.000%  gap=0.067%  ok
+    ShootEarly       observed=19.970%  expected=20.000%  gap=0.030%  ok
+    NoShot           observed=9.963%  expected=10.000%  gap=0.037%  ok
+
+--- Governor loop: two 1,200s halves ---
+  resolved=133 | terminal-ended=132 | parked=0 | noShot=1 | terminal+parked+noShot==total -> ok
+  possession numbers contiguous 1..133 -> ok
+  offense/defense flips match applied consequence -> ok
+  first possession = Home, DeadBallInbound -> ok
+  arrow: jump balls=5 | final=Away | expected=Away -> ok
+  fouls(Home): 7(OneAndOne) -> 18(Double) | monotonic + bonus stays crossed -> ok
+  lineups survive (same objects, 5 slots each) -> ok
+  rebound -> Roll J: possessions entering J=35 (Push now flows into Roll E) -> ok
+  steal -> Roll J: possessions entering J=7 (live turnovers now feed Roll J; observability ΓÇö rigorous proof is RollJStealBatchCheck)
+  half 1: 1,200s / half 2: 1,200s | each drains to 1,200 -> ok
+  possessions=133 (~66 per half) | realized APL=18.0s -> ok
+  tempo histogram (100k samples, center=17 sd=4.5 floor=4 ceiling<30):
+    [0,5): 193
+    [5,10): 5,655
+    [10,15): 26,798
+    [15,20): 42,117
+    [20,25): 21,663
+    [25,30): 3,574
+  min=4.01 / max=30.00 | truncation holds (>= floor, < ceiling) -> ok
+  end-of-half: HoldShootLast=1 ShootEarly=0 NoShot=1
+  score: Home 80 / Away 64 | accumulates per-possession tally -> ok
+  FG rule (Three=3, others=2) -> ok
+  per-stub park breakdown:
+  first 10 possessions:
+    #1   Home entry=DeadBallInbound end=JumpBallArrow:Home                 -> next=Home/DeadBallInbound
+    #2   Home entry=DeadBallInbound end=LostBallDeadBall                   -> next=Away/DeadBallInbound
+    #3   Away entry=DeadBallInbound end=DefensiveRebound                   -> next=Home/Transition
+    #4   Home entry=Transition      end=JumpBallArrow:Away                 -> next=Away/DeadBallInbound
+    #5   Away entry=DeadBallInbound end=FreeThrowsMade                     -> next=Home/DeadBallInbound
+    #6   Home entry=DeadBallInbound end=Made                               -> next=Away/DeadBallInbound
+    #7   Away entry=DeadBallInbound end=MissOutOfBoundsLost                -> next=Home/DeadBallInbound
+    #8   Home entry=DeadBallInbound end=Made                               -> next=Away/DeadBallInbound
+    #9   Away entry=DeadBallInbound end=JumpBallArrow:Home                 -> next=Home/DeadBallInbound
+    #10  Home entry=DeadBallInbound end=DefensiveRebound                   -> next=Away/Transition
+  Governor loop: ok
+
+--- Phase 1: Player object & Roster seam ---
+  RosterConfig loaded OK.
+  Rosters populated OK.
+
+  Side   Slot  Name                 Ath Trans Grav Spac  Validate
+  ---------------------------------------------------------------------------
+  Home   1     Marcus Webb            73.6   64.3   65.5   69.0  OK
+  Home   2     DeShawn Pryor          70.4   66.2   69.4   77.1  OK
+  Home   3     Trey Holloway          67.8   69.9   71.1   60.8  OK
+  Home   4     Javon Okafor           60.6   70.3   77.8   43.5  OK
+  Home   5     Cory Baptiste          64.0   57.0   57.4   78.0  OK
+  Away   1     Kendrick Shaw          71.6   64.8   67.0   67.1  OK
+  Away   2     Rashid Monroe          72.8   73.9   75.7   57.0  OK
+  Away   3     Antoine Dupree         64.6   66.3   68.9   65.8  OK
+  Away   4     Darius Eze             58.8   71.9   82.2   40.5  OK
+  Away   5     Malik Thornton         61.4   54.7   55.5   81.0  OK
+
+  Directional OK ΓÇö Marcus Webb (guard) ath 73.6 > Javon Okafor (big) ath 60.6.
+  Substitution log OK ΓÇö 5 entries per side, all at possession 1.
+  Bare GameState slots are null before population ΓÇö existing sites unaffected.
+  Phase 1 PASSED.
+
+--- Phase 2: Attribute wiring (RollH real generator) ---
+  Logistic range check (ratings 1/25/50/75/99, all five zones)...
+  Logistic values all in [0,1] ΓÇö OK.
+  Logistic monotone per zone ΓÇö OK.
+  Three-point make rate ΓÇö high Outside (85): 48.8%
+  Three-point make rate ΓÇö low  Outside (25): 24.9%
+  Gap: 23.9%  (threshold ΓëÑ 10%)
+  Wiring check PASSED ΓÇö high shooter beats low shooter by required margin.
+  Fallback check (unpopulated roster ΓåÆ stub pie, no throw)...
+  Fallback OK ΓÇö unpopulated roster returns stub pie without throwing.
+  Phase 2 PASSED.
+
+--- Phase 6: Matchup wiring (defender picker + gap fn + make door) ---
+  (a) Defender sweep @Three (shooter Outside=50, sweep PerimeterDefense 10->90):
+      PD=10  make=39.5%
+      PD=30  make=35.5%
+      PD=50  make=34.2%
+      PD=70  make=33.0%
+      PD=90  make=29.5%
+      OK ΓÇö monotone down; even==baseline; edge compresses toward the floor, not zero.
+  (b) Blend @Mid: PerimeterDefense and PostDefense each move make% at half weight:
+      raise PerimeterDefense 20->60: make drops 1.11%
+      raise PostDefense      20->60: make drops 1.11%
+      OK ΓÇö both register, equal half weight, swap-symmetric.
+  (c) Rim specialist (Perim=20,Post=40,Rim=90) vs balanced (all 50), shooter rating 50:
+      Mid: vs specialist 40.8%  vs balanced 39.7%   (specialist gives up MORE)
+      Rim: vs specialist 66.0%  vs balanced 67.7%   (specialist gives up LESS)
+      OK ΓÇö beatable on the perimeter, strong at the rim.
+  (d) Shooter sweep @Three (balanced defender, sweep Outside 30->99):
+      Outside=30  make=27.2%
+      Outside=50  make=34.2%
+      Outside=70  make=42.5%
+      Outside=90  make=52.1%
+      Outside=99  make=55.8%
+      OK ΓÇö monotone up, flattening toward the ceiling (63.3%); the curve caps the payoff.
+  (e) Physical gap (DEC-5: steeper than skill via the larger exponent):
+      at gap=40:  skillShift=15.36  physicalShift=21.34
+      athletic edge (70 vs 30) make=41.6%  vs even make=34.2%
+      OK ΓÇö physical steeper than skill; an athletic edge raises make%.
+  (f) DEC-6 fallback + end-to-end wiring (real generator, batched):
+      empty-slot 33.5%   even 33.5%   strong-defender 28.6%
+      OK ΓÇö empty slot reads raw rating (==even); a strong defender lowers make% through the real pipe.
+  (g) Rim overflow guard (fix #8, carve-then-convert):
+      elite finisher vs weak rim protector @Rim: make 77.0%  (valid pie, no overflow)
+      OK ΓÇö the extreme rim matchup builds a valid pie; the make+block overflow is fixed.
+  Phase 6 PASSED.
+
+--- Phase 7: Block door (matchup-aware block weight) ---
+  (a) Defender sweep @Rim (shooter Fin=50, all 50; sweep RimP+H/W/V 20..95):
+      RimP=20  H/W/V=60  block=11.538%  [4.00%,30.00%]
+      RimP=40  H/W/V=70  block=13.623%  [4.00%,30.00%]
+      RimP=50  H/W/V=70  block=13.768%  [4.00%,30.00%]
+      RimP=60  H/W/V=75  block=15.347%  [4.00%,30.00%]
+      RimP=80  H/W/V=85  block=20.592%  [4.00%,30.00%]
+      RimP=95  H/W/V=90  block=23.999%  [4.00%,30.00%]
+      OK ΓÇö monotone rising; bounded by [floor, ceiling].
+  (b) Defender sweep @Three (shooter Outside=50, all 50; sweep PerimD+H/W/V):
+      PerimD=20  H/W/V=60  block=0.891%  [0.300%,4.000%]
+      PerimD=40  H/W/V=70  block=1.238%  [0.300%,4.000%]
+      PerimD=50  H/W/V=70  block=1.295%  [0.300%,4.000%]
+      PerimD=60  H/W/V=75  block=1.590%  [0.300%,4.000%]
+      PerimD=80  H/W/V=85  block=2.652%  [0.300%,4.000%]
+      PerimD=95  H/W/V=90  block=3.321%  [0.300%,4.000%]
+      Three spread=2.430%  Rim spread=12.461%  Three < Rim: True
+      OK ΓÇö monotone, bounded, spread smaller than Rim (per-zone weights working).
+  (c) Skill vs length split @Rim and @Three:
+      Rim skill-only  (RimP 20ΓåÆ95, length=70): ╬öblock = 4.165%
+      Rim length-only (length 60ΓåÆ90, RimP=70):  ╬öblock = 9.706%
+      OK @Rim ΓÇö length delta > skill delta (length heavier at 60%).
+      Three skill-only  (PerimD 20ΓåÆ95, length=70): ╬öblock = 1.408%
+      Three length-only (length 60ΓåÆ90, PerimD=70):  ╬öblock = 1.570%
+      OK @Three ΓÇö length delta > skill delta (length heavier at 60%).
+  (d) DEC-6 fallback ΓÇö empty slot, even matchup, strong defender:
+      empty-slot (baseline): 12.000%
+      even matchup:           12.000%
+      strong defender:        21.359%
+      OK ΓÇö empty==baseline; even==baseline; strong defender raises block.
+  (e) Shooter-edge symmetry @Rim (fix defender all=50; raise shooter Fin+H/W/V):
+      shooter Fin=20  H/W/V=40  block=15.344%
+      shooter Fin=35  H/W/V=50  block=12.777%
+      shooter Fin=50  H/W/V=60  block=11.879%
+      shooter Fin=65  H/W/V=70  block=10.874%
+      shooter Fin=80  H/W/V=80  block=8.512%
+      shooter Fin=95  H/W/V=90  block=5.812%
+      OK ΓÇö block rate falls as shooter improves; stays above floor.
+  (f) Regression ΓÇö Phase 6 make door valid after Phase 7 block change:
+      elite finisher vs weak rim protector @Rim: make 75.1%  (valid pie)
+      OK ΓÇö valid pie; make rate > 0.50 for extreme shooter edge.
+  Phase 7 PASSED.
+
+--- Phase 8: Foul door (matchup-aware foul rate) ---
+  (a) Shooter sweep @Rim (fix defender Disc=50, sweep FD 20..95):
+      FD=20  foulRate=19.191%
+      FD=30  foulRate=19.633%
+      FD=40  foulRate=19.908%
+      FD=50  foulRate=20.000%
+      FD=60  foulRate=20.461%
+      FD=70  foulRate=21.834%
+      FD=80  foulRate=24.045%
+      FD=90  foulRate=26.831%
+      FD=95  foulRate=28.289%
+      OK ΓÇö monotonically rising; top=28.289% well above baseline=20.000%; below ceiling=35.000%.
+  (b) Defender sweep @Rim (fix shooter FD=50, sweep Disc 20..95):
+      Disc=20  foulRate=20.259%
+      Disc=30  foulRate=20.115%
+      Disc=40  foulRate=20.029%
+      Disc=50  foulRate=20.000%
+      Disc=60  foulRate=19.994%
+      Disc=70  foulRate=19.977%
+      Disc=80  foulRate=19.948%
+      Disc=90  foulRate=19.908%
+      Disc=95  foulRate=19.883%
+      OK ΓÇö monotonically falling; bottom=19.883% only slightly below baseline=20.000%; above floor=17.000%.
+  (c) Asymmetry @Rim (up_bend > 3 x down_bend):
+      baseline=20.000%  up_bend (FD=90)=6.831%  down_bend (Disc=90)=0.092%
+      up > 3x down? 6.831% > 0.276% => OK
+      Basketball: a weak shooter doesn't suppress fouls as much as an elite drawer raises them.
+  (d) Three spread vs Rim spread (Three << Rim):
+      Rim spread=9.098%   Three spread=1.570%
+      Three spread < Rim spread? ok
+  (e) DEC-6 fallback and baseline checks @Rim:
+      empty (DEC-6) = 20.000%  (expect 20.000%): ok
+      even matchup  = 20.000%  (expect 20.000%): ok
+      elite FD=90   = 26.831%  (expect > 22.000%): ok
+      OK ΓÇö empty==baseline; even==baseline; elite drawer > baseline+0.02.
+  (f) MAF/MissFouled split @Rim (50k possessions, elite FD=90 vs Disc=20):
+      total fouled=14503  MAF=5076  MissFouled=9427
+      MAF fraction: observed=35.00%  expected=35.00%  gap=0.00%  ok
+  (g) Regression ΓÇö Phase 6 + Phase 7 still valid after Phase 8 carve change:
+      elite finisher vs weak rim protector @Rim: make/and-1=75.1%  (valid pie)
+      OK ΓÇö valid pie; make+and-1 > 0.50 for extreme shooter edge.
+  Phase 8 PASSED.
+
+--- Phase 9: Shot-location door (Roll G matchup-aware) ---
+  (a) Neutral matchup: zero gap ΓåÆ mix equals raw tendencies normalized:
+    Rim=50.0000%  expected=50.0000%  ok
+    others each=12.5000%  expected=12.5000%  ok
+    OK ΓÇö zero-gap produces exact raw-tendency normalization.
+  (b) All-five-weak-rim defenders: rim share rises above 20%:
+    rim share=24.993%  (>20%? OK)
+    OK ΓÇö all-weak-rim defense raises rim share above uniform baseline.
+  (c) Top-3 blend: Config B (1 elite + 3 solid) resists more than Config A (1 elite + 4 weak):
+    rim share A=19.865%  rim share B=17.600%  (B<A? OK)
+    OK ΓÇö three solid help defenders add more resistance than three weak ones.
+  (d) Level-mismatch behavior (gap-inequality driven):
+    (d1) D1 finisher vs D3 weak rim: rim=65.856%  tendency baseline=50.000%  OK ΓÇö rises
+    (d2) Same-level matched: rim=54.552%  tendency baseline=50.000%  diff=4.552%  OK
+    (d3) Uniform D1 vs D3 (all attrs 75 vs 45): rim=50.000%  baseline=50.000%  diff=0.000%  OK ΓÇö uniform gaps cancel
+  (e) DEC-6 partial defenders:
+    (e1) Zero defenders: rim=20.0000%  expected=20.0000%  OK
+    (e2) One elite rim defender: rim=14.182%  (<20%? OK)
+    (e3) Three defenders (1 elite + 2 normal): rim=17.942%  one-defender rim=14.182%  (three>one? OK (elite diluted))
+         Note: this is correct ΓÇö 1 elite alone gets 100% blend weight (max suppression);
+         two average help partners dilute the blend and REDUCE suppression.
+  (f) Coaching seam identity:
+    returned (30,40,50,60,70) expected (30,40,50,60,70)  OK
+  (g) Roll H regression with Phase 9 roster loaded:
+    slot-1 @Rim: make+and-1=56.1%  (valid pie, >0 and <1?)
+    OK ΓÇö Roll H valid after Phase 9 roster seating.
+  (h) Negative-multiplier guard (ratio form bounds):
+    extreme positive (fin=99 vs rimP=1): mult=2.491407  bounds=(0, 2.5)  OK
+    extreme negative (fin=1 vs rimP=99): mult=0.401380  lower bound=0.4000  OK ΓÇö strictly positive, above lower asymptote
+  Phase 9 PASSED.
+
+--- Phase 10: Rebound door (Roll I matchup-aware) ---
+  (a) Neutral (all-50 teams, Rim zone): off-share == baseline:
+    off-share=0.29032258  baseline=0.29032258  neutral? OK
+    five flat slivers == config: OK
+  (b) Size check (off Str/Ht=85 vs def Str/Ht=35, equal ratings):
+    off-share=0.473403  baseline=0.290323  rises above baseline? OK
+  (c) Skill check (equal size, off OffReb=85 vs def DefReb=35):
+    off-share=0.440510  baseline=0.290323  rises above baseline? OK
+  (d) Positional weight isolated (PostDefense only, equal Str/Height):
+    concentrated (OffReb in big): share=0.266434
+    flat spread:                   share=0.258584
+    concentrated > flat: OK ΓÇö positional weight rewards OffReb in bigs
+  (e) Shooter nerf: Three (nerf on) yields lower off-share than Rim (nerf off):
+    Three (nerf on): off-share=0.287977
+    Rim  (nerf off): off-share=0.290323
+    Three < Rim: OK
+  (f) Flat slivers unchanged across (b)ΓÇô(e) cases:
+    size-check (b): flat slivers == config: OK
+    skill-check (c): flat slivers == config: OK
+    shooter-nerf Three (e): flat slivers == config: OK
+  (g) Block source baseline (neutral matchup):
+    block off-share=0.39024390  blockBase=0.39024390  matches? OK
+    block baseline distinct from live-miss (>0.05 gap): OK
+  Phase 10 PASSED.
+
+--- Phase 11: FT rebound door (Roll M matchup-aware) ---
+  (a) Neutral (all-50 teams, no slot): off-share == Roll M baseline:
+    off-share=0.19672131  baseline=0.19672131  neutral? OK
+    five flat slivers == config: OK
+  (b) Size check (off Str/Height=85 vs def Str/Height=35):
+    off-share=0.445793  baseline=0.196721  rises above baseline? OK
+  (c) Skill check (equal size, off OffReb=85 vs def DefReb=35):
+    off-share=0.401045  baseline=0.196721  rises above baseline? OK
+  (d) Positional weight isolated (PostDefense only, equal Str/Height, no shooter slot):
+    concentrated (OffReb in post): share=0.183464
+    flat spread:                   share=0.179108
+    concentrated > flat: OK ΓÇö positional weight rewards OffReb in bigs on FT glass
+  (e) No-shooter invariance: null-slot and stamped-slot produce identical off-share:
+    null-slot   off-share = 0.1967213115
+    stamped-slot off-share = 0.1967213115
+    identical? OK ΓÇö Roll M is slot-blind
+  (f) Flat slivers unchanged across (b)ΓÇô(c) cases:
+    size-check (b): flat slivers == config: OK
+    skill-check (c): flat slivers == config: OK
+  (g) FT baseline (Roll M) strictly lower than field-goal baseline (Roll I live-miss):
+    Roll M off-share = 0.196721  Roll I off-share = 0.290323
+    M < I: OK   M in sensibility band (0.15, 0.25): OK
+  Phase 11 PASSED.
+
+--- Phase 12: Disruption door (Roll F pressure-aware) ---
+  (a) Neutral anchor (pressure=5, all-50 even matchup): all four arms == config baseline:
+    ShotAttempt=0.85500000  want=0.85500000  OK
+    Turnover   =0.09000000  want=0.09000000  OK
+    Foul       =0.05000000  want=0.05000000  OK
+    JumpBall   =0.00500000  want=0.00500000  OK
+  (b) Pressure raises TO ΓÇö even matchup, BH=ST=50:
+    TO: low=0.051123  neutral=0.090000  high=0.150790
+    Bad-hands (BH=30,ST=30): neutral=0.090000  high=0.150790  flatLift=True
+    high>neutral: True  low<neutral: True  flatLift: True  -> OK
+  (c) Pressure gates matchup ΓÇö high-pressure delta >> low-pressure delta:
+    Low  pressure delta=0.000000  (0.051123 vs 0.051123)
+    High pressure delta=0.157977  (0.021123 vs 0.179100)
+    High delta >> low delta: True  -> OK
+  (d) Monotone at high pressure (9.0):
+    BH=30: 0.179100  BH=50: 0.178185  BH=80: 0.037619  monotone-fall: True
+    ST=30: 0.021123  ST=50: 0.150790  ST=80: 0.179100  monotone-rise: True
+  (e) Low cap: max pressure + most lopsided matchup (BH=10, ST=95, p=10):
+    TO=0.179100  ceiling=0.180000  capped=True  sane=True
+  (f) Foul rises with pressure; flat across BH/ST matchup:
+    Foul: low=0.027788  neutral=0.050000  high=0.076983  rises=True
+    Foul p=8: even=0.07193442  good-hands=0.07193442  weak-hands=0.07193442  flat=True
+  (g) JumpBall flat and sum==1 in all cases:
+    All cases: JumpBall==BaseJumpBall and sum==1  OK
+  (h) Fallbacks return flat baseline pie:
+    Null SelectedSlot ΓåÆ flat baseline: OK
+    Empty offense roster ΓåÆ flat baseline: OK
+    Zero populated defense ΓåÆ flat baseline: OK
+  Phase 12 PASSED.
+
+--- Phase 13: Team-aggregate disruption door (Roll B) ---
+  (a) Neutral anchor (pressure=5, all-50 even aggregate): all four arms == config baseline:
+    Proceed       =0.84500000  want=0.84500000  OK
+    DeadBallTO    =0.03000000  want=0.03000000  OK
+    Foul          =0.12000000  want=0.12000000  OK
+    JumpBall      =0.00500000  want=0.00500000  OK
+  (a) ok
+  (b) Pressure raises TO ΓÇö even aggregate:
+    TO @ p=2: 0.018880  p=5: 0.030000  p=9: 0.077417  rise=True
+  (b) ok
+  (c) Pressure raises Foul:
+    Foul @ p=2: 0.086558  p=5: 0.120000  p=9: 0.187476  rise=True
+  (c) ok
+  (d) Cap holds at max pressure + worst matchup:
+    TO share=0.100000  ceiling=0.1  capped=True
+    Fo share=0.197988  ceiling=0.22  capped=True
+    Proceed > 0: True
+  (d) ok
+  (e) JumpBall exactly flat, sum = 1:
+    p=2 even        JumpBall=0.00500000  sum=1.0000000000  ok
+    p=5 even        JumpBall=0.00500000  sum=1.0000000000  ok
+    p=9 even        JumpBall=0.00500000  sum=1.0000000000  ok
+    p=9 def_adv     JumpBall=0.00500000  sum=1.0000000000  ok
+  (e) ok
+  (f) SelectedSlot-blind (Roll B reads all slots, not the selected one):
+    null slot vs stamped slot ΓåÆ identical pie: OK
+  (f) ok
+  (g) Matchup matters (Option B): def-adv > even at high pressure:
+    TO @ elite-steal def=0.099500  average-steal def=0.077417  defAdv lifts: True
+  (g) ok
+  Phase 13 PASSED.
+
+--- Phase 15: Press frequency + Standard mode (Roll A) ---
+  (1) PressProbabilityFor ΓÇö pure function (no simulation):
+    freq=1  ΓåÆ 0.050000  want=0.050000  OK
+    freq=5.5ΓåÆ 0.425000  want=0.425000  OK
+    freq=10 ΓåÆ 0.800000  want=0.800000  OK
+    in [0,1]=True  monotone=True
+  (1) ok
+  (2) Frequency gates pressed fraction (spy-based):
+    freq=5  expectedProb=0.3833  observed=0.3729  5╧â=0.0341  fracOk=True
+    logLen=5068  Standard=1890  None=3178  Desperate=0  noDesperate=True
+  (2) ok
+  (3) PressMode.None ΓåÆ exact config baseline:
+    CleanEntry=0.88000000  want=0.88000000  OK
+    Turnover  =0.08000000  want=0.08000000  OK
+    DefFoul   =0.02550000  want=0.02550000  OK
+    OffFoul   =0.00450000  want=0.00450000  OK
+    JumpBall  =0.01000000  want=0.01000000  OK
+  (3) ok
+  (4) Standard pie shape:
+    (4a) StandardLift lifts: TO=True  DF=True  OF=True
+    (4b) even=0.126506  +skill=0.071324lifts=True  +ath=0.068147lifts=True  +sz=0.065106lifts=True  szSmallest=True
+    (4c) OffFoul<DefFoul: True  (0.008579 < 0.054468)
+    (4d) worst: TO=0.2000<=0.2=True  DF=0.0550<=0.1=True  OF=0.0087<=0.015=True  cleanPos=True
+    (4e) sum=1.000000000000=True  JumpBall=0.0100000000=base=True
+  (4) ok
+  (5) Frontcourt=true gates Standard (high-freq, worst matchup):
+    CL=True  TO=True  DF=True  OF=True  JB=True  (all must be true)
+  (5) ok
+  (6) SelectedSlot-blind (Standard: null vs stamped slot):
+    null slot vs stamped slot ΓåÆ identical pie: OK
+  (6) ok
+  (7) PressMode threads through ResumeInbound and ResolveSidelineInbound:
+    ResumeInbound(Standard)         ΓåÆ all spy entries Standard: True
+    ResumeInbound(None)             ΓåÆ all spy entries None:     True
+    ResolveSidelineInbound(Standard)ΓåÆ all spy entries None (Phase 16 dead-ball clear): True
+  (7) ok
+  (8) Desperate fail-loud:
+    Desperate stamp ΓåÆ Generate throws InvalidOperationException: True
+    Live RunPossession (1000├ù) never produces Desperate:         True
+  (8) ok
+  Phase 15 PASSED.
+
+--- Phase 16: Press-break fast break ---
+  (1) Standard press + IntoHalfcourtSet ΓåÆ Roll E receives FastBreak=true AND PressMode=None:
+    spy called 1 time(s) on this routing
+    spy.Log[0].FastBreak == true:   True
+    spy.Log[0].Press == None:       True
+  (1) ok
+  (2) None press + IntoHalfcourtSet ΓåÆ Roll B fires, Roll E sees FastBreak=false:
+    Roll E spy called (confirms Roll B path taken): True
+    spy.Log[0].FastBreak == false:  True
+    spy.Log[0].Press == None:       True
+  (2) ok
+  (3) PressMode consumed ΓÇö second IntoHalfcourtSet with PressMode=None ΓåÆ Roll B fires:
+    first routing:  press-break fires (FastBreak=true, Press=None): True
+    second routing: Roll B path taken (FastBreak=false at Roll E):  True
+  (3) ok
+  (4) ResolveSidelineInbound clears FastBreak and PressMode:
+    Roll A sees FastBreak=false: True
+    Roll A sees PressMode=None:  True
+  (4) ok
+  (5) ResumeInbound (frontcourt) clears FastBreak and PressMode:
+    Roll A sees FastBreak=false: True
+    Roll A sees PressMode=None:  True
+  (5) ok
+  (6) ResumeInbound (backcourt) preserves active Standard press:
+    Roll A sees PressMode=Standard (press survived backcourt foul): True
+  (6) ok
+  (7) Roll G with FastBreak=true ΓåÆ flat fast-break pie regardless of shooter tendencies:
+    ShooterA FB: rim=0.7000 want=0.7  three=0.0500 want=0.05  sum=1:True
+    ShooterB FB: rim=0.7000 want=0.7  three=0.0500 want=0.05  sum=1:True
+    Both shooters same fast-break pie:             True
+    Non-FastBreak pies differ (tendencies active): True
+  (7) ok
+  (8) End-to-end smoke (1 000 possessions, AwayPressFreq=10):
+    ended=1,000  parked=0  unrouted=0 ΓåÆ ok
+  (8) ok
+  Phase 16 PASSED.
+
+--- Phase 17: UsageΓåÆEfficiency curve ---
+
+  (a) Zero-pressure regression
+    ok ΓÇö zero-pressure state identical to null state
+  (a) ok
+
+  (b) Specialist efficiency drop
+    Specialist Rim: base=0.6604 pressured=0.5438 drop=11.7pts residual=0.0600
+    Attribution: vol-tax=2.5pts  residual-penalty=12.0pts
+  (b) ok
+
+  (c) Versatile player absorbs; specialist drop >> versatile drop
+    Versatile Mid: base=0.4045 pressured=0.3894 drop=1.5pts residual=0.0000
+    Residual near-zero: ok (0.0000)
+    Specialist drop (11.7pts) >> versatile drop (1.5pts): ok
+  (c) ok
+
+  (d) Below-comfort slot unchanged
+    ok ΓÇö below-comfort (pressure=0) unchanged
+  (d) ok
+
+  (e) Naturally dominant star pays a real cost
+    Star Rim: base=0.7218 natural-load=0.7064 drop=1.5pts
+  (e) ok
+
+  (f) FastBreak exemption
+    Roll G residual on FastBreak: 0.000000 ΓåÆ ok
+    Roll H make (0.0 vs null scalars): 0.6100 vs 0.6100 ΓåÆ ok
+  (f) ok
+
+  (g) Plumbing: nullΓåÆnon-null seams; ResetOffense clears both
+    Fresh state: UsagePressure=null, UsageResidualPressure=null ΓåÆ ok
+    After Roll E stamp (0.25): UsagePressure=0.25 ΓåÆ ok
+    After Roll G stamp (0.06): UsageResidualPressure=0.06 ΓåÆ ok
+    After ResetOffense-style with: both null ΓåÆ ok
+  (g) ok
+  Phase 17 PASSED.
+
+--- Phase 24: Attribution Sanity Check (controlled roster, 200 games) ---
+  NOTE: weighted stats (DReb, OReb, BLK, STL, TO) prove the weighting system
+  preferentially credits players with the intended attributes ΓÇö not causal attribution.
+  Exact stats (FGA, FGM, 3PA, 3PM, FTA, FTM) are slot-exact.
+
+  Running 200 games....
+
+  Player                   PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [Home] RimAnchor        12.2   7.8   5.2  67.5   0.1   0.0  22.2   3.2   1.8  54.6   3.6   8.8  12.3   0.9   1.0   1.8
+  [Home] PerimRole2       16.9  12.4   6.1  48.7   6.0   2.8  47.3   2.5   1.9  78.2   1.0   2.4   3.4   0.7   0.4   2.6
+  [Home] PerimRole3       15.8  11.6   5.6  48.2   5.9   2.7  45.9   2.4   2.0  82.7   0.9   2.5   3.4   0.8   0.4   2.8
+  [Home] PerimRole4       14.3  10.5   5.0  47.8   5.6   2.5  45.0   2.2   1.8  78.9   1.0   2.5   3.4   0.8   0.4   2.5
+  [Home] PerimRole5       13.7  10.4   4.7  45.0   5.7   2.4  42.8   2.3   1.9  82.0   0.9   2.5   3.5   0.8   0.4   2.4
+  [Away] RimAnchor        12.0   7.8   5.1  64.7   0.1   0.0  13.3   3.3   1.8  54.4   3.4   8.8  12.3   0.8   1.1   1.9
+  [Away] PerimRole2       16.1  12.0   5.6  46.9   5.8   2.6  44.5   2.8   2.3  82.4   1.0   2.5   3.5   0.7   0.3   2.6
+  [Away] PerimRole3       14.9  11.4   5.3  46.7   5.7   2.5  43.6   2.3   1.8  76.2   1.1   2.4   3.5   0.9   0.3   2.5
+  [Away] PerimRole4       14.0  10.8   5.0  46.9   5.7   2.5  43.8   1.9   1.4  75.3   1.1   2.3   3.4   0.9   0.4   2.4
+  [Away] PerimRole5       13.6  10.4   4.7  45.5   5.9   2.6  43.9   2.0   1.6  77.6   1.0   2.3   3.3   0.8   0.4   2.5
+
+  --- Invariant checks ---
+  [OK] FGA Home
+  [OK] FGA Away
+  [OK] FGM Home
+  [OK] FGM Away
+  [OK] 3PA Home
+  [OK] 3PA Away
+  [OK] 3PM Home
+  [OK] 3PM Away
+  [OK] FTA Home
+  [OK] FTA Away
+  [OK] FTM Home
+  [OK] FTM Away
+  [OK] OReb: ╬ú per-player == total OrbWon (2993)
+  [OK] DReb: ╬ú per-player == total DReb possessions (7411)
+  [OK] BLK: ╬ú per-player == total BlkCount (984)
+  [OK] STL: ╬ú per-player == total live-TO possessions (1592)
+  [OK] TO: ╬ú per-player == total TO possessions (4790)
+
+  --- Directional assertions ---
+  [OK] Home DReb: Anchor 8.77/g vs Role 2.47/g ΓÇö ratio 3.55├ù > 3.0├ù
+  [OK] Home OReb: Anchor 3.57/g vs Role 0.96/g ΓÇö ratio 3.71├ù > 3.0├ù
+  [OK] Home BLK: Anchor 1.01/g vs Role 0.38/g ΓÇö ratio 2.64├ù > 2.0├ù
+  [OK] Home 3PA (integrated): Role 5.80/g vs Anchor 0.09/g ΓÇö ratio 64.47├ù > 3.0├ù [integrated selection+attribution check]
+  [OK] Home Anchor FT%: 54.6% < 65% (FreeThrow=55, expect Γëê55%)
+  [OK] Home Role combined FT%: 80.4% > 72% (FreeThrow=78, expect Γëê78%)
+  [OK] Away DReb: Anchor 8.84/g vs Role 2.39/g ΓÇö ratio 3.69├ù > 3.0├ù
+  [OK] Away OReb: Anchor 3.44/g vs Role 1.03/g ΓÇö ratio 3.34├ù > 3.0├ù
+  [OK] Away BLK: Anchor 1.05/g vs Role 0.33/g ΓÇö ratio 3.16├ù > 2.0├ù
+  [OK] Away 3PA (integrated): Role 5.75/g vs Anchor 0.15/g ΓÇö ratio 38.30├ù > 3.0├ù [integrated selection+attribution check]
+  [OK] Away Anchor FT%: 54.4% < 65% (FreeThrow=55, expect Γëê55%)
+  [OK] Away Role combined FT%: 78.2% > 72% (FreeThrow=78, expect Γëê78%)
+
+  Attribution sanity check: PASSED
+
+--- Phase 25: Shooting-Foul Attribution Check ---
+  Directional test: draws DrawFoulingDefender directly (100k draws per scenario, no end-to-end confound).
+  End-to-end test: 200 games with the Phase 24 controlled roster (completeness + no-zero check).
+
+  Scenario 1: guard shoots three (slot=2, zone=Three, seed=25001)
+    Slot 1(int)=0.0148  Slot 2(mtch)=0.8001  Slot 3=0.0619  Slot 4=0.0621  Slot 5=0.0610
+    [OK] Matched share ~0.80 (observed 0.8001)
+    [OK] Three residual: perimeter (3,4,5) > interior (1)
+  Scenario 2: guard drives rim (slot=2, zone=Rim, seed=25002)
+    Slot 1(int)=0.2929  Slot 2(mtch)=0.5001  Slot 3=0.0682  Slot 4=0.0689  Slot 5=0.0699
+    [OK] Matched share ~0.50 (observed 0.5001)
+    [OK] Rim residual: interior (1) > each perimeter (3,4,5)
+  Scenario 3: big shoots three (slot=1, zone=Three, seed=25003)
+    Slot 1(mtch)=0.7999  Slot 2=0.0506  Slot 3=0.0504  Slot 4=0.0494  Slot 5=0.0497
+    [OK] Matched share ~0.80 (observed 0.7999)
+    [NOTE] Residual (2-5) all perimeter ΓÇö roughly equal expected.
+  Scenario 4: big at rim (slot=1, zone=Rim, seed=25004)
+    Slot 1(mtch)=0.5007  Slot 2=0.1238  Slot 3=0.1249  Slot 4=0.1250  Slot 5=0.1255
+    [OK] Matched share ~0.50 (observed 0.5007)
+    [NOTE] Residual (2-5) all perimeter ΓÇö roughly equal expected.
+
+  --- End-to-end completeness (200 games, controlled roster) ---
+  Running 200 games.... done (200/200 completed).
+
+    Shooting-foul events ΓÇö Home defense: 975, Away defense: 1000
+    SFL credits ΓÇö Home players: 975, Away players: 1000
+  [OK] Side-specific reconciliation: creditedHome == totalHome AND creditedAway == totalAway
+  [OK] Global completeness: total SFL == total events (1975)
+  [OK] No-zero defender: all 10 players > 0 SFL across 200 games
+
+  Shooting-foul attribution check: PASSED
+
+--- Phase 29: Hierarchy Bias Check ---
+  Five sub-cases: direction, heliocentric amplification, egalitarian
+  compression, pairwise regression anchor, attention directional.
+
+  Sub-case 1: Direction at standard bias (5.0)
+    Shares: rank10=0.4100, rank8=0.2624, rank6=0.1476, rank4=0.0900, rank2=0.0900
+    [OK] Selection shares decrease monotonically rank10 ΓåÆ rank2 (floor-pinned slots may be equal)
+  Sub-case 2: Heliocentric amplification (bias 9.0)
+    bias=5: rank10=0.4100  bias=9: rank10=0.5042
+    [OK] Heliocentric (9.0) gives rank-10 higher share than standard (5.0)
+    Gap rank10-rank2: bias=5=0.3200  bias=9=0.4142
+    [OK] Gap widened under heliocentric bias
+  Sub-case 3: Egalitarian compression (bias 1.0)
+    bias=1 (mixed ranks): 0.200000, 0.200000, 0.200000, 0.200000, 0.200000
+    bias=5 (all rank=5):  0.200000, 0.200000, 0.200000, 0.200000, 0.200000
+    [OK] Egalitarian (bias=1, any ranks) == all-rank-5 at bias=5 ΓÇö attributes only
+  Sub-case 4: Pairwise regression anchor
+    Case A (rank5/bias5): 0.200000, 0.200000, 0.200000, 0.200000, 0.200000
+    Case B (rank5/bias1): 0.200000, 0.200000, 0.200000, 0.200000, 0.200000
+    [OK] Pairwise regression anchor holds: all-rank-5 shares identical across bias values
+  Sub-case 5: Hierarchy feeds attention (directional)
+    FinalShares: slot1=0.5000  slot2=0.1250
+    AttentionShares: slot1=0.2747  slot2=0.1813
+    [OK] Rank-10 FinalShare > rank-5 FinalShare
+    [OK] Rank-10 AttentionShare > rank-5 AttentionShare ΓÇö hierarchy feeds attention
+
+  Hierarchy bias check: PASSED
+
+=== OBSERVATION RUN ΓÇö frozen-corpus-v1 ===
+  config hash:      74b270e61f3909292b04865e51b7a6a6d91793e48f3f3bb39690663d999fb524
+  corpus:           frozen-corpus-v1  (seeds 1..1000; rosters: Marcus Webb/DeShawn Pryor/Trey Holloway/Javon Okafor/Cory Baptiste vs Kendrick Shaw/Rashid Monroe/Antoine Dupree/Darius Eze/Malik Thornton)
+  sample size:      1000 games
+  strategy/context: home-press=1.0  away-press=1.0  halves=2  half=1200s
+  session/commit:   <stamp at run time>
+
+  Running 1000 games.......... done (1000/1000 completed).
+
+  Mechanics:  ALL OK ΓÇö scoring reconciled, count invariant held, zero parks, no throws
+
+--- PACE (total possessions per game) ---
+    Total                                  mean=  132.2  sd=  3.9  min=  120  max=  146
+    Home                                   mean=   66.5  sd=  2.0  min=   60  max=   74
+    Away                                   mean=   65.7  sd=  2.0  min=   60  max=   73
+    NoShot (end-of-half, per game)         mean=    0.2  sd=  0.4  min=    0  max=    2
+  Distribution (total):
+    [ 90,100)      0.0%  (0)
+    [100,110)      0.0%  (0)
+    [110,120)      0.0%  (0)
+    [120,130)     23.9%  (239)
+    [130,140)     73.2%  (732)
+    [140,150)      2.9%  (29)
+    [150,160)      0.0%  (0)
+
+--- PPP (points per possession) ---
+    Home                                   mean= 1.1007  sd=0.1384  min= 0.6667  max= 1.5152
+    Away                                   mean= 1.0934  sd=0.1435  min= 0.5231  max= 1.6308
+    Combined                               mean= 1.0970  sd=0.0962  min= 0.8189  max= 1.4351
+  Distribution (combined):
+    [0.5,0.7)      0.0%  (0)
+    [0.7,0.9)      1.5%  (15)
+    [0.9,1.1)     49.5%  (495)
+    [1.1,1.3)     47.4%  (474)
+    [1.3,1.5)      1.6%  (16)
+
+--- SCORE & MARGIN ---
+    Home score                             mean=   73.2  sd=  9.4  min=   44  max=  103
+    Away score                             mean=   71.8  sd=  9.6  min=   34  max=  106
+    Margin (HomeΓêÆAway)                     mean=    1.4  sd= 13.5  min=  -42  max=   42
+
+--- TRANSITION FREQUENCY (Transition entries / total possessions) ---
+    Transition freq                        mean= 0.3353  sd=0.0410  min= 0.2109  max= 0.4609
+
+--- TERMINAL MIX (fractions across all possessions all games) ---
+  Made-FG                0.3738  (49,427)
+  FT-made                0.1114  (14,733)
+  DefensiveRebound       0.2724  (36,018)
+  Turnover               0.1965  (25,980)
+  OOB                    0.0244  (3,225)
+  JumpBall               0.0200  (2,651)
+  NoShot                 0.0016  (209)
+  Parked                 0.0000  (0)
+  Other                  0.0000  (0)
+
+--- END-OF-HALF INTENT (counts per game) ---
+    HoldShootLast                          mean=    1.6  sd=  0.6  min=    0  max=    2
+    ShootEarly                             mean=    0.4  sd=  0.6  min=    0  max=    3
+    NoShot                                 mean=    0.2  sd=  0.4  min=    0  max=    2
+
+--- APL (avg possession length, seconds) ---
+    APL                                    mean=18.1645  sd=0.5414  min=16.4384  max=20.0000
+
+--- FOULS PER TEAM PER GAME ---
+    Home fouls                             mean=   11.1  sd=  3.2  min=    2  max=   24
+    Away fouls                             mean=   11.3  sd=  3.1  min=    2  max=   22
+
+--- SHOOTING SPLITS ---
+  FG%:
+      Home                                 mean= 0.5187  sd=0.0704  min= 0.3091  max= 0.7436
+      Away                                 mean= 0.5191  sd=0.0716  min= 0.3019  max= 0.7778
+      Combined                             mean= 0.5185  sd=0.0486  min= 0.3646  max= 0.6733
+  Distribution (FG% combined):
+    [0.2,0.3)      0.0%  (0)
+    [0.3,0.3)      0.0%  (0)
+    [0.3,0.4)      0.6%  (6)
+    [0.4,0.5)      7.2%  (72)
+    [0.5,0.5)     25.6%  (256)
+    [0.5,0.6)     40.4%  (404)
+    [0.6,0.6)     21.3%  (213)
+    >=0.6        4.9%  (49)
+  3P%:  (games with zero 3PA report 0.0 ΓÇö possible in principle)
+      Home                                 mean= 0.4543  sd=0.1452  min= 0.0000  max= 0.9000
+      Away                                 mean= 0.4269  sd=0.1486  min= 0.0000  max= 0.8889
+      Combined                             mean= 0.4411  sd=0.1031  min= 0.1579  max= 0.8421
+  FT%:
+      Home                                 mean= 0.7137  sd=0.1064  min= 0.2500  max= 1.0000
+      Away                                 mean= 0.7012  sd=0.1202  min= 0.0000  max= 1.0000
+      Combined                             mean= 0.7087  sd=0.0744  min= 0.3846  max= 0.9677
+  Distribution (FT% combined):
+    <0.4          0.1%  (1)
+    [0.4,0.5)      0.4%  (4)
+    [0.5,0.6)      5.8%  (58)
+    [0.6,0.7)     37.1%  (371)
+    [0.7,0.8)     45.2%  (452)
+    [0.8,0.9)     11.0%  (110)
+    >=0.9        0.4%  (4)
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+
+--- SHOT MIX ---
+    3PA rate (3PA/FGA, combined)           mean= 0.2351  sd=0.0418  min= 0.1034  max= 0.3656
+
+--- SHOOTING BY ZONE (combined, per game) ---
+  FG% by zone:
+      Rim                                  mean= 0.6506  sd=0.0868  min= 0.3600  max= 0.9143
+      Short                                mean= 0.4985  sd=0.1236  min= 0.0000  max= 0.8889
+      Mid                                  mean= 0.4429  sd=0.1278  min= 0.0667  max= 0.8462
+      Long                                 mean= 0.4323  sd=0.1529  min= 0.0000  max= 1.0000
+      Three                                mean= 0.4411  sd=0.1031  min= 0.1579  max= 0.8421
+  Attempt share by zone (fraction of FGA from each zone):
+      Rim                                  mean= 0.3273  sd=0.0452  min= 0.1600  max= 0.4545
+      Short                                mean= 0.1645  sd=0.0352  min= 0.0532  max= 0.2824
+      Mid                                  mean= 0.1667  sd=0.0363  min= 0.0588  max= 0.3000
+      Long                                 mean= 0.1064  sd=0.0313  min= 0.0220  max= 0.2255
+      Three                                mean= 0.2351  sd=0.0418  min= 0.1034  max= 0.3656
+
+--- USAGE (per-slot FGA share, aggregate across all games) ---
+  Home: Slot1=21.5%  Slot2=27.5%  Slot3=23.7%  Slot4=14.0%  Slot5=13.1%  Unattr=0.2%
+  Away: Slot1=20.5%  Slot2=27.3%  Slot3=24.4%  Slot4=15.2%  Slot5=12.3%  Unattr=0.2%
+  Per-slot FG% (SlotFgm / SlotFga):
+  Home: Slot1=50.7%  Slot2=51.9%  Slot3=49.9%  Slot4=55.8%  Slot5=52.7%
+  Away: Slot1=50.6%  Slot2=50.4%  Slot3=50.3%  Slot4=56.5%  Slot5=54.4%
+  NOTE: per-slot, not per-player ΓÇö valid while lineups are fixed. Unattr = bonus-FT putbacks (Roll E never ran).
+
+--- ORB% (offensive rebound rate, FG-miss + block + FT misses combined) ---
+    Combined                               mean= 0.2765  sd=0.0643  min= 0.1000  max= 0.4651
+
+--- FTr (free-throw rate = FTA/FGA, combined) ---
+    Combined                               mean= 0.3945  sd=0.1174  min= 0.0769  max= 0.8780
+
+--- DEFERRED SENTINELS (counter-plumbing needed ΓÇö future session) ---
+  Press frequency / break rate at game level
+
+--- PHASE 23 ATTRIBUTION CHECKS ---
+  [OK] Same-seed reproducibility confirmed.
+
+  Phase 25 shooting-foul summary (1,000 games):
+    Seed-1 game ΓÇö Home defense events: 6, Away defense events: 3
+    Slot-0 events (bonus-FT putback, expected small): 1
+    Total SFL credits across all 1,000 games: 11864
+  [OK] Phase 25: SFL credits populated (full per-side invariant in Phase25ShootingFoulAttributionCheck).
+
+=== PER-PLAYER BOX SCORE (per-game averages, 1000 games) ===
+  Exact attribution: FGA, FGM, 3PA, 3PM, FTA, FTM.
+  Weighted credit (probabilistic): ORB, DRB, REB, STL, BLK, TO (post-Roll-E exact; pre-Roll-E by BallHandling weight).
+  SFL = shooting fouls committed; excludes all non-shooting and offensive fouls.
+  Player                   PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [Home] Marcus Webb      14.7  11.0   5.6  50.7   3.2   1.4  43.8   2.9   2.1  74.2   1.1   2.9   3.9   1.1   0.5   2.9   1.0
+  [Home] DeShawn Pryor    19.0  14.2   7.3  51.9   2.9   1.3  46.1   3.7   3.0  80.7   1.2   3.3   4.5   0.9   0.6   3.0   1.3
+  [Home] Trey Holloway    15.3  12.2   6.1  49.9   2.7   1.0  38.8   3.1   2.1  65.6   1.5   3.9   5.4   0.8   0.7   2.7   1.3
+  [Home] Javon Okafor      9.8   7.2   4.0  55.8   0.3   0.1  35.4   2.9   1.6  54.9   1.9   4.9   6.8   0.6   0.8   1.9   1.7
+  [Home] Cory Baptiste     9.9   6.7   3.5  52.7   3.3   1.7  52.5   1.3   1.1  84.2   1.2   3.1   4.3   0.8   0.6   1.9   0.7
+  [Away] Kendrick Shaw    13.6  10.5   5.3  50.6   2.7   1.1  41.4   2.7   1.9  71.4   1.0   2.8   3.8   1.0   0.5   2.8   1.0
+  [Away] Rashid Monroe    17.6  13.9   7.0  50.4   2.9   1.0  34.7   3.7   2.6  68.3   1.3   3.5   4.8   1.0   0.6   3.1   1.3
+  [Away] Antoine Dupree   15.9  12.5   6.3  50.3   2.7   1.1  41.8   3.1   2.2  72.9   1.5   3.8   5.3   0.8   0.7   2.7   1.3
+  [Away] Darius Eze       10.7   7.8   4.4  56.5   0.3   0.1  34.0   3.1   1.8  58.6   1.9   4.9   6.9   0.5   0.8   1.8   1.6
+  [Away] Malik Thornton    9.6   6.3   3.4  54.4   3.2   1.7  53.4   1.2   1.1  88.1   1.2   3.0   4.2   0.8   0.5   1.9   0.7
+=== END PER-PLAYER BOX SCORE ===
+
+  ALL CHECKS PASSED
+
+=== END OBSERVATION RUN ΓÇö frozen-corpus-v1 ===
+
+=== STRESS TEST: Archetype Generator + Multi-Bucket Simulation (4,000 games) ===
+
+--- HYPOTHESES (observe, do not grade) ---
+  EliteVsWeak: expect Team A win rate substantially above 50%. Magnitude unknown.
+  ShootingVsAthletic: expect Shooting higher Three%, lower Rim% than Athletic.
+  AthleticVsSkill (buckets 7+8): DEC-5 physical exponent may produce an athletic edge,
+    but rosters also differ across many attributes. Reports what engine currently expresses.
+  StarVsBalanced: PPP SD may be higher or lower than AverageVsAverage.
+  PassFirstGuard/FloorGeneral: deferred channels (playmaking, IQ) not fully wired;
+    underperformance is a finding, not a failure.
+  Mirror gap (buckets 7/8): aggregate win-rate gap near 0% expected.
+    Individual game disagreement is expected even in a side-neutral engine.
+
+--- BUCKET 1: AverageVsAverage ---
+  Running 10 variants ├ù 50 games ...
+
+  Team A roster profile (mean across 10 variants):
+    Scoring:  Outside=41  Finishing=41  Mid=40  Close=47  SelfCreation=38
+    Athletic: Speed=49  Quickness=43  Vertical=44  Strength=44
+    Physical: Height=46  Wingspan=49
+    Skill:    Passing=42  Playmaking=43  BallHandling=44  BasketballIQ=43
+    Defense:  PerimeterDefense=44  PostDefense=43  RimProtection=39
+    Boards:   OffensiveRebounding=45  DefensiveRebounding=42
+  Team B roster profile (mean across 10 variants):
+    Scoring:  Outside=40  Finishing=40  Mid=39  Close=47  SelfCreation=39
+    Athletic: Speed=49  Quickness=43  Vertical=43  Strength=45
+    Physical: Height=46  Wingspan=49
+    Skill:    Passing=42  Playmaking=44  BallHandling=45  BasketballIQ=44
+    Defense:  PerimeterDefense=43  PostDefense=43  RimProtection=40
+    Boards:   OffensiveRebounding=44  DefensiveRebounding=41
+
+  validGames=500/500
+  Team A wins: 243/500 = 48.6%
+  Team B wins: 240/500 = 48.0%
+  Ties:        17/500 = 3.4%
+  Physical home win rate: 50.2%  (side-neutrality diagnostic)
+  Team A score: mean=64.8  sd=9.6  min=39  max=96
+  Team B score: mean=64.5  sd=9.7  min=38  max=100
+  Margin (A-B): mean=0.3  sd=13.5
+  PPP Team A: agg=0.997  mean-game=0.997  sd=0.143
+  PPP Team B: agg=0.992  mean-game=0.992  sd=0.145
+  FG%  Team A: agg=43.9%  mean-game=44.0%  sd=6.9%
+  FG%  Team B: agg=43.8%  mean-game=43.8%  sd=7.0%
+  3P%  Team A: agg=35.7%  mean-game=35.6%  sd=13.5%
+  3P%  Team B: agg=35.5%  mean-game=35.4%  sd=13.4%
+  FT%  Team A: agg=71.8%  mean-game=71.8%  sd=11.4%
+  FT%  Team B: agg=72.2%  mean-game=71.9%  sd=11.9%
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+  3PA rate  Team A: 25.9%  Team B: 26.1%
+  Shot mix Team A: Rim=29% Short=19% Mid=13% Long=13% Three=26%
+  Shot mix Team B: Rim=30% Short=18% Mid=12% Long=14% Three=26%
+  Usage Team A: Slot1=16.8% Slot2=22.0% Slot3=19.8% Slot4=22.1% Slot5=19.1% Unattr=0.2%
+  Usage Team B: Slot1=16.0% Slot2=22.1% Slot3=20.4% Slot4=21.7% Slot5=19.6% Unattr=0.2%
+  Slot FG% Team A: Slot1=41.1% Slot2=43.6% Slot3=42.1% Slot4=44.2% Slot5=48.2%
+  Slot FG% Team B: Slot1=42.4% Slot2=42.3% Slot3=41.7% Slot4=44.1% Slot5=48.2%
+  ORB%  Team A: 29.2%  Team B: 29.7%
+  FTr   Team A: 0.351  Team B: 0.363
+  Transition Team A: 37.5%  Team B: 37.6%
+  Pace (total poss/game): 130.1
+  Between-variant:  Team A win-rate range: min=42%  max=56%
+  Between-variant:  Team B PPP range: min=0.969  max=1.012
+
+=== COHORT BOX SCORE ΓÇö Bucket 1: AverageVsAverage ===
+  Rows pool 10 generated roster variants. Each row is the per-game average
+  for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
+  Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [A] Slot1 ΓÇö PassFirstGuard   9.2   8.9   3.7  41.1   1.7   0.5  27.6   2.1   1.4  66.6   1.3   3.2   4.5   1.0   0.5   2.5   0.8
+  [A] Slot2 ΓÇö PerimeterShooter  13.9  11.7   5.1  43.6   4.8   1.9  39.7   2.4   1.8  74.4   1.1   2.9   4.0   1.0   0.5   2.4   0.8
+  [A] Slot3 ΓÇö ThreeAndDWing  12.1  10.5   4.4  42.1   4.2   1.7  39.2   2.1   1.6  74.8   1.9   4.4   6.3   0.9   0.6   2.3   0.9
+  [A] Slot4 ΓÇö PostScorer  13.4  11.7   5.2  44.2   1.7   0.5  30.2   3.2   2.6  78.8   2.1   4.6   6.7   0.5   0.7   2.7   1.5
+  [A] Slot5 ΓÇö RimRunner   12.2  10.1   4.9  48.2   1.4   0.4  27.4   3.0   2.0  66.5   2.0   5.1   7.1   0.8   0.8   2.1   1.3
+  [B] Slot1 ΓÇö PassFirstGuard   9.0   8.4   3.5  42.4   1.4   0.4  28.4   2.2   1.5  67.7   1.4   3.4   4.7   0.9   0.5   2.4   0.9
+  [B] Slot2 ΓÇö PerimeterShooter  13.3  11.6   4.9  42.3   4.6   1.8  38.2   2.3   1.7  75.0   1.1   2.8   3.9   1.0   0.5   2.5   0.9
+  [B] Slot3 ΓÇö ThreeAndDWing  12.2  10.7   4.5  41.7   4.4   1.7  39.1   2.2   1.6  73.6   1.9   4.3   6.1   0.8   0.6   2.4   0.8
+  [B] Slot4 ΓÇö PostScorer  13.3  11.4   5.0  44.1   1.9   0.6  32.5   3.3   2.6  79.5   2.1   5.0   7.1   0.6   0.7   2.6   1.4
+  [B] Slot5 ΓÇö RimRunner   12.3  10.3   4.9  48.2   1.4   0.4  26.4   3.1   2.0  64.2   2.1   5.0   7.1   0.7   0.8   2.3   1.4
+=== END COHORT BOX SCORE ΓÇö Bucket 1 ===
+
+--- BUCKET 2: EliteVsWeak ---
+  Running 10 variants ├ù 50 games ...
+
+  Team A roster profile (mean across 10 variants):
+    Scoring:  Outside=57  Finishing=58  Mid=56  Close=66  SelfCreation=52
+    Athletic: Speed=68  Quickness=63  Vertical=60  Strength=62
+    Physical: Height=65  Wingspan=71
+    Skill:    Passing=59  Playmaking=60  BallHandling=61  BasketballIQ=60
+    Defense:  PerimeterDefense=60  PostDefense=58  RimProtection=53
+    Boards:   OffensiveRebounding=62  DefensiveRebounding=57
+  Team B roster profile (mean across 10 variants):
+    Scoring:  Outside=28  Finishing=29  Mid=29  Close=33  SelfCreation=27
+    Athletic: Speed=35  Quickness=32  Vertical=30  Strength=32
+    Physical: Height=33  Wingspan=36
+    Skill:    Passing=29  Playmaking=31  BallHandling=31  BasketballIQ=31
+    Defense:  PerimeterDefense=31  PostDefense=30  RimProtection=26
+    Boards:   OffensiveRebounding=31  DefensiveRebounding=30
+
+  validGames=500/500
+  Team A wins: 497/500 = 99.4%
+  Team B wins: 2/500 = 0.4%
+  Ties:        1/500 = 0.2%
+  Physical home win rate: 49.4%  (side-neutrality diagnostic)
+  Team A score: mean=82.3  sd=9.9  min=55  max=110
+  Team B score: mean=49.7  sd=9.2  min=20  max=77
+  Margin (A-B): mean=32.6  sd=12.9
+  PPP Team A: agg=1.260  mean-game=1.261  sd=0.151
+  PPP Team B: agg=0.762  mean-game=0.761  sd=0.139
+  FG%  Team A: agg=56.7%  mean-game=56.8%  sd=7.2%
+  FG%  Team B: agg=32.3%  mean-game=32.3%  sd=6.8%
+  3P%  Team A: agg=49.8%  mean-game=49.6%  sd=13.8%
+  3P%  Team B: agg=24.0%  mean-game=24.1%  sd=12.5%
+  FT%  Team A: agg=72.0%  mean-game=71.9%  sd=10.9%
+  FT%  Team B: agg=72.0%  mean-game=71.5%  sd=11.8%
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+  3PA rate  Team A: 26.8%  Team B: 25.3%
+  Shot mix Team A: Rim=30% Short=19% Mid=11% Long=13% Three=27%
+  Shot mix Team B: Rim=27% Short=20% Mid=12% Long=15% Three=25%
+  Usage Team A: Slot1=16.3% Slot2=22.6% Slot3=22.1% Slot4=20.4% Slot5=18.3% Unattr=0.3%
+  Usage Team B: Slot1=15.2% Slot2=22.3% Slot3=21.3% Slot4=20.7% Slot5=20.3% Unattr=0.2%
+  Slot FG% Team A: Slot1=53.4% Slot2=59.0% Slot3=55.6% Slot4=53.1% Slot5=62.5%
+  Slot FG% Team B: Slot1=32.2% Slot2=32.6% Slot3=29.8% Slot4=31.6% Slot5=35.1%
+  ORB%  Team A: 40.4%  Team B: 20.5%
+  FTr   Team A: 0.363  Team B: 0.379
+  Transition Team A: 46.6%  Team B: 27.6%
+  Pace (total poss/game): 130.6
+  Between-variant:  Team A win-rate range: min=98%  max=100%
+  Between-variant:  Team B PPP range: min=0.706  max=0.799
+
+=== COHORT BOX SCORE ΓÇö Bucket 2: EliteVsWeak ===
+  Rows pool 10 generated roster variants. Each row is the per-game average
+  for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
+  Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [A] Slot1 ΓÇö PassFirstGuard  11.6   8.8   4.7  53.4   1.3   0.5  41.6   2.3   1.7  73.0   1.6   4.2   5.9   1.0   0.9   2.4   0.7
+  [A] Slot2 ΓÇö PerimeterShooter  19.6  12.1   7.2  59.0   5.1   3.0  58.0   3.0   2.3  76.2   1.2   3.6   4.8   1.0   0.8   2.4   0.6
+  [A] Slot3 ΓÇö ThreeAndDWing  17.7  11.9   6.6  55.6   5.0   2.6  53.2   2.5   1.9  75.2   2.0   5.8   7.8   0.9   1.3   2.3   0.8
+  [A] Slot4 ΓÇö PostScorer  14.8  11.0   5.8  53.1   1.7   0.5  32.1   3.7   2.6  69.1   2.3   6.1   8.4   0.6   1.3   2.5   1.4
+  [A] Slot5 ΓÇö RimRunner   14.9   9.9   6.2  62.5   1.3   0.5  35.9   3.1   2.1  70.0   2.4   6.6   8.9   0.7   1.5   2.1   1.4
+  [B] Slot1 ΓÇö PassFirstGuard   6.6   7.7   2.5  32.2   1.5   0.3  19.5   1.9   1.3  70.6   1.1   2.4   3.5   0.8   0.3   2.7   1.1
+  [B] Slot2 ΓÇö PerimeterShooter  10.3  11.3   3.7  32.6   4.7   1.3  27.2   2.2   1.6  71.2   0.8   1.8   2.7   0.9   0.4   2.5   1.1
+  [B] Slot3 ΓÇö ThreeAndDWing   9.2  10.8   3.2  29.8   4.6   1.1  24.4   2.2   1.6  73.0   1.6   3.2   4.8   0.9   0.5   2.3   1.1
+  [B] Slot4 ΓÇö PostScorer   9.0  10.5   3.3  31.6   1.1   0.2  17.8   3.0   2.2  73.1   1.6   3.2   4.8   0.6   0.4   2.6   1.7
+  [B] Slot5 ΓÇö RimRunner    9.8  10.3   3.6  35.1   0.9   0.2  19.3   3.5   2.4  69.3   1.6   3.4   5.1   0.6   0.6   2.4   1.4
+=== END COHORT BOX SCORE ΓÇö Bucket 2 ===
+
+--- BUCKET 3: EliteVsElite ---
+  Running 10 variants ├ù 50 games ...
+
+  Team A roster profile (mean across 10 variants):
+    Scoring:  Outside=57  Finishing=58  Mid=55  Close=64  SelfCreation=52
+    Athletic: Speed=67  Quickness=62  Vertical=60  Strength=62
+    Physical: Height=65  Wingspan=71
+    Skill:    Passing=60  Playmaking=60  BallHandling=62  BasketballIQ=60
+    Defense:  PerimeterDefense=60  PostDefense=60  RimProtection=55
+    Boards:   OffensiveRebounding=64  DefensiveRebounding=59
+  Team B roster profile (mean across 10 variants):
+    Scoring:  Outside=57  Finishing=58  Mid=54  Close=64  SelfCreation=52
+    Athletic: Speed=67  Quickness=62  Vertical=60  Strength=62
+    Physical: Height=65  Wingspan=71
+    Skill:    Passing=60  Playmaking=60  BallHandling=62  BasketballIQ=60
+    Defense:  PerimeterDefense=61  PostDefense=60  RimProtection=55
+    Boards:   OffensiveRebounding=63  DefensiveRebounding=58
+
+  validGames=500/500
+  Team A wins: 238/500 = 47.6%
+  Team B wins: 242/500 = 48.4%
+  Ties:        20/500 = 4.0%
+  Physical home win rate: 53.0%  (side-neutrality diagnostic)
+  Team A score: mean=71.8  sd=9.7  min=47  max=108
+  Team B score: mean=72.0  sd=10.0  min=42  max=107
+  Margin (A-B): mean=-0.2  sd=13.9
+  PPP Team A: agg=1.092  mean-game=1.092  sd=0.142
+  PPP Team B: agg=1.093  mean-game=1.093  sd=0.150
+  FG%  Team A: agg=50.6%  mean-game=50.6%  sd=6.9%
+  FG%  Team B: agg=50.2%  mean-game=50.3%  sd=6.9%
+  3P%  Team A: agg=44.0%  mean-game=44.0%  sd=14.5%
+  3P%  Team B: agg=43.6%  mean-game=43.4%  sd=13.7%
+  FT%  Team A: agg=68.8%  mean-game=68.6%  sd=12.0%
+  FT%  Team B: agg=70.0%  mean-game=69.5%  sd=11.8%
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+  3PA rate  Team A: 27.1%  Team B: 26.9%
+  Shot mix Team A: Rim=29% Short=19% Mid=13% Long=13% Three=27%
+  Shot mix Team B: Rim=29% Short=19% Mid=12% Long=13% Three=27%
+  Usage Team A: Slot1=15.6% Slot2=21.2% Slot3=21.7% Slot4=22.2% Slot5=19.2% Unattr=0.2%
+  Usage Team B: Slot1=14.7% Slot2=21.7% Slot3=20.9% Slot4=22.7% Slot5=19.7% Unattr=0.3%
+  Slot FG% Team A: Slot1=48.2% Slot2=52.5% Slot3=49.3% Slot4=48.6% Slot5=54.0%
+  Slot FG% Team B: Slot1=47.8% Slot2=50.9% Slot3=49.4% Slot4=49.2% Slot5=53.3%
+  ORB%  Team A: 28.8%  Team B: 29.3%
+  FTr   Team A: 0.377  Team B: 0.384
+  Transition Team A: 34.1%  Team B: 34.1%
+  Pace (total poss/game): 131.6
+  Between-variant:  Team A win-rate range: min=32%  max=54%
+  Between-variant:  Team B PPP range: min=1.064  max=1.141
+
+=== COHORT BOX SCORE ΓÇö Bucket 3: EliteVsElite ===
+  Rows pool 10 generated roster variants. Each row is the per-game average
+  for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
+  Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [A] Slot1 ΓÇö PassFirstGuard   9.5   8.1   3.9  48.2   1.4   0.5  40.0   2.2   1.2  56.1   1.1   3.1   4.2   0.9   0.5   2.6   0.9
+  [A] Slot2 ΓÇö PerimeterShooter  15.7  10.9   5.7  52.5   4.5   2.3  52.2   2.6   1.8  69.5   1.1   2.5   3.6   1.0   0.4   2.4   0.8
+  [A] Slot3 ΓÇö ThreeAndDWing  14.9  11.2   5.5  49.3   4.8   2.3  48.0   2.0   1.5  74.8   1.6   3.9   5.4   0.9   0.6   2.5   0.9
+  [A] Slot4 ΓÇö PostScorer  14.0  11.5   5.6  48.6   2.0   0.6  28.8   3.6   2.2  62.2   1.8   4.2   6.1   0.6   0.7   2.6   1.7
+  [A] Slot5 ΓÇö RimRunner   13.4   9.9   5.4  54.0   1.4   0.4  29.1   3.0   2.3  76.2   1.9   4.5   6.4   0.7   0.9   2.3   1.5
+  [B] Slot1 ΓÇö PassFirstGuard   9.0   7.6   3.6  47.8   1.3   0.5  38.5   2.0   1.2  59.3   1.2   3.1   4.3   1.0   0.5   2.5   0.9
+  [B] Slot2 ΓÇö PerimeterShooter  15.6  11.2   5.7  50.9   4.6   2.2  48.3   2.6   2.0  75.2   1.1   2.4   3.5   0.9   0.5   2.4   0.8
+  [B] Slot3 ΓÇö ThreeAndDWing  14.4  10.8   5.4  49.4   4.7   2.3  48.0   2.0   1.5  71.6   1.5   3.9   5.4   0.8   0.6   2.4   0.8
+  [B] Slot4 ΓÇö PostScorer  14.7  11.8   5.8  49.2   1.8   0.6  33.1   3.9   2.5  64.4   1.7   4.2   6.0   0.6   0.7   2.6   1.7
+  [B] Slot5 ΓÇö RimRunner   13.7  10.2   5.4  53.3   1.5   0.5  32.5   3.1   2.3  75.3   1.9   4.7   6.7   0.8   0.8   2.2   1.5
+=== END COHORT BOX SCORE ΓÇö Bucket 3 ===
+
+--- BUCKET 4: WeakVsWeak ---
+  Running 10 variants ├ù 50 games ...
+
+  Team A roster profile (mean across 10 variants):
+    Scoring:  Outside=29  Finishing=28  Mid=30  Close=34  SelfCreation=26
+    Athletic: Speed=36  Quickness=30  Vertical=31  Strength=32
+    Physical: Height=33  Wingspan=36
+    Skill:    Passing=30  Playmaking=31  BallHandling=31  BasketballIQ=31
+    Defense:  PerimeterDefense=31  PostDefense=30  RimProtection=27
+    Boards:   OffensiveRebounding=32  DefensiveRebounding=29
+  Team B roster profile (mean across 10 variants):
+    Scoring:  Outside=29  Finishing=28  Mid=29  Close=35  SelfCreation=26
+    Athletic: Speed=36  Quickness=30  Vertical=30  Strength=32
+    Physical: Height=33  Wingspan=36
+    Skill:    Passing=30  Playmaking=31  BallHandling=31  BasketballIQ=31
+    Defense:  PerimeterDefense=30  PostDefense=30  RimProtection=27
+    Boards:   OffensiveRebounding=32  DefensiveRebounding=31
+
+  validGames=500/500
+  Team A wins: 262/500 = 52.4%
+  Team B wins: 227/500 = 45.4%
+  Ties:        11/500 = 2.2%
+  Physical home win rate: 49.2%  (side-neutrality diagnostic)
+  Team A score: mean=61.2  sd=8.8  min=37  max=90
+  Team B score: mean=59.9  sd=9.3  min=34  max=90
+  Margin (A-B): mean=1.2  sd=12.5
+  PPP Team A: agg=0.944  mean-game=0.944  sd=0.132
+  PPP Team B: agg=0.924  mean-game=0.924  sd=0.141
+  FG%  Team A: agg=40.2%  mean-game=40.3%  sd=6.6%
+  FG%  Team B: agg=39.6%  mean-game=39.6%  sd=6.6%
+  3P%  Team A: agg=29.2%  mean-game=29.4%  sd=13.6%
+  3P%  Team B: agg=28.6%  mean-game=28.7%  sd=13.0%
+  FT%  Team A: agg=75.9%  mean-game=75.8%  sd=11.6%
+  FT%  Team B: agg=75.8%  mean-game=76.0%  sd=11.1%
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+  3PA rate  Team A: 24.9%  Team B: 24.6%
+  Shot mix Team A: Rim=30% Short=19% Mid=13% Long=13% Three=25%
+  Shot mix Team B: Rim=30% Short=19% Mid=13% Long=13% Three=25%
+  Usage Team A: Slot1=16.2% Slot2=23.1% Slot3=21.3% Slot4=20.9% Slot5=18.4% Unattr=0.2%
+  Usage Team B: Slot1=15.1% Slot2=23.0% Slot3=21.2% Slot4=21.7% Slot5=18.7% Unattr=0.2%
+  Slot FG% Team A: Slot1=39.2% Slot2=37.9% Slot3=36.4% Slot4=41.9% Slot5=46.5%
+  Slot FG% Team B: Slot1=37.5% Slot2=37.6% Slot3=36.4% Slot4=40.7% Slot5=45.8%
+  ORB%  Team A: 29.5%  Team B: 28.9%
+  FTr   Team A: 0.360  Team B: 0.362
+  Transition Team A: 39.6%  Team B: 39.1%
+  Pace (total poss/game): 129.6
+  Between-variant:  Team A win-rate range: min=42%  max=62%
+  Between-variant:  Team B PPP range: min=0.892  max=0.968
+
+=== COHORT BOX SCORE ΓÇö Bucket 4: WeakVsWeak ===
+  Rows pool 10 generated roster variants. Each row is the per-game average
+  for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
+  Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [A] Slot1 ΓÇö PassFirstGuard   8.9   8.6   3.4  39.2   1.6   0.4  25.3   2.2   1.8  81.4   1.4   3.7   5.1   0.9   0.5   2.6   0.9
+  [A] Slot2 ΓÇö PerimeterShooter  12.7  12.3   4.7  37.9   4.8   1.5  32.3   2.5   1.8  72.5   1.2   2.9   4.1   0.9   0.5   2.4   0.9
+  [A] Slot3 ΓÇö ThreeAndDWing  11.2  11.3   4.1  36.4   4.7   1.4  30.5   2.2   1.6  72.0   1.9   4.5   6.4   0.8   0.7   2.1   0.9
+  [A] Slot4 ΓÇö PostScorer  12.2  11.1   4.7  41.9   1.2   0.3  20.9   3.3   2.6  80.6   2.2   4.9   7.1   0.6   0.7   2.4   1.4
+  [A] Slot5 ΓÇö RimRunner   11.8   9.8   4.5  46.5   1.0   0.2  24.6   3.1   2.5  81.0   2.3   5.6   7.9   0.7   0.8   2.3   1.3
+  [B] Slot1 ΓÇö PassFirstGuard   8.3   8.0   3.0  37.5   1.5   0.4  25.2   2.3   1.9  83.7   1.4   3.6   5.0   0.9   0.5   2.5   0.9
+  [B] Slot2 ΓÇö PerimeterShooter  12.5  12.2   4.6  37.6   4.9   1.4  29.4   2.6   1.9  72.6   1.1   2.8   3.9   0.9   0.4   2.4   0.9
+  [B] Slot3 ΓÇö ThreeAndDWing  11.1  11.2   4.1  36.4   4.4   1.3  30.1   2.3   1.6  70.9   1.8   4.5   6.3   0.7   0.6   2.1   0.9
+  [B] Slot4 ΓÇö PostScorer  12.3  11.4   4.7  40.7   1.2   0.3  24.4   3.3   2.7  81.0   2.3   5.2   7.4   0.6   0.7   2.7   1.5
+  [B] Slot5 ΓÇö RimRunner   11.7   9.9   4.5  45.8   1.0   0.3  28.3   3.0   2.4  80.3   2.2   5.4   7.6   0.8   0.8   2.2   1.2
+=== END COHORT BOX SCORE ΓÇö Bucket 4 ===
+
+--- BUCKET 5: StarVsBalanced ---
+  Running 10 variants ├ù 50 games ...
+
+  Team A roster profile (mean across 10 variants):
+    Scoring:  Outside=53  Finishing=56  Mid=50  Close=55  SelfCreation=52
+    Athletic: Speed=68  Quickness=65  Vertical=59  Strength=51
+    Physical: Height=50  Wingspan=59
+    Skill:    Passing=55  Playmaking=55  BallHandling=54  BasketballIQ=53
+    Defense:  PerimeterDefense=55  PostDefense=49  RimProtection=48
+    Boards:   OffensiveRebounding=52  DefensiveRebounding=51
+  Team B roster profile (mean across 10 variants):
+    Scoring:  Outside=49  Finishing=52  Mid=47  Close=57  SelfCreation=45
+    Athletic: Speed=59  Quickness=55  Vertical=52  Strength=54
+    Physical: Height=56  Wingspan=61
+    Skill:    Passing=51  Playmaking=53  BallHandling=54  BasketballIQ=52
+    Defense:  PerimeterDefense=52  PostDefense=53  RimProtection=47
+    Boards:   OffensiveRebounding=54  DefensiveRebounding=51
+
+  validGames=500/500
+  Team A wins: 288/500 = 57.6%
+  Team B wins: 202/500 = 40.4%
+  Ties:        10/500 = 2.0%
+  Physical home win rate: 54.0%  (side-neutrality diagnostic)
+  Team A score: mean=71.1  sd=9.7  min=40  max=99
+  Team B score: mean=68.1  sd=9.8  min=35  max=101
+  Margin (A-B): mean=3.0  sd=13.9
+  PPP Team A: agg=1.082  mean-game=1.082  sd=0.145
+  PPP Team B: agg=1.036  mean-game=1.036  sd=0.146
+  FG%  Team A: agg=49.7%  mean-game=49.8%  sd=7.2%
+  FG%  Team B: agg=47.3%  mean-game=47.3%  sd=6.9%
+  3P%  Team A: agg=40.5%  mean-game=40.8%  sd=14.5%
+  3P%  Team B: agg=38.3%  mean-game=38.2%  sd=13.5%
+  FT%  Team A: agg=73.5%  mean-game=73.3%  sd=11.0%
+  FT%  Team B: agg=70.8%  mean-game=70.6%  sd=12.0%
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+  3PA rate  Team A: 26.3%  Team B: 26.7%
+  Shot mix Team A: Rim=33% Short=15% Mid=13% Long=13% Three=26%
+  Shot mix Team B: Rim=29% Short=19% Mid=12% Long=13% Three=27%
+  Usage Team A: Slot1=35.0% Slot2=20.9% Slot3=18.4% Slot4=15.6% Slot5=9.9% Unattr=0.3%
+  Usage Team B: Slot1=15.1% Slot2=21.7% Slot3=20.4% Slot4=22.6% Slot5=19.9% Unattr=0.2%
+  Slot FG% Team A: Slot1=54.0% Slot2=47.8% Slot3=46.1% Slot4=51.3% Slot5=43.1%
+  Slot FG% Team B: Slot1=42.8% Slot2=46.2% Slot3=46.9% Slot4=46.4% Slot5=53.1%
+  ORB%  Team A: 28.5%  Team B: 28.8%
+  FTr   Team A: 0.380  Team B: 0.353
+  Transition Team A: 35.9%  Team B: 34.1%
+  Pace (total poss/game): 131.5
+  Between-variant:  Team A win-rate range: min=38%  max=70%
+  Between-variant:  Team B PPP range: min=0.999  max=1.084
+
+=== COHORT BOX SCORE ΓÇö Bucket 5: StarVsBalanced ===
+  Rows pool 10 generated roster variants. Each row is the per-game average
+  for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
+  Note: Team A Slot 1 is an Elite-tier Slasher star; all other Team A slots are Good tier.
+  Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [A] Slot1 ΓÇö Slasher     25.0  18.0   9.7  54.0   3.4   1.2  36.7   6.0   4.3  72.1   1.4   3.7   5.1   1.0   0.6   3.6   1.0
+  [A] Slot2 ΓÇö ThreeAndDWing  13.6  10.8   5.1  47.8   4.1   1.8  44.6   2.1   1.6  73.8   1.6   4.3   5.9   0.7   0.6   2.2   1.0
+  [A] Slot3 ΓÇö PerimeterShooter  11.9   9.5   4.4  46.1   3.8   1.7  44.1   2.0   1.5  75.7   1.2   2.9   4.1   0.9   0.5   2.2   0.7
+  [A] Slot4 ΓÇö RimRunner   10.7   8.0   4.1  51.3   1.3   0.4  31.8   2.5   2.0  80.3   1.9   5.2   7.1   0.7   0.8   2.2   1.5
+  [A] Slot5 ΓÇö PassFirstGuard   5.5   5.1   2.2  43.1   1.0   0.3  34.7   1.2   0.8  67.3   1.2   3.2   4.4   0.8   0.5   2.1   1.0
+  [B] Slot1 ΓÇö PassFirstGuard   8.6   7.9   3.4  42.8   1.3   0.4  28.7   2.1   1.5  70.9   1.2   3.0   4.2   0.9   0.5   2.5   1.8
+  [B] Slot2 ΓÇö PerimeterShooter  14.4  11.4   5.3  46.2   4.7   2.0  43.8   2.4   1.8  74.5   1.0   2.6   3.7   1.0   0.5   2.4   0.8
+  [B] Slot3 ΓÇö ThreeAndDWing  13.5  10.7   5.0  46.9   4.5   1.9  42.2   2.0   1.5  72.5   1.6   3.9   5.5   0.8   0.7   2.5   0.8
+  [B] Slot4 ΓÇö PostScorer  13.7  11.9   5.5  46.4   1.9   0.6  29.7   3.2   2.2  67.8   2.0   4.3   6.3   0.7   0.7   2.6   1.4
+  [B] Slot5 ΓÇö RimRunner   13.6  10.5   5.5  53.1   1.6   0.5  29.4   3.1   2.0  65.2   2.0   4.5   6.5   0.7   0.8   2.3   1.1
+=== END COHORT BOX SCORE ΓÇö Bucket 5 ===
+
+--- BUCKET 6: ShootingVsAthletic ---
+  Running 10 variants ├ù 50 games ...
+
+  Team A roster profile (mean across 10 variants):
+    Scoring:  Outside=51  Finishing=37  Mid=38  Close=41  SelfCreation=38
+    Athletic: Speed=51  Quickness=47  Vertical=38  Strength=33
+    Physical: Height=36  Wingspan=43
+    Skill:    Passing=47  Playmaking=46  BallHandling=48  BasketballIQ=46
+    Defense:  PerimeterDefense=41  PostDefense=34  RimProtection=34
+    Boards:   OffensiveRebounding=38  DefensiveRebounding=36
+  Team B roster profile (mean across 10 variants):
+    Scoring:  Outside=34  Finishing=56  Mid=36  Close=43  SelfCreation=47
+    Athletic: Speed=53  Quickness=53  Vertical=56  Strength=51
+    Physical: Height=47  Wingspan=50
+    Skill:    Passing=35  Playmaking=37  BallHandling=37  BasketballIQ=40
+    Defense:  PerimeterDefense=39  PostDefense=44  RimProtection=50
+    Boards:   OffensiveRebounding=51  DefensiveRebounding=49
+
+  validGames=500/500
+  Team A wins: 126/500 = 25.2%
+  Team B wins: 360/500 = 72.0%
+  Ties:        14/500 = 2.8%
+  Physical home win rate: 50.0%  (side-neutrality diagnostic)
+  Team A score: mean=61.4  sd=9.9  min=35  max=95
+  Team B score: mean=70.0  sd=9.0  min=48  max=94
+  Margin (A-B): mean=-8.6  sd=13.5
+  PPP Team A: agg=0.940  mean-game=0.940  sd=0.148
+  PPP Team B: agg=1.072  mean-game=1.072  sd=0.133
+  FG%  Team A: agg=39.7%  mean-game=39.7%  sd=6.6%
+  FG%  Team B: agg=51.1%  mean-game=51.3%  sd=7.1%
+  3P%  Team A: agg=35.0%  mean-game=34.7%  sd=11.0%
+  3P%  Team B: agg=31.1%  mean-game=31.3%  sd=20.0%
+  FT%  Team A: agg=72.8%  mean-game=72.4%  sd=12.6%
+  FT%  Team B: agg=71.9%  mean-game=71.9%  sd=11.7%
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+  3PA rate  Team A: 35.2%  Team B: 12.7%
+  Shot mix Team A: Rim=21% Short=10% Mid=14% Long=21% Three=35%
+  Shot mix Team B: Rim=54% Short=18% Mid=10% Long=6% Three=13%
+  Usage Team A: Slot1=16.3% Slot2=22.1% Slot3=19.9% Slot4=20.2% Slot5=21.2% Unattr=0.3%
+  Usage Team B: Slot1=27.2% Slot2=16.4% Slot3=25.1% Slot4=17.9% Slot5=13.1% Unattr=0.2%
+  Slot FG% Team A: Slot1=41.1% Slot2=41.4% Slot3=39.8% Slot4=39.1% Slot5=37.3%
+  Slot FG% Team B: Slot1=48.3% Slot2=55.2% Slot3=49.7% Slot4=50.1% Slot5=55.9%
+  ORB%  Team A: 27.1%  Team B: 30.7%
+  FTr   Team A: 0.327  Team B: 0.413
+  Transition Team A: 33.4%  Team B: 40.7%
+  Pace (total poss/game): 130.7
+  Between-variant:  Team A win-rate range: min=12%  max=42%
+  Between-variant:  Team B PPP range: min=1.013  max=1.118
+
+=== COHORT BOX SCORE ΓÇö Bucket 6: ShootingVsAthletic ===
+  Rows pool 10 generated roster variants. Each row is the per-game average
+  for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
+  Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [A] Slot1 ΓÇö PassFirstGuard   9.3   8.7   3.6  41.1   1.6   0.5  31.9   2.3   1.7  73.1   1.7   3.6   5.3   1.0   0.9   2.5   1.8
+  [A] Slot2 ΓÇö PerimeterShooter  13.2  11.7   4.9  41.4   4.9   1.8  36.2   2.4   1.7  71.9   1.6   3.1   4.7   0.9   0.8   2.5   1.4
+  [A] Slot3 ΓÇö PerimeterShooter  11.5  10.6   4.2  39.8   4.5   1.6  35.3   2.0   1.5  74.6   1.5   3.2   4.8   0.9   0.8   2.2   1.6
+  [A] Slot4 ΓÇö ThreeAndDWing  11.5  10.8   4.2  39.1   5.1   1.8  36.0   1.9   1.3  69.4   2.1   4.5   6.6   0.8   1.0   2.4   1.5
+  [A] Slot5 ΓÇö FloorGeneral  11.2  11.3   4.2  37.3   2.6   0.8  31.9   2.7   2.0  74.9   1.5   3.2   4.7   0.6   0.8   2.6   1.2
+  [B] Slot1 ΓÇö Slasher     17.0  14.0   6.8  48.3   2.1   0.7  30.4   4.1   2.8  68.5   1.3   3.5   4.8   0.9   0.4   2.9   0.8
+  [B] Slot2 ΓÇö AthleticBig  11.6   8.5   4.7  55.2   0.6   0.2  27.8   3.0   2.2  72.7   1.8   5.2   7.0   0.8   0.6   1.9   0.9
+  [B] Slot3 ΓÇö Slasher     16.5  12.9   6.4  49.7   2.2   0.7  32.0   3.8   3.0  77.6   1.3   3.5   4.7   0.9   0.4   2.8   0.7
+  [B] Slot4 ΓÇö RimRunner   11.7   9.2   4.6  50.1   1.2   0.4  32.9   3.0   2.1  69.5   1.7   5.1   6.8   0.7   0.6   2.5   0.9
+  [B] Slot5 ΓÇö AthleticBig   9.2   6.8   3.8  55.9   0.4   0.1  30.1   2.2   1.5  68.1   1.7   5.3   7.0   0.8   0.6   1.8   0.9
+=== END COHORT BOX SCORE ΓÇö Bucket 6 ===
+
+--- BUCKET 7: AthleticVsSkill ---
+  Running 10 variants ├ù 50 games ...
+
+  Team A roster profile (mean across 10 variants):
+    Scoring:  Outside=34  Finishing=56  Mid=36  Close=44  SelfCreation=46
+    Athletic: Speed=53  Quickness=53  Vertical=56  Strength=51
+    Physical: Height=45  Wingspan=50
+    Skill:    Passing=36  Playmaking=38  BallHandling=37  BasketballIQ=40
+    Defense:  PerimeterDefense=41  PostDefense=44  RimProtection=48
+    Boards:   OffensiveRebounding=50  DefensiveRebounding=49
+  Team B roster profile (mean across 10 variants):
+    Scoring:  Outside=51  Finishing=41  Mid=40  Close=44  SelfCreation=40
+    Athletic: Speed=41  Quickness=37  Vertical=36  Strength=37
+    Physical: Height=40  Wingspan=46
+    Skill:    Passing=46  Playmaking=47  BallHandling=47  BasketballIQ=47
+    Defense:  PerimeterDefense=43  PostDefense=39  RimProtection=37
+    Boards:   OffensiveRebounding=42  DefensiveRebounding=37
+
+  validGames=500/500
+  Team A wins: 369/500 = 73.8%
+  Team B wins: 122/500 = 24.4%
+  Ties:        9/500 = 1.8%
+  Physical home win rate: 51.8%  (side-neutrality diagnostic)
+  Team A score: mean=69.9  sd=8.8  min=46  max=98
+  Team B score: mean=61.0  sd=9.8  min=34  max=88
+  Margin (A-B): mean=8.9  sd=13.1
+  PPP Team A: agg=1.069  mean-game=1.069  sd=0.133
+  PPP Team B: agg=0.931  mean-game=0.931  sd=0.146
+  FG%  Team A: agg=51.5%  mean-game=51.6%  sd=7.1%
+  FG%  Team B: agg=40.8%  mean-game=40.9%  sd=6.8%
+  3P%  Team A: agg=31.0%  mean-game=31.2%  sd=19.9%
+  3P%  Team B: agg=33.7%  mean-game=33.6%  sd=12.5%
+  FT%  Team A: agg=69.3%  mean-game=69.5%  sd=10.3%
+  FT%  Team B: agg=71.5%  mean-game=71.5%  sd=12.7%
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+  3PA rate  Team A: 12.8%  Team B: 28.5%
+  Shot mix Team A: Rim=54% Short=17% Mid=10% Long=6% Three=13%
+  Shot mix Team B: Rim=22% Short=17% Mid=15% Long=17% Three=28%
+  Usage Team A: Slot1=27.3% Slot2=16.1% Slot3=25.8% Slot4=17.9% Slot5=12.6% Unattr=0.2%
+  Usage Team B: Slot1=21.9% Slot2=19.2% Slot3=19.4% Slot4=19.6% Slot5=19.5% Unattr=0.2%
+  Slot FG% Team A: Slot1=50.7% Slot2=54.6% Slot3=49.1% Slot4=49.2% Slot5=57.6%
+  Slot FG% Team B: Slot1=41.8% Slot2=40.5% Slot3=40.5% Slot4=42.6% Slot5=38.4%
+  ORB%  Team A: 29.6%  Team B: 27.8%
+  FTr   Team A: 0.429  Team B: 0.335
+  Transition Team A: 39.9%  Team B: 33.4%
+  Pace (total poss/game): 130.9
+  Between-variant:  Team A win-rate range: min=64%  max=82%
+  Between-variant:  Team B PPP range: min=0.851  max=0.997
+
+=== COHORT BOX SCORE ΓÇö Bucket 7: AthleticVsSkill ===
+  Rows pool 10 generated roster variants. Each row is the per-game average
+  for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
+  Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [A] Slot1 ΓÇö Slasher     18.1  14.0   7.1  50.7   2.2   0.7  32.4   4.4   3.2  72.6   1.1   3.3   4.4   0.9   0.4   3.0   1.0
+  [A] Slot2 ΓÇö AthleticBig  11.1   8.2   4.5  54.6   0.5   0.1  28.9   2.9   2.0  70.1   1.7   5.0   6.8   0.9   0.5   1.9   0.8
+  [A] Slot3 ΓÇö Slasher     16.5  13.2   6.5  49.1   2.2   0.7  31.0   4.2   2.9  68.5   1.1   3.4   4.5   0.9   0.5   2.7   0.8
+  [A] Slot4 ΓÇö RimRunner   11.1   9.2   4.5  49.2   1.2   0.4  30.2   2.8   1.7  59.1   1.7   5.0   6.8   0.7   0.6   2.4   1.0
+  [A] Slot5 ΓÇö AthleticBig   9.2   6.4   3.7  57.6   0.4   0.1  28.5   2.4   1.7  70.9   1.7   5.1   6.9   0.9   0.7   1.7   0.9
+  [B] Slot1 ΓÇö FloorGeneral  12.7  11.6   4.9  41.8   2.6   0.9  33.4   2.9   2.1  72.3   1.4   3.2   4.6   0.7   0.8   3.0   1.6
+  [B] Slot2 ΓÇö PerimeterShooter  11.2  10.2   4.1  40.5   4.0   1.4  35.4   2.0   1.5  73.1   1.3   2.7   4.0   1.1   0.7   2.1   1.2
+  [B] Slot3 ΓÇö ThreeAndDWing  11.5  10.3   4.2  40.5   4.4   1.6  36.6   2.1   1.6  75.0   1.9   4.1   6.0   0.9   1.0   2.0   1.7
+  [B] Slot4 ΓÇö PostScorer  10.9  10.4   4.4  42.6   1.7   0.4  24.3   2.5   1.6  63.1   2.3   4.6   6.9   0.6   1.0   2.4   2.0
+  [B] Slot5 ΓÇö FloorGeneral  10.4  10.3   4.0  38.4   2.4   0.8  32.2   2.2   1.7  76.6   1.4   3.2   4.7   0.7   0.8   2.8   1.3
+=== END COHORT BOX SCORE ΓÇö Bucket 7 ===
+
+--- BUCKET 8: SkillVsAthletic ---
+  Running 10 variants ├ù 50 games ...
+
+  Team A roster profile (mean across 10 variants):
+    Scoring:  Outside=51  Finishing=41  Mid=40  Close=44  SelfCreation=40
+    Athletic: Speed=41  Quickness=37  Vertical=36  Strength=37
+    Physical: Height=40  Wingspan=46
+    Skill:    Passing=46  Playmaking=47  BallHandling=47  BasketballIQ=47
+    Defense:  PerimeterDefense=43  PostDefense=39  RimProtection=37
+    Boards:   OffensiveRebounding=42  DefensiveRebounding=37
+  Team B roster profile (mean across 10 variants):
+    Scoring:  Outside=34  Finishing=56  Mid=36  Close=44  SelfCreation=46
+    Athletic: Speed=53  Quickness=53  Vertical=56  Strength=51
+    Physical: Height=45  Wingspan=50
+    Skill:    Passing=36  Playmaking=38  BallHandling=37  BasketballIQ=40
+    Defense:  PerimeterDefense=41  PostDefense=44  RimProtection=48
+    Boards:   OffensiveRebounding=50  DefensiveRebounding=49
+
+  validGames=500/500
+  Team A wins: 115/500 = 23.0%
+  Team B wins: 368/500 = 73.6%
+  Ties:        17/500 = 3.4%
+  Physical home win rate: 49.2%  (side-neutrality diagnostic)
+  Team A score: mean=61.4  sd=9.4  min=31  max=93
+  Team B score: mean=69.5  sd=8.8  min=48  max=95
+  Margin (A-B): mean=-8.1  sd=13.0
+  PPP Team A: agg=0.939  mean-game=0.939  sd=0.144
+  PPP Team B: agg=1.063  mean-game=1.063  sd=0.133
+  FG%  Team A: agg=41.2%  mean-game=41.2%  sd=6.8%
+  FG%  Team B: agg=51.1%  mean-game=51.2%  sd=7.0%
+  3P%  Team A: agg=33.6%  mean-game=33.4%  sd=12.4%
+  3P%  Team B: agg=30.2%  mean-game=29.8%  sd=18.7%
+  FT%  Team A: agg=71.2%  mean-game=71.0%  sd=12.4%
+  FT%  Team B: agg=68.9%  mean-game=68.8%  sd=11.3%
+  NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
+  Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
+  This is a named remaining loose end ΓÇö not a bug.
+  3PA rate  Team A: 28.2%  Team B: 13.0%
+  Shot mix Team A: Rim=23% Short=17% Mid=15% Long=17% Three=28%
+  Shot mix Team B: Rim=54% Short=17% Mid=10% Long=6% Three=13%
+  Usage Team A: Slot1=21.9% Slot2=19.4% Slot3=19.7% Slot4=19.4% Slot5=19.5% Unattr=0.2%
+  Usage Team B: Slot1=27.4% Slot2=16.2% Slot3=25.6% Slot4=18.2% Slot5=12.4% Unattr=0.3%
+  Slot FG% Team A: Slot1=42.2% Slot2=40.3% Slot3=40.7% Slot4=43.8% Slot5=38.7%
+  Slot FG% Team B: Slot1=50.8% Slot2=54.8% Slot3=47.4% Slot4=49.4% Slot5=56.8%
+  ORB%  Team A: 27.8%  Team B: 30.0%
+  FTr   Team A: 0.343  Team B: 0.423
+  Transition Team A: 33.9%  Team B: 39.7%
+  Pace (total poss/game): 130.8
+  Between-variant:  Team A win-rate range: min=16%  max=34%
+  Between-variant:  Team B PPP range: min=1.012  max=1.099
+
+=== COHORT BOX SCORE ΓÇö Bucket 8: SkillVsAthletic ===
+  Rows pool 10 generated roster variants. Each row is the per-game average
+  for one logical slot/archetype cohort, not one persistent named player. (500 accepted games)
+  Row                      PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+  [A] Slot1 ΓÇö FloorGeneral  12.7  11.5   4.9  42.2   2.5   0.9  33.4   2.9   2.1  71.6   1.5   3.1   4.6   0.7   0.8   2.9   1.7
+  [A] Slot2 ΓÇö PerimeterShooter  11.1  10.3   4.1  40.3   4.0   1.4  34.6   2.0   1.5  73.1   1.3   2.9   4.2   1.1   0.8   2.1   1.2
+  [A] Slot3 ΓÇö ThreeAndDWing  11.6  10.4   4.2  40.7   4.4   1.6  36.1   2.1   1.6  73.1   1.8   4.2   6.0   1.0   1.0   2.2   1.7
+  [A] Slot4 ΓÇö PostScorer  11.0  10.2   4.5  43.8   1.6   0.4  24.6   2.7   1.7  61.8   2.2   4.6   6.8   0.7   1.0   2.3   1.9
+  [A] Slot5 ΓÇö FloorGeneral  10.6  10.3   4.0  38.7   2.4   0.8  33.6   2.4   1.8  75.5   1.6   3.3   4.9   0.7   0.8   2.8   1.2
+  [B] Slot1 ΓÇö Slasher     18.1  14.1   7.2  50.8   2.2   0.7  31.7   4.3   3.1  72.2   1.2   3.3   4.5   0.9   0.4   3.0   1.0
+  [B] Slot2 ΓÇö AthleticBig  11.3   8.3   4.6  54.8   0.5   0.1  28.9   2.9   2.0  70.3   1.8   5.0   6.8   0.9   0.6   1.8   1.0
+  [B] Slot3 ΓÇö Slasher     15.9  13.1   6.2  47.4   2.3   0.7  29.1   4.0   2.7  69.0   1.2   3.3   4.5   0.8   0.5   2.8   0.8
+  [B] Slot4 ΓÇö RimRunner   11.3   9.3   4.6  49.4   1.3   0.4  30.7   2.9   1.7  58.8   1.7   5.0   6.8   0.8   0.7   2.5   1.1
+  [B] Slot5 ΓÇö AthleticBig   8.9   6.4   3.6  56.8   0.4   0.1  28.6   2.2   1.5  69.4   1.8   5.0   6.8   0.9   0.6   1.6   1.0
+=== END COHORT BOX SCORE ΓÇö Bucket 8 ===
+
+--- BUCKETS 7/8 PAIRED DIAGNOSTIC ---
+  Athletic paired win rate:
+    As Team A (Bucket 7): 73.8%   (= Bucket 7 Team A wins / Bucket 7 validGames)
+    As Team B (Bucket 8): 73.6%   (= Bucket 8 Team B wins / Bucket 8 validGames)
+    NOTE: Bucket 8 Athletic win rate computed directly from Team B wins ΓÇö NOT 1 ΓêÆ TeamAWinRate.
+  Mirror gap: abs(B7_AthleticWinRate ΓêÆ B8_AthleticWinRate) = 0.2%
+  (A large gap suggests physical-side asymmetry, seed-stream sensitivity, or remapping error;
+   it does not by itself identify which cause is responsible.)
+
+  Paired-game outcome agreement (same game seed, rosters swapped):
+    Mirrored result (Athletic wins both, Skill wins both, or both tie): 356 / 500
+    Disagreement (changing presentation changes the winner):             144 / 500
+    Unpaired failures (one bucket game failed, no match):                0
+    (pairedValidGames = games where both Bucket 7 and Bucket 8 game N succeeded)
+    (Disagreement count is a sensitivity diagnostic, not a pass/fail condition.)
+  Interpretation: a large mirror gap or high disagreement count suggests physical-side
+    asymmetry, seed-stream sensitivity, or an incorrect logical remapping.
+
+--- CROSS-BUCKET SUMMARY TABLE ---
+  Bucket                  WinA%  Ties%  PPP_A  PPP_B  FG%_A  FG%_B  3PA%A  3PA%B  Rim%A  Rim%B  ORB%A  ORB%B  Pace  Tr%A  Tr%B
+  AverageVsAverage          49%     3%  0.997  0.992    44%    44%    26%    26%    29%    30%    29%    30%   130   37%   38%
+  EliteVsWeak               99%     0%  1.260  0.762    57%    32%    27%    25%    30%    27%    40%    20%   131   47%   28%
+  EliteVsElite              48%     4%  1.092  1.093    51%    50%    27%    27%    29%    29%    29%    29%   132   34%   34%
+  WeakVsWeak                52%     2%  0.944  0.924    40%    40%    25%    25%    30%    30%    29%    29%   130   40%   39%
+  StarVsBalanced            58%     2%  1.082  1.036    50%    47%    26%    27%    33%    29%    28%    29%   131   36%   34%
+  ShootingVsAthletic        25%     3%  0.940  1.072    40%    51%    35%    13%    21%    54%    27%    31%   131   33%   41%
+  AthleticVsSkill           74%     2%  1.069  0.931    51%    41%    13%    28%    54%    22%    30%    28%   131   40%   33%
+  SkillVsAthletic           23%     3%  0.939  1.063    41%    51%    28%    13%    23%    54%    28%    30%   131   34%   40%
+
+STRESS TEST PASSED
+=== END STRESS TEST ===
+
+ALL CHECKS PASSED.

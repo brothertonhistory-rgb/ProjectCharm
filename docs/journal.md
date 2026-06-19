@@ -1,3 +1,57 @@
+## Session 64 — Phase 29 Session 1: Player Hierarchy + Heliocentric Bias in Roll E (2026-06-18)
+
+**Scope:** First coaching layer. Each player carries an authored `HierarchyRank` (1–10); each team's coach carries a `HeliocentricBias` (1–10); `RollEGenerator` blends these with the existing attribute-based usage scores to produce a usage pie that reflects both who the players are and how the coach wants to use them. Seven files changed.
+
+**What shipped (7 files):**
+
+`src/Charm.Engine/Core/CoachProfile.cs` — REPLACED (was fieldless scaffold). `HeliocentricBias` (double, 1.0–10.0, default 5.0) added as the first real field. Validated in the constructor (not a compact-record constructor — standard constructor with explicit property assignment, chosen after the compact-syntax form caused a compiler error on the target runtime). Future coaching fields (`ShotSelectionBias`, `FreelanceDial`, `PaceBias`) are deferred seams — absent from the record deliberately; no code, no comment stubs.
+
+`src/Charm.Engine/Core/Player.cs` — `HierarchyRank` (int, range [1,10], default 5) added after `PlayerId`. Default 5 produces weight 1.0 at any heliocentric exponent — the regression anchor. Usage-time guard in `RollEGenerator` validates the range and throws `InvalidOperationException` on an authored value outside [1,10]. The max-3-per-number authoring constraint is not enforced here — that belongs to the future roster authoring layer.
+
+`src/Charm.Engine/Core/GameState.cs` — `HomeCoach` and `AwayCoach` (`CoachProfile`, both initialized to `new CoachProfile()` inline) added, mirroring the `HomeRoster`/`AwayRoster` pattern: constructed in the body, not as constructor parameters. All 59 existing `new GameState(...)` sites compile unchanged. `SetCoach(TeamSide, CoachProfile)` mutator added (mirrors `SetPossessionArrow`); `CoachFor(TeamSide)` helper added (mirrors `RosterFor`).
+
+`src/Charm.Engine/Config/RollEConfig.cs` — Two new knobs: `HierarchyExponentNeutral` (double, default 1.0, invariant `>= 0`) and `HierarchyExponentMax` (double, default 2.0, invariant `>= Neutral`). Load-time validation added. Conservative defaults per the pre-validation flag that rank-10 players can approach the rail at bias 9.
+
+`src/Charm.Engine/Generators/RollEGenerator.cs` — Hierarchy blend block inserted in `GenerateWithPressure` AFTER the `MinUsageScore` floor (`rawScores[i] = Math.Max(score, _cfg.MinUsageScore)`), BEFORE the `UsageExponent` sharpening pass. The block reads `_game.CoachFor(state.Offense).HeliocentricBias`, derives the `hierarchyExponent` via piecewise-linear interpolation, and multiplies each slot's raw score by `(HierarchyRank / 5.0)^hierarchyExponent`. FastBreak passthrough returns before this code and is unaffected. Note: hierarchy may push a post-MinUsageScore raw score downward for low-ranked players — intentional; the floor/rail machinery is the participation protection. `MinUsageScore` is NOT reapplied after the multiply.
+
+`src/Charm.Harness/Program.cs` — `StampPlayerId` updated to carry `HierarchyRank = p.HierarchyRank` (gap fix: the function manually copies every init property; omitting the new one silently assigned rank 0 to all stamped players, which would have thrown the RollEGenerator guard). `Phase29HierarchyBiasCheck` added with five sub-cases (direction at standard bias, heliocentric amplification, egalitarian compression, pairwise regression anchor, attention directional). Wired into main pass via `ok &= Phase29HierarchyBiasCheck(configPath)`. The direction sub-case uses `>=` for floor-pinned slots rather than strict `>` — rank-4 and rank-2 players with identical attributes legitimately collapse to the usage floor together, which is correct engine behavior, not a bug.
+
+`src/Charm.Harness/config.json` — `HierarchyExponentNeutral: 1.0` and `HierarchyExponentMax: 2.0` added to the `RollE` section.
+
+**Key design decisions:**
+
+- **`HeliocentricBias = 5.0` is not hierarchy-off.** It is standard authored-hierarchy expression: rank 10 gets 2× the weight of rank 5; rank 1 gets 0.2×. `HeliocentricBias = 1.0` is hierarchy-off / egalitarian — the exponent collapses to 0 and all weights become 1.0 regardless of authored rank. The regression anchor (frozen corpus output identical to Phase 28) comes from all existing players defaulting to `HierarchyRank = 5`, which produces weight 1.0 at any exponent — not from the bias value.
+
+- **Piecewise-linear exponent interpolation.** Bias [1,5] maps to exponent [0, `HierarchyExponentNeutral`]; bias [5,10] maps to exponent [`HierarchyExponentNeutral`, `HierarchyExponentMax`]. Monotone and continuous through bias = 5 — no discontinuity. At bias 1: exponent 0 → all weights 1.0 (attributes only). At bias 5: exponent 1.0 → standard expression. At bias 10: exponent 2.0 → full heliocentric.
+
+- **Hierarchy feeds attention intentionally.** `BendByAttention` takes `gen.FinalShares` — shares that already have hierarchy baked in. Higher FinalShare for a rank-10 player → higher AttentionShare → selection tilt and pressure interactions respond. A coach feeding the star more possessions will also draw more defensive attention to that player. Correct basketball behavior, not a bug.
+
+- **`StampPlayerId` gap was a required fix, not scope expansion.** Without it, every stamped player (frozen corpus, stress test) would have `HierarchyRank = 0`, triggering the `InvalidOperationException` guard in `RollEGenerator` on the first possession. The fix is one line in an existing function.
+
+- **Compact record constructor syntax rejected.** The build prompt specified `public CoachProfile { ... }` (compact constructor). This caused multiple compiler errors on the target runtime. Replaced with a standard constructor (`public CoachProfile(double heliocentricBias = 5.0)`) with explicit property assignment — identical behavior, unambiguous syntax.
+
+**Pre-validation flag (from Python mandatory gate):** At bias 9.0 with a high-attribute rank-10 player in a diverse lineup, the rank-10 player's share can brush the rail (0.52). The prompt's magnitude note anticipated this: `HierarchyExponentMax = 2.0` is the conservative starting point; it may want to come down once real lineups with realistic rank distributions are exercised. Not a blocker — the rail is doing its job; the calibration pass owns the magnitude.
+
+**Python pre-validation (mandatory Step 0 hard gate — all 6 checks passed):**
+1. Exponent mapping bias 1→10: monotone, continuous through bias 5, no discontinuity.
+2. Weight anchors: bias 5, rank 5 → 1.0; rank 10 → 2.0; rank 1 → 0.2. Bias 1: all ranks → 1.0.
+3. Full pipeline with representative 5-player lineup (ranks 10/8/6/4/2): rank-10 does not hit rail at bias 5; approaches rail at bias 9 (flagged, not a blocker).
+4. Regression: all rank-5, any bias → weights all 1.0 → shares identical across all bias values.
+5. Egalitarian: bias 1 with any ranks == bias 5 with all rank-5 (same shares, attributes only).
+6. MinUsageScore vs floor/rail: rank-1 player's post-floor raw score pushed downward by hierarchy multiply at high bias; floor/rail machinery (not MinUsageScore) provides the final participation floor.
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED.
+
+Phase 29 signals in `HierarchyBiasCheck`:
+- Direction at bias 5.0 (ranks 10/8/6/4/2, identical attributes): shares decrease monotonically; rank-4 and rank-2 both floor-pinned at 0.09 (correct — floor is the participation protection).
+- Heliocentric amplification (bias 9.0): rank-10 share meaningfully higher than at bias 5.0; rank-10–rank-2 gap widened (0.3200 → 0.4142).
+- Egalitarian compression (bias 1.0, mixed ranks): shares identical to all-rank-5/bias-5 to 6 decimal places.
+- Pairwise regression anchor: all-rank-5/bias-5 = all-rank-5/bias-1 to 6 decimal places.
+- Attention directional: rank-10 FinalShare 0.5000 > rank-5 FinalShare 0.1250; rank-10 AttentionShare 0.2747 > rank-5 AttentionShare 0.1813.
+
+Frozen corpus observation run (1,000 games) output **identical to Phase 28** — all frozen corpus players default to `HierarchyRank = 5`, all games use the default `HeliocentricBias = 5.0`, hierarchy weights all 1.0, zero behavior change.
 ## Session 63 — Phase 28: Attention-Location Tilt + Steal-Origin Split + Roll J Real Generator (2026-06-18)
 
 **Scope:** Three scopes in one session. Roll G attention-location tilt (amplifier inside `ApplyDietShift`), steal-origin split wiring (`TransitionContext` extension + three steal-site updates), and Roll J real generator (`IRollJPieGenerator` interface + `RollJGenerator` with two independent modifiers). Thirteen files changed.

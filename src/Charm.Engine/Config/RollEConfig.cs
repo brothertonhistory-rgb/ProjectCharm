@@ -90,6 +90,24 @@ public sealed class RollEConfig
     /// Invariant: &gt; 0. [CALIBRATION PLACEHOLDER]</summary>
     public double TiltReferenceShift { get; init; } = 0.08;
 
+    // ── Hierarchy blend parameters (Phase 29 Session 1) ─────────────────────
+    // Both are calibration placeholders; tune alongside UsageExponent once the
+    // coaching layer is exercised in the harness.
+
+    /// <summary>Hierarchy exponent at HeliocentricBias = 5.0 (standard authored-
+    /// hierarchy expression). At this exponent, rank 10 → weight 2.0, rank 5 →
+    /// weight 1.0, rank 1 → weight 0.2.
+    /// Invariant: &gt;= 0. [CALIBRATION PLACEHOLDER]</summary>
+    public double HierarchyExponentNeutral { get; init; } = 1.0;
+
+    /// <summary>Hierarchy exponent at HeliocentricBias = 10.0 (full heliocentric).
+    /// Further amplifies the gap between high and low ranked players.
+    /// Invariant: &gt;= HierarchyExponentNeutral. Conservative default 2.0 — if
+    /// rank-10 players rail the UsageRail in standard lineups at this setting,
+    /// reduce before further calibration.
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double HierarchyExponentMax { get; init; } = 2.0;
+
     /// <summary>Load the <c>"RollE"</c> section from the config file at
     /// <paramref name="path"/>. Mirrors the other rolls' loaders.</summary>
     public static RollEConfig Load(string path)
@@ -116,6 +134,8 @@ public sealed class RollEConfig
             MinUsageScore = e.GetProperty("MinUsageScore").GetDouble(),
             MaxTiltMultiplier  = e.GetProperty("MaxTiltMultiplier").GetDouble(),
             TiltReferenceShift = e.GetProperty("TiltReferenceShift").GetDouble(),
+            HierarchyExponentNeutral = e.GetProperty("HierarchyExponentNeutral").GetDouble(),
+            HierarchyExponentMax     = e.GetProperty("HierarchyExponentMax").GetDouble(),
         };
 
         // ── Invariant validation — fail loud on bad config ───────────────────
@@ -144,6 +164,13 @@ public sealed class RollEConfig
         if (cfg.TiltReferenceShift <= 0)
             throw new InvalidOperationException(
                 $"RollEConfig: TiltReferenceShift must be > 0 (got {cfg.TiltReferenceShift}).");
+        if (cfg.HierarchyExponentNeutral < 0)
+            throw new InvalidOperationException(
+                $"RollEConfig: HierarchyExponentNeutral must be >= 0 (got {cfg.HierarchyExponentNeutral}).");
+        if (cfg.HierarchyExponentMax < cfg.HierarchyExponentNeutral)
+            throw new InvalidOperationException(
+                $"RollEConfig: HierarchyExponentMax ({cfg.HierarchyExponentMax}) must be >= " +
+                $"HierarchyExponentNeutral ({cfg.HierarchyExponentNeutral}).");
 
         return cfg;
     }

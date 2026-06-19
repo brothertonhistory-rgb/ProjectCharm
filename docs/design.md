@@ -4964,3 +4964,61 @@ All magnitudes provisional (wire-the-form mandate):
 - Defender picker architecture: athleticism gap uses team-level means (active five), not individual matchup gaps — the per-slot defender attribution layer is a deferred chapter
 - Calibration passes: correctness before calibration is the standing sequencing principle
 - Deferred roll faces (C, D, J putback-loop, K): unbuilt chapters, not cleanup debt
+
+## Phase 29 Session 1: Player Hierarchy + Heliocentric Bias in Roll E (Session 64, 2026-06-18)
+
+### What this is
+
+The first coaching layer. Introduces two authored values: `Player.HierarchyRank` (1–10, default 5) and `CoachProfile.HeliocentricBias` (1.0–10.0, default 5.0). `RollEGenerator` uses these to blend a coaching-intent signal into the usage pie alongside the existing attribute-based usage scores.
+
+### The semantics that matter
+
+`HeliocentricBias = 5.0` is **not** hierarchy-off — it is standard authored-hierarchy expression. Rank 10 gets 2× the weight of rank 5; rank 1 gets 0.2×. `HeliocentricBias = 1.0` is hierarchy-off / egalitarian: the exponent collapses to 0 and all weights become 1.0 regardless of authored rank, so attributes drive usage entirely.
+
+The regression anchor (frozen corpus output identical to Phase 28) comes from all existing players defaulting to `HierarchyRank = 5`, which produces weight 1.0 at any exponent — not from the bias value.
+
+### Hierarchy blend formula
+
+After the `MinUsageScore` floor and before the `UsageExponent` sharpening pass in `GenerateWithPressure`:
+
+```
+// Derive hierarchyExponent from coach bias (piecewise-linear, monotone, continuous at bias=5)
+if bias <= 5.0:
+    hierarchyExponent = HierarchyExponentNeutral × (bias − 1.0) / 4.0
+else:
+    hierarchyExponent = HierarchyExponentNeutral
+                      + (HierarchyExponentMax − HierarchyExponentNeutral) × (bias − 5.0) / 5.0
+
+// Multiply each populated slot's raw score by the hierarchy weight
+weight[i] = (HierarchyRank[i] / 5.0) ^ hierarchyExponent
+rawScores[i] *= weight[i]
+```
+
+**Key properties:**
+- At rank 5: weight = 1.0 for any exponent → regression anchor.
+- At exponent 0 (bias 1.0): weight = 1.0 for all ranks → attributes only.
+- Placement: after `MinUsageScore` floor, before `UsageExponent` sharpening. The hierarchy gap is further amplified by `UsageExponent` — this is intentional (stacked exponents produce realistic star-vs-role differentiation), but it means both exponents calibrate together.
+- Low-ranked player's score may be pushed below its post-MinUsageScore value. The floor/rail machinery (not MinUsageScore) is the participation protection. `MinUsageScore` is NOT reapplied after the multiply.
+
+### Hierarchy feeds attention (intentional cascade)
+
+`BendByAttention` reads `gen.FinalShares`, which already have hierarchy baked in. A coach feeding the star more possessions will draw more defensive attention to that player — hierarchy → higher FinalShare → higher AttentionShare → tilt and pressure interactions respond. Correct basketball behavior.
+
+### CoachProfile in GameState
+
+`HomeCoach` and `AwayCoach` are initialized to `new CoachProfile()` in the constructor body (not as constructor parameters), mirroring the `HomeRoster`/`AwayRoster` pattern. All 59 existing `new GameState(...)` construction sites compile unchanged. `SetCoach(TeamSide, CoachProfile)` is the mutator; `CoachFor(TeamSide)` is the reader — both mirror the existing `SetPossessionArrow` / `RosterFor` pattern.
+
+### `StampPlayerId` gap (required fix)
+
+`StampPlayerId` in the harness manually copies every init property when stamping a `Player` with a new `PlayerId`. Without explicitly copying `HierarchyRank`, all stamped players received rank 0, which would have triggered the `InvalidOperationException` guard in `RollEGenerator` on the first possession. Adding `HierarchyRank = p.HierarchyRank` to the copy was a required companion to adding the property.
+
+### Calibration note
+
+At `HierarchyExponentMax = 2.0` and bias 9.0, a high-attribute rank-10 player in a diverse lineup can approach the usage rail (0.52). The rail is doing its job. `HierarchyExponentMax = 2.0` is the conservative starting point — reduce it if rank-10 players consistently rail in standard-roster calibration runs. Both `HierarchyExponentNeutral` and `HierarchyExponentMax` calibrate alongside `UsageExponent`; the stacked-exponent amplification means they cannot be tuned independently.
+
+### What is not this session
+
+- `ShotSelectionBias`, `FreelanceDial`, `PaceBias` on `CoachProfile` — deferred seams, no code
+- Max-3-per-number authoring enforcement — belongs to the future roster authoring layer
+- Coaching/offensive-hierarchy layer beyond usage bias (freelance, shot selection, pace) — separate sessions
+- Calibration passes: correctness before calibration is the standing sequencing principle

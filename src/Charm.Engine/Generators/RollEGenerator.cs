@@ -134,6 +134,40 @@ public sealed class RollEGenerator : IRollEGenerationProvider
             }
         }
 
+        // ── Hierarchy blend (Phase 29 Session 1) ─────────────────────────────
+        // Derive the hierarchy exponent from the offensive team's coach bias.
+        // Bias 1.0 → exponent 0 (egalitarian: all weights = 1.0, attributes only).
+        // Bias 5.0 → exponent HierarchyExponentNeutral (standard expression).
+        // Bias 10.0 → exponent HierarchyExponentMax (full heliocentric).
+        // Piecewise-linear interpolation; monotone and continuous through bias = 5.
+        var coach = _game.CoachFor(state.Offense);
+        var bias  = coach.HeliocentricBias;
+        var hierarchyExponent = bias <= 5.0
+            ? _cfg.HierarchyExponentNeutral * (bias - 1.0) / 4.0
+            : _cfg.HierarchyExponentNeutral
+              + (_cfg.HierarchyExponentMax - _cfg.HierarchyExponentNeutral)
+              * (bias - 5.0) / 5.0;
+
+        // Multiply each populated raw score by (HierarchyRank / 5.0)^hierarchyExponent.
+        // At rank 5: weight = 1.0 for any exponent → regression anchor.
+        // At exponent 0 (bias 1.0): weight = 1.0 for all ranks → attributes only.
+        // A rank-1 player's post-MinUsageScore score may be pushed downward here —
+        // this is intentional; the floor/rail machinery is the participation
+        // protection. Do NOT reapply MinUsageScore after this multiply.
+        for (var i = 0; i < 5; i++)
+        {
+            if (rawScores[i] > 0.0 && players[i] is Player ph)
+            {
+                if (ph.HierarchyRank < 1 || ph.HierarchyRank > 10)
+                    throw new InvalidOperationException(
+                        $"Player '{ph.Name}' has HierarchyRank {ph.HierarchyRank} " +
+                        "outside [1, 10]. Check authored player data.");
+                var weight  = Math.Pow(ph.HierarchyRank / 5.0, hierarchyExponent);
+                rawScores[i] *= weight;
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
+
         // Apply sharpening exponent
         var expScores = new double[5];
         var expTotal  = 0.0;

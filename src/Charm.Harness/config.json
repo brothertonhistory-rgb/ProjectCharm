@@ -94,7 +94,9 @@
     "UsageRail": 0.52,
     "MinUsageScore": 1.0,
     "MaxTiltMultiplier": 1.5,
-    "TiltReferenceShift": 0.08
+    "TiltReferenceShift": 0.08,
+    "HierarchyExponentNeutral": 1.0,
+    "HierarchyExponentMax": 2.0
   },
   "RollF": {
     "BaseShotAttempt": 0.855,

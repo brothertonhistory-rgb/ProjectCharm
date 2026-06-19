@@ -115,6 +115,34 @@ public sealed class GameState
     public Roster RosterFor(TeamSide side) =>
         side == TeamSide.Home ? HomeRoster : AwayRoster;
 
+    /// <summary>The home team's coaching profile for this game. Initialized to the
+    /// default <see cref="CoachProfile"/> (HeliocentricBias = 5.0) so all 59 existing
+    /// <c>new GameState(...)</c> sites compile and run unchanged. Assigned via
+    /// <see cref="SetCoach"/> before possession resolution begins, mirroring the
+    /// <see cref="SetPossessionArrow"/> pattern.</summary>
+    public CoachProfile HomeCoach { get; private set; } = new CoachProfile();
+
+    /// <summary>The away team's coaching profile for this game. Same contract as
+    /// <see cref="HomeCoach"/>.</summary>
+    public CoachProfile AwayCoach { get; private set; } = new CoachProfile();
+
+    /// <summary>Assign a coaching profile to one team. Mirrors the
+    /// <see cref="SetPossessionArrow"/> pattern — a mutator that keeps the constructor
+    /// signature unchanged. Harness checks call this to test non-default bias values
+    /// without touching any existing construction site.</summary>
+    public void SetCoach(TeamSide side, CoachProfile coach)
+    {
+        if (coach is null) throw new ArgumentNullException(nameof(coach));
+        if (side == TeamSide.Home) HomeCoach = coach;
+        else                       AwayCoach = coach;
+    }
+
+    /// <summary>The coaching profile for a given team identity — mirrors
+    /// <see cref="RosterFor"/> so call sites stay symmetric:
+    /// <c>game.CoachFor(state.Offense)</c>.</summary>
+    public CoachProfile CoachFor(TeamSide side) =>
+        side == TeamSide.Home ? HomeCoach : AwayCoach;
+
     // --- Placeholder fields: defined shape, not yet wired to anything. ---
     public int HomeScore { get; set; }
     public int AwayScore { get; set; }

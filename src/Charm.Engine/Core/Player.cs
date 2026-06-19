@@ -58,6 +58,21 @@ public sealed class Player
     /// Uniqueness is the harness's responsibility, not the engine's.</summary>
     public int PlayerId { get; init; }
 
+    /// <summary>Authored offensive role priority (1–10, default 5 = standard).
+    /// 10 = primary option; 1 = kept out of the offense. Combined with the
+    /// coach's <see cref="CoachProfile.HeliocentricBias"/> to produce the usage
+    /// pie in Roll E via a piecewise-linear exponent mapping.
+    ///
+    /// <para><b>Regression anchor.</b> Default 5 produces weight 1.0 at any
+    /// heliocentric exponent — a team where all players share this default shows
+    /// zero hierarchy effect at any bias value.</para>
+    ///
+    /// <para><b>Authoring note.</b> The max-3-per-number constraint (no more than
+    /// three players on a roster may share the same rank) is enforced by the roster
+    /// authoring layer, not here. The engine validates only that the value is in
+    /// [1, 10] at usage time.</para></summary>
+    public int HierarchyRank { get; init; } = 5;
+
     // -------------------------------------------------------------------------
     // Offense — authored individual
     // -------------------------------------------------------------------------

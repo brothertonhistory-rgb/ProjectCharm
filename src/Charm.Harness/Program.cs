@@ -139,6 +139,7 @@ internal static class Program
         ok &= Phase17UsageEfficiencyCheck(configPath);
         ok &= AttributionSanityCheck(configPath);            // Phase 24
         ok &= Phase25ShootingFoulAttributionCheck(configPath); // Phase 25
+        ok &= Phase29HierarchyBiasCheck(configPath);           // Phase 29
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -5252,6 +5253,7 @@ internal static class Program
     private static Player StampPlayerId(Player p, int id) => new Player(p.Name)
     {
         PlayerId            = id,
+        HierarchyRank       = p.HierarchyRank,
         Close               = p.Close,
         Mid                 = p.Mid,
         Outside             = p.Outside,
@@ -11843,6 +11845,277 @@ internal static class Program
         Console.WriteLine(checkOk
             ? "  Shooting-foul attribution check: PASSED"
             : "  Shooting-foul attribution check: FAILED (see [FAIL] lines above)");
+
+        return checkOk;
+    }
+
+    // ── Phase 29 Session 1: Hierarchy Bias Check ──────────────────────────────
+
+    private static bool Phase29HierarchyBiasCheck(string configPath)
+    {
+        Console.WriteLine();
+        Console.WriteLine("--- Phase 29: Hierarchy Bias Check ---");
+        Console.WriteLine("  Five sub-cases: direction, heliocentric amplification, egalitarian");
+        Console.WriteLine("  compression, pairwise regression anchor, attention directional.");
+        Console.WriteLine();
+
+        var checkOk = true;
+        var cfgE = RollEConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+        var cfgAttention = AttentionConfig.Load(configPath);
+
+        // ── Shared attribute template — five players, identical attributes ────
+        // All scoring attributes identical so attribute differences cannot confound
+        // the hierarchy direction test.
+        Player MakePlayer(string name, int rank) => new Player(name)
+        {
+            HierarchyRank  = rank,
+            SelfCreation   = 65,
+            Close          = 60,
+            PostMoves      = 55,
+            Outside        = 60,
+            Mid            = 55,
+            Finishing      = 62,
+            FreeThrow      = 70,
+            FoulDrawing    = 50,
+            BallHandling   = 55,
+            Passing        = 55,
+            Playmaking     = 55,
+            OffBallMovement= 50,
+            Screening      = 50,
+            OffensiveRebounding  = 50,
+            PerimeterDefense     = 50,
+            PostDefense          = 50,
+            RimProtection        = 50,
+            DefensiveRebounding  = 50,
+            Steals          = 50,
+            Height          = 50,
+            Wingspan        = 50,
+            Weight          = 50,
+            Strength        = 50,
+            Speed           = 50,
+            Quickness       = 50,
+            FirstStep       = 50,
+            Vertical        = 50,
+            Endurance       = 50,
+            Hustle          = 50,
+            BasketballIQ    = 50,
+            Discipline      = 50,
+            RimTendency     = 40,
+            ShortTendency   = 15,
+            MidTendency     = 15,
+            LongTendency    = 10,
+            ThreeTendency   = 20,
+        };
+
+        GameState MakeGame(double bias = 5.0)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            g.SetCoach(TeamSide.Home, new CoachProfile(bias));
+            return g;
+        }
+
+        void Seat(GameState g, int[] ranks)
+        {
+            var roster  = g.RosterFor(TeamSide.Home);
+            var lineup  = g.LineupFor(TeamSide.Home);
+            var defRost = g.RosterFor(TeamSide.Away);
+            var defLine = g.LineupFor(TeamSide.Away);
+            for (var i = 0; i < 5; i++)
+            {
+                var slot = lineup.SlotAt(i + 1);
+                roster.SetStarter(slot, MakePlayer($"P{i+1}(R{ranks[i]})", ranks[i]));
+                var dslot = defLine.SlotAt(i + 1);
+                defRost.SetStarter(dslot, MakePlayer($"D{i+1}", 5));
+            }
+        }
+
+        var state = new PossessionState(
+            PossessionNumber: 1,
+            Offense: TeamSide.Home,
+            Defense: TeamSide.Away,
+            Entry: EntryType.DeadBallInbound);
+        var testRanks = new[] { 10, 8, 6, 4, 2 };
+
+        // ── Sub-case 1: Direction at standard bias (5.0) ─────────────────────
+        Console.WriteLine("  Sub-case 1: Direction at standard bias (5.0)");
+        {
+            var g    = MakeGame(5.0);
+            Seat(g, testRanks);
+            var gen  = new RollEGenerator(cfgE, g);
+            var result1 = gen.GenerateWithPressure(state);
+            var shares   = result1.FinalShares;
+
+            Console.WriteLine($"    Shares: {string.Join(", ", shares.Select((s, i) => $"rank{testRanks[i]}={s:F4}"))}");
+
+            var mono = true;
+            for (var i = 0; i < 4; i++)
+            {
+                // Strict decrease required — UNLESS both slots are pinned at the
+                // UsageFloor, in which case equality is correct engine behavior
+                // (the floor is the participation protection; ranks below the
+                // floor threshold legitimately collapse to the same value).
+                var atFloor = shares[i + 1] <= cfgE.UsageFloor + 1e-9;
+                var ok      = atFloor ? shares[i] >= shares[i + 1]
+                                      : shares[i]  > shares[i + 1];
+                if (!ok)
+                {
+                    Console.WriteLine($"    [FAIL] Not monotone: slot{i+1}={shares[i]:F4} <= slot{i+2}={shares[i+1]:F4}");
+                    mono = false; checkOk = false;
+                }
+            }
+            if (mono)
+                Console.WriteLine("    [OK] Selection shares decrease monotonically rank10 → rank2 (floor-pinned slots may be equal)");
+        }
+
+        // ── Sub-case 2: Heliocentric amplification (bias 9.0) ────────────────
+        Console.WriteLine("  Sub-case 2: Heliocentric amplification (bias 9.0)");
+        {
+            var g5  = MakeGame(5.0);
+            Seat(g5, testRanks);
+            var g9  = MakeGame(9.0);
+            Seat(g9, testRanks);
+
+            var gen5  = new RollEGenerator(cfgE, g5);
+            var gen9  = new RollEGenerator(cfgE, g9);
+            var shares5 = gen5.GenerateWithPressure(state).FinalShares;
+            var shares9 = gen9.GenerateWithPressure(state).FinalShares;
+
+            Console.WriteLine($"    bias=5: rank10={shares5[0]:F4}  bias=9: rank10={shares9[0]:F4}");
+
+            if (shares9[0] > shares5[0])
+                Console.WriteLine("    [OK] Heliocentric (9.0) gives rank-10 higher share than standard (5.0)");
+            else
+            {
+                Console.WriteLine("    [FAIL] rank-10 share did not increase from bias=5 to bias=9");
+                checkOk = false;
+            }
+
+            // Gap widening: difference between slot1 and slot5 should be larger at bias=9
+            var gap5 = shares5[0] - shares5[4];
+            var gap9 = shares9[0] - shares9[4];
+            Console.WriteLine($"    Gap rank10-rank2: bias=5={gap5:F4}  bias=9={gap9:F4}");
+            if (gap9 > gap5)
+                Console.WriteLine("    [OK] Gap widened under heliocentric bias");
+            else
+            {
+                Console.WriteLine("    [FAIL] Gap did not widen from bias=5 to bias=9");
+                checkOk = false;
+            }
+        }
+
+        // ── Sub-case 3: Egalitarian compression (bias 1.0) ───────────────────
+        Console.WriteLine("  Sub-case 3: Egalitarian compression (bias 1.0)");
+        {
+            // Mixed ranks at bias=1 should equal all-rank-5 at bias=5
+            // (both exponents collapse to 1.0 or 0.0 respectively, collapsing weights to 1.0)
+            var gMixed = MakeGame(1.0);
+            Seat(gMixed, testRanks);   // ranks 10,8,6,4,2
+
+            var gFlat = MakeGame(5.0);
+            Seat(gFlat, new[] { 5, 5, 5, 5, 5 });  // all rank=5
+
+            var genMixed = new RollEGenerator(cfgE, gMixed);
+            var genFlat  = new RollEGenerator(cfgE, gFlat);
+            var sharesMixed = genMixed.GenerateWithPressure(state).FinalShares;
+            var sharesFlat  = genFlat.GenerateWithPressure(state).FinalShares;
+
+            Console.WriteLine($"    bias=1 (mixed ranks): {string.Join(", ", sharesMixed.Select(s => $"{s:F6}"))}");
+            Console.WriteLine($"    bias=5 (all rank=5):  {string.Join(", ", sharesFlat.Select(s => $"{s:F6}"))}");
+
+            var converge = true;
+            for (var i = 0; i < 5; i++)
+            {
+                if (Math.Abs(sharesMixed[i] - sharesFlat[i]) > 1e-9)
+                {
+                    Console.WriteLine($"    [FAIL] slot{i+1}: egalitarian={sharesMixed[i]:F9} != all-rank-5={sharesFlat[i]:F9}");
+                    converge = false; checkOk = false;
+                }
+            }
+            if (converge)
+                Console.WriteLine("    [OK] Egalitarian (bias=1, any ranks) == all-rank-5 at bias=5 — attributes only");
+        }
+
+        // ── Sub-case 4: Pairwise regression anchor ───────────────────────────
+        Console.WriteLine("  Sub-case 4: Pairwise regression anchor");
+        {
+            // Case A: all rank=5, bias=5. Case B: all rank=5, bias=1.
+            // Both must produce identical shares — the regression anchor.
+            var gA = MakeGame(5.0);
+            Seat(gA, new[] { 5, 5, 5, 5, 5 });
+            var gB = MakeGame(1.0);
+            Seat(gB, new[] { 5, 5, 5, 5, 5 });
+
+            var genA = new RollEGenerator(cfgE, gA);
+            var genB = new RollEGenerator(cfgE, gB);
+            var sharesA = genA.GenerateWithPressure(state).FinalShares;
+            var sharesB = genB.GenerateWithPressure(state).FinalShares;
+
+            Console.WriteLine($"    Case A (rank5/bias5): {string.Join(", ", sharesA.Select(s => $"{s:F6}"))}");
+            Console.WriteLine($"    Case B (rank5/bias1): {string.Join(", ", sharesB.Select(s => $"{s:F6}"))}");
+
+            var anchor = true;
+            for (var i = 0; i < 5; i++)
+            {
+                if (Math.Abs(sharesA[i] - sharesB[i]) > 1e-9)
+                {
+                    Console.WriteLine($"    [FAIL] slot{i+1}: caseA={sharesA[i]:F9} != caseB={sharesB[i]:F9}");
+                    anchor = false; checkOk = false;
+                }
+            }
+            if (anchor)
+                Console.WriteLine("    [OK] Pairwise regression anchor holds: all-rank-5 shares identical across bias values");
+        }
+
+        // ── Sub-case 5: Hierarchy feeds attention (directional) ───────────────
+        Console.WriteLine("  Sub-case 5: Hierarchy feeds attention (directional)");
+        {
+            // Slot1 rank=10, slot2 rank=5, otherwise identical attributes.
+            var gAttn = MakeGame(5.0);
+            var rosterA  = gAttn.RosterFor(TeamSide.Home);
+            var lineupA  = gAttn.LineupFor(TeamSide.Home);
+            var defRostA = gAttn.RosterFor(TeamSide.Away);
+            var defLineA = gAttn.LineupFor(TeamSide.Away);
+
+            rosterA.SetStarter(lineupA.SlotAt(1), MakePlayer("Star(R10)", 10));
+            rosterA.SetStarter(lineupA.SlotAt(2), MakePlayer("Role(R5)",   5));
+            rosterA.SetStarter(lineupA.SlotAt(3), MakePlayer("Role(R5)",   5));
+            rosterA.SetStarter(lineupA.SlotAt(4), MakePlayer("Role(R5)",   5));
+            rosterA.SetStarter(lineupA.SlotAt(5), MakePlayer("Role(R5)",   5));
+            for (var i = 1; i <= 5; i++)
+                defRostA.SetStarter(defLineA.SlotAt(i), MakePlayer($"Def{i}", 5));
+
+            var genAttn  = new RollEGenerator(cfgE, gAttn);
+            var attnGen  = new AttentionGenerator(cfgAttention, gAttn);
+
+            var rollEOut    = genAttn.GenerateWithPressure(state);
+            var attnResult  = attnGen.Generate(state, rollEOut.FinalShares);
+            var attnShares  = attnResult.AttentionShares;
+
+            Console.WriteLine($"    FinalShares: slot1={rollEOut.FinalShares[0]:F4}  slot2={rollEOut.FinalShares[1]:F4}");
+            Console.WriteLine($"    AttentionShares: slot1={attnShares[0]:F4}  slot2={attnShares[1]:F4}");
+
+            if (rollEOut.FinalShares[0] > rollEOut.FinalShares[1])
+                Console.WriteLine("    [OK] Rank-10 FinalShare > rank-5 FinalShare");
+            else
+            {
+                Console.WriteLine("    [FAIL] Rank-10 FinalShare not > rank-5");
+                checkOk = false;
+            }
+
+            if (attnShares[0] > attnShares[1])
+                Console.WriteLine("    [OK] Rank-10 AttentionShare > rank-5 AttentionShare — hierarchy feeds attention");
+            else
+            {
+                Console.WriteLine("    [FAIL] Rank-10 not drawing more attention than rank-5");
+                checkOk = false;
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(checkOk
+            ? "  Hierarchy bias check: PASSED"
+            : "  Hierarchy bias check: FAILED (see [FAIL] lines above)");
 
         return checkOk;
     }
