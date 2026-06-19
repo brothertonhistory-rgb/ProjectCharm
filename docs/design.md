@@ -5108,3 +5108,77 @@ This is not a wiring bug. The seam is correct and the machinery works. The fix r
 - `HierarchyRank` calibration — separate pass
 - Roll G location tilt from attention — already deferred from Phase 27/28
 - APL timing gap (early-exit possessions) — deferred to post-wiring calibration pass
+
+## Phase 31 — Offensive Rebounder Picker (Session 66, 2026-06-19)
+
+### What this is
+
+The first in-possession picker in the engine. Phase 31 stamps WHICH offensive player secured the offensive rebound onto `PossessionState.ReboundSlot`, conditional on Roll I having already awarded the board to the offense. It does not re-adjudicate the offense-vs-defense split; that remains Roll I's settled math. The picker is purely additive: Roll I awards the board, the picker identifies who grabbed it, Roll K resolves what happens next.
+
+### The two-layer rebounding model (post-Phase-31)
+
+Rebounding now has two distinct layers with a clean handoff:
+
+1. **Team layer (Roll I / Roll M):** decides WHICH TEAM gets the board, using the matchup-aware two-touchpoint model (pre-staging size check + positional-weighted skill shift + tanh saturation). This is the probability mass that drives possession outcomes and ORB%.
+2. **Attribution layer (OffensiveRebounderPicker):** given that the offense won the board, decides WHICH OFFENSIVE PLAYER gets credit. This is a within-side weighted draw over the five offensive slots; it does not touch the team-layer math.
+
+These two layers are kept strictly separate. The picker runs downstream of Roll I's team verdict; it never re-adjudicates the team split.
+
+### The picker weight formula
+
+```
+weight[i] = max(1, OffensiveRebounding[i] × PositionalWeight(Postness[i]) × shooterNerf[i])
+```
+
+Where:
+- `OffensiveRebounding[i]` is the authored player attribute (0–99)
+- `PositionalWeight(Postness[i])` is the existing `Matchup.PositionalWeight` method — weights relative to the lineup's mean Postness, bigs above 1.0 and guards below, exactly 1.0 at the lineup mean. The same method Roll I's matchup math uses.
+- `shooterNerf[i] = ReboundShooterNerf (0.35, from MatchupConfig)` when candidate slot matches the shooter (`state.SelectedSlot?.Number == i`) AND `state.ShotType` is `Three`, `Long`, or `Mid`; 1.0 (no nerf) on `Rim`/`Short` and when `ShotType` is null (bonus FT boards where Roll E never ran)
+- Floor of 1 ensures every populated offensive slot has a positive weight — no zero-weight slots
+
+The same `Matchup.Postness` and `Matchup.PositionalWeight` methods used by Roll I are reused directly. No new matchup math; only a new consumer.
+
+### Conditional-within-side (Option A) architecture — decision and known limitation
+
+**Why Option A, not Option B (unified 10-player contest).** A unified 10-player contest (Option B) would compute each player's probability of grabbing the board in a single draw across all ten on-court players. This is the structurally correct model — it naturally produces realistic per-player ORB% without any inflation. However, implementing Option B requires replacing Roll I's working two-touchpoint team-math with a per-player attribution model, which is a large rearchitecture. Option A adds the picker strictly downstream of Roll I's verdict: Roll I decides the team; the picker decides the individual within the offense. The architecture is additive and preserves all existing machinery.
+
+**Known limitation: within-side share inflation.** Because the picker distributes probability across 5 offensive players rather than all 10, a weak rebounder's realized share from the picker (~3%) exceeds what his true OR% contribution would be in a full 10-player contest (~1%). The picker correctly ranks players within the offense but inflates their absolute shares relative to the full-game picture. This is a named calibration artifact, not a structural bug. Option B is the named future fix; it is deferred as a calibration-phase task after correctness is confirmed for all existing chains.
+
+### `ReboundSlot` field and lifecycle
+
+`PossessionState.ReboundSlot` (nullable `Slot?`, default null) is appended as the last positional parameter, separate from `SelectedSlot`. Two distinct per-possession facts must persist independently:
+
+- `SelectedSlot`: which offensive player shot the ball (stamped by Roll E)
+- `ReboundSlot`: which offensive player secured the rebound (stamped by Phase 31 picker at `ResolveOffensiveRebound`)
+
+Both are nullable because not every possession involves both a shot and an offensive rebound. Both are cleared to null by Roll K's `ResetOffense` wipe (Phase 32 reads `ReboundSlot` before Roll K clears it, so the tilt lands on the correct possession boundary).
+
+### `OrbBySlot` invariant
+
+`RoutingOutcome` carries `OrbBySlot` (a `SlotGroup`) that accumulates one credit per `ResolveOffensiveRebound` case hit. The terminal return includes `OrbBySlot`. The harness asserts `OrbBySlot.Total == OrbWon` as an invariant in a controlled governor run — every offensive rebound credits exactly one player. This mirrors the Phase 23/24 exact-attribution invariants for FGA/FGM/FTA/FTM, extended to the picker's output.
+
+### SeedMinimalRoster harness pattern (architectural note)
+
+Phase 31 is the first resolver-walk code that reads from the game's roster. Previously, bare `GameState` objects (no players seated) could be passed to the full resolver in harness checks without issue. Once the picker is live, any possession that reaches `ResolveOffensiveRebound` will call `OffensiveRebounderPicker.Pick`, which calls `game.RosterFor(side).PlayerAt(slot)`. An empty roster returns null and the picker throws.
+
+**The fix:** `SeedMinimalRoster(GameState g)` — a private static helper in the harness seating 5 identical all-50 players per side — is called immediately after any bare `GameState` construction in checks that route through the full resolver.
+
+**Four exception categories (must NOT receive SeedMinimalRoster):**
+1. `RollHResolutionBatchCheck` — explicitly bound to a bare game so `PlayerAt()` returns null and `RollHGenerator` falls back to stub/baseline rates. Seeding shifts make% outside the check's calibrated tolerances.
+2. `AttributionSanityCheck`, `ObservationRun` per-game loop, `Phase25ShootingFoulAttributionCheck` loop — these call `SetStarter` themselves. Adding `SeedMinimalRoster` produces "Slot already has starter" exceptions.
+3. `StressTestArchetypeRosters` per-game loop — uses `SeatRoster()` which wraps `SetStarter`; same conflict.
+4. Phase 31 invariant sub-check — uses variable name `govGame` (not `game`) to avoid global-replace collision during harness build.
+
+**Standing rule going forward:** Any new harness check that creates a bare `GameState` and passes it to a full resolver must add `SeedMinimalRoster(game)` immediately after construction.
+
+### Phase 31 calibration note
+
+The interior anchor at `SCALE=40` captures ~58% of rim residual probability (the share of non-matched-man probability tilted toward interior defenders on rim attempts). The prompt draft estimated ~37% using `SCALE≈100`. Smaller `SCALE` produces a stronger interior tilt. This is a calibration item — the formula shape is correct; the magnitude is a tune-later task, consistent with the wire-the-form mandate.
+
+### What is not this session
+
+- Roll K putback tilt toward the rebounding player — Phase 32, the first consumer of `ReboundSlot`
+- Defensive rebounder picker — no in-possession consumer exists yet; DReb credit remains a post-hoc `WeightedDraw` in the harness
+- Option B (unified 10-player contest) — the named future fix for within-side inflation; deferred to the calibration phase
+- Per-player foul ledger, coaching/offensive-hierarchy layer, deferred roll faces (C, D, J, K) — unbuilt chapters, not cleanup debt
+- Calibration of `SCALE`, `ReboundShooterNerf`, or picker weight magnitudes — correctness before calibration is the standing sequencing principle

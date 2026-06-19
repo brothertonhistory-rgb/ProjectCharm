@@ -235,4 +235,14 @@ public sealed record PossessionState(
     /// distinct from C1. Neutral (0.0) when the formula placeholder is in effect.
     /// <para>Null until Roll E runs. Cleared by Roll K's <c>ResetOffense</c>.</para>
     /// </param>
-    double? TeamConversionQuality = null);
+    double? TeamConversionQuality = null,
+    /// <param name="ReboundSlot">The offensive slot that secured the offensive
+    /// rebound this possession (Phase 31), stamped at the shared
+    /// <see cref="ContinuationKind.ResolveOffensiveRebound"/> node — distinct from
+    /// <see cref="SelectedSlot"/>, which is the SHOOTER. Null except between an
+    /// offensive board being secured and the possession resetting or ending.
+    /// <para>Null until an offensive rebound is secured. Cleared by Roll K's
+    /// <c>ResetOffense</c>; carried forward on the PutBack arm so a future
+    /// putback-attribution read (Phase 32) can use it.</para>
+    /// </param>
+    Slot? ReboundSlot = null);

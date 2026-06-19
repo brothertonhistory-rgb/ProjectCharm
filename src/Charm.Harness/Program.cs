@@ -141,6 +141,7 @@ internal static class Program
         ok &= Phase25ShootingFoulAttributionCheck(configPath); // Phase 25
         ok &= Phase29HierarchyBiasCheck(configPath);           // Phase 29
         ok &= Phase30CoachingLayer2Check(configPath);          // Phase 30
+        ok &= Phase31RebounderPickerCheck(configPath);         // Phase 31
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -569,6 +570,7 @@ internal static class Program
         var rng = new SystemRng(42);
         var pieD = genD.Generate(state);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
 
         var allOk = true;
         var offenseFoulsLeaked = false;
@@ -620,6 +622,7 @@ internal static class Program
         bool RunPass(string label, ContinuationKind belowKind, FoulFlavor? flavor)
         {
             var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
             var allOk = true;
             var offenseLeaked = false;
 
@@ -1075,6 +1078,7 @@ internal static class Program
 
         var rng = new SystemRng(cfg.Seed);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var genE = new RollEStubPieGenerator(cfgE);
         var genF = new RollFStubPieGenerator(cfgF);
 
@@ -1253,6 +1257,7 @@ internal static class Program
 
         var rng = new SystemRng(cfg.Seed);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var genE = new RollEStubPieGenerator(cfgE);
 
         var resolver = new Resolver(
@@ -1568,6 +1573,7 @@ internal static class Program
 
         var rng = new SystemRng(cfg.Seed);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var genE = new RollEStubPieGenerator(cfgE);
         var genG = new RollGStubPieGenerator(cfgG);
 
@@ -1703,6 +1709,7 @@ internal static class Program
         // so the defense never reaches the bonus (keeping the loose-ball-defense arm
         // on its SidelineInbound branch for this batch).
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var genE = new RollEStubPieGenerator(cfgE);
         var genG = new RollGStubPieGenerator(cfgG);
         var genH = new RollHStubPieGenerator(cfgH);
@@ -1882,6 +1889,7 @@ internal static class Program
         }, cfgI.Epsilon);
 
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var rng = new SystemRng(cfg.Seed);
 
         var ok = true;
@@ -1948,6 +1956,7 @@ internal static class Program
         // loose-ball-defense arm's charge crosses the bonus partway through THIS game,
         // exercising the §2a split (sideline below the bonus, FTs in it).
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var pieI = genI.Generate(state, ReboundSource.Block);
 
         var counts = new Dictionary<ReboundOutcome, int>();
@@ -2180,6 +2189,7 @@ internal static class Program
 
         var rngR = new SystemRng(cfg.Seed);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var resolver = new Resolver(
             new StubPieGenerator(cfg),
             cfg,
@@ -2312,6 +2322,7 @@ internal static class Program
 
         var rng = new SystemRng(cfg.Seed);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
 
         var resolver = new Resolver(
             new StubPieGenerator(cfg),
@@ -2574,6 +2585,7 @@ internal static class Program
         // climbs as the DefensiveFoul arm fires and CROSSES the bonus partway through
         // — so both fork branches (sideline below bonus, FT in bonus) are exercised.
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var pieJ = genJ.Generate(TransitionContext.Rebound);
 
         var counts = new Dictionary<TransitionOutcome, int>();
@@ -2686,6 +2698,7 @@ internal static class Program
         }, cfgJ.Epsilon);
 
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var rng = new SystemRng(cfg.Seed);
 
         var ok = true;
@@ -2744,6 +2757,7 @@ internal static class Program
         // sideline early routes to FT once the shared game enters the bonus, so BOTH
         // fork branches must be exercised.
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var pieJ = genJ.Generate(TransitionContext.Steal);
 
         var counts = new Dictionary<TransitionOutcome, int>();
@@ -2935,6 +2949,7 @@ internal static class Program
         // A FRESH game so the foul charge here does not perturb the shared game; it
         // crosses the bonus partway through, exercising both fork branches.
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var genE = new RollEStubPieGenerator(cfgE);
         var genG = new RollGStubPieGenerator(cfgG);
         var pieE = genE.Generate(state);
@@ -3173,6 +3188,7 @@ internal static class Program
         }, cfgK.Epsilon);
 
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var rng = new SystemRng(cfg.Seed);
 
         var ok = true;
@@ -3257,6 +3273,7 @@ internal static class Program
         var cfgG = RollGConfig.Load(configPath);
         var rng = new SystemRng(cfg.Seed);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var resolver = new Resolver(
             new StubPieGenerator(cfg),
             cfg,
@@ -3448,6 +3465,7 @@ internal static class Program
         // loose-ball-defense arm's charge crosses the bonus partway through THIS game,
         // exercising the §2a split (sideline below the bonus, FTs in it).
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var pieM = genM.Generate(state);
 
         var counts = new Dictionary<FreeThrowReboundOutcome, int>();
@@ -3802,6 +3820,7 @@ internal static class Program
 
         var rng = new SystemRng(cfg.Seed);
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         var genE = new RollEStubPieGenerator(cfgE);
         var genG = new RollGStubPieGenerator(cfgG);
 
@@ -4070,6 +4089,34 @@ internal static class Program
     // silently fall back to their stub pies and the matchup machinery
     // never runs. Mirrors the seating loop in Phase1RosterCheck.
     // -----------------------------------------------------------------
+    // Phase 31: seeds a bare GameState with five identical all-50 players per side
+    // so OffensiveRebounderPicker has a non-empty roster to draw from. Called by
+    // harness checks that create a fresh GameState for routing verification and
+    // don't care about specific attribute values. SetStarter throws on already-
+    // occupied slots, so only call this on a freshly constructed GameState.
+    private static void SeedMinimalRoster(GameState g)
+    {
+        static Player Mk50(int id) => new Player($"min{id}")
+        {
+            PlayerId = id,
+            Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 50,
+            FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+            SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+            OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50,
+            RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+            Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50,
+            Quickness = 50, FirstStep = 50, Vertical = 50, Endurance = 50,
+            Hustle = 50, BasketballIQ = 50, Discipline = 50,
+            RimTendency = 50, ShortTendency = 50, MidTendency = 50,
+            LongTendency = 50, ThreeTendency = 50,
+        };
+        for (var i = 0; i < 5; i++)
+        {
+            g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), Mk50(i + 1));
+            g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), Mk50(i + 6));
+        }
+    }
+
     private static void SeatStartersFromConfig(GameState game, string configPath)
     {
         var rosterCfg = RosterConfig.Load(configPath);
@@ -4109,6 +4156,7 @@ internal static class Program
         Console.WriteLine();
 
         var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+        SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
         SeatStartersFromConfig(game, configPath);       // seat real rosters (generators currently use stubs; seating future-proofs RunGame)
 
         var resolver = new Resolver(
@@ -5365,12 +5413,17 @@ internal static class Program
                 var dp = defRoster.PlayerAt(new Slot(r.Defense, dSlot));
                 if (dp != null && dp.PlayerId >= 1 && dp.PlayerId <= 10) t.DReb[dp.PlayerId - 1]++;
             }
-            // OReb
-            for (var i = 0; i < r.OrbWon; i++)
+            // OReb — Phase 31: read engine-stamped picks from OrbBySlot rather than
+            // drawing post-hoc. OrbBySlot.Total == r.OrbWon on every possession
+            // (asserted in Phase31RebounderPickerCheck). The DReb draw stays a
+            // WeightedDraw (no in-possession consumer; out of scope).
+            for (var s = 1; s <= 5; s++)
             {
-                var oSlot = WeightedDraw(rng, r.Offense, offRoster, p => p.Height + p.Strength + p.Wingspan + p.OffensiveRebounding);
-                var op2 = offRoster.PlayerAt(new Slot(r.Offense, oSlot));
-                if (op2 != null && op2.PlayerId >= 1 && op2.PlayerId <= 10) t.OReb[op2.PlayerId - 1]++;
+                var orbCount = r.OrbBySlot[s];
+                if (orbCount <= 0) continue;
+                var op2 = offRoster.PlayerAt(new Slot(r.Offense, s));
+                if (op2 != null && op2.PlayerId >= 1 && op2.PlayerId <= 10)
+                    t.OReb[op2.PlayerId - 1] += orbCount;
             }
             // BLK
             for (var i = 0; i < r.BlkCount; i++)
@@ -8273,6 +8326,7 @@ internal static class Program
 
             var spy  = new PressModeSpyGenerator(safePie);
             var game = new GameState(new FoulTracker(7, 10));
+            SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
             var rng  = new SystemRng(cfgA.Seed);
 
             var resolver = new Resolver(
@@ -8527,6 +8581,7 @@ internal static class Program
 
             var spy  = new PressModeSpyGenerator(fixedPie);
             var game = new GameState(new FoulTracker(7, 10));
+            SeedMinimalRoster(game);  // Phase 31: picker needs populated roster
             var rng  = new SystemRng(42);
 
             var resolver = new Resolver(
@@ -8622,6 +8677,7 @@ internal static class Program
                 }, cfgA2.Epsilon);
             var spy2  = new PressModeSpyGenerator(safePie2);
             var game2 = new GameState(new FoulTracker(7, 10));
+            SeedMinimalRoster(game2);  // Phase 31: picker needs populated roster
             var rng2  = new SystemRng(cfgA2.Seed);
             var res2  = new Resolver(
                 spy2, cfgA2,
@@ -12170,6 +12226,7 @@ internal static class Program
         GameState MakeGame(double paceBias = 5.0, double shotSelBias = 5.0)
         {
             var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            SeedMinimalRoster(g);  // Phase 31: picker needs populated roster
             g.SetCoach(TeamSide.Home, new CoachProfile(heliocentricBias: 5.0, shotSelectionBias: shotSelBias, paceBias: paceBias));
             g.SetCoach(TeamSide.Away, new CoachProfile(heliocentricBias: 5.0, shotSelectionBias: shotSelBias, paceBias: paceBias));
             return g;
@@ -12420,5 +12477,319 @@ internal static class Program
             : "  Phase 30 coaching layer 2 check: FAILED (see [FAIL] lines above)");
 
         return checkOk;
+    }
+
+    // ── Phase 31: offensive rebounder picker ──────────────────────────────────
+    private static bool Phase31RebounderPickerCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 31: offensive rebounder picker (OffensiveRebounderPicker) ---");
+        var ok = true;
+        const int N = 100_000;
+
+        var matchupCfg = MatchupConfig.Load(configPath);
+        var cfgD       = RollDConfig.Load(configPath);
+
+        // Helper: player with all attributes at b; override specific rebounding attributes.
+        static Player MkP(int id, int b,
+                          int? height = null, int? postDef = null,
+                          int? str    = null, int? orb     = null)
+            => new Player($"p{id}")
+            {
+                PlayerId             = id,
+                Outside              = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing          = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation         = b, PostMoves    = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding  = orb     ?? b,
+                PerimeterDefense     = b, PostDefense = postDef ?? b, RimProtection = b,
+                DefensiveRebounding  = b,
+                Steals               = b,
+                Height               = height  ?? b, Wingspan = b, Weight = b,
+                Strength             = str     ?? b,
+                Speed = b, Quickness = b, FirstStep = b,
+                Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
+                Discipline           = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Helper: seat five offensive players in Home 1-5; minimal away side.
+        GameState BuildGame(Player[] off)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < off.Length && i < 5; i++)
+            {
+                var slot = g.HomeLineup.SlotAt(i + 1);
+                g.HomeRoster.SetStarter(slot, off[i]);
+                // Away side: neutral all-50 players (picker is offense-only, away side unused).
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), MkP(i + 6, 50));
+            }
+            return g;
+        }
+
+        // Helper: build a state with Home offense, shot zone and shooter slot.
+        static PossessionState MkState(GameState g, ShotLocation zone, int shooterSlot)
+            => new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                SelectedSlot: g.HomeLineup.SlotAt(shooterSlot),
+                ShotType: zone);
+
+        // ── Sub-check 1: Direction ───────────────────────────────────────────────
+        // Dominant big (slot 5, H90/PD80/S88/ORB85) vs four weak guards (H40/PD42/S44/ORB12).
+        // Shooter is slot 1 on a Rim miss → no nerf on the dominant big.
+        // Python-confirmed: dominant ≈70.3%, each weak ≈7.4%, multiplier ≈9.47× >> 3×.
+        {
+            Console.WriteLine("  Sub-check 1: direction (dominant ≈70%, each weak ≈7%, multiplier >> 3×)");
+            var off = new[]
+            {
+                MkP(1, 40, height: 40, postDef: 42, str: 44, orb: 12),
+                MkP(2, 40, height: 40, postDef: 42, str: 44, orb: 12),
+                MkP(3, 40, height: 40, postDef: 42, str: 44, orb: 12),
+                MkP(4, 40, height: 40, postDef: 42, str: 44, orb: 12),
+                MkP(5, 50, height: 90, postDef: 80, str: 88, orb: 85),  // dominant big
+            };
+            var game  = BuildGame(off);
+            var state = MkState(game, ShotLocation.Rim, shooterSlot: 1);  // nerf off: rim zone
+            var rng   = new SystemRng(42);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = OffensiveRebounderPicker.Pick(state, game, matchupCfg, rng);
+                counts[pick.Number - 1]++;
+            }
+            var dominantShare = (double)counts[4] / N;
+            var maxWeakShare  = counts[..4].Max() / (double)N;
+            var multiplier    = maxWeakShare > 0 ? dominantShare / maxWeakShare : double.PositiveInfinity;
+            Console.WriteLine($"    dominant (slot 5): {dominantShare:P2}  max-weak: {maxWeakShare:P2}  mult: {multiplier:F2}×");
+            var sub1Ok = multiplier > 3.0;
+            ok &= sub1Ok;
+            Console.WriteLine(sub1Ok ? "    [OK]" : "    [FAIL] multiplier did not clear 3×");
+        }
+
+        // ── Sub-check 2: Neutral ─────────────────────────────────────────────────
+        // Five identical all-50 players → each slot should be ≈20%.
+        {
+            Console.WriteLine("  Sub-check 2: neutral (5 identical → ~20% each)");
+            var off   = Enumerable.Range(1, 5).Select(i => MkP(i, 50)).ToArray();
+            var game  = BuildGame(off);
+            var state = MkState(game, ShotLocation.Rim, shooterSlot: 1);
+            var rng   = new SystemRng(42);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = OffensiveRebounderPicker.Pick(state, game, matchupCfg, rng);
+                counts[pick.Number - 1]++;
+            }
+            var shares = counts.Select(c => (double)c / N).ToArray();
+            const double NeutralTol = 0.01;  // ±1%
+            var sub2Ok = shares.All(s => Math.Abs(s - 0.20) <= NeutralTol);
+            foreach (var (s, i) in shares.Select((s, i) => (s, i)))
+                Console.WriteLine($"    slot {i + 1}: {s:P2}");
+            ok &= sub2Ok;
+            Console.WriteLine(sub2Ok ? "    [OK]" : "    [FAIL] shares not uniform");
+        }
+
+        // ── Sub-check 3: Buried guard ────────────────────────────────────────────
+        // Small no-ORB guard (slot 1, H38/PD42/S42/ORB10) among four elite rebounders.
+        // Python-confirmed: guard's share ≈3.1–3.5% — assert it stays below 6%.
+        {
+            Console.WriteLine("  Sub-check 3: buried guard (share < 6%)");
+            var off = new[]
+            {
+                MkP(1, 50, height: 38, postDef: 42, str: 42, orb: 10),  // buried PG
+                MkP(2, 60, height: 85, postDef: 80, str: 82, orb: 88),
+                MkP(3, 60, height: 85, postDef: 80, str: 82, orb: 88),
+                MkP(4, 60, height: 85, postDef: 80, str: 82, orb: 88),
+                MkP(5, 60, height: 85, postDef: 80, str: 82, orb: 88),
+            };
+            var game  = BuildGame(off);
+            // Shooter is slot 2 (an elite big), so slot 1 guard is NOT nerfed.
+            var state = MkState(game, ShotLocation.Rim, shooterSlot: 2);
+            var rng   = new SystemRng(42);
+            var counts = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = OffensiveRebounderPicker.Pick(state, game, matchupCfg, rng);
+                counts[pick.Number - 1]++;
+            }
+            var guardShare = (double)counts[0] / N;
+            Console.WriteLine($"    buried guard (slot 1) share: {guardShare:P2}  (bound: < 6%)");
+            var sub3Ok = guardShare < 0.06;
+            ok &= sub3Ok;
+            Console.WriteLine(sub3Ok ? "    [OK]" : "    [FAIL] buried guard share exceeded 6%");
+        }
+
+        // ── Sub-check 4: Shooter nerf ────────────────────────────────────────────
+        // Dominant shooter-big in slot 5. Compare share: Three (nerfed) vs Rim (un-nerfed)
+        // vs FT board (ShotType null → un-nerfed). Python-confirmed: ~24.8% → ~10.3% on Three.
+        {
+            Console.WriteLine("  Sub-check 4: shooter nerf (share drops on Three vs Rim/FT board)");
+            var off = new[]
+            {
+                MkP(1, 50), MkP(2, 50), MkP(3, 50), MkP(4, 50),
+                MkP(5, 50, height: 90, postDef: 80, str: 88, orb: 85),  // dominant big = shooter
+            };
+            var game = BuildGame(off);
+
+            // Rim miss — no nerf; big is in slot 5, shooter slot 5.
+            var stateRim = MkState(game, ShotLocation.Rim,   shooterSlot: 5);
+            // Three miss — nerf fires on slot 5.
+            var stateThree = MkState(game, ShotLocation.Three, shooterSlot: 5);
+            // FT board — ShotType null → no nerf.
+            var stateFt = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                SelectedSlot: game.HomeLineup.SlotAt(5),
+                ShotType: null);  // free-throw miss board — no zone → no nerf
+
+            static double ShareSlot5(PossessionState st, GameState gm, MatchupConfig mc, int n)
+            {
+                var rng = new SystemRng(42);
+                var count = 0;
+                for (var i = 0; i < n; i++)
+                    if (OffensiveRebounderPicker.Pick(st, gm, mc, rng).Number == 5) count++;
+                return (double)count / n;
+            }
+
+            var rimShare   = ShareSlot5(stateRim,   game, matchupCfg, N);
+            var threeShare = ShareSlot5(stateThree, game, matchupCfg, N);
+            var ftShare    = ShareSlot5(stateFt,    game, matchupCfg, N);
+            Console.WriteLine($"    slot-5 share — Rim (un-nerfed): {rimShare:P2}  Three (nerfed): {threeShare:P2}  FT board (un-nerfed): {ftShare:P2}");
+            // Nerf should reduce share on Three; Rim and FT board should be comparable.
+            var sub4Ok = threeShare < rimShare && Math.Abs(ftShare - rimShare) < 0.05;
+            ok &= sub4Ok;
+            Console.WriteLine(sub4Ok ? "    [OK]" : "    [FAIL] nerf did not behave as expected");
+        }
+
+        // ── Sub-check 5: Floor / throw ───────────────────────────────────────────
+        {
+            Console.WriteLine("  Sub-check 5: floor (null slots skipped) and throw (all-null offense)");
+            // 5a: only slots 1 and 3 populated → picks must always be slot 1 or 3.
+            var game5 = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            game5.HomeRoster.SetStarter(game5.HomeLineup.SlotAt(1), MkP(1, 50));
+            game5.HomeRoster.SetStarter(game5.HomeLineup.SlotAt(3), MkP(3, 50));
+            game5.AwayRoster.SetStarter(game5.AwayLineup.SlotAt(1), MkP(6, 50));
+            var stateFloor = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound, ShotType: ShotLocation.Rim);
+            var rng5 = new SystemRng(42);
+            var counts5 = new int[5];
+            for (var i = 0; i < N; i++)
+            {
+                var pick = OffensiveRebounderPicker.Pick(stateFloor, game5, matchupCfg, rng5);
+                counts5[pick.Number - 1]++;
+            }
+            var floorOk = counts5[0] + counts5[2] == N
+                          && counts5[1] == 0 && counts5[3] == 0 && counts5[4] == 0;
+            Console.WriteLine($"    slot distribution (only 1&3 seated): s1={counts5[0]:N0} s2={counts5[1]:N0} s3={counts5[2]:N0} s4={counts5[3]:N0} s5={counts5[4]:N0}");
+            ok &= floorOk;
+            Console.WriteLine(floorOk ? "    floor [OK]" : "    floor [FAIL] picks landed in empty slots");
+
+            // 5b: all-null offense → must throw.
+            var gameEmpty = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            gameEmpty.AwayRoster.SetStarter(gameEmpty.AwayLineup.SlotAt(1), MkP(6, 50));
+            bool threwOk;
+            try
+            {
+                OffensiveRebounderPicker.Pick(stateFloor, gameEmpty, matchupCfg, new SystemRng(1));
+                threwOk = false;
+            }
+            catch (InvalidOperationException) { threwOk = true; }
+            ok &= threwOk;
+            Console.WriteLine(threwOk ? "    throw  [OK]" : "    throw  [FAIL] did not throw on all-null offense");
+        }
+
+        // ── Sub-check 6: Reproducibility ─────────────────────────────────────────
+        // Same seed → identical pick sequence over 1,000 draws.
+        {
+            Console.WriteLine("  Sub-check 6: reproducibility (same seed → identical sequence)");
+            var off   = new[] { MkP(1,50), MkP(2,60), MkP(3,70), MkP(4,65), MkP(5,80) };
+            var game  = BuildGame(off);
+            var state = MkState(game, ShotLocation.Mid, shooterSlot: 3);
+            const int Rep = 1_000;
+            var seq1 = new int[Rep];
+            var seq2 = new int[Rep];
+            var rngA = new SystemRng(77);
+            var rngB = new SystemRng(77);
+            for (var i = 0; i < Rep; i++) seq1[i] = OffensiveRebounderPicker.Pick(state, game, matchupCfg, rngA).Number;
+            for (var i = 0; i < Rep; i++) seq2[i] = OffensiveRebounderPicker.Pick(state, game, matchupCfg, rngB).Number;
+            var sub6Ok = seq1.SequenceEqual(seq2);
+            ok &= sub6Ok;
+            Console.WriteLine(sub6Ok ? "    [OK]" : "    [FAIL] sequences diverged");
+        }
+
+        // ── OrbBySlot total == OrbWon invariant ──────────────────────────────────
+        // Drive a full governor run with real generators so possessions actually reach
+        // Roll I and produce offensive boards. Assert OrbBySlot.Total == OrbWon on
+        // every possession record.
+        {
+            Console.WriteLine("  OrbBySlot.Total == OrbWon invariant (governor run)");
+            var cfgA       = RollAConfig.Load(configPath);
+            var cfgGov     = GovernorConfig.Load(configPath);
+            var cfgClock   = RollClockConfig.Load(configPath);
+            var cfgEoH     = EndOfHalfConfig.Load(configPath);
+            var cfgE       = RollEConfig.Load(configPath);
+
+            // Build a game with five players per side so real generators have attributes.
+            var govGame = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var offPlayers = new[]
+            {
+                MkP(1,50), MkP(2,55), MkP(3,60), MkP(4,65),
+                MkP(5,55, height:75, postDef:70, str:70, orb:75),
+            };
+            var defPlayers = Enumerable.Range(6, 5).Select(i => MkP(i, 50)).ToArray();
+            for (var i = 0; i < 5; i++)
+            {
+                govGame.HomeRoster.SetStarter(govGame.HomeLineup.SlotAt(i + 1), offPlayers[i]);
+                govGame.AwayRoster.SetStarter(govGame.AwayLineup.SlotAt(i + 1), defPlayers[i]);
+            }
+            govGame.SetPossessionArrow(TeamSide.Home);
+
+            var rng = new SystemRng(99);
+            var resolver = new Resolver(
+                new RollAGenerator(cfgA, matchupCfg, govGame),
+                cfgA,
+                new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
+                new RollCStubPieGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDStubPieGenerator(cfgD),
+                new RollEGenerator(cfgE, govGame),
+                new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
+                new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
+                new RollGGenerator(RollGConfig.Load(configPath), matchupCfg, govGame),
+                new RollHGenerator(RollHConfig.Load(configPath), matchupCfg, govGame),
+                new RollIGenerator(RollIConfig.Load(configPath), matchupCfg, govGame),
+                new RollJGenerator(RollJConfig.Load(configPath), matchupCfg, govGame),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                new RollLGenerator(RollLConfig.Load(configPath), govGame),
+                new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
+                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                matchupCfg,
+                govGame,
+                rng);
+
+            var governor = new Governor(resolver, govGame, cfgGov, cfgClock, new SystemRng(100), cfgEoH);
+            var first    = new PossessionState(
+                PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            var result = governor.Run(first);
+
+            var invariantFails = 0;
+            var orbPossessions = 0;
+            foreach (var r in result.Possessions)
+            {
+                if (r.OrbBySlot.Total != r.OrbWon) invariantFails++;
+                if (r.OrbWon > 0) orbPossessions++;
+            }
+            var invOk = invariantFails == 0;
+            ok &= invOk;
+            Console.WriteLine(invOk
+                ? $"    [OK] OrbBySlot.Total == OrbWon on all {result.Possessions.Count:N0} possessions ({orbPossessions} with ORB > 0)"
+                : $"    [FAIL] {invariantFails} possessions violated OrbBySlot.Total == OrbWon");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(ok ? "  Phase 31 rebounder picker check: PASSED" : "  Phase 31 rebounder picker check: FAILED (see [FAIL] lines above)");
+        return ok;
     }
 }

@@ -264,6 +264,20 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// a pure append, like every prior init field.</para>
     /// </summary>
     public IReadOnlyList<ShootingFoulEvent> ShootingFouls { get; init; } = Array.Empty<ShootingFoulEvent>();
+
+    // ── Phase 31: offensive-rebounder attribution ─────────────────────────────
+    /// <summary>
+    /// Per-slot offensive-rebound counts for this possession — stamped by
+    /// <see cref="OffensiveRebounderPicker"/> at the shared
+    /// <c>ContinuationKind.ResolveOffensiveRebound</c> node each time the offense
+    /// secures a board (both Roll I and Roll M feeders converge there).
+    /// <para><c>OrbBySlot.Total</c> equals <see cref="OrbWon"/> on every possession
+    /// (the harness asserts this). Init-only with a <c>default</c> (all-zero)
+    /// SlotGroup, so every existing positional construction
+    /// (<c>new RoutingOutcome(false, "STUB:…")</c>) is untouched — a pure append,
+    /// like every prior init field.</para>
+    /// </summary>
+    public SlotGroup OrbBySlot { get; init; }
 }
 
 /// <summary>
@@ -480,6 +494,9 @@ public sealed class Resolver
         var blkCount      = 0;
         int? turnoverOffSlot   = null;
         var turnoverWasLiveBall = false;
+        // Phase 31: per-slot offensive-rebound accumulator (one entry per picker fire,
+        // i.e. one per ResolveOffensiveRebound case hit). Total == OrbWon at possession end.
+        var orbBySlot = new SlotGroup();
         // Phase 25: shooting-foul events (one per MadeAndFouled / MissFouled edge hit).
         // A possession with no shooting foul stays empty; a putback possession can carry two.
         var shootingFouls = new List<ShootingFoulEvent>();
@@ -544,7 +561,8 @@ public sealed class Resolver
                           BlkCount       = blkCount,
                           TurnoverOffSlot     = turnoverOffSlot,
                           TurnoverWasLiveBall = turnoverWasLiveBall,
-                          ShootingFouls  = shootingFouls.ToArray() };
+                          ShootingFouls  = shootingFouls.ToArray(),
+                          OrbBySlot      = orbBySlot };
 
                 case Continue c:
                     switch (c.Next)
@@ -890,13 +908,23 @@ public sealed class Resolver
                         case ContinuationKind.ResolveOffensiveRebound:
                             // An offensive rebound resets the shot clock to 20 and starts a new period.
                             shotClockPeriods++;
+                            // Phase 31: pick WHICH offensive player secured the board, conditional
+                            // on Roll I already awarding it to the offense. Echoes the team math's
+                            // per-player weight (OffensiveRebounding × PositionalWeight × shooterNerf)
+                            // so the individual pick agrees with the team battle by construction.
+                            // Covers both feeders (Roll I, Roll M) at this one shared node.
+                            // Does NOT overwrite SelectedSlot (the shooter). Consumes one _rng draw
+                            // — stream shifts vs Phase 30 (expected; documented in A5).
+                            var picked31 = OffensiveRebounderPicker.Pick(c.State, _game, _matchup, _rng);
+                            orbBySlot = orbBySlot.WithSlot(picked31.Number, 1);
+                            var reboundState31 = c.State with { ReboundSlot = picked31 };
                             // Select Roll K's pie by the source the board arrived with. A
                             // null stamp — every legacy feeder (Roll I) stamps nothing —
                             // reads as LiveBall, so the field-goal path is byte-for-byte
                             // unchanged. Roll M stamps FreeThrow for its FT-specific pie.
                             var pieK = _rollKGenerator.Generate(
                                 c.OffensiveReboundSource ?? OffensiveReboundSource.LiveBall);
-                            result = RollK.Execute(c.State, pieK, _game, _rng);
+                            result = RollK.Execute(reboundState31, pieK, _game, _rng);
                             continue;
 
                         // Roll H, shooting foul (and-1 or fouled miss) -> the Roll L FT

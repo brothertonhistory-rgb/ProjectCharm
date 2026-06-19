@@ -1,3 +1,74 @@
+## Session 66 — Phase 31: Offensive Rebounder Picker (2026-06-19)
+
+**Scope:** The first in-possession picker: engine-side attribution of which offensive player secured the offensive rebound, conditional on Roll I having already awarded the board to the offense. Previously ORB credit in the box score was assigned via a post-hoc `WeightedDraw` in the harness. Phase 31 stamps the result onto `PossessionState.ReboundSlot` (a new nullable `Slot?` field, separate from `SelectedSlot`) and threads `OrbBySlot` (a `SlotGroup`) from the resolver walk out through `RoutingOutcome` → `PossessionRecord` → harness attribution. Six files changed: one new (`OffensiveRebounderPicker.cs`), five modified.
+
+**What shipped (6 files):**
+
+`src/Charm.Engine/Core/OffensiveRebounderPicker.cs` — NEW. Static class with `Pick(GameState game, PossessionState state, IRng rng, MatchupConfig matchup, RollHConfig cfgH)`. Weights each populated offensive slot by `max(1, OffensiveRebounding × PositionalWeight(Postness) × shooterNerf)`, where `shooterNerf = ReboundShooterNerf (0.35)` when the candidate's slot matches the shooter AND `ShotType` is `Three`, `Long`, or `Mid`; no nerf on `Rim`/`Short`; no nerf when `ShotType` is null (bonus FT boards where no shooter was selected). Uses the existing `Matchup.Postness` and `Matchup.PositionalWeight` public static methods — no new matchup math, only a new consumer. Returns the winning `Slot` (offense side).
+
+`src/Charm.Engine/Core/PossessionState.cs` — `Slot? ReboundSlot = null` appended as the last positional parameter. Default null; stamped by the picker at `ResolveOffensiveRebound`; cleared to null by Roll K's `ResetOffense` wipe list.
+
+`src/Charm.Engine/Core/Resolver.cs` — `OrbBySlot` (`SlotGroup`) property added to `RoutingOutcome` with empty-group default; `orbBySlot` local accumulator initialized in `Route()`; picker called at `case ContinuationKind.ResolveOffensiveRebound:` (between Roll I's award and Roll K's execution), result stamped onto state via `state = state with { ReboundSlot = ... }` and accumulated into `orbBySlot`; `OrbBySlot = orbBySlot.ToReadOnly()` included in the Terminal return.
+
+`src/Charm.Engine/Rolls/RollK.cs` — `ReboundSlot = null` added to `ResetOffense`'s blank-slate `with` expression. Surgical one-liner alongside the existing wipe list.
+
+`src/Charm.Engine/Core/Governor.cs` — `OrbBySlot` added to `PossessionRecord` as a trailing field; threaded from a local `var orbBySlot` in `Run()` that accumulates from `outcome.OrbBySlot` across the walk and is passed positionally to `records.Add(...)`.
+
+`src/Charm.Harness/Program.cs` — The post-hoc `WeightedDraw` ORB block in `AttributeGame` replaced with per-slot reads from `r.OrbBySlot`; `Phase31RebounderPickerCheck` added (6 sub-checks + invariant governor run); wired via `ok &= Phase31RebounderPickerCheck(configPath)`. Also added `SeedMinimalRoster(GameState g)` private static helper (5 identical all-50 players per side) called after bare `GameState` constructions across ~24 sites that route through the full resolver — see key design decisions below.
+
+**Key design decisions:**
+
+- **Option A (conditional-within-side) chosen over Option B (unified 10-player contest).** Option B would require tearing down Roll I's working team-math and rebuilding it as a per-player contest. Option A adds the picker strictly downstream of Roll I's team verdict: Roll I decides the team; the picker decides the individual within that team. The offense-vs-defense split is never re-litigated.
+
+- **`ReboundSlot` is separate from `SelectedSlot`.** Who shot and who rebounded are two distinct per-possession facts. Both must persist for downstream consumers; they live as independent nullable fields on `PossessionState`.
+
+- **Known limitation documented: within-side share inflation.** Because the picker distributes probability across the 5 offensive players rather than all 10, a weak rebounder's share (~3%) exceeds its true OR% contribution (~1%). A full Option B unified contest is the named future fix; deferred as a calibration task, not a structural blocker.
+
+- **`ReboundSlot` has no consumer yet in Roll K.** Phase 32 is the first consumer: it tilts putback share toward the player who secured the board. The field rides through the current chain harmlessly.
+
+- **OrbBySlot invariant.** `OrbBySlot.Total == OrbWon` is asserted in the harness invariant governor run — every offensive rebound credits exactly one player. Confirmed on all 12 possessions with ORB > 0 in the controlled 132-possession run.
+
+- **SeedMinimalRoster harness fix pattern (new standing rule for future sessions).** Phase 31 is the first resolver-walk code that reads from the game's roster. Any harness check that creates a bare `GameState` and routes through the full resolver can now reach `ResolveOffensiveRebound` and crash on a null roster. Fix: `SeedMinimalRoster(GameState g)` is called immediately after bare `GameState` construction at those sites. Four categories must NOT receive `SeedMinimalRoster`: (1) `RollHResolutionBatchCheck` — bound to a bare game so `PlayerAt()` returns null and the generator falls back to stub/baseline rates; adding seeding shifts make% outside tolerance; (2) `AttributionSanityCheck`, the `ObservationRun` game loop, and `Phase25ShootingFoulAttributionCheck` loop — these do their own `SetStarter` seeding and conflict; (3) `StressTestArchetypeRosters` game loop — uses `SeatRoster()` which wraps `SetStarter`; (4) Phase 31's invariant sub-check uses `govGame` as the variable name to avoid global-replace collision. **Standing rule: any new harness check creating a bare `GameState` passed to a full resolver must add `SeedMinimalRoster(game)` right after construction.**
+
+**Python pre-validation (mandatory Step 0 — all checks passed):**
+
+Simulation with a 5-player offensive lineup (dominant big OR=95, three weak guards OR=20, moderate big OR=60) at `SCALE=40`, `shooterNerf=0.35`:
+
+1. Direction: dominant slot wins 70.3%, each weak guard ~7.4%. Ratio 9.47× — exceeds the 3× threshold. ✓
+2. Neutral (all-50, no nerf): each slot exactly 20.0%. ✓
+3. Buried guard: slot-5 guard share 3.5% at extreme scenario. Under the 6% bound. ✓
+4. Shooter nerf: shooter-big share drops 24.8% → 10.3% on Three. Nerf firing correctly. ✓
+5. Floor: all weights ≥ 1 by construction; no zero-weight slots. ✓
+6. Reproducibility: 10,000 draws — no throws; same-seed draws byte-identical. ✓
+
+**Calibration note:** At `SCALE=40` the interior anchor captures ~58% of rim residual probability. The prompt draft estimated ~37% (computed with `SCALE≈100`). Flagged as a calibration item for the tune-magnitudes pass; consistent with the wire-the-form mandate and not a blocker.
+
+**Harness output — key results:**
+
+ALL CHECKS PASSED. STRESS TEST PASSED.
+
+Phase 31 check (6 sub-checks):
+- Direction: 9.35× multiplier (dominant big ~68%, each weak guard ~7.2%). Threshold 3× cleared. [OK]
+- Neutral: each slot exactly 20.0% at all-50 no-nerf. [OK]
+- Buried guard: slot-5 share 2.01% at extreme scenario. Under 6% bound. [OK]
+- Shooter nerf: slot-5 non-shooter big drops 35.78% → 16.36% on Three zone. Nerf firing correctly. [OK]
+- Floor/throw: no zero-weight slots; no throws across 1,000 controlled draws. [OK]
+- Reproducibility: two identical draws from same seed produce byte-identical results. [OK]
+
+Invariant governor run (132 possessions, 12 with ORB > 0): `OrbBySlot.Total == OrbWon` on all 12. [OK]
+
+Observation run (1,000 games, frozen corpus):
+- ORB% 27.64% (unchanged — picker changes WHO gets credit, not the rate). ✓
+- Per-player ORB/g: Okafor (big, slot 4) 2.8 vs Webb (guard, slot 1) 0.6 — 4.7× gap. Picker working correctly.
+- Phase 24 OReb directional (Anchor vs perimeter roles): 22–25× ratio. [OK]
+- Aggregate stats (PPP 1.0999, pace 132.3, FG% 52.05%) unchanged vs Phase 30 — picker consumes one extra RNG draw per ORB but does not alter rates.
+
+Stress test: Athletic beats Skill 72.8–73.0% (both mirror directions); mirror gap 0.2%. STRESS TEST PASSED.
+
+Notable stress test data: Shooting loses to Athletic 22.6% (Athletic 75%). Shooting team takes 35% threes at only 21% rim attempts; Athletic team gets 54% of shots at the rim — perimeter volume cannot overcome rim dominance at current config. EliteVsWeak: 100-0 across 500 games (clean extreme separation). StarVsBalanced: star team wins 58.2% (star effect real and measurable). Mirror gap across Buckets 7/8: 0.2% (side-neutrality excellent). Interior players (PostScorer, RimRunner) commit 1.3–2.0 SFL/g; perimeter players 0.7–1.0 — correct Phase 25 pattern still holding.
+
+**Frozen corpus note:** RNG stream shifted from Phase 30 (one extra draw per ORB event). Aggregate distributions are identical — same probabilities, different stream. This is the expected behavior when a picker is inserted downstream of the rate decision.
+
 ## Session 65 — Phase 30: ShotSelectionBias + PaceBias (Coaching Layer 2) (2026-06-18)
 
 **Scope:** Two new `CoachProfile` fields — `ShotSelectionBias` (1–10) and `PaceBias` (1–10) — wired into the engine. `ShotSelectionBias` fills in the `CoachingPull.Apply` seam so Roll G's shot-zone distribution reflects the coach's offensive system. `PaceBias` wires into two existing seams: Roll J's transition-frequency modifier and the Governor's possession-length draw. Nine files changed. One latent bug in Roll J's modifier application fixed as a consequence of testing.
