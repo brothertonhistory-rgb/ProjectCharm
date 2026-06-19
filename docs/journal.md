@@ -1,3 +1,27 @@
+## Session 73 — Phase 38: Wire RollKGenerator Into All Full-Engine Simulations (2026-06-19)
+
+**Scope:** Replace `RollKStubPieGenerator` with the already-built `RollKGenerator` at the nine harness sites that construct a full-engine resolver (observation corpus, stress test, and seven all-real attribution checks). The stub survives as a deliberate test double at 20 isolation sites where flat weights are required. No engine changes, no config changes, no new files, no deletions. 1 file changed.
+
+**What shipped (1 file changed):**
+
+`src/Charm.Harness/Program.cs` — EDIT (9 surgical generator swaps, nothing else). Four **Pattern A** sites (`ObservationRunV1`, `StressTestArchetypeRosters`, `AttributionSanityCheck`, `Phase25ShootingFoulAttributionCheck`) replaced `new RollKStubPieGenerator(cfgK)` with `new RollKGenerator(cfgK, cfgMatchup, game)`. Five **Pattern B** sites (`Phase31RebounderPickerCheck`, `Phase33TurnoverCommitterCheck`, `Phase34TurnoverAttributionCheck`, `Phase35DefensiveReboundCheck`, `Phase36BlockerCheck`) replaced `new RollKStubPieGenerator(RollKConfig.Load(configPath))` with `new RollKGenerator(RollKConfig.Load(configPath), matchupCfg, govGame)`. All 20 stub sites that are deliberate test doubles remain unchanged. `Resolver.cs`, `config.json`, `RollKStubPieGenerator.cs`, and `IRollKPieGenerator.cs` are untouched.
+
+**Key design decisions:**
+
+- **Stub is a legitimate test double, not dead code.** `RollMContextSelectionCheck` asserts that the returned pie equals the flat config weights exactly — a real generator would correctly break that assertion. The handoff checks, press checks, and `Phase30CoachingLayer2Check` deliberately keep all other rolls flat so they measure only the targeted behavior; injecting attribute-driven Roll K behavior into those resolvers would contaminate the signal. The stub stays until those checks are refactored to match (which is not a goal).
+
+- **Config hash unchanged.** `config.json` was not touched. The hash line is identical to Phase 37: `e48085ff2196764bcca5512258050a4beb3609f8af74c767fd5acb8e8b46ec26`. The corpus output changes came from the generator swap, not a config edit.
+
+- **Corpus direction confirmed.** The Python pre-check predicted EliteVsWeak ORB→points would widen while AverageVsAverage barely moved. Stress-test results: EliteVsWeak ORB% = 48.8% (Team A) vs 12.9% (Team B); AverageVsAverage ORB% = 28.9% vs 29.1%. The gap is exactly where the matchup math should put it.
+
+**Harness results (all checks passed):**
+
+- `Phase32` (`RollKReboundBatchCheck`, `RollKBonusForkCheck`): unchanged `[OK]` — already used the real generator.
+- All nine flipped checks passed: `AttributionSanityCheck`, `Phase25`, `Phase31`–`Phase36` all reported `PASSED`.
+- Observation run: `Mechanics: ALL OK`. Config hash unchanged.
+- Stress test: `STRESS TEST PASSED`. ORB% movement matches corpus-direction prediction.
+- ALL CHECKS PASSED.
+
 ## Session 72 — Phase 37: RollCGenerator — Flat Context-Driven Type-Mix, Activate EntryBackcourt, Retire Pressure Wire (2026-06-19)
 
 **Scope:** Replace `RollCStubPieGenerator` with `RollCGenerator` (flat, no pressure wire, no matchup signal), activate the `EntryBackcourt` context in `RollCContextCheck`, and delete `PressureSignalCheck` and its helper `RollCLiveStripRate`. Roll C's resolver and Roll C itself untouched. 5 files changed, 1 new, 1 deleted.

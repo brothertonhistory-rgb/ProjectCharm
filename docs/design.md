@@ -5595,3 +5595,38 @@ Calibration of all three pies is explicitly deferred until all generators are wi
 - **Calibration** of any Roll C weight. Live/dead split calibration is deferred.
 - **Roll D real generator** (defensive foul flavor). Future session.
 - **Transition expanded types** (Travel, DoubleDribble in Transition). Currently zero; a calibration-session question.
+
+## Phase 38 — Wire RollKGenerator Into All Full-Engine Simulations (2026-06-19)
+
+### What changed and why
+
+`RollKGenerator` shipped in Phase 32 and has been exercised by its own dedicated checks (`RollKReboundBatchCheck`, `RollKBonusForkCheck`) ever since. Phase 38 is a pure activation step: it replaces the flat stub with the real generator at every harness site that builds a full-engine resolver, so the observation corpus and all attribution checks now run with matchup-aware putback tilt.
+
+### The stub's surviving role
+
+`RollKStubPieGenerator` remains the test double at 20 sites where flat Roll K behavior is required by the test's design:
+
+- **`RollMContextSelectionCheck`** asserts the pie equals the flat config weights exactly. The real generator tilts PutBack by matchup, so it correctly produces a different answer — which would break the assertion. The stub is the only way to verify the flat-pie assertion without restructuring the check.
+- **Handoff and isolation checks** (`RollFHandoffCheck`, `RollGHandoffCheck`, `RollHHandoffCheck`, `RollIBlockContextSelectionCheck`, `GovernorLoopCheck`, `RollLFreeThrowCheck`, `OffensiveReboundConvergenceCheck`, `RunGame`) keep other rolls flat to measure only the targeted behavior. Injecting attribute-driven Roll K would contaminate the signal they exist to produce.
+- **Press checks** (`Phase15`, `Phase16`) keep Roll K flat for the same isolation reason.
+- **`Phase30CoachingLayer2Check`** — same logic.
+
+The stub file is not deleted and `IRollKPieGenerator` is not collapsed. Both remain until the isolation checks are refactored, which is not a goal.
+
+### Classifier: two variable-name patterns
+
+All nine FLIP sites were verified against the live source before editing. The two patterns are:
+
+- **Pattern A** — four sites (`ObservationRunV1`, `StressTestArchetypeRosters`, `AttributionSanityCheck`, `Phase25ShootingFoulAttributionCheck`): config is pre-loaded into named locals; the swap is `new RollKStubPieGenerator(cfgK)` → `new RollKGenerator(cfgK, cfgMatchup, game)`.
+- **Pattern B** — five sites (`Phase31`–`Phase36` attribution checks): config is loaded inline; the swap is `new RollKStubPieGenerator(RollKConfig.Load(configPath))` → `new RollKGenerator(RollKConfig.Load(configPath), matchupCfg, govGame)`.
+
+A global find-replace on the constructor name alone would have compiled the wrong variable names at Pattern B sites (confusing `cfgMatchup` with `matchupCfg`, or missing `govGame`). The per-site read was load-bearing.
+
+### Corpus effect
+
+The putback formula tilts PutBack mass by (rebounder offensive composite) minus (self-weighted defensive team interior composite), run through GapFn and clamped to `[PutbackFloor, PutbackCeiling]` with a zone modifier. The Python pre-check and harness confirm the expected pattern:
+
+- **EliteVsWeak**: dominant-big rebounder vs weak interior → putback rate well above stub flat (0.40). Stress-test ORB%: Elite 48.8% vs Weak 12.9% — the gap is now properly encoded in the engine.
+- **AverageVsAverage**: near-zero gap → near-zero shift → putback rate barely above flat. Stress-test ORB%: 28.9% vs 29.1% — essentially unchanged.
+- **Config hash unchanged** (`e48085ff...`) — no config edit, only a generator swap.
+
