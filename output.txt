@@ -34,24 +34,24 @@
   foul#11: 10->11 | flavor=ReachIn  | bonus=Double    | route=ResolveFreeThrows(Double)
 
 --- Observability: Roll E (player selection) ---
-  selection pie (flat, no signal yet): Slot1=20.06%, Slot2=23.89%, Slot3=22.76%, Slot4=18.45%, Slot5=14.84%
+  selection pie (flat, no signal yet): Slot1=17.94%, Slot2=52.00%, Slot3=11.36%, Slot4=9.16%, Slot5=9.55%
   proceed -> selected Home slot 2 | next=IntoPlayerAction
   proceed -> selected Home slot 5 | next=IntoPlayerAction
   proceed -> selected Home slot 4 | next=IntoPlayerAction
+  proceed -> selected Home slot 2 | next=IntoPlayerAction
   proceed -> selected Home slot 3 | next=IntoPlayerAction
-  proceed -> selected Home slot 4 | next=IntoPlayerAction
-  proceed -> selected Home slot 1 | next=IntoPlayerAction
+  proceed -> selected Home slot 2 | next=IntoPlayerAction
   proceed -> selected Home slot 5 | next=IntoPlayerAction
-  proceed -> selected Home slot 3 | next=IntoPlayerAction
+  proceed -> selected Home slot 2 | next=IntoPlayerAction
 
 --- Observability: Roll F (player action) ---
   action pie (flat-ish, no signal yet): ShotAttempt=85.50%, Turnover=9.00%, NonShootingFoul=5.00%, JumpBall=0.50%
   Home slot 2 action -> ResolveJumpBall
   Home slot 4 action -> IntoShotType
-  Home slot 4 action -> IntoShotType
+  Home slot 3 action -> IntoShotType
   Home slot 5 action -> IntoShotType
-  Home slot 4 action -> IntoShotType
-  Home slot 1 action -> IntoShotType
+  Home slot 3 action -> IntoShotType
+  Home slot 2 action -> IntoShotType
   Home slot 2 action -> IntoShotType
   Home slot 5 action -> IntoShotType
 
@@ -63,9 +63,9 @@
     Long   2.00%
     Three  1.00%
   Home slot 2 Rim shot -> MissFouled -> CONTINUE -> ResolveShootingFreeThrows
-  Home slot 3 Rim shot -> Made -> TERMINAL (Made)
+  Home slot 2 Rim shot -> Made -> TERMINAL (Made)
   Home slot 5 Mid shot -> Miss -> CONTINUE -> ResolveRebound
-  Home slot 3 Three shot -> Made -> TERMINAL (Made)
+  Home slot 2 Three shot -> Made -> TERMINAL (Made)
   Home slot 2 Short shot -> Blocked -> CONTINUE -> ResolveRebound
   Home slot 2 Three shot -> Miss -> CONTINUE -> ResolveRebound
   Home slot 2 Long shot -> MissOutOfBoundsRetained -> CONTINUE -> ResolveSidelineInbound
@@ -1180,7 +1180,7 @@
   Hierarchy bias check: PASSED
 
 === OBSERVATION RUN ΓÇö frozen-corpus-v1 ===
-  config hash:      74b270e61f3909292b04865e51b7a6a6d91793e48f3f3bb39690663d999fb524
+  config hash:      fb5c0ebae15d26e33f2e4fb4902673641c215759af54553f5670f985ae667127
   corpus:           frozen-corpus-v1  (seeds 1..1000; rosters: Marcus Webb/DeShawn Pryor/Trey Holloway/Javon Okafor/Cory Baptiste vs Kendrick Shaw/Rashid Monroe/Antoine Dupree/Darius Eze/Malik Thornton)
   sample size:      1000 games
   strategy/context: home-press=1.0  away-press=1.0  halves=2  half=1200s
@@ -1191,125 +1191,124 @@
   Mechanics:  ALL OK ΓÇö scoring reconciled, count invariant held, zero parks, no throws
 
 --- PACE (total possessions per game) ---
-    Total                                  mean=  132.2  sd=  3.9  min=  120  max=  146
-    Home                                   mean=   66.5  sd=  2.0  min=   60  max=   74
-    Away                                   mean=   65.7  sd=  2.0  min=   60  max=   73
+    Total                                  mean=  132.1  sd=  4.0  min=  120  max=  146
+    Home                                   mean=   66.4  sd=  2.1  min=   60  max=   74
+    Away                                   mean=   65.7  sd=  2.0  min=   60  max=   72
     NoShot (end-of-half, per game)         mean=    0.2  sd=  0.4  min=    0  max=    2
   Distribution (total):
     [ 90,100)      0.0%  (0)
     [100,110)      0.0%  (0)
     [110,120)      0.0%  (0)
-    [120,130)     23.9%  (239)
-    [130,140)     73.2%  (732)
-    [140,150)      2.9%  (29)
+    [120,130)     27.6%  (276)
+    [130,140)     69.3%  (693)
+    [140,150)      3.1%  (31)
     [150,160)      0.0%  (0)
 
 --- PPP (points per possession) ---
-    Home                                   mean= 1.1007  sd=0.1384  min= 0.6667  max= 1.5152
-    Away                                   mean= 1.0934  sd=0.1435  min= 0.5231  max= 1.6308
-    Combined                               mean= 1.0970  sd=0.0962  min= 0.8189  max= 1.4351
+    Home                                   mean= 1.0860  sd=0.1365  min= 0.7121  max= 1.4769
+    Away                                   mean= 1.0641  sd=0.1420  min= 0.5625  max= 1.5692
+    Combined                               mean= 1.0750  sd=0.0929  min= 0.7302  max= 1.4015
   Distribution (combined):
     [0.5,0.7)      0.0%  (0)
-    [0.7,0.9)      1.5%  (15)
-    [0.9,1.1)     49.5%  (495)
-    [1.1,1.3)     47.4%  (474)
-    [1.3,1.5)      1.6%  (16)
+    [0.7,0.9)      3.0%  (30)
+    [0.9,1.1)     57.9%  (579)
+    [1.1,1.3)     38.5%  (385)
+    [1.3,1.5)      0.6%  (6)
 
 --- SCORE & MARGIN ---
-    Home score                             mean=   73.2  sd=  9.4  min=   44  max=  103
-    Away score                             mean=   71.8  sd=  9.6  min=   34  max=  106
-    Margin (HomeΓêÆAway)                     mean=    1.4  sd= 13.5  min=  -42  max=   42
+    Home score                             mean=   72.1  sd=  9.3  min=   47  max=  103
+    Away score                             mean=   69.9  sd=  9.5  min=   36  max=  103
+    Margin (HomeΓêÆAway)                     mean=    2.3  sd= 13.6  min=  -46  max=   41
 
 --- TRANSITION FREQUENCY (Transition entries / total possessions) ---
-    Transition freq                        mean= 0.3353  sd=0.0410  min= 0.2109  max= 0.4609
+    Transition freq                        mean= 0.3383  sd=0.0414  min= 0.2279  max= 0.4769
 
 --- TERMINAL MIX (fractions across all possessions all games) ---
-  Made-FG                0.3738  (49,427)
-  FT-made                0.1114  (14,733)
-  DefensiveRebound       0.2724  (36,018)
-  Turnover               0.1965  (25,980)
-  OOB                    0.0244  (3,225)
-  JumpBall               0.0200  (2,651)
-  NoShot                 0.0016  (209)
+  Made-FG                0.3687  (48,711)
+  FT-made                0.1121  (14,807)
+  DefensiveRebound       0.2756  (36,414)
+  Turnover               0.1957  (25,854)
+  OOB                    0.0256  (3,387)
+  JumpBall               0.0205  (2,714)
+  NoShot                 0.0017  (228)
   Parked                 0.0000  (0)
   Other                  0.0000  (0)
 
 --- END-OF-HALF INTENT (counts per game) ---
-    HoldShootLast                          mean=    1.6  sd=  0.6  min=    0  max=    2
-    ShootEarly                             mean=    0.4  sd=  0.6  min=    0  max=    3
+    HoldShootLast                          mean=    1.5  sd=  0.6  min=    0  max=    2
+    ShootEarly                             mean=    0.4  sd=  0.7  min=    0  max=    3
     NoShot                                 mean=    0.2  sd=  0.4  min=    0  max=    2
 
 --- APL (avg possession length, seconds) ---
-    APL                                    mean=18.1645  sd=0.5414  min=16.4384  max=20.0000
+    APL                                    mean=18.1827  sd=0.5517  min=16.4384  max=20.0000
 
 --- FOULS PER TEAM PER GAME ---
-    Home fouls                             mean=   11.1  sd=  3.2  min=    2  max=   24
-    Away fouls                             mean=   11.3  sd=  3.1  min=    2  max=   22
+    Home fouls                             mean=   11.3  sd=  3.2  min=    3  max=   21
+    Away fouls                             mean=   11.1  sd=  3.2  min=    1  max=   22
 
 --- SHOOTING SPLITS ---
   FG%:
-      Home                                 mean= 0.5187  sd=0.0704  min= 0.3091  max= 0.7436
-      Away                                 mean= 0.5191  sd=0.0716  min= 0.3019  max= 0.7778
-      Combined                             mean= 0.5185  sd=0.0486  min= 0.3646  max= 0.6733
+      Home                                 mean= 0.5223  sd=0.0693  min= 0.3200  max= 0.6964
+      Away                                 mean= 0.4947  sd=0.0687  min= 0.2600  max= 0.7551
+      Combined                             mean= 0.5083  sd=0.0478  min= 0.3069  max= 0.6635
   Distribution (FG% combined):
     [0.2,0.3)      0.0%  (0)
-    [0.3,0.3)      0.0%  (0)
-    [0.3,0.4)      0.6%  (6)
-    [0.4,0.5)      7.2%  (72)
-    [0.5,0.5)     25.6%  (256)
-    [0.5,0.6)     40.4%  (404)
-    [0.6,0.6)     21.3%  (213)
-    >=0.6        4.9%  (49)
+    [0.3,0.3)      0.1%  (1)
+    [0.3,0.4)      1.6%  (16)
+    [0.4,0.5)      9.7%  (97)
+    [0.5,0.5)     29.3%  (293)
+    [0.5,0.6)     38.6%  (386)
+    [0.6,0.6)     17.9%  (179)
+    >=0.6        2.8%  (28)
   3P%:  (games with zero 3PA report 0.0 ΓÇö possible in principle)
-      Home                                 mean= 0.4543  sd=0.1452  min= 0.0000  max= 0.9000
-      Away                                 mean= 0.4269  sd=0.1486  min= 0.0000  max= 0.8889
-      Combined                             mean= 0.4411  sd=0.1031  min= 0.1579  max= 0.8421
+      Home                                 mean= 0.4555  sd=0.1774  min= 0.0000  max= 1.0000
+      Away                                 mean= 0.4064  sd=0.1416  min= 0.0000  max= 0.8571
+      Combined                             mean= 0.4265  sd=0.1043  min= 0.0556  max= 0.7500
   FT%:
-      Home                                 mean= 0.7137  sd=0.1064  min= 0.2500  max= 1.0000
-      Away                                 mean= 0.7012  sd=0.1202  min= 0.0000  max= 1.0000
-      Combined                             mean= 0.7087  sd=0.0744  min= 0.3846  max= 0.9677
+      Home                                 mean= 0.7333  sd=0.1103  min= 0.2222  max= 1.0000
+      Away                                 mean= 0.7013  sd=0.1159  min= 0.1818  max= 1.0000
+      Combined                             mean= 0.7182  sd=0.0747  min= 0.4444  max= 0.9545
   Distribution (FT% combined):
-    <0.4          0.1%  (1)
-    [0.4,0.5)      0.4%  (4)
-    [0.5,0.6)      5.8%  (58)
-    [0.6,0.7)     37.1%  (371)
-    [0.7,0.8)     45.2%  (452)
-    [0.8,0.9)     11.0%  (110)
-    >=0.9        0.4%  (4)
+    [0.4,0.5)      0.7%  (7)
+    [0.5,0.6)      4.9%  (49)
+    [0.6,0.7)     33.6%  (336)
+    [0.7,0.8)     48.3%  (483)
+    [0.8,0.9)     11.3%  (113)
+    >=0.9        1.2%  (12)
   NOTE: FT% reflects authored FreeThrow ratings where SelectedSlot is non-null.
   Bonus trips before Roll E retain the config.MakeProbability (72%) fallback.
   This is a named remaining loose end ΓÇö not a bug.
 
 --- SHOT MIX ---
-    3PA rate (3PA/FGA, combined)           mean= 0.2351  sd=0.0418  min= 0.1034  max= 0.3656
+    3PA rate (3PA/FGA, combined)           mean= 0.2115  sd=0.0388  min= 0.0935  max= 0.3302
 
 --- SHOOTING BY ZONE (combined, per game) ---
   FG% by zone:
-      Rim                                  mean= 0.6506  sd=0.0868  min= 0.3600  max= 0.9143
-      Short                                mean= 0.4985  sd=0.1236  min= 0.0000  max= 0.8889
-      Mid                                  mean= 0.4429  sd=0.1278  min= 0.0667  max= 0.8462
-      Long                                 mean= 0.4323  sd=0.1529  min= 0.0000  max= 1.0000
-      Three                                mean= 0.4411  sd=0.1031  min= 0.1579  max= 0.8421
+      Rim                                  mean= 0.6439  sd=0.0885  min= 0.3333  max= 0.9474
+      Short                                mean= 0.4951  sd=0.1174  min= 0.0556  max= 0.8462
+      Mid                                  mean= 0.4376  sd=0.1156  min= 0.1000  max= 0.7778
+      Long                                 mean= 0.4351  sd=0.1466  min= 0.0000  max= 1.0000
+      Three                                mean= 0.4265  sd=0.1043  min= 0.0556  max= 0.7500
   Attempt share by zone (fraction of FGA from each zone):
-      Rim                                  mean= 0.3273  sd=0.0452  min= 0.1600  max= 0.4545
-      Short                                mean= 0.1645  sd=0.0352  min= 0.0532  max= 0.2824
-      Mid                                  mean= 0.1667  sd=0.0363  min= 0.0588  max= 0.3000
-      Long                                 mean= 0.1064  sd=0.0313  min= 0.0220  max= 0.2255
-      Three                                mean= 0.2351  sd=0.0418  min= 0.1034  max= 0.3656
+      Rim                                  mean= 0.3045  sd=0.0438  min= 0.1565  max= 0.4423
+      Short                                mean= 0.1782  sd=0.0374  min= 0.0598  max= 0.3048
+      Mid                                  mean= 0.1861  sd=0.0376  min= 0.0619  max= 0.3107
+      Long                                 mean= 0.1196  sd=0.0319  min= 0.0206  max= 0.2294
+      Three                                mean= 0.2115  sd=0.0388  min= 0.0935  max= 0.3302
 
 --- USAGE (per-slot FGA share, aggregate across all games) ---
-  Home: Slot1=21.5%  Slot2=27.5%  Slot3=23.7%  Slot4=14.0%  Slot5=13.1%  Unattr=0.2%
-  Away: Slot1=20.5%  Slot2=27.3%  Slot3=24.4%  Slot4=15.2%  Slot5=12.3%  Unattr=0.2%
+  Home: Slot1=18.3%  Slot2=48.7%  Slot3=12.5%  Slot4=9.9%  Slot5=10.4%  Unattr=0.2%
+  Away: Slot1=18.0%  Slot2=49.7%  Slot3=12.4%  Slot4=9.4%  Slot5=10.3%  Unattr=0.2%
   Per-slot FG% (SlotFgm / SlotFga):
-  Home: Slot1=50.7%  Slot2=51.9%  Slot3=49.9%  Slot4=55.8%  Slot5=52.7%
-  Away: Slot1=50.6%  Slot2=50.4%  Slot3=50.3%  Slot4=56.5%  Slot5=54.4%
+  Home: Slot1=51.3%  Slot2=51.6%  Slot3=51.3%  Slot4=56.5%  Slot5=53.7%
+  Away: Slot1=51.2%  Slot2=44.9%  Slot3=54.2%  Slot4=56.5%  Slot5=55.8%
   NOTE: per-slot, not per-player ΓÇö valid while lineups are fixed. Unattr = bonus-FT putbacks (Roll E never ran).
 
 --- ORB% (offensive rebound rate, FG-miss + block + FT misses combined) ---
-    Combined                               mean= 0.2765  sd=0.0643  min= 0.1000  max= 0.4651
+    Combined                               mean= 0.2780  sd=0.0627  min= 0.0811  max= 0.5000
 
 --- FTr (free-throw rate = FTA/FGA, combined) ---
-    Combined                               mean= 0.3945  sd=0.1174  min= 0.0769  max= 0.8780
+    Combined                               mean= 0.3879  sd=0.1162  min= 0.0965  max= 0.8276
 
 --- DEFERRED SENTINELS (counter-plumbing needed ΓÇö future session) ---
   Press frequency / break rate at game level
@@ -1318,9 +1317,9 @@
   [OK] Same-seed reproducibility confirmed.
 
   Phase 25 shooting-foul summary (1,000 games):
-    Seed-1 game ΓÇö Home defense events: 6, Away defense events: 3
+    Seed-1 game ΓÇö Home defense events: 4, Away defense events: 3
     Slot-0 events (bonus-FT putback, expected small): 1
-    Total SFL credits across all 1,000 games: 11864
+    Total SFL credits across all 1,000 games: 11604
   [OK] Phase 25: SFL credits populated (full per-side invariant in Phase25ShootingFoulAttributionCheck).
 
 === PER-PLAYER BOX SCORE (per-game averages, 1000 games) ===
@@ -1329,16 +1328,16 @@
   SFL = shooting fouls committed; excludes all non-shooting and offensive fouls.
   Player                   PTS   FGA   FGM   FG%   3PA   3PM   3P%   FTA   FTM   FT%   ORB   DRB   REB   STL   BLK    TO   SFL
 ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  [Home] Marcus Webb      14.7  11.0   5.6  50.7   3.2   1.4  43.8   2.9   2.1  74.2   1.1   2.9   3.9   1.1   0.5   2.9   1.0
-  [Home] DeShawn Pryor    19.0  14.2   7.3  51.9   2.9   1.3  46.1   3.7   3.0  80.7   1.2   3.3   4.5   0.9   0.6   3.0   1.3
-  [Home] Trey Holloway    15.3  12.2   6.1  49.9   2.7   1.0  38.8   3.1   2.1  65.6   1.5   3.9   5.4   0.8   0.7   2.7   1.3
-  [Home] Javon Okafor      9.8   7.2   4.0  55.8   0.3   0.1  35.4   2.9   1.6  54.9   1.9   4.9   6.8   0.6   0.8   1.9   1.7
-  [Home] Cory Baptiste     9.9   6.7   3.5  52.7   3.3   1.7  52.5   1.3   1.1  84.2   1.2   3.1   4.3   0.8   0.6   1.9   0.7
-  [Away] Kendrick Shaw    13.6  10.5   5.3  50.6   2.7   1.1  41.4   2.7   1.9  71.4   1.0   2.8   3.8   1.0   0.5   2.8   1.0
-  [Away] Rashid Monroe    17.6  13.9   7.0  50.4   2.9   1.0  34.7   3.7   2.6  68.3   1.3   3.5   4.8   1.0   0.6   3.1   1.3
-  [Away] Antoine Dupree   15.9  12.5   6.3  50.3   2.7   1.1  41.8   3.1   2.2  72.9   1.5   3.8   5.3   0.8   0.7   2.7   1.3
-  [Away] Darius Eze       10.7   7.8   4.4  56.5   0.3   0.1  34.0   3.1   1.8  58.6   1.9   4.9   6.9   0.5   0.8   1.8   1.6
-  [Away] Malik Thornton    9.6   6.3   3.4  54.4   3.2   1.7  53.4   1.2   1.1  88.1   1.2   3.0   4.2   0.8   0.5   1.9   0.7
+  [Home] Marcus Webb      12.5   9.4   4.8  51.3   2.6   1.1  43.5   2.4   1.8  73.6   1.1   3.0   4.1   1.1   0.5   2.8   0.9
+  [Home] DeShawn Pryor    32.1  24.9  12.8  51.6   2.0   0.9  46.0   6.9   5.5  79.7   1.3   3.5   4.8   0.9   0.5   4.4   1.7
+  [Home] Trey Holloway     8.2   6.4   3.3  51.3   1.3   0.5  38.6   1.7   1.1  65.1   1.5   4.2   5.6   0.8   0.6   2.0   1.0
+  [Home] Javon Okafor      6.9   5.1   2.9  56.5   0.2   0.1  34.6   2.0   1.1  55.3   1.8   5.0   6.9   0.6   0.7   1.6   1.3
+  [Home] Cory Baptiste     8.0   5.3   2.8  53.7   2.5   1.3  52.6   1.1   1.0  85.7   1.2   3.2   4.4   0.9   0.5   1.7   0.6
+  [Away] Kendrick Shaw    12.3   9.3   4.8  51.2   2.4   1.0  41.9   2.5   1.7  70.2   1.0   2.7   3.8   1.0   0.5   2.6   0.9
+  [Away] Rashid Monroe    29.3  25.6  11.5  44.9   6.7   2.3  33.8   5.8   4.0  68.8   1.3   3.3   4.7   0.9   0.6   4.2   2.1
+  [Away] Antoine Dupree    8.7   6.4   3.5  54.2   1.2   0.5  43.5   1.7   1.2  72.5   1.5   3.7   5.3   0.8   0.7   1.9   1.1
+  [Away] Darius Eze        6.7   4.8   2.7  56.5   0.2   0.1  28.0   2.0   1.2  57.7   2.1   4.8   7.0   0.6   0.9   1.5   1.6
+  [Away] Malik Thornton    8.3   5.3   3.0  55.8   2.7   1.5  56.3   1.0   0.9  88.3   1.2   2.9   4.1   0.8   0.6   1.8   0.6
 === END PER-PLAYER BOX SCORE ===
 
   ALL CHECKS PASSED

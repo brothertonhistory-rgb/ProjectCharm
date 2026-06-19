@@ -58,6 +58,9 @@ public sealed class PlayerConfig
     public int BasketballIQ        { get; set; }
     public int Discipline          { get; set; }
 
+    // Phase 29 — coaching hierarchy
+    public int HierarchyRank       { get; set; } = 5;
+
     // Phase 9 — per-zone shot tendencies
     public int RimTendency         { get; set; }
     public int ShortTendency       { get; set; }
@@ -108,6 +111,7 @@ public sealed class PlayerConfig
         MidTendency         = MidTendency,
         LongTendency        = LongTendency,
         ThreeTendency       = ThreeTendency,
+        HierarchyRank       = HierarchyRank,
     };
 }
 
