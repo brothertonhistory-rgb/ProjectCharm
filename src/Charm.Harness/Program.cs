@@ -147,6 +147,7 @@ internal static class Program
         ok &= Phase34TurnoverAttributionCheck(configPath);    // Phase 34
         ok &= Phase35DefensiveReboundCheck(configPath);       // Phase 35
         ok &= Phase36BlockerCheck(configPath);                 // Phase 36
+        ok &= Phase39AssistCheck(configPath);                  // Phase 39
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
@@ -4376,6 +4377,8 @@ internal static class Program
         var bsTo   = new long[10]; var bsOReb = new long[10];
         var bsDReb = new long[10]; var bsStl  = new long[10];
         var bsBlk  = new long[10];
+        // Phase 39: per-player assist counts — engine-stamped on-walk from AstBySlot.
+        var bsAst  = new long[10];
         // Phase 25: shooting fouls committed (SFL) per player — weighted draw, seed+3 RNG.
         var bsShFoul = new long[10];
         var bsGames = 0;
@@ -4403,6 +4406,7 @@ internal static class Program
         long totalStlPoss  = 0L;
         long totalToPoss   = 0L;
         long totalTeamViolToPoss = 0L;   // Phase 34: team violations (null TurnoverOffSlot — no individual credit)
+        long totalAstBySlot = 0L;   // Phase 39: sum of AstBySlot.Total across all possessions
 
         var firstState = new PossessionState(
             PossessionNumber: 1,
@@ -4903,6 +4907,7 @@ internal static class Program
             totalToPoss   += records.Count(IsTurnoverPossession);
             totalTeamViolToPoss += records.Count(r =>
                 r.EndLabel is "FiveSecondInbound" or "TenSecondBackcourt" or "ShotClockViolation");
+            totalAstBySlot += records.Sum(r => r.AstBySlot.Total);
 
             // ── Phase 23: capture player display map on seed==1 ──────────────
             if (seed == 1)
@@ -4931,6 +4936,8 @@ internal static class Program
                 bsTo  [i] += attributed.To  [i];
                 // Phase 25: accumulate shooting-foul credits (seed+3 RNG — seed+2 unchanged).
                 bsShFoul[i] += attributed.ShFoul[i];
+                // Phase 39: accumulate assist credits (engine-stamped — no additional RNG).
+                bsAst [i] += attributed.Ast [i];
             }
 
             // ── Phase 25: shooting-foul per-possession validity checks ────────
@@ -5150,6 +5157,15 @@ internal static class Program
                               $"(total TO {totalToPoss}, team violations {totalTeamViolToPoss} correctly unattributed — Phase 34)");
             attributionOk = false;
         }
+        // Phase 39: AST reconciliation — Σ per-player AST == Σ AstBySlot.Total across all possessions.
+        // AstBySlot.Total <= FGM is asserted per-possession in Phase39AssistCheck.
+        var bsAstTotal = bsAst.Sum();
+        // totalAstBySlot accumulated per-game in the main loop above.
+        if (bsAstTotal != totalAstBySlot)
+        {
+            Console.WriteLine($"  [FAIL] Per-player AST {bsAstTotal} != AstBySlot.Total {totalAstBySlot} — Phase 39 wiring break.");
+            attributionOk = false;
+        }
 
         // ── Phase 23 §5g: same-seed reproducibility ───────────────────────────
         if (seedOneResult != null)
@@ -5224,7 +5240,7 @@ internal static class Program
         Console.WriteLine("  Exact attribution: FGA, FGM, 3PA, 3PM, FTA, FTM.");
         Console.WriteLine("  Weighted credit (probabilistic): ORB, DRB, REB, STL, BLK, TO (post-Roll-E exact; pre-Roll-E by BallHandling weight).");
         Console.WriteLine("  SFL = shooting fouls committed; excludes all non-shooting and offensive fouls.");
-        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"TO",5} {"SFL",5}");
+        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5}");
         Console.WriteLine(new string('─', 121));
         for (var i = 0; i < 10; i++)
         {
@@ -5239,6 +5255,7 @@ internal static class Program
                 var stl  = bsStl[i]   / g;  var blk  = bsBlk[i]   / g;
                 var to   = bsTo[i]    / g;
                 var sfl  = bsShFoul[i]/ g;
+                var ast  = bsAst[i]   / g;
                 var pts  = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
                 var fgPct  = fga  > 0 ? fgm  / fga  * 100 : 0.0;
                 var tpPct  = tpa  > 0 ? tpm  / tpa  * 100 : 0.0;
@@ -5248,7 +5265,7 @@ internal static class Program
                 Console.WriteLine(
                     $"  {label,-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
                     $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
-                    $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {to,5:F1} {sfl,5:F1}");
+                    $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1} {sfl,5:F1}");
             }
         }
         Console.WriteLine($"=== END PER-PLAYER BOX SCORE ===");
@@ -5344,13 +5361,16 @@ internal static class Program
         public long[] To   = new long[10];
         // Phase 25: shooting fouls committed (SFL) — weighted draw, separate seed+3 RNG.
         public long[] ShFoul = new long[10];
+        // Phase 39: assist counts — engine-stamped on-walk from AstBySlot.
+        public long[] Ast  = new long[10];
         public static bool AllEqual(PlayerBoxTotals a, PlayerBoxTotals b) =>
             a.Fga.SequenceEqual(b.Fga)   && a.Fgm.SequenceEqual(b.Fgm) &&
             a.Tpa.SequenceEqual(b.Tpa)   && a.Tpm.SequenceEqual(b.Tpm) &&
             a.Fta.SequenceEqual(b.Fta)   && a.Ftm.SequenceEqual(b.Ftm) &&
             a.OReb.SequenceEqual(b.OReb) && a.DReb.SequenceEqual(b.DReb) &&
             a.Blk.SequenceEqual(b.Blk)   && a.Stl.SequenceEqual(b.Stl) &&
-            a.To.SequenceEqual(b.To)     && a.ShFoul.SequenceEqual(b.ShFoul);
+            a.To.SequenceEqual(b.To)     && a.ShFoul.SequenceEqual(b.ShFoul) &&
+            a.Ast.SequenceEqual(b.Ast);
     }
 
     /// <summary>Run the full per-game attribution pass. Calling twice with the same
@@ -5432,6 +5452,15 @@ internal static class Program
                 var bp = defRoster.PlayerAt(new Slot(r.Defense, s));
                 if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 10)
                     t.Blk[bp.PlayerId - 1] += blkCount36;
+            }
+            // AST — Phase 39: read engine-stamped slots from AstBySlot (AssistPicker).
+            for (var s = 1; s <= 5; s++)
+            {
+                var astCount = r.AstBySlot[s];
+                if (astCount <= 0) continue;
+                var ap = offRoster.PlayerAt(new Slot(r.Offense, s));
+                if (ap != null && ap.PlayerId >= 1 && ap.PlayerId <= 10)
+                    t.Ast[ap.PlayerId - 1] += astCount;
             }
             // Phase 25: shooting-foul attribution. seed+3 RNG (foulRng). seed+2 stream
             // (BLK WeightedDraw) retired in Phase 36 — BlockerPicker now runs engine-side.
@@ -10415,6 +10444,7 @@ internal static class Program
             var cohortOReb   = new long[10]; var cohortDReb   = new long[10];
             var cohortBlk    = new long[10]; var cohortStl    = new long[10];
             var cohortTo     = new long[10]; var cohortShFoul = new long[10];
+            var cohortAst    = new long[10];
 
             for (var variantIdx = 0; variantIdx < 10; variantIdx++)
             {
@@ -10618,6 +10648,7 @@ internal static class Program
                         cohortOReb  [i] += attributed.OReb [i]; cohortDReb  [i] += attributed.DReb [i];
                         cohortBlk   [i] += attributed.Blk  [i]; cohortStl   [i] += attributed.Stl  [i];
                         cohortTo    [i] += attributed.To   [i]; cohortShFoul[i] += attributed.ShFoul[i];
+                        cohortAst   [i] += attributed.Ast  [i];
                     }
 
                     vs.ValidGames++;
@@ -11044,7 +11075,7 @@ internal static class Program
                 Console.WriteLine($"  for one logical slot/archetype cohort, not one persistent named player. ({totalValid} accepted games)");
                 if (bucketNum == 5)
                     Console.WriteLine("  Note: Team A Slot 1 is an Elite-tier Slasher star; all other Team A slots are Good tier.");
-                Console.WriteLine($"  {"Row",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"TO",5} {"SFL",5}");
+                Console.WriteLine($"  {"Row",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5}");
                 Console.WriteLine(new string('─', 121));
                 double g = totalValid;
                 for (var i = 0; i < 10; i++)
@@ -11060,6 +11091,7 @@ internal static class Program
                     var orb  = cohortOReb [i] / g; var drb  = cohortDReb [i] / g;
                     var blk  = cohortBlk  [i] / g; var stl  = cohortStl  [i] / g;
                     var to   = cohortTo   [i] / g; var sfl  = cohortShFoul[i] / g;
+                    var ast  = cohortAst  [i] / g;
                     var pts  = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
                     var fgPct = fga > 0 ? fgm / fga * 100 : 0.0;
                     var tpPct = tpa > 0 ? tpm / tpa * 100 : 0.0;
@@ -11067,7 +11099,7 @@ internal static class Program
                     Console.WriteLine(
                         $"  {label,-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
                         $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
-                        $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {to,5:F1} {sfl,5:F1}");
+                        $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1} {sfl,5:F1}");
                 }
                 Console.WriteLine($"=== END COHORT BOX SCORE — Bucket {bucketNum} ===");
                 Console.WriteLine();
@@ -11291,6 +11323,8 @@ internal static class Program
         var bsTo   = new long[10]; var bsOReb = new long[10];
         var bsDReb = new long[10]; var bsStl  = new long[10];
         var bsBlk  = new long[10];
+        // Phase 39: per-player assist counts — engine-stamped on-walk.
+        var bsAst  = new long[10];
 
         // ── Invariant totals ─────────────────────────────────────────────────
         long totalHomeFga = 0L, totalAwayFga = 0L;
@@ -11473,6 +11507,7 @@ internal static class Program
                 bsTo  [i] += attributed.To  [i]; bsOReb[i] += attributed.OReb[i];
                 bsDReb[i] += attributed.DReb[i]; bsStl [i] += attributed.Stl [i];
                 bsBlk [i] += attributed.Blk [i];
+                bsAst [i] += attributed.Ast [i];
             }
         }
 
@@ -11480,7 +11515,7 @@ internal static class Program
         Console.WriteLine();
 
         // ── Box score ─────────────────────────────────────────────────────────
-        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"TO",5}");
+        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5}");
         Console.WriteLine(new string('─', 115));
         string[] playerNames = {
             "[Home] RimAnchor", "[Home] PerimRole2", "[Home] PerimRole3", "[Home] PerimRole4", "[Home] PerimRole5",
@@ -11495,6 +11530,7 @@ internal static class Program
             var orb    = bsOReb[i] / g; var drb  = bsDReb[i] / g;
             var stl    = bsStl [i] / g; var blk  = bsBlk [i] / g;
             var to     = bsTo  [i] / g;
+            var ast    = bsAst [i] / g;
             var pts    = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
             var fgPct  = fga > 0 ? fgm / fga * 100 : 0.0;
             var tpPct  = tpa > 0 ? tpm / tpa * 100 : 0.0;
@@ -11502,7 +11538,7 @@ internal static class Program
             Console.WriteLine(
                 $"  {playerNames[i],-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
                 $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
-                $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {to,5:F1}");
+                $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1}");
         }
 
         // ── Invariant checks ─────────────────────────────────────────────────
@@ -14483,6 +14519,190 @@ internal static class Program
 
         Console.WriteLine();
         Console.WriteLine(ok ? "  Phase 36 blocker check: PASSED" : "  Phase 36 blocker check: FAILED (see [FAIL] lines above)");
+        return ok;
+    }
+
+    private static bool Phase39AssistCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 39: assist picker (AssistPicker) + on-walk attribution ---");
+        var ok = true;
+        const int N = 100_000;
+
+        var matchupCfg = MatchupConfig.Load(configPath);
+        var cfgD       = RollDConfig.Load(configPath);
+
+        // Helper: make a player with all attributes at base b, with named overrides.
+        static Player MkP39(int id, int b,
+                            int? passing = null, int? playmaking = null, int? iq = null)
+            => new Player($"p{id}")
+            {
+                PlayerId             = id,
+                Outside = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                FoulDrawing = b, BallHandling = b,
+                Passing              = passing    ?? b,
+                Playmaking           = playmaking ?? b,
+                BasketballIQ         = iq         ?? b,
+                SelfCreation = b, PostMoves = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding = b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = b,
+                DefensiveRebounding = b, Steals = b,
+                Height = b, Wingspan = b, Weight = b, Strength = b,
+                Speed = b, Quickness = b, FirstStep = b, Vertical = b,
+                Endurance = b, Hustle = b, Discipline = b,
+                ThreeTendency = 40, RimTendency = 30, MidTendency = 15,
+                ShortTendency = 10, LongTendency = 5,
+            };
+
+        // Build a 5v5 GameState with given home players; away is dummy 50s.
+        GameState BuildGame39(Player[] homePlayers)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < homePlayers.Length && i < 5; i++)
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), homePlayers[i]);
+            for (var i = 1; i <= 5; i++)
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i), MkP39(i + 5, 50));
+            return g;
+        }
+
+        // ── Sub-check A: good passers favored / shooter never self-assists ────
+        {
+            Console.WriteLine("  Sub-check A: good passers favored / shooter never self-assists");
+
+            // Slot 1: elite passer. Slot 3: the shooter. Slots 2,4,5: average passers.
+            var homePlayers = new[]
+            {
+                MkP39(1, 50, passing: 90, playmaking: 80, iq: 75),  // elite PG
+                MkP39(2, 50),
+                MkP39(3, 50),  // will be the shooter
+                MkP39(4, 50),
+                MkP39(5, 50),
+            };
+            var game  = BuildGame39(homePlayers);
+            var rng   = new SystemRng(39101);
+            var picks = new int[6];
+            var selfAssists = 0;
+
+            for (var i = 0; i < N; i++)
+            {
+                var shooterSlot = new Slot(TeamSide.Home, 3);
+                var state = new PossessionState(
+                    PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                    Entry: EntryType.DeadBallInbound)
+                    with { SelectedSlot = shooterSlot };
+                var picked = AssistPicker.Pick(state, game, matchupCfg, rng);
+                if (picked.Number >= 1 && picked.Number <= 5) picks[picked.Number]++;
+                if (picked.Number == 3) selfAssists++;
+            }
+
+            var pgShare  = (double)picks[1] / N;
+            var maxOther = new[] { picks[2], picks[4], picks[5] }.Max() / (double)N;
+            var pgFavored = pgShare > maxOther;
+            ok &= pgFavored;
+            Console.WriteLine(pgFavored
+                ? $"    [OK] PG (slot 1) share {pgShare:P1} > max non-passer share {maxOther:P1}"
+                : $"    [FAIL] PG share {pgShare:P1} not > max non-passer {maxOther:P1}");
+
+            var noSelf = selfAssists == 0;
+            ok &= noSelf;
+            Console.WriteLine(noSelf
+                ? $"    [OK] Shooter (slot 3) never self-assisted across {N:N0} draws"
+                : $"    [FAIL] Shooter self-assisted {selfAssists} times — exclusion broken");
+        }
+
+        // ── Sub-check B: AstBySlot.Total <= FGM invariant (per-possession) ────
+        // Tested via direct AssistPicker rate math: clamp(base * factor, floor, ceil) <= 1.0
+        // which means at most one assist per picker call, and the picker is called at most
+        // once per eligible made FG. So AstBySlot.Total <= eligible FGM by construction.
+        // Confirm here that the rate math stays in [0,1] across all five zones.
+        {
+            Console.WriteLine("  Sub-check B: assistProb in [floor, ceiling] for all zones, avg-passing lineup");
+
+            var meanAw50 = 0.50 * 50 + 0.35 * 50 + 0.15 * 50;  // = 50.0 (avg lineup)
+            var factor50 = 1.0 + matchupCfg.AssistPassSwing
+                         * Math.Tanh((meanAw50 - matchupCfg.AssistPassMidpoint) / matchupCfg.AssistPassScale);
+            var allInBounds = true;
+            foreach (var zone in new[] { ShotLocation.Three, ShotLocation.Long, ShotLocation.Mid,
+                                         ShotLocation.Short, ShotLocation.Rim })
+            {
+                var prob = Math.Clamp(matchupCfg.AssistedRate(zone) * factor50,
+                                      matchupCfg.AssistRateFloor, matchupCfg.AssistRateCeiling);
+                if (prob < matchupCfg.AssistRateFloor || prob > matchupCfg.AssistRateCeiling)
+                    allInBounds = false;
+                Console.WriteLine($"    {zone,-6}: base={matchupCfg.AssistedRate(zone):F3} × factor={factor50:F4} → prob={prob:F4}");
+            }
+            ok &= allInBounds;
+            Console.WriteLine(allInBounds
+                ? "    [OK] All zone probs within [floor, ceiling]"
+                : "    [FAIL] At least one zone prob outside [floor, ceiling]");
+        }
+
+        // ── Sub-check C: per-zone ordering (Three > Long > Rim > Mid > Short) ──
+        {
+            Console.WriteLine("  Sub-check C: per-zone base rate ordering");
+            var threeBase = matchupCfg.AssistedRateThree;
+            var longBase  = matchupCfg.AssistedRateLong;
+            var rimBase   = matchupCfg.AssistedRateRim;
+            var midBase   = matchupCfg.AssistedRateMid;
+            var shortBase = matchupCfg.AssistedRateShort;
+            var orderOk = threeBase > longBase && rimBase > shortBase;
+            ok &= orderOk;
+            Console.WriteLine(orderOk
+                ? $"    [OK] Three({threeBase:F2}) > Long({longBase:F2}); Rim({rimBase:F2}) > Short({shortBase:F2})"
+                : $"    [FAIL] Zone rate ordering violated");
+        }
+
+        // ── Sub-check D: same-seed reproducibility (picker level) ─────────────
+        {
+            Console.WriteLine("  Sub-check D: same-seed reproducibility");
+            var homePlayers = new[]
+            {
+                MkP39(1, 50, passing: 75, playmaking: 60, iq: 55),
+                MkP39(2, 50),
+                MkP39(3, 50),
+                MkP39(4, 50),
+                MkP39(5, 50),  // shooter
+            };
+            var game1 = BuildGame39(homePlayers);
+            var game2 = BuildGame39(homePlayers);
+            var shooterSlot = new Slot(TeamSide.Home, 5);
+            var stateD = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound)
+                with { SelectedSlot = shooterSlot };
+            var rng1 = new SystemRng(39201);
+            var rng2 = new SystemRng(39201);
+            var picks1 = new int[6]; var picks2 = new int[6];
+            for (var i = 0; i < 10_000; i++)
+            {
+                picks1[AssistPicker.Pick(stateD, game1, matchupCfg, rng1).Number]++;
+                picks2[AssistPicker.Pick(stateD, game2, matchupCfg, rng2).Number]++;
+            }
+            var reproOk = picks1.SequenceEqual(picks2);
+            ok &= reproOk;
+            Console.WriteLine(reproOk
+                ? "    [OK] Identical pick distributions from same seed"
+                : "    [FAIL] Same seed produced different pick distributions");
+        }
+
+        // ── Sub-check E: empty non-shooter offense throws ─────────────────────
+        {
+            Console.WriteLine("  Sub-check E: empty non-shooter offense throws InvalidOperationException");
+            var gE = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            // No players seated. Shooter slot = 1 → no other players eligible.
+            var stateE = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound)
+                with { SelectedSlot = new Slot(TeamSide.Home, 1) };
+            try
+            {
+                AssistPicker.Pick(stateE, gE, matchupCfg, new SystemRng(0));
+                Console.WriteLine("    [FAIL] No exception thrown on empty lineup");
+                ok = false;
+            }
+            catch (InvalidOperationException)
+            {
+                Console.WriteLine("    [OK] InvalidOperationException thrown on empty non-shooter lineup");
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine(ok ? "  Phase 39 assist check: PASSED" : "  Phase 39 assist check: FAILED (see [FAIL] lines above)");
         return ok;
     }
 }

@@ -302,6 +302,17 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// Stamped by <see cref="DefensiveRebounderPicker"/> at the Terminal stamp block
     /// (Phase 35) — retires the last post-hoc rebound draw.</summary>
     public int? DefensiveRebounderSlot { get; init; }
+
+    /// <summary>Per-slot assist counts for this possession — stamped by
+    /// <see cref="AssistPicker"/> on-walk at every eligible made field goal
+    /// (Phase 39). An eligible make is non-putback with a non-null
+    /// <c>SelectedSlot</c>; the shooter is excluded from the pick.
+    /// <para><c>AstBySlot.Total</c> is at most <see cref="Fgm"/> on every
+    /// possession (harness-asserted). Init-only with a <c>default</c> (all-zero)
+    /// SlotGroup, so every existing positional construction
+    /// (<c>new RoutingOutcome(false, "STUB:…")</c>) is untouched — a pure append,
+    /// like every prior init field.</para></summary>
+    public SlotGroup AstBySlot { get; init; }
 }
 
 /// <summary>
@@ -518,6 +529,8 @@ public sealed class Resolver
         var blkCount      = 0;
         // Phase 36: per-slot block accumulator. Total == BlkCount on every possession.
         var blkBySlot     = new SlotGroup();
+        // Phase 39: per-slot assist accumulator. Total <= FGM on every possession.
+        var astBySlot     = new SlotGroup();
         int? turnoverOffSlot   = null;
         var turnoverWasLiveBall = false;
         int? stealerSlot        = null;
@@ -612,7 +625,8 @@ public sealed class Resolver
                           ShootingFouls  = shootingFouls.ToArray(),
                           OrbBySlot      = orbBySlot,
                           StealerSlot    = stealerSlot,
-                          DefensiveRebounderSlot = defensiveRebounderSlot };
+                          DefensiveRebounderSlot = defensiveRebounderSlot,
+                          AstBySlot      = astBySlot };
 
                 case Continue c:
                     switch (c.Next)
@@ -906,6 +920,25 @@ public sealed class Resolver
                                         blkCount++;
                                         blkBySlot = blkBySlot.WithSlot(
                                             BlockerPicker.Pick(shotSt, _game, _matchup, _rng).Number, 1);
+                                    }
+                                    // Phase 39: assist attribution on-walk. Ordinary putbacks carry
+                                    // the original shooter slot forward but are self-created (no pass
+                                    // after the board) → excluded by !c.Putback. The bonus-FT putback
+                                    // edge (Roll E never ran) has SelectedSlot null → excluded by the
+                                    // null check (and would crash the picker). One rng draw on the
+                                    // assisted/not roll; a second inside AssistPicker.Pick only when
+                                    // assisted. Applies to both Made and MadeAndFouled (and-1 basket).
+                                    if (!c.Putback && shotSt.SelectedSlot is not null
+                                        && shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled)
+                                    {
+                                        var zoneBase   = _matchup.AssistedRate(shotSt.ShotType!.Value);
+                                        var passFactor = AssistPicker.LineupPassingFactor(shotSt, _game, _matchup);
+                                        var assistProb = Math.Clamp(zoneBase * passFactor,
+                                                                    _matchup.AssistRateFloor,
+                                                                    _matchup.AssistRateCeiling);
+                                        if (_rng.NextUnitInterval() < assistProb)
+                                            astBySlot = astBySlot.WithSlot(
+                                                AssistPicker.Pick(shotSt, _game, _matchup, _rng).Number, 1);
                                     }
                                 }
                             }

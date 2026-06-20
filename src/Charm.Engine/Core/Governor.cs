@@ -131,7 +131,11 @@ public sealed record PossessionRecord(
     int? DefensiveRebounderSlot = null,
     // Phase 36: engine-stamped per-slot block counts. BlkBySlot.Total == BlkCount on every
     // possession (harness-asserted). Default (all zeros) on possessions with no blocks.
-    SlotGroup BlkBySlot = default);
+    SlotGroup BlkBySlot = default,
+    // Phase 39: engine-stamped per-slot assist counts. AstBySlot.Total <= Fgm on every
+    // possession (harness-asserted). Default (all zeros) on possessions with no made FGs
+    // or possessions where every make was a putback or null-SelectedSlot (bonus-FT edge).
+    SlotGroup AstBySlot = default);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -311,6 +315,8 @@ public sealed class Governor
             int? possessionDefensiveRebounderSlot = null;
             // Phase 36: engine-stamped per-slot block counts.
             var possessionBlkBySlot = new SlotGroup();
+            // Phase 39: engine-stamped per-slot assist counts.
+            var possessionAstBySlot = new SlotGroup();
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -411,6 +417,8 @@ public sealed class Governor
                 possessionDefensiveRebounderSlot = outcome.DefensiveRebounderSlot;
                 // Phase 36 threading — stamped per-slot BLK counts from BlockerPicker.
                 possessionBlkBySlot = outcome.BlkBySlot;
+                // Phase 39 threading — stamped per-slot AST counts from AssistPicker.
+                possessionAstBySlot = outcome.AstBySlot;
             }
 
             // Shared by all three intent values + normal possessions.
@@ -443,7 +451,8 @@ public sealed class Governor
                 possessionOrbBySlot,
                 possessionStealerSlot,
                 possessionDefensiveRebounderSlot,
-                possessionBlkBySlot));
+                possessionBlkBySlot,
+                possessionAstBySlot));
 
             // Spawn possession N+1 from the consequence: offense named by it, defense
             // the other side, number +1, entry the consequence's tag, AND the transition

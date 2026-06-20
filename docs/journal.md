@@ -1,3 +1,43 @@
+## Session 74 — Phase 39: Assist Attribution Core (AssistPicker, on-walk) (2026-06-20)
+
+**Scope:** Wire assist attribution on-walk, exactly like STL/BLK/DRB: a probabilistic credit on every eligible made field goal, picked from the four non-shooter offensive players, stamped into a new `AstBySlot` field threaded through `RoutingOutcome → PossessionRecord → harness`. 6 files changed, 1 new.
+
+**What shipped (6 files changed, 1 new):**
+
+`src/Charm.Engine/Core/AssistPicker.cs` — NEW. Static class on the `BlockerPicker` / `OffensiveRebounderPicker` pattern. Two public methods: `LineupPassingFactor(state, game, cfg)` — deterministic, no RNG; returns a tanh-shaped multiplier on the zone base rate based on the mean `AssistWeight` of the five offensive players (shooter included — team property); and `Pick(state, game, cfg, rng)` — excludes the shooter (weight 0 for `state.SelectedSlot`), weights every other populated offensive player by `max(1, AssistWeight(p, cfg))`, one RNG draw, cumulative walk, throws `InvalidOperationException` on empty non-shooter lineup. Private `AssistWeight(Player p, MatchupConfig cfg)` blends `Passing × AssistPassingWeight + Playmaking × AssistPlaymakingWeight + BasketballIQ × AssistIqWeight`. Coefficients sum to 1.0 — deliberate deviation from the block/rebound convention, documented in both the class XML doc and `MatchupConfig`.
+
+`src/Charm.Engine/Config/MatchupConfig.cs` — EDIT. Assist block appended after the `Blk*` block: five `AssistedRate*` props + `AssistedRate(ShotLocation)` switch; `AssistPassingWeight` / `AssistPlaymakingWeight` / `AssistIqWeight`; `AssistPassMidpoint` / `AssistPassScale` / `AssistPassSwing`; `AssistRateFloor` / `AssistRateCeiling`. Load invariants: coefficients `>= 0` and sum to `1.0 ± epsilon`; each zone rate in `[0,1]`; `AssistRateFloor < AssistRateCeiling`.
+
+`src/Charm.Engine/Core/Resolver.cs` — EDIT (surgical, four changes). `var astBySlot = new SlotGroup()` declared alongside `blkBySlot`; assist roll inserted in the made-FG branch after the BLK stamp block, gated by `!c.Putback && shotSt.SelectedSlot is not null && shotSt.Result is Made or MadeAndFouled`; `public SlotGroup AstBySlot { get; init; }` added to `RoutingOutcome` (pure append, init-only default — every positional `new RoutingOutcome(false, "STUB:…")` untouched); `AstBySlot = astBySlot` added to the Terminal return.
+
+`src/Charm.Engine/Core/Governor.cs` — EDIT (surgical, mirror BlkBySlot). `SlotGroup AstBySlot = default` appended to `PossessionRecord`; `var possessionAstBySlot = new SlotGroup()` alongside `possessionBlkBySlot`; `possessionAstBySlot = outcome.AstBySlot` in the resolver branch; `possessionAstBySlot` appended last in `records.Add(...)`.
+
+`src/Charm.Harness/Program.cs` — EDIT. `PlayerBoxTotals.Ast` field added and included in `AllEqual`; `bsAst[10]` accumulator declared; `cohortAst[10]` accumulator declared; per-slot AST read from `r.AstBySlot[s]` (offensive roster, mirrors OrbBySlot pattern); `totalAstBySlot` running total accumulated per-game; AST reconciliation (`bsAst.Sum() == totalAstBySlot`) added after the TO reconciliation; `AST` column added to all three box headers and row writers; `Phase39AssistCheck` wired after `Phase36BlockerCheck` with five sub-checks (PG share > non-passer share; shooter never self-assists; zone probs within bounds; per-zone ordering; empty lineup throws).
+
+`src/Charm.Harness/config.json` — EDIT. 14 new `Matchup` keys added: `AssistPassingWeight`, `AssistPlaymakingWeight`, `AssistIqWeight`, `AssistPassMidpoint`, `AssistPassScale`, `AssistPassSwing`, `AssistedRateThree`, `AssistedRateLong`, `AssistedRateMid`, `AssistedRateShort`, `AssistedRateRim`, `AssistRateFloor`, `AssistRateCeiling`.
+
+**Key design decisions:**
+
+- **Draw, not trace.** An assist is a probabilistic credit on a made bucket, not a tracked pass. Same philosophy as STL/BLK/DRB — given a trigger event, who gets credit? This keeps the engine free of per-event state and consistent with every prior attribution picker.
+
+- **Zone × lineup-passing factor.** Zone sets the base assisted rate; the offensive lineup's collective passing modulates it. Without the multiplier, passing would only decide *who* gets credited, never the team rate — that misses the core signal (Minnesota 71% vs W Illinois 37%). The tanh factor centered at `AssistPassMidpoint=50` (league-average) scales above/below for better/worse passing lineups. Factor range: (0.75, 1.25) with `AssistPassSwing=0.25`.
+
+- **Coefficient sum-to-one is correct here.** `AssistWeight` coefficients (`0.50 / 0.35 / 0.15`) sum to 1.0. This is a deliberate deviation from `BlockerWeight` and the rebound positional weights, which intentionally do NOT sum to one (the picker normalizes among players so absolute scale is irrelevant there). The sum-to-one constraint keeps `AssistWeight` on the 0–100 attribute scale, making `AssistPassMidpoint=50` the league-average reference for `LineupPassingFactor`. This is correct and is not an inconsistency to "fix" against the block/rebound convention.
+
+- **Putbacks flatly ineligible.** A putback means no pass occurred after the offensive rebound — an assist is impossible by definition. Gated by `!c.Putback` in the Resolver, independently of `SelectedSlot` state. The null-`SelectedSlot` guard is a separate, independent safety for the bonus-FT putback edge (Roll E never ran).
+
+- **`AssistedRateThree` and `AssistRateCeiling` corrected post-green.** The v1 prompt set `AssistedRateThree = 0.83` and `AssistRateCeiling = 0.80`, which caused threes to always saturate at the ceiling regardless of passing quality. The real data showed 80% as the *floor* for above-the-break threes, with corner threes at ~95%. Corrected to `AssistedRateThree = 0.88` (blended corner ~95% / above-the-break ~80–81%) and `AssistRateCeiling = 0.95`. Strong-passing lineups can now push three-point assist rates near the corner-three reality.
+
+- **Iso/motion concentration slider deferred.** The W Illinois problem (good passers who don't carry the offensive load → low team rate) requires knowing which players *take the shots*, not just who can pass. That is the slider's job. Phase 39 captures the lineup-collective grain; per-player load concentration is a named future feature.
+
+**Harness results (all checks passed):**
+
+- `Phase39AssistCheck`: all five sub-checks passed — PG share (35.8%) > non-passer share (21.4%); shooter zero self-assists across 100k draws; all zone probs within [floor, ceiling]; ordering correct; empty lineup throws.
+- Reconciliation: `Σ per-player AST == Σ AstBySlot.Total` — passed.
+- Corpus hash shifted from Phase 38 (expected — assist roll consumes one RNG draw on every eligible made FG, plus a second on assisted makes).
+- `Mechanics: ALL OK`. All prior checks passed.
+- ALL CHECKS PASSED.
+
 ## Session 73 — Phase 38: Wire RollKGenerator Into All Full-Engine Simulations (2026-06-19)
 
 **Scope:** Replace `RollKStubPieGenerator` with the already-built `RollKGenerator` at the nine harness sites that construct a full-engine resolver (observation corpus, stress test, and seven all-real attribution checks). The stub survives as a deliberate test double at 20 isolation sites where flat weights are required. No engine changes, no config changes, no new files, no deletions. 1 file changed.

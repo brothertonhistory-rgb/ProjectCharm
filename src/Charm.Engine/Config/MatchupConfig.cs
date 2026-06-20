@@ -914,6 +914,44 @@ public sealed class MatchupConfig
                     $"BlkVertical for zone {zone} must be >= 0: got {cfg.BlkVertical(zone)}.");
         }
 
+        // Phase 39 — Assist attribution invariants.
+        if (cfg.AssistPassingWeight < 0.0)
+            throw new InvalidOperationException(
+                $"AssistPassingWeight must be >= 0: got {cfg.AssistPassingWeight}.");
+        if (cfg.AssistPlaymakingWeight < 0.0)
+            throw new InvalidOperationException(
+                $"AssistPlaymakingWeight must be >= 0: got {cfg.AssistPlaymakingWeight}.");
+        if (cfg.AssistIqWeight < 0.0)
+            throw new InvalidOperationException(
+                $"AssistIqWeight must be >= 0: got {cfg.AssistIqWeight}.");
+        {
+            var coeffSum = cfg.AssistPassingWeight + cfg.AssistPlaymakingWeight + cfg.AssistIqWeight;
+            if (Math.Abs(coeffSum - 1.0) > 1e-9)
+                throw new InvalidOperationException(
+                    $"AssistPassingWeight + AssistPlaymakingWeight + AssistIqWeight must equal 1.0 " +
+                    $"(got {coeffSum:F10}). The sum-to-one constraint keeps AssistWeight on the " +
+                    $"0–100 attribute scale, making AssistPassMidpoint=50 the league-average reference.");
+        }
+        foreach (var (name, val) in new (string, double)[]
+        {
+            (nameof(cfg.AssistedRateThree), cfg.AssistedRateThree),
+            (nameof(cfg.AssistedRateLong),  cfg.AssistedRateLong),
+            (nameof(cfg.AssistedRateMid),   cfg.AssistedRateMid),
+            (nameof(cfg.AssistedRateShort), cfg.AssistedRateShort),
+            (nameof(cfg.AssistedRateRim),   cfg.AssistedRateRim),
+            (nameof(cfg.AssistRateFloor),   cfg.AssistRateFloor),
+            (nameof(cfg.AssistRateCeiling), cfg.AssistRateCeiling),
+        })
+        {
+            if (val < 0.0 || val > 1.0)
+                throw new InvalidOperationException(
+                    $"{name} must be in [0,1]: got {val}.");
+        }
+        if (cfg.AssistRateFloor >= cfg.AssistRateCeiling)
+            throw new InvalidOperationException(
+                $"AssistRateFloor ({cfg.AssistRateFloor}) must be less than " +
+                $"AssistRateCeiling ({cfg.AssistRateCeiling}).");
+
         return cfg;
     }
 
@@ -1355,5 +1393,99 @@ public sealed class MatchupConfig
         ShotLocation.Long  => BlkVerticalLong,
         ShotLocation.Three => BlkVerticalThree,
         _                  => BlkVerticalRim,
+    };
+
+    // ── Phase 39: Assist attribution ─────────────────────────────────────────
+    //
+    // AssistWeight(p) = AssistPassingWeight    * p.Passing
+    //                 + AssistPlaymakingWeight * p.Playmaking
+    //                 + AssistIqWeight         * p.BasketballIQ
+    //
+    // Coefficients sum to 1.0 — unlike BlockerWeight and the rebound positional
+    // coefficients (which intentionally do NOT sum to one because the picker
+    // normalizes among players). The sum-to-one constraint keeps AssistWeight on
+    // the 0–100 attribute scale, making AssistPassMidpoint = 50 the league-average
+    // reference for LineupPassingFactor. This is correct and is NOT an inconsistency
+    // to "fix" against the block/rebound convention.
+    //
+    // LineupPassingFactor = 1.0 + AssistPassSwing
+    //     × tanh((meanAssistWeight - AssistPassMidpoint) / AssistPassScale)
+    //
+    // Final probability = clamp(zoneBase × LineupPassingFactor,
+    //                           AssistRateFloor, AssistRateCeiling)
+    //
+    // All defaults are calibration placeholders (calibration deferred until all
+    // engine organs are wired).
+
+    /// <summary>Passing attribute coefficient in AssistWeight. Default 0.50.
+    /// Must be >= 0; sum with PlaymakingWeight + IqWeight must equal 1.0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double AssistPassingWeight    { get; set; } = 0.50;
+
+    /// <summary>Playmaking attribute coefficient in AssistWeight. Default 0.35.
+    /// Must be >= 0; sum with PassingWeight + IqWeight must equal 1.0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double AssistPlaymakingWeight { get; set; } = 0.35;
+
+    /// <summary>BasketballIQ attribute coefficient in AssistWeight. Default 0.15.
+    /// Must be >= 0; sum with PassingWeight + PlaymakingWeight must equal 1.0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double AssistIqWeight         { get; set; } = 0.15;
+
+    /// <summary>League-average reference point for the lineup passing factor (tanh midpoint).
+    /// Default 50.0 (mid-attribute scale). Calibration placeholder.</summary>
+    public double AssistPassMidpoint { get; set; } = 50.0;
+
+    /// <summary>Scale of the passing tanh (attribute-unit width of the transition band).
+    /// Default 20.0. Calibration placeholder.</summary>
+    public double AssistPassScale    { get; set; } = 20.0;
+
+    /// <summary>Maximum swing of the lineup passing factor above/below 1.0.
+    /// Default 0.25 → factor range (0.75, 1.25). Calibration placeholder.</summary>
+    public double AssistPassSwing    { get; set; } = 0.25;
+
+    /// <summary>Base assisted rate for three-point makes. Default 0.83.
+    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
+    public double AssistedRateThree  { get; set; } = 0.88;
+
+    /// <summary>Base assisted rate for long-two makes. Default 0.62.
+    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
+    public double AssistedRateLong   { get; set; } = 0.62;
+
+    /// <summary>Base assisted rate for mid-range makes. Default 0.50.
+    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
+    public double AssistedRateMid    { get; set; } = 0.50;
+
+    /// <summary>Base assisted rate for short makes (floaters, hooks). Default 0.43.
+    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
+    public double AssistedRateShort  { get; set; } = 0.43;
+
+    /// <summary>Base assisted rate for rim makes. Default 0.54.
+    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
+    public double AssistedRateRim    { get; set; } = 0.54;
+
+    /// <summary>Floor on the final assisted probability after lineup factor is applied.
+    /// Default 0.25. Must be in [0,1] and less than AssistedRateCeiling (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double AssistRateFloor    { get; set; } = 0.25;
+
+    /// <summary>Ceiling on the final assisted probability after lineup factor is applied.
+    /// Default 0.95. Must be in [0,1] and greater than AssistRateFloor (enforced in Load).
+    /// Set to 0.95 to reflect real data: corner threes are assisted ~95% of the time;
+    /// strong-passing lineups should be able to approach that ceiling on three-point makes.
+    /// The Three base rate (0.88, blending corner ~95% and above-the-break ~80–81%) sits
+    /// below the ceiling, so passing quality meaningfully differentiates team assist rates
+    /// on threes. Calibration placeholder.</summary>
+    public double AssistRateCeiling  { get; set; } = 0.95;
+
+    /// <summary>Per-zone base assisted rate switch accessor.</summary>
+    public double AssistedRate(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Three => AssistedRateThree,
+        ShotLocation.Long  => AssistedRateLong,
+        ShotLocation.Mid   => AssistedRateMid,
+        ShotLocation.Short => AssistedRateShort,
+        ShotLocation.Rim   => AssistedRateRim,
+        _                  => AssistedRateRim,
     };
 }

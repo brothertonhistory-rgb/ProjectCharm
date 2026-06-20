@@ -5630,3 +5630,100 @@ The putback formula tilts PutBack mass by (rebounder offensive composite) minus 
 - **AverageVsAverage**: near-zero gap → near-zero shift → putback rate barely above flat. Stress-test ORB%: 28.9% vs 29.1% — essentially unchanged.
 - **Config hash unchanged** (`e48085ff...`) — no config edit, only a generator swap.
 
+
+## Phase 39 — Assist Attribution Core: AssistPicker, Zone-Based Rate, Lineup-Passing Factor (2026-06-20)
+
+### What assist attribution models
+
+An assist credit is not a tracked pass — it is a probabilistic draw on a made field goal. Same philosophy as STL/BLK/DRB: given a trigger event (a made bucket), who on the offense gets credit? This keeps the engine free of per-event state and consistent with every prior attribution picker.
+
+Two questions to answer per eligible made FG: (1) was the bucket assisted? (2) if yes, which teammate gets credit?
+
+### Eligibility
+
+- **Putbacks are ineligible.** A putback follows an offensive rebound — no pass occurred. Gated by `!c.Putback` in the Resolver, independently of `SelectedSlot` state. The null-`SelectedSlot` guard (`shotSt.SelectedSlot is not null`) is a separate, independent safety for the bonus-FT putback edge (Roll E never ran on that path). These two guards are not equivalent and must remain separate.
+- **Both `Made` and `MadeAndFouled` are eligible.** The and-1 basket is a real made field goal; the assist is credited at the time of the make, before the foul shot.
+- **Free throws are never assisted** — the roll lives in the made-FG branch; FT makes enter via a completely separate path (`FtmBySlot`) and never reach this site. No guard needed; stated so the build does not add one in the wrong place.
+
+### Was it assisted? — Zone × lineup-passing factor
+
+```
+assistProb = clamp( zoneBase × LineupPassingFactor, AssistRateFloor, AssistRateCeiling )
+```
+
+**Zone base rates** come from real hoop-math data (assisted-FG% by zone), blended to five engine zones:
+
+| Zone | Base rate | Data anchor |
+|---|---|---|
+| Three | 0.88 | Blend of corner (~95%) and above-the-break (~80–81%) |
+| Long | 0.62 | Baseline two, wing two range |
+| Rim | 0.54 | Low paint |
+| Mid | 0.50 | Straight-up mid-range |
+| Short | 0.43 | High paint / self-created floaters |
+
+Three highest: almost every three is created by a pass. Long above rim: baseline twos and wing twos are largely catch-and-shoot. Rim above short: lay-ups are usually pass-initiated; short (floaters, hooks) is where self-creation peaks.
+
+`AssistRateCeiling = 0.95` sits above the Three base (0.88) so strong-passing lineups can approach the corner-three reality. `AssistRateFloor = 0.25` prevents the rare case of very weak passing lineups from producing implausibly low rates on catch-and-shoot zones. The ceiling is not a stylistic cap — it is a floating-point safety and a calibration headroom mechanism. It should always sit above the highest zone base rate.
+
+**`AssistedRateThree` and `AssistRateCeiling` corrected post-green.** The v1 prompt set both at 0.83/0.80 using the above-the-break three figure as the *ceiling* when it is actually the *floor*. Corrected once the harness confirmed the error: threes were saturating at 0.80 for every lineup regardless of passing quality. The fix (`AssistedRateThree = 0.88`, `AssistRateCeiling = 0.95`) allows the lineup-passing factor to meaningfully differentiate team three-point assist rates.
+
+**LineupPassingFactor** (deterministic, no RNG):
+
+```
+meanAssistWeight = mean of AssistWeight(p) over the five populated offensive players
+                   (shooter included — this is a team property)
+
+LineupPassingFactor = 1.0 + AssistPassSwing
+                          × tanh( (meanAssistWeight − AssistPassMidpoint) / AssistPassScale )
+```
+
+Defaults: `AssistPassMidpoint = 50.0`, `AssistPassScale = 20.0`, `AssistPassSwing = 0.25`. Factor range: (0.75, 1.25). A league-average lineup (mean attribute ≈ 50) produces factor ≈ 1.0. A broad high-passing lineup lifts all zone rates proportionally; a scorer-heavy lineup suppresses them.
+
+**Why the multiplier is necessary.** Without it, passing attributes only decide *who* gets credited, never the team rate. Every team would post the same zone-averaged assist rate (varying only by shot mix), which cannot reproduce the real 37%→71% spread. The multiplier at the lineup grain is the mechanism that makes a ball-movement roster post a high team rate and a scorer-heavy roster a low one.
+
+### Who gets credit? — AssistPicker
+
+Per-player assist weight:
+
+```
+AssistWeight(p) = AssistPassingWeight    × p.Passing       (default 0.50)
+                + AssistPlaymakingWeight × p.Playmaking     (default 0.35)
+                + AssistIqWeight         × p.BasketballIQ   (default 0.15)
+```
+
+**Coefficient sum-to-one is correct and intentional.** This deviates from `BlockerWeight` and the rebound positional weights, which do NOT sum to one (the picker normalizes among players, so absolute scale is irrelevant there). The sum-to-one constraint keeps `AssistWeight` on the 0–100 attribute scale, making `AssistPassMidpoint = 50` the correct league-average reference for `LineupPassingFactor`. Conflating these conventions would be wrong; the documented rationale survives in both the class XML doc and `MatchupConfig`.
+
+Pick mechanics: the shooter's slot gets weight 0 (excluded); every other populated offensive player gets `max(1, AssistWeight(p, cfg))`; one RNG draw, cumulative walk, last eligible slot as floating-point fallback. Throws `InvalidOperationException` on empty non-shooter lineup — loud, unreachable in valid play.
+
+`AssistWeight` is private to `AssistPicker` because nothing else consumes it. This differs from `Matchup.BlockerWeight` (shared with the team shot-block math) and the rebound helpers (shared with team rebound share). No `Matchup` static is needed or added.
+
+### The W Illinois problem — deferred
+
+W Illinois posted a 37% team assist rate despite having passing guards — because those guards didn't carry the offensive load. Good passers who *don't take the shots* can't generate assists on shots they never take. Phase 39 captures the lineup-collective grain: a roster of good passers produces a higher rate than a roster of poor passers. It does not yet capture load concentration: a good passer who takes 5% of shots contributes less than a good passer who takes 30%. That is the iso/motion concentration slider's job — a deferred feature that Phase 39 must stand alone without.
+
+### Structural location
+
+`AssistPicker.cs` lives in `src/Charm.Engine/Core/` alongside every other picker. `AstBySlot` threads as a `SlotGroup` init-only property through `RoutingOutcome → PossessionRecord`, mirroring `BlkBySlot` exactly. `AstBySlot.Total ≤ Fgm` on every possession (harness-asserted). `totalAstBySlot` is accumulated per-game in the main run loop; `bsAst.Sum() == totalAstBySlot` is the reconciliation invariant, mirroring the BLK reconciliation.
+
+### Config additions (`MatchupConfig`, 14 new properties)
+
+Three coefficient props (`AssistPassingWeight`, `AssistPlaymakingWeight`, `AssistIqWeight`) — load invariant: each `>= 0`, sum `== 1.0 ± epsilon`. Three factor props (`AssistPassMidpoint`, `AssistPassScale`, `AssistPassSwing`). Five zone rate props (`AssistedRateThree`, `AssistedRateLong`, `AssistedRateMid`, `AssistedRateShort`, `AssistedRateRim`) — load invariant: each in `[0,1]`. Two bound props (`AssistRateFloor`, `AssistRateCeiling`) — load invariant: both in `[0,1]`, `Floor < Ceiling`. Switch accessor `AssistedRate(ShotLocation zone)`. All defaults are calibration placeholders.
+
+### Attribution family: complete (all six pickers)
+
+| Phase | Picker | Attribute basis | Event |
+|---|---|---|---|
+| 31 | `OffensiveRebounderPicker` | OffensiveRebounding × PositionalWeight × WingspanMultiplier | Offensive rebound |
+| 33 | `TurnoverCommitterPicker` | BallHandling × perimeterMult | Pre-selection turnover |
+| 34 | `TurnoverInteriorPicker` | Strength × interiorMult | Interior/post turnover |
+| 34 | `StealerPicker` | Steals × perimeterMult | Live-ball steal |
+| 35 | `DefensiveRebounderPicker` | DefensiveRebounding × PositionalWeight × WingspanMultiplier | Defensive rebound |
+| 36 | `BlockerPicker` | Zone-weighted sum of 6 blocking attributes | Block |
+| 39 | `AssistPicker` | Passing × 0.50 + Playmaking × 0.35 + BasketballIQ × 0.15 | Assist on made FG |
+
+### What is not this session
+
+- **Calibration** of any assist rate, coefficient, or factor. All values are shape-appropriate placeholders. Calibration waits until all generators are wired.
+- **Iso/motion concentration slider.** The W Illinois problem — good passers who don't carry the load. Deferred; Phase 39 must stand alone if the slider is never built.
+- **Per-event assist record.** `AstBySlot` (per-possession `SlotGroup` totals) is all v1 needs. A per-event `(shooterSlot, assisterSlot)` log is a noted future option.
+- **Transition-specific assist rates.** Zone rate is the anchor for now.
