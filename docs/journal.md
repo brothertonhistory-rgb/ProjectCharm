@@ -1,3 +1,42 @@
+## Session 75 — Phase 40: Retire Last Two Flavor Stubs (RollDGenerator, RollOffensiveFoulGenerator) (2026-06-20)
+
+**Scope:** Rename the last two stub generators in the full-engine path to real generators. No logic changes, no config changes, no new math. Pure rename session — corpus hash stable.
+
+**What shipped (4 files changed, 2 new, 2 deleted):**
+
+`src/Charm.Engine/Generators/RollDGenerator.cs` — NEW. Exact copy of `RollDStubPieGenerator.cs` with class renamed and doc comment rewritten. Stays flat by deliberate design: `ResolveFoulType` fires before Roll G stamps `ShotType`, so `state.ShotType` is null at every Roll D call site — no zone information is available. `SelectedSlot` may be non-null on the Roll F feeder path, but flavor is non-routing theater with no downstream consumer; a player-attribute model here would imply flavor matters. It does not.
+
+`src/Charm.Engine/Generators/RollOffensiveFoulGenerator.cs` — NEW. Exact copy of `RollOffensiveFoulStubPieGenerator.cs` with class renamed and doc comment rewritten. Two-context flat weight set (Frontcourt/Backcourt via `state.Frontcourt`) stays flat by design — same reasoning: flavor is theater, does not route, has no downstream consumer. The Frontcourt split correctly captures the dominant real-world pattern: illegal screens dominate halfcourt sets; charges and push-offs dominate backcourt bring-ups.
+
+`src/Charm.Engine/Generators/RollDStubPieGenerator.cs` — DELETED.
+
+`src/Charm.Engine/Generators/RollOffensiveFoulStubPieGenerator.cs` — DELETED.
+
+`src/Charm.Engine/Core/Resolver.cs` — EDIT (surgical, four changes). Field and constructor parameter types updated: `RollDStubPieGenerator` → `RollDGenerator`; `RollOffensiveFoulStubPieGenerator` → `RollOffensiveFoulGenerator`. No other changes.
+
+`src/Charm.Harness/Program.cs` — EDIT (global rename, two passes). Pass 1: all 32 occurrences of `RollDStubPieGenerator` → `RollDGenerator` (including method signatures at lines 521 and 573). Pass 2: all 29 occurrences of `RollOffensiveFoulStubPieGenerator` → `RollOffensiveFoulGenerator`. No other changes.
+
+**Key design decisions:**
+
+- **Both stay flat — by design, not by accident or incompleteness.** Roll D's `ResolveFoulType` fires before Roll G; `state.ShotType` is always null at Roll D call sites — zone context is architecturally unavailable. Roll D offensive foul flavor stays flat for the same reason Roll C's pressure wire was retired in Phase 37: adding matchup signal implies the field routes somewhere. These fields do not route. Future sessions must not re-litigate this without first establishing a downstream consumer.
+
+- **This is identical in nature to the Roll C rename in Phase 37.** The "real generator" is the stub with an honest name and an honest doc comment. The doc comments now explicitly document why each stays flat so the reasoning is preserved.
+
+- **No interfaces exist for either generator.** Confirmed by pre-build audit: no `IRollDPieGenerator` or `IRollOffensiveFoulPieGenerator` file exists. Concrete types used directly everywhere; global find-replace covers all sites.
+
+- **`RollBStubPieGenerator.cs` remains** — noted during audit, confirmed out of scope.
+
+**Corpus hash note:** Config hash `e48085ff2196764bcca5512258050a4beb3609f8af74c767fd5acb8e8b46ec26` — identical to Phase 38/39 runs. The Session 74 journal entry recorded `039faca2...`, which came from an earlier run against a different config state; the most recent validated run (uploaded pre-session output.txt) already showed `e48085ff...`, confirming hash stability across this rename.
+
+**Harness results (all checks passed):**
+
+- `RollDFlavorBatchCheck`: passed with identical rates — same weights, no math change.
+- `RollDBonusRoutingCheck`: passed unchanged.
+- Corpus hash: `e48085ff...` — stable, matches most recent known-good run.
+- `Mechanics: ALL OK`. All prior checks passed.
+- ALL CHECKS PASSED. STRESS TEST PASSED.
+
+
 ## Session 74 — Phase 39: Assist Attribution Core (AssistPicker, on-walk) (2026-06-20)
 
 **Scope:** Wire assist attribution on-walk, exactly like STL/BLK/DRB: a probabilistic credit on every eligible made field goal, picked from the four non-shooter offensive players, stamped into a new `AstBySlot` field threaded through `RoutingOutcome → PossessionRecord → harness`. 6 files changed, 1 new.

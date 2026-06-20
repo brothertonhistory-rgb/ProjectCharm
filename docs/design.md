@@ -5727,3 +5727,30 @@ Three coefficient props (`AssistPassingWeight`, `AssistPlaymakingWeight`, `Assis
 - **Iso/motion concentration slider.** The W Illinois problem — good passers who don't carry the load. Deferred; Phase 39 must stand alone if the slider is never built.
 - **Per-event assist record.** `AstBySlot` (per-possession `SlotGroup` totals) is all v1 needs. A per-event `(shooterSlot, assisterSlot)` log is a noted future option.
 - **Transition-specific assist rates.** Zone rate is the anchor for now.
+
+## Phase 40 — Retire Last Two Flavor Stubs: RollDGenerator, RollOffensiveFoulGenerator
+
+### Why both stay flat
+
+Roll D foul flavor and offensive foul flavor are the last two generators that carried the "stub" label. Both are now renamed to real generators with honest doc comments. Neither received new math. This is identical in nature to the Roll C rename in Phase 37.
+
+**Roll D stays flat for an architectural reason.** `ResolveFoulType` is emitted by Roll A, Roll B, and Roll F — all three fire before Roll G runs. Roll G is the step that stamps `ShotType` onto `PossessionState`. So `state.ShotType` is null at every Roll D call site; zone context is architecturally unavailable without restructuring the possession chain. `SelectedSlot` can be non-null on the Roll F feeder path (Roll E may have already run), but flavor is non-routing theater with no downstream consumer. Adding player-attribute context here would imply the flavor field matters to the simulation. It does not.
+
+**Offensive foul flavor stays flat for the same reason.** The Frontcourt context split already ships — it correctly captures the dominant real-world pattern (illegal screens in halfcourt sets vs. charges/push-offs on backcourt bring-ups). Adding further player-attribute tilt would imply the flavor field routes or scores. It does not.
+
+**The standing rule for both:** future sessions must not add attribute-driven logic to either generator without first establishing a downstream consumer that reads the flavor field for routing or scoring purposes.
+
+### No interfaces for either generator
+
+`IRollDPieGenerator` and `IRollOffensiveFoulPieGenerator` do not exist and were not created. Both generators are used as concrete types directly everywhere in `Resolver.cs` and `Program.cs`. This is the correct pattern for flat theater-only generators where interface polymorphism adds no value.
+
+### Rename counts (global find-replace)
+
+| Old name | New name | Occurrences replaced |
+|---|---|---|
+| `RollDStubPieGenerator` | `RollDGenerator` | 32 (Program.cs) + 4 (Resolver.cs) |
+| `RollOffensiveFoulStubPieGenerator` | `RollOffensiveFoulGenerator` | 29 (Program.cs) + 4 (Resolver.cs) |
+
+### All rolls now have real generators
+
+Phase 40 completes the generator retirement pass. Every roll in the full-engine simulation path now has a real, named generator. The calibration pass can begin.

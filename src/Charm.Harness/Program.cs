@@ -33,13 +33,13 @@ internal static class Program
         // Roll A generator constructed below after SeatStartersFromConfig (Phase 14).
         // Roll B generator constructed below after SeatStartersFromConfig (Phase 13).
         var rollCGenerator = new RollCGenerator(cfgC);
-        var rollDGenerator = new RollDStubPieGenerator(cfgD);
+        var rollDGenerator = new RollDGenerator(cfgD);
         // Roll E generator constructed below after game is created (Phase 15: needs GameState).
         // Roll F generator constructed below after SeatStartersFromConfig (Phase 12).
         // RollHGenerator, RollGGenerator, and RollIGenerator constructed below,
         // after game and cfgMatchup (need GameState and MatchupConfig).
         // RollKGenerator constructed below after SeatStartersFromConfig (Phase 32: needs game + cfgMatchup).
-        var offensiveFoulGenerator = new RollOffensiveFoulStubPieGenerator(cfgOffFoul);
+        var offensiveFoulGenerator = new RollOffensiveFoulGenerator(cfgOffFoul);
 
         // The half's foul tracker carries the config-driven bonus thresholds.
         var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
@@ -200,7 +200,7 @@ internal static class Program
         // visible — count before/after, bonus state, and the resulting route.
         Console.WriteLine("--- Observability: Roll D (non-shooting defensive foul) ---");
         var cfgD = RollDConfig.Load(Path.Combine(AppContext.BaseDirectory, "config.json"));
-        var genD = new RollDStubPieGenerator(cfgD);
+        var genD = new RollDGenerator(cfgD);
         var pieD = genD.Generate(state);
         Console.WriteLine($"  flavor pie (theater, does not route): {pieD}");
         Console.WriteLine($"  thresholds: bonus>={cfgD.BonusThreshold}, double>={cfgD.DoubleBonusThreshold}");
@@ -518,7 +518,7 @@ internal static class Program
     //     per iteration so the foul count never climbs into the bonus — this
     //     check isolates FLAVOR conformance; routing is checked separately. ---
     private static bool RollDFlavorBatchCheck(
-        RollAConfig cfg, RollDConfig cfgD, RollDStubPieGenerator genD, PossessionState state)
+        RollAConfig cfg, RollDConfig cfgD, RollDGenerator genD, PossessionState state)
     {
         Console.WriteLine($"\n--- Batch: {cfg.BatchSize:N0} fouls through Roll D (flavor rates) ---");
         var rng = new SystemRng(cfg.Seed);
@@ -570,7 +570,7 @@ internal static class Program
     //     bonus, OneAndOne on [bonus, double), Double at/above double. Also
     //     confirms the increment lands on the FOULING (defense) team only. ---
     private static bool RollDBonusRoutingCheck(
-        RollDConfig cfgD, RollDStubPieGenerator genD, PossessionState state)
+        RollDConfig cfgD, RollDGenerator genD, PossessionState state)
     {
         Console.WriteLine("\n--- Bonus routing: Roll D route vs. foul count ---");
         var rng = new SystemRng(42);
@@ -1065,7 +1065,7 @@ internal static class Program
             new RollBStubPieGenerator(cfgB),
             new RollCGenerator(cfgC),
             cfgC,
-            new RollDStubPieGenerator(cfgD),
+            new RollDGenerator(cfgD),
             genE,
             new AttentionGenerator(AttentionConfig.Load(configPath), game),
             genF,
@@ -1076,7 +1076,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
             game,
             rng);
@@ -1243,7 +1243,7 @@ internal static class Program
             new RollBStubPieGenerator(cfgB),
             new RollCGenerator(cfgC),
             cfgC,
-            new RollDStubPieGenerator(cfgD),
+            new RollDGenerator(cfgD),
             genE,
             new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
@@ -1254,7 +1254,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
             game,
             rng);
@@ -1560,7 +1560,7 @@ internal static class Program
             new RollBStubPieGenerator(cfgB),
             new RollCGenerator(cfgC),
             cfgC,
-            new RollDStubPieGenerator(cfgD),
+            new RollDGenerator(cfgD),
             genE,
             new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
@@ -1571,7 +1571,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
             game,
             rng);
@@ -2173,7 +2173,7 @@ internal static class Program
             new RollBStubPieGenerator(cfgB),
             new RollCGenerator(cfgC),
             cfgC,
-            new RollDStubPieGenerator(cfgD),
+            new RollDGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
             new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
@@ -2184,7 +2184,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
             game,
             rngR);
@@ -2307,7 +2307,7 @@ internal static class Program
             new RollBStubPieGenerator(cfgB),
             new RollCGenerator(cfgC),
             cfgC,
-            new RollDStubPieGenerator(cfgD),
+            new RollDGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
             new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
@@ -2318,7 +2318,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
             game,
             rng);
@@ -3265,7 +3265,7 @@ internal static class Program
             new RollBStubPieGenerator(cfgB),
             new RollCGenerator(cfgC),
             cfgC,
-            new RollDStubPieGenerator(cfgD),
+            new RollDGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
             new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
@@ -3289,7 +3289,7 @@ internal static class Program
                 OffensiveRebound = 0, LooseBallFoulOnDefense = 0, LooseBallFoulOnOffense = 0,
                 OutOfBoundsOffOffense = 0, OutOfBoundsOffDefense = 0, JumpBall = 0
             }),
-            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
             game,
             rng);
@@ -3815,7 +3815,7 @@ internal static class Program
             new RollBStubPieGenerator(cfgB),
             new RollCGenerator(cfgC),
             cfgC,
-            new RollDStubPieGenerator(cfgD),
+            new RollDGenerator(cfgD),
             genE,
             new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
@@ -3826,7 +3826,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLStubPieGenerator(RollLConfig.Load(configPath)),
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
             game,
             rng);
@@ -4150,7 +4150,7 @@ internal static class Program
             new RollBStubPieGenerator(cfgB),
             new RollCGenerator(cfgC),
             cfgC,
-            new RollDStubPieGenerator(cfgD),
+            new RollDGenerator(cfgD),
             new RollEStubPieGenerator(cfgE),
             new AttentionGenerator(AttentionConfig.Load(configPath), game),
             new RollFStubPieGenerator(cfgF),
@@ -4161,7 +4161,7 @@ internal static class Program
             new RollKStubPieGenerator(RollKConfig.Load(configPath)),
             new RollLGenerator(RollLConfig.Load(configPath), game),    // Phase 18: attribute-driven FT make%
             new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-            new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+            new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
             MatchupConfig.Load(configPath),
             game,
             new SystemRng(seed));
@@ -4466,7 +4466,7 @@ internal static class Program
                 new RollBGenerator(cfgB, cfgMatchup, game),
                 new RollCGenerator(cfgC),
                 cfgC,
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEGenerator(cfgE, game),                        // Phase 19: attribute-driven usage selection
                 new AttentionGenerator(AttentionConfig.Load(configPath), game), // Phase 27: defensive attention pie
                 new RollFGenerator(cfgF, cfgMatchup, game),
@@ -4477,7 +4477,7 @@ internal static class Program
                 new RollKGenerator(cfgK, cfgMatchup, game),
                 new RollLGenerator(cfgL, game),                        // Phase 18: attribute-driven FT make%
                 new RollMGenerator(cfgM, cfgMatchup, game),
-                new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
+                new RollOffensiveFoulGenerator(cfgOffFoul),
                 cfgMatchup,
                 game,
                 resolverRng);
@@ -8384,7 +8384,7 @@ internal static class Program
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
                 new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -8395,7 +8395,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM,
                 game,
                 rng);
@@ -8639,7 +8639,7 @@ internal static class Program
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
                 new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -8650,7 +8650,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM,
                 game,
                 rng);
@@ -8733,7 +8733,7 @@ internal static class Program
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
                 new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game2),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -8744,7 +8744,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM2, game2, rng2);
             var st2 = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home,
                          Defense: TeamSide.Away, Entry: EntryType.DeadBallInbound);
@@ -8832,7 +8832,7 @@ internal static class Program
                 new RollAGenerator(cfgA, cfgM, game), cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
                 new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 spyE,
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -8843,7 +8843,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM, game, rng);
 
             var stStandard = new PossessionState(
@@ -8890,7 +8890,7 @@ internal static class Program
                 new RollAGenerator(cfgA, cfgM, game), cfgA,
                 new AlwaysProceedRollBGenerator(cfgB),
                 new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 spyE,
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -8901,7 +8901,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM, game, rng);
 
             var stNone = new PossessionState(
@@ -8950,7 +8950,7 @@ internal static class Program
                 new RollAGenerator(cfgA, cfgM, game), cfgA,
                 new AlwaysProceedRollBGenerator(cfgB),
                 new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 spyE,
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -8961,7 +8961,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM, game, rng);
 
             // First routing: Standard press → press-break fires. Spy sees (FastBreak=true, None).
@@ -9014,7 +9014,7 @@ internal static class Program
                 spyA, cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
                 new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -9025,7 +9025,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM, game, rng);
 
             var stBoth = new PossessionState(
@@ -9069,7 +9069,7 @@ internal static class Program
                 spyA, cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
                 new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -9080,7 +9080,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM, game, rng);
 
             var stFrontcourt = new PossessionState(
@@ -9124,7 +9124,7 @@ internal static class Program
                 spyA, cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
                 new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -9135,7 +9135,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM, game, rng);
 
             var stBackcourt = new PossessionState(
@@ -9220,7 +9220,7 @@ internal static class Program
                 new RollAGenerator(cfgA, cfgM, game), cfgA,
                 new RollBStubPieGenerator(RollBConfig.Load(configPath)),
                 new RollCGenerator(RollCConfig.Load(configPath)), RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(RollDConfig.Load(configPath)),
+                new RollDGenerator(RollDConfig.Load(configPath)),
                 new RollEStubPieGenerator(RollEConfig.Load(configPath)),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFStubPieGenerator(RollFConfig.Load(configPath)),
@@ -9231,7 +9231,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgM, game, rng);
 
             const int N = 1_000;
@@ -10556,7 +10556,7 @@ internal static class Program
                         new RollBGenerator(cfgB, cfgMatchup, game),
                         new RollCGenerator(cfgC),
                         cfgC,
-                        new RollDStubPieGenerator(cfgD),
+                        new RollDGenerator(cfgD),
                         new RollEGenerator(cfgE, game),                    // Phase 19: attribute-driven usage selection
                         new AttentionGenerator(AttentionConfig.Load(configPath), game), // Phase 27: defensive attention pie
                         new RollFGenerator(cfgF, cfgMatchup, game),
@@ -10567,7 +10567,7 @@ internal static class Program
                         new RollKGenerator(cfgK, cfgMatchup, game),
                         new RollLGenerator(cfgL, game),                    // Phase 18: attribute-driven FT make%
                         new RollMGenerator(cfgM, cfgMatchup, game),
-                        new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
+                        new RollOffensiveFoulGenerator(cfgOffFoul),
                         cfgMatchup,
                         game,
                         resolverRng);
@@ -11387,7 +11387,7 @@ internal static class Program
                 new RollBGenerator(cfgB, cfgMatchup, game),
                 new RollCGenerator(cfgC),
                 cfgC,
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEGenerator(cfgE, game),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFGenerator(cfgF, cfgMatchup, game),
@@ -11398,7 +11398,7 @@ internal static class Program
                 new RollKGenerator(cfgK, cfgMatchup, game),
                 new RollLGenerator(cfgL, game),
                 new RollMGenerator(cfgM, cfgMatchup, game),
-                new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
+                new RollOffensiveFoulGenerator(cfgOffFoul),
                 cfgMatchup,
                 game,
                 resolverRng);
@@ -11890,7 +11890,7 @@ internal static class Program
                 new RollAGenerator(cfg, cfgMatchup, game), cfg,
                 new RollBGenerator(cfgB, cfgMatchup, game),
                 new RollCGenerator(cfgC), cfgC,
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEGenerator(cfgE, game),
                 new AttentionGenerator(AttentionConfig.Load(configPath), game),
                 new RollFGenerator(cfgF, cfgMatchup, game),
@@ -11901,7 +11901,7 @@ internal static class Program
                 new RollKGenerator(cfgK, cfgMatchup, game),
                 new RollLGenerator(cfgL, game),
                 new RollMGenerator(cfgM, cfgMatchup, game),
-                new RollOffensiveFoulStubPieGenerator(cfgOffFoul),
+                new RollOffensiveFoulGenerator(cfgOffFoul),
                 cfgMatchup, game, new SystemRng(seed));
 
             var governor = new Governor(resolver, game, cfgGov, cfgClock, new SystemRng(seed + 1), cfgEndHalf);
@@ -12303,7 +12303,7 @@ internal static class Program
                 new RollBStubPieGenerator(cfgB),
                 new RollCGenerator(cfgC),
                 cfgC,
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEStubPieGenerator(cfgE),
                 new AttentionGenerator(AttentionConfig.Load(configPath), g),
                 new RollFStubPieGenerator(cfgF),
@@ -12314,7 +12314,7 @@ internal static class Program
                 new RollKStubPieGenerator(RollKConfig.Load(configPath)),
                 new RollLStubPieGenerator(RollLConfig.Load(configPath)),
                 new RollMStubPieGenerator(RollMConfig.Load(configPath)),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 cfgMatchup,
                 g,
                 rng);
@@ -12811,7 +12811,7 @@ internal static class Program
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
                 new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
                 new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
                 new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
@@ -12822,7 +12822,7 @@ internal static class Program
                 new RollKGenerator(RollKConfig.Load(configPath), matchupCfg, govGame),
                 new RollLGenerator(RollLConfig.Load(configPath), govGame),
                 new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 matchupCfg,
                 govGame,
                 rng);
@@ -13456,7 +13456,7 @@ internal static class Program
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
                 new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
                 new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
                 new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
@@ -13467,7 +13467,7 @@ internal static class Program
                 new RollKGenerator(RollKConfig.Load(configPath), matchupCfg, govGame),
                 new RollLGenerator(RollLConfig.Load(configPath), govGame),
                 new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 matchupCfg,
                 govGame,
                 rng);
@@ -13811,7 +13811,7 @@ internal static class Program
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
                 new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
                 new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
                 new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
@@ -13822,7 +13822,7 @@ internal static class Program
                 new RollKGenerator(RollKConfig.Load(configPath), matchupCfg, govGame),
                 new RollLGenerator(RollLConfig.Load(configPath), govGame),
                 new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 matchupCfg,
                 govGame,
                 rng);
@@ -14156,7 +14156,7 @@ internal static class Program
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
                 new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
                 new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
                 new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
@@ -14167,7 +14167,7 @@ internal static class Program
                 new RollKGenerator(RollKConfig.Load(configPath), matchupCfg, govGame),
                 new RollLGenerator(RollLConfig.Load(configPath), govGame),
                 new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 matchupCfg,
                 govGame,
                 rng);
@@ -14476,7 +14476,7 @@ internal static class Program
                 new RollBGenerator(RollBConfig.Load(configPath), matchupCfg, govGame),
                 new RollCGenerator(RollCConfig.Load(configPath)),
                 RollCConfig.Load(configPath),
-                new RollDStubPieGenerator(cfgD),
+                new RollDGenerator(cfgD),
                 new RollEGenerator(cfgE, govGame),
                 new AttentionGenerator(AttentionConfig.Load(configPath), govGame),
                 new RollFGenerator(RollFConfig.Load(configPath), matchupCfg, govGame),
@@ -14487,7 +14487,7 @@ internal static class Program
                 new RollKGenerator(RollKConfig.Load(configPath), matchupCfg, govGame),
                 new RollLGenerator(RollLConfig.Load(configPath), govGame),
                 new RollMGenerator(RollMConfig.Load(configPath), matchupCfg, govGame),
-                new RollOffensiveFoulStubPieGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
                 matchupCfg,
                 govGame,
                 rng);

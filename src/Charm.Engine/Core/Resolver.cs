@@ -335,7 +335,7 @@ public sealed class Resolver
     private readonly IRollBPieGenerator _rollBGenerator;
     private readonly RollCGenerator _rollCGenerator;
     private readonly RollCConfig _rollCConfig;
-    private readonly RollDStubPieGenerator _rollDGenerator;
+    private readonly RollDGenerator _rollDGenerator;
     private readonly IRollEGenerationProvider _rollEGenerator;
     private readonly AttentionGenerator _attentionGenerator;
     private readonly IRollFPieGenerator _rollFGenerator;
@@ -346,7 +346,7 @@ public sealed class Resolver
     private readonly IRollKPieGenerator _rollKGenerator;
     private readonly IRollLPieGenerator _rollLGenerator;
     private readonly IRollMPieGenerator _rollMGenerator;
-    private readonly RollOffensiveFoulStubPieGenerator _offensiveFoulGenerator;
+    private readonly RollOffensiveFoulGenerator _offensiveFoulGenerator;
     private readonly MatchupConfig _matchup;
     private readonly GameState _game;
     private readonly IRng _rng;
@@ -357,7 +357,7 @@ public sealed class Resolver
         IRollBPieGenerator rollBGenerator,
         RollCGenerator rollCGenerator,
         RollCConfig rollCConfig,
-        RollDStubPieGenerator rollDGenerator,
+        RollDGenerator rollDGenerator,
         IRollEGenerationProvider rollEGenerator,
         AttentionGenerator attentionGenerator,
         IRollFPieGenerator rollFGenerator,
@@ -368,7 +368,7 @@ public sealed class Resolver
         IRollKPieGenerator rollKGenerator,
         IRollLPieGenerator rollLGenerator,
         IRollMPieGenerator rollMGenerator,
-        RollOffensiveFoulStubPieGenerator offensiveFoulGenerator,
+        RollOffensiveFoulGenerator offensiveFoulGenerator,
         MatchupConfig matchup,
         GameState game,
         IRng rng)
