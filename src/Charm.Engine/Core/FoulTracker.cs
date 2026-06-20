@@ -15,8 +15,8 @@ namespace Charm.Engine;
 /// it must not know about.
 ///
 /// Per-half: a real game resets these counts at the half (and the bonus resets
-/// with them). That reset is future infrastructure — noted, not built. When it
-/// lands it clears this one object; nothing else need change.
+/// with them). Called at the regulation half boundary by the Governor via
+/// <see cref="ResetForNewHalf()"/>.
 /// </summary>
 public sealed class FoulTracker
 {
@@ -72,5 +72,15 @@ public sealed class FoulTracker
         if (fouls >= _doubleBonusThreshold) return BonusType.Double;
         if (fouls >= _bonusThreshold) return BonusType.OneAndOne;
         return BonusType.None;
+    }
+
+    /// <summary>Reset both teams' foul counts to zero. Called by the Governor
+    /// at the regulation half boundary only — between the first and second half.
+    /// NCAA rule: team fouls do NOT reset for overtime. A team in the double
+    /// bonus at the end of regulation begins overtime in the double bonus.</summary>
+    public void ResetForNewHalf()
+    {
+        _homeFouls = 0;
+        _awayFouls = 0;
     }
 }

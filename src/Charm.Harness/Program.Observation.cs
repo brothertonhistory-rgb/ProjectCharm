@@ -368,12 +368,6 @@ internal static partial class Program
         long totalTeamViolToPoss = 0L;   // Phase 34: team violations (null TurnoverOffSlot — no individual credit)
         long totalAstBySlot = 0L;   // Phase 39: sum of AstBySlot.Total across all possessions
 
-        var firstState = new PossessionState(
-            PossessionNumber: 1,
-            Offense: TeamSide.Home,
-            Defense: TeamSide.Away,
-            Entry: EntryType.DeadBallInbound);
-
         Console.Write($"  Running {N} games");
 
         for (var seed = 1; seed <= N; seed++)
@@ -415,10 +409,9 @@ internal static partial class Program
                 if (seenIds.Count != 10)
                     throw new InvalidOperationException($"Expected 10 unique PlayerIds 1–10; got {seenIds.Count}");
             }
-            game.SetPossessionArrow(TeamSide.Home);
-
             var resolverRng = new SystemRng(seed);
             var governorRng = new SystemRng(seed + 1);
+            var firstState = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1);
 
             var resolver = new Resolver(
                 new RollAGenerator(cfg, cfgMatchup, game),

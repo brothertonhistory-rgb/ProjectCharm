@@ -1,3 +1,108 @@
+## Session 76 — Game Boundaries: Halftime Foul Reset + Opening Tip + Overtime (2026-06-20)
+
+**Scope:** Three game-boundary correctness items in one build. No changes to any possession roll, generator, matchup math, or roll config. This is a correctness build — the harness oracle does not apply; `output.txt` was refreshed after the new behavior was accepted.
+
+1. **Halftime foul reset** — team foul counts reset to zero at the regulation half boundary only; fouls carry into overtime per NCAA rules.
+2. **Opening tip seam** — `TipPossession.CreateFromTip` resolves the tip and returns the starting possession; used for both game start and overtime tips; all real game starts now use it.
+3. **Overtime** — if regulation ends tied, the Governor runs 5-minute OT periods until a winner exists.
+
+**What shipped (10 files — 1 new engine file, 3 engine edits, 6 harness edits):**
+
+`src/Charm.Engine/Core/TipPossession.cs` — NEW. Static class. Single method `CreateFromTip(GameState game, IRng rng, int possessionNumber)`. Preconditions: `PossessionArrow` must be `ArrowState.Off` (throws `InvalidOperationException` if not); `possessionNumber` must be positive. Calls `JumpBall.Resolve` (already correct for `Off` state: 50/50 draw, sets arrow to loser, returns winner). Returns a `PossessionState` with `Offense = winner`, `Defense = other`, `Entry = DeadBallInbound`.
+
+`src/Charm.Engine/Core/FoulTracker.cs` — EDIT. Added `ResetForNewHalf()` method: sets both `_homeFouls` and `_awayFouls` to zero. Updated class-level doc: removed "That reset is future infrastructure — noted, not built"; replaced with "Called at the regulation half boundary by the Governor via `ResetForNewHalf()`."
+
+`src/Charm.Engine/Config/GovernorConfig.cs` — EDIT. Added `OvertimeSeconds` property (default `300.0` = 5 minutes × 60). Load-time invariant: `OvertimeSeconds > 0` (throws if violated). Independent of `HalfSeconds` so the two clocks are separately tunable.
+
+`src/Charm.Engine/Core/Governor.cs` — EDIT. Three changes.
+
+Change 1: `GovernorRunResult` record gains `int OvertimePeriods` as a trailing parameter (0 = regulation finish; 1 = one OT; etc.). All consumers use named properties — no positional deconstruction anywhere in the codebase — so the trailing addition is safe. The single `return new GovernorRunResult(...)` call passes `otPeriod`.
+
+Change 2: The possession-loop body extracted into a local function `RunOnePossession(ref PossessionState state, ref double periodRemaining, int periodNumber)`. The local captures run-level accumulators naturally. `periodNumber` replaces `half` as the `PossessionRecord.Half` value, allowing OT periods to stamp `Half = 3, 4, …` directly. Extraction boundary: includes intent draw → resolver → score write → record creation → state spawn. Does NOT include the period-transition block (half increment, foul reset, clock reset) — those belong to the caller loops.
+
+Change 3: Regulation loop updated with the foul-reset guard:
+```
+if (halfRemaining <= 0.0)
+{
+    if (half < _cfg.Halves)
+        _game.Fouls.ResetForNewHalf();
+    half++;
+    halfRemaining = _cfg.HalfSeconds;
+}
+```
+After the regulation `while` loop, an OT loop was added:
+```
+var otPeriod = 0;
+while (_game.HomeScore == _game.AwayScore)
+{
+    otPeriod++;
+    _game.ResetPossessionArrow();   // fresh contest (arrow -> Off)
+    state = TipPossession.CreateFromTip(_game, _rng, possessionNumber: state.PossessionNumber);
+    var otRemaining = _cfg.OvertimeSeconds;
+    while (otRemaining > 0.0)
+        RunOnePossession(ref state, ref otRemaining, _cfg.Halves + otPeriod);
+}
+```
+No foul reset at OT boundaries — fouls carry forward per NCAA rule. The guard `half < _cfg.Halves` ensures the reset fires only between regulation halves and never after the final regulation half.
+
+**A11 confirmed at audit:** `RunOnePossession` spawns the next state before returning (last line of the local function), so `state.PossessionNumber` already holds the next sequential number when the OT loop calls `CreateFromTip` — pass directly, do not add one.
+
+`src/Charm.Harness/config.json` — EDIT. Added `"OvertimeSeconds": 300.0` to the `Governor` section.
+
+`src/Charm.Harness/Program.Game.cs` — EDIT. Extracted `var governorRng = new SystemRng(seed + 1)` before the `Governor` constructor (so it has a name for the tip call). Removed `game.SetPossessionArrow(TeamSide.Home)`. Replaced `first` construction with `TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1)`.
+
+`src/Charm.Harness/Program.Observation.cs` — EDIT. In `ObservationRunV1`: removed `firstState` declared outside the game loop; removed `game.SetPossessionArrow(TeamSide.Home)` from inside the loop; added `var firstState = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1)` inside the loop after `governorRng` is declared.
+
+`src/Charm.Harness/Program.Stress.cs` — EDIT. In `StressTestArchetypeRosters`: removed `game.SetPossessionArrow(TeamSide.Home)`; replaced `firstState` construction with `TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1)`.
+
+`src/Charm.Harness/Program.Checks.GameLifecycle.cs` — EDIT. Three changes.
+
+Change A (`GovernorLoopCheck`): removed `foulOk` from pass/fail computation. Updated comment at lines ~142–144: replaced "Fouls only ever increment (no half-reset this session)" with statement that the halftime reset is verified in `GameBoundaryCheck`. Replaced the foul report line with observability text: `fouls(Home): pre-run={homeFoulsBefore} post-run=... | halftime reset: covered by deterministic GameBoundaryCheck`. `foulOk` removed from `allOk` expression.
+
+Change B (`AttributionSanityCheck`): removed `firstState` from outside the game loop. Added `var firstState = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1)` inside the loop after `governorRng` is declared.
+
+Change C (new `GameBoundaryCheck` method): added `private static bool GameBoundaryCheck(string configPath)` and wired `ok &= GameBoundaryCheck(configPath)` after `GovernorLoopCheck` in `Program.cs`. Five sub-checks:
+- Sub-check 1: `FoulTracker.ResetForNewHalf()` unit test — pre-loads Home to 10 fouls (double bonus) and Away to 8 (1-and-1); asserts correct bonus states; calls reset; asserts both counts == 0 and both bonus states == None.
+- Sub-check 2: Governor lifecycle integration — controlled config with `HalfSeconds=1.0`, `NoShot=1.0` (regulation ends 0–0 trivially), then sets `HomeScore=1` to prevent OT, runs governor, asserts foul counts for both teams == 0 after run (reset fired between halves) and `OvertimePeriods == 0`.
+- Sub-check 3: OT entered, correct half numbering, gap-free sequence — controlled regulation (`HalfSeconds=1.0`, `EndOfHalfConfig.Load(configPath)` for the intent config so OT possessions at 300s get `intent=null` and can score), seed 73001. Asserts `OvertimePeriods >= 1`, first OT record has `Half == cfgGov.Halves + 1`, final score not tied, and `firstOtRecord.Number == lastRegRecord.Number + 1` (gap-free).
+- Sub-check 4: No tied finals in 200 normal games — smoke test; asserts zero tied final scores.
+- Sub-check 5: Tip fairness (~50% ± tolerance) and precondition enforcement — 10,000 tip draws, each with a fresh `GameState` and incrementing seed; asserts Home rate within `RateTolerance` of 50%; asserts arrow is non-Off after each call; asserts arrow points at the loser. Also constructs a game with `ArrowState.Home` and asserts `CreateFromTip` throws `InvalidOperationException`.
+
+`src/Charm.Harness/Program.cs` — EDIT. Added `ok &= GameBoundaryCheck(configPath)` after `GovernorLoopCheck`.
+
+**Key design decisions:**
+
+- **Foul reset guard `half < _cfg.Halves` is load-bearing.** Without it, `ResetForNewHalf()` would fire after the final regulation half, erasing foul counts before overtime begins — directly violating the NCAA rule. The loop exits when `half > _cfg.Halves`, so the half-transition block runs one final time on the last half's drain; the guard prevents the reset from firing there.
+
+- **`TipPossession.CreateFromTip` precondition: arrow must be `Off`.** This prevents a caller from accidentally converting a routine alternating-possession jump ball into a fake tip. `GovernorLoopCheck`'s controlled fixture explicitly sets the arrow `On` before its run — that check is deliberately not a real game start and correctly does not use `TipPossession.CreateFromTip` (A8 confirmed and preserved).
+
+- **`ObservationRunV1`'s `firstState` moved inside the loop.** The variable was declared outside with hardcoded Home offense and used every game, meaning every game in the corpus started with Home offense regardless of tip outcome. The fix moves the construction inside the loop after `governorRng` is available, using the tip result.
+
+- **`AttributionSanityCheck` same pattern.** Same stale outer declaration removed; tip-based construction added inside.
+
+- **Sub-check 3 uses real `EndOfHalfConfig`, not a handmade one.** An earlier attempt used `HoldThresholdSeconds=999` (causing every OT possession to draw `NoShot` intent and never score). The fix: `EndOfHalfConfig.Load(configPath)` has `HoldThresholdSeconds=30`, so OT possessions starting at 300s get `intent=null` and the resolver runs normally, allowing scoring. Regulation halves (1.0s each) still end correctly because 1.0 < 30, so the intent block fires for those.
+
+- **Controlled fixtures preserved.** `GovernorLoopCheck` (A8), `Phase30CoachingLayer2Check`'s `MeanAPL` helper, `Phase33`/`Phase34` governor invariant runs, and `Phase10ReboundDoorCheck` all retain their explicit `SetPossessionArrow` calls — they are isolated controlled test fixtures, not real game starts, and must not use `TipPossession.CreateFromTip`.
+
+- **`Program.cs` shared fixture unchanged.** The deterministic `state` constructed in `Program.cs` for `ShowSamples` and isolated roll checks uses hardcoded `Offense: TeamSide.Home`. Changing it to use `TipPossession.CreateFromTip` would consume from the same `rng` used by downstream deterministic checks and alter arrow state before roll tests that are not modeling a new game. Confirmed out of scope (A10).
+
+**A note on the partial-class reorganization.** The harness's `Program.cs` had been split into partial classes in a prior reorganization session (committed as "reorg: Pass 2+3") before this session's files were dropped in. The first build attempt failed with 57 "does not exist in the current context" errors because the reorganized `Program.Checks.GameLifecycle.cs` was a new file not matching the earlier monolithic one. The fixes were applied against the reorganized file, and the build succeeded on the second attempt.
+
+**Harness results (ALL CHECKS PASSED):**
+
+- `GovernorLoopCheck`: foul line now reads `fouls(Home): pre-run=7 post-run=10 | halftime reset: covered by deterministic GameBoundaryCheck`. No FAIL possible from foul counts. All other checks in this block unchanged.
+- `GameBoundaryCheck` sub-check 1: `FoulTracker.ResetForNewHalf direct test -> ok`
+- `GameBoundaryCheck` sub-check 2: `Governor fires halftime reset -> ok`
+- `GameBoundaryCheck` sub-check 3: `OT entered, Half==3 on first OT possession -> ok` (seed 73001 produced a tied 0–0 regulation end with the controlled 1-second halves; OT ran to a winner)
+- `GameBoundaryCheck` sub-check 4: `0 tied final scores across 200 games -> ok`
+- `GameBoundaryCheck` sub-check 5: `tip fairness ~50% ± tolerance -> ok` (observed ~50%); `precondition guard (arrow ON → throws) -> ok`
+- ALL CHECKS PASSED. STRESS TEST PASSED.
+
+**Stress test observations (hypotheses only — no calibration grades):**
+- Zero tied final scores across all 4,000 stress test games — the OT loop is working.
+- Athletic over Skill 75% win rate (mirror gap 0.6%). The gap is notable and was flagged in the pre-phase 40 calibration notes — worth watching but not acted on here.
+- Shooting loses to Athletic 80–20 — the engine currently values athletic rim presence much more than perimeter shooting, consistent with prior sessions.
+
 ## Session 75 — Phase 40: Retire Last Two Flavor Stubs (RollDGenerator, RollOffensiveFoulGenerator) (2026-06-20)
 
 **Scope:** Rename the last two stub generators in the full-engine path to real generators. No logic changes, no config changes, no new math. Pure rename session — corpus hash stable.

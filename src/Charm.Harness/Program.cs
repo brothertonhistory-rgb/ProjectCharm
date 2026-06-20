@@ -124,6 +124,7 @@ internal static partial class Program
         ok &= RollCExpansionCheck(cfg, cfgC, rollCGenerator, state);
         ok &= EndOfHalfIntentBatchCheck(cfg, cfgEndOfHalf);
         ok &= GovernorLoopCheck(cfg, cfgD, cfgGov, cfgClock, cfgEndOfHalf);
+        ok &= GameBoundaryCheck(configPath);
         ok &= Phase1RosterCheck(configPath);
         ok &= Phase2AttributeWiringCheck(configPath);
         ok &= Phase6MatchupWiringCheck(configPath);

@@ -437,7 +437,8 @@
   "Governor": {
     "PossessionCap": 400,
     "Halves": 2,
-    "HalfSeconds": 1200.0
+    "HalfSeconds": 1200.0,
+    "OvertimeSeconds": 300.0
   },
   "OffensiveFoulFlavor": {
     "FrontcourtCharge": 0.3,

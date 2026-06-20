@@ -5754,3 +5754,49 @@ Roll D foul flavor and offensive foul flavor are the last two generators that ca
 ### All rolls now have real generators
 
 Phase 40 completes the generator retirement pass. Every roll in the full-engine simulation path now has a real, named generator. The calibration pass can begin.
+
+## Game Boundaries — Halftime Foul Reset + Opening Tip + Overtime
+
+### Why these three are one build
+
+All three items touch the Governor's game-lifecycle logic and are meaningfully coupled. The opening tip uses `TipPossession.CreateFromTip`, which requires the arrow to be `Off`. Overtime requires the arrow to be reset to `Off` before each OT tip. The halftime foul reset must be guarded so it doesn't fire before OT tips. Doing them separately would require intermediate states that don't represent valid basketball.
+
+### Halftime foul reset
+
+NCAA rule: team fouls reset at the regulation half boundary only. Overtime periods carry forward whatever foul count teams ended regulation with. A team in the double bonus at the end of regulation begins overtime in the double bonus.
+
+The reset lives in `FoulTracker.ResetForNewHalf()`, called by the Governor inside the regulation `while` loop's half-transition block. The guard `half < _cfg.Halves` is load-bearing: the transition block runs one final time when the last regulation half drains, and the guard prevents the reset from firing there. Without the guard, fouls would be wiped before the first OT tip.
+
+`GovernorLoopCheck` no longer asserts foul counts as part of pass/fail. Its existing fixture (pre-loading fouls above the bonus threshold before the run) was designed to prove foul persistence across possessions — a different invariant from the halftime reset. The persistence proof remains valid (the fixture checks that fouls survive individual possession transitions); the reset proof moved to `GameBoundaryCheck` sub-check 2, which uses a controlled config to run two 1-second halves and assert that both teams' foul counts are zero after the run.
+
+### Opening tip seam
+
+`TipPossession.CreateFromTip(GameState game, IRng rng, int possessionNumber)` is the single entry point for any coin-flip tip-off. It enforces the precondition that the possession arrow is `Off`, delegates to `JumpBall.Resolve` (which handles the 50/50 draw and arrow set), and returns a fully-constructed `PossessionState`.
+
+**Precondition enforcement is architectural.** The throw on `ArrowState != Off` prevents any caller from accidentally converting a routine alternating-possession jump ball into a fake tip. `Sub-check 5` in `GameBoundaryCheck` permanently proves this: a game with the arrow set to `Home` causes `CreateFromTip` to throw.
+
+**Controlled fixtures are exempt.** `GovernorLoopCheck` explicitly sets the arrow `On` before its run (to predict the final arrow state from jump-ball count). This is a deliberate test setup, not a game start, and must not use `TipPossession.CreateFromTip`. All isolated roll checks that construct possession states for testing specific rolls are similarly exempt.
+
+**All real game starts now use the tip.** `Program.Game.cs`, `ObservationRunV1`, `StressTestArchetypeRosters`, and `AttributionSanityCheck` all moved to `TipPossession.CreateFromTip`. The shared `state` in `Program.cs` used by `ShowSamples` and isolated roll checks was explicitly confirmed out of scope (A10) — changing it would consume from the deterministic RNG stream used by downstream roll checks.
+
+### Overtime
+
+If regulation ends tied, the Governor runs 5-minute OT periods (configurable via `GovernorConfig.OvertimeSeconds`) until a winner exists. Each OT period:
+1. `_game.ResetPossessionArrow()` — sets arrow back to `Off` for a fresh tip contest.
+2. `TipPossession.CreateFromTip` — resolves the tip and returns the first OT possession. The possession number comes directly from `state.PossessionNumber`, which already holds the next sequential number after the regulation loop exits (the local function spawns before returning — A11 confirmed at audit).
+3. The OT `while (otRemaining > 0.0)` loop runs the same `RunOnePossession` local function used in regulation, stamping `Half = _cfg.Halves + otPeriod` (first OT = 3, second OT = 4, etc.).
+4. No foul reset at OT boundaries — fouls carry per NCAA rule.
+
+`GovernorRunResult` now carries `int OvertimePeriods` as a trailing parameter. 0 = regulation finish; 1 = one OT; etc. All existing consumers use named properties — no positional pattern-matching in the codebase — so the trailing addition is non-breaking.
+
+### `RunOnePossession` local function
+
+The possession-loop body was extracted into a local function inside `Governor.Run` so it can be called from both the regulation loop and the OT loop without duplicating ~100 lines of threading code. The local function captures run-level accumulators naturally from the enclosing `Run` method. Only the values that differ between the regulation and OT callers are passed explicitly: `state`, `periodRemaining`, and `periodNumber`.
+
+**Extraction boundary.** The local function includes code from intent selection through score write, record creation, and spawning the next `PossessionState`. It does NOT include the `if (halfRemaining <= 0.0)` half-transition block, any half increment, any foul reset call, or any period-clock reinitialization. Period transitions belong exclusively to the regulation and OT caller loops.
+
+### What is not this session
+
+- **Overtime foul-carry direct regression test.** The structural guarantee (guard `half < _cfg.Halves` prevents reset after final regulation half) plus source-level verification is the proof for this session. A separate controlled-foul OT regression test is explicitly deferred.
+- **Height-driven tip contest.** `JumpBall.Resolve`'s 50/50 draw is the existing placeholder. The `FUTURE SEAM` comment in `JumpBall.cs` remains — plugs in once the player/attribute layer adds a center matchup.
+- **Score-aware end-of-regulation strategy.** The end-of-half intent pie (`HoldShootLast`, `ShootEarly`, `NoShot`) is score-blind. Late-game strategy (fouling to stop the clock, heaving a three to tie) is a named future feature.

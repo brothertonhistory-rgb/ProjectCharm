@@ -148,12 +148,15 @@ public sealed record PossessionRecord(
 /// <param name="PerStubParks">Per-stub park breakdown: stub destination -> count. This
 /// quantifies the FT / offensive-rebound / etc. volume still flowing through placeholder
 /// flips — the point of printing it.</param>
+/// <param name="OvertimePeriods">Number of overtime periods played. 0 = regulation finish;
+/// 1 = one OT; 2 = double OT; etc.</param>
 public sealed record GovernorRunResult(
     IReadOnlyList<PossessionRecord> Possessions,
     int TerminalEnded,
     int Parked,
     double TotalSeconds,
-    IReadOnlyDictionary<string, int> PerStubParks);
+    IReadOnlyDictionary<string, int> PerStubParks,
+    int OvertimePeriods);
 
 /// <summary>
 /// The THIN Governor. It turns "resolve ONE possession" into "play a sequence of
@@ -260,22 +263,24 @@ public sealed class Governor
         var halfRemaining = _cfg.HalfSeconds;
         var guard = 0;
 
-        while (half <= _cfg.Halves)
+        // ── Local function: resolve one possession and append its record. ──────
+        // Captures and updates run-level accumulators naturally. Only the values
+        // that differ between the regulation and OT callers are passed explicitly:
+        // state (the current possession), periodRemaining (the clock for this period),
+        // and periodNumber (stamped as PossessionRecord.Half).
+        //
+        // Extraction boundary: includes intent draw → resolver (or NoShot short-circuit)
+        // → score write → record creation → state spawn. Does NOT include the period-
+        // transition block (half increment, foul reset, clock reset) — those belong
+        // exclusively to the caller loops.
+        void RunOnePossession(ref PossessionState st, ref double periodRemaining, int periodNumber)
         {
             if (++guard > _cfg.PossessionCap)
                 throw new InvalidOperationException(
                     $"Governor safety guard exceeded {_cfg.PossessionCap} possessions — the clock " +
                     "is not draining (check HalfSeconds and possession-time config).");
 
-            // End-of-half intent: drawn only when this possession starts with less than
-            // a full shot clock left; null on every normal possession (the common case).
-            // When null, the S29 base-clock behavior runs byte-for-byte. NoShot
-            // short-circuits the resolver; HoldShootLast and ShootEarly run it normally
-            // and differ only in how much clock drains. §2a note: this draw consumes one
-            // unit from _rng per end-of-half possession, so the rng stream (and therefore
-            // the exact possession count and score) will differ from the S29 output once
-            // the first intent fires — expected; the harness asserts bands, not exact values.
-            EndOfHalfIntent? intent = halfRemaining < _endOfHalf.HoldThresholdSeconds
+            EndOfHalfIntent? intent = periodRemaining < _endOfHalf.HoldThresholdSeconds
                 ? _endOfHalfPie.Roll(_rng.NextUnitInterval())
                 : null;
 
@@ -284,8 +289,6 @@ public sealed class Governor
             string endLabel;
             int pointsThisPossession;
             double applied;
-            // Shot and rebound counters — zero-initialized; set from outcome in the
-            // resolver branch, left at zero for NoShot (no resolver call was made).
             int possessionFga = 0, possessionFgm = 0, possessionThreePa = 0, possessionThreePm = 0;
             int possessionShotResolutions = 0, possessionMissFouled = 0;
             int possessionFta = 0, possessionFtm = 0, possessionOrbChances = 0, possessionOrbWon = 0;
@@ -297,7 +300,6 @@ public sealed class Governor
             int possessionSlot1Fgm = 0, possessionSlot2Fgm = 0, possessionSlot3Fgm = 0,
                 possessionSlot4Fgm = 0, possessionSlot5Fgm = 0;
             int possessionSlotUnattributedFgm = 0;
-            // Phase 23 per-slot attribution locals
             var possessionThreePaBySlot      = new SlotGroup();
             var possessionThreePmBySlot      = new SlotGroup();
             var possessionFtaBySlot          = new SlotGroup();
@@ -305,40 +307,27 @@ public sealed class Governor
             var possessionBlkCount           = 0;
             int?  possessionTurnoverOffSlot    = null;
             var   possessionTurnoverWasLiveBall = false;
-            // Phase 25: shooting-foul events — null until the resolver branch sets it.
             IReadOnlyList<ShootingFoulEvent>? possessionShootingFouls = null;
-            // Phase 31: per-slot ORB counts threaded from RoutingOutcome.OrbBySlot.
             var possessionOrbBySlot = new SlotGroup();
-            // Phase 34: engine-stamped stealer slot for live-ball turnovers.
             int? possessionStealerSlot = null;
-            // Phase 35: engine-stamped defensive rebounder slot.
             int? possessionDefensiveRebounderSlot = null;
-            // Phase 36: engine-stamped per-slot block counts.
             var possessionBlkBySlot = new SlotGroup();
-            // Phase 39: engine-stamped per-slot assist counts.
             var possessionAstBySlot = new SlotGroup();
 
             if (intent == EndOfHalfIntent.NoShot)
             {
-                // No resolver call: the offense ran out the clock without a shot.
-                // Synthesize a zero-point, no-terminal possession. Does NOT increment
-                // terminalEnded or parked — it is a third class (§2a discipline: handle
-                // every branch the loop can reach; the count assertion in the harness
-                // accounts for it as noShotCount separately).
                 endedOnTerminal = false;
                 endLabel = "endOfHalf:NoShot";
-                consequence = PossessionConsequence.DeadBallTo(state.Defense);
+                consequence = PossessionConsequence.DeadBallTo(st.Defense);
                 pointsThisPossession = 0;
-                applied = halfRemaining;   // drains the rest of the half to 0
+                applied = periodRemaining;
             }
             else
             {
-                // Normal / HoldShootLast / ShootEarly: run the resolver.
-                var outcome = _resolver.RunPossession(state);
+                var outcome = _resolver.RunPossession(st);
 
                 if (outcome.EndedOn is { } term)
                 {
-                    // Ended on a terminal: read its consequence directly.
                     endedOnTerminal = true;
                     consequence = term.Consequence;
                     endLabel = term.Reason;
@@ -346,29 +335,20 @@ public sealed class Governor
                 }
                 else
                 {
-                    // Parked at a stub: no terminal, no consequence. Apply the DEFAULT —
-                    // ball to the other team, dead-ball restart at Roll A. One uniform
-                    // path for every stub.
                     endedOnTerminal = false;
-                    consequence = PossessionConsequence.DeadBallTo(state.Defense);
+                    consequence = PossessionConsequence.DeadBallTo(st.Defense);
                     endLabel = $"parked:{outcome.Destination}";
                     parked++;
                     perStubParks[outcome.Destination] =
                         perStubParks.GetValueOrDefault(outcome.Destination) + 1;
                 }
 
-                // Time: HoldShootLast forces the whole remaining clock (the offense
-                // milked — forced even if the resolver produced an invariant terminal
-                // elapsed, because the milk intent dominates). ShootEarly and normal
-                // draw elapsed the S29 way (invariant terminal wins; otherwise truncated-
-                // normal draw) and cap at halfRemaining.
-                var rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(outcome.ShotClockPeriods, state.Offense);
+                var rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(outcome.ShotClockPeriods, st.Offense);
                 applied = intent == EndOfHalfIntent.HoldShootLast
-                    ? halfRemaining
-                    : Math.Min(rawElapsed, halfRemaining);
+                    ? periodRemaining
+                    : Math.Min(rawElapsed, periodRemaining);
 
                 pointsThisPossession = outcome.Points;
-                // Thread shot/rebound counters from the resolver's outcome.
                 possessionFga             = outcome.Fga;
                 possessionFgm             = outcome.Fgm;
                 possessionThreePa         = outcome.ThreePa;
@@ -399,7 +379,6 @@ public sealed class Governor
                 possessionSlot4Fgm        = outcome.Slot4Fgm;
                 possessionSlot5Fgm        = outcome.Slot5Fgm;
                 possessionSlotUnattributedFgm = outcome.SlotUnattributedFgm;
-                // Phase 23 threading
                 possessionThreePaBySlot      = outcome.ThreePaBySlot;
                 possessionThreePmBySlot      = outcome.ThreePmBySlot;
                 possessionFtaBySlot          = outcome.FtaBySlot;
@@ -407,31 +386,23 @@ public sealed class Governor
                 possessionBlkCount           = outcome.BlkCount;
                 possessionTurnoverOffSlot     = outcome.TurnoverOffSlot;
                 possessionTurnoverWasLiveBall = outcome.TurnoverWasLiveBall;
-                // Phase 25 threading — already a snapshot array from the resolver walk.
                 possessionShootingFouls       = outcome.ShootingFouls;
-                // Phase 31 threading — stamped per-slot ORB counts from the picker.
                 possessionOrbBySlot           = outcome.OrbBySlot;
-                // Phase 34 threading — stamped defensive stealer slot (live-ball TOs only).
                 possessionStealerSlot         = outcome.StealerSlot;
-                // Phase 35 threading — stamped defensive rebounder slot (DefensiveRebound only).
                 possessionDefensiveRebounderSlot = outcome.DefensiveRebounderSlot;
-                // Phase 36 threading — stamped per-slot BLK counts from BlockerPicker.
                 possessionBlkBySlot = outcome.BlkBySlot;
-                // Phase 39 threading — stamped per-slot AST counts from AssistPicker.
                 possessionAstBySlot = outcome.AstBySlot;
             }
 
-            // Shared by all three intent values + normal possessions.
-            halfRemaining -= applied;
-            totalSeconds  += applied;
+            periodRemaining -= applied;
+            totalSeconds    += applied;
 
-            // Score write: points credit the offense (state.Offense). Zero for NoShot.
-            if (state.Offense == TeamSide.Home) _game.HomeScore += pointsThisPossession;
+            if (st.Offense == TeamSide.Home) _game.HomeScore += pointsThisPossession;
             else _game.AwayScore += pointsThisPossession;
 
             records.Add(new PossessionRecord(
-                state.PossessionNumber, state.Offense, state.Defense, state.Entry,
-                endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, half, intent,
+                st.PossessionNumber, st.Offense, st.Defense, st.Entry,
+                endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, periodNumber, intent,
                 possessionFga, possessionFgm, possessionThreePa, possessionThreePm,
                 possessionShotResolutions, possessionMissFouled,
                 possessionFta, possessionFtm, possessionOrbChances, possessionOrbWon,
@@ -454,32 +425,51 @@ public sealed class Governor
                 possessionBlkBySlot,
                 possessionAstBySlot));
 
-            // Spawn possession N+1 from the consequence: offense named by it, defense
-            // the other side, number +1, entry the consequence's tag, AND the transition
-            // context ticket it carries (non-null only off a defensive rebound this
-            // session — that ticket is what makes the resolver route the new possession
-            // to Roll J instead of Roll A). Per-possession facts (slot / zone / result)
-            // reset to null — a fresh possession. The final iteration spawns a state that
-            // is never run (the loop exits), which is harmless.
             var nextOffense = consequence.NextOffense;
-            state = new PossessionState(
-                PossessionNumber: state.PossessionNumber + 1,
+            st = new PossessionState(
+                PossessionNumber: st.PossessionNumber + 1,
                 Offense: nextOffense,
                 Defense: Other(nextOffense),
                 Entry: consequence.NextEntry,
                 TransitionContext: consequence.TransitionContext);
+        }
 
-            // Half boundary: when this half's clock is spent, advance to the next half.
-            // Only the clock resets — fouls, arrow, and lineups carry (no halftime reset
-            // this session, matching the existing persistence checks).
+        // ── Regulation loop ───────────────────────────────────────────────────
+        while (half <= _cfg.Halves)
+        {
+            RunOnePossession(ref state, ref halfRemaining, half);
+
             if (halfRemaining <= 0.0)
             {
+                // Reset fouls only when moving from one regulation half to another —
+                // never after the final regulation half (fouls carry into overtime, NCAA rule).
+                if (half < _cfg.Halves)
+                    _game.Fouls.ResetForNewHalf();
                 half++;
                 halfRemaining = _cfg.HalfSeconds;
             }
         }
 
-        return new GovernorRunResult(records, terminalEnded, parked, totalSeconds, perStubParks);
+        // ── Overtime loop ─────────────────────────────────────────────────────
+        // NCAA: each OT starts with a fresh tip; team fouls do NOT reset.
+        var otPeriod = 0;
+        while (_game.HomeScore == _game.AwayScore)
+        {
+            otPeriod++;
+            _game.ResetPossessionArrow();   // fresh contest (arrow -> Off)
+            // TipPossession.CreateFromTip sets the arrow to the tip loser and returns
+            // the OT opening possession. After RunOnePossession, state already holds the
+            // next unplayed sequential number — pass it directly, do not add one.
+            state = TipPossession.CreateFromTip(_game, _rng,
+                possessionNumber: state.PossessionNumber);   // state already holds the next unplayed number
+
+            var otRemaining = _cfg.OvertimeSeconds;
+            while (otRemaining > 0.0)
+                RunOnePossession(ref state, ref otRemaining, _cfg.Halves + otPeriod);
+            // No foul reset at OT boundaries (NCAA rule: fouls carry forward).
+        }
+
+        return new GovernorRunResult(records, terminalEnded, parked, totalSeconds, perStubParks, otPeriod);
     }
 
     /// <summary>Sum the truncated-normal draws for a possession's shot-clock periods:

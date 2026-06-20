@@ -56,14 +56,10 @@ internal static partial class Program
             game,
             new SystemRng(seed));
 
-        game.SetPossessionArrow(TeamSide.Home);
-        var governor = new Governor(resolver, game, cfgGov, cfgClock, new SystemRng(seed + 1), cfgEndOfHalf);
+        var governorRng = new SystemRng(seed + 1);
+        var governor = new Governor(resolver, game, cfgGov, cfgClock, governorRng, cfgEndOfHalf);
 
-        var first = new PossessionState(
-            PossessionNumber: 1,
-            Offense: TeamSide.Home,
-            Defense: TeamSide.Away,
-            Entry: EntryType.DeadBallInbound);
+        var first = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1);
 
         var result  = governor.Run(first);
         var records = result.Possessions;

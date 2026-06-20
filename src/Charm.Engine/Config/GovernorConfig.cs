@@ -23,6 +23,10 @@ public sealed class GovernorConfig
     /// value and moves to the next half when it reaches zero.</summary>
     public double HalfSeconds { get; set; } = 1200.0;
 
+    /// <summary>Length of each overtime period in seconds. 300 = 5 minutes × 60,
+    /// matching NCAA. Independent of HalfSeconds so the two clocks are separately tunable.</summary>
+    public double OvertimeSeconds { get; set; } = 300.0;
+
     public static GovernorConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -31,6 +35,10 @@ public sealed class GovernorConfig
         var cfg = JsonSerializer.Deserialize<GovernorConfig>(
             section.GetRawText(),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        return cfg ?? throw new InvalidOperationException($"Could not parse Governor config at {path}.");
+        cfg = cfg ?? throw new InvalidOperationException($"Could not parse Governor config at {path}.");
+        if (cfg.OvertimeSeconds <= 0)
+            throw new InvalidOperationException(
+                $"GovernorConfig.OvertimeSeconds must be positive (got {cfg.OvertimeSeconds}).");
+        return cfg;
     }
 }

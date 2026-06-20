@@ -891,8 +891,6 @@ internal static partial class Program
                     var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
                     SeatRoster(game, teamASide, teamAPlayers);
                     SeatRoster(game, teamBSide, teamBPlayers);
-                    game.SetPossessionArrow(TeamSide.Home);
-
                     var resolverRng = new SystemRng(gameSeed);
                     var governorRng = new SystemRng(gameSeed + 1);
 
@@ -920,11 +918,7 @@ internal static partial class Program
 
                     var governor = new Governor(resolver, game, cfgGov, cfgClock, governorRng, cfgEndOfHalf);
 
-                    var firstState = new PossessionState(
-                        PossessionNumber: 1,
-                        Offense: TeamSide.Home,
-                        Defense: TeamSide.Away,
-                        Entry: EntryType.DeadBallInbound);
+                    var firstState = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1);
 
                     GovernorRunResult result;
                     try
