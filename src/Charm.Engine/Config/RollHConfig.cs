@@ -279,16 +279,15 @@ public sealed class RollHConfig
     // ── Session 04 — Screening interior make% bonus (C5.5) ────────────────────
     // The five offensive players (shooter included) set screens that aggregate
     // with an ACCELERATING curve (one good screener ≈ a sliver; five compound)
-    // and LIFT make% on interior shots (Rim/Short). Halfcourt only.
-    // Symmetric mirror of C6 by design: at full lineup capacity vs full off-ball
-    // capacity, the bonus and suppression are analytically equal.
-    // All-zones in concept; interior-only this session. The perimeter unlock
-    // lands with OffBallDefense (future session). [CALIBRATION PLACEHOLDER]
+    // and LIFT make% on ALL FIVE ZONES (Phase 44: gate removed). Halfcourt only.
+    // Symmetric mirror of C7 by design: at full lineup capacity vs full off-ball
+    // capacity (4.0 denominator), the bonus and suppression are analytically equal
+    // at Long/Three. [CALIBRATION PLACEHOLDER]
 
     /// <summary>Maximum make%-point bonus from perfect five-player screening.
-    /// Symmetric mirror of <see cref="HelpDefenseSuppressionScale"/>: at full
-    /// capacity on each side, the bonus and suppression cancel algebraically.
-    /// Invariant: in [0, 1]. [CALIBRATION PLACEHOLDER]</summary>
+    /// Symmetric mirror of <see cref="OffBallDefenseSuppressionScale"/>: at full
+    /// capacity on each side, the bonus and suppression cancel algebraically at
+    /// perimeter zones. Invariant: in [0, 1]. [CALIBRATION PLACEHOLDER]</summary>
     public double ScreeningBonusScale         { get; set; } = 0.15;
 
     /// <summary>Exponent for the accelerating Screening aggregate. Must be
@@ -296,6 +295,23 @@ public sealed class RollHConfig
     /// both violate the locked accelerating-curve design.
     /// [CALIBRATION PLACEHOLDER]</summary>
     public double ScreeningAggregateExponent  { get; set; } = 2.0;
+
+    /// <summary>Zone multiplier for HelpDefense suppression at Mid — partial effect
+    /// (between 0 = no effect and 1 = full interior suppression). [CALIBRATION PLACEHOLDER]</summary>
+    public double HelpDefenseMidMultiplier { get; set; } = 0.30;
+
+    /// <summary>Maximum make%-point suppression from OffBallDefense at full aggregate.
+    /// Symmetric counterpart to HelpDefenseSuppressionScale at the perimeter.
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double OffBallDefenseSuppressionScale { get; set; } = 0.15;
+
+    /// <summary>Exponent for OffBallDefense aggregate — must be > 1.0 for accelerating
+    /// aggregation (same contract as HelpDefenseAggregateExponent). [CALIBRATION PLACEHOLDER]</summary>
+    public double OffBallDefenseAggregateExponent { get; set; } = 2.0;
+
+    /// <summary>Zone multiplier for OffBallDefense suppression at Mid — partial effect
+    /// (between 0 = no effect and 1 = full perimeter suppression). [CALIBRATION PLACEHOLDER]</summary>
+    public double OffBallDefenseMidMultiplier { get; set; } = 0.30;
 
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
@@ -365,6 +381,20 @@ public sealed class RollHConfig
         if (cfg.ScreeningAggregateExponent <= 1.0)
             throw new InvalidOperationException(
                 "RollH ScreeningAggregateExponent must be > 1.0 for accelerating aggregation.");
+
+        // Session 06 invariants — HelpDefense Mid multiplier and OffBallDefense knobs
+        if (cfg.HelpDefenseMidMultiplier < 0.0 || cfg.HelpDefenseMidMultiplier > 1.0)
+            throw new InvalidOperationException(
+                "RollH HelpDefenseMidMultiplier must be in [0, 1].");
+        if (cfg.OffBallDefenseSuppressionScale < 0.0 || cfg.OffBallDefenseSuppressionScale > 1.0)
+            throw new InvalidOperationException(
+                "RollH OffBallDefenseSuppressionScale must be in [0, 1].");
+        if (cfg.OffBallDefenseAggregateExponent <= 1.0)
+            throw new InvalidOperationException(
+                "RollH OffBallDefenseAggregateExponent must be > 1.0 for accelerating aggregation.");
+        if (cfg.OffBallDefenseMidMultiplier < 0.0 || cfg.OffBallDefenseMidMultiplier > 1.0)
+            throw new InvalidOperationException(
+                "RollH OffBallDefenseMidMultiplier must be in [0, 1].");
 
         return cfg;
     }

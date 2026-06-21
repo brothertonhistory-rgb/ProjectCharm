@@ -568,7 +568,7 @@ internal static partial class Program
             OffBallMovement = 50, Screening = 50,
             PerimeterDefense = 50, PostDefense = 50, Steals = 50,
             Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
-            Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50, HelpDefense = 50,
+            Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
         };
 
         // Slots 2–5 — Perimeter role players (Home PlayerId=2–5, Away PlayerId=7–10)
@@ -587,7 +587,7 @@ internal static partial class Program
             OffBallMovement = 50, Screening = 50,
             PerimeterDefense = 50, PostDefense = 50, Steals = 50,
             Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
-            Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50, HelpDefense = 50,
+            Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
         };
 
         // ── Per-player box score accumulators (indexed PlayerId-1, 0..9) ─────
@@ -1021,7 +1021,7 @@ internal static partial class Program
             Endurance       = 50,
             Hustle          = 50,
             BasketballIQ    = 50,
-            Discipline      = 50, HelpDefense    = 50,
+            Discipline      = 50, HelpDefense    = 50, OffBallDefense = 50,
             RimTendency     = 40,
             ShortTendency   = 15,
             MidTendency     = 15,
@@ -1283,7 +1283,7 @@ internal static partial class Program
                 RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                 Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50,
                 Quickness = 50, FirstStep = 50, Vertical = 50, Endurance = 50,
-                Hustle = 50, BasketballIQ = 50, Discipline = 50, HelpDefense = 50,
+                Hustle = 50, BasketballIQ = 50, Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
                 HierarchyRank = 5,
             };
 
@@ -1575,7 +1575,7 @@ internal static partial class Program
                 Strength             = str    ?? b,
                 Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline           = b, HelpDefense = b,
+                Discipline           = b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -1949,7 +1949,7 @@ internal static partial class Program
                 Strength             = str    ?? b,
                 Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline           = b, HelpDefense = b,
+                Discipline           = b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };

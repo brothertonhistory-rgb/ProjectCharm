@@ -1408,7 +1408,7 @@ internal static partial class Program
                 Height = height ?? b, Wingspan = wingspan ?? b, Weight = b,
                 Strength = str ?? b, Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline = b, HelpDefense = b,
+                Discipline = b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -1739,7 +1739,7 @@ internal static partial class Program
                 Height = height ?? b, Wingspan = b, Weight = b,
                 Strength = str ?? b, Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline = b, HelpDefense = b,
+                Discipline = b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -2012,7 +2012,7 @@ internal static partial class Program
                 Strength             = str     ?? b,
                 Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline           = b, HelpDefense = b,
+                Discipline           = b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -2360,7 +2360,7 @@ internal static partial class Program
                 Strength = str ?? b,
                 Speed = spdBase ?? b, Quickness = spdBase ?? b,
                 FirstStep = spdBase ?? b, Vertical = spdBase ?? b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b, HelpDefense = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -2621,7 +2621,7 @@ internal static partial class Program
                 Strength             = str     ?? b,
                 Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline           = b, HelpDefense = b,
+                Discipline           = b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -2783,7 +2783,7 @@ internal static partial class Program
                     Steals = p.Steals, Height = p.Height, Wingspan = p.Wingspan, Weight = p.Weight,
                     Strength = p.Strength, Speed = p.Speed, Quickness = p.Quickness,
                     FirstStep = p.FirstStep, Vertical = p.Vertical, Endurance = p.Endurance,
-                    Hustle = p.Hustle, BasketballIQ = p.BasketballIQ, Discipline = p.Discipline, HelpDefense = p.HelpDefense,
+                    Hustle = p.Hustle, BasketballIQ = p.BasketballIQ, Discipline = p.Discipline, HelpDefense = p.HelpDefense, OffBallDefense = p.OffBallDefense,
                     RimTendency = p.RimTendency, ShortTendency = p.ShortTendency,
                     MidTendency = p.MidTendency, LongTendency = p.LongTendency,
                     ThreeTendency = p.ThreeTendency,
@@ -2946,7 +2946,7 @@ internal static partial class Program
                 Strength             = b,
                 Speed = b, Quickness = b, FirstStep = b,
                 Vertical = vertical ?? b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline           = b, HelpDefense = b,
+                Discipline           = b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -3277,7 +3277,7 @@ internal static partial class Program
                 RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                 Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
                 Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
-                Discipline = 50, HelpDefense = 50,
+                Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
                 RimTendency = 50, ShortTendency = 50, MidTendency = 50,
                 LongTendency = 50, ThreeTendency = 50 };
 
@@ -3289,7 +3289,7 @@ internal static partial class Program
                 RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                 Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
                 Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
-                Discipline = 50, HelpDefense = 50,
+                Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
                 RimTendency = 50, ShortTendency = 50, MidTendency = 50,
                 LongTendency = 50, ThreeTendency = 50 };
 
@@ -3301,7 +3301,7 @@ internal static partial class Program
                 RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                 Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
                 Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
-                Discipline = 50, HelpDefense = 50,
+                Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
                 RimTendency = 50, ShortTendency = 50, MidTendency = 50,
                 LongTendency = 50, ThreeTendency = 50 };
 
@@ -3338,7 +3338,7 @@ internal static partial class Program
                 RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                 Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
                 Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
-                Discipline = 50, HelpDefense = 50,
+                Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
                 RimTendency = 50, ShortTendency = 50, MidTendency = 50,
                 LongTendency = 50, ThreeTendency = 50 };
 
@@ -3350,7 +3350,7 @@ internal static partial class Program
                 RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                 Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
                 Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
-                Discipline = 50, HelpDefense = 50,
+                Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
                 RimTendency = 50, ShortTendency = 50, MidTendency = 50,
                 LongTendency = 50, ThreeTendency = 50 };
 
@@ -3392,7 +3392,7 @@ internal static partial class Program
                     RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                     Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
                     Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
-                    Discipline = 50, HelpDefense = 50,
+                    Discipline = 50, HelpDefense = 50, OffBallDefense = 50,
                     RimTendency = 50, ShortTendency = 50, MidTendency = 50,
                     LongTendency = 50, ThreeTendency = 50,
                 };

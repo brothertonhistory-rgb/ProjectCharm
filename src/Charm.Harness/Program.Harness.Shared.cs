@@ -52,6 +52,7 @@ internal static partial class Program
             Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50,
             Quickness = 50, FirstStep = 50, Vertical = 50, Endurance = 50,
             Hustle = 50, BasketballIQ = 50, Discipline = 50,
+            OffBallDefense = 50,
             RimTendency = 50, ShortTendency = 50, MidTendency = 50,
             LongTendency = 50, ThreeTendency = 50,
         };
@@ -144,6 +145,7 @@ internal static partial class Program
         Hustle              = p.Hustle,
         BasketballIQ        = p.BasketballIQ,
         Discipline          = p.Discipline,
+        OffBallDefense      = p.OffBallDefense,
     };
 
     /// <summary>Per-player stat totals for one game. Indexed by PlayerId - 1 (0–9).</summary>

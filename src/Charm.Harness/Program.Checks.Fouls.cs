@@ -412,7 +412,7 @@ internal static partial class Program
                 DefensiveRebounding = b, Steals = b,
                 Height = h ?? b, Wingspan = ws ?? b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = v ?? b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = disc ?? b, HelpDefense = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = disc ?? b, HelpDefense = b, OffBallDefense = b,
                 RimTendency = rimT ?? b, ShortTendency = shortT ?? b, MidTendency = midT ?? b,
                 LongTendency = longT ?? b, ThreeTendency = threeT ?? b,
             };
@@ -674,7 +674,7 @@ internal static partial class Program
             OffBallMovement=50, Screening=50,
             PerimeterDefense=50, PostDefense=50, Steals=50,
             Weight=50, Speed=50, Quickness=50, FirstStep=50,
-            Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HelpDefense=50,
+            Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HelpDefense=50, OffBallDefense=50,
         };
         var roleTemplate = new Player("PerimRole")
         {
@@ -688,7 +688,7 @@ internal static partial class Program
             OffBallMovement=50, Screening=50,
             PerimeterDefense=50, PostDefense=50, Steals=50,
             Weight=50, Speed=50, Quickness=50, FirstStep=50,
-            Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HelpDefense=50,
+            Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HelpDefense=50, OffBallDefense=50,
         };
 
         // ── §4.2 Directional test ─────────────────────────────────────────────

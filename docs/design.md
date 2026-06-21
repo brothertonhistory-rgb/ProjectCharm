@@ -5973,3 +5973,76 @@ All three `ReboundPhysical` weight components are enforced nonnegative in `Match
 ### Calibration note
 
 The exact values (0.525 / 0.4875 / 0.4875) are calibration placeholders that preserve the historical total of 1.5. The ordering (Strength leads; Height = Wingspan) is the locked design decision. Calibration of magnitudes happens against real D1 data during the calibration pass and may change these values while preserving the ordering invariant (proven by sub-check (a) of `Phase43ReboundPhysicalWeightsCheck`).
+
+
+## Session 06 — OffBallDefense: Perimeter Suppression + Selection Compression
+
+### The completed interior/perimeter defensive make% system
+
+Sessions 03, 04, and 06 together build the full two-sided defensive make% system. The three C-terms that operate on `makePct` in `RollHGenerator` now form a symmetric, zone-partitioned structure:
+
+| Term | Attribute | Direction | Zone coverage | Denominator |
+|---|---|---|---|---|
+| C5.5 | Screening (off) | + makePct | All 5 zones | 5.0 (all offensive slots) |
+| C6 | HelpDefense (def) | − makePct | Rim/Short full, Mid 0.30, Long/Three 0 | 4.0 (4 off-ball helpers) |
+| C7 | OffBallDefense (def) | − makePct | Long/Three full, Mid 0.30, Rim/Short 0 | 4.0 (4 off-ball helpers) |
+
+C6 and C7 are exact zone-inverses of each other. Mid is the overlap zone where both have partial effect (0.30 of full). The three signed terms settle under a single `Math.Clamp(makePct, 0.0, 1.0)` at the end of C7 — the deferred-clamp discipline from Session 04, extended to cover three terms.
+
+### Why zone-specific multipliers replace binary gates
+
+Sessions 03 and 04 gated C6 on `{Rim, Short}` and C5.5 on `{Rim, Short}` as a temporary design: we had interior defense (HelpDefense) but no perimeter counterpart yet. The binary gates were placeholders, not architecture. Session 06 replaces them with the real structure:
+
+- C6 fires for all halfcourt possessions; a `helpDefZoneMultiplier` switch (1.0/1.0/0.30/0.0/0.0 for Rim/Short/Mid/Long/Three) sends it to zero where help defense doesn't apply. This is cleaner than a binary gate — the math is always the same, only the magnitude varies.
+- C7 mirrors this with the inverse pattern. The symmetry is complete and legible in the config: two Mid multiplier knobs, each at 0.30.
+
+### The three-term deferred-clamp contract
+
+The single `Math.Clamp` lives after C7 and settles all three signed terms together. The algebraic consequence:
+
+```
+makePct(Scr=99, OBD=99) = makePct(Scr=0, OBD=0)
+```
+
+at any Long or Three fixture, because `ScreeningBonusScale × (0.99)^2 = OffBallDefenseSuppressionScale × (0.99)^2 = 0.147015`. Elite screeners and elite off-ball deniers cancel to floating-point precision. This cancellation holds at any make% level because no premature clamp exists between C5.5 and C7.
+
+A premature clamp after C6 (which has zero effect at Long/Three) would be transparent at current config magnitudes — C5.5 at perimeter zones never pushes the logistic above 1.0 given the current Long/Three ceilings (~0.60). The correct proof of the deferred-clamp contract is therefore the algebraic one: confirm the three-term arithmetic composes additively, which the harness sub-check (e) does.
+
+### OffBallDefense: the attribute
+
+Off-ball perimeter denial — the ability to make it hard for guards and wings to catch the ball and start offensive actions. Distinct from PerimeterDefense (which is about contesting the dribble and the shot) and from Steals (live-ball turnovers). Not size-gated: a guard or wing can have high OffBallDefense; a big who patrols the perimeter less typically has lower values. Typical ranges: elite off-ball deniers 70+; guards/wings moderate (45–65); bigs lower (30–50).
+
+### Selection compression: the design
+
+`BendByAttention` in `RollEGenerator` now runs a compression pass after the existing tilt → floor/rail sequence. The compression targets above-equal-share offensive focal points — players whose selection share exceeds `1/populatedCount` — and reduces their excess proportionally, redistributing the freed mass to below-equal-share slots.
+
+The compression is role-split by the shooter's Postness relative to `PostnessNeutral`:
+
+```
+perimeterWeight = max(0, 1 − postness / PostnessNeutral)
+interiorWeight  = max(0, min(1, postness / PostnessNeutral − 1))
+compression     = offBallDefAgg × perimeterWeight + helpDefAgg × interiorWeight
+```
+
+Three regions:
+- **Below PostnessNeutral (guards):** `perimeterWeight` fades from 1.0 at postness=0 to 0.0 at PostnessNeutral. OffBallDefense drives compression; HelpDefense does not.
+- **At PostnessNeutral exactly:** Both weights are zero. A role-neutral player is affected by neither defensive system.
+- **Above PostnessNeutral (posts):** `interiorWeight` rises from 0.0. HelpDefense drives compression; OffBallDefense does not.
+
+`PostnessNeutral = 50.0` is computed from `Matchup.Postness` at all-50 attributes with the current 1/3-each coefficient set. It is a `MatchupConfig` knob, not a hardcoded constant, so calibration can shift it without touching the formula.
+
+### Why compression uses all five defenders (no exclusion)
+
+C7 (make%) excludes the matched defender because he already contributed to make% at Stage 1 (the logistic). Selection compression has no analogous Stage 1 — it is a pre-shot-attempt team-aggregate effect. All five defenders contribute to the team's ability to deny the ball in the halfcourt; excluding the matched defender would arbitrarily remove a meaningful contributor. The denominator is 5.0 (fixed at team capacity), consistent with all other aggregate knobs.
+
+### HelpDefense as a dual consumer
+
+HelpDefense now feeds two engine consumers:
+1. **C6 (RollHGenerator):** Suppresses make% when the post actually gets a shot off. Interior zones only.
+2. **Selection compression (RollEGenerator/BendByAttention):** Compresses the selection tilt toward interior focal points before any shot attempt exists.
+
+These are independent effects, not double-counting. A great help-defense team makes interior posts harder to feed AND harder to convert when fed. The two effects are separated by the roll boundary: selection compression fires at Roll E time; make% suppression fires at Roll H time.
+
+### The PostnessNeutral pivot is a design guarantee, not a calibration artifact
+
+The zero-compression zone at `PostnessNeutral` is intentional. A role-neutral player (Postness = PostnessNeutral) is neither a perimeter focal point nor an interior focal point in a meaningful sense — compressing his selection share with either defensive attribute would be a false signal. The harness sub-check (f.neutral) proves this: a player constructed to sit exactly at the pivot is confirmed to have both OBD-only and HD-only compression equal to zero, even when that player is above equal-share (has a focal-point share that could theoretically be compressed). The zero-compression is not a numerical accident — it is algebraically enforced by the two weight formulas crossing zero at the same point.

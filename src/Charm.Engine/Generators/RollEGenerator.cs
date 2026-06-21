@@ -222,6 +222,13 @@ public sealed class RollEGenerator : IRollEGenerationProvider
     /// Strictly bounded in (1/MaxTiltMultiplier, MaxTiltMultiplier); exactly 1.0 at zero
     /// gap (neutral anchor: usage == attention reproduces the pre-tilt pie).</para>
     ///
+    /// <para>Phase 44 — selection compression. After tilt + floor/rail, a second pass
+    /// compresses the tilt toward above-equal-share offensive focal points using defensive
+    /// OffBallDefense (perimeter focal points) and HelpDefense (interior focal points).
+    /// Freed mass redistributes to below-equal-share slots. Floor/rail re-applied after
+    /// compression. Full contract: tilt → floor/rail → compression → redistribute →
+    /// normalize → floor/rail.</para>
+    ///
     /// <para>Halfcourt-only: caller must NOT call this on the FastBreak branch. The
     /// FastBreak branch passes <paramref name="gen"/>.Pie directly into RollE.Execute
     /// untilted.</para>
@@ -232,7 +239,12 @@ public sealed class RollEGenerator : IRollEGenerationProvider
     /// RollE.Execute — the tilt changes WHICH slot is rolled, not the pressure each
     /// slot carries.</para>
     /// </summary>
-    public Pie<SelectionOutcome> BendByAttention(RollEGeneration gen, double[] attentionShares)
+    public Pie<SelectionOutcome> BendByAttention(
+        RollEGeneration gen,
+        double[] attentionShares,
+        GameState game,
+        MatchupConfig matchupCfg,
+        PossessionState state)
     {
         var finalShares = gen.FinalShares;
 
@@ -262,11 +274,106 @@ public sealed class RollEGenerator : IRollEGenerationProvider
         // pre-tilt proportions and partially undo the tilt.
         var constrained = ApplyFloorAndRail(tilted, tilted, populatedCount);
 
+        // Phase 44 — selection compression.
+        // OffBallDefense compresses tilt on perimeter focal points (low postness).
+        // HelpDefense compresses tilt on interior focal points (high postness).
+        // Both fully independent; freed mass redistributes to below-equal-share slots.
+        var equalShare = populatedCount > 0 ? 1.0 / populatedCount : 0.2;
+
+        // Compute defensive aggregates (all five defenders, fixed denominator 5.0).
+        var defRoster = game.RosterFor(state.Defense);
+        var defLineup = game.LineupFor(state.Defense);
+        var offBallDefSum = 0.0;
+        var helpDefSum    = 0.0;
+        for (var i = 1; i <= 5; i++)
+        {
+            var defender = defRoster.PlayerAt(defLineup.SlotAt(i));
+            if (defender is null) continue;
+            offBallDefSum += defender.OffBallDefense / 100.0;
+            helpDefSum    += defender.HelpDefense    / 100.0;
+        }
+        var offBallDefAgg = Math.Pow(offBallDefSum / 5.0, matchupCfg.OffBallDefenseCompressionExponent)
+                          * matchupCfg.OffBallDefenseCompressionScale;
+        var helpDefAgg    = Math.Pow(helpDefSum    / 5.0, matchupCfg.HelpDefenseCompressionExponent)
+                          * matchupCfg.HelpDefenseCompressionScale;
+
+        // Offensive lineup postness (for identifying focal point type).
+        var offRoster = game.RosterFor(state.Offense);
+        var offLineup = game.LineupFor(state.Offense);
+
+        var freedMass  = 0.0;
+        var compressed = (double[])constrained.Clone();
+        for (var i = 0; i < 5; i++)
+        {
+            if (constrained[i] <= equalShare) continue;   // only compress above-equal-share slots
+
+            var offPlayer = offRoster.PlayerAt(offLineup.SlotAt(i + 1));
+            if (offPlayer is null) continue;
+
+            var postness = Matchup.Postness(offPlayer, matchupCfg);
+            // perimeterWeight: 1.0 for pure guard (postness=0), 0.0 at or above PostnessNeutral
+            var perimeterWeight = Math.Max(0.0, 1.0 - postness / matchupCfg.PostnessNeutral);
+            // interiorWeight: 0.0 for pure guard, approaches 1.0 for high-postness player
+            var interiorWeight  = Math.Max(0.0, Math.Min(1.0, postness / matchupCfg.PostnessNeutral - 1.0));
+
+            var compressionFraction = offBallDefAgg * perimeterWeight + helpDefAgg * interiorWeight;
+            compressionFraction     = Math.Min(compressionFraction, 1.0);   // never compress more than 100%
+
+            var excess = constrained[i] - equalShare;
+            var freed  = excess * compressionFraction;
+            compressed[i] -= freed;
+            freedMass     += freed;
+        }
+
+        // Redistribute freed mass proportionally to below-equal-share slots.
+        if (freedMass > 0.0)
+        {
+            var belowTotal = 0.0;
+            for (var i = 0; i < 5; i++)
+                if (compressed[i] < equalShare && constrained[i] > 0.0) belowTotal += equalShare - compressed[i];
+
+            if (belowTotal > 0.0)
+            {
+                for (var i = 0; i < 5; i++)
+                {
+                    if (compressed[i] < equalShare && constrained[i] > 0.0)
+                    {
+                        var gap = equalShare - compressed[i];
+                        compressed[i] += freedMass * (gap / belowTotal);
+                    }
+                }
+            }
+            else
+            {
+                // All slots at or above equal share — redistribute evenly to populated slots.
+                // Defensive fallback only — unreachable under a valid normalized populated lineup.
+                for (var i = 0; i < 5; i++)
+                    if (constrained[i] > 0.0) compressed[i] += freedMass / populatedCount;
+            }
+
+            // Re-normalize after redistribution.
+            var compTotal = 0.0;
+            foreach (var v in compressed) compTotal += v;
+            if (compTotal > 0.0)
+                for (var i = 0; i < 5; i++) compressed[i] /= compTotal;
+        }
+
+        // Compression is a post-tilt adjustment, not an exemption from Roll E's existing
+        // floor/rail contract. Re-apply ApplyFloorAndRail a second time before building
+        // the final pie. Full contract: tilt → floor/rail → compression → redistribute
+        // → normalize → floor/rail.
+        // Use the compressed/normalized array as both candidate shares and redistribution
+        // basis (same discipline as the first call above: tilted weights as basis,
+        // not the original expScores).
+        var finalConstrained = freedMass > 0.0
+            ? ApplyFloorAndRail(compressed, compressed, populatedCount)
+            : constrained;
+
         // Build the new pie from the constrained tilted shares
         var allOutcomes = Enum.GetValues<SelectionOutcome>();
         var weights     = new Dictionary<SelectionOutcome, double>();
         for (var i = 0; i < 5; i++)
-            weights[allOutcomes[i]] = constrained[i];
+            weights[allOutcomes[i]] = finalConstrained[i];
 
         return new Pie<SelectionOutcome>(weights, _cfg.Epsilon);
     }

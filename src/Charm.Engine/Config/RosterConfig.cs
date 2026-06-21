@@ -42,6 +42,7 @@ public sealed class PlayerConfig
     public int DefensiveRebounding { get; set; }
     public int Steals              { get; set; }
     public int HelpDefense         { get; set; }
+    public int OffBallDefense      { get; set; }
 
     // Physical
     public int Height              { get; set; }
@@ -96,6 +97,7 @@ public sealed class PlayerConfig
         DefensiveRebounding = DefensiveRebounding,
         Steals              = Steals,
         HelpDefense         = HelpDefense,
+        OffBallDefense      = OffBallDefense,
         Height              = Height,
         Wingspan            = Wingspan,
         Weight              = Weight,

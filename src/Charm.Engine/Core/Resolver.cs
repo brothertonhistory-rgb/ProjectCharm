@@ -379,7 +379,7 @@ public sealed class Resolver
                             // FastBreak: not reached here (handled at IntoHalfcourtSet above).
                             // Pre-tilt pressures passed unchanged — tilt changes WHICH slot is rolled,
                             // not the pressure each slot carries (one-pass, no feedback loop).
-                            var tiltedPieE = _rollEGenerator.BendByAttention(genE, attn.AttentionShares);
+                            var tiltedPieE = _rollEGenerator.BendByAttention(genE, attn.AttentionShares, _game, _matchup, c.State);
                             result = RollE.Execute(c.State, tiltedPieE, genE.Pressures,
                                 attn.AttentionShares, attn.TeamBaseOpenness,
                                 attn.TeamGravityLevel, attn.TeamSpacingLevel,

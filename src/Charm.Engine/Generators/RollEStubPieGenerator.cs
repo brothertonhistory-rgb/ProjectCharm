@@ -107,6 +107,11 @@ public sealed class RollEStubPieGenerator : IRollEGenerationProvider
     /// get no tilt; the real generator's implementation applies the bounded-multiplier
     /// form. Halfcourt-only by contract; the stub does not check.
     /// </summary>
-    public Pie<SelectionOutcome> BendByAttention(RollEGeneration gen, double[] attentionShares)
+    public Pie<SelectionOutcome> BendByAttention(
+        RollEGeneration gen,
+        double[] attentionShares,
+        GameState game,
+        MatchupConfig matchupCfg,
+        PossessionState state)
         => gen.Pie;
 }

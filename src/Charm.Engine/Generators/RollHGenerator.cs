@@ -230,28 +230,27 @@ public sealed class RollHGenerator : IRollHPieGenerator
             if (makePct > 1.0) makePct = 1.0;
         }
 
-        // ── C5.5: Screening interior make% bonus (Phase 42) ──────────────────
+        // ── C5.5: Screening make% bonus (Phase 42 + Phase 44) ────────────────
         // Stage 2 offensive counterweight: all five offensive players (shooter
         // included — a screen-setting shooter still contributes to the team's
         // screening environment before the release) aggregate their Screening
-        // with an ACCELERATING curve and LIFT make% on interior shots.
+        // with an ACCELERATING curve and LIFT make% on ALL FIVE ZONES (Phase 44:
+        // interior-only gate removed — excellent screening creates open looks everywhere).
         //
         // All-five-aggregate (different from C6's off-ball-only): no exclusions.
         // Fixed denominator 5.0 (full lineup capacity) — same "fixed at capacity"
         // discipline as C6's 4.0. Missing/unpopulated slots contribute 0.0;
         // one elite screener is a sliver, five compound.
         //
-        // Bonus-only (cannot lower make%). Halfcourt + interior-zone only this
-        // session — the perimeter unlock lands when OffBallDefense is authored.
+        // Bonus-only (cannot lower make%). Halfcourt only.
         //
-        // DO NOT upper-clamp here. C6 follows immediately and may offset this
-        // signed bonus. The single Math.Clamp(0, 1) lives at the end of C6,
-        // settling the paired signed terms together. If C5.5 clamped to 1.0
-        // before C6 ran, the symmetric-cancellation contract would break in the
-        // upper make% range (pre=0.95 + bonus=0.147 → premature clamp to 1.0 →
-        // C6 subtracts 0.147 → 0.853 instead of the correct 0.950).
-        if (!state.FastBreak &&
-            (zone == ShotLocation.Rim || zone == ShotLocation.Short))
+        // DO NOT upper-clamp here. C6 and C7 follow immediately and may offset this
+        // signed bonus. The single Math.Clamp(0, 1) lives at the end of C7,
+        // settling the three signed terms (C5.5+, C6−, C7−) together. If C5.5 clamped
+        // to 1.0 before C7 ran, the symmetric-cancellation contract at perimeter zones
+        // would break (pre=0.95 + bonus=0.147 → premature clamp to 1.0 →
+        // C7 subtracts 0.147 → 0.853 instead of the correct 0.950).
+        if (!state.FastBreak)
         {
             var offRoster = _game.RosterFor(state.Offense);
             var offLineup = _game.LineupFor(state.Offense);
@@ -267,10 +266,10 @@ public sealed class RollHGenerator : IRollHPieGenerator
             var screeningBonus = _cfg.ScreeningBonusScale
                                * Math.Pow(screeningShare, _cfg.ScreeningAggregateExponent);
             makePct += screeningBonus;
-            // No clamp here — C6 follows and may offset. See deferred-clamp note above.
+            // No clamp here — C6 and C7 follow. See deferred-clamp note above.
         }
 
-        // ── C6: HelpDefense interior make% suppression (Phase 41) ────────────
+        // ── C6: HelpDefense interior make% suppression (Phase 41 + Phase 44) ──
         // Stage 2 of the interior defensive sequence: the four off-ball defenders
         // rotate to help after the primary defender (Stage 1) is beaten. Their
         // HelpDefense aggregates with an ACCELERATING curve — one good helper is a
@@ -279,41 +278,84 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // Off-ball-only: the matched defender (defenderSlot.Number) had his Stage 1
         // contest above; exclude him unconditionally here. Every remaining null/
         // unpopulated slot contributes 0.0 — the denominator is always the full
-        // four-helper capacity (4.0), never the count of populated helpers. This makes
-        // partial lineups degrade safely, keeps one elite helper a sliver, and makes
-        // four elite helpers a genuine defensive identity.
+        // four-helper capacity (4.0), never the count of populated helpers.
         //
-        // Halfcourt + interior-zone only. Compounds-with-but-separate-from RimProtection:
-        // C6 touches make% (Stage 2); the block door below touches block weight (Stage 3).
-        // No double-subtraction.
+        // Zone-specific multipliers (Phase 44): Rim/Short full (1.0), Mid partial
+        // (HelpDefenseMidMultiplier, default 0.30), Long/Three zero.
+        // The block runs for all halfcourt possessions; the multiplier sends it to
+        // zero at zones where HelpDefense has no effect.
         //
-        // Paired with C5.5 (Screening +) this session. The single Math.Clamp below
-        // settles both signed terms together — neither C5.5 nor C6 clamps alone,
-        // preserving the symmetric-cancellation contract across the full make% range.
-        if (!state.FastBreak &&
-            (zone == ShotLocation.Rim || zone == ShotLocation.Short))
+        // Paired with C5.5 (Screening +) and C7 (OffBallDefense −). The single
+        // Math.Clamp below (at the end of C7) settles all three signed terms together.
+        if (!state.FastBreak)
         {
-            var defRoster = _game.RosterFor(state.Defense);
-            var defLineup = _game.LineupFor(state.Defense);
+            var helpDefZoneMultiplier = zone switch {
+                ShotLocation.Rim   => 1.0,
+                ShotLocation.Short => 1.0,
+                ShotLocation.Mid   => _cfg.HelpDefenseMidMultiplier,
+                _                  => 0.0
+            };
 
-            var offBallSum = 0.0;
-            for (var i = 1; i <= 5; i++)
+            if (helpDefZoneMultiplier > 0.0)
             {
-                if (i == defenderSlot.Number) continue;   // exclude the matched defender
-                var helper = defRoster.PlayerAt(defLineup.SlotAt(i));
-                offBallSum += helper is not null ? helper.HelpDefense / 100.0 : 0.0;
-            }
+                var defRoster = _game.RosterFor(state.Defense);
+                var defLineup = _game.LineupFor(state.Defense);
 
-            var offBallShare          = offBallSum / 4.0;   // always full four-helper capacity
-            var helpDefenseSuppression = _cfg.HelpDefenseSuppressionScale
-                                       * Math.Pow(offBallShare, _cfg.HelpDefenseAggregateExponent);
-            makePct -= helpDefenseSuppression;
-            // After both C5.5 (Screening +) and C6 (HelpDefense −) have applied,
-            // settle makePct to [0,1] once. This is the saturation guard for the
-            // paired signed terms — neither C5.5 nor C6 clamps alone, so that the
-            // symmetric-cancellation contract holds across the full make% range.
-            makePct = Math.Clamp(makePct, 0.0, 1.0);
+                var offBallSum = 0.0;
+                for (var i = 1; i <= 5; i++)
+                {
+                    if (i == defenderSlot.Number) continue;   // exclude the matched defender
+                    var helper = defRoster.PlayerAt(defLineup.SlotAt(i));
+                    offBallSum += helper is not null ? helper.HelpDefense / 100.0 : 0.0;
+                }
+
+                var offBallShare           = offBallSum / 4.0;   // always full four-helper capacity
+                var helpDefenseSuppression = _cfg.HelpDefenseSuppressionScale
+                                           * Math.Pow(offBallShare, _cfg.HelpDefenseAggregateExponent)
+                                           * helpDefZoneMultiplier;
+                makePct -= helpDefenseSuppression;
+            }
         }
+
+        // ── C7: OffBallDefense perimeter make% suppression (Phase 44) ────────
+        // Symmetric counterpart to C6 at the perimeter. Off-ball-only (matched defender
+        // excluded), fixed denominator 4.0, accelerating curve — same shape as C6.
+        // Zone-specific multiplier: full on Long/Three, partial on Mid, zero on Rim/Short.
+        // Halfcourt only.
+        //
+        // The single Math.Clamp below settles C5.5 (+), C6 (−), and C7 (−) together.
+        if (!state.FastBreak)
+        {
+            var offBallZoneMultiplier = zone switch {
+                ShotLocation.Long  => 1.0,
+                ShotLocation.Three => 1.0,
+                ShotLocation.Mid   => _cfg.OffBallDefenseMidMultiplier,
+                _                  => 0.0
+            };
+
+            if (offBallZoneMultiplier > 0.0)
+            {
+                var defRoster = _game.RosterFor(state.Defense);
+                var defLineup = _game.LineupFor(state.Defense);
+
+                var offBallSum = 0.0;
+                for (var i = 1; i <= 5; i++)
+                {
+                    if (i == defenderSlot.Number) continue;   // exclude matched defender
+                    var helper = defRoster.PlayerAt(defLineup.SlotAt(i));
+                    offBallSum += helper is not null ? helper.OffBallDefense / 100.0 : 0.0;
+                }
+
+                var offBallShare          = offBallSum / 4.0;
+                var offBallDefSuppression = _cfg.OffBallDefenseSuppressionScale
+                                          * Math.Pow(offBallShare, _cfg.OffBallDefenseAggregateExponent)
+                                          * offBallZoneMultiplier;
+                makePct -= offBallDefSuppression;
+            }
+        }
+
+        // Settle all three signed C-terms (C5.5 +, C6 −, C7 −) under a single clamp.
+        makePct = Math.Clamp(makePct, 0.0, 1.0);
 
         // Phase 7 — matchup-aware block door. Compute the bent block weight from the
         // matchup, or fall back to the configured baseline if the defending slot is empty

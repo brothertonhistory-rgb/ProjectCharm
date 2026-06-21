@@ -23,7 +23,7 @@ namespace Charm.Engine;
 /// <para><b>Wiring status.</b> All authored attributes are carried and validated
 /// on construction. Live-on-arrival attributes are ready to be consumed the moment
 /// a real generator replaces its stub. Dormant-pending-module attributes
-/// (Endurance, Gravity, Spacing, OffBallDefense) are real
+/// (Endurance, Gravity, Spacing) are real
 /// fields on this object — authored or computed — but no generator reads them yet.
 /// They sit here as proven, occupied seats, not future placeholders.</para>
 ///
@@ -218,6 +218,13 @@ public sealed class Player
     /// (bigs rotate and protect) but not size-gated: a guard with high HelpDefense is
     /// a rare, valuable unlock. Read by RollHGenerator (C6, Phase 41).</summary>
     public int HelpDefense { get; init; }
+
+    /// <summary>Perimeter off-ball denial — the ability to make it hard for perimeter
+    /// players to catch the ball and start offensive actions. High values compress the
+    /// selection tilt toward perimeter focal points and suppress make% on Long and Three
+    /// (with partial effect at Mid). Guards and wings can have high values; this is not
+    /// size-gated. [CALIBRATION PLACEHOLDER]</summary>
+    public int OffBallDefense { get; init; }
 
     // -------------------------------------------------------------------------
     // Physical — authored individual
@@ -440,6 +447,7 @@ public sealed class Player
         Check(nameof(DefensiveRebounding), DefensiveRebounding);
         Check(nameof(Steals),              Steals);
         Check(nameof(HelpDefense),         HelpDefense);
+        Check(nameof(OffBallDefense),      OffBallDefense);
         Check(nameof(Height),              Height);
         Check(nameof(Wingspan),            Wingspan);
         Check(nameof(Weight),              Weight);

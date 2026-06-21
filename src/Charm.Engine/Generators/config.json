@@ -517,7 +517,7 @@
         "MidTendency": 35,
         "LongTendency": 15,
         "ThreeTendency": 50,
-        "HelpDefense": 55,
+        "HelpDefense": 55
         "OffBallDefense": 50
       },
       {
@@ -558,7 +558,7 @@
         "MidTendency": 30,
         "LongTendency": 20,
         "ThreeTendency": 40,
-        "HelpDefense": 50,
+        "HelpDefense": 50
         "OffBallDefense": 50
       },
       {
@@ -599,7 +599,7 @@
         "MidTendency": 35,
         "LongTendency": 25,
         "ThreeTendency": 45,
-        "HelpDefense": 58,
+        "HelpDefense": 58
         "OffBallDefense": 50
       },
       {
@@ -640,7 +640,7 @@
         "MidTendency": 25,
         "LongTendency": 10,
         "ThreeTendency": 10,
-        "HelpDefense": 82,
+        "HelpDefense": 82
         "OffBallDefense": 50
       },
       {
@@ -681,7 +681,7 @@
         "MidTendency": 25,
         "LongTendency": 20,
         "ThreeTendency": 80,
-        "HelpDefense": 33,
+        "HelpDefense": 33
         "OffBallDefense": 50
       }
     ],
@@ -724,7 +724,7 @@
         "MidTendency": 32,
         "LongTendency": 18,
         "ThreeTendency": 48,
-        "HelpDefense": 38,
+        "HelpDefense": 38
         "OffBallDefense": 50
       },
       {
@@ -765,7 +765,7 @@
         "MidTendency": 28,
         "LongTendency": 22,
         "ThreeTendency": 42,
-        "HelpDefense": 52,
+        "HelpDefense": 52
         "OffBallDefense": 50
       },
       {
@@ -806,7 +806,7 @@
         "MidTendency": 30,
         "LongTendency": 22,
         "ThreeTendency": 38,
-        "HelpDefense": 62,
+        "HelpDefense": 62
         "OffBallDefense": 50
       },
       {
@@ -847,7 +847,7 @@
         "MidTendency": 30,
         "LongTendency": 12,
         "ThreeTendency": 12,
-        "HelpDefense": 85,
+        "HelpDefense": 85
         "OffBallDefense": 50
       },
       {
@@ -888,7 +888,7 @@
         "MidTendency": 22,
         "LongTendency": 18,
         "ThreeTendency": 82,
-        "HelpDefense": 30,
+        "HelpDefense": 30
         "OffBallDefense": 50
       }
     ]

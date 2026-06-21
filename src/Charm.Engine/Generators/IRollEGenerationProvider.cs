@@ -49,9 +49,16 @@ public interface IRollEGenerationProvider : IRollEPieGenerator
     /// <see cref="GenerateWithPressure"/> by the gap between usage intent
     /// (FinalShares) and defensive attention, re-enforcing the floor/rail
     /// constraint using the TILTED weights as the redistribution basis.
+    /// Phase 44: adds selection compression via defensive OffBallDefense
+    /// (perimeter focal points) and HelpDefense (interior focal points).
     /// Halfcourt-only: caller must NOT call this on the FastBreak branch.
     /// <para>The stub implementation returns the pie unchanged (no tilt in
     /// isolated harness checks that don't wire the full attention path).</para>
     /// </summary>
-    Pie<SelectionOutcome> BendByAttention(RollEGeneration gen, double[] attentionShares);
+    Pie<SelectionOutcome> BendByAttention(
+        RollEGeneration gen,
+        double[] attentionShares,
+        GameState game,
+        MatchupConfig matchupCfg,
+        PossessionState state);
 }

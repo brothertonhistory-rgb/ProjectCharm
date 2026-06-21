@@ -961,6 +961,20 @@ public sealed class MatchupConfig
                 $"AssistRateFloor ({cfg.AssistRateFloor}) must be less than " +
                 $"AssistRateCeiling ({cfg.AssistRateCeiling}).");
 
+        // Phase 44
+        if (cfg.PostnessNeutral <= 0.0)
+            throw new InvalidOperationException("PostnessNeutral must be > 0.");
+        if (cfg.OffBallDefenseCompressionExponent <= 1.0)
+            throw new InvalidOperationException(
+                "OffBallDefenseCompressionExponent must be > 1.0 for accelerating aggregation.");
+        if (cfg.HelpDefenseCompressionExponent <= 1.0)
+            throw new InvalidOperationException(
+                "HelpDefenseCompressionExponent must be > 1.0 for accelerating aggregation.");
+        if (cfg.OffBallDefenseCompressionScale < 0.0 || cfg.OffBallDefenseCompressionScale > 1.0)
+            throw new InvalidOperationException("OffBallDefenseCompressionScale must be in [0, 1].");
+        if (cfg.HelpDefenseCompressionScale < 0.0 || cfg.HelpDefenseCompressionScale > 1.0)
+            throw new InvalidOperationException("HelpDefenseCompressionScale must be in [0, 1].");
+
         return cfg;
     }
 
@@ -1502,4 +1516,37 @@ public sealed class MatchupConfig
         ShotLocation.Rim   => AssistedRateRim,
         _                  => AssistedRateRim,
     };
+
+    // ── Phase 44 — OffBallDefense and HelpDefense selection compression knobs. ──
+
+    /// <summary>Zero-compression pivot used to split perimeter and interior selection
+    /// compression in BendByAttention. At exactly PostnessNeutral, both OffBallDefense
+    /// and HelpDefense compression weights are zero. Below it, OffBallDefense influence
+    /// fades linearly from its maximum (at postness=0) to zero. Above it, HelpDefense
+    /// influence rises from zero, capped at 1.0 for sufficiently high-postness players.
+    /// Builder must compute Matchup.Postness at all-50 attributes against the live
+    /// PostnessHeight/PostnessPostDefense/PostnessStrength config values and confirm.
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double PostnessNeutral { get; set; } = 50.0;
+
+    /// <summary>Exponent for OffBallDefense compression aggregate — must be strictly > 1.0
+    /// for accelerating aggregation (same contract as HelpDefenseAggregateExponent).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double OffBallDefenseCompressionExponent { get; set; } = 2.0;
+
+    /// <summary>Exponent for HelpDefense compression aggregate — must be strictly > 1.0
+    /// for accelerating aggregation (same contract as HelpDefenseAggregateExponent).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double HelpDefenseCompressionExponent { get; set; } = 2.0;
+
+    /// <summary>Maximum compression fraction applied to the above-equal-share
+    /// excess for OffBallDefense (perimeter focal points). At 1.0, a full
+    /// aggregate would eliminate all tilt toward the perimeter focal point.
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double OffBallDefenseCompressionScale { get; set; } = 0.5;
+
+    /// <summary>Maximum compression fraction applied to the above-equal-share
+    /// excess for HelpDefense (interior focal points).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double HelpDefenseCompressionScale { get; set; } = 0.5;
 }
