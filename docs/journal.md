@@ -1,3 +1,23 @@
+## Session 01 — Wingspan-Driven Opening Tip (2026-06-20)
+
+**Scope:** Replace the 50/50 coin-flip tip with a wingspan-gap-driven probability model. Two files changed; no roll logic, generator, or config touched.
+
+**What shipped:**
+
+`src/Charm.Engine/Core/JumpBall.cs` — EDIT. The `ArrowState.Off` branch (opening / OT tip) now computes a real contest. Two private static helpers added:
+
+`MaxWingspan(GameState game, TeamSide side)` — enumerates slots 1–5 via `roster.PlayerAt(lineup.SlotAt(slot))`; returns the highest `Wingspan` among populated players. Returns 50 when no roster is populated (preserves 50/50 only when both sides are unpopulated — a real lineup facing an empty side correctly holds the advantage).
+
+`HomeWinProbability(int homeWingspan, int awayWingspan)` — linear gap formula: `0.50 + (gap / 7.0) * 0.40`, clamped to [0.10, 0.90] via `Math.Clamp`. A 7-rating-point gap on the 0–99 scale → ±40% shift from 50/50. No tip is ever a guaranteed win.
+
+The coin flip `rng.NextUnitInterval() < 0.5` replaced with `rng.NextUnitInterval() < HomeWinProbability(homeMax, awayMax)`. Arrow logic, `WasTipContest` flag, and alternating-possession branch untouched. Class-level XML summary updated: FUTURE SEAM language removed, height-differential S-curve reference removed, wingspan gap model described.
+
+`src/Charm.Harness/Program.Checks.GameLifecycle.cs` — EDIT. Sub-check 5 replaced entirely. New shape: seats the config roster via `SeatStartersFromConfig`, reads actual max wingspan for each side using a local `ReadMaxWingspan` helper (same logic as `JumpBall.MaxWingspan`), derives `expectedHomeProb` from the same formula, then runs 10,000 tips and asserts the observed home rate lands within `RateTolerance * 2.0` of the expected value. No hardcoded thresholds — the assertion is derived from whoever is on the court, so it remains valid with any lineup. Arrow-still-Off and arrow-points-at-winner invariants preserved from prior version. Precondition guard (arrow ON → throws) preserved unchanged. Sub-check label updated to `"wingspan-driven tip directionality + precondition guard"`.
+
+**Harness result:** All checks passed. Sub-check 5 reported `home max wingspan=90, away max wingspan=92`, `expected home win prob=38.57%`, observed within tolerance. Stress test confirmed directional behavior in live games (EliteVsWeak bucket shows expected attribute-driven outcome separation).
+
+**Design call flagged during build:** Sub-check 5 uses `SeatStartersFromConfig` and derives its assertion threshold from the actual roster on the court — not hardcoded values. This makes the check valid with any lineup. When real rosters eventually replace the config roster, the threshold will auto-update; only the printed expected probability line changes.
+
 ## Session 76 — Game Boundaries: Halftime Foul Reset + Opening Tip + Overtime (2026-06-20)
 
 **Scope:** Three game-boundary correctness items in one build. No changes to any possession roll, generator, matchup math, or roll config. This is a correctness build — the harness oracle does not apply; `output.txt` was refreshed after the new behavior was accepted.

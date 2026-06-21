@@ -12,23 +12,19 @@ public readonly record struct JumpBallAward(TeamSide AwardedTo, bool WasTipConte
 ///
 /// Two behaviors, by arrow state:
 ///
-///   • Arrow OFF (opening tip / overtime tip) — a real contest. Resolved as a
-///     pure 50/50 coin flip for now. The winner gets the ball; the arrow is
-///     turned ON pointing at the LOSER (NCAA: the tip-loser is owed the next
-///     alternating-possession award).
+///   • Arrow OFF (opening tip / overtime tip) — a real contest. The jumper for
+///     each team is the player with the highest <see cref="Player.Wingspan"/> in
+///     the current lineup. Win probability is scaled by the gap between the two
+///     jumpers' Wingspan ratings: a 7-rating-point gap on the 0–99 scale shifts
+///     the probability by ±0.40, clamped to [0.10, 0.90] (no tip is ever a
+///     guaranteed win). When no roster is populated for a side, that side falls
+///     back to Wingspan 50, preserving 50/50 behavior for unpopulated games.
+///     Wingspan is a 0–99 reach rating, not literal inches. Curve is
+///     calibration-pending.
 ///
 ///   • Arrow ON — a routine alternating-possession situation. The team the
 ///     arrow points at is awarded the ball, then the arrow flips away from them.
 ///     Deterministic; no randomness.
-///
-/// FUTURE SEAM — height-driven tip contest. The 50/50 coin flip is a placeholder
-/// for the one true contest in this node. The intended model: tip-win
-/// probability driven by the centers' height differential, non-linear (a 1" edge
-/// is a near-negligible bump; a large gap, ~8", approaches near-certainty) — an
-/// S-curve on height-diff, not linear. It plugs in exactly here, consuming the
-/// center matchup once a player/attribute layer exists. Nothing else in this
-/// node changes when it does: the node still returns "which team won," the arrow
-/// still consumes it. Same seam discipline as the stub pie generators.
 /// </summary>
 public static class JumpBall
 {
@@ -38,11 +34,12 @@ public static class JumpBall
     {
         if (game.PossessionArrow == ArrowState.Off)
         {
-            // Opening / OT tip — a real contest. Placeholder: 50/50 coin flip.
-            // FUTURE: height-differential S-curve (see class summary).
-            var homeWinsTip = rng.NextUnitInterval() < 0.5;
+            // Opening / OT tip — wingspan-driven contest.
+            var homeMax  = MaxWingspan(game, TeamSide.Home);
+            var awayMax  = MaxWingspan(game, TeamSide.Away);
+            var homeWinsTip = rng.NextUnitInterval() < HomeWinProbability(homeMax, awayMax);
             var winner = homeWinsTip ? TeamSide.Home : TeamSide.Away;
-            var loser = homeWinsTip ? TeamSide.Away : TeamSide.Home;
+            var loser  = homeWinsTip ? TeamSide.Away : TeamSide.Home;
 
             // Arrow turns ON pointing at the LOSER — they are owed the next award.
             game.SetPossessionArrow(loser);
@@ -54,5 +51,37 @@ public static class JumpBall
         var awarded = game.PossessionArrow == ArrowState.Home ? TeamSide.Home : TeamSide.Away;
         game.FlipPossessionArrow();
         return new JumpBallAward(awarded, WasTipContest: false);
+    }
+
+    /// <summary>
+    /// The highest <see cref="Player.Wingspan"/> among populated slots 1–5 for
+    /// <paramref name="side"/>. Returns 50 when no roster is populated — preserves
+    /// 50/50 tip behavior only when BOTH sides are unpopulated; a real lineup facing
+    /// an unpopulated side correctly holds the wingspan advantage.
+    /// </summary>
+    private static int MaxWingspan(GameState game, TeamSide side)
+    {
+        var roster  = game.RosterFor(side);
+        var lineup  = game.LineupFor(side);
+        var max     = -1;
+        for (var slot = 1; slot <= 5; slot++)
+        {
+            var player = roster.PlayerAt(lineup.SlotAt(slot));
+            if (player is not null && player.Wingspan > max)
+                max = player.Wingspan;
+        }
+        return max >= 0 ? max : 50;
+    }
+
+    /// <summary>
+    /// Home win probability from the wingspan gap. A 7-rating-point gap on the
+    /// 0–99 scale shifts probability by ±0.40 from 50/50, clamped to [0.10, 0.90].
+    /// Calibration-pending.
+    /// </summary>
+    private static double HomeWinProbability(int homeWingspan, int awayWingspan)
+    {
+        var gap = homeWingspan - awayWingspan;
+        var raw = 0.50 + (gap / 7.0) * 0.40;
+        return Math.Clamp(raw, 0.10, 0.90);
     }
 }

@@ -2546,18 +2546,56 @@ internal static partial class Program
                 : $"    FAIL: {tiedCount} tied final scores across 200 games");
         }
 
-        // ── Sub-check 5: Tip fairness and precondition enforcement ────────────
-        Console.WriteLine("  Sub-check 5: tip fairness ~50% ± tolerance, precondition guard");
+        // ── Sub-check 5: wingspan-driven tip directionality + precondition guard ─
+        // Seats whoever is on the court (config roster), reads the actual max
+        // wingspan for each side, derives the expected home win probability from
+        // the same formula JumpBall uses, then asserts the observed rate across
+        // 10,000 tips lands within a tolerance band of that expected probability.
+        // No hardcoded thresholds: the assertion is always derived from whoever
+        // is actually on the court, so it works correctly with any lineup.
+        Console.WriteLine("  Sub-check 5: wingspan-driven tip directionality + precondition guard");
         {
             const int N5 = 10_000;
+
+            // ── Read the actual max wingspan for each side from the live roster ─
+            // Use a throw-away game just for the roster read — no tip run here.
+            var game5Ref = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            SeatStartersFromConfig(game5Ref, configPath);
+
+            static int ReadMaxWingspan(GameState g, TeamSide side)
+            {
+                var roster = g.RosterFor(side);
+                var lineup = g.LineupFor(side);
+                var max = -1;
+                for (var s = 1; s <= 5; s++)
+                {
+                    var p = roster.PlayerAt(lineup.SlotAt(s));
+                    if (p is not null && p.Wingspan > max) max = p.Wingspan;
+                }
+                return max >= 0 ? max : 50;
+            }
+
+            var homeMax5 = ReadMaxWingspan(game5Ref, TeamSide.Home);
+            var awayMax5 = ReadMaxWingspan(game5Ref, TeamSide.Away);
+
+            // Derive the expected home win probability from the same formula as JumpBall.
+            var gap5    = homeMax5 - awayMax5;
+            var rawProb = 0.50 + (gap5 / 7.0) * 0.40;
+            var expectedHomeProb = Math.Clamp(rawProb, 0.10, 0.90);
+
+            Console.WriteLine($"    roster: home max wingspan={homeMax5}, away max wingspan={awayMax5}");
+            Console.WriteLine($"    expected home win prob={expectedHomeProb:P2}  away={1.0 - expectedHomeProb:P2}");
+
+            // ── Run 10,000 tips, each with the same seeded roster ────────────
             var homeCount = 0;
             for (var seed = 0; seed < N5; seed++)
             {
                 var game5 = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
-                // Arrow starts Off on a fresh GameState — correct precondition
-                var rng5 = new SystemRng(seed);
+                SeatStartersFromConfig(game5, configPath);
+                var rng5   = new SystemRng(seed);
                 var state5 = TipPossession.CreateFromTip(game5, rng5, possessionNumber: 1);
                 if (state5.Offense == TeamSide.Home) homeCount++;
+
                 // Arrow must no longer be Off after the tip
                 if (game5.PossessionArrow == ArrowState.Off)
                 {
@@ -2572,13 +2610,15 @@ internal static partial class Program
                     allOk = false;
                 }
             }
-            var observed = (double)homeCount / N5 * 100.0;
-            var tolerance = cfgA.RateTolerance * 100.0;
-            var fairOk = Math.Abs(observed - 50.0) <= tolerance;
-            allOk &= fairOk;
-            Console.WriteLine(fairOk
-                ? $"    tip fairness ~50% ± tolerance -> ok  (observed={observed:F2}%)"
-                : $"    FAIL: observed={observed:F2}% outside 50% ± {tolerance:F2}%");
+
+            // Assert observed rate is within tolerance of the expected probability.
+            var observedHomeProb = (double)homeCount / N5;
+            var dirTolerance     = cfgA.RateTolerance * 2.0;  // wider band: directional, not calibration
+            var dirOk = Math.Abs(observedHomeProb - expectedHomeProb) <= dirTolerance;
+            allOk &= dirOk;
+            Console.WriteLine(dirOk
+                ? $"    tip directionality -> ok  (observed home={observedHomeProb:P2}, expected={expectedHomeProb:P2})"
+                : $"    FAIL: observed home={observedHomeProb:P2} outside expected={expectedHomeProb:P2} ± {dirTolerance:P2}");
 
             // Precondition guard: arrow ON should throw
             bool threwOk;

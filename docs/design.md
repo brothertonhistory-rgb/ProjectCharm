@@ -5800,3 +5800,15 @@ The possession-loop body was extracted into a local function inside `Governor.Ru
 - **Overtime foul-carry direct regression test.** The structural guarantee (guard `half < _cfg.Halves` prevents reset after final regulation half) plus source-level verification is the proof for this session. A separate controlled-foul OT regression test is explicitly deferred.
 - **Height-driven tip contest.** `JumpBall.Resolve`'s 50/50 draw is the existing placeholder. The `FUTURE SEAM` comment in `JumpBall.cs` remains — plugs in once the player/attribute layer adds a center matchup.
 - **Score-aware end-of-regulation strategy.** The end-of-half intent pie (`HoldShootLast`, `ShootEarly`, `NoShot`) is score-blind. Late-game strategy (fouling to stop the clock, heaving a three to tie) is a named future feature.
+
+### Session 01 — Wingspan-Driven Opening Tip
+
+**The model.** The team with the longer-wingspan player wins the tip more often. The jumper for each team is the player with the highest `Wingspan` rating in the current lineup (slots 1–5, null slots skipped). Win probability is computed from the gap between the two jumpers' Wingspan ratings via a linear formula: `0.50 + (gap / 7.0) * 0.40`, clamped to [0.10, 0.90]. A 7-rating-point gap on the 0–99 scale → ±40% shift from 50/50. No tip is ever a guaranteed win (no hard zeros, per Principle 1). Curve is calibration-pending.
+
+**Wingspan is a reach rating, not literal inches.** The 0–99 scale is the same as all other player attributes. A 7-rating-point gap is intentionally treated as a major advantage because the tip is a specific athletic contest where reach dominates — the aggressive curve reflects that. Calibration will tune the scale.
+
+**Fallback behavior.** When no roster is populated for a side, `MaxWingspan` returns 50. Both sides returning 50 → probability exactly 0.50 → pure 50/50. This preserves backward compatibility for any check that constructs a `GameState` without seating players. A real lineup facing an empty side correctly holds the wingspan advantage (only one side falls back to 50).
+
+**Implementation seam.** `MaxWingspan` reads from `game.RosterFor(side).PlayerAt(lineup.SlotAt(slot))` — the same seam used by all attribute-driven generators. When substitutions exist, `PlayerAt` always returns the current occupant, so mid-game jump balls (Arrow ON → routine alternating possession, no wingspan read) and OT tips (Arrow OFF → MaxWingspan fires against whoever is currently on the court) both work correctly without any additional wiring.
+
+**Check design.** Sub-check 5 in `GameBoundaryCheck` derives its assertion threshold from the actual roster on the court — not hardcoded values. It seats the config roster, reads max wingspan for each side, computes `expectedHomeProb` from the same formula `JumpBall` uses, and asserts the observed rate across 10,000 tips lands within `RateTolerance * 2.0` of that expected value. This makes the check valid with any lineup: when rosters change, the threshold auto-updates.
