@@ -407,8 +407,8 @@ internal static partial class Program
 
         // --- Per-slot assertions ---
         Console.WriteLine();
-        Console.WriteLine($"  {"Side",-6} {"Slot",-5} {"Name",-20} {"Ath":>6} {"Trans":>6} {"Grav":>6} {"Spac":>6}  Validate");
-        Console.WriteLine($"  {new string('-', 75)}");
+        Console.WriteLine($"  {"Side",-6} {"Slot",-5} {"Name",-20} {"Ath":>6} {"Grav":>6} {"Spac":>6}  Validate");
+        Console.WriteLine($"  {new string('-', 68)}");
 
         foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
         {
@@ -441,7 +441,7 @@ internal static partial class Program
                 // Print derived values
                 Console.WriteLine(
                     $"  {side,-6} {n,-5} {player.Name,-20} " +
-                    $"{player.Athleticism,6:F1} {player.Transition,6:F1} " +
+                    $"{player.Athleticism,6:F1} " +
                     $"{player.GravityContribution,6:F1} {player.SpacingContribution,6:F1}" +
                     $"  {validateLabel}");
 
@@ -449,8 +449,6 @@ internal static partial class Program
                 // component max of 99 from a flat mean of 0–99 inputs)
                 if (player.Athleticism < 0 || player.Athleticism > 99)
                 { Console.WriteLine($"    FAIL  {player.Name}.Athleticism out of range: {player.Athleticism:F1}"); pass = false; }
-                if (player.Transition < 0 || player.Transition > 99)
-                { Console.WriteLine($"    FAIL  {player.Name}.Transition out of range: {player.Transition:F1}"); pass = false; }
                 if (player.GravityContribution < 0 || player.GravityContribution > 99)
                 { Console.WriteLine($"    FAIL  {player.Name}.GravityContribution out of range: {player.GravityContribution:F1}"); pass = false; }
                 if (player.SpacingContribution < 0 || player.SpacingContribution > 99)

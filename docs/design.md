@@ -5812,3 +5812,42 @@ The possession-loop body was extracted into a local function inside `Governor.Ru
 **Implementation seam.** `MaxWingspan` reads from `game.RosterFor(side).PlayerAt(lineup.SlotAt(slot))` — the same seam used by all attribute-driven generators. When substitutions exist, `PlayerAt` always returns the current occupant, so mid-game jump balls (Arrow ON → routine alternating possession, no wingspan read) and OT tips (Arrow OFF → MaxWingspan fires against whoever is currently on the court) both work correctly without any additional wiring.
 
 **Check design.** Sub-check 5 in `GameBoundaryCheck` derives its assertion threshold from the actual roster on the court — not hardcoded values. It seats the config roster, reads max wingspan for each side, computes `expectedHomeProb` from the same formula `JumpBall` uses, and asserts the observed rate across 10,000 tips lands within `RateTolerance * 2.0` of that expected value. This makes the check valid with any lineup: when rosters change, the threshold auto-updates.
+
+## Session 02 — GravityContribution + SpacingContribution Formula Updates; Transition Retired
+
+### GravityContribution: perimeter gravity is real (small)
+
+The prior formula gave Outside zero weight in gravity, treating perimeter shooting as purely spacing. This was architecturally clean but slightly wrong. A dominant perimeter threat pulls the defense toward the arc even without attacking the rim — the defense must account for the possibility of the three. That is real gravity, not just spacing.
+
+New formula: `0.35×Finishing + 0.25×Close + 0.25×Access + 0.10×Mid + 0.05×Outside`
+
+The 0.05 Outside weight is deliberately small. Rim pressure remains the primary gravity signal (Finishing + Close = 0.60). The delta versus the prior formula is exactly `0.05 × (Outside − Access)`: perimeter-dominant players tick up, post-dominant players tick down modestly. Both directions are intentional and should not be corrected during calibration without explicit design approval.
+
+**Two behavioral consequences in AttentionGenerator (both intentional):**
+1. The Outside term flows into the defensive attention allocation and team gravity/openness calculation.
+2. The Outside term flows into the passing-converter activation route — `postRoute` reads `GravityContribution / 100.0`, so elite perimeter threats now have a slightly higher activation floor.
+
+### SpacingContribution: OffBallMovement promoted from dormant to active
+
+A shooter who can get open without the ball (cutting, relocating, using screens) is a more dangerous spacing threat than one who stands in the corner. Before this session, OffBallMovement was authored data that no generator read. This session promotes it into a compound multiplier that amplifies spacing when paired with real shooting ability.
+
+New formula:
+```
+BaseSpacing         = 0.75 x Outside + 0.25 x Mid
+SpacingContribution = BaseSpacing x (1 + (OffBallMovement / 100) x (Outside / 100) x 0.30)
+```
+Result clamped to [0, 100].
+
+Key design properties:
+- **OffBallMovement does almost nothing without shooting ability.** Outside near 0 gives a multiplier near 1.0. A non-shooter who runs all day does not create spacing.
+- **Stationary shooters score slightly lower than the old formula.** Outside base weight dropped from 0.85 to 0.75. A good shooter with low OffBallMovement gets a small compound bump that does not fully recover the base weight reduction. This is intentional — OffBallMovement is now a real separator.
+- **Mid weight rose from 0.15 to 0.25 in the base.** A stretch player who can step to the elbow creates real spacing regardless of position. This is Emmett's basketball call.
+- **The 0.30 literal is a calibration placeholder.** Do not promote to a config field or named constant until the calibration pass establishes a target range.
+
+### Transition derived property: retired
+
+`Transition = (Athleticism + Finishing) / 2` let Athleticism (itself a derived composite of five physical attributes) and Finishing count again through a third channel. The retirement removes double-counting. Nothing is lost: any generator that wants to model open-floor scoring ability can read Athleticism and Finishing directly.
+
+### The validation surface for derived player properties
+
+Formula changes at the player-model layer do not produce visible shifts in aggregate game stats. Their effect flows through AttentionGenerator into Roll H C1/C2/C3 and Roll E selection tilt — real but several layers deep and small in magnitude. The direct validation surface is the per-player Grav and Spac column values in the GameLifecycle check player table: these show computed derived values per player and can be checked against formula predictions. Calibration of magnitudes is deferred to the calibration pass.

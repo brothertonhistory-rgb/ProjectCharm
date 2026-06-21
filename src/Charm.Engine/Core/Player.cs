@@ -23,7 +23,7 @@ namespace Charm.Engine;
 /// <para><b>Wiring status.</b> All authored attributes are carried and validated
 /// on construction. Live-on-arrival attributes are ready to be consumed the moment
 /// a real generator replaces its stub. Dormant-pending-module attributes
-/// (Endurance, Gravity, Spacing, HelpDefense, OffBallDefense, Transition) are real
+/// (Endurance, Gravity, Spacing, HelpDefense, OffBallDefense) are real
 /// fields on this object — authored or computed — but no generator reads them yet.
 /// They sit here as proven, occupied seats, not future placeholders.</para>
 ///
@@ -295,45 +295,36 @@ public sealed class Player
         (Strength + Speed + Quickness + FirstStep + Vertical) / 5.0;
 
     /// <summary>
-    /// Open-floor scoring ability — the confluence of <see cref="Athleticism"/>
-    /// (itself derived) and <see cref="Finishing"/>. The engine's existing
-    /// <c>FastBreak</c> marker is what makes transition a separable context.
-    ///
-    /// <para>Derived-from-derived: fine as long as the dependency order is
-    /// explicit. Athleticism is computed first, Transition reads it.
-    /// <b>Dormant-pending-module:</b> no generator reads Transition until Roll J's
-    /// real generator is built.</para>
-    ///
-    /// <para><b>Placeholder formula.</b> Equal-weight mean of athleticism and
-    /// finishing. Phase 6 tunes.</para>
-    /// </summary>
-    public double Transition =>
-        (Athleticism + Finishing) / 2.0;
-
-    /// <summary>
     /// The rim pressure this player generates — the per-player input to the
     /// team-aggregate gravity value. <b>Gravity = does this player put pressure on
     /// the rim?</b> Route-agnostic: a modern rim-attacking guard and a Shaq-era
     /// post scorer generate the same gravity because the rim is constant.
     ///
-    /// <para><b>Formula (Phase 27, bounded [0,100]).</b>
+    /// <para><b>Formula (Session 02 update, bounded [0,100]).</b>
     /// <code>
     /// PerimeterAccess = avg(FirstStep, SelfCreation, Speed)
     /// PostAccess      = avg(PostMoves, Strength)
     /// Access          = max(PerimeterAccess, PostAccess)
     ///                   + 0.10 × min(PerimeterAccess, PostAccess)   // bounded versatility bonus
-    /// GravityContribution = 0.35×Finishing + 0.25×Close + 0.30×Access + 0.10×Mid
+    /// GravityContribution = 0.35×Finishing + 0.25×Close + 0.25×Access + 0.10×Mid + 0.05×Outside
     /// </code>
-    /// Weights sum to 1; result clamped to [0,100]. Finishing and Close carry the
-    /// highest weight (converting near the basket IS the threat); Access captures
-    /// the ability to reach the paint via either route (one route suffices; a
-    /// two-route player receives a small — bounded — versatility bonus); Mid has
-    /// moderate weight; Outside near-zero (perimeter shooting is spacing, not
-    /// gravity).</para>
+    /// Weights sum to 1.0; result clamped to [0,100]. Rim pressure remains primary
+    /// (Finishing + Close = 0.60); Access weight reduced slightly to make room for
+    /// a small but deliberate Outside term — dominant perimeter threats pull the
+    /// defense in a way that is real gravity, not just spacing. The delta versus the
+    /// prior formula is exactly <c>0.05 × (Outside − Access)</c>: players whose
+    /// Outside exceeds Access gain gravity; players whose Access exceeds Outside
+    /// (post-oriented bigs) decline modestly. Both directions are intentional.</para>
+    ///
+    /// <para><b>Two behavioral consequences in AttentionGenerator.</b> The Outside
+    /// term flows automatically into (1) the defensive attention allocation and
+    /// team gravity/openness calculation, and (2) the passing-converter activation
+    /// route (<c>postRoute</c> reads <c>GravityContribution / 100.0</c>). Both
+    /// are intentional — perimeter gravity has a real effect on both paths.</para>
     ///
     /// <para><b>Realistic, overlapping distributions.</b> No real player is 0 or
     /// 100. A Korver-type generates some gravity (backdoor cut / foul-line touch);
-    /// an Evans-type generates some spacing (can step to 16 feet). The formula
+    /// a Shaq-type generates some spacing (can step to 16 feet). The formula
     /// produces moderate overlapping values, not a bipolar split.</para>
     ///
     /// <para>Read by <see cref="AttentionGenerator"/> (Phase 27). The team-aggregate
@@ -348,7 +339,7 @@ public sealed class Player
             var postAccess      = (PostMoves  + Strength) / 2.0;
             var access          = Math.Max(perimeterAccess, postAccess)
                                 + 0.10 * Math.Min(perimeterAccess, postAccess);
-            var g = 0.35 * Finishing + 0.25 * Close + 0.30 * access + 0.10 * Mid;
+            var g = 0.35 * Finishing + 0.25 * Close + 0.25 * access + 0.10 * Mid + 0.05 * Outside;
             return Math.Min(Math.Max(g, 0.0), 100.0);
         }
     }
@@ -358,14 +349,25 @@ public sealed class Player
     /// to the team-aggregate spacing value. <b>Spacing = does this player punish
     /// a defense that collapses?</b>
     ///
-    /// <para><b>Formula (Phase 27, bounded [0,100], honest — no artificial floor).</b>
+    /// <para><b>Formula (Session 02 update, bounded [0,100], honest — no artificial floor).</b>
     /// <code>
-    /// SpacingContribution = 0.85×Outside + 0.15×Mid
+    /// BaseSpacing         = 0.75×Outside + 0.25×Mid
+    /// SpacingContribution = BaseSpacing × (1.0 + (OffBallMovement / 100.0) × (Outside / 100.0) × 0.30)
     /// </code>
-    /// Outside carries the dominant weight: the primary spacing threat is the
-    /// three-point line. Mid has modest weight: a big who can step to 16 feet
-    /// has real spacing value (the defense must respect it). Result clamped to
-    /// [0,100].</para>
+    /// Outside remains the dominant weight; Mid weight rises slightly (mid-range
+    /// threat has real spacing value). OffBallMovement amplifies spacing as a
+    /// compound multiplier — it only matters when shooting ability (Outside) is
+    /// present. A stationary good shooter gets a small bump; a non-shooter who
+    /// moves well gets almost nothing. Result clamped to [0,100].</para>
+    ///
+    /// <para><b>Calibration note.</b> The 0.30 multiplier is a provisional literal,
+    /// pending the calibration pass. Do not promote it to a config field or named
+    /// constant until that pass establishes a target range.</para>
+    ///
+    /// <para><b>Intentional calibration consequence.</b> The base shift from
+    /// 0.85/0.15 to 0.75/0.25 means some high-Outside, low-OffBallMovement players
+    /// score slightly lower than under the prior formula. This is intentional —
+    /// OffBallMovement is now a meaningful spacing separator, not dormant data.</para>
     ///
     /// <para><b>No artificial floor.</b> This property honestly represents the
     /// player's authored shooting threat. A genuine non-shooting center should
@@ -378,8 +380,15 @@ public sealed class Player
     ///
     /// <para>Read by <see cref="AttentionGenerator"/> (Phase 27).</para>
     /// </summary>
-    public double SpacingContribution =>
-        Math.Min(Math.Max(0.85 * Outside + 0.15 * Mid, 0.0), 100.0);
+    public double SpacingContribution
+    {
+        get
+        {
+            var baseSpacing = 0.75 * Outside + 0.25 * Mid;
+            var modifier    = 1.0 + (OffBallMovement / 100.0) * (Outside / 100.0) * 0.30;
+            return Math.Min(Math.Max(baseSpacing * modifier, 0.0), 100.0);
+        }
+    }
 
     // -------------------------------------------------------------------------
     // Validation

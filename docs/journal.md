@@ -1,3 +1,24 @@
+## Session 02 — Spacing/Gravity Formula Update + OffBallMovement Modifier (2026-06-21)
+
+**Scope:** Two derived-formula updates in `Player.cs` (one adding an OffBallMovement compound multiplier), one derived property cut, and three corresponding harness edits. No generator, resolver, config, or roll logic changes. Pure player-model session.
+
+**What shipped (2 files):**
+
+`src/Charm.Engine/Core/Player.cs` — three changes.
+
+Change 1: `GravityContribution` formula updated. Old: `0.35×Finishing + 0.25×Close + 0.30×Access + 0.10×Mid`. New: `0.35×Finishing + 0.25×Close + 0.25×Access + 0.10×Mid + 0.05×Outside`. Weights sum to 1.0. Effect: the delta vs. the prior formula is exactly `0.05 × (Outside − Access)`. Players whose Outside exceeds Access (perimeter-dominant) tick up slightly; players whose Access exceeds Outside (post-dominant bigs) tick down modestly. Both directions intentional. Class-level XML doc updated: Transition removed from the dormant-pending-module list. GravityContribution XML doc rewritten to describe the new formula, the delta rule, and both behavioral consequences in AttentionGenerator (attention/openness path and postRoute passing-converter activation path).
+
+Change 2: `SpacingContribution` formula updated. Old: `0.85×Outside + 0.15×Mid`. New: `BaseSpacing = 0.75×Outside + 0.25×Mid`; `SpacingContribution = BaseSpacing × (1 + (OffBallMovement / 100.0) × (Outside / 100.0) × 0.30)`, clamped to [0,100]. OffBallMovement now amplifies spacing as a compound multiplier — it only matters when shooting ability (Outside) is present. A non-shooter who moves well gets almost nothing; a stationary good shooter gets a small bump but may score slightly lower than the old formula (Outside base weight dropped from 0.85 to 0.75). The 0.30 literal is a calibration placeholder. SpacingContribution XML doc rewritten to describe the base formula change, the OffBallMovement modifier, the calibration-pending note on the 0.30 literal, and the intentional consequence for stationary shooters.
+
+Change 3: `Transition` derived property removed entirely (XML doc + property). Reasoning: transition ability is already represented through Athleticism and Finishing individually. The composite let them count again through a third channel.
+
+`src/Charm.Harness/Program.Checks.GameLifecycle.cs` — three surgical edits. (A) Column header updated: `{"Trans":>6}` removed, separator width reduced from 75 to 68. (B) Print string: `{player.Transition,6:F1}` removed. (C) Transition range assertion block removed (`if (player.Transition < 0 || player.Transition > 99)` and its Console.WriteLine).
+
+**Validation surface for this session:** The per-player `Grav` and `Spac` columns in the GameLifecycle check player table are the direct validation surface for formula changes at this layer. Downstream game effects flow through multiple AttentionGenerator layers before affecting make% or selection — real but too subtle to see in aggregate stress test stats. The calibration pass is the right place to evaluate magnitudes. Formula correctness is verified against the player table printout.
+
+**Harness result:** ALL CHECKS PASSED. STRESS TEST PASSED. (Harness output pasted started at Phase 32; the GameLifecycle check ran before that section and is confirmed passed by the final ALL CHECKS PASSED banner and absence of compile errors.)
+
+
 ## Session 01 — Wingspan-Driven Opening Tip (2026-06-20)
 
 **Scope:** Replace the 50/50 coin-flip tip with a wingspan-gap-driven probability model. Two files changed; no roll logic, generator, or config touched.
