@@ -5851,3 +5851,47 @@ Key design properties:
 ### The validation surface for derived player properties
 
 Formula changes at the player-model layer do not produce visible shifts in aggregate game stats. Their effect flows through AttentionGenerator into Roll H C1/C2/C3 and Roll E selection tilt — real but several layers deep and small in magnitude. The direct validation surface is the per-player Grav and Spac column values in the GameLifecycle check player table: these show computed derived values per player and can be checked against formula predictions. Calibration of magnitudes is deferred to the calibration pass.
+
+## Session 03 — HelpDefense: Stage 2 of the Interior Defensive Sequence
+
+### The four-stage interior defensive sequence
+
+Interior shot defense is modeled in four distinct stages, each with a single job and a single attribute family:
+
+| Stage | Attribute | Job |
+|---|---|---|
+| 1 | PerimeterDefense / PostDefense | Primary defender's initial contest (matchup make door, wired Phase 6) |
+| 2 | HelpDefense | Secondary help reduces make% after the first defender is beaten (C6, Phase 41) |
+| 3 | RimProtection | Shot-altering / block threat (block door, Phases 7 + 36) |
+| 4 | Wingspan / Height | Physical reach ceiling on blocks and rebounds (Phases 7 + 35 + 36) |
+
+The rule: **each rating has one job in one stage.** HelpDefense reduces make%; RimProtection drives blocks. They compound (a help defender who also blocks is the most dangerous interior combo) but fire at different moments and must not both subtract from the same make%. This is not a convention — it is a hard structural separation proven by sub-check (f): varying only off-ball HelpDefense changes makePct but not blockWeight (byte-identical); varying only the matched defender's RimProtection changes blockWeight but not the C6 suppression component (identical drop at RimP=10 vs RimP=90).
+
+### HelpDefense: off-ball-only, accelerating
+
+HelpDefense measures the ability of a player to rotate from off-ball positions and contest an interior scorer after the primary defender has been beaten. Three design properties:
+
+**Off-ball-only.** The matched defender (the one contesting the shot at Stage 1) is excluded from the C6 aggregate — unconditionally, regardless of his HelpDefense rating. He already had his Stage 1 contest; including him in Stage 2 would be double-counting.
+
+**Accelerating aggregation with a fixed denominator.** The formula:
+```
+offBallShare = sum(HelpDefense/100 for each off-ball slot, null=0) / 4.0
+helpDefenseSuppression = Scale × offBallShare^Exponent
+```
+The denominator is always 4.0 — never the count of populated helpers. This is what makes one good helper a sliver and four a defensive identity. A mean-over-populated formula would make one elite helper as effective as four; the fixed denominator correctly rewards the roster-construction decision to build around team help defense. The exponent must be strictly > 1.0 (enforced by Load() invariant) — linear or diminishing aggregation would fail sub-check (b).
+
+**Correlated with size, not gated by it.** Big men tend to have higher HelpDefense because they rotate to protect the rim. But a guard with high HelpDefense is an explicit, valuable unlock — the config fixture assigns Marcus Webb (a guard) HelpDefense=55 to exercise this path. Generation-layer size correlation is a note for the player-pool layer, not a constraint here.
+
+### Why RimProtection also moves make% at Rim zone
+
+Sub-check (f)'s original design assumed RimProtection only affected the block door. Phase 6 output disproved this: a rim specialist with RimP=90 and PostD=40 gives up lower make% at Rim than a balanced defender (all=50). `Matchup.EffectiveRating` for the Rim zone includes a RimProtection term in the defensive blend — Stage 3 feeds Stage 1 through the matchup. This is correct basketball: a rim protector deters attackers even before the block. The proof of C6 independence does not require byte-identical makePct across RimProtection values; it requires byte-identical HelpDefense drops. Since `helpDefenseSuppression` has no RimProtection term, the logistic baselines cancel exactly and the proof holds analytically.
+
+### Calibration placeholders
+
+`HelpDefenseSuppressionScale = 0.15` and `HelpDefenseAggregateExponent = 2.0` are calibration placeholders. At these values, four elite off-ball helpers (HelpDefense=99) suppress interior make% by ~14.7 percentage points — aggressive but not unreasonable as a pre-calibration starting point. The Screening counterweight (next session) will create a two-sided gap that calibration tunes as a pair, not in isolation.
+
+### What is not this session
+
+- **Screening counterweight.** The two-sided make% gap (high Screening vs. high HelpDefense) assembles next session. No Screening term, hook, or config was added here.
+- **OffBallDefense.** A separate future attribute for perimeter help defense. Remains in the dormant-pending-module comment.
+- **Generation-layer size correlation.** Noted for the player-pool layer; HelpDefense is authored directly regardless of position.

@@ -1,3 +1,53 @@
+## Session 03 — Phase 41: HelpDefense Authored + C6 Interior Make% Suppression (2026-06-21)
+
+**Scope:** Author the `HelpDefense` player attribute and wire it as Stage 2 of the four-stage interior defensive sequence in `RollHGenerator`. A new config check (`Phase41HelpDefenseCheck`) with six sub-checks verifies the mechanic. 14 files changed; no resolver, roll routing, or non–Roll H generator touched.
+
+**What shipped (14 files):**
+
+`src/Charm.Engine/Core/Player.cs` — three changes. (A) `HelpDefense` property added to the Defense authored-individual block: `public int HelpDefense { get; init; }`. XML doc comment describes it as Stage 2 of the interior sequence — secondary help reduces make% after the primary defender is beaten; correlated-with-but-not-gated-by size; the off-ball-rotation skill. (B) `Check(nameof(HelpDefense), HelpDefense)` added to `Validate()` alongside the other defensive checks. (C) `HelpDefense` removed from the dormant-pending-module comment at line 26 (comment now lists `Endurance, Gravity, Spacing, OffBallDefense`).
+
+`src/Charm.Engine/Config/RosterConfig.cs` — two changes. `public int HelpDefense { get; set; }` added to `PlayerConfig` DTO in the Defense block. `HelpDefense = HelpDefense,` added to `ToPlayer()`.
+
+`src/Charm.Engine/Config/RollHConfig.cs` — two new knobs (`HelpDefenseSuppressionScale` default 0.15; `HelpDefenseAggregateExponent` default 2.0) with XML doc comments marking them as calibration placeholders. Two new invariants added to `Load()` after the Phase 27 invariants: Scale must be in [0, 1]; Exponent must be strictly > 1.0 (the accelerating-curve contract).
+
+`src/Charm.Engine/Generators/RollHGenerator.cs` — C6 block inserted between C4 (passing converter, closing brace at ~line 231) and the Phase 7 block door (~line 272). Gated by `!state.FastBreak` and `zone ∈ {Rim, Short}`. Logic: enumerate five defensive slots; skip `defenderSlot.Number` unconditionally (off-ball-only, matched defender excluded); sum populated helpers' normalized HelpDefense (each `/100.0`), unpopulated slots contribute `0.0`; divide by the fixed denominator `4.0` (never by populated count — this is what makes one good helper a sliver and four a defensive identity); compute `helpDefenseSuppression = Scale × Math.Pow(share, Exponent)`; `makePct -= helpDefenseSuppression`; clamp `if (makePct < 0.0) makePct = 0.0`. Doc block: Stage 2 of the interior sequence; off-ball-only; halfcourt + interior-zone only; standalone this session (Screening counterweight next session); compounds-with-but-separate-from RimProtection's block effect — C6 touches make%, the block door touches block weight.
+
+`src/Charm.Harness/config.json` — `HelpDefense` added to all 10 players in the `Rosters` section (bigs high: Javon Okafor=82, Darius Eze=85; wings moderate: Trey Holloway=58, Antoine Dupree=62, DeShawn Pryor=50, Rashid Monroe=52; guards lower: Marcus Webb=55 [the deliberate "rare unlock" guard], Cory Baptiste=33, Kendrick Shaw=38, Malik Thornton=30). Two new knobs added to the `"RollH"` section: `"HelpDefenseSuppressionScale": 0.15`, `"HelpDefenseAggregateExponent": 2.0`.
+
+`src/Charm.Harness/Program.cs` — `ok &= Phase41HelpDefenseCheck(configPath);` added after Phase 39.
+
+`src/Charm.Harness/Program.Harness.Shared.cs` — two changes. `HelpDefense = 50` added to the `Mk50` factory. `HelpDefense = p.HelpDefense` added to the `StampPlayerId` copy-constructor.
+
+`src/Charm.Harness/Program.Stress.cs` — `HelpDefense = Clamp(AtBaseline())` added to all eight archetype `new Player` blocks (RimRunner, PerimeterShooter, Slasher, PostScorer, ThreeAndDWing, PassFirstGuard, AthleticBig, FloorGeneral).
+
+`src/Charm.Harness/Program.Checks.Shooting.cs` — `HelpDefense = b` (or `HelpDefense = 50`) added to every `new Player` factory/inline construction (five individual constructions + four local `Mk()` factories + `MkP39`). `Phase41HelpDefenseCheck` added: six sub-checks (a)–(f). Sub-check (f) uses a drop-comparison approach to prove C6 is independent of RimProtection: the HelpDefense suppression drop (makePct_HD0 − makePct_HD99) is byte-identical at RimP=10 vs RimP=90 because `helpDefenseSuppression = Scale × share^Exp` has no RimProtection term — the logistic baseline shifts cancel exactly.
+
+`src/Charm.Harness/Program.Checks.Rebounding.cs` — `HelpDefense = b` or `HelpDefense = p.HelpDefense` added to all seven factory lambdas and one copy-constructor lambda.
+
+`src/Charm.Harness/Program.Checks.Fouls.cs` — `HelpDefense = b` added to the factory lambda, `HelpDefense=50` added to `anchorTemplate` and `roleTemplate`.
+
+`src/Charm.Harness/Program.Checks.GameLifecycle.cs` — `HelpDefense = 50` or `HelpDefense = b` added to `anchorTemplate`, `roleTemplate`, `MakePlayer`, `MkShooter`, and two local factory lambdas.
+
+`src/Charm.Harness/Program.Checks.EntryAndTransition.cs` — `HelpDefense = b` added to three factory functions/lambdas.
+
+`src/Charm.Harness/Program.Checks.Selection.cs` — `HelpDefense=50` added to five named player constructions (Alpha, Solid2, Solid3, Solid4, Rodman), one `Mk` factory, one Phase17 `Mk` factory, and `NeutralDef`.
+
+**Bugs found and fixed mid-session:**
+
+- **Slot double-SetStarter** — the `Generate` helper inside `Phase41HelpDefenseCheck` first filled all five Home slots with neutral, then called `SetStarter` on slot 1 again for the shooter. `SetStarter` correctly throws on an already-occupied slot. Fix: seat shooter first (slot 1), then neutral fillers in slots 2–5.
+
+- **Flawed RimProtection "byte-identical makePct" assertion** — sub-check (f) originally asserted pre-block makePct was byte-identical when only RimProtection varied. But `RimProtection` feeds into `Matchup.EffectiveRating` at Rim zone (confirmed by Phase 6 output: a rim specialist with RimP=90 and PostD=40 gives up lower make% at Rim than a balanced defender). The assertion was wrong in its basketball assumption. Replaced with the correct proof: compute the HelpDefense suppression drop (makePct_HD0 − makePct_HD99) at RimP=10 and RimP=90; assert the drops are byte-identical. Since `helpDefenseSuppression = Scale × (offBallShare)^Exp` has no RimProtection term, the RimProtection baselines cancel exactly and the assertion holds with Δ=0.0 by algebra.
+
+**Harness result:** ALL CHECKS PASSED. STRESS TEST PASSED. Phase41HelpDefenseCheck all six sub-checks green. Config hash shifted from `e48085ff...` to `ca1f5402...` (expected — ten players now carry HelpDefense, two new RollH knobs added). Observation run identical to Session 02 (HelpDefense in the config fixture is moderate — suppression visible but within normal FG% noise).
+
+**Phase 41 sub-check summary:**
+- (a) Matched HD=99, off-ball=0: makePct=0.677464 = baseline → matched defender correctly excluded ✓
+- (b) 1 good helper drop=0.9188pts; 4 good helpers drop=14.7015pts; ratio=16.00× > 4× → super-linear ✓
+- (c) Rim: 14.7015pts suppression; Short: 14.7015pts suppression; Mid/Long/Three: 0.0000pts ✓
+- (d) FastBreak HD=99 = FastBreak HD=0 (byte-identical) → exempt ✓
+- (e) Max suppression @Rim: makePct=0.530449 ∈ [0,1]; partial and zero off-ball: no throw ✓
+- (f) HD-only: makePct diff=14.7015pts, block diff=0.0 (identical); C6 indep: drop@RP10=drop@RP90=14.7015pts, Δ=0.0 → Stage 2/Stage 3 independent ✓
+
 ## Session 02 — Spacing/Gravity Formula Update + OffBallMovement Modifier (2026-06-21)
 
 **Scope:** Two derived-formula updates in `Player.cs` (one adding an OffBallMovement compound multiplier), one derived property cut, and three corresponding harness edits. No generator, resolver, config, or roll logic changes. Pure player-model session.

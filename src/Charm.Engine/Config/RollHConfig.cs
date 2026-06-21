@@ -259,6 +259,23 @@ public sealed class RollHConfig
     /// [CALIBRATION PLACEHOLDER]</summary>
     public double MaxPassingBonus { get; set; } = 0.08;
 
+    // ── Session 03 — HelpDefense interior make% suppression (C6) ──────────────
+    // The four off-ball defenders (matched defender excluded) rotate to help on
+    // interior shots (Rim/Short). Their HelpDefense aggregates with an ACCELERATING
+    // curve (one good helper ≈ a sliver; four compound) and reduces make%.
+    // Halfcourt only. Standalone suppressor — the Screening counterweight lands next
+    // session. [CALIBRATION PLACEHOLDER]
+
+    /// <summary>Maximum make%-point suppression from perfect off-ball help defense.
+    /// Invariant: in [0, 1] (above 1.0 is nonsensical as a maximum percentage-point
+    /// reduction). [CALIBRATION PLACEHOLDER]</summary>
+    public double HelpDefenseSuppressionScale  { get; set; } = 0.15;
+
+    /// <summary>Exponent for the accelerating HelpDefense aggregate. Must be strictly
+    /// greater than 1.0 — 1.0 is linear, below 1.0 is diminishing; both violate the
+    /// locked accelerating-curve design. [CALIBRATION PLACEHOLDER]</summary>
+    public double HelpDefenseAggregateExponent { get; set; } = 2.0;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
@@ -294,6 +311,23 @@ public sealed class RollHConfig
         if (cfg.MaxPassingBonus <= 0 || cfg.MaxPassingBonus > 1.0)
             throw new InvalidOperationException(
                 $"RollH MaxPassingBonus must be in (0, 1] (got {cfg.MaxPassingBonus}).");
+
+        // Session 03 invariants
+        // Scale: a make%-point suppressor; [0, 1] is the semantically valid range
+        // (above 1.0 is nonsensical as a maximum percentage-point reduction; the make%
+        // clamp would catch it, but it must not be expressible). Note: Roll H knobs are
+        // NOT uniformly bounded above — C3AttentionAmplifier defaults to 1.5 and is only
+        // bounded >= 0 — so there is no convention requiring an upper bound; [0,1] is
+        // added here because the suppressor's units make an upper bound meaningful.
+        if (cfg.HelpDefenseSuppressionScale < 0.0 || cfg.HelpDefenseSuppressionScale > 1.0)
+            throw new InvalidOperationException(
+                "RollH HelpDefenseSuppressionScale must be in [0, 1].");
+        // Exponent: must be STRICTLY > 1.0 for accelerating aggregation. 1.0 is linear,
+        // < 1.0 is diminishing — both violate the locked design and would fail harness
+        // sub-check (b), which requires suppression(4 helpers) > 4 × suppression(1 helper).
+        if (cfg.HelpDefenseAggregateExponent <= 1.0)
+            throw new InvalidOperationException(
+                "RollH HelpDefenseAggregateExponent must be > 1.0 for accelerating aggregation.");
 
         return cfg;
     }

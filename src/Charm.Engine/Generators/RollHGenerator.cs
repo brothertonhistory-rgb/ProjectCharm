@@ -230,6 +230,45 @@ public sealed class RollHGenerator : IRollHPieGenerator
             if (makePct > 1.0) makePct = 1.0;
         }
 
+        // ── C6: HelpDefense interior make% suppression (Phase 41) ────────────
+        // Stage 2 of the interior defensive sequence: the four off-ball defenders
+        // rotate to help after the primary defender (Stage 1) is beaten. Their
+        // HelpDefense aggregates with an ACCELERATING curve — one good helper is a
+        // sliver; four compound into a meaningful identity (roster-identity principle).
+        //
+        // Off-ball-only: the matched defender (defenderSlot.Number) had his Stage 1
+        // contest above; exclude him unconditionally here. Every remaining null/
+        // unpopulated slot contributes 0.0 — the denominator is always the full
+        // four-helper capacity (4.0), never the count of populated helpers. This makes
+        // partial lineups degrade safely, keeps one elite helper a sliver, and makes
+        // four elite helpers a genuine defensive identity.
+        //
+        // Halfcourt + interior-zone only. Compounds-with-but-separate-from RimProtection:
+        // C6 touches make% (Stage 2); the block door below touches block weight (Stage 3).
+        // No double-subtraction.
+        //
+        // Standalone this session — the Screening counterweight lands next session.
+        if (!state.FastBreak &&
+            (zone == ShotLocation.Rim || zone == ShotLocation.Short))
+        {
+            var defRoster = _game.RosterFor(state.Defense);
+            var defLineup = _game.LineupFor(state.Defense);
+
+            var offBallSum = 0.0;
+            for (var i = 1; i <= 5; i++)
+            {
+                if (i == defenderSlot.Number) continue;   // exclude the matched defender
+                var helper = defRoster.PlayerAt(defLineup.SlotAt(i));
+                offBallSum += helper is not null ? helper.HelpDefense / 100.0 : 0.0;
+            }
+
+            var offBallShare          = offBallSum / 4.0;   // always full four-helper capacity
+            var helpDefenseSuppression = _cfg.HelpDefenseSuppressionScale
+                                       * Math.Pow(offBallShare, _cfg.HelpDefenseAggregateExponent);
+            makePct -= helpDefenseSuppression;
+            if (makePct < 0.0) makePct = 0.0;
+        }
+
         // Phase 7 — matchup-aware block door. Compute the bent block weight from the
         // matchup, or fall back to the configured baseline if the defending slot is empty
         // (DEC-6, same guard as the make door above).

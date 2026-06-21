@@ -35,6 +35,7 @@ internal static partial class Program
             PerimeterDefense=55, PostDefense=45, RimProtection=30, DefensiveRebounding=40, Steals=50,
             Height=75, Wingspan=76, Weight=60, Strength=70, Speed=75, Quickness=75, FirstStep=75, Vertical=75,
             Endurance=75, Hustle=70, BasketballIQ=80, Discipline=70,
+            HelpDefense=50,
             RimTendency=20, ShortTendency=15, MidTendency=30, LongTendency=15, ThreeTendency=20,
         });
         // Slot2: solid scorer
@@ -46,6 +47,7 @@ internal static partial class Program
             PerimeterDefense=58, PostDefense=50, RimProtection=40, DefensiveRebounding=50, Steals=50,
             Height=76, Wingspan=77, Weight=65, Strength=60, Speed=65, Quickness=65, FirstStep=60, Vertical=65,
             Endurance=65, Hustle=65, BasketballIQ=65, Discipline=65,
+            HelpDefense=50,
             RimTendency=20, ShortTendency=20, MidTendency=25, LongTendency=15, ThreeTendency=20,
         });
         // Slot3: solid scorer
@@ -57,6 +59,7 @@ internal static partial class Program
             PerimeterDefense=55, PostDefense=52, RimProtection=45, DefensiveRebounding=52, Steals=48,
             Height=78, Wingspan=79, Weight=70, Strength=62, Speed=62, Quickness=62, FirstStep=60, Vertical=62,
             Endurance=65, Hustle=65, BasketballIQ=63, Discipline=65,
+            HelpDefense=50,
             RimTendency=25, ShortTendency=20, MidTendency=22, LongTendency=15, ThreeTendency=18,
         });
         // Slot4: solid scorer
@@ -68,6 +71,7 @@ internal static partial class Program
             PerimeterDefense=55, PostDefense=58, RimProtection=50, DefensiveRebounding=58, Steals=45,
             Height=79, Wingspan=80, Weight=75, Strength=65, Speed=58, Quickness=55, FirstStep=55, Vertical=60,
             Endurance=65, Hustle=70, BasketballIQ=62, Discipline=65,
+            HelpDefense=50,
             RimTendency=30, ShortTendency=22, MidTendency=25, LongTendency=10, ThreeTendency=13,
         });
         // Slot5: Rodman-type (low scoring — should land at/near floor)
@@ -79,6 +83,7 @@ internal static partial class Program
             PerimeterDefense=65, PostDefense=70, RimProtection=75, DefensiveRebounding=92, Steals=55,
             Height=80, Wingspan=82, Weight=85, Strength=85, Speed=55, Quickness=52, FirstStep=50, Vertical=70,
             Endurance=80, Hustle=95, BasketballIQ=70, Discipline=80,
+            HelpDefense=50,
             RimTendency=50, ShortTendency=30, MidTendency=10, LongTendency=5, ThreeTendency=5,
         });
 
@@ -389,7 +394,7 @@ internal static partial class Program
                 Height = b, Wingspan = b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline = b,
+                Discipline = b, HelpDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -755,7 +760,7 @@ internal static partial class Program
                 Height = b, Wingspan = b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b,
-                BasketballIQ = b, Discipline = b,
+                BasketballIQ = b, Discipline = b, HelpDefense = b,
                 RimTendency   = rimT   ?? b,
                 ShortTendency = shortT ?? b,
                 MidTendency   = midT   ?? b,
@@ -773,7 +778,7 @@ internal static partial class Program
                 DefensiveRebounding=50, Steals=50,
                 Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
                 Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
-                BasketballIQ=50, Discipline=50,
+                BasketballIQ=50, Discipline=50, HelpDefense=50,
                 RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
             };
 

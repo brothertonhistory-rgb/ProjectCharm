@@ -23,7 +23,7 @@ namespace Charm.Engine;
 /// <para><b>Wiring status.</b> All authored attributes are carried and validated
 /// on construction. Live-on-arrival attributes are ready to be consumed the moment
 /// a real generator replaces its stub. Dormant-pending-module attributes
-/// (Endurance, Gravity, Spacing, HelpDefense, OffBallDefense) are real
+/// (Endurance, Gravity, Spacing, OffBallDefense) are real
 /// fields on this object — authored or computed — but no generator reads them yet.
 /// They sit here as proven, occupied seats, not future placeholders.</para>
 ///
@@ -211,6 +211,13 @@ public sealed class Player
     /// <summary>Forcing live-ball turnovers. Feeds Roll C's live-strip arms, Roll
     /// J/K's live-turnover paths, and Roll B's strip.</summary>
     public int Steals { get; init; }
+
+    /// <summary>Rotating to help after the primary defender is beaten — Stage 2
+    /// of the interior defensive sequence. Lowers make% on Rim/Short attempts when
+    /// the four off-ball defenders collapse. Correlated with size in player generation
+    /// (bigs rotate and protect) but not size-gated: a guard with high HelpDefense is
+    /// a rare, valuable unlock. Read by RollHGenerator (C6, Phase 41).</summary>
+    public int HelpDefense { get; init; }
 
     // -------------------------------------------------------------------------
     // Physical — authored individual
@@ -432,6 +439,7 @@ public sealed class Player
         Check(nameof(RimProtection),       RimProtection);
         Check(nameof(DefensiveRebounding), DefensiveRebounding);
         Check(nameof(Steals),              Steals);
+        Check(nameof(HelpDefense),         HelpDefense);
         Check(nameof(Height),              Height);
         Check(nameof(Wingspan),            Wingspan);
         Check(nameof(Weight),              Weight);

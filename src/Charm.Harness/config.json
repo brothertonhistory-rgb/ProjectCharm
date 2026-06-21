@@ -153,8 +153,10 @@
     "C1ReliefScale": 2.0,
     "C2ImbalanceScale": 0.08,
     "C3AttentionAmplifier": 1.5,
-    "PassingOpportunityFloor": 0.10,
-    "MaxPassingBonus": 0.08
+    "PassingOpportunityFloor": 0.1,
+    "MaxPassingBonus": 0.08,
+    "HelpDefenseSuppressionScale": 0.15,
+    "HelpDefenseAggregateExponent": 2.0
   },
   "Attention": {
     "GravityBlendWeight": 0.5,
@@ -169,10 +171,10 @@
     "IqMin": 0.85,
     "IqMax": 1.15,
     "ConversionFloor": 0.05,
-    "DirectPassingScale": 0.10,
-    "ActivationScale": 0.20,
-    "PlaymakingDecay": 0.80,
-    "OpportunityFloor": 0.10,
+    "DirectPassingScale": 0.1,
+    "ActivationScale": 0.2,
+    "PlaymakingDecay": 0.8,
+    "OpportunityFloor": 0.1,
     "MaxPassingBonus": 0.08
   },
   "Matchup": {
@@ -242,7 +244,7 @@
     "ReboundStrengthWeight": 0.5,
     "ReboundHeightWeight": 0.5,
     "ReboundWingspanWeight": 0.5,
-    "ReboundWingspanSwing": 0.10,
+    "ReboundWingspanSwing": 0.1,
     "ReboundWingspanScale": 15.0,
     "PostnessHeight": 0.3333333333333333,
     "PostnessPostDefense": 0.3333333333333333,
@@ -255,56 +257,56 @@
     "ReboundOffShareFloor": 0.08,
     "ReboundOffShareCeiling": 0.55,
     "ReboundReferenceShift": 20.0,
-    "PutbackOffStrengthWeight": 0.40,
-    "PutbackOffHeightWeight": 0.40,
+    "PutbackOffStrengthWeight": 0.4,
+    "PutbackOffHeightWeight": 0.4,
     "PutbackOffAthleticismWeight": 0.15,
     "PutbackOffFinishingWeight": 0.05,
     "PutbackDefRimProtectionWeight": 0.55,
     "PutbackDefHeightWeight": 0.25,
-    "PutbackDefStrengthWeight": 0.20,
+    "PutbackDefStrengthWeight": 0.2,
     "PutbackReferenceShift": 20.0,
-    "PutbackZoneModifierThree": 0.50,
-    "PutbackZoneModifierLong": 0.70,
+    "PutbackZoneModifierThree": 0.5,
+    "PutbackZoneModifierLong": 0.7,
     "PutbackZoneModifierMid": 0.85,
-    "PutbackZoneModifierShort": 1.00,
-    "PutbackZoneModifierRim": 1.10,
-    "TurnoverCommitterPostFloor": 0.10,
+    "PutbackZoneModifierShort": 1.0,
+    "PutbackZoneModifierRim": 1.1,
+    "TurnoverCommitterPostFloor": 0.1,
     "TurnoverCommitterPostnessScale": 40.0,
-    "TurnoverInteriorGuardFloor": 0.10,
+    "TurnoverInteriorGuardFloor": 0.1,
     "TurnoverInteriorPostnessScale": 40.0,
-    "StealerPostFloor": 0.10,
+    "StealerPostFloor": 0.1,
     "StealerPostnessScale": 40.0,
-    "BlkRimProtectionRim": 0.40,
+    "BlkRimProtectionRim": 0.4,
     "BlkRimProtectionShort": 0.35,
-    "BlkRimProtectionMid": 0.20,
+    "BlkRimProtectionMid": 0.2,
     "BlkRimProtectionLong": 0.05,
     "BlkRimProtectionThree": 0.03,
     "BlkPerimeterDefenseRim": 0.03,
     "BlkPerimeterDefenseShort": 0.05,
     "BlkPerimeterDefenseMid": 0.15,
-    "BlkPerimeterDefenseLong": 0.30,
-    "BlkPerimeterDefenseThree": 0.40,
+    "BlkPerimeterDefenseLong": 0.3,
+    "BlkPerimeterDefenseThree": 0.4,
     "BlkPostDefenseRim": 0.07,
-    "BlkPostDefenseShort": 0.10,
+    "BlkPostDefenseShort": 0.1,
     "BlkPostDefenseMid": 0.15,
-    "BlkPostDefenseLong": 0.10,
+    "BlkPostDefenseLong": 0.1,
     "BlkPostDefenseThree": 0.05,
-    "BlkHeightRim": 0.20,
+    "BlkHeightRim": 0.2,
     "BlkHeightShort": 0.18,
     "BlkHeightMid": 0.15,
     "BlkHeightLong": 0.12,
-    "BlkHeightThree": 0.10,
-    "BlkWingspanRim": 0.20,
+    "BlkHeightThree": 0.1,
+    "BlkWingspanRim": 0.2,
     "BlkWingspanShort": 0.22,
     "BlkWingspanMid": 0.25,
     "BlkWingspanLong": 0.28,
-    "BlkWingspanThree": 0.30,
-    "BlkVerticalRim": 0.10,
-    "BlkVerticalShort": 0.10,
-    "BlkVerticalMid": 0.10,
+    "BlkWingspanThree": 0.3,
+    "BlkVerticalRim": 0.1,
+    "BlkVerticalShort": 0.1,
+    "BlkVerticalMid": 0.1,
     "BlkVerticalLong": 0.15,
     "BlkVerticalThree": 0.12,
-    "AssistPassingWeight": 0.50,
+    "AssistPassingWeight": 0.5,
     "AssistPlaymakingWeight": 0.35,
     "AssistIqWeight": 0.15,
     "AssistPassMidpoint": 50.0,
@@ -312,7 +314,7 @@
     "AssistPassSwing": 0.25,
     "AssistedRateThree": 0.88,
     "AssistedRateLong": 0.62,
-    "AssistedRateMid": 0.50,
+    "AssistedRateMid": 0.5,
     "AssistedRateShort": 0.43,
     "AssistedRateRim": 0.54,
     "AssistRateFloor": 0.25,
@@ -416,7 +418,7 @@
     "FreeThrowLiveBallTurnover": 0.02,
     "FreeThrowResetOffense": 0.32,
     "PutbackFloor": 0.15,
-    "PutbackCeiling": 0.70,
+    "PutbackCeiling": 0.7,
     "Epsilon": 1e-09
   },
   "RollL": {
@@ -503,7 +505,8 @@
         "ShortTendency": 20,
         "MidTendency": 35,
         "LongTendency": 15,
-        "ThreeTendency": 50
+        "ThreeTendency": 50,
+        "HelpDefense": 55
       },
       {
         "Name": "DeShawn Pryor",
@@ -542,7 +545,8 @@
         "ShortTendency": 30,
         "MidTendency": 30,
         "LongTendency": 20,
-        "ThreeTendency": 40
+        "ThreeTendency": 40,
+        "HelpDefense": 50
       },
       {
         "Name": "Trey Holloway",
@@ -581,7 +585,8 @@
         "ShortTendency": 25,
         "MidTendency": 35,
         "LongTendency": 25,
-        "ThreeTendency": 45
+        "ThreeTendency": 45,
+        "HelpDefense": 58
       },
       {
         "Name": "Javon Okafor",
@@ -620,7 +625,8 @@
         "ShortTendency": 65,
         "MidTendency": 25,
         "LongTendency": 10,
-        "ThreeTendency": 10
+        "ThreeTendency": 10,
+        "HelpDefense": 82
       },
       {
         "Name": "Cory Baptiste",
@@ -659,7 +665,8 @@
         "ShortTendency": 15,
         "MidTendency": 25,
         "LongTendency": 20,
-        "ThreeTendency": 80
+        "ThreeTendency": 80,
+        "HelpDefense": 33
       }
     ],
     "Away": [
@@ -700,7 +707,8 @@
         "ShortTendency": 22,
         "MidTendency": 32,
         "LongTendency": 18,
-        "ThreeTendency": 48
+        "ThreeTendency": 48,
+        "HelpDefense": 38
       },
       {
         "Name": "Rashid Monroe",
@@ -739,7 +747,8 @@
         "ShortTendency": 28,
         "MidTendency": 28,
         "LongTendency": 22,
-        "ThreeTendency": 42
+        "ThreeTendency": 42,
+        "HelpDefense": 52
       },
       {
         "Name": "Antoine Dupree",
@@ -778,7 +787,8 @@
         "ShortTendency": 30,
         "MidTendency": 30,
         "LongTendency": 22,
-        "ThreeTendency": 38
+        "ThreeTendency": 38,
+        "HelpDefense": 62
       },
       {
         "Name": "Darius Eze",
@@ -817,7 +827,8 @@
         "ShortTendency": 60,
         "MidTendency": 30,
         "LongTendency": 12,
-        "ThreeTendency": 12
+        "ThreeTendency": 12,
+        "HelpDefense": 85
       },
       {
         "Name": "Malik Thornton",
@@ -856,7 +867,8 @@
         "ShortTendency": 12,
         "MidTendency": 22,
         "LongTendency": 18,
-        "ThreeTendency": 82
+        "ThreeTendency": 82,
+        "HelpDefense": 30
       }
     ]
   }

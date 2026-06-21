@@ -513,7 +513,7 @@ internal static partial class Program
                 Height = b, Wingspan = b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b, Endurance = b, Hustle = b, BasketballIQ = b,
-                Discipline = b,
+                Discipline = b, HelpDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -746,7 +746,7 @@ internal static partial class Program
                 Height = l, Wingspan = l, Weight = b,
                 Strength = a, Speed = a, Quickness = a, FirstStep = a,
                 Vertical = l,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b, HelpDefense = b,
                 RimTendency = b, ShortTendency = b, MidTendency = b,
                 LongTendency = b, ThreeTendency = b,
             };
@@ -1234,7 +1234,7 @@ internal static partial class Program
                 Height = b, Wingspan = b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b,
                 Vertical = b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b, HelpDefense = b,
                 RimTendency   = rim   ?? b,
                 ShortTendency = b,
                 MidTendency   = b,

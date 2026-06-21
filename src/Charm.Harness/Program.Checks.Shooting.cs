@@ -590,7 +590,7 @@ internal static partial class Program
                     OffBallMovement = 50, Screening = 50, OffensiveRebounding = 50,
                     PerimeterDefense = 50, PostDefense = 50, RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                     Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50, Quickness = 50,
-                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50,
+                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50, HelpDefense = 50,
                     RimTendency = 50, ShortTendency = 50, MidTendency = 50, LongTendency = 50, ThreeTendency = 50 };
                 var defender = new Player($"Defender{i}") { Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 70,
                     FoulDrawing = 50,
@@ -598,7 +598,7 @@ internal static partial class Program
                     OffBallMovement = 50, Screening = 50, OffensiveRebounding = 50,
                     PerimeterDefense = 50, PostDefense = 50, RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
                     Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50, Quickness = 50,
-                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50,
+                    FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50, HelpDefense = 50,
                     RimTendency = 50, ShortTendency = 50, MidTendency = 50, LongTendency = 50, ThreeTendency = 50 };
                 homeRoster.SetStarter(homeLineup.SlotAt(i), shooter);
                 awayRoster.SetStarter(awayLineup.SlotAt(i), defender);
@@ -715,7 +715,7 @@ internal static partial class Program
                 DefensiveRebounding = b, Steals = b,
                 Height = b, Wingspan = b, Weight = b,
                 Strength = ath ?? b, Speed = ath ?? b, Quickness = ath ?? b, FirstStep = ath ?? b, Vertical = ath ?? b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b, HelpDefense = b,
                 RimTendency = rimT ?? b, ShortTendency = shortT ?? b, MidTendency = midT ?? b,
                 LongTendency = longT ?? b, ThreeTendency = threeT ?? b,
             };
@@ -949,7 +949,7 @@ internal static partial class Program
                 DefensiveRebounding = b, Steals = b,
                 Height = h ?? b, Wingspan = ws ?? b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = v ?? b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b, HelpDefense = b,
                 RimTendency = rimT ?? b, ShortTendency = shortT ?? b, MidTendency = midT ?? b,
                 LongTendency = longT ?? b, ThreeTendency = threeT ?? b,
             };
@@ -1185,7 +1185,7 @@ internal static partial class Program
                 DefensiveRebounding = b, Steals = b,
                 Height = b, Wingspan = b, Weight = b,
                 Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = b,
-                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b, HelpDefense = b,
                 RimTendency   = rimT   ?? b,
                 ShortTendency = shortT ?? b,
                 MidTendency   = midT   ?? b,
@@ -1513,7 +1513,7 @@ internal static partial class Program
                 DefensiveRebounding = b, Steals = b,
                 Height = b, Wingspan = b, Weight = b, Strength = b,
                 Speed = b, Quickness = b, FirstStep = b, Vertical = b,
-                Endurance = b, Hustle = b, Discipline = b,
+                Endurance = b, Hustle = b, Discipline = b, HelpDefense = b,
                 ThreeTendency = 40, RimTendency = 30, MidTendency = 15,
                 ShortTendency = 10, LongTendency = 5,
             };
@@ -1669,5 +1669,257 @@ internal static partial class Program
         Console.WriteLine();
         Console.WriteLine(ok ? "  Phase 39 assist check: PASSED" : "  Phase 39 assist check: FAILED (see [FAIL] lines above)");
         return ok;
+    }
+
+
+    // =========================================================================
+    // Phase 41 — HelpDefense interior make% suppression (C6)
+    // =========================================================================
+    private static bool Phase41HelpDefenseCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 41: HelpDefense interior make% suppression (C6) ---");
+        var pass = true;
+        const double Eps     = 1e-9;
+        const double TightEps = 1e-10;   // byte-identical checks
+
+        var cfgH = RollHConfig.Load(configPath);
+        var cfgM = MatchupConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+
+        // Back-calculate the pre-block/pre-foul makePct from a pie.
+        // Uses actual foul weight from the pie (maf + missFouled = foulRate × nonBNF_inverse),
+        // avoiding any config-baseline assumption.
+        static double MakePct(Pie<ShotResult> pie)
+        {
+            var blocked    = pie.Slices.First(s => s.Outcome == ShotResult.Blocked).Weight;
+            var maf        = pie.Slices.First(s => s.Outcome == ShotResult.MadeAndFouled).Weight;
+            var missFouled = pie.Slices.First(s => s.Outcome == ShotResult.MissFouled).Weight;
+            var foul       = maf + missFouled;       // actual foul weight
+            var nonBNF     = 1.0 - blocked - foul;
+            var made       = pie.Slices.First(s => s.Outcome == ShotResult.Made).Weight;
+            return nonBNF > 1e-9 ? made / nonBNF : 0.0;
+        }
+
+        static double BlockWt(Pie<ShotResult> pie) =>
+            pie.Slices.First(s => s.Outcome == ShotResult.Blocked).Weight;
+
+        // Build a player with all attributes at b; HelpDefense and RimProtection overridable.
+        static Player Mk(int b, int? hd = null, int? rimP = null, int? fin = null)
+            => new Player("p")
+            {
+                Close = b, Mid = b, Outside = b, Finishing = fin ?? b, FreeThrow = b,
+                FoulDrawing = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation = b, PostMoves = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding = b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = rimP ?? b,
+                DefensiveRebounding = b, Steals = b, HelpDefense = hd ?? b,
+                Height = b, Wingspan = b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Seat a shooter in Home slot 1 (+ 4 neutral fillers), matched defender in Away slot 1,
+        // and four off-ball defenders in Away slots 2-5.
+        // SelectedSlot=slot1 → DefenderPicker picks Away slot 1 as the matched defender.
+        Pie<ShotResult> Generate(
+            Player shooter, Player matchedDef, Player[] offBall,
+            ShotLocation zone, bool fastBreak = false)
+        {
+            var g       = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            // Shooter in slot 1; neutral fillers in slots 2-5 (slot 1 must be seated first).
+            g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(1), shooter);
+            var neutral = Mk(50, hd: 0);
+            for (var i = 2; i <= 5; i++)
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i), neutral);
+            g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(1), matchedDef);
+            for (var i = 0; i < 4; i++)
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 2), offBall[i]);
+
+            var state = new PossessionState(
+                PossessionNumber: 1,
+                Offense: TeamSide.Home,
+                Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                SelectedSlot: g.HomeLineup.SlotAt(1),
+                ShotType: zone,
+                FastBreak: fastBreak);
+
+            return new RollHGenerator(cfgH, cfgM, g).Generate(state);
+        }
+
+        var shooter50  = Mk(50, hd: 0, fin: 50);
+        var low        = Mk(50, hd: 0,  rimP: 50);
+        var high       = Mk(50, hd: 99, rimP: 50);
+        var fourZero   = new[] { low,  low,  low,  low  };
+        var fourHigh   = new[] { high, high, high, high };
+
+        // ── (a) Off-ball-only: matched HD=99 → NO suppression; inverse → full ──
+        Console.WriteLine("  (a) Off-ball exclusion:");
+        {
+            // Zero baseline: matched=0, off-ball=0
+            var makeBase = MakePct(Generate(shooter50, Mk(50, hd: 0,  rimP: 50), fourZero, ShotLocation.Rim));
+            // Matched=99, off-ball=0 → should equal zero baseline (matched excluded)
+            var makeMatchedHigh = MakePct(Generate(shooter50, Mk(50, hd: 99, rimP: 50), fourZero, ShotLocation.Rim));
+            // Matched=0, off-ball=99 → full suppression (< baseline)
+            var makeOffBallFull = MakePct(Generate(shooter50, Mk(50, hd: 0,  rimP: 50), fourHigh, ShotLocation.Rim));
+
+            var excludedOk = Math.Abs(makeMatchedHigh - makeBase) < TightEps;
+            var inverseOk  = makeOffBallFull < makeBase - Eps;
+            Console.WriteLine($"    baseline (all HD=0):       makePct={makeBase:F6}");
+            Console.WriteLine($"    matched HD=99, off-ball=0: makePct={makeMatchedHigh:F6}  equal to baseline → {(excludedOk ? "ok" : "FAIL")}");
+            Console.WriteLine($"    matched=0, off-ball=4×99:  makePct={makeOffBallFull:F6}  < baseline → {(inverseOk ? "ok" : "FAIL")}");
+            pass &= excludedOk && inverseOk;
+            Console.WriteLine($"  (a) {(excludedOk && inverseOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (b) Accelerating aggregation ─────────────────────────────────────
+        Console.WriteLine("  (b) Accelerating aggregation:");
+        {
+            var makeBase   = MakePct(Generate(shooter50, low, fourZero, ShotLocation.Rim));
+            var make1High  = MakePct(Generate(shooter50, low, new[] { high, low, low, low  }, ShotLocation.Rim));
+            var make4High  = MakePct(Generate(shooter50, low, fourHigh, ShotLocation.Rim));
+            var drop1      = makeBase - make1High;
+            var drop4      = makeBase - make4High;
+            var ratio      = drop1 > Eps ? drop4 / drop1 : 0.0;
+            var accelOk    = drop4 > 4.0 * drop1 && drop1 > Eps;
+            Console.WriteLine($"    base:          makePct={makeBase:F6}");
+            Console.WriteLine($"    1 good helper: makePct={make1High:F6}  drop={drop1*100:F4}pts");
+            Console.WriteLine($"    4 good helpers:makePct={make4High:F6}  drop={drop4*100:F4}pts  ratio={ratio:F2}x (need >4x)");
+            pass &= accelOk;
+            Console.WriteLine($"  (b) {(accelOk ? "ok — super-linear" : "FAIL")}");
+        }
+
+        // ── (c) Interior-zone-only ────────────────────────────────────────────
+        Console.WriteLine("  (c) Interior-zone-only gate:");
+        {
+            var cOk = true;
+            foreach (var zone in new[] { ShotLocation.Rim, ShotLocation.Short,
+                                         ShotLocation.Mid, ShotLocation.Long, ShotLocation.Three })
+            {
+                var makeZeroHD = MakePct(Generate(shooter50, low, fourZero, zone));
+                var makeHighHD = MakePct(Generate(shooter50, low, fourHigh, zone));
+                var diff       = makeZeroHD - makeHighHD;
+                if (zone == ShotLocation.Rim || zone == ShotLocation.Short)
+                {
+                    var ok = diff > Eps;
+                    Console.WriteLine($"    {zone,5}: diff={diff*100:F4}pts  {(ok ? "ok — suppression" : "FAIL — expected suppression")}");
+                    if (!ok) cOk = false;
+                }
+                else
+                {
+                    var ok = Math.Abs(diff) < TightEps;
+                    Console.WriteLine($"    {zone,5}: diff={diff*100:F4}pts  {(ok ? "ok — no suppression" : "FAIL — unexpected suppression")}");
+                    if (!ok) cOk = false;
+                }
+            }
+            pass &= cOk;
+            Console.WriteLine($"  (c) {(cOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (d) FastBreak exempt ──────────────────────────────────────────────
+        Console.WriteLine("  (d) FastBreak exempt:");
+        {
+            var makeFBHigh = MakePct(Generate(shooter50, low, fourHigh, ShotLocation.Rim, fastBreak: true));
+            var makeFBZero = MakePct(Generate(shooter50, low, fourZero, ShotLocation.Rim, fastBreak: true));
+            var fbOk       = Math.Abs(makeFBHigh - makeFBZero) < TightEps;
+            Console.WriteLine($"    FastBreak off-ball HD=99: makePct={makeFBHigh:F6}");
+            Console.WriteLine($"    FastBreak off-ball HD=0:  makePct={makeFBZero:F6}  byte-identical → {(fbOk ? "ok" : "FAIL")}");
+            pass &= fbOk;
+            Console.WriteLine($"  (d) {(fbOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (e) Clamp / no-throw ─────────────────────────────────────────────
+        Console.WriteLine("  (e) Clamp / no-throw:");
+        {
+            var eOk = true;
+            try
+            {
+                // Max suppression clamp
+                var makeMax   = MakePct(Generate(shooter50, low, fourHigh, ShotLocation.Rim));
+                var inRange   = makeMax >= 0.0 && makeMax <= 1.0;
+                Console.WriteLine($"    max off-ball HD @Rim: makePct={makeMax:F6}  in [0,1] → {(inRange ? "ok" : "FAIL")}");
+                if (!inRange) eOk = false;
+
+                // Partial: 1 of 4 off-ball populated with HD=80
+                MakePct(Generate(shooter50, low,
+                    new[] { Mk(50, hd: 80), low, low, low }, ShotLocation.Rim));
+                Console.WriteLine("    partial off-ball (1×HD80, 3×HD0): no throw → ok");
+
+                // Zero off-ball HD
+                MakePct(Generate(shooter50, low, fourZero, ShotLocation.Rim));
+                Console.WriteLine("    all HD=0: no throw → ok");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"    FAIL — threw: {ex.Message}");
+                eOk = false;
+            }
+            pass &= eOk;
+            Console.WriteLine($"  (e) {(eOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (f) C6 (make%) and block door (block weight) are independent ──────
+        Console.WriteLine("  (f) Independent: C6 (make%) vs block door (block weight):");
+        {
+            var fOk = true;
+
+            // HelpDefense-only: hold matched defender RimProtection=50 constant;
+            // vary only off-ball HelpDefense.
+            // Expected: makePct changes, block weight byte-identical.
+            var matchedFixed = Mk(50, hd: 0, rimP: 50);
+            var pie_HD0  = Generate(shooter50, matchedFixed, fourZero, ShotLocation.Rim);
+            var pie_HD99 = Generate(shooter50, matchedFixed, fourHigh, ShotLocation.Rim);
+            var mkDiff   = Math.Abs(MakePct(pie_HD0) - MakePct(pie_HD99));
+            var blkDiff  = Math.Abs(BlockWt(pie_HD0) - BlockWt(pie_HD99));
+            var hdMkOk   = mkDiff > Eps;
+            var hdBlkOk  = blkDiff < TightEps;
+            Console.WriteLine($"    HD-only: makePct diff={mkDiff*100:F4}pts → {(hdMkOk ? "ok — changes" : "FAIL")}");
+            Console.WriteLine($"             block  diff={blkDiff:F10}     → {(hdBlkOk ? "ok — identical" : "FAIL")}");
+            if (!hdMkOk || !hdBlkOk) fOk = false;
+
+            // RimProtection-only: hold ALL HelpDefense constant (off-ball=0 throughout);
+            // vary only matched defender's RimProtection between two extremes.
+            //
+            // What we prove: the C6 suppression is INDEPENDENT of RimProtection.
+            // Mechanism: helpDefenseSuppression = Scale × (offBallHD/4)^Exp is a pure
+            // function of off-ball HelpDefense — it has no RimProtection term. So the
+            // DROP (makePct_HD0 − makePct_HD99) must be byte-identical at RimP=10 vs RimP=90,
+            // even though the makePct baseline itself shifts (RimProtection feeds EffectiveRating
+            // at Rim zone and moves the make door — this is correct Stage 1 behaviour, not a bug).
+            // If C6 were reading RimProtection, the drops would diverge.
+            //
+            // Also verify block weight changes with RimProtection (Stage 3 still fires).
+            {
+                var offBallZero = new[] { Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0) };
+                var offBallFull = new[] { Mk(50, hd: 99), Mk(50, hd: 99), Mk(50, hd: 99), Mk(50, hd: 99) };
+                var matchedLP   = Mk(50, hd: 0, rimP: 10);
+                var matchedHP   = Mk(50, hd: 0, rimP: 90);
+
+                // Block weight changes (Stage 3 fires)
+                var pieLP_HD0  = Generate(shooter50, matchedLP, offBallZero, ShotLocation.Rim);
+                var pieHP_HD0  = Generate(shooter50, matchedHP, offBallZero, ShotLocation.Rim);
+                var rpBlkDiff  = Math.Abs(BlockWt(pieLP_HD0) - BlockWt(pieHP_HD0));
+                var rpBlkOk    = rpBlkDiff > Eps;
+
+                // C6 drop is identical at both RimProtection values
+                var pieLP_HD99 = Generate(shooter50, matchedLP, offBallFull, ShotLocation.Rim);
+                var pieHP_HD99 = Generate(shooter50, matchedHP, offBallFull, ShotLocation.Rim);
+                var dropLP     = MakePct(pieLP_HD0) - MakePct(pieLP_HD99);
+                var dropHP     = MakePct(pieHP_HD0) - MakePct(pieHP_HD99);
+                var c6IndepOk  = Math.Abs(dropLP - dropHP) < TightEps;
+
+                Console.WriteLine($"    RimProt-only: block diff={rpBlkDiff:F6}  → {(rpBlkOk ? "ok — changes" : "FAIL")}");
+                Console.WriteLine($"    C6 indep: drop@RimP=10={dropLP*100:F4}pts  drop@RimP=90={dropHP*100:F4}pts  Δ={Math.Abs(dropLP - dropHP):F12}  → {(c6IndepOk ? "ok — C6 independent of RimProtection" : "FAIL")}");
+                if (!rpBlkOk || !c6IndepOk) fOk = false;
+            }
+
+            pass &= fOk;
+            Console.WriteLine($"  (f) {(fOk ? "ok — Stage 2/Stage 3 independent" : "FAIL")}");
+        }
+
+        Console.WriteLine(pass ? "  Phase 41 PASSED." : "  Phase 41 FAILED.");
+        return pass;
     }
 }

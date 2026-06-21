@@ -41,6 +41,7 @@ public sealed class PlayerConfig
     public int RimProtection       { get; set; }
     public int DefensiveRebounding { get; set; }
     public int Steals              { get; set; }
+    public int HelpDefense         { get; set; }
 
     // Physical
     public int Height              { get; set; }
@@ -94,6 +95,7 @@ public sealed class PlayerConfig
         RimProtection       = RimProtection,
         DefensiveRebounding = DefensiveRebounding,
         Steals              = Steals,
+        HelpDefense         = HelpDefense,
         Height              = Height,
         Wingspan            = Wingspan,
         Weight              = Weight,
