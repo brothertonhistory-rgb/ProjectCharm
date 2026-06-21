@@ -230,6 +230,46 @@ public sealed class RollHGenerator : IRollHPieGenerator
             if (makePct > 1.0) makePct = 1.0;
         }
 
+        // ── C5.5: Screening interior make% bonus (Phase 42) ──────────────────
+        // Stage 2 offensive counterweight: all five offensive players (shooter
+        // included — a screen-setting shooter still contributes to the team's
+        // screening environment before the release) aggregate their Screening
+        // with an ACCELERATING curve and LIFT make% on interior shots.
+        //
+        // All-five-aggregate (different from C6's off-ball-only): no exclusions.
+        // Fixed denominator 5.0 (full lineup capacity) — same "fixed at capacity"
+        // discipline as C6's 4.0. Missing/unpopulated slots contribute 0.0;
+        // one elite screener is a sliver, five compound.
+        //
+        // Bonus-only (cannot lower make%). Halfcourt + interior-zone only this
+        // session — the perimeter unlock lands when OffBallDefense is authored.
+        //
+        // DO NOT upper-clamp here. C6 follows immediately and may offset this
+        // signed bonus. The single Math.Clamp(0, 1) lives at the end of C6,
+        // settling the paired signed terms together. If C5.5 clamped to 1.0
+        // before C6 ran, the symmetric-cancellation contract would break in the
+        // upper make% range (pre=0.95 + bonus=0.147 → premature clamp to 1.0 →
+        // C6 subtracts 0.147 → 0.853 instead of the correct 0.950).
+        if (!state.FastBreak &&
+            (zone == ShotLocation.Rim || zone == ShotLocation.Short))
+        {
+            var offRoster = _game.RosterFor(state.Offense);
+            var offLineup = _game.LineupFor(state.Offense);
+
+            var screeningSum = 0.0;
+            for (var i = 1; i <= 5; i++)
+            {
+                var screener = offRoster.PlayerAt(offLineup.SlotAt(i));
+                screeningSum += screener is not null ? screener.Screening / 100.0 : 0.0;
+            }
+
+            var screeningShare = screeningSum / 5.0;   // always full five-screener capacity
+            var screeningBonus = _cfg.ScreeningBonusScale
+                               * Math.Pow(screeningShare, _cfg.ScreeningAggregateExponent);
+            makePct += screeningBonus;
+            // No clamp here — C6 follows and may offset. See deferred-clamp note above.
+        }
+
         // ── C6: HelpDefense interior make% suppression (Phase 41) ────────────
         // Stage 2 of the interior defensive sequence: the four off-ball defenders
         // rotate to help after the primary defender (Stage 1) is beaten. Their
@@ -247,7 +287,9 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // C6 touches make% (Stage 2); the block door below touches block weight (Stage 3).
         // No double-subtraction.
         //
-        // Standalone this session — the Screening counterweight lands next session.
+        // Paired with C5.5 (Screening +) this session. The single Math.Clamp below
+        // settles both signed terms together — neither C5.5 nor C6 clamps alone,
+        // preserving the symmetric-cancellation contract across the full make% range.
         if (!state.FastBreak &&
             (zone == ShotLocation.Rim || zone == ShotLocation.Short))
         {
@@ -266,7 +308,11 @@ public sealed class RollHGenerator : IRollHPieGenerator
             var helpDefenseSuppression = _cfg.HelpDefenseSuppressionScale
                                        * Math.Pow(offBallShare, _cfg.HelpDefenseAggregateExponent);
             makePct -= helpDefenseSuppression;
-            if (makePct < 0.0) makePct = 0.0;
+            // After both C5.5 (Screening +) and C6 (HelpDefense −) have applied,
+            // settle makePct to [0,1] once. This is the saturation guard for the
+            // paired signed terms — neither C5.5 nor C6 clamps alone, so that the
+            // symmetric-cancellation contract holds across the full make% range.
+            makePct = Math.Clamp(makePct, 0.0, 1.0);
         }
 
         // Phase 7 — matchup-aware block door. Compute the bent block weight from the

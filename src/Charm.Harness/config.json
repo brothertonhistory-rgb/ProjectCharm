@@ -156,7 +156,9 @@
     "PassingOpportunityFloor": 0.1,
     "MaxPassingBonus": 0.08,
     "HelpDefenseSuppressionScale": 0.15,
-    "HelpDefenseAggregateExponent": 2.0
+    "HelpDefenseAggregateExponent": 2.0,
+    "ScreeningBonusScale": 0.15,
+    "ScreeningAggregateExponent": 2.0
   },
   "Attention": {
     "GravityBlendWeight": 0.5,

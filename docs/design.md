@@ -5895,3 +5895,45 @@ Sub-check (f)'s original design assumed RimProtection only affected the block do
 - **Screening counterweight.** The two-sided make% gap (high Screening vs. high HelpDefense) assembles next session. No Screening term, hook, or config was added here.
 - **OffBallDefense.** A separate future attribute for perimeter help defense. Remains in the dormant-pending-module comment.
 - **Generation-layer size correlation.** Noted for the player-pool layer; HelpDefense is authored directly regardless of position.
+
+## Session 04 — Screening: The Offensive Counterweight to HelpDefense
+
+### The two-sided interior make% gap
+
+Sessions 03 and 04 together complete a symmetric pair. Neither term is meaningful in isolation — they are designed to be tuned as a unit during calibration:
+
+| Side | Term | Direction | Aggregate |
+|---|---|---|---|
+| Offense | Screening (C5.5) | + makePct | All 5 offensive slots, sum / 5.0 |
+| Defense | HelpDefense (C6) | − makePct | 4 off-ball defenders (matched excluded), sum / 4.0 |
+
+The net make% effect on any interior halfcourt possession is `+screeningBonus − helpDefenseSuppression`. This is emergent from two independent signed terms, never computed as a difference inside the engine. A team with no screeners against an elite help-defense team gets the full C6 suppression unbuffered. A team with elite screeners against a poor help-defense team gets the full bonus unmuted. Symmetric strengths roughly cancel — proven analytically and confirmed by sub-checks (f) and (g).
+
+### Why the shooter is included in the Screening aggregate (no exclusions)
+
+C6 excludes the matched defender because he already fired at Stage 1. C5.5 has no analogous exclusion: the shooter's own Screening rating counts as one of five symmetric slots. A screen-setting shooter contributes to the team's screening environment in the seconds before the release. Excluding him would create a feedback loop with Roll E's shot selection (which implicitly accounts for the shooter's Screening via usage tilt) and would break the aggregate's slot symmetry. Sub-check (a) proves symmetry: a lineup with shooter Screening=99 and a lineup with one teammate Screening=99 (all else equal) produce byte-identical make%.
+
+### The accelerating formula and fixed denominator (mirror of C6)
+
+```
+screeningShare = sum(Screening/100 for each populated offensive slot, null=0) / 5.0
+screeningBonus = ScreeningBonusScale × screeningShare^ScreeningAggregateExponent
+```
+
+The denominator is always 5.0 — never the count of populated screeners. One elite screener gets share=0.99/5=0.198; five get share=0.99. At Exponent=2.0, the ratio is 25× (5²) — the same accelerating payoff C6 achieves at 16× (4²) with its 4.0 denominator. A mean-over-populated formula would make one elite screener as effective as five; the fixed denominator correctly rewards the roster-construction decision. Sub-checks (b) and (e) prove the 25× ratio and the (2/5)²=0.16 partial-roster ratio respectively.
+
+### The deferred-clamp discipline (load-bearing)
+
+C1 and C4 each apply their own upper clamp (`if (makePct > 1.0) makePct = 1.0`) because they have no immediately-following negative partner. C5.5 does not clamp. The single `Math.Clamp(makePct, 0.0, 1.0)` lives at the end of the C6 block and settles both signed terms together.
+
+If C5.5 upper-clamped to 1.0 before C6 ran, the symmetric-cancellation contract would fail in the upper make% range. Example: pre-C5.5 makePct=0.95, C5.5 lifts to 1.097, premature clamp drops to 1.0, then C6 subtracts 0.147 → final 0.853 (instead of the correct 0.95). Sub-check (g) is the regression guard for this bug: it constructs a high-baseline fixture (bothOffBaseline=0.926502 > saturation threshold 0.852985) and asserts cancellation still holds. A premature-clamp implementation would show ~7.35pts error at that fixture.
+
+### Symmetric cancellation at full capacity
+
+At `ScreeningBonusScale=0.15` and `ScreeningAggregateExponent=2.0`, the C5.5 maximum bonus (5×Screening=99, denom 5.0) = `0.15 × (4.95/5)² = 0.147015`. C6's maximum suppression (4×HelpDefense=99, denom 4.0) = `0.15 × (3.96/4)² = 0.147015`. Identical to floating-point precision. Elite-vs-elite cancels algebraically — the matched defender's Stage 1 contest (the matchup logistic) is the only net differentiator. This is the intended design: the Screening/HelpDefense pair compresses the make% range rather than inflating or deflating it.
+
+### What is not this session
+
+- **Perimeter Screening bonus.** C5.5 is gated to `zone ∈ {Rim, Short}`. The perimeter unlock (Mid/Long/Three) is a one-line gate change that lands when `OffBallDefense` is authored as the perimeter defensive counterweight.
+- **OffBallDefense.** The perimeter defensive counterweight. Remains in the dormant-pending-module comment.
+- **Calibration.** Both `ScreeningBonusScale` and `HelpDefenseSuppressionScale` are placeholders set to 0.15 with Exponent=2.0. They must be tuned as a pair against real D1 data — tuning one without the other destroys the symmetric-cancellation property.

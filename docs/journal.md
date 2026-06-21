@@ -1,3 +1,30 @@
+## Session 04 — Phase 42: Screening Authored + C5.5 Interior Make% Bonus (2026-06-21)
+
+**Scope:** Author the Screening offensive make% bonus (C5.5) as the counterweight to C6's HelpDefense suppression. Inserts between C4 (passing converter) and C6 in `RollHGenerator`. Also promotes C6's terminal lower-only clamp to a single `Math.Clamp(makePct, 0.0, 1.0)` that settles both signed terms together. 5 files changed; no attribute authoring needed (Screening was already on Player, RosterConfig, and all 10 config players from Session 03 prep).
+
+**What shipped (5 files):**
+
+`src/Charm.Engine/Config/RollHConfig.cs` — two new knobs (`ScreeningBonusScale` default 0.15; `ScreeningAggregateExponent` default 2.0) with XML doc comments marking them as calibration placeholders and noting symmetric-mirror relationship with `HelpDefenseSuppressionScale`. Two new invariants added to `Load()` after the Session 03 block: Scale must be in [0, 1]; Exponent must be strictly > 1.0 (same accelerating-curve contract as C6).
+
+`src/Charm.Engine/Generators/RollHGenerator.cs` — two changes. (A) C5.5 block inserted between C4 (passing converter, closing brace ~line 231) and C6 (~line 233). Gated by `!state.FastBreak` and `zone ∈ {Rim, Short}`. Logic: enumerate all five offensive slots (shooter included — no exclusions); sum populated players' normalized Screening (each `/100.0`), unpopulated slots contribute `0.0`; divide by fixed denominator `5.0` (never by populated count); compute `screeningBonus = ScreeningBonusScale × Math.Pow(screeningShare, ScreeningAggregateExponent)`; `makePct += screeningBonus`. No upper clamp at C5.5 — the deferred-clamp discipline requires C6 to run first so the paired signed terms can cancel across the full make% range. (B) C6 terminal `if (makePct < 0.0) makePct = 0.0` replaced with `makePct = Math.Clamp(makePct, 0.0, 1.0)` — the single saturation guard for the C5.5/C6 pair. C6 comment updated to reflect it is now paired with C5.5 rather than standalone.
+
+`src/Charm.Harness/config.json` — two new knobs added to the `"RollH"` section: `"ScreeningBonusScale": 0.15`, `"ScreeningAggregateExponent": 2.0`. No player Screening values changed (all 10 players already carried basketball-reasonable values from Session 03).
+
+`src/Charm.Harness/Program.cs` — `ok &= Phase42ScreeningCheck(configPath);` added after Phase 41.
+
+`src/Charm.Harness/Program.Checks.Shooting.cs` — `Phase42ScreeningCheck` added immediately after `Phase41HelpDefenseCheck`. Seven sub-checks (a)–(g). Uses the `screeningDelta` convention throughout: delta = MakePct(intended Screening) − MakePct(same lineup with all Screening forced to 0), isolating the C5.5 contribution from the matchup baseline and all other C-terms. Sub-check (a) is the exception (raw byte-identical comparison across two lineups with equal Screening totals — proving slot symmetry). Also corrected: an unused `BlockWt` local function copied from the Phase 41 template was removed after the initial run produced a CS8321 warning; the runtime behavior is byte-identical.
+
+**Harness result:** ALL CHECKS PASSED. STRESS TEST PASSED. Phase42ScreeningCheck all seven sub-checks green. Config hash shifted (two new RollH knobs). Interior halfcourt make% rose modestly — expected; calibration deferred.
+
+**Phase 42 sub-check summary:**
+- (a) Lineup A (shooter scr=99, rest=0) = Lineup B (one teammate scr=99, rest=0): makePct=0.68334478 byte-identical → shooter slot symmetric ✓
+- (b) delta1 (1×scr=99) = +0.588060pts; delta5 (5×scr=99) = +14.701500pts; ratio=25.00× = 5² → accelerating ✓
+- (c) Rim: +14.7015pts bonus; Short: +14.7015pts bonus; Mid/Long/Three: 0.0000pts → interior-only gate ✓
+- (d) FastBreak scr=99 = FastBreak scr=0 (byte-identical) → exempt ✓
+- (e) Max-everything @Rim: makePct=1.000000 ∈ [0,1]; partial (2/5) ratio=0.16=(2/5)²; shooter-only delta=0.00384000 = formula ✓
+- (f) C5.5 max bonus=0.147015000 = C6 max suppression=0.147015000; elite-vs-elite residual≈0 → symmetric cancellation ✓
+- (g) High-baseline fixture (bothOffBaseline=0.926502 > threshold 0.852985); both-elite=0.926502; residual≈0 → deferred-clamp contract holds (premature-clamp bug would show ~7.35pts error) ✓
+
 ## Session 03 — Phase 41: HelpDefense Authored + C6 Interior Make% Suppression (2026-06-21)
 
 **Scope:** Author the `HelpDefense` player attribute and wire it as Stage 2 of the four-stage interior defensive sequence in `RollHGenerator`. A new config check (`Phase41HelpDefenseCheck`) with six sub-checks verifies the mechanic. 14 files changed; no resolver, roll routing, or non–Roll H generator touched.

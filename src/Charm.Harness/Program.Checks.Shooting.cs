@@ -1922,4 +1922,380 @@ internal static partial class Program
         Console.WriteLine(pass ? "  Phase 41 PASSED." : "  Phase 41 FAILED.");
         return pass;
     }
+
+    // Phase 42 — Screening interior make% bonus (C5.5)
+    // =========================================================================
+    private static bool Phase42ScreeningCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 42: Screening interior make% bonus (C5.5) ---");
+        var pass = true;
+        const double Eps      = 1e-9;
+        const double TightEps = 1e-10;   // byte-identical checks
+
+        var cfgH = RollHConfig.Load(configPath);
+        var cfgM = MatchupConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+
+        // Back-calculate the pre-block/pre-foul makePct from a pie.
+        static double MakePct(Pie<ShotResult> pie)
+        {
+            var blocked    = pie.Slices.First(s => s.Outcome == ShotResult.Blocked).Weight;
+            var maf        = pie.Slices.First(s => s.Outcome == ShotResult.MadeAndFouled).Weight;
+            var missFouled = pie.Slices.First(s => s.Outcome == ShotResult.MissFouled).Weight;
+            var foul       = maf + missFouled;
+            var nonBNF     = 1.0 - blocked - foul;
+            var made       = pie.Slices.First(s => s.Outcome == ShotResult.Made).Weight;
+            return nonBNF > 1e-9 ? made / nonBNF : 0.0;
+        }
+
+        // Build a player with all attributes at b; Screening, HelpDefense, Finishing,
+        // and RimProtection individually overridable.
+        static Player Mk(int b, int? scr = null, int? hd = null, int? fin = null, int? rimP = null)
+            => new Player("p")
+            {
+                Close = b, Mid = b, Outside = b, Finishing = fin ?? b, FreeThrow = b,
+                FoulDrawing = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation = b, PostMoves = b, OffBallMovement = b,
+                Screening = scr ?? b,
+                OffensiveRebounding = b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = rimP ?? b,
+                DefensiveRebounding = b, Steals = b, HelpDefense = hd ?? b,
+                Height = b, Wingspan = b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = b,
+                Endurance = b, Hustle = b, BasketballIQ = b, Discipline = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Seat shooter in Home slot 1 (+ 4 offensive teammates in slots 2-5),
+        // matched defender in Away slot 1, four off-ball defenders in Away slots 2-5.
+        // SelectedSlot=slot1 → DefenderPicker picks Away slot 1 as the matched defender.
+        // Seat shooter first — SetStarter throws on already-occupied slots.
+        Pie<ShotResult> Generate(
+            Player shooter, Player[] offTeammates,
+            Player matchedDef, Player[] offBallDefs,
+            ShotLocation zone, bool fastBreak = false)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(1), shooter);
+            for (var i = 0; i < 4; i++)
+                if (offTeammates[i] is not null)
+                    g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 2), offTeammates[i]);
+            g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(1), matchedDef);
+            for (var i = 0; i < 4; i++)
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 2), offBallDefs[i]);
+
+            var state = new PossessionState(
+                PossessionNumber: 1,
+                Offense: TeamSide.Home,
+                Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound,
+                SelectedSlot: g.HomeLineup.SlotAt(1),
+                ShotType: zone,
+                FastBreak: fastBreak);
+
+            return new RollHGenerator(cfgH, cfgM, g).Generate(state);
+        }
+
+        // screeningDelta: the C5.5 contribution isolated from all other terms.
+        // L_intended  = lineup with the Screening values under test
+        // L_zeroed    = identical lineup with every populated player's Screening forced to 0
+        // Delta = MakePct(intended) − MakePct(zeroed)
+        // All non-Screening ratings, zone, state, and defenders held identical.
+        double ScreeningDelta(
+            Player shooterIntended, Player[] teammatesIntended,
+            Player shooterZeroed,   Player[] teammatesZeroed,
+            Player matchedDef, Player[] offBallDefs,
+            ShotLocation zone)
+        {
+            var intended = MakePct(Generate(shooterIntended, teammatesIntended, matchedDef, offBallDefs, zone));
+            var zeroed   = MakePct(Generate(shooterZeroed,   teammatesZeroed,   matchedDef, offBallDefs, zone));
+            return intended - zeroed;
+        }
+
+        // Shared neutral anchors
+        var neutral50  = Mk(50, scr: 50, hd: 0);
+        var matchedDef = Mk(50, hd: 0, rimP: 50);
+        var offBallDefs = new[] { Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0) };
+        var zero4      = new Player[] { Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0),
+                                        Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+
+        // ── (a) Aggregate-inclusive: shooter's Screening is symmetric with teammates ──
+        Console.WriteLine("  (a) Aggregate-inclusive:");
+        {
+            // Lineup A: shooter Screening=99, four teammates Screening=0
+            var shooterA   = Mk(50, scr: 99, hd: 0);
+            var teams0     = new Player[] { Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0),
+                                            Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+            // Lineup B: shooter Screening=0, one teammate Screening=99, rest 0
+            var shooterB   = Mk(50, scr: 0, hd: 0);
+            var teamsB     = new Player[] { Mk(50, scr: 99, hd: 0), Mk(50, scr: 0, hd: 0),
+                                            Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+
+            var makeA = MakePct(Generate(shooterA, teams0,  matchedDef, offBallDefs, ShotLocation.Rim));
+            var makeB = MakePct(Generate(shooterB, teamsB,  matchedDef, offBallDefs, ShotLocation.Rim));
+            var aOk   = Math.Abs(makeA - makeB) < TightEps;
+            Console.WriteLine($"    Lineup A (shooter scr=99, rest=0): makePct={makeA:F8}");
+            Console.WriteLine($"    Lineup B (one teammate scr=99, rest=0): makePct={makeB:F8}  byte-identical → {(aOk ? "ok" : "FAIL")}");
+            pass &= aOk;
+            Console.WriteLine($"  (a) {(aOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (b) Accelerating aggregation: 1 elite vs 5 elite ─────────────────
+        Console.WriteLine("  (b) Accelerating aggregation:");
+        {
+            var shooter0   = Mk(50, scr: 0, hd: 0);
+            var shooter99  = Mk(50, scr: 99, hd: 0);
+            var teams0     = new Player[] { Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0),
+                                            Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+            var teams99    = new Player[] { Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0),
+                                            Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0) };
+
+            // delta1: one screener (shooter=99, rest=0)
+            var delta1 = ScreeningDelta(
+                shooter99, teams0,   // intended: shooter scr=99, teammates scr=0
+                shooter0,  teams0,   // zeroed: all scr=0
+                matchedDef, offBallDefs, ShotLocation.Rim);
+            // delta5: five screeners (all=99)
+            var delta5 = ScreeningDelta(
+                shooter99, teams99,  // intended: all scr=99
+                shooter0,  teams0,   // zeroed: all scr=0
+                matchedDef, offBallDefs, ShotLocation.Rim);
+
+            var ratio  = delta1 > Eps ? delta5 / delta1 : 0.0;
+            var bOk    = delta5 > 5.0 * delta1 && delta1 > Eps;
+            Console.WriteLine($"    delta1 (1×scr=99): +{delta1*100:F6}pts");
+            Console.WriteLine($"    delta5 (5×scr=99): +{delta5*100:F6}pts  ratio={ratio:F4}x (expected ~25.00x = 5²)");
+            pass &= bOk;
+            Console.WriteLine($"  (b) {(bOk ? "ok — accelerating" : "FAIL")}");
+        }
+
+        // ── (c) Interior-zone-only gate ───────────────────────────────────────
+        Console.WriteLine("  (c) Interior-zone-only gate:");
+        {
+            var shooterHigh = Mk(50, scr: 99, hd: 0);
+            var shooterZero = Mk(50, scr: 0,  hd: 0);
+            var teamsHigh   = new Player[] { Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0),
+                                             Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0) };
+            var teamsZero   = new Player[] { Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0),
+                                             Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+            var cOk = true;
+            foreach (var zone in new[] { ShotLocation.Rim, ShotLocation.Short,
+                                         ShotLocation.Mid, ShotLocation.Long, ShotLocation.Three })
+            {
+                var makeHigh = MakePct(Generate(shooterHigh, teamsHigh, matchedDef, offBallDefs, zone));
+                var makeZero = MakePct(Generate(shooterZero, teamsZero, matchedDef, offBallDefs, zone));
+                var diff     = makeHigh - makeZero;
+                if (zone == ShotLocation.Rim || zone == ShotLocation.Short)
+                {
+                    var ok = diff > Eps;
+                    Console.WriteLine($"    {zone,5}: diff=+{diff*100:F4}pts  {(ok ? "ok — bonus" : "FAIL — expected bonus")}");
+                    if (!ok) cOk = false;
+                }
+                else
+                {
+                    var ok = Math.Abs(diff) < TightEps;
+                    Console.WriteLine($"    {zone,5}: diff={diff*100:F4}pts  {(ok ? "ok — no bonus" : "FAIL — unexpected bonus")}");
+                    if (!ok) cOk = false;
+                }
+            }
+            pass &= cOk;
+            Console.WriteLine($"  (c) {(cOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (d) FastBreak exempt ──────────────────────────────────────────────
+        Console.WriteLine("  (d) FastBreak exempt:");
+        {
+            var shooterHigh = Mk(50, scr: 99, hd: 0);
+            var shooterZero = Mk(50, scr: 0,  hd: 0);
+            var teamsHigh   = new Player[] { Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0),
+                                             Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0) };
+            var teamsZero   = new Player[] { Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0),
+                                             Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+            var makeFBHigh = MakePct(Generate(shooterHigh, teamsHigh, matchedDef, offBallDefs, ShotLocation.Rim, fastBreak: true));
+            var makeFBZero = MakePct(Generate(shooterZero, teamsZero, matchedDef, offBallDefs, ShotLocation.Rim, fastBreak: true));
+            var dOk        = Math.Abs(makeFBHigh - makeFBZero) < TightEps;
+            Console.WriteLine($"    FastBreak scr=99: makePct={makeFBHigh:F6}");
+            Console.WriteLine($"    FastBreak scr=0:  makePct={makeFBZero:F6}  byte-identical → {(dOk ? "ok" : "FAIL")}");
+            pass &= dOk;
+            Console.WriteLine($"  (d) {(dOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (e) Clamp / no-throw ──────────────────────────────────────────────
+        Console.WriteLine("  (e) Clamp / no-throw:");
+        {
+            var eOk = true;
+            try
+            {
+                // Max-everything: 5×scr=99, maxed shooter Finishing, weak rim defender
+                var shooterMax = Mk(99, scr: 99, hd: 0, fin: 99);
+                var teamsMax   = new Player[] { Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0),
+                                                Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0) };
+                var weakDef    = Mk(20, hd: 0, rimP: 20);
+                var defWeak    = new[] { Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0) };
+                var makeMax    = MakePct(Generate(shooterMax, teamsMax, weakDef, defWeak, ShotLocation.Rim));
+                var inRange    = makeMax >= 0.0 && makeMax <= 1.0;
+                Console.WriteLine($"    max-everything @Rim: makePct={makeMax:F6}  in [0,1] → {(inRange ? "ok" : "FAIL")}");
+                if (!inRange) eOk = false;
+
+                // Partial-roster: 2 of 5 offensive slots populated (shooter + 1 teammate),
+                // three teammate slots null. Use delta convention.
+                var shooterP80  = Mk(50, scr: 80, hd: 0);
+                var shooterP0   = Mk(50, scr: 0,  hd: 0);
+                var teamsPartI  = new Player[] { Mk(50, scr: 80, hd: 0), null!, null!, null! };
+                var teamsPartZ  = new Player[] { Mk(50, scr: 0,  hd: 0), null!, null!, null! };
+                var teams5_80   = new Player[] { Mk(50, scr: 80, hd: 0), Mk(50, scr: 80, hd: 0),
+                                                 Mk(50, scr: 80, hd: 0), Mk(50, scr: 80, hd: 0) };
+                var teams5_0    = new Player[] { Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0),
+                                                 Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+
+                // partialDelta: 2-populated lineup with scr=80 vs scr=0
+                var partialDelta = ScreeningDelta(
+                    shooterP80, teamsPartI,
+                    shooterP0,  teamsPartZ,
+                    matchedDef, offBallDefs, ShotLocation.Rim);
+                // fullDelta: 5-populated lineup with scr=80 vs scr=0
+                var fullDelta = ScreeningDelta(
+                    shooterP80, teams5_80,
+                    shooterP0,  teams5_0,
+                    matchedDef, offBallDefs, ShotLocation.Rim);
+
+                var partRatio = fullDelta > Eps ? partialDelta / fullDelta : 0.0;
+                var partOk    = Math.Abs(partRatio - 0.16) < 1e-6;
+                Console.WriteLine($"    partial (2/5, scr=80): delta={partialDelta*100:F6}pts");
+                Console.WriteLine($"    full    (5/5, scr=80): delta={fullDelta*100:F6}pts");
+                Console.WriteLine($"    ratio={partRatio:F6}  (expected (2/5)²=0.16) → {(partOk ? "ok" : "FAIL")}");
+                if (!partOk) eOk = false;
+
+                // Shooter-only: one slot populated (shooter=80), four teammates null
+                var shooterOnly80 = Mk(50, scr: 80, hd: 0);
+                var shooterOnly0  = Mk(50, scr: 0,  hd: 0);
+                var teamsNull     = new Player[] { null!, null!, null!, null! };
+
+                var shooterOnlyDelta = ScreeningDelta(
+                    shooterOnly80, teamsNull,
+                    shooterOnly0,  teamsNull,
+                    matchedDef, offBallDefs, ShotLocation.Rim);
+                var expected = cfgH.ScreeningBonusScale
+                             * Math.Pow(80.0 / 100.0 / 5.0, cfgH.ScreeningAggregateExponent);
+                var soOk = Math.Abs(shooterOnlyDelta - expected) < 1e-9;
+                Console.WriteLine($"    shooter-only (scr=80, 4 null): delta={shooterOnlyDelta*100:F8}pts  expected={expected*100:F8}pts → {(soOk ? "ok" : "FAIL")}");
+                if (!soOk) eOk = false;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"    FAIL — threw: {ex.Message}");
+                eOk = false;
+            }
+            pass &= eOk;
+            Console.WriteLine($"  (e) {(eOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (f) Symmetric cancellation: elite Screening + elite HelpDefense ───
+        Console.WriteLine("  (f) Symmetric cancellation:");
+        {
+            var actualMaxScreeningBonus = cfgH.ScreeningBonusScale
+                                        * Math.Pow(0.99, cfgH.ScreeningAggregateExponent);
+            var actualMaxHDSuppression  = cfgH.HelpDefenseSuppressionScale
+                                        * Math.Pow(0.99, cfgH.HelpDefenseAggregateExponent);
+
+            // Baseline: all Screening=0, all HelpDefense=0
+            var shooter50  = Mk(50, scr: 0, hd: 0);
+            var teams0scr  = new Player[] { Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0),
+                                            Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+            var defMatched0 = Mk(50, hd: 0, rimP: 50);
+            var defOB0      = new[] { Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0) };
+            var makeBaseline = MakePct(Generate(shooter50, teams0scr, defMatched0, defOB0, ShotLocation.Rim));
+
+            // Bonus-alone: 5×scr=99, HD=0 everywhere
+            var shooter99  = Mk(50, scr: 99, hd: 0);
+            var teams99scr = new Player[] { Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0),
+                                            Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0) };
+            var makeBonusAlone = MakePct(Generate(shooter99, teams99scr, defMatched0, defOB0, ShotLocation.Rim));
+
+            // Suppression-alone: scr=0 everywhere, 4×off-ball HD=99
+            var defOB99 = new[] { Mk(50, hd: 99), Mk(50, hd: 99), Mk(50, hd: 99), Mk(50, hd: 99) };
+            var makeSupprAlone = MakePct(Generate(shooter50, teams0scr, defMatched0, defOB99, ShotLocation.Rim));
+
+            // Elite-vs-elite: 5×scr=99, 4×HD=99
+            var makeEliteElite = MakePct(Generate(shooter99, teams99scr, defMatched0, defOB99, ShotLocation.Rim));
+
+            var cancelResidual = Math.Abs(makeBaseline - makeEliteElite);
+            var bonusMag       = makeBonusAlone - makeBaseline;
+            var supprMag       = makeBaseline - makeSupprAlone;
+            var symmetryDiff   = Math.Abs(bonusMag - supprMag);
+            var cancelOk       = cancelResidual < 1e-6;
+            var symmetryOk     = symmetryDiff < 1e-6;
+
+            Console.WriteLine($"    max Screening bonus:     {actualMaxScreeningBonus:F9}");
+            Console.WriteLine($"    max HelpDef suppression: {actualMaxHDSuppression:F9}");
+            Console.WriteLine($"    baseline makePct:       {makeBaseline:F6}");
+            Console.WriteLine($"    bonus-alone makePct:    {makeBonusAlone:F6}  (+{bonusMag*100:F4}pts)");
+            Console.WriteLine($"    suppression-alone:      {makeSupprAlone:F6}  (-{supprMag*100:F4}pts)");
+            Console.WriteLine($"    elite-vs-elite makePct: {makeEliteElite:F6}");
+            Console.WriteLine($"    cancellation residual:  {cancelResidual:F2e}  → {(cancelOk ? "ok — cancels" : "FAIL")}");
+            Console.WriteLine($"    symmetry (|bonus|=|supr|): Δ={symmetryDiff:F2e}  → {(symmetryOk ? "ok" : "FAIL")}");
+            pass &= cancelOk && symmetryOk;
+            Console.WriteLine($"  (f) {(cancelOk && symmetryOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (g) Ceiling-symmetry regression: cancellation near upper clamp ────
+        // Specifically catches premature C5.5 upper-clamping.
+        Console.WriteLine("  (g) Ceiling-symmetry regression:");
+        {
+            var gOk = true;
+            try
+            {
+                var actualMaxScreeningBonus = cfgH.ScreeningBonusScale
+                                            * Math.Pow(0.99, cfgH.ScreeningAggregateExponent);
+                var saturationThreshold = 1.0 - actualMaxScreeningBonus;
+
+                // High-baseline fixture: finishing-99 shooter, weak rim matched defender
+                var shooterHigh  = Mk(50, scr: 0,  hd: 0, fin: 99);
+                var teamsAll0    = new Player[] { Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0),
+                                                  Mk(50, scr: 0, hd: 0), Mk(50, scr: 0, hd: 0) };
+                var weakRimDef   = Mk(20, hd: 0, rimP: 20);
+                var defOBzero    = new[] { Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0), Mk(50, hd: 0) };
+
+                // Both-off baseline: scr=0, HD=0
+                var bothOffBaseline = MakePct(Generate(shooterHigh, teamsAll0, weakRimDef, defOBzero, ShotLocation.Rim));
+
+                // Assert fixture is in saturation-sensitive range
+                if (!(bothOffBaseline > saturationThreshold))
+                {
+                    Console.WriteLine($"    FAIL — fixture baseline {bothOffBaseline:F6} does not exceed saturation threshold {saturationThreshold:F6}; test would pass vacuously with buggy code.");
+                    pass = false;
+                    Console.WriteLine($"  (g) FAIL — fixture out of range");
+                }
+                else
+                {
+                    Console.WriteLine($"    both-off baseline:    {bothOffBaseline:F6}  > threshold {saturationThreshold:F6} → fixture in range");
+
+                    // Both-elite: 5×scr=99, 4×off-ball HD=99
+                    var shooterHigh99 = Mk(50, scr: 99, hd: 0, fin: 99);
+                    var teams99       = new Player[] { Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0),
+                                                       Mk(50, scr: 99, hd: 0), Mk(50, scr: 99, hd: 0) };
+                    var defOBhigh     = new[] { Mk(50, hd: 99), Mk(50, hd: 99), Mk(50, hd: 99), Mk(50, hd: 99) };
+                    var bothElite     = MakePct(Generate(shooterHigh99, teams99, weakRimDef, defOBhigh, ShotLocation.Rim));
+
+                    var cancelResidual = Math.Abs(bothOffBaseline - bothElite);
+                    var gCancelOk      = cancelResidual < 1e-6;
+                    Console.WriteLine($"    both-elite makePct:   {bothElite:F6}");
+                    Console.WriteLine($"    cancellation residual:{cancelResidual:F2e}  (premature-clamp bug would show ≈{(bothOffBaseline + actualMaxScreeningBonus - 1.0)*100:F4}pts error)");
+                    Console.WriteLine($"    → {(gCancelOk ? "ok — deferred-clamp contract holds" : "FAIL — premature clamp detected")}");
+                    gOk &= gCancelOk;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"    FAIL — threw: {ex.Message}");
+                gOk = false;
+            }
+            pass &= gOk;
+            Console.WriteLine($"  (g) {(gOk ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine(pass ? "  Phase 42 PASSED." : "  Phase 42 FAILED.");
+        return pass;
+    }
 }

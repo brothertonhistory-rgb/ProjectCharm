@@ -276,6 +276,27 @@ public sealed class RollHConfig
     /// locked accelerating-curve design. [CALIBRATION PLACEHOLDER]</summary>
     public double HelpDefenseAggregateExponent { get; set; } = 2.0;
 
+    // ── Session 04 — Screening interior make% bonus (C5.5) ────────────────────
+    // The five offensive players (shooter included) set screens that aggregate
+    // with an ACCELERATING curve (one good screener ≈ a sliver; five compound)
+    // and LIFT make% on interior shots (Rim/Short). Halfcourt only.
+    // Symmetric mirror of C6 by design: at full lineup capacity vs full off-ball
+    // capacity, the bonus and suppression are analytically equal.
+    // All-zones in concept; interior-only this session. The perimeter unlock
+    // lands with OffBallDefense (future session). [CALIBRATION PLACEHOLDER]
+
+    /// <summary>Maximum make%-point bonus from perfect five-player screening.
+    /// Symmetric mirror of <see cref="HelpDefenseSuppressionScale"/>: at full
+    /// capacity on each side, the bonus and suppression cancel algebraically.
+    /// Invariant: in [0, 1]. [CALIBRATION PLACEHOLDER]</summary>
+    public double ScreeningBonusScale         { get; set; } = 0.15;
+
+    /// <summary>Exponent for the accelerating Screening aggregate. Must be
+    /// strictly greater than 1.0 — 1.0 is linear, below 1.0 is diminishing;
+    /// both violate the locked accelerating-curve design.
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double ScreeningAggregateExponent  { get; set; } = 2.0;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
@@ -328,6 +349,22 @@ public sealed class RollHConfig
         if (cfg.HelpDefenseAggregateExponent <= 1.0)
             throw new InvalidOperationException(
                 "RollH HelpDefenseAggregateExponent must be > 1.0 for accelerating aggregation.");
+
+        // Session 04 invariants
+        // Scale: a make%-point bonus; [0, 1] is the semantically valid range
+        // (above 1.0 is nonsensical as a maximum percentage-point lift; the make%
+        // clamp at 1.0 would catch it, but it must not be expressible). Symmetric
+        // with HelpDefenseSuppressionScale by design.
+        if (cfg.ScreeningBonusScale < 0.0 || cfg.ScreeningBonusScale > 1.0)
+            throw new InvalidOperationException(
+                "RollH ScreeningBonusScale must be in [0, 1].");
+        // Exponent: must be STRICTLY > 1.0 for accelerating aggregation — same
+        // contract as HelpDefenseAggregateExponent. Linear or diminishing would
+        // fail harness sub-check (b), which requires bonus(5 screeners) >
+        // 5 × bonus(1 screener).
+        if (cfg.ScreeningAggregateExponent <= 1.0)
+            throw new InvalidOperationException(
+                "RollH ScreeningAggregateExponent must be > 1.0 for accelerating aggregation.");
 
         return cfg;
     }
