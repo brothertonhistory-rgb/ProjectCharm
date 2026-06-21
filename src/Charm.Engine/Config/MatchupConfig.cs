@@ -880,6 +880,15 @@ public sealed class MatchupConfig
                 $"StealerPostnessScale must be > 0: got {cfg.StealerPostnessScale}.");
 
         // Phase 35 — wingspan in rebound battle and attribution.
+        // Phase 43 — all three ReboundPhysical components are nonnegative; they need not
+        //             sum to 1.0, but a negative coefficient would invert the physical
+        //             meaning of Strength, Height, or Wingspan in the team rebound battle.
+        if (cfg.ReboundStrengthWeight < 0.0)
+            throw new InvalidOperationException(
+                $"ReboundStrengthWeight must be >= 0: got {cfg.ReboundStrengthWeight}.");
+        if (cfg.ReboundHeightWeight < 0.0)
+            throw new InvalidOperationException(
+                $"ReboundHeightWeight must be >= 0: got {cfg.ReboundHeightWeight}.");
         if (cfg.ReboundWingspanWeight < 0.0)
             throw new InvalidOperationException(
                 $"ReboundWingspanWeight must be >= 0: got {cfg.ReboundWingspanWeight}.");
@@ -962,20 +971,25 @@ public sealed class MatchupConfig
     // --- Phase 10: pre-staging team-size composite blend.
     //     ReboundPhysical(p) = ReboundStrengthWeight * p.Strength + ReboundHeightWeight * p.Height
     //                        + ReboundWingspanWeight * p.Wingspan   (Phase 35).
-    //     Weights need not sum to 1 (a weighted read, like LengthRating). Placeholders. ---
+    //     Weights need not sum to 1 (a weighted read, like LengthRating).
+    //     Design decision (Session 05): Strength leads (box-out dominance); Height and
+    //     Wingspan are equal secondaries (reach/length). Exact magnitudes are calibration
+    //     placeholders. ---
 
     /// <summary>Weight of <see cref="Player.Strength"/> in the pre-staging size composite.
-    /// Calibration placeholder — equal thirds for now.</summary>
-    public double ReboundStrengthWeight { get; set; } = 0.5;
+    /// Strength is the lead factor — box-out dominance and the physical battle for position.
+    /// Calibration placeholder. [CALIBRATION PLACEHOLDER]</summary>
+    public double ReboundStrengthWeight { get; set; } = 0.525;
 
     /// <summary>Weight of <see cref="Player.Height"/> in the pre-staging size composite.
-    /// Calibration placeholder — equal thirds for now.</summary>
-    public double ReboundHeightWeight { get; set; } = 0.5;
+    /// Equal secondary factor alongside Wingspan — reach and length matter but Strength leads.
+    /// Calibration placeholder. [CALIBRATION PLACEHOLDER]</summary>
+    public double ReboundHeightWeight { get; set; } = 0.4875;
 
     /// <summary>Weight of <see cref="Player.Wingspan"/> in the pre-staging size composite
-    /// (Phase 35). A longer-armed team wins more boards at the team level.
-    /// Calibration placeholder — matches existing equal-ish weight convention.</summary>
-    public double ReboundWingspanWeight { get; set; } = 0.5;
+    /// (Phase 35). Equal secondary factor alongside Height.
+    /// Calibration placeholder. [CALIBRATION PLACEHOLDER]</summary>
+    public double ReboundWingspanWeight { get; set; } = 0.4875;
 
     // --- Phase 10: positional composite (Postness) blend.
     //     Postness(p) = PostnessHeight * p.Height + PostnessPostDefense * p.PostDefense

@@ -1,3 +1,40 @@
+## Session 05 — Phase 43: ReboundPhysical Weight Ordering (Strength Primary, Height/Wingspan Equal Secondary) (2026-06-21)
+
+**Scope:** Lock the design decision that Strength is the lead factor in `ReboundPhysical` — the team-size composite that drives the pre-staging rebound battle — with Height and Wingspan as equal secondary factors. Update the three config defaults, comment block, and invariant guards in `MatchupConfig.cs`. Wire a new `Phase43ReboundPhysicalWeightsCheck` that proves the ordering at the config level, the formula level, and through the live `OffensiveReboundShare` team-battle path. 4 files changed.
+
+**What shipped (4 files):**
+
+`src/Charm.Engine/Config/MatchupConfig.cs` — three changes. (1) The comment block above the `ReboundPhysical` property group updated to record the Session 05 design decision: Strength leads (box-out dominance); Height and Wingspan are equal secondaries (reach/length); exact magnitudes are calibration placeholders. (2) Three property defaults updated: `ReboundStrengthWeight` 0.5 → **0.525**; `ReboundHeightWeight` 0.5 → **0.4875**; `ReboundWingspanWeight` 0.5 → **0.4875**. XML doc comments on all three updated to describe the role (lead vs. equal secondary) and mark them as calibration placeholders. (3) Load invariants expanded: the lone Phase 35 `ReboundWingspanWeight >= 0` guard replaced with symmetric nonnegative guards for all three components (Strength, Height, Wingspan). Comment updated to explain why: a negative coefficient would invert the physical meaning of that attribute in the team rebound battle.
+
+`src/Charm.Harness/config.json` — three values in the `"Matchup"` section updated to match: `ReboundStrengthWeight: 0.525`, `ReboundHeightWeight: 0.4875`, `ReboundWingspanWeight: 0.4875`.
+
+`src/Charm.Harness/Program.cs` — `ok &= Phase43ReboundPhysicalWeightsCheck(configPath);` added after Phase 42.
+
+`src/Charm.Harness/Program.Checks.Rebounding.cs` — `Phase43ReboundPhysicalWeightsCheck` added at the end of the file (before the closing class brace). Three sub-checks: (a) Config contract + Strength leads — loads live config, asserts `|total − 1.5| < 1e-9`, `StrengthWeight > HeightWeight`, `StrengthWeight > WingspanWeight`, `|HeightWeight − WingspanWeight| < 1e-9`; constructs three players each with one physical attribute at 99 and the others at 50, asserts `ReboundPhysical(pStr) > ReboundPhysical(pHt)` and `> ReboundPhysical(pWs)`. (b) Height and Wingspan are equal — asserts `|ReboundPhysical(pHt) − ReboundPhysical(pWs)| < 1e-9` using the same players. (c) Team battle ordering propagates through `OffensiveReboundShare` — constructs three five-player lineups each with one physical attribute at 80 and the others at 50; one shared neutral defense (all 50); computes lift over `baseOffShare=0.27` for each lineup; asserts `strengthLift > heightLift`, `strengthLift > wingspanLift`, `|heightLift − wingspanLift| < 1e-9`.
+
+**Key design decisions:**
+
+- **Strength leads because it represents box-out dominance.** The physical battle for position before the ball arrives is primarily about Strength — who can hold their ground, seal their man, and control the lane. Height and Wingspan both represent reach and length (the ability to outreach a competitor once in position), so they are properly equal to each other. This ordering is not a calibration call — it is a structural basketball decision locked for Phase 43.
+
+- **Total magnitude preserved at 1.5.** The sum of the three weights is unchanged (0.525 + 0.4875 + 0.4875 = 1.5). This is a ratio reconciliation only — the relative ordering changes, not the overall influence of the physical battle on the rebound share. Calibrating the total magnitude (how much the physical battle matters relative to skill) remains a deferred calibration-pass task.
+
+- **The Session 00 two-factor decision is superseded.** Session 00 settled an 80% Wingspan / 20% Height split when Strength was not yet an explicit factor. With three factors and a defined design principle, that split is replaced by the current Strength-primary / Height-Wingspan-equal model. The Session 00 split is retained in `design.md` as historical context only.
+
+- **This session changes only the config weights, not the `ReboundPhysical` formula.** `Matchup.ReboundPhysical` is a pure weighted sum with no normalization — confirmed at lines 350–353 of `Matchup.cs`. Changing the weights requires no formula edits.
+
+- **Neither attribution picker calls `ReboundPhysical`.** `OffensiveRebounderPicker` and `DefensiveRebounderPicker` both use `OffensiveRebounding × PositionalWeight × ReboundWingspanMultiplier` — confirmed by source read. The weight change affects the team-level rebound battle only, not individual credit distribution.
+
+- **Three-input Wingspan grep confirmed no existing assertion breaks.** Every harness fixture with a "wash" comment was confirmed to have all three physical inputs (Strength, Height, Wingspan) equal between teams — not just Strength and Height. The two Phase 35 wing-direction fixtures deliberately vary wingspan and assert direction-only ordering, which survives weight changes intact.
+
+**Harness result:** ALL CHECKS PASSED. STRESS TEST PASSED. Phase43ReboundPhysicalWeightsCheck all three sub-checks green.
+
+**Phase 43 sub-check summary:**
+- (a) totalWeight=1.5 ✓; StrengthWeight > HeightWeight ✓; StrengthWeight > WingspanWeight ✓; |HeightWeight − WingspanWeight| < 1e-9 ✓; ReboundPhysical(pStr)=100.7250 > pHt=98.8875 ✓; > pWs=98.8875 ✓
+- (b) |pHt − pWs| = 0.000E+000 ✓
+- (c) strengthLift=0.01085160 > heightLift=0.00888519 ✓; > wingspanLift=0.00888519 ✓; |heightLift − wingspanLift| = 0.000E+000 ✓
+
+**Stress test observation (not a bug):** Bucket 6 (ShootingVsAthletic) shows Athletic winning 83%. Athletic and physical attributes are currently punching hard relative to shooting/skill. This is a pre-calibration finding; weight for the calibration pass.
+
 ## Session 04 — Phase 42: Screening Authored + C5.5 Interior Make% Bonus (2026-06-21)
 
 **Scope:** Author the Screening offensive make% bonus (C5.5) as the counterweight to C6's HelpDefense suppression. Inserts between C4 (passing converter) and C6 in `RollHGenerator`. Also promotes C6's terminal lower-only clamp to a single `Math.Clamp(makePct, 0.0, 1.0)` that settles both signed terms together. 5 files changed; no attribute authoring needed (Screening was already on Player, RosterConfig, and all 10 config players from Session 03 prep).

@@ -151,6 +151,7 @@ internal static partial class Program
         ok &= Phase39AssistCheck(configPath);                  // Phase 39
         ok &= Phase41HelpDefenseCheck(configPath);             // Phase 41
         ok &= Phase42ScreeningCheck(configPath);               // Phase 42
+        ok &= Phase43ReboundPhysicalWeightsCheck(configPath);  // Phase 43
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

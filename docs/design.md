@@ -5937,3 +5937,39 @@ At `ScreeningBonusScale=0.15` and `ScreeningAggregateExponent=2.0`, the C5.5 max
 - **Perimeter Screening bonus.** C5.5 is gated to `zone ∈ {Rim, Short}`. The perimeter unlock (Mid/Long/Three) is a one-line gate change that lands when `OffBallDefense` is authored as the perimeter defensive counterweight.
 - **OffBallDefense.** The perimeter defensive counterweight. Remains in the dormant-pending-module comment.
 - **Calibration.** Both `ScreeningBonusScale` and `HelpDefenseSuppressionScale` are placeholders set to 0.15 with Exponent=2.0. They must be tuned as a pair against real D1 data — tuning one without the other destroys the symmetric-cancellation property.
+
+## Session 05 — ReboundPhysical Weight Ordering: Strength Primary, Height/Wingspan Equal Secondary
+
+### The design decision
+
+`ReboundPhysical(p, cfg)` is the team-size composite used in the pre-staging stage of `OffensiveReboundShare`. It determines which team has the physical edge in the rebound battle before skill enters. Phase 43 locks the relative ordering of its three components:
+
+- **Strength is the lead factor.** Strength represents box-out dominance — the physical battle for position in the lane before the ball arrives. Who holds their ground, seals their man, and controls space. This is the most direct determinant of whether a player wins the pre-staging battle.
+- **Height and Wingspan are equal secondary factors.** Both represent reach and length — the ability to outreach a competitor once in position. They are legitimately equal because they serve the same function (extending to the ball) through different physical mechanisms (standing reach vs. arm length).
+
+### The weights
+
+```
+ReboundStrengthWeight  = 0.525
+ReboundHeightWeight    = 0.4875
+ReboundWingspanWeight  = 0.4875
+Total                  = 1.5   (historical placeholder total, preserved)
+```
+
+The total magnitude is unchanged from the prior all-equal state (3 × 0.5 = 1.5). Phase 43 changes **the relative ordering only**, not the overall influence of the physical battle. Calibrating total magnitude — how much the physical size battle matters relative to skill — is deferred to the calibration pass.
+
+### What this supersedes
+
+Session 00 settled an 80% Wingspan / 20% Height split when Strength was not yet an explicit factor in `ReboundPhysical`. That two-factor decision is replaced by the current three-factor model. Session 00's ratio is retained as historical context only; it does not govern the current weighting.
+
+### Scope of effect
+
+`ReboundPhysical` is called only inside `OffensiveReboundShare` (lines 459 and 461 of `Matchup.cs`). It drives the team-level pre-staging size shift. The individual attribution pickers (`OffensiveRebounderPicker`, `DefensiveRebounderPicker`) are confirmed by source read to use `OffensiveRebounding × PositionalWeight × ReboundWingspanMultiplier` — they do not call `ReboundPhysical`. The weight change therefore affects the team rebound battle only, not individual credit distribution.
+
+### Invariants
+
+All three `ReboundPhysical` weight components are enforced nonnegative in `MatchupConfig.Load()`. They need not sum to any particular value (a weighted read, not a probability distribution). A negative coefficient would invert the physical meaning of that attribute in the team battle — guarded loud at startup.
+
+### Calibration note
+
+The exact values (0.525 / 0.4875 / 0.4875) are calibration placeholders that preserve the historical total of 1.5. The ordering (Strength leads; Height = Wingspan) is the locked design decision. Calibration of magnitudes happens against real D1 data during the calibration pass and may change these values while preserving the ordering invariant (proven by sub-check (a) of `Phase43ReboundPhysicalWeightsCheck`).

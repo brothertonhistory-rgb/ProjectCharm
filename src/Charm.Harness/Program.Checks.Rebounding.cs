@@ -3232,4 +3232,219 @@ internal static partial class Program
         return ok;
     }
 
+    private static bool Phase43ReboundPhysicalWeightsCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 43: ReboundPhysical weights (Strength leads; Height = Wingspan) ---");
+        var pass = true;
+
+        var cfg = MatchupConfig.Load(configPath);
+
+        // ── (a) Config contract + Strength leads ─────────────────────────────────
+        // Verify the loaded config preserves the Session 05 design decision:
+        //   1. Total weight stays at the historical placeholder total of 1.5.
+        //   2. Strength is strictly primary (leads Height and Wingspan).
+        //   3. Height and Wingspan are equal secondaries.
+        // Also verify at the player level via three single-attribute players.
+        Console.WriteLine("  (a) Config contract + Strength leads:");
+        bool aOk;
+        try
+        {
+            var totalWeight = cfg.ReboundStrengthWeight
+                            + cfg.ReboundHeightWeight
+                            + cfg.ReboundWingspanWeight;
+
+            Console.WriteLine($"    ReboundStrengthWeight = {cfg.ReboundStrengthWeight}");
+            Console.WriteLine($"    ReboundHeightWeight   = {cfg.ReboundHeightWeight}");
+            Console.WriteLine($"    ReboundWingspanWeight = {cfg.ReboundWingspanWeight}");
+            Console.WriteLine($"    totalWeight           = {totalWeight}");
+
+            var totalOk    = Math.Abs(totalWeight - 1.5) < 1e-9;
+            var strLeadsHt = cfg.ReboundStrengthWeight > cfg.ReboundHeightWeight;
+            var strLeadsWs = cfg.ReboundStrengthWeight > cfg.ReboundWingspanWeight;
+            var htEqWs     = Math.Abs(cfg.ReboundHeightWeight - cfg.ReboundWingspanWeight) < 1e-9;
+
+            Console.WriteLine($"    |total - 1.5| < 1e-9? {(totalOk    ? "OK" : "FAIL")}");
+            Console.WriteLine($"    StrengthWeight > HeightWeight? {(strLeadsHt ? "OK" : "FAIL")}");
+            Console.WriteLine($"    StrengthWeight > WingspanWeight? {(strLeadsWs ? "OK" : "FAIL")}");
+            Console.WriteLine($"    |HeightWeight - WingspanWeight| < 1e-9? {(htEqWs ? "OK" : "FAIL")}");
+
+            // Player-level ordering proof: one attribute at 99, others at 50.
+            var pStr = new Player("pStr") { Strength = 99, Height = 50, Wingspan = 50,
+                Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 50,
+                FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+                OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50,
+                RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
+                Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
+                Discipline = 50, HelpDefense = 50,
+                RimTendency = 50, ShortTendency = 50, MidTendency = 50,
+                LongTendency = 50, ThreeTendency = 50 };
+
+            var pHt = new Player("pHt") { Strength = 50, Height = 99, Wingspan = 50,
+                Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 50,
+                FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+                OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50,
+                RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
+                Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
+                Discipline = 50, HelpDefense = 50,
+                RimTendency = 50, ShortTendency = 50, MidTendency = 50,
+                LongTendency = 50, ThreeTendency = 50 };
+
+            var pWs = new Player("pWs") { Strength = 50, Height = 50, Wingspan = 99,
+                Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 50,
+                FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+                OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50,
+                RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
+                Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
+                Discipline = 50, HelpDefense = 50,
+                RimTendency = 50, ShortTendency = 50, MidTendency = 50,
+                LongTendency = 50, ThreeTendency = 50 };
+
+            var physStr = Matchup.ReboundPhysical(pStr, cfg);
+            var physHt  = Matchup.ReboundPhysical(pHt,  cfg);
+            var physWs  = Matchup.ReboundPhysical(pWs,  cfg);
+
+            Console.WriteLine($"    ReboundPhysical(pStr) = {physStr:F6}");
+            Console.WriteLine($"    ReboundPhysical(pHt)  = {physHt:F6}");
+            Console.WriteLine($"    ReboundPhysical(pWs)  = {physWs:F6}");
+
+            var strGtHtP  = physStr > physHt;
+            var strGtWsP  = physStr > physWs;
+
+            Console.WriteLine($"    pStr > pHt at player level? {(strGtHtP ? "OK" : "FAIL")}");
+            Console.WriteLine($"    pStr > pWs at player level? {(strGtWsP ? "OK" : "FAIL")}");
+
+            aOk = totalOk && strLeadsHt && strLeadsWs && htEqWs && strGtHtP && strGtWsP;
+        }
+        catch (Exception ex) { aOk = false; Console.WriteLine($"  FAIL  (a) threw: {ex.Message}"); }
+        pass &= aOk;
+
+        // ── (b) Height and Wingspan are equal ────────────────────────────────────
+        // Using the same three 99/50/50 players, confirm |ReboundPhysical(pHt) - ReboundPhysical(pWs)| < 1e-9.
+        Console.WriteLine("  (b) Height and Wingspan are equal secondaries:");
+        bool bOk;
+        try
+        {
+            var pHtB = new Player("pHt") { Strength = 50, Height = 99, Wingspan = 50,
+                Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 50,
+                FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+                OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50,
+                RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
+                Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
+                Discipline = 50, HelpDefense = 50,
+                RimTendency = 50, ShortTendency = 50, MidTendency = 50,
+                LongTendency = 50, ThreeTendency = 50 };
+
+            var pWsB = new Player("pWs") { Strength = 50, Height = 50, Wingspan = 99,
+                Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 50,
+                FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+                OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50,
+                RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
+                Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
+                Discipline = 50, HelpDefense = 50,
+                RimTendency = 50, ShortTendency = 50, MidTendency = 50,
+                LongTendency = 50, ThreeTendency = 50 };
+
+            var physHtB = Matchup.ReboundPhysical(pHtB, cfg);
+            var physWsB = Matchup.ReboundPhysical(pWsB, cfg);
+            var diff    = Math.Abs(physHtB - physWsB);
+
+            Console.WriteLine($"    ReboundPhysical(pHt) = {physHtB:F10}");
+            Console.WriteLine($"    ReboundPhysical(pWs) = {physWsB:F10}");
+            Console.WriteLine($"    |difference|         = {diff:E3}");
+
+            bOk = diff < 1e-9;
+            Console.WriteLine($"    |pHt - pWs| < 1e-9? {(bOk ? "OK" : "FAIL")}");
+        }
+        catch (Exception ex) { bOk = false; Console.WriteLine($"  FAIL  (b) threw: {ex.Message}"); }
+        pass &= bOk;
+
+        // ── (c) Team battle ordering propagates through OffensiveReboundShare ────
+        // Three five-player lineups: each has one physical attribute at 80, others at 50.
+        // Shared neutral defense: all 50. Measure lift over baseline off-share.
+        // Assert: strengthLift > heightLift, strengthLift > wingspanLift,
+        //         |heightLift - wingspanLift| < 1e-9.
+        // OffensiveReboundShare is nonlinear (tanh-based), so ordering + symmetry is the
+        // correct contract — not an exact ratio.
+        Console.WriteLine("  (c) Team battle ordering propagates through OffensiveReboundShare:");
+        bool cOk;
+        try
+        {
+            const double baseOffShare = 0.27;
+
+            static Player MkP43(int str, int height, int wingspan)
+                => new Player("p")
+                {
+                    Strength = str, Height = height, Wingspan = wingspan,
+                    Outside = 50, Mid = 50, Close = 50, Finishing = 50, FreeThrow = 50,
+                    FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                    SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+                    OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50,
+                    RimProtection = 50, DefensiveRebounding = 50, Steals = 50,
+                    Weight = 50, Speed = 50, Quickness = 50, FirstStep = 50,
+                    Vertical = 50, Endurance = 50, Hustle = 50, BasketballIQ = 50,
+                    Discipline = 50, HelpDefense = 50,
+                    RimTendency = 50, ShortTendency = 50, MidTendency = 50,
+                    LongTendency = 50, ThreeTendency = 50,
+                };
+
+            // Strength lineup: Strength=80, Height=50, Wingspan=50
+            var strLineup = new Player?[] {
+                MkP43(80, 50, 50), MkP43(80, 50, 50), MkP43(80, 50, 50),
+                MkP43(80, 50, 50), MkP43(80, 50, 50) };
+
+            // Height lineup: Strength=50, Height=80, Wingspan=50
+            var htLineup = new Player?[] {
+                MkP43(50, 80, 50), MkP43(50, 80, 50), MkP43(50, 80, 50),
+                MkP43(50, 80, 50), MkP43(50, 80, 50) };
+
+            // Wingspan lineup: Strength=50, Height=50, Wingspan=80
+            var wsLineup = new Player?[] {
+                MkP43(50, 50, 80), MkP43(50, 50, 80), MkP43(50, 50, 80),
+                MkP43(50, 50, 80), MkP43(50, 50, 80) };
+
+            // Neutral defense: all 50
+            var neutralDef = new Player?[] {
+                MkP43(50, 50, 50), MkP43(50, 50, 50), MkP43(50, 50, 50),
+                MkP43(50, 50, 50), MkP43(50, 50, 50) };
+
+            var strShare = Matchup.OffensiveReboundShare(strLineup, neutralDef, -1, ShotLocation.Rim, baseOffShare, cfg);
+            var htShare  = Matchup.OffensiveReboundShare(htLineup,  neutralDef, -1, ShotLocation.Rim, baseOffShare, cfg);
+            var wsShare  = Matchup.OffensiveReboundShare(wsLineup,  neutralDef, -1, ShotLocation.Rim, baseOffShare, cfg);
+
+            var strengthLift  = strShare - baseOffShare;
+            var heightLift    = htShare  - baseOffShare;
+            var wingspanLift  = wsShare  - baseOffShare;
+
+            Console.WriteLine($"    strengthLift  = {strengthLift:F8}");
+            Console.WriteLine($"    heightLift    = {heightLift:F8}");
+            Console.WriteLine($"    wingspanLift  = {wingspanLift:F8}");
+            Console.WriteLine($"    |heightLift - wingspanLift| = {Math.Abs(heightLift - wingspanLift):E3}");
+
+            var strGtHtLift = strengthLift > heightLift;
+            var strGtWsLift = strengthLift > wingspanLift;
+            var htEqWsLift  = Math.Abs(heightLift - wingspanLift) < 1e-9;
+
+            Console.WriteLine($"    strengthLift > heightLift? {(strGtHtLift ? "OK" : "FAIL")}");
+            Console.WriteLine($"    strengthLift > wingspanLift? {(strGtWsLift ? "OK" : "FAIL")}");
+            Console.WriteLine($"    |heightLift - wingspanLift| < 1e-9? {(htEqWsLift ? "OK" : "FAIL")}");
+
+            cOk = strGtHtLift && strGtWsLift && htEqWsLift;
+        }
+        catch (Exception ex) { cOk = false; Console.WriteLine($"  FAIL  (c) threw: {ex.Message}"); }
+        pass &= cOk;
+
+        Console.WriteLine(pass ? "  Phase 43 PASSED." : "  Phase 43 FAILED.");
+        return pass;
+    }
+
 }
