@@ -82,7 +82,7 @@ A fifth tag, orthogonal to kind, marks **wiring status**:
 | Off-ball defense | Defense | Team-aggregate | dormant-pending-module |
 | Height | Physical | Authored individual | live-on-arrival |
 | Wingspan | Physical | Authored individual | live-on-arrival |
-| Weight | Physical | Authored individual | live-on-arrival |
+| Weight | Physical | Body-input (drives Strength up, Quickness/Speed down at generation) | not-engine-consumed; generation-time only (spec locked, build pending player-gen module) |
 | Strength | Physical | Authored individual | live-on-arrival |
 | Speed | Physical | Authored individual | live-on-arrival |
 | Quickness (lateral) | Physical | Authored individual | live-on-arrival |
@@ -239,7 +239,12 @@ layer exists.
 - **Height** — the direct vertical-size rating.
 - **Wingspan** — reach. **Absorbs "standing reach"** entirely; generators read wingspan
   directly rather than a separate derived reach value.
-- **Weight** — mass (contact absorption, post leverage, screening).
+- **Weight** — mass, expressed *relative to height* (mass-for-frame). NOT read by the
+  possession engine. A body-input that, at player generation, slides the Strength range up
+  and the Quickness/Speed ranges down — a reliable population tendency with real spread and
+  outliers (the heavy-but-quick "freak" is an emergent high roll, not a special case). Spec
+  locked; build deferred to the player-generation module. See design.md, "Weight as a
+  Body-Input to Strength and Quickness."
 - **Strength** — force (rebounding through contact, finishing through contact, holding
   position).
 - **Speed** — straight-line, north-south.

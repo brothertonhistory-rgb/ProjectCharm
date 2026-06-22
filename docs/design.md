@@ -6167,3 +6167,53 @@ Seven Phase 46 invariants enforced at Load: `DenialExponent > 1` (convex/flat-bo
 ### Calibration note
 
 All seven denial knobs are calibration placeholders. The locked design decisions are the shapes and seams: per-slot (not team-aggregate), two-channel blended skill gap plus athleticism physical channel, sum-to-1 channel split by postness, bounded tanh multiplier, denial before compression in the pipeline. Magnitudes will be tuned during the calibration pass and may move freely while the structural decisions hold.
+
+---
+
+## Weight as a Body-Input to Strength and Quickness (forward spec — player-generation module)
+
+### Status: design locked, no code. Build home is the future player-generation module, not the stress-test archetype scaffolding.
+
+This section records a settled design decision for how Weight will work once the real player-generation system exists. It is **not** implemented. It deliberately does not touch the archetype factory in `Program.Stress.cs`, because those named archetypes are throwaway calibration scaffolding — the real system will roll players from authored ranges rather than from nine hard-coded templates, and the logic below belongs to that range-rolling system. There is nothing to validate in a harness run today: this shapes what ratings a player is *born with*, and has no consumer in the possession engine.
+
+### What Weight is — and what it is not
+
+Weight is **not a consumer attribute**. Nothing in the possession engine reads it directly. It is an **input to generation** that shapes two other ratings: Strength (pulled up) and Quickness/Speed (pulled down). After a player is generated, the engine reads his final Strength and Quickness/Speed numbers normally — Weight has already done its work and is not consulted again during a game.
+
+This is the scouting-realism principle: a scout watching a heavy, powerful forward sees a *strong* player — not "a Strength rating with a live Weight modifier attached." The mass is the *explanation* for the rating, not a separate ingredient re-applied at runtime. So Weight resolves entirely at birth and the matchup engine stays clean, reading final ratings exactly as it does now.
+
+### The causal chain at generation
+
+1. **Body first.** Height and Weight are rolled before Strength and Quickness. (In the range-rolling system, each is drawn from its authored range for the kind of player being generated — bigs tall and heavy, guards short and light.)
+
+2. **Mass-for-frame is the operative quantity — not raw Weight.** What matters is weight *relative to height*. A 6'7" 260 player is enormous mass-for-frame; a 6'11" 215 player is light-for-frame. This single derived idea carries the whole mechanism: it is high for the burly forward and low for the wispy seven-footer, regardless of their tier or position.
+
+3. **Mass-for-frame slides the Strength range upward.** A player heavy for his height has the *center* of his Strength draw-range shifted up; light-for-frame shifts it down. The draw still happens within the shifted range with normal spread.
+
+4. **Mass-for-frame slides the Quickness and Speed ranges downward.** Same quantity, opposite sign. Heavy-for-frame costs lateral quickness and straight-line speed — the ranges shift down, the draw still happens with spread.
+
+### The critical design property: bias, not law
+
+Mass-for-frame **slides the center of a range**; it does **not** compute the rating directly. This distinction is the whole point and must survive into implementation:
+
+- **Rejected model:** `Strength = f(mass-for-frame)`. This is mathematical lockstep — more mass *always* means proportionally more strength, no exceptions. Not wanted.
+- **Locked model:** mass-for-frame moves *where the Strength range sits*, then Strength is drawn randomly within that shifted range. A heavy-for-frame player is *probably* strong, but a low roll inside his (raised) range can still produce a heavy player who is only average-strong. A light-for-frame player can roll high and surprise. The tendency lives in where the range sits; the outlier lives in the roll.
+
+The population shows a reliable tendency — heavier-for-frame players skew stronger and slower — while any individual player is free to defy it. There are ranges and outliers, exactly as everywhere else in the engine.
+
+### The freak (Zion) falls out for free — not special-cased
+
+If mass-for-frame *always* dropped quickness, there would be no quick heavy player by construction. Because mass-for-frame only slides the Quickness range down (rather than dictating the value), a player can still roll the top of his shifted-down range. A heavy player who rolls high quickness despite the downward slide *is* the freak — the mass-driven strength without the usual quickness tax. He is rare because most heavy players roll somewhere in the middle of a range whose center was pulled down; he is not a bolted-on exception. The triad (heavy + strong + quick + athletic) emerges naturally from the slide-and-draw mechanism, and its rarity is a mathematical consequence of the shifted range, not a hand-placed special case.
+
+### Calibration dials (tuned on arrival, not now)
+
+Two magnitudes govern the feel, and both are deferred to the calibration pass when a generated population exists to measure:
+
+- **Slide size vs. spread width.** If the slide is large relative to the spread, mass-for-frame nearly determines Strength and outliers are rare. If small relative to spread, it is a gentle lean with many exceptions. The locked *target shape*: sized so the **extremes** (a 260-for-6'7 vs a 215-for-6'11) almost never overlap on Strength — the burly forward reliably out-muscles the wispy seven-footer — while **moderate** mass differences overlap freely and produce plenty of exceptions. Clean separation at the extremes, lots of mixing in the middle. Same shape applies to the quickness tax: extreme mass clearly costs quickness, moderate mass barely registers.
+- **Quickness-tax weight and the freak override.** How hard mass-for-frame pulls Quickness/Speed down, which directly sets how common quick bigs are. A heavier tax with wider athletic spread makes the freak rarer and more special.
+
+Locking specific constants now would be guessing against data that does not exist. As with every calibration placeholder in the project, the *shapes and seams* are locked — body-first ordering, mass-for-frame as the operative quantity, slide-the-range (never compute-the-value), Strength up / Quickness-Speed down, freak-as-emergent-outlier — and the magnitudes move freely during calibration while those structural decisions hold.
+
+### What does NOT change
+
+No matchup-engine code. No consumer reads Weight. Strength and Quickness/Speed keep their current meanings and their current consumers; only the *way they are assigned at generation* changes, and only inside the future player-generation module. The archetype factory in `Program.Stress.cs` is left alone — it will be replaced by the range-rolling system that hosts this logic.
