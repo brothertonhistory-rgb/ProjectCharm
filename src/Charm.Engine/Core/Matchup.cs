@@ -87,6 +87,45 @@ public static class Matchup
         return Math.Sign(gap) * steepness * magnitude;
     }
 
+    // =========================================================================
+    // Phase 45 — Hustle helpers (centralized, list-based)
+    // =========================================================================
+
+    /// <summary>
+    /// Fixed-five Hustle mean. Slots 0–4; null/missing → neutral 50.
+    /// Denominator always 5 — matches the fixed-denominator discipline of all
+    /// team aggregates. One absent player on a full roster contributes 50, not
+    /// an omission, so a single elite hustler is a sliver (56.0), not the full 80.
+    /// </summary>
+    public static double TeamMeanHustle(IReadOnlyList<Player?> players)
+    {
+        var sum = 0.0;
+        for (var i = 0; i < 5; i++)
+        {
+            var p = i < players.Count ? players[i] : null;
+            sum += p?.Hustle ?? 50.0;
+        }
+        return sum / 5.0;
+    }
+
+    /// <summary>
+    /// Signed Hustle gap: offense mean minus defense mean.
+    /// Positive = offense out-hustles. Consumers flip sign as needed.
+    /// </summary>
+    public static double HustleGap(
+        IReadOnlyList<Player?> offense,
+        IReadOnlyList<Player?> defense)
+        => TeamMeanHustle(offense) - TeamMeanHustle(defense);
+
+    /// <summary>
+    /// Hustle gap shift via <see cref="GapFn"/>. Do NOT substitute raw
+    /// <c>Math.Tanh</c>: tanh is near-linear at zero, making a 1-point gap
+    /// ~25× more perceptible than the intended zero-slope / convex GapFn behavior.
+    /// </summary>
+    public static double HustleGapShift(
+        double gap, double steepness, double exponent, double scale)
+        => GapFn(gap, steepness, exponent, scale);
+
     /// <summary>
     /// The matchup-adjusted effective rating fed to the make-curve (DEC-2). Builds the
     /// shooter's baseline, the defender's blended defensive read, the skill gap and the
@@ -445,6 +484,15 @@ public static class Matchup
     ///
     /// <para><b>Pure and static.</b> No state, no RNG. The harness calls this
     /// directly in <c>Phase10ReboundDoorCheck</c>.</para>
+    ///
+    /// <para><b>Phase 45 — Hustle.</b> A third pre-bend contribution — the team Hustle
+    /// gap (offense mean minus defense mean) through <see cref="HustleGapShift"/>, scaled
+    /// by <see cref="MatchupConfig.HustleReboundWeight"/> — is added to <c>totalShift</c>
+    /// alongside the size and skill shifts, before the tanh, so it respects the same
+    /// off-share ceiling/floor. Computed in-method from the <paramref name="offense"/> and
+    /// <paramref name="defense"/> lists already passed in (no signature change). Equal-Hustle
+    /// teams yield <c>GapFn(0) = 0</c> → no change, so the Phase 10/43 harness checks
+    /// (equal Hustle on both sides) are byte-unaffected.</para>
     /// </summary>
     public static double OffensiveReboundShare(
         IReadOnlyList<Player?> offense,
@@ -508,7 +556,18 @@ public static class Matchup
         var skillShift = GapFn(offWeightedReb - defWeightedReb, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
 
         // ── Compose + bend (BlockWeight shape) ──────────────────────────────
-        var totalShift = cfg.ReboundSizeWeight * sizeShift + cfg.ReboundSkillWeight * skillShift;
+        // Phase 45: Hustle gap contribution, computed in-method from the offense/defense
+        // lists already passed in (no signature change). Same pre-bend units as sizeShift
+        // and skillShift; added to totalShift before the tanh so it respects the off-share
+        // ceiling/floor. Equal-Hustle teams → GapFn(0) = 0 → no change. The Phase 10/43
+        // harness checks (equal Hustle on both sides) are therefore byte-unaffected.
+        var hustleShift = cfg.HustleReboundWeight
+                        * HustleGapShift(HustleGap(offense, defense),
+                                         cfg.HustleReboundSteepness,
+                                         cfg.HustleReboundExponent,
+                                         cfg.HustleReboundScale);
+        var totalShift = cfg.ReboundSizeWeight * sizeShift + cfg.ReboundSkillWeight * skillShift
+                       + hustleShift;
         var ceiling    = cfg.ReboundOffShareCeiling;
         var floor      = cfg.ReboundOffShareFloor;
         var span       = totalShift >= 0.0 ? (ceiling - baseOffShare) : (baseOffShare - floor);
@@ -581,9 +640,17 @@ public static class Matchup
     /// (= BaseNonShootingFoul / actionMass). Reproduced exactly at neutral pressure.</param>
     /// <param name="cfg">The matchup config — pressure knobs, steal ceiling/floor,
     /// foul ceiling/floor, and the existing GapFn parameters.</param>
+    /// <param name="hustlePressureNudge">Phase 45: pre-saturation Hustle contribution
+    /// to the turnover disruption shift. Positive when the defense out-hustles. Added to
+    /// disruptionShift BEFORE the tanh so it respects the turnover ceiling. Default 0.0.</param>
+    /// <param name="hustleFoulNudge">Phase 45: pre-saturation Hustle contribution to the
+    /// foul shift. Positive only when the defense has the Hustle advantage (the caller
+    /// passes max(0, -hustleGap) through the foul GapFn). Added to foulShift BEFORE the
+    /// tanh so it respects the foul ceiling. Default 0.0.</param>
     public static (double turnoverShare, double foulShare) DisruptionShares(
         Player handler, Player defender, double pressure,
-        double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg)
+        double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg,
+        double hustlePressureNudge = 0.0, double hustleFoulNudge = 0.0)
     {
         // ── Pressure normalization ───────────────────────────────────────────
         // Map the 1–10 dial to a signed unit around neutral.
@@ -603,7 +670,9 @@ public static class Matchup
         // Disruption shift: flat lift + pressure-gated matchup.
         // At low pressure, pressureGate ≈ 0 so matchup is muted regardless of attributes.
         // At high pressure, matchupShift is scaled in — ball-hawks feast.
-        var disruptionShift = pressureLift + pressureGate * matchupShift;
+        // Phase 45: hustlePressureNudge is added pre-saturation (NOT gated by pressure —
+        // effort exists at any pressure level, an explicit Phase 45 design decision).
+        var disruptionShift = pressureLift + pressureGate * matchupShift + hustlePressureNudge;
 
         var toCeiling   = cfg.TurnoverCeiling;
         var toFloor     = cfg.TurnoverFloor;
@@ -618,7 +687,9 @@ public static class Matchup
         // ── Foul share — flat-lift only, no matchup term ─────────────────────
         // Reach-in non-shooting fouls track aggression, not skill: any level of
         // BallHandling/Steals matchup produces the same foul rate at the same pressure.
-        var foulShift    = pressureLift;                 // NO matchupShift term
+        // Phase 45: hustleFoulNudge is added pre-saturation. The caller passes a value
+        // that is positive only when the defense out-hustles (defense-only foul cost).
+        var foulShift    = pressureLift + hustleFoulNudge;   // NO matchupShift term
         var foulCeiling  = cfg.FoulPressureCeiling;
         var foulFloor    = cfg.FoulPressureFloor;
         var foulSpan     = foulShift >= 0.0
@@ -670,9 +741,16 @@ public static class Matchup
     /// (= BaseFoul / actionMass). Reproduced exactly at neutral pressure.</param>
     /// <param name="cfg">Matchup config — pressure knobs, Roll-B-specific
     /// ceilings/floors, slot weights, and shared GapFn parameters.</param>
+    /// <param name="hustlePressureNudge">Phase 45: pre-saturation Hustle contribution to
+    /// the turnover disruption shift. Positive when the defense out-hustles. Added to
+    /// disruptionShift BEFORE the tanh so it respects the turnover ceiling. Default 0.0.</param>
+    /// <param name="hustleFoulNudge">Phase 45: pre-saturation Hustle contribution to the
+    /// foul shift. Positive only when the defense has the Hustle advantage. Added to
+    /// foulShift BEFORE the tanh so it respects the foul ceiling. Default 0.0.</param>
     public static (double turnoverShare, double foulShare) TeamDisruptionShares(
         double offenseHandling, double defenseStealers, double pressure,
-        double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg)
+        double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg,
+        double hustlePressureNudge = 0.0, double hustleFoulNudge = 0.0)
     {
         // ── Pressure normalization ───────────────────────────────────────────
         var pUnit        = (pressure - cfg.PressureNeutral) / cfg.PressureScale;
@@ -685,7 +763,9 @@ public static class Matchup
         // At high pressure the gate opens and the team gap drives the outcome.
         var teamGap        = defenseStealers - offenseHandling;
         var matchupShift   = GapFn(teamGap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
-        var disruptionShift = pressureLift + pressureGate * matchupShift;
+        // Phase 45: hustlePressureNudge added pre-saturation (NOT pressure-gated —
+        // effort exists at any pressure level, an explicit Phase 45 design decision).
+        var disruptionShift = pressureLift + pressureGate * matchupShift + hustlePressureNudge;
 
         var toCeiling  = cfg.RollBTurnoverCeiling;
         var toFloor    = cfg.RollBTurnoverFloor;
@@ -696,7 +776,9 @@ public static class Matchup
         var finalToShare = baseTurnoverShare + toBend;   // plain addition; tanh supplies sign
 
         // ── Foul share — pressure-only, no matchup term ──────────────────────
-        var foulShift   = pressureLift;
+        // Phase 45: hustleFoulNudge added pre-saturation; positive only when the
+        // defense out-hustles (defense-only foul cost).
+        var foulShift   = pressureLift + hustleFoulNudge;
         var foulCeiling = cfg.RollBFoulPressureCeiling;
         var foulFloor   = cfg.RollBFoulPressureFloor;
         var foulSpan    = foulShift >= 0.0

@@ -110,7 +110,12 @@ public static class StealerPicker
             var raw  = Math.Tanh((postnesses[i] - meanPostness) / postnessScale);
             var mult = postFloor + (1.0 - postFloor) * (1.0 - (raw + 1.0) / 2.0);
 
-            weights[i]   = Math.Max(1.0, p.Steals * mult);
+            // Phase 45: per-player Hustle tilt (tanh). A higher-Hustle defender earns a
+            // larger share of his team's steals; centered at 1.0 for a 50-Hustle player.
+            var hm   = 1.0 + matchupCfg.HustleStealerSteepness
+                           * Math.Tanh((p.Hustle - 50.0) / matchupCfg.HustleStealerScale);
+
+            weights[i]   = Math.Max(1.0, p.Steals * mult * hm);
             totalWeight += weights[i];
         }
 

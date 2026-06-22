@@ -6046,3 +6046,64 @@ These are independent effects, not double-counting. A great help-defense team ma
 ### The PostnessNeutral pivot is a design guarantee, not a calibration artifact
 
 The zero-compression zone at `PostnessNeutral` is intentional. A role-neutral player (Postness = PostnessNeutral) is neither a perimeter focal point nor an interior focal point in a meaningful sense — compressing his selection share with either defensive attribute would be a false signal. The harness sub-check (f.neutral) proves this: a player constructed to sit exactly at the pivot is confirmed to have both OBD-only and HD-only compression equal to zero, even when that player is above equal-share (has a focal-point share that could theoretically be compressed). The zero-compression is not a numerical accident — it is algebraically enforced by the two weight formulas crossing zero at the same point.
+
+
+## Session 07 — Hustle: Relative Team-Aggregate Effect Across Five Consumers
+
+### What kind of attribute Hustle is
+
+Hustle is the engine's first fully **relative** attribute wired across multiple consumers. Only the *gap* between the two teams' mean Hustle matters; the absolute level does not. Two teams that both hustle at 90 play exactly as if both hustled at 50 — the gap is zero, so every Hustle effect is zero. This is the defining property and the source of the attribute's self-limiting balance: a high-Hustle team earns nothing against an equally high-Hustle opponent. The advantage is real only against a less scrappy team, and it scales with how much less scrappy that team is.
+
+This is deliberately different from an absolute attribute like Screening, which needed a natural counterweight (OffBallDefense / HelpDefense) to keep it from running away. A relative attribute counterbalances itself — the opposing team's rating is the counterweight, built into the gap. Balance for Hustle therefore comes from **rarity in the player population** (how often a roster of five genuine hustlers actually assembles), not from a formula ceiling.
+
+### The five consumers
+
+| # | Consumer | Site | Shape | Direction |
+|---|---|---|---|---|
+| 1 | Rebound battle | `Matchup.OffensiveReboundShare` (reaches Roll I + Roll M) | GapFn, pre-bend | Higher-hustle team gains share |
+| 2 | Turnover disruption | Roll B `TeamDisruptionShares` + Roll F `DisruptionShares` | GapFn, pre-saturation | Higher-hustle defense forces more |
+| 3 | Defensive foul cost | Roll B `TeamDisruptionShares` + Roll F `DisruptionShares` | GapFn, pre-saturation, defense-only | Higher-hustle defense fouls more |
+| 4 | Transition defense | `RollHGenerator` C8 (FastBreak only) | GapFn, own clamp | Higher-hustle defense suppresses break make% |
+| 5 | Attribution credit | Offensive/defensive rebounder + stealer pickers | per-player tanh | Higher-Hustle player absorbs more credit |
+
+Consumers 1–4 are team-vs-team gap effects. Consumer 5 is the one within-team effect.
+
+### GapFn for teams, tanh for players — why the two shapes differ
+
+The team consumers all run the gap through `GapFn(gap, steepness, exponent, scale) = steepness × sign(gap) × (|gap|/scale)^exponent` — a signed power law with **zero slope at zero** and **convex** growth. This is the correct shape for a gap between two teams: a one- or two-point difference in average effort should be almost imperceptible (you cannot feel a roster that is a hair scrappier), while a large gap should compound (a team that dramatically out-hustles should see it across the box score). The exponent (default 2.0, enforced > 1.0) is what gives the flat bottom and the acceleration.
+
+The attribution pickers face a structurally different question. They are not comparing two teams — they are dividing a fixed pot of rebound or steal credit *within* one team, based on each player's *own* Hustle relative to the 50-neutral midpoint. That is a per-player tilt, identical in shape to the existing `ReboundWingspanMultiplier`: `1 + steepness × tanh((rating − 50) / scale)`. tanh is right here precisely because it is near-linear in the middle and saturating at the extremes — a player slightly above average should get slightly more credit, smoothly. Reusing the established wingspan-multiplier shape keeps the pickers internally consistent.
+
+The harness proves the team path is genuinely GapFn and not tanh: at a one-point gap, the GapFn shift is ~25× smaller than the raw-tanh equivalent (24.99× measured). If a future maintainer ever "simplifies" `HustleGapShift` to a tanh, that one-point gap would suddenly become ~25× more perceptible, and the flat-bottom contract would break — the helper carries a doc-comment warning against exactly this.
+
+### The pre-saturation insertion seam
+
+For both turnover and foul disruption, the Hustle nudge is added to the disruption/foul shift **before** the tanh that bends the arm toward its configured ceiling — not as a post-bend addition to the final share. This is the single most important correctness property of the disruption consumers, and it is what the ceiling-sensitive harness sub-check exists to prove.
+
+The mechanism: `disruptionShift = pressureLift + pressureGate × matchupShift + hustlePressureNudge`, then `finalShare = base + span × tanh(disruptionShift / referenceShift)`. Because the nudge enters before the tanh, its effect on the final share depends on how much headroom remains. Near the ceiling the tanh slope is shallow, so the same Hustle advantage produces a smaller increment than it does at neutral pressure where the slope is steep. The harness confirms this directly: with a fixed defensive Hustle advantage, the Roll F turnover increment falls from 0.0599pp at neutral pressure to 0.0235pp near the ceiling, and the final share never crosses the ceiling. A post-bend addition would carry the full increment regardless of headroom and could push the arm past its ceiling — the exact failure this seam prevents.
+
+### Defense-only foul cost, and why it is smaller than the turnover gain
+
+Extra ball pressure forces more turnovers but also draws more reach-in fouls — that trade-off is the foul consumer. It is **defense-only**: the nudge uses `max(0, -hustleGap)`, which is positive only when the defense out-hustles the offense. An offense that out-hustles its defender does not somehow cause the defense to foul more; the harness confirms an offensive Hustle advantage produces exactly zero change in the defensive foul arm.
+
+The foul weight (0.02) is deliberately set below the turnover weight (0.04) so that a hustling defense's *net* effect is favorable: it forces more turnovers than the fouls it costs. This is a within-disruption calibration contract, verified behaviorally in the harness (foul Δ 0.0034pp < turnover Δ 0.0599pp at the same defensive advantage), not a Load invariant — calibration may retune both weights while preserving the foul < turnover ordering.
+
+### Transition defense (C8): FastBreak-only, self-clamping
+
+C8 is a new term in `RollHGenerator`, placed immediately after the C5.5/C6/C7 settle clamp and gated by `state.FastBreak`. The placement matters: C5.5, C6, and C7 are all halfcourt-gated, so on a FastBreak the make% entering C8 is the raw matchup value, untouched by any earlier C-term. C8 computes the gap as `(defense − offense)` — a positive gap means the defense out-hustles and gets back in transition — runs it through GapFn, subtracts the result from make%, and applies its own `Math.Clamp`. On a FastBreak, C8's clamp is the only one that fires; on a half-court possession, C8 never runs and the half-court make% is byte-identical regardless of the Hustle gap (the gap touches no half-court make% term). The harness proves both halves: FastBreak make% drops under a hustling defense, half-court make% does not move.
+
+### The fixed-denominator-5 aggregate
+
+`TeamMeanHustle` always divides by 5 and treats null or missing lineup slots as the neutral value 50, never as omissions. The effect is graceful degradation and correct rarity: a single elite hustler (Hustle 80) on an otherwise-average roster moves the team mean only to 56.0, not 80. One specialist is nearly imperceptible; a full five-man roster of hustlers is what produces a felt team identity. This matches the fixed-capacity discipline used by every other lineup aggregate in the engine — partial lineups never inflate per-player influence, and the rarity of assembling five specialists is what keeps the effect bounded in a real player population.
+
+### Scope of effect and what stays untouched
+
+The rebound consumer lives entirely inside `OffensiveReboundShare`, computed from the offense/defense lists that method already receives — no signature change, and therefore both rebound callers (Roll I live-miss, Roll M free-throw) inherit the effect with no caller edits. The disruption consumers are added as optional parameters to `DisruptionShares`/`TeamDisruptionShares` defaulting to 0.0, so every prior caller and every prior harness check is byte-identical when the parameters are omitted. No routing, no resolver structure, and no `PossessionState` field changed this session. The Hustle property itself already existed on `Player`; this session only wired it into outcomes.
+
+### Invariants
+
+Each of the four team-level GapFn families is enforced at Load: steepness > 0, exponent > 1 (the convex/flat-bottom contract), scale > 0, and weight in the open interval (0, 1). The four per-player picker knobs are enforced: steepness > 0, scale > 0. There is intentionally **no** cross-consumer ordering invariant in Load (e.g. foul-weight < turnover-weight is not asserted at load time) — that is a calibration contract proven in the harness, not a structural constraint, so calibration retains the freedom to retune within the proven-correct shape.
+
+### Calibration note
+
+Every Hustle value shipped this session — all four GapFn families and all four picker knobs — is a calibration placeholder. The locked design decisions are the *shapes and seams*: relative gap (not absolute), GapFn for teams and tanh for players, pre-saturation insertion for disruption, defense-only foul cost, FastBreak-only transition suppression, fixed-denominator-5 aggregation, and the foul < turnover ordering. Magnitudes will be tuned against real data during the calibration pass and may move freely while those structural decisions hold.

@@ -108,7 +108,13 @@ public static class DefensiveRebounderPicker
             var pw = Matchup.PositionalWeight(postnesses[i], meanPostness, matchupCfg);
             var wm = Matchup.ReboundWingspanMultiplier(wingspans[i], meanWingspan, matchupCfg);
 
-            weights[i]   = Math.Max(1.0, p.DefensiveRebounding * pw * wm);
+            // Phase 45: per-player Hustle tilt (tanh, same shape as the offensive picker).
+            // A higher-Hustle defender absorbs a larger share of his team's defensive
+            // boards; centered at 1.0 for a 50-Hustle player.
+            var hm = 1.0 + matchupCfg.HustleRebounderSteepness
+                         * Math.Tanh((p.Hustle - 50.0) / matchupCfg.HustleRebounderScale);
+
+            weights[i]   = Math.Max(1.0, p.DefensiveRebounding * pw * wm * hm);
             totalWeight += weights[i];
         }
 

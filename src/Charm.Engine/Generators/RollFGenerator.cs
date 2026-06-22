@@ -135,8 +135,51 @@ public sealed class RollFGenerator : IRollFPieGenerator
         var baseTurnoverShare = _cfgF.BaseTurnover        / actionMass;
         var baseFoulShare    = _cfgF.BaseNonShootingFoul  / actionMass;
 
+        // ── Phase 45: Hustle disruption + defensive foul cost ───────────────
+        // Team-aggregate Hustle gap (offense mean − defense mean), full five-slot
+        // lineups with the fixed-denominator-5 discipline. Both nudges are computed
+        // here and fed into the pre-saturation disruption/foul shifts inside
+        // DisruptionShares so they respect the existing ceilings (never a raw
+        // post-bend addition). Falls back to 0 nothing when rosters are sparse —
+        // TeamMeanHustle treats null slots as neutral 50, so an empty side washes out.
+        var offHustle = new Player?[]
+        {
+            _game.RosterFor(state.Offense).PlayerAt(_game.LineupFor(state.Offense).SlotAt(1)),
+            _game.RosterFor(state.Offense).PlayerAt(_game.LineupFor(state.Offense).SlotAt(2)),
+            _game.RosterFor(state.Offense).PlayerAt(_game.LineupFor(state.Offense).SlotAt(3)),
+            _game.RosterFor(state.Offense).PlayerAt(_game.LineupFor(state.Offense).SlotAt(4)),
+            _game.RosterFor(state.Offense).PlayerAt(_game.LineupFor(state.Offense).SlotAt(5)),
+        };
+        var defHustle = new Player?[]
+        {
+            _game.RosterFor(state.Defense).PlayerAt(_game.LineupFor(state.Defense).SlotAt(1)),
+            _game.RosterFor(state.Defense).PlayerAt(_game.LineupFor(state.Defense).SlotAt(2)),
+            _game.RosterFor(state.Defense).PlayerAt(_game.LineupFor(state.Defense).SlotAt(3)),
+            _game.RosterFor(state.Defense).PlayerAt(_game.LineupFor(state.Defense).SlotAt(4)),
+            _game.RosterFor(state.Defense).PlayerAt(_game.LineupFor(state.Defense).SlotAt(5)),
+        };
+        var hustleGap = Matchup.HustleGap(offHustle, defHustle);
+
+        // Turnover: -hustleGap is positive when the defense out-hustles → more turnovers.
+        var hustlePressureNudge = _matchup.HustlePressureWeight
+            * Matchup.HustleGapShift(-hustleGap,
+                                     _matchup.HustlePressureSteepness,
+                                     _matchup.HustlePressureExponent,
+                                     _matchup.HustlePressureScale);
+
+        // Defensive foul cost (defense-only): positive only when the defense out-hustles.
+        // hustleGap = offense − defense, so the defense's advantage is max(0, -hustleGap).
+        // If the offense has equal or greater Hustle, this is exactly 0.0.
+        var defensiveHustleAdvantage = Math.Max(0.0, -hustleGap);
+        var defensiveFoulNudge = _matchup.HustleFoulWeight
+            * Matchup.HustleGapShift(defensiveHustleAdvantage,
+                                     _matchup.HustleFoulSteepness,
+                                     _matchup.HustleFoulExponent,
+                                     _matchup.HustleFoulScale);
+
         var (finalToShare, finalFoulShare) = Matchup.DisruptionShares(
-            handler, defender, pressure, baseTurnoverShare, baseFoulShare, _matchup);
+            handler, defender, pressure, baseTurnoverShare, baseFoulShare, _matchup,
+            hustlePressureNudge, defensiveFoulNudge);
 
         // ── Overflow guard ───────────────────────────────────────────────────
         // At sane ceiling values this never fires, but a misconfigured ceiling

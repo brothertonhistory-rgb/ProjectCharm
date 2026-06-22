@@ -357,6 +357,51 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // Settle all three signed C-terms (C5.5 +, C6 −, C7 −) under a single clamp.
         makePct = Math.Clamp(makePct, 0.0, 1.0);
 
+        // ── C8: Hustle transition defense (Phase 45) ─────────────────────────
+        // FastBreak ONLY. C5.5/C6/C7 above are all halfcourt-gated (never fire on a
+        // break), so the settle clamp above leaves the raw matchup make% untouched on
+        // a FastBreak — C8's own clamp below is the only one that fires on a break.
+        //
+        // The defending team's mean Hustle vs the offense's drives the suppression:
+        // a high-hustle defense gets back in transition and contests the run-out.
+        // Gap is (defense − offense) so a positive gap = defense out-hustles = suppress.
+        // GapFn (NOT raw tanh) gives the zero-slope/convex shape: a tiny gap barely
+        // matters; a big gap compounds. Subtracted from make%, then clamped to [0,1].
+        if (state.FastBreak)
+        {
+            var defRoster = _game.RosterFor(state.Defense);
+            var defLineup = _game.LineupFor(state.Defense);
+            var offRoster = _game.RosterFor(state.Offense);
+            var offLineup = _game.LineupFor(state.Offense);
+
+            var defPlayers = new Player?[]
+            {
+                defRoster.PlayerAt(defLineup.SlotAt(1)),
+                defRoster.PlayerAt(defLineup.SlotAt(2)),
+                defRoster.PlayerAt(defLineup.SlotAt(3)),
+                defRoster.PlayerAt(defLineup.SlotAt(4)),
+                defRoster.PlayerAt(defLineup.SlotAt(5)),
+            };
+            var offPlayers = new Player?[]
+            {
+                offRoster.PlayerAt(offLineup.SlotAt(1)),
+                offRoster.PlayerAt(offLineup.SlotAt(2)),
+                offRoster.PlayerAt(offLineup.SlotAt(3)),
+                offRoster.PlayerAt(offLineup.SlotAt(4)),
+                offRoster.PlayerAt(offLineup.SlotAt(5)),
+            };
+
+            // defense first → positive gap = defense out-hustles = suppression
+            var gap = Matchup.HustleGap(defPlayers, offPlayers);
+            var suppression = _matchup.HustleTransitionDefenseWeight
+                            * Matchup.HustleGapShift(gap,
+                                                     _matchup.HustleTransitionDefenseSteepness,
+                                                     _matchup.HustleTransitionDefenseExponent,
+                                                     _matchup.HustleTransitionDefenseScale);
+            makePct -= suppression;
+            makePct  = Math.Clamp(makePct, 0.0, 1.0);
+        }
+
         // Phase 7 — matchup-aware block door. Compute the bent block weight from the
         // matchup, or fall back to the configured baseline if the defending slot is empty
         // (DEC-6, same guard as the make door above).

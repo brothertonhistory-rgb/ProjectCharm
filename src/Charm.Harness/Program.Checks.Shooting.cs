@@ -3033,4 +3033,381 @@ internal static partial class Program
         Console.WriteLine(pass ? "  Phase 44 PASSED." : "  Phase 44 FAILED.");
         return pass;
     }
+
+    // =========================================================================
+    // Phase 45 — Hustle: relative team-aggregate effect across five consumers.
+    // Direct-probe discipline (matches Phase 13 / Phase 41 / Phase 44): every
+    // assertion reads a real generator pie or calls Matchup directly — no stubs,
+    // no full-game batch. Each consumer's mechanism is proven in isolation.
+    // =========================================================================
+    private static bool Phase45HustleCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase 45: Hustle — relative team-aggregate effect across five consumers ---");
+        var pass = true;
+        const double Eps      = 1e-9;
+        const double TightEps = 1e-9;
+
+        var cfgH = RollHConfig.Load(configPath);
+        var cfgM = MatchupConfig.Load(configPath);
+        var cfgB = RollBConfig.Load(configPath);
+        var cfgF = RollFConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+
+        // Player with all attributes at b; Hustle (and rebound/steal skill) overridable.
+        static Player Mk(int b, int? hustle = null, int? oreb = null, int? dreb = null, int? steals = null)
+            => new Player("p")
+            {
+                Close = b, Mid = b, Outside = b, Finishing = b, FreeThrow = b,
+                FoulDrawing = b, BallHandling = b, Passing = b, Playmaking = b,
+                SelfCreation = b, PostMoves = b, OffBallMovement = b, Screening = b,
+                OffensiveRebounding = oreb ?? b,
+                PerimeterDefense = b, PostDefense = b, RimProtection = b,
+                DefensiveRebounding = dreb ?? b, Steals = steals ?? b, HelpDefense = b,
+                OffBallDefense = b,
+                Height = b, Wingspan = b, Weight = b,
+                Strength = b, Speed = b, Quickness = b, FirstStep = b, Vertical = b,
+                Endurance = b, Hustle = hustle ?? b, BasketballIQ = b, Discipline = b,
+                RimTendency = b, ShortTendency = b, MidTendency = b,
+                LongTendency = b, ThreeTendency = b,
+            };
+
+        // Five-player lineup, all at Hustle h, every other attribute 50.
+        static Player?[] Five(int h) => new Player?[] { Mk(50, h), Mk(50, h), Mk(50, h), Mk(50, h), Mk(50, h) };
+
+        // Back-calculate pre-block/pre-foul make% from a ShotResult pie.
+        static double MakePct(Pie<ShotResult> pie)
+        {
+            var blocked    = pie.Slices.First(s => s.Outcome == ShotResult.Blocked).Weight;
+            var maf        = pie.Slices.First(s => s.Outcome == ShotResult.MadeAndFouled).Weight;
+            var missFouled = pie.Slices.First(s => s.Outcome == ShotResult.MissFouled).Weight;
+            var foul       = maf + missFouled;
+            var nonBNF     = 1.0 - blocked - foul;
+            var made       = pie.Slices.First(s => s.Outcome == ShotResult.Made).Weight;
+            return nonBNF > 1e-9 ? made / nonBNF : 0.0;
+        }
+
+        // MatchupConfig with Away (defense) pressure set to p (mirrors Phase 13).
+        MatchupConfig WithAwayPressure(double p)
+        {
+            var c = MatchupConfig.Load(configPath);
+            c.AwayPressure = p;
+            return c;
+        }
+
+        // Roll B / Roll F arm readers (real generators, full lineups).
+        Dictionary<HalfcourtOutcome, double> RollBArms(MatchupConfig cfg, int offH, int defH)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), Mk(50, offH));
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), Mk(50, defH));
+            }
+            var st = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound);
+            var pie = new RollBGenerator(cfgB, cfg, g).Generate(st, physicality: 0.0);
+            return pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+        }
+        Dictionary<PlayerActionOutcome, double> RollFArms(MatchupConfig cfg, int offH, int defH)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), Mk(50, offH));
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), Mk(50, defH));
+            }
+            var st = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound,
+                SelectedSlot: g.HomeLineup.SlotAt(1));
+            var pie = new RollFGenerator(cfgF, cfg, g).Generate(st);
+            return pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
+        }
+        // RollH FastBreak/halfcourt make% (real generator, full lineups).
+        double RollHMake(int offH, int defH, bool fastBreak, ShotLocation zone)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            for (var i = 0; i < 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i + 1), Mk(50, offH));
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), Mk(50, defH));
+            }
+            var st = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound,
+                SelectedSlot: g.HomeLineup.SlotAt(1), ShotType: zone, FastBreak: fastBreak);
+            return MakePct(new RollHGenerator(cfgH, cfgM, g).Generate(st));
+        }
+
+        // ── (a) Rebound battle direction ─────────────────────────────────────
+        Console.WriteLine("  (a) Rebound battle direction:");
+        {
+            const double baseOffShare = 0.29;   // live-miss baseline
+            var off80 = Five(80); var def20 = Five(20);
+            var off20 = Five(20); var def80 = Five(80);
+            var both50off = Five(50); var both50def = Five(50);
+
+            var shareHigh = Matchup.OffensiveReboundShare(off80, def20, -1, ShotLocation.Rim, baseOffShare, cfgM);
+            var shareLow  = Matchup.OffensiveReboundShare(off20, def80, -1, ShotLocation.Rim, baseOffShare, cfgM);
+            var shareEven = Matchup.OffensiveReboundShare(both50off, both50def, -1, ShotLocation.Rim, baseOffShare, cfgM);
+
+            // Pre-bend totalShift contribution at canonical gap 60.
+            var preBend = cfgM.HustleReboundWeight
+                        * Matchup.HustleGapShift(60.0, cfgM.HustleReboundSteepness,
+                                                 cfgM.HustleReboundExponent, cfgM.HustleReboundScale);
+
+            var highUp   = shareHigh > shareEven + Eps;
+            var lowDown  = shareLow  < shareEven - Eps;
+            var evenFlat = Math.Abs(shareEven - baseOffShare) < TightEps;
+
+            Console.WriteLine($"    pre-bend totalShift contribution @gap60 = {preBend:F6}");
+            Console.WriteLine($"    off80/def20: share={shareHigh:F6} (Δ={(shareHigh-shareEven)*100:F3}pp)  > even → {(highUp ? "ok" : "FAIL")}");
+            Console.WriteLine($"    off20/def80: share={shareLow:F6} (Δ={(shareLow-shareEven)*100:F3}pp)  < even → {(lowDown ? "ok" : "FAIL")}");
+            Console.WriteLine($"    even (50/50): share={shareEven:F6}  == baseline → {(evenFlat ? "ok" : "FAIL")}");
+            var aOk = highUp && lowDown && evenFlat;
+            pass &= aOk;
+            Console.WriteLine($"  (a) {(aOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (h) GapFn zero-slope / convex (placed early — pure math) ──────────
+        Console.WriteLine("  (h) GapFn zero-slope / convex (vs raw tanh):");
+        {
+            const double baseOffShare = 0.29;
+            // 1-point gap: offense mean 51, defense 50.
+            var offMean51 = new Player?[] { Mk(50, 51), Mk(50, 51), Mk(50, 51), Mk(50, 51), Mk(50, 51) };
+            var def50      = Five(50);
+            var share1 = Matchup.OffensiveReboundShare(offMean51, def50, -1, ShotLocation.Rim, baseOffShare, cfgM);
+            var even   = Matchup.OffensiveReboundShare(Five(50),  def50, -1, ShotLocation.Rim, baseOffShare, cfgM);
+
+            // The pre-bend shift at gap=1 should match the quadratic GapFn prediction.
+            var gapFn1   = cfgM.HustleReboundSteepness * Math.Pow(1.0 / cfgM.HustleReboundScale, cfgM.HustleReboundExponent);
+            var preBend1 = cfgM.HustleReboundWeight * gapFn1;
+            var tanh1    = cfgM.HustleReboundSteepness * Math.Tanh(1.0 / cfgM.HustleReboundScale);
+            var ratio    = preBend1 > 0.0 ? (cfgM.HustleReboundWeight * tanh1) / preBend1 : 0.0;
+
+            // Canonical 60-gap pre-bend.
+            var preBend60 = cfgM.HustleReboundWeight
+                          * cfgM.HustleReboundSteepness * Math.Pow(60.0 / cfgM.HustleReboundScale, cfgM.HustleReboundExponent);
+
+            var oneGapTiny   = (share1 - even) > 0.0 && (share1 - even) < (preBend60 / cfgM.ReboundReferenceShift);  // far smaller than canonical
+            var notTanh      = ratio > 10.0;   // tanh is ~25× larger at gap=1
+            var muchSmaller  = preBend1 < preBend60 / 100.0;
+
+            Console.WriteLine($"    gap=1 GapFn pre-bend={preBend1:F8}  raw-tanh equiv={cfgM.HustleReboundWeight*tanh1:F8}  ratio={ratio:F1}× (expect ~25×) → {(notTanh ? "ok" : "FAIL")}");
+            Console.WriteLine($"    gap=1 share lift={(share1-even)*100:F6}pp  (tiny, positive) → {(oneGapTiny ? "ok" : "FAIL")}");
+            Console.WriteLine($"    gap=1 pre-bend << gap=60 pre-bend ({preBend1:F8} vs {preBend60:F6}) → {(muchSmaller ? "ok" : "FAIL")}");
+            var hOk = oneGapTiny && notTanh && muchSmaller;
+            pass &= hOk;
+            Console.WriteLine($"  (h) {(hOk ? "ok — GapFn (not tanh) confirmed" : "FAIL")}");
+        }
+
+        // ── (b) Equal-Hustle wash (all five consumers) ───────────────────────
+        Console.WriteLine("  (b) Equal-Hustle wash (Hustle=90 both == Hustle=50 both):");
+        {
+            const double baseOffShare = 0.29;
+            // Rebound
+            var reb90 = Matchup.OffensiveReboundShare(Five(90), Five(90), -1, ShotLocation.Rim, baseOffShare, cfgM);
+            var reb50 = Matchup.OffensiveReboundShare(Five(50), Five(50), -1, ShotLocation.Rim, baseOffShare, cfgM);
+            var rebOk = Math.Abs(reb90 - reb50) < TightEps;
+            // Roll B turnover + foul
+            var b90 = RollBArms(cfgM, 90, 90); var b50 = RollBArms(cfgM, 50, 50);
+            var bToOk   = Math.Abs(b90[HalfcourtOutcome.DeadBallTurnover] - b50[HalfcourtOutcome.DeadBallTurnover]) < TightEps;
+            var bFoulOk = Math.Abs(b90[HalfcourtOutcome.Foul]             - b50[HalfcourtOutcome.Foul])             < TightEps;
+            // Roll F turnover + foul
+            var f90 = RollFArms(cfgM, 90, 90); var f50 = RollFArms(cfgM, 50, 50);
+            var fToOk   = Math.Abs(f90[PlayerActionOutcome.Turnover]        - f50[PlayerActionOutcome.Turnover])        < TightEps;
+            var fFoulOk = Math.Abs(f90[PlayerActionOutcome.NonShootingFoul] - f50[PlayerActionOutcome.NonShootingFoul]) < TightEps;
+            // Transition make%
+            var t90 = RollHMake(90, 90, fastBreak: true, ShotLocation.Rim);
+            var t50 = RollHMake(50, 50, fastBreak: true, ShotLocation.Rim);
+            var tOk = Math.Abs(t90 - t50) < TightEps;
+
+            Console.WriteLine($"    rebound:         Δ={Math.Abs(reb90-reb50):E2} → {(rebOk ? "ok" : "FAIL")}");
+            Console.WriteLine($"    Roll B turnover: Δ={Math.Abs(b90[HalfcourtOutcome.DeadBallTurnover]-b50[HalfcourtOutcome.DeadBallTurnover]):E2} → {(bToOk ? "ok" : "FAIL")}");
+            Console.WriteLine($"    Roll B foul:     Δ={Math.Abs(b90[HalfcourtOutcome.Foul]-b50[HalfcourtOutcome.Foul]):E2} → {(bFoulOk ? "ok" : "FAIL")}");
+            Console.WriteLine($"    Roll F turnover: Δ={Math.Abs(f90[PlayerActionOutcome.Turnover]-f50[PlayerActionOutcome.Turnover]):E2} → {(fToOk ? "ok" : "FAIL")}");
+            Console.WriteLine($"    Roll F foul:     Δ={Math.Abs(f90[PlayerActionOutcome.NonShootingFoul]-f50[PlayerActionOutcome.NonShootingFoul]):E2} → {(fFoulOk ? "ok" : "FAIL")}");
+            Console.WriteLine($"    transition mk%:  Δ={Math.Abs(t90-t50):E2} → {(tOk ? "ok" : "FAIL")}");
+            var bOk = rebOk && bToOk && bFoulOk && fToOk && fFoulOk && tOk;
+            pass &= bOk;
+            Console.WriteLine($"  (b) {(bOk ? "ok — all five consumers wash" : "FAIL")}");
+        }
+
+        // ── (c) Turnover disruption, ceiling-sensitive (Roll B and Roll F) ───
+        Console.WriteLine("  (c) Turnover disruption ceiling-sensitive (pre-saturation proof):");
+        {
+            var cOk = true;
+
+            // Roll B: defensive Hustle advantage (def=80, off=20). Hustle increment =
+            // (Hustle-on TO arm) − (Hustle-off TO arm, both=50) at each pressure level.
+            {
+                var lowP  = WithAwayPressure(5.0);    // neutral, well below ceiling
+                var highP = WithAwayPressure(10.0);   // near ceiling
+                var incLow  = RollBArms(lowP,  20, 80)[HalfcourtOutcome.DeadBallTurnover]
+                            - RollBArms(lowP,  50, 50)[HalfcourtOutcome.DeadBallTurnover];
+                var incHigh = RollBArms(highP, 20, 80)[HalfcourtOutcome.DeadBallTurnover]
+                            - RollBArms(highP, 50, 50)[HalfcourtOutcome.DeadBallTurnover];
+                var finalHigh = RollBArms(highP, 20, 80)[HalfcourtOutcome.DeadBallTurnover];
+                var shrink = incHigh < incLow && incLow > Eps;
+                var capOk  = finalHigh <= cfgM.RollBTurnoverCeiling + Eps;
+                Console.WriteLine($"    Roll B: incr @neutral={incLow*100:F4}pp  @highP={incHigh*100:F4}pp  shrinks → {(shrink ? "ok" : "FAIL")}");
+                Console.WriteLine($"    Roll B: final TO @highP={finalHigh:F6} ≤ ceiling {cfgM.RollBTurnoverCeiling:F4} → {(capOk ? "ok" : "FAIL")}");
+                cOk &= shrink && capOk;
+            }
+            // Roll F: same pattern.
+            {
+                var lowP  = WithAwayPressure(5.0);
+                var highP = WithAwayPressure(10.0);
+                var incLow  = RollFArms(lowP,  20, 80)[PlayerActionOutcome.Turnover]
+                            - RollFArms(lowP,  50, 50)[PlayerActionOutcome.Turnover];
+                var incHigh = RollFArms(highP, 20, 80)[PlayerActionOutcome.Turnover]
+                            - RollFArms(highP, 50, 50)[PlayerActionOutcome.Turnover];
+                var finalHigh = RollFArms(highP, 20, 80)[PlayerActionOutcome.Turnover];
+                var shrink = incHigh < incLow && incLow > Eps;
+                var capOk  = finalHigh <= cfgM.TurnoverCeiling + Eps;
+                Console.WriteLine($"    Roll F: incr @neutral={incLow*100:F4}pp  @highP={incHigh*100:F4}pp  shrinks → {(shrink ? "ok" : "FAIL")}");
+                Console.WriteLine($"    Roll F: final TO @highP={finalHigh:F6} ≤ ceiling {cfgM.TurnoverCeiling:F4} → {(capOk ? "ok" : "FAIL")}");
+                cOk &= shrink && capOk;
+            }
+            pass &= cOk;
+            Console.WriteLine($"  (c) {(cOk ? "ok — Hustle inserted pre-saturation" : "FAIL")}");
+        }
+
+        // ── (d) Foul direction: defense-only ─────────────────────────────────
+        Console.WriteLine("  (d) Foul direction (defense-only):");
+        {
+            var dOk = true;
+            var neutral = WithAwayPressure(5.0);   // isolates Hustle (pressure lift = 0, matchup gated off)
+
+            // Pre-saturation nudge ordering (mirrors the Python pre-check).
+            var foulNudge     = cfgM.HustleFoulWeight
+                              * Matchup.HustleGapShift(60.0, cfgM.HustleFoulSteepness, cfgM.HustleFoulExponent, cfgM.HustleFoulScale);
+            var pressureNudge = cfgM.HustlePressureWeight
+                              * Matchup.HustleGapShift(60.0, cfgM.HustlePressureSteepness, cfgM.HustlePressureExponent, cfgM.HustlePressureScale);
+            var preOrderOk = foulNudge < pressureNudge && foulNudge > 0.0;
+            Console.WriteLine($"    pre-saturation: foulNudge={foulNudge:F6} < pressureNudge={pressureNudge:F6} → {(preOrderOk ? "ok" : "FAIL")}");
+            dOk &= preOrderOk;
+
+            // Roll F: offense advantage → foul arm unchanged; defense advantage → foul arm rises.
+            var fEven = RollFArms(neutral, 50, 50)[PlayerActionOutcome.NonShootingFoul];
+            var fOffAdv = RollFArms(neutral, 80, 20)[PlayerActionOutcome.NonShootingFoul];   // offense out-hustles → no def foul
+            var fDefAdv = RollFArms(neutral, 20, 80)[PlayerActionOutcome.NonShootingFoul];   // defense out-hustles → foul rises
+            var fOffUnchanged = Math.Abs(fOffAdv - fEven) < TightEps;
+            var fDefRises      = fDefAdv > fEven + Eps;
+            Console.WriteLine($"    Roll F foul: even={fEven:F6}  off-adv={fOffAdv:F6} (==even → {(fOffUnchanged ? "ok" : "FAIL")})  def-adv={fDefAdv:F6} (>even → {(fDefRises ? "ok" : "FAIL")})");
+            dOk &= fOffUnchanged && fDefRises;
+
+            // Roll B: same defense-only behaviour on the Foul arm.
+            var bEven = RollBArms(neutral, 50, 50)[HalfcourtOutcome.Foul];
+            var bOffAdv = RollBArms(neutral, 80, 20)[HalfcourtOutcome.Foul];
+            var bDefAdv = RollBArms(neutral, 20, 80)[HalfcourtOutcome.Foul];
+            var bOffUnchanged = Math.Abs(bOffAdv - bEven) < TightEps;
+            var bDefRises      = bDefAdv > bEven + Eps;
+            Console.WriteLine($"    Roll B foul: even={bEven:F6}  off-adv={bOffAdv:F6} (==even → {(bOffUnchanged ? "ok" : "FAIL")})  def-adv={bDefAdv:F6} (>even → {(bDefRises ? "ok" : "FAIL")})");
+            dOk &= bOffUnchanged && bDefRises;
+
+            // Post-saturation: final foul-arm delta < final turnover-arm delta (defense advantage).
+            var fFoulDelta = fDefAdv - fEven;
+            var fToDelta   = RollFArms(neutral, 20, 80)[PlayerActionOutcome.Turnover]
+                           - RollFArms(neutral, 50, 50)[PlayerActionOutcome.Turnover];
+            var postOrderOk = fFoulDelta < fToDelta && fFoulDelta > Eps;
+            Console.WriteLine($"    post-saturation (Roll F): foul Δ={fFoulDelta*100:F4}pp < turnover Δ={fToDelta*100:F4}pp → {(postOrderOk ? "ok" : "FAIL")}");
+            dOk &= postOrderOk;
+
+            pass &= dOk;
+            Console.WriteLine($"  (d) {(dOk ? "ok — defense-only, foul < turnover" : "FAIL")}");
+        }
+
+        // ── (f) Transition defense: FastBreak only, halfcourt unaffected ─────
+        Console.WriteLine("  (f) Transition defense (FastBreak only, halfcourt unaffected):");
+        {
+            // FastBreak: defense out-hustles (def=80, off=20) → make% suppressed vs even.
+            var fbEven = RollHMake(50, 50, fastBreak: true, ShotLocation.Rim);
+            var fbDef  = RollHMake(20, 80, fastBreak: true, ShotLocation.Rim);
+            var fbSuppressed = fbDef < fbEven - Eps;
+            // Halfcourt: same Hustle gap → C8 does NOT fire → make% unchanged.
+            var hcEven = RollHMake(50, 50, fastBreak: false, ShotLocation.Rim);
+            var hcDef  = RollHMake(20, 80, fastBreak: false, ShotLocation.Rim);
+            var hcUnaffected = Math.Abs(hcDef - hcEven) < TightEps;
+
+            Console.WriteLine($"    FastBreak: even mk%={fbEven:F6}  def-adv mk%={fbDef:F6}  suppressed → {(fbSuppressed ? "ok" : "FAIL")}");
+            Console.WriteLine($"    Halfcourt: even mk%={hcEven:F6}  def-adv mk%={hcDef:F6}  unaffected → {(hcUnaffected ? "ok" : "FAIL")}");
+            var fOk = fbSuppressed && hcUnaffected;
+            pass &= fOk;
+            Console.WriteLine($"  (f) {(fOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (g) Attribution picker direction (Monte Carlo draw counts) ───────
+        Console.WriteLine("  (g) Attribution picker direction (high-Hustle teammate favored):");
+        {
+            const int Draws = 60_000;
+            const int Seed   = 12345;
+
+            // Build a lineup: slot 1 Hustle=80, slot 2 Hustle=20, identical skill,
+            // slots 3-5 neutral (Hustle=50). The Hustle multiplier is the only
+            // differentiator between slots 1 and 2.
+            GameState BuildPickerGame(Func<int, Player> mkSlot)
+            {
+                var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+                for (var i = 1; i <= 5; i++)
+                {
+                    var h = i == 1 ? 80 : i == 2 ? 20 : 50;
+                    g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i), mkSlot(h));
+                    g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i), mkSlot(h));
+                }
+                return g;
+            }
+
+            // Offensive rebounder: OffensiveRebounding=50, vary only Hustle.
+            int countSlot1Oreb = 0, countSlot2Oreb = 0;
+            {
+                var g = BuildPickerGame(h => Mk(50, h, oreb: 50));
+                var st = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound,
+                    SelectedSlot: null, ShotType: ShotLocation.Rim);
+                var rng = new SystemRng(Seed);
+                for (var i = 0; i < Draws; i++)
+                {
+                    var slot = OffensiveRebounderPicker.Pick(st, g, cfgM, rng);
+                    if (slot.Number == 1) countSlot1Oreb++;
+                    else if (slot.Number == 2) countSlot2Oreb++;
+                }
+            }
+            var orebOk = countSlot1Oreb > countSlot2Oreb;
+            Console.WriteLine($"    OffRebounder: slot1(H80)={countSlot1Oreb}  slot2(H20)={countSlot2Oreb}  high>low → {(orebOk ? "ok" : "FAIL")}");
+
+            // Defensive rebounder: DefensiveRebounding=50, vary only Hustle.
+            int countSlot1Dreb = 0, countSlot2Dreb = 0;
+            {
+                var g = BuildPickerGame(h => Mk(50, h, dreb: 50));
+                var st = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound);
+                var rng = new SystemRng(Seed);
+                for (var i = 0; i < Draws; i++)
+                {
+                    var slot = DefensiveRebounderPicker.Pick(st, g, cfgM, rng);
+                    if (slot.Number == 1) countSlot1Dreb++;
+                    else if (slot.Number == 2) countSlot2Dreb++;
+                }
+            }
+            var drebOk = countSlot1Dreb > countSlot2Dreb;
+            Console.WriteLine($"    DefRebounder: slot1(H80)={countSlot1Dreb}  slot2(H20)={countSlot2Dreb}  high>low → {(drebOk ? "ok" : "FAIL")}");
+
+            // Stealer: Steals=50, vary only Hustle.
+            int countSlot1Stl = 0, countSlot2Stl = 0;
+            {
+                var g = BuildPickerGame(h => Mk(50, h, steals: 50));
+                var st = new PossessionState(1, TeamSide.Home, TeamSide.Away, EntryType.DeadBallInbound);
+                var rng = new SystemRng(Seed);
+                for (var i = 0; i < Draws; i++)
+                {
+                    var slot = StealerPicker.Pick(st, g, cfgM, rng);
+                    if (slot.Number == 1) countSlot1Stl++;
+                    else if (slot.Number == 2) countSlot2Stl++;
+                }
+            }
+            var stlOk = countSlot1Stl > countSlot2Stl;
+            Console.WriteLine($"    Stealer:      slot1(H80)={countSlot1Stl}  slot2(H20)={countSlot2Stl}  high>low → {(stlOk ? "ok" : "FAIL")}");
+
+            var gOk = orebOk && drebOk && stlOk;
+            pass &= gOk;
+            Console.WriteLine($"  (g) {(gOk ? "ok — high-Hustle favored in all three pickers" : "FAIL")}");
+        }
+
+        Console.WriteLine(pass ? "  Phase 45 PASSED." : "  Phase 45 FAILED.");
+        return pass;
+    }
 }

@@ -975,6 +975,34 @@ public sealed class MatchupConfig
         if (cfg.HelpDefenseCompressionScale < 0.0 || cfg.HelpDefenseCompressionScale > 1.0)
             throw new InvalidOperationException("HelpDefenseCompressionScale must be in [0, 1].");
 
+        // Phase 45 — Hustle. Team-level GapFn families: steepness > 0, exponent > 1,
+        // scale > 0, weight in (0, 1). Per-player tanh families: steepness > 0, scale > 0.
+        foreach (var (name, steep, exp, scale, weight) in new (string, double, double, double, double)[]
+        {
+            ("HustleRebound",           cfg.HustleReboundSteepness,           cfg.HustleReboundExponent,           cfg.HustleReboundScale,           cfg.HustleReboundWeight),
+            ("HustlePressure",          cfg.HustlePressureSteepness,          cfg.HustlePressureExponent,          cfg.HustlePressureScale,          cfg.HustlePressureWeight),
+            ("HustleFoul",             cfg.HustleFoulSteepness,             cfg.HustleFoulExponent,             cfg.HustleFoulScale,             cfg.HustleFoulWeight),
+            ("HustleTransitionDefense", cfg.HustleTransitionDefenseSteepness, cfg.HustleTransitionDefenseExponent, cfg.HustleTransitionDefenseScale, cfg.HustleTransitionDefenseWeight),
+        })
+        {
+            if (steep <= 0.0)
+                throw new InvalidOperationException($"{name}Steepness must be > 0: got {steep}.");
+            if (exp <= 1.0)
+                throw new InvalidOperationException($"{name}Exponent must be > 1 for the convex/flat-bottom contract: got {exp}.");
+            if (scale <= 0.0)
+                throw new InvalidOperationException($"{name}Scale must be > 0: got {scale}.");
+            if (weight <= 0.0 || weight >= 1.0)
+                throw new InvalidOperationException($"{name}Weight must be in (0, 1): got {weight}.");
+        }
+        if (cfg.HustleRebounderSteepness <= 0.0)
+            throw new InvalidOperationException($"HustleRebounderSteepness must be > 0: got {cfg.HustleRebounderSteepness}.");
+        if (cfg.HustleRebounderScale <= 0.0)
+            throw new InvalidOperationException($"HustleRebounderScale must be > 0: got {cfg.HustleRebounderScale}.");
+        if (cfg.HustleStealerSteepness <= 0.0)
+            throw new InvalidOperationException($"HustleStealerSteepness must be > 0: got {cfg.HustleStealerSteepness}.");
+        if (cfg.HustleStealerScale <= 0.0)
+            throw new InvalidOperationException($"HustleStealerScale must be > 0: got {cfg.HustleStealerScale}.");
+
         return cfg;
     }
 
@@ -1549,4 +1577,112 @@ public sealed class MatchupConfig
     /// excess for HelpDefense (interior focal points).
     /// [CALIBRATION PLACEHOLDER]</summary>
     public double HelpDefenseCompressionScale { get; set; } = 0.5;
+
+    // ── Phase 45 — Hustle: relative team-aggregate effect across five consumers. ──
+    //
+    // Hustle is a RELATIVE attribute: the gap between the two teams' mean Hustle
+    // drives small general boosts across contested/transition/loose-ball outcomes.
+    // Two equally-hustling teams cancel out. Team-level consumers use GapFn (signed
+    // power law, zero slope at zero, convex) — NOT raw tanh. Per-player attribution
+    // consumers use a per-player tanh multiplier (same shape as ReboundWingspanMultiplier).
+    //
+    // All steepness/scale > 0, exponent > 1, weights in (0, 1) — enforced in Load.
+    // No cross-consumer ordering invariant in Load; that is a calibration contract
+    // verified in the harness, not a load-time constraint. All [CALIBRATION PLACEHOLDER].
+
+    // --- Rebound battle (Matchup.OffensiveReboundShare): third pre-bend shift. ---
+
+    /// <summary>Steepness of the Hustle gap → rebound shift (GapFn). Default 2.50.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleReboundSteepness { get; set; } = 2.50;
+
+    /// <summary>Exponent of the Hustle gap → rebound shift (GapFn). Default 2.0.
+    /// Must be &gt; 1 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleReboundExponent { get; set; } = 2.0;
+
+    /// <summary>Reference scale of the Hustle gap → rebound shift (GapFn). Default 25.0.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleReboundScale { get; set; } = 25.0;
+
+    /// <summary>Weight applied to the Hustle rebound GapFn output before it is added to
+    /// totalShift. Default 0.08. Must be in (0, 1) (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleReboundWeight { get; set; } = 0.08;
+
+    // --- Turnover disruption (Roll B dead-ball + Roll F live-ball, pre-saturation). ---
+
+    /// <summary>Steepness of the Hustle gap → turnover disruption shift (GapFn). Default 0.035.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustlePressureSteepness { get; set; } = 0.035;
+
+    /// <summary>Exponent of the Hustle gap → turnover disruption shift (GapFn). Default 2.0.
+    /// Must be &gt; 1 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustlePressureExponent { get; set; } = 2.0;
+
+    /// <summary>Reference scale of the Hustle gap → turnover disruption shift (GapFn). Default 25.0.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustlePressureScale { get; set; } = 25.0;
+
+    /// <summary>Weight applied to the Hustle turnover GapFn output before it is added to the
+    /// pre-saturation disruption shift. Default 0.04. Must be in (0, 1) (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double HustlePressureWeight { get; set; } = 0.04;
+
+    // --- Defensive Hustle foul cost (Roll B + Roll F, defense-only, pre-saturation). ---
+
+    /// <summary>Steepness of the Hustle gap → defensive foul shift (GapFn). Default 0.009.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleFoulSteepness { get; set; } = 0.009;
+
+    /// <summary>Exponent of the Hustle gap → defensive foul shift (GapFn). Default 2.0.
+    /// Must be &gt; 1 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleFoulExponent { get; set; } = 2.0;
+
+    /// <summary>Reference scale of the Hustle gap → defensive foul shift (GapFn). Default 25.0.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleFoulScale { get; set; } = 25.0;
+
+    /// <summary>Weight applied to the Hustle foul GapFn output before it is added to the
+    /// pre-saturation foul shift. Default 0.02. Must be in (0, 1) (enforced in Load).
+    /// Deliberately smaller than HustlePressureWeight so the foul-arm effect stays below
+    /// the turnover-arm effect (the within-disruption calibration contract). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleFoulWeight { get; set; } = 0.02;
+
+    // --- Transition defense (RollHGenerator C8, FastBreak only). ---
+
+    /// <summary>Steepness of the Hustle gap → FastBreak make% suppression (GapFn). Default 0.043.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleTransitionDefenseSteepness { get; set; } = 0.043;
+
+    /// <summary>Exponent of the Hustle gap → FastBreak make% suppression (GapFn). Default 2.0.
+    /// Must be &gt; 1 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleTransitionDefenseExponent { get; set; } = 2.0;
+
+    /// <summary>Reference scale of the Hustle gap → FastBreak make% suppression (GapFn). Default 25.0.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleTransitionDefenseScale { get; set; } = 25.0;
+
+    /// <summary>Weight applied to the Hustle transition-defense GapFn output before it is
+    /// subtracted from FastBreak make%. Default 0.05. Must be in (0, 1) (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleTransitionDefenseWeight { get; set; } = 0.05;
+
+    // --- Attribution pickers (per-player tanh — correct here, not GapFn). ---
+
+    /// <summary>Half-amplitude of the per-player Hustle multiplier for the rebound pickers
+    /// (offensive + defensive). At default 0.20, a Hustle=80 player gets ~1.18× and a
+    /// Hustle=20 player ~0.82×. Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleRebounderSteepness { get; set; } = 0.20;
+
+    /// <summary>Rating-point spread of the rebound-picker Hustle tanh (relative to the
+    /// 50-neutral midpoint). Default 20.0. Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleRebounderScale { get; set; } = 20.0;
+
+    /// <summary>Half-amplitude of the per-player Hustle multiplier for the StealerPicker.
+    /// At default 0.15, a Hustle=80 player gets ~1.14× and a Hustle=20 player ~0.86×.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleStealerSteepness { get; set; } = 0.15;
+
+    /// <summary>Rating-point spread of the StealerPicker Hustle tanh (relative to the
+    /// 50-neutral midpoint). Default 20.0. Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double HustleStealerScale { get; set; } = 20.0;
 }

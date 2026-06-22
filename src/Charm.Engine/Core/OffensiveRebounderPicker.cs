@@ -130,7 +130,14 @@ public static class OffensiveRebounderPicker
                              && sel.Number == slot.Number;
             var shooterNerf = isShooter && nerfZones ? matchupCfg.ReboundShooterNerf : 1.0;
 
-            weights[i]   = Math.Max(1.0, p.OffensiveRebounding * pw * wm * shooterNerf);
+            // Phase 45: per-player Hustle tilt (tanh, same shape as the wingspan
+            // multiplier). A higher-Hustle player absorbs a larger share of his team's
+            // offensive boards; centered at 1.0 for a 50-Hustle player. The Math.Max(1)
+            // floor below keeps even a low-Hustle player drawing.
+            var hm         = 1.0 + matchupCfg.HustleRebounderSteepness
+                                 * Math.Tanh((p.Hustle - 50.0) / matchupCfg.HustleRebounderScale);
+
+            weights[i]   = Math.Max(1.0, p.OffensiveRebounding * pw * wm * hm * shooterNerf);
             totalWeight += weights[i];
         }
 

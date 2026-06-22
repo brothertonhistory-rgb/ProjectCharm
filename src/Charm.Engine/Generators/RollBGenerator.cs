@@ -130,9 +130,34 @@ public sealed class RollBGenerator : IRollBPieGenerator
         var baseTurnoverShare = _cfgB.BaseDeadBallTurnover / actionMass;
         var baseFoulShare    = _cfgB.BaseFoul              / actionMass;
 
+        // ── Phase 45: Hustle disruption + defensive foul cost ───────────────
+        // Reuse the offPlayers/defPlayers arrays already built above. Team-aggregate
+        // Hustle gap (offense mean − defense mean), fixed-denominator-5 discipline.
+        // Both nudges feed the pre-saturation shifts inside TeamDisruptionShares so
+        // they respect the Roll-B-specific ceilings (never a raw post-bend addition).
+        var hustleGap = Matchup.HustleGap(offPlayers, defPlayers);
+
+        // Turnover: -hustleGap is positive when the defense out-hustles → more turnovers.
+        var hustlePressureNudge = _matchup.HustlePressureWeight
+            * Matchup.HustleGapShift(-hustleGap,
+                                     _matchup.HustlePressureSteepness,
+                                     _matchup.HustlePressureExponent,
+                                     _matchup.HustlePressureScale);
+
+        // Defensive foul cost (defense-only): positive only when the defense out-hustles.
+        // hustleGap = offense − defense, so the defense's advantage is max(0, -hustleGap).
+        // If the offense has equal or greater Hustle, this is exactly 0.0.
+        var defensiveHustleAdvantage = Math.Max(0.0, -hustleGap);
+        var defensiveFoulNudge = _matchup.HustleFoulWeight
+            * Matchup.HustleGapShift(defensiveHustleAdvantage,
+                                     _matchup.HustleFoulSteepness,
+                                     _matchup.HustleFoulExponent,
+                                     _matchup.HustleFoulScale);
+
         var (finalToShare, finalFoulShare) = Matchup.TeamDisruptionShares(
             offHandling, defStealers, pressure,
-            baseTurnoverShare, baseFoulShare, _matchup);
+            baseTurnoverShare, baseFoulShare, _matchup,
+            hustlePressureNudge, defensiveFoulNudge);
 
         // ── Overflow guard ───────────────────────────────────────────────────
         // With sane Roll-B-specific ceilings this never fires, but a misconfigured
