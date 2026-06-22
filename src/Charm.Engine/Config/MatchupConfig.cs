@@ -964,16 +964,29 @@ public sealed class MatchupConfig
         // Phase 44
         if (cfg.PostnessNeutral <= 0.0)
             throw new InvalidOperationException("PostnessNeutral must be > 0.");
-        if (cfg.OffBallDefenseCompressionExponent <= 1.0)
-            throw new InvalidOperationException(
-                "OffBallDefenseCompressionExponent must be > 1.0 for accelerating aggregation.");
         if (cfg.HelpDefenseCompressionExponent <= 1.0)
             throw new InvalidOperationException(
                 "HelpDefenseCompressionExponent must be > 1.0 for accelerating aggregation.");
-        if (cfg.OffBallDefenseCompressionScale < 0.0 || cfg.OffBallDefenseCompressionScale > 1.0)
-            throw new InvalidOperationException("OffBallDefenseCompressionScale must be in [0, 1].");
         if (cfg.HelpDefenseCompressionScale < 0.0 || cfg.HelpDefenseCompressionScale > 1.0)
             throw new InvalidOperationException("HelpDefenseCompressionScale must be in [0, 1].");
+
+        // Phase 46 — Individual Matchup Denial
+        if (cfg.DenialExponent <= 1.0)
+            throw new InvalidOperationException(
+                "DenialExponent must be > 1.0 for the convex/flat-bottom contract.");
+        if (cfg.MaxDenialMultiplier <= 1.0)
+            throw new InvalidOperationException(
+                "MaxDenialMultiplier must be > 1: multiplier is bounded in [1/Max, Max].");
+        if (cfg.DenialReferenceShift <= 0.0)
+            throw new InvalidOperationException("DenialReferenceShift must be > 0.");
+        if (cfg.DenialSkillSteepness <= 0.0)
+            throw new InvalidOperationException("DenialSkillSteepness must be > 0.");
+        if (cfg.DenialPhysSteepness <= 0.0)
+            throw new InvalidOperationException("DenialPhysSteepness must be > 0.");
+        if (cfg.DenialSkillWeight <= 0.0 || cfg.DenialSkillWeight >= 1.0)
+            throw new InvalidOperationException("DenialSkillWeight must be in (0, 1).");
+        if (cfg.DenialPhysWeight <= 0.0 || cfg.DenialPhysWeight >= 1.0)
+            throw new InvalidOperationException("DenialPhysWeight must be in (0, 1).");
 
         // Phase 45 — Hustle. Team-level GapFn families: steepness > 0, exponent > 1,
         // scale > 0, weight in (0, 1). Per-player tanh families: steepness > 0, scale > 0.
@@ -1557,26 +1570,60 @@ public sealed class MatchupConfig
     /// [CALIBRATION PLACEHOLDER]</summary>
     public double PostnessNeutral { get; set; } = 50.0;
 
-    /// <summary>Exponent for OffBallDefense compression aggregate — must be strictly > 1.0
-    /// for accelerating aggregation (same contract as HelpDefenseAggregateExponent).
-    /// [CALIBRATION PLACEHOLDER]</summary>
-    public double OffBallDefenseCompressionExponent { get; set; } = 2.0;
-
     /// <summary>Exponent for HelpDefense compression aggregate — must be strictly > 1.0
     /// for accelerating aggregation (same contract as HelpDefenseAggregateExponent).
     /// [CALIBRATION PLACEHOLDER]</summary>
     public double HelpDefenseCompressionExponent { get; set; } = 2.0;
 
     /// <summary>Maximum compression fraction applied to the above-equal-share
-    /// excess for OffBallDefense (perimeter focal points). At 1.0, a full
-    /// aggregate would eliminate all tilt toward the perimeter focal point.
-    /// [CALIBRATION PLACEHOLDER]</summary>
-    public double OffBallDefenseCompressionScale { get; set; } = 0.5;
-
-    /// <summary>Maximum compression fraction applied to the above-equal-share
     /// excess for HelpDefense (interior focal points).
     /// [CALIBRATION PLACEHOLDER]</summary>
     public double HelpDefenseCompressionScale { get; set; } = 0.5;
+
+    // ── Phase 46 — Individual Matchup Denial: per-slot access denial in BendByAttention.
+    //
+    // For each offensive slot, the defender's denial attributes (OffBallDefense, PostDefense,
+    // Athleticism) are compared against the offensive player's access attributes
+    // (OffBallMovement, Strength + PostMoves, Athleticism). The blended skill gap is
+    // weighted perimeter/post by postness (sum-to-1; distinct from Phase 44's compression
+    // weights). Produces a bounded per-slot multiplier: [1/MaxDenialMultiplier, MaxDenialMultiplier].
+    //
+    // DenialExponent > 1, MaxDenialMultiplier > 1, DenialReferenceShift > 0,
+    // DenialSkillSteepness/DenialPhysSteepness > 0, weights in (0, 1).
+    // Reuses ReferenceScale (no new scale knob). All [CALIBRATION PLACEHOLDER].
+
+    /// <summary>Steepness of the blended skill gap → denial shift (GapFn). Default 6.0.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double DenialSkillSteepness { get; set; } = 6.0;
+
+    /// <summary>Steepness of the athleticism gap → denial shift (GapFn). Default 6.0.
+    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double DenialPhysSteepness { get; set; } = 6.0;
+
+    /// <summary>Exponent for both GapFn calls in denial — must be strictly &gt; 1.0 for
+    /// the convex/flat-bottom contract (same as SkillExponent/PhysicalExponent).
+    /// Default 2.0. [CALIBRATION PLACEHOLDER]</summary>
+    public double DenialExponent { get; set; } = 2.0;
+
+    /// <summary>Weight of the blended skill denial shift. Default 0.04.
+    /// Must be in (0, 1) (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double DenialSkillWeight { get; set; } = 0.04;
+
+    /// <summary>Weight of the athleticism denial shift. Default 0.03.
+    /// Must be in (0, 1) (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double DenialPhysWeight { get; set; } = 0.03;
+
+    /// <summary>Maximum per-slot multiplier for denial/boost. At 1.5, a maximally-denied
+    /// slot receives 1/1.5 ≈ 0.67× its pre-denial share; a maximally-open slot receives
+    /// 1.5× — strictly bounded. Must be &gt; 1 (enforced in Load).
+    /// Default 1.5. [CALIBRATION PLACEHOLDER]</summary>
+    public double MaxDenialMultiplier { get; set; } = 1.5;
+
+    /// <summary>Tanh saturation denominator for the denial multiplier. When
+    /// denialShift == DenialReferenceShift, tanh ≈ 0.76, giving ~60% of the maximum
+    /// log-multiplier. Must be &gt; 0 (enforced in Load).
+    /// Default 1.0. [CALIBRATION PLACEHOLDER]</summary>
+    public double DenialReferenceShift { get; set; } = 1.0;
 
     // ── Phase 45 — Hustle: relative team-aggregate effect across five consumers. ──
     //

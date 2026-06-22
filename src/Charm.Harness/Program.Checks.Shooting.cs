@@ -2727,13 +2727,14 @@ internal static partial class Program
             Console.WriteLine($"  (e) {(eOk ? "ok" : "FAIL")}");
         }
 
-        // ── (f) Selection compression — perimeter focal point ────────────────
-        Console.WriteLine("  (f) Selection compression — perimeter focal point (OffBallDefense):");
+        // ── (f) Retirement guard — team-aggregate OBD compression retired (Phase 46) ─
+        Console.WriteLine("  (f) Retirement guard — perimeter OBD team compression retired (Phase 46):");
         {
             var fOk = true;
 
-            // Build a lineup where Slot 1 is a pure guard (Height=30, PostDefense=30, Strength=30),
-            // high usage (HierarchyRank=10).
+            // Slot 1: low-postness focal guard — same player as the original (f) fixture.
+            // High-usage (HierarchyRank=10) and postness < PostnessNeutral so the retired
+            // perimeter compression would have keyed on it if it still existed.
             var pureGuard = new Player("guard") {
                 Close = 50, Mid = 50, Outside = 70, Finishing = 50, FreeThrow = 70,
                 FoulDrawing = 50, BallHandling = 60, Passing = 55, Playmaking = 55,
@@ -2745,6 +2746,7 @@ internal static partial class Program
                 BasketballIQ = 60, Discipline = 60, HierarchyRank = 10,
                 RimTendency = 20, ShortTendency = 15, MidTendency = 25, LongTendency = 15, ThreeTendency = 25,
             };
+            // Filler for slots 2-5 (all-50 attributes).
             var filler = new Player("filler") {
                 Close = 50, Mid = 50, Outside = 50, Finishing = 50, FreeThrow = 50,
                 FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
@@ -2757,79 +2759,156 @@ internal static partial class Program
                 RimTendency = 20, ShortTendency = 20, MidTendency = 20, LongTendency = 20, ThreeTendency = 20,
             };
 
-            // Verify guard postness is below PostnessNeutral.
+            // Verify slot-1 is a low-postness focal player (fixture validity guard).
             var guardPostness = Matchup.Postness(pureGuard, cfgM);
             if (!(guardPostness < cfgM.PostnessNeutral))
             {
-                Console.WriteLine($"    FAIL — guard postness={guardPostness:F4} is not < PostnessNeutral={cfgM.PostnessNeutral}. Fixture invalid.");
+                Console.WriteLine($"    FAIL — guard postness={guardPostness:F4} not < PostnessNeutral. Fixture invalid.");
                 pass = false; Console.WriteLine("  (f) FAIL");
                 goto fDone;
             }
-            Console.WriteLine($"    guard postness={guardPostness:F4} < PostnessNeutral={cfgM.PostnessNeutral} → fixture valid");
+            Console.WriteLine($"    guard postness={guardPostness:F4} < PostnessNeutral={cfgM.PostnessNeutral} → focal fixture valid");
 
-            // Compression test helper: returns Slot1 share from BendByAttention.
-            double Slot1Share(int obdVal, int hdVal)
+            // Slot-1 matched defender: all per-slot denial gaps zero by construction.
+            //   perimeterGap = OBD(60) - pureGuard.OffBallMovement(60)     = 0
+            //   postGap      = PD(25)  - (Strength(30) + PostMoves(20))/2  = 0
+            //   athGap       = Athleticism(59.0) - pureGuard.Athleticism(59.0) = 0
+            //   (Athleticism = (30+70+70+70+55)/5 = 59.0 for both)
+            var matchedDef1 = new Player("def1") {
+                Close = 50, Mid = 50, Outside = 50, Finishing = 50, FreeThrow = 50,
+                FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+                OffensiveRebounding = 50, PerimeterDefense = 50, RimProtection = 50,
+                DefensiveRebounding = 50, Steals = 50, HelpDefense = 0,
+                OffBallDefense = 60,   // = pureGuard.OffBallMovement → perimeterGap = 0
+                PostDefense    = 25,   // = (Strength(30) + PostMoves(20))/2 → postGap = 0
+                Height = 50, Wingspan = 50, Weight = 50,
+                // Same athleticism components as pureGuard → athGap = 0
+                Strength = 30, Speed = 70, Quickness = 70, FirstStep = 70, Vertical = 55,
+                Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50, HierarchyRank = 5,
+                RimTendency = 20, ShortTendency = 20, MidTendency = 20, LongTendency = 20, ThreeTendency = 20,
+            };
+
+            // Assert slot-1 denial gaps are zero from public ratings (no engine diagnostic seam).
+            var slot1PerimGap = matchedDef1.OffBallDefense - pureGuard.OffBallMovement;
+            var slot1PostGap  = matchedDef1.PostDefense
+                              - (pureGuard.Strength + pureGuard.PostMoves) / 2.0;
+            var slot1AthGap   = matchedDef1.Athleticism - pureGuard.Athleticism;
+            Console.WriteLine($"    Slot-1 denial gaps: perim={slot1PerimGap:F4}, post={slot1PostGap:F4}, ath={slot1AthGap:F6}");
+            if (!(Math.Abs(slot1PerimGap) < 1e-9 && Math.Abs(slot1PostGap) < 1e-9 && Math.Abs(slot1AthGap) < 1e-9))
+            {
+                Console.WriteLine("    FAIL — slot-1 denial gaps not zero; fixture misconfigured.");
+                pass = false; Console.WriteLine("  (f) FAIL");
+                goto fDone;
+            }
+            Console.WriteLine("    Slot-1 denial gaps: all zero → denial term is analytically zero in both fixtures");
+
+            // Helper: returns Slot1 share from BendByAttention.
+            //   obd2to5   — OffBallDefense for defenders 2-5 (baseline=50, guard=80)
+            //   obm2to5   — OffBallMovement for offense 2-5 (matched: baseline=50, guard=80)
+            //   hdAllDefs — HelpDefense for all 5 defenders (used only for the HD-only arm)
+            // Slot-1 defender is ALWAYS matchedDef1 (byte-identical in both fixtures).
+            double Slot1Share(int obd2to5, int obm2to5, int hdAllDefs = 0)
             {
                 var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
                 var coach = new CoachProfile(heliocentricBias: 8.0, shotSelectionBias: 5.0, paceBias: 5.0);
                 g.SetCoach(TeamSide.Home, coach);
                 g.SetCoach(TeamSide.Away, coach);
+                // Offensive lineup: slot 1 = pureGuard; slots 2-5 = filler with OBM = obm2to5.
                 g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(1), pureGuard);
-                for (var i = 2; i <= 5; i++) g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i), filler);
-                var defPlayer = new Player("def") {
+                for (var i = 2; i <= 5; i++)
+                {
+                    var offFill = new Player($"ofill{i}") {
+                        Close = 50, Mid = 50, Outside = 50, Finishing = 50, FreeThrow = 50,
+                        FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                        SelfCreation = 50, PostMoves = 50, OffBallMovement = obm2to5, Screening = 50,
+                        OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50, RimProtection = 50,
+                        DefensiveRebounding = 50, Steals = 50, HelpDefense = 0, OffBallDefense = 0,
+                        Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50,
+                        Quickness = 50, FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50,
+                        BasketballIQ = 50, Discipline = 50, HierarchyRank = 5,
+                        RimTendency = 20, ShortTendency = 20, MidTendency = 20, LongTendency = 20, ThreeTendency = 20,
+                    };
+                    g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i), offFill);
+                }
+                // Defensive lineup: slot 1 = matchedDef1 (always); slots 2-5 matched.
+                //   For slots 2-5: postGap = PD(50) - (Str(50)+PM(50))/2 = 0; athGap = 0.
+                //   perimeterGap = obd2to5 - obm2to5 = 0 (matched in every call by construction).
+                var def1 = new Player("def1m") {
                     Close = 50, Mid = 50, Outside = 50, Finishing = 50, FreeThrow = 50,
                     FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
                     SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
-                    OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50, RimProtection = 50,
-                    DefensiveRebounding = 50, Steals = 50,
-                    HelpDefense = hdVal, OffBallDefense = obdVal,
-                    Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50,
-                    Quickness = 50, FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50,
-                    BasketballIQ = 50, Discipline = 50, HierarchyRank = 5,
+                    OffensiveRebounding = 50, PerimeterDefense = 50, RimProtection = 50,
+                    DefensiveRebounding = 50, Steals = 50, HelpDefense = hdAllDefs,
+                    OffBallDefense = 60, PostDefense = 25,
+                    Height = 50, Wingspan = 50, Weight = 50,
+                    Strength = 30, Speed = 70, Quickness = 70, FirstStep = 70, Vertical = 55,
+                    Endurance = 50, Hustle = 50, BasketballIQ = 50, Discipline = 50, HierarchyRank = 5,
                     RimTendency = 20, ShortTendency = 20, MidTendency = 20, LongTendency = 20, ThreeTendency = 20,
                 };
-                for (var i = 1; i <= 5; i++) g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i), defPlayer);
-                var genE = new RollEGenerator(cfgE, g);
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(1), def1);
+                for (var i = 2; i <= 5; i++)
+                {
+                    var defFill = new Player($"dfill{i}") {
+                        Close = 50, Mid = 50, Outside = 50, Finishing = 50, FreeThrow = 50,
+                        FoulDrawing = 50, BallHandling = 50, Passing = 50, Playmaking = 50,
+                        SelfCreation = 50, PostMoves = 50, OffBallMovement = 50, Screening = 50,
+                        OffensiveRebounding = 50, PerimeterDefense = 50, PostDefense = 50, RimProtection = 50,
+                        DefensiveRebounding = 50, Steals = 50, HelpDefense = hdAllDefs,
+                        OffBallDefense = obd2to5,  // matched to obm2to5 → perimeterGap = 0
+                        Height = 50, Wingspan = 50, Weight = 50, Strength = 50, Speed = 50,
+                        Quickness = 50, FirstStep = 50, Vertical = 50, Endurance = 50, Hustle = 50,
+                        BasketballIQ = 50, Discipline = 50, HierarchyRank = 5,
+                        RimTendency = 20, ShortTendency = 20, MidTendency = 20, LongTendency = 20, ThreeTendency = 20,
+                    };
+                    g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i), defFill);
+                }
+                var genE    = new RollEGenerator(cfgE, g);
                 var attnGen = new AttentionGenerator(AttentionConfig.Load(configPath), g);
                 var st = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
                     Entry: EntryType.DeadBallInbound);
                 var genResult = genE.GenerateWithPressure(st);
-                var attn = attnGen.Generate(st, genResult.FinalShares);
-                var tilted = genE.BendByAttention(genResult, attn.AttentionShares, g, cfgM, st);
+                var attn      = attnGen.Generate(st, genResult.FinalShares);
+                var tilted    = genE.BendByAttention(genResult, attn.AttentionShares, g, cfgM, st);
                 return tilted.Slices.First(s => s.Outcome == SelectionOutcome.Slot1).Weight;
             }
 
-            var baseline   = Slot1Share(0, 0);
-            var equalShare = 1.0 / 5.0;
-
-            if (!(baseline > equalShare))
+            var baseline = Slot1Share(50, 50);   // both sides low-matched; no denial in either fixture
+            if (!(baseline > 1.0 / 5.0))
             {
-                Console.WriteLine($"    FAIL — baseline Slot1 share={baseline:F4} is not > equalShare={equalShare:F4}. Focal point not created.");
+                Console.WriteLine($"    FAIL — baseline Slot1={baseline:F4} not > equalShare. Focal point not created.");
                 pass = false; Console.WriteLine("  (f) FAIL");
                 goto fDone;
             }
-            Console.WriteLine($"    baseline Slot1 share={baseline:F4} > equalShare={equalShare:F4} → focal point confirmed");
+            Console.WriteLine($"    baseline Slot1={baseline:F6} > equalShare → focal point confirmed");
 
-            var obdOnly  = Slot1Share(80, 0);
-            var hdOnly   = Slot1Share(0, 80);
+            // Guard: raise defenders 2-5's OBD to 80 with offensive 2-5's OBM also 80 (zero gap
+            // maintained). Slot-1 defender and guard are byte-identical. If the retired
+            // team-aggregate OBD term were still live, it would now suppress slot 1.
+            var guard = Slot1Share(80, 80);      // matched-high; zero gap; no denial in either fixture
 
-            // OBD-only lowers Slot1 share (compression fired)
-            var obdLowersOk = obdOnly < baseline - Eps;
-            // HD-only should have no effect on a pure guard (interiorWeight≈0)
+            var sharesDiff  = Math.Abs(guard - baseline);
+            var retiredOk   = sharesDiff < TightEps;
+            Console.WriteLine($"    baseline Slot1={baseline:F6}  guard Slot1={guard:F6}  |diff|={sharesDiff:E2}");
+            Console.WriteLine($"    Shares match → {(retiredOk ? "ok — team-aggregate OBD compression confirmed retired" : "FAIL — retired term still firing")}");
+            fOk = retiredOk;
+
+            // HD-only ≈ baseline: HelpDefense doesn't compress a low-postness guard.
+            var hdOnly      = Slot1Share(50, 50, 80);  // all 5 defenders HD=80, denial still zero
             var hdNoEffectOk = Math.Abs(hdOnly - baseline) < TightEps;
-
-            Console.WriteLine($"    OBD-only Slot1={obdOnly:F6}  < baseline → {(obdLowersOk ? "ok — compression fired" : "FAIL")}");
             Console.WriteLine($"    HD-only  Slot1={hdOnly:F6}  ≈ baseline → {(hdNoEffectOk ? "ok — no interior compression on guard" : "FAIL")}");
+            fOk &= hdNoEffectOk;
 
-            // Verify sum to 1.0
-            // (Single slot check — full sum validated by Pie constructor)
-            fOk = obdLowersOk && hdNoEffectOk;
             pass &= fOk;
             fDone:
             Console.WriteLine($"  (f) {(fOk ? "ok" : "FAIL")}");
         }
 
         // ── Neutral-postness pivot ────────────────────────────────────────────
+        // After Phase 46: the OBD pivot behavior is now trivially baseline (OBD no longer
+        // does team-aggregate compression at any postness). The HD pivot is unchanged —
+        // helpInteriorWeight is still zero at PostnessNeutral, so HD still has no effect
+        // at the pivot. Both assertions should pass for the same underlying reason as before.
         Console.WriteLine("  (f.neutral) Neutral-postness pivot — zero compression at PostnessNeutral:");
         {
             var fnOk = true;
@@ -3018,13 +3097,17 @@ internal static partial class Program
             var postHdOnly  = Slot1SharePost(0, 80);
             var postObdOnly = Slot1SharePost(80, 0);
 
-            var hdLowersOk   = postHdOnly  < postBaseline - Eps;
-            var obdNoEffectG = Math.Abs(postObdOnly - postBaseline) < TightEps;
+            var hdLowersOk  = postHdOnly < postBaseline - Eps;
 
-            Console.WriteLine($"    HD-only  Slot1={postHdOnly:F6}  < baseline → {(hdLowersOk   ? "ok — compression fired" : "FAIL")}");
-            Console.WriteLine($"    OBD-only Slot1={postObdOnly:F6}  ≈ baseline → {(obdNoEffectG ? "ok — no perimeter compression on post" : "FAIL")}");
+            // Phase 46 note: OBD now reaches post players via per-slot denial. The direction depends
+            // on the matchup: this star's strong post channel (PM=75, Str=90 vs PD=50) means the
+            // offense wins, so OBD-only BOOSTS his share rather than leaving it flat. The per-slot
+            // denial direction for all postness levels is tested in Phase46IndividualDenialCheck;
+            // (g) now asserts HD interior compression only.
+            Console.WriteLine($"    HD-only  Slot1={postHdOnly:F6}  < baseline → {(hdLowersOk ? "ok — interior compression fired" : "FAIL")}");
+            Console.WriteLine($"    OBD-only Slot1={postObdOnly:F6}  (observe only — per-slot denial direction tested in Phase 46)");
 
-            gOk = hdLowersOk && obdNoEffectG;
+            gOk = hdLowersOk;
             pass &= gOk;
             gDone:
             Console.WriteLine($"  (g) {(gOk ? "ok" : "FAIL")}");

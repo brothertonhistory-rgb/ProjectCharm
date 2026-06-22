@@ -222,12 +222,22 @@ public sealed class RollEGenerator : IRollEGenerationProvider
     /// Strictly bounded in (1/MaxTiltMultiplier, MaxTiltMultiplier); exactly 1.0 at zero
     /// gap (neutral anchor: usage == attention reproduces the pre-tilt pie).</para>
     ///
-    /// <para>Phase 44 — selection compression. After tilt + floor/rail, a second pass
-    /// compresses the tilt toward above-equal-share offensive focal points using defensive
-    /// OffBallDefense (perimeter focal points) and HelpDefense (interior focal points).
+    /// <para>Phase 46 — individual matchup denial. After tilt + floor/rail, a per-slot
+    /// denial pass computes a bounded multiplier from each offensive player's one-on-one
+    /// matchup: OffBallDefense vs OffBallMovement (perimeter channel), PostDefense vs
+    /// (Strength + PostMoves)/2 (post channel), and athleticism gap. The perimeter/post
+    /// channels blend by postness and always sum to one full helping (sum-to-1 split,
+    /// distinct from Phase 44's compression weights). Defender wins → fewer touches;
+    /// offense wins → more. Bounded in [1/MaxDenialMultiplier, MaxDenialMultiplier];
+    /// exactly 1.0 at a neutral matchup. OffBallDefense's former perimeter team-aggregate
+    /// selection-compression term is retired here in favor of this per-man mechanism.</para>
+    ///
+    /// <para>Phase 44 — interior HelpDefense compression (retained; perimeter OBD
+    /// compression retired in Phase 46). After denial + normalize, a second pass compresses
+    /// tilt on above-equal-share INTERIOR focal points using the HelpDefense team aggregate.
     /// Freed mass redistributes to below-equal-share slots. Floor/rail re-applied after
-    /// compression. Full contract: tilt → floor/rail → compression → redistribute →
-    /// normalize → floor/rail.</para>
+    /// compression. Full contract: tilt → floor/rail → DENIAL → normalize → interior-help-
+    /// compression → redistribute → normalize → floor/rail.</para>
     ///
     /// <para>Halfcourt-only: caller must NOT call this on the FastBreak branch. The
     /// FastBreak branch passes <paramref name="gen"/>.Pie directly into RollE.Execute
@@ -274,52 +284,108 @@ public sealed class RollEGenerator : IRollEGenerationProvider
         // pre-tilt proportions and partially undo the tilt.
         var constrained = ApplyFloorAndRail(tilted, tilted, populatedCount);
 
-        // Phase 44 — selection compression.
-        // OffBallDefense compresses tilt on perimeter focal points (low postness).
-        // HelpDefense compresses tilt on interior focal points (high postness).
-        // Both fully independent; freed mass redistributes to below-equal-share slots.
-        var equalShare = populatedCount > 0 ? 1.0 / populatedCount : 0.2;
-
-        // Compute defensive aggregates (all five defenders, fixed denominator 5.0).
+        // ── Per-slot individual denial (Phase 46) ────────────────────────────
+        // For each offensive slot, compute a bounded multiplier from the one-on-one
+        // matchup between that player and the defender in the same slot (slot-guards-
+        // slot, A2). Positive denialShift (defender wins) → denialMult < 1 → fewer
+        // touches. Negative (offense wins) → denialMult > 1 → more touches. Bounded in
+        // [1/MaxDenialMultiplier, MaxDenialMultiplier]; exactly 1.0 at a neutral matchup.
+        // No floor/rail of its own — the final floor/rail pass handles everything.
+        var offRoster = game.RosterFor(state.Offense);
+        var offLineup = game.LineupFor(state.Offense);
         var defRoster = game.RosterFor(state.Defense);
         var defLineup = game.LineupFor(state.Defense);
-        var offBallDefSum = 0.0;
-        var helpDefSum    = 0.0;
+
+        var denied = (double[])constrained.Clone();
+        for (var i = 0; i < 5; i++)
+        {
+            var offPlayer = offRoster.PlayerAt(offLineup.SlotAt(i + 1));
+            var defPlayer = defRoster.PlayerAt(defLineup.SlotAt(i + 1));   // slot-guards-slot
+
+            if (offPlayer is null || defPlayer is null)
+                continue;   // no matchup → denialMult = 1.0 (denied[i] stays at constrained[i])
+
+            // Postness-based channel split (NEW variables, DISTINCT from Phase 44's
+            // helpInteriorWeight below). These sum to 1.0 across the full postness range;
+            // Phase 44's helpInteriorWeight is zero at the pivot — the two systems are
+            // mathematically different and must not share or overwrite each other's variables.
+            var pn   = Matchup.Postness(offPlayer, matchupCfg);
+            var norm = 2.0 * matchupCfg.PostnessNeutral;                // = 100 by default
+            var denialPerimeterWeight = Math.Clamp(1.0 - pn / norm, 0.0, 1.0);
+            var denialPostWeight      = Math.Clamp(pn / norm,        0.0, 1.0);
+            // denialPerimeterWeight + denialPostWeight == 1.0 across the full postness range.
+
+            // Skill channel: perimeter = OffBallDefense vs OffBallMovement;
+            //                post      = PostDefense vs (Strength + PostMoves) / 2.
+            var perimeterGap    = defPlayer.OffBallDefense - offPlayer.OffBallMovement;
+            var postGap         = defPlayer.PostDefense
+                                - (offPlayer.Strength + offPlayer.PostMoves) / 2.0;
+            var blendedSkillGap = denialPerimeterWeight * perimeterGap
+                                + denialPostWeight      * postGap;
+
+            // Physical channel: athleticism gap (same concept as the make door).
+            var athGap = defPlayer.Athleticism - offPlayer.Athleticism;
+
+            // GapFn — same signed power-law the make door uses; reuses ReferenceScale.
+            var skillShift = Matchup.GapFn(blendedSkillGap, matchupCfg.DenialSkillSteepness,
+                                           matchupCfg.DenialExponent, matchupCfg.ReferenceScale);
+            var athShift   = Matchup.GapFn(athGap,          matchupCfg.DenialPhysSteepness,
+                                           matchupCfg.DenialExponent, matchupCfg.ReferenceScale);
+
+            var denialShift = matchupCfg.DenialSkillWeight * skillShift
+                            + matchupCfg.DenialPhysWeight  * athShift;
+
+            // Bounded multiplier — mirrors the tilt multiplier, negated so a positive
+            // shift (defender wins) suppresses the share.
+            var denialMult = Math.Exp(
+                -Math.Log(matchupCfg.MaxDenialMultiplier)
+                * Math.Tanh(denialShift / matchupCfg.DenialReferenceShift));
+            denied[i] = constrained[i] * denialMult;
+        }
+
+        // Normalize after denial pass.
+        var deniedTotal = 0.0;
+        foreach (var v in denied) deniedTotal += v;
+        if (deniedTotal > 0.0)
+            for (var i = 0; i < 5; i++) denied[i] /= deniedTotal;
+
+        // ── Interior HelpDefense compression (Phase 44, retained) ────────────
+        // OffBallDefense's perimeter selection-compression was retired in Phase 46
+        // in favor of the per-man denial above. Interior HelpDefense compression stays:
+        // it models the team collapsing the lane, a genuinely different mechanism.
+        var equalShare = populatedCount > 0 ? 1.0 / populatedCount : 0.2;
+
+        // Compute HelpDefense aggregate (all five defenders, fixed denominator 5.0).
+        var helpDefSum = 0.0;
         for (var i = 1; i <= 5; i++)
         {
             var defender = defRoster.PlayerAt(defLineup.SlotAt(i));
             if (defender is null) continue;
-            offBallDefSum += defender.OffBallDefense / 100.0;
-            helpDefSum    += defender.HelpDefense    / 100.0;
+            helpDefSum += defender.HelpDefense / 100.0;
         }
-        var offBallDefAgg = Math.Pow(offBallDefSum / 5.0, matchupCfg.OffBallDefenseCompressionExponent)
-                          * matchupCfg.OffBallDefenseCompressionScale;
-        var helpDefAgg    = Math.Pow(helpDefSum    / 5.0, matchupCfg.HelpDefenseCompressionExponent)
-                          * matchupCfg.HelpDefenseCompressionScale;
-
-        // Offensive lineup postness (for identifying focal point type).
-        var offRoster = game.RosterFor(state.Offense);
-        var offLineup = game.LineupFor(state.Offense);
+        var helpDefAgg = Math.Pow(helpDefSum / 5.0, matchupCfg.HelpDefenseCompressionExponent)
+                       * matchupCfg.HelpDefenseCompressionScale;
 
         var freedMass  = 0.0;
-        var compressed = (double[])constrained.Clone();
+        var compressed = (double[])denied.Clone();    // compress the POST-DENIAL shares
         for (var i = 0; i < 5; i++)
         {
-            if (constrained[i] <= equalShare) continue;   // only compress above-equal-share slots
+            if (denied[i] <= equalShare) continue;    // only compress above-equal-share slots
 
             var offPlayer = offRoster.PlayerAt(offLineup.SlotAt(i + 1));
             if (offPlayer is null) continue;
 
             var postness = Matchup.Postness(offPlayer, matchupCfg);
-            // perimeterWeight: 1.0 for pure guard (postness=0), 0.0 at or above PostnessNeutral
-            var perimeterWeight = Math.Max(0.0, 1.0 - postness / matchupCfg.PostnessNeutral);
-            // interiorWeight: 0.0 for pure guard, approaches 1.0 for high-postness player
-            var interiorWeight  = Math.Max(0.0, Math.Min(1.0, postness / matchupCfg.PostnessNeutral - 1.0));
+            // helpInteriorWeight: 0.0 at or below PostnessNeutral; rises for high-postness
+            // players. DISTINCT from denialPostWeight above — this weight IS ZERO at the
+            // pivot (not 0.5). Do NOT share variables with the denial system.
+            var helpInteriorWeight = Math.Max(0.0,
+                Math.Min(1.0, postness / matchupCfg.PostnessNeutral - 1.0));
 
-            var compressionFraction = offBallDefAgg * perimeterWeight + helpDefAgg * interiorWeight;
+            var compressionFraction = helpDefAgg * helpInteriorWeight;
             compressionFraction     = Math.Min(compressionFraction, 1.0);   // never compress more than 100%
 
-            var excess = constrained[i] - equalShare;
+            var excess = denied[i] - equalShare;      // excess above equal share (post-denial)
             var freed  = excess * compressionFraction;
             compressed[i] -= freed;
             freedMass     += freed;
@@ -330,13 +396,13 @@ public sealed class RollEGenerator : IRollEGenerationProvider
         {
             var belowTotal = 0.0;
             for (var i = 0; i < 5; i++)
-                if (compressed[i] < equalShare && constrained[i] > 0.0) belowTotal += equalShare - compressed[i];
+                if (compressed[i] < equalShare && denied[i] > 0.0) belowTotal += equalShare - compressed[i];
 
             if (belowTotal > 0.0)
             {
                 for (var i = 0; i < 5; i++)
                 {
-                    if (compressed[i] < equalShare && constrained[i] > 0.0)
+                    if (compressed[i] < equalShare && denied[i] > 0.0)
                     {
                         var gap = equalShare - compressed[i];
                         compressed[i] += freedMass * (gap / belowTotal);
@@ -348,7 +414,7 @@ public sealed class RollEGenerator : IRollEGenerationProvider
                 // All slots at or above equal share — redistribute evenly to populated slots.
                 // Defensive fallback only — unreachable under a valid normalized populated lineup.
                 for (var i = 0; i < 5; i++)
-                    if (constrained[i] > 0.0) compressed[i] += freedMass / populatedCount;
+                    if (denied[i] > 0.0) compressed[i] += freedMass / populatedCount;
             }
 
             // Re-normalize after redistribution.
@@ -358,16 +424,16 @@ public sealed class RollEGenerator : IRollEGenerationProvider
                 for (var i = 0; i < 5; i++) compressed[i] /= compTotal;
         }
 
-        // Compression is a post-tilt adjustment, not an exemption from Roll E's existing
-        // floor/rail contract. Re-apply ApplyFloorAndRail a second time before building
-        // the final pie. Full contract: tilt → floor/rail → compression → redistribute
-        // → normalize → floor/rail.
+        // Denial and compression are post-tilt adjustments, not exemptions from Roll E's
+        // floor/rail contract. Re-apply ApplyFloorAndRail a final time before building the
+        // pie. Full contract: tilt → floor/rail → DENIAL → normalize → interior-help-
+        // compression → redistribute → normalize → floor/rail.
         // Use the compressed/normalized array as both candidate shares and redistribution
         // basis (same discipline as the first call above: tilted weights as basis,
         // not the original expScores).
         var finalConstrained = freedMass > 0.0
             ? ApplyFloorAndRail(compressed, compressed, populatedCount)
-            : constrained;
+            : denied;
 
         // Build the new pie from the constrained tilted shares
         var allOutcomes = Enum.GetValues<SelectionOutcome>();

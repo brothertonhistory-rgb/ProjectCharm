@@ -6107,3 +6107,63 @@ Each of the four team-level GapFn families is enforced at Load: steepness > 0, e
 ### Calibration note
 
 Every Hustle value shipped this session — all four GapFn families and all four picker knobs — is a calibration placeholder. The locked design decisions are the *shapes and seams*: relative gap (not absolute), GapFn for teams and tanh for players, pre-saturation insertion for disruption, defense-only foul cost, FastBreak-only transition suppression, fixed-denominator-5 aggregation, and the foul < turnover ordering. Magnitudes will be tuned against real data during the calibration pass and may move freely while those structural decisions hold.
+
+---
+
+## Phase 46 — Individual Matchup Denial (Session 08)
+
+### What this phase does
+
+Phase 46 adds per-slot individual denial to `BendByAttention` in `RollEGenerator`. For each offensive slot, the defender assigned to that same slot compares his denial attributes against the ball-handler's access attributes. A bounded per-slot multiplier emerges from the matchup: defenders who win suppress that player's share of ball-touches; offenses that win get a small boost. Phase 44's team-aggregate OffBallDefense perimeter compression is retired here and replaced by this per-man mechanism. HelpDefense interior compression is retained unchanged.
+
+### Why per-slot instead of team-aggregate
+
+Phase 44's OffBallDefense term modeled perimeter denial as a sum of all five defenders' ratings — a team-level aggregate that compressed the share of any above-equal-share perimeter focal point. This overrepresents reality: perimeter denial is a one-on-one skill. The defender guarding the ball-handler is what makes it hard for him to get the ball, not the team's aggregate OBD rating. A team with four elite perimeter deniers and a weak slot-1 matchup should not deny the focal-point ball-handler — the slot-1 defender is the relevant agent. The team-aggregate model produces the wrong shape for a per-player attribute. Phase 46 retires it in favor of a mechanism where each defender's denial affects only the player he is guarding.
+
+### Channel structure and the sum-to-1 split
+
+Denial operates through two skill channels and one physical channel:
+
+**Perimeter channel**: `OffBallDefense − OffBallMovement`. High OBD and low OBM make it hard for the player to get open cuts and dribble entries. Full weight at postness=0 (pure guard); fades to zero at postness=2×PostnessNeutral.
+
+**Post channel**: `PostDefense − (Strength + PostMoves)/2`. High PostDefense and a low (Strength, PostMoves) average make it hard for a post player to receive entry passes and establish position. Zero weight at postness=0; rises to full at postness=2×PostnessNeutral.
+
+The two channel weights sum to exactly 1.0 across the full postness range — a pure guard is 100% perimeter, a pure post is 100% post, a mid-postness player is a blend. This is **not** the same as Phase 44's `helpInteriorWeight`, which is zero at or below `PostnessNeutral` and rises above it. The denial split is a sum-to-1 partition of full weight; the compression weight is a threshold function starting at zero. The two systems use physically separate variable names (`denialPerimeterWeight`/`denialPostWeight` vs `helpInteriorWeight`) precisely because conflating them would produce incorrect math. Code comments flag this distinction explicitly.
+
+**Physical channel**: `Athleticism gap (def − off)`. A more athletic defender makes it harder to get free regardless of positional skill — quickness to deny driving lanes, length to contest catches. Reuses `ReferenceScale` (the same scale throughout the make door) rather than adding a new scale knob.
+
+### The bounded multiplier
+
+`denialMult = exp(−log(MaxDenialMultiplier) × tanh(denialShift / DenialReferenceShift))`
+
+This mirrors the tilt multiplier, negated so a positive shift (defender wins) suppresses the share. Properties: exactly 1.0 at zero shift (neutral matchup); bounded in [1/MaxDenialMultiplier, MaxDenialMultiplier] for all real shifts; never drives a share to zero. At MaxDenialMultiplier=1.5, a maximally denied slot receives ≈0.667× its pre-denial share; a maximally open slot receives 1.5×.
+
+A null slot (no defender or no offensive player in that slot) gets denialMult=1.0 implicitly — the loop continues without modifying `denied[i]`.
+
+### Pipeline position
+
+The full pipeline after Phase 46: **tilt → floor/rail → DENIAL → normalize → interior-help-compression → redistribute → normalize → floor/rail**.
+
+Denial sits after the first floor/rail (so it operates on shares that already respect the selection floor and rail) and before the interior HelpDefense compression (so a player who already has fewer touches due to denial is less likely to be identified as a focal point by the compression pass). The final floor/rail enforces the selection constraints a second time, as before.
+
+The `finalConstrained` fallback path (when `freedMass = 0`, meaning no slot was compressed) now returns `denied` instead of `constrained`, because the denial pass has already been applied regardless of whether compression fires.
+
+### OBD retirement: what stays, what goes
+
+The team-aggregate OffBallDefense perimeter compression term (Phase 44's `offBallDefAgg × perimeterWeight`) is removed. The two config knobs that fed it (`OffBallDefenseCompressionExponent`, `OffBallDefenseCompressionScale`) are removed from `MatchupConfig` and `config.json`. The corresponding Load guards are removed.
+
+HelpDefense interior compression stays exactly as it was, operating on the post-denial shares. The `helpInteriorWeight` computation and the redistribution logic are unchanged; only the array they operate on shifts from `constrained[]` to `denied[]`.
+
+The Phase 44 retirement guard in `Phase44OffBallDefenseCheck` sub-check (f) constructs a fixture where all per-slot denial gaps are analytically zero (matched defenders, OBD = OBM, PostDefense = (Strength + PostMoves)/2, athleticism attributes mirrored). With all denial multipliers equal to 1.0, the only observable difference between the baseline and the guard (which has higher OBD for defenders 2–5) is whether the retired team-aggregate term fires. The harness confirms it does not: |diff| = 0.00E+000.
+
+### Phase 44 (g) sub-check update
+
+The original (g) assertion "OBD-only has no effect on a post player" was testing the old team-aggregate system's property: `perimeterWeight = 0` for high-postness players, so OBD had zero effect. After Phase 46, OBD reaches post players through the per-slot denial system via the `denialPerimeterWeight` channel (which is 0.1 for a player at postness=90 with neutral=50). For the specific fixture in (g) — a star with PostMoves=75, Strength=90 facing a defender with PostDefense=50 and OBD=80 — the offense wins on the post channel by a large margin (postGap = 50 − 82.5 = −32.5), which outweighs the perimeter-channel denial. The net denialShift is negative (offense wins overall), so denialMult > 1.0 and the star's share increases. The direction assertion is replaced with an observation-only print; (g) now asserts only that HD interior compression fires. The per-slot denial direction across all postness levels is covered by the nine sub-checks in `Phase46IndividualDenialCheck`.
+
+### Invariants
+
+Seven Phase 46 invariants enforced at Load: `DenialExponent > 1` (convex/flat-bottom contract, same as `SkillExponent`); `MaxDenialMultiplier > 1` (meaningful bound, not trivial at 1.0); `DenialReferenceShift > 0`; `DenialSkillSteepness > 0`; `DenialPhysSteepness > 0`; `DenialSkillWeight ∈ (0, 1)`; `DenialPhysWeight ∈ (0, 1)`.
+
+### Calibration note
+
+All seven denial knobs are calibration placeholders. The locked design decisions are the shapes and seams: per-slot (not team-aggregate), two-channel blended skill gap plus athleticism physical channel, sum-to-1 channel split by postness, bounded tanh multiplier, denial before compression in the pipeline. Magnitudes will be tuned during the calibration pass and may move freely while the structural decisions hold.

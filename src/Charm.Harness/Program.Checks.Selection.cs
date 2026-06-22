@@ -1030,4 +1030,573 @@ internal static partial class Program
         return pass;
     }
 
+    // =========================================================================
+    // Phase 46 — Individual Matchup Denial: per-slot access denial in Roll E
+    // BendByAttention. Direct-probe discipline (matches Phase 44 convention):
+    // every assertion reads real generator output via BendByAttention directly —
+    // no stubs, no full-game batch.
+    // =========================================================================
+
+    private static bool Phase46IndividualDenialCheck(string configPath)
+    {
+        Console.WriteLine("\n--- Phase46IndividualDenialCheck ---");
+        var pass = true;
+
+        var cfgE  = RollEConfig.Load(configPath);
+        var cfgM  = MatchupConfig.Load(configPath);
+        var cfgD  = RollDConfig.Load(configPath);
+        const double Eps = 1e-4;   // directional checks: share must move by at least this much
+
+        // Shared helper: build a GameState, run GenerateWithPressure + AttentionGenerator,
+        // call BendByAttention directly, return the Slot1 share.
+        // offSlot1 / defSlot1 are the full players for slot 1.
+        // Slots 2-5 receive all-50 filler (both sides) unless overridden.
+        double GetSlot1Share(
+            Player offSlot1, Player defSlot1,
+            Player? offFill2to5 = null, Player? defFill2to5 = null)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var coach = new CoachProfile(heliocentricBias: 5.0, shotSelectionBias: 5.0, paceBias: 5.0);
+            g.SetCoach(TeamSide.Home, coach);
+            g.SetCoach(TeamSide.Away, coach);
+
+            // Offensive lineup
+            g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(1), offSlot1);
+            var neutralOff = offFill2to5 ?? new Player("noff") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=0,
+                Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+                Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+                BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            for (var i = 2; i <= 5; i++) g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i), neutralOff);
+
+            // Defensive lineup
+            g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(1), defSlot1);
+            var neutralDef = defFill2to5 ?? new Player("ndef") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=0,
+                Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+                Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+                BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            for (var i = 2; i <= 5; i++) g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i), neutralDef);
+
+            var genE    = new RollEGenerator(cfgE, g);
+            var attnGen = new AttentionGenerator(AttentionConfig.Load(configPath), g);
+            var st = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            var genResult = genE.GenerateWithPressure(st);
+            var attn      = attnGen.Generate(st, genResult.FinalShares);
+            var tilted    = genE.BendByAttention(genResult, attn.AttentionShares, g, cfgM, st);
+            return tilted.Slices.First(s => s.Outcome == SelectionOutcome.Slot1).Weight;
+        }
+
+        // Helper players (reusable across sub-checks)
+
+        // High-usage focal Slot 1 (perimeter: low postness, high SelfCreation).
+        var perimStar = new Player("psstar") {
+            Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+            FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+            SelfCreation=70, PostMoves=20, OffBallMovement=50, Screening=40,
+            OffensiveRebounding=30, PerimeterDefense=55, PostDefense=30, RimProtection=20,
+            DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+            Height=30, Wingspan=45, Weight=40, Strength=30, Speed=70,
+            Quickness=70, FirstStep=70, Vertical=55, Endurance=60, Hustle=60,
+            BasketballIQ=60, Discipline=60, HierarchyRank=10,
+            RimTendency=20, ShortTendency=15, MidTendency=25, LongTendency=15, ThreeTendency=25,
+        };
+
+        // High-usage focal Slot 1 (post: high postness, high PostMoves/Close).
+        var postStar = new Player("postar") {
+            Close=70, Mid=45, Outside=30, Finishing=75, FreeThrow=55,
+            FoulDrawing=60, BallHandling=40, Passing=40, Playmaking=35,
+            SelfCreation=40, PostMoves=75, OffBallMovement=35, Screening=50,
+            OffensiveRebounding=75, PerimeterDefense=40, PostDefense=90, RimProtection=70,
+            DefensiveRebounding=80, Steals=35, HelpDefense=0, OffBallDefense=50,
+            Height=90, Wingspan=85, Weight=80, Strength=90, Speed=40,
+            Quickness=35, FirstStep=35, Vertical=60, Endurance=65, Hustle=70,
+            BasketballIQ=55, Discipline=60, HierarchyRank=10,
+            RimTendency=50, ShortTendency=35, MidTendency=10, LongTendency=3, ThreeTendency=2,
+        };
+
+        // Neutral defender (all 50 relevant attrs — exact neutral matchup vs an all-50 offensive player).
+        var neutralDef1 = new Player("ndef1") {
+            Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+            FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+            SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+            OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+            DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=50,
+            Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+            Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+            BasketballIQ=50, Discipline=50, HierarchyRank=5,
+            RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+        };
+
+        // ── (a) Perimeter denial fires ────────────────────────────────────────
+        Console.WriteLine("  (a) Perimeter denial fires:");
+        {
+            var perimStarLowOBM = new Player("pslowobm") {
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=20, OffBallMovement=30, Screening=40,
+                OffensiveRebounding=30, PerimeterDefense=55, PostDefense=30, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Height=30, Wingspan=45, Weight=40, Strength=30, Speed=70,
+                Quickness=70, FirstStep=70, Vertical=55, Endurance=60, Hustle=60,
+                BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=15, MidTendency=25, LongTendency=15, ThreeTendency=25,
+            };
+            // Slot-1 postness (low)
+            var pn = Matchup.Postness(perimStarLowOBM, cfgM);
+            Console.WriteLine($"    perim player postness={pn:F2} (expect < {cfgM.PostnessNeutral})");
+
+            // Neutral defender (OBD=50) vs high OBD defender (90)
+            var highObdDef = new Player("hobd") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=90,
+                Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+                Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+                BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var shareNeutral = GetSlot1Share(perimStarLowOBM, neutralDef1);
+            var shareHighObd = GetSlot1Share(perimStarLowOBM, highObdDef);
+            var aOk = shareHighObd < shareNeutral - Eps;
+            Console.WriteLine($"    OBD=50 Slot1={shareNeutral:F6}  OBD=90 Slot1={shareHighObd:F6}");
+            Console.WriteLine($"    High OBD drops share → {(aOk ? "ok" : "FAIL")}");
+            pass &= aOk;
+            Console.WriteLine($"  (a) {(aOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (b) Perimeter self-balancing ──────────────────────────────────────
+        Console.WriteLine("  (b) Perimeter self-balancing:");
+        {
+            var highObdDef = new Player("hobd2") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=90,
+                Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+                Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+                BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            // Low OBM perimeter star (weak mover — maximal denial)
+            var lowObmStar = new Player("lowobm") {
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=20, OffBallMovement=20, Screening=40,
+                OffensiveRebounding=30, PerimeterDefense=55, PostDefense=30, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Height=30, Wingspan=45, Weight=40, Strength=30, Speed=70,
+                Quickness=70, FirstStep=70, Vertical=55, Endurance=60, Hustle=60,
+                BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=15, MidTendency=25, LongTendency=15, ThreeTendency=25,
+            };
+            // High OBM perimeter star (shifty mover — minimal denial)
+            var highObmStar = new Player("hiobm") {
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=20, OffBallMovement=85, Screening=40,
+                OffensiveRebounding=30, PerimeterDefense=55, PostDefense=30, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Height=30, Wingspan=45, Weight=40, Strength=30, Speed=70,
+                Quickness=70, FirstStep=70, Vertical=55, Endurance=60, Hustle=60,
+                BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=15, MidTendency=25, LongTendency=15, ThreeTendency=25,
+            };
+            var shareLowObm  = GetSlot1Share(lowObmStar,  highObdDef);
+            var shareHighObm = GetSlot1Share(highObmStar, highObdDef);
+            var bOk = shareHighObm > shareLowObm + Eps;
+            Console.WriteLine($"    OBM=20 Slot1={shareLowObm:F6}  OBM=85 Slot1={shareHighObm:F6}");
+            Console.WriteLine($"    Shifty mover less denied → {(bOk ? "ok" : "FAIL")}");
+            pass &= bOk;
+            Console.WriteLine($"  (b) {(bOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (c) Post denial fires ─────────────────────────────────────────────
+        Console.WriteLine("  (c) Post denial fires:");
+        {
+            var pn = Matchup.Postness(postStar, cfgM);
+            Console.WriteLine($"    post player postness={pn:F2} (expect > {cfgM.PostnessNeutral})");
+
+            // Neutral defender vs high-PostDefense defender
+            var highPdDef = new Player("hpd") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=90, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=50,
+                Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+                Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+                BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var shareNeutral = GetSlot1Share(postStar, neutralDef1);
+            var shareHighPd  = GetSlot1Share(postStar, highPdDef);
+            var cOk = shareHighPd < shareNeutral - Eps;
+            Console.WriteLine($"    PD=50 Slot1={shareNeutral:F6}  PD=90 Slot1={shareHighPd:F6}");
+            Console.WriteLine($"    High PostDefense drops share → {(cOk ? "ok" : "FAIL")}");
+            pass &= cOk;
+            Console.WriteLine($"  (c) {(cOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (d) Post self-balancing ───────────────────────────────────────────
+        Console.WriteLine("  (d) Post self-balancing:");
+        {
+            var highPdDef = new Player("hpd2") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=90, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=50,
+                Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+                Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+                BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            // Weak post star (low Str+PostMoves — more denied)
+            var weakPost = new Player("wkpost") {
+                Close=70, Mid=45, Outside=30, Finishing=75, FreeThrow=55,
+                FoulDrawing=60, BallHandling=40, Passing=40, Playmaking=35,
+                SelfCreation=40, PostMoves=30, OffBallMovement=35, Screening=50,
+                OffensiveRebounding=75, PerimeterDefense=40, PostDefense=90, RimProtection=70,
+                DefensiveRebounding=80, Steals=35, HelpDefense=0, OffBallDefense=50,
+                Height=90, Wingspan=85, Weight=80, Strength=35, Speed=40,
+                Quickness=35, FirstStep=35, Vertical=60, Endurance=65, Hustle=70,
+                BasketballIQ=55, Discipline=60, HierarchyRank=10,
+                RimTendency=50, ShortTendency=35, MidTendency=10, LongTendency=3, ThreeTendency=2,
+            };
+            // Strong post star (high Str+PostMoves — less denied, possibly boosted)
+            var strongPost = new Player("stpost") {
+                Close=70, Mid=45, Outside=30, Finishing=75, FreeThrow=55,
+                FoulDrawing=60, BallHandling=40, Passing=40, Playmaking=35,
+                SelfCreation=40, PostMoves=90, OffBallMovement=35, Screening=50,
+                OffensiveRebounding=75, PerimeterDefense=40, PostDefense=90, RimProtection=70,
+                DefensiveRebounding=80, Steals=35, HelpDefense=0, OffBallDefense=50,
+                Height=90, Wingspan=85, Weight=80, Strength=95, Speed=40,
+                Quickness=35, FirstStep=35, Vertical=60, Endurance=65, Hustle=70,
+                BasketballIQ=55, Discipline=60, HierarchyRank=10,
+                RimTendency=50, ShortTendency=35, MidTendency=10, LongTendency=3, ThreeTendency=2,
+            };
+            var shareWeak   = GetSlot1Share(weakPost,   highPdDef);
+            var shareStrong = GetSlot1Share(strongPost, highPdDef);
+            var dOk = shareStrong > shareWeak + Eps;
+            Console.WriteLine($"    weak Str+PM Slot1={shareWeak:F6}  strong Str+PM Slot1={shareStrong:F6}");
+            Console.WriteLine($"    Strong post harder to deny → {(dOk ? "ok" : "FAIL")}");
+            pass &= dOk;
+            Console.WriteLine($"  (d) {(dOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (e) Athletic gap — both directions ────────────────────────────────
+        Console.WriteLine("  (e) Athletic gap (both directions):");
+        {
+            // Neutral skill matchup; isolate athleticism.
+            // Off: OBM=50, Str=50, PM=50 → skill gaps zero.
+            var skillNeutralOff = new Player("athnoff") {
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=50, OffBallMovement=50, Screening=40,
+                OffensiveRebounding=30, PerimeterDefense=55, PostDefense=30, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Height=30, Wingspan=45, Weight=40,
+                Strength=50, Speed=50, Quickness=50, FirstStep=50, Vertical=50,   // Athleticism=50
+                Endurance=60, Hustle=60, BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=15, MidTendency=25, LongTendency=15, ThreeTendency=25,
+            };
+            // Neutral skill defender (OBD=50, PD=50) but different athleticism levels.
+            Player AthDef(int ath) => new Player($"athdef{ath}") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=50,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=ath, Speed=ath, Quickness=ath, FirstStep=ath, Vertical=ath,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var shareAthDeny  = GetSlot1Share(skillNeutralOff, AthDef(80));   // def ath=80, off ath=50 → deny
+            var shareAthNeu   = GetSlot1Share(skillNeutralOff, AthDef(50));   // equal → neutral
+            var shareAthBoost = GetSlot1Share(skillNeutralOff, AthDef(20));   // def ath=20, off ath=50 → boost
+            var eOk = shareAthDeny < shareAthNeu - Eps && shareAthBoost > shareAthNeu + Eps;
+            Console.WriteLine($"    Def ath=80 (deny):  Slot1={shareAthDeny:F6}");
+            Console.WriteLine($"    Def ath=50 (equal): Slot1={shareAthNeu:F6}");
+            Console.WriteLine($"    Def ath=20 (boost): Slot1={shareAthBoost:F6}");
+            Console.WriteLine($"    Both directions → {(eOk ? "ok" : "FAIL")}");
+            pass &= eOk;
+            Console.WriteLine($"  (e) {(eOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (f) Never to zero ─────────────────────────────────────────────────
+        Console.WriteLine("  (f) Never to zero:");
+        {
+            // Maximal mismatch: defender maxed (OBD=99, PD=99, all-99 athleticism),
+            // offensive player minimal relevant attrs (OBM=0, Str=0, PM=0, ath=0).
+            var minimalOff = new Player("minoff") {
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=0, OffBallMovement=0, Screening=40,
+                OffensiveRebounding=30, PerimeterDefense=55, PostDefense=30, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Height=30, Wingspan=45, Weight=40,
+                Strength=0, Speed=0, Quickness=0, FirstStep=0, Vertical=0,
+                Endurance=60, Hustle=60, BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=15, MidTendency=25, LongTendency=15, ThreeTendency=25,
+            };
+            var maxedDef = new Player("maxdef") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=99, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=99,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=99, Speed=99, Quickness=99, FirstStep=99, Vertical=99,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var shareMaxDeny = GetSlot1Share(minimalOff, maxedDef);
+            var fOkSub = shareMaxDeny > 0.0;
+            Console.WriteLine($"    Maximal mismatch Slot1={shareMaxDeny:F6} (expect > 0)");
+            Console.WriteLine($"    Share strictly positive → {(fOkSub ? "ok" : "FAIL")}");
+            pass &= fOkSub;
+            Console.WriteLine($"  (f) {(fOkSub ? "ok" : "FAIL")}");
+        }
+
+        // ── (g) Offense wins → more touches ───────────────────────────────────
+        Console.WriteLine("  (g) Offense wins → more touches:");
+        {
+            // Neutral defender; high-skill, high-athleticism offensive player vs weak defender.
+            var weakDef = new Player("wkdef") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=20, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=20,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=20, Speed=20, Quickness=20, FirstStep=20, Vertical=20,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            // Perimeter star with high OBM + good athleticism vs weak defender
+            var shiftyStar = new Player("shify") {
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=30, OffBallMovement=85, Screening=40,
+                OffensiveRebounding=30, PerimeterDefense=55, PostDefense=30, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Height=30, Wingspan=45, Weight=40,
+                Strength=30, Speed=80, Quickness=80, FirstStep=80, Vertical=60,
+                Endurance=60, Hustle=60, BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=15, MidTendency=25, LongTendency=15, ThreeTendency=25,
+            };
+            var shareVsNeutral = GetSlot1Share(shiftyStar, neutralDef1);
+            var shareVsWeak    = GetSlot1Share(shiftyStar, weakDef);
+            var gOk = shareVsWeak > shareVsNeutral + Eps;
+            Console.WriteLine($"    vs neutral def Slot1={shareVsNeutral:F6}  vs weak def Slot1={shareVsWeak:F6}");
+            Console.WriteLine($"    Offense winning raises share → {(gOk ? "ok" : "FAIL")}");
+            pass &= gOk;
+            Console.WriteLine($"  (g) {(gOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (h) Neutral wash ─────────────────────────────────────────────────
+        Console.WriteLine("  (h) Neutral wash (equal matchup → denialMult = 1.0):");
+        {
+            // All-50 offensive and defensive slot-1 players → all gaps zero → mult = 1.0.
+            // Compare against the same player facing the same player (baseline = control).
+            var allFiftyOff = new Player("a50off") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=50,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=50, Speed=50, Quickness=50, FirstStep=50, Vertical=50,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=10,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var allFiftyDef = new Player("a50def") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=50,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=50, Speed=50, Quickness=50, FirstStep=50, Vertical=50,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            // Baseline: same all-50 matchup (denial is exactly neutral; share = unmodified usage share)
+            var shareNeutralMatchup = GetSlot1Share(allFiftyOff, allFiftyDef);
+            // Confirm the gaps are zero analytically
+            var hPerimGap = allFiftyDef.OffBallDefense - allFiftyOff.OffBallMovement;   // = 0
+            var hPostGap  = allFiftyDef.PostDefense - (allFiftyOff.Strength + allFiftyOff.PostMoves) / 2.0;  // = 0
+            var hAthGap   = allFiftyDef.Athleticism - allFiftyOff.Athleticism;  // = 0
+            var hOk = Math.Abs(hPerimGap) < 1e-9 && Math.Abs(hPostGap) < 1e-9 && Math.Abs(hAthGap) < 1e-9;
+            Console.WriteLine($"    Gaps: perim={hPerimGap:F4} post={hPostGap:F4} ath={hAthGap:F6} → all zero: {hOk}");
+            Console.WriteLine($"    Neutral matchup Slot1={shareNeutralMatchup:F6} (denial mult=1.0 by construction)");
+            // A neutral matchup doesn't fire the denial at all — the share should equal 0.2
+            // (all-50 lineup with HierarchyRank=10 at slot 1 among all-50 rank-5 fillers still
+            // produces a >0.2 share due to usage; what we verify is the denial doesn't fire)
+            // Verify by also running with a slightly unequal defender and checking it moves.
+            var mildHighObdDef = new Player("mhobd") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=70,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=50, Speed=50, Quickness=50, FirstStep=50, Vertical=50,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var shareMild = GetSlot1Share(allFiftyOff, mildHighObdDef);
+            var hOk2 = shareMild < shareNeutralMatchup - Eps;
+            Console.WriteLine($"    With OBD=70 def: Slot1={shareMild:F6} < neutral → {(hOk2 ? "ok — denial fires off neutral" : "FAIL")}");
+            hOk &= hOk2;
+            pass &= hOk;
+            Console.WriteLine($"  (h) {(hOk ? "ok" : "FAIL")}");
+        }
+
+        // ── (i) Hybrid blend / no dead-zone at PostnessNeutral ───────────────
+        Console.WriteLine("  (i) Hybrid blend / no dead-zone at PostnessNeutral:");
+        {
+            bool iOk = false;   // declared before any goto iDone; set true only on full pass
+
+            // Build slot-1 player at exactly postness = PostnessNeutral.
+            // With equal-thirds (1/3 each): Height = PostDefense = Strength = PostnessNeutral = 50.
+            var midPostness = Matchup.Postness(new Player("mid50") {
+                Height=50, PostDefense=50, Strength=50,
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=50, OffBallMovement=50, Screening=40,
+                OffensiveRebounding=50, PerimeterDefense=55, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Wingspan=50, Weight=50, Speed=60, Quickness=60, FirstStep=60, Vertical=55,
+                Endurance=60, Hustle=60, BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            }, cfgM);
+            Console.WriteLine($"    Mid player postness={midPostness:F4} (expect = {cfgM.PostnessNeutral})");
+            if (!(Math.Abs(midPostness - cfgM.PostnessNeutral) < 1e-9))
+            {
+                Console.WriteLine("    FAIL — cannot construct mid-postness fixture.");
+                pass = false; Console.WriteLine("  (i) FAIL");
+                goto iDone;
+            }
+
+            var midStar = new Player("midstar") {
+                Height=50, PostDefense=50, Strength=50,
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=50, OffBallMovement=30, Screening=40,
+                OffensiveRebounding=50, PerimeterDefense=55, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Wingspan=50, Weight=50, Speed=60, Quickness=60, FirstStep=60, Vertical=55,
+                Endurance=60, Hustle=60, BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+
+            // Neutral matchup baseline (OBD=50, PD=50, ath=50 — no denial in either channel)
+            var iNeutralDef = new Player("indef") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=50,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=50, Speed=60, Quickness=60, FirstStep=60, Vertical=55,  // Athleticism = 57 = midStar
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var iBaseline = GetSlot1Share(midStar, iNeutralDef);
+
+            // (1) Perimeter-only edge: high OBD vs low OBM; post channel neutral.
+            //     midStar.OBM=30 vs defender OBD=80: perimeterGap=+50 (defender wins).
+            //     PostDefense=50 vs (Str=50+PM=50)/2=50: postGap=0.
+            var perimEdgeDef = new Player("pedge") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=80,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=50, Speed=60, Quickness=60, FirstStep=60, Vertical=55,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var iPerimOnly = GetSlot1Share(midStar, perimEdgeDef);
+
+            // (2) Post-only edge: high PostDefense vs low (Str+PM)/2; perimeter channel neutral.
+            //     midStar.OBM=30 vs OBD=30 (matched → perimeterGap=0).
+            //     PostDefense=80 vs (Str=50+PM=50)/2=50: postGap=+30 (defender wins).
+            var midStarOBM30 = new Player("midstarOBM30") {
+                Height=50, PostDefense=50, Strength=50,
+                Close=50, Mid=50, Outside=70, Finishing=50, FreeThrow=70,
+                FoulDrawing=50, BallHandling=60, Passing=55, Playmaking=55,
+                SelfCreation=70, PostMoves=50, OffBallMovement=30, Screening=40,   // OBM=30
+                OffensiveRebounding=50, PerimeterDefense=55, RimProtection=20,
+                DefensiveRebounding=30, Steals=55, HelpDefense=0, OffBallDefense=50,
+                Wingspan=50, Weight=50, Speed=60, Quickness=60, FirstStep=60, Vertical=55,
+                Endurance=60, Hustle=60, BasketballIQ=60, Discipline=60, HierarchyRank=10,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var postEdgeDef = new Player("postEdgeDef") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=80, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0,
+                OffBallDefense=30,   // matched to OBM=30 → perimeterGap=0
+                Height=50, Wingspan=50, Weight=50,
+                Strength=50, Speed=60, Quickness=60, FirstStep=60, Vertical=55,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var iPostOnly = GetSlot1Share(midStarOBM30, postEdgeDef);
+
+            // (3) Both edges simultaneously (same midStar OBM=30, OBD=80 + PD=80).
+            var bothEdgeDef = new Player("bothedge") {
+                Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+                FoulDrawing=50, BallHandling=50, Passing=50, Playmaking=50,
+                SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+                OffensiveRebounding=50, PerimeterDefense=50, PostDefense=80, RimProtection=50,
+                DefensiveRebounding=50, Steals=50, HelpDefense=0, OffBallDefense=80,
+                Height=50, Wingspan=50, Weight=50,
+                Strength=50, Speed=60, Quickness=60, FirstStep=60, Vertical=55,
+                Endurance=50, Hustle=50, BasketballIQ=50, Discipline=50, HierarchyRank=5,
+                RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+            };
+            var iBoth = GetSlot1Share(midStar, bothEdgeDef);
+
+            Console.WriteLine($"    baseline  Slot1={iBaseline:F6}");
+            Console.WriteLine($"    perim-only Slot1={iPerimOnly:F6} < baseline → {(iPerimOnly < iBaseline - Eps ? "ok" : "FAIL")}");
+            Console.WriteLine($"    post-only  Slot1={iPostOnly:F6} < baseline → {(iPostOnly  < iBaseline - Eps ? "ok" : "FAIL")}");
+            Console.WriteLine($"    both edges Slot1={iBoth:F6} < min(perim,post) → {(iBoth < Math.Min(iPerimOnly, iPostOnly) - Eps ? "ok" : "FAIL")}");
+
+            iOk = iPerimOnly < iBaseline - Eps
+                   && iPostOnly  < iBaseline - Eps
+                   && iBoth      < Math.Min(iPerimOnly, iPostOnly) - Eps;
+            Console.WriteLine($"    Mid-postness: both channels active, blend stronger than either alone → {(iOk ? "ok" : "FAIL")}");
+            pass &= iOk;
+            iDone:
+            Console.WriteLine($"  (i) {(iOk ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine(pass ? "  Phase 46 PASSED." : "  Phase 46 FAILED.");
+        return pass;
+    }
+
 }
