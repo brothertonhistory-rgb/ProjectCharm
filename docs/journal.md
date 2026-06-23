@@ -1,3 +1,44 @@
+## Session 09 — Phase 47: Passing Compound — rank-weighted bottom-heavy (depth over stars) (2026-06-22)
+
+**Scope:** Replace the flat-average passing term in `AttentionGenerator` with a rank-weighted, bottom-heavy additive compound. The populated passers are ranked weakest→strongest; the weakest carries full weight (1.0) and each better passer's weight multiplies by `PassingRankWeight` (placeholder 0.75). The weighted sum is normalized by the sum of the weights actually used, preserving the retired mean's [0,1] output contract. The deliberate mirror of `PlaymakingDecay` (which decays top-down). No penalty, no cap, no subtraction. Roll H, SelfCreation, and the playmaking decay were left untouched. 5 files changed.
+
+**What shipped (5 files):**
+
+`src/Charm.Engine/Generators/AttentionGenerator.cs` — the passing accumulation in the converter loop changed from a running `passingSum`/`passingCount` mean to collection of each populated player's `Passing/100` into the first `passingCount` entries of a fixed array (absent slots are NOT added — a zero-rated phantom passer would land the heaviest rank weight on a non-existent weak link). The compound (formerly `passingSum/passingCount`) is now computed by: sort the populated values ascending (weakest first); accumulate `weightedSum += rankWeight × value` and `weightTotal += rankWeight` with `rankWeight` starting at 1.0 and multiplying by `_cfg.PassingRankWeight` each step; `passingCompound = weightedSum / weightTotal`. The lines feeding `conversionQuality` are unchanged — the new compound flows into both the direct and the activation-gated terms exactly as the mean did, and stays in [0,1]. Zero-populated → 0.0. The stale "flat average" comment in the converter doc block was updated to describe the bottom-heavy compound.
+
+`src/Charm.Engine/Config/AttentionConfig.cs` — `PassingRankWeight` property added (placeholder 0.75) as the explicit mirror of `PlaymakingDecay`, with an XML doc comment (weakest passer full weight; each better passer's weight multiplies by this factor; 1.0 = flat pure mean; lower = more bottom-heavy; normalized to [0,1]; invariant (0,1]). Load guard added mirroring the `PlaymakingDecay` guard exactly: throw if `<= 0 || > 1.0`.
+
+`src/Charm.Harness/config.json` — `"PassingRankWeight": 0.75` added to the `"Attention"` section after `PlaymakingDecay`.
+
+`src/Charm.Harness/Program.Checks.Selection.cs` — `PassingCompoundCheck(configPath)` added after `Phase46IndividualDenialCheck`. Direct-probe discipline. `conversionQuality` reads only the offense's per-player ratings (never the usage shares), so every fixture passes a FIXED neutral `finalShares` array and every compared lineup is identical in every attribute except Passing — making playmaking activation, and therefore the coefficient on the passing compound, provably identical across the compared lineups. The coefficient C is recovered empirically from a uniform lineup (a normalized weighted average of identical values equals that value, for any weights and any knob), so the checks need no duplicated activation math and no hardcoded activation constant. The all-50 base puts every raw `conversionQuality` well under 1.0, so the [0,1] clamp never participates. Five sub-checks: (a) monotone in total passing; (b) normalization bounds (all-0 → ConversionFloor, all-99 → compound exactly 0.99, raw < 1.0); (c) THE load-bearing bottom-heavy check — at equal total 370, five-even (74×5) beats four-elite-plus-a-dud (90,90,90,90,10); (d) flat-knob degeneration — with `PassingRankWeight=1.0`, two NON-uniform lineups reproduce the retired arithmetic mean exactly (0.500, 0.608) through the production path; (e) second equal-total depth proof — at total 210, five-even (42×5) beats one-sharp (90,30,30,30,30).
+
+`src/Charm.Harness/Program.cs` — `ok &= PassingCompoundCheck(configPath);` wired after the Phase 46 line.
+
+**Key design decisions:**
+
+- **Bottom-heavy, the inverse of playmaking decay.** Playmaking decays top-down — the largest weight on the single best distributor (rewards the peak, "one ball"). Passing climbs downward — the largest weight on the weakest-ranked passer (rewards the floor, "no weak link to hunt"). Deliberate opposites, expressed by one knob each (`PlaymakingDecay` shrinks the weight downward; `PassingRankWeight` grows the weight toward the weakest).
+
+- **Additive, non-negative, no penalty.** Every passing contribution is non-negative; the model never subtracts value from a passer and never imposes a threshold or explicit weak-link penalty. The weak-fifth-passer effect is a structural consequence of a normalized bottom-heavy weighted average (a weak fifth lowers the team compound more than an equally-weak top), not a penalty term.
+
+- **Depth raises the ceiling — structural, not a calibration hope.** At equal total passing, five solid passers beat four-elite-plus-one-dud because the biggest weight lands on a solid fifth man instead of a dud. This DIRECTION holds for any `PassingRankWeight < 1.0` (proven by check (c), not tuned). Calibration controls only how large that advantage is.
+
+- **Normalization preserves the old output contract.** The compound divides the weighted sum by the sum of the weights actually used, so an all-0.99 lineup yields exactly 0.99 and an all-0 lineup yields exactly 0.0 — the same [0,1] range the retired mean produced. The two downstream scales and the [0,1] clamp on `conversionQuality` keep their meaning; the clamp does not silently do the work (raw `conversionQuality` verified < 1.0 in every sub-check).
+
+- **Population guard.** Absent slots are not added to the value array — they are absent, not zero-rated passers. A 5-element array casually seeded with zeros would create a false weak-link penalty exactly where the heaviest weight lands. Zero-populated lineups yield compound 0.0.
+
+- **Harness proves direction without algebra.** Check (d) exercises the production `AttentionGenerator.Generate` path with a flat-knob config and NON-uniform lineups (uniform lineups equal their value under any knob and so cannot catch a hardcoded or ignored config); checks (c)/(e) at the default knob distinguish bottom-heavy from top-heavy, which a naive "good passers beat bad passers" check would not.
+
+**Build notes:** No compile errors. Pre-build Python Monte Carlo (200k random lineups, populated counts 0–5) confirmed output stays in [0,1], `PassingRankWeight=1.0` reproduces the arithmetic mean to float error, and zero-populated → 0.0; a full trace of the `conversionQuality` path on the all-50 base predicted every sub-check number exactly before the harness ran.
+
+**Harness result:** ALL CHECKS PASSED. STRESS TEST PASSED. `PassingCompoundCheck` all five sub-checks green; observation run mechanics clean (scoring reconciled, zero parks, no throws).
+
+**Phase 47 sub-check summary:**
+- (a) Monotone: Q(all-50)=0.186141 < Q(all-80)=0.267826 < Q(all-99)=0.319559 ✓; coefficient C=0.272282 > 0 ✓
+- (b) Bounds: all-0 → Q=0.050000 == ConversionFloor ✓; all-99 → implied compound=0.990000 == 0.99 ✓; raw Q=0.319559 < 1.0 (clamp inactive) ✓
+- (c) Bottom-heavy (equal total 370): Y(74×5) Q=0.251489 > X(90,90,90,90,10) Q=0.223654 ✓
+- (d) Flat knob (1.0): implied compound (90,70,50,30,10)=0.5000000000 == 0.500 ✓; (99,90,60,35,20)=0.6080000000 == 0.608 ✓
+- (e) Depth (equal total 210): even(42×5) Q=0.164358 > one-sharp(90,30,30,30,30) Q=0.148628 ✓
+
 ## Session 08 — Phase 46: Individual Matchup Denial in BendByAttention (2026-06-22)
 
 **Scope:** Wire per-slot individual denial into `BendByAttention` in `RollEGenerator`. For each offensive slot, the matched defender's denial attributes (OffBallDefense, PostDefense, athleticism) are compared against the offensive player's access attributes (OffBallMovement, Strength + PostMoves, athleticism). A blended skill gap and an athleticism gap drive a bounded per-slot multiplier: [1/MaxDenialMultiplier, MaxDenialMultiplier], exactly 1.0 at a neutral matchup. OffBallDefense's former role as a team-aggregate perimeter selection-compression term is simultaneously retired in favor of this per-man mechanism. HelpDefense interior compression is retained. 6 files changed.

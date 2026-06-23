@@ -1599,4 +1599,133 @@ internal static partial class Program
         return pass;
     }
 
+    // =========================================================================
+    // Phase 47 — Passing compound (rank-weighted, bottom-heavy). Direct-probe
+    // discipline (matches the Phase 46 convention): every assertion reads real
+    // AttentionGenerator output (TeamConversionQuality) — no stubs, no batch.
+    //
+    // conversionQuality reads ONLY the offense's per-player ratings; it does NOT
+    // read the usage shares. So every fixture passes a FIXED neutral finalShares
+    // array, and every compared lineup is identical in every attribute EXCEPT
+    // Passing — making playmaking activation (and therefore the coefficient on the
+    // passing compound) provably identical across the compared lineups. The
+    // coefficient C = DirectPassingScale + ActivationScale × playmakingActivation
+    // is recovered empirically from a uniform lineup (a normalized weighted average
+    // of identical values equals that value, for ANY weights and ANY knob), so the
+    // checks need no duplicated activation math and no hardcoded activation
+    // constant. The all-50 base puts every raw conversionQuality well under 1.0, so
+    // the [0,1] clamp never participates in (a)–(e).
+    // =========================================================================
+    private static bool PassingCompoundCheck(string configPath)
+    {
+        Console.WriteLine("\n--- PassingCompoundCheck ---");
+        var pass = true;
+
+        var cfg  = AttentionConfig.Load(configPath);
+        var cfgD = RollDConfig.Load(configPath);
+        const double Tol     = 1e-6;   // conversionQuality comparison tolerance
+        const double TolFlat = 1e-9;   // (d) flat-knob == arithmetic-mean tolerance
+        var fixedShares = new double[5] { 0.2, 0.2, 0.2, 0.2, 0.2 };  // ignored by conversionQuality; fixed so it can never tilt a comparison
+
+        // A passer identical on every rating EXCEPT Passing (all-50 base →
+        // GravityContribution 51.25; one playmaking activation shared by every
+        // fixture in this check).
+        Player Passer(int passing) => new Player("p")
+        {
+            Close=50, Mid=50, Outside=50, Finishing=50, FreeThrow=50,
+            FoulDrawing=50, BallHandling=50, Passing=passing, Playmaking=50,
+            SelfCreation=50, PostMoves=50, OffBallMovement=50, Screening=50,
+            OffensiveRebounding=50, PerimeterDefense=50, PostDefense=50, RimProtection=50,
+            DefensiveRebounding=50, Steals=50, HelpDefense=50, OffBallDefense=50,
+            Height=50, Wingspan=50, Weight=50, Strength=50, Speed=50,
+            Quickness=50, FirstStep=50, Vertical=50, Endurance=50, Hustle=50,
+            BasketballIQ=50, Discipline=50, HierarchyRank=5,
+            RimTendency=20, ShortTendency=20, MidTendency=20, LongTendency=20, ThreeTendency=20,
+        };
+
+        // conversionQuality for a five-man offense whose per-slot Passing ratings
+        // are passingBySlot[0..4]; all other ratings identical. Defense is neutral
+        // (irrelevant to conversionQuality). useCfg lets (d) probe a flat-knob variant.
+        double ConvQuality(int[] passingBySlot, AttentionConfig useCfg)
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            var coach = new CoachProfile(heliocentricBias: 5.0, shotSelectionBias: 5.0, paceBias: 5.0);
+            g.SetCoach(TeamSide.Home, coach);
+            g.SetCoach(TeamSide.Away, coach);
+            for (var i = 1; i <= 5; i++)
+            {
+                g.HomeRoster.SetStarter(g.HomeLineup.SlotAt(i), Passer(passingBySlot[i - 1]));
+                g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i), Passer(50));
+            }
+            var attnGen = new AttentionGenerator(useCfg, g);
+            var st = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                Entry: EntryType.DeadBallInbound);
+            return attnGen.Generate(st, fixedShares).TeamConversionQuality;
+        }
+
+        // ── (a) Monotone in total passing ────────────────────────────────────
+        var qa50 = ConvQuality(new[] { 50, 50, 50, 50, 50 }, cfg);
+        var qa80 = ConvQuality(new[] { 80, 80, 80, 80, 80 }, cfg);
+        var qa99 = ConvQuality(new[] { 99, 99, 99, 99, 99 }, cfg);
+        var aOk = qa50 < qa80 - Tol && qa80 < qa99 - Tol;
+        Console.WriteLine($"  (a) monotone: Q(all-50)={qa50:F6} < Q(all-80)={qa80:F6} < Q(all-99)={qa99:F6} → {(aOk ? "ok" : "FAIL")}");
+        pass &= aOk;
+
+        // Recover the coefficient C on the passing compound from the uniform-50
+        // lineup: Q(all-u) = ConversionFloor + C·u  →  C = (Q(all-u) − floor)/u.
+        // Mathematically equal to DirectPassingScale + ActivationScale×activation;
+        // must be > 0 (positive coefficient, required for the inversions below).
+        var coeff = (qa50 - cfg.ConversionFloor) / 0.50;
+        var coeffOk = coeff > 0.0;
+        Console.WriteLine($"  coefficient on passingCompound C={coeff:F6} (> 0 → {(coeffOk ? "ok" : "FAIL")})");
+        pass &= coeffOk;
+
+        // ── (b) Normalization bounds (clamp must NOT participate) ─────────────
+        var qb0 = ConvQuality(new[] { 0, 0, 0, 0, 0 }, cfg);
+        var floorOk = Math.Abs(qb0 - cfg.ConversionFloor) < Tol;        // all-0 → compound 0 → Q == floor
+        var impliedCompound99 = (qa99 - cfg.ConversionFloor) / coeff;   // recover compound from Q
+        var normOk = Math.Abs(impliedCompound99 - 0.99) < Tol;         // all-99 → exactly 0.99 (NOT 1.0)
+        var clampOk = qa99 < 1.0 - Tol;                                // raw Q stayed below the [0,1] clamp
+        Console.WriteLine($"  (b) all-0 → Q={qb0:F6} == ConversionFloor {cfg.ConversionFloor:F6} → {(floorOk ? "ok" : "FAIL")}");
+        Console.WriteLine($"      all-99 → implied compound={impliedCompound99:F6} == 0.99 → {(normOk ? "ok" : "FAIL")}; raw Q={qa99:F6} < 1.0 (clamp inactive) → {(clampOk ? "ok" : "FAIL")}");
+        pass &= floorOk && normOk && clampOk;
+
+        // ── (c) Bottom-heavy direction — THE load-bearing check ───────────────
+        // EQUAL total (370). X = four elite + one dud; Y = five even. Y must WIN —
+        // the heaviest rank weight lands on Y's solid fifth man, not X's dud.
+        var qcX = ConvQuality(new[] { 90, 90, 90, 90, 10 }, cfg);   // compound ≈ 0.6378
+        var qcY = ConvQuality(new[] { 74, 74, 74, 74, 74 }, cfg);   // compound  = 0.7400
+        var cOk = qcY > qcX + Tol;
+        Console.WriteLine($"  (c) equal-total 370: Y(74×5) Q={qcY:F6} > X(90,90,90,90,10) Q={qcX:F6} → {(cOk ? "ok" : "FAIL")}");
+        pass &= cOk;
+
+        // ── (d) Flat-knob degeneration (PRODUCTION path, not algebra) ─────────
+        // Same generator, a config with PassingRankWeight = 1.0. Two NON-uniform
+        // lineups must reproduce the retired arithmetic mean exactly. Non-uniform
+        // is essential: a uniform lineup equals its value under ANY knob and so
+        // would also pass if the config knob were ignored/hardcoded.
+        var cfgFlat = AttentionConfig.Load(configPath);
+        cfgFlat.PassingRankWeight = 1.0;
+        var coeffFlat = (ConvQuality(new[] { 50, 50, 50, 50, 50 }, cfgFlat) - cfgFlat.ConversionFloor) / 0.50;
+        var d1Implied = (ConvQuality(new[] { 90, 70, 50, 30, 10 }, cfgFlat) - cfgFlat.ConversionFloor) / coeffFlat;
+        var d2Implied = (ConvQuality(new[] { 99, 90, 60, 35, 20 }, cfgFlat) - cfgFlat.ConversionFloor) / coeffFlat;
+        var d1Ok = Math.Abs(d1Implied - 0.500) < TolFlat;   // mean of 0.9,0.7,0.5,0.3,0.1
+        var d2Ok = Math.Abs(d2Implied - 0.608) < TolFlat;   // mean of 0.99,0.9,0.6,0.35,0.2
+        Console.WriteLine($"  (d) flat knob (1.0): implied compound (90,70,50,30,10)={d1Implied:F10} == 0.500 → {(d1Ok ? "ok" : "FAIL")}");
+        Console.WriteLine($"      flat knob (1.0): implied compound (99,90,60,35,20)={d2Implied:F10} == 0.608 → {(d2Ok ? "ok" : "FAIL")}");
+        pass &= d1Ok && d2Ok;
+
+        // ── (e) One sharp passer ≠ five connected passers (second equal-total) ─
+        // EQUAL total (210). One-sharp (90,30,30,30,30) vs even (42×5). Even WINS:
+        // the model rewards lineup-wide continuity, not value concentrated in one man.
+        var qeOne  = ConvQuality(new[] { 90, 30, 30, 30, 30 }, cfg);   // compound ≈ 0.3622
+        var qeEven = ConvQuality(new[] { 42, 42, 42, 42, 42 }, cfg);   // compound  = 0.4200
+        var eOk = qeEven > qeOne + Tol;
+        Console.WriteLine($"  (e) equal-total 210: even(42×5) Q={qeEven:F6} > one-sharp(90,30,30,30,30) Q={qeOne:F6} → {(eOk ? "ok" : "FAIL")}");
+        pass &= eOk;
+
+        Console.WriteLine(pass ? "  Phase 47 PASSED." : "  Phase 47 FAILED.");
+        return pass;
+    }
+
 }

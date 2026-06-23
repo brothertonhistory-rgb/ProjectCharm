@@ -155,6 +155,7 @@ internal static partial class Program
         ok &= Phase44OffBallDefenseCheck(configPath);          // Phase 44
         ok &= Phase45HustleCheck(configPath);                  // Phase 45
         ok &= Phase46IndividualDenialCheck(configPath);        // Phase 46
+        ok &= PassingCompoundCheck(configPath);                // Phase 47
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

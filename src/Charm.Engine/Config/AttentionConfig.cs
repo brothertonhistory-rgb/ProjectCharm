@@ -124,6 +124,17 @@ public sealed class AttentionConfig
     /// Invariant: in (0, 1]. [CALIBRATION PLACEHOLDER]</summary>
     public double PlaymakingDecay { get; set; } = 0.80;
 
+    /// <summary>Rank weight for the passing compound — the deliberate MIRROR of
+    /// <see cref="PlaymakingDecay"/>. The populated passers are ranked
+    /// weakest→strongest; the weakest passer carries full weight (1.0) and each
+    /// better passer's weight multiplies by this factor. 1.0 = flat (the retired
+    /// pure arithmetic mean); lower = more bottom-heavy (the weakest-ranked passer
+    /// pulls the team compound down harder). The weighted result is normalized to
+    /// [0,1]. Where PlaymakingDecay rewards the single best distributor,
+    /// PassingRankWeight rewards the floor — a lineup with no weak link to hunt.
+    /// Invariant: in (0, 1]. [CALIBRATION PLACEHOLDER]</summary>
+    public double PassingRankWeight { get; set; } = 0.75;
+
     /// <summary>Floor of the opportunity gate at zero BaseOpenness. Allows a small
     /// passing bonus even when gravity/spacing produce no engine (the v4 wording fix —
     /// "strongly SCALED by opportunity with a small positive floor").
@@ -174,6 +185,9 @@ public sealed class AttentionConfig
         if (cfg.PlaymakingDecay <= 0 || cfg.PlaymakingDecay > 1.0)
             throw new InvalidOperationException(
                 $"AttentionConfig: PlaymakingDecay must be in (0, 1] (got {cfg.PlaymakingDecay}).");
+        if (cfg.PassingRankWeight <= 0 || cfg.PassingRankWeight > 1.0)
+            throw new InvalidOperationException(
+                $"AttentionConfig: PassingRankWeight must be in (0, 1] (got {cfg.PassingRankWeight}).");
         if (cfg.OpportunityFloor < 0 || cfg.OpportunityFloor >= 1.0)
             throw new InvalidOperationException(
                 $"AttentionConfig: OpportunityFloor must be in [0, 1) (got {cfg.OpportunityFloor}).");

@@ -6217,3 +6217,47 @@ Locking specific constants now would be guessing against data that does not exis
 ### What does NOT change
 
 No matchup-engine code. No consumer reads Weight. Strength and Quickness/Speed keep their current meanings and their current consumers; only the *way they are assigned at generation* changes, and only inside the future player-generation module. The archetype factory in `Program.Stress.cs` is left alone — it will be replaced by the range-rolling system that hosts this logic.
+
+## Phase 47 — Passing Compound (rank-weighted, bottom-heavy) (Session 09)
+
+### What this phase does
+
+Team passing — the crispness of a lineup's ball movement — was a flat average of the five players' Passing ratings (each counted equally). It is now a **rank-weighted, bottom-heavy compound**: the populated passers are ranked weakest→strongest, the weakest carries full weight (1.0), and each better passer's weight multiplies by `PassingRankWeight` (placeholder 0.75). The weighted sum is normalized by the sum of the weights actually used. The result feeds `conversionQuality` (Roll H's bonus-only passing block) exactly as the mean did, and stays in [0,1]. The only thing that changed is the internal shape of the team-passing number; nothing downstream changed.
+
+### Why bottom-heavy — the mirror of playmaking decay
+
+The two ball-skill aggregates in `AttentionGenerator` are deliberate opposites:
+
+- **Playmaking decays top-down.** Activation contributions are ranked high→low and weighted by `PlaymakingDecay` (each subsequent contributor counts less). This rewards the *peak* — one elite distributor nearly maxes it; a second adds less. "One ball."
+- **Passing climbs downward.** The weight grows toward the *weakest* passer, so the largest weight lands on your fifth-best. This rewards the *floor* — the offense is only as fluid as the player most able to disrupt its ball movement. "No weak link to hunt."
+
+An offense with five sharp passers should compound into a near-scrambled defense on its own — getting *close to* (not equal to) what one elite playmaker provides.
+
+### Additive, non-negative — no penalty, no cap
+
+Every passing contribution is non-negative. The model never subtracts value from a passer and never imposes a threshold or explicit weak-link penalty. Because the result is a *normalized* bottom-heavy weighted average, a weak fifth passer lowers the team compound more than an equally-weak top-ranked passer would — but that is a structural consequence of the weighting, not a penalty term. Passing multiplies ability players already have (it scales conversion quality); it never grants ability or creates shots.
+
+### Depth raises the ceiling — structural, not a calibration hope
+
+At equal total passing, five solid passers beat four-elite-plus-one-dud, because the biggest weight lands on a solid fifth man instead of a dud. This DIRECTION holds for any `PassingRankWeight < 1.0` — it is a structural consequence of the shape, not something calibration has to find. Worked example at the 0.75 placeholder: (90,90,90,90,10) → compound ≈ 0.6378 vs (74,74,74,74,74) → 0.7400; the even lineup wins by a wide margin. A second point in the space: (90,30,30,30,30) → ≈ 0.3622 vs (42,42,42,42,42) → 0.4200, even again. Calibration controls only how large the advantage is and whether it is appropriately consequential at game level.
+
+### The normalization-to-[0,1] contract
+
+The compound divides the weighted sum by the sum of the weights actually used. Consequences: an all-0.99 lineup yields exactly 0.99 (the rating ceiling is 99, not 100 — each input is Passing/100); an all-0 lineup yields exactly 0.0; every legal lineup lands in [0,1]. This preserves the retired mean's output range, so the two downstream scales (`DirectPassingScale`, `ActivationScale`) keep their meaning and the [0,1] clamp on `conversionQuality` is not silently doing the work. Absent slots are not added to the value array (they are absent, not zero-rated passers); a zero-populated lineup yields 0.0.
+
+### How the harness proves the shape (not just "more passing is more")
+
+A naive "good passers beat bad passers" check would pass even if the weight direction were backwards. The check therefore includes two equal-total depth proofs that specifically distinguish bottom-heavy from top-heavy: (c) at total 370, five-even beats four-elite-plus-a-dud; (e) at total 210, five-even beats one-sharp-plus-four-weak. Flat-knob degeneration (d) sets `PassingRankWeight = 1.0` and confirms two NON-uniform lineups reproduce the retired arithmetic mean exactly through the production `AttentionGenerator.Generate` path — non-uniform is essential, because a uniform lineup equals its value under any knob and so cannot catch a config that is ignored or hardcoded. Because `conversionQuality` is independent of the usage shares, the checks pass a fixed neutral `finalShares` and hold every non-Passing attribute identical, so a comparison can only be won by the passing compound itself; the coefficient on the compound is recovered empirically from a uniform lineup rather than re-deriving the playmaking-activation math.
+
+### Invariants
+
+- `PassingRankWeight ∈ (0, 1]` (Load guard, mirrors `PlaymakingDecay`). 1.0 = flat (pure arithmetic mean, the retired behavior); lower = more bottom-heavy.
+- `passingCompound ∈ [0, 1]`; all-0.99 → 0.99, all-0 → 0.0; zero-populated → 0.0.
+- Every term additive and non-negative; no subtraction, no threshold, no cap.
+- The deliberate inverse of `PlaymakingDecay`'s top-down direction.
+
+### Calibration note (deferred — do not tune until feature-complete)
+
+1. **Equal-total depth direction is structural; effect SIZE is calibration.** Five solid passers must beat four-elite-plus-a-dud at equal total whenever `PassingRankWeight < 1.0` (proven, not tuned). Calibration sets how large that advantage is and whether it matters in game-level results.
+2. **One elite playmaker + four shooters should beat five sharp passers with no creation/playmaking** — cross-system check (passing vs playmaking-unlocks-openness); verify at calibration.
+3. **One playmaker + four shooters beats two non-shooting playmakers** — spacing-cost vs playmaking-value ordering; verify at calibration.

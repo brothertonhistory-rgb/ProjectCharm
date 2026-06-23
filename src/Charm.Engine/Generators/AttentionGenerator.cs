@@ -178,11 +178,17 @@ public sealed class AttentionGenerator
         // Post route: the player's own gravity contribution (already computed above).
         // Activation per player: effPlaymaking × max(perimeterRoute, postRoute).
         // Playmaking summed top-down with gentle geometric decay (PlaymakingDecay).
-        // Passing: flat average of Passing/100 across five. BallHandling excluded.
+        // Passing: rank-weighted bottom-heavy compound of Passing/100 across the
+        //   populated slots (Phase 47 — heaviest weight on the weakest passer).
+        //   BallHandling excluded.
 
         var activations = new double[5];
-        var passingSum  = 0.0;
-        var passingCount = 0;
+        // Collect Passing/100 for POPULATED slots only into the first passingCount
+        // entries. Absent slots are NOT added — a zero-rated phantom passer would
+        // land the heaviest rank weight on a non-existent weak link (the population
+        // guard the whole bottom-heavy shape depends on). passingCount = populated.
+        var passingValues = new double[5];
+        var passingCount  = 0;
         for (var i = 0; i < 5; i++)
         {
             if (players[i] is Player pp)
@@ -197,7 +203,7 @@ public sealed class AttentionGenerator
 
                 activations[i] = effPlaymaking * Math.Max(perimeterRoute, postRoute);
 
-                passingSum += pp.Passing / 100.0;
+                passingValues[passingCount] = pp.Passing / 100.0;
                 passingCount++;
             }
         }
@@ -213,7 +219,36 @@ public sealed class AttentionGenerator
             decay *= _cfg.PlaymakingDecay;
         }
 
-        var passingCompound = passingCount > 0 ? passingSum / passingCount : 0.0;
+        // ── Passing compound (rank-weighted, bottom-heavy) — Phase 47 ─────────
+        // The deliberate MIRROR of the playmaking decay above. Playmaking decays
+        // top-down (rewards the single best distributor — "one ball"); passing
+        // climbs DOWNWARD (rewards the floor — "no weak link to hunt"). By
+        // construction the largest weight lands on the WEAKEST-ranked passer.
+        //
+        // Convention (mandatory — getting it backwards inverts the basketball):
+        //   sort ASCENDING (weakest → strongest); the weakest passer carries full
+        //   weight 1.0, and each better passer's weight multiplies by
+        //   PassingRankWeight ∈ (0,1] (1.0 = flat / pure arithmetic mean; lower =
+        //   more bottom-heavy). Divide by the sum of the weights actually used,
+        //   preserving the retired mean's [0,1] output contract — all-0.99 → 0.99,
+        //   all-0 → 0.0 — so a weak fifth passer lowers the compound MORE than a
+        //   weak top passer would. Every term is additive and non-negative: no
+        //   penalty, no cap, no subtraction.
+        var passingCompound = 0.0;
+        if (passingCount > 0)
+        {
+            Array.Sort(passingValues, 0, passingCount);   // ascending: weakest first
+            var weightedSum = 0.0;
+            var weightTotal = 0.0;
+            var rankWeight  = 1.0;                          // weakest passer → full weight
+            for (var r = 0; r < passingCount; r++)
+            {
+                weightedSum += rankWeight * passingValues[r];
+                weightTotal += rankWeight;
+                rankWeight  *= _cfg.PassingRankWeight;
+            }
+            passingCompound = weightedSum / weightTotal;    // normalized → [0,1]
+        }
 
         var conversionQuality = _cfg.ConversionFloor
             + _cfg.DirectPassingScale * passingCompound
