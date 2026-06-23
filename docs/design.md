@@ -6387,3 +6387,52 @@ No substitutions (own session), so in observation the five starters per side pla
 2. **Offense-vs-defense gap size.** The spread between the two dials sets how much equal fatigue tilts toward offense. The *direction* is locked (`Def > Off`); the *magnitude* of the tilt is open.
 3. **The combined meter-cliff × discount curve.** What a player's effective athleticism looks like as a function of possessions-played is the convolution of the Phase-48 drain curve and this linear discount. Tuning either in isolation is misleading; the realistic target is the combined late-game fade, and that is best judged once substitutions exist and minutes are real.
 4. **Interaction with the no-substitution corpus.** Until subs land, starters never rest mid-half, so the current corpus shows a heavier end-game fade than a real rotation would. Do not calibrate the dials against the no-sub corpus — it overstates fatigue's footprint.
+
+---
+
+## Basketball IQ — design spec (LOCKED, NOT YET BUILT) (design conversation, 2026-06-23)
+
+Settled in a design conversation; no code shipped. Recorded so the wiring session inherits the reasoning exactly. The wiring **audit** (which contest sites can carry IQ cleanly) is the one remaining input and is a read-the-code task for the build session, not a design question. Two separate buckets below: how IQ *behaves* (wiring) and how IQ values are *generated* (generation). The no-scalar wall sits between them.
+
+### The governing rule (relabeled 2026-06-23 after the make-door design + two prompt reviews)
+
+**IQ is a small, bounded, proportional conversion bonus applied as the LAST thing on an outcome — an intangible sprinkle on top of all the tangibles, never a floor-raiser.** After every tangible factor has fully resolved an outcome (the shot's quality, the defender, athleticism, help, spacing, usage, passing — whatever settled it), IQ adds a small bump *proportional to what is already there*. It does **not** recover specific deficits and does **not** care whether the shot was contested or open, or whether the defender was bigger / stronger / more skilled — it is added on top regardless, dead last. Because the bump is proportional to the settled value, a strong result gets a meaningful bump and a poor one gets a rounding error, so IQ **rewards ability already present and never manufactures ability a player lacks**: a genius-IQ poor shooter is still a poor shooter (his settled make% is low, so his sprinkle is tiny); a genius-IQ good shooter gets a little extra out of his good looks.
+
+> **Naming honesty (do not regress).** Earlier drafts of this section called the mechanic "recovering value toward the player's own ceiling." That language is **RETIRED.** There is no per-player ceiling model, and IQ does not recover defensive losses — it is an *additive, proportional, applied-last conversion bonus*. Call it that. It does nudge a settled value upward by its small amount; that is intended, and it is not "manufacturing ability" because the nudge is proportional to what skill/context already produced and is bounded by one small sensitivity.
+
+This is what lets IQ be pervasive without being the banned scalar: it is **not** a flat add (a flat +X everywhere would be the scalar and would help a bricklayer as much as a sharpshooter). It is proportional to the settled outcome and bounded by a single small sensitivity, so its size tracks the ability already on the floor and tunes with one knob.
+
+### Why IQ lands on outcome surfaces (the coarseness reconciliation)
+
+The engine has **no "openness" or "position-quality" state** and will not get one — it does not represent how open a shooter is, only whether the shot goes in. Therefore the real basketball effect "a smart player gets a better look" has **nowhere to live except the outcome surface** (make%, turnover avoidance, rebound conversion, …). IQ writing into make% is not a second payment on top of a get-open stage — in a one-stage engine there *is* no separate get-open stage, so there is no double-count across stages. The earlier worry ("IQ pays for the bucket twice") assumed a two-stage world; this engine is one-stage, so the worry dissolves.
+
+The discipline that keeps this honest is **not** "few sites." It is: **at every site IQ is (a) capped, (b) interacts with the underlying rating rather than overriding it, and (c) stands in for a specific real effect the engine cannot otherwise express.** Bounded-and-rating-interacting at each site is the wall, not site-count.
+
+### Wiring spec (the *what* and *how much*)
+
+- **Lands on outcome surfaces**, pervasively, because there is no intermediate layer to absorb it: make%, turnover avoidance, rebound conversion, and any other contest the audit clears.
+- **Proportional, applied last, bounded** — the bump is `settledMakePct × iqZoneFactor` (a fraction of the already-settled outcome), added as the last term on the make probability, before block/foul are carved. Not a flat add; not a multiply toward any per-player "ceiling" (no such model exists). A low settled value gets a small *absolute* bump; a high one gets more.
+- **Make-door magnitude (approximate anchors, not simultaneous exact equations):** at max IQ on a jumper, roughly **34% → ~37%, 22% → ~23.5%, 52% → ~56%** — a single proportional factor (~+8% at max IQ) cannot hit all three exactly, so these are directional targets with a tolerance, not three equations to solve. Scales to **zero at IQ 50** and **zero at the rim**. The IQ→fraction curve is `iqProgress = clamp((IQ−50)/49, 0, 1)`, `iqZoneFactor = Sensitivity × ZoneWeight × iqProgress`; locked zone weights **Three 1.0, Long 1.0, Mid 0.7, Short 0.3, Rim 0.0** (placeholders, one sensitivity knob). Fires on both half-court and fast-break jumpers; putbacks excluded.
+- **Absolute, not relative.** Smart is smart regardless of the opponent's IQ. Two elite-IQ teams both play well; a smart play on one end does not imply a dumb play on the other. (This reverses an earlier relative framing — settled to absolute in conversation.)
+- **Pure-physical battles stay losable.** IQ does not buy back the fast break or finishing over a shot-blocker — losses that cannot be thought around. Protecting these keeps the athletic archetype real.
+- **Magnitude is a CALIBRATION TARGET, not a design constant.** Built small and bounded; tuned later against the generated pool. **Compounding is the watch item** — IQ + gravity + spacing + a competent shooter all landing on one possession is the intended payoff ("a team that doesn't mess up"), but stacked small nudges can over-deliver; that can only be judged by watching compounded FG% in the stress test, which is why it waits for player generation + calibration.
+- **Shares a "depth compounds" character with passing (Phase 47).** One high-IQ player is a small bump; five compounding is a hard-to-build, genuinely special team — the same shape as five-even passers beating four-elite-plus-a-dud. The rare five-smart team and the rare five-even-passing team are the same *kind* of roster, an emergent archetype from two independent attributes pointing the same way.
+
+### Generation intent (the *how often* — built later, in the player-gen layer)
+
+Locked as intent only; the actual distribution numbers are a generation + calibration output, not set now (setting them before the pool exists is guessing).
+
+- **Normal-ish distribution:** a fat average middle with small bumps; **90th-percentile IQ is rare**, like real high IQ.
+- **Below-average IQ is viable, not disqualifying.** A low-IQ rim-runner, defensive specialist, or catch-and-shoot guy is still useful at what he does; low IQ is never a hard recruit-stop. This is the locked generation **triad** (Size / Athleticism / Skill thresholds) doing its job — a low-IQ player clears a *different* threshold and that is why he is draftable.
+- **Team effect compounds across the lineup** (see passing parallel above): a full five of high-IQ players is the rare, special, hard-to-accumulate roster.
+
+### Audit outcome + locked make-door mechanic (2026-06-23 — audit done, two independent passes converged)
+
+The site-by-site wiring audit is **complete** (Claude + an independent ChatGPT pass, agreeing). Findings:
+
+- **IQ is already live in two places.** `AttentionGenerator` (`iqFactor`, neutral at IQ 50 via `IqMin/IqMax` 0.85/1.15) multiplies a player's Playmaking → playmaking activation → `conversionQuality` → Roll H's **C4** passing bonus → make% (outcome-affecting, *indirect*). `AssistPicker` weights assist *credit* (attribution-only — not a double-count).
+- **The make door is the ONLY clean site.** Roll H is the seam; IQ is added as the last proportional term on the make probability (per the rule above). The deferred/excluded sites: **denial (Roll E)** — same "better look" the make door owns, overlaps OffBallMovement; **help defense (C6)** — already the HelpDefense attribute; **rebound (Roll K)** — non-monotone, overlaps OffensiveRebounding; **transition (Roll J)** — non-monotone.
+- **C4 partition (the build's first design gate).** The new direct term must stay distinct from C4. C4 is **lineup-level ball movement** ("the offense created this look"); the direct term is **the shooter's own decision** ("he got a good look for himself"). IQ's C4 contribution is measured as a counterfactual delta — `C4(shooter IQ 99) − C4(shooter IQ 50)`, fixture held — NOT C4's whole bonus (C4 is mostly Passing/Playmaking/gravity). Note C4 is a lineup path: the direct term can fire even when the shooter's IQ adds little to C4; it is not a guaranteed personal effect.
+- **Turnover (Roll A) is a deferred FORK, not a clean second site.** Roll A works on team aggregates before any ball-handler is selected — no individual subject, no per-player ceiling — so the proportional-on-an-individual-outcome rule does not fit. A turnover-IQ effect would be a *separate team-aggregate model* (a deliberate new mechanic, overlapping BallHandling), to be designed in its own conversation and built only if chosen over letting turnover-avoidance emerge from the make door + the IQ generation distribution.
+
+**First build scope: the make door only** (proportional conversion bonus, applied last on make%, locked zone weights, C4 counterfactual partition). All other sites mapped-and-deferred.
