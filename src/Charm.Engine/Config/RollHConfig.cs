@@ -313,6 +313,27 @@ public sealed class RollHConfig
     /// (between 0 = no effect and 1 = full perimeter suppression). [CALIBRATION PLACEHOLDER]</summary>
     public double OffBallDefenseMidMultiplier { get; set; } = 0.30;
 
+    // ── Phase 50 — Basketball IQ make-door conversion bonus ───────────────────
+    // IQ is the LAST make% term: a small, bounded, PROPORTIONAL sprinkle on the
+    // already-settled make%. RollHGenerator computes
+    //   bump = settledMakePct × IqMakeSensitivity × ZoneWeight × iqProgress,
+    //   iqProgress = clamp((BasketballIQ − 50) / 49, 0, 1)
+    // so a good look (high settled make%) gets a meaningful bump and a poor one a
+    // rounding error — IQ rewards ability already on the plate, it never manufactures
+    // it (a genius-IQ poor shooter is still a poor shooter). Driven by the SHOOTER's
+    // OWN BasketballIQ (absolute, not relative). The per-zone ZoneWeights are fixed
+    // CODE CONSTANTS in RollHGenerator (Three/Long 1.0, Mid 0.7, Short 0.3, Rim 0.0) —
+    // deliberately NOT config fields, to avoid five extra user-facing knobs at locked
+    // placeholder values. This single sensitivity is the only tunable. 0.08 lands the
+    // ~34→37 jumper anchor at max IQ; the 0.20 ceiling bounds the most IQ alone may
+    // ever swing one shot (~34→41). 0.0 = make-door IQ OFF (inertness anchor).
+
+    /// <summary>Single tunable for the Phase 50 IQ make-door bonus — multiplied by
+    /// fixed per-zone code constants and the IQ-progress scalar to size the
+    /// proportional bump on the settled make%. Ships at 0.08; Load-guarded to
+    /// [0.0, 0.20]. 0.0 = IQ make-door OFF. [CALIBRATION PLACEHOLDER]</summary>
+    public double IqMakeSensitivity { get; set; } = 0.08;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
@@ -395,6 +416,15 @@ public sealed class RollHConfig
         if (cfg.OffBallDefenseMidMultiplier < 0.0 || cfg.OffBallDefenseMidMultiplier > 1.0)
             throw new InvalidOperationException(
                 "RollH OffBallDefenseMidMultiplier must be in [0, 1].");
+
+        // Phase 50 invariant — IQ make-door sensitivity. Bounded on BOTH sides on
+        // purpose: 0.0 = make-door IQ OFF (the inertness anchor for the zero-knob
+        // byte-compare); the 0.20 ceiling is a DESIGN bound on the most IQ alone may
+        // swing a single shot (~34→41 make% at max IQ on a jumper). Unlike most Roll H
+        // knobs (bounded ≥ 0 only), this one has a meaningful upper limit.
+        if (cfg.IqMakeSensitivity < 0.0 || cfg.IqMakeSensitivity > 0.20)
+            throw new InvalidOperationException(
+                $"RollH IqMakeSensitivity must be in [0.0, 0.20] (got {cfg.IqMakeSensitivity}).");
 
         return cfg;
     }

@@ -6436,3 +6436,44 @@ The site-by-site wiring audit is **complete** (Claude + an independent ChatGPT p
 - **Turnover (Roll A) is a deferred FORK, not a clean second site.** Roll A works on team aggregates before any ball-handler is selected — no individual subject, no per-player ceiling — so the proportional-on-an-individual-outcome rule does not fit. A turnover-IQ effect would be a *separate team-aggregate model* (a deliberate new mechanic, overlapping BallHandling), to be designed in its own conversation and built only if chosen over letting turnover-avoidance emerge from the make door + the IQ generation distribution.
 
 **First build scope: the make door only** (proportional conversion bonus, applied last on make%, locked zone weights, C4 counterfactual partition). All other sites mapped-and-deferred.
+
+## Phase 50 — Basketball IQ at the make door — BUILT (Session 12, 2026-06-23)
+
+Supersedes the **NOT YET BUILT** label on the "Basketball IQ — design spec (LOCKED)" section above; the design recorded there shipped unchanged in substance. This section captures what was actually built and validated.
+
+### The mechanic, as built
+
+IQ is the **last make% term**. After the entire C1–C8 chain has settled the make probability — matchup logistic, C1 openness, C2 imbalance, C3 usage, C4 passing, C5.5 screening, C6 help-def, C7 off-ball-def, C8 hustle — and **before** block and foul are carved, Roll H adds:
+
+```
+iqProgress   = clamp((shooter.BasketballIQ − 50) / 49, 0, 1)
+iqZoneFactor = IqMakeSensitivity × ZoneWeight × iqProgress
+makePct     += makePct × iqZoneFactor        // proportional to the settled make%
+if (makePct > 1.0) makePct = 1.0             // own clamp
+```
+
+It is driven by the **shooter's own** BasketballIQ — absolute, not relative to the defender, not a team aggregate. Because the bump is `settledMakePct × factor`, it is proportional to whatever the shot was already worth: a good look gets a meaningful bump, a poor one a rounding error. IQ rewards ability already present and never manufactures it (a genius-IQ poor shooter is still a poor shooter — his settled make% is low, so his sprinkle is tiny).
+
+**Placement (the resolved ordering question).** The term sits after the C8 (hustle, fast-break-only) block closes, before the block-weight calculation. At that point make% is fully settled on every path — halfcourt shots came through the C5.5/C6/C7 settle clamp; fast-break shots came through C8's own clamp — so the term fires on **both halfcourt and fast-break jumpers**. It is NOT inside the fast-break-gated block (that would skip every halfcourt shot). Putbacks (early return) and the stub path (no shooter) never reach it.
+
+**Zone weights are fixed CODE CONSTANTS** (not config): Three 1.0, Long 1.0, Mid 0.7, Short 0.3, Rim 0.0. Zero at the Rim — a layup is not a thinking man's shot; the bonus lives on jumpers. Five extra config knobs at locked placeholder values would be noise; the single tunable is `IqMakeSensitivity`.
+
+**The one knob.** `IqMakeSensitivity` ships at **0.08**, Load-guarded to **[0.0, 0.20]** — bounded on *both* sides (unlike most Roll H knobs, which are bounded ≥ 0 only): 0.0 = make-door IQ OFF (the inertness anchor), and 0.20 is a design ceiling on the most IQ alone may swing a single shot.
+
+**The own upper clamp** (design call, locked). Nothing between the IQ term and `BuildRealPie` re-clamps; a settled make% near 1.0 plus the bump could exceed 1.0 and break the carve (`made > nonBlockNonFoul`). The clamp mirrors the per-term-clamp shape C1/C4 already use, and is a no-op at knob 0 (make% already ≤ 1.0 from the chain's caps), so the inertness anchor holds.
+
+### Magnitude, as validated on the real path
+
+Harness-confirmed, max IQ (99) on a Three (ZoneWeight 1.0, factor 0.08): settled **34.25% → 36.99%** (bump +2.740pt, matching `settled × 0.08` to the digit). The approximate design anchors (34→~37, 22→~23.5, 52→~56) are directional with a ±1pt band, not three exact equations — a single proportional factor cannot hit all three exactly, by design. Zone taper (bump ÷ settled): Three/Long 0.0800, Mid 0.0560, Short 0.0240, Rim 0.0000. Finding-#1 confirmed: a weak shooter (settled 21.18%) gets +1.695pt while a strong shooter (settled 55.79%) gets +4.463pt — low base, smaller absolute bump.
+
+### The C4 partition (as measured)
+
+IQ already leaks into make% indirectly: `AttentionGenerator`'s `iqFactor` lifts playmaking activation → `conversionQuality` → Roll H's C4 passing bonus. The new direct term stays distinct, and the overlap is measured as a **counterfactual delta** — IQ's *own* slice of C4, `C4(shooter IQ 99) − C4(shooter IQ 50)` with the fixture held — **not** C4's whole bonus (which is mostly Passing/Playmaking/gravity). Harness-confirmed at openness 0.5: ΔC4_IQ = **+0.054pt** (just 4.6% of the full C4 bonus, 1.176pt), while the direct term is **+2.762pt**. The existing leak is a rounding error next to the direct term; the two are additive and separable; there is no meaningful double-count. The interaction the spec wanted surfaced — the proportional direct term rides a marginally C4-raised base, so it is itself fractionally larger — is real, tiny, and printed rather than hidden.
+
+### Observability (how the harness proves it without a new engine surface)
+
+Roll H exposes only a Pie — the older six-value attribution comment in the file is aspirational, and no diagnostic surface was added this phase. The Phase 50 check recovers every quantity by **differencing controlled runs** (the same idiom Phase 47/49 use): the clean pre-carve make% is `Made / (1 − block − foul)` (block and foul are independent of IQ and the knob, so the surface is comparable); the **direct term** is pre-carve(knob 0.08) − pre-carve(knob 0.0) on one fixture (everything else, including the C4 leak, cancels); **ΔC4_IQ** is the `conversionQuality` counterfactual through the production AttentionGenerator. This was a flagged design call (differencing vs. an engine-level returned value); differencing won for staying surgical.
+
+### What this phase did NOT do (mapped-and-deferred, unchanged)
+
+Make door only; make/miss only. Denial (Roll E) overlaps OffBallMovement and the "better look" the make door now owns; help defense (C6) is already the HelpDefense attribute; rebound (Roll K) and transition (Roll J) are non-monotone; turnover (Roll A) is a team-aggregate fork with no individual subject, a separate model if ever chosen. Magnitude calibration of the IQ footprint — the compounding watch item (IQ + gravity + spacing + a competent shooter on one possession) — waits for the player-generation + calibration pass.

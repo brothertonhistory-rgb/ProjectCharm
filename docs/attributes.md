@@ -91,7 +91,7 @@ A fifth tag, orthogonal to kind, marks **wiring status**:
 | Endurance | Physical | Authored individual | consumed by the fatigue meter (scales drain + recovery); the meter now discounts effective athleticism, so Endurance **reaches play** (Phase 49) |
 | Athleticism | Physical | Derived | composite ceiling; **fatigue-discounted at five gameplay read-sites** (Phase 49) |
 | Hustle | Intangible | Modifier (effort family) | live-on-arrival |
-| Basketball IQ | Intangible | Modifier (decision family) | live-on-arrival |
+| Basketball IQ | Intangible | Modifier (decision family) | live-on-arrival; indirect via `iqFactor` → playmaking activation → C4 passing bonus, AND a direct proportional make-door conversion bonus on jumpers, so IQ **reaches play** (Phase 50) |
 | Discipline | Intangible | Authored individual | live-on-arrival |
 
 **Moved to the Tendencies doc (NOT attributes):** aggression (shot / drive / gamble
@@ -299,6 +299,20 @@ to force. **Magnitude note:** strategy-enabling end of the modifier/aggregate sp
 IQ's effect must be more than a rounding error or the smart-team build does not actually
 exist. The team-aggregate/modifier bins are explicitly **not uniform in leverage** (subtle
 flavor like help defense vs. strategy-enabling like IQ).
+
+**Wiring status (Phase 50 — reaches the make door).** IQ now has its first direct
+outcome-affecting wire: the **last make% term** in Roll H, a small, bounded, *proportional*
+conversion bonus driven by the shooter's own IQ, added on top of the fully-settled make%
+(after the whole C1–C8 chain) and before block/foul are carved. `bump = settledMakePct ×
+IqMakeSensitivity × ZoneWeight × clamp((IQ−50)/49, 0, 1)`, zero at/below IQ 50 and zero at
+the Rim (jumpers only: Three/Long 1.0, Mid 0.7, Short 0.3, Rim 0.0). Proportional on
+purpose — a good look gets a meaningful bump, a poor one a rounding error, so IQ rewards
+ability already present and never manufactures it. This is **distinct** from IQ's older
+*indirect* path (`iqFactor` → playmaking activation → `conversionQuality` → C4 passing
+bonus): the overlap was measured as a counterfactual and is a rounding error next to the
+direct term (≈4.6% of the C4 bonus vs. a ~50× larger direct term), so no double-count. All
+other IQ sites (denial, help defense, rebound, transition, turnover) remain mapped-and-
+deferred; magnitude is a calibration target for the player-generation pass.
 
 ### Discipline — *authored individual*
 Foul avoidance and staying sound — NOT the same as shot selection. The "takes questionable

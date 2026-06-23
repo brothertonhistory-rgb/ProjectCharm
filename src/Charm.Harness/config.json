@@ -162,7 +162,8 @@
     "HelpDefenseMidMultiplier": 0.30,
     "OffBallDefenseSuppressionScale": 0.15,
     "OffBallDefenseAggregateExponent": 2.0,
-    "OffBallDefenseMidMultiplier": 0.30
+    "OffBallDefenseMidMultiplier": 0.30,
+    "IqMakeSensitivity": 0.08
   },
   "Attention": {
     "GravityBlendWeight": 0.5,

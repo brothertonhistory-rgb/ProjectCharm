@@ -404,6 +404,48 @@ public sealed class RollHGenerator : IRollHPieGenerator
             makePct  = Math.Clamp(makePct, 0.0, 1.0);
         }
 
+        // ── IQ: proportional make-door conversion bonus (Phase 50) ────────────
+        // The LAST make% term — an intangible sprinkle on TOP of every tangible
+        // adjustment (matchup → C1/C2/C3 → C4 passing → C5.5/C6/C7 → C8 hustle).
+        // bump = settledMakePct × IqMakeSensitivity × ZoneWeight × iqProgress, so a
+        // good look (high settled make%) gets a meaningful bump and a poor one a
+        // rounding error: IQ rewards ability already on the plate, it never
+        // manufactures it (a genius-IQ poor shooter is still a poor shooter). Driven
+        // by the SHOOTER's OWN BasketballIQ — absolute, not relative to the defender,
+        // not a team aggregate. Zero at/below IQ 50 (iqProgress clamps to 0), zero at
+        // the Rim (ZoneWeight 0.0).
+        //
+        // Placement: fires on BOTH halfcourt and fast-break jumpers because it sits
+        // AFTER the full C1–C8 chain has settled — halfcourt make% came through the
+        // C5.5/C6/C7 settle clamp above; fast-break make% came through C8's own clamp
+        // (C8 is the only chain term that fires on a break). It is NOT inside the
+        // FastBreak-gated C8 block (that would wrongly skip every halfcourt shot).
+        // Putbacks never reach here (short-circuited at the top of Generate).
+        //
+        // Zone weights are fixed CODE CONSTANTS (a good shot is a good shot);
+        // IqMakeSensitivity is the single config knob.
+        //
+        // Own upper clamp: nothing between here and BuildRealPie re-clamps, and a
+        // settled make% near 1.0 plus the bump could otherwise exceed 1.0 and break
+        // the carve (made > nonBlockNonFoul). Same per-term-clamp shape as C1/C4. At
+        // IqMakeSensitivity = 0 the bump is 0 and makePct is already in [0,1] from the
+        // clamps above, so this whole block is inert — the zero-knob byte-identical
+        // anchor.
+        var iqZoneWeight = zone switch
+        {
+            ShotLocation.Three => 1.0,
+            ShotLocation.Long  => 1.0,
+            ShotLocation.Mid   => 0.7,
+            ShotLocation.Short => 0.3,
+            ShotLocation.Rim   => 0.0,
+            _                  => 0.0
+        };
+        var iqProgress   = Math.Clamp((player.BasketballIQ - 50.0) / 49.0, 0.0, 1.0);
+        var iqZoneFactor = _cfg.IqMakeSensitivity * iqZoneWeight * iqProgress;
+        var iqBump       = makePct * iqZoneFactor;   // proportional sprinkle on the settled make%
+        makePct         += iqBump;
+        if (makePct > 1.0) makePct = 1.0;            // own clamp; no-op when knob = 0
+
         // Phase 7 — matchup-aware block door. Compute the bent block weight from the
         // matchup, or fall back to the configured baseline if the defending slot is empty
         // (DEC-6, same guard as the make door above).
