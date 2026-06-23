@@ -6261,3 +6261,59 @@ A naive "good passers beat bad passers" check would pass even if the weight dire
 1. **Equal-total depth direction is structural; effect SIZE is calibration.** Five solid passers must beat four-elite-plus-a-dud at equal total whenever `PassingRankWeight < 1.0` (proven, not tuned). Calibration sets how large that advantage is and whether it matters in game-level results.
 2. **One elite playmaker + four shooters should beat five sharp passers with no creation/playmaking** — cross-system check (passing vs playmaking-unlocks-openness); verify at calibration.
 3. **One playmaker + four shooters beats two non-shooting playmakers** — spacing-cost vs playmaking-value ordering; verify at calibration.
+
+## Phase 48 — Fatigue Meter (stateful stamina: drain / recover / halftime) (Session 10, 2026-06-23)
+
+The first piece of per-player state that REMEMBERS across possessions. Team fouls already persist per-team; this is the first thing the engine carries per-player from one possession to the next. It ships as a meter ONLY: it is computed and stored, and **nothing reads it to change any outcome this session**. Full-game observation output is byte-identical to pre-change except the config hash (config.json gained a `Fatigue` section). The athleticism effect — reading the meter to discount *effective* athleticism at the five consumer sites (`Matchup`, `RollE`, `RollA`, `RollJ`, `RollK`) — is the next session, deliberately split off so the meter's correctness is proven before anything depends on it.
+
+### Where it lives and how it is driven
+
+`FatigueTracker` hangs on `GameState` next to `FoulTracker` and is structurally its sibling — a dedicated class, constructed with its config, mutated through methods, read through `LevelFor`. It differs only in storage: fatigue is per-player, so the level lives in a `PlayerId`-keyed dictionary, not two team ints. It holds no entries until a player first takes the floor; `LevelFor` returns 0.0 (fresh) for any unseen id, so reserves and future substitutes materialize naturally on first appearance with no roster pre-seeding.
+
+The Governor drives it at exactly two points. Accrual fires once in the possession tail, after the outcome resolved — so every on-floor player of BOTH sides accrues exactly ONE possession of fatigue per top-level possession, never per Roll, free-throw, rebound continuation, retained inbound, or internal retry (all of those happen inside the single resolver call that the tail wraps). Halftime recovery fires from the regulation half-boundary block, under the same `half < Halves` guard as the foul reset — so it runs exactly once, at the half-1→2 boundary, and never in the separate overtime loop. Both reach the players through the same lineup→roster seam the attribution layer uses, and neither touches RNG.
+
+### The drain curve — trickle then cliff, carried by the meter itself
+
+Accrual is convex: `ΔF = BaseDrain × drainFactor(Endurance) × (1 + Convexity × (F/Ceiling)^Exponent)`, then clamped to `Ceiling`. A fresh player barely tires; as his level climbs, each possession costs more, and the bottom falls out near the ceiling. The convexity lives in the METER, not in some future consumer — so when the athleticism effect is wired in, it reads a level that already encodes the trickle-then-cliff shape, and the effect itself can stay a simple monotone discount. The increment is strictly positive below the ceiling and strictly increasing in current fatigue (`Exponent > 1`), so a late step always exceeds an early one.
+
+### Endurance scales both directions
+
+Authored `Endurance` (0–99) is normalized the engine-standard way — `e = clamp(Endurance/100, 0, 1)`, so a raw 80 becomes 0.80. It drives two bounded, strictly-monotone multipliers: `drainFactor = 1 + DrainEnduranceSensitivity × (1 − e)` (lower Endurance → bigger drain, so the gasser tires faster and reaches the cliff in fewer possessions) and `recoveryFactor = 1 + RecoveryEnduranceSensitivity × e` (higher Endurance → bigger recovery, so the gasser also recovers slower). Authored ratings never change at runtime — fatigue is a derived quantity layered on top, exactly as the no-runtime-mutation guardrail requires.
+
+### Recovery — fast but partial, one primitive shared with halftime
+
+Recovery is multiplicative decay of the current level: `F × clamp(1 − RecoveryRate × recoveryFactor(Endurance) × elapsedSeconds, 0, 1)`. It strictly decreases fatigue toward zero and never crosses below it; a short rest knocks the meter down meaningfully but never returns a tired player all the way to fresh (the multiplier is `< 1` but `> 0` for any finite short rest). A very long rest drives the multiplier to its zero-floor clamp — full reset — which is the correct boundary behavior, not a bug.
+
+Halftime is **not a special case**. `ApplyHalftimeRecovery` calls the exact same private recovery primitive with `elapsedSeconds = HalftimeRestEquivalentSeconds` (a large rest-equivalent). Because the primitive is partial and Endurance-scaled, the most-gassed players retain the most residual fatigue into the second half automatically — no carve-out, no "halftime recovery amount" to tune separately. The harness proves the equivalence directly: a halftime-recovered player and a `Recover(HalftimeRestEquivalentSeconds)` player at the same level land identically to 1e-12.
+
+### Pace via count; recovery via elapsed clock (the intentional asymmetry, D6)
+
+Pace enters fatigue purely through how OFTEN accrual is called — once per possession — not through any per-second or per-player-effort term (per-player effort tracking was explicitly rejected as untunable). Recovery, by contrast, is a function of ELAPSED game-clock seconds off the floor, not possession count. The asymmetry is deliberate: a fast game should tire players through more possessions, but it must not over-restore a benched player just because more possessions elapsed. No off-floor recovery runs this session (no substitutions yet), but `Recover` already takes elapsed seconds so the meter can never later bake in a pace-undoes-rest relationship.
+
+### Determinism
+
+Every operation is a pure function of (current level, the player's authored Endurance, the elapsed/possession input). It draws no randomness, so a replayed seed reproduces the meter trajectory exactly and the meter perturbs no other RNG stream. This was verified, not assumed: a clean pre-change build and the post-change build produce an identical 758-line observation artifact except the single config-hash line, and same-seed runs reproduce both gameplay and meter levels exactly.
+
+### The construction call
+
+Adding required state to `GameState` would mean editing all ~100 `new GameState(...)` sites. The coach/roster/lineup fields already solved this by constructing internally with a default, so fatigue follows that precedent: an optional last constructor parameter defaulting to an empty placeholder-config tracker, leaving every existing site unchanged. The foul tracker stays required-and-injected (its thresholds vary by config at the call site); the fatigue meter is defaulted-internally (no site that ignores fatigue should have to mention it). This is reversible — if config-bearing trackers are later wanted everywhere, the injection is mechanical.
+
+### What this session deliberately does NOT do
+
+No consumer reads the meter; no outcome changes. The five athleticism consumer sites are untouched (next session). Substitutions are untouched (own session). No magnitude is calibrated — every config value is a placeholder. Tuning against a stub-heavy, not-yet-feature-complete engine would chase a moving target.
+
+### Invariants
+
+- Level ∈ [0, `Ceiling`]; fresh (unseen player) reads 0.0.
+- Accrual increment strictly positive below the ceiling; strictly increasing in current fatigue (`Exponent > 1`); pinned at the ceiling once reached.
+- `drainFactor ∈ [1, 1 + DrainEnduranceSensitivity]`, strictly decreasing in Endurance; `recoveryFactor ∈ [1, 1 + RecoveryEnduranceSensitivity]`, strictly increasing in Endurance.
+- Recovery multiplier ∈ [0, 1]; recovery strictly decreases fatigue (for level > 0) and never below zero.
+- Halftime recovery routes through the identical recovery primitive (no separate equation); fires exactly once, at the regulation half-1→2 boundary, never in OT.
+- Accrual fires exactly once per completed top-level possession per on-floor player; reads no RNG.
+- Config guards: `Ceiling > 0`, `BaseDrain > 0`, `Convexity ≥ 0`, `Exponent > 1`, sensitivities `≥ 0`, `RecoveryRate > 0`, `HalftimeRestEquivalentSeconds > 0`.
+
+### Calibration note (deferred — do not tune until the attribute-coverage pass is complete)
+
+1. **Where the cliff sits.** How many possessions a median-Endurance player plays before the bottom falls out. At the placeholder values the curve is mild over the first ~30 possessions and bites near the ceiling; whether that maps to realistic game-minutes is a magnitude question, not a shape one.
+2. **Halftime reset depth.** How much residual fatigue the most-gassed players carry into the second half — set by `HalftimeRestEquivalentSeconds` against `RecoveryRate`.
+3. **Recovery-rate vs drain-rate ratio.** The balance that matters most once substitutions exist and benched players actually recover; meaningless to tune before the off-floor path is driven.

@@ -503,6 +503,16 @@
     "NoShot": 0.1,
     "Epsilon": 1e-09
   },
+  "Fatigue": {
+    "Ceiling": 100.0,
+    "BaseDrain": 0.5,
+    "Convexity": 4.0,
+    "Exponent": 2.0,
+    "DrainEnduranceSensitivity": 1.0,
+    "RecoveryRate": 0.0015,
+    "RecoveryEnduranceSensitivity": 1.0,
+    "HalftimeRestEquivalentSeconds": 300.0
+  },
   "Rosters": {
     "Home": [
       {

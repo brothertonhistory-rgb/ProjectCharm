@@ -88,7 +88,7 @@ A fifth tag, orthogonal to kind, marks **wiring status**:
 | Quickness (lateral) | Physical | Authored individual | live-on-arrival |
 | First step | Physical | Authored individual | live-on-arrival |
 | Vertical | Physical | Authored individual | live-on-arrival |
-| Endurance | Physical | Authored individual | dormant-pending-module (stamina) |
+| Endurance | Physical | Authored individual | consumed by the fatigue meter (scales drain + recovery); meter does not yet affect play |
 | Athleticism | Physical | Derived | n/a (composite ceiling) |
 | Hustle | Intangible | Modifier (effort family) | live-on-arrival |
 | Basketball IQ | Intangible | Modifier (decision family) | live-on-arrival |
@@ -251,8 +251,11 @@ layer exists.
 - **Quickness (lateral)** — side-to-side, east-west; the defensive movement trait.
 - **First step** — initial acceleration / blow-by burst.
 - **Vertical** — explosiveness off the floor (rim finishing, blocks, the glass).
-- **Endurance** — *dormant-pending-module.* A stamina-based attribute, authored per player,
-  but no generator reads it until the **stamina module** is built. Authored-now, parked.
+- **Endurance** — *consumed by the fatigue meter (Phase 48).* The stamina attribute, authored
+  per player. The fatigue meter reads it to scale how fast a player tires (lower Endurance →
+  faster drain, reaching deep fatigue sooner) and how fast he recovers on rest and at halftime
+  (higher Endurance → faster recovery). The meter is computed and stored only — it does **not
+  yet change any outcome**; the athleticism effect that will read it is a later session.
 
 ### Athleticism — *derived*
 **Not authored.** The composite of the explosive/movement physicals (strength + speed +

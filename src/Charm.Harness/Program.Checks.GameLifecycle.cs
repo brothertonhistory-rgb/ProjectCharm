@@ -2638,4 +2638,327 @@ internal static partial class Program
         return allOk;
     }
 
+    // Test-only fatigue observer (CONVENTIONS: no counters on the gameplay surface). Records
+    // per-PlayerId accrual counts and the halftime-recovery invocation count so the
+    // exactly-once-per-possession and fires-once-at-halftime contracts can be asserted from the
+    // harness without adding public counting members to FatigueTracker or GameState. Consumes
+    // no RNG; the real game constructs its tracker without one.
+    private sealed class FatigueProbe : IFatigueObserver
+    {
+        private readonly Dictionary<int, int> _accruals = new();
+        public int HalftimeCount { get; private set; }
+        public void OnAccrue(int playerId) =>
+            _accruals[playerId] = _accruals.GetValueOrDefault(playerId) + 1;
+        public void OnHalftimeRecovery() => HalftimeCount++;
+        public int AccrualsFor(int playerId) => _accruals.GetValueOrDefault(playerId);
+        public int DistinctPlayers => _accruals.Count;
+    }
+
+    // ── Phase 48: Fatigue meter — stateful per-player stamina (drain/recover/halftime). ──
+    // The meter is computed and STORED ONLY; nothing reads it to change gameplay this session,
+    // so the full-game observation output is byte-identical to pre-change except the config hash
+    // (the new "Fatigue" config section). Part 1 drives the FatigueTracker directly to prove the
+    // curve/recovery dynamics; Part 2 runs the real Governor to prove the meter is driven once
+    // per possession, halftime fires exactly once (even across OT), and same-seed runs reproduce
+    // identically. All magnitudes are placeholders — the SHAPE is what is asserted, not values.
+    private static bool FatigueMeterCheck(string configPath)
+    {
+        Console.WriteLine("\n--- FatigueMeterCheck: stateful stamina (no gameplay effect yet) ---");
+        var allOk = true;
+
+        var cfgFatigue = FatigueConfig.Load(configPath);
+
+        // Minimal player carrying only what the tracker reads (PlayerId, Endurance).
+        static Player Mk(int id, int endurance) => new Player($"fat{id}") { PlayerId = id, Endurance = endurance };
+        static IReadOnlyList<Player?> Just(Player p) => new Player?[] { p };
+
+        // ===== PART 1 — tracker dynamics (drive the FatigueTracker directly) =====
+
+        // (a) On-floor climb: a player's level strictly rises over a sequence of accruals.
+        {
+            var t = new FatigueTracker(cfgFatigue);
+            var p = Mk(1, 65);
+            var prev = t.LevelFor(1);
+            var rose = true;
+            for (var i = 0; i < 25; i++)
+            {
+                t.Accrue(Just(p));
+                var now = t.LevelFor(1);
+                if (now <= prev) rose = false;
+                prev = now;
+            }
+            allOk &= rose;
+            Console.WriteLine($"    (a) on-floor climb, strictly rising (final={prev:F3}) -> {(rose ? "ok" : "FAIL")}");
+        }
+
+        // (b) Convex — trickle then cliff: a late increment strictly exceeds an early one.
+        {
+            var t = new FatigueTracker(cfgFatigue);
+            var p = Mk(1, 65);
+            var b0 = t.LevelFor(1); t.Accrue(Just(p)); var earlyStep = t.LevelFor(1) - b0;
+            for (var i = 0; i < 40; i++) t.Accrue(Just(p));
+            var bN = t.LevelFor(1); t.Accrue(Just(p)); var lateStep = t.LevelFor(1) - bN;
+            var convex = lateStep > earlyStep;
+            allOk &= convex;
+            Console.WriteLine($"    (b) convex: late step {lateStep:F4} > early step {earlyStep:F4} -> {(convex ? "ok" : "FAIL")}");
+        }
+
+        // (c) Endurance drains the gasser faster: same possessions, low-Endurance ends higher and
+        //     crosses a deep-fatigue threshold sooner.
+        {
+            const int N = 30; const double Deep = 60.0;
+            var tLo = new FatigueTracker(cfgFatigue); var lo = Mk(1, 30);
+            var tHi = new FatigueTracker(cfgFatigue); var hi = Mk(2, 80);
+            for (var i = 0; i < N; i++) { tLo.Accrue(Just(lo)); tHi.Accrue(Just(hi)); }
+            var endsHigher = tLo.LevelFor(1) > tHi.LevelFor(2);
+
+            int PossToDeep(int endurance)
+            {
+                var t = new FatigueTracker(cfgFatigue); var p = Mk(9, endurance); var n = 0;
+                while (t.LevelFor(9) < Deep && n < 100_000) { t.Accrue(Just(p)); n++; }
+                return n;
+            }
+            var d30 = PossToDeep(30); var d80 = PossToDeep(80);
+            var ok = endsHigher && d30 < d80;
+            allOk &= ok;
+            Console.WriteLine($"    (c) low-Endurance drains faster (after {N}: {tLo.LevelFor(1):F2} vs {tHi.LevelFor(2):F2}; deep@{d30} vs @{d80}) -> {(ok ? "ok" : "FAIL")}");
+        }
+
+        // (d) Pace: more possessions ends higher (pace enters via count).
+        {
+            var tMore = new FatigueTracker(cfgFatigue); var pm = Mk(1, 65);
+            var tFew  = new FatigueTracker(cfgFatigue); var pf = Mk(2, 65);
+            for (var i = 0; i < 50; i++) tMore.Accrue(Just(pm));
+            for (var i = 0; i < 20; i++) tFew.Accrue(Just(pf));
+            var ok = tMore.LevelFor(1) > tFew.LevelFor(2);
+            allOk &= ok;
+            Console.WriteLine($"    (d) pace via count (50 poss {tMore.LevelFor(1):F2} > 20 poss {tFew.LevelFor(2):F2}) -> {(ok ? "ok" : "FAIL")}");
+        }
+
+        // (e) Recovery monotone & partial for a fixed short rest; never zero from a finite rest.
+        {
+            var t = new FatigueTracker(cfgFatigue); var p = Mk(1, 65);
+            for (var i = 0; i < 40; i++) t.Accrue(Just(p));
+            var before = t.LevelFor(1);
+            const double ShortRest = 30.0;
+            t.Recover(Just(p), ShortRest); var after1 = t.LevelFor(1);
+            t.Recover(Just(p), ShortRest); var after2 = t.LevelFor(1);
+            var ok = before > 0 && after1 > 0 && after1 < before && after2 > 0 && after2 < after1;
+            allOk &= ok;
+            Console.WriteLine($"    (e) recovery partial & monotone ({before:F2} -> {after1:F2} -> {after2:F2}, stays > 0) -> {(ok ? "ok" : "FAIL")}");
+        }
+
+        // (f) Endurance recovers the gasser slower. The retained fraction equals the recovery
+        //     multiplier, which is Endurance-driven and independent of the starting level — so a
+        //     larger retained fraction for the low-Endurance player IS the "from equal fatigue,
+        //     low-Endurance recovers less" proof at any equal starting fatigue.
+        {
+            var tLo = new FatigueTracker(cfgFatigue); var lo = Mk(1, 30);
+            var tHi = new FatigueTracker(cfgFatigue); var hi = Mk(2, 80);
+            for (var i = 0; i < 50; i++) { tLo.Accrue(Just(lo)); tHi.Accrue(Just(hi)); }
+            var loPre = tLo.LevelFor(1); var hiPre = tHi.LevelFor(2);
+            const double Rest = 60.0;
+            tLo.Recover(Just(lo), Rest); tHi.Recover(Just(hi), Rest);
+            var loFrac = tLo.LevelFor(1) / loPre;   // fraction RETAINED
+            var hiFrac = tHi.LevelFor(2) / hiPre;
+            var ok = loFrac > hiFrac;               // low-Endurance retains more => recovers less
+            allOk &= ok;
+            Console.WriteLine($"    (f) low-Endurance recovers slower (retains {loFrac:P1} vs {hiFrac:P1}) -> {(ok ? "ok" : "FAIL")}");
+        }
+
+        // (g) Halftime uses the SAME recovery rule at a larger rest-equivalent. Same-equation
+        //     proof: two identical players at the same accrued level — halftime one, Recover with
+        //     HalftimeRestEquivalentSeconds the other — land identically (so halftime is not
+        //     special-case code). Residual proof: a deeply-fatigued low- vs high-Endurance pair
+        //     each decreases, stays > 0, and the gasser retains more.
+        {
+            var t = new FatigueTracker(cfgFatigue);
+            var a = Mk(1, 50); var b = Mk(2, 50);
+            for (var i = 0; i < 60; i++) { t.Accrue(Just(a)); t.Accrue(Just(b)); }
+            var preEqual = Math.Abs(t.LevelFor(1) - t.LevelFor(2)) < 1e-12;
+            t.ApplyHalftimeRecovery(Just(a));
+            t.Recover(Just(b), cfgFatigue.HalftimeRestEquivalentSeconds);
+            var sameEqn = preEqual && Math.Abs(t.LevelFor(1) - t.LevelFor(2)) < 1e-12;
+
+            var t2 = new FatigueTracker(cfgFatigue);
+            var lo = Mk(3, 30); var hi = Mk(4, 80);
+            for (var i = 0; i < 80; i++) { t2.Accrue(Just(lo)); t2.Accrue(Just(hi)); }
+            var loPre = t2.LevelFor(3); var hiPre = t2.LevelFor(4);
+            t2.ApplyHalftimeRecovery(Just(lo));
+            t2.ApplyHalftimeRecovery(Just(hi));
+            var loPost = t2.LevelFor(3); var hiPost = t2.LevelFor(4);
+            var decreased = loPost < loPre && hiPost < hiPre;
+            var nonNeg    = loPost >= 0 && hiPost >= 0;
+            var gasserResidual = loPost > 0 && loPost > hiPost;
+            var ok = sameEqn && decreased && nonNeg && gasserResidual;
+            allOk &= ok;
+            Console.WriteLine($"    (g) halftime == Recover(HalftimeSec) [{t.LevelFor(1):F4}=={t.LevelFor(2):F4}]; gasser retains {loPost:F2} > fit {hiPost:F2} (>0) -> {(ok ? "ok" : "FAIL")}");
+        }
+
+        // ===== PART 2 — integration + reproducibility (run the real Governor) =====
+
+        var cfgA   = RollAConfig.Load(configPath);
+        var cfgB   = RollBConfig.Load(configPath);
+        var cfgC   = RollCConfig.Load(configPath);
+        var cfgD   = RollDConfig.Load(configPath);
+        var cfgE   = RollEConfig.Load(configPath);
+        var cfgF   = RollFConfig.Load(configPath);
+        var cfgG   = RollGConfig.Load(configPath);
+        var cfgH   = RollHConfig.Load(configPath);
+        var cfgI   = RollIConfig.Load(configPath);
+        var cfgJ   = RollJConfig.Load(configPath);
+        var cfgK   = RollKConfig.Load(configPath);
+        var cfgL   = RollLConfig.Load(configPath);
+        var cfgM   = RollMConfig.Load(configPath);
+        var cfgOff = RollOffensiveFoulConfig.Load(configPath);
+        var cfgMatch = MatchupConfig.Load(configPath);
+        var cfgClock = RollClockConfig.Load(configPath);
+        var cfgAtt   = AttentionConfig.Load(configPath);
+        var cfgGov   = GovernorConfig.Load(configPath);
+
+        // Lightweight stub resolver (same wiring shape as GovernorLoopCheck / GameBoundaryCheck);
+        // fatigue is pace-driven, so the actual roll outcomes do not matter — only that the game
+        // runs and the Governor drives the meter.
+        Resolver BuildStubResolver(GameState g, SystemRng rng) => new Resolver(
+            new StubPieGenerator(cfgA),
+            cfgA,
+            new RollBStubPieGenerator(cfgB),
+            new RollCGenerator(cfgC),
+            cfgC,
+            new RollDGenerator(cfgD),
+            new RollEStubPieGenerator(cfgE),
+            new AttentionGenerator(cfgAtt, g),
+            new RollFStubPieGenerator(cfgF),
+            new RollGStubPieGenerator(cfgG),
+            new RollHStubPieGenerator(cfgH),
+            new RollIStubPieGenerator(cfgI),
+            new RollJGenerator(cfgJ, cfgMatch, g),
+            new RollKStubPieGenerator(cfgK),
+            new RollLStubPieGenerator(cfgL),
+            new RollMStubPieGenerator(cfgM),
+            new RollOffensiveFoulGenerator(cfgOff),
+            cfgMatch,
+            g,
+            rng);
+
+        // (h) The meter is actually DRIVEN by the Governor: run a short two-half game with an
+        //     observed tracker; on-floor levels are non-zero (rose from fresh), all ten players
+        //     accrued, and halftime recovery fired exactly once.
+        {
+            var cfgGovShort = new GovernorConfig { PossessionCap = 400, Halves = 2, HalfSeconds = 120.0, OvertimeSeconds = 300.0 };
+            var cfgEoH = EndOfHalfConfig.Load(configPath);
+            var probe = new FatigueProbe();
+            var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold),
+                                     ArrowState.Off, new FatigueTracker(cfgFatigue, probe));
+            SeedMinimalRoster(game);
+            var govRng = new SystemRng(8);
+            var gov = new Governor(BuildStubResolver(game, new SystemRng(7)), game, cfgGovShort, cfgClock, govRng, cfgEoH);
+            var first = TipPossession.CreateFromTip(game, govRng, possessionNumber: 1);
+            var result = gov.Run(first);
+
+            var allNonZero = true;
+            for (var id = 1; id <= 10; id++) if (game.Fatigue.LevelFor(id) <= 0.0) allNonZero = false;
+            var droveAll = probe.DistinctPlayers == 10;
+            var halftimeFired = probe.HalftimeCount == 1;
+            var ok = allNonZero && droveAll && halftimeFired && result.Possessions.Count > 0;
+            allOk &= ok;
+            Console.WriteLine($"    (h) Governor drives meter ({result.Possessions.Count} poss, level[1]={game.Fatigue.LevelFor(1):F2}>0, all 10 accrued, halftime×{probe.HalftimeCount}) -> {(ok ? "ok" : "FAIL")}");
+        }
+
+        // (i) Exactly-once top-level accounting: each on-floor player gets exactly ONE accrual per
+        //     completed top-level possession — not per Roll, FT trip, rebound continuation,
+        //     retained inbound, or internal retry. With fixed lineups all ten are on the floor
+        //     every possession, so each player's accrual count must equal the completed-possession
+        //     count. (A doubled meter is still convex, so counting — not shape — is the test.)
+        {
+            var cfgGovShort = new GovernorConfig { PossessionCap = 400, Halves = 2, HalfSeconds = 90.0, OvertimeSeconds = 300.0 };
+            var cfgEoH = EndOfHalfConfig.Load(configPath);
+            var probe = new FatigueProbe();
+            var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold),
+                                     ArrowState.Off, new FatigueTracker(cfgFatigue, probe));
+            SeedMinimalRoster(game);
+            var govRng = new SystemRng(12);
+            var gov = new Governor(BuildStubResolver(game, new SystemRng(11)), game, cfgGovShort, cfgClock, govRng, cfgEoH);
+            var first = TipPossession.CreateFromTip(game, govRng, possessionNumber: 1);
+            var result = gov.Run(first);
+
+            var poss = result.Possessions.Count;
+            var exactlyOnce = true; var detail = "";
+            for (var id = 1; id <= 10; id++)
+                if (probe.AccrualsFor(id) != poss) { exactlyOnce = false; detail += $" id{id}={probe.AccrualsFor(id)}"; }
+            allOk &= exactlyOnce;
+            Console.WriteLine($"    (i) exactly one accrual per possession (poss={poss}, each player=={poss}) -> {(exactlyOnce ? "ok" : "FAIL" + detail)}");
+        }
+
+        // (j) Halftime fires exactly ONCE across overtime: a tied regulation fixture that enters OT
+        //     (the GameBoundaryCheck Sub-check 3 recipe) must invoke ApplyHalftimeRecovery exactly
+        //     once for the whole game regardless of OT count (A4 — a green regulation-only check
+        //     must not hide wrong OT behavior).
+        {
+            const int OtRegressionSeed = 73001;
+            var cfgGovOt = new GovernorConfig { PossessionCap = 400, Halves = 2, HalfSeconds = 1.0, OvertimeSeconds = cfgGov.OvertimeSeconds };
+            var cfgEoHOt = EndOfHalfConfig.Load(configPath);
+            var probe = new FatigueProbe();
+            var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold),
+                                     ArrowState.Off, new FatigueTracker(cfgFatigue, probe));
+            SeedMinimalRoster(game);
+            var govRng = new SystemRng(OtRegressionSeed + 1);
+            var gov = new Governor(BuildStubResolver(game, new SystemRng(OtRegressionSeed)), game, cfgGovOt, cfgClock, govRng, cfgEoHOt);
+            var first = TipPossession.CreateFromTip(game, govRng, possessionNumber: 1);
+            var result = gov.Run(first);
+
+            var otEntered = result.OvertimePeriods >= 1;
+            var onceAcrossOt = probe.HalftimeCount == 1;
+            if (!otEntered)
+            {
+                Console.WriteLine($"    (j) STOP — seed {OtRegressionSeed} did not enter OT (OvertimePeriods={result.OvertimePeriods}); fixture stale, needs a prompt revision.");
+                allOk = false;
+            }
+            else
+            {
+                allOk &= onceAcrossOt;
+                Console.WriteLine($"    (j) halftime fires once across OT (OT periods={result.OvertimePeriods}, halftime×{probe.HalftimeCount}) -> {(onceAcrossOt ? "ok" : "FAIL")}");
+            }
+        }
+
+        // (k) No gameplay perturbation — same-seed determinism. Run the identical short-game
+        //     fixture twice; the possession sequence (outcomes, points, elapsed) AND the final
+        //     meter levels must match exactly. This is the in-harness half of the A1 proof
+        //     (same seed -> identical meter trajectory and identical gameplay). The other half —
+        //     full observation output byte-identical to the pre-change baseline except the
+        //     config-hash line — is the operator's fc /B comparison (see the delivery note).
+        string RunSignature(out double[] levels, int resolverSeed, int govSeed)
+        {
+            var cfgGovK = new GovernorConfig { PossessionCap = 400, Halves = 2, HalfSeconds = 120.0, OvertimeSeconds = 300.0 };
+            var cfgEoH = EndOfHalfConfig.Load(configPath);
+            var game = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold),
+                                     ArrowState.Off, new FatigueTracker(cfgFatigue));
+            SeedMinimalRoster(game);
+            var govRng = new SystemRng(govSeed);
+            var gov = new Governor(BuildStubResolver(game, new SystemRng(resolverSeed)), game, cfgGovK, cfgClock, govRng, cfgEoH);
+            var first = TipPossession.CreateFromTip(game, govRng, possessionNumber: 1);
+            var result = gov.Run(first);
+            var sb = new System.Text.StringBuilder();
+            foreach (var r in result.Possessions)
+                sb.Append(r.Number).Append('|').Append(r.Offense).Append('|').Append(r.EndLabel)
+                  .Append('|').Append(r.Points).Append('|').Append(r.Elapsed.ToString("F4")).Append(';');
+            levels = new double[10];
+            for (var id = 1; id <= 10; id++) levels[id - 1] = game.Fatigue.LevelFor(id);
+            return sb.ToString();
+        }
+        {
+            var sig1 = RunSignature(out var lv1, 21, 22);
+            var sig2 = RunSignature(out var lv2, 21, 22);
+            var gameplaySame = sig1 == sig2;
+            var meterSame = true;
+            for (var i = 0; i < 10; i++) if (lv1[i] != lv2[i]) meterSame = false;
+            var ok = gameplaySame && meterSame;
+            allOk &= ok;
+            Console.WriteLine($"    (k) same-seed determinism (gameplay {(gameplaySame ? "identical" : "DIFF")}, meter {(meterSame ? "identical" : "DIFF")}) -> {(ok ? "ok" : "FAIL")}");
+        }
+
+        Console.WriteLine($"  FatigueMeterCheck: {(allOk ? "ok" : "FAIL")}");
+        return allOk;
+    }
+
 }

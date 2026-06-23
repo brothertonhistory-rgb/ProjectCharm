@@ -47,7 +47,14 @@ public sealed class GameState
     /// <param name="fouls">The half's foul tracker (owns both teams' counts and
     /// the bonus read). Required: the bonus thresholds are config-driven, so the
     /// tracker is constructed with them and handed in rather than defaulted here.</param>
-    public GameState(FoulTracker fouls, ArrowState initialArrow = ArrowState.Off)
+    /// <param name="fatigue">The per-player fatigue meter. OPTIONAL and defaulted to an
+    /// empty placeholder-config tracker, so every existing construction site compiles and
+    /// runs unchanged — the same "compile unchanged" contract the coach/roster/lineup fields
+    /// use. The real game and the fatigue checks pass a configured tracker explicitly. (The
+    /// foul tracker is required-and-injected because its thresholds vary by config at the
+    /// call site; the fatigue meter is defaulted-internally because no site that ignores
+    /// fatigue should have to mention it.)</param>
+    public GameState(FoulTracker fouls, ArrowState initialArrow = ArrowState.Off, FatigueTracker? fatigue = null)
     {
         Fouls = fouls ?? throw new ArgumentNullException(nameof(fouls));
         PossessionArrow = initialArrow;
@@ -55,6 +62,7 @@ public sealed class GameState
         AwayLineup  = new Lineup(TeamSide.Away);
         HomeRoster  = new Roster(TeamSide.Home);
         AwayRoster  = new Roster(TeamSide.Away);
+        Fatigue     = fatigue ?? new FatigueTracker(new FatigueConfig());
     }
 
     /// <summary>Turn the arrow ON, pointing at <paramref name="team"/>. Used by
@@ -83,6 +91,12 @@ public sealed class GameState
     /// incremented by Roll D and read for bonus routing. Per-half: a future
     /// half-reset replaces this tracker (or resets it) at the break.</summary>
     public FoulTracker Fouls { get; }
+
+    /// <summary>Per-player fatigue — the meter that rises on the floor, falls on rest and
+    /// at halftime, scaled by Endurance. Persistent game-scoped state like <see cref="Fouls"/>.
+    /// Constructed empty (no entries until a player first takes the floor). NOTHING reads the
+    /// level this session; the athleticism-effect session is its first consumer.</summary>
+    public FatigueTracker Fatigue { get; }
 
     /// <summary>Each team's on-court five. Persistent game-scoped state (will
     /// mutate via future subs), one per team. The attachment point the

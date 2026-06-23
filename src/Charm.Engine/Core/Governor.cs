@@ -400,6 +400,13 @@ public sealed class Governor
             if (st.Offense == TeamSide.Home) _game.HomeScore += pointsThisPossession;
             else _game.AwayScore += pointsThisPossession;
 
+            // Phase 48: accrue exactly ONE possession of fatigue to every on-floor player of
+            // BOTH sides. This sits at the top-level possession tail, after the outcome
+            // resolved (applied known) — so it fires once per possession, never per Roll, free
+            // throw, rebound continuation, retained inbound, or internal retry. It reads no
+            // RNG and nothing reads the level this session, so it changes no outcome.
+            _game.Fatigue.Accrue(OnFloorBothSides());
+
             records.Add(new PossessionRecord(
                 st.PossessionNumber, st.Offense, st.Defense, st.Entry,
                 endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, periodNumber, intent,
@@ -441,10 +448,16 @@ public sealed class Governor
 
             if (halfRemaining <= 0.0)
             {
-                // Reset fouls only when moving from one regulation half to another —
-                // never after the final regulation half (fouls carry into overtime, NCAA rule).
+                // Reset fouls AND apply halftime fatigue recovery only when moving from one
+                // regulation half to another — never after the final regulation half. Fouls
+                // carry into overtime (NCAA rule); halftime recovery fires exactly once and
+                // never in OT. Same guard, same boundary — the overtime loop below is separate,
+                // so this block never executes during OT.
                 if (half < _cfg.Halves)
+                {
                     _game.Fouls.ResetForNewHalf();
+                    _game.Fatigue.ApplyHalftimeRecovery(OnFloorBothSides());
+                }
                 half++;
                 halfRemaining = _cfg.HalfSeconds;
             }
@@ -496,6 +509,23 @@ public sealed class Governor
             seconds += ClockDraw.Sample(_rng, center * resetScale, _clock.StdDev * resetScale,
                                         _clock.Floor, _clock.ResetClockSeconds);
         return seconds;
+    }
+
+    // Gather the on-floor players for BOTH sides — the fatigue meter accrues to all ten and
+    // recovers all ten at halftime. Walks the same lineup -> roster seam the attribution
+    // layer uses. An absent slot contributes null and is skipped by the tracker (defensive;
+    // with fixed lineups there are no absent slots). Reads no RNG.
+    private List<Player?> OnFloorBothSides()
+    {
+        var players = new List<Player?>(2 * Lineup.Size);
+        foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
+        {
+            var lineup = _game.LineupFor(side);
+            var roster = _game.RosterFor(side);
+            foreach (var slot in lineup.OnCourt)
+                players.Add(roster.PlayerAt(slot));
+        }
+        return players;
     }
 
     private static TeamSide Other(TeamSide side) =>
