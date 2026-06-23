@@ -323,8 +323,11 @@ public sealed class RollEGenerator : IRollEGenerationProvider
             var blendedSkillGap = denialPerimeterWeight * perimeterGap
                                 + denialPostWeight      * postGap;
 
-            // Physical channel: athleticism gap (same concept as the make door).
-            var athGap = defPlayer.Athleticism - offPlayer.Athleticism;
+            // Physical channel: athleticism gap (same concept as the make door), now
+            // fatigue-discounted — defender on the steeper defensive drop, offense on the
+            // lighter offensive drop. Both players are non-null here (loop guards above).
+            var athGap = _game.Fatigue.EffectiveAthleticism(defPlayer, isDefense: true)
+                       - _game.Fatigue.EffectiveAthleticism(offPlayer, isDefense: false);
 
             // GapFn — same signed power-law the make door uses; reuses ReferenceScale.
             var skillShift = Matchup.GapFn(blendedSkillGap, matchupCfg.DenialSkillSteepness,

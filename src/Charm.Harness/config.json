@@ -511,7 +511,9 @@
     "DrainEnduranceSensitivity": 1.0,
     "RecoveryRate": 0.0015,
     "RecoveryEnduranceSensitivity": 1.0,
-    "HalftimeRestEquivalentSeconds": 300.0
+    "HalftimeRestEquivalentSeconds": 300.0,
+    "OffenseAthleticismDrop": 0.10,
+    "DefenseAthleticismDrop": 0.20
   },
   "Rosters": {
     "Home": [

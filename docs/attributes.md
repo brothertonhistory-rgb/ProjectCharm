@@ -88,8 +88,8 @@ A fifth tag, orthogonal to kind, marks **wiring status**:
 | Quickness (lateral) | Physical | Authored individual | live-on-arrival |
 | First step | Physical | Authored individual | live-on-arrival |
 | Vertical | Physical | Authored individual | live-on-arrival |
-| Endurance | Physical | Authored individual | consumed by the fatigue meter (scales drain + recovery); meter does not yet affect play |
-| Athleticism | Physical | Derived | n/a (composite ceiling) |
+| Endurance | Physical | Authored individual | consumed by the fatigue meter (scales drain + recovery); the meter now discounts effective athleticism, so Endurance **reaches play** (Phase 49) |
+| Athleticism | Physical | Derived | composite ceiling; **fatigue-discounted at five gameplay read-sites** (Phase 49) |
 | Hustle | Intangible | Modifier (effort family) | live-on-arrival |
 | Basketball IQ | Intangible | Modifier (decision family) | live-on-arrival |
 | Discipline | Intangible | Authored individual | live-on-arrival |
@@ -251,11 +251,14 @@ layer exists.
 - **Quickness (lateral)** — side-to-side, east-west; the defensive movement trait.
 - **First step** — initial acceleration / blow-by burst.
 - **Vertical** — explosiveness off the floor (rim finishing, blocks, the glass).
-- **Endurance** — *consumed by the fatigue meter (Phase 48).* The stamina attribute, authored
-  per player. The fatigue meter reads it to scale how fast a player tires (lower Endurance →
-  faster drain, reaching deep fatigue sooner) and how fast he recovers on rest and at halftime
-  (higher Endurance → faster recovery). The meter is computed and stored only — it does **not
-  yet change any outcome**; the athleticism effect that will read it is a later session.
+- **Endurance** — *reaches play via the fatigue meter (Phase 48 meter, Phase 49 effect).* The
+  stamina attribute, authored per player. The fatigue meter reads it to scale how fast a player
+  tires (lower Endurance → faster drain, reaching deep fatigue sooner) and how fast he recovers
+  on rest and at halftime (higher Endurance → faster recovery). **As of Phase 49 the meter is no
+  longer inert:** a tired player's *effective* athleticism is discounted at the five athleticism
+  read-sites (steeper on defense than offense), so a low-Endurance player visibly fades down the
+  stretch while a high-Endurance one holds his athleticism. Authored Endurance and authored
+  athleticism never change — the discount is a derived quantity layered on top.
 
 ### Athleticism — *derived*
 **Not authored.** The composite of the explosive/movement physicals (strength + speed +
@@ -264,6 +267,14 @@ locked **ceiling principle** refers to: *athleticism acts as a ceiling that limi
 skill can express against a given competition level — not the other way around.* It is a
 computed value, never a number you type, so the "athleticism as ceiling" rule stays intact
 while the redundant authored umbrella comes off the list.
+
+**Runtime discount (Phase 49).** The *authored* composite never changes, but the value the
+five gameplay sites actually read is the **effective** athleticism — the composite scaled down
+by the player's current fatigue (`1 − drop × level/Ceiling`, linear in the meter, steeper on
+defense than offense, hard-floored so a gassed player is a step slow, never a statue). This is
+the only place fatigue touches gameplay; the skill axis is untouched. The athletic axis here is
+the **derived `Athleticism` composite only** — the raw physicals (Strength, Vertical, etc.) that
+feed *other* composites are read at full strength, so fatigue is not silently double-counted.
 
 ---
 

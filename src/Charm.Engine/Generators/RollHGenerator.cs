@@ -105,7 +105,9 @@ public sealed class RollHGenerator : IRollHPieGenerator
 
         var effectiveRating = defender is null
             ? Matchup.OffenseRating(zone, player)
-            : Matchup.EffectiveRating(zone, player, defender, _matchup);
+            : Matchup.EffectiveRating(zone, player, defender, _matchup,
+                  _game.Fatigue.EffectiveAthleticism(player,   isDefense: false),
+                  _game.Fatigue.EffectiveAthleticism(defender, isDefense: true));
 
         var makePct = _cfg.MakeProbability(zone, effectiveRating);
 

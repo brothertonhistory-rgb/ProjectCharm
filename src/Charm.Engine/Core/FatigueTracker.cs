@@ -66,6 +66,30 @@ public sealed class FatigueTracker
         _level.TryGetValue(playerId, out var f) ? f : 0.0;
 
     /// <summary>
+    /// A player's EFFECTIVE athleticism for one matchup read — his authored
+    /// <see cref="Player.Athleticism"/> composite discounted by his current fatigue, scaled
+    /// by his ROLE in this read. The discount is LINEAR in the meter
+    /// (<c>1 − drop × level/Ceiling</c>); the convex trickle-then-cliff already lives in the
+    /// meter, so effective athleticism is convex in possessions-played WITHOUT stacking a
+    /// second curve. <paramref name="isDefense"/> selects the steeper
+    /// <see cref="FatigueConfig.DefenseAthleticismDrop"/> over
+    /// <see cref="FatigueConfig.OffenseAthleticismDrop"/> — a tired player loses a step on
+    /// defense faster than on offense.
+    ///
+    /// <para>A fresh player (level 0) returns his authored athleticism EXACTLY (discount 1.0):
+    /// the inertness anchor. A fully-gassed player (level clamped to Ceiling) bottoms at
+    /// <c>(1 − drop)</c> of authored — never below, never zero (drops are guarded to [0,1)).
+    /// Authored ratings are never mutated; this is a derived discount on a derived composite.</para>
+    /// </summary>
+    public double EffectiveAthleticism(Player player, bool isDefense)
+    {
+        var level    = LevelFor(player.PlayerId);
+        var drop     = isDefense ? _cfg.DefenseAthleticismDrop : _cfg.OffenseAthleticismDrop;
+        var discount = 1.0 - drop * (level / _cfg.Ceiling);   // level ∈ [0,Ceiling] ⇒ discount ∈ [1−drop, 1]
+        return player.Athleticism * discount;
+    }
+
+    /// <summary>
     /// Accrue exactly ONE possession of on-floor fatigue for each player in
     /// <paramref name="onFloor"/>. The step is convex: small when fresh (a trickle), larger
     /// as the level rises (the cliff) — so the meter ITSELF carries the trickle-then-cliff

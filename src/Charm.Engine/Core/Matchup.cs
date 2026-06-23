@@ -134,13 +134,32 @@ public static class Matchup
     /// result to <see cref="RollHConfig.MakeProbability"/>, which is untouched.
     /// </summary>
     public static double EffectiveRating(ShotLocation zone, Player attacker, Player defender, MatchupConfig cfg)
+        => EffectiveRating(zone, attacker, defender, cfg,
+                           attacker.Athleticism, defender.Athleticism);
+
+    /// <summary>
+    /// Fatigue-aware overload (Phase 49). Identical to the 4-arg
+    /// <see cref="EffectiveRating(ShotLocation,Player,Player,MatchupConfig)"/> except the
+    /// PHYSICAL gap uses the caller-supplied EFFECTIVE athleticism values — authored
+    /// athleticism discounted by each player's current fatigue and role — instead of the raw
+    /// composites. The skill baseline and skill gap are untouched: fatigue rides the athletic
+    /// axis only. Kept pure/static — the caller (which holds the GameState) computes the
+    /// effective values via <see cref="FatigueTracker.EffectiveAthleticism"/> and passes them
+    /// in; Matchup never reaches the fatigue tracker. The 4-arg path delegates here with raw
+    /// athleticism, which is exactly the fresh (no-fatigue) case, so the analytic make-curve
+    /// sweep and the no-defender fallback keep their existing behavior.
+    /// </summary>
+    public static double EffectiveRating(ShotLocation zone, Player attacker, Player defender,
+                                         MatchupConfig cfg,
+                                         double attackerEffectiveAthleticism,
+                                         double defenderEffectiveAthleticism)
     {
         var baseline = OffenseRating(zone, attacker);
         var defense  = DefenseRating(zone, defender, cfg);
 
         var skillShift    = GapFn(baseline - defense,
                                   cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
-        var physicalShift = GapFn(attacker.Athleticism - defender.Athleticism,
+        var physicalShift = GapFn(attackerEffectiveAthleticism - defenderEffectiveAthleticism,
                                   cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
 
         return baseline + skillShift + physicalShift;

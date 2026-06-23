@@ -72,7 +72,7 @@ public sealed class RollKGenerator : IRollKPieGenerator
         // ── Stage 2: offense composite ────────────────────────────────────────────
         var offScore = _matchup.PutbackOffStrengthWeight     * rebounder.Strength
                      + _matchup.PutbackOffHeightWeight       * rebounder.Height
-                     + _matchup.PutbackOffAthleticismWeight  * rebounder.Athleticism
+                     + _matchup.PutbackOffAthleticismWeight  * _game.Fatigue.EffectiveAthleticism(rebounder, isDefense: false)
                      + _matchup.PutbackOffFinishingWeight    * rebounder.Finishing;
 
         // ── Stage 3: defense composite (self-weighted team mean) ──────────────────

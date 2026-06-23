@@ -6317,3 +6317,73 @@ No consumer reads the meter; no outcome changes. The five athleticism consumer s
 1. **Where the cliff sits.** How many possessions a median-Endurance player plays before the bottom falls out. At the placeholder values the curve is mild over the first ~30 possessions and bites near the ceiling; whether that maps to realistic game-minutes is a magnitude question, not a shape one.
 2. **Halftime reset depth.** How much residual fatigue the most-gassed players carry into the second half — set by `HalftimeRestEquivalentSeconds` against `RecoveryRate`.
 3. **Recovery-rate vs drain-rate ratio.** The balance that matters most once substitutions exist and benched players actually recover; meaningless to tune before the off-floor path is driven.
+
+---
+
+## Phase 49 — Fatigue → Effective Athleticism (the meter bites)
+
+Phase 48 built a per-player fatigue meter that nothing read. Phase 49 makes it read: a tired player's **effective** athleticism is discounted wherever the engine reads the derived `Athleticism` composite for gameplay. Authored ratings never change — the discount is a derived quantity layered on top, exactly as the no-runtime-mutation guardrail requires.
+
+### The discount — linear in the meter, two dials, hard-floored
+
+For a read at fatigue `level` (∈ [0, Ceiling]):
+
+```
+effectiveAthleticism = authoredAthleticism × (1 − drop × level/Ceiling)
+drop = DefenseAthleticismDrop  if the read is a defensive role
+       OffenseAthleticismDrop  otherwise
+```
+
+It is **linear in the meter on purpose.** The convex trickle-then-cliff already lives in the METER (Phase 48), so effective athleticism is automatically convex in possessions-played without stacking a second curve here. A fresh player (level 0) reads his authored athleticism EXACTLY — discount 1.0, the inertness anchor. A fully-gassed player (level pinned at Ceiling) bottoms at `(1 − drop)` of authored: with the placeholder dials, 90% on offense, 80% on defense. The dials are guarded to `[0, 1)`, so the floor is always positive — a gassed player is a **step slow, never a statue, never zero.**
+
+### Defense steeper than offense — and what that produces
+
+`DefenseAthleticismDrop > OffenseAthleticismDrop` is a **structural invariant**, not a calibration choice (the config Load enforces it, with the all-zero inertness control as the only exception). The basketball claim: a tired player loses a first step and a defensive slide faster than he loses his offensive burst.
+
+The consequence at the make door is exact. Two equally-gassed players in a matchup, equal authored athleticism, produce a physical gap
+
+```
+attackerEffective − defenderEffective = A × (DefenseAthleticismDrop − OffenseAthleticismDrop) × (level/Ceiling) > 0
+```
+
+— i.e. **equal fatigue tilts toward the offense.** This is a formula property (`DefDrop > OffDrop`), not a tuning hope; it survives any calibration that preserves the ordering. At full gas with A=99 it is ~9.9 rating points of offense-favoring shift feeding `GapFn` (before saturation).
+
+### The athletic axis is the derived `Athleticism` composite ONLY
+
+Fatigue discounts the derived `Athleticism` composite at the read-sites. The **raw** physicals (Strength, Speed, Quickness, First step, Vertical) that feed *other* composites — and any other composite built from them — are read at full strength. This is deliberate: discounting both the composite and the raw inputs that also flow elsewhere would penalize a tired player twice through a back door. One axis, one discount.
+
+### Matchup stays pure/static — the overload pattern
+
+`Matchup.EffectiveRating` gained a 6-arg overload taking caller-supplied `attackerEffectiveAthleticism` / `defenderEffectiveAthleticism`; the physical gap uses those, the skill baseline and skill gap are untouched. The 4-arg signature is kept and **delegates** to the 6-arg with raw athleticism — which is exactly the fresh (no-fatigue) case — so the analytic make-curve sweep and the no-defender fallback keep their existing behavior bit-for-bit. Matchup never reaches the fatigue tracker: the caller (a generator, which holds the `GameState`) computes the effective values via `FatigueTracker.EffectiveAthleticism` and passes them in. The same defaulted-purity precedent the rest of Matchup follows.
+
+### The five read-sites (and the role each reads)
+
+1. **Make door** — `Matchup.EffectiveRating` via `RollHGenerator` (with-defender branch): shooter on the offensive drop, defender on the defensive drop. The no-defender branch is skill-only and unchanged.
+2. **Selection denial** — `RollEGenerator`'s per-man `athGap`: defender on the defensive drop minus offender on the offensive drop. **Structural note:** this lives in `BendByAttention`, the defended-pie pass — NOT in `GenerateWithPressure`, which produces offensive *usage intent* only (pre-denial). Anyone probing how a defender's athleticism moves the selected share must read the post-`BendByAttention` pie, not `FinalShares`.
+3. **Entry disruption** — `RollAGenerator`'s two team athleticism aggregates: offense on the lighter drop, defense on the steeper.
+4. **Transition** — `RollJGenerator`'s `MeanEffectiveAthleticism(side, isDefense)`: offense on the offensive drop, defense on the defensive drop. Null/unseated slots still yield a neutral 0.0 gap (regression anchor for isolated checks).
+5. **Putback** — `RollKGenerator`'s offense composite: the rebounder on the offensive drop (he is going back up).
+
+### Determinism and the equivalence control
+
+The discount draws no randomness — it is a pure function of (authored athleticism, current level, role) — so a replayed seed reproduces outcomes exactly and the effect perturbs no RNG stream. Setting both dials to 0.0 (the inertness control) makes the discount identically 1.0 at every level, which reproduces the Phase-48 (meter-inert) behavior; the dual-mode harness check asserts exactly this (no movement under zero drops, documented movement under live drops), and the fresh-anchor sub-check shows the make door is bit-exact fresh==raw under live drops.
+
+### What this session deliberately does NOT do
+
+No substitutions (own session), so in observation the five starters per side play every possession and only halftime relieves them — their athleticism sags down the stretch, and that end-game fade is now in the corpus. No magnitude is calibrated — both dials are placeholders. The skill axis is untouched. This is the first session whose frozen-corpus output is intentionally not byte-identical to its predecessor; re-baselining `frozen-corpus-v1` is parked for the substitution session, when on/off-floor recovery makes the corpus meaningful.
+
+### Invariants
+
+- `effectiveAthleticism = authored × (1 − drop × level/Ceiling)`; fresh (level 0) → authored exactly; ceiling → `(1 − drop) × authored`.
+- Linear in `level` (no second curve here — convexity is the meter's).
+- Floor `(1 − drop) × authored` is strictly positive (dials in `[0, 1)`); effective athleticism never ≤ 0 for a positive authored value, never below the floor.
+- `DefenseAthleticismDrop > OffenseAthleticismDrop` (structural; all-zero inertness control is the only exception) → defense discounted more at equal level → equal-fatigue matchup favors offense.
+- Discount applies to the derived `Athleticism` composite only; raw physicals feeding other composites are read at full strength.
+- `Matchup` is pure/static; the 4-arg path equals the fresh case bit-for-bit; the effect draws no RNG.
+
+### Calibration note (deferred — do not tune until the attribute-coverage pass is complete)
+
+1. **Full-gas floor depth.** How much athleticism a maxed-out meter should strip — the `(1 − drop)` floors (placeholder 0.90 offense / 0.80 defense). Whether a fully-gassed player should be 10%/20% slower or more/less is a magnitude question; the floor shape (linear to a positive floor) is locked.
+2. **Offense-vs-defense gap size.** The spread between the two dials sets how much equal fatigue tilts toward offense. The *direction* is locked (`Def > Off`); the *magnitude* of the tilt is open.
+3. **The combined meter-cliff × discount curve.** What a player's effective athleticism looks like as a function of possessions-played is the convolution of the Phase-48 drain curve and this linear discount. Tuning either in isolation is misleading; the realistic target is the combined late-game fade, and that is best judged once substitutions exist and minutes are real.
+4. **Interaction with the no-substitution corpus.** Until subs land, starters never rest mid-half, so the current corpus shows a heavier end-game fade than a real rotation would. Do not calibrate the dials against the no-sub corpus — it overstates fatigue's footprint.

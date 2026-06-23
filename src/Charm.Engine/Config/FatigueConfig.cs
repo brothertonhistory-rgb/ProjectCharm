@@ -55,6 +55,24 @@ public sealed class FatigueConfig
     /// [CALIBRATION PLACEHOLDER]</summary>
     public double HalftimeRestEquivalentSeconds { get; set; } = 300.0;
 
+    /// <summary>How much a fully-gassed player's EFFECTIVE athleticism is discounted on
+    /// OFFENSE. The discount is linear in the meter: <c>1 − OffenseAthleticismDrop ×
+    /// (level/Ceiling)</c>, so a fresh player plays at full athleticism and a fully-gassed
+    /// one bottoms at <c>(1 − OffenseAthleticismDrop)</c> of his authored athleticism (never
+    /// below, never zero). The convex trickle-then-cliff lives in the METER, so this stays a
+    /// straight line. Must be &gt;= 0 and &lt; 1. Must be &lt; <see cref="DefenseAthleticismDrop"/>
+    /// (defense degrades faster) — except the all-zero inertness control. [CALIBRATION PLACEHOLDER]</summary>
+    public double OffenseAthleticismDrop { get; set; } = 0.10;
+
+    /// <summary>How much a fully-gassed player's EFFECTIVE athleticism is discounted on
+    /// DEFENSE — STEEPER than offense, because a tired player loses a first step and a slide
+    /// on defense faster than he loses them on offense. Same linear-in-meter shape:
+    /// <c>1 − DefenseAthleticismDrop × (level/Ceiling)</c>, bottoming at
+    /// <c>(1 − DefenseAthleticismDrop)</c>. Must be &gt;= 0 and &lt; 1, and must EXCEED
+    /// <see cref="OffenseAthleticismDrop"/> (structural invariant, not a calibration choice) —
+    /// except the all-zero inertness control. [CALIBRATION PLACEHOLDER]</summary>
+    public double DefenseAthleticismDrop { get; set; } = 0.20;
+
     public static FatigueConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -84,6 +102,29 @@ public sealed class FatigueConfig
         if (cfg.HalftimeRestEquivalentSeconds <= 0)
             throw new InvalidOperationException(
                 $"Fatigue HalftimeRestEquivalentSeconds must be positive (got {cfg.HalftimeRestEquivalentSeconds}).");
+
+        // Athleticism-drop bounds: each must be in [0, 1) so its floor (1 − drop) is positive
+        // — a fully-gassed player is a step slow, never a statue, never below zero.
+        if (cfg.OffenseAthleticismDrop < 0)
+            throw new InvalidOperationException(
+                $"Fatigue OffenseAthleticismDrop must be >= 0 (got {cfg.OffenseAthleticismDrop}).");
+        if (cfg.DefenseAthleticismDrop < 0)
+            throw new InvalidOperationException(
+                $"Fatigue DefenseAthleticismDrop must be >= 0 (got {cfg.DefenseAthleticismDrop}).");
+        if (cfg.OffenseAthleticismDrop >= 1)
+            throw new InvalidOperationException(
+                $"Fatigue OffenseAthleticismDrop must be < 1 (got {cfg.OffenseAthleticismDrop}).");
+        if (cfg.DefenseAthleticismDrop >= 1)
+            throw new InvalidOperationException(
+                $"Fatigue DefenseAthleticismDrop must be < 1 (got {cfg.DefenseAthleticismDrop}).");
+
+        // Defense degrades FASTER than offense — a structural invariant, not a calibration
+        // choice. The ONLY permitted exception is the all-zero pair, the inertness control
+        // used to prove zero-drop equivalence with the Phase-48 baseline (effect fully off).
+        var inert = cfg.OffenseAthleticismDrop == 0.0 && cfg.DefenseAthleticismDrop == 0.0;
+        if (!inert && cfg.DefenseAthleticismDrop <= cfg.OffenseAthleticismDrop)
+            throw new InvalidOperationException(
+                "DefenseAthleticismDrop must exceed OffenseAthleticismDrop unless both drops are 0 (inertness control).");
 
         return cfg;
     }

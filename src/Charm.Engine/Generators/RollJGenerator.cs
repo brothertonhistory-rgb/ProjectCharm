@@ -134,8 +134,8 @@ public sealed class RollJGenerator : IRollJPieGenerator
         {
             var offenseSide = ctx.OffenseSide.Value;
             var defenseSide = offenseSide == TeamSide.Home ? TeamSide.Away : TeamSide.Home;
-            var offenseAthl = MeanAthleticism(offenseSide);
-            var defenseAthl = MeanAthleticism(defenseSide);
+            var offenseAthl = MeanEffectiveAthleticism(offenseSide, isDefense: false);
+            var defenseAthl = MeanEffectiveAthleticism(defenseSide, isDefense: true);
             athlLift = (offenseAthl - defenseAthl) * _cfg.AthleticismGapScale;
         }
 
@@ -164,13 +164,15 @@ public sealed class RollJGenerator : IRollJPieGenerator
     // ── Helper ──────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Mean derived <see cref="Player.Athleticism"/> across the populated active-five
-    /// slots for <paramref name="side"/>. Returns 0.0 when the roster is unpopulated
-    /// (isolated harness tests, pre-seating) — produces a neutral athleticism gap
-    /// that leaves the configured base weights unchanged, preserving the regression
-    /// anchor on any check that does not seat full rosters.
+    /// Mean EFFECTIVE <see cref="Player.Athleticism"/> across the populated active-five
+    /// slots for <paramref name="side"/> — authored athleticism discounted by each player's
+    /// current fatigue, on the offensive or defensive drop per <paramref name="isDefense"/>.
+    /// Returns 0.0 when the roster is unpopulated (isolated harness tests, pre-seating) —
+    /// produces a neutral athleticism gap that leaves the configured base weights unchanged,
+    /// preserving the regression anchor on any check that does not seat full rosters. Fresh
+    /// players read at full athleticism, so an all-fresh transition is unchanged from before.
     /// </summary>
-    private double MeanAthleticism(TeamSide side)
+    private double MeanEffectiveAthleticism(TeamSide side, bool isDefense)
     {
         var roster = _game.RosterFor(side);
         var lineup = _game.LineupFor(side);
@@ -181,7 +183,7 @@ public sealed class RollJGenerator : IRollJPieGenerator
             var player = roster.PlayerAt(lineup.SlotAt(slot));
             if (player is not null)
             {
-                total += player.Athleticism;
+                total += _game.Fatigue.EffectiveAthleticism(player, isDefense);
                 count++;
             }
         }

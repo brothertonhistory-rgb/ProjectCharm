@@ -162,8 +162,8 @@ public sealed class RollAGenerator : IRollAPieGenerator
         // Same DQ2 Option B resolution as Phase 13 (Roll B).
         var offHandling  = WeightedAggregate(offPlayers, p => p.BallHandling);
         var defStealers  = WeightedAggregate(defPlayers, p => p.Steals);
-        var offAthletic  = WeightedAggregate(offPlayers, p => p.Athleticism);
-        var defAthletic  = WeightedAggregate(defPlayers, p => p.Athleticism);
+        var offAthletic  = WeightedAggregate(offPlayers, p => _game.Fatigue.EffectiveAthleticism(p, isDefense: false));
+        var defAthletic  = WeightedAggregate(defPlayers, p => _game.Fatigue.EffectiveAthleticism(p, isDefense: true));
         var offLength    = WeightedAggregate(offPlayers, p => Matchup.LengthRating(p, _matchup));
         var defLength    = WeightedAggregate(defPlayers, p => Matchup.LengthRating(p, _matchup));
 
