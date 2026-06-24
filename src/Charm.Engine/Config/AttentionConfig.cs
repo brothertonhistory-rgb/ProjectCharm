@@ -135,12 +135,6 @@ public sealed class AttentionConfig
     /// Invariant: in (0, 1]. [CALIBRATION PLACEHOLDER]</summary>
     public double PassingRankWeight { get; set; } = 0.75;
 
-    /// <summary>Floor of the opportunity gate at zero BaseOpenness. Allows a small
-    /// passing bonus even when gravity/spacing produce no engine (the v4 wording fix —
-    /// "strongly SCALED by opportunity with a small positive floor").
-    /// Invariant: in [0, 1). [CALIBRATION PLACEHOLDER]</summary>
-    public double OpportunityFloor { get; set; } = 0.10;
-
     /// <summary>Maximum absolute passing bonus added to makePct in Roll H.
     /// Provides an explicit ceiling on the converter's contribution.
     /// Invariant: in (0, 1]. [CALIBRATION PLACEHOLDER]</summary>
@@ -188,9 +182,6 @@ public sealed class AttentionConfig
         if (cfg.PassingRankWeight <= 0 || cfg.PassingRankWeight > 1.0)
             throw new InvalidOperationException(
                 $"AttentionConfig: PassingRankWeight must be in (0, 1] (got {cfg.PassingRankWeight}).");
-        if (cfg.OpportunityFloor < 0 || cfg.OpportunityFloor >= 1.0)
-            throw new InvalidOperationException(
-                $"AttentionConfig: OpportunityFloor must be in [0, 1) (got {cfg.OpportunityFloor}).");
         if (cfg.MaxPassingBonus <= 0 || cfg.MaxPassingBonus > 1.0)
             throw new InvalidOperationException(
                 $"AttentionConfig: MaxPassingBonus must be in (0, 1] (got {cfg.MaxPassingBonus}).");

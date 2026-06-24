@@ -70,16 +70,16 @@ A fifth tag, orthogonal to kind, marks **wiring status**:
 | Off-ball movement | Offense | Authored individual | live-on-arrival |
 | Screening | Offense | Authored individual | live-on-arrival |
 | Offensive rebounding | Offense | Authored individual | live-on-arrival |
-| Gravity | Offense | Team-aggregate | dormant-pending-module |
-| Spacing | Offense | Team-aggregate (2-stage) | dormant-pending-module |
-| Transition | Offense | Derived (from physicals) | dormant-pending-module |
+| Gravity | Offense | Team-aggregate | live; feeds the defensive attention pie (gravity×spacing → openness → C1 make% + conversionQuality), so Gravity **reaches play** (Phase 27) |
+| Spacing | Offense | Team-aggregate (2-stage) | live; same attention rework (gravity×spacing → openness → C1 make% + conversionQuality), so Spacing **reaches play** (Phase 27) |
+| Transition | Offense | Derived (from physicals) | live; transition play reaches the floor through Roll J's real generator (pace bias + effective-athleticism gap), not a separately authored field, so Transition **reaches play** (Phase 28) |
 | Perimeter defense | Defense | Authored individual | live-on-arrival |
 | Post defense | Defense | Authored individual | live-on-arrival |
 | Rim protection | Defense | Authored individual | live-on-arrival |
 | Defensive rebounding | Defense | Authored individual | live-on-arrival |
 | Steals / turnover generation | Defense | Authored individual | live-on-arrival |
-| Help defense | Defense | Team-aggregate | dormant-pending-module |
-| Off-ball defense | Defense | Team-aggregate | dormant-pending-module |
+| Help defense | Defense | Team-aggregate | live; C6 interior make% suppression in Roll H, so Help defense **reaches play** (Phase 41) |
+| Off-ball defense | Defense | Team-aggregate | live; C7 perimeter make% suppression in Roll H plus per-slot selection denial in Roll E, so Off-ball defense **reaches play** (Phase 44) |
 | Height | Physical | Authored individual | live-on-arrival |
 | Wingspan | Physical | Authored individual | live-on-arrival |
 | Weight | Physical | Body-input (drives Strength up, Quickness/Speed down at generation) | not-engine-consumed; generation-time only (spec locked, build pending player-gen module) |

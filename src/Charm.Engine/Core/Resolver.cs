@@ -803,7 +803,7 @@ public sealed class Resolver
                         // -> sideline inbound; JumpBall -> the arrow node). It mutates
                         // GameState (its LooseBallFoulOnDefense arm charges the defensive
                         // team foul), hence it takes _game — the Roll D / I / J / K shape.
-                        // FTReboundStub is retired from the live chain; this edge now
+                        // This edge now
                         // executes Roll M. Roll M fires ONCE per FT trip — a missed putback
                         // off its offensive board re-enters Roll I, not Roll M, so it adds
                         // no new convergence loop.

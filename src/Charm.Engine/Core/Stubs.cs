@@ -12,20 +12,6 @@ public interface IContinuationNode
     string Receive(Continue continuation);
 }
 
-/// <summary>STUB for the turnover-type resolver.</summary>
-public sealed class TurnoverTypeResolverStub : IContinuationNode
-{
-    public string Receive(Continue continuation) => "STUB:TurnoverTypeResolver";
-}
-
-/// <summary>STUB for the resumed-inbound / possession-continues node — where a
-/// non-shooting foul with the opponent NOT in the bonus lands: the offense keeps
-/// the ball and inbounds. A real node replaces this without Roll D changing.</summary>
-public sealed class ResumeInboundStub : IContinuationNode
-{
-    public string Receive(Continue continuation) => "STUB:ResumeInbound";
-}
-
 /// <summary>STUB for the free-throw node — RETIRED from the live chain as of Session
 /// 18, when Roll L's FT-sequence driver took over both FT edges. Where a non-shooting
 /// foul with the opponent in the bonus used to land; the bonus fork (Roll D / I / J /
@@ -72,37 +58,6 @@ public sealed class OffensiveReboundStub : IContinuationNode
         ShotFacts.Describe("OffensiveRebound", continuation.State);
 }
 
-/// <summary>STUB for the shooting-free-throw node — RETIRED from the live chain as
-/// of Session 18, when Roll L's FT-sequence driver took over both FT edges (the same
-/// stub→roll swap as OffensiveReboundStub→Roll K a session earlier). Roll H's two
-/// foul arms (an and-1 on a make, or a shooting foul on a miss) now drive Roll L
-/// directly; the resolver no longer parks here. Kept ONLY as a harness fact-echo
-/// helper: a couple of checks invoke <see cref="Receive"/> directly on a Roll H
-/// shooting-foul continue to confirm slot+zone+result rode through, without routing
-/// through the resolver. The free-throw COUNT (and-1 = 1; fouled miss = 2; fouled
-/// miss on a three = 3) is now derived at the resolver's FT entry edge. Echoes slot,
-/// zone, AND result via <see cref="ShotFacts.Describe"/>.</summary>
-public sealed class ShootingFreeThrowsStub : IContinuationNode
-{
-    public string Receive(Continue continuation) =>
-        ShotFacts.Describe("ShootingFreeThrows", continuation.State);
-}
-
-/// <summary>STUB for the FT-rebound node — RETIRED from the live chain as of Session
-/// 19, when Roll M took over the <c>ResolveFTRebound</c> edge (the same stub→roll swap
-/// as OffensiveReboundStub→Roll K). A missed FINAL free throw now executes Roll M (the
-/// offensive/defensive board split off a missed FT, the OOB pair, and any foul on that
-/// rebound); the resolver no longer parks here and no longer injects this stub.
-/// <para>KEPT IN THE CORNER, FLAGGED FOR FUTURE REMOVAL: unlike the other two retired
-/// FT stubs (<see cref="ResolveFreeThrowsStub"/>, still used as a harness fact-echo
-/// helper), this is a plain-label stub with NO remaining caller — no check invokes it.
-/// It is retained only as cheap insurance against a near-term need to re-park; delete
-/// it once Roll M has settled and no re-park is wanted.</para></summary>
-public sealed class FTReboundStub : IContinuationNode
-{
-    public string Receive(Continue continuation) => "STUB:FTRebound";
-}
-
 /// <summary>STUB for the sideline-inbound node — where Roll H's
 /// MissOutOfBoundsRetained lands: the missed shot deflected OOB off the defender,
 /// the offense keeps it and inbounds from the side. MAY eventually share a
@@ -113,12 +68,6 @@ public sealed class SidelineInboundStub : IContinuationNode
 {
     public string Receive(Continue continuation) =>
         ShotFacts.Describe("SidelineInbound", continuation.State);
-}
-
-/// <summary>STUB for the jump-ball resolver (consults the possession arrow).</summary>
-public sealed class JumpBallResolverStub : IContinuationNode
-{
-    public string Receive(Continue continuation) => "STUB:JumpBallResolver";
 }
 
 /// <summary>STUB for the transition node — where Roll J's <c>Push</c> lands: the
@@ -134,8 +83,8 @@ public sealed class TransitionStub : IContinuationNode
 }
 
 /// <summary>
-/// Shared label-builder for the four post-Roll-H stubs (rebound, shooting free
-/// throws, sideline inbound, and — as of Session 13 — block recovery). Each lands
+/// Shared label-builder for the three post-Roll-H stubs (rebound, sideline
+/// inbound, and — as of Session 13 — block recovery). Each lands
 /// AFTER all three per-possession facts are stamped (slot by Roll E, zone by Roll
 /// G, result by Roll H), so each echoes all three in the form
 /// <c>STUB:{node}:{Side}slot{N}:{Zone}:{Result}</c>, surfacing any missing fact

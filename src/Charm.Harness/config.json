@@ -182,7 +182,6 @@
     "ActivationScale": 0.2,
     "PlaymakingDecay": 0.8,
     "PassingRankWeight": 0.75,
-    "OpportunityFloor": 0.1,
     "MaxPassingBonus": 0.08
   },
   "Matchup": {

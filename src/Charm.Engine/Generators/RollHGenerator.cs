@@ -214,7 +214,7 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // plays evenly — the v1–v3 bug fixed in v4).
         //
         // PassingBonus = MaxPassingBonus × conversionQuality × opportunityGate
-        //   opportunityGate = lerp(OpportunityFloor, 1.0, BaseOpenness)
+        //   opportunityGate = lerp(PassingOpportunityFloor, 1.0, BaseOpenness)
         //     — small floor at zero opportunity; → 1.0 as the gravity/spacing engine roars
         //   conversionQuality = DIRECT term (passing × floor) + activation-gated compound
         //     — stamped on PossessionState at Roll E time
