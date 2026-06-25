@@ -381,47 +381,43 @@ ball, advance it up the floor, get set in the halfcourt. Not just the inbound pa
 everything that can happen before the offense is set at its end lives here. (See
 "The backcourt / frontcourt division" above for the organizing principle.)
 
-> ⚠ SUPERSEDED (Contextification #6): Roll A is five-arm — see the correction at the end of this doc.
+**Pie shape:** five arms over `EntryOutcome` — `CleanEntry`, `Turnover`,
+`OffensiveFoul`, `DefensiveFoul`, `JumpBall`.
 
-**Pie shape:** seven slices over `EntryOutcome` — `CleanEntry`, `Turnover`,
-`ShotClockViolation`, `FiveSecondInbound`, `TenSecondBackcourt`, `Foul`,
-`JumpBall`. (Stub weights today; see below.)
-
-**Seven exits:**
+**Five exits:**
 
 | Outcome | Result | Routes to |
 |---|---|---|
-| Clean entry | `Continue(IntoHalfcourtSet)` | Roll B |
-| Turnover (incl. backcourt bad pass / stepping on line) | `Continue(ResolveTurnoverType)` | Roll C |
-| Shot-clock violation | `Terminal("ShotClockViolation")`, elapsed = 30s | possession ends |
-| 5-second inbound | `Terminal("FiveSecondInbound")`, elapsed = 0s | possession ends |
-| 10-second backcourt | `Terminal("TenSecondBackcourt")`, elapsed = 10s | possession ends |
-| Foul | `Continue(ResolveFoulType)` | Roll D |
+| Clean entry | `Continue(IntoHalfcourtSet)`, latches `Frontcourt = true` | Roll B |
+| Turnover | `Continue(ResolveTurnoverType)`, stamps the loss context | Roll C |
+| Offensive foul | `Continue(ResolveOffensiveFoul)` | offensive-foul resolution |
+| Defensive foul | `Continue(ResolveFoulType)` | Roll D |
 | Jump ball | `Continue(ResolveJumpBall)` | jump-ball node |
 
-**Three violation terminals, three fixed elapsed times.** All three violations are
-zero-variance: the violation simply *is* the outcome, nothing remains to resolve,
-so each stamps its own invariant elapsed time with no time roll. They differ only
-in how much clock burned:
-- Shot-clock (30s) — never got a shot off in the full backcourt+frontcourt window.
-- 10-second backcourt (10s) — inbounded, but never cleared the division line; the
-  count ran before the whistle.
-- 5-second inbound (0s) — the entry pass never came in, so the clock never started.
+**Where the old violations went.** Roll A used to terminate three backcourt
+violations itself (shot-clock, 5-second inbound, 10-second backcourt). They no
+longer live here: a backcourt loss now rides the `Turnover` arm, which stamps
+`TurnoverContext.EntryBackcourt` (or `Halfcourt` on a frontcourt re-inbound), and
+Roll C — the canonical home of every no-shot loss — resolves the type. The three
+violations are now slices of Roll C's EntryBackcourt pie, and their fixed elapsed
+times moved from `RollAConfig` to `RollCConfig`.
 
-A backcourt *turnover* (bad pass out of bounds, stepping on the division line) is
-NOT a new slice: it rides the existing `Turnover → ResolveTurnoverType` path and
-Roll C classifies it by ball-state as it does any other turnover.
+**The foul split.** The old single `Foul` slice is now two arms. `OffensiveFoul`
+(a charge or illegal screen) routes to offensive-foul resolution — a deterministic
+dead-ball loss to the defense, no free throws, no bonus. `DefensiveFoul` (a reach-in
+or bump on the ball-handler) routes to Roll D, which charges the team foul and forks
+on the bonus.
 
-**Why foul and jump ball are continues, not terminals.** Both have real variance
-in what they become. A foul still needs its type decided (Roll D). A jump ball
-needs the possession arrow consulted. Roll A only classifies that the outcome
-occurred and hands off; the resolver does the deciding.
+**Why turnover, both fouls, and jump ball are continues, not terminals.** Each still
+has something left to resolve. A turnover needs its type classified (Roll C); a
+defensive foul needs the bonus consulted (Roll D); a jump ball needs the possession
+arrow read; even the offensive foul hands to its own resolution. Roll A only
+classifies that the outcome occurred and hands off; the resolver does the deciding.
 
-**The pie generator is stubbed.** `StubPieGenerator` (in `StubPieGenerator.cs`;
-its config is `RollAConfig`, which lives in the misleadingly-named `Config.cs`)
-returns the configured base weights with one live wire: a single 0–1 `pressure`
-scalar nudges the turnover slice, then renormalizes. Placeholder to prove the seam
-carries signal — not basketball logic.
+**The pie generator is real.** Roll A's generator is the full-court-press disruption
+door (Phase 14/15): when the defense presses, it bends the turnover and foul arms by
+press intensity and the backcourt matchup, and falls back to a flat baseline once the
+offense has crossed half. See the Phase 14 entry below for the wiring.
 
 ---
 
@@ -3895,20 +3891,6 @@ The generator's doc-comment states this explicitly.
 
 ---
 
-## Roll A — correction: five-arm pie (Contextification #6 supersedes the "seven slices" section above)
-
-The Roll A section above (the "Pie shape: seven slices" block) describes the pre-Contextification-#6 shape and is stale. A banner on that section marks it superseded. The Contextification #6 entry later in this document documents the correct shape in full. This correction restates the key facts plainly for any reader landing on the stale section first.
-
-**Roll A's pie is five-arm.** `EntryOutcome` is: `CleanEntry`, `Turnover`, `OffensiveFoul`, `DefensiveFoul`, `JumpBall`. The three former violation terminals (`ShotClockViolation`, `FiveSecondInbound`, `TenSecondBackcourt`) are gone from Roll A's pie.
-
-**Where the violations went.** A backcourt violation is a way the possession is lost — it belongs in Roll C, the canonical home of every no-shot loss. Roll A's Turnover arm stamps `TurnoverContext.EntryBackcourt` on a backcourt bring-up; Roll C's EntryBackcourt pie resolves the type, which includes `FiveSecondInbound`, `TenSecondBackcourt`, and the backcourt shot-clock. A frontcourt re-inbound stamps `TurnoverContext.Halfcourt` instead, where those backcourt-only losses are 0.0. The invariant elapsed times formerly in `RollAConfig` now live in `RollCConfig`.
-
-**The foul split.** The old single `Foul` slice became two: `OffensiveFoul` (charge / illegal screen → offensive-foul resolution: deterministic dead-ball loss to the defense, no free throws, no bonus) and `DefensiveFoul` (reach-in / bump on the ball-handler → Roll D, which charges the team foul and forks on the bonus).
-
-See the Contextification #6 design entry for full rationale and wiring details.
-
----
-
 ## Phase 14 — Full-court press disruption door (Roll A, backcourt entry)
 
 ### What this phase is and is not
@@ -6357,9 +6339,9 @@ No substitutions (own session), so in observation the five starters per side pla
 
 ---
 
-## Basketball IQ — design spec (LOCKED, NOT YET BUILT) (design conversation, 2026-06-23)
+## Basketball IQ — design spec (LOCKED; make door BUILT in Phase 50, generation forward) (design conversation, 2026-06-23)
 
-Settled in a design conversation; no code shipped. Recorded so the wiring session inherits the reasoning exactly. The wiring **audit** (which contest sites can carry IQ cleanly) is the one remaining input and is a read-the-code task for the build session, not a design question. Two separate buckets below: how IQ *behaves* (wiring) and how IQ values are *generated* (generation). The no-scalar wall sits between them.
+The make-door mechanic shipped in Phase 50 (below); the **generation** half — how IQ values are distributed across the player pool — is still forward, in the player-gen layer. This section records the locked design reasoning behind both, and the site-by-site wiring audit it refers to is complete (see "Audit outcome" below). Two separate buckets: how IQ *behaves* (wiring — built) and how IQ values are *generated* (generation — forward). The no-scalar wall sits between them.
 
 ### The governing rule (relabeled 2026-06-23 after the make-door design + two prompt reviews)
 
