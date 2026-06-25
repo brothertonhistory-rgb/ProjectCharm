@@ -157,6 +157,22 @@ public sealed record PossessionState(
     TeamSide Defense,
     EntryType Entry,
     Slot? SelectedSlot = null,
+    /// <param name="FreeThrowShooterSlot">The offensive slot that drew a foul on a
+    /// pre-Roll-E bonus trip — the "who drew the foul" identity (Phase 51), stamped by
+    /// <see cref="FouledPlayerPicker"/> when a bonus foul arrives before a shooter has
+    /// been selected (<see cref="SelectedSlot"/> still null).
+    /// <para><b>Trip-scoped.</b> Valid ONLY while resolving and attributing the current
+    /// free-throw trip. It is read by exactly two sites: Roll L's make% resolution
+    /// (<c>FreeThrowShooterSlot ?? SelectedSlot</c>) and the bonus FT per-slot
+    /// attribution. It is NOT a general possession shooter identity and must never
+    /// influence Roll E/K/M, FGA/FGM, or putback attribution.</para>
+    /// <para><b>Explicit clear.</b> Nulled on the missed-final-FT
+    /// <see cref="ContinuationKind.ResolveFTRebound"/> exit (the only live-ball exit
+    /// from a FT trip), so it can never leak into a later live-ball continuation — a
+    /// second shooting-foul trip in the same possession (the bonus-miss → FT-rebound →
+    /// putback route, where Roll E never runs and <see cref="SelectedSlot"/> stays
+    /// null) would otherwise read this stale stamp. Default null.</param>
+    Slot? FreeThrowShooterSlot = null,
     ShotLocation? ShotType = null,
     ShotResult? Result = null,
     TransitionContext? TransitionContext = null,

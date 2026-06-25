@@ -182,6 +182,16 @@ public sealed class Resolver
         var missFouled = 0;
         var fta = 0;
         var ftm = 0;
+        // Phase 51: FTA-source classification — every FTA on this walk lands in exactly
+        // one of five buckets, incremented at the two FT entry edges using the trip's
+        // actual spin count. They reconcile to `fta`
+        // (ftaBonusPicker + ftaBonusSelected + ftaBonusUnattributed + ftaShootingSelected
+        //  + ftaShootingNoSlot == fta) — asserted per-record and aggregate in Observation.
+        var ftaBonusPicker      = 0;   // bonus trip, shooter named by FouledPlayerPicker (the new path)
+        var ftaBonusSelected    = 0;   // bonus trip, Roll E shooter already selected (post-Roll-E bonus)
+        var ftaBonusUnattributed = 0;  // bonus trip, no shooter at all (empty roster — the residual 72%)
+        var ftaShootingSelected = 0;   // shooting-foul trip, normal selected shooter
+        var ftaShootingNoSlot   = 0;   // shooting-foul trip, no-slot exception (post-FT-rebound putback)
         var orbChances = 0;
         var orbWon = 0;
         var rimFga = 0;
@@ -292,6 +302,9 @@ public sealed class Resolver
                           Fga = fga, Fgm = fgm, ThreePa = threePa, ThreePm = threePm,
                           ShotResolutions = shotResolutions, MissFouled = missFouled,
                           Fta = fta, Ftm = ftm, OrbChances = orbChances, OrbWon = orbWon,
+                          FtaBonusPicker = ftaBonusPicker, FtaBonusSelected = ftaBonusSelected,
+                          FtaBonusUnattributed = ftaBonusUnattributed,
+                          FtaShootingSelected = ftaShootingSelected, FtaShootingNoSlot = ftaShootingNoSlot,
                           RimFga = rimFga, RimFgm = rimFgm, ShortFga = shortFga, ShortFgm = shortFgm,
                           MidFga = midFga, MidFgm = midFgm, LongFga = longFga, LongFgm = longFgm,
                           Slot1Fga = slot1Fga, Slot2Fga = slot2Fga, Slot3Fga = slot3Fga,
@@ -465,8 +478,24 @@ public sealed class Resolver
                         // Continue(ResolveFTRebound) (last miss -> live board); feed it
                         // back into this switch.
                         case ContinuationKind.ResolveFreeThrows:
+                            // Phase 51: a pre-Roll-E bonus foul arrives with no shooter
+                            // selected (SelectedSlot null). Name WHO drew it via the
+                            // foul-draw picker and stamp it onto a LOCAL trip state, so
+                            // the trip is shot at his real FreeThrow rating and credited
+                            // to him. The stamp lives ONLY on this local ftState (A2
+                            // isolation): c.State is never mutated, and the picker fires
+                            // only when a draw is actually needed — SelectedSlot still
+                            // null AND ≥1 populated offensive slot (an empty-roster
+                            // isolation game falls through to the flat fallback, never
+                            // throwing).
+                            var ftState = c.State;
+                            if (ftState.SelectedSlot is null && AnyOffensivePlayer(ftState))
+                                ftState = ftState with
+                                {
+                                    FreeThrowShooterSlot = FouledPlayerPicker.Pick(ftState, _game, _matchup, _rng)
+                                };
                             result = DriveFreeThrows(
-                                c.State,
+                                ftState,
                                 shots: c.Bonus == BonusType.Double ? 2 : 1,
                                 oneAndOne: c.Bonus == BonusType.OneAndOne,
                                 out var bonusFtSpins, out var bonusFtPoints);
@@ -474,12 +503,19 @@ public sealed class Resolver
                             points        += bonusFtPoints;
                             fta           += bonusFtSpins;   // each spin is one attempt
                             ftm           += bonusFtPoints;  // ftPoints == ftMakes (verified)
-                            // Phase 23: FTA/FTM per slot for bonus free throws.
+                            // Phase 23 + Phase 51: FTA/FTM per slot for bonus free throws —
+                            // credit the foul-draw pick when set, else the existing selected
+                            // shooter, else slot 0 (unattributed, empty-roster only).
                             {
-                                var ftSlot = c.State.SelectedSlot?.Number ?? 0;
+                                var ftSlot = (ftState.FreeThrowShooterSlot ?? ftState.SelectedSlot)?.Number ?? 0;
                                 ftaBySlot = ftaBySlot.WithSlot(ftSlot, bonusFtSpins);
                                 ftmBySlot = ftmBySlot.WithSlot(ftSlot, bonusFtPoints);
                             }
+                            // Phase 51: FTA-source classification for this bonus trip. Read
+                            // the LOCAL ftState (the stamp lives here, not on c.State).
+                            if (ftState.FreeThrowShooterSlot != null) ftaBonusPicker       += bonusFtSpins;
+                            else if (ftState.SelectedSlot     != null) ftaBonusSelected     += bonusFtSpins;
+                            else                                       ftaBonusUnattributed += bonusFtSpins;
                             continue;
 
                         // RETIRED (Contextification #2): Roll H's Blocked no longer emits
@@ -739,6 +775,12 @@ public sealed class Resolver
                                 ftaBySlot = ftaBySlot.WithSlot(ftSlotS, shootingFtSpins);
                                 ftmBySlot = ftmBySlot.WithSlot(ftSlotS, shootingFtPoints);
                             }
+                            // Phase 51: FTA-source classification for this shooting-foul trip.
+                            // The foul-draw picker is NOT wired here — a shooting foul with no
+                            // selected shooter is the existing no-slot exception (a post-FT-rebound
+                            // putback, Roll E never ran), which keeps the flat fallback untouched.
+                            if (c.State.SelectedSlot != null) ftaShootingSelected += shootingFtSpins;
+                            else                              ftaShootingNoSlot   += shootingFtSpins;
                             continue;
 
                         // OOB off the defender, offense RETAINS (Roll H's
@@ -853,6 +895,21 @@ public sealed class Resolver
     /// made FT is 1 point, a downstream derivation the future points pass reads off the
     /// make/miss fact, exactly as a field goal's 2/3 is.</para>
     /// </summary>
+    /// <summary>Phase 51: true if the offensive side has at least one populated slot —
+    /// the gate the bonus FT edge checks before invoking <see cref="FouledPlayerPicker"/>.
+    /// An empty-roster isolation game has zero populated offensive slots, so the picker
+    /// (which throws on zero) is skipped and the trip falls through to Roll L's flat
+    /// fallback. Mirrors the picker's own Stage-1 population scan.</summary>
+    private bool AnyOffensivePlayer(PossessionState state)
+    {
+        var lineup = _game.LineupFor(state.Offense);
+        var roster = _game.RosterFor(state.Offense);
+        for (var i = 1; i <= 5; i++)
+            if (roster.PlayerAt(lineup.SlotAt(i)) is not null)
+                return true;
+        return false;
+    }
+
     private RollResult DriveFreeThrows(PossessionState state, int shots, bool oneAndOne, out int spinCount, out int ftPoints)
     {
         var pie = _rollLGenerator.Generate(state);
@@ -900,11 +957,18 @@ public sealed class Resolver
     /// <summary>The uniform last-shot rule: a made final free throw ENDS the possession
     /// (opponent inbounds and starts at Roll A — the same dead-ball consequence as a
     /// made field goal); a missed final free throw leaves the ball LIVE and routes to
-    /// the FT-rebound node.</summary>
+    /// the FT-rebound node.
+    /// <para>Phase 51: the live-ball exit NULLS
+    /// <see cref="PossessionState.FreeThrowShooterSlot"/> — this is the one and only
+    /// live-ball exit from a free-throw trip, so clearing it here guarantees a foul-draw
+    /// stamp can never carry past the trip into a later live-ball continuation (the
+    /// bonus-miss → FT-rebound → putback route, where a second shooting-foul trip would
+    /// otherwise read the stale stamp). The made-FT exit ends the possession, so its
+    /// stamp dies with the terminal — no clear needed there.</para></summary>
     private static RollResult LastShot(PossessionState state, FreeThrowOutcome outcome) =>
         outcome == FreeThrowOutcome.Make
             ? new Terminal("FreeThrowsMade", state, PossessionConsequence.DeadBallTo(state.Defense))
-            : new Continue(ContinuationKind.ResolveFTRebound, state);
+            : new Continue(ContinuationKind.ResolveFTRebound, state with { FreeThrowShooterSlot = null });
 
     /// <summary>Derive the shot count for a SHOOTING foul from the stamped facts —
     /// plain sequencing the conductor reads at the entry edge, never a stamp Roll L

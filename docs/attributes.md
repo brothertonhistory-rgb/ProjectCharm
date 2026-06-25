@@ -70,6 +70,7 @@ A fifth tag, orthogonal to kind, marks **wiring status**:
 | Off-ball movement | Offense | Authored individual | live-on-arrival |
 | Screening | Offense | Authored individual | live-on-arrival |
 | Offensive rebounding | Offense | Authored individual | live-on-arrival |
+| Foul drawing | Offense | Authored individual | live; drives the Roll H shooting-foul *rate* (the Matchup foul contest) AND weights the FouledPlayerPicker foul-draw *selection* (Phase 51), so Foul drawing **reaches play** |
 | Gravity | Offense | Team-aggregate | live; feeds the defensive attention pie (gravity×spacing → openness → C1 make% + conversionQuality), so Gravity **reaches play** (Phase 27) |
 | Spacing | Offense | Team-aggregate (2-stage) | live; same attention rework (gravity×spacing → openness → C1 make% + conversionQuality), so Spacing **reaches play** (Phase 27) |
 | Transition | Offense | Derived (from physicals) | live; transition play reaches the floor through Roll J's real generator (pace bias + effective-athleticism gap), not a separately authored field, so Transition **reaches play** (Phase 28) |
@@ -158,6 +159,23 @@ The screener's quality affects what the ball-handler gets off the screen. Physic
 Pursuing and securing the team's own misses. Feeds Roll I / Roll K's offensive-board arms;
 its rate is also a possession-count calibration knob (too many offensive boards inflate
 possessions per team above the ~67-70 anchor).
+
+### Foul drawing
+Getting to the line — drawing contact. Two distinct, non-overlapping uses, kept separate
+the way the engine keeps every *rate* apart from every *identity*:
+- **The shooting-foul rate** (the Matchup foul contest Roll H consumes) — a higher foul
+  drawing raises the chance an attempt becomes a shooting foul or an and-1. This answers
+  *how often* a foul is drawn.
+- **The foul-draw pick** (FouledPlayerPicker, Phase 51) — when a team is in the bonus and
+  a non-shooting foul is drawn before a shooter has been selected, this is one of three
+  channels (with planned usage and ball handling) deciding *which* of the five offensive
+  players drew it, so the bonus trip is shot at his real Free-throw rating and credited to
+  him. This answers *which player*, given a foul happened — not how often, so it does not
+  double-count the rate use above.
+
+Not the same as **Discipline** (the foul-*avoidance* attribute on the defensive side) and
+not a tendency — foul drawing is *how good you are at getting to the line*, an ability,
+not a frequency choice.
 
 ### Gravity — *team-aggregate, derived-per-player contribution*
 The defensive attention a player's scoring threat commands. **Derived per player** (a

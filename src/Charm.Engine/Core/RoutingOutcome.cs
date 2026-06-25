@@ -131,6 +131,43 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     public int Ftm { get; init; }
 
     /// <summary>
+    /// Phase 51 — FTA-source classification. Every free-throw attempt on this
+    /// possession lands in exactly one of these five buckets, so they reconcile to
+    /// <see cref="Fta"/> on every possession:
+    /// <c>FtaBonusPicker + FtaBonusSelected + FtaBonusUnattributed +
+    /// FtaShootingSelected + FtaShootingNoSlot == Fta</c> (asserted per-record and in
+    /// aggregate by the Observation run). Init-only with a 0 default, so every existing
+    /// positional construction is untouched — a pure append, like every prior field.
+    /// <list type="bullet">
+    ///   <item><see cref="FtaBonusPicker"/> — bonus trip whose shooter was named by
+    ///         <see cref="FouledPlayerPicker"/> (the Phase 51 path; on populated rosters
+    ///         this is where the old pre-Roll-E unattributed FTA now lands).</item>
+    ///   <item><see cref="FtaBonusSelected"/> — bonus trip where Roll E had already
+    ///         selected the shooter (a post-Roll-E bonus foul).</item>
+    ///   <item><see cref="FtaBonusUnattributed"/> — bonus trip with no shooter at all
+    ///         (an empty-roster isolation game — the residual flat-fallback FTA, which
+    ///         collapses to ~0 on populated rosters).</item>
+    ///   <item><see cref="FtaShootingSelected"/> — shooting-foul trip with the normal
+    ///         selected shooter.</item>
+    ///   <item><see cref="FtaShootingNoSlot"/> — shooting-foul trip with no selected
+    ///         slot (the existing post-FT-rebound putback exception, unchanged).</item>
+    /// </list>
+    /// </summary>
+    public int FtaBonusPicker { get; init; }
+
+    /// <summary>See <see cref="FtaBonusPicker"/> — bonus trip, Roll E shooter selected.</summary>
+    public int FtaBonusSelected { get; init; }
+
+    /// <summary>See <see cref="FtaBonusPicker"/> — bonus trip, no shooter (empty roster).</summary>
+    public int FtaBonusUnattributed { get; init; }
+
+    /// <summary>See <see cref="FtaBonusPicker"/> — shooting-foul trip, selected shooter.</summary>
+    public int FtaShootingSelected { get; init; }
+
+    /// <summary>See <see cref="FtaBonusPicker"/> — shooting-foul trip, no-slot exception.</summary>
+    public int FtaShootingNoSlot { get; init; }
+
+    /// <summary>
     /// Offensive-rebound chances on this possession — the count of Roll I and Roll M
     /// resolutions that ended in either <see cref="ReboundOutcome.DefensiveRebound"/>
     /// (defense won) or <see cref="ReboundOutcome.OffensiveRebound"/> (offense won).

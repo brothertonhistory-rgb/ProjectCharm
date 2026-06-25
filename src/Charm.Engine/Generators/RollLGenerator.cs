@@ -12,18 +12,25 @@ namespace Charm.Engine;
 /// modifier — the authored rating IS the make%. This is the simplest real generator
 /// in the engine.</para>
 ///
-/// <para><b>Shooter resolution.</b> The generator reads
-/// <see cref="PossessionState.SelectedSlot"/> and walks
-/// <c>game.RosterFor(state.Offense).PlayerAt(slot)</c>. Two fallback paths use
-/// <see cref="RollLConfig.MakeProbability"/> (the flat 72% D1 average):
+/// <para><b>Shooter resolution.</b> The generator resolves the shooter as
+/// <see cref="PossessionState.FreeThrowShooterSlot"/> ?? <see cref="PossessionState.SelectedSlot"/>
+/// and walks <c>game.RosterFor(state.Offense).PlayerAt(slot)</c>. A populated
+/// <see cref="PossessionState.FreeThrowShooterSlot"/> is the Phase 51 pre-Roll-E
+/// bonus attribution path — the foul-draw pick named who went to the line, so the
+/// trip is shot at his real rating. Otherwise the Roll E selected shooter is used.
+/// The flat fallback to <see cref="RollLConfig.MakeProbability"/> (the 72% D1
+/// average) now means BOTH identities are unavailable:
 /// <list type="bullet">
-///   <item>Null slot — a bonus foul arrived before Roll E ran; the shooter is
-///         unknown.</item>
-///   <item>Unpopulated slot — an isolation-test game with an empty roster.</item>
+///   <item>Empty roster — an isolation-test game with no populated offensive
+///         players (no picker fires, no Roll E shooter).</item>
+///   <item>The parked putback exception — a shooting foul on a post-FT-rebound
+///         putback where Roll E never ran (<see cref="PossessionState.SelectedSlot"/>
+///         null) and the foul-draw picker does not fire (it is wired only at the
+///         bonus FT edge). Out of scope for Phase 51.</item>
 /// </list>
-/// These are named loose ends (Phase 18 build §7), not bugs. The reported FT% in
-/// game runs is therefore a blend of player-attributed ratings (shooting-foul trips
-/// and post-Roll-E bonus trips) and the 72% flat fallback (pre-Roll-E bonus trips).
+/// The reported FT% in game runs is therefore a blend of player-attributed ratings
+/// (shooting-foul trips, post-Roll-E bonus trips, and Phase 51 pre-Roll-E bonus
+/// trips) and the 72% flat fallback (only the two cases above).
 /// </para>
 ///
 /// <para><b>RoadMakePenalty is dormant.</b> The <see cref="RollLConfig.RoadMakePenalty"/>
@@ -52,15 +59,21 @@ public sealed class RollLGenerator : IRollLPieGenerator
     {
         double makeProbability;
 
-        if (state.SelectedSlot is null)
+        // Phase 51: resolve the shooter as the pre-Roll-E bonus foul-draw pick when set,
+        // else the Roll E selected shooter. The flat fallback now means BOTH are
+        // unavailable (a fully empty roster, or — for the parked putback exception —
+        // a shooting foul where Roll E never ran and no picker fired).
+        var shooterSlot = state.FreeThrowShooterSlot ?? state.SelectedSlot;
+
+        if (shooterSlot is null)
         {
-            // Null slot: bonus foul before Roll E ran; shooter unknown.
-            // Fall back to the flat config make%.
+            // No shooter identity at all (FreeThrowShooterSlot and SelectedSlot both
+            // null) — fall back to the flat config make%.
             makeProbability = _config.MakeProbability;
         }
         else
         {
-            var player = _game.RosterFor(state.Offense).PlayerAt(state.SelectedSlot.Value);
+            var player = _game.RosterFor(state.Offense).PlayerAt(shooterSlot.Value);
             if (player is null)
             {
                 // Unpopulated slot: isolation-test game with an empty roster.

@@ -879,6 +879,23 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"StealerPostnessScale must be > 0: got {cfg.StealerPostnessScale}.");
 
+        // Phase 51 — FouledPlayerPicker. The floor must be STRICTLY > 0 (it alone keeps
+        // every populated offensive slot eligible); the three channel weights are each
+        // >= 0 (the floor being positive is sufficient — the weights need not sum to
+        // anything positive).
+        if (cfg.FouledPlayerPickFloor <= 0.0)
+            throw new InvalidOperationException(
+                $"FouledPlayerPickFloor must be > 0: got {cfg.FouledPlayerPickFloor}.");
+        if (cfg.FouledPlayerPickFoulDrawingWeight < 0.0)
+            throw new InvalidOperationException(
+                $"FouledPlayerPickFoulDrawingWeight must be >= 0: got {cfg.FouledPlayerPickFoulDrawingWeight}.");
+        if (cfg.FouledPlayerPickUsageWeight < 0.0)
+            throw new InvalidOperationException(
+                $"FouledPlayerPickUsageWeight must be >= 0: got {cfg.FouledPlayerPickUsageWeight}.");
+        if (cfg.FouledPlayerPickBallHandlingWeight < 0.0)
+            throw new InvalidOperationException(
+                $"FouledPlayerPickBallHandlingWeight must be >= 0: got {cfg.FouledPlayerPickBallHandlingWeight}.");
+
         // Phase 35 — wingspan in rebound battle and attribution.
         // Phase 43 — all three ReboundPhysical components are nonnegative; they need not
         //             sum to 1.0, but a negative coefficient would invert the physical
@@ -1276,6 +1293,33 @@ public sealed class MatchupConfig
     /// <see cref="StealerPostFloor"/> (post). Must be &gt; 0 (enforced in Load).
     /// Calibration placeholder.</summary>
     public double StealerPostnessScale { get; set; } = 40.0;
+
+    // --- Phase 51: FouledPlayerPicker (pre-Roll-E bonus trips — "who drew the foul").
+    //     Three authored channels, each normalized to [0,1] first, then a weighted
+    //     additive blend, then a strictly-positive floor that keeps every populated
+    //     offensive player eligible. All CALIBRATION PLACEHOLDERS. ---
+
+    /// <summary>Weight on the FoulDrawing channel (<c>FoulDrawing / 99</c>) in the
+    /// foul-draw pick — the contact channel (drivers and banging posts high, perimeter
+    /// parkers low). Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double FouledPlayerPickFoulDrawingWeight { get; set; } = 1.0;
+
+    /// <summary>Weight on the planned-usage channel (<c>(HierarchyRank − 1) / 9</c>) in
+    /// the foul-draw pick — more-featured players draw more. Must be &gt;= 0 (enforced in
+    /// Load). Calibration placeholder.</summary>
+    public double FouledPlayerPickUsageWeight { get; set; } = 1.0;
+
+    /// <summary>Weight on the BallHandling channel (<c>BallHandling / 99</c>) in the
+    /// foul-draw pick — the early-reach-in-on-the-handler aspect; spreads the share among
+    /// the guards. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double FouledPlayerPickBallHandlingWeight { get; set; } = 1.0;
+
+    /// <summary>The pick-weight floor every populated offensive player reaches in the
+    /// foul-draw pick — the parked perimeter shooter can still get grabbed (rare, never
+    /// zero). Must be strictly &gt; 0 (enforced in Load): a zero floor would let an
+    /// all-zero-channel parker reach zero draw weight, breaking the "every populated
+    /// player nonzero" contract. Calibration placeholder.</summary>
+    public double FouledPlayerPickFloor { get; set; } = 0.05;
 
     // =========================================================================
     // Phase 36 — BLK attribution: zone-aware blocker weight coefficients

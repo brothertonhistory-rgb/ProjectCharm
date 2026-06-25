@@ -6477,3 +6477,61 @@ Roll H exposes only a Pie — the older six-value attribution comment in the fil
 ### What this phase did NOT do (mapped-and-deferred, unchanged)
 
 Make door only; make/miss only. Denial (Roll E) overlaps OffBallMovement and the "better look" the make door now owns; help defense (C6) is already the HelpDefense attribute; rebound (Roll K) and transition (Roll J) are non-monotone; turnover (Roll A) is a team-aggregate fork with no individual subject, a separate model if ever chosen. Magnitude calibration of the IQ footprint — the compounding watch item (IQ + gravity + spacing + a competent shooter on one possession) — waits for the player-generation + calibration pass.
+
+## Phase 51 — Real free-throw shooter on populated bonus trips — FouledPlayerPicker (Session 14, 2026-06-24)
+
+### The problem this closes
+
+Free throws had one persistent gap. When a team is in the bonus and a non-shooting foul is drawn **before the offense has run a play**, no shooter has been selected (`SelectedSlot` is null — Roll E never ran). Roll L (free-throw resolution) therefore had no rating to read, so it fell back to a flat `MakeProbability` (72%) and the attempt was credited to the slot-0 "unattributed" sentinel. On a real roster this is wrong twice: the make rate ignores who actually shot, and the box score loses the attempt. This is the loose end the observation corpus had been flagging in its FT% note for several phases.
+
+### The fix — a "who," not a "how many"
+
+`FouledPlayerPicker` answers the missing question: *given a non-shooting bonus foul happened, which of the five offensive players drew it?* The bonus rules already decide the shot count (1-and-1 vs. two vs. double bonus); this draw does not touch that. It is offense-side only — which *defender* committed the foul, and per-defender foul trouble, are explicitly out of scope.
+
+**Weight model (locked shape, placeholder coefficients).** Each populated offensive player gets a pick weight blending three authored channels, each normalized to [0,1] first so the three config weights share one interpretable unit:
+
+```
+n(FoulDrawing)  = FoulDrawing / 99           // the contact channel
+n(usage)        = (HierarchyRank − 1) / 9     // the planned-usage knob (1–10 → 0..1)
+n(BallHandling) = BallHandling / 99           // the early-reach-on-the-handler aspect
+weight          = max(floor, w_fd·n(FoulDrawing) + w_use·n(usage) + w_bh·n(BallHandling))
+```
+
+normalized across the populated slots; **one** RNG draw walks the cumulative sum to the chosen slot. The lead guard tops the list **emergently** (highest BallHandling *and* usage), not by rule; a genuinely featured high-usage big also draws heavily. The floor is **strictly > 0** (enforced in `MatchupConfig.Load`) — the never-zero contract: a parked perimeter shooter can still get grabbed, rare but never impossible. Coefficients ship at **w_fd = w_use = w_bh = 1.0, floor = 0.05**; these are CALIBRATION PLACEHOLDERS, deferred to the player-gen + calibration pass. The shape — three channels, additive, floored, normalized, one draw — is what is locked here.
+
+**Why this is not a double-count.** FoulDrawing already drives Roll H's shooting-foul *rate* (via the Matchup shooting-foul contest — how often a foul is drawn). The picker uses FoulDrawing for a different question: *which* of the five drew a non-shooting foul, given one occurred. Two distinct questions, no shared term — the same separation the rest of the engine keeps between a rate and an identity.
+
+### The trip-scoped state field
+
+`PossessionState` gains `FreeThrowShooterSlot` (`Slot?`, default null) — the "who drew the foul" identity. It is **trip-scoped**: valid only while resolving and attributing the current free-throw trip, read by exactly two sites:
+
+1. Roll L's make% resolution — the shooter is `FreeThrowShooterSlot ?? SelectedSlot`; only when both are null does Roll L fall to the flat fallback.
+2. The bonus-FT per-slot attribution — the FTA/FTM credit goes to `FreeThrowShooterSlot ?? SelectedSlot`.
+
+It must never influence Roll E/K/M, FGA/FGM, or putback attribution. The picker stamps it onto a **local** trip state at the bonus FT edge — the live possession state is never mutated, and the stamp fires only when a draw is actually needed (no shooter selected **and** ≥1 offensive slot populated).
+
+**The clear (the one invariant that keeps it trip-scoped).** A free-throw trip has exactly one live-ball exit: `LastShot`'s missed-final-FT arm, which routes to the FT-rebound node. That arm **nulls** `FreeThrowShooterSlot`. Because it is the *sole* live-ball exit, clearing it there guarantees a stamp can never carry past the trip into a later live-ball continuation — specifically the bonus-miss → FT-rebound → putback route, where a second shooting-foul trip would otherwise read a stale stamp. The made-FT exit ends the possession, so its stamp dies with the terminal; no clear is needed there.
+
+**The empty-roster gate.** An isolation test game with no players seated has zero populated offensive slots. The bonus edge checks `AnyOffensivePlayer` before calling the picker (which throws on zero), so an empty roster falls through to Roll L's flat fallback exactly as before — no regression, and the picker's zero-population throw stays an unreachable loud guard.
+
+### Observability — the FTA-source classification
+
+Every free-throw attempt on a possession is classified into exactly one of five buckets, threaded `RoutingOutcome → Governor → PossessionRecord` and reconciled (per-record **and** aggregate) to `Fta`:
+
+- **FtaBonusPicker** — bonus trip whose shooter the picker named (the Phase 51 path; on populated rosters this is where the old unattributed FTA now lands).
+- **FtaBonusSelected** — bonus trip where Roll E had already selected the shooter (a post-Roll-E bonus foul).
+- **FtaBonusUnattributed** — bonus trip with no shooter at all (an empty-roster isolation game — the residual flat fallback, which collapses to ~0 on real rosters).
+- **FtaShootingSelected** — shooting-foul trip with the normal selected shooter.
+- **FtaShootingNoSlot** — shooting-foul trip with no selected slot (the existing post-FT-rebound putback exception, unchanged).
+
+The observation run prints these as a `--- FREE-THROW SOURCE ---` report. The design contract is **FtaBonusUnattributed ≈ 0** on populated rosters; the validating run produced literal **0 (0.00%)** over 1,000 games, with 4,302 attempts (15.26%) under FtaBonusPicker.
+
+### Validation method (no end-to-end batch where avoidable)
+
+The picker's **shape** is proven by direct probes — the real picker, fixed-seed Monte Carlo, ≥100k draws — not by a noisy whole-game batch: six acceptance bands (equal lineup ~20% each, lead handler 28–40%, featured big ≥22%, parker 1–8% never 0, strict per-channel monotonicity, ≥100k draws) plus the floor. The two reader sites are proven where they live: make% at `RollLGenerator.Generate`, and the trip mechanics (one-draw discipline, attribution to the drawn slot, the no-slot exception, the empty-roster gate) through `resolver.Route` on constructed free-throw-edge states. A Python Monte Carlo mirroring the exact weight model gated the build before any C# — all six bands passed at the shipped placeholders.
+
+**The carryover-guard methodology call (deliberate deviation, recorded).** The literal carryover test would force the natural chain — populated bonus trip → missed final FT → offensive FT-rebound → putback → second shooting foul — to show the stamp does not leak. That chain cannot be forced deterministically without **running** the engine: its rebound and foul outcomes depend on config-driven pie slice positions, so a blind scripted RNG would be the brittle-blind-code failure mode the conventions warn against. The clear was instead proven two robust ways: a no-slot shooting foul is handled as the existing exception and never reclassified through the picker (`FtaBonusPicker = 0`), and a cleared stamp provably falls through to the flat fallback at the generator (the clear sits at the sole live-ball FT exit, verified). If a forced-chain proof is ever wanted, it belongs in a harness that runs the engine, not a scripted-RNG construction.
+
+### What this phase did NOT do (mapped-and-deferred)
+
+Which *defender* committed the foul, and per-defender foul trouble — out of scope (offense-side only). Intentional/off-ball fouling realism — not modelled. Coefficient calibration — the placeholders (1.0/1.0/1.0, floor 0.05) wait for the player-gen + calibration pass, where balance comes from rarity in the player population, not from formula ceilings. Reusing `SelectedSlot` for the FT shooter was rejected — the new field keeps the foul-draw identity strictly separate from the play-selection identity, so neither leaks into the other's attribution.

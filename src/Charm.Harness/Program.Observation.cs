@@ -324,6 +324,13 @@ internal static partial class Program
         };
 
         var mechanicsOk = true;
+
+        // Phase 51: FTA-source running totals across all possessions, all games — the
+        // corpus evidence that the pre-Roll-E "unattributed" FTA collapses to ~0 on the
+        // populated observation rosters (it now lands in the bonus-picker bucket).
+        long totalFtaBonusPicker = 0L, totalFtaBonusSelected = 0L,
+             totalFtaBonusUnattributed = 0L, totalFtaShootingSelected = 0L,
+             totalFtaShootingNoSlot = 0L;
         var gamesRun    = 0;
 
         // ── Phase 23 per-player box score accumulators ──────────────────────
@@ -657,6 +664,42 @@ internal static partial class Program
                 Console.WriteLine();
                 Console.WriteLine($"  [FAIL] Seed {seed}: FTM slots {recFtmSlots} > FTA slots {recFtaSlots}");
                 mechanicsOk = false;
+            }
+            // Phase 51: FTA-source classification reconciliation. Every FTA lands in
+            // exactly one of five buckets (bonus-picker / bonus-selected /
+            // bonus-unattributed / shooting-selected / shooting-no-slot), so per record
+            // AND in aggregate they must sum to Fta. A mismatch means a FT trip was
+            // counted into the wrong bucket or dropped.
+            var recFtaBonusPicker       = records.Sum(r => r.FtaBonusPicker);
+            var recFtaBonusSelected     = records.Sum(r => r.FtaBonusSelected);
+            var recFtaBonusUnattributed = records.Sum(r => r.FtaBonusUnattributed);
+            var recFtaShootingSelected  = records.Sum(r => r.FtaShootingSelected);
+            var recFtaShootingNoSlot    = records.Sum(r => r.FtaShootingNoSlot);
+            totalFtaBonusPicker       += recFtaBonusPicker;
+            totalFtaBonusSelected     += recFtaBonusSelected;
+            totalFtaBonusUnattributed += recFtaBonusUnattributed;
+            totalFtaShootingSelected  += recFtaShootingSelected;
+            totalFtaShootingNoSlot    += recFtaShootingNoSlot;
+            var recFtaSourceTotal = recFtaBonusPicker + recFtaBonusSelected
+                                  + recFtaBonusUnattributed + recFtaShootingSelected
+                                  + recFtaShootingNoSlot;
+            if (recFtaSourceTotal != recFtaCheck)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: FTA-source total {recFtaSourceTotal} != Fta {recFtaCheck}");
+                mechanicsOk = false;
+            }
+            foreach (var r in records)
+            {
+                var perRec = r.FtaBonusPicker + r.FtaBonusSelected + r.FtaBonusUnattributed
+                           + r.FtaShootingSelected + r.FtaShootingNoSlot;
+                if (perRec != r.Fta)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine($"  [FAIL] Seed {seed}: possession {r.Number} FTA-source total {perRec} != Fta {r.Fta}");
+                    mechanicsOk = false;
+                    break;
+                }
             }
             // TurnoverWasLiveBall must match live-TO EndLabel exactly
             var recLiveToPoss = records.Count(r => r.TurnoverWasLiveBall);
@@ -1021,6 +1064,18 @@ internal static partial class Program
         ObsPrintD("    Mid",   midShareList);
         ObsPrintD("    Long",  longShareList);
         ObsPrintD("    Three", threeShareList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- FREE-THROW SOURCE (FTA by entry edge + shooter identity, aggregate across all games) ---");
+        var totalFtaAll = totalFtaBonusPicker + totalFtaBonusSelected + totalFtaBonusUnattributed
+                        + totalFtaShootingSelected + totalFtaShootingNoSlot;
+        double FtaSh(long n) => totalFtaAll > 0 ? (double)n / totalFtaAll : 0.0;
+        Console.WriteLine($"  Total FTA: {totalFtaAll:N0}");
+        Console.WriteLine($"  Bonus, picker shooter     : {totalFtaBonusPicker,10:N0}  ({FtaSh(totalFtaBonusPicker):P2})   <- Phase 51 (drew the foul, real rating)");
+        Console.WriteLine($"  Bonus, selected shooter   : {totalFtaBonusSelected,10:N0}  ({FtaSh(totalFtaBonusSelected):P2})   (post-Roll-E bonus)");
+        Console.WriteLine($"  Bonus, UNATTRIBUTED (72%) : {totalFtaBonusUnattributed,10:N0}  ({FtaSh(totalFtaBonusUnattributed):P2})   <- should be ~0 on populated rosters");
+        Console.WriteLine($"  Shooting foul, selected   : {totalFtaShootingSelected,10:N0}  ({FtaSh(totalFtaShootingSelected):P2})");
+        Console.WriteLine($"  Shooting foul, no-slot    : {totalFtaShootingNoSlot,10:N0}  ({FtaSh(totalFtaShootingNoSlot):P2})   (post-FT-rebound putback exception)");
 
         Console.WriteLine();
         Console.WriteLine("--- USAGE (per-slot FGA share, aggregate across all games) ---");

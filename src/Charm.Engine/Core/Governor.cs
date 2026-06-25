@@ -135,7 +135,16 @@ public sealed record PossessionRecord(
     // Phase 39: engine-stamped per-slot assist counts. AstBySlot.Total <= Fgm on every
     // possession (harness-asserted). Default (all zeros) on possessions with no made FGs
     // or possessions where every make was a putback or null-SelectedSlot (bonus-FT edge).
-    SlotGroup AstBySlot = default);
+    SlotGroup AstBySlot = default,
+    // Phase 51: FTA-source classification — every FTA on the possession lands in exactly
+    // one of these five buckets, so they reconcile to Fta
+    // (FtaBonusPicker + FtaBonusSelected + FtaBonusUnattributed + FtaShootingSelected +
+    //  FtaShootingNoSlot == Fta) — asserted by the Observation run. Defaults 0.
+    int FtaBonusPicker = 0,
+    int FtaBonusSelected = 0,
+    int FtaBonusUnattributed = 0,
+    int FtaShootingSelected = 0,
+    int FtaShootingNoSlot = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -292,6 +301,10 @@ public sealed class Governor
             int possessionFga = 0, possessionFgm = 0, possessionThreePa = 0, possessionThreePm = 0;
             int possessionShotResolutions = 0, possessionMissFouled = 0;
             int possessionFta = 0, possessionFtm = 0, possessionOrbChances = 0, possessionOrbWon = 0;
+            // Phase 51: FTA-source classification locals (reconcile to possessionFta).
+            int possessionFtaBonusPicker = 0, possessionFtaBonusSelected = 0,
+                possessionFtaBonusUnattributed = 0, possessionFtaShootingSelected = 0,
+                possessionFtaShootingNoSlot = 0;
             int possessionRimFga = 0, possessionRimFgm = 0, possessionShortFga = 0, possessionShortFgm = 0;
             int possessionMidFga = 0, possessionMidFgm = 0, possessionLongFga = 0, possessionLongFgm = 0;
             int possessionSlot1Fga = 0, possessionSlot2Fga = 0, possessionSlot3Fga = 0,
@@ -357,6 +370,12 @@ public sealed class Governor
                 possessionMissFouled      = outcome.MissFouled;
                 possessionFta             = outcome.Fta;
                 possessionFtm             = outcome.Ftm;
+                // Phase 51: carry the FTA-source classification through to the record.
+                possessionFtaBonusPicker       = outcome.FtaBonusPicker;
+                possessionFtaBonusSelected     = outcome.FtaBonusSelected;
+                possessionFtaBonusUnattributed = outcome.FtaBonusUnattributed;
+                possessionFtaShootingSelected  = outcome.FtaShootingSelected;
+                possessionFtaShootingNoSlot    = outcome.FtaShootingNoSlot;
                 possessionOrbChances      = outcome.OrbChances;
                 possessionOrbWon          = outcome.OrbWon;
                 possessionRimFga          = outcome.RimFga;
@@ -430,7 +449,10 @@ public sealed class Governor
                 possessionStealerSlot,
                 possessionDefensiveRebounderSlot,
                 possessionBlkBySlot,
-                possessionAstBySlot));
+                possessionAstBySlot,
+                possessionFtaBonusPicker, possessionFtaBonusSelected,
+                possessionFtaBonusUnattributed, possessionFtaShootingSelected,
+                possessionFtaShootingNoSlot));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(
