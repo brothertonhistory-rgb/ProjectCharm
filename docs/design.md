@@ -10,8 +10,8 @@ task lists (those live in the journal). It is updated every session.
 The possession engine is a gravity funnel. Imagine dropping balls into the top:
 each one falls through pipes and branches until it EXTINGUISHES at the bottom — a
 turnover, a missed shot, a made shot, a resolved foul — all into one discard pile.
-The work right now is building the pipes and naming them as we go. Where a pipe
-isn't built yet, balls park in a HOLDING PEN (a stub) until the next pipe is laid —
+The engine was built one pipe at a time, naming them as it went. While a pipe was
+still unbuilt, balls parked in a HOLDING PEN (a stub) until the next pipe was laid —
 exactly as ~80% of possessions parked at the player-selection stub until Roll E
 was built.
 
@@ -23,29 +23,27 @@ Two consequences that govern all sequencing:
    pipe. The roll web is built stub-first, each new roll converting a holding pen
    into either a terminal or another pipe that eventually terminates.
 
-2. **The game layer comes LAST, after the funnel is whole.** The Game Governor
+2. **The game layer came LAST, after the funnel was whole.** The Game Governor
    (the thing that drops the next ball and decides which side it starts on, tracks
-   score, declares a winner) does NOT exist yet and should not. There is nothing to
-   govern until possessions produce real endings — points, turnovers, misses. "The
-   game begins" only once the funnel terminates everywhere. Until then, validation
-   is per-pipe (drop balls, check the rates, confirm every ball reaches a bottom),
-   exactly as every session has worked so far — no game-level view is needed or
-   wanted yet.
+   score, declares a winner) was deliberately deferred until possessions produced
+   real endings — points, turnovers, misses. Nothing could be governed until the
+   funnel terminated everywhere, so until then validation stayed per-pipe: drop
+   balls, check the rates, confirm every ball reaches a bottom. That sequencing
+   held, and the game layer is now built (see "The Game Governor" below).
 
-Anti-pattern to avoid (it has cost real time): trying to build the Governor against
-a half-built funnel, then discovering "this outcome can't say where the next ball
-goes." Of course it can't — that pipe isn't built. Finish the pipes; the Governor
-becomes trivial once every terminal is real and sitting right there to read.
+The anti-pattern this avoided (it cost real time before the rule was adopted):
+building the Governor against a half-built funnel, then hitting an outcome that
+couldn't say where the next ball goes. The fix was to finish the pipes first — and
+once every terminal was real and sitting right there to read, the Governor was
+trivial.
 
-Current frontier: the chain terminates cleanly for turnovers (Roll C — now fed by A,
-B, and F), fouls (Roll D → stubs — also fed by A, B, F), violations and jump balls
-(Roll A, B, F). Roll F (player action) resolves the selected player's action into a
-shot attempt, turnover, non-shooting foul, block, or held ball; Roll G (shot
-location) then stamps WHERE a clean attempt comes from (Three / Long / Mid / Short /
-Rim). The chain now dead-ends at the `IntoShotResolution` stub for any possession
-that gets a shot off (the future Roll H — make/miss), and at the `ResolveBlock` stub
-for a blocked attempt. The next pipes are the shot web beyond Roll G (make/miss,
-block-recovery, rebound, free throws). The Governor is built only after those land.
+Where the funnel stands now: the possession engine is complete through Roll M. No
+possession dead-ends at an unbuilt roll any more — the full shot web is live
+(make/miss is Roll H, then block recovery, rebounding, free throws, and the
+free-throw glass), and a missed shot loops back through a real rebound rather than
+parking at a stub. The game layer — Governor, clock, score, game boundaries — is
+built. The frontier now is the universe layer: player generation, save/persistence,
+scheduling, the season loop, and recruiting.
 
 ---
 
@@ -918,16 +916,15 @@ node with block recovery — also flagged, not merged.
 **Config lives separately.** Roll H's six weights live in the `"RollH"` section of
 `config.json`, loaded by `RollHConfig`.
 
-## The Game Governor — the possession-to-possession layer (DESIGNED, not built)
+## The Game Governor — the possession-to-possession layer (built)
 
-The engine resolves ONE possession (the Resolver) but has no layer above it: the
-ball never changes teams, no second possession ever begins, and the
-possessions-as-accounting-unit anchor (~67–70/team, ~1.0 PPP) is therefore not even
-measurable. The Game Governor is the layer that turns "resolve a possession" into
-"play a game." DESIGNED this session; built LAST — only once the possession engine
-terminates on every path (see "The funnel principle" below). The Governor governs a
-finished funnel; until every possession reaches a real ending there is nothing to
-govern, so it is deliberately deferred behind the rest of the roll web.
+Above the Resolver (which resolves ONE possession) sits the Game Governor: the layer
+that turns "resolve a possession" into "play a game." It loops possessions, flips the
+ball between teams, and keeps the possessions-as-accounting-unit anchor (~67–70/team,
+~1.0 PPP) measurable. It was deliberately built LAST — only after the possession
+engine terminated on every path (see "The funnel principle" above), because there is
+nothing to govern until possessions produce real endings. That funnel is now whole,
+and the Governor governs it.
 
 **Two routing layers, kept distinct.** WITHIN a possession, routing is unchanged:
 roll → continuation kind → Resolver → next roll. BETWEEN possessions is the new
@@ -941,72 +938,42 @@ a possession.
 MEANS for the next possession (who gets the ball, dead vs. live start, points
 scored) lives where it is generated — the same philosophy as "a roll names its
 continuation kind, the Resolver maps it." The Governor reads the stamped
-consequence and executes it; it does not inspect reason strings and decide. (The
-exact attachment mechanism — stamp every terminal vs. a gap-filling interpreter for
-legacy terminals — is the central question for the build session.)
+consequence and executes it; it does not inspect reason strings and decide. Each
+terminal stamps its own consequence, so the Governor never has to interpret a legacy
+terminal after the fact.
 
 **Default flip, override on the consequence.** Most terminals flip the ball to the
 other team. The OFFENSIVE REBOUND is the exception: same team, and it does NOT
 increment the possession count — it is a continuation, which is what preserves the
-~67–70 anchor. No rebound roll exists yet, so this is a stub branch, but the loop
-is SHAPED from day one to allow "same team, possession continues," because
-retrofitting that later is painful.
+~67–70 anchor. Roll I (rebounding) fills this branch: an offensive rebound keeps the
+ball with the same team and is a continuation, and the loop was shaped from day one
+to allow "same team, possession continues."
 
-**Owns: loop, whose-ball, clock, score, possession count.** The clock and score are
-STUBBED-but-real-shaped at first: the Governor writes score (0 until the make/miss
-roll exists) and drains a flat placeholder time per possession toward 40 minutes
-(until the real time roll exists). The write paths and fields are real; the values
-snap in later without reopening the Governor. The stopping rule starts as a config'd
-possession cap, not a real clock.
+**Owns: loop, whose-ball, clock, score, possession count.** These are live: the
+Governor writes real points from the make/miss roll and drains real game-clock
+seconds per possession across two halves toward 40 minutes. The write paths and
+fields were shaped before the values existed, so the real make/miss and clock rolls
+snapped in without reopening the Governor.
 
 **Start-state is an enum** (`DeadBallInbound`, `Transition`, …), so the Governor can
-eventually route to different entry variants. Roll A is the `DeadBallInbound` entry;
-a transition-entry roll is future. (`EntryType` and this enum may be the same
-concept — reconcile, don't carry both.) This is also the home for the deferred
-jump-ball retain/turnover branch: the jump-ball terminal's consequence carries the
-arrow-award result, and once the Governor exists the defense-retains case (new
-possession from Roll A) becomes buildable.
+route to different entry variants. Roll A is the `DeadBallInbound` entry; Roll J is
+the transition entry. This is also the home for the jump-ball retain/turnover branch:
+the jump-ball terminal's consequence carries the arrow-award result, and the
+defense-retains case starts a new possession from Roll A.
 
 ---
 
-## Known required infrastructure (not yet built)
+## Possession-layer infrastructure — built
 
-- **Free-throw node** — consumes the `BonusType` from Roll D. Resolves a 1-and-1
-  (front-end miss → live ball → rebound roll) or a double bonus (two guaranteed;
-  first miss is dead, only a missed final attempt is live). Currently a stub; the
-  reboundability logic lives here, derived from the bonus type — not upstream.
-- **Resumed-inbound / possession-continues node** — where a non-shooting foul
-  with the opponent not in the bonus lands (offense keeps the ball, inbounds).
-  Currently a stub.
-- **Per-player foul attribution** — which defender committed the foul, for the
-  personal/team foul accumulation. A counting-stat concern like turnover/steal
-  credit; Roll D charges only the team. Future.
-- **Half-reset of team fouls** — resets/replaces the `FoulTracker` at the half
-  (the bonus resets with it). Future; clears the one object.
-- **Shooting-foul roll** — a future post-player-selection roll; the only foul
-  path Roll D does not cover (Roll D is pre-shot by construction).
-- **Time roll** — apportions game-clock seconds for non-invariant outcomes. Every
-  terminal except the shot-clock violation defers its time here — including all
-  of Roll C's and the jump-ball terminals.
-- **Player-selection roll** — BUILT (Session 8, Roll E). Picks which on-court
-  offensive slot the possession runs through and stamps it on `PossessionState`.
-  Roll B's `Proceed` exit lands here. Flat odds for now; the attribute model tilts
-  them later via a smarter generator.
-- **Player-action sequence** — where Roll E's selection lands. The gate (Roll F,
-  BUILT S9) resolves the action into shot attempt / turnover / non-shooting foul /
-  block / held ball. Still ahead: the shot-creation / shot-quality / make-miss /
-  rebound / shooting-foul rolls beyond it. The chain now dead-ends at the
-  `IntoShotType` and `ResolveBlock` stubs — the next frontier. Roll F consumes
-  `PossessionState.SelectedSlot` only indirectly (it rides forward untouched).
-- **Player/steal attribution layer** — runs over outcomes whenever a counting
-  stat is generated; assigns the offensive turnover and (on live-ball slices) the
-  defensive steal to specific players. Orthogonal to the possession chain; reads,
-  never gates. Roll C's classification is one of its inputs.
-- **Next-possession entry** — the awarded team (after a jump ball) and the team
-  inbounding after a dead-ball turnover both need to *start a new possession*.
-  Likely a sibling of Roll A.
-- **Height-driven tip contest** — replaces the jump-ball node's 50/50 placeholder
-  once a player/attribute layer exists (S-curve on centers' height differential).
+Everything this section once tracked as "required but not yet built" now exists and
+is documented in the rolls and systems above: free throws (Roll L) and the
+free-throw glass (Roll M), rebounding (Roll I), the clock and score, per-player foul
+and steal/turnover attribution, the half-reset of team fouls at the break, and the
+next-possession entry (Roll A for dead-ball starts, Roll J for transition). The jump
+ball's old 50/50 placeholder is gone too — the tip now turns on wingspan. The
+possession layer is complete through Roll M; what remains unbuilt is the universe
+layer (player generation, persistence, scheduling, the season loop, recruiting), not
+anything inside a possession.
 
 ---
 
