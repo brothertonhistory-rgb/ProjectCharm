@@ -1,0 +1,42 @@
+﻿
+=== PROJECT CHARM :: Size Ladder ===
+  Position-realistic heights | skill + athleticism flat at 50 | wingspan = height
+  1,000 games / row  |  13 rows  |  13,000 total games
+
+  FLOOR vs FLOOR   .... done
+  SMALL vs SMALL   .... done
+  AVG   vs AVG     .... done
+  BIG   vs BIG     .... done
+  ELITE vs ELITE   .... done
+  BIG   vs AVG     .... done
+  AVG   vs SMALL   .... done
+  SMALL vs FLOOR   .... done
+  ELITE vs AVG     .... done
+  ELITE vs SMALL   .... done
+  BIG   vs FLOOR   .... done
+  ELITE vs FLOOR   .... done
+  MAX   vs MIN     .... done
+
+  Matchup           H.Reb  A.Reb   Reb╬ö  H.ORb  A.ORb   Orb╬ö  H.Blk  A.Blk   Blk╬ö
+  ----------------------------------------------------------------------------------
+  FLOOR vs FLOOR     30.6   30.5    0.1    8.8    8.8    0.1   3.29   3.35  -0.05
+  SMALL vs SMALL     30.6   30.6    0.1    8.9    8.8    0.1   3.29   3.36  -0.07
+  AVG   vs AVG       30.6   30.6    0.1    8.8    8.8    0.1   3.28   3.35  -0.07
+  BIG   vs BIG       30.6   30.5    0.1    8.8    8.8    0.0   3.28   3.34  -0.05
+  ELITE vs ELITE     30.6   30.4    0.2    8.8    8.7    0.1   3.29   3.32  -0.03
+  BIG   vs AVG       30.7   30.4    0.3    8.9    8.7    0.3   3.38   3.28   0.10
+  AVG   vs SMALL     31.6   29.6    2.0    9.6    8.2    1.3   3.54   3.19   0.35
+  SMALL vs FLOOR     30.8   30.3    0.6    9.0    8.6    0.4   3.46   3.20   0.26
+  ELITE vs AVG       32.1   29.3    2.8    9.9    8.1    1.8   3.61   3.23   0.37
+  ELITE vs SMALL     35.2   26.5    8.7   11.9    6.7    5.2   4.31   2.99   1.32
+  BIG   vs FLOOR     35.0   26.6    8.4   11.8    6.8    5.1   4.34   3.00   1.35
+  ELITE vs FLOOR     37.4   24.7   12.7   13.4    5.7    7.6   4.93   2.86   2.07
+  MAX   vs MIN       39.5   22.7   16.8   14.9    4.8   10.0   5.51   2.69   2.82
+
+  CSV  ΓåÆ  C:\Project Charm\src\Charm.Harness\bin\Debug\net10.0\size_ladder.csv
+
+  Controls (same tier both teams) should show margins near zero.
+  Gap rows: Home is the bigger team throughout ΓÇö positive margins = size biting.
+  Two-tier gap vs one-tier gap: does doubling the gap more than double the margin?
+  MAX vs MIN: the absolute ceiling on what size alone can produce.
+

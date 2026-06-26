@@ -11,6 +11,9 @@ internal static partial class Program
         // dotnet run -- game  skips validation and plays one game.
         if (args.Length > 0 && args[0] == "game") { RunGame(configPath); return 0; }
 
+        // dotnet run -- sizetest  runs the size experiment instrument (not in the validation suite).
+        if (args.Length > 0 && args[0] == "sizetest") { RunSizeExperiment(configPath); return 0; }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);

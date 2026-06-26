@@ -1,0 +1,21 @@
+﻿
+=== PROJECT CHARM :: Size Experiment (all skill flat at 50) ===
+  400 full games per arm  |  paired seeds  |  only Height + Wingspan differ
+
+  control  ....  done
+  size gap ....  done
+
+  CONTROL   Home 50/50  vs  Away 50/50
+    rebounds / game   Home  30.9   Away  30.5   margin +0.4
+      of which OReb   Home   8.9   Away   8.8   margin +0.1
+    blocks   / game   Home  3.25   Away  3.34   margin -0.09
+
+  SIZE GAP  Home 78/78 vs  Away 50/50
+    rebounds / game   Home  33.0   Away  28.6   margin +4.4
+      of which OReb   Home  10.5   Away   7.6   margin +2.9
+    blocks   / game   Home  3.62   Away  3.05   margin +0.57
+
+  Read: CONTROL should be ~even on every line. SIZE GAP should show Home
+  ahead on rebounds (especially offensive) and blocks. Shooting is untouched
+  by design ΓÇö skill is flat, so only the size dial can move anything.
+

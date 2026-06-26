@@ -187,8 +187,8 @@
   "Matchup": {
     "SkillSteepness": 6.0,
     "SkillExponent": 2.0,
-    "PhysicalSteepness": 6.0,
-    "PhysicalExponent": 2.7,
+    "PhysicalSteepness": 11.5,
+    "PhysicalExponent": 1.75,
     "ReferenceScale": 25.0,
     "ThreePerimeter": 1.0,
     "ThreePost": 0.0,

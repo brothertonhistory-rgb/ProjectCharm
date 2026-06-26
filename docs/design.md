@@ -2859,17 +2859,29 @@ It is the only simple family that satisfies every property axes.md demands **sim
 - **Convex / accelerating, and uncapped.** The effect grows faster than the gap. There is **no asymptote
   in the gap function** — the make-curve's logistic ceiling/floor is the *only* bound on the payoff, so
   the saturation lives in exactly one place (the curve), consistent with the Phase-5 coverage math.
-- **Physical steeper than skill.** Implemented as `physicalExponent > skillExponent`. Steepness in the
-  *tail* (not a larger constant) is what encodes "**size is insurmountable**" — a large athletic gap runs
-  away faster than a large skill gap — while the make-curve's floor independently guarantees "**skill is
-  never extinguished**" (the baseline carries the skill, and the floor keeps even a badly-beaten skilled
-  shooter above a scrub).
+- **Physical dominates skill — via steepness, not exponent (calibrated 2026-06-26).** Originally implemented
+  as `physicalExponent > skillExponent`, on the theory that a steeper *tail* encodes "size is insurmountable."
+  The size-ladder calibration **inverted** this: `physicalExponent` was lowered to **1.75**, *below*
+  `skillExponent` (2.0), because a higher physical exponent made small size gaps **dead** — a two-inch-per-
+  position edge produced ~0 rebound margin — which contradicts the domain rule that size must bite even when
+  the other axes are equal (the two-of-three principle). Physical dominance is now carried by **steepness**
+  (`physicalSteepness` 11.5 > `skillSteepness` 6.0): at every realistic gap the physical shift exceeds the
+  skill shift, and the gap between them is *widest at small gaps* (where the lower exponent lifts the floor),
+  narrowing proportionally as gaps open — so physical no longer "runs away faster" than skill at large gaps,
+  though it stays larger in absolute terms across the realistic range. "**Size is insurmountable**" at the
+  extreme is now produced by steepness plus the rebound tanh cap plus the cumulative effect across rebounds
+  **and** blocks — not a steep exponent tail. The make-curve's floor still independently guarantees "**skill
+  is never extinguished.**" **Cross-cutting:** `physicalExponent`/`physicalSteepness` are shared with the
+  make-door athleticism shift and are currently tuned against the *size* ladder only; athleticism is not yet
+  separately validated against them, and if the two want different convexity, splitting into size-specific
+  and athleticism-specific exponents is a known open fork.
 
 **`referenceScale` is a unit, not a magnitude.** It is the gap (in rating points) at which a shift equals
 its steepness — a fixed, legible denominator that keeps the steepness parameters identifiable (move it
-rarely; tune steepness/exponent in calibration). Placeholder defaults: skill exponent 2.0, physical
-exponent 2.7, both steepnesses 6.0, scale 25.0. These are best-guess scaffolding; the calibration pass
-owns the real numbers, and `MatchupConfig.Load` enforces only the **invariant** (exponent > 1, scale > 0),
+rarely; tune steepness/exponent in calibration). Defaults: skill exponent 2.0 and skill steepness 6.0 (both
+still placeholder scaffolding — the skill/athleticism calibration pass owns these); physical exponent **1.75**
+and physical steepness **11.5** (calibrated 2026-06-26 against the size ladder — no longer scaffolding); scale
+25.0. `MatchupConfig.Load` enforces only the **invariant** (exponent > 1, scale > 0),
 not any particular magnitude — a deliberate, small deviation from `RollHConfig.Load`'s no-validation
 pattern, justified because an exponent ≤ 1 silently breaks the convex/flat-bottom contract.
 
