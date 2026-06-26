@@ -1,3 +1,59 @@
+## Session 17 — FG% basics: three-point make-curve calibration (2026-06-26)
+
+**Scope:** First FG% calibration pass, same working session as the size work (Session 16) but a
+separate commit. Verify and nudge the **three-point make-curve** against Emmett's real-basketball
+targets. **Analytic, not a full-game run** — make% is a deterministic formula (`MakeProbability`
+over an effective rating), so the curve was read and calibrated by direct computation; no
+instrument and no Monte-Carlo were needed (nothing to sample — it is the formula). One line shipped.
+
+**The make-curve, for the record.** Per-zone logistic in `RollHConfig` (the parameters live in the
+**C# defaults**, not config.json — config.json's RollH section carries only block/foul/MAF rates):
+`makePct = Floor + (Ceiling − Floor) / (1 + exp(−K·(rating − Midpoint)))`. The "rating" fed in is
+the matchup-adjusted **effective rating** from `Matchup.EffectiveRating` = shooter's zone skill
+(baseline) + skillShift (shooter vs the defender's blended defensive *ratings*) + physicalShift
+(the **athleticism** gap). At an even matchup (shooter rating = defender rating) or no defender, the
+shifts are zero and make% = the raw-rating curve.
+
+**Framing locked — make% is purely relative; there is no open/contested layer.** This engine has
+**no** "this shot was open vs contested" state and none is planned. A shot's make% is entirely the
+shooter rating plus the shooter-vs-defender gap (skill + athleticism). So "wide open" is not a
+fixed bonus — it is the shooter winning the matchup, which slides make% up toward the curve's
+ceiling; a good defender slides it down toward the floor. This means Emmett's wide-open targets map
+*directly* onto the make-curve with no translation.
+
+**The finding: the three-point curve was already on target.** Current params (Three: Floor 0.1608,
+Ceiling 0.6328, K 0.029646, Midpoint 65.8067) put an average (50) shooter at **34.2%** and an elite
+(90) at **47.8%** at an even matchup. Targets (Emmett): average wide-open **35–37%**, elite wide-open
+**45–55%**. The elite was dead-center; the average was ~1–2 points light. So this was a nudge, not a
+rebuild.
+
+**The change.** `RollHConfig.ThreeMidpoint` 65.8067 → **60.6** (the single knob that lifts the middle
+onto target while keeping the elite in range — sliding the curve's center toward the average shooter).
+Result at an even matchup: average (50) **36.0%**, elite (90) **49.4%**, near-max (99) 51.8%, poor (30)
+29.7% — the whole three-point curve slid up ~1–2 points, shape preserved. **Only the three zone moved**
+(Long/Mid/Short/Rim midpoints untouched). Committed standalone (`Calibration: 3pt make-curve average
+to 36% (midpoint 65.8→60.6)`).
+
+**The skill-gap read, and the deferred question.** With athleticism held equal (isolating the skill
+gap — shooter's Outside vs the defender's PerimeterDefense, since a three blends 100% perimeter), an
+average shooter's three swings only ~**39.5% (vs a beaten defender) down to ~29.5% (vs an elite
+defender)** across the *entire* defender range — about a 10-point spread, modest, because the skill
+GapFn is flat-bottomed (`SkillExponent` 2.0). **Whether the defender bites hard enough is DEFERRED**
+to the athleticism session: athleticism is the defender's *other* wire on make% (the physicalShift),
+and with no open/contested layer to lean on, the two wires (perimeter rating + athleticism) carry the
+entire contested-vs-open spread between them. Judge the full defender effect with both visible — not
+the skill wire alone.
+
+**Make-door reach note (for the record).** The make-door physicalShift is the **athleticism** gap
+only — **no length** (height/wingspan). Length drives *blocks*, not make% ("Length is what blocks
+shots; quickness and strength belong to the make door"). So a longer defender does **not** lower
+make% on shots he doesn't block. Emmett wants that effect ("undersized → contested looks over length;
+size advantage → easier"); it is real basketball but **not wired** — parked as its own later
+design+build (adding a length term to the make door), weighed against size then influencing scoring
+through a *third* channel (rebounds, blocks, **and** make%).
+
+**Next:** athleticism calibration (the athleticism ladder) — the prompt is drafted and source-audited.
+
 ## Session 16 — Size-impact calibration: the physical matchup curve + the size ladder (2026-06-26)
 
 **Scope:** Calibrate how much a size advantage bites. Built an exploratory harness instrument (the "size ladder") to measure size's effect on rebounds and blocks with skill and athleticism held flat, then tuned the shared physical matchup curve against it. Engine *config* changed (two numbers); no engine *logic* changed. The same working session also did an earlier `design.md` stale-claim cleanup (committed separately, no journal entry — the funnel, Governor, "infrastructure not yet built," Roll A seven-slice, and IQ sections corrected to present tense). Validation here is the ladder plus a Python model that reproduces it — not a full-game regression.
