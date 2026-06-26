@@ -140,7 +140,7 @@ public sealed class RollHConfig
     public double ThreeFloor    { get; set; } = 0.1608;
     public double ThreeCeiling  { get; set; } = 0.6328;
     public double ThreeK        { get; set; } = 0.029646;
-    public double ThreeMidpoint { get; set; } = 65.8067;
+    public double ThreeMidpoint { get; set; } = 60.6;
 
     // Long (reads player.Outside)
     public double LongFloor    { get; set; } = 0.1934;
