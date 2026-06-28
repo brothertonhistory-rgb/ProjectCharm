@@ -140,14 +140,25 @@ public sealed class RollJGenerator : IRollJPieGenerator
         }
 
         // ── 4. Apply both modifiers to Push/Settle (NEVER pre-fused) ─────────
-        // Additive: each modifier contributes independently.
-        // Push increases → Settle decreases by the same amount.
-        // Use the ACTUAL applied delta (post-clamp on Push) to drive Settle,
-        // so the pie always sums to exactly 1 even when Push floors at 0.
-        var rawPush        = basePush   + paceLift + athlLift;
-        var modifiedPush   = Math.Max(0.0, rawPush);
-        var actualDelta    = modifiedPush - basePush;          // what Push actually changed by
-        var modifiedSettle = Math.Max(0.0, baseSettle - actualDelta);
+        // Each modifier contributes its OWN additive delta, computed blind to the
+        // other (above); only the COMBINED delta is bounded here, as a single
+        // transfer between Settle and Push. The transfer is clamped to the room
+        // actually available — at most all of Settle may move into Push (+baseSettle),
+        // at most all of Push may move into Settle (−basePush) — so BOTH weights stay
+        // in [0, basePush+baseSettle] AND the pair's mass is conserved EXACTLY at
+        // every gap: modifiedPush + modifiedSettle == basePush + baseSettle always,
+        // including the extremes a stronger AthleticismGapScale or a GapFn can reach.
+        //
+        // This replaces an earlier two-independent-clamps form that conserved mass
+        // ONLY when the binding clamp was on Push: a large POSITIVE transfer floored
+        // Settle at 0 while Push kept climbing, the five weights summed past 1, and
+        // Pie threw (it validates sum-to-1 and refuses — it does not normalise). The
+        // bounded transfer removes that latent crash while leaving the other three
+        // arms untouched and keeping conditional Push% == modifiedPush at every gap.
+        var rawDelta       = paceLift + athlLift;
+        var transfer       = Math.Max(-basePush, Math.Min(baseSettle, rawDelta));
+        var modifiedPush   = basePush   + transfer;
+        var modifiedSettle = baseSettle - transfer;
 
         var weights = new Dictionary<TransitionOutcome, double>
         {

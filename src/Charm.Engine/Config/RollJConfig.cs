@@ -97,10 +97,14 @@ public sealed class RollJConfig
     //     AthleticismGapScale — converts the signed athleticism gap
     //     (offenseFiveAthl − defenseFiveAthl, derived Athleticism mean of active five)
     //     into a Push delta. Gap is positive when offense is more athletic (more Push),
-    //     negative when less athletic (less Push). Placeholder: 1 unit gap ≈ 0.001 Push. ---
+    //     negative when less athletic (less Push). LINEAR wire (gap × scale, no GapFn).
+    //     Calibrated Session 20: 1 unit of gap = 0.008 Push. Off a rebound (base 0.30):
+    //     a clear within-division edge (+10) → ~38% run; a cross-division mismatch
+    //     (+30) → ~54%. Applied as a bounded Push↔Settle transfer (see RollJGenerator),
+    //     so mass is conserved at every gap. ---
     public double TeamPaceBias { get; set; } = 0.0;
     public double PaceScale { get; set; } = 0.15;
-    public double AthleticismGapScale { get; set; } = 0.001;
+    public double AthleticismGapScale { get; set; } = 0.008;
 
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;

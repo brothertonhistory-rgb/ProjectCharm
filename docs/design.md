@@ -1293,20 +1293,32 @@ Roll C reads one `TurnoverContext` off the immediate `Continue`; Roll J reads on
 (a steal-born break or an entry-stage turnover pushing the downstream pie harder than a
 halfcourt one) is a future clean-append onto the same record, NOT built here.
 
-### Roll J's two deferred modifier seams (documented, independent, NOT built)
+### Roll J's modifier seams — two built and independent, one still deferred
 
-The Push/Settle split is where two SEPARATE future inputs will land — and, per the
-locked "strategy and matchup modifiers stay independent" rule, they are **never** fused
-into one pre-blended weight:
+The Push/Settle split is where SEPARATE inputs land — and, per the locked "strategy and
+matchup modifiers stay independent" rule, they are **never** fused into one pre-blended
+weight (each contributes its own additive delta; only the combined delta is bounded at the
+transfer, below).
 
-1. **Rebounder tilt (attribute).** WHO grabbed the board nudges push vs. settle — a
-   guard pushes more than a center. Lands in the attribute layer, read off the rebounder
-   slot once selection/attribution names it.
-2. **Coach tempo (strategy).** The team's up-tempo / low-tempo setting nudges push vs.
-   settle. Lands in the strategy layer.
+1. **Coach tempo (strategy) — BUILT.** The offense's up-tempo / low-tempo setting nudges
+   push vs. settle. Wired as a `CoachProfile.PaceBias` read in Phase 28 (config-knob seam)
+   and made live off the real coach in Phase 30. Lives in the strategy layer.
+2. **Team athleticism gap (attribute) — BUILT and CALIBRATED.** The offense five's mean
+   athleticism minus the defense five's nudges push vs. settle: a more athletic team runs
+   more. Wired in Phase 28; calibrated in Session 20 as a **linear** wire (`gap × 0.008`,
+   NOT the make door's flat-bottom `GapFn` — tempo is the one place a marginally faster team
+   legitimately leaks a few extra run-outs). Off a rebound (base Push 0.30): a clear
+   within-division edge (+10) → ~38% run; a cross-division mismatch (+30) → ~54%. Lives in
+   the attribute layer, read off the seated lineups.
+3. **Rebounder tilt (attribute) — still deferred.** WHICH player grabbed the board tilts
+   push vs. settle — a guard pushes more than a center. Distinct from the team-gap wire
+   above (a per-rebounder read, not a team mean); genuinely unbuilt, its own design+build if
+   the data ever names it.
 
-Both attach at the GENERATOR (a smarter pie), exactly like the height-driven tip contest
-and Roll C's pressure wire; Roll J the roll never changes when they arrive.
+All attach at the GENERATOR (a smarter pie), exactly like the height-driven tip contest and
+Roll C's pressure wire; Roll J the roll never changes when they arrive. Both built modifiers
+feed one **bounded Push↔Settle transfer** (Session 20) so the pie's mass is conserved at
+every gap — see the Phase 28 generator section.
 
 ### Rebound-first scope, and the one-line flip that finishes it
 
@@ -4906,12 +4918,18 @@ requestedShift  *= attnAmplifier
 
 2. **Team athleticism-gap (relative, directional):** `AthlLift = (offenseFiveAthl − defenseFiveAthl) × AthleticismGapScale`. `offenseFiveAthl` = mean derived `Player.Athleticism` of the active five for `ctx.OffenseSide`. Null `OffenseSide` → gap = 0, regression anchor (isolated harness tests that do not seat full rosters).
 
-**Modifier application:**
+**Modifier application (bounded transfer — Session 20).** The two deltas are summed and
+applied as a single transfer between Settle and Push, clamped to the room available:
 ```
-modifiedPush   = max(0, basePush   + PaceLift + AthlLift)
-modifiedSettle = max(0, baseSettle − PaceLift − AthlLift)
+transfer       = clamp(PaceLift + AthlLift, −basePush, baseSettle)
+modifiedPush   = basePush   + transfer
+modifiedSettle = baseSettle − transfer
 ```
-Turnover, DefensiveFoul, JumpBall are fixed to their base values.
+Pie mass is conserved exactly at every gap (`modifiedPush + modifiedSettle == basePush +
+baseSettle`), so a strong gap can floor one weight without the pie ever leaving a valid
+simplex. (Superseded the original two-independent-clamps form — see the Phase 30
+clamp-asymmetry note for the bug history.) Turnover, DefensiveFoul, JumpBall are fixed to
+their base values.
 
 **Regression anchor:** At neutral pace (`TeamPaceBias = 0.0`) and neutral athleticism gap (0 — empty lineups in harness checks), Rebound and FreeThrowRebound pies reproduce configured weights exactly. Confirmed by `RollMContextSelectionCheck`.
 
@@ -4919,10 +4937,11 @@ Turnover, DefensiveFoul, JumpBall are fixed to their base values.
 
 ### Calibration placeholders
 
-All magnitudes provisional (wire-the-form mandate):
+Magnitudes provisional at Phase 28 (wire-the-form mandate), except where later calibrated:
 - `AttentionShiftAmplifier = 1.0`
 - `BackcourtVictimPush = 0.55`, `FrontcourtVictimPush = 0.35`
-- `TeamPaceBias = 0.0`, `PaceScale = 0.15`, `AthleticismGapScale = 0.001`
+- `TeamPaceBias = 0.0`, `PaceScale = 0.15`
+- `AthleticismGapScale` — **calibrated 0.008 in Session 20** (linear; was the 0.001 placeholder)
 
 ### What is not this session
 
@@ -5029,23 +5048,23 @@ One surgical change: `CoachingPull.Apply(shooter, coach: null, ...)` replaced by
 
 **`_cfg.TeamPaceBias` role change.** Now a signed fallback knob used only when `OffenseSide` is null. Not removed — still the regression anchor for isolated harness checks. `PaceScale` is unchanged.
 
-### Roll J clamp-asymmetry bug fix
+### Roll J clamp-asymmetry bug fix (Phase 30) — generalized to a bounded transfer (Session 20)
 
-The pre-existing modifier-application block:
+The original Phase-28 modifier-application clamped Push and Settle independently:
 ```csharp
-// OLD (buggy):
+// ORIGINAL (Phase 28, buggy):
 var modifiedPush   = Math.Max(0.0, basePush   + paceLift + athlLift);
 var modifiedSettle = Math.Max(0.0, baseSettle - paceLift - athlLift);
 ```
-When `FreeThrowPush=0.08` minus a slow-pace lift of 0.09 went negative and clamped to 0, `modifiedSettle` still received the full +0.09 boost. Pie summed to 1.01, throwing `PieValidationException`. Fix:
+When `FreeThrowPush=0.08` minus a slow-pace lift of 0.09 went negative and clamped to 0, `modifiedSettle` still received the full +0.09 boost. Pie summed to 1.01, throwing `PieValidationException`. Phase 30 fixed the *negative* side by driving Settle off Push's actual delta (`actualDelta = modifiedPush − basePush`) — but the *positive* side remained a latent crash: a large positive gap floored Settle while Push kept climbing, summing past 1. Session 20 replaced the whole block with a single **bounded transfer**, closing both sides at once:
 ```csharp
-// NEW (correct):
-var rawPush      = basePush + paceLift + athlLift;
-var modifiedPush = Math.Max(0.0, rawPush);
-var actualDelta  = modifiedPush - basePush;         // what Push actually changed
-var modifiedSettle = Math.Max(0.0, baseSettle - actualDelta);
+// CURRENT (Session 20):
+var rawDelta       = paceLift + athlLift;
+var transfer       = Math.Max(-basePush, Math.Min(baseSettle, rawDelta));
+var modifiedPush   = basePush   + transfer;
+var modifiedSettle = baseSettle - transfer;
 ```
-`actualDelta` mirrors only the delta that Push actually moved, so the pie always sums to 1.0 regardless of which source and which bias. Affects the FreeThrow source at slow pace (bias ≤ ~3 with PaceScale=0.15). The bug was latent before Phase 30 because `TeamPaceBias = 0.0` never produced a lift large enough to floor Push.
+The transfer is clamped to the room available in *both* directions, so mass is conserved exactly at every gap and `Pie` never throws — at the FreeThrow source's slow-pace negative floor *or* at a strong positive gap (the positive-side crash that became reachable once `AthleticismGapScale` was calibrated up from 0.001 to 0.008).
 
 ### PaceBias in Governor
 

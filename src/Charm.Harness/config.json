@@ -440,7 +440,7 @@
     "FrontcourtVictimJumpBall": 0.005,
     "TeamPaceBias": 0.0,
     "PaceScale": 0.15,
-    "AthleticismGapScale": 0.001,
+    "AthleticismGapScale": 0.008,
     "Epsilon": 1e-09
   },
   "RollK": {
