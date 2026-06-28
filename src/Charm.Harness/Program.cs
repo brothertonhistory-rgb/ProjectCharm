@@ -17,6 +17,9 @@ internal static partial class Program
         // dotnet run -- athtest  runs the athleticism ladder (make door; not in the validation suite).
         if (args.Length > 0 && args[0] == "athtest") { RunAthleticismExperiment(configPath); return 0; }
 
+        // dotnet run -- deftest  runs the defender ladder (make door, Three; not in the validation suite).
+        if (args.Length > 0 && args[0] == "deftest") { RunDefenderExperiment(configPath); return 0; }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
