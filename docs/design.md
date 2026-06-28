@@ -2872,9 +2872,12 @@ It is the only simple family that satisfies every property axes.md demands **sim
   extreme is now produced by steepness plus the rebound tanh cap plus the cumulative effect across rebounds
   **and** blocks — not a steep exponent tail. The make-curve's floor still independently guarantees "**skill
   is never extinguished.**" **Cross-cutting:** `physicalExponent`/`physicalSteepness` are shared with the
-  make-door athleticism shift and are currently tuned against the *size* ladder only; athleticism is not yet
-  separately validated against them, and if the two want different convexity, splitting into size-specific
-  and athleticism-specific exponents is a known open fork.
+  make-door athleticism shift. They were fit against the *size* (rebound) ladder, then **validated against
+  athleticism** by the athleticism ladder (a direct make-door read, journal Session 18): at realistic
+  athleticism gaps the shared curve gives a gentle, correct shooting bite (a clear +20 edge lifts an average
+  shooter ~2–3 points at Three; the flat bottom keeps small edges imperceptible), so the two axes share one
+  curve and the size-vs-athleticism exponent **split is resolved — not taken** for the make door. The other
+  four athleticism doors and the combined defender-magnitude read remain to be calibrated separately.
 
 **`referenceScale` is a unit, not a magnitude.** It is the gap (in rating points) at which a shift equals
 its steepness — a fixed, legible denominator that keeps the steepness parameters identifiable (move it
@@ -4181,7 +4184,7 @@ The plan above was executed in the same conversation. The five per-zone logistic
 
 | Zone | Floor | Ceiling | K | Midpoint |
 |------|-------|---------|------|----------|
-| Three | 0.1608 | 0.6328 | 0.029646 | 65.8067 |
+| Three | 0.1608 | 0.6328 | 0.029646 | 60.6 |
 | Long  | 0.1934 | 0.6034 | 0.034190 | 59.5793 |
 | Mid   | 0.1042 | 0.6447 | 0.021592 | 42.3369 |
 | Short | 0.1316 | 0.7045 | 0.021592 | 42.3369 |
@@ -4193,7 +4196,7 @@ The plan above was executed in the same conversation. The five per-zone logistic
 
 **Phase 6 (f) threshold.** The harness check that a strong defender lowers the generator's make rate demanded a >5-point drop — a value calibrated to the retired steep curve. On the flattened curve a *skill-only* strong defender (PerimD 90 vs a 50 shooter, even athleticism) lowers the three by ~4.9 points, correct by design: a skilled-but-not-more-athletic defender should only nudge a shooter. The floor was relaxed to 0.03. The direction (strong defender lowers make) is the invariant; the magnitude is a design quantity, not an invariant.
 
-**Athletic vs skill (confirmation, not a change).** The engine already encodes "athletic separation suppresses a shooter harder than a skill gap" via DEC-5 (physical gap exponent 2.7 > skill 2.0). The two axes cross at a 25-point gap (= ReferenceScale): below it skill is marginally steeper, above it athletic runs away. Worked example, good shooter (Outside 78) at Three: vs an elite-skill/even-athlete defender 46→43% (barely dented), vs a much-more-athletic defender 46→39% (dragged down), vs both 46→36%. If a future pass wants athletic to dominate at *moderate* gaps too, the lever is a smaller physical ReferenceScale or a higher PhysicalSteepness — left unchanged for now.
+**Athletic vs skill on the make door (measured — the athleticism ladder, journal Session 18).** Both the shooter-vs-defender **skill** gap (Outside vs the defender's blended defensive ratings, `skillExponent` 2.0) and the **athleticism** gap (`physicalExponent` 1.75, `physicalSteepness` 11.5 — DEC-5's inversion) shift the effective rating into the make-curve. Physical no longer "runs away" at large gaps via a steeper exponent; it stays larger in absolute terms across the realistic range via steepness, and the flat bottom (`exponent > 1`) keeps a marginal edge imperceptible on *both* axes. Measured at Three with skill held equal and athleticism varied: an even matchup is **36.0%**; a clear athletic edge (gap +20) lifts it to **38.7%** (~2–3 points); the extreme (gap +70 — elite vs near-helpless, a matchup that does not occur in play) reaches **56.3%**, capped by the curve ceiling. So athleticism is a **gentle nudge** on a settled shot — correct, because athleticism's real value lives in the other four doors (rim pressure, transition, putbacks, entry denial), not in pure shooting. The shared physical curve is confirmed for athleticism; the size-vs-athleticism exponent split is **not** taken.
 
 **Validated result (frozen-corpus-v1, 1000 games; Run 4 in observations.md):**
 - Combined FG% 57.8% → 50.4%. A rating-50 roster nets 45.1% (real D1 average); the test rosters read ~50% because their shooting ratings average ~64–67 (above average) — the intended consequence of "50 = average," not a hot curve.
