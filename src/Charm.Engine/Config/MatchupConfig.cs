@@ -13,12 +13,14 @@ namespace Charm.Engine;
 /// weights, per-zone block floor/ceiling, a block reference shift (tanh saturation knob),
 /// and the length-composite blend (Height / Wingspan / Vertical).</para>
 ///
-/// <para><b>Defaults are PLACEHOLDERS.</b> The decision they encode is the shape and
-/// parameterization (DEC-5) and the blend's perimeter→interior slide (CONF-1); the
-/// magnitudes are a calibration-pass concern, set-and-left here. Physical is steeper
-/// than skill via a higher exponent (the tail property that delivers "size
-/// insurmountable"). The Rim split (0.35 post / 0.65 rim protection) is a placeholder
-/// default; the rest of the blend table is spec.</para>
+/// <para><b>Defaults.</b> The decision they encode is the shape and
+/// parameterization (DEC-5) and the blend's perimeter→interior slide (CONF-1). The
+/// physical gap-function pair is CALIBRATED (Session 16): physical dominates skill
+/// through steepness (11.5, above skill's 6.0), NOT exponent — the physical exponent is
+/// deliberately lower (1.75, below skill's 2.0) so small physical gaps still register,
+/// and the "size insurmountable" tail lives in steepness plus the downstream tanh caps.
+/// The skill pair and blend ceilings stay placeholders. The Rim split (0.35 post / 0.65
+/// rim protection) is a placeholder default; the rest of the blend table is spec.</para>
 ///
 /// <para><b>Phase 7 block weights.</b> At Three the contest is 40% skill / 60% length
 /// (Emmett's anchor); at Rim the reverse pair 40% skill / 60% physical is the starting
@@ -31,11 +33,13 @@ public sealed class MatchupConfig
 {
     // --- Gap function (DEC-5): shift = steepness · sign(gap) · (|gap| / scale)^exponent.
     //     Exponent > 1 is REQUIRED (convex, flat-bottomed) and enforced in Load.
-    //     Physical steeper than skill via the larger exponent. Placeholders. ---
+    //     Physical dominates skill via steepness (11.5 > 6.0), NOT exponent — the
+    //     physical exponent is deliberately lower (1.75 < 2.0) so small gaps register
+    //     (DEC-5 inversion, calibrated Session 16). Skill pair still placeholder. ---
     public double SkillSteepness    { get; set; } = 6.0;
     public double SkillExponent     { get; set; } = 2.0;
-    public double PhysicalSteepness { get; set; } = 6.0;
-    public double PhysicalExponent  { get; set; } = 2.7;
+    public double PhysicalSteepness { get; set; } = 11.5;
+    public double PhysicalExponent  { get; set; } = 1.75;
 
     /// <summary>The reference gap (rating points) at which a shift equals its steepness —
     /// a fixed UNIT that keeps the steepness knobs legible and identifiable, moved rarely.
