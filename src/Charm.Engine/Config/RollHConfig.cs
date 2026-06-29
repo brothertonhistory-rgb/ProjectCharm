@@ -100,17 +100,19 @@ public sealed class RollHConfig
         _ => throw new InvalidOperationException($"No MAF fraction for zone '{zone}'.")
     };
 
-    // --- Putback pie (Session 17). A go-back-up off an offensive rebound is a
-    //     DISTINCT shot population from a normal located attempt — point-blank,
-    //     often through contact — so it gets its OWN seven-way make/miss/foul pie
-    //     rather than reusing the at-the-rim numbers. Selected when Roll K's PutBack
-    //     arm stamps the putback ticket (it also forces the zone to Rim). These seven
-    //     sum to 1 among themselves and are best-guess PLACEHOLDERS: the real
-    //     percentages — and the tilt by the putback-er's size / athleticism / rim
-    //     rating and the defender contesting — are a future basketball call delivered
-    //     by the attribute-driven generator, which reads the carried slot. Block is
-    //     just a flat slice here (no per-zone carve: a putback is always Rim), unlike
-    //     the located-shot pie above. ---
+    // --- Putback pie (Session 17; make rate wired Session 21). A go-back-up off an
+    //     offensive rebound is a DISTINCT shot population from a normal located attempt —
+    //     point-blank, often through contact — so it gets its OWN seven-way make/miss/foul
+    //     pie rather than reusing the at-the-rim numbers. Selected when Roll K's PutBack arm
+    //     stamps the putback ticket (it also forces the zone to Rim).
+    //
+    //     As of Session 21 the MADE RATE is no longer flat: RollHGenerator reads it off the
+    //     finisher (the rebounder) vs the matched defender on the same calibrated rim make
+    //     curve every rim attempt uses, then applies PutbackMakePenalty (below). PutbackMade
+    //     is now only the FLAT LEGACY fallback (unresolved rebounder/defender) and the
+    //     even-matchup reference. Block, foul, and-1, and OOB are STILL flat here — the
+    //     putback block/foul doors are a separate session. Block is a flat slice (no per-zone
+    //     carve: a putback is always Rim), unlike the located-shot pie above. ---
     public double PutbackMade { get; set; } = 0.50;
     public double PutbackMadeAndFouled { get; set; } = 0.08;
     public double PutbackMiss { get; set; } = 0.28;
@@ -118,6 +120,16 @@ public sealed class RollHConfig
     public double PutbackMissOutOfBoundsLost { get; set; } = 0.01;
     public double PutbackMissOutOfBoundsRetained { get; set; } = 0.01;
     public double PutbackBlocked { get; set; } = 0.07;
+
+    /// <summary>Flat percentage-point reduction applied to a putback's matchup rim make%
+    /// before the block/foul carve (Session 21):
+    /// putbackMakePct = clamp(rimMakePct − PutbackMakePenalty, 0, 1). 0.0 = a putback
+    /// converts at the FULL rim make rate (the finisher-vs-defender spread rides in
+    /// untouched); raising it pulls every finisher's putback down by the SAME points,
+    /// preserving the spread (a flat shift, deliberately not a multiplier — a multiplier
+    /// would compress the inherited spread). The model owns the floor: the penalized rate is
+    /// clamped to [0,1] before the pie is built. Load-guarded to [0, 1].</summary>
+    public double PutbackMakePenalty { get; set; } = 0.0;
 
     // --- Per-zone logistic parameters (Phase 2). The real attribute-driven
     //     generator reads the shooter's zone-relevant rating and runs a bounded
@@ -425,6 +437,16 @@ public sealed class RollHConfig
         if (cfg.IqMakeSensitivity < 0.0 || cfg.IqMakeSensitivity > 0.20)
             throw new InvalidOperationException(
                 $"RollH IqMakeSensitivity must be in [0.0, 0.20] (got {cfg.IqMakeSensitivity}).");
+
+        // Session 21 invariant — putback make penalty. A make%-point shift applied to the
+        // putback's matchup rim make% before the carve; [0, 1] is the semantically valid
+        // range. The model owns the floor (the penalized rate is clamped to [0,1] before the
+        // pie is built), but the dial itself must not be expressible outside [0,1]. Same
+        // [0,1] shape as the make-door suppressor knobs. 0.0 = putback rides the full rim
+        // make rate (the shipped default).
+        if (cfg.PutbackMakePenalty < 0.0 || cfg.PutbackMakePenalty > 1.0)
+            throw new InvalidOperationException(
+                $"RollH PutbackMakePenalty must be in [0, 1] (got {cfg.PutbackMakePenalty}).");
 
         return cfg;
     }

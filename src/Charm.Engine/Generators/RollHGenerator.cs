@@ -76,9 +76,52 @@ public sealed class RollHGenerator : IRollHPieGenerator
     /// <inheritdoc cref="IRollHPieGenerator.Generate"/>
     public Pie<ShotResult> Generate(PossessionState state, bool putback = false)
     {
-        // Putback path — return the putback pie unchanged (Phase 4 work).
+        // Putback path (Session 21) — the go-back-up's MAKE RATE now rides the same
+        // calibrated finisher-vs-defender rim matchup every rim attempt uses, then a flat
+        // PutbackMakePenalty percentage-point shift (penalty 0 = rides the full rim make
+        // rate). Only the made rate is wired here: block, foul/and-1, and OOB structure are
+        // unchanged (the putback block/foul doors are a separate session).
+        //
+        //   * The finisher is the REBOUNDER (state.ReboundSlot) — the player who grabbed the
+        //     board and goes straight back up — NOT state.SelectedSlot (which on an ordinary
+        //     putback still holds the missed shooter, and on a bonus-FT putback is null).
+        //   * The contesting defender is the one matched to the REBOUNDER's slot, via
+        //     DefenderPicker.PickForOffensiveSlot keyed off ReboundSlot — NOT Pick (which
+        //     reads SelectedSlot and would resolve the wrong defender on an ordinary putback
+        //     and throw on a bonus-FT putback).
+        //   * The penalized conditional rate is clamped to [0,1] BEFORE the pie is built, so
+        //     a weak finisher vs a strong defender can never produce a negative made rate.
+        //
+        // Fallback (regression anchor): if the rebounder cannot be resolved — no ReboundSlot,
+        // or an unpopulated roster — return the flat legacy putback pie, byte-identical to the
+        // pre-build behaviour (the no-arg BuildPutbackPie). Ordered FIRST, before any picker
+        // call, so the slot-explicit picker is only ever reached with a real rebounder slot.
         if (putback)
-            return BuildPutbackPie();
+        {
+            var reboundSlot = state.ReboundSlot;
+            if (reboundSlot is null)
+                return BuildPutbackPie();
+
+            var rebounder = _game.RosterFor(state.Offense).PlayerAt(reboundSlot.Value);
+            if (rebounder is null)
+                return BuildPutbackPie();
+
+            // DEC-6 (same empty-slot fallback as the make door): if the matched defending
+            // slot is empty, read the rebounder's own rim rating with no matchup term.
+            var pbDefenderSlot = DefenderPicker.PickForOffensiveSlot(state, reboundSlot.Value);
+            var pbDefender     = _game.RosterFor(state.Defense).PlayerAt(pbDefenderSlot);
+
+            var pbEffectiveRating = pbDefender is null
+                ? Matchup.OffenseRating(ShotLocation.Rim, rebounder)
+                : Matchup.EffectiveRating(ShotLocation.Rim, rebounder, pbDefender, _matchup,
+                      _game.Fatigue.EffectiveAthleticism(rebounder,  isDefense: false),
+                      _game.Fatigue.EffectiveAthleticism(pbDefender, isDefense: true));
+
+            var pbRimMakePct   = _cfg.MakeProbability(ShotLocation.Rim, pbEffectiveRating);
+            var putbackMakePct = Math.Clamp(pbRimMakePct - _cfg.PutbackMakePenalty, 0.0, 1.0);
+
+            return BuildPutbackPie(putbackMakePct);
+        }
 
         // Zone is required — Roll G must have run before Roll H.
         var zone = state.ShotType
@@ -560,17 +603,24 @@ public sealed class RollHGenerator : IRollHPieGenerator
 
     /// <summary>
     /// Putback pie — applies Phase 8 carve-then-convert to the putback shot population,
-    /// using Rim foul baseline and MafFraction (a putback is always at the Rim).
-    /// PutbackMade is the conversion rate given not blocked AND not fouled.
-    /// The real putback matchup tilt is Phase 4 work.
+    /// using the Rim foul baseline and MafFraction (a putback is always at the Rim).
+    /// <paramref name="putbackMakePct"/> is the conversion rate GIVEN not blocked AND not
+    /// fouled — the same conditional the located-shot pie's makePct is.
+    ///
+    /// <para>As of Session 21 the make rate is supplied by the caller: the putback path
+    /// reads it off the finisher-vs-defender rim matchup (penalized by PutbackMakePenalty).
+    /// The no-arg overload is the FLAT LEGACY fallback (the rebounder/defender could not be
+    /// resolved): it delegates here with the configured flat PutbackMade, so its output is
+    /// byte-identical to the pre-Session-21 behaviour. Block, foul, and-1, and OOB are still
+    /// flat config (the putback block/foul doors are a separate session).</para>
     /// </summary>
-    private Pie<ShotResult> BuildPutbackPie()
+    private Pie<ShotResult> BuildPutbackPie(double putbackMakePct)
     {
         var block           = _cfg.PutbackBlocked;
         var foul            = _cfg.FoulRate(ShotLocation.Rim);
         var nonBlockNonFoul = 1.0 - block - foul;
 
-        var made        = _cfg.PutbackMade * nonBlockNonFoul;
+        var made        = putbackMakePct * nonBlockNonFoul;
 
         var mafFraction = _cfg.MafFraction(ShotLocation.Rim);
         var maf         = foul * mafFraction;
@@ -594,4 +644,12 @@ public sealed class RollHGenerator : IRollHPieGenerator
         };
         return new Pie<ShotResult>(weights, _cfg.Epsilon);
     }
+
+    /// <summary>
+    /// Flat legacy putback pie — the regression-anchor fallback used when the rebounder or
+    /// matched defender cannot be resolved. Delegates to the parametrized overload with the
+    /// configured flat <see cref="RollHConfig.PutbackMade"/>, so there is exactly one carve
+    /// implementation and this output is byte-identical to the pre-Session-21 behaviour.
+    /// </summary>
+    private Pie<ShotResult> BuildPutbackPie() => BuildPutbackPie(_cfg.PutbackMade);
 }

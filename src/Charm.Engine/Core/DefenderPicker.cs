@@ -17,12 +17,31 @@ namespace Charm.Engine;
 /// defender, or the pick becomes non-deterministic (mismatch-hunting), the defender must
 /// be promoted to a carried <c>PossessionState.DefenderSlot</c> stamped once after Roll E
 /// so every door in a possession shares one coherent pick.</para>
+///
+/// <para><b>Putback contester (Session 21).</b> A putback's finisher is the REBOUNDER
+/// (<see cref="PossessionState.ReboundSlot"/>), not the selected shooter — so the putback
+/// path needs the defender matched to an explicit offensive slot, not to
+/// <see cref="PossessionState.SelectedSlot"/> (which on an ordinary putback still holds the
+/// missed shooter, and on a bonus-FT putback is null). <see cref="PickForOffensiveSlot"/>
+/// is the slot-explicit primitive; <see cref="Pick"/> is now a thin wrapper that forwards
+/// the selected shooter's slot, so the normal shot path is unchanged.</para>
 /// </summary>
 public static class DefenderPicker
 {
     /// <summary>
+    /// The defending slot matched to an EXPLICIT offensive slot — same number, defense side
+    /// (slot-guards-slot). The normal make door passes the selected shooter's slot; the
+    /// putback path passes the rebounder's slot. Takes a non-null <see cref="Slot"/>, so it
+    /// never throws — the caller is responsible for resolving the offensive slot first.
+    /// </summary>
+    public static Slot PickForOffensiveSlot(PossessionState state, Slot offensiveSlot)
+        => new Slot(state.Defense, offensiveSlot.Number);
+
+    /// <summary>
     /// The defending slot for the offense's selected shooter — same number, defense side.
-    /// Throws if no slot has been selected (the selection roll must run before the make door).
+    /// Thin wrapper over <see cref="PickForOffensiveSlot"/> forwarding
+    /// <see cref="PossessionState.SelectedSlot"/>. Throws if no slot has been selected (the
+    /// selection roll must run before the make door).
     /// </summary>
     public static Slot Pick(PossessionState state)
     {
@@ -30,6 +49,6 @@ public static class DefenderPicker
             ?? throw new InvalidOperationException(
                 "DefenderPicker requires a stamped SelectedSlot — the selection roll must run before the make door.");
 
-        return new Slot(state.Defense, selected.Number);
+        return PickForOffensiveSlot(state, selected);
     }
 }
