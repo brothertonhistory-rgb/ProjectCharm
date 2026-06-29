@@ -108,11 +108,14 @@ public sealed class RollHConfig
     //
     //     As of Session 21 the MADE RATE is no longer flat: RollHGenerator reads it off the
     //     finisher (the rebounder) vs the matched defender on the same calibrated rim make
-    //     curve every rim attempt uses, then applies PutbackMakePenalty (below). PutbackMade
-    //     is now only the FLAT LEGACY fallback (unresolved rebounder/defender) and the
-    //     even-matchup reference. Block, foul, and-1, and OOB are STILL flat here — the
-    //     putback block/foul doors are a separate session. Block is a flat slice (no per-zone
-    //     carve: a putback is always Rim), unlike the located-shot pie above. ---
+    //     curve every rim attempt uses, then applies PutbackMakePenalty (below). The BLOCK
+    //     RATE is likewise no longer flat: it rides the same rim length / shot-blocking
+    //     matchup (Matchup.BlockWeight), bending this PutbackBlocked baseline toward the rim
+    //     block floor/ceiling. PutbackMade and PutbackBlocked are now the FLAT LEGACY
+    //     fallbacks (unresolved rebounder/defender) and the even-matchup references. Foul,
+    //     and-1, and OOB are STILL flat here — their own later door. PutbackBlocked is a flat
+    //     baseline slice (no per-zone carve: a putback is always Rim), unlike the located-shot
+    //     pie above. ---
     public double PutbackMade { get; set; } = 0.50;
     public double PutbackMadeAndFouled { get; set; } = 0.08;
     public double PutbackMiss { get; set; } = 0.28;

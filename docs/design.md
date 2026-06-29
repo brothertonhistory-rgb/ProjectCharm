@@ -1418,12 +1418,16 @@ PARAMETERIZED onto the existing shot-resolution roll via the ticket/station mech
 - **Stamp.** Roll K's `PutBack` arm sets `Continue.Putback = true` and forces
   `ShotType = Rim`.
 - **Read.** The generator returns a distinct putback pie (always Rim, no per-zone block
-  carve) instead of the located-shot pie. The **make rate is wired (Session 21):** the real
-  `RollHGenerator` reads it off the finisher-vs-defender rim matchup — the finisher is the
-  REBOUNDER (`ReboundSlot`), the contesting defender is the one matched to the rebounder's
-  slot (`DefenderPicker.PickForOffensiveSlot`) — penalized by `PutbackMakePenalty` (shipped
-  0 = the full rim make rate). Block, foul/and-1, and OOB are still flat `Putback*` config.
-  `RollHStubPieGenerator` and the no-rebounder fallback return the flat `PutbackMade` pie.
+  carve) instead of the located-shot pie. The **make rate is wired (Session 21)** and the
+  **block rate is wired (Session 22):** the real `RollHGenerator` reads both off the
+  finisher-vs-defender rim matchup — the finisher is the REBOUNDER (`ReboundSlot`), the
+  contesting defender is the one matched to the rebounder's slot
+  (`DefenderPicker.PickForOffensiveSlot`). The make rate rides the rim make curve (penalized
+  by `PutbackMakePenalty`, shipped 0 = the full rim make rate); the block rate rides the rim
+  length / shot-blocking matchup (`Matchup.BlockWeight` bending the flat `PutbackBlocked`
+  baseline toward the rim block floor/ceiling). Foul/and-1 and OOB are still flat `Putback*`
+  config. `RollHStubPieGenerator` and the no-rebounder fallback return the flat
+  `PutbackMade` / `PutbackBlocked` pie.
 - **Blind.** The generator never asks who set the ticket; signal flows one direction.
 
 This is the third live instance of the pattern (Roll C's turnover context, Roll J's
@@ -1432,10 +1436,11 @@ single bool, because there is exactly one putback flavor. The variety a putback 
 eventually express — a 7-foot center finishing over a guard vs. a point guard who happened
 to grab the board flinging up a low-percentage attempt — is NOT more ticket variants; it is
 the attribute generator reading the carried rebounder slot — wired for the **make rate** as
-of Session 21 (a strong finisher converts more, a stiff less; an elite rim protector takes
-it away), with the block and foul doors still flat pending their own session. The seam is
-shaped so that wiring dropped in WITHOUT Roll K or the resolver changing: the slot already
-rides the whole loop untouched.
+of Session 21 and the **block rate** as of Session 22 (a strong finisher converts more, a
+stiff less; a long, rangy rim protector takes it away and stuffs it more often), with the
+foul/and-1 door still flat pending its own session. The seam is shaped so that wiring
+dropped in WITHOUT Roll K or the resolver changing: the slot already rides the whole loop
+untouched.
 
 ### Reset re-enters at selection, not initiation
 
@@ -1449,24 +1454,44 @@ action, not re-initiating. The wiped slate (`SelectedSlot`, `ShotType`, `Result`
 means the fresh play draws the inherent selection odds with no residue from the shot that
 missed.
 
-### Putback attribute seams — one wired, two still deferred
+### Putback attribute seams — two wired, two still deferred
 
 1. **Putback MAKE rate (attribute) — WIRED (Session 21).** The make rate reads the
    finisher-vs-defender rim matchup (the rebounder's finishing + athleticism vs the matched
    defender's rim defense, on the same calibrated rim curve every rim attempt uses),
-   penalized by `PutbackMakePenalty` (shipped 0 = the full rim make rate). Block, foul, and
-   and-1 are NOT yet wired — they remain flat `Putback*` config, the putback **block/foul
-   door** deferred to its own session (length / shot-blocking / wingspan should make a
-   putback get stuffed more; that channel lives in the block door, not the make rate).
-2. **Same-player rebound tilt (attribute) — deferred.** A missed putback re-enters Roll I,
+   penalized by `PutbackMakePenalty` (shipped 0 = the full rim make rate).
+2. **Putback BLOCK rate (attribute) — WIRED (Session 22).** The block rate reads the
+   rebounder-vs-matched-defender rim length / shot-blocking matchup via `Matchup.BlockWeight`,
+   bending the flat `PutbackBlocked` baseline (7%, deliberately below the normal rim block
+   baseline — a quick-reaction point-blank go-back-up is harder to time a clean block on)
+   toward the shared Rim block ceiling (30%, defender edge) or floor (4%, shooter edge) via a
+   tanh saturation. Two contributions: a skill shift (the defender's Rim defense blend minus
+   the rebounder's finishing) and a length shift (the defender's Height/Wingspan/Vertical
+   composite minus the rebounder's), weighted 40% skill / 60% length at the Rim. Reuses the
+   SAME contesting defender the make rate resolved (matched to `ReboundSlot`), not a
+   re-resolved `Pick` off `SelectedSlot`. **No new config** — the Rim block range is reused
+   as-is; putback-specific floor/ceiling is a future calibration pass if the shared range
+   ever reads wrong for the putback population. Foul/and-1 is NOT yet wired — it remains flat
+   `Putback*` config, the putback **foul/and-1 door** deferred to its own session.
+3. **Same-player rebound tilt (attribute) — deferred.** A missed putback re-enters Roll I,
    and the rebounder — especially a big — should be favored to grab his own miss back. Lands
    in the attribution layer once it names the rebounder; the slot rides the loop so it has
    the player to favor.
 
+**Contester identity — the locked next session ("make the putback contest more chaotic").**
+The block door (S22) changed *how good* the matched defender's contest is, not *who*
+contests. The putback block is still computed solely against the rebounder's own matched man
+(the defender on the rebounder's slot). A real putback is often swatted by a **help defender
+rotating over from the weak side or coming from behind** — which the engine does not model.
+The next putback session reworks the contester to let a help / weak-side / behind defender
+contribute to (or replace) the matched man's contest, with a real basketball fork to settle
+first (replace the contester some of the time vs. let a help defender also weigh in vs. add
+randomness to whether the putback is cleanly contested at all).
+
 Note: a putback's made basket is currently credited to the original Roll E shooter's slot
-(`SelectedSlot`, carried untouched on the PutBack arm), while the make rate is driven by the
-REBOUNDER (`ReboundSlot`). That attribution split is pre-existing and outside the make-rate
-door's scope — flagged for the box-score / attribution layer.
+(`SelectedSlot`, carried untouched on the PutBack arm), while the make and block rates are
+driven by the REBOUNDER (`ReboundSlot`). That attribution split is pre-existing and outside
+the make/block doors' scope — flagged for the box-score / attribution layer.
 
 Both attach at a GENERATOR, exactly like every prior deferred modifier (the height-driven
 tip contest, Roll C's pressure wire, Roll J's rebounder/tempo seams); the rolls themselves
@@ -1485,8 +1510,8 @@ pie, the seam already shaped for it in Session 16.
 It closes the Session-15 "offensive-rebound stub → default-flip" provisional: an offensive
 board now KEEPS the ball with the same team and the possession count does not increment,
 replacing the deliberately-wrong park-and-flip. It opens the door to the attribute work on
-putback quality (make rate wired S21; block/foul deferred to their own session) and
-same-player rebounding, and it leaves the broader chain's remaining stubs (free-throw
+putback quality (make rate wired S21, block rate wired S22; foul/and-1 deferred to its own
+session) and same-player rebounding, and it leaves the broader chain's remaining stubs (free-throw
 resolution and rebounding, block recovery, the transition roll) untouched and on the horizon.
 
 ---

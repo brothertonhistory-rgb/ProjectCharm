@@ -76,11 +76,12 @@ public sealed class RollHGenerator : IRollHPieGenerator
     /// <inheritdoc cref="IRollHPieGenerator.Generate"/>
     public Pie<ShotResult> Generate(PossessionState state, bool putback = false)
     {
-        // Putback path (Session 21) — the go-back-up's MAKE RATE now rides the same
-        // calibrated finisher-vs-defender rim matchup every rim attempt uses, then a flat
-        // PutbackMakePenalty percentage-point shift (penalty 0 = rides the full rim make
-        // rate). Only the made rate is wired here: block, foul/and-1, and OOB structure are
-        // unchanged (the putback block/foul doors are a separate session).
+        // Putback path (Sessions 21 + this) — the go-back-up's MAKE RATE rides the same
+        // calibrated finisher-vs-defender rim matchup every rim attempt uses (then a flat
+        // PutbackMakePenalty percentage-point shift; penalty 0 = rides the full rim make
+        // rate), and its BLOCK RATE now rides the same length / shot-blocking / rim-defense
+        // matchup every rim attempt uses (Matchup.BlockWeight). Make and block are wired;
+        // foul/and-1 and OOB structure are still flat (their own later door).
         //
         //   * The finisher is the REBOUNDER (state.ReboundSlot) — the player who grabbed the
         //     board and goes straight back up — NOT state.SelectedSlot (which on an ordinary
@@ -120,7 +121,21 @@ public sealed class RollHGenerator : IRollHPieGenerator
             var pbRimMakePct   = _cfg.MakeProbability(ShotLocation.Rim, pbEffectiveRating);
             var putbackMakePct = Math.Clamp(pbRimMakePct - _cfg.PutbackMakePenalty, 0.0, 1.0);
 
-            return BuildPutbackPie(putbackMakePct);
+            // Putback BLOCK door — the go-back-up's BLOCK RATE now rides the same
+            // length / shot-blocking / rim-defense matchup every normal rim attempt uses
+            // (Matchup.BlockWeight bends the flat PutbackBlocked baseline toward the rim
+            // floor/ceiling). A long, rangy rim protector swats more putbacks; a small
+            // defender swats fewer. Reuses the SAME pbDefender resolved above (keyed to
+            // ReboundSlot) — NOT a re-resolved DefenderPicker.Pick, which reads SelectedSlot
+            // and would contest with the missed shooter (or throw on a bonus-FT putback).
+            // DEC-6 (same empty-slot fallback as the make door and the located-shot block
+            // door): an empty matched defending slot keeps the flat PutbackBlocked baseline.
+            var pbBlockWeight = pbDefender is null
+                ? _cfg.PutbackBlocked
+                : Matchup.BlockWeight(ShotLocation.Rim, rebounder, pbDefender,
+                                      _cfg.PutbackBlocked, _matchup);
+
+            return BuildPutbackPie(putbackMakePct, pbBlockWeight);
         }
 
         // Zone is required — Roll G must have run before Roll H.
@@ -606,17 +621,20 @@ public sealed class RollHGenerator : IRollHPieGenerator
     /// using the Rim foul baseline and MafFraction (a putback is always at the Rim).
     /// <paramref name="putbackMakePct"/> is the conversion rate GIVEN not blocked AND not
     /// fouled — the same conditional the located-shot pie's makePct is.
+    /// <paramref name="blockWeight"/> is the carved block slice.
     ///
-    /// <para>As of Session 21 the make rate is supplied by the caller: the putback path
-    /// reads it off the finisher-vs-defender rim matchup (penalized by PutbackMakePenalty).
+    /// <para>Both rates are supplied by the caller: the putback path reads the make rate
+    /// off the finisher-vs-defender rim matchup (penalized by PutbackMakePenalty) and the
+    /// block weight off the same rim length / shot-blocking matchup (Matchup.BlockWeight).
     /// The no-arg overload is the FLAT LEGACY fallback (the rebounder/defender could not be
-    /// resolved): it delegates here with the configured flat PutbackMade, so its output is
-    /// byte-identical to the pre-Session-21 behaviour. Block, foul, and-1, and OOB are still
-    /// flat config (the putback block/foul doors are a separate session).</para>
+    /// resolved): it delegates here with the configured flat PutbackMade and PutbackBlocked,
+    /// so its output is byte-identical to the pre-Session-21 behaviour and there is exactly
+    /// one carve implementation. Foul, and-1, and OOB are still flat config (their own
+    /// later door).</para>
     /// </summary>
-    private Pie<ShotResult> BuildPutbackPie(double putbackMakePct)
+    private Pie<ShotResult> BuildPutbackPie(double putbackMakePct, double blockWeight)
     {
-        var block           = _cfg.PutbackBlocked;
+        var block           = blockWeight;
         var foul            = _cfg.FoulRate(ShotLocation.Rim);
         var nonBlockNonFoul = 1.0 - block - foul;
 
@@ -651,5 +669,5 @@ public sealed class RollHGenerator : IRollHPieGenerator
     /// configured flat <see cref="RollHConfig.PutbackMade"/>, so there is exactly one carve
     /// implementation and this output is byte-identical to the pre-Session-21 behaviour.
     /// </summary>
-    private Pie<ShotResult> BuildPutbackPie() => BuildPutbackPie(_cfg.PutbackMade);
+    private Pie<ShotResult> BuildPutbackPie() => BuildPutbackPie(_cfg.PutbackMade, _cfg.PutbackBlocked);
 }

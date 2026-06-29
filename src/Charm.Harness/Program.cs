@@ -26,6 +26,9 @@ internal static partial class Program
         // dotnet run -- pbtest  runs the putback conversion ladder (make rate, Rim; not in the validation suite).
         if (args.Length > 0 && args[0] == "pbtest") { RunPutbackConversionExperiment(configPath); return 0; }
 
+        // dotnet run -- pbblocktest  runs the putback block ladder (block rate, Rim; not in the validation suite).
+        if (args.Length > 0 && args[0] == "pbblocktest") { RunPutbackBlockExperiment(configPath); return 0; }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
