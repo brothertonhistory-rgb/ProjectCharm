@@ -171,6 +171,26 @@ public sealed class MatchupConfig
     /// Must be &gt; 0 (enforced in Load).</summary>
     public double BlockReferenceShift { get; set; } = 20.0;
 
+    // --- Putback CONTESTER door: the team putback-block stack (Matchup.PutbackBlockRate).
+    //     The putback go-back-up's block rate is a FIVE-DEFENDER stack, not a single-defender
+    //     duel, so it gets its OWN ceiling and saturation knob — a whole frontline of rim
+    //     protectors should be scarier than the single-defender located-shot ceiling (0.30).
+    //     The floor reuses BlockFloorRim (0.04); the baseline is RollHConfig.PutbackBlocked
+    //     (0.07). The located-shot block path (BlockWeight) is unchanged and keeps BlockCeilRim
+    //     / BlockReferenceShift — these two fields are additive, used only by the team stack. ---
+    /// <summary>The putback-block ceiling: a full wall of elite rim protectors asymptotes here.
+    /// Higher than BlockCeilRim (0.30) because a TEAM of shot blockers swats more putbacks than
+    /// the single matched defender of the located-shot path. Must lie strictly in
+    /// (BlockFloorRim, 1.0) (enforced in Load); the baseline lies strictly below it (A6 guard
+    /// in PutbackBlockRate, which alone can see RollHConfig.PutbackBlocked).</summary>
+    public double PutbackBlockCeiling { get; set; } = 0.55;
+
+    /// <summary>The net team-stack drive (rating points) that reaches ~76% saturation toward the
+    /// putback ceiling/floor. Higher → adding blockers saturates SLOWER, so one elite lands
+    /// lower. Default 35.0 (one elite rim protector among four average → ~34% putback block).
+    /// Must be &gt; 0 (enforced in Load).</summary>
+    public double PutbackBlockReferenceShift { get; set; } = 35.0;
+
     // --- Phase 7: length composite blend for the block contest.
     //     Length = (Height * LengthHeight + Wingspan * LengthWingspan + Vertical * LengthVertical).
     //     Equal thirds by default — all three contribute equally to blocking ability.
@@ -607,6 +627,17 @@ public sealed class MatchupConfig
         if (cfg.BlockReferenceShift <= 0.0)
             throw new InvalidOperationException(
                 $"BlockReferenceShift must be > 0: got {cfg.BlockReferenceShift}.");
+
+        // Putback CONTESTER door: the team-stack ceiling must sit strictly above the shared
+        // rim floor and below 1.0 (the baseline-below-ceiling relationship is guarded in
+        // PutbackBlockRate, the only place RollHConfig.PutbackBlocked is also visible).
+        if (cfg.PutbackBlockCeiling <= cfg.BlockFloorRim || cfg.PutbackBlockCeiling >= 1.0)
+            throw new InvalidOperationException(
+                $"PutbackBlockCeiling must lie strictly in (BlockFloorRim {cfg.BlockFloorRim}, 1.0): " +
+                $"got {cfg.PutbackBlockCeiling}.");
+        if (cfg.PutbackBlockReferenceShift <= 0.0)
+            throw new InvalidOperationException(
+                $"PutbackBlockReferenceShift must be > 0: got {cfg.PutbackBlockReferenceShift}.");
 
         const double Eps = 1e-9;
 

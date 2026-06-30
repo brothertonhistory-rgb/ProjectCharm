@@ -227,6 +227,8 @@
     "BlockFloorThree": 0.003,
     "BlockCeilThree": 0.04,
     "BlockReferenceShift": 20.0,
+    "PutbackBlockCeiling": 0.55,
+    "PutbackBlockReferenceShift": 35.0,
     "LengthHeight": 0.3333333333333333,
     "LengthWingspan": 0.3333333333333333,
     "LengthVertical": 0.3333333333333334,

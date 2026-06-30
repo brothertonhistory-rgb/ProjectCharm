@@ -246,6 +246,102 @@ public static class Matchup
     }
 
     /// <summary>
+    /// The team putback block rate (Putback CONTESTER door) — the go-back-up's block rate as a
+    /// FIVE-DEFENDER additive stack, NOT the single matched-defender duel of <see cref="BlockWeight"/>.
+    ///
+    /// <para><b>Why a team property, not a duel.</b> Whether a putback is swatted is a property of
+    /// the whole interior, not just the one defender matched to the rebounder: every defender's
+    /// length and rim defense contributes. A frontline of rim protectors swats more putbacks than
+    /// one rim protector surrounded by guards. (The located-shot block path stays a duel —
+    /// <see cref="BlockWeight"/> — because a located jumper is contested by the matched man; only
+    /// the putback go-back-up at the rim is contested by the whole interior. This method is
+    /// additive and does NOT modify <see cref="BlockWeight"/>.)</para>
+    ///
+    /// <para><b>Stack, do NOT average (no dilution).</b> Each defender's blocking threat is
+    /// measured against a NEUTRAL (<see cref="MatchupConfig.AttributeMidpoint"/>) finisher —
+    /// finisher-independent team strength: a defender's blocking is the same regardless of who he
+    /// is blocking; the finisher applies once, separately. The per-defender threats are SUMMED and
+    /// NEVER divided by the populated count — one elite shot blocker is undiluted by four weak
+    /// teammates, and a missing slot simply contributes zero. A future refactor must NOT
+    /// "helpfully" renormalize by player count: the sum IS the design (contrast the AVERAGING
+    /// team aggregates in RollHGenerator's C5.5/C6/C7, which divide by capacity).</para>
+    ///
+    /// <para><b>Per-defender floor (no drag).</b> Each defender's contribution is floored at zero
+    /// (<c>max(0, shift)</c>) before summing, so a below-average defender contributes nothing
+    /// rather than dragging the team total negative. Weak teammates cannot lower the block rate
+    /// below what the capable defenders alone produce.</para>
+    ///
+    /// <para><b>Finisher resistance.</b> The finisher's own finishing/length above neutral reduces
+    /// the block once (signed — a SHORT finisher RAISES it). Net drive is
+    /// <c>teamDrive − finisherResist</c>, bent toward the putback ceiling (defense edge) or the
+    /// shared rim floor (finisher edge) by the same tanh saturation <see cref="BlockWeight"/> uses,
+    /// scaled by <see cref="MatchupConfig.PutbackBlockReferenceShift"/>.</para>
+    ///
+    /// <para><b>Cross-config baseline guard (A6).</b> The baseline lives in
+    /// <see cref="RollHConfig.PutbackBlocked"/> while the ceiling lives in
+    /// <see cref="MatchupConfig.PutbackBlockCeiling"/> — two config families. If the baseline were
+    /// not strictly between the floor and ceiling, a positive team advantage would bend the rate
+    /// the WRONG way (downward). This call site is the only place both values are visible, so the
+    /// guard lives here; <see cref="MatchupConfig.Load"/> cannot enforce it (it cannot read
+    /// RollHConfig).</para>
+    ///
+    /// <para><b>Empty-slot fallback (subsumes S22 DEC-6).</b> A null defensive slot contributes
+    /// zero threat; an (unreachable) all-empty defense yields zero team drive. The caller's
+    /// null-rebounder / unpopulated-roster fallback returns the flat legacy putback pie BEFORE
+    /// reaching this method, so it is only ever called with a real rebounder.</para>
+    /// </summary>
+    public static double PutbackBlockRate(
+        Player rebounder, IReadOnlyList<Player?> defenders,
+        double baseBlockWeight, MatchupConfig cfg)
+    {
+        // A6 — baseline must lie strictly inside (floor, ceiling), or "more team threat" bends
+        // the rate DOWN. Guarded here because the baseline (RollHConfig) and the ceiling
+        // (MatchupConfig) are only both visible at this call site.
+        var floor = cfg.BlockFloor(ShotLocation.Rim);
+        if (baseBlockWeight <= floor || baseBlockWeight >= cfg.PutbackBlockCeiling)
+            throw new InvalidOperationException(
+                $"PutbackBlockRate: baseline {baseBlockWeight:F4} must lie strictly inside " +
+                $"(BlockFloorRim {floor:F4}, PutbackBlockCeiling {cfg.PutbackBlockCeiling:F4}); " +
+                "otherwise a stronger defense would lower the block rate.");
+
+        // Per-defender blocking threat vs a NEUTRAL finisher (finisher-independent team strength).
+        // Skill = rim defensive read above neutral; length = length composite above neutral;
+        // weighted by the Rim skill/length split (the same 40/60 BlockWeight uses at the Rim).
+        // SUMMED and floored per defender — NEVER divided by the populated count.
+        var (skillW, lengthW) = cfg.BlockContestWeights(ShotLocation.Rim);
+        var teamDrive = 0.0;
+        for (var i = 0; i < defenders.Count; i++)
+        {
+            var d = defenders[i];
+            if (d is null) continue;   // a missing slot contributes zero (no renormalization)
+
+            var skill  = GapFn(DefenseRating(ShotLocation.Rim, d, cfg) - cfg.AttributeMidpoint,
+                               cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+            var length = GapFn(LengthRating(d, cfg) - cfg.AttributeMidpoint,
+                               cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+            var shift  = skillW * skill + lengthW * length;
+
+            teamDrive += Math.Max(0.0, shift);   // no-drag floor: a weak defender adds nothing
+        }
+
+        // Finisher resistance vs a NEUTRAL defense — the finisher's finishing/length above neutral
+        // reduces the block once (signed: a short finisher RAISES it).
+        var finSkill  = GapFn(rebounder.Finishing - cfg.AttributeMidpoint,
+                              cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+        var finLength = GapFn(LengthRating(rebounder, cfg) - cfg.AttributeMidpoint,
+                              cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+        var finResist = skillW * finSkill + lengthW * finLength;
+
+        // Net drive bent toward ceiling (defense edge) or the shared rim floor (finisher edge) by
+        // tanh — same saturation shape as BlockWeight, with the putback ceiling and reference shift.
+        var net  = teamDrive - finResist;
+        var span = net >= 0.0
+            ? (cfg.PutbackBlockCeiling - baseBlockWeight)
+            : (baseBlockWeight - floor);
+        return baseBlockWeight + span * Math.Tanh(net / cfg.PutbackBlockReferenceShift);
+    }
+
+    /// <summary>
     /// The matchup-aware foul rate for a shot attempt (Phase 8). Bends a per-zone
     /// foul baseline toward a per-zone ceiling (shooter-favorable contest) or floor
     /// (defender-favorable) using a tanh saturation.

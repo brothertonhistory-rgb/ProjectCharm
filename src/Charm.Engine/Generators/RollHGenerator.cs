@@ -77,19 +77,22 @@ public sealed class RollHGenerator : IRollHPieGenerator
     public Pie<ShotResult> Generate(PossessionState state, bool putback = false)
     {
         // Putback path (Sessions 21 + this) — the go-back-up's MAKE RATE rides the same
-        // calibrated finisher-vs-defender rim matchup every rim attempt uses (then a flat
-        // PutbackMakePenalty percentage-point shift; penalty 0 = rides the full rim make
-        // rate), and its BLOCK RATE now rides the same length / shot-blocking / rim-defense
-        // matchup every rim attempt uses (Matchup.BlockWeight). Make and block are wired;
-        // foul/and-1 and OOB structure are still flat (their own later door).
+        // calibrated finisher-vs-matched-defender rim matchup every rim attempt uses (then a
+        // flat PutbackMakePenalty percentage-point shift; penalty 0 = rides the full rim make
+        // rate), and its BLOCK RATE is a FIVE-DEFENDER TEAM STACK (Matchup.PutbackBlockRate) —
+        // every defender's length and rim defense contributes, not just the matched man. Make
+        // and block are wired; foul/and-1 and OOB structure are still flat (their own later door).
         //
         //   * The finisher is the REBOUNDER (state.ReboundSlot) — the player who grabbed the
         //     board and goes straight back up — NOT state.SelectedSlot (which on an ordinary
         //     putback still holds the missed shooter, and on a bonus-FT putback is null).
-        //   * The contesting defender is the one matched to the REBOUNDER's slot, via
-        //     DefenderPicker.PickForOffensiveSlot keyed off ReboundSlot — NOT Pick (which
-        //     reads SelectedSlot and would resolve the wrong defender on an ordinary putback
-        //     and throw on a bonus-FT putback).
+        //   * The MAKE contest is the defender matched to the REBOUNDER's slot, via
+        //     DefenderPicker.PickForOffensiveSlot keyed off ReboundSlot — NOT Pick (which reads
+        //     SelectedSlot and would resolve the wrong defender on an ordinary putback and throw
+        //     on a bonus-FT putback). Your shot-MAKING is contested by your man.
+        //   * The BLOCK contest is the whole defensive lineup (all five slots), gathered below —
+        //     the swat can come from anyone, weighted by length and rim defense, stacking. The
+        //     matched defender has no special role in the block rate.
         //   * The penalized conditional rate is clamped to [0,1] BEFORE the pie is built, so
         //     a weak finisher vs a strong defender can never produce a negative made rate.
         //
@@ -121,19 +124,33 @@ public sealed class RollHGenerator : IRollHPieGenerator
             var pbRimMakePct   = _cfg.MakeProbability(ShotLocation.Rim, pbEffectiveRating);
             var putbackMakePct = Math.Clamp(pbRimMakePct - _cfg.PutbackMakePenalty, 0.0, 1.0);
 
-            // Putback BLOCK door — the go-back-up's BLOCK RATE now rides the same
-            // length / shot-blocking / rim-defense matchup every normal rim attempt uses
-            // (Matchup.BlockWeight bends the flat PutbackBlocked baseline toward the rim
-            // floor/ceiling). A long, rangy rim protector swats more putbacks; a small
-            // defender swats fewer. Reuses the SAME pbDefender resolved above (keyed to
-            // ReboundSlot) — NOT a re-resolved DefenderPicker.Pick, which reads SelectedSlot
-            // and would contest with the missed shooter (or throw on a bonus-FT putback).
-            // DEC-6 (same empty-slot fallback as the make door and the located-shot block
-            // door): an empty matched defending slot keeps the flat PutbackBlocked baseline.
-            var pbBlockWeight = pbDefender is null
-                ? _cfg.PutbackBlocked
-                : Matchup.BlockWeight(ShotLocation.Rim, rebounder, pbDefender,
-                                      _cfg.PutbackBlocked, _matchup);
+            // Putback BLOCK door — the go-back-up's BLOCK RATE is a FIVE-DEFENDER TEAM STACK
+            // (Matchup.PutbackBlockRate), NOT a single matched-defender duel. Every defender's
+            // length and rim defense contributes; the threats stack WITHOUT averaging, so a
+            // frontline of rim protectors swats more putbacks than one rim protector surrounded
+            // by guards, a weak defender simply adds nothing (per-defender floor), and the
+            // finisher's own length resists. This differs from the located-shot block path
+            // (Matchup.BlockWeight, a matched-defender duel, retained UNCHANGED): a go-back-up at
+            // the rim is contested by the whole interior, not just one man.
+            //
+            // The make door ABOVE still uses the matched pbDefender — your shot-MAKING is
+            // contested by your man even though the swat can come from anyone. The five defenders
+            // are gathered the same way the C8 hustle block gathers a lineup; a missing slot
+            // contributes zero (the method's no-renormalization rule subsumes the S22 empty-slot
+            // DEC-6 fallback). Stage 2 — which defender is CREDITED for a block — is unchanged and
+            // already all-five-eligible (BlockerPicker, stamped on-walk in the resolver).
+            var pbDefRoster = _game.RosterFor(state.Defense);
+            var pbDefLineup = _game.LineupFor(state.Defense);
+            var pbDefenders = new Player?[]
+            {
+                pbDefRoster.PlayerAt(pbDefLineup.SlotAt(1)),
+                pbDefRoster.PlayerAt(pbDefLineup.SlotAt(2)),
+                pbDefRoster.PlayerAt(pbDefLineup.SlotAt(3)),
+                pbDefRoster.PlayerAt(pbDefLineup.SlotAt(4)),
+                pbDefRoster.PlayerAt(pbDefLineup.SlotAt(5)),
+            };
+            var pbBlockWeight = Matchup.PutbackBlockRate(rebounder, pbDefenders,
+                                                         _cfg.PutbackBlocked, _matchup);
 
             return BuildPutbackPie(putbackMakePct, pbBlockWeight);
         }
@@ -624,19 +641,33 @@ public sealed class RollHGenerator : IRollHPieGenerator
     /// <paramref name="blockWeight"/> is the carved block slice.
     ///
     /// <para>Both rates are supplied by the caller: the putback path reads the make rate
-    /// off the finisher-vs-defender rim matchup (penalized by PutbackMakePenalty) and the
-    /// block weight off the same rim length / shot-blocking matchup (Matchup.BlockWeight).
-    /// The no-arg overload is the FLAT LEGACY fallback (the rebounder/defender could not be
-    /// resolved): it delegates here with the configured flat PutbackMade and PutbackBlocked,
-    /// so its output is byte-identical to the pre-Session-21 behaviour and there is exactly
-    /// one carve implementation. Foul, and-1, and OOB are still flat config (their own
-    /// later door).</para>
+    /// off the finisher-vs-matched-defender rim matchup (penalized by PutbackMakePenalty) and
+    /// the block weight off the FIVE-DEFENDER team stack (Matchup.PutbackBlockRate — every
+    /// defender's length and rim defense contributes, not just the matched man). The no-arg
+    /// overload is the FLAT LEGACY fallback (the rebounder/defender could not be resolved): it
+    /// delegates here with the configured flat PutbackMade and PutbackBlocked, so its output is
+    /// byte-identical to the pre-Session-21 behaviour and there is exactly one carve
+    /// implementation. Foul, and-1, and OOB are still flat config (their own later door).</para>
+    ///
+    /// <para><b>Overflow guard.</b> Throws if block + foul ≥ 1 (mirrors BuildRealPie). Now
+    /// load-bearing: the putback block ceiling rose to a team-stack asymptote
+    /// (PutbackBlockCeiling), so the margin to 1 shrank — defense in depth, not currently
+    /// reachable at the shipped ceiling/FoulRim.</para>
     /// </summary>
     private Pie<ShotResult> BuildPutbackPie(double putbackMakePct, double blockWeight)
     {
         var block           = blockWeight;
         var foul            = _cfg.FoulRate(ShotLocation.Rim);
         var nonBlockNonFoul = 1.0 - block - foul;
+
+        // Overflow guard (mirrors BuildRealPie). Now load-bearing: the putback block ceiling
+        // rose to a team-stack asymptote (PutbackBlockCeiling, default 0.55), so block + FoulRim
+        // (0.55 + 0.20 = 0.75) is still < 1 but the margin shrank — defense in depth against any
+        // future ceiling/FoulRim rise that would make block + foul >= 1.
+        if (nonBlockNonFoul <= 0.0)
+            throw new InvalidOperationException(
+                $"RollHGenerator: putback block + foul = {block + foul:F4} >= 1. " +
+                "Ceiling configuration permits an impossible putback matchup.");
 
         var made        = putbackMakePct * nonBlockNonFoul;
 

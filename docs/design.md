@@ -1419,15 +1419,15 @@ PARAMETERIZED onto the existing shot-resolution roll via the ticket/station mech
   `ShotType = Rim`.
 - **Read.** The generator returns a distinct putback pie (always Rim, no per-zone block
   carve) instead of the located-shot pie. The **make rate is wired (Session 21)** and the
-  **block rate is wired (Session 22):** the real `RollHGenerator` reads both off the
-  finisher-vs-defender rim matchup — the finisher is the REBOUNDER (`ReboundSlot`), the
-  contesting defender is the one matched to the rebounder's slot
-  (`DefenderPicker.PickForOffensiveSlot`). The make rate rides the rim make curve (penalized
-  by `PutbackMakePenalty`, shipped 0 = the full rim make rate); the block rate rides the rim
-  length / shot-blocking matchup (`Matchup.BlockWeight` bending the flat `PutbackBlocked`
-  baseline toward the rim block floor/ceiling). Foul/and-1 and OOB are still flat `Putback*`
-  config. `RollHStubPieGenerator` and the no-rebounder fallback return the flat
-  `PutbackMade` / `PutbackBlocked` pie.
+  **block rate is a five-defender team stack (Putback CONTESTER door):** the real
+  `RollHGenerator` reads the make rate off the finisher-vs-MATCHED-defender rim matchup (the
+  finisher is the REBOUNDER, `ReboundSlot`; the matched defender via
+  `DefenderPicker.PickForOffensiveSlot`), penalized by `PutbackMakePenalty` (shipped 0 = the
+  full rim make rate). The block rate is a separate, TEAM read (`Matchup.PutbackBlockRate`):
+  every defender on the floor contributes his length and rim defense, so the swat can come
+  from anyone, not just the matched man. Foul/and-1 and OOB are still flat `Putback*` config.
+  `RollHStubPieGenerator` and the no-rebounder fallback return the flat `PutbackMade` /
+  `PutbackBlocked` pie.
 - **Blind.** The generator never asks who set the ticket; signal flows one direction.
 
 This is the third live instance of the pattern (Roll C's turnover context, Roll J's
@@ -1436,9 +1436,10 @@ single bool, because there is exactly one putback flavor. The variety a putback 
 eventually express — a 7-foot center finishing over a guard vs. a point guard who happened
 to grab the board flinging up a low-percentage attempt — is NOT more ticket variants; it is
 the attribute generator reading the carried rebounder slot — wired for the **make rate** as
-of Session 21 and the **block rate** as of Session 22 (a strong finisher converts more, a
-stiff less; a long, rangy rim protector takes it away and stuffs it more often), with the
-foul/and-1 door still flat pending its own session. The seam is shaped so that wiring
+of Session 21 and the **block rate** as a five-defender team stack (a strong finisher
+converts more, a stiff less; a frontline of rim protectors stuffs putbacks more often than
+one rim protector surrounded by guards), with the foul/and-1 door still flat pending its own
+session. The seam is shaped so that wiring
 dropped in WITHOUT Roll K or the resolver changing: the slot already rides the whole loop
 untouched.
 
@@ -1460,38 +1461,60 @@ missed.
    finisher-vs-defender rim matchup (the rebounder's finishing + athleticism vs the matched
    defender's rim defense, on the same calibrated rim curve every rim attempt uses),
    penalized by `PutbackMakePenalty` (shipped 0 = the full rim make rate).
-2. **Putback BLOCK rate (attribute) — WIRED (Session 22).** The block rate reads the
-   rebounder-vs-matched-defender rim length / shot-blocking matchup via `Matchup.BlockWeight`,
-   bending the flat `PutbackBlocked` baseline (7%, deliberately below the normal rim block
-   baseline — a quick-reaction point-blank go-back-up is harder to time a clean block on)
-   toward the shared Rim block ceiling (30%, defender edge) or floor (4%, shooter edge) via a
-   tanh saturation. Two contributions: a skill shift (the defender's Rim defense blend minus
-   the rebounder's finishing) and a length shift (the defender's Height/Wingspan/Vertical
-   composite minus the rebounder's), weighted 40% skill / 60% length at the Rim. Reuses the
-   SAME contesting defender the make rate resolved (matched to `ReboundSlot`), not a
-   re-resolved `Pick` off `SelectedSlot`. **No new config** — the Rim block range is reused
-   as-is; putback-specific floor/ceiling is a future calibration pass if the shared range
-   ever reads wrong for the putback population. Foul/and-1 is NOT yet wired — it remains flat
-   `Putback*` config, the putback **foul/and-1 door** deferred to its own session.
+2. **Putback BLOCK rate (attribute) — WIRED as a FIVE-DEFENDER TEAM STACK (Putback CONTESTER
+   door).** Whether a putback is swatted is a property of the whole defense at the rim, not
+   the rebounder's matched man alone: `Matchup.PutbackBlockRate` sums each defender's block
+   threat (length + rim defense, each measured against a neutral finisher, weighted 40% skill
+   / 60% length at the Rim, run through `GapFn`) and bends the flat `PutbackBlocked` baseline
+   (7%, deliberately below the normal rim block baseline — a quick-reaction point-blank
+   go-back-up is harder to time a clean block on) toward a putback-specific ceiling
+   (`PutbackBlockCeiling` 0.55) or the shared Rim floor (4%) via a tanh saturation scaled by
+   `PutbackBlockReferenceShift` (35.0). Three rules make the stack a team property rather than
+   a duel: (a) the contributions are **summed, never averaged** — one elite rim protector is
+   undiluted by four weak teammates; (b) each defender's contribution is **floored at zero** —
+   a weak defender adds nothing rather than dragging the team total down; (c) the **finisher's
+   own length resists once** (a tall finisher rising over the pile pushes the rate below
+   baseline; a short finisher raises it). Calibrated outcomes: five average defenders hold the
+   7% baseline; one elite rim protector among four average raises the team putback-block rate
+   to ~34% (the game-changing-rim-protector number — he alters about one in three putbacks
+   even when he was not the rebounder's man); a full wall of five elite rim protectors
+   asymptotes to ~55%; three long 3-and-D wings with no rim-protection skill still reach ~35%
+   on length alone. The ceiling is higher than the located-shot Rim ceiling (30%) precisely
+   because a *team* of shot blockers should be scarier than the single matched defender of a
+   located jumper. **New config:** `PutbackBlockCeiling` and `PutbackBlockReferenceShift`
+   (Load-guarded; the baseline-strictly-inside-(floor,ceiling) relationship is guarded inside
+   `PutbackBlockRate`, the only site that can see `RollHConfig.PutbackBlocked`). **A team-help
+   abstraction, named honestly:** Charm has no spatial model (no paint position, no help-side
+   distance), so a team block rate is a help/rotation abstraction, not a literal claim that
+   all five defenders physically contest every go-back-up — Emmett's model stance, shipped
+   because an elite big *should* alter putbacks he is near even when not matched. Foul/and-1 is
+   NOT yet wired — it remains flat `Putback*` config, the putback **foul/and-1 door** deferred
+   to its own session.
+
+   *Make vs. block asymmetry (deliberate):* the **make** rate still reads only the rebounder's
+   MATCHED defender (`Matchup.EffectiveRating`) — your shot-MAKING is contested by your man —
+   while the **block** rate draws from all five. The matched defender carries the make
+   contest; the swat can come from anyone.
 3. **Same-player rebound tilt (attribute) — deferred.** A missed putback re-enters Roll I,
    and the rebounder — especially a big — should be favored to grab his own miss back. Lands
    in the attribution layer once it names the rebounder; the slot rides the loop so it has
    the player to favor.
 
-**Contester identity — the locked next session ("make the putback contest more chaotic").**
-The block door (S22) changed *how good* the matched defender's contest is, not *who*
-contests. The putback block is still computed solely against the rebounder's own matched man
-(the defender on the rebounder's slot). A real putback is often swatted by a **help defender
-rotating over from the weak side or coming from behind** — which the engine does not model.
-The next putback session reworks the contester to let a help / weak-side / behind defender
-contribute to (or replace) the matched man's contest, with a real basketball fork to settle
-first (replace the contester some of the time vs. let a help defender also weigh in vs. add
-randomness to whether the putback is cleanly contested at all).
+**Contester identity — RESOLVED (Putback CONTESTER door).** The S22 block door read only the
+rebounder's matched man; this door makes the block rate a team property where a help /
+weak-side / behind defender contributes to the swat (the "more chaotic contest" Emmett
+flagged after S22). This completes BOTH halves of putback shot-blocking: the block **rate** is
+now a five-defender stack (this door), and the block **attribution** — which defender is
+credited when a putback is blocked — was already all-five-eligible via `BlockerPicker` (the
+on-walk Stage-2 picker that credits every block, putbacks included, weighted toward interior
+length). The matched man retains only the **make** contest. No contester work remains; the
+remaining putback doors are the foul/and-1 rate and the same-player rebound tilt.
 
 Note: a putback's made basket is currently credited to the original Roll E shooter's slot
-(`SelectedSlot`, carried untouched on the PutBack arm), while the make and block rates are
-driven by the REBOUNDER (`ReboundSlot`). That attribution split is pre-existing and outside
-the make/block doors' scope — flagged for the box-score / attribution layer.
+(`SelectedSlot`, carried untouched on the PutBack arm), while the make rate is driven by the
+REBOUNDER (`ReboundSlot`) and the block rate by the whole defense. That attribution split is
+pre-existing and outside the make/block doors' scope — flagged for the box-score /
+attribution layer.
 
 Both attach at a GENERATOR, exactly like every prior deferred modifier (the height-driven
 tip contest, Roll C's pressure wire, Roll J's rebounder/tempo seams); the rolls themselves
