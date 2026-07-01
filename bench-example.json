@@ -1,0 +1,33 @@
+{
+  "gameCount": 400,
+  "baseSeed": 20260701,
+  "teamA": {
+    "slots": {
+      "5": {
+        "set": {
+          "Finishing": 95,
+          "Close": 95,
+          "RimProtection": 90,
+          "OffensiveRebounding": 90,
+          "Height": 80,
+          "Wingspan": 85,
+          "RimTendency": 85,
+          "ShortTendency": 10,
+          "MidTendency": 5,
+          "LongTendency": 0,
+          "ThreeTendency": 0
+        }
+      },
+      "4": {
+        "set": {
+          "OffensiveRebounding": 90,
+          "DefensiveRebounding": 90
+        },
+        "add": {
+          "Strength": 20
+        }
+      }
+    }
+  },
+  "teamB": {}
+}

@@ -6584,3 +6584,49 @@ The picker's **shape** is proven by direct probes — the real picker, fixed-see
 ### What this phase did NOT do (mapped-and-deferred)
 
 Which *defender* committed the foul, and per-defender foul trouble — out of scope (offense-side only). Intentional/off-ball fouling realism — not modelled. Coefficient calibration — the placeholders (1.0/1.0/1.0, floor 0.05) wait for the player-gen + calibration pass, where balance comes from rarity in the player population, not from formula ceilings. Reusing `SelectedSlot` for the FT shooter was rejected — the new field keeps the foul-draw identity strictly separate from the play-selection identity, so neither leaks into the other's attribution.
+
+## The player-generation lab bench — Phase 1: the dialed matchup (Session 24, 2026-06-30)
+
+The lab bench is a **harness-only instrument** (nothing under `src/Charm.Engine/` participates) for building and tuning player generation. It is the general control panel the archetype ladders (`pbtest`, `athtest`, …) never were: build two five-man teams from a flat all-average baseline, let a plain-text file dial any individual rating on any of the five lineup spots, run N seeded games on that one matchup, and print two proofs — an **Applied Dials echo** and a **per-team channel breakdown**. Dispatched by the `bench` token (`dotnet run --no-build --project src/Charm.Harness -- bench [path]`); it returns before the validation suite and is never part of the default run. **Phase 1 is the dialed matchup + readout; the single-seed play-by-play narrator is Phase 2 (deferred, its own session).**
+
+### The four settled design principles
+
+**Individual dials, not families** — each authored rating is exposed on its own, never bundled, so one lever moves at a time. **Per-slot independence** — every rating is settable on each of the five lineup spots separately, so a single dialed player's effect shows against four neutral teammates. **Flat/even baseline** — every rating starts at 50, so any asymmetry in the output traces to a dial, never to the baseline. **Fully literal** — a dial does exactly what it says; the bench adds no realism opinion (no softening, clamping, or "fixing" an extreme). Engine-*validity* rules still bind; the bench simply refuses to build an invalid player rather than quietly repairing it. Identity is a **slot tag** (`TeamA_Slot5`), not a generated name.
+
+### The config format and the strict reader
+
+A JSON file carries `gameCount`, `baseSeed`, and per-team `teamA` / `teamB`, each with a `slots` map keyed `"1"`–`"5"`; each slot carries a `set` map (absolute values) and/or an `add` map (deltas in rating points). Absent teams or slots are flat.
+
+The reader is a **JSON tree-walk that refuses anything unrecognized, at every level** — the deliberate opposite of the engine's lenient roster loader — because a lenient reader turns a mis-dialed typo into silent false data. It rejects: unknown keys and **duplicate keys** (the parsed tree preserves both occurrences; the reader catches them) at root, team, slot, and field-map level; a slot outside 1–5; a non-integer value; the same field in both `set` and `add`; a missing seed or game count; a non-positive game count. Field names are **case-sensitive** (`RimProtection`, not `rimProtection`). A bad file fails naming the exact team/slot/field/value **before any game runs**. The file is read from a **live path** (explicit arg, or bare `bench` resolves `bench.json` from CWD and prints the resolved path) — **not** copied into the build output — so with `--no-build` an edit takes effect on the next run with no recompile.
+
+### The dialable surface
+
+The 38 authored 0–99 ratings (the same set the engine's `Player.Validate()` range-checks, including the five shot-zone tendencies), plus `HierarchyRank` as the one special-range field. **Excluded:** `PlayerId` (attribution identity), `Name`, and the derived computed properties (`Athleticism`, `GravityContribution`, `SpacingContribution`), which are functions of other ratings and cannot be authored. The whitelist is an explicit list, not reflection — the exclusions are the point, and reflection cannot set the init-only authored properties anyway.
+
+### The flat-plus-dials build sequence (fixed order, per slot)
+
+1. Seed a mutable spec at neutral baselines: every rating `50`, `HierarchyRank` `5` (the hierarchy scale is 1–10, so its middle is 5 — **not** flattened to 50).
+2. Apply `set` (absolute) then `add` (delta on the post-set value).
+3. **Validate the finished spec before constructing:** every rating in `0–99`; `HierarchyRank` in `1–10`; the five zone tendencies not all zero. Range-checking lives here, not at read time, because an `add` can push a legal `+60` off a 50 baseline past 99 — caught as an out-of-range *result*, named.
+4. Construct the `Player` once via a typed object initializer reading every field from the validated spec (`PlayerId` is **not** set here — it is stamped by logical team afterward).
+5. Run `Player.Validate()` as a post-construction assertion — if the build ever disagreed with the spec it fails loudly rather than shipping a subtly-wrong player.
+
+**Two validity rules the bench owns at config time.** The tendency-sum rule the engine's validation already enforces (inherited). But **`HierarchyRank`'s 1–10 range is not in `Player.Validate()`** — the engine only trips on a bad hierarchy value later, in Roll E at usage time — so the bench pulls that check forward to config time, refusing a bad hierarchy dial up front instead of surfacing it as a mid-game crash. (The archetype factory's local "floor at 10" convention is *not* replicated; the engine's real rating range is 0–99.)
+
+### The readout
+
+The driver mirrors the stress test's per-game loop exactly — same config loads, same 20-argument `Resolver` wiring, same `gameSeed = baseSeed + i` derivation, same deterministic side alternation (logical Team A Home on even indices, Away on odd) — for one matchup and one accumulator, re-mapping physical Home/Away back to logical Team A/B on every channel. `PlayerId` is stamped by logical team (A → 1–5, B → 6–10) once, before seating.
+
+**Applied Dials echo** — every explicitly dialed field with its operation, its own baseline (50 for ratings, 5 for `HierarchyRank`), and its resolved final value (`Slot 5: Finishing set 95 (50 → 95)`; `Strength add +20 (50 → 70)`). A flat team prints `(none — flat)`.
+
+**Channel breakdown** (per team) — Result (win%, avg score, avg margin, PPP); Shooting (FG% overall and by the five zones, 3P%, FT%); Shot mix (attempt share by zone); Glass (ORB%); Turnovers (rate); Transition (frequency); Free throw (FTA/FGA); Usage (per-slot FGA); plus both roster fingerprints. Every channel is computed from the same possession-record fields the stress test reads.
+
+**Two numbers the stress test's `VariantStats` does not carry, added here:** **per-zone makes** (the stress scoreboard keeps zone *attempts* only; zone FG% needs makes, which were always on the possession record) and a **per-team turnover count**. The turnover channel is cross-checked against the engine's per-player turnover attribution — but because the engine assigns **no committer to a team violation** (shot-clock / 5-second / 10-second), the reconciliation is **per-player sum == committer turnovers**, with team violations reported alongside, not against the total. The displayed turnover *rate* uses the full count (committer + team violations).
+
+### The bench's own accumulator (engineering seam)
+
+The bench keeps a **focused local accumulator**, not the stress test's `VariantStats`. `VariantStats` is shaped for the cross-bucket stress summary (per-game SD lists, physical-home diagnostic, unattributed-slot buckets) and lacks the two numbers the readout needs. A purpose-built accumulator reading the same possession fields keeps **`Program.Stress.cs` byte-for-byte untouched**, so the "validation suite unchanged" guarantee holds by inspection of the diff. A game that crashes is **left to crash with its location** — no per-game safety net — because on a *legal* roster (in-range, nonzero-tendency, all refused at build time otherwise) a crash is a real engine finding, not something to swallow. Engine dials are loaded once up front rather than per game.
+
+### Scope
+
+Phase 1 is the dialed matchup + readout only. **Phase 2 — the readable single-seed play-by-play narrator — is deferred to its own session.** Downstream, the bench is the on-ramp to **player generation proper** (archetypes, tiers, seeded generation), where the calibration calls parked against a real player population land: the putback block ceiling, the division-spread anchor, and the three remaining athleticism doors (press, entry denial, putback-attempt frequency).
