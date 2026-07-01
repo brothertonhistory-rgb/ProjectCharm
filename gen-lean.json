@@ -1,0 +1,7 @@
+{
+  "gameCount": 400,
+  "baseSeed": 12345,
+  "genSeed": 20260701,
+  "programA": { "prestige": 60, "lean": "athletic" },
+  "programB": { "prestige": 60, "lean": "skilled" }
+}

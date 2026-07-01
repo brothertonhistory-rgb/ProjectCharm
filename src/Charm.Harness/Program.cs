@@ -34,6 +34,12 @@ internal static partial class Program
         // config path — otherwise the bench resolves "bench.json" from the current directory.
         if (args.Length > 0 && args[0] == "bench") { RunBench(configPath, args.Length > 1 ? args[1] : null); return 0; }
 
+        // dotnet run -- gen [path]  generates two programs' rosters from prestige, prints the
+        // roster sheet, then sims the two starter cohorts on the bench (not in the validation
+        // suite). configPath is the engine config.json (for the sim); args[1], if given, is the
+        // gen config path — otherwise "gen.json" resolves from the current directory.
+        if (args.Length > 0 && args[0] == "gen") { RunGen(configPath, args.Length > 1 ? args[1] : null); return 0; }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
