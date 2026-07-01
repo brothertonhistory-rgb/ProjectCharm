@@ -10,8 +10,8 @@ namespace Charm.Harness;
 // the same roster seam, the same per-game Resolver/Governor wiring, and the same
 // PossessionRecord channels the stress test reads. What is new here is (a) a flat
 // all-50 team-builder that a plain-text config dials on top of, (b) a strict config
-// reader, and (c) a single-matchup readout: an "Applied Dials" echo plus a per-team
-// channel breakdown.
+// reader, and (c) a single-matchup readout: an "Applied Dials" echo, a per-team channel
+// breakdown, and a per-player box score.
 //
 // Dispatched from Program.cs by the `bench` token; it returns before the validation
 // suite, so the bench is never part of the default run.
@@ -150,6 +150,7 @@ internal static partial class Program
 
         PrintAppliedDials(appliedA, appliedB);
         PrintBenchChannels(stats, teamAPlayers, teamBPlayers);
+        PrintBenchBoxScore(stats);
     }
 
     // ── Strict config parser (tree-walk; unknown + duplicate keys rejected) ─────
@@ -558,8 +559,23 @@ internal static partial class Program
         public readonly long[] ASlotFga = new long[5];
         public readonly long[] BSlotFga = new long[5];
 
-        // Per-player turnovers from attribution (index 0–4 = Team A ids 1–5, 5–9 = Team B ids 6–10).
-        public readonly long[] PlayerTo = new long[10];
+        // Per-player attribution accumulators (index 0–4 = Team A ids 1–5, 5–9 = Team B ids
+        // 6–10). PlayerTo drives both the turnover reconciliation and the box-score TO
+        // column; the other twelve feed the per-player box score only. Each is summed from
+        // the same PlayerBoxTotals the stress/observation runs use, one field per array.
+        public readonly long[] PlayerFga    = new long[10];
+        public readonly long[] PlayerFgm    = new long[10];
+        public readonly long[] PlayerTpa    = new long[10];
+        public readonly long[] PlayerTpm    = new long[10];
+        public readonly long[] PlayerFta    = new long[10];
+        public readonly long[] PlayerFtm    = new long[10];
+        public readonly long[] PlayerOReb   = new long[10];
+        public readonly long[] PlayerDReb   = new long[10];
+        public readonly long[] PlayerBlk    = new long[10];
+        public readonly long[] PlayerStl    = new long[10];
+        public readonly long[] PlayerShFoul = new long[10];
+        public readonly long[] PlayerAst    = new long[10];
+        public readonly long[] PlayerTo     = new long[10];
 
         public void Accumulate(
             IReadOnlyList<PossessionRecord> records, GameState game,
@@ -615,7 +631,22 @@ internal static partial class Program
                 BSlotFga[s] += SumB(r => GetSlotFga(r, s + 1));
             }
 
-            for (var i = 0; i < 10; i++) PlayerTo[i] += attributed.To[i];
+            for (var i = 0; i < 10; i++)
+            {
+                PlayerFga[i]    += attributed.Fga[i];
+                PlayerFgm[i]    += attributed.Fgm[i];
+                PlayerTpa[i]    += attributed.Tpa[i];
+                PlayerTpm[i]    += attributed.Tpm[i];
+                PlayerFta[i]    += attributed.Fta[i];
+                PlayerFtm[i]    += attributed.Ftm[i];
+                PlayerOReb[i]   += attributed.OReb[i];
+                PlayerDReb[i]   += attributed.DReb[i];
+                PlayerBlk[i]    += attributed.Blk[i];
+                PlayerStl[i]    += attributed.Stl[i];
+                PlayerShFoul[i] += attributed.ShFoul[i];
+                PlayerAst[i]    += attributed.Ast[i];
+                PlayerTo[i]     += attributed.To[i];
+            }
         }
     }
 
@@ -710,6 +741,77 @@ internal static partial class Program
         Console.WriteLine($"  Transition: freq {Rate(trans, offPoss):F3}   ({trans} of {offPoss})");
         Console.WriteLine($"  Free throw: FTA/FGA {Rate(fta, fga):F3}   (FTA {fta})");
         Console.WriteLine($"  Usage:      slot FGA   1:{slotFga[0]}   2:{slotFga[1]}   3:{slotFga[2]}   4:{slotFga[3]}   5:{slotFga[4]}");
+        Console.WriteLine();
+    }
+
+    // ── Readout: the per-player box score ───────────────────────────────────────
+    //
+    // The channel breakdown proves team-level shaping; this proves the same shaping at
+    // the individual grain. Every column is the per-game average over the run of a
+    // persistent dialed player, mirroring the observation run's per-player box score —
+    // with one deliberate difference: rows are labeled by LOGICAL team + slot tag
+    // ([A] Slot 1..5 / [B] Slot 1..5), never Home/Away. The bench alternates which team
+    // is physically Home every other game, so a Home/Away label (correct in the
+    // never-flipped observation run) would mislabel across this run even though the
+    // numbers are logical and correct. PTS and REB are derived, not stored, reusing the
+    // observation printer's formulas so the two box scores reconcile.
+    private static void PrintBenchBoxScore(BenchStats s)
+    {
+        Console.WriteLine($"--- PER-PLAYER BOX SCORE (per-game averages, {s.Games} games) ---");
+        Console.WriteLine("  Exact attribution (engine-stamped): FGA, FGM, 3PA, 3PM, FTA, FTM, ORB, DRB, STL, BLK, AST, TO.");
+        Console.WriteLine("  Weighted credit (probabilistic): SFL only — shooting fouls committed, drawn by zone/defender weight.");
+        Console.WriteLine("  SFL excludes all non-shooting and offensive fouls.");
+        Console.WriteLine("  Each row is one persistent dialed player across the whole run (not a pooled cohort),");
+        Console.WriteLine("  so the stress test's \"cohort, not a player\" caveat does not apply here.");
+        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5}");
+        Console.WriteLine(new string('─', 121));
+
+        // Every bench slot is always populated with a stamped PlayerId 1–10, so all ten
+        // rows print unconditionally (no null-player guard needed, unlike observation).
+        for (var i = 0; i < 10; i++)
+        {
+            double g = s.Games;
+            var fga = s.PlayerFga[i]    / g;  var fgm = s.PlayerFgm[i]  / g;
+            var tpa = s.PlayerTpa[i]    / g;  var tpm = s.PlayerTpm[i]  / g;
+            var fta = s.PlayerFta[i]    / g;  var ftm = s.PlayerFtm[i]  / g;
+            var orb = s.PlayerOReb[i]   / g;  var drb = s.PlayerDReb[i] / g;
+            var stl = s.PlayerStl[i]    / g;  var blk = s.PlayerBlk[i]  / g;
+            var to  = s.PlayerTo[i]     / g;
+            var sfl = s.PlayerShFoul[i] / g;
+            var ast = s.PlayerAst[i]    / g;
+            var pts = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
+            var fgPct = fga > 0 ? fgm / fga * 100 : 0.0;
+            var tpPct = tpa > 0 ? tpm / tpa * 100 : 0.0;
+            var ftPct = fta > 0 ? ftm / fta * 100 : 0.0;
+            var team  = i < 5 ? "A" : "B";
+            var slot  = (i % 5) + 1;
+            var label = $"[{team}] Slot {slot}";
+            Console.WriteLine(
+                $"  {label,-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
+                $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
+                $"{orb,5:F1} {drb,5:F1} {(orb + drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1} {sfl,5:F1}");
+        }
+
+        // Per-player FGA reconciliation — computed from the RAW accumulators, never the
+        // rounded per-game display above. Each team's five players' raw FGA must equal
+        // that team's raw per-slot usage FGA total: both are built from the same
+        // GetSlotFga slot-binning (AttributeGame builds player FGA from it; the usage row
+        // sums the same), so this is an exact identity. It is deliberately NOT reconciled
+        // against the channel FGA total (AFga/BFga, summed from r.Fga), which includes the
+        // ~0.2% null-slot bonus-FT-putback attempts that carry no slot attribution
+        // (design.md §4422, SlotUnattributedFga) — that comparison would be short by that
+        // count and fail a naive equality. FGM/FTA/FTM share the same unattributed paths
+        // and are eyeballed against the channel numbers, not hard-asserted here.
+        long aPlayerFga = 0, bPlayerFga = 0, aUsageFga = 0, bUsageFga = 0;
+        for (var i = 0; i < 5; i++)  aPlayerFga += s.PlayerFga[i];
+        for (var i = 5; i < 10; i++) bPlayerFga += s.PlayerFga[i];
+        for (var i = 0; i < 5; i++) { aUsageFga += s.ASlotFga[i]; bUsageFga += s.BSlotFga[i]; }
+        bool aFgaOk = aPlayerFga == aUsageFga;
+        bool bFgaOk = bPlayerFga == bUsageFga;
+        Console.WriteLine();
+        Console.WriteLine("Per-player FGA reconciliation (player-sum vs. per-slot usage total, raw counts):");
+        Console.WriteLine($"  Team A: players={aPlayerFga}  usage={aUsageFga}  [{(aFgaOk ? "OK" : "FAIL")}]");
+        Console.WriteLine($"  Team B: players={bPlayerFga}  usage={bUsageFga}  [{(bFgaOk ? "OK" : "FAIL")}]");
         Console.WriteLine();
     }
 }

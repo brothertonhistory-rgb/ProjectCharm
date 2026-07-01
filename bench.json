@@ -1,0 +1,85 @@
+{
+  "gameCount": 400,
+  "baseSeed": 20260701,
+  "teamA": {
+    "slots": {
+      "1": {
+        "set": {
+          "Outside": 71,
+          "FreeThrow": 80,
+          "RimTendency": 0,
+          "ThreeTendency": 99,
+          "Passing": 99,
+          "HierarchyRank": 4
+        }
+      },
+      "2": {
+        "set": {
+          "Outside": 73,
+          "FreeThrow": 80,
+          "RimTendency": 0,
+          "ThreeTendency": 99,
+          "Passing": 99
+        }
+      },
+      "3": {
+        "set": {
+          "FreeThrow": 80,
+          "Passing": 99,
+          "HierarchyRank": 2
+        }
+      },
+      "4": {
+        "set": {
+          "FreeThrow": 80,
+          "Passing": 99,
+          "HierarchyRank": 2
+        }
+      },
+      "5": {
+        "set": {
+          "Finishing": 99,
+          "FreeThrow": 80,
+          "FoulDrawing": 87,
+          "Passing": 99
+        }
+      }
+    }
+  },
+  "teamB": {
+    "slots": {
+      "1": {
+        "set": {
+          "Height": 99,
+          "Wingspan": 99
+        }
+      },
+      "2": {
+        "set": {
+          "Height": 99,
+          "Wingspan": 99
+        }
+      },
+      "3": {
+        "set": {
+          "Height": 99,
+          "Wingspan": 99
+        }
+      },
+      "4": {
+        "set": {
+          "OffensiveRebounding": 99,
+          "Height": 99,
+          "Wingspan": 99
+        }
+      },
+      "5": {
+        "set": {
+          "OffensiveRebounding": 99,
+          "Height": 99,
+          "Wingspan": 99
+        }
+      }
+    }
+  }
+}
