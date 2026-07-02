@@ -148,19 +148,23 @@ internal static partial class Program
         OffBallDefense      = p.OffBallDefense,
     };
 
-    /// <summary>Per-player stat totals for one game. Indexed by PlayerId - 1 (0–9).</summary>
+    /// <summary>Per-player stat totals for one game. Indexed by PlayerId - 1 (0–19).
+    /// Phase 52: widened 10 → 20 so a ten-man-per-side gen game (PlayerIds 1–20) can log
+    /// stats. A five-per-side run (PlayerIds 1–10) fills only indices 0–9 and leaves 10–19
+    /// zero, so the equality/reproducibility check (SequenceEqual over the full arrays) is
+    /// unaffected and every existing run is byte-for-byte unchanged.</summary>
     private sealed class PlayerBoxTotals
     {
-        public long[] Fga  = new long[10]; public long[] Fgm  = new long[10];
-        public long[] Tpa  = new long[10]; public long[] Tpm  = new long[10];
-        public long[] Fta  = new long[10]; public long[] Ftm  = new long[10];
-        public long[] OReb = new long[10]; public long[] DReb = new long[10];
-        public long[] Blk  = new long[10]; public long[] Stl  = new long[10];
-        public long[] To   = new long[10];
+        public long[] Fga  = new long[20]; public long[] Fgm  = new long[20];
+        public long[] Tpa  = new long[20]; public long[] Tpm  = new long[20];
+        public long[] Fta  = new long[20]; public long[] Ftm  = new long[20];
+        public long[] OReb = new long[20]; public long[] DReb = new long[20];
+        public long[] Blk  = new long[20]; public long[] Stl  = new long[20];
+        public long[] To   = new long[20];
         // Phase 25: shooting fouls committed (SFL) — weighted draw, separate seed+3 RNG.
-        public long[] ShFoul = new long[10];
+        public long[] ShFoul = new long[20];
         // Phase 39: assist counts — engine-stamped on-walk from AstBySlot.
-        public long[] Ast  = new long[10];
+        public long[] Ast  = new long[20];
         public static bool AllEqual(PlayerBoxTotals a, PlayerBoxTotals b) =>
             a.Fga.SequenceEqual(b.Fga)   && a.Fgm.SequenceEqual(b.Fgm) &&
             a.Tpa.SequenceEqual(b.Tpa)   && a.Tpm.SequenceEqual(b.Tpm) &&
@@ -192,10 +196,10 @@ internal static partial class Program
             // Exact per-slot stats (offense side)
             for (var slot = 1; slot <= 5; slot++)
             {
-                var op = offRoster.PlayerAt(new Slot(r.Offense, slot));
+                var op = offRoster.PlayerAt(new Slot(r.Offense, slot), r.Number);
                 if (op is null) continue;
                 var oi = op.PlayerId - 1;
-                if (oi < 0 || oi >= 10) continue; // guard: unset PlayerId
+                if (oi < 0 || oi >= 20) continue; // guard: unset PlayerId
                 t.Fga [oi] += GetSlotFga(r, slot); t.Fgm [oi] += GetSlotFgm(r, slot);
                 t.Tpa [oi] += r.ThreePaBySlot[slot]; t.Tpm [oi] += r.ThreePmBySlot[slot];
                 t.Fta [oi] += r.FtaBySlot[slot];    t.Ftm [oi] += r.FtmBySlot[slot];
@@ -205,8 +209,8 @@ internal static partial class Program
             {
                 if (r.TurnoverOffSlot is { } toSlot)
                 {
-                    var top = offRoster.PlayerAt(new Slot(r.Offense, toSlot));
-                    if (top != null && top.PlayerId >= 1 && top.PlayerId <= 10) t.To[top.PlayerId - 1]++;
+                    var top = offRoster.PlayerAt(new Slot(r.Offense, toSlot), r.Number);
+                    if (top != null && top.PlayerId >= 1 && top.PlayerId <= 20) t.To[top.PlayerId - 1]++;
                 }
                 // else: team violation (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation)
                 // — no individual credit; team TO count tracked at aggregate level only.
@@ -218,8 +222,8 @@ internal static partial class Program
                     ?? throw new InvalidOperationException(
                         "Phase 34: StealerSlot null on a live-ball turnover — the engine stealer " +
                         "pick should stamp every live-ball possession. Wiring break.");
-                var stlp = defRoster.PlayerAt(new Slot(r.Defense, stlSlot));
-                if (stlp != null && stlp.PlayerId >= 1 && stlp.PlayerId <= 10) t.Stl[stlp.PlayerId - 1]++;
+                var stlp = defRoster.PlayerAt(new Slot(r.Defense, stlSlot), r.Number);
+                if (stlp != null && stlp.PlayerId >= 1 && stlp.PlayerId <= 20) t.Stl[stlp.PlayerId - 1]++;
             }
             // DReb — Phase 35: read engine-stamped slot from DefensiveRebounderSlot.
             if (r.EndLabel == "DefensiveRebound")
@@ -228,8 +232,8 @@ internal static partial class Program
                     ?? throw new InvalidOperationException(
                         "Phase 35: DefensiveRebounderSlot null on a defensive-rebound possession — " +
                         "the engine defensive-rebound pick should stamp every DReb possession. Wiring break.");
-                var dp = defRoster.PlayerAt(new Slot(r.Defense, drebSlot));
-                if (dp != null && dp.PlayerId >= 1 && dp.PlayerId <= 10) t.DReb[dp.PlayerId - 1]++;
+                var dp = defRoster.PlayerAt(new Slot(r.Defense, drebSlot), r.Number);
+                if (dp != null && dp.PlayerId >= 1 && dp.PlayerId <= 20) t.DReb[dp.PlayerId - 1]++;
             }
             // OReb — Phase 31: read engine-stamped picks from OrbBySlot rather than
             // drawing post-hoc. OrbBySlot.Total == r.OrbWon on every possession
@@ -238,8 +242,8 @@ internal static partial class Program
             {
                 var orbCount = r.OrbBySlot[s];
                 if (orbCount <= 0) continue;
-                var op2 = offRoster.PlayerAt(new Slot(r.Offense, s));
-                if (op2 != null && op2.PlayerId >= 1 && op2.PlayerId <= 10)
+                var op2 = offRoster.PlayerAt(new Slot(r.Offense, s), r.Number);
+                if (op2 != null && op2.PlayerId >= 1 && op2.PlayerId <= 20)
                     t.OReb[op2.PlayerId - 1] += orbCount;
             }
             // BLK — Phase 36: read engine-stamped slots from BlkBySlot (BlockerPicker).
@@ -247,8 +251,8 @@ internal static partial class Program
             {
                 var blkCount36 = r.BlkBySlot[s];
                 if (blkCount36 <= 0) continue;
-                var bp = defRoster.PlayerAt(new Slot(r.Defense, s));
-                if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 10)
+                var bp = defRoster.PlayerAt(new Slot(r.Defense, s), r.Number);
+                if (bp != null && bp.PlayerId >= 1 && bp.PlayerId <= 20)
                     t.Blk[bp.PlayerId - 1] += blkCount36;
             }
             // AST — Phase 39: read engine-stamped slots from AstBySlot (AssistPicker).
@@ -256,8 +260,8 @@ internal static partial class Program
             {
                 var astCount = r.AstBySlot[s];
                 if (astCount <= 0) continue;
-                var ap = offRoster.PlayerAt(new Slot(r.Offense, s));
-                if (ap != null && ap.PlayerId >= 1 && ap.PlayerId <= 10)
+                var ap = offRoster.PlayerAt(new Slot(r.Offense, s), r.Number);
+                if (ap != null && ap.PlayerId >= 1 && ap.PlayerId <= 20)
                     t.Ast[ap.PlayerId - 1] += astCount;
             }
             // Phase 25: shooting-foul attribution. seed+3 RNG (foulRng). seed+2 stream
@@ -267,9 +271,9 @@ internal static partial class Program
             if (r.ShootingFouls is { } sfs)
                 foreach (var sf in sfs)
                 {
-                    var fSlot = DrawFoulingDefender(foulRng, r.Defense, defRoster, sf.Zone, sf.ShooterSlot);
-                    var fp = defRoster.PlayerAt(new Slot(r.Defense, fSlot));
-                    if (fp != null && fp.PlayerId >= 1 && fp.PlayerId <= 10) t.ShFoul[fp.PlayerId - 1]++;
+                    var fSlot = DrawFoulingDefender(foulRng, r.Defense, defRoster, sf.Zone, sf.ShooterSlot, r.Number);
+                    var fp = defRoster.PlayerAt(new Slot(r.Defense, fSlot), r.Number);
+                    if (fp != null && fp.PlayerId >= 1 && fp.PlayerId <= 20) t.ShFoul[fp.PlayerId - 1]++;
                 }
         }
         return t;
@@ -294,7 +298,7 @@ internal static partial class Program
     /// </summary>
     private static int DrawFoulingDefender(
         Random rng, TeamSide side, Roster roster,
-        ShotLocation zone, int shooterSlot)
+        ShotLocation zone, int shooterSlot, int atPossession)
     {
         // ── Zone lookup tables (CALIBRATION PLACEHOLDERS) ────────────────────
         // matchedShare: fraction of probability given to the defender at the same slot
@@ -328,10 +332,14 @@ internal static partial class Program
 
         // ── Populate the five defending slots ────────────────────────────────
         // Gather (slot index, interior score) for every populated slot.
+        // Phase 52: read the defenders who were on the floor AT this possession, not the
+        // roster's final occupants — under substitutions the two differ, and the fouler is
+        // selected from the size profile of the five actually defending. Identical to the
+        // current occupant on any no-sub game (the starter's log entry wins every lookup).
         var slots = new List<(int Slot, double Interior)>(5);
         for (var s = 1; s <= 5; s++)
         {
-            var p = roster.PlayerAt(new Slot(side, s));
+            var p = roster.PlayerAt(new Slot(side, s), atPossession);
             if (p != null)
                 slots.Add((s, p.Height + p.Strength + p.PostDefense));
         }

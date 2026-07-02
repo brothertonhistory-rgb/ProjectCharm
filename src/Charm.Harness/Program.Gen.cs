@@ -648,30 +648,430 @@ internal static partial class Program
         // namespace via StampPlayerId (A -> 1-5, B -> 6-10), creating game-facing stamped
         // copies; the generated players are never mutated and a roster-slot number is
         // never used as a PlayerId (A0.7). The five bench players are not seated.
-        var startersA = rowsA.Where(x => x.Starter).Select(x => x.Player).ToArray();
-        var startersB = rowsB.Where(x => x.Starter).Select(x => x.Player).ToArray();
-        if (startersA.Length != 5 || startersB.Length != 5)
+        // Phase 52: stamp ALL TEN of each program (not just the five starters) into the
+        // gen attribution namespace. Roster depth slot 1..10 maps directly to PlayerId —
+        // program A → 1..10, program B → 11..20 — so PlayerIds are stable per logical
+        // player regardless of which physical side they take each game. The depth slot is
+        // the stamping key; it is not reused as a PlayerId anywhere else (A0.7). Starters
+        // (depth 1..5) seat into on-floor slots 1..5 in depth order; the five reserves
+        // (depth 6..10) begin on the bench and check in only through the fatigue fence.
+        if (rowsA.Count != 10 || rowsB.Count != 10)
             throw new InvalidOperationException(
-                $"assembly bug — each program must have exactly five starters " +
-                $"(got A={startersA.Length}, B={startersB.Length}).");
+                $"assembly bug — each program must have exactly ten players " +
+                $"(got A={rowsA.Count}, B={rowsB.Count}).");
 
-        for (var i = 0; i < 5; i++) startersA[i] = StampPlayerId(startersA[i], i + 1);
-        for (var i = 0; i < 5; i++) startersB[i] = StampPlayerId(startersB[i], i + 6);
+        var stampedA = new Player[10];
+        var stampedB = new Player[10];
+        for (var i = 0; i < 10; i++) stampedA[i] = StampPlayerId(rowsA[i].Player, rowsA[i].Slot);
+        for (var i = 0; i < 10; i++) stampedB[i] = StampPlayerId(rowsB[i].Player, rowsB[i].Slot + 10);
+
+        var sideA    = BuildGenSideData(rowsA, stampedA);
+        var sideB    = BuildGenSideData(rowsB, stampedB);
+        var identity = BuildGenIdentity(rowsA, rowsB);
 
         Console.WriteLine(
-            $"Simming the two starter cohorts (A slots 1–5 vs B slots 1–5): " +
-            $"{config.GameCount} games, base seed {config.BaseSeed} ...");
+            $"Simming the two full ten-man rosters — five starters in slots 1–5, five reserves " +
+            $"on the bench behind the fatigue fence: {config.GameCount} games, base seed {config.BaseSeed} ...");
         Console.WriteLine();
 
-        // Reuse the bench matchup + readout verbatim. RunBenchMatchup reads only
-        // GameCount/BaseSeed from the config and takes the two player arrays as params,
-        // so a minimal BenchConfig is all it needs. The [A]/[B] Slot 1–5 labels in the
-        // bench channels + box score now denote just the starter cohort (distinct from
-        // the ten-slot roster sheet above).
-        var benchConfig = new BenchConfig { GameCount = config.GameCount, BaseSeed = config.BaseSeed };
-        var stats = RunBenchMatchup(benchConfig, startersA, startersB, engineConfigPath);
+        var stats = RunGenMatchup(config, stampedA, stampedB, sideA, sideB, engineConfigPath);
 
-        PrintBenchChannels(stats, startersA, startersB);
-        PrintBenchBoxScore(stats);
+        PrintGenChannels(stats);
+        PrintGenBoxScore(stats, identity);
+    }
+
+    // ── Ten-man assembly for the gen matchup ─────────────────────────────────────
+
+    // One logical program's depth data: the five starters (in on-floor slot order 1..5)
+    // with their positions, and the five reserves with theirs. The stamped Player at index
+    // i corresponds to rows[i] (depth slot i+1), so starters land in depth order.
+    private sealed record GenSideData(
+        Player[] Starters, string[] StarterPositions,
+        Player[] Reserves, string[] ReservePositions);
+
+    private static GenSideData BuildGenSideData(List<GenPlayerRow> rows, Player[] stamped)
+    {
+        var starters = new List<Player>();  var starterPos = new List<string>();
+        var reserves = new List<Player>();  var reservePos = new List<string>();
+        for (var i = 0; i < rows.Count; i++)
+        {
+            if (rows[i].Starter) { starters.Add(stamped[i]); starterPos.Add(rows[i].Pos); }
+            else                 { reserves.Add(stamped[i]); reservePos.Add(rows[i].Pos); }
+        }
+        if (starters.Count != 5 || reserves.Count != 5)
+            throw new InvalidOperationException(
+                $"assembly bug — a program must split into five starters and five reserves " +
+                $"(got {starters.Count} starters, {reserves.Count} reserves).");
+        return new GenSideData(starters.ToArray(), starterPos.ToArray(), reserves.ToArray(), reservePos.ToArray());
+    }
+
+    // PlayerId → who this is, for the box-score row labels. A → depth slot (1..10),
+    // B → depth slot + 10 (11..20).
+    private sealed record GenIdentity(string Team, int Slot, string Pos, string Role, bool Starter);
+
+    private static Dictionary<int, GenIdentity> BuildGenIdentity(List<GenPlayerRow> rowsA, List<GenPlayerRow> rowsB)
+    {
+        var map = new Dictionary<int, GenIdentity>();
+        foreach (var row in rowsA) map[row.Slot]      = new GenIdentity("A", row.Slot, row.Pos, row.Role, row.Starter);
+        foreach (var row in rowsB) map[row.Slot + 10] = new GenIdentity("B", row.Slot, row.Pos, row.Role, row.Starter);
+        return map;
+    }
+
+    // ── The gen matchup runner ───────────────────────────────────────────────────
+    //
+    // A sibling of RunBenchMatchup, forked rather than widened so the five-a-side bench
+    // instrument (and every byte-for-byte suite path that shares its accumulator/printer)
+    // is left literally untouched. This runner seats the five starters, installs the
+    // fatigue-fence policy with the correct logical→physical side mapping for the game, and
+    // constructs the Governor WITH that policy. Attribution flows through the shared
+    // AttributeGame (now 20-wide); a GenStats accumulates both the team-level channels and
+    // the 20-player box score plus a possessions-played count.
+    private static GenStats RunGenMatchup(
+        GenConfig config, Player[] stampedA, Player[] stampedB,
+        GenSideData sideA, GenSideData sideB, string engineConfigPath)
+    {
+        var cfg          = RollAConfig.Load(engineConfigPath);
+        var cfgB         = RollBConfig.Load(engineConfigPath);
+        var cfgC         = RollCConfig.Load(engineConfigPath);
+        var cfgD         = RollDConfig.Load(engineConfigPath);
+        var cfgE         = RollEConfig.Load(engineConfigPath);
+        var cfgF         = RollFConfig.Load(engineConfigPath);
+        var cfgG         = RollGConfig.Load(engineConfigPath);
+        var cfgH         = RollHConfig.Load(engineConfigPath);
+        var cfgI         = RollIConfig.Load(engineConfigPath);
+        var cfgJ         = RollJConfig.Load(engineConfigPath);
+        var cfgK         = RollKConfig.Load(engineConfigPath);
+        var cfgL         = RollLConfig.Load(engineConfigPath);
+        var cfgM         = RollMConfig.Load(engineConfigPath);
+        var cfgOffFoul   = RollOffensiveFoulConfig.Load(engineConfigPath);
+        var cfgGov       = GovernorConfig.Load(engineConfigPath);
+        var cfgClock     = RollClockConfig.Load(engineConfigPath);
+        var cfgEndOfHalf = EndOfHalfConfig.Load(engineConfigPath);
+        var cfgMatchup   = MatchupConfig.Load(engineConfigPath);
+        var cfgAttention = AttentionConfig.Load(engineConfigPath);
+        // The fence and the engine's fatigue both read this one config, so the fence's
+        // recovery and the engine's halftime rest use identical magnitudes.
+        var cfgFat       = FatigueConfig.Load(engineConfigPath);
+
+        var stats = new GenStats();
+
+        for (var i = 0; i < config.GameCount; i++)
+        {
+            int gameSeed = config.BaseSeed + i;
+
+            // Same deterministic side balancing as the bench (D4): logical A is Home on
+            // even indices, Away on odd. Any home/away asymmetry splits evenly across A/B.
+            bool teamAIsHome = (i % 2 == 0);
+            TeamSide teamASide = teamAIsHome ? TeamSide.Home : TeamSide.Away;
+            TeamSide teamBSide = teamAIsHome ? TeamSide.Away : TeamSide.Home;
+
+            var game = new GameState(
+                new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold),
+                ArrowState.Off,
+                new FatigueTracker(cfgFat));
+
+            SeatRoster(game, teamASide, sideA.Starters);
+            SeatRoster(game, teamBSide, sideB.Starters);
+
+            // Build each side's depth chart with its PHYSICAL side for this game, then hand
+            // the policy the Home/Away pair and the shared halftime-equivalent magnitude.
+            var aDepth = new FlatFatigueFencePolicy.SideDepth(
+                teamASide, sideA.Starters, sideA.StarterPositions, sideA.Reserves, sideA.ReservePositions);
+            var bDepth = new FlatFatigueFencePolicy.SideDepth(
+                teamBSide, sideB.Starters, sideB.StarterPositions, sideB.Reserves, sideB.ReservePositions);
+            var homeDepth = teamAIsHome ? aDepth : bDepth;
+            var awayDepth = teamAIsHome ? bDepth : aDepth;
+            var policy = new FlatFatigueFencePolicy(homeDepth, awayDepth, cfgFat.HalftimeRestEquivalentSeconds);
+
+            var resolverRng = new SystemRng(gameSeed);
+            var governorRng = new SystemRng(gameSeed + 1);
+
+            var resolver = new Resolver(
+                new RollAGenerator(cfg, cfgMatchup, game),
+                cfg,
+                new RollBGenerator(cfgB, cfgMatchup, game),
+                new RollCGenerator(cfgC),
+                cfgC,
+                new RollDGenerator(cfgD),
+                new RollEGenerator(cfgE, game),
+                new AttentionGenerator(cfgAttention, game),
+                new RollFGenerator(cfgF, cfgMatchup, game),
+                new RollGGenerator(cfgG, cfgMatchup, game),
+                new RollHGenerator(cfgH, cfgMatchup, game),
+                new RollIGenerator(cfgI, cfgMatchup, game),
+                new RollJGenerator(cfgJ, cfgMatchup, game),
+                new RollKGenerator(cfgK, cfgMatchup, game),
+                new RollLGenerator(cfgL, game),
+                new RollMGenerator(cfgM, cfgMatchup, game),
+                new RollOffensiveFoulGenerator(cfgOffFoul),
+                cfgMatchup,
+                game,
+                resolverRng);
+
+            // The one line that differs from the bench runner: the Governor is given the
+            // substitution policy (7th argument). Everything else is identical.
+            var governor = new Governor(resolver, game, cfgGov, cfgClock, governorRng, cfgEndOfHalf, policy);
+            var firstState = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1);
+
+            var result = governor.Run(firstState);
+            var attributed = AttributeGame(result, game, gameSeed);
+
+            stats.Accumulate(result.Possessions, game, attributed, teamASide, teamBSide);
+        }
+
+        return stats;
+    }
+
+    // ── Gen accumulator: team-level channels + 20-player box + possessions played ──
+    //
+    // Team-level channels mirror BenchStats (aggregated by possession Offense, position-
+    // and count-agnostic). The 20-player arrays come straight from the shared AttributeGame
+    // output. PlayerPoss counts, per player, how many possession records he was on the
+    // floor for (either side of the ball) — the column that makes substitutions visible.
+    private sealed class GenStats
+    {
+        public int Games;
+        public int TeamAWins, TeamBWins, Ties;
+        public readonly List<int> TeamAScores = new();
+        public readonly List<int> TeamBScores = new();
+        public readonly List<int> Margins     = new();   // A − B
+
+        public long AOffPoss, BOffPoss, APoints, BPoints;
+        public long AFga, BFga, AFgm, BFgm;
+        public long ARimA,   BRimA,   ARimM,   BRimM;
+        public long AShortA, BShortA, AShortM, BShortM;
+        public long AMidA,   BMidA,   AMidM,   BMidM;
+        public long ALongA,  BLongA,  ALongM,  BLongM;
+        public long A3pa, B3pa, A3pm, B3pm;
+        public long AFta, BFta, AFtm, BFtm;
+        public long AOrbC, BOrbC, AOrbW, BOrbW;
+        public long ATrans, BTrans;
+        public long ATurnovers,   BTurnovers;
+        public long ACommitterTo, BCommitterTo;
+        public readonly long[] ASlotFga = new long[5];
+        public readonly long[] BSlotFga = new long[5];
+
+        // 20-player arrays (index = PlayerId - 1; A = 0..9, B = 10..19).
+        public readonly long[] PlayerFga  = new long[20]; public readonly long[] PlayerFgm  = new long[20];
+        public readonly long[] PlayerTpa  = new long[20]; public readonly long[] PlayerTpm  = new long[20];
+        public readonly long[] PlayerFta  = new long[20]; public readonly long[] PlayerFtm  = new long[20];
+        public readonly long[] PlayerOReb = new long[20]; public readonly long[] PlayerDReb = new long[20];
+        public readonly long[] PlayerBlk  = new long[20]; public readonly long[] PlayerStl  = new long[20];
+        public readonly long[] PlayerShFoul = new long[20];
+        public readonly long[] PlayerAst  = new long[20]; public readonly long[] PlayerTo   = new long[20];
+        public readonly long[] PlayerPoss = new long[20];   // possessions on the floor (either side)
+
+        public void Accumulate(
+            IReadOnlyList<PossessionRecord> records, GameState game,
+            PlayerBoxTotals attributed, TeamSide teamASide, TeamSide teamBSide)
+        {
+            Games++;
+
+            int aScore = teamASide == TeamSide.Home ? game.HomeScore : game.AwayScore;
+            int bScore = teamASide == TeamSide.Home ? game.AwayScore : game.HomeScore;
+            TeamAScores.Add(aScore);
+            TeamBScores.Add(bScore);
+            Margins.Add(aScore - bScore);
+            if (aScore > bScore) TeamAWins++;
+            else if (bScore > aScore) TeamBWins++;
+            else Ties++;
+
+            long SumA(Func<PossessionRecord, int> f) => records.Where(r => r.Offense == teamASide).Sum(r => (long)f(r));
+            long SumB(Func<PossessionRecord, int> f) => records.Where(r => r.Offense == teamBSide).Sum(r => (long)f(r));
+
+            AOffPoss += records.Count(r => r.Offense == teamASide);
+            BOffPoss += records.Count(r => r.Offense == teamBSide);
+            APoints  += SumA(r => r.Points);   BPoints  += SumB(r => r.Points);
+            AFga += SumA(r => r.Fga);           BFga += SumB(r => r.Fga);
+            AFgm += SumA(r => r.Fgm);           BFgm += SumB(r => r.Fgm);
+
+            ARimA   += SumA(r => r.RimFga);     BRimA   += SumB(r => r.RimFga);
+            ARimM   += SumA(r => r.RimFgm);     BRimM   += SumB(r => r.RimFgm);
+            AShortA += SumA(r => r.ShortFga);   BShortA += SumB(r => r.ShortFga);
+            AShortM += SumA(r => r.ShortFgm);   BShortM += SumB(r => r.ShortFgm);
+            AMidA   += SumA(r => r.MidFga);     BMidA   += SumB(r => r.MidFga);
+            AMidM   += SumA(r => r.MidFgm);     BMidM   += SumB(r => r.MidFgm);
+            ALongA  += SumA(r => r.LongFga);    BLongA  += SumB(r => r.LongFga);
+            ALongM  += SumA(r => r.LongFgm);    BLongM  += SumB(r => r.LongFgm);
+
+            A3pa += SumA(r => r.ThreePa);       B3pa += SumB(r => r.ThreePa);
+            A3pm += SumA(r => r.ThreePm);       B3pm += SumB(r => r.ThreePm);
+            AFta += SumA(r => r.Fta);           BFta += SumB(r => r.Fta);
+            AFtm += SumA(r => r.Ftm);           BFtm += SumB(r => r.Ftm);
+            AOrbC += SumA(r => r.OrbChances);   BOrbC += SumB(r => r.OrbChances);
+            AOrbW += SumA(r => r.OrbWon);       BOrbW += SumB(r => r.OrbWon);
+
+            ATrans += records.Count(r => r.Offense == teamASide && r.Entry == EntryType.Transition);
+            BTrans += records.Count(r => r.Offense == teamBSide && r.Entry == EntryType.Transition);
+
+            ATurnovers   += records.Count(r => r.Offense == teamASide && IsTurnoverPossession(r));
+            BTurnovers   += records.Count(r => r.Offense == teamBSide && IsTurnoverPossession(r));
+            ACommitterTo += records.Count(r => r.Offense == teamASide && IsTurnoverPossession(r) && r.TurnoverOffSlot != null);
+            BCommitterTo += records.Count(r => r.Offense == teamBSide && IsTurnoverPossession(r) && r.TurnoverOffSlot != null);
+
+            for (var s = 0; s < 5; s++)
+            {
+                ASlotFga[s] += SumA(r => GetSlotFga(r, s + 1));
+                BSlotFga[s] += SumB(r => GetSlotFga(r, s + 1));
+            }
+
+            for (var i = 0; i < 20; i++)
+            {
+                PlayerFga[i]    += attributed.Fga[i];
+                PlayerFgm[i]    += attributed.Fgm[i];
+                PlayerTpa[i]    += attributed.Tpa[i];
+                PlayerTpm[i]    += attributed.Tpm[i];
+                PlayerFta[i]    += attributed.Fta[i];
+                PlayerFtm[i]    += attributed.Ftm[i];
+                PlayerOReb[i]   += attributed.OReb[i];
+                PlayerDReb[i]   += attributed.DReb[i];
+                PlayerBlk[i]    += attributed.Blk[i];
+                PlayerStl[i]    += attributed.Stl[i];
+                PlayerShFoul[i] += attributed.ShFoul[i];
+                PlayerAst[i]    += attributed.Ast[i];
+                PlayerTo[i]     += attributed.To[i];
+            }
+
+            // Possessions-played: every on-floor player of BOTH sides, per record. A player
+            // appears on exactly one side per possession, so each on-floor player gets +1;
+            // a player subbed out stops accruing from the possession he leaves.
+            foreach (var r in records)
+                for (var slot = 1; slot <= 5; slot++)
+                {
+                    var op = game.RosterFor(r.Offense).PlayerAt(new Slot(r.Offense, slot), r.Number);
+                    if (op != null && op.PlayerId >= 1 && op.PlayerId <= 20) PlayerPoss[op.PlayerId - 1]++;
+                    var dp = game.RosterFor(r.Defense).PlayerAt(new Slot(r.Defense, slot), r.Number);
+                    if (dp != null && dp.PlayerId >= 1 && dp.PlayerId <= 20) PlayerPoss[dp.PlayerId - 1]++;
+                }
+        }
+    }
+
+    // ── Gen readout: team-level channels + reconciliation ────────────────────────
+
+    private static void PrintGenChannels(GenStats s)
+    {
+        Console.WriteLine("--- CHANNEL BREAKDOWN (team-level; roster-shape + outcome proof) ---");
+        Console.WriteLine($"Games: {s.Games}");
+        Console.WriteLine();
+
+        PrintGenTeamChannels("Team A", s, isA: true);
+        PrintGenTeamChannels("Team B", s, isA: false);
+
+        // Turnover reconciliation across the FULL ten-man roster (A = ids 1–10 → indices
+        // 0–9, B = ids 11–20 → indices 10–19). A mismatch would mean the logical→physical
+        // side mapping inverted for some games, or a sub mis-attributed a committer.
+        long aPlayerTo = 0, bPlayerTo = 0;
+        for (var i = 0;  i < 10; i++) aPlayerTo += s.PlayerTo[i];
+        for (var i = 10; i < 20; i++) bPlayerTo += s.PlayerTo[i];
+        bool aOk = aPlayerTo == s.ACommitterTo;
+        bool bOk = bPlayerTo == s.BCommitterTo;
+        Console.WriteLine("Turnover reconciliation (per-player attribution vs. committer possessions):");
+        Console.WriteLine($"  Team A: players={aPlayerTo}  committer={s.ACommitterTo}  team-violations={s.ATurnovers - s.ACommitterTo}  [{(aOk ? "OK" : "MISMATCH")}]");
+        Console.WriteLine($"  Team B: players={bPlayerTo}  committer={s.BCommitterTo}  team-violations={s.BTurnovers - s.BCommitterTo}  [{(bOk ? "OK" : "MISMATCH")}]");
+        Console.WriteLine();
+    }
+
+    private static void PrintGenTeamChannels(string label, GenStats s, bool isA)
+    {
+        long offPoss = isA ? s.AOffPoss : s.BOffPoss;
+        long points  = isA ? s.APoints  : s.BPoints;
+        long fga  = isA ? s.AFga  : s.BFga;   long fgm  = isA ? s.AFgm  : s.BFgm;
+        long rimA = isA ? s.ARimA : s.BRimA;  long rimM = isA ? s.ARimM : s.BRimM;
+        long shA  = isA ? s.AShortA : s.BShortA; long shM = isA ? s.AShortM : s.BShortM;
+        long midA = isA ? s.AMidA : s.BMidA;  long midM = isA ? s.AMidM : s.BMidM;
+        long lgA  = isA ? s.ALongA : s.BLongA; long lgM = isA ? s.ALongM : s.BLongM;
+        long tpa  = isA ? s.A3pa  : s.B3pa;   long tpm  = isA ? s.A3pm  : s.B3pm;
+        long fta  = isA ? s.AFta  : s.BFta;   long ftm  = isA ? s.AFtm  : s.BFtm;
+        long orbC = isA ? s.AOrbC : s.BOrbC;  long orbW = isA ? s.AOrbW : s.BOrbW;
+        long trans = isA ? s.ATrans : s.BTrans;
+        long turns = isA ? s.ATurnovers : s.BTurnovers;
+        long[] slotFga = isA ? s.ASlotFga : s.BSlotFga;
+        int wins = isA ? s.TeamAWins : s.TeamBWins;
+        var scores = isA ? s.TeamAScores : s.TeamBScores;
+        double avgMargin = s.Margins.Count > 0 ? s.Margins.Average() * (isA ? 1 : -1) : 0.0;
+
+        double Pct(long m, long a) => a > 0 ? 100.0 * m / a : 0.0;
+        double Rate(long n, long d) => d > 0 ? (double)n / d : 0.0;
+        double winPct = s.Games > 0 ? 100.0 * wins / s.Games : 0.0;
+        double avgScore = scores.Count > 0 ? scores.Average() : 0.0;
+
+        Console.WriteLine($"{label}:");
+        Console.WriteLine($"  Result:     win% {winPct:F1}   avgScore {avgScore:F1}   avgMargin {avgMargin:+0.0;-0.0}   PPP {Rate(points, offPoss):F3}");
+        Console.WriteLine($"  Shooting:   FG% {Pct(fgm, fga):F1}   Rim {Pct(rimM, rimA):F1}   Short {Pct(shM, shA):F1}   Mid {Pct(midM, midA):F1}   Long {Pct(lgM, lgA):F1}   Three {Pct(tpm, tpa):F1}   FT% {Pct(ftm, fta):F1}");
+        Console.WriteLine($"  Shot mix:   Rim {Pct(rimA, fga):F1}%   Short {Pct(shA, fga):F1}%   Mid {Pct(midA, fga):F1}%   Long {Pct(lgA, fga):F1}%   Three {Pct(tpa, fga):F1}%");
+        Console.WriteLine($"  Glass:      ORB% {Pct(orbW, orbC):F1}   (won {orbW} of {orbC} chances)");
+        Console.WriteLine($"  Turnovers:  TO rate {Rate(turns, offPoss):F3}   ({turns} in {offPoss} off. poss)");
+        Console.WriteLine($"  Transition: freq {Rate(trans, offPoss):F3}   ({trans} of {offPoss})");
+        Console.WriteLine($"  Free throw: FTA/FGA {Rate(fta, fga):F3}   (FTA {fta})");
+        Console.WriteLine($"  Usage:      starter slot FGA   1:{slotFga[0]}   2:{slotFga[1]}   3:{slotFga[2]}   4:{slotFga[3]}   5:{slotFga[4]}");
+        Console.WriteLine();
+    }
+
+    // ── Gen readout: the 20-player box score with a possessions column ────────────
+    //
+    // Every player who logged at least one on-floor possession prints — up to twenty. A
+    // reserve the fence never called on has POSS 0 and is omitted; the ten starters always
+    // appear. The POSS column (per-game average possessions on the floor) is what makes the
+    // substitution pattern legible: a starter reads near the full-game count, a used reserve
+    // reads a fraction of it.
+    private static void PrintGenBoxScore(GenStats s, Dictionary<int, GenIdentity> identity)
+    {
+        Console.WriteLine($"--- PER-PLAYER BOX SCORE (per-game averages, {s.Games} games) ---");
+        Console.WriteLine("  Ten-man rosters: [A]/[B] with roster depth slot (1..10) and role. POSS = per-game");
+        Console.WriteLine("  possessions on the floor (either side of the ball) — starters near the full count,");
+        Console.WriteLine("  reserves a fraction if the fatigue fence used them; a reserve never used is omitted.");
+        Console.WriteLine("  Exact attribution: FGA FGM 3PA 3PM FTA FTM ORB DRB STL BLK AST TO. Weighted: SFL only.");
+        Console.WriteLine($"  {"Player",-24} {"POSS",5} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5}");
+        Console.WriteLine(new string('─', 133));
+
+        double g = s.Games;
+        for (var i = 0; i < 20; i++)
+        {
+            if (s.PlayerPoss[i] <= 0) continue;   // never took the floor
+
+            var poss = s.PlayerPoss[i] / g;
+            var fga = s.PlayerFga[i]    / g;  var fgm = s.PlayerFgm[i]  / g;
+            var tpa = s.PlayerTpa[i]    / g;  var tpm = s.PlayerTpm[i]  / g;
+            var fta = s.PlayerFta[i]    / g;  var ftm = s.PlayerFtm[i]  / g;
+            var orb = s.PlayerOReb[i]   / g;  var drb = s.PlayerDReb[i] / g;
+            var stl = s.PlayerStl[i]    / g;  var blk = s.PlayerBlk[i]  / g;
+            var to  = s.PlayerTo[i]     / g;  var sfl = s.PlayerShFoul[i] / g;
+            var ast = s.PlayerAst[i]    / g;
+            var pts = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
+            var fgPct = fga > 0 ? fgm / fga * 100 : 0.0;
+            var tpPct = tpa > 0 ? tpm / tpa * 100 : 0.0;
+            var ftPct = fta > 0 ? ftm / fta * 100 : 0.0;
+
+            string label;
+            if (identity.TryGetValue(i + 1, out var id))
+            {
+                var mark = id.Starter ? "S" : "b";
+                label = $"[{id.Team}]{id.Slot,2} {mark} {id.Pos} {id.Role}";
+                if (label.Length > 24) label = label.Substring(0, 24);
+            }
+            else label = $"id {i + 1}";
+
+            Console.WriteLine(
+                $"  {label,-24} {poss,5:F1} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
+                $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
+                $"{orb,5:F1} {drb,5:F1} {(orb + drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1} {sfl,5:F1}");
+        }
+
+        // Per-player FGA reconciliation, raw accumulators (never the rounded display). Each
+        // team's players' FGA must equal that team's starter-slot usage FGA total: both are
+        // built from the same GetSlotFga binning. (As on the bench, this is NOT reconciled
+        // against the channel FGA total, which includes the ~0.2% null-slot bonus-FT-putback
+        // attempts that carry no slot attribution.)
+        long aPlayerFga = 0, bPlayerFga = 0, aUsageFga = 0, bUsageFga = 0;
+        for (var i = 0;  i < 10; i++) aPlayerFga += s.PlayerFga[i];
+        for (var i = 10; i < 20; i++) bPlayerFga += s.PlayerFga[i];
+        for (var i = 0;  i < 5;  i++) { aUsageFga += s.ASlotFga[i]; bUsageFga += s.BSlotFga[i]; }
+        bool aFgaOk = aPlayerFga == aUsageFga;
+        bool bFgaOk = bPlayerFga == bUsageFga;
+        Console.WriteLine();
+        Console.WriteLine("Per-player FGA reconciliation (all players' FGA vs. starter-slot usage FGA):");
+        Console.WriteLine($"  Team A: players={aPlayerFga}  slotUsage={aUsageFga}  [{(aFgaOk ? "OK" : "MISMATCH")}]");
+        Console.WriteLine($"  Team B: players={bPlayerFga}  slotUsage={bUsageFga}  [{(bFgaOk ? "OK" : "MISMATCH")}]");
+        Console.WriteLine();
     }
 }

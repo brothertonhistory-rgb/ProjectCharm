@@ -229,7 +229,13 @@ public sealed class Governor
     private readonly EndOfHalfConfig _endOfHalf;
     private readonly Pie<EndOfHalfIntent> _endOfHalfPie;
 
-    public Governor(Resolver resolver, GameState game, GovernorConfig cfg, RollClockConfig clock, IRng rng, EndOfHalfConfig endOfHalf)
+    // Phase 52: optional substitution seam. Null on every existing construction path, so
+    // every existing run is a strict no-op (the hook is never invoked when null). The
+    // engine stays position-agnostic — it only reports boundaries and hands over the game.
+    private readonly ISubstitutionPolicy? _substitutionPolicy;
+
+    public Governor(Resolver resolver, GameState game, GovernorConfig cfg, RollClockConfig clock, IRng rng, EndOfHalfConfig endOfHalf,
+        ISubstitutionPolicy? substitutionPolicy = null)
     {
         _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         _game = game ?? throw new ArgumentNullException(nameof(game));
@@ -237,6 +243,7 @@ public sealed class Governor
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _rng = rng ?? throw new ArgumentNullException(nameof(rng));
         _endOfHalf = endOfHalf ?? throw new ArgumentNullException(nameof(endOfHalf));
+        _substitutionPolicy = substitutionPolicy;   // may be null → no substitutions
         _endOfHalfPie = new Pie<EndOfHalfIntent>(
             new Dictionary<EndOfHalfIntent, double>
             {
@@ -271,6 +278,13 @@ public sealed class Governor
         var half = 1;
         var halfRemaining = _cfg.HalfSeconds;
         var guard = 0;
+
+        // Phase 52: the elapsed (capped) seconds of the most-recently-resolved possession,
+        // captured by RunOnePossession. The loops read it to feed the substitution seam:
+        // the ordinary boundary callback recovers benched players by the just-ended
+        // possession's clock, and a period-break callback needs the final possession's
+        // clock (its ordinary callback is suppressed across the break).
+        var lastApplied = 0.0;
 
         // ── Local function: resolve one possession and append its record. ──────
         // Captures and updates run-level accumulators naturally. Only the values
@@ -426,6 +440,11 @@ public sealed class Governor
             // RNG and nothing reads the level this session, so it changes no outcome.
             _game.Fatigue.Accrue(OnFloorBothSides());
 
+            // Phase 52: publish this possession's elapsed clock for the substitution seam.
+            // Set AFTER accrual so ordering holds — the five who played this possession have
+            // already accrued it before any boundary callback that reads this value fires.
+            lastApplied = applied;
+
             records.Add(new PossessionRecord(
                 st.PossessionNumber, st.Offense, st.Defense, st.Entry,
                 endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, periodNumber, intent,
@@ -468,7 +487,17 @@ public sealed class Governor
         {
             RunOnePossession(ref state, ref halfRemaining, half);
 
-            if (halfRemaining <= 0.0)
+            if (halfRemaining > 0.0)
+            {
+                // Phase 52: within-period boundary — a successor possession runs THIS half.
+                // `state` already holds that successor (RunOnePossession spawned it): its
+                // number, and its entry (dead-ball inbound / ball-advanced vs live-ball
+                // transition). Substitutions are legal only from a dead ball.
+                _substitutionPolicy?.OnPossessionBoundary(
+                    _game, state.PossessionNumber, lastApplied,
+                    state.Entry != EntryType.Transition);
+            }
+            else
             {
                 // Reset fouls AND apply halftime fatigue recovery only when moving from one
                 // regulation half to another — never after the final regulation half. Fouls
@@ -479,6 +508,15 @@ public sealed class Governor
                 {
                     _game.Fouls.ResetForNewHalf();
                     _game.Fatigue.ApplyHalftimeRecovery(OnFloorBothSides());
+                    // Phase 52: halftime period break. The engine has just rested the
+                    // on-floor five above; the policy rests its benched players (final-
+                    // possession slice + the matching halftime chunk) and reclaims starters
+                    // for the first possession of the second half. NOT the terminal boundary:
+                    // a successor half follows. The final regulation half (half == Halves)
+                    // never enters this block — if the game reaches OT it is a tied ending,
+                    // handled as an overtime break below; if untied, it is terminal.
+                    _substitutionPolicy?.OnPeriodBreak(
+                        _game, state.PossessionNumber, lastApplied, PeriodBreakKind.Halftime);
                 }
                 half++;
                 halfRemaining = _cfg.HalfSeconds;
@@ -490,6 +528,18 @@ public sealed class Governor
         var otPeriod = 0;
         while (_game.HomeScore == _game.AwayScore)
         {
+            // Phase 52: overtime period break. Entering this loop body means the PRIOR
+            // period (the final regulation half on the first iteration, the prior OT
+            // afterward) ended TIED — so a successor period runs and this is a non-terminal
+            // boundary. `state.PossessionNumber` is the first possession of this OT period
+            // (the tip below uses it); `lastApplied` is the prior period's final possession
+            // clock. There is NO rest chunk at an OT boundary — the policy applies only the
+            // final-possession recovery slice, then reclaims. If a period instead ends
+            // UNtied, this loop body never runs, so no callback fires after a game-ending
+            // possession (the terminal guard).
+            _substitutionPolicy?.OnPeriodBreak(
+                _game, state.PossessionNumber, lastApplied, PeriodBreakKind.Overtime);
+
             otPeriod++;
             _game.ResetPossessionArrow();   // fresh contest (arrow -> Off)
             // TipPossession.CreateFromTip sets the arrow to the tip loser and returns

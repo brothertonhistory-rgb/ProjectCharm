@@ -713,7 +713,10 @@ internal static partial class Program
             var counts = new long[6];
             for (var n = 0; n < DrawN; n++)
             {
-                var s = DrawFoulingDefender(rng, side, roster, zone, shooterSlot);
+                // Static directional-test roster (SetStarter only, no subs), so the
+                // possession-aware read at possession 1 returns the seated five — identical
+                // to the pre-Phase-52 current-occupant read.
+                var s = DrawFoulingDefender(rng, side, roster, zone, shooterSlot, 1);
                 if (s >= 1 && s <= 5) counts[s]++;
             }
             return counts;
