@@ -6694,3 +6694,56 @@ The generation numbers were validated by a **Python oracle mirroring the same na
 ### What this pass does NOT do (deferred)
 
 Base generation only. **Calibration is deferred** — the population it produces is the thing future calibration will tune against, and tuning against a fake distribution twice is exactly what deferral avoids. A first reading is already visible and recorded as a *data point, not a to-do*: with the leg model as built, **skill outweighs athleticism** (same-prestige athletic-vs-skilled sims to skilled by ~9 points — athleticism is a ceiling modifier, skill drives the outcome surface). Also deferred: the **general cross-leg floor system** (length→blocking/rebounding proportional minimums, small→handling), of which only the rebounding-rides-size sliver shipped; **engine-side generation** (this lives in the harness; it moves to `Charm.Engine` when the world layer needs to generate populations); small-ball / lineup selection; real player names (slot tags stay); and the **world layer** (league-wide prestige distribution, scheduling, season loop, recruiting) that will eventually settle prestige→roster shape organically.
+
+## World Structure — Pass 1: the era-file skeleton (Session 28, 2026-07-02)
+
+The first layer of the world-structure arc (`docs/world-structure-brief.md` is the arc's governing design record; this section is the as-built state). Pass 1 is **data + tooling + proof**: the era-file schema, the stock D1 world, the pyramid seeder, the integrity validator, and the distribution readout. No seasons, no dynamics, no engine change — everything lives in `src/Charm.Harness/Program.World.cs` with the Phase 53 suite block beside it.
+
+### The era-file schema (schemaVersion 1 — the first persistent schema)
+
+A single JSON world file:
+
+- `metadata`: `kind` (`"authored"` | `"generated"`), `eraLabel`, `division`, and `worldSeed` — present **iff** generated (the reproducibility contract, brief rule 7).
+- `tiers`: exactly the four canonical objects (`power` / `highMid` / `lowMid` / `low`), each carrying `floor`, `equilibrium`, `pullbackIntensity`. **The floor is the only load-bearing number this pass** (the validator and seeder consume it); equilibrium and pullbackIntensity are carried as schema now so the Pass 3 dynamics need no migration. Placeholders: floors 40 / 20 / 8 / 0, equilibria 75 / 55 / 35 / 18, pullback 0.25 / 0.45 / 0.65 / 0.85 (intensity rising as tier falls, per the brief) — all burn-in-tunable.
+- `conferences`: `id`, `name`, `shortName`, `tierId`.
+- `schools`: `id` (internal, opaque — dynamics never read a name), `name`, `abbr`, `city`, `state`, `color`, `lat`, `long`, `conferenceId`, **`division` per school** (carried from day one; must match `metadata.division` in this single-division format), `currentPrestige`, `historicalPrestige` — both 0–99.
+
+The **reader** is the bench-reader standard: a strict tree-walk refusing unknown keys, duplicates, wrong types, and out-of-range values at every level, naming the exact school/conference/field. The **writer** is deterministic by construction: canonical tier order, conferences and schools by id, fixed property order, `\n` newlines, invariant numeric formatting — same inputs, byte-identical file.
+
+**Standing boundary rule (recorded, not yet exercised):** the world's prestige scale is 0–99; the roster generator's floor is 1. Any future pass feeding a school's prestige to generation treats 0 as 1 at that seam.
+
+**Historical prestige = current prestige everywhere in Pass 1** — the stock authored file and every generated world. A real-era file with authored national memory (historical above current for faded blue bloods) is a later authoring exercise over the same schema.
+
+### The reference data and the converter (`world convert`)
+
+`data/teams.csv` (347 D1 schools) and `data/conf.csv` (32 conferences) are the committed reference inputs from Emmett's source game. Two traps, resolved at check-in and encoded in the converter: **`teams.csv`'s `Division` column is the intra-conference East/West split, not the NCAA division** — dropped, every school stamped `D1`; and **`conf.csv`'s 1–5 conference rating maps to the tiers** — 5 → power, 4 → highMid, 3 → lowMid, 1–2 → low ("Independent" rides as an ordinary low-tier conference, no special casing). The authored data proves the placeholder floors: per-tier prestige minimums are 45 / 21 / 8 / 0 against floors 40 / 20 / 8 / 0.
+
+The converter parses with a **quote-aware csv reader** (never `string.Split(',')`), handles the files' leading count line and CRLF, trims every decoded field, verifies the exact expected header, and checks its row count against the csv's **own count line** — the 347 assert lives in Phase 53, not the tooling, so the converter stays count-agnostic. The stock output (`worlds/stock-d1.world.json`) carries the game's authored prestige **loaded as written**; its report shows a deviation from the target pyramid concentrated exactly where the target was deliberately thinned relative to this reference (20–39 band +9.3 points, <20 base −10.4) — reported, never corrected.
+
+### The pyramid and the seeder (`world seed`)
+
+The target pyramid is proportions, never counts (brief §3b): 95+ 1%, 85–94 6%, 75–84 9%, 60–74 14%, 40–59 23%, 20–39 21%, <20 26%. **Band counts come from largest-remainder apportionment** with ties on the fractional remainder broken by seeded permutation in the seeder and by canonical top-down band order in the validator. Canonical n=347 apportionment: 3 / 21 / 31 / 49 / 80 / 73 / 90 (an oracle constant Phase 53 asserts).
+
+The seeder generates a **new** world from an existing world's *structure* — schools, conferences, tiers; incoming prestige ignored entirely — reseeding `currentPrestige` to the pyramid, setting `historicalPrestige` equal to it, stamping `kind: "generated"` + the seed. It is **tooling, never a load-time mutation**, and it never mutates its input.
+
+Mechanics, in the fixed RNG-consumption order that *is* the reproducibility contract (7 tie-break doubles → two jitter doubles per school in ascending id order → one double per band slot, bands top-down):
+
+1. **PRNG:** an explicit **SplitMix64** (`WorldRng`), not `System.Random` — a shared world file must reproduce identically on any runtime, never depend on a version-specific algorithm. The Python oracle mirrors it bit-for-bit.
+2. **Station:** each school's tier equilibrium + triangular jitter (±30) — roughly tier-ordered with genuine overlap (in the committed sample world, lowMid's max of 61 sits above power's min of 54).
+3. **Assignment:** band values sorted ascending; each value goes to the unassigned school with the **lowest station whose conference floor permits it**. Floors are honored **by this construction, never a post-hoc clamp** (a clamp would silently distort the exact band counts). A value no school can take throws loudly — it means the validator missed an infeasibility.
+
+### The validator (runs on every load, every command)
+
+Ordinary checks: unique school/conference ids, real conference/tier references, exactly the four canonical tiers, both prestige values 0–99, floor ≤ equilibrium, pullbackIntensity in (0, 1], worldSeed present iff generated, every school's division matching the metadata. **Member-below-floor:** any file — authored or generated — with a school under its conference's floor fails, naming school, value, conference, and floor (membership guarantees a minimum; a file starting below it is incoherent). **The special check (brief rule 6):** the target pyramid and the floors must be **simultaneously satisfiable** — cumulative per distinct floor descending, schools whose floor forces them to F+ must not exceed the pyramid slots in bands reaching F+; an infeasible file fails naming the binding conflict. Never a silent floor weakening, never a distorted pyramid.
+
+### The readout (`world <file>` / `world report`), Phase 53, and the CLI
+
+The report prints the band histogram (count, actual %, target %, signed deviation), the tier rollup (conference/school counts, floor, min/median/mean/max), and the per-conference table — median is the middle value for odd n, the mean of the two middle values for even n; all formatting invariant-culture. For an authored file it is a deviation *report*; for a generated file it reads exact to the apportionment.
+
+**Phase 53** (in the suite; the `world` CLI itself returns before the suite): converter → valid 347/32 world, every school D1, historical == current; the 20-school fixture (`worlds/fixture-tiny.world.json`) proving nothing assumes 347; the infeasible world rejected with the named conflict; the below-floor member rejected naming the school; seeder determinism (same seed identical, different seed different, seeded output itself validates); pyramid exactness at both n (counts == apportionment, the oracle constant, floors, bounds, historical == current); tier means strictly ordered at both n — means only, because overlap is the design.
+
+CLI: `world <file>` (validate + report), `world report <file>`, `world convert <teams.csv> <conf.csv> <out>`, `world seed <in> <seed> <out>`. The csproj copies the csvs and fixture beside the binary (the `config.json` convention) so the suite reads them from `AppContext.BaseDirectory`.
+
+### What Pass 1 does NOT do (deferred, per the arc map)
+
+No seasons (Pass 2: the minimal season loop feeding the dynamics), no prestige dynamics (Pass 3: the four forces + clamps, oracle-first), no burn-in readout (Pass 4), no prestige→roster wiring (the world file is now *where* the generator's number will come from; the wiring is a later pass, and the 0-vs-1 floor rule above waits with it), no realignment, no D2/D3/JUCO files (the per-school division marker is carried; later files ride the same machinery), no postseason fields, no fictional name generation, no engine-side migration of anything.

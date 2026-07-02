@@ -18,4 +18,19 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- World Structure Pass 1 (Phase 53) inputs: the committed reference csvs and the
+         tiny fixture world, copied beside the binary so the suite reads them from
+         AppContext.BaseDirectory (the config.json convention). -->
+    <None Include="..\..\data\teams.csv" Link="data\teams.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\data\conf.csv" Link="data\conf.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\worlds\fixture-tiny.world.json" Link="worlds\fixture-tiny.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

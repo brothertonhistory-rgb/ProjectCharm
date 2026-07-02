@@ -40,6 +40,12 @@ internal static partial class Program
         // gen config path — otherwise "gen.json" resolves from the current directory.
         if (args.Length > 0 && args[0] == "gen") { RunGen(configPath, args.Length > 1 ? args[1] : null); return 0; }
 
+        // dotnet run -- world ...  the World Structure Pass 1 CLI: validate+report a world
+        // file, convert the reference csvs to the stock world, or seed a generated world
+        // from an existing world's structure. Returns before the validation suite; not in
+        // the suite (the suite's Phase 53 block proves the same machinery in-memory).
+        if (args.Length > 0 && args[0] == "world") { return RunWorld(args); }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
@@ -190,6 +196,7 @@ internal static partial class Program
         ok &= Phase50BasketballIqCheck(configPath);            // Phase 50
         ok &= FreeThrowFoulDrawCheck(configPath);              // Phase 51
         ok &= Phase52SubstitutionsCheck(configPath);           // Phase 52
+        ok &= Phase53WorldStructureCheck();                    // Phase 53
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
