@@ -247,6 +247,12 @@ Dependency-ordered; scope walls per session as always.
   generates fictional/bootstrap files. Small-population apportionment is
   deterministic (largest-remainder with stable tie-breaking from the world
   seed), so the same inputs always produce the same shape at any n.
+- **Pass 1.5 — national pool & divvy** (governing record:
+  `docs/roster-genesis-brief.md`; shipped Session 29). Rosters for every
+  program in a world file, drawn from one national talent pool by
+  prestige-weighted access — inserted ahead of the season loop so the Pass 3
+  dynamics are tuned against pool-built populations, never per-team-generated
+  ones.
 - **Pass 2 — minimal season loop.** Enough scheduling to produce a season of
   results at population scale (round-robin-ish placeholder; real scheduling is
   its own later arc), driving the possession engine per game. This exists to

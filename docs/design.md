@@ -6746,4 +6746,56 @@ CLI: `world <file>` (validate + report), `world report <file>`, `world convert <
 
 ### What Pass 1 does NOT do (deferred, per the arc map)
 
-No seasons (Pass 2: the minimal season loop feeding the dynamics), no prestige dynamics (Pass 3: the four forces + clamps, oracle-first), no burn-in readout (Pass 4), no prestige→roster wiring (the world file is now *where* the generator's number will come from; the wiring is a later pass, and the 0-vs-1 floor rule above waits with it), no realignment, no D2/D3/JUCO files (the per-school division marker is carried; later files ride the same machinery), no postseason fields, no fictional name generation, no engine-side migration of anything.
+No seasons (Pass 2: the minimal season loop feeding the dynamics), no prestige dynamics (Pass 3: the four forces + clamps, oracle-first), no burn-in readout (Pass 4), no prestige→roster wiring in Pass 1 itself — **superseded by Pass 1.5 (Session 29): the divvy wires prestige to roster *access*, never to generation quality** (the odds curve reads `currentPrestige` directly, so the 0-vs-1 floor rule above remains unexercised — prestige-0 schools ride the odds' +10 base instead), no realignment, no D2/D3/JUCO files (the per-school division marker is carried; later files ride the same machinery), no postseason fields, no fictional name generation, no engine-side migration of anything.
+---
+
+# Roster genesis — the national pool and the prestige-weighted divvy (Pass 1.5)
+
+Governing record: `docs/roster-genesis-brief.md` (design conversation of 2026-07-02); shipped Session 29. A pass inserted into the world-structure arc ahead of the season loop, so the Pass 3 dynamics are tuned against pool-built populations, never against per-team-generated rosters (the ordering constraint that motivated the insertion).
+
+**The frame.** Every school in a world file gets a ten-man roster from **one national talent pool** (10 × school count, unclassified — a bootstrap standing in for four absorbed recruiting classes; classes/ages are recruiting-arc design) divided by **prestige-weighted selection**. The pool's shape is the one authored distribution; prestige is **access**, never quality. Talent is zero-sum: elite players are scarce because the pool says how many exist. The Session 26 `gen` mode and its prestige→leg-count curve survive untouched as a lab instrument; the world's rosters come from the divvy, and the prestige→depth relationship now *emerges* from access (proven on the page: at stock seed 20260702, band means 1.56 / 2.33 / 3.32 / 4.58 / 5.81 multi-leg per roster from bottom to top, every adjacent band overlapping).
+
+### The pool
+
+- **Positions fixed by pool id:** 4n guards, then 3n wings, then 3n bigs — global coverage feasible by construction, still validated loudly before pick one (`ValidateDivvyPool` names the shortfall).
+- **Leg tiers by hierarchical largest-remainder apportionment** (canonical-order ties): the top-level mix over the whole pool, then the gradient tiers over the *realized* two-leg count. Mix (ALL PLACEHOLDERS, Emmett-approved 2026-07-02): **0.8% three-leg / 32% two-leg / 67.2% one-leg** — the 32% is the thickened middle class (~3.2 multi-leg per roster average at n=347). Oracle constants asserted by Phase 54: n=347 → 28/1110/2332 with gradient 167/388/555; n=20 → 2/64/134 with 10/22/32.
+- **Roles:** one draw per player; the first ⌈1.2n⌉ guards are forced lead-handlers and the first ⌈1.2n⌉ wings forced ThreeAndDWing — coverage supply guaranteed with 20% headroom.
+- **The third-leg gradient** (the pass's design center): two-leg players' missing leg is redrawn from a tier band on the generic scale — borderline 56–70 (15%), useful 46–55 (35%), scarce 34–45 (50%) — instead of the flat ordinary stamp. A SIZE third maps through the position scaling and recomputes the free throw (Height changed); a big's ATH third takes the downshift after the band draw. The third leg is derived from the plus set (SKILL is never third — every position's priority puts it in the top two).
+- **The pool path's leg-health floor is 20** (`DivvyLegHealthFloor`) — a leg can be bad, never broken; the scarce band ships as drawn. The `gen` mode keeps 40 via `GenEnforceLegHealth`'s default parameter (the Session 29 seam, the only Gen edit).
+- **Reuse seam:** `SplitMixRandom`, a `System.Random` adapter over `WorldRng` (every overload consumes exactly one double, `min + (int)(u·(max−min))`), lets `GenRatings` be reused verbatim while the pool stays reproducible on any runtime.
+
+### The scout rank (the quarantined exception to the no-scalar wall)
+
+`rank = L1 + 0.9·L2 + 0.4·L3 + 0.045·max(0, L3−30)²` over the three leg means (holes excluded), sorted descending, with the SIZE leg normalized by a single per-position affine map anchored (ordinary-lo → 44, plus-hi → 88), slope 44/24 both directions (forward places the SIZE gradient band; inverse feeds the rank). Properties, oracle-pinned: **monotone** in every feeding rating; **convex in the third leg** (per-point deltas 1.255 → 2.245 → 3.37 across the bands); groups **ordered on average with overlap** (stock means 251 > 212 > 178 > 162 > 160). Rank-vs-actual-value disagreement is the recruiting miss, by design. **Quarantine:** the rank lives on the pool row only — never on a `Player`, never printed as an overall, never sorting anything outside the draft board (roster sheets print leg means, not rank).
+
+### The divvy
+
+- **Who picks:** each pick won by weight `(currentPrestige + 10)^2.0` among schools with a legal candidate. `DivvyOddsK` is **the constitutional dial** — too steep collapses the pool back into an authored curve; placeholder until burn-in, tuned alongside the prestige forces. The +10 base keeps prestige-0 schools strictly positive.
+- **What they see:** the global rank plus **stable per-(school, player) noise** — sd 8% of the pool's rank range, triangular (no transcendentals, oracle-mirrorable bit-for-bit), drawn from a fresh SplitMix64 seeded by mixing (divvySeed, schoolId, poolPlayerId). Order-free by construction: a coherent alternate scouting board, never a per-pick reroll. **Access variance** (who won the picks) and **evaluation variance** (board noise) are separate dials, kept distinguishable in the readout.
+- **Coverage is a hard constraint, two layers:** (i) the per-school **last-slot rule** — an unmet coverage role keeps a slot of its position free; (ii) the **global protected-supply rule** — taking a protected-role player a school does not need is illegal whenever remaining supply equals remaining unmet obligations. A needed take reduces supply and obligation together and is always safe; a school with no legal candidate is skipped by the winner draw. Slack (supply − obligations) never goes negative — asserted per pick, oracle-proven under an adversarial rigged board, asserted on live drafts by Phase 54.
+- **Ties** on the board break to the lowest pool id; the winner draw is searchsorted-right on cumulative weights.
+- **The opening five is the first five players acquired — no shape rule** (Emmett's ruling: the game molding a team toward a well-rounded five is the design). Acquisition order is immutable and is the printed depth order. `BuildOpeningFive` is deterministic and rank-blind by signature.
+- **Rosters are not persisted:** deterministic from world + seed; the season pass regenerates.
+
+### The RNG contract (the reproducibility spec, mirrored bit-for-bit by the oracle)
+
+Sequential stream, one `WorldRng(divvySeed)`: **Phase A** leg-tier Fisher-Yates shuffle (i = P−1..1, one draw each); **Phase B** one role draw per player in id order; **Phase C** ratings per player in id order (GenLegPriority, GenRatings, the third-leg redraw, the FT recompute where SIZE was redrawn); **Phase D** one winner draw per pick. The board noise rides its own per-pair streams (the mix above), random-access by design.
+
+### The readout (`divvy <world.json> <seed> [idA idB]`) and Phase 54
+
+Four parts: **the pool on the page** (generated vs apportionment targets, rank distribution by group); **the draft story** (picks by prestige band; the surprises table with board deviation and access deviation as separate columns — no sim-value claims until seasons exist; the leak count); **sample roster sheets** (highest/median/lowest prestige plus two seeded-random schools, acquisition order with the opening five starred); **variance & overlap** (multi-leg per roster by band: mean, spread, adjacent-band overlap). The optional two school ids run a **smoke sim** of drafted rosters through the existing ten-man gen runner — a sanity check only, never the proof.
+
+**Phase 54** (suite; the CLI returns before it): determinism at both scales; noise triples to 1e-15 plus read-order independence; every roster legal at both n; pool shape equal to the apportionment constants; a rigged pool rejected loudly naming the shortfall; rank fixtures to 1e-9, convexity, monotonicity spot check, group ordering with overlap; fixed-seed access sanity (top-decile prestige mean drafted rank above bottom-decile, ≥1 leak — robust even to oracle/C# stream divergence, since at stock scale essentially every seed leaks); protected-supply slack non-negative across both worlds plus five fixture seeds; the opening five pinned deterministic and rank-blind. The suite's stock world comes from `ConvertWorld` on the csvs beside the binary (the Phase 53 path — no csproj change).
+
+### What a green Phase 54 does and does not prove
+
+Proven: wiring correctness, formula fidelity to the oracle's exported constants, determinism, and every legality invariant, across 260 oracle-seeded drafts and the suite's live runs. **Not proven:** bit-level equality between the Python pool and the C# pool (constants and invariants are asserted instead); and that any magnitude is basketball truth — the mix, the gradient fractions, the odds exponent, and the noise sigma all ship placeholder, tuned at burn-in against pool-built populations.
+
+### Emergent observations (recorded for basketball judgment, not acted on)
+
+- **Bigs go late everywhere:** the athleticism downshift tilts the rank slightly perimeter, so draft boards lean guard/wing and bigs cluster in the late acquisitions on every sheet. Arguably scouting-realistic; Emmett's call at a later pass whether it is a feature or needs a thumb on the scale.
+- **Some elite opening fives carry no big** (first-five-acquired + perimeter-tilted boards); since the fatigue fence subs strictly within position, such a team's benched bigs never check into a smoke sim. Honored as found. **Deferred:** opening-five shape / lineup logic belongs to a future lineup-or-coaching layer, not the divvy.
+
+### Deferred out of this pass (per the brief)
+
+Classifications/ages and multi-class pools; real recruiting (the divvy is its bootstrap stand-in, not its design); coaching styles and preference-driven picking; transfers; per-conference or regional draft biases; engine-side migration of generation; substitution policy beyond the flat fence; and any calibration of pool magnitudes beyond "looks like college basketball on the sheet."

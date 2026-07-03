@@ -401,15 +401,19 @@ internal static partial class Program
 
     // Guarantee no leg is broken: lift any sub-floor leg's non-hole owned ratings by a
     // constant so the aggregate clears the floor. Round UP so integer ratings clear it.
-    private static void GenEnforceLegHealth(Dictionary<string, int> v, string pos)
+    // The optional floor is the Session 29 seam: the divvy's pool path enforces a
+    // lower floor (a leg can be bad, never broken — DivvyLegHealthFloor = 20) so the
+    // scarce gradient band ships as drawn; every pre-existing call site omits the
+    // argument and keeps the original 40 unchanged.
+    private static void GenEnforceLegHealth(Dictionary<string, int> v, string pos, int floor = GenLegHealthFloor)
     {
         var holes = GenPermittedHoles[pos];
         foreach (var leg in new[] { "SIZE", "ATH", "SKILL" })
         {
             var m = GenLegMeanExHoles(v, leg, holes);
-            if (m < GenLegHealthFloor)
+            if (m < floor)
             {
-                var delta = (int)Math.Ceiling(GenLegHealthFloor - m);
+                var delta = (int)Math.Ceiling(floor - m);
                 foreach (var rt in GenLegOwned(leg))
                 {
                     if (holes.Contains(rt)) continue;

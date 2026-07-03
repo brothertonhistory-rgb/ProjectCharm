@@ -46,6 +46,14 @@ internal static partial class Program
         // the suite (the suite's Phase 53 block proves the same machinery in-memory).
         if (args.Length > 0 && args[0] == "world") { return RunWorld(args); }
 
+        // dotnet run -- divvy <world.json> <seed> [idA idB]  Roster Genesis Pass 1.5: builds
+        // the national talent pool (10 x school count) and runs the prestige-weighted divvy
+        // for every school in the world file — pool sheet, draft story, sample roster sheets,
+        // variance readout; the two optional school ids run a smoke sim of drafted rosters.
+        // Returns before the validation suite (the suite's Phase 54 block proves the same
+        // machinery in-memory). configPath is the engine config.json (for the smoke sim).
+        if (args.Length > 0 && args[0] == "divvy") { RunDivvy(configPath, args); return 0; }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
@@ -197,6 +205,7 @@ internal static partial class Program
         ok &= FreeThrowFoulDrawCheck(configPath);              // Phase 51
         ok &= Phase52SubstitutionsCheck(configPath);           // Phase 52
         ok &= Phase53WorldStructureCheck();                    // Phase 53
+        ok &= Phase54DivvyCheck();                             // Phase 54
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
