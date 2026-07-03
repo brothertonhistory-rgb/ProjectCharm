@@ -284,10 +284,11 @@ internal static partial class Program
                 bigRanksTop.Average() > bigRanksBot.Average(),
                 $"{bigRanksTop.Average():F1} > {bigRanksBot.Average():F1}");
 
-            // 9d. The seating floor: every roster's opening five (both worlds) has
-            //     >= 1 B and >= 2 G; deterministic; rank-blind by signature (inputs:
-            //     acquisition order + positions); equals the raw first five whenever
-            //     that five already satisfies the quotas.
+            // 9d. The seating floor (amended 30.1): every roster's opening five
+            //     (both worlds) has >= 1 B, >= 2 G, and >= 1 W; deterministic;
+            //     rank-blind by signature (inputs: acquisition order + positions);
+            //     equals the raw first five whenever that five already satisfies
+            //     the quotas.
             var floorOk = true; var rawEqOk = true; var rawLegalSeen = 0;
             foreach (var res in new[] { tinyA, stockA })
             {
@@ -296,17 +297,19 @@ internal static partial class Program
                     var five = BuildOpeningFive(roster, pid => res.Pool[pid].Pos);
                     var b = five.Count(pid => res.Pool[pid].Pos == "B");
                     var g = five.Count(pid => res.Pool[pid].Pos == "G");
-                    if (five.Length != 5 || b < 1 || g < 2) floorOk = false;
+                    var w = five.Count(pid => res.Pool[pid].Pos == "W");
+                    if (five.Length != 5 || b < 1 || g < 2 || w < 1) floorOk = false;
                     var raw = roster.Take(5).ToArray();
                     if (raw.Count(pid => res.Pool[pid].Pos == "B") >= 1 &&
-                        raw.Count(pid => res.Pool[pid].Pos == "G") >= 2)
+                        raw.Count(pid => res.Pool[pid].Pos == "G") >= 2 &&
+                        raw.Count(pid => res.Pool[pid].Pos == "W") >= 1)
                     {
                         rawLegalSeen++;
                         if (!five.SequenceEqual(raw)) rawEqOk = false;
                     }
                 }
             }
-            Check("opening five: >= 1 B and >= 2 G on every roster, both worlds", floorOk);
+            Check("opening five: >= 1 B, >= 2 G, and >= 1 W on every roster, both worlds", floorOk);
             Check("opening five: equals raw first five whenever raw already satisfies the quotas",
                 rawEqOk && rawLegalSeen > 0, $"raw-legal rosters seen: {rawLegalSeen}");
             var anyRoster = tinyA.Rosters.Values.First();

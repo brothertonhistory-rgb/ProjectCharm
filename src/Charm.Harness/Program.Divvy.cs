@@ -511,36 +511,42 @@ internal static partial class Program
         return result;
     }
 
-    // ── The opening five — the binding contract (S29 prompt §4, amended 29.1) ────
+    // ── The opening five — the binding contract (S29 prompt §4, amended 29.1, 30.1) ─
     // Acquisition order is IMMUTABLE and is the printed depth order. Session 29.1
     // (Emmett's ruling, 2026-07-02): the opening five gets a PLAYABLE FLOOR — the
-    // earliest five acquired that includes at least 1 big and at least 2 guards.
+    // earliest five acquired that satisfies the quotas. Session 30.1 (Emmett's
+    // ruling, 2026-07-03, after the first stock season showed 44 schools whose
+    // three wings never played a possession): the floor extends to a wing —
+    // at least 1 big, at least 2 guards, at least 1 wing.
     // Greedy walk of the acquisition order with the same feasibility logic the
     // draft's last-slot rule uses: take the earliest player, skipping one only
     // when taking him would leave too few remaining slots to cover the unmet
     // quota. When the raw first five already satisfies the quotas, the opening
     // five IS the raw first five. Every roster is exactly 4G/3W/3B, so the quota
-    // is always satisfiable and the walk cannot strand (Phase 54 asserts).
+    // is always satisfiable and the walk cannot strand — proven exhaustively over
+    // all 4,200 distinct orderings of a 4G/3W/3B roster (Session 30.1 pre-check;
+    // Phase 54 asserts on live drafts).
     // Deterministic; still rank-blind by signature — the inputs are the
     // acquisition order and positions, never rank or ratings (Phase 54 asserts).
-    // Accepted residual, ruled and recorded: a no-wing five is possible (e.g.
-    // 4G/1B small-ball), and benched wings then cannot check in under the
-    // fence's same-position pairing — the smoke sim warns when it happens.
+    // The 29.1 no-wing residual is RETIRED: every position now seats at least one
+    // starter, so every benched player has a same-position door under the fence.
+    // The absent-position warnings downstream stay as never-fire sentinels.
     private static int[] BuildOpeningFive(IReadOnlyList<int> acquisitionOrder, Func<int, string> positionOf)
     {
         if (acquisitionOrder.Count != 10)
             throw new InvalidOperationException($"BuildOpeningFive needs a full ten-man roster (got {acquisitionOrder.Count}).");
         var five = new List<int>(5);
-        int needB = 1, needG = 2;
+        int needB = 1, needG = 2, needW = 1;
         foreach (var pid in acquisitionOrder)
         {
             if (five.Count == 5) break;
             var pos = positionOf(pid);
             var nb = pos == "B" ? Math.Max(0, needB - 1) : needB;
             var ng = pos == "G" ? Math.Max(0, needG - 1) : needG;
-            if (nb + ng > 5 - five.Count - 1) continue;   // taking him would strand a quota
+            var nw = pos == "W" ? Math.Max(0, needW - 1) : needW;
+            if (nb + ng + nw > 5 - five.Count - 1) continue;   // taking him would strand a quota
             five.Add(pid);
-            needB = nb; needG = ng;
+            needB = nb; needG = ng; needW = nw;
         }
         if (five.Count != 5)
             throw new InvalidOperationException("BuildOpeningFive could not seat a legal five (roster-shape bug — every roster must be 4G/3W/3B).");
@@ -762,10 +768,10 @@ internal static partial class Program
             }).ToList();
         }
 
-        // Session 29.1 (§1c): the accepted residual of the 1B/2G floor, visible on
-        // the page, never silent — exactly ONE line per affected side, listing its
-        // absent positions (given the floor only W can currently be absent; the
-        // once-per-side contract is stated so it survives any future floor change).
+        // Session 30.1: with the seating floor at 1B/2G/1W, no position can be
+        // absent — this warning is now a never-fire SENTINEL, kept (per the 29.1
+        // once-per-side contract) so any future floor change stays visible on the
+        // page, never silent. A line printing here is a seating bug.
         void WarnAbsentPositions(WorldSchool s, List<GenPlayerRow> rows)
         {
             var onFloor = new HashSet<string>(rows.Where(r => r.Starter).Select(r => r.Pos));

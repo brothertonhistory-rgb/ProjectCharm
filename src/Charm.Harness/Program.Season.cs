@@ -372,8 +372,8 @@ internal static partial class Program
             }).ToList();
             if (verbose)
             {
-                // Session 29.1 residual, kept visible: exactly one line per affected
-                // side listing its absent positions (only W can currently be absent).
+                // Session 30.1: with the seating floor at 1B/2G/1W, no position can
+                // be absent — a never-fire sentinel; a line here is a seating bug.
                 var onFloor = new HashSet<string>(list.Where(r => r.Starter).Select(r => r.Pos));
                 var absent = new[] { "G", "W", "B" }.Where(p => !onFloor.Contains(p)).ToList();
                 if (absent.Count > 0)

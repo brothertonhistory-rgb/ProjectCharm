@@ -211,7 +211,8 @@ internal static partial class Program
                 var starters = stockRows[schoolId].Where(r => r.Starter).ToList();
                 return starters.Count == 5
                     && starters.Count(r => r.Pos == "B") >= 1
-                    && starters.Count(r => r.Pos == "G") >= 2;
+                    && starters.Count(r => r.Pos == "G") >= 2
+                    && starters.Count(r => r.Pos == "W") >= 1;   // 30.1 seating floor
             }
             Check("stock prep: exactly two prestige-0 schools, both still read 0 and prep " +
                   "a legal opening five (season path carries NO GenProgram — prestige's only " +
