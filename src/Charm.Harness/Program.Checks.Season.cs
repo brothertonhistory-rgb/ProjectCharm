@@ -12,6 +12,10 @@ namespace Charm.Harness;
 // stock schools without mutating the world; a full fixture season conserves
 // results (every team 30, wins == losses == games, zero ties), credits scores
 // to the right schools (the attribution replay), and reproduces exactly.
+// Session 31 adds §3.8: the calibration accumulator conserves — points
+// reconcile three independent ways, the ending buckets partition the records,
+// per-game elapsed matches TotalSeconds — while asserting ZERO basketball
+// target values (those are page-only by design; see Program.Season.Calibration.cs).
 //
 // What it does NOT prove: outcome realism, calibration direction, or that the
 // prestige-vs-wins relationship on the page is basketball truth — those are
@@ -272,6 +276,44 @@ internal static partial class Program
                     && outcome2.Results.SequenceEqual(outcome.Results)
                     && tiny.Schools.All(s => outcome2.Wins[s.Id] == outcome.Wins[s.Id]
                                           && outcome2.Losses[s.Id] == outcome.Losses[s.Id]));
+
+            // ── §3.8 Calibration instrument (Session 31): MACHINERY only. ────────────
+            //        Conservation identities proving the accumulator counts what the
+            //        engine produced, all on the §3.5 fixture outcome (zero additional
+            //        games). No basketball target values are asserted, ever — the
+            //        readout's sim-vs-reference verdicts are page-only by design.
+            var lg = outcome.League;
+            var scoreSum = outcome.Results.Sum(r => (long)r.HomeScore + r.AwayScore);
+            Check("calibration: triple point reconciliation — recorded game scores == " +
+                  "record Points == accumulator points",
+                  scoreSum == lg.PointsFromRecords && scoreSum == lg.PointsFromScores,
+                  $"results {scoreSum}, records {lg.PointsFromRecords}, " +
+                  $"accumulator {lg.PointsFromScores}");
+            Check("calibration: turnover metadata never drifts outside the classifier " +
+                  "(a future TO label turns this red instead of leaking into OTHER)",
+                  lg.MetadataDriftRecords == 0,
+                  lg.MetadataDriftRecords == 0 ? "" : $"{lg.MetadataDriftRecords} drift records");
+            Check("calibration: ending buckets conserve — made + FT-trip + miss->DREB + " +
+                  "miss-OOB + turnover + other + excluded == total records",
+                  lg.MadeN + lg.FtTripN + lg.MissDrebN + lg.MissOobN + lg.TurnoverN
+                    + lg.OtherN + lg.ExcludedN == lg.PossessionRecords,
+                  $"{lg.MadeN}+{lg.FtTripN}+{lg.MissDrebN}+{lg.MissOobN}+{lg.TurnoverN}" +
+                  $"+{lg.OtherN}+{lg.ExcludedN} vs {lg.PossessionRecords} " +
+                  $"(fixed-time sub-line {lg.FixedTimeN} of the turnover bucket)");
+            Check("calibration: per-game elapsed guard — sum of record Elapsed matches " +
+                  "TotalSeconds in every game (not a season aggregate)",
+                  lg.ElapsedMismatchGames == 0,
+                  $"{lg.ElapsedMismatchGames} mismatched game(s), max delta " +
+                  lg.MaxElapsedMismatch.ToString("E3", System.Globalization.CultureInfo.InvariantCulture));
+            Check("calibration: FGM >= 3PM, FTA >= FTM, every accumulated total non-negative",
+                  lg.Fgm >= lg.ThreePm && lg.Fta >= lg.Ftm
+                    && lg.Fga >= 0 && lg.Fgm >= 0 && lg.ThreePa >= 0 && lg.ThreePm >= 0
+                    && lg.Fta >= 0 && lg.Ftm >= 0
+                    && lg.OReb >= 0 && lg.DReb >= 0 && lg.Ast >= 0 && lg.Stl >= 0 && lg.Blk >= 0
+                    && lg.PointsFromScores >= 0 && lg.PointsFromRecords >= 0
+                    && lg.PossessionRecords >= 0 && lg.TurnoverPossessions >= 0
+                    && lg.TotalSeconds >= 0,
+                  $"FGM {lg.Fgm} vs 3PM {lg.ThreePm}, FTA {lg.Fta} vs FTM {lg.Ftm}");
 
             // §3.7 (the existing suite is untouched) is proven by the suite itself:
             // every phase above this one still running green on unchanged baselines.

@@ -97,6 +97,9 @@ internal static partial class Program
         public required Dictionary<int, int> Wins { get; init; }
         public required Dictionary<int, int> Losses { get; init; }
         public required DivvyResult Divvy { get; init; }
+        // Session 31: the calibration instrument's league-wide accumulator — fed once
+        // per game inside RunSeasonCore; read by the page readout and Phase 55 §3.8.
+        public required SeasonLeagueStats League { get; init; }
         public int Ties { get; init; }
     }
 
@@ -407,6 +410,7 @@ internal static partial class Program
         var losses = world.Schools.ToDictionary(s => s.Id, _ => 0);
         var results = new List<SeasonGameResult>(schedule.Count);
         var ties = 0;
+        var league = new SeasonLeagueStats();
         var baseSeed = unchecked((int)seasonSeed);
 
         for (var g = 0; g < schedule.Count; g++)
@@ -418,10 +422,14 @@ internal static partial class Program
             // cached across games where a school flips sides).
             var sideHome = BuildSeasonSide(rowsBySchool[sg.HomeId], 0);
             var sideAway = BuildSeasonSide(rowsBySchool[sg.AwayId], 10);
-            var (game, result, _) = RunSingleGenGame(
+            var (game, result, attributed) = RunSingleGenGame(
                 cfgs, sideHome, sideAway, TeamSide.Home, TeamSide.Away,
                 resolverSeed: unchecked(baseSeed + 2 * g),
                 governorSeed: unchecked(baseSeed + 2 * g + 1));
+
+            // Session 31: keep the attribution the loop used to discard and feed the
+            // calibration accumulator. Nothing else about the loop changes.
+            league.Accumulate(game, result, attributed);
 
             // GameState.HomeScore is credited to HomeSchool, AwayScore to AwaySchool,
             // full stop (a flipped attribution passes conservation and determinism —
@@ -439,7 +447,7 @@ internal static partial class Program
         return new SeasonRunOutcome
         {
             Schedule = schedule, Fingerprint = fingerprint, Results = results,
-            Wins = wins, Losses = losses, Divvy = divvy, Ties = ties,
+            Wins = wins, Losses = losses, Divvy = divvy, League = league, Ties = ties,
         };
     }
 
@@ -561,5 +569,9 @@ internal static partial class Program
         Console.WriteLine($"  OT: {otGames} of {run.Results.Count} games needed overtime " +
                           $"({otPeriods} OT periods total); average total score {avgTotal:F1}" +
                           (run.Ties > 0 ? $"; ANOMALY: {run.Ties} unresolved ties" : ""));
+        Console.WriteLine();
+
+        // (v) Session 31: the calibration instrument — sim vs the D1 decade blend.
+        PrintCalibrationReadout(run.League);
     }
 }
