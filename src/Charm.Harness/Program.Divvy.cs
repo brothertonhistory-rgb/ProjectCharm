@@ -75,9 +75,11 @@ internal static partial class Program
 
     // ── Scout rank (quarantined to the divvy; never on a Player, never a sort) ──
     // rank = L1 + 0.9*L2 + 0.4*L3 + 0.045*max(0, L3-30)^2 over the three leg means
-    // (holes excluded, SIZE normalized to the generic scale), sorted descending.
-    // Monotone in every feeding rating; convex in the third leg (the quadratic);
-    // ordered on average with overlap (oracle-proven).
+    // (holes excluded, SIZE normalized to the generic scale; since 29.1 the SKILL
+    // mean also excludes FreeThrow and a big's ATH mean is graded back onto the
+    // position's scale — see DivvyScoutRank), sorted descending. Monotone in every
+    // feeding rating; convex in the third leg (the quadratic); ordered on average
+    // three > borderline > useful (scarce and one-leg sit even by ruling).
     private const double DivvyRankW1 = 1.0, DivvyRankW2 = 0.9, DivvyRankW3 = 0.4;
     private const double DivvyRankConvCoef = 0.045, DivvyRankConvAnchor = 30.0;
 
@@ -289,12 +291,20 @@ internal static partial class Program
              + DivvyRankConvCoef * conv * conv;
     }
 
+    // Session 29.1 fair scouting (Emmett's rulings, 2026-07-02):
+    //  - the rank's SKILL input excludes FreeThrow (shooting must not buy prestige
+    //    access; the FT draw itself is untouched, and the sheet's FT column stands);
+    //  - a big's ATH is graded back onto the position's own scale by re-adding
+    //    GenBigAthDownshift (the exact inverse of the generation-side -8 on the
+    //    pool path — proven post-enforcement; standing condition: re-run that
+    //    proof if the scarce band's floor or the pool leg-health floor ever moves).
     private static double DivvyScoutRank(Dictionary<string, int> v, string pos)
     {
         var holes = GenPermittedHoles[pos];
+        var skillEx = new HashSet<string>(holes) { "FreeThrow" };
         var gs = DivvySizeToGeneric(GenLegMeanExHoles(v, "SIZE", holes), pos);
-        var ga = GenLegMeanExHoles(v, "ATH", holes);
-        var gk = GenLegMeanExHoles(v, "SKILL", holes);
+        var ga = GenLegMeanExHoles(v, "ATH", holes) + (pos == "B" ? GenBigAthDownshift : 0);
+        var gk = GenLegMeanExHoles(v, "SKILL", skillEx);
         return DivvyRankFromLegs(gs, ga, gk);
     }
 
@@ -501,20 +511,40 @@ internal static partial class Program
         return result;
     }
 
-    // ── The opening five — the binding contract (prompt §4) ─────────────────────
-    // Acquisition order is IMMUTABLE and is the printed depth order. The opening
-    // five is the earliest five-player subset in acquisition order satisfying the
-    // existing seating requirements — which, read from the current runner and
-    // honored as found (SeatRoster + SideDepth), are: five players, each with a
-    // position, no composition constraint (Emmett's ruling at the S29 check-in:
-    // the game molding you toward a well-rounded five IS the design). So the
-    // opening five is acquisition slots 1-5. Deterministic; may not inspect scout
-    // rank or derive any overall (Phase 54 asserts both).
-    private static int[] BuildOpeningFive(IReadOnlyList<int> acquisitionOrder)
+    // ── The opening five — the binding contract (S29 prompt §4, amended 29.1) ────
+    // Acquisition order is IMMUTABLE and is the printed depth order. Session 29.1
+    // (Emmett's ruling, 2026-07-02): the opening five gets a PLAYABLE FLOOR — the
+    // earliest five acquired that includes at least 1 big and at least 2 guards.
+    // Greedy walk of the acquisition order with the same feasibility logic the
+    // draft's last-slot rule uses: take the earliest player, skipping one only
+    // when taking him would leave too few remaining slots to cover the unmet
+    // quota. When the raw first five already satisfies the quotas, the opening
+    // five IS the raw first five. Every roster is exactly 4G/3W/3B, so the quota
+    // is always satisfiable and the walk cannot strand (Phase 54 asserts).
+    // Deterministic; still rank-blind by signature — the inputs are the
+    // acquisition order and positions, never rank or ratings (Phase 54 asserts).
+    // Accepted residual, ruled and recorded: a no-wing five is possible (e.g.
+    // 4G/1B small-ball), and benched wings then cannot check in under the
+    // fence's same-position pairing — the smoke sim warns when it happens.
+    private static int[] BuildOpeningFive(IReadOnlyList<int> acquisitionOrder, Func<int, string> positionOf)
     {
         if (acquisitionOrder.Count != 10)
             throw new InvalidOperationException($"BuildOpeningFive needs a full ten-man roster (got {acquisitionOrder.Count}).");
-        return acquisitionOrder.Take(5).ToArray();
+        var five = new List<int>(5);
+        int needB = 1, needG = 2;
+        foreach (var pid in acquisitionOrder)
+        {
+            if (five.Count == 5) break;
+            var pos = positionOf(pid);
+            var nb = pos == "B" ? Math.Max(0, needB - 1) : needB;
+            var ng = pos == "G" ? Math.Max(0, needG - 1) : needG;
+            if (nb + ng > 5 - five.Count - 1) continue;   // taking him would strand a quota
+            five.Add(pid);
+            needB = nb; needG = ng;
+        }
+        if (five.Count != 5)
+            throw new InvalidOperationException("BuildOpeningFive could not seat a legal five (roster-shape bug — every roster must be 4G/3W/3B).");
+        return five.ToArray();
     }
 
     // ── The readout ──────────────────────────────────────────────────────────────
@@ -662,7 +692,7 @@ internal static partial class Program
     private static void PrintDivvyRosterSheet(DivvyResult res, WorldSchool school)
     {
         var roster = res.Rosters[school.Id];
-        var five = new HashSet<int>(BuildOpeningFive(roster));
+        var five = new HashSet<int>(BuildOpeningFive(roster, pid => res.Pool[pid].Pos));
         Console.WriteLine($"  === {school.Name} ({school.Abbr})  prestige {school.CurrentPrestige} ===");
         Console.WriteLine($"    {"Acq",-5}{"Pos",-4}{"Role",-17}{"Legs",-22}{"Size",5}{"Ath",5}{"Skl",5}{"FT",5}  Depth");
         for (var i = 0; i < roster.Count; i++)
@@ -723,7 +753,7 @@ internal static partial class Program
         List<GenPlayerRow> Rows(WorldSchool s)
         {
             var roster = res.Rosters[s.Id];
-            var five = new HashSet<int>(BuildOpeningFive(roster));
+            var five = new HashSet<int>(BuildOpeningFive(roster, pid => res.Pool[pid].Pos));
             return roster.Select((pid, i) =>
             {
                 var p = res.Pool[pid];
@@ -732,8 +762,23 @@ internal static partial class Program
             }).ToList();
         }
 
+        // Session 29.1 (§1c): the accepted residual of the 1B/2G floor, visible on
+        // the page, never silent — exactly ONE line per affected side, listing its
+        // absent positions (given the floor only W can currently be absent; the
+        // once-per-side contract is stated so it survives any future floor change).
+        void WarnAbsentPositions(WorldSchool s, List<GenPlayerRow> rows)
+        {
+            var onFloor = new HashSet<string>(rows.Where(r => r.Starter).Select(r => r.Pos));
+            var absent = new[] { "G", "W", "B" }.Where(p => !onFloor.Contains(p)).ToList();
+            if (absent.Count > 0)
+                Console.WriteLine($"  NOTE {s.Name}: no {string.Join("/", absent)} on the floor — " +
+                                  $"benched {string.Join("/", absent)} cannot enter under the same-position fence.");
+        }
+
         var rowsA = Rows(schoolA);
         var rowsB = Rows(schoolB);
+        WarnAbsentPositions(schoolA, rowsA);
+        WarnAbsentPositions(schoolB, rowsB);
         var stampedA = new Player[10];
         var stampedB = new Player[10];
         for (var i = 0; i < 10; i++) stampedA[i] = StampPlayerId(rowsA[i].Player, rowsA[i].Slot);

@@ -170,19 +170,34 @@ internal static partial class Program
                 }
             }
             Check("rank monotone in every feeding rating (20-player spot check)", mono);
-            // group ordering with overlap, on the stock pool (oracle: 251 > 212 > 178 > 162 > 160)
+            // group ordering (29.1, per Emmett's rulings): three > borderline >
+            // useful > scarce strictly on means, one-leg mean below useful — but NO
+            // order asserted between scarce and one-leg (fair grading revealed they
+            // sit even: two strong legs + one bad leg ≈ one strong leg + two passable
+            // ones; a future coach layer bends boards toward its own preference).
+            // Overlap: with positions co-located inside each tier, spreads narrowed —
+            // true-rank overlap is only robust low on the board (oracle, 60 stock
+            // seeds: scarce/one-leg 60/60, useful/scarce 55/60; borderline/useful 0/60,
+            // three/borderline 24/60). Asserted: the two robust true-rank overlaps,
+            // plus the borderline-useful gap sitting UNDER the board-noise sigma —
+            // the tiers separate in truth and blur through scouting error.
             var groups = new[] { "three-leg", "two (borderline)", "two (useful)", "two (scarce)", "one-leg" };
             var ranksByGroup = groups.Select(g =>
                 stockA.Pool.Where(p => DivvyGroupOf(p) == g).Select(p => p.ScoutRank).ToList()).ToArray();
-            var ordered = true; var overlaps = true;
-            for (var i = 0; i + 1 < groups.Length; i++)
-            {
-                if (ranksByGroup[i].Average() <= ranksByGroup[i + 1].Average()) ordered = false;
-                if (ranksByGroup[i + 1].Max() <= ranksByGroup[i].Min()) overlaps = false;
-            }
-            Check("stock pool: group rank means strictly ordered (3 > b > u > s > 1)", ordered,
-                string.Join(" > ", ranksByGroup.Select(r => r.Average().ToString("F0"))));
-            Check("stock pool: adjacent groups overlap (ordered on average, never cleanly)", overlaps);
+            var gm = ranksByGroup.Select(r => r.Average()).ToArray();
+            Check("stock pool: means strictly ordered three > borderline > useful > scarce",
+                gm[0] > gm[1] && gm[1] > gm[2] && gm[2] > gm[3],
+                string.Join(" > ", gm.Take(4).Select(m => m.ToString("F0"))));
+            Check("stock pool: one-leg mean below useful mean (scarce vs one-leg deliberately unordered)",
+                gm[4] < gm[2], $"one-leg {gm[4]:F1} vs useful {gm[2]:F1} (scarce {gm[3]:F1})");
+            Check("stock pool: useful/scarce true-rank overlap",
+                ranksByGroup[3].Max() > ranksByGroup[2].Min());
+            Check("stock pool: scarce/one-leg true-rank overlap",
+                ranksByGroup[4].Max() > ranksByGroup[3].Min());
+            var buGap = ranksByGroup[1].Min() - ranksByGroup[2].Max();
+            var noiseSigma = stockA.NoiseScale / Math.Sqrt(6.0);
+            Check("stock pool: borderline-useful gap under board-noise sigma (tiers blur through scouting error)",
+                buGap < noiseSigma, $"gap {buGap:F2} < sigma {noiseSigma:F2}");
 
             // ── 7. Access sanity on the fixed seed: prestige buys cracks, not players. ─
             var prestige = stock.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);
@@ -199,7 +214,7 @@ internal static partial class Program
             var leaks = stockA.Rosters.Where(kv => prestige[kv.Key] < med)
                                       .Sum(kv => kv.Value.Count(pid => topDecile.Contains(pid)));
             Check("stock: at least one top-decile player leaks below median prestige",
-                leaks >= 1, $"leaks = {leaks} (oracle at this seed: 48)");
+                leaks >= 1, $"leaks = {leaks} (oracle at this seed: 54)");
 
             // ── 8. Protected supply + the opening five's contract. ─────────────────────
             // The coverage guarantee is a hard constraint: remaining supply of a
@@ -217,13 +232,88 @@ internal static partial class Program
                         ro.Any(pid => r.Pool[pid].Role == GenWingDefenderRole))) slackOk = false;
             }
             Check("protected-supply slack never negative (both worlds + 5 fixture seeds)", slackOk);
-            // Opening five: deterministic, exactly the first five acquired, rank-blind
-            // (its input is the acquisition order alone — no rank, no ratings).
+
+            // ── 9. Session 29.1 — fair scouting + the opening five's playable floor. ───
+            // 9a. FT-blindness: the rank is bit-identical under any FreeThrow value
+            //     (a generated player's real dict; == on the doubles, no tolerance).
+            var ftp = tinyA.Pool[0];
+            var savedFt = ftp.Ratings["FreeThrow"];
+            ftp.Ratings["FreeThrow"] = 25;
+            var rankFt25 = DivvyScoutRank(ftp.Ratings, ftp.Pos);
+            ftp.Ratings["FreeThrow"] = 95;
+            var rankFt95 = DivvyScoutRank(ftp.Ratings, ftp.Pos);
+            ftp.Ratings["FreeThrow"] = savedFt;
+            Check("rank is FreeThrow-blind (FT=25 vs FT=95 bit-identical)", rankFt25 == rankFt95);
+
+            // 9b. Full-pipeline per-position fixtures — fixed hand-specified dicts,
+            //     oracle constants to 1e-9. One read proves size map + big-ATH
+            //     add-back + FT exclusion, per position. (The formula fixtures in §6
+            //     feed leg means directly and would stay green without the wiring —
+            //     these three go through DivvyScoutRank itself.)
+            Dictionary<string, int> FixtureDict(int sizeBase, int athBase, int skillBase, int ft)
+            {
+                var d = new Dictionary<string, int>(StringComparer.Ordinal);
+                var sizeR = new[] { "Height", "Wingspan", "Weight", "OffensiveRebounding", "DefensiveRebounding" };
+                var athR = new[] { "Strength", "Speed", "Quickness", "FirstStep", "Vertical", "Endurance", "Hustle" };
+                var skillR = new[] { "Close", "Mid", "Outside", "Finishing", "FreeThrow", "FoulDrawing",
+                                     "BallHandling", "Passing", "Playmaking", "SelfCreation", "PostMoves",
+                                     "OffBallMovement", "Screening", "PerimeterDefense", "PostDefense",
+                                     "RimProtection", "Steals", "HelpDefense", "OffBallDefense",
+                                     "BasketballIQ", "Discipline" };
+                for (var i = 0; i < sizeR.Length; i++) d[sizeR[i]] = sizeBase + i;
+                for (var i = 0; i < athR.Length; i++) d[athR[i]] = athBase + i;
+                for (var i = 0; i < skillR.Length; i++) d[skillR[i]] = skillBase + (i % 5);
+                d["FreeThrow"] = ft;
+                return d;
+            }
+            Check("full-pipeline rank fixture B = 164.551060606...",
+                Math.Abs(DivvyScoutRank(FixtureDict(80, 40, 55, 30), "B") - 164.5510606060606) < 1e-9);
+            Check("full-pipeline rank fixture G = 200.777786458...",
+                Math.Abs(DivvyScoutRank(FixtureDict(46, 74, 70, 88), "G") - 200.7777864583333) < 1e-9);
+            Check("full-pipeline rank fixture W = 186.946666666...",
+                Math.Abs(DivvyScoutRank(FixtureDict(58, 62, 66, 50), "W") - 186.94666666666666) < 1e-9);
+
+            // 9c. Post access at the fixed seed: elite programs get their pick of
+            //     the post litter — top-prestige-decile mean drafted-big rank
+            //     strictly above bottom decile (oracle at this seed: 182.3 vs 154.0).
+            var bigRanksTop = bySchool.Take(dec).SelectMany(s => stockA.Rosters[s.Id])
+                .Where(pid => stockA.Pool[pid].Pos == "B").Select(pid => ranks[pid]).ToList();
+            var bigRanksBot = bySchool.TakeLast(dec).SelectMany(s => stockA.Rosters[s.Id])
+                .Where(pid => stockA.Pool[pid].Pos == "B").Select(pid => ranks[pid]).ToList();
+            Check("stock: top-prestige-decile mean drafted-BIG rank > bottom decile",
+                bigRanksTop.Average() > bigRanksBot.Average(),
+                $"{bigRanksTop.Average():F1} > {bigRanksBot.Average():F1}");
+
+            // 9d. The seating floor: every roster's opening five (both worlds) has
+            //     >= 1 B and >= 2 G; deterministic; rank-blind by signature (inputs:
+            //     acquisition order + positions); equals the raw first five whenever
+            //     that five already satisfies the quotas.
+            var floorOk = true; var rawEqOk = true; var rawLegalSeen = 0;
+            foreach (var res in new[] { tinyA, stockA })
+            {
+                foreach (var roster in res.Rosters.Values)
+                {
+                    var five = BuildOpeningFive(roster, pid => res.Pool[pid].Pos);
+                    var b = five.Count(pid => res.Pool[pid].Pos == "B");
+                    var g = five.Count(pid => res.Pool[pid].Pos == "G");
+                    if (five.Length != 5 || b < 1 || g < 2) floorOk = false;
+                    var raw = roster.Take(5).ToArray();
+                    if (raw.Count(pid => res.Pool[pid].Pos == "B") >= 1 &&
+                        raw.Count(pid => res.Pool[pid].Pos == "G") >= 2)
+                    {
+                        rawLegalSeen++;
+                        if (!five.SequenceEqual(raw)) rawEqOk = false;
+                    }
+                }
+            }
+            Check("opening five: >= 1 B and >= 2 G on every roster, both worlds", floorOk);
+            Check("opening five: equals raw first five whenever raw already satisfies the quotas",
+                rawEqOk && rawLegalSeen > 0, $"raw-legal rosters seen: {rawLegalSeen}");
             var anyRoster = tinyA.Rosters.Values.First();
-            var five1 = BuildOpeningFive(anyRoster);
-            var five2 = BuildOpeningFive(anyRoster);
-            Check("opening five deterministic and = first five in acquisition order",
-                five1.SequenceEqual(five2) && five1.SequenceEqual(anyRoster.Take(5)));
+            var five1 = BuildOpeningFive(anyRoster, pid => tinyA.Pool[pid].Pos);
+            var five2 = BuildOpeningFive(anyRoster, pid => tinyA.Pool[pid].Pos);
+            Check("opening five deterministic (same roster twice -> identical five)",
+                five1.SequenceEqual(five2));
         }
         catch (Exception ex)
         {
