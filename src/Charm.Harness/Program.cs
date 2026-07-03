@@ -54,6 +54,16 @@ internal static partial class Program
         // machinery in-memory). configPath is the engine config.json (for the smoke sim).
         if (args.Length > 0 && args[0] == "divvy") { RunDivvy(configPath, args); return 0; }
 
+        // dotnet run -- season <world.json> <seed>  World Structure Pass 2: the minimal
+        // season loop. Regenerates every school's divvied roster (world + seed — nothing
+        // persisted), builds the deterministic 30-game schedule (16 conference + 14
+        // non-conference, 15 home / 15 away, neutral floors), plays every game through the
+        // real engine, and prints the standings page: all schools ranked by W-L, the
+        // prestige-band proof table, the overachievers with leaked talent named, and the
+        // OT pulse. Returns before the validation suite (Phase 55 proves the same machinery
+        // in-memory). configPath is the engine config.json (for the games).
+        if (args.Length > 0 && args[0] == "season") { RunSeason(configPath, args); return 0; }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
@@ -206,6 +216,7 @@ internal static partial class Program
         ok &= Phase52SubstitutionsCheck(configPath);           // Phase 52
         ok &= Phase53WorldStructureCheck();                    // Phase 53
         ok &= Phase54DivvyCheck();                             // Phase 54
+        ok &= Phase55SeasonCheck(configPath);                  // Phase 55
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

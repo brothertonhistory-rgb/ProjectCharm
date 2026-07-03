@@ -734,28 +734,11 @@ internal static partial class Program
         GenConfig config, Player[] stampedA, Player[] stampedB,
         GenSideData sideA, GenSideData sideB, string engineConfigPath)
     {
-        var cfg          = RollAConfig.Load(engineConfigPath);
-        var cfgB         = RollBConfig.Load(engineConfigPath);
-        var cfgC         = RollCConfig.Load(engineConfigPath);
-        var cfgD         = RollDConfig.Load(engineConfigPath);
-        var cfgE         = RollEConfig.Load(engineConfigPath);
-        var cfgF         = RollFConfig.Load(engineConfigPath);
-        var cfgG         = RollGConfig.Load(engineConfigPath);
-        var cfgH         = RollHConfig.Load(engineConfigPath);
-        var cfgI         = RollIConfig.Load(engineConfigPath);
-        var cfgJ         = RollJConfig.Load(engineConfigPath);
-        var cfgK         = RollKConfig.Load(engineConfigPath);
-        var cfgL         = RollLConfig.Load(engineConfigPath);
-        var cfgM         = RollMConfig.Load(engineConfigPath);
-        var cfgOffFoul   = RollOffensiveFoulConfig.Load(engineConfigPath);
-        var cfgGov       = GovernorConfig.Load(engineConfigPath);
-        var cfgClock     = RollClockConfig.Load(engineConfigPath);
-        var cfgEndOfHalf = EndOfHalfConfig.Load(engineConfigPath);
-        var cfgMatchup   = MatchupConfig.Load(engineConfigPath);
-        var cfgAttention = AttentionConfig.Load(engineConfigPath);
-        // The fence and the engine's fatigue both read this one config, so the fence's
-        // recovery and the engine's halftime rest use identical magnitudes.
-        var cfgFat       = FatigueConfig.Load(engineConfigPath);
+        // Session 30 extraction: configs loaded ONCE per call (exactly as before —
+        // same Load calls, same order), then the loop delegates each game to the
+        // shared single-game body. One construction site, two callers (gen/smoke
+        // here, the season runner in Program.Season.cs), zero drift.
+        var c = LoadGenEngineConfigs(engineConfigPath);
 
         var stats = new GenStats();
 
@@ -769,61 +752,114 @@ internal static partial class Program
             TeamSide teamASide = teamAIsHome ? TeamSide.Home : TeamSide.Away;
             TeamSide teamBSide = teamAIsHome ? TeamSide.Away : TeamSide.Home;
 
-            var game = new GameState(
-                new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold),
-                ArrowState.Off,
-                new FatigueTracker(cfgFat));
-
-            SeatRoster(game, teamASide, sideA.Starters);
-            SeatRoster(game, teamBSide, sideB.Starters);
-
-            // Build each side's depth chart with its PHYSICAL side for this game, then hand
-            // the policy the Home/Away pair and the shared halftime-equivalent magnitude.
-            var aDepth = new FlatFatigueFencePolicy.SideDepth(
-                teamASide, sideA.Starters, sideA.StarterPositions, sideA.Reserves, sideA.ReservePositions);
-            var bDepth = new FlatFatigueFencePolicy.SideDepth(
-                teamBSide, sideB.Starters, sideB.StarterPositions, sideB.Reserves, sideB.ReservePositions);
-            var homeDepth = teamAIsHome ? aDepth : bDepth;
-            var awayDepth = teamAIsHome ? bDepth : aDepth;
-            var policy = new FlatFatigueFencePolicy(homeDepth, awayDepth, cfgFat.HalftimeRestEquivalentSeconds);
-
-            var resolverRng = new SystemRng(gameSeed);
-            var governorRng = new SystemRng(gameSeed + 1);
-
-            var resolver = new Resolver(
-                new RollAGenerator(cfg, cfgMatchup, game),
-                cfg,
-                new RollBGenerator(cfgB, cfgMatchup, game),
-                new RollCGenerator(cfgC),
-                cfgC,
-                new RollDGenerator(cfgD),
-                new RollEGenerator(cfgE, game),
-                new AttentionGenerator(cfgAttention, game),
-                new RollFGenerator(cfgF, cfgMatchup, game),
-                new RollGGenerator(cfgG, cfgMatchup, game),
-                new RollHGenerator(cfgH, cfgMatchup, game),
-                new RollIGenerator(cfgI, cfgMatchup, game),
-                new RollJGenerator(cfgJ, cfgMatchup, game),
-                new RollKGenerator(cfgK, cfgMatchup, game),
-                new RollLGenerator(cfgL, game),
-                new RollMGenerator(cfgM, cfgMatchup, game),
-                new RollOffensiveFoulGenerator(cfgOffFoul),
-                cfgMatchup,
-                game,
-                resolverRng);
-
-            // The one line that differs from the bench runner: the Governor is given the
-            // substitution policy (7th argument). Everything else is identical.
-            var governor = new Governor(resolver, game, cfgGov, cfgClock, governorRng, cfgEndOfHalf, policy);
-            var firstState = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1);
-
-            var result = governor.Run(firstState);
-            var attributed = AttributeGame(result, game, gameSeed);
+            var (game, result, attributed) = RunSingleGenGame(
+                c, sideA, sideB, teamASide, teamBSide,
+                resolverSeed: gameSeed, governorSeed: gameSeed + 1);
 
             stats.Accumulate(result.Possessions, game, attributed, teamASide, teamBSide);
         }
 
         return stats;
+    }
+
+    // ── The single-game body (Session 30 extraction) ────────────────────────────
+    //
+    // The pre-loaded engine configs a gen-style game needs. Loaded once per
+    // RunGenMatchup call (the committed behavior) and once per SEASON — never per
+    // game. Field order matches the original Load order in RunGenMatchup.
+    private sealed record GenEngineConfigs(
+        RollAConfig A, RollBConfig B, RollCConfig C, RollDConfig D, RollEConfig E,
+        RollFConfig F, RollGConfig G, RollHConfig H, RollIConfig I, RollJConfig J,
+        RollKConfig K, RollLConfig L, RollMConfig M,
+        RollOffensiveFoulConfig OffFoul, GovernorConfig Gov, RollClockConfig Clock,
+        EndOfHalfConfig EndOfHalf, MatchupConfig Matchup, AttentionConfig Attention,
+        FatigueConfig Fat);
+
+    private static GenEngineConfigs LoadGenEngineConfigs(string engineConfigPath) => new(
+        RollAConfig.Load(engineConfigPath),
+        RollBConfig.Load(engineConfigPath),
+        RollCConfig.Load(engineConfigPath),
+        RollDConfig.Load(engineConfigPath),
+        RollEConfig.Load(engineConfigPath),
+        RollFConfig.Load(engineConfigPath),
+        RollGConfig.Load(engineConfigPath),
+        RollHConfig.Load(engineConfigPath),
+        RollIConfig.Load(engineConfigPath),
+        RollJConfig.Load(engineConfigPath),
+        RollKConfig.Load(engineConfigPath),
+        RollLConfig.Load(engineConfigPath),
+        RollMConfig.Load(engineConfigPath),
+        RollOffensiveFoulConfig.Load(engineConfigPath),
+        GovernorConfig.Load(engineConfigPath),
+        RollClockConfig.Load(engineConfigPath),
+        EndOfHalfConfig.Load(engineConfigPath),
+        MatchupConfig.Load(engineConfigPath),
+        AttentionConfig.Load(engineConfigPath),
+        // The fence and the engine's fatigue both read this one config, so the fence's
+        // recovery and the engine's halftime rest use identical magnitudes.
+        FatigueConfig.Load(engineConfigPath));
+
+    // One complete ten-man engine game — the body lifted verbatim from the committed
+    // RunGenMatchup loop (Session 30; the behavioral wall: `gen` and the divvy smoke
+    // sim must stay byte-for-byte, so every construction below is in the original
+    // order). Attribution uses the resolver seed, exactly as the committed
+    // AttributeGame(result, game, gameSeed) call did.
+    private static (GameState Game, GovernorRunResult Result, PlayerBoxTotals Attributed) RunSingleGenGame(
+        GenEngineConfigs c, GenSideData sideA, GenSideData sideB,
+        TeamSide teamASide, TeamSide teamBSide, int resolverSeed, int governorSeed)
+    {
+        var game = new GameState(
+            new FoulTracker(c.D.BonusThreshold, c.D.DoubleBonusThreshold),
+            ArrowState.Off,
+            new FatigueTracker(c.Fat));
+
+        SeatRoster(game, teamASide, sideA.Starters);
+        SeatRoster(game, teamBSide, sideB.Starters);
+
+        // Build each side's depth chart with its PHYSICAL side for this game, then hand
+        // the policy the Home/Away pair and the shared halftime-equivalent magnitude.
+        var aDepth = new FlatFatigueFencePolicy.SideDepth(
+            teamASide, sideA.Starters, sideA.StarterPositions, sideA.Reserves, sideA.ReservePositions);
+        var bDepth = new FlatFatigueFencePolicy.SideDepth(
+            teamBSide, sideB.Starters, sideB.StarterPositions, sideB.Reserves, sideB.ReservePositions);
+        var homeDepth = teamASide == TeamSide.Home ? aDepth : bDepth;
+        var awayDepth = teamASide == TeamSide.Home ? bDepth : aDepth;
+        var policy = new FlatFatigueFencePolicy(homeDepth, awayDepth, c.Fat.HalftimeRestEquivalentSeconds);
+
+        var resolverRng = new SystemRng(resolverSeed);
+        var governorRng = new SystemRng(governorSeed);
+
+        var resolver = new Resolver(
+            new RollAGenerator(c.A, c.Matchup, game),
+            c.A,
+            new RollBGenerator(c.B, c.Matchup, game),
+            new RollCGenerator(c.C),
+            c.C,
+            new RollDGenerator(c.D),
+            new RollEGenerator(c.E, game),
+            new AttentionGenerator(c.Attention, game),
+            new RollFGenerator(c.F, c.Matchup, game),
+            new RollGGenerator(c.G, c.Matchup, game),
+            new RollHGenerator(c.H, c.Matchup, game),
+            new RollIGenerator(c.I, c.Matchup, game),
+            new RollJGenerator(c.J, c.Matchup, game),
+            new RollKGenerator(c.K, c.Matchup, game),
+            new RollLGenerator(c.L, game),
+            new RollMGenerator(c.M, c.Matchup, game),
+            new RollOffensiveFoulGenerator(c.OffFoul),
+            c.Matchup,
+            game,
+            resolverRng);
+
+        // The one line that differs from the bench runner: the Governor is given the
+        // substitution policy (7th argument). Everything else is identical.
+        var governor = new Governor(resolver, game, c.Gov, c.Clock, governorRng, c.EndOfHalf, policy);
+        var firstState = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1);
+
+        var result = governor.Run(firstState);
+        var attributed = AttributeGame(result, game, resolverSeed);
+
+        return (game, result, attributed);
     }
 
     // ── Gen accumulator: team-level channels + 20-player box + possessions played ──
