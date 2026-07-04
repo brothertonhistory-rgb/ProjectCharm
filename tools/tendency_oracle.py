@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
 """
-Skill-derived shot-tendency derivation — FIRST-CUT ORACLE.
+Skill-derived shot-tendency derivation — LOCKED SPEC ORACLE (2026-07-04).
+
+Status: the constants and shapes below were reviewed and approved by Emmett
+(archetype diet table + structural checks). They are the approved spec for the
+generator build pass: the C# port mirrors this file constant-for-constant and
+stage-for-stage. If the C# and this oracle ever disagree, the oracle wins.
+Future tuning happens HERE first (new approval), never in the C# alone.
 
 Mirrors the intended C# derivation (the table GenRoles[..].Tendencies is deleted;
 each player's 5 zone tendencies fall out of his own drawn skills). Proves STRUCTURAL
 claims across seeds; prints league three-share as a DIAGNOSTIC (not a gate).
 
-Zone order everywhere: Rim, Short, Mid, Long, Three  (matches GenTendencies[]).
+DETERMINISM RULING (locked): the derivation is a pure function of the final rating
+map. No player-style seed, no manufactured tendency noise. Identical final ratings
+yield identical integer diets; population variety comes from varied drawn skills,
+and shot VOLUME differences are usage/hierarchy's job, not this function's.
 
-All constants here are FIRST-CUT guesses. What is being judged is whether the
-resulting shot DIETS look basketball-right, not these numbers.
+Zone order everywhere: Rim, Short, Mid, Long, Three  (matches GenTendencies[]).
+All tie-breaks (largest-remainder rounding, the 99-cap redistribution) resolve in
+that fixed zone order.
 """
-import random, statistics
+import json, random, statistics
 
 Z = ["Rim", "Short", "Mid", "Long", "Three"]
 
@@ -92,18 +102,23 @@ def peakedness_gamma(R):
     return clamp(GAMMA_BASE + GAMMA_SHAPE*lop + GAMMA_DEFICIT*defic, 1.0, 6.0)
 
 def to_int_diet(weights):
-    """Normalize to ints summing to 100, each <=99 (Player.Validate ceiling)."""
+    """Normalize to ints summing to 100, each <=99 (Player.Validate ceiling).
+    DETERMINISTIC TIE-BREAKS, locked for the C# port:
+      - largest-remainder rounding: remainders sorted descending; equal remainders
+        resolve in zone order (Rim, Short, Mid, Long, Three);
+      - 99-cap redistribution: overflow moves to the smallest zone; equal smallest
+        resolves to the earliest zone in the same fixed order."""
     s = sum(weights)
     if s <= 0: weights = [1.0]*len(weights); s = len(weights)
     raw = [100*w/s for w in weights]
     floor = [int(x) for x in raw]
     rem = 100 - sum(floor)
-    order = sorted(range(len(raw)), key=lambda i: raw[i]-floor[i], reverse=True)
+    order = sorted(range(len(raw)), key=lambda i: (-(raw[i]-floor[i]), i))
     for k in range(rem): floor[order[k]] += 1
     # ceiling guard: no single zone may be 100
     for i in range(len(floor)):
         if floor[i] >= 100:
-            j = min(range(len(floor)), key=lambda k: floor[k])
+            j = min(range(len(floor)), key=lambda k: (floor[k], k))
             floor[i] -= 1; floor[j] += 1
     return floor
 
@@ -239,6 +254,42 @@ def population(nteams=800, seed=20260703):
     return three_shares, means, all_diets
 
 # ---------------------------------------------------------------------------
+# GOLDEN PARITY VECTORS  (exact port proof for the C# build)
+# ---------------------------------------------------------------------------
+# Named input rating maps -> exact expected integer diets. The C# DeriveTendencies
+# must reproduce every diet ELEMENT-FOR-ELEMENT in zone order Rim,Short,Mid,Long,
+# Three. Includes rounding/tie traps beyond the basketball archetypes.
+GOLDEN_EXTRA = {
+ "All-low (20s across)":      P(**{k:22 for k in ("Close","Mid","Outside","Finishing","PostMoves","BallHandling",
+                                                  "SelfCreation","FirstStep","Speed","Vertical","Screening")},
+                                Height=60, Weight=55),
+ "All-high (90s across)":     P(**{k:92 for k in ("Close","Mid","Outside","Finishing","PostMoves","BallHandling",
+                                                  "SelfCreation","FirstStep","Speed","Vertical","Screening")},
+                                Height=75, Weight=70),
+ "All-flat 50s (tie trap)":   P(**{k:50 for k in ("Close","Mid","Outside","Finishing","PostMoves","BallHandling",
+                                                  "SelfCreation","FirstStep","Speed","Vertical","Screening")},
+                                Height=60, Weight=55),
+ "Equal-remainder trap":      P(Close=50, Mid=57, Outside=57, Finishing=57, PostMoves=50, BallHandling=57,
+                                SelfCreation=57, FirstStep=57, Speed=57, Vertical=57, Screening=50,
+                                Height=60, Weight=55),
+ "Near-cap single zone":      P(Close=20, Mid=10, Outside=10, Finishing=97, PostMoves=10, BallHandling=15,
+                                SelfCreation=10, FirstStep=90, Speed=88, Vertical=92, Screening=30,
+                                Height=84, Weight=84),
+}
+
+def golden_vectors():
+    out = []
+    for name, a in list(ARCH.items()) + list(GOLDEN_EXTRA.items()):
+        diet, _, _ = derive(a)
+        out.append({"name": name, "ratings": a, "expected": diet})
+    return out
+
+def emit_golden(path="tendency_golden.json"):
+    with open(path, "w") as f:
+        json.dump({"zoneOrder": Z, "vectors": golden_vectors()}, f, indent=1, sort_keys=True)
+    print(f"golden parity fixture written: {path} ({len(golden_vectors())} vectors)")
+
+# ---------------------------------------------------------------------------
 # STRUCTURAL CHECKS  (the real gate; three-share is only printed)
 # ---------------------------------------------------------------------------
 def checks():
@@ -298,15 +349,22 @@ if __name__ == "__main__":
     print("="*72); print("ARCHETYPE SHOT DIETS  (Rim / Short / Mid / Long / Three, sum=100)"); print("="*72)
     print_arch()
 
-    print(); print("="*72); print("POPULATION DIAGNOSTIC  (approximate generator-mirroring draw)"); print("="*72)
+    print(); print("="*72)
+    print("POPULATION DIAGNOSTIC — mean generated NEUTRAL TENDENCY diet")
+    print("(directional only: the sampler approximates, not reproduces, the real")
+    print(" roster pipeline; and tendency is not realized FGA share — Roll G bends it)")
+    print("="*72)
     for seed in (20260703, 40, 12345):
         shares, means, _ = population(seed=seed)
         print(f"seed {seed:<9}  mean league diet  "
               f"Rim {means[0]:4.1f}  Short {means[1]:4.1f}  Mid {means[2]:4.1f}  "
-              f"Long {means[3]:4.1f}  Three {means[4]:4.1f}   (three-share proxy for 3PA rate)")
+              f"Long {means[3]:4.1f}  Three {means[4]:4.1f}")
 
     print(); print("="*72); print("STRUCTURAL CHECKS  (the actual gate)"); print("="*72)
     allok = True
     for name, ok in checks():
         allok &= ok; print(f"  [{'PASS' if ok else 'FAIL'}]  {name}")
     print("-"*72); print("  ALL STRUCTURAL CHECKS PASS" if allok else "  *** SOME CHECKS FAILED ***")
+
+    print()
+    emit_golden()
