@@ -2,11 +2,11 @@
  "vectors": [
   {
    "expected": [
-    5,
+    4,
     2,
-    23,
+    10,
     7,
-    63
+    77
    ],
    "name": "Pure spot-up shooter",
    "ratings": {
@@ -36,11 +36,11 @@
   },
   {
    "expected": [
-    14,
-    2,
-    8,
+    9,
+    3,
+    3,
     6,
-    70
+    79
    ],
    "name": "3&D wing (catch-shoot)",
    "ratings": {
@@ -70,11 +70,11 @@
   },
   {
    "expected": [
-    74,
-    13,
-    6,
+    60,
+    9,
     3,
-    4
+    3,
+    25
    ],
    "name": "Slasher (handle+hops, no J)",
    "ratings": {
@@ -104,11 +104,11 @@
   },
   {
    "expected": [
-    40,
-    10,
-    23,
+    37,
+    7,
+    11,
     4,
-    23
+    41
    ],
    "name": "Floor general (balanced G)",
    "ratings": {
@@ -138,11 +138,11 @@
   },
   {
    "expected": [
-    33,
-    10,
-    25,
+    32,
+    7,
+    12,
     6,
-    26
+    43
    ],
    "name": "Wing scorer (multi-level)",
    "ratings": {
@@ -172,11 +172,11 @@
   },
   {
    "expected": [
-    29,
-    12,
-    27,
-    11,
-    21
+    30,
+    8,
+    14,
+    10,
+    38
    ],
    "name": "Mid-range maestro (CP3)",
    "ratings": {
@@ -206,11 +206,11 @@
   },
   {
    "expected": [
-    31,
-    64,
-    5,
+    37,
+    55,
+    4,
     0,
-    0
+    4
    ],
    "name": "Post scorer (bruiser)",
    "ratings": {
@@ -240,11 +240,11 @@
   },
   {
    "expected": [
-    91,
+    87,
     7,
     2,
     0,
-    0
+    4
    ],
    "name": "Rim runner (lob/putback)",
    "ratings": {
@@ -274,11 +274,11 @@
   },
   {
    "expected": [
-    15,
-    4,
-    30,
-    11,
-    40
+    12,
+    2,
+    12,
+    9,
+    65
    ],
    "name": "Stretch big (3pt shooter)",
    "ratings": {
@@ -308,11 +308,11 @@
   },
   {
    "expected": [
-    16,
-    7,
-    64,
+    24,
+    6,
+    46,
     11,
-    2
+    13
    ],
    "name": "Pick-&-pop big (mid, long2)",
    "ratings": {
@@ -342,13 +342,13 @@
   },
   {
    "expected": [
-    85,
-    6,
+    9,
     2,
-    3,
-    4
+    2,
+    6,
+    81
    ],
-   "name": "Weak non-shooter (fringe)",
+   "name": "Weak-shooting spot-up (fringe)",
    "ratings": {
     "BallHandling": 42,
     "Close": 44,
@@ -376,11 +376,11 @@
   },
   {
    "expected": [
-    7,
-    3,
+    4,
     2,
-    6,
-    82
+    2,
+    7,
+    85
    ],
    "name": "Weak shooter (fringe)",
    "ratings": {
@@ -410,11 +410,80 @@
   },
   {
    "expected": [
-    85,
-    6,
-    2,
+    39,
     3,
+    2,
+    4,
+    52
+   ],
+   "name": "Open-only guard (O=25)",
+   "ratings": {
+    "BallHandling": 55,
+    "Close": 48,
+    "Endurance": 55,
+    "Finishing": 55,
+    "FirstStep": 58,
+    "FoulDrawing": 50,
+    "FreeThrow": 60,
+    "Height": 60,
+    "Mid": 45,
+    "OffBallMovement": 50,
+    "Outside": 25,
+    "Passing": 50,
+    "PerimeterDefense": 75,
+    "Playmaking": 50,
+    "PostMoves": 45,
+    "Quickness": 55,
+    "Screening": 45,
+    "SelfCreation": 50,
+    "Speed": 55,
+    "Strength": 55,
+    "Vertical": 55,
+    "Weight": 55,
+    "Wingspan": 60
+   }
+  },
+  {
+   "expected": [
+    79,
+    15,
+    2,
+    0,
     4
+   ],
+   "name": "True non-shooter big (O=3)",
+   "ratings": {
+    "BallHandling": 25,
+    "Close": 70,
+    "Endurance": 55,
+    "Finishing": 78,
+    "FirstStep": 55,
+    "FoulDrawing": 50,
+    "FreeThrow": 60,
+    "Height": 84,
+    "Mid": 30,
+    "OffBallMovement": 50,
+    "Outside": 3,
+    "Passing": 50,
+    "Playmaking": 50,
+    "PostMoves": 70,
+    "Quickness": 55,
+    "Screening": 70,
+    "SelfCreation": 25,
+    "Speed": 55,
+    "Strength": 55,
+    "Vertical": 70,
+    "Weight": 84,
+    "Wingspan": 60
+   }
+  },
+  {
+   "expected": [
+    2,
+    2,
+    2,
+    7,
+    87
    ],
    "name": "All-low (20s across)",
    "ratings": {
@@ -444,11 +513,11 @@
   },
   {
    "expected": [
-    21,
-    21,
-    20,
-    19,
-    19
+    23,
+    16,
+    11,
+    15,
+    35
    ],
    "name": "All-high (90s across)",
    "ratings": {
@@ -478,11 +547,11 @@
   },
   {
    "expected": [
-    51,
-    4,
-    6,
+    13,
     3,
-    36
+    2,
+    6,
+    76
    ],
    "name": "All-flat 50s (tie trap)",
    "ratings": {
@@ -512,11 +581,11 @@
   },
   {
    "expected": [
-    28,
+    22,
+    3,
+    11,
     5,
-    29,
-    5,
-    33
+    59
    ],
    "name": "Equal-remainder trap",
    "ratings": {
@@ -546,11 +615,11 @@
   },
   {
    "expected": [
-    91,
+    87,
     7,
     2,
     0,
-    0
+    4
    ],
    "name": "Near-cap single zone",
    "ratings": {

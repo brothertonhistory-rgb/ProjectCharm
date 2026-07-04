@@ -1,12 +1,33 @@
 #!/usr/bin/env python3
 """
-Skill-derived shot-tendency derivation — LOCKED SPEC ORACLE (2026-07-04).
+Skill-derived shot-tendency derivation — LOCKED SPEC ORACLE v2 (2026-07-04).
 
-Status: the constants and shapes below were reviewed and approved by Emmett
-(archetype diet table + structural checks). They are the approved spec for the
-generator build pass: the C# port mirrors this file constant-for-constant and
-stage-for-stage. If the C# and this oracle ever disagree, the oracle wins.
-Future tuning happens HERE first (new approval), never in the C# alone.
+Status: v2 constants and shapes reviewed and approved by Emmett (archetype diet
+table + structural checks, modern-era retune). They are the approved spec for the
+generator: the C# port mirrors this file constant-for-constant and stage-for-stage.
+If the C# and this oracle ever disagree, the oracle wins. Future tuning happens
+HERE first (new approval), never in the C# alone.
+
+v2 RULINGS (Emmett, 2026-07-04) — the modern-era retune:
+  1. RATING DRIVES EFFICIENCY AND USAGE, NOT FREQUENCY (perimeter players).
+     On the 0-99 scale 50 = league-average conversion; a 25-rated guard is an
+     open-only shooter, not a non-shooter. Shooting is pervasive across college
+     perimeter players (a guard who truly can't shoot must be elite elsewhere or
+     he doesn't get a scholarship, down to D3). So a perimeter player's three
+     FREQUENCY is broad and only weakly rating-dependent — the rating's real
+     punishment lands at the make curve (contested) and the usage layer (volume).
+  2. NONZERO RATING = CAPABLE. Any player with Outside > 0 carries a small
+     universal three floor (~4%): a rating-3 big fires his occasional wide-open
+     one at ~30%. The old "paint big takes exactly zero threes" rule is
+     overturned; this floor also largely absorbs the once-deferred Roll G heave.
+  3. THE ERA PROFILE — one explicit post-peakedness stage of five weight-space
+     multipliers encoding the era's shot-selection culture (threes up, mid-range
+     way down, floaters/long-twos trimmed, rim untouched). Capability signals
+     stay pure; the era is culture. A 1995-mode league is five numbers.
+  4. THE PARADOX, embraced: a poor shooter with NO other tools (no rim game, no
+     athletic edge) correctly skews three-HEAVY — it's all he's capable of. His
+     level fit (D1 washout, serviceable D2) is the population/divvy's job, not
+     the derivation's.
 
 Mirrors the intended C# derivation (the table GenRoles[..].Tendencies is deleted;
 each player's 5 zone tendencies fall out of his own drawn skills). Proves STRUCTURAL
@@ -31,10 +52,15 @@ def gate(x, lo, hi):   return clamp((x - lo) / (hi - lo), 0.0, 1.0)
 # ---------------------------------------------------------------------------
 # THE DERIVATION
 # ---------------------------------------------------------------------------
-# ---- first-cut constants ----
+# ---- v2 constants ----
 CREATION_LO, CREATION_HI = 45, 78          # what "having a creation game" means
 MID_CRED_LO, MID_CRED_HI   = 44, 62        # a mid jumper is a real shot above here (catch-&-shoot credible)
-THREE_CRED_LO, THREE_CRED_HI = 34, 56      # a three is a real shot above here; below it he's left open, doesn't fire
+# THREE — two paths blended by perimeter-ness (v2 ruling 1):
+#   perimeter path: COMPRESSED frequency — rating drives efficiency/usage, not diet
+#   interior path:  stretch-gated — a big earns arc volume only through a real stretch rating
+THREE_BASE, THREE_SLOPE      = 28.0, 0.55  # compressed signal = 28 + 0.55*Outside (25 -> 41.8, 88 -> 76.4)
+THREE_EXIST_LO, THREE_EXIST_HI = 2, 18     # only the near-zero truly fades out of the compressed path
+THREE_STRETCH_LO, THREE_STRETCH_HI = 32, 50  # the interior path's gate: a real stretch rating
 RIM_FED_W, RIM_CREATE_W  = 0.72, 0.60      # rim = fed finish + self-created downhill (downhill is primary for creators)
 FLOATER_SCALE            = 0.55            # the floater is a secondary/counter shot, below the rim it replaces
 POST_TOUCH_GATE          = (55, 85)        # a post touch needs a REAL post game, not ordinary PostMoves
@@ -49,10 +75,19 @@ CREDIBLE_CEILING         = 85.0            # a top-2 average at/above this earns
 MARGIN_BLEED             = 0.07            # porousness of the zone walls: each zone spills this
                                            # fraction of the gap into its distance-ladder neighbors.
                                            # (foot on the line, bumped off the rim, chased off the arc)
+# THE ERA PROFILE (v2 ruling 3): weight-space multipliers applied AFTER peakedness,
+# Rim/Short/Mid/Long/Three. Encodes the modern shot-selection culture, cleanly
+# separated from individual capability. An earlier-era league is these 5 numbers.
+ERA_PROFILE              = [1.00, 0.66, 0.50, 0.70, 2.10]
 FLOOR_INSIDE             = 0.025           # the layup, floater, wide-open 12-footer basketball hands everyone
 FLOOR_LONG_PERIM         = 0.030           # a perimeter player pulls up from midrange a few times a year
-FLOOR_THREE_PERIM        = 0.045           # a perimeter player ALWAYS launches a few (kick-out, heave) —
-                                           # gated so a paint big who never steps to the arc still takes zero
+FLOOR_THREE_CAP          = 0.040           # v2 ruling 2: ANY player with Outside>0 is capable — universal floor
+FLOOR_THREE_PERIM_EXTRA  = 0.020           # perimeter players a touch more (kick-outs find them)
+
+def perimeter_ness(a):
+    """How perimeter-shaped a player is, 0..1 — small OR a real handle qualifies.
+    Shared by the three signal (path blend) and the opportunity floor."""
+    return clamp(max(1 - gate(a["Height"], 68, 79), gate(a["BallHandling"], 45, 70)), 0, 1)
 
 def raw_signals(a):
     """a: dict of 0-99 attributes -> five raw per-zone capability signals (0-99)."""
@@ -69,8 +104,14 @@ def raw_signals(a):
     mid_access = clamp(gate(a["Mid"], MID_CRED_LO, MID_CRED_HI) + 0.70*creation, 0, 1)
     R_mid = a["Mid"] * mid_access
 
-    # THREE: catch-&-shoot spot-up — only if he can actually shoot it (else he's left open, doesn't fire)
-    R_three = a["Outside"] * gate(a["Outside"], THREE_CRED_LO, THREE_CRED_HI)
+    # THREE (v2 ruling 1): two paths blended by perimeter-ness.
+    #   Perimeter: COMPRESSED — frequency is broad and only weakly rating-dependent;
+    #     the rating's punishment is efficiency (make curve) and usage, not the diet.
+    #   Interior: stretch-gated — a big earns arc volume only via a real stretch rating.
+    p = perimeter_ness(a)
+    compressed = (THREE_BASE + THREE_SLOPE*a["Outside"]) * gate(a["Outside"], THREE_EXIST_LO, THREE_EXIST_HI)
+    gated      = a["Outside"] * gate(a["Outside"], THREE_STRETCH_LO, THREE_STRETCH_HI)
+    R_three = clamp(p*compressed + (1-p)*gated, 0, 99)
 
     # SHORT: two routes that STACK (each earns its own volume), each near-zero without its real skill
     post_touch = gate(a["PostMoves"], *POST_TOUCH_GATE) * (0.70*a["PostMoves"] + 0.30*a["Close"])
@@ -134,25 +175,26 @@ def bleed_margins(w):
 
 def opportunity_floor(w, a):
     """No zone a player can plausibly reach is ever exactly zero. Inside shots are handed
-    to everyone; perimeter shots only to players who actually operate out there (a paint
-    big who never steps to the arc still takes zero threes).
+    to everyone. The three (v2 ruling 2): NONZERO RATING = CAPABLE — any player with
+    Outside > 0 carries a small universal floor (a rating-3 big fires his occasional
+    wide-open one), with a perimeter extra on top (kick-outs find perimeter players).
 
-    DEFERRED (Roll G, separate add-in): the emergency heave. A true non-shooter still puts
-    up 2-3 threes over a CAREER (~0.2%) from buzzer/desperation. That is below integer-
-    tendency resolution and belongs as a tiny ~0.2% floor on every zone when Roll G builds
-    the pie (fractional weights), NOT in the authored tendency here. This function keeps a
-    genuine non-shooter's three at 0; Roll G floors it nonzero at shot time."""
+    The once-deferred Roll G emergency heave is now largely ABSORBED by this floor: only
+    a literal Outside==0 player still reads a zero three tendency, and that residual
+    (~0.2% buzzer heave) remains Roll G's, at pie time, if ever needed."""
     s = sum(w)
     d = [x/s for x in w] if s > 0 else list(w)
-    perim = clamp(max(1 - gate(a["Height"], 68, 79), gate(a["BallHandling"], 45, 70)), 0, 1)
+    perim = perimeter_ness(a)
+    capable = 1.0 if a["Outside"] > 0 else 0.0
     floors = [FLOOR_INSIDE, FLOOR_INSIDE, FLOOR_INSIDE,
-              FLOOR_LONG_PERIM*perim, FLOOR_THREE_PERIM*perim]
+              FLOOR_LONG_PERIM*perim,
+              FLOOR_THREE_CAP*capable + FLOOR_THREE_PERIM_EXTRA*perim]
     return [max(d[i], floors[i]) for i in range(5)]
 
 def derive(a):
     R = raw_signals(a)
     g = peakedness_gamma(R)
-    w = [r**g for r in R]
+    w = [R[i]**g * ERA_PROFILE[i] for i in range(5)]   # v2 ruling 3: the era stage
     w = bleed_margins(w)
     w = opportunity_floor(w, a)
     return to_int_diet(w), R, g
@@ -178,8 +220,11 @@ ARCH = {
  "Rim runner (lob/putback)":   P(Outside=8, Mid=42, Finishing=86, Screening=80, Vertical=82, Height=83, Weight=82, PostMoves=48, SelfCreation=20, BallHandling=25, Close=52),
  "Stretch big (3pt shooter)":  P(Outside=74, Mid=68, Finishing=68, PostMoves=50, Screening=74, Height=82, Weight=80, Close=58, SelfCreation=35, BallHandling=38),
  "Pick-&-pop big (mid, long2)":P(Outside=44, Mid=82, Finishing=68, PostMoves=52, Screening=74, Height=82, Weight=80, Close=58, SelfCreation=35, BallHandling=38),
- "Weak non-shooter (fringe)":  P(Outside=40, Mid=42, Finishing=46, Close=44, PostMoves=40, SelfCreation=40, BallHandling=42, FirstStep=44, Height=64),
+ "Weak-shooting spot-up (fringe)": P(Outside=40, Mid=42, Finishing=46, Close=44, PostMoves=40, SelfCreation=40, BallHandling=42, FirstStep=44, Height=64),
  "Weak shooter (fringe)":      P(Outside=64, Mid=46, Finishing=44, Close=42, PostMoves=38, SelfCreation=40, BallHandling=44, FirstStep=42, Height=60),
+ # v2 probes (Emmett rulings 1 and 2):
+ "Open-only guard (O=25)":     P(Outside=25, Mid=45, SelfCreation=50, BallHandling=55, FirstStep=58, Finishing=55, PerimeterDefense=75),
+ "True non-shooter big (O=3)": P(Outside=3, Mid=30, Finishing=78, PostMoves=70, Close=70, Height=84, Weight=84, SelfCreation=25, BallHandling=25, Screening=70, Vertical=70),
 }
 
 def print_arch():
@@ -312,16 +357,30 @@ def checks():
     d_rr = derive(ARCH["Rim runner (lob/putback)"])[0]
     chk("rim runner collapses to rim (Rim>=50, top zone)", d_rr[0]>=50 and d_rr[0]==max(d_rr))
     chk("rim runner catches the occasional 12-footer (Mid>=1)", d_rr[2]>=1)
-    chk("paint big who never steps out takes zero threes (rim runner Three==0)", d_rr[4]==0)
+    # v2 ruling 2 REWRITE (was: rim runner Three==0): nonzero rating = capable —
+    # the paint big fires his occasional wide-open one, and only rarely.
+    chk("rim runner's threes are rare but real (2 <= Three <= 6)", 2<=d_rr[4]<=6)
 
     d_ml = derive(ARCH["Wing scorer (multi-level)"])[0]
     chk("multi-level scorer is flatter than shooter (max<=45)", max(d_ml)<=45)
     chk("multi-level flatter than shooter (its max < shooter's max)", max(d_ml)<max(d_shoot))
 
-    d_wns = derive(ARCH["Weak non-shooter (fringe)"])[0]
-    chk("weak non-shooter tilts to rim, not spread out (Rim top)", d_wns[0]==max(d_wns))
+    # v2 ruling 1 REWRITE (the archetype was mislabeled): Outside 40 on this scale is a
+    # below-average shooter, not a non-shooter — a fringe guard with no rim game is
+    # correctly a corner spot-up guy (three-dominant on very few attempts; usage owns volume).
+    d_wss = derive(ARCH["Weak-shooting spot-up (fringe)"])[0]
+    chk("weak-shooting spot-up tilts three (Three top) — the corner guy", d_wss[4]==max(d_wss))
     d_ws  = derive(ARCH["Weak shooter (fringe)"])[0]
     chk("weak shooter tilts to three (Three top)", d_ws[4]==max(d_ws))
+
+    # v2 probes: the TRUE non-shooter (single digits) is where the tilt-to-rim truth
+    # now lives, and the open-only guard's diet skews three despite the poor rating.
+    d_tns = derive(ARCH["True non-shooter big (O=3)"])[0]
+    chk("TRUE non-shooter big tilts to rim (Rim top)", d_tns[0]==max(d_tns))
+    chk("TRUE non-shooter big's threes rare but nonzero (2 <= Three <= 6)", 2<=d_tns[4]<=6)
+    d_oog = derive(ARCH["Open-only guard (O=25)"])[0]
+    chk("open-only guard skews three (Three top) — the paradox, embraced", d_oog[4]==max(d_oog))
+    chk("open-only guard keeps a real rim share (Rim>=30)", d_oog[0]>=30)
 
     d_pop = derive(ARCH["Pick-&-pop big (mid, long2)"])[0]
     d_st  = derive(ARCH["Stretch big (3pt shooter)"])[0]
