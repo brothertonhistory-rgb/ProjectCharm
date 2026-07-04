@@ -328,8 +328,31 @@ internal static partial class Program
                   $"vs {lg.Fga}; FGM {lg.RimFgm}+{lg.ShortFgm}+{lg.MidFgm}+{lg.LongFgm}" +
                   $"+{lg.ThreePm} vs {lg.Fgm}");
 
-            // §3.7 (the existing suite is untouched) is proven by the suite itself:
-            // every phase above this one still running green on unchanged baselines.
+            // ── §3.8 Session 33: the OTHER whitelist guard. After the Roll K leak
+            //        is returned home, OTHER must contain ONLY the named residuals —
+            //        the four jump-ball labels (suffix exactly Home or Away), the
+            //        offensive loose-ball foul, and the offense-OOB ending. Any other
+            //        label entering OTHER (including any parked terminal) is a hard
+            //        failure naming the label — no future ending can silently hide
+            //        here again. parked:* is NOT accepted: every page to date reads
+            //        zero parks, so a park is an engine dead-end to investigate.
+            var otherOffenders = new List<string>();
+            foreach (var kv in lg.OtherByLabel)
+            {
+                var label = kv.Key;
+                var accepted =
+                    label is "LooseBallFoulOnOffense" or "OutOfBoundsOffOffense"
+                    || ((label.StartsWith("JumpBallTip:", StringComparison.Ordinal)
+                         || label.StartsWith("JumpBallArrow:", StringComparison.Ordinal))
+                        && label[(label.IndexOf(':') + 1)..] is "Home" or "Away");
+                if (!accepted) otherOffenders.Add($"{label} (n={kv.Value.N})");
+            }
+            Check("calibration: OTHER whitelist — only jump-ball (Home/Away), offensive " +
+                  "loose-ball foul, and offense-OOB may reside in OTHER; no label hides here",
+                  otherOffenders.Count == 0,
+                  otherOffenders.Count == 0 ? "" : string.Join("; ", otherOffenders));
+
+
         }
         catch (Exception ex)
         {

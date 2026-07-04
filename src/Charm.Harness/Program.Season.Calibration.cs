@@ -84,6 +84,18 @@ internal static partial class Program
         public long OtherN;     public double OtherS;
         public long ExcludedN;                              // the NoShot/HoldShootLast count
 
+        // Session 33 Phase A: itemize the OTHER bucket — per-label (count, elapsed
+        // sum), fed ONLY from records landing in the else-branch below. Classifies
+        // nothing; this is the measurement that informs rulings R1/R2.
+        public readonly Dictionary<string, (long N, double S)> OtherByLabel = new();
+
+        // Session 33 Phase A: jump-ball award relative to the possession's OFFENSE,
+        // parsed from the label suffix — never assumed to flip, because a held ball
+        // can retain offense (the arrow/tip sets the awarded team). Split tip vs
+        // arrow, retained vs awarded-to-defense, each with its elapsed sum.
+        public long JbTipRetainedN,   JbTipAwardedN,   JbArrowRetainedN,   JbArrowAwardedN;
+        public double JbTipRetainedS, JbTipAwardedS,   JbArrowRetainedS,   JbArrowAwardedS;
+
         public void Accumulate(GameState game, GovernorRunResult result, PlayerBoxTotals box)
         {
             Games++;
@@ -134,7 +146,33 @@ internal static partial class Program
                                     or "TenSecondBackcourt")
                     { FixedTimeN++; FixedTimeS += r.Elapsed; }
                 }
-                else { OtherN++; OtherS += r.Elapsed; }   // parked:*, LooseBallFoulOnOffense, future labels
+                else
+                {
+                    OtherN++; OtherS += r.Elapsed;   // parked:*, LooseBallFoulOnOffense, future labels
+                    // Session 33 Phase A: per-label tally of everything landing here.
+                    OtherByLabel[r.EndLabel] = OtherByLabel.TryGetValue(r.EndLabel, out var t)
+                        ? (t.N + 1, t.S + r.Elapsed)
+                        : (1L, r.Elapsed);
+                    // Jump-ball award vs the record's Offense — a record-level read,
+                    // never a pure label match (a held ball can retain offense).
+                    if (r.EndLabel.StartsWith("JumpBallTip:", StringComparison.Ordinal)
+                        || r.EndLabel.StartsWith("JumpBallArrow:", StringComparison.Ordinal))
+                    {
+                        var isTip    = r.EndLabel.StartsWith("JumpBallTip:", StringComparison.Ordinal);
+                        var suffix   = r.EndLabel[(r.EndLabel.IndexOf(':') + 1)..];
+                        var retained = suffix == r.Offense.ToString();
+                        if (isTip)
+                        {
+                            if (retained) { JbTipRetainedN++;   JbTipRetainedS   += r.Elapsed; }
+                            else          { JbTipAwardedN++;    JbTipAwardedS    += r.Elapsed; }
+                        }
+                        else
+                        {
+                            if (retained) { JbArrowRetainedN++; JbArrowRetainedS += r.Elapsed; }
+                            else          { JbArrowAwardedN++;  JbArrowAwardedS  += r.Elapsed; }
+                        }
+                    }
+                }
             }
 
             var delta = Math.Abs(elapsedSum - result.TotalSeconds);
@@ -250,5 +288,28 @@ internal static partial class Program
             Inv($"    turnover {Avg(s.TurnoverS, s.TurnoverN):F1}s (n={s.TurnoverN})  ") +
             Inv($"[fixed-time violations {Avg(s.FixedTimeS, s.FixedTimeN):F1}s (n={s.FixedTimeN})]  ") +
             Inv($"| other n={s.OtherN}"));
+
+        // Session 33 Phase A: the OTHER bucket itemized — each label, count, share
+        // of OTHER, mean seconds. Page-only; classifies nothing. Exists so rulings
+        // R1/R2 are taken with the counts on the page.
+        if (s.OtherN > 0)
+        {
+            Console.WriteLine("  OTHER itemized (per label; page-only, classifies nothing):");
+            foreach (var kv in s.OtherByLabel.OrderByDescending(kv => kv.Value.N))
+                Console.WriteLine(Inv(
+                    $"    {kv.Key,-28} n={kv.Value.N,8}  {Pct(kv.Value.N, s.OtherN),5:F1}% of OTHER  mean {Avg(kv.Value.S, kv.Value.N):F1}s"));
+
+            var jbN = s.JbTipRetainedN + s.JbTipAwardedN + s.JbArrowRetainedN + s.JbArrowAwardedN;
+            if (jbN > 0)
+            {
+                Console.WriteLine("  jump-ball award vs the possession's offense (held ball can retain offense):");
+                Console.WriteLine(Inv(
+                    $"    tip:   offense retained n={s.JbTipRetainedN} (mean {Avg(s.JbTipRetainedS, s.JbTipRetainedN):F1}s)") + Inv(
+                    $" | defense awarded n={s.JbTipAwardedN} (mean {Avg(s.JbTipAwardedS, s.JbTipAwardedN):F1}s)"));
+                Console.WriteLine(Inv(
+                    $"    arrow: offense retained n={s.JbArrowRetainedN} (mean {Avg(s.JbArrowRetainedS, s.JbArrowRetainedN):F1}s)") + Inv(
+                    $" | defense awarded n={s.JbArrowAwardedN} (mean {Avg(s.JbArrowAwardedS, s.JbArrowAwardedN):F1}s)"));
+            }
+        }
     }
 }

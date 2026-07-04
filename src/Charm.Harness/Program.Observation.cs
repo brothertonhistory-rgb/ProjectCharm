@@ -373,6 +373,7 @@ internal static partial class Program
         long totalStlPoss  = 0L;
         long totalToPoss   = 0L;
         long totalTeamViolToPoss = 0L;   // Phase 34: team violations (null TurnoverOffSlot — no individual credit)
+        long totalRollKToPoss = 0L;      // Session 33: Roll K post-ORB turnovers (aggregate-only, no per-player credit)
         long totalAstBySlot = 0L;   // Phase 39: sum of AstBySlot.Total across all possessions
 
         Console.Write($"  Running {N} games");
@@ -903,6 +904,8 @@ internal static partial class Program
             totalToPoss   += records.Count(IsTurnoverPossession);
             totalTeamViolToPoss += records.Count(r =>
                 r.EndLabel is "FiveSecondInbound" or "TenSecondBackcourt" or "ShotClockViolation");
+            totalRollKToPoss += records.Count(r =>
+                r.EndLabel is "DeadBallTurnover" or "LiveBallTurnover");
             totalAstBySlot += records.Sum(r => r.AstBySlot.Total);
 
             // ── Phase 23: capture player display map on seed==1 ──────────────
@@ -1159,10 +1162,10 @@ internal static partial class Program
         // NOTE: BLK proves downward (every BlkCount credit distributed) but not upward
         // (Resolver captured every block in BlkCount). Upward validation is by code placement.
         if (bsStlTotal   != totalStlPoss)  { Console.WriteLine($"  [FAIL] Per-player STL {bsStlTotal} != live-TO possessions {totalStlPoss}");  attributionOk = false; }
-        if (bsToTotal    != totalToPoss - totalTeamViolToPoss)
+        if (bsToTotal    != totalToPoss - totalTeamViolToPoss - totalRollKToPoss)
         {
-            Console.WriteLine($"  [FAIL] Per-player TO {bsToTotal} != individual-TO possessions {totalToPoss - totalTeamViolToPoss} " +
-                              $"(total TO {totalToPoss}, team violations {totalTeamViolToPoss} correctly unattributed — Phase 34)");
+            Console.WriteLine($"  [FAIL] Per-player TO {bsToTotal} != individual-TO possessions {totalToPoss - totalTeamViolToPoss - totalRollKToPoss} " +
+                              $"(total TO {totalToPoss}, team violations {totalTeamViolToPoss} + Roll K post-ORB {totalRollKToPoss} correctly unattributed — Phase 34 / Session 33)");
             attributionOk = false;
         }
         // Phase 39: AST reconciliation — Σ per-player AST == Σ AstBySlot.Total across all possessions.

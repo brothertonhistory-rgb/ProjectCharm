@@ -89,13 +89,19 @@ internal static partial class Program
         1 => r.Slot1Fgm, 2 => r.Slot2Fgm, 3 => r.Slot3Fgm,
         4 => r.Slot4Fgm, 5 => r.Slot5Fgm, _ => 0
     };
+    // Session 33: the two Roll K post-offensive-rebound turnover labels join the
+    // classifier. Both flip possession (DeadBallTurnover -> dead-ball inbound to the
+    // defense; LiveBallTurnover -> transition steal to the defense) — turnovers by
+    // the engine's own contract, previously miscounted as OTHER. Aggregate-only: the
+    // records carry no per-player TO metadata, so no individual credit changes.
     private static bool IsTurnoverPossession(PossessionRecord r) =>
         r.EndLabel is "BadPassDeadBall" or "BadPassIntercepted"
             or "LostBallDeadBall" or "LostBallLiveBall" or "OffensiveFoul"
             or "Travel" or "DoubleDribble" or "Carry" or "ThreeSecondViolation"
             or "FiveSecondCloselyGuarded" or "OffensiveGoaltending"
             or "BackcourtViolation" or "ShotClockViolation"
-            or "FiveSecondInbound" or "TenSecondBackcourt";
+            or "FiveSecondInbound" or "TenSecondBackcourt"
+            or "DeadBallTurnover" or "LiveBallTurnover";
 
     private static int BoxIdx(TeamSide side, int slot) =>
         side == TeamSide.Home ? slot - 1 : slot + 4;

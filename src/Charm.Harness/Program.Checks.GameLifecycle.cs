@@ -616,6 +616,7 @@ internal static partial class Program
         long totalOrbWon = 0L, totalDrebPoss = 0L;
         long totalBlkCount = 0L, totalStlPoss = 0L, totalToPoss = 0L;
         long totalTeamViolToPoss = 0L;   // Phase 34: team violations (null TurnoverOffSlot — no individual credit)
+        long totalRollKToPoss = 0L;      // Session 33: Roll K post-ORB turnovers (aggregate-only, no per-player credit)
 
         const int Games = 200;
 
@@ -726,6 +727,7 @@ internal static partial class Program
                 totalStlPoss   += r.TurnoverWasLiveBall ? 1 : 0;
                 totalToPoss    += IsTurnoverPossession(r) ? 1 : 0;
                 totalTeamViolToPoss += r.EndLabel is "FiveSecondInbound" or "TenSecondBackcourt" or "ShotClockViolation" ? 1 : 0;
+                totalRollKToPoss += r.EndLabel is "DeadBallTurnover" or "LiveBallTurnover" ? 1 : 0;
             }
 
             // ── Per-slot subset checks (verbatim from ObservationRunV1) ───────
@@ -863,9 +865,9 @@ internal static partial class Program
         { Console.WriteLine($"  [FAIL] STL: Σ per-player {bsStlTotal} != live-TO possessions {totalStlPoss}"); sanityOk = false; }
         else Console.WriteLine($"  [OK] STL: Σ per-player == total live-TO possessions ({totalStlPoss})");
 
-        if (bsToTotal != totalToPoss - totalTeamViolToPoss)
-        { Console.WriteLine($"  [FAIL] TO: Σ per-player {bsToTotal} != individual-TO possessions {totalToPoss - totalTeamViolToPoss} (team violations {totalTeamViolToPoss} unattributed — Phase 34)"); sanityOk = false; }
-        else Console.WriteLine($"  [OK] TO: Σ per-player == individual-TO possessions ({totalToPoss - totalTeamViolToPoss}; team violations {totalTeamViolToPoss} correctly unattributed)");
+        if (bsToTotal != totalToPoss - totalTeamViolToPoss - totalRollKToPoss)
+        { Console.WriteLine($"  [FAIL] TO: Σ per-player {bsToTotal} != individual-TO possessions {totalToPoss - totalTeamViolToPoss - totalRollKToPoss} (team violations {totalTeamViolToPoss} + Roll K post-ORB {totalRollKToPoss} unattributed — Phase 34 / Session 33)"); sanityOk = false; }
+        else Console.WriteLine($"  [OK] TO: Σ per-player == individual-TO possessions ({totalToPoss - totalTeamViolToPoss - totalRollKToPoss}; team violations {totalTeamViolToPoss} + Roll K post-ORB {totalRollKToPoss} correctly unattributed)");
 
         // ── Directional assertions ────────────────────────────────────────────
         Console.WriteLine();
@@ -1886,7 +1888,10 @@ internal static partial class Program
             foreach (var r in result.Possessions)
             {
                 if (r.EndLabel is null) continue;
-                // IsTurnoverPossession check mirrors the harness helper
+                // Mirrors the committer-bearing subset of IsTurnoverPossession. The
+                // two Session 33 Roll K labels (DeadBallTurnover / LiveBallTurnover)
+                // are deliberately OMITTED: they carry no committer slot (aggregate-
+                // only), so they are outside this null-slot check by design.
                 var isTurnover = r.EndLabel is "BadPassDeadBall" or "BadPassIntercepted"
                                             or "LostBallDeadBall" or "LostBallLiveBall"
                                             or "OffensiveFoul" or "Travel" or "DoubleDribble"
