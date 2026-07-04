@@ -1,16 +1,17 @@
 # Project Charm — Skill-Derived Shot Tendencies: Design Brief
 
 Settled in the design conversation of 2026-07-03, immediately after Session 33
-(the OTHER-bucket fix) closed, and **revised the same day after an outside review**
-(ChatGPT, per CONVENTIONS §6c) sharpened the math agenda — see the review-driven
-changes marked through §§3–5 and §8. This is the design record for a
-**player-generation Pass 2 family redesign**: the five shot-location tendencies
-stop being authored from a fixed per-role table and become **derived from the
-player's own skills**, with per-player variation. It is a brief, not a build
-prompt, and it is not yet a locked spec — the intent is settled; the math is not.
-A dedicated follow-up design conversation turns the intentions below into
-mechanical claims, and only then does a build prompt get drafted, audited, and
-reviewed per CONVENTIONS §6.
+(the OTHER-bucket fix) closed; **revised the same day after an outside review**
+(ChatGPT, per CONVENTIONS §6c) sharpened the math agenda; and **updated again as
+the design-math conversation began** and resolved the first agenda question (§3.5:
+tendency is the neutral-matchup baseline; access and displacement belong to
+Roll G). This is the design record for a **player-generation Pass 2 family
+redesign**: the five shot-location tendencies stop being authored from a fixed
+per-role table and become **derived from the player's own skills**, with
+per-player variation. It is a brief, not a build prompt, and it is not yet a
+locked spec — the intent is settled, and the math is being settled question by
+question (§8). Only once the math is locked does a build prompt get drafted,
+audited, and reviewed per CONVENTIONS §6.
 
 ---
 
@@ -78,13 +79,16 @@ shooter from a three shooter; the discriminator has to be something else. Emmett
 confirmed the discriminator: **shot creation**.
 
 **A principle the math pass must honor per zone (from the review): access is not
-the same as reason.** Each zone's expectation has two separable signals — an
-*ability-to-access* signal (can he get to this shot: creation, burst, handle)
-and an *ability-to-make* signal (can he punish from here: the zone's shooting
-skill). A player who can access a shot but not make it should not seek it in
-volume. The long two is where this bites hardest (creation without a jumper),
-but the split applies everywhere and the math should define both signals for
-each zone rather than collapsing them into a single blended key.
+the same as reason.** Each zone's expectation has two conceptually separable
+signals — an *ability-to-access* signal (can he get to this shot) and an
+*ability-to-make* signal (can he punish from here). **SUPERSEDED in part by §3.5:**
+the design-math conversation resolved that *access is not a generation concern* —
+the engine already models getting-open (Phase 46 denial, the openness layer) and
+defers matchup displacement to Roll G. So the zone keys below are read as
+**make/skill signals only**. The access/make split is preserved here as the
+reasoning that *led* to that resolution, not as a live instruction; the long two,
+which looked like the sharpest access case, is reframed in §3.5 as a
+*seek-credibility* question instead.
 
 - **Three** ← `Outside`, pushed *higher* by weakness elsewhere. The pure
   specialist — high Outside, low SelfCreation, low athleticism — lands at an
@@ -107,23 +111,27 @@ each zone rather than collapsing them into a single blended key.
     `FirstStep` (runners, teardrops from the small quick guard).
   - Short expectation = a combination of the two routes (the exact blend is open
     math; the point settled now is that both archetypes must have a path in).
-- **Long** ← the special one, and it needs **both access and reason**, not
-  access alone. Creation gets a player *to* the pull-up space; it does not
-  justify taking the shot. The expectation is a product:
-  **creation access × perimeter pull-up ability × small stretch-post exception.**
-  - *creation access* ← primarily `SelfCreation`, with a smaller `BallHandling`
-    contribution (can he get separation).
-  - *perimeter pull-up ability* ← `Mid`, with some `Outside` (the engine folds
-    long-two skill into the perimeter family), i.e. can he actually punish from
-    there. **A high-SelfCreation / weak-Mid / weak-Outside player does NOT become
-    a long-two shooter** — he drives, gets to the rim, maybe floats; he is not a
-    bad long-two artist. This is the exact pathology the whole session exists to
-    remove, and creation-as-sole-gate would have reintroduced it.
-  - *stretch-post exception* ← `PostMoves` × shooting ability (not the vague
-    "post with real shooting ability" of the first draft — a concrete product).
-    Even then "he's typically not shooting unless he's wide open," so the term is
-    small. A post *without* shooting stays short/rim, never long.
-  - Everyone lacking both a creation path and the stretch-post profile collapses
+- **Long** ← the special one, and the fullest treatment is in **§3.6** (cap, the
+  two independent paths, the teammate-spacing deferral); this entry lists the
+  attribute keys, read through §3.5 (these are *style/identity* signals, not
+  opponent-relative access). **Two independent paths into the zone, not one
+  blended product** (§3.6b):
+  - *guard/wing pull-up* = **creation style × pull-up shooting** (a product — both
+    required). Creation style ← `SelfCreation` + smaller `BallHandling` (does he
+    live off the dribble). Pull-up shooting ← `Mid` + some `Outside` (can he
+    punish from there). **A high-SelfCreation / weak-Mid / weak-Outside player does
+    NOT become a long-two shooter** — he drives, floats, gets to the rim; he is not
+    a bad long-two artist. This is the exact pathology the session exists to remove,
+    and creation-as-sole-gate would have reintroduced it. Capped low, dominant-
+    player-only (§3.6a).
+  - *stretch-post* = **frontcourt/screener plausibility × catch-and-shoot
+    shooting credibility** (not `PostMoves × shooting` — see §3.6b; post moves and
+    floor-spacing are adjacent, not identical). Its own term, **lower bar** than
+    the guard path (§3.6b), because the value is floor-spacing, not dominance.
+    Authored from his *own* jumper only; the teammate-relative "he spaces because
+    his teammates can't" amplification is a runtime selection effect, deferred
+    (§3.6c).
+  - Everyone lacking both a creation style and the stretch-post profile collapses
     to near-zero long, with the freed volume flowing to three (if he can shoot)
     or rim (if he can't). In modern offenses nobody else stands in that spot
     waiting for a pass.
@@ -131,6 +139,175 @@ each zone rather than collapsing them into a single blended key.
 All inputs already exist on `Player`. Nothing new needs to be authored — the
 attribute surface was checked against source in this conversation and confirmed
 sufficient.
+
+### 3.5 RESOLVED (§8 Q1): tendency is the NEUTRAL-MATCHUP baseline — access and displacement belong to Roll G
+
+The design-math conversation of 2026-07-03 resolved the first agenda question, and
+the resolution simplifies the whole derivation. The route to it, recorded because
+it is load-bearing:
+
+- The first instinct was to split every zone into an *access* signal (can he get
+  to the shot) and a *make* signal (can he punish it). Emmett corrected the
+  framing by pointing at machinery that already exists. **Verified against source:**
+  - **Phase 46 individual denial** (`RollEGenerator`, per-slot denial pass): after
+    the usage tilt, each offensive player's touches are multiplied down or up by
+    his one-on-one matchup — a *skill channel* (defender `OffBallDefense` vs
+    offense `OffBallMovement`, blended with a post channel) and a *physical
+    channel* (the athleticism gap). The overmatched or blanketed player already
+    gets **fewer selection tickets**. Getting-open is already modeled.
+  - The **attention / openness** layer (`AttentionGenerator`) already models
+    gravity, spacing, and focal-point defense at make time.
+- So "can he get to this shot / get open" is **already owned upstream**, at
+  selection and make time, reading the actual defender. If the tendency layer also
+  encoded access, it would **double-count** Phase 46. Therefore tendency's only
+  job is: *given that he shoots, where does he seek it, from his own scoring
+  skills* — access excluded by design.
+
+**Displacement is matchup-relative and symmetric — so it is Roll G's job, not
+generation's.** Emmett's two cases pin this down:
+- *Overmatched* → the defense pushes him off the rim; his diet is shoved outward
+  toward the **three, as a low-efficiency bailout** (a fallback he's allowed to
+  take, not one he earned).
+- *Undermatched* (the Korver-in-D3 case) → a weak defense lets him get to shots he
+  never could otherwise; his spot-up baseline **breaks toward the rim**, at high
+  efficiency.
+
+Both are the *same player with identical attributes* shooting a different
+distribution purely because the defender differs. A generation-time tendency is
+authored with **no defender in the room**, so it structurally cannot express this
+— only Roll G, which reads the actual defender, can. This is the same machinery
+the brief already credits: Roll G's per-zone defensive-resistance bend is the seed
+of exactly this behavior.
+
+**The resolution, locked:**
+- **Generation-time tendency (this brief) = the player's neutral-matchup baseline**
+  — what he seeks against an *average* defender, derived purely from his own
+  scoring skills. Every access, getting-open, and displacement effect is
+  deliberately **excluded**, because Phase 46, the openness layer, and Roll G own
+  them.
+- Consequently the per-zone keys in §3 are read as **make/skill signals only**
+  (Outside for three, Finishing+burst for rim, Mid for mid, the two short routes,
+  the long-two credibility product). The "access signal" half of the §3 principle
+  is retired: access is not a generation concern.
+- **"Make/skill signals only" does NOT ban SelfCreation, BallHandling, or
+  athleticism from the derivation** — and the final spec must state this once
+  explicitly, because "access excluded" could otherwise be misread as "these
+  attributes cannot influence tendency," which would gut the long-two credibility
+  product and the rim/floater routes we just built. Those attributes belong in the
+  baseline as **style / seek-credibility signals, not opponent-relative access:**
+  - `SelfCreation` in Long = "does this player voluntarily live in pull-up
+    decisions" (identity), not "can he beat this defender to the pull-up" (Roll G).
+  - `BallHandling` in Rim / Short = "does his scoring identity include on-ball
+    penetration or runners."
+  - `FirstStep` / `Speed` in Rim = "does his neutral profile lean downhill."
+  The test that keeps the line clean: an attribute is a *style* signal if it
+  describes what the player *seeks against an average defender*; it is an *access*
+  signal (excluded) only if it describes *beating a specific defender to the shot*.
+  The same attribute can be a style signal here and feed an access computation in
+  Phase 46 / Roll G — different jobs, no conflict.
+- The long-two gate is reframed accordingly — see §3's Long entry, now read not as
+  "can he create access" but as "does he *seek* the pull-up as part of his
+  identity" (SelfCreation + pull-up shooting = credibility, not access).
+
+**New deferral created by this resolution (recorded in §7):** symmetric
+matchup displacement in Roll G, with **efficiency coupling** — pushed-out bailout
+threes convert low, pulled-in rim shots convert high — of which the existing
+defensive-resistance bend is the seed. Belongs to a future Roll G / possession
+pass alongside the clock-heave, not this generation pass.
+
+### 3.6 RESOLVED (§8 Q2): the long two — capped small, two independent paths, teammate-spacing deferred
+
+The design-math conversation resolved the long two. Three rulings:
+
+**(a) The long-two tendency is CAPPED small, and the cap is reachable only by a
+dominant, self-limiting player.** The modern long two is the least-taken shot on
+the floor; even a genuine pull-up scorer takes far more threes and rim attempts.
+So the qualifier gets a *modest* slice, never a large one. The archetype of the
+high-volume mid-range maestro (prime CP3 / DeRozan) still exists — a player
+off-the-charts at *both* creation and mid-range pull-up can approach the cap — but
+that skill level is one-and-done to the pros, so at any moment the college
+universe has almost none of them. The cap does double duty: unfashionable for the
+ordinary qualifier, and rarely even touched because only the elite reach it. The
+**product form is confirmed for the gate** (creation style × pull-up shooting —
+both required, either missing collapses it, no sum papering over a weakness); the
+cap governs magnitude on top of the product.
+
+**(b) The guard/wing path and the stretch-post path are INDEPENDENT terms with
+different availability — not one formula with a small add-on.** They are different
+basketball shots:
+- *Guard/wing pull-up long two* — a **dominant-player** shot. Gated hard, capped
+  low, reachable only by the near-elite creator-plus-shooter. Unfashionable, and
+  only stars overcome that.
+- *Stretch-post long two* — a **floor-spacing / role-value** shot, framed by
+  Emmett as "a way they can spread the floor a bit." NOT about dominance. An
+  ordinary big with a real jumper earns a modest long two because the value is the
+  spacing, not shot-making dominance — so this term switches on at a **lower bar**
+  than the guard's and does not require the player to be dominant.
+  - **Gate correction (outside review, accepted): the stretch-post term is NOT
+    `PostMoves × shooting`.** Post moves and floor-spacing are *adjacent, not
+    identical* — a real pick-and-pop big is valuable precisely because he does
+    *not* need a back-to-the-basket game. Gating on PostMoves would invert the
+    intent: it would hand the *traditional* post scorer the spacing shot and
+    starve the *actual* floor-spacer (good jumper, modest post game). The term is
+    **frontcourt/screener plausibility × catch-and-shoot shooting credibility**,
+    and the two factors must **partition their inputs with no attribute in both**
+    (second review — otherwise a factored product double-counts shooting, once
+    inside "plausibility" and again inside "credibility," squaring its influence
+    for bigs):
+    - *frontcourt/screener plausibility* ← **structural** frontcourt identity only:
+      physical profile (`Height` / `Weight` / frame) + role *eligibility* (is he a
+      frontcourt-eligible body) + `Screening` (if live enough to rely on) + a small
+      `PostMoves` contribution. **This must be derived from physical profile and
+      role eligibility, NOT from a hard-coded shot-diet role category** (second
+      review) — the whole redesign deletes role→shot-behavior authoring, so
+      "frontcourt identity" here means *structural plausibility that he's a spacing
+      big at all*, never a disguised role table. Roles still seed skill emphasis;
+      they must not re-enter as a shot-diet lookup through this door. **No shooting
+      attributes in this factor** — it answers only "is he plausibly a
+      frontcourt screener/popper."
+    - *catch-and-shoot credibility* ← `Mid` + a smaller `Outside` contribution.
+      This factor owns **all** the shooting — "can he actually make the pop."
+    Exact blend and weights are item-2 math (§8).
+Running both through one cap/steepness would either starve the floor-spacing four
+or make the guard long two too common (breaking (a)). Two terms, two availabilities.
+
+**(c) The stretch-post's TEAMMATE-relative amplification is deferred to the
+SELECTION layer (Roll G), NOT the make layer — and NOT a generation-time term
+(§7).** Emmett's sharpening: a middling-shooting big gets catch-and-shoot long
+twos *because his teammates can't shoot* — he's the least-bad spacer on that unit
+— and the same big is redundant on a unit full of shooters. That is a
+**team-composition** effect that changes with every lineup swap, off identical
+attributes — structurally the same shape as the Korver-in-D3 displacement
+(context-dependent redistribution, not birth-time identity), pointed at teammates
+instead of defenders. Ruling **(i)**, locked:
+- **Generation** authors the big's long two from his *own jumper alone* — a
+  small, capped, personal-credibility baseline (per (a)/(b)). Context-free.
+- The **teammate-relative amplification** is a **runtime lineup effect** — but its
+  owning layer is a correction from the outside review, resolved against source:
+  - The effect is not only "the big's shot gets more open" (a *make* condition) —
+    it is "the offense *selects* the big's catch-and-pop more often" (a *shot-diet
+    / zone-selection* change). By this brief's own rule, a context that changes
+    *what shot is selected* belongs to the **selection** layer; only a context
+    that changes *how likely it goes in* belongs to the **make** layer. Assigning
+    it to the attention layer (an earlier draft's error) would route a selection
+    effect into a layer that cannot select.
+  - **VERIFIED against source:** the team spacing/gravity/openness fields
+    (`TeamSpacingLevel`, `TeamBaseOpenness`, `TeamGravityLevel`,
+    `TeamConversionQuality`) are consumed **only by Roll H** — they touch make
+    probability, not shot location. Roll G (shot location) reads *no* spacing
+    field; its location decision is tendency + defensive-resistance bend, with
+    `ShooterAttentionShare` used only as a usage-pressure amplifier. **The
+    attention/spacing system today has no path into shot-location selection.**
+  - Therefore the clean future seam: the **attention/spacing system computes the
+    lineup-relative spacing context** → a future **Roll G lineup-context bend
+    consumes it to move the zone ticket** (selection) → **Roll H consumes openness
+    for conversion** (make). This sits alongside the deferred Roll G matchup
+    displacement (§3.5) — both are runtime redistributions of the neutral diet.
+
+This collapses the "how good must a big's jumper be" threshold question back to
+the same **personal-credibility gate** as the guard — just a lower bar, because a
+big's catch-and-shoot is a simpler shot than a guard's pull-up. "Is he the best
+spacer in this lineup" is not generation's question.
 
 ---
 
@@ -164,10 +341,10 @@ merely because his numbers have low variance. The resulting diet shapes:
 | Rim athlete | Finishing/burst/handle excellent, shooting limited | highly rim-peaked |
 | Multi-level scorer | several strong zone pathways | broad / flatter |
 | Even but mediocre | several *average* pathways | somewhat balanced, but NOT "unguardable" |
-| Weak player | no strong pathway | mostly constrained toward the least-bad accessible attempts, small variation |
+| Weak player | no strong pathway | mostly constrained toward his least-bad credible scoring option, small variation |
 
-The weak player's correct shape is *not* flat — it is constrained toward whatever
-he can least-badly access, which is itself a form of peaking. Flatness is
+The weak player's correct shape is *not* flat — it is constrained toward his
+least-bad credible scoring option, which is itself a form of peaking. Flatness is
 reserved for genuine multi-zone capability.
 
 This connects forward: the flat-tendency multi-level scorer is the player whose
@@ -288,8 +465,24 @@ first-pass representation.
 - **No calibration of the make curves or any Roll H parameter.** The Session 32
   midpoints stand; if the derived diets shift zone volumes enough to move
   per-zone FG%, that is a reading, not a thing to chase mid-pass.
-- **No Roll G changes.** The clock-conditioned heave is deferred to a future Roll
-  G / possession-length pass (§5), not smuggled into this one.
+- **No Roll G changes.** Three runtime behaviors are deferred to a future
+  Roll G / possession pass, NOT smuggled into this generation pass:
+  - the clock-conditioned late-clock heave (§5);
+  - **symmetric matchup displacement with efficiency coupling** (§3.5) — a strong
+    defender pushes a player's diet outward to low-efficiency bailout threes; a
+    weak defender pulls it inward to high-efficiency rim shots (the Korver-in-D3
+    case). The existing per-zone defensive-resistance bend is the seed; what's
+    deferred is its magnitude and the efficiency coupling. Generation authors only
+    the neutral-matchup baseline this bends.
+  - **teammate-relative floor-spacing amplification** (§3.6c) — a middling-shooting
+    big gets more catch-and-shoot long twos when his teammates can't shoot, none
+    when they can. This is a *selection* effect (it changes which shot the offense
+    picks), so it belongs to a future Roll G lineup-context bend, NOT the make
+    layer. VERIFIED against source: the attention/spacing fields feed only Roll H
+    (make); Roll G reads no spacing field today, so the attention layer has no path
+    into shot-location selection. The seam: attention/spacing computes the
+    lineup-relative context → Roll G consumes it for selection. Generation authors
+    only the big's context-free personal-credibility long two (§3.6a/b).
 - **No coach-layer work.** The coaching ShotSelectionBias nudge continues to
   operate on whatever tendencies the player carries.
 - **No tweener-post or versatility work.** Those remain their own parked Pass 2
@@ -303,13 +496,23 @@ first-pass representation.
 The intent above is settled. The math is not. The follow-up design conversation
 answers these **in order** — each builds on the one before:
 
-1. **Per-zone signals, make vs access, defined separately.** For each of the five
-   zones, define its ability-to-access signal and its ability-to-make signal as
-   two things, not one blended key (§3 principle).
-2. **Long two = creation × pull-up competence, not creation alone** (§3). Settle
-   the creation-access curve (SelfCreation + some BallHandling), the pull-up term
-   (Mid + some Outside), and the concrete stretch-post exception
-   (PostMoves × shooting), including its small size.
+1. ~~**Per-zone signals, make vs access, defined separately.**~~ **RESOLVED (§3.5).**
+   Access is not a generation concern — Phase 46 denial and the openness layer
+   already own getting-open, and matchup displacement is deferred to Roll G. The
+   per-zone keys are read as **make/skill signals only**; the access half is
+   retired. Remaining under this item: pin the exact make-signal weighting per
+   zone (in what space, normalized to sum ~100).
+2. ~~**Long two = seek-credibility, not access**~~ **RESOLVED (§3.6).** Capped
+   small, reachable near-cap only by a dominant self-limiting player; two
+   independent paths (guard pull-up = SelfCreation×pull-up-shooting product,
+   dominant-only; stretch-post = frontcourt/screener plausibility × shooting
+   credibility, lower bar — NOT PostMoves-gated, §3.6b); teammate-relative
+   floor-spacing deferred to a future Roll G lineup-context selection bend
+   (a *selection* effect, source-verified — NOT the make/attention layer, §3.6c).
+   Remaining under this
+   item: pin the two paths' exact curves, the cap value, and the stretch-post
+   bar — as concrete numbers, alongside item 1's make-signal weighting, since they
+   share the sum-to-~100 normalization.
 3. **Short = post-touch route + floater route** (§3). Settle both routes and how
    they combine so neither the bruising post nor the small touch guard is pushed
    out of the zone.
