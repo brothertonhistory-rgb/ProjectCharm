@@ -15,9 +15,23 @@ exploratory oracle putting numbers on the seven archetypes. It produced three
 further rulings (all Emmett's), now recorded in §3a: superiority is **always
 relative** to the player himself; the **force/invite asymmetry** (outward push
 unconditional, inward pull capability-gated); and the advantaged non-finisher's
-edge cashing as a **small spread plus core efficiency**, not a rim assault. All
-seven archetypes now behave per the rulings under the composed candidate math.
-What remains open in §6 is engineering, not basketball. This is the design record for the
+edge cashing as a **small spread plus core efficiency**, not a rim assault. The
+full proof set now behaves per the rulings under the composed candidate math.
+What remains open in §6 is engineering, not basketball.
+
+**A third outside review (of the candidate oracle) was adjudicated 2026-07-04:
+two findings folded, one rejected against a fresh pull.** Folded: the 5a/5b
+proof case was confounded (the two defenses differed in level sign, not just
+shape) — replaced with a **level-matched** pair, the uneven defense solved
+exactly so the shooter's diet-weighted skill level equals the uniform case;
+and the golden fixture's homogeneous five-identical-defender lineups could not
+protect the aggregation rules — a heterogeneous case now proves top-three
+skill resistance vs five-man-mean physical read to the bit, and the fixture
+emits the full lineup. **Rejected:** the review claimed the make door's
+physical constants are steepness 6.0 / exponent 2.7; a fresh pull shows
+**11.5 / 1.75 in both the C# defaults (MatchupConfig.cs L41–42) and the live
+config.json** — the oracle's constants and §6.3's "3.0 vs 11.5" language stand
+as written. This is the design record for the
 **third Roll G shot-diet effect**: the matchup-driven displacement of a featured
 player's shot diet — toward the rim when he has the edge on his defense, away
 from the rim when the defense has the edge on him — scaled smoothly by his usage
@@ -300,7 +314,7 @@ oracle must resolve, with concrete archetypes on the page (the proof set in
 §6.6). Four are hard requirements the review (ChatGPT, 2026-07-04) sharpened and
 Emmett accepted; they are no longer free choices.
 
-### 6.1 The level signal is diet-weighted, and it is NOT a flat average (formula confirmed on archetypes; Route A/B still open)
+### 6.1 The level signal is diet-weighted, and it is NOT a flat average (formula confirmed on archetypes; Route B RULED, 2026-07-04)
 
 The five zone gaps do not mean the same thing for every player. A slasher's rim
 gap is far more relevant to whether he is pressured outward than his long-two or
@@ -311,9 +325,22 @@ a plain mean.
 
 ```
 zone gap (per zone) = shooter zone capability − defending-lineup zone resistance
-overall level       = Σ (desiredDiet[zone] × zone gap[zone])    ← the displacement signal
-zone-shape residual = zone gap[zone] − overall level            ← what Phase 9 already reacts to
+skillLevel          = Σ (desiredDiet[zone] × zone gap[zone])
+physicalLevel       = bounded shooter-vs-lineup-mean athleticism read (§6.3)
+overallLevel        = skillLevel + physicalLevel     ← the displacement signal
+zone-shape residual = zone gap[zone] − skillLevel    ← what Phase 9 reacts to
 ```
+
+**Physicality feeds the displacement level ONLY; it is intentionally excluded
+from residualization**, so Phase 9 remains a pure zone-skill shape read —
+exactly the skill-only door it is today. (An athleticism gap has no zone shape
+to contribute; letting it into the residuals would invent one.) The locked
+oracle implements precisely this split.
+
+**`desiredDiet` is the NORMALIZED pre-bend coached/derived five-zone profile,
+summing to 1.0** — the same pre-matchup baseline §6.2 mandates, normalized
+before use (the executable oracle does this; the formula states it so the C#
+port cannot skip it).
 
 The existing Phase 9 location bend is *intended* to react to the **residual
 shape**; displacement reacts to the **overall level**. A common defensive
@@ -341,10 +368,19 @@ deliberately, between two routes and prove the choice:
   two terms are orthogonal by construction. Cleaner, but it perturbs an
   already-calibrated bend.
 
-Neither is pre-chosen here. Route A is likely less invasive (Phase 9 is
-calibrated); Route B is mathematically cleaner. The oracle decides with numbers,
-and in **either** case must *demonstrate* the overlap is bounded, never assert
-it.
+**RULED: Route B (Emmett, 2026-07-04), decided by measurement.** Holding a
+defense's shape fixed and sweeping its level uniformly ±15 moved raw-gap
+Phase 9's pie by up to **~4.5pp of zone share** — the same order as
+displacement's own effect — and in an *incoherent* direction (a uniformly
+weaker defense gave the shooter archetype MORE threes than a stronger one): an
+accident of the convex gap function, not designed basketball. Under Route B the
+same sweep moves Phase 9 by **exactly 0.000** — the bend responds to shape
+only, and displacement becomes the sole owner of level. In evenly-matched games
+Route B is nearly identical to today (level ≈ 0 ⇒ residual ≈ raw gap); in
+mismatched games the accidental level response disappears and the designed one
+replaces it. Presented to Emmett in plain terms as removing a glitch that would
+otherwise double-dip against the new effect; approved. Reversible (one formula
+input).
 
 ### 6.2 The diet weight is the PRE-BEND baseline, never the already-bent pie (hard requirement)
 
@@ -354,19 +390,25 @@ If displacement weighted by the already-bent pie, the level signal would inherit
 Phase 9's bend and the zone-shape effect would be **paid twice**. This is the
 single most important anti-double-count guard in the design.
 
-### 6.3 Whether a physical/athletic term enters — an explicit decision, not an assumption
+### 6.3 The physical/athletic term — SETTLED: included, gentle, lineup-mean (2026-07-04)
 
-The location door is skill-only today (§2). "Cannot stay in front of him" is
-inherently athletic as well as skill-based, so the level signal *may* warrant a
-small, bounded physical component built from the existing athleticism-gap
-primitive — but the oracle must decide this explicitly and, if it includes one,
-answer: against what defensive aggregate (lineup mean, top-three physical
-threat, or another existing read), and how gently. The constraint if it is
-included: **materially gentler than the make-door physical shift.** Diet
-displacement decides which locations become available over a possession
-aggregate; the make curve remains where the harsh physical punishment lives. The
-build prompt may claim "athleticism" **only if** the oracle contains a bounded,
-sourceable physical term; otherwise the language shrinks to "defensive skill."
+The location door is skill-only today (§2), but "cannot stay in front of him"
+is inherently athletic, and Emmett's §1 intent names size and athleticism as
+forcers of bad shots. **Decision (Claude's lane, within the review's
+constraints, presented with numbers and unobjected):** the level signal gains a
+bounded physical component — the shooter's `Player.Athleticism` composite
+against the **defending lineup's mean athleticism**, through the existing
+`GapFn` at a **fraction of the make-door's physical steepness** (candidate:
+steepness 3.0 vs the make door's 11.5, same exponent and reference scale — the
+final constant is the oracle's, a calibration placeholder like every magnitude
+here). At that strength a huge ±25–30 athleticism mismatch contributes roughly
+±3–4 rating-points to the level — enough that a big athletic unskilled defense
+genuinely displaces a skill shooter, while the harsh physical punishment stays
+at the make curve, which charges ~4× as much for the same gap. Lineup-mean
+(not top-three) because athletic pressure is the collective environment
+everywhere on the floor, and it reuses an existing composite with no new
+machinery. The build prompt may now honestly say "athleticism" — the term
+exists, bounded and sourceable.
 
 ### 6.4 The direction vector — SETTLED (§3a R2/R3); anchor and magnitude still open
 
@@ -416,9 +458,13 @@ paid once or twice:
   load **regardless of matchup**; displacement points the diet somewhere
   **because of the matchup**. Widening stays **last** — a pressure-driven
   inability to remain narrowly specialized, applied to whatever diet the
-  matchup effects have produced. The equal-matchup high-usage archetype (§6.6)
-  is the guard that proves widening's existing behavior (attention amplifier
-  included) is untouched.
+  matchup effects have produced (the current C# applies it after the
+  matchup-bent profile; the build preserves that ordering). The equal-matchup
+  high-usage archetype (§6.6) proves **displacement ≈ 0 before widening**;
+  "existing widening behavior is intact" is the **C# regression harness's**
+  obligation at build time — the preserved pre-existing widening checks plus a
+  no-displacement equivalence test at equal level — not something the oracle,
+  which does not execute widening, can claim.
 
 ### 6.6 The proof set (the oracle's obligation — adopted verbatim from the review)
 
@@ -429,21 +475,33 @@ a 78-rated star means a ~78-rated defense. Two first-cut cases mislabeled in
 absolute terms produced false failures; the locked oracle's fixtures must carry
 the relative labels explicitly.
 
-The oracle must demonstrate bounds and composition on all of (all seven ran
-correctly under the composed candidate math in the design-math conversation;
-the locked oracle re-proves them as structural checks):
+The oracle must demonstrate bounds and composition on all of (all cases run
+green under the corrected candidate; the locked oracle carries them as
+structural checks):
 
 1. average shooter, overmatched (loses fringe drives, compresses to arc);
 2. featured rim slasher versus a wall (stays rim-first, leaks some outward);
 3. advantaged multi-level star (pulled rim-ward);
 4. low-usage shooter in a blowout (essentially untouched — the "open threes"
    are his fed niche, not a drift);
-5. uniform strong defense **vs** uneven rim-first strong defense (level moves in
-   both; shape moves only in the second — the §6.1 separation, shown);
+5. uniform strong defense **vs** an uneven rim-first defense **LEVEL-MATCHED
+   to it** — the uneven lineup's post-defense solved exactly so the shooter's
+   diet-weighted skill level equals the uniform case, athleticism pinned. This
+   removes the confound a third review caught (the original pair differed in
+   level *sign*, not just shape) and makes the proof real: identical level ⇒
+   identical displacement; different shape ⇒ materially different Phase 9 bend;
 6. one-zone specialist under high usage (displacement + widening interacting
    without either double-counting);
-7. equal matchup at high usage (displacement ≈ 0; existing widening behavior
-   provably intact).
+7. equal matchup at high usage (displacement ≈ 0 **before widening**;
+   widening-intact is the C# regression's proof, per §6.5);
+8. **a heterogeneous five-defender lineup, paired** — top-three zone defenders
+   held fixed, only the bench defenders' athleticism varied: zone gaps and the
+   shape bend must be bit-identical across the pair while the five-man-mean
+   physical level and the displacement magnitude move. This is the check that
+   protects the aggregation asymmetry (top-three skill resistance, five-man
+   physical environment); homogeneous fixtures cannot catch a wrong
+   aggregation, so the golden fixture emits the **full five-defender lineup**
+   per vector, never a single representative defender.
 
 ### 6.7 FastBreak and the zero-defender fallback (confirmed against source)
 
@@ -489,16 +547,26 @@ archetypes behaving per the rulings under the composed math). What remains
 before the build prompt is engineering, Claude's lane, escalated to Emmett only
 if a genuine basketball choice surfaces:
 
-1. **Route A/B quantification** (§6.1) — measure the residual level–shape
-   overlap on raw-gap Phase 9, choose, and bound it.
-2. **The physical-term decision** (§6.3) — with numbers, per its constraints.
-3. **Magnitude calibration** — realistic caps and gate anchors against the
-   league's actual mismatch and usage-pressure distributions (the first-cut
-   knobs are placeholders).
-4. **Hardening into the locked oracle** — structural checks over the §6.6
-   proof set (relatively labeled), a population sweep, and golden traces if
-   the build warrants stage-wise parity, tendency-oracle style.
+1. **Route A/B quantification** (§6.1) — DONE, ruled Route B by measurement.
+2. **The physical-term decision** (§6.3) — DONE: included, gentle, lineup-mean.
+3. **Magnitude calibration** — deferred to season pages by standing principle:
+   every magnitude constant in the oracle is a named CALIBRATION PLACEHOLDER,
+   tuned post-build from the calibration page, never suite-asserted. The lock
+   fixes the STRUCTURE, not the dial values.
+4. **Hardening into the locked oracle** — DONE: `tools/displacement_oracle.py`
+   (LOCKED SPEC ORACLE v1, 2026-07-04), **28 structural checks green** over the
+   §6.6 proof set including the level-matched shape pair and the heterogeneous
+   aggregation pair (the 4,000-derivation validity sweep and the extreme-bound
+   sweep are two of the 28, not extras), and a 10-vector golden fixture
+   emitting full five-defender lineups and complete per-stage traces (base,
+   gaps, levels, residuals, shape bend, mag, ladder, final) for stage-wise C#
+   parity. Reviewed green per §6c (five rounds total; one false finding
+   rejected against a fresh pull).
 
-Then: outside review of the locked oracle (§6c), the build prompt drafted as
-its own audited pass (CONVENTIONS §6a/6b), reviewed, and built behind the
-check-in gate.
+**Next: the build prompt**, drafted as its own audited pass (CONVENTIONS
+§6a/6b) against a fresh pull, sent for outside review (§6c), then built behind
+the check-in gate. The build's obligations beyond the port: preserve the
+existing widening regression checks and add the no-displacement equivalence
+test at equal level (§6.5); assert the FastBreak and zero-defender bypasses
+(§6.7); and revisit the open-only-guard context readout (§7), whose plumbing
+this build creates.
