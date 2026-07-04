@@ -72,6 +72,14 @@ same-skill variation term: identical final ratings yield an identical diet.
 
 ## 3. The derivation — per-zone attribute keys (intent settled; math open)
 
+> **SUPERSEDED (Session 35) for the three signal and the three floor.** The locked
+> **oracle v2** (`tools/tendency_oracle.py`) is the spec of record: it derives three
+> FREQUENCY from a compressed perimeter path blended with a stretch-gated interior path,
+> gives every player with any outside rating a universal capable floor, and applies an
+> explicit era profile — replacing the single credibility-gate description below. The
+> section body is kept as the reasoning that led there; the oracle file, not this text, is
+> authoritative for the three column.
+
 One source fact shapes everything: **the skill side has three shooting buckets
 (Close / Mid / Outside) but the tendency side has five zones** — and the
 `Outside` docstring says "threes and long twos folded into one bucket." There is

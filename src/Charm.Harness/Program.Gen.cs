@@ -421,7 +421,9 @@ internal static partial class Program
 
     // ============================================================================
     // Skill-derived shot tendencies — C# port of tools/tendency_oracle.py
-    // (LOCKED SPEC 2026-07-04). The oracle is authoritative: stage-for-stage,
+    // (LOCKED SPEC ORACLE v2, 2026-07-04 — the modern-era retune: compressed
+    // perimeter three frequency, universal capable floor, the era profile).
+    // The oracle is authoritative: stage-for-stage,
     // constant-for-constant. If this port and the oracle ever disagree, the oracle
     // wins; future tuning happens in the oracle first (new approval), never here.
     //
@@ -435,10 +437,15 @@ internal static partial class Program
     // resolve in that fixed zone order.
     // ============================================================================
 
-    // ---- first-cut constants (oracle names + comments, verbatim) ----
+    // ---- v2 constants (oracle names + comments, verbatim) ----
     private const double TendCreationLo = 45, TendCreationHi = 78;   // what "having a creation game" means
     private const double TendMidCredLo = 44, TendMidCredHi = 62;     // a mid jumper is a real shot above here (catch-&-shoot credible)
-    private const double TendThreeCredLo = 34, TendThreeCredHi = 56; // a three is a real shot above here; below it he's left open, doesn't fire
+    // THREE — two paths blended by perimeter-ness (v2 ruling 1):
+    //   perimeter path: COMPRESSED frequency — rating drives efficiency/usage, not diet
+    //   interior path:  stretch-gated — a big earns arc volume only through a real stretch rating
+    private const double TendThreeBase = 28.0, TendThreeSlope = 0.55;    // compressed signal = 28 + 0.55*Outside (25 -> 41.8, 88 -> 76.4)
+    private const double TendThreeExistLo = 2, TendThreeExistHi = 18;    // only the near-zero truly fades out of the compressed path
+    private const double TendThreeStretchLo = 32, TendThreeStretchHi = 50; // the interior path's gate: a real stretch rating
     private const double TendRimFedW = 0.72, TendRimCreateW = 0.60;  // rim = fed finish + self-created downhill (downhill is primary for creators)
     private const double TendFloaterScale = 0.55;                    // the floater is a secondary/counter shot, below the rim it replaces
     private const double TendPostTouchLo = 55, TendPostTouchHi = 85; // a post touch needs a REAL post game, not ordinary PostMoves
@@ -455,8 +462,13 @@ internal static partial class Program
                                                                      // (foot on the line, bumped off the rim, chased off the arc)
     private const double TendFloorInside = 0.025;                    // the layup, floater, wide-open 12-footer basketball hands everyone
     private const double TendFloorLongPerim = 0.030;                 // a perimeter player pulls up from midrange a few times a year
-    private const double TendFloorThreePerim = 0.045;                // a perimeter player ALWAYS launches a few (kick-out, heave) —
-                                                                     // gated so a paint big who never steps to the arc still takes zero
+    private const double TendFloorThreeCap = 0.040;                  // v2 ruling 2: ANY player with Outside>0 is capable — universal floor
+    private const double TendFloorThreePerimExtra = 0.020;           // perimeter players a touch more (kick-outs find them)
+
+    // THE ERA PROFILE (v2 ruling 3): weight-space multipliers applied AFTER peakedness,
+    // Rim/Short/Mid/Long/Three. Encodes the modern shot-selection culture, cleanly
+    // separated from individual capability. An earlier-era league is these 5 numbers.
+    private static readonly double[] TendEraProfile = { 1.00, 0.66, 0.50, 0.70, 2.10 };
 
     // The 13 rating-map inputs the derivation reads. A missing key throws loudly
     // (KeyNotFoundException) — never a silent default.
@@ -467,6 +479,11 @@ internal static partial class Program
 
     private static double TendClamp(double x, double lo, double hi) => x < lo ? lo : x > hi ? hi : x;
     private static double TendGate(double x, double lo, double hi) => TendClamp((x - lo) / (hi - lo), 0.0, 1.0);
+
+    // perimeter_ness: how perimeter-shaped a player is, 0..1 — small OR a real handle
+    // qualifies. Shared by the three signal (path blend) and the opportunity floor.
+    private static double TendPerimeterNess(Dictionary<string, int> a) =>
+        TendClamp(Math.Max(1 - TendGate(a["Height"], 68, 79), TendGate(a["BallHandling"], 45, 70)), 0, 1);
 
     // raw_signals: dict of 0-99 attributes -> five raw per-zone capability signals (0-99)
     private static double[] TendRawSignals(Dictionary<string, int> a)
@@ -484,8 +501,14 @@ internal static partial class Program
         var midAccess = TendClamp(TendGate(a["Mid"], TendMidCredLo, TendMidCredHi) + 0.70 * creation, 0, 1);
         var rMid = a["Mid"] * midAccess;
 
-        // THREE: catch-&-shoot spot-up — only if he can actually shoot it (else he's left open, doesn't fire)
-        var rThree = a["Outside"] * TendGate(a["Outside"], TendThreeCredLo, TendThreeCredHi);
+        // THREE (v2 ruling 1): two paths blended by perimeter-ness.
+        //   Perimeter: COMPRESSED — frequency is broad and only weakly rating-dependent;
+        //     the rating's punishment is efficiency (make curve) and usage, not the diet.
+        //   Interior: stretch-gated — a big earns arc volume only via a real stretch rating.
+        var p = TendPerimeterNess(a);
+        var compressed = (TendThreeBase + TendThreeSlope * a["Outside"]) * TendGate(a["Outside"], TendThreeExistLo, TendThreeExistHi);
+        var gated = a["Outside"] * TendGate(a["Outside"], TendThreeStretchLo, TendThreeStretchHi);
+        var rThree = TendClamp(p * compressed + (1 - p) * gated, 0, 99);
 
         // SHORT: two routes that STACK (each earns its own volume), each near-zero without its real skill
         var postTouch = TendGate(a["PostMoves"], TendPostTouchLo, TendPostTouchHi)
@@ -539,22 +562,23 @@ internal static partial class Program
     }
 
     // opportunity_floor: no zone a player can plausibly reach is ever exactly zero.
-    // Inside shots are handed to everyone; perimeter shots only to players who actually
-    // operate out there (a paint big who never steps to the arc still takes zero threes).
+    // Inside shots are handed to everyone. The three (v2 ruling 2): NONZERO RATING =
+    // CAPABLE — any player with Outside > 0 carries a small universal floor (a rating-3
+    // big fires his occasional wide-open one), with a perimeter extra on top (kick-outs
+    // find perimeter players).
     //
-    // DEFERRED (Roll G, separate add-in): the emergency heave. A true non-shooter still
-    // puts up 2-3 threes over a CAREER (~0.2%) from buzzer/desperation. That is below
-    // integer-tendency resolution and belongs as a tiny ~0.2% floor on every zone when
-    // Roll G builds the pie (fractional weights), NOT in the authored tendency here.
-    // This function keeps a genuine non-shooter's three at 0; Roll G floors it nonzero
-    // at shot time.
+    // The once-deferred Roll G emergency heave is now largely ABSORBED by this floor:
+    // only a literal Outside==0 player still reads a zero three tendency, and that
+    // residual (~0.2% buzzer heave) remains Roll G's, at pie time, if ever needed.
     private static double[] TendOpportunityFloor(double[] w, Dictionary<string, int> a)
     {
         var s = w.Sum();
         var d = s > 0 ? w.Select(x => x / s).ToArray() : (double[])w.Clone();
-        var perim = TendClamp(Math.Max(1 - TendGate(a["Height"], 68, 79), TendGate(a["BallHandling"], 45, 70)), 0, 1);
+        var perim = TendPerimeterNess(a);
+        var capable = a["Outside"] > 0 ? 1.0 : 0.0;
         var floors = new[] { TendFloorInside, TendFloorInside, TendFloorInside,
-                             TendFloorLongPerim * perim, TendFloorThreePerim * perim };
+                             TendFloorLongPerim * perim,
+                             TendFloorThreeCap * capable + TendFloorThreePerimExtra * perim };
         var outW = new double[5];
         for (var i = 0; i < 5; i++) outW[i] = Math.Max(d[i], floors[i]);
         return outW;
@@ -599,7 +623,9 @@ internal static partial class Program
     {
         var r = TendRawSignals(v);
         var g = TendPeakednessGamma(r);
-        var w = r.Select(x => Math.Pow(x, g)).ToArray();
+        var w = new double[5];
+        for (var i = 0; i < 5; i++)
+            w[i] = Math.Pow(r[i], g) * TendEraProfile[i];   // v2 ruling 3: the era stage
         w = TendBleedMargins(w);
         w = TendOpportunityFloor(w, v);
         return TendToIntDiet(w);
@@ -616,12 +642,17 @@ internal static partial class Program
     }
 
     // ============================================================================
-    // Golden-vector parity — the port proof. Loads tools/tendency_golden.json
+    // Golden-vector parity — the port proof, stage-wise. Loads tools/tendency_golden.json
     // (copied beside the binary, the Phase 53 convention), validates the fixture
     // CONTRACT first (so a stale or malformed file is rejected loudly instead of
-    // silently testing the wrong thing), then requires every C# diet to equal the
-    // oracle diet element-for-element in zone order. Runs at the start of RunGen,
-    // before either roster is generated. Seed-independent by construction.
+    // silently testing the wrong thing) — including the per-stage trace every vector
+    // must now carry — then requires every C# stage to match the oracle's trace
+    // (intermediate doubles at tight relative tolerance; Python ** and Math.Pow may
+    // differ by ULPs) and every final diet to equal the oracle diet EXACTLY,
+    // element-for-element in zone order. Two different implementations can round to
+    // the same 5 ints; the trace proves the PIPELINE, not just the integers. Runs at
+    // the start of RunGen, before either roster is generated. Seed-independent by
+    // construction.
     // ============================================================================
     private static void RunTendencyGoldenParity()
     {
@@ -644,6 +675,22 @@ internal static partial class Program
 
         if (!root.TryGetProperty("vectors", out var vectors) || vectors.GetArrayLength() == 0)
             throw new InvalidOperationException("golden fixture rejected: no vectors.");
+
+        // Cross-language float parity holds at tolerance, not equality:
+        // |a-b| <= max(1e-9 * max(|a|,|b|), 1e-12) — Python ** and Math.Pow may differ
+        // by ULPs. Final integers compare EXACTLY.
+        static bool TendNear(double x, double y) =>
+            Math.Abs(x - y) <= Math.Max(1e-9 * Math.Max(Math.Abs(x), Math.Abs(y)), 1e-12);
+        void AssertStage(string vecName, string stage, double[] act, double[] exp)
+        {
+            for (var i = 0; i < 5; i++)
+                if (!TendNear(act[i], exp[i]))
+                    throw new InvalidOperationException(
+                        $"GOLDEN PARITY FAILURE — vector '{vecName}', stage {stage}, index {i} ({expectedZones[i]}):\n" +
+                        $"  expected  {exp[i]:R}\n" +
+                        $"  actual    {act[i]:R}\n" +
+                        "The C# port disagrees with the locked oracle at this stage. The oracle wins — fix the port.");
+        }
 
         var run = 0;
         foreach (var vec in vectors.EnumerateArray())
@@ -675,20 +722,64 @@ internal static partial class Program
                 throw new InvalidOperationException(
                     $"golden fixture rejected: vector '{name}' expected diet sums to {sum}, not 100.");
 
-            // ── the parity assert ────────────────────────────────────────────────
+            // ── trace contract: every vector must carry the five per-stage fields ───
+            if (!vec.TryGetProperty("trace", out var traceEl))
+                throw new InvalidOperationException(
+                    $"golden fixture rejected: vector '{name}' has no trace. " +
+                    "Stage-wise parity requires the v2 fixture (re-run tools/tendency_oracle.py).");
+            string[] traceVec = { "rawSignals", "postEraWeights", "postBleedWeights", "postFloorWeights" };
+            var trace = new Dictionary<string, double[]>(StringComparer.Ordinal);
+            foreach (var field in traceVec)
+            {
+                if (!traceEl.TryGetProperty(field, out var fe) || fe.GetArrayLength() != 5)
+                    throw new InvalidOperationException(
+                        $"golden fixture rejected: vector '{name}' trace.{field} missing or not length five.");
+                var vals = new double[5];
+                for (var i = 0; i < 5; i++) vals[i] = fe[i].GetDouble();
+                trace[field] = vals;
+            }
+            if (!traceEl.TryGetProperty("gamma", out var gammaEl))
+                throw new InvalidOperationException(
+                    $"golden fixture rejected: vector '{name}' trace.gamma missing.");
+            var traceGamma = gammaEl.GetDouble();
+
+            // ── the stage-wise parity asserts ────────────────────────────────────
+            var r = TendRawSignals(ratings);
+            AssertStage(name, "rawSignals", r, trace["rawSignals"]);
+
+            var g = TendPeakednessGamma(r);
+            if (!TendNear(g, traceGamma))
+                throw new InvalidOperationException(
+                    $"GOLDEN PARITY FAILURE — vector '{name}', stage gamma:\n" +
+                    $"  expected  {traceGamma:R}\n" +
+                    $"  actual    {g:R}\n" +
+                    "The C# port disagrees with the locked oracle at this stage. The oracle wins — fix the port.");
+
+            var wEra = new double[5];
+            for (var i = 0; i < 5; i++)
+                wEra[i] = Math.Pow(r[i], g) * TendEraProfile[i];
+            AssertStage(name, "postEraWeights", wEra, trace["postEraWeights"]);
+
+            var wBleed = TendBleedMargins(wEra);
+            AssertStage(name, "postBleedWeights", wBleed, trace["postBleedWeights"]);
+
+            var wFloor = TendOpportunityFloor(wBleed, ratings);
+            AssertStage(name, "postFloorWeights", wFloor, trace["postFloorWeights"]);
+
+            // final integers — through the real production entry point, compared EXACTLY
             var actual = DeriveTendencies(ratings);
             for (var i = 0; i < 5; i++)
             {
                 if (actual[i] != expected[i])
                     throw new InvalidOperationException(
-                        $"GOLDEN PARITY FAILURE — vector '{name}' ({expectedZones[i]}):\n" +
+                        $"GOLDEN PARITY FAILURE — vector '{name}', stage finalDiet, index {i} ({expectedZones[i]}):\n" +
                         $"  expected  [{string.Join(", ", expected)}]\n" +
                         $"  actual    [{string.Join(", ", actual)}]\n" +
                         "The C# port disagrees with the locked oracle. The oracle wins — fix the port.");
             }
             run++;
         }
-        Console.WriteLine($"golden tendency parity: {run} vectors, all exact. (oracle: tools/tendency_oracle.py, LOCKED SPEC 2026-07-04)");
+        Console.WriteLine($"golden tendency parity: {run} vectors, all stages within tolerance, all diets exact. (oracle: tools/tendency_oracle.py, LOCKED SPEC ORACLE v2, 2026-07-04)");
     }
 
     // Typed object initializer reading every field from the value map. Mirrors the

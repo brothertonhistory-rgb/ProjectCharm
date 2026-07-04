@@ -26,6 +26,8 @@ finishing → lots of rim attempts that go in; high drive tendency with poor fin
 rim attempts that miss. Mixing "how often" with "how good" in one catalogue is a category
 error, which is why tendencies live in their own document.
 
+**Note (Session 35): the five-zone shot-*location* diet is now skill-DERIVED for generated players.** As of the tendency-derivation work, a generated player's five shot-location tendencies (Rim / Short / Mid / Long / Three) are no longer authored from a role table — they fall out of his own skill ratings, computed by a committed locked oracle. That change replaced a role-table *approximation* of one specific tendency (where his shots come from); it did **not** overturn the orthogonality principle above, and it did not touch the rest of this catalogue. The paired **behavioral action leans** this document defines (drive-vs-pull-up, attack-vs-reset, and the rest) remain a separate, player-owned future layer — "how he gets his offense" beyond raw shot location is still its own axis, distinct from "how good he is." Deriving shot location from skills is a category-preserving move: it makes one distribution fall out of the quality ratings that feed it, not a merger of the two axes.
+
 **The tightest filter for what counts as a tendency:** a tendency only exists if there is a
 **pie fork for it to redistribute** — a choice between options the engine actually rolls. An
 attribute can be "real but dormant" (endurance, waiting on a stamina module); a tendency must
