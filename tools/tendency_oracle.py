@@ -323,10 +323,24 @@ GOLDEN_EXTRA = {
 }
 
 def golden_vectors():
+    """Each vector carries the final diet AND a per-stage trace (raw signals, gamma,
+    post-era weights, post-bleed weights, post-floor weights) so C# parity proves the
+    PIPELINE, not just the final integers — two different implementations can round to
+    the same 5 ints. C# compares intermediate doubles at tight tolerance (relative
+    1e-9), final integers exactly."""
     out = []
     for name, a in list(ARCH.items()) + list(GOLDEN_EXTRA.items()):
-        diet, _, _ = derive(a)
-        out.append({"name": name, "ratings": a, "expected": diet})
+        R = raw_signals(a)
+        g = peakedness_gamma(R)
+        w_era   = [R[i]**g * ERA_PROFILE[i] for i in range(5)]
+        w_bleed = bleed_margins(w_era)
+        w_floor = opportunity_floor(w_bleed, a)
+        diet    = to_int_diet(w_floor)
+        out.append({"name": name, "ratings": a, "expected": diet,
+                    "trace": {"rawSignals": R, "gamma": g,
+                              "postEraWeights": w_era,
+                              "postBleedWeights": w_bleed,
+                              "postFloorWeights": w_floor}})
     return out
 
 def emit_golden(path="tendency_golden.json"):
