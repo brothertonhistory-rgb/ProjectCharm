@@ -238,6 +238,7 @@ internal static partial class Program
 
             GenEnforceFloors(v, pos[pid]);
             GenEnforceLegHealth(v, pos[pid], DivvyLegHealthFloor);
+            DeriveAndStampTendencies(v);   // AFTER all rating mutation (incl. third-leg redraw), BEFORE mapping
 
             var player = GenMapToPlayer(v, $"Pool_{pid}");
             var errs = player.Validate();

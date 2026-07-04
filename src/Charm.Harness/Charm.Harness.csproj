@@ -33,4 +33,13 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Skill-derived tendency golden fixture (emitted by tools/tendency_oracle.py,
+         LOCKED SPEC 2026-07-04), copied beside the binary so RunTendencyGoldenParity
+         reads it from AppContext.BaseDirectory (the Phase 53 convention). -->
+    <None Include="..\..\tools\tendency_golden.json" Link="tools\tendency_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

@@ -100,27 +100,22 @@ internal static partial class Program
     };
 
     // ── ROLES (reuse the NAMES only, never the old rating logic; A0.4) ──────────
-    private sealed record GenRoleDef(string Pos, string[] Emphasis, int[] Tendencies);
+    // The role tendency table is RETIRED (this session): tendencies are no longer
+    // authored per role — they are DERIVED from each player's own final ratings by
+    // DeriveTendencies below (ported from tools/tendency_oracle.py, LOCKED SPEC
+    // 2026-07-04). Roles keep only their position and skill emphasis.
+    private sealed record GenRoleDef(string Pos, string[] Emphasis);
     private static readonly Dictionary<string, GenRoleDef> GenRoles = new(StringComparer.Ordinal)
     {
-        ["FloorGeneral"]     = new("G", new[] { "Playmaking", "Passing", "BallHandling", "BasketballIQ", "Discipline" },
-                                   new[] { 18, 18, 20, 18, 26 }),
-        ["PassFirstGuard"]   = new("G", new[] { "Passing", "Playmaking", "BallHandling", "OffBallMovement" },
-                                   new[] { 20, 18, 20, 16, 26 }),
-        ["PerimeterShooter"] = new("G", new[] { "Outside", "OffBallMovement", "Mid" },
-                                   new[] { 8, 10, 18, 24, 40 }),
-        ["Slasher"]          = new("G", new[] { "FirstStep", "Finishing", "BallHandling", "SelfCreation" },
-                                   new[] { 34, 22, 20, 14, 10 }),
-        ["ThreeAndDWing"]    = new("W", new[] { "Outside", "PerimeterDefense", "OffBallDefense", "HelpDefense" },
-                                   new[] { 14, 12, 16, 20, 38 }),
-        ["WingScorer"]       = new("W", new[] { "Mid", "Outside", "SelfCreation", "Finishing" },
-                                   new[] { 22, 16, 22, 22, 18 }),
-        ["PostScorer"]       = new("B", new[] { "PostMoves", "Close", "Finishing", "Strength" },
-                                   new[] { 30, 30, 22, 12, 6 }),
-        ["RimRunner"]        = new("B", new[] { "Finishing", "Screening", "OffensiveRebounding", "Vertical" },
-                                   new[] { 55, 22, 12, 7, 4 }),
-        ["AthleticBig"]      = new("B", new[] { "Finishing", "RimProtection", "DefensiveRebounding", "Vertical", "Strength" },
-                                   new[] { 50, 24, 12, 8, 6 }),
+        ["FloorGeneral"]     = new("G", new[] { "Playmaking", "Passing", "BallHandling", "BasketballIQ", "Discipline" }),
+        ["PassFirstGuard"]   = new("G", new[] { "Passing", "Playmaking", "BallHandling", "OffBallMovement" }),
+        ["PerimeterShooter"] = new("G", new[] { "Outside", "OffBallMovement", "Mid" }),
+        ["Slasher"]          = new("G", new[] { "FirstStep", "Finishing", "BallHandling", "SelfCreation" }),
+        ["ThreeAndDWing"]    = new("W", new[] { "Outside", "PerimeterDefense", "OffBallDefense", "HelpDefense" }),
+        ["WingScorer"]       = new("W", new[] { "Mid", "Outside", "SelfCreation", "Finishing" }),
+        ["PostScorer"]       = new("B", new[] { "PostMoves", "Close", "Finishing", "Strength" }),
+        ["RimRunner"]        = new("B", new[] { "Finishing", "Screening", "OffensiveRebounding", "Vertical" }),
+        ["AthleticBig"]      = new("B", new[] { "Finishing", "RimProtection", "DefensiveRebounding", "Vertical", "Strength" }),
     };
     private static readonly string[] GenGuardRoles = { "FloorGeneral", "PassFirstGuard", "PerimeterShooter", "Slasher" };
     private static readonly string[] GenWingRoles  = { "ThreeAndDWing", "WingScorer" };
@@ -327,9 +322,10 @@ internal static partial class Program
             }
         }
 
-        // tendencies from the role
-        var tend = GenRoles[role].Tendencies;
-        for (var i = 0; i < 5; i++) v[GenTendencies[i]] = tend[i];
+        // tendencies are NOT written here: GenRatings produces a half-finished
+        // player (lean, floors, leg health, third-leg redraw still to run).
+        // DeriveAndStampTendencies runs at both pipeline tails, after the last
+        // rating mutator and before GenMapToPlayer.
 
         // free throw (fixed-pivot, uses the drawn Outside + Height)
         v["FreeThrow"] = DrawFreeThrowGen(v["Outside"], v["Height"], r);
@@ -421,6 +417,278 @@ internal static partial class Program
                 }
             }
         }
+    }
+
+    // ============================================================================
+    // Skill-derived shot tendencies — C# port of tools/tendency_oracle.py
+    // (LOCKED SPEC 2026-07-04). The oracle is authoritative: stage-for-stage,
+    // constant-for-constant. If this port and the oracle ever disagree, the oracle
+    // wins; future tuning happens in the oracle first (new approval), never here.
+    //
+    // DETERMINISM RULING (locked): DeriveTendencies is a PURE function of the final
+    // rating map. No player-style seed, no manufactured tendency noise. Identical
+    // final ratings yield identical integer diets; population variety comes from
+    // varied drawn skills, and shot VOLUME differences are usage/hierarchy's job.
+    //
+    // Zone order everywhere: Rim, Short, Mid, Long, Three (== GenTendencies[]).
+    // All tie-breaks (largest-remainder rounding, the 99-cap redistribution)
+    // resolve in that fixed zone order.
+    // ============================================================================
+
+    // ---- first-cut constants (oracle names + comments, verbatim) ----
+    private const double TendCreationLo = 45, TendCreationHi = 78;   // what "having a creation game" means
+    private const double TendMidCredLo = 44, TendMidCredHi = 62;     // a mid jumper is a real shot above here (catch-&-shoot credible)
+    private const double TendThreeCredLo = 34, TendThreeCredHi = 56; // a three is a real shot above here; below it he's left open, doesn't fire
+    private const double TendRimFedW = 0.72, TendRimCreateW = 0.60;  // rim = fed finish + self-created downhill (downhill is primary for creators)
+    private const double TendFloaterScale = 0.55;                    // the floater is a secondary/counter shot, below the rim it replaces
+    private const double TendPostTouchLo = 55, TendPostTouchHi = 85; // a post touch needs a REAL post game, not ordinary PostMoves
+    private const double TendLongGuardCap = 46.0;                    // max raw long from the star pull-up path
+    private const double TendLongStretchCap = 46.0;                  // max raw long from the stretch-pop path (lower bar, modest size)
+    private const double TendGuardCreateLo = 66, TendGuardCreateHi = 86;   // dominant-only: both factors must be near-elite
+    private const double TendGuardPullupLo = 64, TendGuardPullupHi = 86;
+    private const double TendStretchPlausLo = 58, TendStretchPlausHi = 80; // frontcourt body plausibility (NO shooting in here)
+    private const double TendStretchCredLo = 48, TendStretchCredHi = 74;   // catch-&-shoot credibility (ALL shooting in here); lower bar
+    private const double TendGammaBase = 1.10, TendGammaShape = 2.30, TendGammaDeficit = 1.90;
+    private const double TendCredibleCeiling = 85.0;                 // a top-2 average at/above this earns full flatness
+    private const double TendMarginBleed = 0.07;                     // porousness of the zone walls: each zone spills this
+                                                                     // fraction of the gap into its distance-ladder neighbors
+                                                                     // (foot on the line, bumped off the rim, chased off the arc)
+    private const double TendFloorInside = 0.025;                    // the layup, floater, wide-open 12-footer basketball hands everyone
+    private const double TendFloorLongPerim = 0.030;                 // a perimeter player pulls up from midrange a few times a year
+    private const double TendFloorThreePerim = 0.045;                // a perimeter player ALWAYS launches a few (kick-out, heave) —
+                                                                     // gated so a paint big who never steps to the arc still takes zero
+
+    // The 13 rating-map inputs the derivation reads. A missing key throws loudly
+    // (KeyNotFoundException) — never a silent default.
+    private static readonly string[] TendInputs =
+        { "Outside", "Mid", "Close", "Finishing", "PostMoves", "BallHandling",
+          "SelfCreation", "FirstStep", "Speed", "Vertical", "Screening",
+          "Height", "Weight" };
+
+    private static double TendClamp(double x, double lo, double hi) => x < lo ? lo : x > hi ? hi : x;
+    private static double TendGate(double x, double lo, double hi) => TendClamp((x - lo) / (hi - lo), 0.0, 1.0);
+
+    // raw_signals: dict of 0-99 attributes -> five raw per-zone capability signals (0-99)
+    private static double[] TendRawSignals(Dictionary<string, int> a)
+    {
+        var creation = TendGate(0.50 * a["SelfCreation"] + 0.30 * a["BallHandling"] + 0.20 * a["FirstStep"],
+                                TendCreationLo, TendCreationHi);
+        var burst = (a["FirstStep"] + a["Speed"] + a["Vertical"]) / 3.0;
+
+        // RIM: fed finish (no creation needed) + self-created downhill (creation-gated, primary for creators)
+        double fedRim = a["Finishing"];
+        var createRim = (0.55 * burst + 0.45 * a["BallHandling"]) * creation;
+        var rRim = TendClamp(TendRimFedW * fedRim + TendRimCreateW * createRim, 0, 99);
+
+        // MID: a real shot only if the jumper is credible (catch-&-shoot) OR he can create the pull-up
+        var midAccess = TendClamp(TendGate(a["Mid"], TendMidCredLo, TendMidCredHi) + 0.70 * creation, 0, 1);
+        var rMid = a["Mid"] * midAccess;
+
+        // THREE: catch-&-shoot spot-up — only if he can actually shoot it (else he's left open, doesn't fire)
+        var rThree = a["Outside"] * TendGate(a["Outside"], TendThreeCredLo, TendThreeCredHi);
+
+        // SHORT: two routes that STACK (each earns its own volume), each near-zero without its real skill
+        var postTouch = TendGate(a["PostMoves"], TendPostTouchLo, TendPostTouchHi)
+                        * (0.70 * a["PostMoves"] + 0.30 * a["Close"]);
+        var floater = (0.45 * Math.Max(a["Close"], a["Finishing"]) + 0.30 * a["BallHandling"]
+                       + 0.25 * Math.Max(a["SelfCreation"], a["FirstStep"])) * creation * TendFloaterScale;
+        var rShort = TendClamp(postTouch + floater, 0, 99);
+
+        // LONG: two independent capped gated paths
+        var creationStyle = 0.7 * a["SelfCreation"] + 0.3 * a["BallHandling"];
+        var pullupShooting = 0.7 * a["Mid"] + 0.3 * a["Outside"];
+        var gGuard = TendGate(creationStyle, TendGuardCreateLo, TendGuardCreateHi)
+                     * TendGate(pullupShooting, TendGuardPullupLo, TendGuardPullupHi);
+        var guardLong = TendLongGuardCap * gGuard;
+
+        var plaus = 0.55 * a["Height"] + 0.20 * a["Weight"] + 0.15 * a["Screening"] + 0.10 * a["PostMoves"]; // NO shooting
+        var cred = 0.7 * a["Mid"] + 0.3 * a["Outside"];                                                       // ALL shooting
+        var gStretch = TendGate(plaus, TendStretchPlausLo, TendStretchPlausHi)
+                       * TendGate(cred, TendStretchCredLo, TendStretchCredHi);
+        var stretchLong = TendLongStretchCap * gStretch;
+
+        var rLong = TendClamp(guardLong + stretchLong, 0, 99);
+
+        return new[] { rRim, rShort, rMid, rLong, rThree };
+    }
+
+    // peakedness_gamma: two inputs — lopsided shape AND absolute capability. Both push spikier.
+    private static double TendPeakednessGamma(double[] r)
+    {
+        var rmax = r.Max();
+        var rmean = r.Sum() / r.Length;
+        var lop = rmax == 0 ? 0.0 : (rmax - rmean) / rmax;                       // relative shape
+        var top2 = r.OrderByDescending(x => x).Take(2).Sum() / 2.0;
+        var defic = TendClamp(1 - top2 / TendCredibleCeiling, 0, 1);             // absolute capability deficit
+        return TendClamp(TendGammaBase + TendGammaShape * lop + TendGammaDeficit * defic, 1.0, 6.0);
+    }
+
+    // bleed_margins: the zone walls are porous. Each zone spills TendMarginBleed of the
+    // gap to its neighbors on the distance ladder Rim-Short-Mid-Long-Three. Conserves
+    // the total; shaves impossible peaks; fills the in-between shots a clean diet drops to zero.
+    private static double[] TendBleedMargins(double[] w)
+    {
+        var s = w.Sum();
+        if (s <= 0) return w;
+        var d = w.Select(x => x / s).ToArray();
+        int[][] nbr = { new[] { 1 }, new[] { 0, 2 }, new[] { 1, 3 }, new[] { 2, 4 }, new[] { 3 } }; // rim, short, mid, long, three
+        var outW = new double[5];
+        for (var i = 0; i < 5; i++)
+            outW[i] = d[i] + TendMarginBleed * nbr[i].Sum(j => d[j] - d[i]);
+        return outW;
+    }
+
+    // opportunity_floor: no zone a player can plausibly reach is ever exactly zero.
+    // Inside shots are handed to everyone; perimeter shots only to players who actually
+    // operate out there (a paint big who never steps to the arc still takes zero threes).
+    //
+    // DEFERRED (Roll G, separate add-in): the emergency heave. A true non-shooter still
+    // puts up 2-3 threes over a CAREER (~0.2%) from buzzer/desperation. That is below
+    // integer-tendency resolution and belongs as a tiny ~0.2% floor on every zone when
+    // Roll G builds the pie (fractional weights), NOT in the authored tendency here.
+    // This function keeps a genuine non-shooter's three at 0; Roll G floors it nonzero
+    // at shot time.
+    private static double[] TendOpportunityFloor(double[] w, Dictionary<string, int> a)
+    {
+        var s = w.Sum();
+        var d = s > 0 ? w.Select(x => x / s).ToArray() : (double[])w.Clone();
+        var perim = TendClamp(Math.Max(1 - TendGate(a["Height"], 68, 79), TendGate(a["BallHandling"], 45, 70)), 0, 1);
+        var floors = new[] { TendFloorInside, TendFloorInside, TendFloorInside,
+                             TendFloorLongPerim * perim, TendFloorThreePerim * perim };
+        var outW = new double[5];
+        for (var i = 0; i < 5; i++) outW[i] = Math.Max(d[i], floors[i]);
+        return outW;
+    }
+
+    // to_int_diet: normalize to ints summing to 100, each <= 99 (Player.Validate ceiling).
+    // DETERMINISTIC TIE-BREAKS, locked to the oracle:
+    //   - largest-remainder rounding: remainders sorted descending; equal remainders
+    //     resolve in zone order (Rim, Short, Mid, Long, Three);
+    //   - 99-cap redistribution: overflow moves to the smallest zone; equal smallest
+    //     resolves to the earliest zone in the same fixed order.
+    private static int[] TendToIntDiet(double[] weights)
+    {
+        var w = weights;
+        var s = w.Sum();
+        if (s <= 0) { w = new[] { 1.0, 1.0, 1.0, 1.0, 1.0 }; s = w.Length; }
+        var raw = w.Select(x => 100 * x / s).ToArray();
+        var floor = raw.Select(x => (int)x).ToArray();
+        var rem = 100 - floor.Sum();
+        var order = Enumerable.Range(0, raw.Length)
+            .OrderByDescending(i => raw[i] - floor[i])
+            .ThenBy(i => i)
+            .ToArray();
+        for (var k = 0; k < rem; k++) floor[order[k]] += 1;
+        // ceiling guard: no single zone may be 100
+        for (var i = 0; i < floor.Length; i++)
+        {
+            if (floor[i] >= 100)
+            {
+                var j = 0;
+                for (var k = 1; k < floor.Length; k++)
+                    if (floor[k] < floor[j]) j = k;   // smallest value; ties keep the earliest zone
+                floor[i] -= 1; floor[j] += 1;
+            }
+        }
+        return floor;
+    }
+
+    // The PURE derivation (what golden parity calls): final rating map -> five ints
+    // in GenTendencies order (Rim, Short, Mid, Long, Three), sum 100, each in [0,99].
+    private static int[] DeriveTendencies(Dictionary<string, int> v)
+    {
+        var r = TendRawSignals(v);
+        var g = TendPeakednessGamma(r);
+        var w = r.Select(x => Math.Pow(x, g)).ToArray();
+        w = TendBleedMargins(w);
+        w = TendOpportunityFloor(w, v);
+        return TendToIntDiet(w);
+    }
+
+    // Thin wrapper for the two generation pipelines: derive, then stamp the five
+    // results into the value map under the GenTendencies keys. Runs AFTER the last
+    // rating mutator (lean / floors / leg health / third-leg redraw) and before
+    // GenMapToPlayer — deriving earlier would stamp a diet from a half-finished player.
+    private static void DeriveAndStampTendencies(Dictionary<string, int> v)
+    {
+        var diet = DeriveTendencies(v);
+        for (var i = 0; i < 5; i++) v[GenTendencies[i]] = diet[i];
+    }
+
+    // ============================================================================
+    // Golden-vector parity — the port proof. Loads tools/tendency_golden.json
+    // (copied beside the binary, the Phase 53 convention), validates the fixture
+    // CONTRACT first (so a stale or malformed file is rejected loudly instead of
+    // silently testing the wrong thing), then requires every C# diet to equal the
+    // oracle diet element-for-element in zone order. Runs at the start of RunGen,
+    // before either roster is generated. Seed-independent by construction.
+    // ============================================================================
+    private static void RunTendencyGoldenParity()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "tools", "tendency_golden.json");
+        if (!File.Exists(path))
+            throw new InvalidOperationException($"golden parity fixture not found: {path}");
+
+        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        var root = doc.RootElement;
+
+        // ── fixture contract ────────────────────────────────────────────────────
+        string[] expectedZones = { "Rim", "Short", "Mid", "Long", "Three" };
+        if (!root.TryGetProperty("zoneOrder", out var zo) || zo.GetArrayLength() != 5)
+            throw new InvalidOperationException("golden fixture rejected: missing/short zoneOrder.");
+        for (var i = 0; i < 5; i++)
+            if (zo[i].GetString() != expectedZones[i])
+                throw new InvalidOperationException(
+                    $"golden fixture rejected: zoneOrder[{i}] is '{zo[i].GetString()}', expected '{expectedZones[i]}'. " +
+                    "The fixture does not match the locked contract (GenTendencies order).");
+
+        if (!root.TryGetProperty("vectors", out var vectors) || vectors.GetArrayLength() == 0)
+            throw new InvalidOperationException("golden fixture rejected: no vectors.");
+
+        var run = 0;
+        foreach (var vec in vectors.EnumerateArray())
+        {
+            var name = vec.GetProperty("name").GetString() ?? "(unnamed)";
+            var ratingsEl = vec.GetProperty("ratings");
+            var ratings = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (var p in ratingsEl.EnumerateObject()) ratings[p.Name] = p.Value.GetInt32();
+            foreach (var key in TendInputs)
+                if (!ratings.ContainsKey(key))
+                    throw new InvalidOperationException(
+                        $"golden fixture rejected: vector '{name}' lacks derivation input '{key}'.");
+
+            var expEl = vec.GetProperty("expected");
+            if (expEl.GetArrayLength() != 5)
+                throw new InvalidOperationException(
+                    $"golden fixture rejected: vector '{name}' expected diet is not length five.");
+            var expected = new int[5];
+            var sum = 0;
+            for (var i = 0; i < 5; i++)
+            {
+                expected[i] = expEl[i].GetInt32();
+                if (expected[i] < 0 || expected[i] > 99)
+                    throw new InvalidOperationException(
+                        $"golden fixture rejected: vector '{name}' expected[{i}]={expected[i]} outside [0,99].");
+                sum += expected[i];
+            }
+            if (sum != 100)
+                throw new InvalidOperationException(
+                    $"golden fixture rejected: vector '{name}' expected diet sums to {sum}, not 100.");
+
+            // ── the parity assert ────────────────────────────────────────────────
+            var actual = DeriveTendencies(ratings);
+            for (var i = 0; i < 5; i++)
+            {
+                if (actual[i] != expected[i])
+                    throw new InvalidOperationException(
+                        $"GOLDEN PARITY FAILURE — vector '{name}' ({expectedZones[i]}):\n" +
+                        $"  expected  [{string.Join(", ", expected)}]\n" +
+                        $"  actual    [{string.Join(", ", actual)}]\n" +
+                        "The C# port disagrees with the locked oracle. The oracle wins — fix the port.");
+            }
+            run++;
+        }
+        Console.WriteLine($"golden tendency parity: {run} vectors, all exact. (oracle: tools/tendency_oracle.py, LOCKED SPEC 2026-07-04)");
     }
 
     // Typed object initializer reading every field from the value map. Mirrors the
@@ -523,6 +791,7 @@ internal static partial class Program
             GenApplyLean(v, lean);
             GenEnforceFloors(v, pos);
             GenEnforceLegHealth(v, pos);
+            DeriveAndStampTendencies(v);   // AFTER all rating mutation, BEFORE mapping
 
             var player = GenMapToPlayer(v, $"Prog{programTag}_S{depth + 1}");
 
@@ -588,6 +857,10 @@ internal static partial class Program
 
     private static void RunGen(string engineConfigPath, string? genPathArg)
     {
+        // Port proof first: golden-vector parity against the locked oracle fixture,
+        // before either roster is generated. Seed-independent; throws on any mismatch.
+        RunTendencyGoldenParity();
+
         string genPath;
         if (!string.IsNullOrWhiteSpace(genPathArg))
         {

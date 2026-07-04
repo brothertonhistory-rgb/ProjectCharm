@@ -61,11 +61,12 @@ Outside/low-ThreeTendency player is a catch-and-shoot role player; a low-Outside
 high-ThreeTendency player is a volume chucker.
 
 This brief **reverses that principle**: tendency becomes a function of skill
-(plus variation). The reversal is Emmett's call, made in this conversation, and
-the build must update the docstrings to match — a design principle stated in
-source must never silently contradict the generator. What the old principle was
-protecting (two same-skill players with different diets) is preserved by the
-variation term (§4.2), not by independent authoring.
+(no variation term — see the §4.2 determinism ruling). The reversal is Emmett's
+call, made in this conversation, and the build updated the docstrings to match — a
+design principle stated in source must never silently contradict the generator.
+What the old independent-authoring principle was reaching for (players who want
+different shots) is delivered by the varied *skills* the generator draws, not by a
+same-skill variation term: identical final ratings yield an identical diet.
 
 ---
 
@@ -353,45 +354,48 @@ defense is giving" realism Emmett named — Roll G's existing defensive-resistan
 bend already supplies the in-game reaction; the flat spread is what gives that
 bend multiple plausible destinations to move his shots toward.
 
-### 4.2 Same ratings must NOT mean same tendencies — but variation needs discipline
+### 4.2 Same ratings mean the same tendencies — the determinism ruling (SUPERSEDED, 2026-07-04)
 
-The derivation is not a pure function of the ratings. Two players with identical
-offensive numbers must come out with different diets — genuine per-player
-variation layered on the derived spread. This is what replaces the old
-independent-authoring principle (§2): the Klay-vs-Curry distinction survives as a
-seeded style draw around the skill-derived expectation, not as a hand-authored
-number.
+> **This section is superseded by the build-time determinism ruling (Session 34).**
+> The original §4.2 argued for a per-player style draw so that two players with
+> identical ratings would still shoot different diets. That was reversed before the
+> build. The text below records the final ruling; the old reasoning is preserved in
+> the journal.
 
-The review's caution, accepted: **naive independent noise on five zone weights
-would reintroduce the exact pathology we are removing** — one player could
-accidentally become a 70% long-two shooter despite having no creation path. The
-variation needs a disciplined home. The pipeline shape for the math pass:
+**The derivation IS a pure function of the final rating map.** No player-style
+seed, no manufactured tendency noise. Two players with identical final ratings
+come out with the **identical** integer diet. Population variety comes entirely
+from the varied skills the generator already draws independently per player —
+which is abundant — not from a separate noise term layered on top.
+
+Why the reversal: the thing the old §4.2 wanted to preserve (Klay-vs-Curry
+distinction) is already delivered by the skills themselves. Two shooters with
+genuinely different creation, mid, and outside numbers already derive different
+diets; if their ratings are *truly identical*, there is no basketball reason they
+should want different shots, and inventing one would only reintroduce the
+pathology the disciplined variation was trying to avoid (a player accidentally
+acquiring a shot his skills don't support). The cleaner rule is: **skills carry
+all the variation; the derivation is deterministic on top of them.**
+
+The other half of the old distinction — a skilled shooter who nonetheless *takes*
+few shots — is not a tendency-shape question at all. That is **shot volume**, and
+volume is usage/hierarchy's job (a separate existing layer): a low-usage spot-up
+shooter and a high-usage one can share the same *diet* (what fraction of his own
+shots are threes) while differing enormously in *how many* shots he gets. The
+derivation sets the diet; usage sets the volume. Keeping them separate is what
+lets both be modeled honestly.
+
+The pipeline shape, as built:
 
 ```
-skill-derived zone signals   (the expectation, §3)
-  → correlated player-style variation   (the identity draw)
-  → peakedness transform   (§4.1, relative shape × absolute capability)
-  → normalize five weights to sum ~100   (the tendency values)
+skill-derived zone signals   (raw capability per zone, §3)
+  → peakedness transform      (relative shape × absolute capability, §4.1)
+  → margin bleed              (porous zone walls — no false zeros)
+  → opportunity floor         (inside for everyone; perimeter only for perimeter players)
+  → integerize to sum 100     (deterministic tie-breaks, fixed zone order)
 ```
 
-Guardrails on the variation term:
-
-- **Correlated, not five unrelated dice.** A style draw shifts a coherent
-  identity, not five independent knobs.
-- **Narrower where basketball logic is strongest.** A zero-creation, low-Mid
-  player must not randomly acquire a meaningful long two; the variation band
-  collapses where the skill signal forbids the shot. Wider where several
-  plausible pathways exist — that is where genuine Klay/Curry-type style
-  distinction lives.
-- **Player-stable and reproducible.** The seed is stable to the player, not
-  dependent on incidental roster-generation ordering (the same
-  order-independence discipline Roster Genesis already enforces).
-
-Mental model for the design pass — not "random tendency noise" but a **latent
-shot-identity draw**: spot-up specialist, downhill attacker, pull-up scorer,
-interior technician, versatile opportunist. These need not be authored as
-explicit types, but the variation should *feel* like it produces those
-identities, bounded by what the skills allow.
+No variation term appears anywhere in that chain — the reversal removed it.
 
 ---
 
@@ -520,9 +524,9 @@ answers these **in order** — each builds on the one before:
    each is measured and how they jointly set the spread — and resolve the
    double-count flag: the specialist's three-spike must be owned by *either* the
    three signal *or* the peakedness transform, not both.
-5. **A reproducible correlated variation model** (§4.2), player-stable seed,
-   bands that narrow where the skill signal forbids a shot — while the
-   clock-conditioned heave stays deferred (§5).
+5. **Determinism** (§4.2, superseded ruling): the derivation is a pure function of
+   the final ratings — no variation term, no style seed. Variety comes from varied
+   skills; the clock-conditioned heave stays deferred (§5).
 
 ### The oracle's proof obligations (structural claims, NOT a calibration gate)
 

@@ -121,11 +121,16 @@ public sealed class Player
 
     /// <summary>
     /// How often this player wants to take rim attempts when given the choice.
-    /// Authored, 0–99, INDEPENDENT of <see cref="Finishing"/> (which governs
-    /// CONVERSION at the rim). Klay Thompson and Steph Curry can have similar
-    /// three-point conversion skill but very different ThreeTendency values — the
-    /// shot mix the engine produces reflects what a player WANTS to take, not
-    /// just what they're good at.
+    /// 0–99, INDEPENDENT of <see cref="Finishing"/> (which governs CONVERSION at
+    /// the rim). The shot mix the engine produces reflects what a player WANTS to
+    /// take, not just what they're good at.
+    ///
+    /// <para><b>Source of the value:</b> for GENERATED players these five
+    /// tendencies are DERIVED from the player's own final skill profile (the
+    /// procedural generator, Session 34 — the old nine-row role table is retired).
+    /// Identical final ratings yield an identical diet; population variety comes
+    /// from varied drawn skills. Explicit JSON rosters and stress fixtures may
+    /// still AUTHOR these values intentionally — both are valid inputs.</para>
     ///
     /// <para><b>Phase 9 read:</b> RimTendency is one of the five per-zone
     /// tendency baselines RollGGenerator normalizes and bends by the matchup
@@ -147,10 +152,14 @@ public sealed class Player
     public int LongTendency { get; init; }
 
     /// <summary>How often this player wants to take three-point attempts. See
-    /// <see cref="RimTendency"/>. A high <see cref="Outside"/> + low
-    /// ThreeTendency player is a skilled shooter who doesn't shoot much (catch-
-    /// and-shoot role); a low Outside + high ThreeTendency player is a volume
-    /// chucker.</summary>
+    /// <see cref="RimTendency"/> for where the value comes from (derived from the
+    /// final skill profile for generated players; authored for JSON/stress
+    /// fixtures). Tendency and skill stay independent: a high <see cref="Outside"/>
+    /// player can still have a modest ThreeTendency (a skilled shooter in a
+    /// catch-and-shoot role who doesn't launch many), and a JSON/stress fixture may
+    /// deliberately pair a low Outside with a high ThreeTendency (a volume chucker)
+    /// — for generated players the derivation ties the two together sensibly, but
+    /// the fields remain separate by design.</summary>
     public int ThreeTendency { get; init; }
 
     /// <summary>Ball security and control — turnover resistance, beating pressure.
