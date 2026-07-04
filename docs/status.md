@@ -1,0 +1,116 @@
+# Project Charm — Status Board
+
+The living done/to-do board. **Read this FIRST when planning any session** (CONVENTIONS §6a),
+and update it in the docs step of every session (CONVENTIONS §3). Rules:
+
+- Edited **in place**, like design.md — this reflects *now*; journal.md holds history.
+- An item leaves **Open** or **Parked** only by **shipping** or by an **explicit ruling**
+  (which moves it to Closed-by-ruling) — never by fading out of memory.
+- Keep it short. This is a checklist, not a third journal. One line per item, with the
+  session/phase that owns the detail.
+
+Last updated: Session 36.1 (2026-07-04).
+
+---
+
+## 1. Built and live
+
+Every roll has a **real generator**, and every meaningful execution path (observation run,
+stress test, season, calibration, gen bench) wires all of them. There are **no outstanding
+stub generators.** The stub classes that remain exist only for isolated harness regression
+baselines and the legacy `game` demo command (see Open).
+
+| Roll | What drives it |
+|---|---|
+| A — Entry | Press decision + slot-weighted matchup (P15) |
+| B — Halfcourt initiation | Pressure + steals-vs-handling matchup (P13) |
+| C — Turnover classification | Context ticket (halfcourt / transition / entry-backcourt); flat within context **by ruling** (§2) |
+| D — Foul flavor | Flat **by structural necessity** (§2) |
+| E — Player selection | Attribute-driven usage hierarchy (P15/19) + defensive attention (P27) |
+| F — Player action | Pressure + matchup (P12) |
+| G — Shot location | Matchup bend on residualized gaps (P9 + S36 Route B), coaching nudge (P30), usage diet shift (P17), attention amplifier (P28), **matchup displacement** (S36) |
+| H — Make/miss | Matchup make/block/foul doors (P6/7/8), IQ term (P50), fatigue-discounted athleticism (P49) |
+| I — Rebound | Two-touchpoint matchup model (P10) |
+| J — Transition run-or-not | Coach pace + team athleticism gap (P28/30) |
+| K — Offensive rebound | Attribute-driven putback tilt, per-zone (P32) |
+| L — Free throws | Authored FT rating (P18) |
+| M — FT glass | Roll I's model on the FT board population (P11) |
+| Offensive-foul flavor | Frontcourt/backcourt context; flat within context **by ruling** (§2) |
+
+**Systems live:** fouls/bonus + jump-ball arrow; end-of-half intent; OT; fatigue meter +
+athleticism discount + fatigue-fence substitutions; Governor + Resolver walk with full
+per-possession counters; shooting-foul / steal / rebound / block / assist attribution.
+
+**Layers live:** player generation Pass 1 + skill-derived tendencies (oracle v2, 19-vector
+golden parity); divvy Pass 1.5 (national pool + prestige draft); world Pass 1 (347 schools,
+32 conferences); season Pass 2 (schedule oracle-fingerprinted, standings, calibration page);
+Roll G displacement (oracle v1, 10-vector golden parity, Phase 56); observation / stress /
+bench instruments.
+
+## 2. Closed by ruling (looks unfinished — is not; do not "fix")
+
+- **Turnover KIND stays flat.** Attributes drive how *often* a team turns it over (Rolls
+  A/B/F own frequency), not what *kind* results. (Roll C docstring; the stub-era pressure
+  parameter was retired on purpose.)
+- **Roll D foul flavor stays flat.** Fires before Roll G — no zone stamped; slot may be
+  null — no position context exists at its call time.
+- **Offensive-foul flavor stays flat** beyond the frontcourt/backcourt split. Flavor is
+  theater; nothing downstream reads it functionally.
+- **The and-1 split (MafFraction) is per-zone, not matchup-aware.** Emmett's call.
+- **Tendencies are deterministic in ratings** — same final ratings, same diet; the
+  per-player style draw was rejected (S34). Volume differences are usage's job.
+- **Held-ball losses stay off the turnover line** (S33 R1).
+- **The tendency oracle's population-mean diet is a directional diagnostic only** — never
+  a gate (S34/35).
+- **DisplacementMaxMagnitude = 0 is ablation only** — it does NOT undo Route B; the
+  residualized bend is ruled structure, not a dial (S36).
+
+## 3. Open — next-session candidates
+
+- **Season calibration pass** at seed 20260703 on the stock world — the front-runner.
+  Fresh read needed now that displacement is live; last recorded page (S35): 3PA rate
+  ~0.32 vs 0.39 target, FG% ~45.6 vs 44.0, 3P% ~33 vs 34.0, per-zone FG% all OK, pace OK,
+  FT% OK. Known open verdicts from earlier pages: FTA LOW, steals LOW (4.4 vs 6.2) with
+  total TOs slightly HIGH, OT LOW (2.9% vs 4–8%).
+- **Turnover-clock dial** — shift the turnover-possession draw *center* shorter (measured
+  17.3s vs ~18.2s for shooting endings; full range stays legal). (S31/33)
+- **Whistle / FTA dial** — FTA LOW; the total-PF cumulative counter rides this session;
+  standing condition: if Roll H block/foul baselines move, rim/short midpoints re-derive.
+- **Steals vs dead-ball composition** — sharpen the live/dead turnover mix. (S33)
+- **Curve-steepness design conversation** — before any K moves; carries the finding that
+  diminishing returns no longer exist inside the authored 0–99 range. (S32)
+- **Displacement magnitude tuning** — only via the oracle-first flow (approve new oracle
+  calibration → regenerate fixture → sync C# defaults + config → parity stays green). (S36)
+- **`game` demo command** still stub-wired (self-documented) — upgrade to real generators
+  or retire; micro-session or rides a session that touches Program.Game.cs anyway.
+
+## 4. Parked — waiting on a named prerequisite
+
+- **Player-generation Pass 2** — tweener-post existence requirement; weakest-leg
+  multiplicative development. (Formal notes in memory + journal, parked 2026-07-03.)
+- **Roll G lineup-context bend** — teammate spacing/gravity as a *selection* effect
+  (gravity/spacing attributes carried on Player, unread). Needs its own design conversation.
+- **`Outside == 0` buzzer heave** at pie time — the only heave residual left after the
+  universal capable floor (S35). Tiny.
+- **Personality/timidity on the usage dial; strategy layers.** (S36)
+- **Per-player attribution for held balls and Roll K turnovers** — records carry no
+  slot/committer; aggregate-only today. (S33)
+- **Press frequency / break rate game-level sentinels** — counter plumbing. (Named in the
+  observation output's deferred block.)
+- **Length-in-make% defender term** — a parked candidate wire, judged on its own merits,
+  never a rescue knob. (S17/S40-era)
+- **Per-zone location-blend weights** (top-3 blend varies by zone). (P9)
+- **Corner vs above-the-break three split.** (P9)
+- **Reference-card source pinning** — per line, when a tuning session needs a bullseye. (S31)
+- **Multi-seed measurement** — blend seeds if per-zone drift proves material. (S31/32)
+- **EqualShare centralization** — one shared constant across C1/C3/selection-tilt/Roll G. (P28)
+- **Opening-five shape / lineup logic** — future lineup-or-coaching layer, not the divvy.
+- **FT unattributed bonus-trip fallback** (pre-Roll-E trips use config MakeProbability 72%)
+  — named loose end, ~0 volume on populated rosters.
+- **Displacement "advantaged" observation bin** — empty on the even sentinel corpus by
+  construction; revisit on a varied-population season page. (S36)
+- **Code hygiene, parked:** WeightedAggregate duplication (A/B); harness `Mk`
+  fixture-builder consolidation; RollEStubPieGenerator's internal double-build.
+- **Long-term watches (design before the relevant layer ships, not now):** save-file
+  schema versioning; end-to-end RNG/determinism review before the full season layer;
+  the Player data layer at 21k+ actives; moddability. (working-with-emmett §7)
