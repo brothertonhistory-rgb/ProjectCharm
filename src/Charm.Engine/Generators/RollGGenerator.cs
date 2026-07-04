@@ -14,33 +14,32 @@ namespace Charm.Engine;
 /// a top-3 blend (<see cref="Matchup.DefensiveResistance"/>) of the five
 /// defenders' CONF-1 zone reads.</para>
 ///
-/// <para><b>The math (settled in design conversation, v2 ratio form):</b>
+/// <para><b>The math (v2 ratio form; Session 36 — Route B + displacement):</b>
 /// <list type="number">
 ///   <item>Baseline: read the shooter's five tendency attributes. Route
 ///         through <see cref="CoachingPull.Apply"/> (live in Phase 30 —
 ///         applies the coach's ShotSelectionBias nudge).</item>
-///   <item>For each zone, compute the defending team's resistance via
-///         <see cref="Matchup.DefensiveResistance"/>.</item>
-///   <item>For each zone, compute the offensive capability via
-///         <see cref="Matchup.OffenseRating"/> (the existing Phase 6
-///         zone→attribute map).</item>
-///   <item>Per-zone gap = capability − resistance. Run through
-///         <see cref="Matchup.GapFn"/> with the existing skill
-///         steepness/exponent. NO new gap function.</item>
-///   <item>Per-zone multiplier = exp(log(LocationMaxMultiplier) ×
-///         tanh(shift / LocationReferenceShift)). Bounded in
-///         (1/Max, Max); exactly 1 at zero gap; NEVER negative.</item>
-///   <item>Multiply each baseline tendency by its multiplier; renormalize
-///         the five products to sum to 1.0.</item>
+///   <item>Hand the coached baseline to <see cref="Matchup.DeriveDisplacement"/>
+///         — the pure derivation mirroring the locked oracle
+///         (tools/displacement_oracle.py): per-zone gaps via the existing
+///         <see cref="Matchup.DefensiveResistance"/>/<see cref="Matchup.OffenseRating"/>
+///         reads; the Phase 9 ratio-form bend applied to RESIDUALIZED gaps
+///         (gap − diet-weighted skill level), so a uniform defensive upgrade
+///         moves the shape by exactly zero; plus the usage-gated asymmetric
+///         displacement ladder driven by the overall level (skill + gentle
+///         physical term). Deltas composed from the same baseline, clamped,
+///         renormalized once.</item>
+///   <item>The usage-driven diet shift (Phase 17) applies downstream, LAST,
+///         unchanged.</item>
 /// </list></para>
 ///
-/// <para><b>Level-mismatch behavior:</b> the math is gap-relative AND
-/// only redistributes mix when the gaps are UNEQUAL across zones. Same
-/// gap everywhere → same multiplier everywhere → renormalization erases
-/// the shift. Mismatches that involve uneven shape (a D1 finisher vs a
-/// D3 defense with weak rim protection) produce per-zone gap inequality,
-/// which shifts the mix toward the most-favorable zone. Level differences
-/// matter to the degree they produce uneven gaps, not directly.</para>
+/// <para><b>Level-mismatch behavior (Session 36):</b> the bend is shape-only —
+/// residualization guarantees a level difference with a UNIFORM shape moves the
+/// mix by exactly zero. Level now acts through the displacement ladder instead:
+/// overmatched featured shooters are pushed outward unconditionally; advantaged
+/// ones are invited inward and accept only per their own Finishing/Close. Both
+/// effects are usage-gated (zero at/below an equal share) except the bend,
+/// which applies whenever gaps are uneven.</para>
 ///
 /// <para><b>Fallback paths (DEC-6):</b>
 /// <list type="bullet">
@@ -134,38 +133,31 @@ public sealed class RollGGenerator : IRollGGenerationProvider
             return new RollGGeneration(shiftedPurePie, pureResidual);
         }
 
-        // 1–5 defenders: bend tendencies by per-zone multipliers (existing Phase 9 math).
-        var rimMult   = Matchup.LocationMultiplier(ShotLocation.Rim,   shooter, defenders, _matchup);
-        var shortMult = Matchup.LocationMultiplier(ShotLocation.Short, shooter, defenders, _matchup);
-        var midMult   = Matchup.LocationMultiplier(ShotLocation.Mid,   shooter, defenders, _matchup);
-        var longMult  = Matchup.LocationMultiplier(ShotLocation.Long,  shooter, defenders, _matchup);
-        var threeMult = Matchup.LocationMultiplier(ShotLocation.Three, shooter, defenders, _matchup);
+        // 1–5 defenders: Session 36 — Route B residualized bend + matchup
+        // displacement, both computed by the pure derivation on Matchup
+        // (stage-for-stage mirror of tools/displacement_oracle.py; if they ever
+        // disagree, the oracle wins).
+        //
+        // The derivation's desiredDiet is the COACHED pre-bend baseline — the
+        // SAME five values the old bend multiplied. The raw authored read inside
+        // ApplyDietShift (intrinsicCapacity) is a DIFFERENT read, deliberately:
+        // the coach can bend where a player shoots from, not how flexible he
+        // inherently is. Do not unify them.
+        var dispDefenders = new List<DisplacementDefender>(populated);
+        foreach (var d in defenders)
+            if (d is not null) dispDefenders.Add(DisplacementDefender.FromPlayer(d));
 
-        var bentRim   = tRim   * rimMult;
-        var bentShort = tShort * shortMult;
-        var bentMid   = tMid   * midMult;
-        var bentLong  = tLong  * longMult;
-        var bentThree = tThree * threeMult;
+        var coached = new double[] { tRim, tShort, tMid, tLong, tThree };
 
-        var total = bentRim + bentShort + bentMid + bentLong + bentThree;
-        if (total <= 0.0)
-            throw new InvalidOperationException(
-                $"RollGGenerator: bent tendency total <= 0 ({total}). " +
-                "Should be unreachable — multipliers are bounded strictly positive by the ratio form.");
+        // Usage source: null and 0 both mean mag = 0 — matches the oracle's gate.
+        var trace = Matchup.DeriveDisplacement(
+            coached, shooter, dispDefenders, state.UsagePressure ?? 0.0, _matchup);
 
-        var bentNorm = new double[]
-        {
-            bentRim   / total,
-            bentShort / total,
-            bentMid   / total,
-            bentLong  / total,
-            bentThree / total,
-        };
-
-        // Apply usage-driven diet shift (Phase 17 addition).
-        // Insert AFTER matchup multiply+renormalize, BEFORE building the final pie.
-        var (finalPie, residual) = ApplyDietShift(state, shooter, bentNorm);
-        return new RollGGeneration(finalPie, residual);
+        // Apply usage-driven diet shift (Phase 17 addition) — unchanged,
+        // downstream, LAST. The derivation's final shares land exactly where
+        // bentNorm went pre-Session-36.
+        var (finalPie, residual) = ApplyDietShift(state, shooter, trace.Final);
+        return new RollGGeneration(finalPie, residual, trace.Level);
     }
 
     /// <inheritdoc cref="IRollGPieGenerator.Generate"/>

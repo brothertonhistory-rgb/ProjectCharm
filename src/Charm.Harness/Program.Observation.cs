@@ -331,6 +331,14 @@ internal static partial class Program
         long totalFtaBonusPicker = 0L, totalFtaBonusSelected = 0L,
              totalFtaBonusUnattributed = 0L, totalFtaShootingSelected = 0L,
              totalFtaShootingNoSlot = 0L;
+
+        // Session 36: displacement-context running totals (level-populated FGA
+        // only; read-only, no assertion). Buckets: level < −5 / |level| ≤ 5 /
+        // level > +5. Null-level attempts are excluded, never counted as neutral.
+        long totalDispLowFga = 0L,  totalDispLowThreePa = 0L,  totalDispLowThreePm = 0L,
+             totalDispMidFga = 0L,  totalDispMidThreePa = 0L,  totalDispMidThreePm = 0L,
+             totalDispHighFga = 0L, totalDispHighThreePa = 0L, totalDispHighThreePm = 0L,
+             totalDispAllFga = 0L;   // ALL FGA — denominator for the excluded-count line
         var gamesRun    = 0;
 
         // ── Phase 23 per-player box score accumulators ──────────────────────
@@ -851,6 +859,18 @@ internal static partial class Program
             longShareList.Add(tFga > 0     ? (double)tLongA / tFga     : 0.0);
             threeShareList.Add(tFga > 0    ? (double)t3pa / tFga       : 0.0);
 
+            // Session 36: displacement-context running totals.
+            totalDispLowFga     += records.Sum(r => r.DispLowFga);
+            totalDispLowThreePa += records.Sum(r => r.DispLowThreePa);
+            totalDispLowThreePm += records.Sum(r => r.DispLowThreePm);
+            totalDispMidFga     += records.Sum(r => r.DispMidFga);
+            totalDispMidThreePa += records.Sum(r => r.DispMidThreePa);
+            totalDispMidThreePm += records.Sum(r => r.DispMidThreePm);
+            totalDispHighFga     += records.Sum(r => r.DispHighFga);
+            totalDispHighThreePa += records.Sum(r => r.DispHighThreePa);
+            totalDispHighThreePm += records.Sum(r => r.DispHighThreePm);
+            totalDispAllFga      += recFga;
+
             // Per-slot FGA running totals — accumulate for aggregate share.
             totalHomeFga   += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Fga);
             totalHomeFgaS1 += records.Where(r => r.Offense == TeamSide.Home).Sum(r => r.Slot1Fga);
@@ -1052,6 +1072,15 @@ internal static partial class Program
         Console.WriteLine();
         Console.WriteLine("--- SHOT MIX ---");
         ObsPrintD("  3PA rate (3PA/FGA, combined)", threePaRateList);
+
+        Console.WriteLine();
+        Console.WriteLine("--- DISPLACEMENT CONTEXT (Session 36; level-populated FGA only, aggregate across all games; RECORDED, NOT JUDGED) ---");
+        var totalDispBucketed = totalDispLowFga + totalDispMidFga + totalDispHighFga;
+        double Rate(long num, long den) => den > 0 ? (double)num / den : 0.0;
+        Console.WriteLine($"  level < -5 (overmatched) : FGA {totalDispLowFga,10:N0}  3PA-rate {Rate(totalDispLowThreePa, totalDispLowFga):P2}  3P% {Rate(totalDispLowThreePm, totalDispLowThreePa):P2}");
+        Console.WriteLine($"  |level| <= 5 (near-even) : FGA {totalDispMidFga,10:N0}  3PA-rate {Rate(totalDispMidThreePa, totalDispMidFga):P2}  3P% {Rate(totalDispMidThreePm, totalDispMidThreePa):P2}");
+        Console.WriteLine($"  level > +5 (advantaged)  : FGA {totalDispHighFga,10:N0}  3PA-rate {Rate(totalDispHighThreePa, totalDispHighFga):P2}  3P% {Rate(totalDispHighThreePm, totalDispHighThreePa):P2}");
+        Console.WriteLine($"  null-level FGA excluded  : {totalDispAllFga - totalDispBucketed:N0} of {totalDispAllFga:N0} (FastBreak / stub / zero-defender / bonus-FT putback)");
 
         Console.WriteLine();
         Console.WriteLine("--- SHOOTING BY ZONE (combined, per game) ---");

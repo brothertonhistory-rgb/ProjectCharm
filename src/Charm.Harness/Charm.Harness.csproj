@@ -40,6 +40,12 @@
     <None Include="..\..\tools\tendency_golden.json" Link="tools\tendency_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Roll G displacement golden fixture (emitted by tools/displacement_oracle.py,
+         LOCKED SPEC ORACLE v1, 2026-07-04), copied beside the binary so the Phase 56
+         golden parity reads it from AppContext.BaseDirectory (same convention). -->
+    <None Include="..\..\tools\displacement_golden.json" Link="tools\displacement_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

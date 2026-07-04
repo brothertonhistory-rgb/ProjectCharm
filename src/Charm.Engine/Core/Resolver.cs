@@ -178,6 +178,15 @@ public sealed class Resolver
         var fgm = 0;
         var threePa = 0;
         var threePm = 0;
+        // Session 36: displacement-context bucket counters — read-only observation
+        // instrumentation. Every FGA whose state carries a populated
+        // ShotDisplacementLevel lands in exactly one of three buckets
+        // (level < −5 / |level| ≤ 5 / level > +5); a null level is EXCLUDED,
+        // never counted as neutral (FastBreak, stub, zero-defender paths, and
+        // bonus-FT putbacks where Roll G never ran on this state).
+        var dispLowFga = 0;   var dispLowThreePa = 0;   var dispLowThreePm = 0;
+        var dispMidFga = 0;   var dispMidThreePa = 0;   var dispMidThreePm = 0;
+        var dispHighFga = 0;  var dispHighThreePa = 0;  var dispHighThreePm = 0;
         var shotResolutions = 0;
         var missFouled = 0;
         var fta = 0;
@@ -300,6 +309,9 @@ public sealed class Resolver
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
                         { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods,
                           Fga = fga, Fgm = fgm, ThreePa = threePa, ThreePm = threePm,
+                          DispLowFga = dispLowFga, DispLowThreePa = dispLowThreePa, DispLowThreePm = dispLowThreePm,
+                          DispMidFga = dispMidFga, DispMidThreePa = dispMidThreePa, DispMidThreePm = dispMidThreePm,
+                          DispHighFga = dispHighFga, DispHighThreePa = dispHighThreePa, DispHighThreePm = dispHighThreePm,
                           ShotResolutions = shotResolutions, MissFouled = missFouled,
                           Fta = fta, Ftm = ftm, OrbChances = orbChances, OrbWon = orbWon,
                           FtaBonusPicker = ftaBonusPicker, FtaBonusSelected = ftaBonusSelected,
@@ -536,7 +548,7 @@ public sealed class Resolver
                         // (state, pie, rng) — like Roll F, not Roll E.
                         case ContinuationKind.IntoShotType:
                             var genG  = _rollGGenerator.GenerateWithResidual(c.State);
-                            result = RollG.Execute(c.State, genG.Pie, genG.ResidualPressure, _rng);
+                            result = RollG.Execute(c.State, genG.Pie, genG.ResidualPressure, _rng, genG.DisplacementLevel);
                             continue;
 
                         // Roll G's stamped shot -> execute Roll H (make/miss), loop.
@@ -584,6 +596,27 @@ public sealed class Resolver
                                         case ShotLocation.Mid:   midFga++;   break;
                                         case ShotLocation.Short: shortFga++; break;
                                         case ShotLocation.Rim:   rimFga++;   break;
+                                    }
+                                    // Session 36: displacement-context bucket (level-populated FGA only).
+                                    if (shotSt.ShotDisplacementLevel is double dispLevel)
+                                    {
+                                        var isThree = shotSt.ShotType == ShotLocation.Three;
+                                        var isMake  = shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled;
+                                        if (dispLevel < -5.0)
+                                        {
+                                            dispLowFga++;
+                                            if (isThree) { dispLowThreePa++; if (isMake) dispLowThreePm++; }
+                                        }
+                                        else if (dispLevel > 5.0)
+                                        {
+                                            dispHighFga++;
+                                            if (isThree) { dispHighThreePa++; if (isMake) dispHighThreePm++; }
+                                        }
+                                        else
+                                        {
+                                            dispMidFga++;
+                                            if (isThree) { dispMidThreePa++; if (isMake) dispMidThreePm++; }
+                                        }
                                     }
                                     if (shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled)
                                     {

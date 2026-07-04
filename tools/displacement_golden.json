@@ -1,0 +1,1231 @@
+{
+ "vectors": [
+  {
+   "defenders": [
+    {
+     "FirstStep": 70.0,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70.0,
+     "RimProtection": 70,
+     "Speed": 70.0,
+     "Strength": 70.0,
+     "Vertical": 70.0
+    },
+    {
+     "FirstStep": 70.0,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70.0,
+     "RimProtection": 70,
+     "Speed": 70.0,
+     "Strength": 70.0,
+     "Vertical": 70.0
+    },
+    {
+     "FirstStep": 70.0,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70.0,
+     "RimProtection": 70,
+     "Speed": 70.0,
+     "Strength": 70.0,
+     "Vertical": 70.0
+    },
+    {
+     "FirstStep": 70.0,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70.0,
+     "RimProtection": 70,
+     "Speed": 70.0,
+     "Strength": 70.0,
+     "Vertical": 70.0
+    },
+    {
+     "FirstStep": 70.0,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70.0,
+     "RimProtection": 70,
+     "Speed": 70.0,
+     "Strength": 70.0,
+     "Vertical": 70.0
+    }
+   ],
+   "diet": {
+    "Long": 9,
+    "Mid": 18,
+    "Rim": 18,
+    "Short": 10,
+    "Three": 45
+   },
+   "name": "1 shooter vs uniform-strong (above HIS level)",
+   "shooter": {
+    "Close": 48,
+    "Finishing": 48,
+    "FirstStep": 50,
+    "Mid": 55,
+    "Outside": 72,
+    "Quickness": 50,
+    "Speed": 50,
+    "Strength": 50,
+    "Vertical": 50
+   },
+   "trace": {
+    "base": {
+     "Long": 0.09,
+     "Mid": 0.18,
+     "Rim": 0.18,
+     "Short": 0.1,
+     "Three": 0.45
+    },
+    "bentShapeOnly": {
+     "Long": 0.09430259971846569,
+     "Mid": 0.1767427222914626,
+     "Rim": 0.1654982224699778,
+     "Short": 0.09194345692776545,
+     "Three": 0.4715129985923285
+    },
+    "final": {
+     "Long": 0.09722064876480953,
+     "Mid": 0.17016159039970838,
+     "Rim": 0.13408263060933984,
+     "Short": 0.08138881144098983,
+     "Three": 0.5171463187851524
+    },
+    "gaps": {
+     "Long": 2.0,
+     "Mid": -15.0,
+     "Rim": -22.0,
+     "Short": -22.0,
+     "Three": 2.0
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 1.0,
+     "Three": -2.0
+    },
+    "level": -9.810152825805883,
+    "mag": -0.07160253160394987,
+    "physLevel": -2.0301528258058834,
+    "residuals": {
+     "Long": 9.780000000000001,
+     "Mid": -7.22,
+     "Rim": -14.219999999999999,
+     "Short": -14.219999999999999,
+     "Three": 9.780000000000001
+    },
+    "skillLevel": -7.78
+   },
+   "usagePressure": 0.15
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 84.0,
+     "PerimeterDefense": 78,
+     "PostDefense": 82,
+     "Quickness": 84.0,
+     "RimProtection": 92,
+     "Speed": 84.0,
+     "Strength": 84.0,
+     "Vertical": 84.0
+    },
+    {
+     "FirstStep": 84.0,
+     "PerimeterDefense": 78,
+     "PostDefense": 82,
+     "Quickness": 84.0,
+     "RimProtection": 92,
+     "Speed": 84.0,
+     "Strength": 84.0,
+     "Vertical": 84.0
+    },
+    {
+     "FirstStep": 84.0,
+     "PerimeterDefense": 78,
+     "PostDefense": 82,
+     "Quickness": 84.0,
+     "RimProtection": 92,
+     "Speed": 84.0,
+     "Strength": 84.0,
+     "Vertical": 84.0
+    },
+    {
+     "FirstStep": 84.0,
+     "PerimeterDefense": 78,
+     "PostDefense": 82,
+     "Quickness": 84.0,
+     "RimProtection": 92,
+     "Speed": 84.0,
+     "Strength": 84.0,
+     "Vertical": 84.0
+    },
+    {
+     "FirstStep": 84.0,
+     "PerimeterDefense": 78,
+     "PostDefense": 82,
+     "Quickness": 84.0,
+     "RimProtection": 92,
+     "Speed": 84.0,
+     "Strength": 84.0,
+     "Vertical": 84.0
+    }
+   ],
+   "diet": {
+    "Long": 5,
+    "Mid": 12,
+    "Rim": 55,
+    "Short": 18,
+    "Three": 10
+   },
+   "name": "2 slasher vs ELITE wall (rim res above HIS 80)",
+   "shooter": {
+    "Close": 60,
+    "Finishing": 80,
+    "FirstStep": 72,
+    "Mid": 42,
+    "Outside": 40,
+    "Quickness": 72,
+    "Speed": 72,
+    "Strength": 72,
+    "Vertical": 72
+   },
+   "trace": {
+    "base": {
+     "Long": 0.05,
+     "Mid": 0.12,
+     "Rim": 0.55,
+     "Short": 0.18,
+     "Three": 0.1
+    },
+    "bentShapeOnly": {
+     "Long": 0.04280146166594795,
+     "Mid": 0.10375056428176659,
+     "Rim": 0.5848618640680979,
+     "Short": 0.18212730641604863,
+     "Three": 0.08645880356813883
+    },
+    "final": {
+     "Long": 0.05653681465437458,
+     "Mid": 0.12047657048245161,
+     "Rim": 0.5126666835821315,
+     "Short": 0.1828580542597679,
+     "Three": 0.12746187702127446
+    },
+    "gaps": {
+     "Long": -38.599999999999994,
+     "Mid": -38.0,
+     "Rim": -8.5,
+     "Short": -21.400000000000006,
+     "Three": -38.0
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 1.0,
+     "Three": -2.0
+    },
+    "level": -19.64741162472497,
+    "mag": -0.1187692189860622,
+    "physLevel": -0.8304116247249711,
+    "residuals": {
+     "Long": -19.782999999999994,
+     "Mid": -19.183,
+     "Rim": 10.317,
+     "Short": -2.5830000000000055,
+     "Three": -19.183
+    },
+    "skillLevel": -18.817
+   },
+   "usagePressure": 0.15
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    },
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    },
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    },
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    },
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    }
+   ],
+   "diet": {
+    "Long": 11,
+    "Mid": 22,
+    "Rim": 30,
+    "Short": 15,
+    "Three": 22
+   },
+   "name": "3 star vs weak (well below HIS level)",
+   "shooter": {
+    "Close": 66,
+    "Finishing": 78,
+    "FirstStep": 70,
+    "Mid": 80,
+    "Outside": 78,
+    "Quickness": 70,
+    "Speed": 70,
+    "Strength": 70,
+    "Vertical": 70
+   },
+   "trace": {
+    "base": {
+     "Long": 0.11,
+     "Mid": 0.22,
+     "Rim": 0.3,
+     "Short": 0.15,
+     "Three": 0.22
+    },
+    "bentShapeOnly": {
+     "Long": 0.1107174088337069,
+     "Mid": 0.22235609258433955,
+     "Rim": 0.3019565695464734,
+     "Short": 0.1435351113680664,
+     "Three": 0.2214348176674138
+    },
+    "final": {
+     "Long": 0.09087547605758126,
+     "Mid": 0.21600250781088198,
+     "Rim": 0.3841933560702869,
+     "Short": 0.16050798872488112,
+     "Three": 0.14842067133636871
+    },
+    "gaps": {
+     "Long": 48.0,
+     "Mid": 50.0,
+     "Rim": 48.0,
+     "Short": 36.0,
+     "Three": 48.0
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 0.9375,
+     "Three": -2.0
+    },
+    "level": 53.46859293454946,
+    "mag": 0.15600674012457266,
+    "physLevel": 6.828592934549464,
+    "residuals": {
+     "Long": 1.3599999999999994,
+     "Mid": 3.3599999999999994,
+     "Rim": 1.3599999999999994,
+     "Short": -10.64,
+     "Three": 1.3599999999999994
+    },
+    "skillLevel": 46.64
+   },
+   "usagePressure": 0.15
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    },
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    },
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    },
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    },
+    {
+     "FirstStep": 30.0,
+     "PerimeterDefense": 30,
+     "PostDefense": 30,
+     "Quickness": 30.0,
+     "RimProtection": 30,
+     "Speed": 30.0,
+     "Strength": 30.0,
+     "Vertical": 30.0
+    }
+   ],
+   "diet": {
+    "Long": 8,
+    "Mid": 12,
+    "Rim": 8,
+    "Short": 6,
+    "Three": 66
+   },
+   "name": "4 spot-up in blowout, LOW usage",
+   "shooter": {
+    "Close": 44,
+    "Finishing": 46,
+    "FirstStep": 46,
+    "Mid": 52,
+    "Outside": 74,
+    "Quickness": 46,
+    "Speed": 46,
+    "Strength": 46,
+    "Vertical": 46
+   },
+   "trace": {
+    "base": {
+     "Long": 0.08,
+     "Mid": 0.12,
+     "Rim": 0.08,
+     "Short": 0.06,
+     "Three": 0.66
+    },
+    "bentShapeOnly": {
+     "Long": 0.0835798053968512,
+     "Mid": 0.11092474836330621,
+     "Rim": 0.06731448334049443,
+     "Short": 0.048647568375325724,
+     "Three": 0.6895333945240224
+    },
+    "final": {
+     "Long": 0.0835798053968512,
+     "Mid": 0.11092474836330621,
+     "Rim": 0.06731448334049443,
+     "Short": 0.048647568375325724,
+     "Three": 0.6895333945240224
+    },
+    "gaps": {
+     "Long": 44.0,
+     "Mid": 22.0,
+     "Rim": 16.0,
+     "Short": 14.0,
+     "Three": 44.0
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 1.0,
+     "Three": -2.0
+    },
+    "level": 38.693840165375875,
+    "mag": 0.0,
+    "physLevel": 1.3738401653758707,
+    "residuals": {
+     "Long": 6.68,
+     "Mid": -15.32,
+     "Rim": -21.32,
+     "Short": -23.32,
+     "Three": 6.68
+    },
+    "skillLevel": 37.32
+   },
+   "usagePressure": 0.0
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70,
+     "RimProtection": 70,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    },
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70,
+     "RimProtection": 70,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    },
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70,
+     "RimProtection": 70,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    },
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70,
+     "RimProtection": 70,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    },
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 70,
+     "PostDefense": 70,
+     "Quickness": 70,
+     "RimProtection": 70,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    }
+   ],
+   "diet": {
+    "Long": 9,
+    "Mid": 18,
+    "Rim": 18,
+    "Short": 10,
+    "Three": 45
+   },
+   "name": "5a shooter vs UNIFORM strong, ath pinned 70",
+   "shooter": {
+    "Close": 48,
+    "Finishing": 48,
+    "FirstStep": 50,
+    "Mid": 55,
+    "Outside": 72,
+    "Quickness": 50,
+    "Speed": 50,
+    "Strength": 50,
+    "Vertical": 50
+   },
+   "trace": {
+    "base": {
+     "Long": 0.09,
+     "Mid": 0.18,
+     "Rim": 0.18,
+     "Short": 0.1,
+     "Three": 0.45
+    },
+    "bentShapeOnly": {
+     "Long": 0.09430259971846569,
+     "Mid": 0.1767427222914626,
+     "Rim": 0.1654982224699778,
+     "Short": 0.09194345692776545,
+     "Three": 0.4715129985923285
+    },
+    "final": {
+     "Long": 0.09722064876480953,
+     "Mid": 0.17016159039970838,
+     "Rim": 0.13408263060933984,
+     "Short": 0.08138881144098983,
+     "Three": 0.5171463187851524
+    },
+    "gaps": {
+     "Long": 2.0,
+     "Mid": -15.0,
+     "Rim": -22.0,
+     "Short": -22.0,
+     "Three": 2.0
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 1.0,
+     "Three": -2.0
+    },
+    "level": -9.810152825805883,
+    "mag": -0.07160253160394987,
+    "physLevel": -2.0301528258058834,
+    "residuals": {
+     "Long": 9.780000000000001,
+     "Mid": -7.22,
+     "Rim": -14.219999999999999,
+     "Short": -14.219999999999999,
+     "Three": 9.780000000000001
+    },
+    "skillLevel": -7.78
+   },
+   "usagePressure": 0.15
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 65,
+     "PostDefense": 76.97216699801193,
+     "Quickness": 70,
+     "RimProtection": 82,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    },
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 65,
+     "PostDefense": 76.97216699801193,
+     "Quickness": 70,
+     "RimProtection": 82,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    },
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 65,
+     "PostDefense": 76.97216699801193,
+     "Quickness": 70,
+     "RimProtection": 82,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    },
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 65,
+     "PostDefense": 76.97216699801193,
+     "Quickness": 70,
+     "RimProtection": 82,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    },
+    {
+     "FirstStep": 70,
+     "PerimeterDefense": 65,
+     "PostDefense": 76.97216699801193,
+     "Quickness": 70,
+     "RimProtection": 82,
+     "Speed": 70,
+     "Strength": 70,
+     "Vertical": 70
+    }
+   ],
+   "diet": {
+    "Long": 9,
+    "Mid": 18,
+    "Rim": 18,
+    "Short": 10,
+    "Three": 45
+   },
+   "name": "5b shooter vs UNEVEN rim-first, LEVEL-MATCHED to 5a",
+   "shooter": {
+    "Close": 48,
+    "Finishing": 48,
+    "FirstStep": 50,
+    "Mid": 55,
+    "Outside": 72,
+    "Quickness": 50,
+    "Speed": 50,
+    "Strength": 50,
+    "Vertical": 50
+   },
+   "trace": {
+    "base": {
+     "Long": 0.09,
+     "Mid": 0.18,
+     "Rim": 0.18,
+     "Short": 0.1,
+     "Three": 0.45
+    },
+    "bentShapeOnly": {
+     "Long": 0.0977823458052514,
+     "Mid": 0.1763193704571202,
+     "Rim": 0.14057786589631882,
+     "Short": 0.08566332628660467,
+     "Three": 0.49965709155470495
+    },
+    "final": {
+     "Long": 0.10070039485159525,
+     "Mid": 0.16973823856536602,
+     "Rim": 0.10916227403568086,
+     "Short": 0.07510868079982906,
+     "Three": 0.5452904117475289
+    },
+    "gaps": {
+     "Long": 5.20417495029821,
+     "Mid": -15.986083499005957,
+     "Rim": -32.24025844930418,
+     "Short": -27.17634194831014,
+     "Three": 7.0
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 1.0,
+     "Three": -2.0
+    },
+    "level": -9.810152825805883,
+    "mag": -0.07160253160394987,
+    "physLevel": -2.0301528258058834,
+    "residuals": {
+     "Long": 12.98417495029821,
+     "Mid": -8.206083499005958,
+     "Rim": -24.460258449304177,
+     "Short": -19.396341948310138,
+     "Three": 14.78
+    },
+    "skillLevel": -7.779999999999999
+   },
+   "usagePressure": 0.15
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 52.0,
+     "PerimeterDefense": 52,
+     "PostDefense": 52,
+     "Quickness": 52.0,
+     "RimProtection": 52,
+     "Speed": 52.0,
+     "Strength": 52.0,
+     "Vertical": 52.0
+    },
+    {
+     "FirstStep": 52.0,
+     "PerimeterDefense": 52,
+     "PostDefense": 52,
+     "Quickness": 52.0,
+     "RimProtection": 52,
+     "Speed": 52.0,
+     "Strength": 52.0,
+     "Vertical": 52.0
+    },
+    {
+     "FirstStep": 52.0,
+     "PerimeterDefense": 52,
+     "PostDefense": 52,
+     "Quickness": 52.0,
+     "RimProtection": 52,
+     "Speed": 52.0,
+     "Strength": 52.0,
+     "Vertical": 52.0
+    },
+    {
+     "FirstStep": 52.0,
+     "PerimeterDefense": 52,
+     "PostDefense": 52,
+     "Quickness": 52.0,
+     "RimProtection": 52,
+     "Speed": 52.0,
+     "Strength": 52.0,
+     "Vertical": 52.0
+    },
+    {
+     "FirstStep": 52.0,
+     "PerimeterDefense": 52,
+     "PostDefense": 52,
+     "Quickness": 52.0,
+     "RimProtection": 52,
+     "Speed": 52.0,
+     "Strength": 52.0,
+     "Vertical": 52.0
+    }
+   ],
+   "diet": {
+    "Long": 8,
+    "Mid": 12,
+    "Rim": 8,
+    "Short": 6,
+    "Three": 66
+   },
+   "name": "6 spot-up specialist HIGH usage, avg defense",
+   "shooter": {
+    "Close": 44,
+    "Finishing": 46,
+    "FirstStep": 46,
+    "Mid": 52,
+    "Outside": 74,
+    "Quickness": 46,
+    "Speed": 46,
+    "Strength": 46,
+    "Vertical": 46
+   },
+   "trace": {
+    "base": {
+     "Long": 0.08,
+     "Mid": 0.12,
+     "Rim": 0.08,
+     "Short": 0.06,
+     "Three": 0.66
+    },
+    "bentShapeOnly": {
+     "Long": 0.0835798053968512,
+     "Mid": 0.11092474836330621,
+     "Rim": 0.06731448334049443,
+     "Short": 0.04864756837532574,
+     "Three": 0.6895333945240225
+    },
+    "final": {
+     "Long": 0.08731333300929467,
+     "Mid": 0.1326478093191956,
+     "Rim": 0.08685464775413808,
+     "Short": 0.06152444504542346,
+     "Three": 0.6316597648719483
+    },
+    "gaps": {
+     "Long": 22.000000000000007,
+     "Mid": 0.0,
+     "Rim": -6.0,
+     "Short": -7.999999999999993,
+     "Three": 22.0
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 0.47058823529411764,
+     "Short": 0.25,
+     "Three": -2.0
+    },
+    "level": 15.073117146874026,
+    "mag": 0.11376249869625878,
+    "physLevel": -0.24688285312597624,
+    "residuals": {
+     "Long": 6.680000000000005,
+     "Mid": -15.320000000000002,
+     "Rim": -21.32,
+     "Short": -23.319999999999993,
+     "Three": 6.679999999999998
+    },
+    "skillLevel": 15.320000000000002
+   },
+   "usagePressure": 0.17
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 76.0,
+     "PerimeterDefense": 76,
+     "PostDefense": 76,
+     "Quickness": 76.0,
+     "RimProtection": 76,
+     "Speed": 76.0,
+     "Strength": 76.0,
+     "Vertical": 76.0
+    },
+    {
+     "FirstStep": 76.0,
+     "PerimeterDefense": 76,
+     "PostDefense": 76,
+     "Quickness": 76.0,
+     "RimProtection": 76,
+     "Speed": 76.0,
+     "Strength": 76.0,
+     "Vertical": 76.0
+    },
+    {
+     "FirstStep": 76.0,
+     "PerimeterDefense": 76,
+     "PostDefense": 76,
+     "Quickness": 76.0,
+     "RimProtection": 76,
+     "Speed": 76.0,
+     "Strength": 76.0,
+     "Vertical": 76.0
+    },
+    {
+     "FirstStep": 76.0,
+     "PerimeterDefense": 76,
+     "PostDefense": 76,
+     "Quickness": 76.0,
+     "RimProtection": 76,
+     "Speed": 76.0,
+     "Strength": 76.0,
+     "Vertical": 76.0
+    },
+    {
+     "FirstStep": 76.0,
+     "PerimeterDefense": 76,
+     "PostDefense": 76,
+     "Quickness": 76.0,
+     "RimProtection": 76,
+     "Speed": 76.0,
+     "Strength": 76.0,
+     "Vertical": 76.0
+    }
+   ],
+   "diet": {
+    "Long": 11,
+    "Mid": 22,
+    "Rim": 30,
+    "Short": 15,
+    "Three": 22
+   },
+   "name": "7 star vs defense AT HIS level (equal-to-him)",
+   "shooter": {
+    "Close": 66,
+    "Finishing": 78,
+    "FirstStep": 70,
+    "Mid": 80,
+    "Outside": 78,
+    "Quickness": 70,
+    "Speed": 70,
+    "Strength": 70,
+    "Vertical": 70
+   },
+   "trace": {
+    "base": {
+     "Long": 0.11,
+     "Mid": 0.22,
+     "Rim": 0.3,
+     "Short": 0.15,
+     "Three": 0.22
+    },
+    "bentShapeOnly": {
+     "Long": 0.1107174088337069,
+     "Mid": 0.22235609258433955,
+     "Rim": 0.3019565695464734,
+     "Short": 0.1435351113680664,
+     "Three": 0.2214348176674138
+    },
+    "final": {
+     "Long": 0.11025826195289465,
+     "Mid": 0.22220906917368574,
+     "Rim": 0.3038595476709564,
+     "Short": 0.1439278676476445,
+     "Three": 0.2197452535548186
+    },
+    "gaps": {
+     "Long": 2.0,
+     "Mid": 4.0,
+     "Rim": 2.0,
+     "Short": -10.0,
+     "Three": 2.0
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 0.9375,
+     "Three": -2.0
+    },
+    "level": 0.39311714687402377,
+    "mag": 0.0035081187570697153,
+    "physLevel": -0.24688285312597624,
+    "residuals": {
+     "Long": 1.3599999999999999,
+     "Mid": 3.36,
+     "Rim": 1.3599999999999999,
+     "Short": -10.64,
+     "Three": 1.3599999999999999
+    },
+    "skillLevel": 0.64
+   },
+   "usagePressure": 0.17
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 68,
+     "PerimeterDefense": 74,
+     "PostDefense": 70,
+     "Quickness": 68,
+     "RimProtection": 78,
+     "Speed": 68,
+     "Strength": 68,
+     "Vertical": 68
+    },
+    {
+     "FirstStep": 62,
+     "PerimeterDefense": 66,
+     "PostDefense": 72,
+     "Quickness": 62,
+     "RimProtection": 70,
+     "Speed": 62,
+     "Strength": 62,
+     "Vertical": 62
+    },
+    {
+     "FirstStep": 71,
+     "PerimeterDefense": 70,
+     "PostDefense": 64,
+     "Quickness": 71,
+     "RimProtection": 72,
+     "Speed": 71,
+     "Strength": 71,
+     "Vertical": 71
+    },
+    {
+     "FirstStep": 40,
+     "PerimeterDefense": 30,
+     "PostDefense": 28,
+     "Quickness": 40,
+     "RimProtection": 26,
+     "Speed": 40,
+     "Strength": 40,
+     "Vertical": 40
+    },
+    {
+     "FirstStep": 45,
+     "PerimeterDefense": 28,
+     "PostDefense": 32,
+     "Quickness": 45,
+     "RimProtection": 30,
+     "Speed": 45,
+     "Strength": 45,
+     "Vertical": 45
+    }
+   ],
+   "diet": {
+    "Long": 11,
+    "Mid": 22,
+    "Rim": 30,
+    "Short": 15,
+    "Three": 22
+   },
+   "name": "8 star vs HETEROGENEOUS lineup (bench ath low)",
+   "shooter": {
+    "Close": 66,
+    "Finishing": 78,
+    "FirstStep": 70,
+    "Mid": 80,
+    "Outside": 78,
+    "Quickness": 70,
+    "Speed": 70,
+    "Strength": 70,
+    "Vertical": 70
+   },
+   "trace": {
+    "base": {
+     "Long": 0.11,
+     "Mid": 0.22,
+     "Rim": 0.3,
+     "Short": 0.15,
+     "Three": 0.22
+    },
+    "bentShapeOnly": {
+     "Long": 0.11049938297867175,
+     "Mid": 0.22266126718577398,
+     "Rim": 0.30099101190204175,
+     "Short": 0.1449791927507165,
+     "Three": 0.22086914518279602
+    },
+    "final": {
+     "Long": 0.10442406299177871,
+     "Mid": 0.22071588913222817,
+     "Rim": 0.3261707561569528,
+     "Short": 0.1501760484302707,
+     "Three": 0.19851324328876968
+    },
+    "gaps": {
+     "Long": 6.864999999999995,
+     "Mid": 9.650000000000006,
+     "Rim": 5.049999999999997,
+     "Short": -4.019999999999996,
+     "Three": 6.3999999999999915
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 0.9375,
+     "Three": -2.0
+    },
+    "level": 6.12785183131448,
+    "mag": 0.046801401543996146,
+    "physLevel": 0.9297018313144816,
+    "residuals": {
+     "Long": 1.6668499999999966,
+     "Mid": 4.451850000000007,
+     "Rim": -0.14815000000000111,
+     "Short": -9.218149999999994,
+     "Three": 1.2018499999999932
+    },
+    "skillLevel": 5.198149999999998
+   },
+   "usagePressure": 0.15
+  },
+  {
+   "defenders": [
+    {
+     "FirstStep": 68,
+     "PerimeterDefense": 74,
+     "PostDefense": 70,
+     "Quickness": 68,
+     "RimProtection": 78,
+     "Speed": 68,
+     "Strength": 68,
+     "Vertical": 68
+    },
+    {
+     "FirstStep": 62,
+     "PerimeterDefense": 66,
+     "PostDefense": 72,
+     "Quickness": 62,
+     "RimProtection": 70,
+     "Speed": 62,
+     "Strength": 62,
+     "Vertical": 62
+    },
+    {
+     "FirstStep": 71,
+     "PerimeterDefense": 70,
+     "PostDefense": 64,
+     "Quickness": 71,
+     "RimProtection": 72,
+     "Speed": 71,
+     "Strength": 71,
+     "Vertical": 71
+    },
+    {
+     "FirstStep": 85,
+     "PerimeterDefense": 30,
+     "PostDefense": 28,
+     "Quickness": 85,
+     "RimProtection": 26,
+     "Speed": 85,
+     "Strength": 85,
+     "Vertical": 85
+    },
+    {
+     "FirstStep": 88,
+     "PerimeterDefense": 28,
+     "PostDefense": 32,
+     "Quickness": 88,
+     "RimProtection": 30,
+     "Speed": 88,
+     "Strength": 88,
+     "Vertical": 88
+    }
+   ],
+   "diet": {
+    "Long": 11,
+    "Mid": 22,
+    "Rim": 30,
+    "Short": 15,
+    "Three": 22
+   },
+   "name": "8b same top-three, bench ath HIGH (physical only)",
+   "shooter": {
+    "Close": 66,
+    "Finishing": 78,
+    "FirstStep": 70,
+    "Mid": 80,
+    "Outside": 78,
+    "Quickness": 70,
+    "Speed": 70,
+    "Strength": 70,
+    "Vertical": 70
+   },
+   "trace": {
+    "base": {
+     "Long": 0.11,
+     "Mid": 0.22,
+     "Rim": 0.3,
+     "Short": 0.15,
+     "Three": 0.22
+    },
+    "bentShapeOnly": {
+     "Long": 0.11049938297867175,
+     "Mid": 0.22266126718577398,
+     "Rim": 0.30099101190204175,
+     "Short": 0.1449791927507165,
+     "Three": 0.22086914518279602
+    },
+    "final": {
+     "Long": 0.10545450088698938,
+     "Mid": 0.221045845623608,
+     "Rim": 0.3219000078296302,
+     "Short": 0.14929460728154004,
+     "Three": 0.2023050383782325
+    },
+    "gaps": {
+     "Long": 6.864999999999995,
+     "Mid": 9.650000000000006,
+     "Rim": 5.049999999999997,
+     "Short": -4.019999999999996,
+     "Three": 6.3999999999999915
+    },
+    "ladder": {
+     "Long": -1.0,
+     "Mid": 0.0,
+     "Rim": 2.0,
+     "Short": 0.9375,
+     "Three": -2.0
+    },
+    "level": 5.031080026027759,
+    "mag": 0.03880467513694467,
+    "physLevel": -0.1670699739722397,
+    "residuals": {
+     "Long": 1.6668499999999966,
+     "Mid": 4.451850000000007,
+     "Rim": -0.14815000000000111,
+     "Short": -9.218149999999994,
+     "Three": 1.2018499999999932
+    },
+    "skillLevel": 5.198149999999998
+   },
+   "usagePressure": 0.15
+  }
+ ],
+ "zoneOrder": [
+  "Rim",
+  "Short",
+  "Mid",
+  "Long",
+  "Three"
+ ]
+}

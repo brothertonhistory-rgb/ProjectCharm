@@ -217,6 +217,7 @@ internal static partial class Program
         ok &= Phase53WorldStructureCheck();                    // Phase 53
         ok &= Phase54DivvyCheck();                             // Phase 54
         ok &= Phase55SeasonCheck(configPath);                  // Phase 55
+        ok &= Phase56DisplacementCheck(configPath);            // Phase 56
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

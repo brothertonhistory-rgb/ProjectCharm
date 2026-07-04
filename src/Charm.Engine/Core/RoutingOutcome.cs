@@ -98,6 +98,34 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// </summary>
     public int ThreePm { get; init; }
 
+    // --- Session 36: displacement-context bucket counters (observation
+    //     readout, read-only — no assertion consumes these). Every FGA whose
+    //     state carried a populated ShotDisplacementLevel lands in exactly one
+    //     bucket; a null level (FastBreak, stub, zero-defender, bonus-FT
+    //     putback) is EXCLUDED entirely, never counted as neutral, so
+    //     DispLowFga + DispMidFga + DispHighFga ≤ Fga. ---
+
+    /// <summary>FGA with displacement level &lt; −5 (meaningfully overmatched shooter).</summary>
+    public int DispLowFga { get; init; }
+    /// <summary>3PA subset of <see cref="DispLowFga"/>.</summary>
+    public int DispLowThreePa { get; init; }
+    /// <summary>3PM subset of <see cref="DispLowThreePa"/>.</summary>
+    public int DispLowThreePm { get; init; }
+
+    /// <summary>FGA with |displacement level| ≤ 5 (near-even matchup).</summary>
+    public int DispMidFga { get; init; }
+    /// <summary>3PA subset of <see cref="DispMidFga"/>.</summary>
+    public int DispMidThreePa { get; init; }
+    /// <summary>3PM subset of <see cref="DispMidThreePa"/>.</summary>
+    public int DispMidThreePm { get; init; }
+
+    /// <summary>FGA with displacement level &gt; +5 (meaningfully advantaged shooter).</summary>
+    public int DispHighFga { get; init; }
+    /// <summary>3PA subset of <see cref="DispHighFga"/>.</summary>
+    public int DispHighThreePa { get; init; }
+    /// <summary>3PM subset of <see cref="DispHighThreePa"/>.</summary>
+    public int DispHighThreePm { get; init; }
+
     /// <summary>
     /// Total Roll H resolutions on this possession — all seven
     /// <see cref="ShotResult"/> outcomes. Used as the denominator-guard identity:

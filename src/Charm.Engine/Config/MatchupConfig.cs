@@ -1068,6 +1068,30 @@ public sealed class MatchupConfig
         if (cfg.HustleStealerScale <= 0.0)
             throw new InvalidOperationException($"HustleStealerScale must be > 0: got {cfg.HustleStealerScale}.");
 
+        // Session 36 — displacement block. MaxMagnitude/UsageScale ≥ 0 (0 is the
+        // ablation state), LevelReference > 0 (tanh denominator),
+        // PhysicalSteepness ≥ 0 (0 disables the physical term), each gate Low < High.
+        if (cfg.DisplacementMaxMagnitude < 0.0)
+            throw new InvalidOperationException(
+                $"DisplacementMaxMagnitude must be >= 0 (0 = ablation): got {cfg.DisplacementMaxMagnitude}.");
+        if (cfg.DisplacementUsageScale < 0.0)
+            throw new InvalidOperationException(
+                $"DisplacementUsageScale must be >= 0: got {cfg.DisplacementUsageScale}.");
+        if (cfg.DisplacementLevelReference <= 0.0)
+            throw new InvalidOperationException(
+                $"DisplacementLevelReference must be > 0: got {cfg.DisplacementLevelReference}.");
+        if (cfg.DisplacementPhysicalSteepness < 0.0)
+            throw new InvalidOperationException(
+                $"DisplacementPhysicalSteepness must be >= 0: got {cfg.DisplacementPhysicalSteepness}.");
+        if (cfg.DisplacementRimGateLow >= cfg.DisplacementRimGateHigh)
+            throw new InvalidOperationException(
+                $"DisplacementRimGateLow must be < DisplacementRimGateHigh: got " +
+                $"{cfg.DisplacementRimGateLow} >= {cfg.DisplacementRimGateHigh}.");
+        if (cfg.DisplacementShortGateLow >= cfg.DisplacementShortGateHigh)
+            throw new InvalidOperationException(
+                $"DisplacementShortGateLow must be < DisplacementShortGateHigh: got " +
+                $"{cfg.DisplacementShortGateLow} >= {cfg.DisplacementShortGateHigh}.");
+
         return cfg;
     }
 
@@ -1811,4 +1835,79 @@ public sealed class MatchupConfig
     /// <summary>Rating-point spread of the StealerPicker Hustle tanh (relative to the
     /// 50-neutral midpoint). Default 20.0. Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
     public double HustleStealerScale { get; set; } = 20.0;
+
+    // --- Session 36 — Roll G matchup displacement (Route B + the asymmetric
+    //     gated ladder). Executable spec: tools/displacement_oracle.py (LOCKED
+    //     SPEC ORACLE v1). All values below are CALIBRATION PLACEHOLDERS in the
+    //     page-only sense (no macro-target assertion anywhere), but they ARE
+    //     pinned by the Phase 56 golden parity at the approved calibration
+    //     state: tuning follows the oracle-first flow (approve a new oracle
+    //     calibration → regenerate the fixture → sync these defaults AND
+    //     config.json → parity stays green) — never "change config only and
+    //     expect the suite to tolerate it". ---
+
+    /// <summary>Steepness of the displacement physical term's GapFn — shooter
+    /// athleticism vs the defending lineup's MEAN athleticism. A deliberate
+    /// fraction of the make door's 11.5 (gentle by design; the make curve owns
+    /// the harsh physical punishment). Reuses PhysicalExponent and
+    /// ReferenceScale — no new exponent/scale knobs. Must be ≥ 0 (enforced in
+    /// Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementPhysicalSteepness { get; set; } = 3.0;
+
+    /// <summary>Rating-points of overall level at which tanh reaches ~76% of
+    /// the max displacement magnitude. Must be &gt; 0 (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementLevelReference { get; set; } = 20.0;
+
+    /// <summary>Cap on |mag| — the maximum per-zone ladder scaling at full
+    /// mismatch and full usage. Must be ≥ 0 (enforced in Load).
+    /// <para><b>0 = ablation: displacement off. NOTE that 0 does NOT undo
+    /// Route B</b> — the residualized bend is the ruled structure, not a
+    /// dial.</para> [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementMaxMagnitude { get; set; } = 0.35;
+
+    /// <summary>Converts UsagePressure (observed roughly 0..0.17) to the 0..1
+    /// usage gate: min(1, scale · usage). Must be ≥ 0 (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementUsageScale { get; set; } = 3.0;
+
+    /// <summary>Ladder weight for the Rim zone (+ = pulled inward when
+    /// advantaged, pushed away when overmatched). The INWARD application is
+    /// gated by the shooter's own Finishing (Rim gates below).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementLadderRim { get; set; } = 2.0;
+
+    /// <summary>Ladder weight for the Short zone; inward application gated by
+    /// the shooter's own Close (Short gates below). [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementLadderShort { get; set; } = 1.0;
+
+    /// <summary>Ladder weight for the Mid zone (the neutral rung).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementLadderMid { get; set; } = 0.0;
+
+    /// <summary>Ladder weight for the Long zone. [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementLadderLong { get; set; } = -1.0;
+
+    /// <summary>Ladder weight for the Three zone (the outward end — an
+    /// overmatched featured shooter is forced out here; an advantaged one is
+    /// pulled off it). [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementLadderThree { get; set; } = -2.0;
+
+    /// <summary>Finishing rating at/below which the Rim inward pull is fully
+    /// declined (gate = 0). Must be &lt; DisplacementRimGateHigh (enforced in
+    /// Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementRimGateLow { get; set; } = 38.0;
+
+    /// <summary>Finishing rating at/above which the Rim inward pull is fully
+    /// accepted (gate = 1). [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementRimGateHigh { get; set; } = 72.0;
+
+    /// <summary>Close rating at/below which the Short inward pull is fully
+    /// declined. Must be &lt; DisplacementShortGateHigh (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementShortGateLow { get; set; } = 36.0;
+
+    /// <summary>Close rating at/above which the Short inward pull is fully
+    /// accepted. [CALIBRATION PLACEHOLDER]</summary>
+    public double DisplacementShortGateHigh { get; set; } = 68.0;
 }

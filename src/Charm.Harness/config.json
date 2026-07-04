@@ -416,7 +416,21 @@
     "FullCourtPressReferenceShift": 1.2,
     "StandardSkillWeight": 0.5,
     "StandardAthleticismWeight": 0.35,
-    "StandardSizeWeight": 0.15
+    "StandardSizeWeight": 0.15,
+
+    "DisplacementPhysicalSteepness": 3.0,
+    "DisplacementLevelReference": 20.0,
+    "DisplacementMaxMagnitude": 0.35,
+    "DisplacementUsageScale": 3.0,
+    "DisplacementLadderRim": 2.0,
+    "DisplacementLadderShort": 1.0,
+    "DisplacementLadderMid": 0.0,
+    "DisplacementLadderLong": -1.0,
+    "DisplacementLadderThree": -2.0,
+    "DisplacementRimGateLow": 38.0,
+    "DisplacementRimGateHigh": 72.0,
+    "DisplacementShortGateLow": 36.0,
+    "DisplacementShortGateHigh": 68.0
   },
   "RollI": {
     "DefensiveRebound": 0.66,

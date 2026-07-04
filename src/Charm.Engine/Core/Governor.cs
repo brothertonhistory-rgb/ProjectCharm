@@ -82,6 +82,19 @@ public sealed record PossessionRecord(
     int Fgm = 0,
     int ThreePa = 0,
     int ThreePm = 0,
+    // Session 36: displacement-context bucket counts — read-only observation
+    // instrumentation copied through from RoutingOutcome. Every FGA whose state
+    // carried a populated ShotDisplacementLevel lands in exactly one bucket;
+    // null-level attempts are excluded, so Low+Mid+High <= Fga.
+    int DispLowFga = 0,
+    int DispLowThreePa = 0,
+    int DispLowThreePm = 0,
+    int DispMidFga = 0,
+    int DispMidThreePa = 0,
+    int DispMidThreePm = 0,
+    int DispHighFga = 0,
+    int DispHighThreePa = 0,
+    int DispHighThreePm = 0,
     int ShotResolutions = 0,
     int MissFouled = 0,
     int Fta = 0,
@@ -313,6 +326,10 @@ public sealed class Governor
             int pointsThisPossession;
             double applied;
             int possessionFga = 0, possessionFgm = 0, possessionThreePa = 0, possessionThreePm = 0;
+            // Session 36: displacement-context bucket locals (copied from RoutingOutcome).
+            int possessionDispLowFga = 0, possessionDispLowThreePa = 0, possessionDispLowThreePm = 0;
+            int possessionDispMidFga = 0, possessionDispMidThreePa = 0, possessionDispMidThreePm = 0;
+            int possessionDispHighFga = 0, possessionDispHighThreePa = 0, possessionDispHighThreePm = 0;
             int possessionShotResolutions = 0, possessionMissFouled = 0;
             int possessionFta = 0, possessionFtm = 0, possessionOrbChances = 0, possessionOrbWon = 0;
             // Phase 51: FTA-source classification locals (reconcile to possessionFta).
@@ -380,6 +397,15 @@ public sealed class Governor
                 possessionFgm             = outcome.Fgm;
                 possessionThreePa         = outcome.ThreePa;
                 possessionThreePm         = outcome.ThreePm;
+                possessionDispLowFga      = outcome.DispLowFga;
+                possessionDispLowThreePa  = outcome.DispLowThreePa;
+                possessionDispLowThreePm  = outcome.DispLowThreePm;
+                possessionDispMidFga      = outcome.DispMidFga;
+                possessionDispMidThreePa  = outcome.DispMidThreePa;
+                possessionDispMidThreePm  = outcome.DispMidThreePm;
+                possessionDispHighFga     = outcome.DispHighFga;
+                possessionDispHighThreePa = outcome.DispHighThreePa;
+                possessionDispHighThreePm = outcome.DispHighThreePm;
                 possessionShotResolutions = outcome.ShotResolutions;
                 possessionMissFouled      = outcome.MissFouled;
                 possessionFta             = outcome.Fta;
@@ -449,6 +475,9 @@ public sealed class Governor
                 st.PossessionNumber, st.Offense, st.Defense, st.Entry,
                 endedOnTerminal, endLabel, consequence, pointsThisPossession, applied, periodNumber, intent,
                 possessionFga, possessionFgm, possessionThreePa, possessionThreePm,
+                possessionDispLowFga, possessionDispLowThreePa, possessionDispLowThreePm,
+                possessionDispMidFga, possessionDispMidThreePa, possessionDispMidThreePm,
+                possessionDispHighFga, possessionDispHighThreePa, possessionDispHighThreePm,
                 possessionShotResolutions, possessionMissFouled,
                 possessionFta, possessionFtm, possessionOrbChances, possessionOrbWon,
                 possessionRimFga, possessionRimFgm, possessionShortFga, possessionShortFgm,

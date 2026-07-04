@@ -45,19 +45,25 @@ namespace Charm.Engine;
 public static class RollG
 {
     public static RollResult Execute(
-        PossessionState state, Pie<ShotLocation> pie, double residualPressure, IRng rng)
+        PossessionState state, Pie<ShotLocation> pie, double residualPressure, IRng rng,
+        double? displacementLevel = null)
     {
         // 1. Roll the pie to a shot location.
         var zone = pie.Roll(rng.NextUnitInterval());
 
-        // 2. Stamp both the chosen zone AND the residual pressure onto the possession
-        //    as per-possession facts (ShotType and UsageResidualPressure). One `with`
-        //    keeps both writes atomic — mirrors how Roll E stamps SelectedSlot and
-        //    UsagePressure together.
+        // 2. Stamp the chosen zone AND the residual pressure AND (Session 36) the
+        //    displacement level onto the possession as per-possession facts. One
+        //    `with` keeps the writes atomic — mirrors how Roll E stamps
+        //    SelectedSlot and UsagePressure together. The level is null unless
+        //    the generator's real-defender bend path ran (FastBreak, no-shooter
+        //    stub, and zero-defender paths leave it null — the optional-parameter
+        //    default also keeps every harness call site that predates Session 36
+        //    stamping null, which is correct for those plumbing checks).
         var stampedState = state with
         {
             ShotType              = zone,
             UsageResidualPressure = residualPressure,
+            ShotDisplacementLevel = displacementLevel,
         };
 
         // 3. Hand off to the make/miss beat (Roll H). Names the KIND, not

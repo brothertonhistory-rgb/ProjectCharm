@@ -14,9 +14,16 @@ namespace Charm.Engine;
 /// Zero when the load was fully absorbed (versatile shooter, ordinary defense),
 /// when there was no pressure, or on a FastBreak. Positive for a forced
 /// specialist.</param>
+/// <param name="DisplacementLevel">The overall matchup level (skill + physical)
+/// from the displacement derivation (Session 36) — a per-possession context
+/// fact for the observation readout, NOT an input to any later roll. Populated
+/// ONLY on the real-defender bend path; null on FastBreak, the no-shooter stub,
+/// and the zero-defender fallback (a null level is excluded from the readout,
+/// never counted as neutral).</param>
 public readonly record struct RollGGeneration(
     Pie<ShotLocation> Pie,
-    double ResidualPressure);
+    double ResidualPressure,
+    double? DisplacementLevel = null);
 
 /// <summary>
 /// Derived interface for Roll G's generator — extends

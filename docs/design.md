@@ -3356,11 +3356,20 @@ After computing five bent tendencies (each tendency × its zone's multiplier), r
 sum to 1. The relative magnitudes of the multipliers are what redistributes the shot mix; the
 absolute magnitudes don't matter. This produces one critical behavior: **uniform gaps cancel**.
 If every zone has the same gap → every multiplier is the same constant → renormalization erases
-the shift → the player shoots at his raw tendency ratios. D3 vs D3 and D1 vs D1 produce very
-similar mixes; the weird stuff only shows up when you mix levels AND the defensive shape is
-uneven. A D1 finisher vs a D3 team with weak rim protection but average perimeter D will
-shift toward the rim — because the rim gap is large and the perimeter gap is small. The engine
-encodes per-zone gap inequality, not average level difference.
+the shift → the player shoots at his raw tendency ratios.
+
+**Route B (Session 36): the bend now reads RESIDUALIZED gaps, not raw gaps.** The uniform-gaps-cancel
+behavior above used to be an *accident* of the convex gap function — a uniform level difference
+produced *nearly* equal multipliers that *nearly* cancelled, leaving a small residual tilt. Session 36
+made the cancellation **exact** by subtracting the diet-weighted skill level from every zone gap
+before the bend: `residual[z] = gap[z] − skillLevel`. The bend consumes the residuals, so a uniform
+defensive upgrade (every zone stronger by the same amount) moves the shape by *exactly* zero, not
+approximately zero. Level itself no longer touches the bend at all — it was carved out and handed to
+the displacement stage below. What remains in the bend is pure *shape*: where the defense is uneven
+across zones, which is the only thing that should redistribute the mix. A D1 finisher vs a D3 team
+with weak rim protection but average perimeter D still shifts toward the rim — because the rim
+*residual* is large and the perimeter *residual* is small. The engine encodes per-zone gap
+inequality, and now *only* that; average level difference is displacement's job.
 
 ### DEC-6 fallbacks (two tiers)
 
@@ -3373,6 +3382,72 @@ encodes per-zone gap inequality, not average level difference.
 3. **1–2 populated defenders**: `Matchup.DefensiveResistance` renormalizes the blend weights
    to the available N defenders, then proceeds normally.
 
+### Matchup displacement — the third shot-diet effect (Session 36)
+
+Phase 9's bend is *shape* (uneven defense → tilt toward the soft zone) and Phase 17's diet shift
+is *volume* (heavy usage → widen the diet). Session 36 adds the third and last generation-time
+shot-diet effect: **displacement**, driven by *how much better or worse the defending lineup is
+than the shooter* — the overall level, not the shape. It is the runtime half of closing the
+three-point-rate gap that the Session 34/35 tendency retune left open: the neutral-matchup
+baseline was the generator's job; the matchup bend is this.
+
+The basketball, in one line: a defending lineup clearly superior to a featured shooter forces his
+diet **outward** (away from the rim, toward low-efficiency bailout threes); an inferior lineup
+**invites** him inward, and he accepts only to the degree his own inside skills let him. Efficiency
+needs nothing new — the make curve at Roll H already prices a bad shot; displacement only moves
+*where* the shots come from.
+
+The whole derivation is a pure function on `Matchup` (`DeriveDisplacement`), mirrored
+stage-for-stage from a committed locked oracle (`tools/displacement_oracle.py`, LOCKED SPEC v1).
+If the C# and the oracle ever disagree, the oracle wins, and future tuning happens in the oracle
+first. The stages:
+
+- **The level.** `skillLevel` is the diet-weighted sum of the per-zone gaps (a shooter's edge in
+  the zones he actually shoots from counts more). `physicalLevel` is a *gentle* athleticism term —
+  the shooter's athleticism composite vs. the defending lineup's **mean** athleticism (all five,
+  not the top three), through the same `GapFn` at a deliberately low steepness (3.0 vs the make
+  door's 11.5). It is gentle by design: the make curve owns the harsh physical punishment; this
+  only nudges shot selection. `level = skillLevel + physicalLevel`. The physical term feeds the
+  level **only** — the bend's residuals are computed against the skill level alone, so Phase 9's
+  zone-shape read stays exactly the skill read it always was.
+- **The magnitude.** `mag = DisplacementMaxMagnitude · tanh(level / DisplacementLevelReference) ·
+  min(1, DisplacementUsageScale · usagePressure)`. Bounded, smooth in level, and **usage-gated**:
+  at or below an equal usage share the magnitude is zero, so a low-usage spot-up shooter in a
+  blowout is not displaced at all (he is not the one being schemed against). Usage is the volume
+  knob on the whole effect.
+- **The asymmetric gated ladder.** Five per-zone weights (Rim +2, Short +1, Mid 0, Long −1, Three
+  −2) scaled by `mag`. When `mag > 0` (advantaged shooter being invited inward), the two inward
+  rungs are **gated by the shooter's own inside skills** — Rim by Finishing, Short by Close — so
+  an advantaged non-finisher declines the invitation to the rim and the ladder's Rim rung goes to
+  zero. When `mag ≤ 0` (overmatched shooter forced outward) the push is **unconditional** — anyone
+  can be chased off his spot regardless of skill. This is the force/invite asymmetry: being forced
+  out needs no permission; being invited in needs the skill to accept.
+- **Composition.** The bend delta and the displacement delta are both computed from the *same*
+  normalized baseline, added, clamped at zero, and renormalized **once**. The Phase 17 usage
+  widening stays downstream of all of this, applied last, unchanged.
+
+**Ablation and the Route B caveat.** Setting `DisplacementMaxMagnitude = 0` turns displacement off
+(magnitude is exactly zero, the ladder contributes nothing). It does **not** undo Route B — the
+residualized bend is the ruled structure, not a dial. Zero-ing the magnitude is a clean way to
+isolate the bend; restoring the raw-gap bend would be a code change, not a config change.
+
+### The two baseline reads, deliberately distinct
+
+There are two different "preferred diet" reads inside the generator, and Session 36 made a point of
+**not** unifying them:
+
+- The **bend + displacement** consume the **coached** baseline — the five tendencies *after*
+  `CoachingPull.Apply` has nudged them toward the coach's system. This is the diet the player will
+  actually try to shoot, so it is the right baseline for "how does the matchup reshape what he'd do."
+- The **diet shift's** intrinsic-capacity read (Phase 17: "how flexible is this player") consumes the
+  **raw authored** tendencies. Flexibility is an intrinsic property of the player — a coach can bend
+  *where* he shoots from, not *how adaptable* he inherently is — so it correctly ignores the coaching
+  nudge.
+
+With the default identity-ish coach the two reads are nearly equal, so the distinction is invisible
+in most tests; it matters only for a biased coach, and unifying the reads would silently double-count
+the coach's influence.
+
 ### Roll G's architecture after Phase 9
 
 - `IRollGPieGenerator` — new interface. Both stub and real generator implement it; Resolver
@@ -3381,9 +3456,31 @@ encodes per-zone gap inequality, not average level difference.
   isolated harness check constructions (13 stub-only + 1 inside `RollGLocationBatchCheck` for
   baseline regression).
 - `RollGGenerator` — matchup-aware real generator. Ctor takes `(RollGConfig, MatchupConfig,
-  GameState)`. Mirrors `RollHGenerator`'s pattern.
-- **Roll G itself unchanged.** `RollG.Execute` still takes `(state, pie, rng)`. Only the
+  GameState)`. Mirrors `RollHGenerator`'s pattern. The real-defender path now calls
+  `Matchup.DeriveDisplacement` (Session 36) for the bend + displacement, then hands the result to
+  the unchanged Phase 17 diet shift.
+- **Roll G itself unchanged in signature.** `RollG.Execute` gained one optional parameter
+  (`displacementLevel`) that it stamps onto the possession as a read-only observation fact
+  (`ShotDisplacementLevel`), null on FastBreak / no-shooter / zero-defender paths. Only the
   generator reads `GameState`.
+- `Matchup.DeriveDisplacement` + the `DisplacementDefender` / `DisplacementTrace` types (Session 36)
+  — the pure derivation and its full stage trace, public-static so the Phase 56 golden parity tests
+  the math directly (the `LocationMultiplier` / `BlockWeight` / `FoulRate` precedent). `DisplacementDefender`
+  carries the four defender reads as doubles because the golden fixture's level-matched vector solves
+  a defensive rating to a fraction — `Player` attributes are ints, so the fixture cannot be Players;
+  live players convert into it losslessly.
+
+### Displacement observation readout (Session 36)
+
+The overall matchup level is stamped onto every real-defender-path attempt (`ShotDisplacementLevel`,
+cleared by Roll K's `ResetOffense` alongside the usage facts). The observation run buckets every
+level-populated FGA into three bins (level < −5 overmatched / |level| ≤ 5 near-even / level > +5
+advantaged) and reports realized 3PA-rate and 3P% per bin — read-only, no assertion. A null level
+(FastBreak, stub, zero-defender, bonus-FT putback) is *excluded*, never counted as neutral. Note that
+the frozen sentinel corpus pits two evenly-matched populated rosters, so its "advantaged" bin is
+typically empty and the overmatched bin carries the signal (higher 3PA-rate, lower 3P% — the bailout
+signature); the advantaged direction is proven by the Phase 56 direction checks and the stress-test
+EliteVsWeak bucket instead. The empty bin is a property of that corpus, not the mechanism.
 
 ### SeatStartersFromConfig (the v2 fix that makes Phase 9 actually run)
 

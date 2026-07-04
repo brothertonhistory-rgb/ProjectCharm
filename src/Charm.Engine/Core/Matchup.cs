@@ -64,11 +64,26 @@ public static class Matchup
     /// big gives up the perimeter share at Mid/Long). Weights are config data.
     /// </summary>
     public static double DefenseRating(ShotLocation zone, Player d, MatchupConfig cfg)
+        => DefenseRatingRaw(zone, d.PerimeterDefense, d.PostDefense, d.RimProtection, cfg);
+
+    /// <summary>
+    /// The same per-zone defensive blend over raw attribute values (Session 36
+    /// extraction). <see cref="DefenseRating"/> delegates here with the Player's
+    /// int attributes (lossless widening — behavior byte-identical); the
+    /// displacement derivation feeds it <see cref="DisplacementDefender"/> reads,
+    /// which may be non-integral (the golden fixture's level-matched vector
+    /// solves PostDefense to a fraction). One blend, two feeders.
+    /// </summary>
+    public static double DefenseRatingRaw(ShotLocation zone,
+                                          double perimeterDefense,
+                                          double postDefense,
+                                          double rimProtection,
+                                          MatchupConfig cfg)
     {
         var (perimeter, post, rim) = cfg.BlendWeights(zone);
-        return perimeter * d.PerimeterDefense
-             + post      * d.PostDefense
-             + rim       * d.RimProtection;
+        return perimeter * perimeterDefense
+             + post      * postDefense
+             + rim       * rimProtection;
     }
 
     /// <summary>
@@ -431,6 +446,18 @@ public static class Matchup
                 $"DefensiveResistance for zone {zone}: no populated defenders. " +
                 "Caller must short-circuit BEFORE calling this method.");
 
+        return BlendTopThree(scores, cfg);
+    }
+
+    /// <summary>
+    /// The top-3 descending blend over a list of per-defender zone scores
+    /// (Session 36 extraction — the tail of <see cref="DefensiveResistance"/>,
+    /// arithmetic unchanged). Shared by <see cref="DefensiveResistance"/>
+    /// (Player-fed) and <see cref="DeriveDisplacement"/>
+    /// (<see cref="DisplacementDefender"/>-fed). Sorts the list in place.
+    /// </summary>
+    private static double BlendTopThree(List<double> scores, MatchupConfig cfg)
+    {
         scores.Sort((a, b) => b.CompareTo(a));   // descending — best first
         var take = Math.Min(3, scores.Count);
 
@@ -476,12 +503,222 @@ public static class Matchup
     {
         var resistance = DefensiveResistance(zone, defenders, cfg);
         var capability = OffenseRating(zone, shooter);
-        var gap        = capability - resistance;
-        var shift      = GapFn(gap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+        return LocationMultiplierFromGap(capability - resistance, cfg);
+    }
+
+    /// <summary>
+    /// The gap-parameterized entry to the Phase 9 ratio form (Session 36
+    /// extraction): <c>exp(log(LocationMaxMultiplier) · tanh(GapFn(gap) /
+    /// LocationReferenceShift))</c>. Strictly positive, exactly 1.0 at zero gap,
+    /// bounded in <c>(1/LocationMaxMultiplier, LocationMaxMultiplier)</c>.
+    ///
+    /// <para><see cref="LocationMultiplier"/> delegates here with the raw
+    /// capability−resistance gap (behavior unchanged); the displacement
+    /// derivation calls it with the RESIDUALIZED gap (Route B) — the same bend,
+    /// a different input.</para>
+    /// </summary>
+    public static double LocationMultiplierFromGap(double gap, MatchupConfig cfg)
+    {
+        var shift = GapFn(gap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
         // Ratio form: strictly positive, exactly 1.0 at zero shift, bounded in
         // (1 / LocationMaxMultiplier, LocationMaxMultiplier).
         return Math.Exp(Math.Log(cfg.LocationMaxMultiplier)
                       * Math.Tanh(shift / cfg.LocationReferenceShift));
+    }
+
+    // =========================================================================
+    // Session 36 — Roll G matchup displacement (Route B residualized bend +
+    // the usage-gated asymmetric ladder). Executable spec:
+    // tools/displacement_oracle.py (LOCKED SPEC ORACLE v1, 2026-07-04). If this
+    // code and the oracle ever disagree, the oracle wins. Design record:
+    // docs/rollg-displacement-brief.md.
+    // =========================================================================
+
+    /// <summary>The fixed zone order every displacement array uses:
+    /// [Rim, Short, Mid, Long, Three] — matches RollGGenerator's convention.</summary>
+    private static readonly ShotLocation[] DisplacementZones =
+    {
+        ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid,
+        ShotLocation.Long, ShotLocation.Three,
+    };
+
+    /// <summary>Linear gate: 0 at/below <paramref name="lo"/>, 1 at/above
+    /// <paramref name="hi"/>, linear between. Mirrors the oracle's gate().</summary>
+    private static double DisplacementGate(double x, double lo, double hi)
+    {
+        var t = (x - lo) / (hi - lo);
+        return t < 0.0 ? 0.0 : t > 1.0 ? 1.0 : t;
+    }
+
+    /// <summary>
+    /// The full Roll G displacement derivation (Session 36) — mirrors the locked
+    /// oracle's <c>derive()</c> stage-for-stage. Pure: reads only its arguments.
+    ///
+    /// <para><b>The decomposition (Route B, ruled 2026-07-04):</b>
+    /// <list type="number">
+    ///   <item>Normalize the coached pre-bend baseline (any positive scale in;
+    ///         shares summing to 1 out).</item>
+    ///   <item>Per-zone raw gap: shooter zone skill − top-3-blended lineup
+    ///         resistance (the existing Phase 9 reads, over
+    ///         <see cref="DisplacementDefender"/> values).</item>
+    ///   <item>Diet-weighted skill level = Σ base[z]·gap[z]; physical level =
+    ///         GapFn(shooter athleticism − lineup MEAN athleticism, displacement
+    ///         steepness) — gentle by design, the make curve owns the harsh
+    ///         physical punishment. Level = skill + physical.</item>
+    ///   <item>Residual[z] = gap[z] − SKILL level (physical term feeds the level
+    ///         only — the zone-shape read stays purely the skill read).</item>
+    ///   <item>The Phase 9 bend runs on RESIDUALS: a uniform defensive upgrade
+    ///         moves the shape by exactly zero.</item>
+    ///   <item>Displacement: mag = MaxMagnitude · tanh(level/LevelReference) ·
+    ///         min(1, UsageScale·usage); the asymmetric ladder multiplies the
+    ///         SAME baseline — inward Rim/Short entries gated by the shooter's
+    ///         own Finishing/Close when mag &gt; 0, outward push ungated.</item>
+    ///   <item>Compose base + Δbend + Δdisplacement, clamp ≥ 0, renormalize
+    ///         ONCE. The usage widening (Phase 17) stays downstream, LAST,
+    ///         untouched.</item>
+    /// </list></para>
+    ///
+    /// <para><b>Caller's responsibility:</b> at least one defender (the
+    /// zero-defender path short-circuits in the generator — no manufactured
+    /// neutral defense), and a positive diet total.</para>
+    /// </summary>
+    /// <param name="dietRaw">The five coached pre-bend baseline tendencies in
+    /// zone order [Rim, Short, Mid, Long, Three] — the SAME five values the old
+    /// bend multiplied. NOT the raw authored tendencies (those stay the diet
+    /// shift's private read; two different reads, deliberate).</param>
+    /// <param name="shooter">The shooter — zone skills, Finishing/Close gates,
+    /// and the athleticism composite are read.</param>
+    /// <param name="defenders">The POPULATED defenders (nulls already filtered)
+    /// as <see cref="DisplacementDefender"/> reads.</param>
+    /// <param name="usagePressure">This possession's usage pressure; 0 (or a
+    /// null coalesced to 0 by the caller) means mag is exactly 0.</param>
+    /// <param name="cfg">The matchup config carrying both the Phase 9 bend
+    /// constants and the Displacement* block.</param>
+    public static DisplacementTrace DeriveDisplacement(
+        IReadOnlyList<double> dietRaw,
+        Player shooter,
+        IReadOnlyList<DisplacementDefender> defenders,
+        double usagePressure,
+        MatchupConfig cfg)
+    {
+        if (dietRaw.Count != 5)
+            throw new InvalidOperationException(
+                $"DeriveDisplacement: dietRaw must have exactly 5 entries (got {dietRaw.Count}).");
+        if (defenders.Count == 0)
+            throw new InvalidOperationException(
+                "DeriveDisplacement: no defenders. Caller must short-circuit the " +
+                "zero-defender path BEFORE calling (RollGGenerator does).");
+
+        // ── Stage 1: normalize the baseline. ─────────────────────────────
+        var dietTotal = 0.0;
+        for (var i = 0; i < 5; i++) dietTotal += dietRaw[i];
+        if (dietTotal <= 0.0)
+            throw new InvalidOperationException(
+                $"DeriveDisplacement: diet total <= 0 ({dietTotal}). " +
+                "Player.Validate() and the coaching floor clamp should make this unreachable.");
+        var baseDiet = new double[5];
+        for (var i = 0; i < 5; i++) baseDiet[i] = dietRaw[i] / dietTotal;
+
+        // ── Stage 2: per-zone raw gaps (existing Phase 9 reads). ─────────
+        var gaps = new double[5];
+        for (var i = 0; i < 5; i++)
+        {
+            var zone   = DisplacementZones[i];
+            var scores = new List<double>(defenders.Count);
+            foreach (var d in defenders)
+                scores.Add(DefenseRatingRaw(zone, d.PerimeterDefense, d.PostDefense, d.RimProtection, cfg));
+            gaps[i] = OffenseRating(zone, shooter) - BlendTopThree(scores, cfg);
+        }
+
+        // ── Stage 3: the level — diet-weighted skill + gentle physical. ──
+        var skillLevel = 0.0;
+        for (var i = 0; i < 5; i++) skillLevel += baseDiet[i] * gaps[i];
+
+        var lineupMeanAth = 0.0;
+        foreach (var d in defenders) lineupMeanAth += d.Athleticism;
+        lineupMeanAth /= defenders.Count;
+        var physLevel = GapFn(shooter.Athleticism - lineupMeanAth,
+                              cfg.DisplacementPhysicalSteepness,
+                              cfg.PhysicalExponent,
+                              cfg.ReferenceScale);
+        var level = skillLevel + physLevel;
+
+        // ── Stage 4: residuals against the SKILL level only (Route B). ───
+        var residuals = new double[5];
+        for (var i = 0; i < 5; i++) residuals[i] = gaps[i] - skillLevel;
+
+        // ── Stage 5: the Phase 9 bend on residualized gaps. ──────────────
+        var bent    = new double[5];
+        var bentSum = 0.0;
+        for (var i = 0; i < 5; i++)
+        {
+            bent[i]  = baseDiet[i] * LocationMultiplierFromGap(residuals[i], cfg);
+            bentSum += bent[i];
+        }
+        if (bentSum <= 0.0)
+            throw new InvalidOperationException(
+                $"DeriveDisplacement: bent total <= 0 ({bentSum}). Should be unreachable — " +
+                "multipliers are bounded strictly positive by the ratio form.");
+        for (var i = 0; i < 5; i++) bent[i] /= bentSum;
+
+        // ── Stage 6: displacement — bounded, usage-gated, asymmetric ladder. ──
+        var mag = cfg.DisplacementMaxMagnitude
+                * Math.Tanh(level / cfg.DisplacementLevelReference)
+                * Math.Min(1.0, cfg.DisplacementUsageScale * usagePressure);
+
+        var ladder = new[]
+        {
+            cfg.DisplacementLadderRim,
+            cfg.DisplacementLadderShort,
+            cfg.DisplacementLadderMid,
+            cfg.DisplacementLadderLong,
+            cfg.DisplacementLadderThree,
+        };
+        if (mag > 0.0)
+        {
+            // §3a R2: the INWARD pull (an inferior lineup inviting the shooter in)
+            // is accepted only per his own inside skills; the outward push is
+            // unconditional, so mag <= 0 leaves the ladder ungated.
+            ladder[0] = cfg.DisplacementLadderRim
+                      * DisplacementGate(shooter.Finishing, cfg.DisplacementRimGateLow, cfg.DisplacementRimGateHigh);
+            ladder[1] = cfg.DisplacementLadderShort
+                      * DisplacementGate(shooter.Close, cfg.DisplacementShortGateLow, cfg.DisplacementShortGateHigh);
+        }
+
+        var disp    = new double[5];
+        var dispSum = 0.0;
+        for (var i = 0; i < 5; i++)
+        {
+            disp[i]  = Math.Max(0.0, baseDiet[i] * (1.0 + mag * ladder[i]));
+            dispSum += disp[i];
+        }
+        if (dispSum <= 0.0)
+            throw new InvalidOperationException(
+                $"DeriveDisplacement: displacement total <= 0 ({dispSum}). Should be unreachable — " +
+                "|mag·ladder| is bounded well below 1 at the validated constants and the " +
+                "baseline sums to 1.");
+        for (var i = 0; i < 5; i++) disp[i] /= dispSum;
+
+        // ── Stage 7: compose both deltas from the SAME baseline, clamp,
+        //             renormalize ONCE. ──────────────────────────────────
+        var final    = new double[5];
+        var finalSum = 0.0;
+        for (var i = 0; i < 5; i++)
+        {
+            var dBend = bent[i] - baseDiet[i];
+            var dDisp = disp[i] - baseDiet[i];
+            final[i]  = Math.Max(0.0, baseDiet[i] + dBend + dDisp);
+            finalSum += final[i];
+        }
+        if (finalSum <= 0.0)
+            throw new InvalidOperationException(
+                $"DeriveDisplacement: final total <= 0 ({finalSum}). Should be unreachable — " +
+                "the pre-clamp entries sum to exactly 1, so at least one is positive.");
+        for (var i = 0; i < 5; i++) final[i] /= finalSum;
+
+        return new DisplacementTrace(
+            baseDiet, gaps, skillLevel, physLevel, level,
+            residuals, bent, mag, ladder, final);
     }
 
     // =========================================================================

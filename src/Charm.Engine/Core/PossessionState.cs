@@ -261,4 +261,16 @@ public sealed record PossessionState(
     /// <c>ResetOffense</c>; carried forward on the PutBack arm so a future
     /// putback-attribution read (Phase 32) can use it.</para>
     /// </param>
-    Slot? ReboundSlot = null);
+    Slot? ReboundSlot = null,
+    /// <param name="ShotDisplacementLevel">The overall matchup level (skill +
+    /// physical) from Roll G's displacement derivation (Session 36) — stamped by
+    /// <see cref="RollG.Execute"/> alongside <see cref="UsageResidualPressure"/>,
+    /// but populated ONLY when the generator's real-defender bend path ran.
+    /// FastBreak, the no-shooter stub, and the zero-defender fallback leave it
+    /// null. A read-only context fact for the observation readout — no roll
+    /// consumes it.
+    /// <para>Null until Roll G runs. Cleared by Roll K's <c>ResetOffense</c>
+    /// alongside <see cref="UsagePressure"/>/<see cref="UsageResidualPressure"/>
+    /// — a reset restarts the shot-diet story from scratch.</para>
+    /// </param>
+    double? ShotDisplacementLevel = null);
