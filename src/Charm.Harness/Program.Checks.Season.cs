@@ -314,6 +314,19 @@ internal static partial class Program
                     && lg.PossessionRecords >= 0 && lg.TurnoverPossessions >= 0
                     && lg.TotalSeconds >= 0,
                   $"FGM {lg.Fgm} vs 3PM {lg.ThreePm}, FTA {lg.Fta} vs FTM {lg.Ftm}");
+            // Session 32: league-scale zone conservation. The per-possession
+            // bins-sum-to-FGA identity is asserted per-seed in Program.Observation
+            // (zone-attempt / zone-make bin checks); this proves the ACCUMULATOR
+            // preserved it across a full fixture season. No make-rate value is
+            // asserted, ever — the suite stays green across every re-tuning of
+            // the make dial by design.
+            Check("calibration: zone bins conserve at league scale — Rim+Short+Mid+Long+Three " +
+                  "FGA == FGA, and the FGM twin",
+                  lg.RimFga + lg.ShortFga + lg.MidFga + lg.LongFga + lg.ThreePa == lg.Fga
+                    && lg.RimFgm + lg.ShortFgm + lg.MidFgm + lg.LongFgm + lg.ThreePm == lg.Fgm,
+                  $"FGA {lg.RimFga}+{lg.ShortFga}+{lg.MidFga}+{lg.LongFga}+{lg.ThreePa} " +
+                  $"vs {lg.Fga}; FGM {lg.RimFgm}+{lg.ShortFgm}+{lg.MidFgm}+{lg.LongFgm}" +
+                  $"+{lg.ThreePm} vs {lg.Fgm}");
 
             // §3.7 (the existing suite is untouched) is proven by the suite itself:
             // every phase above this one still running green on unchanged baselines.

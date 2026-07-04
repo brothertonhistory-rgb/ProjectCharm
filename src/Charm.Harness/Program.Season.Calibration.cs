@@ -44,6 +44,13 @@ internal static partial class Program
 
         // From records (result.Possessions):
         public long Fga, Fgm, ThreePa, ThreePm, Fta, Ftm;
+
+        // Session 32: per-zone attempt/make totals (Three rides the existing
+        // ThreePa/ThreePm pair above — the Three zone IS the three-point line).
+        // Sourced from the same PossessionRecord fields the per-seed observation
+        // mode already asserts bin-conservation on; §3.8 proves the ACCUMULATOR
+        // preserved that identity at league scale.
+        public long RimFga, RimFgm, ShortFga, ShortFgm, MidFga, MidFgm, LongFga, LongFgm;
         public long PossessionRecords;       // every record — the pace numerator
         public long TurnoverPossessions;     // via IsTurnoverPossession, all records
         public long MetadataDriftRecords;    // TO metadata present but classifier says no
@@ -100,6 +107,10 @@ internal static partial class Program
                 Fga += r.Fga; Fgm += r.Fgm;
                 ThreePa += r.ThreePa; ThreePm += r.ThreePm;
                 Fta += r.Fta; Ftm += r.Ftm;
+                RimFga   += r.RimFga;   RimFgm   += r.RimFgm;
+                ShortFga += r.ShortFga; ShortFgm += r.ShortFgm;
+                MidFga   += r.MidFga;   MidFgm   += r.MidFgm;
+                LongFga  += r.LongFga;  LongFgm  += r.LongFgm;
 
                 var isTo = IsTurnoverPossession(r);
                 if (isTo) TurnoverPossessions++;
@@ -152,6 +163,17 @@ internal static partial class Program
     // PF counter, and an estimate must not wear a measurement's clothes; deferred.)
 
     private const double CalRelBand = 0.05;   // ±5% relative on volume lines
+
+    // ── Per-zone observed-FG% anchor targets (the Session 50 ruling: what an
+    //    average shooter in an even matchup should shoot per zone, box-score
+    //    definition). This static table is the SOLE committed home of these five
+    //    constants — the make-midpoint oracle receives them as explicit inputs
+    //    copied from the printed readout, never as a second hard-coded copy. ──
+    private const double ZoneTargetRim   = 61.0;
+    private const double ZoneTargetShort = 43.0;
+    private const double ZoneTargetMid   = 39.0;
+    private const double ZoneTargetLong  = 36.0;
+    private const double ZoneTargetThree = 34.0;
 
     private static void PrintCalibrationReadout(SeasonLeagueStats s)
     {
@@ -206,6 +228,17 @@ internal static partial class Program
         RowRel("3PA rate (3PA/FGA)",        s.Fga > 0 ? (double)s.ThreePa / s.Fga : 0.0, 0.39, "F2");
         RowRel("FT rate (FTA/FGA)",         s.Fga > 0 ? (double)s.Fta / s.Fga : 0.0,     0.34, "F2");
         Row("OT games",                     Pct(s.OtGames, s.Games), 6.0, 2.0, "4-8%", "F1");
+
+        // Session 32: per-zone shooting block — the make dial's instrument.
+        // Same Row machinery, same page-only discipline: verdicts are never asserted.
+        Console.WriteLine("  per-zone FG% (sim vs Session 50 anchors; page-only, never asserted):");
+        RowAbs("  rim FG%",                 Pct(s.RimFgm,   s.RimFga),   ZoneTargetRim,   1.0);
+        RowAbs("  short FG%",               Pct(s.ShortFgm, s.ShortFga), ZoneTargetShort, 1.0);
+        RowAbs("  mid FG%",                 Pct(s.MidFgm,   s.MidFga),   ZoneTargetMid,   1.0);
+        RowAbs("  long FG%",                Pct(s.LongFgm,  s.LongFga),  ZoneTargetLong,  1.0);
+        RowAbs("  three FG%",               Pct(s.ThreePm,  s.ThreePa),  ZoneTargetThree, 1.0);
+        Console.WriteLine(Inv($"    zone FGA mix: rim {s.RimFga} / short {s.ShortFga} / mid {s.MidFga}") +
+                          Inv($" / long {s.LongFga} / three {s.ThreePa}  (sum {s.RimFga + s.ShortFga + s.MidFga + s.LongFga + s.ThreePa} vs FGA {s.Fga})"));
 
         Console.WriteLine("  seconds per possession by ending (NoShot/HoldShootLast excluded):");
         Console.WriteLine(
