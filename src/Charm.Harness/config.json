@@ -535,7 +535,14 @@
     "Floor": 4.0,
     "FullClockSeconds": 30.0,
     "ResetClockSeconds": 20.0,
-    "PaceCenterScale": 1.5
+    "PaceCenterScale": 1.5,
+    "BackcourtTurnoverCenter": 5.0,
+    "BackcourtTurnoverStdDev": 2.0,
+    "BackcourtTurnoverFloor": 1.0,
+    "BackcourtTurnoverCeiling": 10.0,
+    "FrontcourtTurnoverCenter": 14.5,
+    "FrontcourtTurnoverStdDev": 5.5,
+    "FrontcourtTurnoverFloor": 6.0
   },
   "EndOfHalf": {
     "HoldThresholdSeconds": 30.0,

@@ -2147,12 +2147,31 @@ period runs the full 30-second clock; each offensive rebound that keeps the poss
 clock to 20 and starts a new period. Each period's duration is an **outcome-blind truncated-normal draw**
 — centered by pace (a config stub today), bounded by `[floor, ceiling)`, where the exclusive ceiling is
 what produces the natural skew (a fast center keeps its tail toward the cap; a slow center gets its tail
-clipped and leans short). Two things override the draw: a terminal that already carries an **invariant
-`ElapsedSeconds`** (shot-clock violation = 30s, backcourt = 10s, five-second inbound = 0s), and
-**free throws, which draw 0** (the FT sequence is a clock-stopper; the live period up to the foul
+clipped and leans short). Three things override the shared draw: a terminal that already carries an **invariant
+`ElapsedSeconds`** (shot-clock violation = 30s, backcourt = 10s, five-second inbound = 0s); a
+possession-ending **turnover** (or offensive foul), which draws a shorter, **court-aware band** instead of
+the shared possession clock (Session 37, below); and **free throws, which draw 0** (the FT sequence is a
+clock-stopper; the live period up to the foul
 already drew its time). The Governor counts each possession's elapsed **down** from `HalfSeconds`
 (1200), runs two halves, and ends a half when the time is spent — the last possession's contribution
 is **capped** at the time remaining so each half sums exactly to 1200.
+
+**Court-aware turnover clock (Session 37).** A turnover no longer eats a full possession's worth of
+clock. A backcourt strip resolves before the 10-second mark; a worked-out frontcourt turnover runs on
+the shot clock; neither takes the ~18s a shot attempt does. The emitting arm stamps each
+turnover-family terminal with a `TimeProfile` marker — `BackcourtTurnover` or `FrontcourtTurnover`,
+read off the possession's court-state — and the Governor's `DrawTurnoverSeconds` draws the matching band
+(`[BackcourtTurnoverFloor, Ceiling)` centered ~5s; `[FrontcourtTurnoverFloor, FullClock)` centered
+~14.5s). The three invariant-time violation arms stamp no profile (their time is already known); every
+other drawn turnover stamps one, so nothing leaks to the shared draw. **The profile is a stamp, not the
+final timing:** the court-state flag only latches on the halfcourt entry, so transition and
+ball-advanced possessions carry `BackcourtTurnover` even after they cross half. `EffectiveTurnoverProfile`
+corrects this at the draw — a possession that has offensive-rebounded (`ShotClockPeriods > 1`) is
+physically in the frontcourt (you cannot rebound in the backcourt), so its turnover is timed as
+frontcourt regardless of the stale flag, and a multi-period frontcourt turnover draws prior periods as a
+normal possession plus a final band segment. The band centers/spreads are **calibration placeholders**
+tuned off the season page's turnover-length-by-court split, not asserted anywhere. Center stayed 17.0:
+the bands themselves closed the pace gap (65.5 → ~69), because turnovers stopped drawing full possessions.
 
 **The architecture: draw lives in the Governor, count lives in the walk.**
 - The resolver's `Route` walk **counts** shot-clock periods: `var shotClockPeriods = 1;` at the top
@@ -2197,8 +2216,9 @@ present, tune `Center`/`StdDev`, and confirm the ceiling-exclusive contract (not
 **Future seams seated by this session.**
 - The coach pace (1–10) attribute plugs in at `RollClockConfig.Center` — no engine change, only the
   center value shifts.
-- Per-outcome time shaping (turnovers shorter than makes) would go in `DrawPossessionSeconds` as a
-  context parameter, but is explicitly deferred (creep risk).
+- Per-outcome time shaping (turnovers shorter than makes) is **BUILT (Session 37)** — the court-aware
+  turnover bands above, drawn by `DrawTurnoverSeconds` off a `TimeProfile` stamp. What was deferred here
+  as creep risk became its own scoped session once the season page could read the turnover-length split.
 - End-of-half hold-for-last-shot is the next clock session: a `halfRemaining < 30` branch in the
   Governor that probabilistically drains and then resolves (or misses the shot) rather than just capping.
 

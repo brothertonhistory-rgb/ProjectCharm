@@ -49,6 +49,37 @@ public sealed class RollClockConfig
     /// Invariant: &gt;= 0. [CALIBRATION PLACEHOLDER]</summary>
     public double PaceCenterScale { get; set; } = 1.5;
 
+    // ── Session 37: court-aware turnover clock bands ──────────────────────────
+    // A turnover draws a SHORTER, court-dependent band instead of the shared
+    // possession clock — a strip in the backcourt burns ~5s, a worked frontcourt
+    // turnover ~14.5s, neither the full ~18s a shot attempt takes. The bands are
+    // basketball law (Emmett's ruling): a backcourt turnover must resolve before the
+    // 10-second mark (else the violation fired); a single frontcourt shot-clock
+    // segment cannot reach 30 without becoming a violation. Centers and spreads are
+    // CALIBRATION PLACEHOLDERS, tuned against the season page's turnover-length lines.
+
+    /// <summary>Center of the backcourt-turnover band in seconds. Band is
+    /// <c>[BackcourtTurnoverFloor, BackcourtTurnoverCeiling)</c>. [CALIBRATION PLACEHOLDER]</summary>
+    public double BackcourtTurnoverCenter { get; set; } = 5.0;
+    /// <summary>Spread of the backcourt-turnover band. [CALIBRATION PLACEHOLDER]</summary>
+    public double BackcourtTurnoverStdDev { get; set; } = 2.0;
+    /// <summary>Minimum backcourt-turnover length in seconds (inclusive floor).</summary>
+    public double BackcourtTurnoverFloor { get; set; } = 1.0;
+    /// <summary>Exclusive ceiling of the backcourt-turnover band in seconds. 10.0 by
+    /// basketball law: a backcourt turnover must resolve before the 10-second mark,
+    /// else the 10-second-backcourt violation fired instead.</summary>
+    public double BackcourtTurnoverCeiling { get; set; } = 10.0;
+
+    /// <summary>Center of the frontcourt-turnover band in seconds. Band is
+    /// <c>[FrontcourtTurnoverFloor, FullClockSeconds)</c> — the shot clock is the
+    /// exclusive ceiling (hitting exactly 30 is a shot-clock violation, not a
+    /// turnover draw). Distinctly shorter than the made-basket center. [CALIBRATION PLACEHOLDER]</summary>
+    public double FrontcourtTurnoverCenter { get; set; } = 14.5;
+    /// <summary>Spread of the frontcourt-turnover band. [CALIBRATION PLACEHOLDER]</summary>
+    public double FrontcourtTurnoverStdDev { get; set; } = 5.5;
+    /// <summary>Minimum frontcourt-turnover length in seconds (inclusive floor).</summary>
+    public double FrontcourtTurnoverFloor { get; set; } = 6.0;
+
     public static RollClockConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -61,6 +92,31 @@ public sealed class RollClockConfig
         if (cfg.PaceCenterScale < 0)
             throw new InvalidOperationException(
                 $"Clock PaceCenterScale must be >= 0 (got {cfg.PaceCenterScale}).");
+
+        // Session 37: the court-aware turnover bands must be well-formed truncated
+        // normals — positive spread, floor strictly below ceiling, floor non-negative.
+        if (cfg.BackcourtTurnoverStdDev <= 0)
+            throw new InvalidOperationException(
+                $"Clock BackcourtTurnoverStdDev must be > 0 (got {cfg.BackcourtTurnoverStdDev}).");
+        if (cfg.FrontcourtTurnoverStdDev <= 0)
+            throw new InvalidOperationException(
+                $"Clock FrontcourtTurnoverStdDev must be > 0 (got {cfg.FrontcourtTurnoverStdDev}).");
+        if (cfg.BackcourtTurnoverFloor < 0)
+            throw new InvalidOperationException(
+                $"Clock BackcourtTurnoverFloor must be >= 0 (got {cfg.BackcourtTurnoverFloor}).");
+        if (cfg.FrontcourtTurnoverFloor < 0)
+            throw new InvalidOperationException(
+                $"Clock FrontcourtTurnoverFloor must be >= 0 (got {cfg.FrontcourtTurnoverFloor}).");
+        if (cfg.BackcourtTurnoverFloor >= cfg.BackcourtTurnoverCeiling)
+            throw new InvalidOperationException(
+                $"Clock BackcourtTurnoverFloor ({cfg.BackcourtTurnoverFloor}) must be < " +
+                $"BackcourtTurnoverCeiling ({cfg.BackcourtTurnoverCeiling}).");
+        // The frontcourt band's ceiling is FullClockSeconds (the shot clock); the floor
+        // must sit strictly inside it.
+        if (cfg.FrontcourtTurnoverFloor >= cfg.FullClockSeconds)
+            throw new InvalidOperationException(
+                $"Clock FrontcourtTurnoverFloor ({cfg.FrontcourtTurnoverFloor}) must be < " +
+                $"FullClockSeconds ({cfg.FullClockSeconds}).");
         return cfg;
     }
 }

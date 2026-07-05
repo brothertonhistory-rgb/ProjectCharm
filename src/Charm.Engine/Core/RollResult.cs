@@ -143,6 +143,40 @@ public sealed record Terminal(string Reason, PossessionState State, PossessionCo
     /// "OffensiveFoul".
     /// </summary>
     public OffensiveFoulFlavor? Flavor { get; init; }
+
+    /// <summary>
+    /// The TIMING class of a possession-ending turnover-family terminal — which
+    /// court-aware clock band the Governor draws its elapsed time from. FUNCTIONAL:
+    /// unlike <see cref="ElapsedSeconds"/> (an invariant known time) this is a
+    /// MARKER, not a time — the Governor sees a stamped profile and draws the
+    /// matching band (backcourt 1–10s, frontcourt 6–30s) instead of the shared
+    /// possession-length draw.
+    /// <para>Null on every terminal whose time is either invariant (the three
+    /// violation arms carry <see cref="ElapsedSeconds"/> and stamp nothing — the
+    /// invariant time takes precedence) or drawn on the shared possession clock
+    /// (made / miss / jump ball / loose-ball foul / OOB). Stamped by the arm that
+    /// constructs the terminal — the court is known where the loss happens — so the
+    /// Governor never string-matches Reason labels. Named for the physical timing
+    /// class: a backcourt offensive foul is bounded by the same 10-second law as a
+    /// backcourt turnover, so it is <c>BackcourtTurnover</c> even though its page
+    /// label sits in OTHER, not on the turnover line.</para>
+    /// </summary>
+    public PossessionTimeProfile? TimeProfile { get; init; }
+}
+
+/// <summary>
+/// The court-aware timing class a turnover-family terminal is STAMPED with, read off
+/// the possession's court-state flag. A stamp, not the final timing: a possession that
+/// has offensive-rebounded is timed as frontcourt regardless of a backcourt stamp (see
+/// <see cref="Governor.EffectiveTurnoverProfile"/>), because transition / ball-advanced
+/// possessions carry the backcourt flag even after they cross half. <c>BackcourtTurnover</c>
+/// is the bring-up class (bounded by the 10-second backcourt law); <c>FrontcourtTurnover</c>
+/// the in-set class (bounded by the shot clock). See <see cref="Terminal.TimeProfile"/>.
+/// </summary>
+public enum PossessionTimeProfile
+{
+    BackcourtTurnover,
+    FrontcourtTurnover,
 }
 
 /// <summary>The possession continues. The resolver routes by <paramref name="Next"/>.</summary>

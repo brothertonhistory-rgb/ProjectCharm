@@ -499,7 +499,14 @@ internal static partial class Program
 
             // ── Mechanical check 4: loose sanity (NaN / ÷0 guard) ───────
             if (records.Count == 0) { mechanicsOk = false; continue; }
-            if (records.Count > 200)
+            // Runaway-game tripwire (NaN / infinite-loop guard), not a calibration
+            // bound. Session 37 shortened turnover clocks (a backcourt strip now burns
+            // ~5s, not a full possession), so under the observation corpus's 100%-press
+            // stress setting a legitimate game can reach ~100 possessions a side — the
+            // mean stays on target, but the tail widened. Raised 200 → 260 so the guard
+            // still catches a true runaway (which prints thousands) without flagging a
+            // legal max-press outlier.
+            if (records.Count > 260)
             {
                 Console.WriteLine();
                 Console.WriteLine($"  [FAIL] Seed {seed}: pace exceeds outer bound ({records.Count})");

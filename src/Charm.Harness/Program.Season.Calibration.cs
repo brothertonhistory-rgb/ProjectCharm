@@ -81,6 +81,23 @@ internal static partial class Program
         public long MissOobN;   public double MissOobS;
         public long TurnoverN;  public double TurnoverS;
         public long FixedTimeN; public double FixedTimeS;   // sub-line of TURNOVER
+        // Session 37: court-aware turnover-length split. The official classifier filters
+        // FIRST (fixed-time violations, which carry no TimeProfile, stay on their own
+        // sub-line above); only the profile-stamped drawn turnovers split by court.
+        // Raw = the pre-clamp band draw (the oracle's prediction target); applied = the
+        // clamped record Elapsed (raw min period-remaining).
+        public long BackcourtToN;  public double BackcourtToAppliedS, BackcourtToRawS;
+        public long FrontcourtToN; public double FrontcourtToAppliedS, FrontcourtToRawS;
+        // Session 37 structural observations — read + ASSERTED by Phase 57, never printed
+        // as a calibration target. Raw band ranges (frontcourt max over SINGLE-period
+        // draws only: a multi-period frontcourt total can legitimately exceed 30s), the
+        // multi-period frontcourt count, and a LEAK counter: any drawn (non-fixed-time)
+        // turnover that reached the Governor with NO TimeProfile — an emitter that forgot
+        // to stamp, which would silently draw the shared clock. Phase 57 asserts it is 0.
+        public double BackcourtRawMin = double.PositiveInfinity, BackcourtRawMax = double.NegativeInfinity;
+        public double FrontcourtRawMin1P = double.PositiveInfinity, FrontcourtRawMax1P = double.NegativeInfinity;
+        public long FrontcourtMultiPeriodN;
+        public long DrawnTurnoverNoProfileN;
         public long OtherN;     public double OtherS;
         public long ExcludedN;                              // the NoShot/HoldShootLast count
 
@@ -145,6 +162,46 @@ internal static partial class Program
                     if (r.EndLabel is "ShotClockViolation" or "FiveSecondInbound"
                                     or "TenSecondBackcourt")
                     { FixedTimeN++; FixedTimeS += r.Elapsed; }
+                    // Session 37: split the drawn (non-fixed-time) turnovers by court.
+                    // TimeProfile is non-null exactly for the profile-stamped drawn
+                    // turnovers (and offensive fouls, which ARE on the 17-label turnover
+                    // line); the three fixed-time violations carry no profile and fall
+                    // through to their sub-line above, never here.
+                    else if (r.TimeProfile is { } prof)
+                    {
+                        if (prof == PossessionTimeProfile.BackcourtTurnover)
+                        {
+                            BackcourtToN++; BackcourtToAppliedS += r.Elapsed;
+                            if (r.TurnoverRawElapsed is { } raw)
+                            {
+                                BackcourtToRawS += raw;
+                                if (raw < BackcourtRawMin) BackcourtRawMin = raw;
+                                if (raw > BackcourtRawMax) BackcourtRawMax = raw;
+                            }
+                        }
+                        else
+                        {
+                            FrontcourtToN++; FrontcourtToAppliedS += r.Elapsed;
+                            if (r.ShotClockPeriods > 1) FrontcourtMultiPeriodN++;
+                            if (r.TurnoverRawElapsed is { } raw)
+                            {
+                                FrontcourtToRawS += raw;
+                                // Range asserted only on single-period draws (a multi-period
+                                // total can exceed 30 legitimately — see §3).
+                                if (r.ShotClockPeriods == 1)
+                                {
+                                    if (raw < FrontcourtRawMin1P) FrontcourtRawMin1P = raw;
+                                    if (raw > FrontcourtRawMax1P) FrontcourtRawMax1P = raw;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        // A drawn (non-fixed-time) turnover that carries no TimeProfile — an
+                        // emitter forgot to stamp and this possession drew the shared clock.
+                        DrawnTurnoverNoProfileN++;
+                    }
                 }
                 else
                 {
@@ -288,6 +345,14 @@ internal static partial class Program
             Inv($"    turnover {Avg(s.TurnoverS, s.TurnoverN):F1}s (n={s.TurnoverN})  ") +
             Inv($"[fixed-time violations {Avg(s.FixedTimeS, s.FixedTimeN):F1}s (n={s.FixedTimeN})]  ") +
             Inv($"| other n={s.OtherN}"));
+        // Session 37: the drawn turnovers split by court (offensive fouls included — they
+        // are on the 17-label turnover line). Raw = pre-clamp band draw (compare to the
+        // oracle: ~5s backcourt / ~15s frontcourt); applied = clamped record length.
+        Console.WriteLine(
+            Inv($"    turnover by court — backcourt applied {Avg(s.BackcourtToAppliedS, s.BackcourtToN):F1}s ") +
+            Inv($"raw {Avg(s.BackcourtToRawS, s.BackcourtToN):F1}s (n={s.BackcourtToN})  |  ") +
+            Inv($"frontcourt applied {Avg(s.FrontcourtToAppliedS, s.FrontcourtToN):F1}s ") +
+            Inv($"raw {Avg(s.FrontcourtToRawS, s.FrontcourtToN):F1}s (n={s.FrontcourtToN})"));
 
         // Session 33 Phase A: the OTHER bucket itemized — each label, count, share
         // of OTHER, mean seconds. Page-only; classifies nothing. Exists so rulings

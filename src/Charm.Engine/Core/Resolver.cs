@@ -453,7 +453,10 @@ public sealed class Resolver
                             result = new Terminal("OffensiveFoul", c.State,
                                 c.State.Frontcourt
                                     ? PossessionConsequence.DeadBallTo(c.State.Defense)
-                                    : PossessionConsequence.BallAdvancedTo(c.State.Defense));
+                                    : PossessionConsequence.BallAdvancedTo(c.State.Defense))
+                                { TimeProfile = c.State.Frontcourt
+                                    ? PossessionTimeProfile.FrontcourtTurnover
+                                    : PossessionTimeProfile.BackcourtTurnover };
                             continue;
 
                         // Roll D, opponent not in bonus -> the offense keeps the ball and

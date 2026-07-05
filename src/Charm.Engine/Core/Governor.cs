@@ -157,7 +157,22 @@ public sealed record PossessionRecord(
     int FtaBonusSelected = 0,
     int FtaBonusUnattributed = 0,
     int FtaShootingSelected = 0,
-    int FtaShootingNoSlot = 0);
+    int FtaShootingNoSlot = 0,
+    // Session 37: court-aware turnover clock instrumentation.
+    //  TimeProfile        — the turnover timing class (backcourt/frontcourt) if this
+    //                       possession ended on a profile-stamped turnover-family
+    //                       terminal; null otherwise. The page groups turnover records
+    //                       by this to split the length line by court.
+    //  TurnoverRawElapsed — the PRE-CLAMP band draw for a profile possession (Elapsed
+    //                       is min(this, periodRemaining)); null otherwise. Lets the
+    //                       page report raw band means (the oracle's prediction target)
+    //                       alongside the clamped applied mean.
+    //  ShotClockPeriods   — shot-clock periods this possession spanned (1 = single
+    //                       period; >1 = one reset per offensive rebound). Lets the raw
+    //                       band assertion filter to single-period frontcourt draws.
+    PossessionTimeProfile? TimeProfile = null,
+    double? TurnoverRawElapsed = null,
+    int ShotClockPeriods = 1);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -325,6 +340,12 @@ public sealed class Governor
             string endLabel;
             int pointsThisPossession;
             double applied;
+            // Session 37: turnover-clock record locals. Survive both fork branches so
+            // the record ctor can read them. Profile null / raw null / periods 1 unless
+            // a profile-stamped terminal sets them in the resolved branch below.
+            PossessionTimeProfile? recordTimeProfile = null;
+            double? recordTurnoverRaw = null;
+            int recordShotClockPeriods = 1;
             int possessionFga = 0, possessionFgm = 0, possessionThreePa = 0, possessionThreePm = 0;
             // Session 36: displacement-context bucket locals (copied from RoutingOutcome).
             int possessionDispLowFga = 0, possessionDispLowThreePa = 0, possessionDispLowThreePm = 0;
@@ -387,7 +408,35 @@ public sealed class Governor
                         perStubParks.GetValueOrDefault(outcome.Destination) + 1;
                 }
 
-                var rawElapsed = outcome.EndedOn?.ElapsedSeconds ?? DrawPossessionSeconds(outcome.ShotClockPeriods, st.Offense);
+                // Elapsed-time precedence, exactly one RNG-consuming draw per possession:
+                //   1. invariant ElapsedSeconds (the three violation arms) — no draw;
+                //   2. a profile-stamped turnover-band draw (Session 37, court-aware);
+                //   3. the shared possession draw (everything else).
+                // A non-turnover or invariant terminal takes the SAME path it took before
+                // this session — identical draw, identical RNG consumption — so the
+                // neutrality anchor holds.
+                double rawElapsed;
+                recordShotClockPeriods = outcome.ShotClockPeriods;
+                if (outcome.EndedOn?.ElapsedSeconds is { } invariantElapsed)
+                {
+                    rawElapsed = invariantElapsed;
+                }
+                else if (outcome.EndedOn?.TimeProfile is { } stampedProfile)
+                {
+                    // A possession that has offensive-rebounded (ShotClockPeriods > 1) is
+                    // physically in the frontcourt regardless of the court-state flag —
+                    // that flag only latches on the halfcourt entry and stays "backcourt"
+                    // for transition / ball-advanced possessions that skip it. Promote
+                    // such a turnover to frontcourt so its clock reflects reality.
+                    var profile = EffectiveTurnoverProfile(stampedProfile, outcome.ShotClockPeriods);
+                    rawElapsed = DrawTurnoverSeconds(profile, outcome.ShotClockPeriods, st.Offense);
+                    recordTimeProfile = profile;
+                    recordTurnoverRaw = rawElapsed;
+                }
+                else
+                {
+                    rawElapsed = DrawPossessionSeconds(outcome.ShotClockPeriods, st.Offense);
+                }
                 applied = intent == EndOfHalfIntent.HoldShootLast
                     ? periodRemaining
                     : Math.Min(rawElapsed, periodRemaining);
@@ -500,7 +549,8 @@ public sealed class Governor
                 possessionAstBySlot,
                 possessionFtaBonusPicker, possessionFtaBonusSelected,
                 possessionFtaBonusUnattributed, possessionFtaShootingSelected,
-                possessionFtaShootingNoSlot));
+                possessionFtaShootingNoSlot,
+                recordTimeProfile, recordTurnoverRaw, recordShotClockPeriods));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(
@@ -597,12 +647,7 @@ public sealed class Governor
     /// The floor guard ensures center never drops below <c>Floor + 1.0</c>.</para></summary>
     private double DrawPossessionSeconds(int shotClockPeriods, TeamSide offense)
     {
-        var coach   = _game.CoachFor(offense);
-        // Map PaceBias [1,10] to a center shift. Neutral (5.0) → 0.0.
-        // (5.0 - bias) / 5.0 → positive for slow (bias < 5), negative for fast (bias > 5).
-        var paceAdj = (5.0 - coach.PaceBias) / 5.0 * _clock.PaceCenterScale;
-        var center  = Math.Max(_clock.Floor + 1.0, _clock.Center + paceAdj);
-
+        var center     = CoachAdjustedCenter(offense);
         var periods    = Math.Max(1, shotClockPeriods);
         var seconds    = ClockDraw.Sample(_rng, center, _clock.StdDev, _clock.Floor, _clock.FullClockSeconds);
         var resetScale = _clock.ResetClockSeconds / _clock.FullClockSeconds;
@@ -611,6 +656,89 @@ public sealed class Governor
                                         _clock.Floor, _clock.ResetClockSeconds);
         return seconds;
     }
+
+    /// <summary>The coach-pace-adjusted center for a possession's period-1 draw —
+    /// factored out so the turnover-band draw's prior periods (§ Session 37) reuse the
+    /// identical center the shared draw uses. Numerically identical to the inline
+    /// computation it replaces, so non-turnover draws stay byte-for-byte unchanged.</summary>
+    private double CoachAdjustedCenter(TeamSide offense)
+    {
+        var coach   = _game.CoachFor(offense);
+        // Map PaceBias [1,10] to a center shift. Neutral (5.0) → 0.0.
+        // (5.0 - bias) / 5.0 → positive for slow (bias < 5), negative for fast (bias > 5).
+        var paceAdj = (5.0 - coach.PaceBias) / 5.0 * _clock.PaceCenterScale;
+        return Math.Max(_clock.Floor + 1.0, _clock.Center + paceAdj);
+    }
+
+    /// <summary>Session 37 — the court-aware turnover clock draw. A profile-stamped
+    /// terminal (backcourt or frontcourt turnover / offensive foul) draws its elapsed
+    /// time from a shorter, court-dependent band instead of the shared possession
+    /// clock. Called only when a terminal carries a <see cref="PossessionTimeProfile"/>
+    /// and no invariant <see cref="RollResult.ElapsedSeconds"/> (invariant time takes
+    /// precedence — see the applied fork).
+    ///
+    /// <para><b>Backcourt</b> (band <c>[BackcourtFloor, BackcourtCeiling)</c>) is a
+    /// single-period event by construction: the ball cannot be in the backcourt after
+    /// an offensive rebound, so <c>shotClockPeriods &gt; 1</c> is physically impossible
+    /// and throws — a silent reclassification would hide a real routing bug.</para>
+    ///
+    /// <para><b>Frontcourt</b>: N = 1 (the vast majority) draws the frontcourt band
+    /// directly. A multi-period possession (a frontcourt turnover after one or more
+    /// offensive rebounds) draws its prior periods exactly as a normal possession
+    /// (period 1 full clock, intermediates on the reset clock) and its FINAL period on
+    /// the frontcourt band scaled to the reset window — so its whole-possession elapsed
+    /// can legitimately exceed 30s (a prior clock period plus a reset period).</para></summary>
+    private double DrawTurnoverSeconds(PossessionTimeProfile profile, int shotClockPeriods, TeamSide offense)
+    {
+        var periods = Math.Max(1, shotClockPeriods);
+
+        if (profile == PossessionTimeProfile.BackcourtTurnover)
+        {
+            // Backcourt reaches the draw only single-period: EffectiveTurnoverProfile
+            // has already promoted any multi-period possession to frontcourt (you cannot
+            // grab an offensive rebound in the backcourt). A multi-period backcourt here
+            // means a caller skipped that rule — fail loud rather than draw a wrong band.
+            if (periods > 1)
+                throw new InvalidOperationException(
+                    $"BackcourtTurnover reached the clock draw across {periods} shot-clock periods — " +
+                    "EffectiveTurnoverProfile should have promoted it to frontcourt first. Routing bug.");
+            return ClockDraw.Sample(_rng, _clock.BackcourtTurnoverCenter, _clock.BackcourtTurnoverStdDev,
+                                    _clock.BackcourtTurnoverFloor, _clock.BackcourtTurnoverCeiling);
+        }
+
+        // FrontcourtTurnover.
+        if (periods == 1)
+            return ClockDraw.Sample(_rng, _clock.FrontcourtTurnoverCenter, _clock.FrontcourtTurnoverStdDev,
+                                    _clock.FrontcourtTurnoverFloor, _clock.FullClockSeconds);
+
+        // N > 1: prior periods drawn exactly as a normal possession (period 1 full,
+        // intermediates reset), the FINAL period on the frontcourt band scaled to the
+        // reset window (center×rs, sd×rs, floor = Floor, ceiling = ResetClockSeconds).
+        var center     = CoachAdjustedCenter(offense);
+        var resetScale = _clock.ResetClockSeconds / _clock.FullClockSeconds;
+        var seconds    = ClockDraw.Sample(_rng, center, _clock.StdDev, _clock.Floor, _clock.FullClockSeconds);
+        for (var p = 2; p <= periods - 1; p++)
+            seconds += ClockDraw.Sample(_rng, center * resetScale, _clock.StdDev * resetScale,
+                                        _clock.Floor, _clock.ResetClockSeconds);
+        seconds += ClockDraw.Sample(_rng,
+            _clock.FrontcourtTurnoverCenter * resetScale, _clock.FrontcourtTurnoverStdDev * resetScale,
+            _clock.Floor, _clock.ResetClockSeconds);
+        return seconds;
+    }
+
+    /// <summary>The clock profile a turnover-family terminal is actually TIMED by,
+    /// given how many shot-clock periods the possession spanned. The court-state flag a
+    /// terminal is stamped with (<see cref="PossessionTimeProfile.BackcourtTurnover"/> vs
+    /// frontcourt) reflects whether the possession came up through the halfcourt entry —
+    /// it stays "backcourt" for transition and ball-advanced possessions that never take
+    /// that entry, even after they cross half. But a possession that has recorded an
+    /// offensive rebound (<paramref name="shotClockPeriods"/> &gt; 1) was physically in
+    /// the frontcourt — you cannot rebound your own miss in the backcourt — so its
+    /// turnover is timed as a frontcourt turnover regardless of the stale flag. Pure and
+    /// public so the harness proves the rule directly.</summary>
+    public static PossessionTimeProfile EffectiveTurnoverProfile(
+        PossessionTimeProfile stamped, int shotClockPeriods) =>
+        shotClockPeriods > 1 ? PossessionTimeProfile.FrontcourtTurnover : stamped;
 
     // Gather the on-floor players for BOTH sides — the fatigue meter accrues to all ten and
     // recovers all ten at halftime. Walks the same lineup -> roster seam the attribution

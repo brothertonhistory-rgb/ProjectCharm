@@ -70,7 +70,7 @@ public static class RollC
                 new Terminal("BadPassDeadBall", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             // Phase 28: stamp steal origin from the VICTIM's Frontcourt flag (role-flip).
             // Frontcourt == false (victim in backcourt) → thief near scoring basket → BackcourtVictim (high run).
@@ -78,25 +78,25 @@ public static class RollC
             TurnoverOutcome.BadPassIntercepted =>
                 new Terminal("BadPassIntercepted", state,
                     PossessionConsequence.TransitionStealTo(state.Defense,
-                        state.Frontcourt ? StealOrigin.FrontcourtVictim : StealOrigin.BackcourtVictim)),
+                        state.Frontcourt ? StealOrigin.FrontcourtVictim : StealOrigin.BackcourtVictim)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             TurnoverOutcome.LostBallDeadBall =>
                 new Terminal("LostBallDeadBall", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             // Phase 28: same role-flip as BadPassIntercepted above.
             TurnoverOutcome.LostBallLiveBall =>
                 new Terminal("LostBallLiveBall", state,
                     PossessionConsequence.TransitionStealTo(state.Defense,
-                        state.Frontcourt ? StealOrigin.FrontcourtVictim : StealOrigin.BackcourtVictim)),
+                        state.Frontcourt ? StealOrigin.FrontcourtVictim : StealOrigin.BackcourtVictim)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             TurnoverOutcome.OffensiveFoul =>
                 new Terminal("OffensiveFoul", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             // --- Contextification #5a: the expanded loss set. Every arm below is
             //     a DEAD-ball loss -> the ball goes to the defense on a dead-ball
@@ -113,43 +113,43 @@ public static class RollC
                 new Terminal("Travel", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             TurnoverOutcome.DoubleDribble =>
                 new Terminal("DoubleDribble", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             TurnoverOutcome.Carry =>
                 new Terminal("Carry", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             TurnoverOutcome.ThreeSecondViolation =>
                 new Terminal("ThreeSecondViolation", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             TurnoverOutcome.FiveSecondCloselyGuarded =>
                 new Terminal("FiveSecondCloselyGuarded", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             TurnoverOutcome.OffensiveGoaltending =>
                 new Terminal("OffensiveGoaltending", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             TurnoverOutcome.BackcourtViolation =>
                 new Terminal("BackcourtViolation", state,
                     state.Frontcourt
                         ? PossessionConsequence.DeadBallTo(state.Defense)
-                        : PossessionConsequence.BallAdvancedTo(state.Defense)),
+                        : PossessionConsequence.BallAdvancedTo(state.Defense)) { TimeProfile = state.Frontcourt ? PossessionTimeProfile.FrontcourtTurnover : PossessionTimeProfile.BackcourtTurnover },
 
             // Violations carry their own INVARIANT elapsed (the only timed arms here).
             TurnoverOutcome.ShotClockViolation =>

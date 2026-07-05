@@ -94,13 +94,15 @@ public static class RollK
             // No foul charged (Roll C's OffensiveFoul precedent).
             OffensiveReboundOutcome.OffensiveFoul =>
                 new Terminal("OffensiveFoul", state,
-                    PossessionConsequence.DeadBallTo(state.Defense)),
+                    PossessionConsequence.DeadBallTo(state.Defense))
+                    { TimeProfile = PossessionTimeProfile.FrontcourtTurnover },
 
             // Dead-ball turnover off the board. Ball switches teams — TERMINAL.
             // Same consequence as the offensive foul: dead-ball inbound at Roll A.
             OffensiveReboundOutcome.DeadBallTurnover =>
                 new Terminal("DeadBallTurnover", state,
-                    PossessionConsequence.DeadBallTo(state.Defense)),
+                    PossessionConsequence.DeadBallTo(state.Defense))
+                    { TimeProfile = PossessionTimeProfile.FrontcourtTurnover },
 
             // Phase 28: stamp FrontcourtVictim — a live turnover off an offensive rebound
             // happens in the frontcourt (state.Frontcourt == true): the offense had already
@@ -109,7 +111,8 @@ public static class RollK
             // a putback-traffic turnover is not a pick-six.
             OffensiveReboundOutcome.LiveBallTurnover =>
                 new Terminal("LiveBallTurnover", state,
-                    PossessionConsequence.TransitionStealTo(state.Defense, StealOrigin.FrontcourtVictim)),
+                    PossessionConsequence.TransitionStealTo(state.Defense, StealOrigin.FrontcourtVictim))
+                    { TimeProfile = PossessionTimeProfile.FrontcourtTurnover },
 
             // Kick it back out and run a fresh play. Same possession stays alive —
             // CONTINUE back to Roll E (player selection). Wipe the prior shot's facts

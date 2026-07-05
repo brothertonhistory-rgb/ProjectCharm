@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 36.1 (2026-07-04).
+Last updated: Session 37 (2026-07-04).
 
 ---
 
@@ -39,7 +39,9 @@ baselines and the legacy `game` demo command (see Open).
 
 **Systems live:** fouls/bonus + jump-ball arrow; end-of-half intent; OT; fatigue meter +
 athleticism discount + fatigue-fence substitutions; Governor + Resolver walk with full
-per-possession counters; shooting-foul / steal / rebound / block / assist attribution.
+per-possession counters; **court-aware turnover clock** (S37 — turnovers draw a short
+court-dependent band, not the shared possession clock; page splits length by court);
+shooting-foul / steal / rebound / block / assist attribution.
 
 **Layers live:** player generation Pass 1 + skill-derived tendencies (oracle v2, 19-vector
 golden parity); divvy Pass 1.5 (national pool + prestige draft); world Pass 1 (347 schools,
@@ -64,16 +66,27 @@ bench instruments.
   a gate (S34/35).
 - **DisplacementMaxMagnitude = 0 is ablation only** — it does NOT undo Route B; the
   residualized bend is ruled structure, not a dial (S36).
+- **Turnover clock is court-aware bands, not a shifted center** (S37). The pace gap
+  (65.5 → ~69) closed because turnovers stopped drawing a full possession's clock; the
+  tempo Center stayed 17.0. Oracle-confirmed the center barely moves once the bands exist.
+- **A possession that has offensive-rebounded is timed as a frontcourt turnover** (S37),
+  regardless of the backcourt court-state flag transition / ball-advanced possessions
+  carry — you cannot rebound in the backcourt. (`EffectiveTurnoverProfile`.)
 
 ## 3. Open — next-session candidates
 
 - **Season calibration pass** at seed 20260703 on the stock world — the front-runner.
-  Fresh read needed now that displacement is live; last recorded page (S35): 3PA rate
+  Fresh read needed now that displacement **and the court-aware turnover clock (S37)** are
+  live; pace shifted up to ~69 (was 65.5). Last recorded page (S35): 3PA rate
   ~0.32 vs 0.39 target, FG% ~45.6 vs 44.0, 3P% ~33 vs 34.0, per-zone FG% all OK, pace OK,
   FT% OK. Known open verdicts from earlier pages: FTA LOW, steals LOW (4.4 vs 6.2) with
   total TOs slightly HIGH, OT LOW (2.9% vs 4–8%).
-- **Turnover-clock dial** — shift the turnover-possession draw *center* shorter (measured
-  17.3s vs ~18.2s for shooting endings; full range stays legal). (S31/33)
+- **Turnover-band calibration** — the court-aware bands shipped with **placeholder**
+  centers/spreads (backcourt ~5s, frontcourt ~14.5s); tune them off the season page's new
+  turnover-length-by-court split. Open question flagged S37: single-period transition /
+  ball-advanced turnovers currently draw the short backcourt band — fine for a bring-up
+  strip, arguably too short for an already-across possession; decide once the split's size
+  and mean are on the page. (S37)
 - **Whistle / FTA dial** — FTA LOW; the total-PF cumulative counter rides this session;
   standing condition: if Roll H block/foul baselines move, rim/short midpoints re-derive.
 - **Steals vs dead-ball composition** — sharpen the live/dead turnover mix. (S33)
