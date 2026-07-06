@@ -105,8 +105,9 @@ bench instruments.
   so no double-charge. The shooter's own trip is never converted to a one-and-one (`oneAndOne: false`,
   never reads `BonusFor`) — the charge only moves future possessions' bonus reads. **Thresholds stay
   7/10** — the gap closed with foul *volume*, not an easier bonus. Proven by `ShootingFoulFeedsBonusCheck`
-  (7th-foul boundary exact, no leak, no double). Payoff on the instruments captured: bonus share of FTA
-  ~27% → ~42%, FTr → 0.34, FTA/team ~19 (target 19.5).
+  (7th-foul boundary exact, no leak, no double). Payoff on the 347-page (seed 20260703, 5205 games):
+  FTA 15.8 → 19.3 (t19.5, OK), FT-rate 0.27 → 0.34 (t0.34, OK), bonus share of FTA ~27% → ~42%;
+  per-zone FG% all held in band, no shot-math regression.
 
 ## 3. Open — next-session candidates
 
@@ -118,14 +119,14 @@ bench instruments.
   Per-zone FG% all held OK (rim 61.2 / short 42.8 / mid 39.3 / long 36.1 / three 33.9); fast-break
   page line 34.9% transition three, sane (Means re-synced). FG% sits at the high edge of its band
   (44.9 vs 44.0) — a mix result, noted not chased.
-  **Remaining open page gaps, for a future ruling — three-point thread CLOSED at S39, FTA/FT-rate CLOSED at S40:**
-  **LOW** — rebounds 30.7 (t34.5) incl. offensive 8.9, and steals 4.6 (t6.2)
-  (credited-rebound / live-ball reconciliation); OT 2.8% (t4–8%). **HIGH** — assists 17.9 (t13.5;
-  possibly the probabilistic attribution, not real over-assisting); turnovers 14.3 (t12.5) / TO%
-  20.3; blocks 4.1 (t3.5). **The front-runner is now the rebound/steal reconciliation or the
+  **Remaining open page gaps (S40 347-page run), for a future ruling — three-point thread CLOSED at S39, FTA/FT-rate CLOSED at S40:**
+  **LOW** — rebounds 30.6 (t34.5) incl. offensive 8.8, and steals 4.5 (t6.2)
+  (credited-rebound / live-ball reconciliation); OT 2.5% (t4–8%). **HIGH** — assists 17.4 (t13.5;
+  possibly the probabilistic attribution, not real over-assisting); turnovers 13.8 (t12.5) / TO%
+  19.6; blocks 4.1 (t3.5). **The front-runner is now the rebound/steal reconciliation or the
   assists-HIGH attribution.** FTA-LOW / FT-rate-LOW was the prior front-runner and is **closed by the
-  S40 bonus fix** (FTr 0.34 / FTA ~19 on the instruments captured; the exact 347-page FTA/FT-rate line
-  is pending its own run — run the season page once to record it). Pick the gap before drafting; the
+  S40 bonus fix** — the 347-page (seed 20260703, 5205 games) reads FTA 15.8 → 19.3 (OK) and FT-rate
+  0.27 → 0.34 (OK), both on target, per-zone FG% all held. Pick the gap before drafting; the
   next-session prompt is its own audited pass.
 - **Generation-layer bridge opened.** S39 was the first change to the population-selection layer
   (era profile) — the smallest step toward player-generation Pass 2 (below). The oracle-first,
