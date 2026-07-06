@@ -28,6 +28,9 @@
 # the coach's PaceBias tilts the three share. No team scalar anywhere.
 # Run: python3 tools/fastbreak_diet_oracle.py
 import random, statistics
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).parent))   # import tendency_oracle from beside this file
 import tendency_oracle as T
 
 # ---- design constants (PLACEHOLDERS for Emmett's ruling) --------------------
@@ -89,8 +92,12 @@ def emit_golden():
         }
     out={"base":BASE,"beta":BETA,"ratio_cap":list(RATIO_CAP),"pace_tilt":PACE_TILT,
          "mean":MEAN,"zones":ZONES,"vectors":vectors}
-    json.dump(out,open("fastbreak_golden.json","w"),indent=1)
-    print(f"golden parity fixture written: fastbreak_golden.json ({len(vectors)} vectors)")
+    # Anchor the fixture BESIDE this oracle, never the caller's working directory —
+    # the byte-identical verification gate must touch tools/fastbreak_golden.json
+    # regardless of where the command is run from. (ChatGPT review, round 2.)
+    output = Path(__file__).with_name("fastbreak_golden.json")
+    json.dump(out, output.open("w"), indent=1)
+    print(f"golden parity fixture written: {output} ({len(vectors)} vectors)")
 
 if __name__=="__main__":
     print(f"base break diet: {BASE}   identity pull beta={BETA} cap={RATIO_CAP}   pace tilt={PACE_TILT}/pt")
