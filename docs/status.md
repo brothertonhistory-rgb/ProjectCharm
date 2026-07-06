@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 38.1 (2026-07-06; make-curve tune, all per-zone FG% on target).
+Last updated: Session 39 (2026-07-06; three-point volume via era-profile retune — 3PA rate on target 0.39).
 
 ---
 
@@ -47,7 +47,8 @@ golden parity, Phase 58);
 shooting-foul / steal / rebound / block / assist attribution.
 
 **Layers live:** player generation Pass 1 + skill-derived tendencies (oracle v2, 19-vector
-golden parity); divvy Pass 1.5 (national pool + prestige draft); world Pass 1 (347 schools,
+golden parity; **S39 era-profile volume retune — population three diagnostic ~35.5% → ~39.0%**);
+divvy Pass 1.5 (national pool + prestige draft); world Pass 1 (347 schools,
 32 conferences); season Pass 2 (schedule oracle-fingerprinted, standings, calibration page);
 Roll G displacement (oracle v1, 10-vector golden parity, Phase 56); observation / stress /
 bench instruments.
@@ -86,32 +87,37 @@ bench instruments.
   possession's putback carries `FastBreak` forward but is rim-forced / putback-pie-resolved,
   so it never touched the fast-break diet; counting it would drag the reported transition
   three-rate below its true value. (`!c.Putback` guard.)
+- **Three-point VOLUME is a generation/era-profile lever, not a runtime knob** (S39). The
+  era profile's three multiplier + mid/long donors were retuned (Mid 0.50→0.44, Long 0.70→0.63,
+  Three 2.10→2.44) to lift the population three diagnostic ~35.5% → ~39.0%, which landed the
+  realized league **3PA rate 0.36 → 0.39 (OK)** and eased **aggregate FG% 45.3 → 44.9 (OK)** in
+  one pass — a pure *selection* change, no make-curve touch. The `FastBreakMean{Zone}` denominators
+  were re-synced to the new diagnostic (0.324/0.147/0.084/0.056/0.390) so the transition bend stays
+  calibrated rather than double-counting the higher inclination into the break. Mid-range is the
+  primary donor; rim is protected but not invariant. The oracle's multi-level structural gate now
+  guards that archetype's identity, not a stale absolute three cap.
 
 ## 3. Open — next-session candidates
 
-- **Season calibration page — READ at S38, make-curve tuned at S38.1 (seed 20260703, stock
-  world, 5205 games).** Two payoffs landed. S38: fast-break transition three-rate **5% → 34.5%**
-  (retired as a driver); league 3PA rate **~0.32 → 0.36**. S38.1 make-curve tune: the two cold
-  perimeter zones recentered to target in **one oracle iteration** — **long FG% 34.9 → 36.1**
-  (t36.0), **three FG% 32.9 → 33.9** (t34.0); rim/short/mid held; aggregate **3P% 32.9 → 33.9
-  now OK**. All five per-zone FG% now in band; the make-curve is **done**.
-  **Key standing finding (unchanged):** the remaining 3-point gap is *volume*, and it is
-  **league-wide, not transition** — the lever is **generation / tendency-oracle** (population
-  shoots ~35.5% threes by tendency, engine realizes ~36%, so realized ≈ intent; raising league
-  3PA to 0.39 means generating players a touch more three-inclined), not a runtime knob.
-  **New at S38.1:** raising the cold outer zones lifted aggregate **FG% 44.9 → 45.3 (now HIGH
-  by 0.3)** — a shot-MIX consequence (too few low-FG% threes diluting the average), so it rides
-  the SAME three-point-volume thread and resolves when more threes get taken. Not a make-curve issue.
-  Fresh page verdicts (S38.1 run): **OK** — points 71.1, FGA 58.2, 3P% 33.9, FT% 70.3, ORB% 29.0,
-  pace 70.3, all five per-zone FG%. **LOW** — 3PA 21.0 (t22.5), 3PA rate 0.36 (t0.39), FTA 16.0
-  (t19.5), FT rate 0.27 (t0.34), rebounds 30.5 (t34.5) incl. ORB 8.8, steals 4.6 (t6.2), OT 2.5%
-  (t4–8%). **HIGH** — FG% 45.3 (t44; the mix consequence above), assists 17.9 (t13.5; possibly
-  the probabilistic attribution, not real over-assisting), turnovers 14.2 (t12.5) / TO% 20.2,
-  blocks 4.3 (t3.5).
-  **Next session is a tuning/build pass; target is Emmett's ruling among these gaps** — the 3PA
-  volume + aggregate-FG% pair now routes through **generation tendencies** (and dovetails with
-  Pass 2); the *largest standalone* misses are FTA-LOW (a standing whistle/foul-rate gap) and
-  assists-HIGH. Pick the gap before drafting.
+- **Season calibration page — three-point thread CLOSED at S39 (seed 20260703, stock world,
+  5205 games).** The full three-point arc is now done across three sessions: S38 fast-break diet
+  (transition three 5% → 34.5%), S38.1 make-curve (all five per-zone FG% on target), **S39 volume
+  via the era-profile retune — 3PA rate 0.36 → 0.39 (OK, on target) and aggregate FG% 45.3 → 44.9
+  (OK, back in band), together, in one pass.** No make-curve touch; a pure population-selection change.
+  Per-zone FG% all held OK (rim 61.2 / short 42.8 / mid 39.3 / long 36.1 / three 33.9); fast-break
+  page line 34.9% transition three, sane (Means re-synced). FG% sits at the high edge of its band
+  (44.9 vs 44.0) — a mix result, noted not chased.
+  **Remaining open page gaps (S39 run), for a future ruling — NONE are the three-point thread:**
+  **LOW** — FTA 15.8 (t19.5) and FT rate 0.27 (t0.34) (the standing whistle/foul-rate gap, the
+  largest standalone miss); rebounds 30.7 (t34.5) incl. offensive 8.9, and steals 4.6 (t6.2)
+  (credited-rebound / live-ball reconciliation); OT 2.8% (t4–8%). **HIGH** — assists 17.9 (t13.5;
+  possibly the probabilistic attribution, not real over-assisting); turnovers 14.3 (t12.5) / TO%
+  20.3; blocks 4.1 (t3.5). **The front-runner standalone miss is FTA-LOW / FT-rate-LOW** (a
+  population-sensitive whistle tune, deliberately deferred past the generation build). Pick the
+  gap before drafting; the next-session prompt is its own audited pass.
+- **Generation-layer bridge opened.** S39 was the first change to the population-selection layer
+  (era profile) — the smallest step toward player-generation Pass 2 (below). The oracle-first,
+  archetype-table, golden-parity workflow now has a proven generation-side precedent.
 - **Turnover-band calibration** — the court-aware bands shipped with **placeholder**
   centers/spreads (backcourt ~5s, frontcourt ~14.5s); tune them off the season page's new
   turnover-length-by-court split. Open question flagged S37: single-period transition /

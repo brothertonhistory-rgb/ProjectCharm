@@ -43,6 +43,7 @@ All tie-breaks (largest-remainder rounding, the 99-cap redistribution) resolve i
 that fixed zone order.
 """
 import json, random, statistics
+from pathlib import Path
 
 Z = ["Rim", "Short", "Mid", "Long", "Three"]
 
@@ -78,7 +79,7 @@ MARGIN_BLEED             = 0.07            # porousness of the zone walls: each 
 # THE ERA PROFILE (v2 ruling 3): weight-space multipliers applied AFTER peakedness,
 # Rim/Short/Mid/Long/Three. Encodes the modern shot-selection culture, cleanly
 # separated from individual capability. An earlier-era league is these 5 numbers.
-ERA_PROFILE              = [1.00, 0.66, 0.50, 0.70, 2.10]
+ERA_PROFILE              = [1.00, 0.66, 0.44, 0.63, 2.44]
 FLOOR_INSIDE             = 0.025           # the layup, floater, wide-open 12-footer basketball hands everyone
 FLOOR_LONG_PERIM         = 0.030           # a perimeter player pulls up from midrange a few times a year
 FLOOR_THREE_CAP          = 0.040           # v2 ruling 2: ANY player with Outside>0 is capable — universal floor
@@ -343,8 +344,12 @@ def golden_vectors():
                               "postFloorWeights": w_floor}})
     return out
 
-def emit_golden(path="tendency_golden.json"):
-    with open(path, "w") as f:
+def emit_golden():
+    # Anchor the fixture BESIDE this oracle, never the caller's working directory — the
+    # byte-identical parity gate must touch tools/tendency_golden.json regardless of where
+    # the command is run from (mirrors the fastbreak oracle's emit fix, its L97).
+    path = Path(__file__).with_name("tendency_golden.json")
+    with path.open("w") as f:
         json.dump({"zoneOrder": Z, "vectors": golden_vectors()}, f, indent=1, sort_keys=True)
     print(f"golden parity fixture written: {path} ({len(golden_vectors())} vectors)")
 
@@ -376,7 +381,14 @@ def checks():
     chk("rim runner's threes are rare but real (2 <= Three <= 6)", 2<=d_rr[4]<=6)
 
     d_ml = derive(ARCH["Wing scorer (multi-level)"])[0]
-    chk("multi-level scorer is flatter than shooter (max<=45)", max(d_ml)<=45)
+    # v2 ruling: the modern-era three bump lifts every archetype's three share, so the
+    # multi-level wing's max climbs past the old stale 45. Retire the bare number; guard
+    # the multi-level IDENTITY instead — still a real multi-level scorer, flatter than a
+    # pure shooter, with a protected rim and a live mid-range.
+    chk("multi-level scorer keeps a bounded three (Three<=50)", d_ml[4]<=50)
+    chk("multi-level scorer protects the rim (Rim>=25)", d_ml[0]>=25)
+    chk("multi-level scorer keeps a live mid-range (Mid>=8)", d_ml[2]>=8)
+    chk("multi-level scorer is not three-lopsided (Three-Rim<=20)", d_ml[4]-d_ml[0]<=20)
     chk("multi-level flatter than shooter (its max < shooter's max)", max(d_ml)<max(d_shoot))
 
     # v2 ruling 1 REWRITE (the archetype was mislabeled): Outside 40 on this scale is a

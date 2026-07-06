@@ -468,7 +468,7 @@ internal static partial class Program
     // THE ERA PROFILE (v2 ruling 3): weight-space multipliers applied AFTER peakedness,
     // Rim/Short/Mid/Long/Three. Encodes the modern shot-selection culture, cleanly
     // separated from individual capability. An earlier-era league is these 5 numbers.
-    private static readonly double[] TendEraProfile = { 1.00, 0.66, 0.50, 0.70, 2.10 };
+    private static readonly double[] TendEraProfile = { 1.00, 0.66, 0.44, 0.63, 2.44 };
 
     // The 13 rating-map inputs the derivation reads. A missing key throws loudly
     // (KeyNotFoundException) — never a silent default.

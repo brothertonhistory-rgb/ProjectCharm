@@ -39,7 +39,7 @@ RATIO_CAP   = (0.15, 2.2)  # clamp on the identity ratio (guards the extremes)
 PACE_TILT   = 0.035     # per PaceBias point above/below 5, multiplied into Three
 ZONES = ["Rim","Short","Mid","Long","Three"]
 # league mean neutral diet (the tendency oracle's population diagnostic)
-MEAN = {"Rim":0.335, "Short":0.155, "Mid":0.098, "Long":0.058, "Three":0.355}
+MEAN = {"Rim":0.324, "Short":0.147, "Mid":0.084, "Long":0.056, "Three":0.390}
 
 def fb_pie(neutral_diet, pace=5.0):
     """Identity-relative pull: the base break diet bent by how this shooter's own

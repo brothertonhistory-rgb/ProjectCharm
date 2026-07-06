@@ -57,17 +57,17 @@ public sealed class RollGConfig
     //     raises transition threes; grind-it-out (<5) trims them. ShotSelectionBias is NOT
     //     read on the fast-break path (deferred to the future coach-philosophy layer).
     //     FastBreakMean{Zone} — the league mean neutral diet, PINNED to the tendency
-    //     oracle's population diagnostic (Rim 33.5 / Short 15.5 / Mid 9.8 / Long 5.8 /
-    //     Three 35.5%). This is the DENOMINATOR of the identity ratio, not a free knob. ---
+    //     oracle's population diagnostic (Rim 32.4 / Short 14.7 / Mid 8.4 / Long 5.6 /
+    //     Three 39.0%). This is the DENOMINATOR of the identity ratio, not a free knob. ---
     public double FastBreakShooterPull   { get; set; } = 0.70;
     public double FastBreakRatioCapLow   { get; set; } = 0.15;
     public double FastBreakRatioCapHigh  { get; set; } = 2.2;
     public double FastBreakPaceTilt      { get; set; } = 0.035;
-    public double FastBreakMeanRim   { get; set; } = 0.335;
-    public double FastBreakMeanShort { get; set; } = 0.155;
-    public double FastBreakMeanMid   { get; set; } = 0.098;
-    public double FastBreakMeanLong  { get; set; } = 0.058;
-    public double FastBreakMeanThree { get; set; } = 0.355;
+    public double FastBreakMeanRim   { get; set; } = 0.324;
+    public double FastBreakMeanShort { get; set; } = 0.147;
+    public double FastBreakMeanMid   { get; set; } = 0.084;
+    public double FastBreakMeanLong  { get; set; } = 0.056;
+    public double FastBreakMeanThree { get; set; } = 0.390;
 
     // --- Usage-pressure diet-shift dials (Phase 17). Control how far Roll G
     //     bends the shot diet when a shooter is carrying above an equal load.
