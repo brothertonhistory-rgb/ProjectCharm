@@ -893,4 +893,145 @@ internal static partial class Program
         return checkOk;
     }
 
+
+    // --- Session 40 mechanism check: a shooting foul now counts toward the team-foul
+    //     total (the bonus fix). Proves the 7th-foul boundary EXACTLY, that the shooter's
+    //     own trip is unaffected by the charge, that offensive fouls stay turnovers, and
+    //     the conservation identity (no leak, no double-count).
+    //
+    //     ISOLATION FIXTURE (load-bearing — the count identity is invalid without it):
+    //     a shooting-foul trip whose final FT MISSES goes live -> ResolveFTRebound ->
+    //     Roll M, whose loose-ball-defense arm would charge an INCIDENTAL team foul via
+    //     DefensiveFoulCharge and contaminate the exact count. So Roll L is pinned to
+    //     Make = 1.0 (every trip ends on a made final FT and never reaches Roll M) AND
+    //     Roll M is pinned to its DefensiveRebound terminal (belt-and-suspenders if a
+    //     later edit changes the Roll L pin) — the same isolation RollLFreeThrowCheck uses.
+    //     The ONLY team-foul mutations are then the ones this check intentionally drives.
+    //
+    //     Shooting fouls are driven THROUGH the resolver (resolver.Route) so they exercise
+    //     the real S40 increment inside the ResolveShootingFreeThrows case; non-shooting
+    //     fouls are driven with DefensiveFoulCharge.Resolve directly (the same node the
+    //     five non-shooting feeders use). Both mutate the SAME shared game.Fouls. ---
+    private static bool ShootingFoulFeedsBonusCheck(RollAConfig cfg, PossessionState state)
+    {
+        Console.WriteLine("\n--- Session 40: shooting fouls feed the team-foul total (bonus fix) ---");
+        var configPath = Path.Combine(AppContext.BaseDirectory, "config.json");
+        var cfgD = RollDConfig.Load(configPath);
+        var A = state.Defense;   // the fouling team on the driving state (charged the fouls)
+        var O = state.Offense;   // the offense — must never be charged
+
+        // Build a fresh resolver on a fresh shared game with the isolation pins.
+        (Resolver Resolver, GameState Game) Build()
+        {
+            var g = new GameState(new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold));
+            SeedMinimalRoster(g);  // pickers on the FT / offensive-foul paths need a roster
+            var resolver = new Resolver(
+                new StubPieGenerator(cfg),
+                cfg,
+                new RollBStubPieGenerator(RollBConfig.Load(configPath)),
+                new RollCGenerator(RollCConfig.Load(configPath)),
+                RollCConfig.Load(configPath),
+                new RollDGenerator(cfgD),
+                new RollEStubPieGenerator(RollEConfig.Load(configPath)),
+                new AttentionGenerator(AttentionConfig.Load(configPath), g),
+                new RollFStubPieGenerator(RollFConfig.Load(configPath)),
+                new RollGStubPieGenerator(RollGConfig.Load(configPath)),
+                new RollHStubPieGenerator(RollHConfig.Load(configPath)),
+                new RollIStubPieGenerator(RollIConfig.Load(configPath)),
+                new RollJGenerator(RollJConfig.Load(configPath), MatchupConfig.Load(configPath), g),
+                new RollKStubPieGenerator(RollKConfig.Load(configPath)),
+                // Roll L pinned to Make = 1.0: every shooting-foul trip ends on a made
+                // final FT, so it hands the ball to the opponent and never reaches Roll M.
+                new RollLStubPieGenerator(new RollLConfig { MakeProbability = 1.0 }),
+                // Roll M pinned to DefensiveRebound: belt-and-suspenders — even if a made
+                // final FT somehow reached a rebound, this arm charges no foul.
+                new RollMStubPieGenerator(new RollMConfig
+                {
+                    DefensiveRebound = 1.0,
+                    OffensiveRebound = 0, LooseBallFoulOnDefense = 0, LooseBallFoulOnOffense = 0,
+                    OutOfBoundsOffOffense = 0, OutOfBoundsOffDefense = 0, JumpBall = 0
+                }),
+                new RollOffensiveFoulGenerator(RollOffensiveFoulConfig.Load(configPath)),
+                MatchupConfig.Load(configPath),
+                g,
+                new SystemRng(cfg.Seed));
+            return (resolver, g);
+        }
+
+        // Drive ONE and-1 shooting foul through the resolver. An and-1 is exactly ONE
+        // free throw, so its FT-spin count (returned) is the discriminator that proves
+        // the trip stayed shot-derived — a one-and-one would be TWO shots (front make ->
+        // second). This exercises the real S40 increment in ResolveShootingFreeThrows.
+        int DriveShootingFoul(Resolver r) =>
+            r.Route(new Continue(ContinuationKind.ResolveShootingFreeThrows,
+                state with { Result = ShotResult.MadeAndFouled, ShotType = ShotLocation.Rim }))
+             .FreeThrowSpins;
+
+        // Drive ONE non-shooting defensive foul through the shared node; return its Continue.
+        Continue DriveNonShootingFoul(GameState g) =>
+            (Continue)DefensiveFoulCharge.Resolve(state, g, ContinuationKind.ResolveSidelineInbound);
+
+        var allOk = true;
+
+        // ── T1: six shooting fouls leave A one short of the bonus. ──────────────────
+        var (r1, g1) = Build();
+        for (var i = 0; i < 6; i++) DriveShootingFoul(r1);
+        var count6 = g1.Fouls.FoulsFor(A);
+        var bonus6 = g1.Fouls.BonusFor(A);
+        var t1 = count6 == 6 && bonus6 == BonusType.None;
+        allOk &= t1;
+        Console.WriteLine($"  [T1] 6 shooting fouls -> A fouls={count6} (want 6), bonus={bonus6} (want None) -> {(t1 ? "ok" : "FAIL")}");
+
+        // ── T2: the 7th foul (a NON-shooting foul) turns the bonus ON at exactly 7. ──
+        var c7 = DriveNonShootingFoul(g1);
+        var count7 = g1.Fouls.FoulsFor(A);
+        var t2 = count7 == 7 && c7.Next == ContinuationKind.ResolveFreeThrows && c7.Bonus == BonusType.OneAndOne;
+        allOk &= t2;
+        Console.WriteLine($"  [T2] +1 non-shooting -> A fouls={count7} (want 7), route={c7.Next} (want ResolveFreeThrows), bonus={c7.Bonus} (want OneAndOne) -> {(t2 ? "ok" : "FAIL")}");
+
+        // ── T3 (fresh game): a shooting foul AS the 7th foul increments ONCE and still
+        //     resolves as its own shot-derived trip — never a one-and-one. This is the
+        //     load-bearing semantic: the shooting branch never reads BonusFor, so charging
+        //     the team foul cannot alter the shooter's trip. ───────────────────────────
+        var (r3, g3) = Build();
+        for (var i = 0; i < 6; i++) DriveShootingFoul(r3);
+        var before7 = g3.Fouls.FoulsFor(A);
+        var spins7  = DriveShootingFoul(r3);   // the 7th foul is itself a shooting foul
+        var after7  = g3.Fouls.FoulsFor(A);
+        var bonusAfter7 = g3.Fouls.BonusFor(A);
+        var t3 = (after7 - before7) == 1 && after7 == 7 && spins7 == 1 && bonusAfter7 == BonusType.OneAndOne;
+        allOk &= t3;
+        Console.WriteLine($"  [T3] shooting foul as 7th -> delta=+{after7 - before7} (want +1), fouls={after7} (want 7), trip spins={spins7} (want 1 = NOT a one-and-one), bonus now={bonusAfter7} (want OneAndOne) -> {(t3 ? "ok" : "FAIL")}");
+
+        // ── T4: the next non-shooting foul reads the PERSISTED post-shooting-foul count. ─
+        var c8 = DriveNonShootingFoul(g3);
+        var count8 = g3.Fouls.FoulsFor(A);
+        var t4 = count8 == 8 && c8.Next == ContinuationKind.ResolveFreeThrows && c8.Bonus == BonusType.OneAndOne;
+        allOk &= t4;
+        Console.WriteLine($"  [T4] +1 non-shooting after the shooting-foul bonus -> A fouls={count8} (want 8), route={c8.Next} (want ResolveFreeThrows), bonus={c8.Bonus} (want OneAndOne) -> {(t4 ? "ok" : "FAIL")}");
+
+        // ── T5: an OFFENSIVE foul charges NO team foul (charges stay turnovers). ──────
+        var (r5, g5) = Build();
+        r5.Route(new Continue(ContinuationKind.ResolveOffensiveFoul, state));
+        var t5 = g5.Fouls.FoulsFor(A) == 0 && g5.Fouls.FoulsFor(O) == 0;
+        allOk &= t5;
+        Console.WriteLine($"  [T5] offensive foul -> defense fouls={g5.Fouls.FoulsFor(A)}, offense fouls={g5.Fouls.FoulsFor(O)} (both want 0) -> {(t5 ? "ok" : "FAIL")}");
+
+        // ── T6: conservation — A's total == shooting + non-shooting fouls charged to it,
+        //     with zero leak to the offense (the real no-leak / no-double proof). ───────
+        var (r6, g6) = Build();
+        const int nShooting = 4;
+        const int nNonShooting = 3;
+        for (var i = 0; i < nShooting; i++)    DriveShootingFoul(r6);
+        for (var i = 0; i < nNonShooting; i++) DriveNonShootingFoul(g6);
+        var total = g6.Fouls.FoulsFor(A);
+        var offenseLeak = g6.Fouls.FoulsFor(O);
+        var t6 = total == nShooting + nNonShooting && offenseLeak == 0;
+        allOk &= t6;
+        Console.WriteLine($"  [T6] conservation: A fouls={total} (want {nShooting + nNonShooting} = {nShooting} shooting + {nNonShooting} non-shooting), offense leak={offenseLeak} (want 0) -> {(t6 ? "ok" : "FAIL")}");
+
+        Console.WriteLine($"  shooting fouls feed the bonus, shooter's trip unchanged, no leak / no double -> {(allOk ? "ok" : "FAIL")}");
+        return allOk;
+    }
+
 }

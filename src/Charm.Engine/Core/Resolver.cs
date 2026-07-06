@@ -826,6 +826,18 @@ public sealed class Resolver
                             shootingFouls.Add(new ShootingFoulEvent(
                                 c.State.ShotType!.Value,
                                 c.State.SelectedSlot?.Number ?? 0));
+                            // Session 40: a shooting foul is a defensive team foul like any
+                            // other — it counts toward the opponent's bonus. Non-shooting
+                            // fouls already do this via DefensiveFoulCharge (the sole other
+                            // Fouls.Increment site); the shooting path previously did not,
+                            // starving the 7th-foul bonus. Charge the DEFENSE directly here.
+                            // Deliberately NOT DefensiveFoulCharge.Resolve — that helper reads
+                            // the bonus and forks, which would wrongly convert this shooting
+                            // trip into a one-and-one; the shooter's own trip must stay the
+                            // shot-derived 1/2/3 count (oneAndOne: false below). Increment
+                            // draws no RNG, so the pre-bonus stream is unchanged; only future
+                            // possessions' bonus reads move, which is the intended effect.
+                            _game.Fouls.Increment(c.State.Defense);
                             result = DriveFreeThrows(c.State, ShootingFoulShots(c.State), oneAndOne: false, out var shootingFtSpins, out var shootingFtPoints);
                             freeThrowSpins += shootingFtSpins;
                             points         += shootingFtPoints;

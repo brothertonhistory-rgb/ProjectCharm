@@ -1581,7 +1581,13 @@ never a stamp Roll L sees. The two FT resolver edges became two entry points to 
 edge reads the stamped `(Result, ShotType)` — and-1 = 1, fouled two = 2, fouled three = 3;
 the `ResolveFreeThrows` edge reads the `Bonus` token — `Double` = 2, `OneAndOne` = a
 conditional 1-and-1. This keeps the FT rules in exactly one place (the conductor) and out of
-both the upstream foul rolls and Roll L itself.
+both the upstream foul rolls and Roll L itself. **(Session 40: the `ShootingFreeThrows` edge
+also charges the defense one team foul — `_game.Fouls.Increment(state.Defense)`, so a shooting
+foul feeds the opponent's bonus like any defensive foul. It always drives `DriveFreeThrows` with
+`oneAndOne: false` on the shot-derived 1/2/3 count and never reads `BonusFor`, so charging the
+team foul only affects *future* possessions' bonus reads — the shooter's own trip is never
+converted to a one-and-one. The increment is deliberately the direct call, not
+`DefensiveFoulCharge.Resolve`, which would fork the trip on the bonus.)**
 
 ### The uniform dead-intermediate / live-last rule
 
@@ -1926,8 +1932,23 @@ correctness proof — each exercises its caller and asserts the produced `Contin
 routing through the new node = success. A direct unit check (`DefensiveFoulChargeCheck`) proves the
 node itself: both below-bonus kinds, with and without flavor, across the foul-count climb, asserting
 charge-to-defense-only, the below/in-bonus split, the `Bonus` payload on both arms, and the flavor
-pass-through. The node is now the single place fouls cross the bonus, so the Governor accumulation
-check (§2a) is the end-to-end guarantee.
+pass-through.
+
+**What this node is, precisely (updated Session 40).** It is the single place *non-shooting*
+defensive fouls are charged, and the **only** place the bonus *fork* happens (below bonus →
+caller kind; in bonus → `ResolveFreeThrows`). It is **not** the only place a team foul is
+*incremented*: as of Session 40 the *shooting*-foul path increments `FoulTracker` too — directly,
+at the conductor's `ResolveShootingFreeThrows` resolution (see Roll L below), via a plain
+`_game.Fouls.Increment(state.Defense)` rather than through this node. A shooting foul is a
+defensive team foul like any other and now counts toward the opponent's bonus; before S40 it
+resolved straight to free throws and never touched the tracker, which starved the 7th-foul bonus
+and dragged league FTA below target. So team-foul accumulation is now complete over *all*
+defensive fouls (shooting + non-shooting), while the fork stays here alone. Two increment sites,
+one fork site; the two paths are disjoint (a shooting foul never flows through this node, so
+there is no double-charge). The Governor accumulation check (§2a), `DefensiveFoulChargeCheck`,
+and the S40 mechanism check (`ShootingFoulFeedsBonusCheck`, which proves the 7th-foul boundary
+exactly and that the charge never converts the shooter's own trip into a one-and-one) are the
+end-to-end guarantee.
 
 ### Contextification #5a — Roll C expansion: every no-shot loss seated, context-gated and DORMANT (Session 24)
 

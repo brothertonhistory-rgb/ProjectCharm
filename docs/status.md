@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 39 (2026-07-06; three-point volume via era-profile retune — 3PA rate on target 0.39).
+Last updated: Session 40 (2026-07-06; shooting fouls now feed the team-foul total — the bonus fix; FTA / FT-rate land on target).
 
 ---
 
@@ -37,7 +37,7 @@ baselines and the legacy `game` demo command (see Open).
 | M — FT glass | Roll I's model on the FT board population (P11) |
 | Offensive-foul flavor | Frontcourt/backcourt context; flat within context **by ruling** (§2) |
 
-**Systems live:** fouls/bonus + jump-ball arrow; end-of-half intent; OT; fatigue meter +
+**Systems live:** fouls/bonus + jump-ball arrow (**all defensive fouls feed the team total — shooting fouls included as of S40**, so the 7-foul bonus arrives on real schedule); end-of-half intent; OT; fatigue meter +
 athleticism discount + fatigue-fence substitutions; Governor + Resolver walk with full
 per-possession counters; **court-aware turnover clock** (S37 — turnovers draw a short
 court-dependent band, not the shared possession clock; page splits length by court);
@@ -96,6 +96,17 @@ bench instruments.
   calibrated rather than double-counting the higher inclination into the break. Mid-range is the
   primary donor; rim is protected but not invariant. The oracle's multi-level structural gate now
   guards that archetype's identity, not a stale absolute three cap.
+- **Shooting fouls count toward the team-foul total** (S40). A shooting foul now increments
+  `FoulTracker` — a direct `_game.Fouls.Increment(state.Defense)` at the `ResolveShootingFreeThrows`
+  resolution — so it feeds the opponent's bonus like every non-shooting defensive foul already did.
+  Before S40 only non-shooting fouls counted, so teams crawled to the 7-foul bonus and the bonus-FTA
+  bucket starved (FTA 15.8 / FT-rate 0.27, both LOW). Two increment sites (shooting here + non-shooting
+  via `DefensiveFoulCharge`), **one** bonus-fork site (`DefensiveFoulCharge`); the paths are disjoint,
+  so no double-charge. The shooter's own trip is never converted to a one-and-one (`oneAndOne: false`,
+  never reads `BonusFor`) — the charge only moves future possessions' bonus reads. **Thresholds stay
+  7/10** — the gap closed with foul *volume*, not an easier bonus. Proven by `ShootingFoulFeedsBonusCheck`
+  (7th-foul boundary exact, no leak, no double). Payoff on the instruments captured: bonus share of FTA
+  ~27% → ~42%, FTr → 0.34, FTA/team ~19 (target 19.5).
 
 ## 3. Open — next-session candidates
 
@@ -107,14 +118,15 @@ bench instruments.
   Per-zone FG% all held OK (rim 61.2 / short 42.8 / mid 39.3 / long 36.1 / three 33.9); fast-break
   page line 34.9% transition three, sane (Means re-synced). FG% sits at the high edge of its band
   (44.9 vs 44.0) — a mix result, noted not chased.
-  **Remaining open page gaps (S39 run), for a future ruling — NONE are the three-point thread:**
-  **LOW** — FTA 15.8 (t19.5) and FT rate 0.27 (t0.34) (the standing whistle/foul-rate gap, the
-  largest standalone miss); rebounds 30.7 (t34.5) incl. offensive 8.9, and steals 4.6 (t6.2)
+  **Remaining open page gaps, for a future ruling — three-point thread CLOSED at S39, FTA/FT-rate CLOSED at S40:**
+  **LOW** — rebounds 30.7 (t34.5) incl. offensive 8.9, and steals 4.6 (t6.2)
   (credited-rebound / live-ball reconciliation); OT 2.8% (t4–8%). **HIGH** — assists 17.9 (t13.5;
   possibly the probabilistic attribution, not real over-assisting); turnovers 14.3 (t12.5) / TO%
-  20.3; blocks 4.1 (t3.5). **The front-runner standalone miss is FTA-LOW / FT-rate-LOW** (a
-  population-sensitive whistle tune, deliberately deferred past the generation build). Pick the
-  gap before drafting; the next-session prompt is its own audited pass.
+  20.3; blocks 4.1 (t3.5). **The front-runner is now the rebound/steal reconciliation or the
+  assists-HIGH attribution.** FTA-LOW / FT-rate-LOW was the prior front-runner and is **closed by the
+  S40 bonus fix** (FTr 0.34 / FTA ~19 on the instruments captured; the exact 347-page FTA/FT-rate line
+  is pending its own run — run the season page once to record it). Pick the gap before drafting; the
+  next-session prompt is its own audited pass.
 - **Generation-layer bridge opened.** S39 was the first change to the population-selection layer
   (era profile) — the smallest step toward player-generation Pass 2 (below). The oracle-first,
   archetype-table, golden-parity workflow now has a proven generation-side precedent.
@@ -124,8 +136,13 @@ bench instruments.
   ball-advanced turnovers currently draw the short backcourt band — fine for a bring-up
   strip, arguably too short for an already-across possession; decide once the split's size
   and mean are on the page. (S37)
-- **Whistle / FTA dial** — FTA LOW; the total-PF cumulative counter rides this session;
-  standing condition: if Roll H block/foul baselines move, rim/short midpoints re-derive.
+- **Bridge #3 — shooting-foul rate dial (PARKED, no longer urgent)** — the S40 bonus fix closed
+  FTA to target with foul *volume*, so a shooting-foul-rate bump is not needed for FTA. If ever
+  opened it carries three items: (1) a modest per-zone shooting-foul-rate bump **with** the make-curve
+  re-derive (standing condition — if Roll H block/foul baselines move, rim/short midpoints re-derive);
+  (2) diagnose what `FoulDrawing` actually does and where shooting fouls are called per zone;
+  (3) **late-game intentional fouling** — a trailing team hacking to extend the game, entirely unbuilt,
+  a real separate FTA source. (S40)
 - **Steals vs dead-ball composition** — sharpen the live/dead turnover mix. (S33)
 - **Curve-steepness design conversation** — before any K moves; carries the finding that
   diminishing returns no longer exist inside the authored 0–99 range. (S32)

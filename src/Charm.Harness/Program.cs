@@ -170,6 +170,7 @@ internal static partial class Program
         ok &= RollKPutbackPieCheck(cfg, cfgH, state);
         ok &= RollKBonusForkCheck(cfg, cfgD, cfgK, rollKGenerator, state);
         ok &= RollLFreeThrowCheck(cfg, state);
+        ok &= ShootingFoulFeedsBonusCheck(cfg, state);
         ok &= RollMReboundBatchCheck(cfg, cfgM, new RollMStubPieGenerator(cfgM), game, state);
         ok &= RollMContextSelectionCheck(cfg, cfgK, cfgJ, rollJGenerator, state);
         ok &= OffensiveReboundConvergenceCheck(cfg, state);
