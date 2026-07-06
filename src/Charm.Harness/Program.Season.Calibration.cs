@@ -317,6 +317,26 @@ internal static partial class Program
         RowRel("rebounds (credited)",       (s.OReb + s.DReb) / g2,  34.5);
         RowRel("- offensive",               s.OReb / g2,              9.5);
         RowAbs("ORB%",                      Pct(s.OReb, s.OReb + s.DReb), 28.5, 1.5);
+        // Session 41 (Phase C): the credited-rebound LOW is a DEFINITION gap, not a bug.
+        // 'rebounds (credited)' counts only player-credited boards; the public 34.5 includes
+        // uncredited TEAM rebounds. This instrument cannot yet reconcile them — rebound-origin
+        // provenance is lost in the final possession labels (jump-ball arrows arise from Rolls
+        // A/B/F/I/J/K/M, not only Roll I/M rebound scrambles), so completeness cannot be proven
+        // page-only. The candidates below are therefore a page-only DIAGNOSTIC: never summed
+        // into the credited line, never judged against 34.5. (A reconciled team-rebound line
+        // needs rebound-provenance instrumentation — a future item, out of scope here.)
+        {
+            long CN(string k) => s.OtherByLabel.TryGetValue(k, out var v) ? v.N : 0L;
+            var oob = CN("OutOfBoundsOffOffense");
+            var jb  = CN("JumpBallArrow:Home") + CN("JumpBallArrow:Away");
+            var lbf = CN("LooseBallFoulOnOffense");
+            var candSum = oob + jb + lbf + s.MissOobN;
+            Console.WriteLine("    note: 'rebounds (credited)' excludes uncredited team rebounds the public 34.5 includes;");
+            Console.WriteLine(Inv($"          this instrument does not yet fully measure them (credited gap ~{34.5 - (s.OReb + s.DReb) / g2:F1}/team/game)."));
+            Console.WriteLine("    candidate dead-ball possession endings (NOT reconciled to rebounds; page-only diagnostic):");
+            Console.WriteLine(Inv($"      OutOfBoundsOffOffense {oob / g2:F2} | jump-ball arrows {jb / g2:F2} | ") +
+                              Inv($"LooseBallFoulOnOffense {lbf / g2:F2} | MissOutOfBoundsLost {s.MissOobN / g2:F2} | sum {candSum / g2:F2}"));
+        }
         RowRel("assists",                   s.Ast / g2,              13.5);
         RowRel("turnovers",                 s.TurnoverPossessions / g2, 12.5);
         RowAbs("TO% of possessions",        Pct(s.TurnoverPossessions, s.PossessionRecords), 18.5, 1.5);

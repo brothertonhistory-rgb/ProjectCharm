@@ -5765,9 +5765,9 @@ Roll C answers one question: given that a possession ended in a turnover, what *
 
 Roll C selects one of three fixed weight sets based on the `TurnoverContext` ticket stamped on the incoming `Continue`:
 
-- **Halfcourt** — the default. Every turnover that doesn't arrive with a context ticket (Roll B's loss, Roll F's player-action turnovers, Roll A's frontcourt re-inbound) lands here. Bad passes, lost balls, travels, carries, violations — the full menu of halfcourt turnovers. Backcourt-only types (FiveSecondInbound, TenSecondBackcourt) are zero.
-- **Transition** — stamped by Roll J's Turnover arm. More live strips (LostBallLiveBall 35%) than Halfcourt (16%); offensive fouls nearly vanish (5%). The live/dead split is higher because transition turnovers are more often contested breaks, not set-play mistakes.
-- **EntryBackcourt** — stamped by Roll A when `state.Frontcourt == false`. The backcourt bring-up context, now live. Only types that can happen before crossing halfcourt: bad passes, lost balls, and the three backcourt-only violations (FiveSecondInbound, TenSecondBackcourt, ShotClockViolation on the way up). Travels, carries, 3-second violations, offensive fouls, and over-and-back are zero — you haven't crossed halfcourt yet.
+- **Halfcourt** — the default. Every turnover that doesn't arrive with a context ticket (Roll B's loss, Roll F's player-action turnovers, Roll A's frontcourt re-inbound) lands here. Bad passes, lost balls, travels, carries, violations — the full menu of halfcourt turnovers. Backcourt-only types (FiveSecondInbound, TenSecondBackcourt) are zero. **Live/dead split ruled 50/50 at S41** (BadPassIntercepted 0.265 + LostBallLiveBall 0.235 = 0.50 live; the dead menu holds its internal shape, scaled to 0.50) — Emmett's ruling, iteration anticipated. This lifted the realized `steals`-per-turnover box proxy from ~33% to ~47%, landing league steals 4.5 → 6.5 (t6.2, OK).
+- **Transition** — stamped by Roll J's Turnover arm. Its two live kinds already sum to 0.50 (BadPassIntercepted 0.15 + LostBallLiveBall 0.35) — **untouched at S41**, already at the ruled split; offensive fouls nearly vanish (5%). The live/dead split is high because transition turnovers are more often contested breaks, not set-play mistakes.
+- **EntryBackcourt** — stamped by Roll A when `state.Frontcourt == false`. The backcourt bring-up context, now live. Only types that can happen before crossing halfcourt: bad passes, lost balls, and the three backcourt-only violations (FiveSecondInbound, TenSecondBackcourt, ShotClockViolation on the way up). Travels, carries, 3-second violations, offensive fouls, and over-and-back are zero — you haven't crossed halfcourt yet. **Live/dead also ruled 50/50 at S41** (BadPassIntercepted 0.25 + LostBallLiveBall 0.25); tiny volume, scaled for consistency with the ruling — the dead side (0.142857 / 0.107143 / 0.071429 / 0.071429 / 0.107142) carries the rounding remainder so the serialized weights total exactly 1.0.
 
 ### No pressure parameter
 
@@ -5781,7 +5781,7 @@ Calibration of all three pies is explicitly deferred until all generators are wi
 
 ### What is not this session
 
-- **Calibration** of any Roll C weight. Live/dead split calibration is deferred.
+- **Calibration** of the drawn turnover *kinds* within each context beyond the live/dead split. The **live/dead split itself is now ruled (S41: 50/50 in Halfcourt and EntryBackcourt; Transition already 50/50)** — the internal shape of the dead menu and the kind-level weights remain shape-appropriate placeholders open to future tuning.
 - **Roll D real generator** (defensive foul flavor). Future session.
 - **Transition expanded types** (Travel, DoubleDribble in Transition). Currently zero; a calibration-session question.
 
@@ -5840,15 +5840,17 @@ Two questions to answer per eligible made FG: (1) was the bucket assisted? (2) i
 assistProb = clamp( zoneBase × LineupPassingFactor, AssistRateFloor, AssistRateCeiling )
 ```
 
-**Zone base rates** come from real hoop-math data (assisted-FG% by zone), blended to five engine zones:
+**Zone base rates** come from real hoop-math data (assisted-FG% by zone), then uniformly trimmed at S41 so the league assist total lands 13.5:
 
-| Zone | Base rate | Data anchor |
-|---|---|---|
-| Three | 0.88 | Blend of corner (~95%) and above-the-break (~80–81%) |
-| Long | 0.62 | Baseline two, wing two range |
-| Rim | 0.54 | Low paint |
-| Mid | 0.50 | Straight-up mid-range |
-| Short | 0.43 | High paint / self-created floaters |
+| Zone | Base rate (S41) | Was | Data anchor |
+|---|---|---|---|
+| Three | 0.784 | 0.88 | Blend of corner (~95%) and above-the-break (~80–81%) |
+| Long | 0.5524 | 0.62 | Baseline two, wing two range |
+| Rim | 0.4811 | 0.54 | Low paint |
+| Mid | 0.4455 | 0.50 | Straight-up mid-range |
+| Short | 0.3831 | 0.43 | High paint / self-created floaters |
+
+The five were trimmed by a **uniform ×0.8909** (S41), which preserves the basketball ordering — threes most assisted, short least — and, because the midpoint recenter (below) did most of the correction, the realized per-zone assisted shares still land near real-world (three ~78% / long ~55% / mid ~45% / short ~38% / rim ~48%). The base-rate anchors above describe the *shape*; the recenter + this trim set the *level*.
 
 Three highest: almost every three is created by a pass. Long above rim: baseline twos and wing twos are largely catch-and-shoot. Rim above short: lay-ups are usually pass-initiated; short (floaters, hooks) is where self-creation peaks.
 
@@ -5866,7 +5868,9 @@ LineupPassingFactor = 1.0 + AssistPassSwing
                           × tanh( (meanAssistWeight − AssistPassMidpoint) / AssistPassScale )
 ```
 
-Defaults: `AssistPassMidpoint = 50.0`, `AssistPassScale = 20.0`, `AssistPassSwing = 0.25`. Factor range: (0.75, 1.25). A league-average lineup (mean attribute ≈ 50) produces factor ≈ 1.0. A broad high-passing lineup lifts all zone rates proportionally; a scorer-heavy lineup suppresses them.
+Defaults: `AssistPassMidpoint = 71.31` (S41; was 50.0), `AssistPassScale = 20.0`, `AssistPassSwing = 0.25`. Factor range: (0.75, 1.25). A league-average lineup produces factor ≈ 1.0. A broad high-passing lineup lifts all zone rates proportionally; a scorer-heavy lineup suppresses them.
+
+**S41 recenter — the midpoint tracks the generated population, not the scale midpoint.** The placeholder `AssistPassMidpoint = 50` assumed lineup AssistWeight centers at 50 (the middle of the 0–100 scale). It does not: generated starters average **~71** on the passing/playmaking/IQ blend, so every eligible make drew a pre-clamp factor centered at ~1.19, not 1.0 — inflating league assists to 17.4. Recentering the midpoint to the **eligible-make-weighted mean lineup AssistWeight (71.31, solved by tanh zero-balance bisection so the weighted-mean pre-clamp factor equals exactly 1.0)** is the surgical fix: a league-average lineup now earns factor 1.0 as intended. The recenter alone dropped assists 17.4 → ~15.2; the uniform zone-base trim (above) closed the rest to 13.5. This is a *relative-engine* correctness fix — the midpoint follows the population it measures, so it stays correct as the generated population shifts.
 
 **Why the multiplier is necessary.** Without it, passing attributes only decide *who* gets credited, never the team rate. Every team would post the same zone-averaged assist rate (varying only by shot mix), which cannot reproduce the real 37%→71% spread. The multiplier at the lineup grain is the mechanism that makes a ball-movement roster post a high team rate and a scorer-heavy roster a low one.
 
@@ -5880,7 +5884,7 @@ AssistWeight(p) = AssistPassingWeight    × p.Passing       (default 0.50)
                 + AssistIqWeight         × p.BasketballIQ   (default 0.15)
 ```
 
-**Coefficient sum-to-one is correct and intentional.** This deviates from `BlockerWeight` and the rebound positional weights, which do NOT sum to one (the picker normalizes among players, so absolute scale is irrelevant there). The sum-to-one constraint keeps `AssistWeight` on the 0–100 attribute scale, making `AssistPassMidpoint = 50` the correct league-average reference for `LineupPassingFactor`. Conflating these conventions would be wrong; the documented rationale survives in both the class XML doc and `MatchupConfig`.
+**Coefficient sum-to-one is correct and intentional.** This deviates from `BlockerWeight` and the rebound positional weights, which do NOT sum to one (the picker normalizes among players, so absolute scale is irrelevant there). The sum-to-one constraint keeps `AssistWeight` on the 0–100 attribute scale, against which `AssistPassMidpoint` is calibrated — recentered at S41 to the generated population's mean (~71.31), the reference point `LineupPassingFactor` measures against. Conflating these conventions would be wrong; the documented rationale survives in both the class XML doc and `MatchupConfig`.
 
 Pick mechanics: the shooter's slot gets weight 0 (excluded); every other populated offensive player gets `max(1, AssistWeight(p, cfg))`; one RNG draw, cumulative walk, last eligible slot as floating-point fallback. Throws `InvalidOperationException` on empty non-shooter lineup — loud, unreachable in valid play.
 
@@ -7007,7 +7011,7 @@ Sim vs. target vs. band, verdict LOW/OK/HIGH per row: points, FGA, FG%, 3PA, 3P%
 
 ### The reference card (PROVISIONAL)
 
-Center points compiled from published national per-season averages — the blend is the mean of the ten annual D1 per-team-per-game national averages, 2015-16..2024-25 — **not yet pinned to one saved source extract**. The bands (±1.0 point on percentages, ±5% relative on volumes, ±1.5 on ORB%/TO%, 4–8% on OT share) are 5–10× wider than any methodology-of-averaging difference, so a verdict cannot flip on provenance; **when a tuning session needs a bullseye on a specific line, that session pins that line's source first.** Stated caveat: public rebound totals include *team* rebounds (dead-ball boards no player is credited with); the sim total is all credited individual boards — the closest engine analog of the uncredited board is the MissOutOfBoundsLost ending. The gap is visible, not papered over. **Personal fouls (~17.5 real) are not printable in v1:** the engine keeps no cumulative PF counter (`ResetForNewHalf` wipes at the half), and a reconstruction from record fragments would miss non-shooting below-the-bonus fouls — an estimate must not wear a measurement's clothes. Deferred to a small additive engine-side counter when a fouls/whistle pass needs the line; FTA and FT-trip volume stand in.
+Center points compiled from published national per-season averages — the blend is the mean of the ten annual D1 per-team-per-game national averages, 2015-16..2024-25 — **not yet pinned to one saved source extract**. The bands (±1.0 point on percentages, ±5% relative on volumes, ±1.5 on ORB%/TO%, 4–8% on OT share) are 5–10× wider than any methodology-of-averaging difference, so a verdict cannot flip on provenance; **when a tuning session needs a bullseye on a specific line, that session pins that line's source first.** Stated caveat: public rebound totals include *team* rebounds (dead-ball boards no player is credited with); the sim total is all credited individual boards — the closest engine analog of the uncredited board is the MissOutOfBoundsLost ending. The gap is visible, not papered over. **S41 audited whether the credited-rebound LOW could be reconciled to the public 34.5 page-only (the "C0" provenance gate) and it degraded to diagnostic-only.** The credited gap (~3.8/team/game) is *numerically* close to a set of candidate dead-ball possession endings (OutOfBoundsOffOffense ~0.99 + jump-ball arrows ~1.44 + LooseBallFoulOnOffense ~0.37 + MissOutOfBoundsLost ~1.08 = ~3.88), but that near-match is **not a reconciliation**: `OutOfBoundsOffOffense`/`LooseBallFoulOnOffense`/`MissOutOfBoundsLost` are provably rebound-opportunity-only (Roll I/M terminals and the Roll H shot-miss terminal), yet **completeness cannot be proven** — a `JumpBallArrow` label carries no rebound-origin provenance, and jump balls feed in from Rolls A/B/F/I/J/K/M, so the rebound-scramble arrows can't be separated from the rest without a new counter. The page therefore prints these under the honest label **`candidate dead-ball possession endings (NOT reconciled to rebounds)`** as a pure diagnostic plus a footnote on `rebounds (credited)` — **never** a verdict row against 34.5, never summed into the credited line. A reconciled team-rebound line is a **future item needing rebound-provenance instrumentation** (out of scope at S41). Per the Session-31 discipline: a possession-ending count must not wear a rebound's clothes. **Personal fouls (~17.5 real) are not printable in v1:** the engine keeps no cumulative PF counter (`ResetForNewHalf` wipes at the half), and a reconstruction from record fragments would miss non-shooting below-the-bonus fouls — an estimate must not wear a measurement's clothes. Deferred to a small additive engine-side counter when a fouls/whistle pass needs the line; FTA and FT-trip volume stand in.
 
 ### Phase 55 §3.8 — machinery only
 

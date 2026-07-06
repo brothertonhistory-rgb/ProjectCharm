@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 40 (2026-07-06; shooting fouls now feed the team-foul total — the bonus fix; FTA / FT-rate land on target).
+Last updated: Session 41 (2026-07-06; the scoreboard session — assists recentered to 13.7 (OK), turnover mix 50/50 live so steals land 6.5 (OK), rebound instrument audited (C0 diagnostic-only)).
 
 ---
 
@@ -108,6 +108,20 @@ bench instruments.
   (7th-foul boundary exact, no leak, no double). Payoff on the 347-page (seed 20260703, 5205 games):
   FTA 15.8 → 19.3 (t19.5, OK), FT-rate 0.27 → 0.34 (t0.34, OK), bonus share of FTA ~27% → ~42%;
   per-zone FG% all held in band, no shot-math regression.
+- **The halfcourt turnover mix is 50/50 live/dead** (S41, Emmett's ruling — "to start", iteration
+  anticipated). Base live .34→.50 (BadPassIntercepted .265 + LostBallLiveBall .235) and EntryBackcourt
+  live .30→.50, dead menus scaled with shape preserved (each context sums to exactly 1.0); Transition
+  was already 50/50, untouched. Weights-only, no Roll C code. Landed league **steals 4.5 → 6.5 (t6.2, OK)**;
+  the realized `steals/turnovers` box proxy is ~47% (below the configured ~50% because Roll K live-ball
+  turnovers are steal-less — the parked dilution, reported not fixed). Total turnover rate held at 13.8.
+- **The assist lineup-passing midpoint tracks the generated population, not the scale midpoint** (S41).
+  `AssistPassMidpoint` recentered 50 → **71.31** — the eligible-make-weighted mean lineup AssistWeight,
+  solved by tanh zero-balance bisection so a league-average lineup earns factor 1.0. The placeholder 50
+  assumed attributes center at 50; generated starters average ~71 (measured: mean factor 1.192 over 252k
+  eligible makes), which had inflated assists to 17.4. The five `AssistedRate` zone bases were then trimmed
+  a **uniform ×0.8909** (.88→.784 / .62→.5524 / .50→.4455 / .43→.3831 / .54→.4811), preserving the ordering;
+  per-zone realized assisted shares stay near real-world (three ~78 / rim ~48). Landed **assists 17.4 → 13.7
+  (t13.5, OK)** in one pass. The midpoint is a *relative-engine* dial: it follows the population it measures.
 
 ## 3. Open — next-session candidates
 
@@ -119,15 +133,16 @@ bench instruments.
   Per-zone FG% all held OK (rim 61.2 / short 42.8 / mid 39.3 / long 36.1 / three 33.9); fast-break
   page line 34.9% transition three, sane (Means re-synced). FG% sits at the high edge of its band
   (44.9 vs 44.0) — a mix result, noted not chased.
-  **Remaining open page gaps (S40 347-page run), for a future ruling — three-point thread CLOSED at S39, FTA/FT-rate CLOSED at S40:**
-  **LOW** — rebounds 30.6 (t34.5) incl. offensive 8.8, and steals 4.5 (t6.2)
-  (credited-rebound / live-ball reconciliation); OT 2.5% (t4–8%). **HIGH** — assists 17.4 (t13.5;
-  possibly the probabilistic attribution, not real over-assisting); turnovers 13.8 (t12.5) / TO%
-  19.6; blocks 4.1 (t3.5). **The front-runner is now the rebound/steal reconciliation or the
-  assists-HIGH attribution.** FTA-LOW / FT-rate-LOW was the prior front-runner and is **closed by the
-  S40 bonus fix** — the 347-page (seed 20260703, 5205 games) reads FTA 15.8 → 19.3 (OK) and FT-rate
-  0.27 → 0.34 (OK), both on target, per-zone FG% all held. Pick the gap before drafting; the
-  next-session prompt is its own audited pass.
+  **Remaining open page gaps (S41 347-page run, seed 20260703) — three-point CLOSED at S39, FTA/FT-rate CLOSED at S40, assists + steals CLOSED at S41:**
+  **HIGH** — turnovers 13.8 (t12.5) / TO% 19.6 (mostly a pace echo, its own read); blocks 4.1 (t3.5).
+  **LOW** — rebounds 30.7 (t34.5) incl. offensive 8.8 (now an **understood definition gap**, not a mystery —
+  S41 audited the credited↔public reconciliation and it degraded to diagnostic-only; see Parked, team-rebound
+  line); OT 2.8% (t4–8%). Also a small routing drift: FG% 45.0 sits a hair over its +1.0 band edge (more live
+  turnovers → more transition → slightly more efficient shots; noted, not chased). **The front-runner is now
+  the turnovers-HIGH pace echo, the blocks-HIGH attribution, or OT-LOW.** Assists-HIGH (17.4) and steals-LOW
+  (4.5) were prior front-runners and are **closed by S41** (assists 13.7 OK via the midpoint recenter + uniform
+  trim; steals 6.5 OK via the 50/50 turnover mix). Pick the gap before drafting; the next-session prompt is its
+  own audited pass.
 - **Generation-layer bridge opened.** S39 was the first change to the population-selection layer
   (era profile) — the smallest step toward player-generation Pass 2 (below). The oracle-first,
   archetype-table, golden-parity workflow now has a proven generation-side precedent.
@@ -144,7 +159,6 @@ bench instruments.
   (2) diagnose what `FoulDrawing` actually does and where shooting fouls are called per zone;
   (3) **late-game intentional fouling** — a trailing team hacking to extend the game, entirely unbuilt,
   a real separate FTA source. (S40)
-- **Steals vs dead-ball composition** — sharpen the live/dead turnover mix. (S33)
 - **Curve-steepness design conversation** — before any K moves; carries the finding that
   diminishing returns no longer exist inside the authored 0–99 range. (S32)
 - **Displacement magnitude tuning** — only via the oracle-first flow (approve new oracle
@@ -154,6 +168,13 @@ bench instruments.
 
 ## 4. Parked — waiting on a named prerequisite
 
+- **Reconciled team-rebound line** (S41) — the credited-rebound LOW is an understood definition gap:
+  public 34.5 includes uncredited team rebounds. S41's C0 audit proved the candidate dead-ball endings
+  (OOB-off-offense, jump-ball arrows, loose-ball-foul-on-offense, MissOutOfBoundsLost) are individually
+  rebound-opportunity-only but **cannot be reconciled page-only** — `JumpBallArrow` labels carry no
+  rebound-origin provenance (jump balls feed from Rolls A/B/F/I/J/K/M). A true team-rebound line needs
+  **rebound-provenance instrumentation** (a counter stamping which held-ball/OOB endings arose from a
+  Roll I/M rebound scramble). Until then the page prints the candidates as a NOT-reconciled diagnostic only.
 - **Player-generation Pass 2** — tweener-post existence requirement; weakest-leg
   multiplicative development. (Formal notes in memory + journal, parked 2026-07-03.)
 - **Roll G lineup-context bend** — teammate spacing/gravity as a *selection* effect

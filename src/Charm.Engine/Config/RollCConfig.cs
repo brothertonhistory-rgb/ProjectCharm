@@ -10,11 +10,11 @@ public sealed class RollCConfig
 {
     // --- Stub pie base weights (placeholders; the real attribute-driven
     //     generator will replace these). Kept summing to 1 for clarity. ---
-    public double BaseBadPassDeadBall { get; set; } = 0.24;
-    public double BaseBadPassIntercepted { get; set; } = 0.18;
-    public double BaseLostBallDeadBall { get; set; } = 0.14;
-    public double BaseLostBallLiveBall { get; set; } = 0.16;
-    public double BaseOffensiveFoul { get; set; } = 0.09;
+    public double BaseBadPassDeadBall { get; set; } = 0.182;
+    public double BaseBadPassIntercepted { get; set; } = 0.265;
+    public double BaseLostBallDeadBall { get; set; } = 0.106;
+    public double BaseLostBallLiveBall { get; set; } = 0.235;
+    public double BaseOffensiveFoul { get; set; } = 0.068;
 
     // --- Contextification #6: the expanded loss set is now LIVE in the Halfcourt
     //     context — the realistic ways a SET possession dies (a travel, an over-and-
@@ -25,14 +25,14 @@ public sealed class RollCConfig
     //     here — they cannot happen once the ball is across. Placeholder weights, the
     //     blessed 24/18/16/14/9 main + 8/2.5/2.5/2/1.5/1.5/0.5/0.5 minor shape; tuned
     //     later like every pie. ---
-    public double BaseTravel { get; set; } = 0.08;
-    public double BaseDoubleDribble { get; set; } = 0.015;
-    public double BaseCarry { get; set; } = 0.015;
-    public double BaseThreeSecondViolation { get; set; } = 0.025;
-    public double BaseFiveSecondCloselyGuarded { get; set; } = 0.005;
-    public double BaseOffensiveGoaltending { get; set; } = 0.005;
-    public double BaseBackcourtViolation { get; set; } = 0.02;
-    public double BaseShotClockViolation { get; set; } = 0.025;
+    public double BaseTravel { get; set; } = 0.061;
+    public double BaseDoubleDribble { get; set; } = 0.011;
+    public double BaseCarry { get; set; } = 0.011;
+    public double BaseThreeSecondViolation { get; set; } = 0.019;
+    public double BaseFiveSecondCloselyGuarded { get; set; } = 0.004;
+    public double BaseOffensiveGoaltending { get; set; } = 0.004;
+    public double BaseBackcourtViolation { get; set; } = 0.015;
+    public double BaseShotClockViolation { get; set; } = 0.019;
     public double BaseFiveSecondInbound { get; set; } = 0.0;
     public double BaseTenSecondBackcourt { get; set; } = 0.0;
 
@@ -73,10 +73,10 @@ public sealed class RollCConfig
     //     violations); the halfcourt-only types (travel, over-and-back, 3-second,
     //     carry, closely-guarded, offensive goaltending) and the offensive foul are
     //     0.0 here. Placeholder values, sum to 1; tuned in #5b like every pie. ---
-    public double EntryBackcourtBadPassDeadBall { get; set; } = 0.20;
-    public double EntryBackcourtBadPassIntercepted { get; set; } = 0.15;
-    public double EntryBackcourtLostBallDeadBall { get; set; } = 0.15;
-    public double EntryBackcourtLostBallLiveBall { get; set; } = 0.15;
+    public double EntryBackcourtBadPassDeadBall { get; set; } = 0.142857;
+    public double EntryBackcourtBadPassIntercepted { get; set; } = 0.25;
+    public double EntryBackcourtLostBallDeadBall { get; set; } = 0.107143;
+    public double EntryBackcourtLostBallLiveBall { get; set; } = 0.25;
     public double EntryBackcourtOffensiveFoul { get; set; } = 0.0;
     public double EntryBackcourtTravel { get; set; } = 0.0;
     public double EntryBackcourtDoubleDribble { get; set; } = 0.0;
@@ -85,9 +85,9 @@ public sealed class RollCConfig
     public double EntryBackcourtFiveSecondCloselyGuarded { get; set; } = 0.0;
     public double EntryBackcourtOffensiveGoaltending { get; set; } = 0.0;
     public double EntryBackcourtBackcourtViolation { get; set; } = 0.0;
-    public double EntryBackcourtShotClockViolation { get; set; } = 0.10;
-    public double EntryBackcourtFiveSecondInbound { get; set; } = 0.10;
-    public double EntryBackcourtTenSecondBackcourt { get; set; } = 0.15;
+    public double EntryBackcourtShotClockViolation { get; set; } = 0.071429;
+    public double EntryBackcourtFiveSecondInbound { get; set; } = 0.071429;
+    public double EntryBackcourtTenSecondBackcourt { get; set; } = 0.107142;
 
     // --- Contextification #5a: invariant elapsed for Roll C's three violation arms
     //     (the only Roll C arms that stamp time; turnovers defer to the future time

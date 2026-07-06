@@ -991,7 +991,8 @@ public sealed class MatchupConfig
                 throw new InvalidOperationException(
                     $"AssistPassingWeight + AssistPlaymakingWeight + AssistIqWeight must equal 1.0 " +
                     $"(got {coeffSum:F10}). The sum-to-one constraint keeps AssistWeight on the " +
-                    $"0–100 attribute scale, making AssistPassMidpoint=50 the league-average reference.");
+                    $"0–100 attribute scale, against which AssistPassMidpoint is calibrated " +
+                    $"(S41: recentered to the generated population's mean, ~71).");
         }
         foreach (var (name, val) in new (string, double)[]
         {
@@ -1576,9 +1577,9 @@ public sealed class MatchupConfig
     // Coefficients sum to 1.0 — unlike BlockerWeight and the rebound positional
     // coefficients (which intentionally do NOT sum to one because the picker
     // normalizes among players). The sum-to-one constraint keeps AssistWeight on
-    // the 0–100 attribute scale, making AssistPassMidpoint = 50 the league-average
-    // reference for LineupPassingFactor. This is correct and is NOT an inconsistency
-    // to "fix" against the block/rebound convention.
+    // the 0–100 attribute scale, against which AssistPassMidpoint is calibrated
+    // (S41: recentered to ~71, the generated population's mean). This is correct and is
+    // NOT an inconsistency to "fix" against the block/rebound convention.
     //
     // LineupPassingFactor = 1.0 + AssistPassSwing
     //     × tanh((meanAssistWeight - AssistPassMidpoint) / AssistPassScale)
@@ -1605,8 +1606,11 @@ public sealed class MatchupConfig
     public double AssistIqWeight         { get; set; } = 0.15;
 
     /// <summary>League-average reference point for the lineup passing factor (tanh midpoint).
-    /// Default 50.0 (mid-attribute scale). Calibration placeholder.</summary>
-    public double AssistPassMidpoint { get; set; } = 50.0;
+    /// S41: recentered from the placeholder 50.0 to 71.31 — the eligible-make-weighted mean
+    /// lineup AssistWeight of the generated starter population (measured, not assumed), so a
+    /// league-average lineup earns factor 1.0. The old 50 assumed attributes center at 50;
+    /// generated starters average ~71, which inflated every assist by ~×1.19.</summary>
+    public double AssistPassMidpoint { get; set; } = 71.31;
 
     /// <summary>Scale of the passing tanh (attribute-unit width of the transition band).
     /// Default 20.0. Calibration placeholder.</summary>
@@ -1616,25 +1620,25 @@ public sealed class MatchupConfig
     /// Default 0.25 → factor range (0.75, 1.25). Calibration placeholder.</summary>
     public double AssistPassSwing    { get; set; } = 0.25;
 
-    /// <summary>Base assisted rate for three-point makes. Default 0.83.
-    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
-    public double AssistedRateThree  { get; set; } = 0.88;
+    /// <summary>Base assisted rate for three-point makes. S41: trimmed 0.88 → 0.784
+    /// (uniform ×0.8909 across all five zones after the midpoint recenter, landing 13.5).</summary>
+    public double AssistedRateThree  { get; set; } = 0.784;
 
-    /// <summary>Base assisted rate for long-two makes. Default 0.62.
-    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
-    public double AssistedRateLong   { get; set; } = 0.62;
+    /// <summary>Base assisted rate for long-two makes. S41: trimmed 0.62 → 0.5524
+    /// (uniform ×0.8909 across all five zones after the midpoint recenter).</summary>
+    public double AssistedRateLong   { get; set; } = 0.5524;
 
-    /// <summary>Base assisted rate for mid-range makes. Default 0.50.
-    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
-    public double AssistedRateMid    { get; set; } = 0.50;
+    /// <summary>Base assisted rate for mid-range makes. S41: trimmed 0.50 → 0.4455
+    /// (uniform ×0.8909 across all five zones after the midpoint recenter).</summary>
+    public double AssistedRateMid    { get; set; } = 0.4455;
 
-    /// <summary>Base assisted rate for short makes (floaters, hooks). Default 0.43.
-    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
-    public double AssistedRateShort  { get; set; } = 0.43;
+    /// <summary>Base assisted rate for short makes (floaters, hooks). S41: trimmed 0.43 → 0.3831
+    /// (uniform ×0.8909 across all five zones after the midpoint recenter).</summary>
+    public double AssistedRateShort  { get; set; } = 0.3831;
 
-    /// <summary>Base assisted rate for rim makes. Default 0.54.
-    /// Must be in [0,1] (enforced in Load). Calibration placeholder.</summary>
-    public double AssistedRateRim    { get; set; } = 0.54;
+    /// <summary>Base assisted rate for rim makes. S41: trimmed 0.54 → 0.4811
+    /// (uniform ×0.8909 across all five zones after the midpoint recenter).</summary>
+    public double AssistedRateRim    { get; set; } = 0.4811;
 
     /// <summary>Floor on the final assisted probability after lineup factor is applied.
     /// Default 0.25. Must be in [0,1] and less than AssistedRateCeiling (enforced in Load).
