@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 38 (2026-07-06).
+Last updated: Session 38.1 (2026-07-06; make-curve tune, all per-zone FG% on target).
 
 ---
 
@@ -89,15 +89,29 @@ bench instruments.
 
 ## 3. Open — next-session candidates
 
-- **Season calibration pass** at seed 20260703 on the stock world — the front-runner, and
-  now the read of the S38 fast-break payoff. Fresh read needed now that displacement, the
-  court-aware turnover clock (S37), **and the shooter-bent fast-break diet (S38)** are all
-  live; pace ~69 (was 65.5); the frozen 5%-of-transition-attempts-are-threes drag is retired.
-  The page now carries a **fast-break shot-diet line** (realized transition FGA, three-rate,
-  3P%) — the direct read of whether the transition-three fix lifts the league 3PA rate toward
-  target. Last recorded page (S35, pre-S38): 3PA rate ~0.32 vs 0.39 target, FG% ~45.6 vs 44.0,
-  3P% ~33 vs 34.0, per-zone FG% all OK, pace OK, FT% OK. Known open verdicts from earlier
-  pages: FTA LOW, steals LOW (4.4 vs 6.2) with total TOs slightly HIGH, OT LOW (2.9% vs 4–8%).
+- **Season calibration page — READ at S38, make-curve tuned at S38.1 (seed 20260703, stock
+  world, 5205 games).** Two payoffs landed. S38: fast-break transition three-rate **5% → 34.5%**
+  (retired as a driver); league 3PA rate **~0.32 → 0.36**. S38.1 make-curve tune: the two cold
+  perimeter zones recentered to target in **one oracle iteration** — **long FG% 34.9 → 36.1**
+  (t36.0), **three FG% 32.9 → 33.9** (t34.0); rim/short/mid held; aggregate **3P% 32.9 → 33.9
+  now OK**. All five per-zone FG% now in band; the make-curve is **done**.
+  **Key standing finding (unchanged):** the remaining 3-point gap is *volume*, and it is
+  **league-wide, not transition** — the lever is **generation / tendency-oracle** (population
+  shoots ~35.5% threes by tendency, engine realizes ~36%, so realized ≈ intent; raising league
+  3PA to 0.39 means generating players a touch more three-inclined), not a runtime knob.
+  **New at S38.1:** raising the cold outer zones lifted aggregate **FG% 44.9 → 45.3 (now HIGH
+  by 0.3)** — a shot-MIX consequence (too few low-FG% threes diluting the average), so it rides
+  the SAME three-point-volume thread and resolves when more threes get taken. Not a make-curve issue.
+  Fresh page verdicts (S38.1 run): **OK** — points 71.1, FGA 58.2, 3P% 33.9, FT% 70.3, ORB% 29.0,
+  pace 70.3, all five per-zone FG%. **LOW** — 3PA 21.0 (t22.5), 3PA rate 0.36 (t0.39), FTA 16.0
+  (t19.5), FT rate 0.27 (t0.34), rebounds 30.5 (t34.5) incl. ORB 8.8, steals 4.6 (t6.2), OT 2.5%
+  (t4–8%). **HIGH** — FG% 45.3 (t44; the mix consequence above), assists 17.9 (t13.5; possibly
+  the probabilistic attribution, not real over-assisting), turnovers 14.2 (t12.5) / TO% 20.2,
+  blocks 4.3 (t3.5).
+  **Next session is a tuning/build pass; target is Emmett's ruling among these gaps** — the 3PA
+  volume + aggregate-FG% pair now routes through **generation tendencies** (and dovetails with
+  Pass 2); the *largest standalone* misses are FTA-LOW (a standing whistle/foul-rate gap) and
+  assists-HIGH. Pick the gap before drafting.
 - **Turnover-band calibration** — the court-aware bands shipped with **placeholder**
   centers/spreads (backcourt ~5s, frontcourt ~14.5s); tune them off the season page's new
   turnover-length-by-court split. Open question flagged S37: single-period transition /
