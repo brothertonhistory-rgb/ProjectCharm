@@ -541,6 +541,10 @@ internal static partial class Program
             var recFta  = records.Sum(r => r.Fta);
             var recOrbW = records.Sum(r => r.OrbWon);
             var recOrbC = records.Sum(r => r.OrbChances);
+            // Session 38: fast-break shot-diet reconciliation sums (0 ≤ fb3pm ≤ fb3pa ≤ fbFga ≤ FGA).
+            var recFbFga = records.Sum(r => r.FastBreakFga);
+            var recFb3pa = records.Sum(r => r.FastBreakThreePa);
+            var recFb3pm = records.Sum(r => r.FastBreakThreePm);
             if (recFga + recMf != recSr)
             {
                 Console.WriteLine();
@@ -551,6 +555,13 @@ internal static partial class Program
             {
                 Console.WriteLine();
                 Console.WriteLine($"  [FAIL] Seed {seed}: counter sanity — FGM={recFgm} FGA={recFga} 3PM={rec3pm} 3PA={rec3pa} FTM={recFtm} FTA={recFta} ORBwon={recOrbW} ORBchances={recOrbC}");
+                mechanicsOk = false;
+            }
+            // Session 38: fast-break subset chain — fbFGM3 ≤ fb3PA ≤ fbFGA ≤ FGA on the batch.
+            if (recFb3pm > recFb3pa || recFb3pa > recFbFga || recFbFga > recFga)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"  [FAIL] Seed {seed}: fast-break counter sanity — fbFGM3={recFb3pm} fb3PA={recFb3pa} fbFGA={recFbFga} FGA={recFga}");
                 mechanicsOk = false;
             }
 

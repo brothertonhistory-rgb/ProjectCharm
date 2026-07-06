@@ -46,6 +46,9 @@
     <None Include="..\..\tools\displacement_golden.json" Link="tools\displacement_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\..\tools\fastbreak_golden.json" Link="tools\fastbreak_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

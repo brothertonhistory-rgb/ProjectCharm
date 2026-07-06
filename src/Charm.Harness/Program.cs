@@ -219,6 +219,7 @@ internal static partial class Program
         ok &= Phase55SeasonCheck(configPath);                  // Phase 55
         ok &= Phase56DisplacementCheck(configPath);            // Phase 56
         ok &= Phase57TurnoverClockCheck(configPath, cfgC, game, state); // Phase 57
+        ok &= Phase58FastBreakDietCheck(configPath);            // Phase 58
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

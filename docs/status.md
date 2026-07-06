@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 37 (2026-07-04).
+Last updated: Session 38 (2026-07-06).
 
 ---
 
@@ -28,7 +28,7 @@ baselines and the legacy `game` demo command (see Open).
 | D — Foul flavor | Flat **by structural necessity** (§2) |
 | E — Player selection | Attribute-driven usage hierarchy (P15/19) + defensive attention (P27) |
 | F — Player action | Pressure + matchup (P12) |
-| G — Shot location | Matchup bend on residualized gaps (P9 + S36 Route B), coaching nudge (P30), usage diet shift (P17), attention amplifier (P28), **matchup displacement** (S36) |
+| G — Shot location | Matchup bend on residualized gaps (P9 + S36 Route B), coaching nudge (P30), usage diet shift (P17), attention amplifier (P28), **matchup displacement** (S36), **fast-break diet bent per shooter + PaceBias tilt** (S38) |
 | H — Make/miss | Matchup make/block/foul doors (P6/7/8), IQ term (P50), fatigue-discounted athleticism (P49) |
 | I — Rebound | Two-touchpoint matchup model (P10) |
 | J — Transition run-or-not | Coach pace + team athleticism gap (P28/30) |
@@ -41,6 +41,9 @@ baselines and the legacy `game` demo command (see Open).
 athleticism discount + fatigue-fence substitutions; Governor + Resolver walk with full
 per-possession counters; **court-aware turnover clock** (S37 — turnovers draw a short
 court-dependent band, not the shared possession clock; page splits length by court);
+**fast-break shot diet** (S38 — the break sets a modern base diet bent per shooter, PaceBias
+tilts the three share; page reads the realized transition three share; oracle v1, 14-vector
+golden parity, Phase 58);
 shooting-foul / steal / rebound / block / assist attribution.
 
 **Layers live:** player generation Pass 1 + skill-derived tendencies (oracle v2, 19-vector
@@ -72,15 +75,29 @@ bench instruments.
 - **A possession that has offensive-rebounded is timed as a frontcourt turnover** (S37),
   regardless of the backcourt court-state flag transition / ball-advanced possessions
   carry — you cannot rebound in the backcourt. (`EffectiveTurnoverProfile`.)
+- **The fast break sets a modern base diet bent per shooter, not a flat pie** (S38). The
+  break dictates a base (Rim 0.57 / Short 0.08 / Mid 0.03 / Long 0.02 / Three 0.30) pulled
+  toward the runner's own tendencies with a PaceBias three-share tilt; the null-shooter
+  fallback is the flat base, NOT the half-court stub. The break reads RAW tendencies —
+  coach shot-selection philosophy is deliberately NOT read on the break (only PaceBias
+  tilts it). The `FastBreakMean{Zone}` denominators are pinned to the tendency oracle's
+  population diagnostic, not free knobs. Locked oracle wins on any disagreement.
+- **Roll K putbacks are excluded from fast-break FGA accounting** (S38). A transition
+  possession's putback carries `FastBreak` forward but is rim-forced / putback-pie-resolved,
+  so it never touched the fast-break diet; counting it would drag the reported transition
+  three-rate below its true value. (`!c.Putback` guard.)
 
 ## 3. Open — next-session candidates
 
-- **Season calibration pass** at seed 20260703 on the stock world — the front-runner.
-  Fresh read needed now that displacement **and the court-aware turnover clock (S37)** are
-  live; pace shifted up to ~69 (was 65.5). Last recorded page (S35): 3PA rate
-  ~0.32 vs 0.39 target, FG% ~45.6 vs 44.0, 3P% ~33 vs 34.0, per-zone FG% all OK, pace OK,
-  FT% OK. Known open verdicts from earlier pages: FTA LOW, steals LOW (4.4 vs 6.2) with
-  total TOs slightly HIGH, OT LOW (2.9% vs 4–8%).
+- **Season calibration pass** at seed 20260703 on the stock world — the front-runner, and
+  now the read of the S38 fast-break payoff. Fresh read needed now that displacement, the
+  court-aware turnover clock (S37), **and the shooter-bent fast-break diet (S38)** are all
+  live; pace ~69 (was 65.5); the frozen 5%-of-transition-attempts-are-threes drag is retired.
+  The page now carries a **fast-break shot-diet line** (realized transition FGA, three-rate,
+  3P%) — the direct read of whether the transition-three fix lifts the league 3PA rate toward
+  target. Last recorded page (S35, pre-S38): 3PA rate ~0.32 vs 0.39 target, FG% ~45.6 vs 44.0,
+  3P% ~33 vs 34.0, per-zone FG% all OK, pace OK, FT% OK. Known open verdicts from earlier
+  pages: FTA LOW, steals LOW (4.4 vs 6.2) with total TOs slightly HIGH, OT LOW (2.9% vs 4–8%).
 - **Turnover-band calibration** — the court-aware bands shipped with **placeholder**
   centers/spreads (backcourt ~5s, frontcourt ~14.5s); tune them off the season page's new
   turnover-length-by-court split. Open question flagged S37: single-period transition /

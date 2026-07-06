@@ -172,7 +172,14 @@ public sealed record PossessionRecord(
     //                       band assertion filter to single-period frontcourt draws.
     PossessionTimeProfile? TimeProfile = null,
     double? TurnoverRawElapsed = null,
-    int ShotClockPeriods = 1);
+    int ShotClockPeriods = 1,
+    // Session 38: fast-break shot-diet counters, copied through from RoutingOutcome —
+    // read-only page instrumentation. FastBreakThreePm <= FastBreakThreePa <=
+    // FastBreakFga <= Fga on every possession. Excludes Roll K putbacks (a transition
+    // possession's putback carries FastBreak but is rim-forced, not a diet shot).
+    int FastBreakFga = 0,
+    int FastBreakThreePa = 0,
+    int FastBreakThreePm = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -347,6 +354,7 @@ public sealed class Governor
             double? recordTurnoverRaw = null;
             int recordShotClockPeriods = 1;
             int possessionFga = 0, possessionFgm = 0, possessionThreePa = 0, possessionThreePm = 0;
+            int possessionFastBreakFga = 0, possessionFastBreakThreePa = 0, possessionFastBreakThreePm = 0;
             // Session 36: displacement-context bucket locals (copied from RoutingOutcome).
             int possessionDispLowFga = 0, possessionDispLowThreePa = 0, possessionDispLowThreePm = 0;
             int possessionDispMidFga = 0, possessionDispMidThreePa = 0, possessionDispMidThreePm = 0;
@@ -446,6 +454,9 @@ public sealed class Governor
                 possessionFgm             = outcome.Fgm;
                 possessionThreePa         = outcome.ThreePa;
                 possessionThreePm         = outcome.ThreePm;
+                possessionFastBreakFga     = outcome.FastBreakFga;
+                possessionFastBreakThreePa = outcome.FastBreakThreePa;
+                possessionFastBreakThreePm = outcome.FastBreakThreePm;
                 possessionDispLowFga      = outcome.DispLowFga;
                 possessionDispLowThreePa  = outcome.DispLowThreePa;
                 possessionDispLowThreePm  = outcome.DispLowThreePm;
@@ -550,7 +561,8 @@ public sealed class Governor
                 possessionFtaBonusPicker, possessionFtaBonusSelected,
                 possessionFtaBonusUnattributed, possessionFtaShootingSelected,
                 possessionFtaShootingNoSlot,
-                recordTimeProfile, recordTurnoverRaw, recordShotClockPeriods));
+                recordTimeProfile, recordTurnoverRaw, recordShotClockPeriods,
+                possessionFastBreakFga, possessionFastBreakThreePa, possessionFastBreakThreePm));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(

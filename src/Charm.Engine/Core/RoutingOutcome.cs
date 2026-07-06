@@ -98,6 +98,21 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// </summary>
     public int ThreePm { get; init; }
 
+    // --- Session 38: fast-break shot-diet counters (read-only page instrumentation).
+    //     A fast-break FGA is an ordinary Roll-G-selected field-goal attempt whose stamped
+    //     state has FastBreak = true; it EXCLUDES Roll K putbacks (a transition possession's
+    //     putback carries FastBreak forward but was rim-forced by Roll K / resolved on Roll
+    //     H's putback pie — it never touched the fast-break diet). Nested at the resolver
+    //     so 0 ≤ FastBreakThreePm ≤ FastBreakThreePa ≤ FastBreakFga ≤ Fga on every record.
+    //     Init-only with 0 defaults — a pure append, like every prior field. ---
+
+    /// <summary>Fast-break field-goal attempts (FastBreak state, excluding Roll K putbacks).</summary>
+    public int FastBreakFga { get; init; }
+    /// <summary>3PA subset of <see cref="FastBreakFga"/>.</summary>
+    public int FastBreakThreePa { get; init; }
+    /// <summary>3PM subset of <see cref="FastBreakThreePa"/>.</summary>
+    public int FastBreakThreePm { get; init; }
+
     // --- Session 36: displacement-context bucket counters (observation
     //     readout, read-only — no assertion consumes these). Every FGA whose
     //     state carried a populated ShotDisplacementLevel lands in exactly one

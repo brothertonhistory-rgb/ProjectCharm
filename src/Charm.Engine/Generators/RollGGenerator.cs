@@ -84,12 +84,29 @@ public sealed class RollGGenerator : IRollGGenerationProvider
             ?? throw new InvalidOperationException(
                 "RollGGenerator requires a stamped SelectedSlot — Roll E must run before Roll G.");
 
-        // Phase 16: fast-break shot location — flat rim-heavy pie, no diet shift,
-        // residual 0.0 (no volume load on a transition possession).
-        if (state.FastBreak)
-            return new RollGGeneration(BuildFastBreakPie(), 0.0);
-
+        // Session 38: fetch the shooter BEFORE the fast-break branch — the break diet now
+        // bends to whoever is running it, so we need the shooter here. A null shooter must
+        // still fall through to a flat fallback, never throw.
         var shooter = _game.RosterFor(state.Offense).PlayerAt(slot);
+
+        // Session 38: fast-break shot location BENDS to the shooter. The break dictates a
+        // modern base diet (rim-heavy, real three share, long twos nearly gone); the
+        // shooter's own stored neutral tendencies pull it zone-by-zone and the offensive
+        // coach's PaceBias tilts the three share. Residual stays 0.0 (no volume load on a
+        // transition possession).
+        //   - shooter present → shooter-bent, PaceBias-tilted pie.
+        //   - shooter null    → flat configured base (BuildFlatFastBreakPie). NOT
+        //                       BuildStubPie: that is the 35/36 HALFCOURT diet, and using it
+        //                       here would silently turn a missing-shooter break into a
+        //                       halfcourt-looking possession (a real regression).
+        if (state.FastBreak)
+            return new RollGGeneration(
+                shooter is null
+                    ? BuildFlatFastBreakPie()
+                    : BuildFastBreakPie(shooter, _game.CoachFor(state.Offense)),
+                0.0);
+
+        // Non-fast-break, no shooter: ordinary halfcourt stub (unchanged).
         if (shooter is null)
             return new RollGGeneration(BuildStubPie(), 0.0);
 
@@ -308,7 +325,8 @@ public sealed class RollGGenerator : IRollGGenerationProvider
     }
 
     // -------------------------------------------------------------------------
-    // Helpers (BuildStubPie, BuildFastBreakPie, BuildPureTendencyPie)
+    // Helpers (BuildStubPie, BuildFlatFastBreakPie, BuildFastBreakPie,
+    //          DeriveFastBreakPie, BuildPureTendencyPie)
     // -------------------------------------------------------------------------
 
     // v3 fix: NO private Multiplier helper here. The multiplier math lives on
@@ -328,11 +346,12 @@ public sealed class RollGGenerator : IRollGGenerationProvider
         return new Pie<ShotLocation>(weights, _cfg.Epsilon);
     }
 
-    private Pie<ShotLocation> BuildFastBreakPie()
+    private Pie<ShotLocation> BuildFlatFastBreakPie()
     {
-        // Phase 16: flat rim-heavy pie for press-break possessions. The five
-        // weights are config-driven calibration placeholders; the Pie constructor
-        // enforces sum-to-1 (load invariant in RollGConfig.Load backs this up).
+        // Session 38: the flat, UNBENT fast-break base diet — the null-shooter fallback
+        // (no shooter identity to bend). The five weights are config-driven calibration
+        // placeholders summing to 1.0 (the load invariant in RollGConfig.Load backs this
+        // up); the Pie constructor re-checks sum-to-1.
         var weights = new Dictionary<ShotLocation, double>
         {
             [ShotLocation.Rim]   = _cfg.FastBreakRim,
@@ -342,6 +361,82 @@ public sealed class RollGGenerator : IRollGGenerationProvider
             [ShotLocation.Three] = _cfg.FastBreakThree,
         };
         return new Pie<ShotLocation>(weights, _cfg.Epsilon);
+    }
+
+    /// <summary>
+    /// The shooter-bent fast-break pie: the configured base diet pulled toward this
+    /// shooter's own stored neutral tendencies (identity-relative ratio, the same
+    /// multiplier idiom Roll G's matchup bend uses) and tilted on the three share by the
+    /// offensive coach's PaceBias. Reads the RAW stored tendencies — NOT
+    /// <see cref="CoachingPull.Apply"/> — because shot-selection philosophy is the future
+    /// coach layer's job; only tempo (PaceBias) tilts the break this session.
+    /// </summary>
+    private Pie<ShotLocation> BuildFastBreakPie(Player shooter, CoachProfile offCoach) =>
+        DeriveFastBreakPie(
+            shooter.RimTendency, shooter.ShortTendency, shooter.MidTendency,
+            shooter.LongTendency, shooter.ThreeTendency,
+            offCoach.PaceBias, _cfg);
+
+    /// <summary>
+    /// LOCKED-SPEC PORT (Session 38) — constant-for-constant mirror of
+    /// <c>tools/fastbreak_diet_oracle.py</c> (fb_pie). Zone order Rim, Short, Mid, Long,
+    /// Three. If the C# and the oracle ever disagree, THE ORACLE WINS.
+    ///
+    /// <para>Math: each zone's neutral tendency is read as a share of 100 (the fixed
+    /// constant the oracle uses — NOT the tendency sum; generated tendencies sum to 100).
+    /// The identity ratio <c>(share / mean) ^ Beta</c> is clamped to [CapLo, CapHi] and
+    /// multiplies the base diet. The three share is then tilted by
+    /// <c>1 + PaceTilt * (PaceBias − 5)</c>. One renormalization yields the pie. There is
+    /// NO additive floor: a non-shooter's tiny three ratio keeps his break ~rim-run.</para>
+    ///
+    /// <para>Public static so the Phase 58 golden-parity harness can reproduce every
+    /// fixture vector directly — the same shape as <see cref="Matchup.DeriveDisplacement"/>.
+    /// Constants are read from the passed <paramref name="cfg"/> so a config/default drift
+    /// fails the parity check loudly.</para>
+    /// </summary>
+    public static Pie<ShotLocation> DeriveFastBreakPie(
+        int rimTend, int shortTend, int midTend, int longTend, int threeTend,
+        double paceBias, RollGConfig cfg)
+    {
+        var tend = new[] { rimTend, shortTend, midTend, longTend, threeTend };
+        var baseDiet = new[]
+        {
+            cfg.FastBreakRim, cfg.FastBreakShort, cfg.FastBreakMid,
+            cfg.FastBreakLong, cfg.FastBreakThree,
+        };
+        var mean = new[]
+        {
+            cfg.FastBreakMeanRim, cfg.FastBreakMeanShort, cfg.FastBreakMeanMid,
+            cfg.FastBreakMeanLong, cfg.FastBreakMeanThree,
+        };
+
+        var blend = new double[5];
+        for (var z = 0; z < 5; z++)
+        {
+            // Neutral share of 100 (fixed constant — oracle parity, NOT the tendency sum).
+            var share = tend[z] / 100.0;
+            var ratio = Math.Pow(share / mean[z], cfg.FastBreakShooterPull);
+            ratio = Math.Clamp(ratio, cfg.FastBreakRatioCapLow, cfg.FastBreakRatioCapHigh);
+            blend[z] = baseDiet[z] * ratio;
+        }
+
+        // PaceBias tilt on the three share only (index 4). Run-and-gun (>5) raises
+        // transition threes; grind-it-out (<5) trims them. RollGConfig.Load validation
+        // guarantees this multiplier stays strictly positive across PaceBias ∈ [1, 10].
+        blend[4] *= 1.0 + cfg.FastBreakPaceTilt * (paceBias - 5.0);
+
+        var sum = 0.0;
+        foreach (var v in blend) sum += v;
+
+        var weights = new Dictionary<ShotLocation, double>
+        {
+            [ShotLocation.Rim]   = blend[0] / sum,
+            [ShotLocation.Short] = blend[1] / sum,
+            [ShotLocation.Mid]   = blend[2] / sum,
+            [ShotLocation.Long]  = blend[3] / sum,
+            [ShotLocation.Three] = blend[4] / sum,
+        };
+        return new Pie<ShotLocation>(weights, cfg.Epsilon);
     }
 
     private Pie<ShotLocation> BuildPureTendencyPie(

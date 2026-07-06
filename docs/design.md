@@ -4245,7 +4245,7 @@ The stamp is written BEFORE `Generate` so the generator reads a finished decisio
 
 **Phase 15 test 7c corrected.** The previous assertion (`ResolveSidelineInbound(Standard)` → spy sees `PressMode.Standard`) was wrong: `ResolveSidelineInbound` now clears `PressMode` to `None` before calling `Generate`. The test and label were updated to assert `None`.
 
-**Roll G fast-break pie.** `RollGConfig` gains five `FastBreak*` properties (default weights summing to 1.0: Rim=0.70, Short=0.10, Mid=0.10, Long=0.05, Three=0.05 — calibration placeholders). `RollGConfig.Load` validates non-negative weights and sum==1.0. `RollGGenerator.Generate` checks `state.FastBreak` after the `SelectedSlot` null-guard and before any shooter/defender read; returns `BuildFastBreakPie()` immediately. The stub path (`RollGStubPieGenerator`) is untouched — it remains FastBreak-blind by design.
+**Roll G fast-break pie (base values + branch superseded by Session 38 — see below).** `RollGConfig` carries five `FastBreak*` base-diet properties (summing to 1.0). As of **Session 38** these are a modern break base — Rim=0.57, Short=0.08, Mid=0.03, Long=0.02, Three=0.30 (the long-two nearly gone, a real transition three share) — *not* the original flat rim-heavy placeholders (0.70/0.10/0.10/0.05/0.05). `RollGConfig.Load` validates non-negative weights and sum==1.0. `RollGGenerator.Generate` still checks `state.FastBreak` after the `SelectedSlot` null-guard and before any defender read, but the shooter is now fetched *first* and the branch is **three-way**: a present shooter gets the shooter-bent, PaceBias-tilted diet (`BuildFastBreakPie` → `DeriveFastBreakPie`); a null shooter falls back to the flat configured base (`BuildFlatFastBreakPie`) — explicitly NOT `BuildStubPie` (the 35/36 halfcourt diet), which would silently turn a missing-shooter break into a halfcourt-looking possession. The stub path (`RollGStubPieGenerator`) is untouched — it remains FastBreak-blind by design. See the Session 38 fast-break shot-diet subsystem entry for the bend math (locked oracle `tools/fastbreak_diet_oracle.py`, golden parity in Phase 58).
 
 **`PressMode.Standard` semantic (refined).** "Press live, not yet beaten." The stamp survives backcourt dead balls (the press is still on at the re-inbound) and is consumed at the first `CleanEntry` (press beaten, break fires). Frontcourt dead balls clear it because the press decision cannot logically persist past halfcourt.
 
@@ -7025,3 +7025,56 @@ Measured HIGH everywhere (rim 67.7 / short 51.7 / mid 51.7 / long 49.6 / three 5
 ### The design consequence worth remembering
 
 With midpoints above the authored 0–99 range, **the entire authored scale sits on the rising side of the curve — diminishing returns at the top no longer exist within 0–99** (a 90→99 Outside jump now buys more make% than 30→50, not less). This is the direct, accepted consequence of recenter-not-compress and belongs to the deferred curve-steepness conversation. It is also why the two Phase 6 harness sub-checks that assumed "rating 99 is near the ceiling" went stale and were rewritten curve-relative (see the Session 50 shooting-curve section) — the suite now derives both the direction and the magnitude of its expectations from the loaded config, and stays green across every future turn of this dial by construction.
+
+## Roll G — fast-break shot diet: the shooter-bent, PaceBias-tilted break (Session 38, 2026-07-06)
+
+**Current state.** A fast break no longer produces one flat shot menu for everyone. The break
+dictates a modern **base diet** (Rim 0.57 / Short 0.08 / Mid 0.03 / Long 0.02 / Three 0.30 — long
+twos nearly gone, a real transition three share), and that base **bends to whoever is running the
+break**: the shooter's own stored neutral tendencies pull it zone-by-zone, and the offensive coach's
+**PaceBias** tilts the three share (run-and-gun raises transition threes, grind-it-out trims them).
+This is the runtime piece that retired the frozen 5%-of-transition-attempts-are-threes suppression —
+the last big drag the Session 34/35 tendency retune left on the realized three-point rate.
+
+**Where it lives.** `RollGGenerator.Generate`, fast-break branch. The shooter is fetched *before* the
+branch; the branch is three-way — present shooter → `BuildFastBreakPie(shooter, coach)` →
+`DeriveFastBreakPie` (the bent diet); null shooter → `BuildFlatFastBreakPie` (the flat configured
+base, explicitly **not** `BuildStubPie`, which is the 35/36 halfcourt diet — using it would silently
+turn a missing-shooter break into a halfcourt-looking possession). Residual stays 0.0 (no volume load
+on a transition possession). The stub generator remains FastBreak-blind.
+
+**The math (locked oracle `tools/fastbreak_diet_oracle.py`, golden fixture `tools/fastbreak_golden.json`).**
+Constant-for-constant port in `RollGGenerator.DeriveFastBreakPie` (public static so the harness can
+reproduce every fixture vector directly). Per zone: read the neutral tendency as a share of 100 (a
+fixed constant, **not** the tendency sum), form the identity ratio `(share / mean) ^ Beta` (Beta 0.70)
+clamped to `[0.15, 2.2]`, multiply the base diet; then tilt the three share by
+`1 + PaceTilt·(PaceBias − 5)` (PaceTilt 0.035); one renormalization yields the pie. No additive floor —
+a non-shooter's tiny three ratio keeps his break a rim-run. The `FastBreakMean{Zone}` denominators
+(Rim 0.335 / Short 0.155 / Mid 0.098 / Long 0.058 / Three 0.355) are pinned to the tendency oracle's
+population diagnostic, **not** free knobs. **If the C# and the oracle ever disagree, the oracle wins.**
+
+**Shot-selection philosophy is deliberately NOT read here.** The break path reads the shooter's *raw*
+stored tendencies, never `CoachingPull.Apply` — only tempo (PaceBias) tilts the break. Coach
+shot-selection bias, an era three-multiplier, and teammate-spacing bends on the break are all **parked**
+(the era-multiplier and coach-on-break belong to their own future passes). Config validation keeps the
+PaceBias multiplier strictly positive across the legal `[1, 10]` range (PaceTilt < 0.25).
+
+**Accounting (read-only page instrumentation).** The resolver counts fast-break FGA / 3PA / 3PM —
+an ordinary Roll-G-selected FGA whose stamped state carries `FastBreak = true`, **excluding Roll K
+putbacks** (a transition possession's putback carries `FastBreak` forward but was rim-forced by Roll K /
+resolved on Roll H's putback pie — it never touched the fast-break diet, so counting it would drag the
+reported three-rate below its true value). The counters nest so `0 ≤ fbThreePm ≤ fbThreePa ≤ fbFga ≤ Fga`
+on every possession; they thread `RoutingOutcome → PossessionRecord` and surface as a page-only line on
+the season calibration page (the direct read of the realized transition three share). The observation run
+asserts the subset chain at batch scale.
+
+**Validation.** Golden parity (Phase 58): `DeriveFastBreakPie` reproduces all 14 fixture vectors × 2
+paces under both the built-in defaults and the loaded config, at cross-language tolerance (an absolute
+floor absorbs the fixture's 10-decimal rounding). Plus: ShotSelectionBias isolation (swinging it 1↔10 at
+fixed pace leaves the break diet identical), and resolver accounting fixtures (a fast-break three
+increments all three counters; a halfcourt three touches none; a putback carrying `FastBreak` increments
+`Fga` but not `FastBreakFga`). Phase 16 (7) was rewritten from the retired flat-pie assertion to the
+bent truth (rim-runner vs pure-shooter diets differ; the shooter takes more transition threes; PaceBias
+moves the three share both ways; the null-shooter fallback equals the flat base, not the halfcourt stub).
+The whole suite ran **ALL CHECKS PASSED** on Emmett's machine. The calibration payoff — whether the
+league three-point rate actually climbs toward the ~39% target — is read on the season page, not asserted.

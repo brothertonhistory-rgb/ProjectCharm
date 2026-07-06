@@ -1603,16 +1603,20 @@ internal static partial class Program
         pass &= t6Ok;
         Console.WriteLine($"  (6) {(t6Ok ? "ok" : "FAIL")}");
 
-        // ── (7) Roll G with FastBreak=true → flat fast-break pie, bypasses tendencies ──
-        Console.WriteLine("  (7) Roll G with FastBreak=true → flat fast-break pie regardless of shooter tendencies:");
+        // ── (7) Roll G FastBreak=true → shot diet BENDS to the shooter (Session 38) ──
+        //   Was: every shooter got the identical flat pie. Now (the Session 35 "big takes
+        //   zero threes" precedent) the break diet bends to WHO is running it, the coach's
+        //   PaceBias tilts the three share both ways, and a null shooter falls back to the
+        //   flat configured base — NOT the 35/36 halfcourt stub.
+        Console.WriteLine("  (7) Roll G FastBreak=true → shooter-bent diet, PaceBias tilt, null-shooter flat base:");
         bool t7Ok;
         try
         {
             var cfgG = RollGConfig.Load(configPath);
             var cfgM = MatchupConfig.Load(configPath);
 
-            var shooterA = Mk16(50, rim: 99, three: 1);
-            var shooterB = Mk16(50, rim: 1,  three: 99);
+            var shooterA = Mk16(50, rim: 99, three: 1);   // rim-runner identity
+            var shooterB = Mk16(50, rim: 1,  three: 99);  // pure-shooter identity
 
             var gameA = BuildGame16(new[] { shooterA, Mk16(50), Mk16(50), Mk16(50), Mk16(50) }, even5);
             var gameB = BuildGame16(new[] { shooterB, Mk16(50), Mk16(50), Mk16(50), Mk16(50) }, even5);
@@ -1627,29 +1631,78 @@ internal static partial class Program
                                 SelectedSlot: slot, FastBreak: true);
             var stNoBreak = stBreak with { FastBreak = false };
 
-            var pieABreak   = genA.Generate(stBreak);
-            var pieBBreak   = genB.Generate(stBreak);
-            var pieANoBreak = genA.Generate(stNoBreak);
-            var pieBNoBreak = genB.Generate(stNoBreak);
-
             double Wt(Pie<ShotLocation> p, ShotLocation loc) =>
                 p.Slices.First(s => s.Outcome == loc).Weight;
 
-            var aRimOk   = Math.Abs(Wt(pieABreak, ShotLocation.Rim)   - cfgG.FastBreakRim)   < Eps;
-            var aThreeOk = Math.Abs(Wt(pieABreak, ShotLocation.Three) - cfgG.FastBreakThree) < Eps;
-            var aSumOk   = Math.Abs(pieABreak.Slices.Sum(s => s.Weight) - 1.0) < Eps;
-            var bRimOk   = Math.Abs(Wt(pieBBreak, ShotLocation.Rim)   - cfgG.FastBreakRim)   < Eps;
-            var bThreeOk = Math.Abs(Wt(pieBBreak, ShotLocation.Three) - cfgG.FastBreakThree) < Eps;
-            var bSumOk   = Math.Abs(pieBBreak.Slices.Sum(s => s.Weight) - 1.0) < Eps;
-            var samePie  = pieABreak.Slices.All(s => Math.Abs(s.Weight - Wt(pieBBreak, s.Outcome)) < Eps);
-            // Non-FastBreak: rim-dominant and three-dominant shooters must get different rim weights.
+            var pieABreak = genA.Generate(stBreak);   // both under the default neutral coach (pace 5)
+            var pieBBreak = genB.Generate(stBreak);
+
+            // (a) Different pies; the pure shooter's break-three > the rim-runner's.
+            var aThree      = Wt(pieABreak, ShotLocation.Three);
+            var bThree      = Wt(pieBBreak, ShotLocation.Three);
+            var differ      = !pieABreak.Slices.All(s => Math.Abs(s.Weight - Wt(pieBBreak, s.Outcome)) < Eps);
+            var shooterMore = bThree > aThree + 0.05;
+
+            // (b) Both sum to 1.
+            var aSumOk = Math.Abs(pieABreak.Slices.Sum(s => s.Weight) - 1.0) < Eps;
+            var bSumOk = Math.Abs(pieBBreak.Slices.Sum(s => s.Weight) - 1.0) < Eps;
+
+            // (c) PaceBias moves the break-three share in BOTH directions for the SAME shooter
+            //     (pure-shooter): pace 2 < pace 5 < pace 8. Guards a future sign error or an
+            //     over-aggressive tilt edit. Restore the neutral coach afterward.
+            gameB.SetCoach(TeamSide.Home, new CoachProfile(paceBias: 2.0));
+            var pieBPace2   = genB.Generate(stBreak);
+            var bThreePace2 = Wt(pieBPace2, ShotLocation.Three);
+            gameB.SetCoach(TeamSide.Home, new CoachProfile(paceBias: 8.0));
+            var pieBPace8   = genB.Generate(stBreak);
+            var bThreePace8 = Wt(pieBPace8, ShotLocation.Three);
+            gameB.SetCoach(TeamSide.Home, new CoachProfile(paceBias: 5.0));   // restore neutral
+            var paceLower  = bThreePace2 < bThree - 1e-6;
+            var paceHigher = bThreePace8 > bThree + 1e-6;
+            var paceFinite = double.IsFinite(bThreePace2) && double.IsFinite(bThreePace8)
+                             && bThreePace2 >= 0 && bThreePace8 >= 0
+                             && Math.Abs(pieBPace2.Slices.Sum(s => s.Weight) - 1.0) < Eps
+                             && Math.Abs(pieBPace8.Slices.Sum(s => s.Weight) - 1.0) < Eps;
+
+            // (d) Non-FastBreak: tendencies still active (rim-runner vs shooter differ).
+            var pieANoBreak   = genA.Generate(stNoBreak);
+            var pieBNoBreak   = genB.Generate(stNoBreak);
             var noBreakDiffer = Math.Abs(Wt(pieANoBreak, ShotLocation.Rim) - Wt(pieBNoBreak, ShotLocation.Rim)) > 0.01;
 
-            t7Ok = aRimOk && aThreeOk && aSumOk && bRimOk && bThreeOk && bSumOk && samePie && noBreakDiffer;
-            Console.WriteLine($"    ShooterA FB: rim={Wt(pieABreak,ShotLocation.Rim):F4} want={cfgG.FastBreakRim}  three={Wt(pieABreak,ShotLocation.Three):F4} want={cfgG.FastBreakThree}  sum=1:{aSumOk}");
-            Console.WriteLine($"    ShooterB FB: rim={Wt(pieBBreak,ShotLocation.Rim):F4} want={cfgG.FastBreakRim}  three={Wt(pieBBreak,ShotLocation.Three):F4} want={cfgG.FastBreakThree}  sum=1:{bSumOk}");
-            Console.WriteLine($"    Both shooters same fast-break pie:             {samePie}");
-            Console.WriteLine($"    Non-FastBreak pies differ (tendencies active): {noBreakDiffer}");
+            // (e) Null-shooter fallback: FastBreak=true with the selected slot UNPOPULATED →
+            //     the pie equals the normalized configured FastBreak* base EXACTLY (NOT
+            //     BuildStubPie, the 35/36 halfcourt diet), does not throw, and is UNCHANGED
+            //     by PaceBias (no shooter identity to bend). This is the regression the
+            //     three-way branch exists to prevent.
+            var emptyGame = new GameState(new FoulTracker(7, 10));   // Home slot 1 left unpopulated
+            var genNull   = new RollGGenerator(cfgG, cfgM, emptyGame);
+            var nullSlot  = emptyGame.HomeLineup.SlotAt(1);
+            var stNull    = new PossessionState(PossessionNumber: 1, Offense: TeamSide.Home,
+                                Defense: TeamSide.Away, Entry: EntryType.DeadBallInbound,
+                                SelectedSlot: nullSlot, FastBreak: true);
+            var pieNull   = genNull.Generate(stNull);
+            emptyGame.SetCoach(TeamSide.Home, new CoachProfile(paceBias: 9.0));
+            var pieNullPace9 = genNull.Generate(stNull);
+
+            var nullIsBase =
+                Math.Abs(Wt(pieNull, ShotLocation.Rim)   - cfgG.FastBreakRim)   < Eps &&
+                Math.Abs(Wt(pieNull, ShotLocation.Short) - cfgG.FastBreakShort) < Eps &&
+                Math.Abs(Wt(pieNull, ShotLocation.Mid)   - cfgG.FastBreakMid)   < Eps &&
+                Math.Abs(Wt(pieNull, ShotLocation.Long)  - cfgG.FastBreakLong)  < Eps &&
+                Math.Abs(Wt(pieNull, ShotLocation.Three) - cfgG.FastBreakThree) < Eps;
+            var nullPaceInvariant = pieNull.Slices.All(s => Math.Abs(s.Weight - Wt(pieNullPace9, s.Outcome)) < Eps);
+            // Explicitly NOT the halfcourt stub (rim base differs: FastBreakRim vs BaseRim).
+            var nullNotStub = Math.Abs(Wt(pieNull, ShotLocation.Rim) - cfgG.BaseRim) > 0.01;
+
+            t7Ok = differ && shooterMore && aSumOk && bSumOk
+                   && paceLower && paceHigher && paceFinite
+                   && noBreakDiffer && nullIsBase && nullPaceInvariant && nullNotStub;
+
+            Console.WriteLine($"    (a) rim-runner three={aThree:F4}  pure-shooter three={bThree:F4}  differ={differ} shooter>runner={shooterMore}");
+            Console.WriteLine($"    (b) both break pies sum to 1: {aSumOk && bSumOk}");
+            Console.WriteLine($"    (c) pure-shooter three by pace: p2={bThreePace2:F4} < p5={bThree:F4} < p8={bThreePace8:F4}  ({paceLower && paceHigher && paceFinite})");
+            Console.WriteLine($"    (d) non-FastBreak pies differ (tendencies active): {noBreakDiffer}");
+            Console.WriteLine($"    (e) null-shooter → flat base exactly={nullIsBase} pace-invariant={nullPaceInvariant} not-stub={nullNotStub}");
         }
         catch (Exception ex) { t7Ok = false; Console.WriteLine($"  FAIL  (7) threw: {ex.Message}"); }
         pass &= t7Ok;

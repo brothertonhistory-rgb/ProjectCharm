@@ -178,6 +178,12 @@ public sealed class Resolver
         var fgm = 0;
         var threePa = 0;
         var threePm = 0;
+        // Session 38: fast-break shot-diet accounting. An ordinary Roll-G-selected FGA whose
+        // stamped state has FastBreak = true; EXCLUDES Roll K putbacks (see the gated block
+        // in the IntoShotResolution case). Nested so 0 ≤ fbThreePm ≤ fbThreePa ≤ fbFga ≤ fga.
+        var fastBreakFga = 0;
+        var fastBreakThreePa = 0;
+        var fastBreakThreePm = 0;
         // Session 36: displacement-context bucket counters — read-only observation
         // instrumentation. Every FGA whose state carries a populated
         // ShotDisplacementLevel lands in exactly one of three buckets
@@ -309,6 +315,7 @@ public sealed class Resolver
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
                         { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods,
                           Fga = fga, Fgm = fgm, ThreePa = threePa, ThreePm = threePm,
+                          FastBreakFga = fastBreakFga, FastBreakThreePa = fastBreakThreePa, FastBreakThreePm = fastBreakThreePm,
                           DispLowFga = dispLowFga, DispLowThreePa = dispLowThreePa, DispLowThreePm = dispLowThreePm,
                           DispMidFga = dispMidFga, DispMidThreePa = dispMidThreePa, DispMidThreePm = dispMidThreePm,
                           DispHighFga = dispHighFga, DispHighThreePa = dispHighThreePa, DispHighThreePm = dispHighThreePm,
@@ -619,6 +626,26 @@ public sealed class Resolver
                                         {
                                             dispMidFga++;
                                             if (isThree) { dispMidThreePa++; if (isMake) dispMidThreePm++; }
+                                        }
+                                    }
+                                    // Session 38: fast-break shot-diet accounting. Counts an
+                                    // ordinary Roll-G-selected FGA whose stamped state has
+                                    // FastBreak = true, EXCLUDING Roll K putbacks. Roll K's
+                                    // PutBack arm carries FastBreak forward (only ResetOffense
+                                    // wipes it) but forced the shot to the rim / Roll H resolved
+                                    // a putback pie — that attempt never touched the fast-break
+                                    // diet, so counting it would inflate fast-break FGA with
+                                    // rim-forced shots and drag the reported three-rate below
+                                    // its true value. The nesting keeps the reconciliation
+                                    // 0 ≤ fbThreePm ≤ fbThreePa ≤ fbFga ≤ fga.
+                                    if (shotSt.FastBreak && !c.Putback)
+                                    {
+                                        fastBreakFga++;
+                                        if (shotSt.ShotType == ShotLocation.Three)
+                                        {
+                                            fastBreakThreePa++;
+                                            if (shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled)
+                                                fastBreakThreePm++;
                                         }
                                     }
                                     if (shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled)

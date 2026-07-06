@@ -51,6 +51,8 @@ internal static partial class Program
         // mode already asserts bin-conservation on; §3.8 proves the ACCUMULATOR
         // preserved that identity at league scale.
         public long RimFga, RimFgm, ShortFga, ShortFgm, MidFga, MidFgm, LongFga, LongFgm;
+        // Session 38: fast-break shot-diet totals (page-only, never asserted on the page).
+        public long FastBreakFga, FastBreakThreePa, FastBreakThreePm;
         public long PossessionRecords;       // every record — the pace numerator
         public long TurnoverPossessions;     // via IsTurnoverPossession, all records
         public long MetadataDriftRecords;    // TO metadata present but classifier says no
@@ -140,6 +142,7 @@ internal static partial class Program
                 ShortFga += r.ShortFga; ShortFgm += r.ShortFgm;
                 MidFga   += r.MidFga;   MidFgm   += r.MidFgm;
                 LongFga  += r.LongFga;  LongFgm  += r.LongFgm;
+                FastBreakFga += r.FastBreakFga; FastBreakThreePa += r.FastBreakThreePa; FastBreakThreePm += r.FastBreakThreePm;
 
                 var isTo = IsTurnoverPossession(r);
                 if (isTo) TurnoverPossessions++;
@@ -334,6 +337,13 @@ internal static partial class Program
         RowAbs("  three FG%",               Pct(s.ThreePm,  s.ThreePa),  ZoneTargetThree, 1.0);
         Console.WriteLine(Inv($"    zone FGA mix: rim {s.RimFga} / short {s.ShortFga} / mid {s.MidFga}") +
                           Inv($" / long {s.LongFga} / three {s.ThreePa}  (sum {s.RimFga + s.ShortFga + s.MidFga + s.LongFga + s.ThreePa} vs FGA {s.Fga})"));
+
+        // Session 38: fast-break shot-diet readout (page-only, no target asserted). Excludes
+        // Roll K putbacks; the 3PA-rate is the transition three share realized in play.
+        Console.WriteLine(Inv(
+            $"    fast-break shot diet: FGA {s.FastBreakFga} ({Pct(s.FastBreakFga, s.Fga):F1}% of all FGA)") +
+            Inv($"  3PA-rate {(s.FastBreakFga > 0 ? 100.0 * s.FastBreakThreePa / s.FastBreakFga : 0.0):F1}%") +
+            Inv($"  3P% {Pct(s.FastBreakThreePm, s.FastBreakThreePa):F1}%"));
 
         Console.WriteLine("  seconds per possession by ending (NoShot/HoldShootLast excluded):");
         Console.WriteLine(
