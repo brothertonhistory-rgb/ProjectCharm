@@ -23,7 +23,6 @@
 # All constants below are CALIBRATION PLACEHOLDERS, tuned off the season
 # page's new fast-break shot-diet readout, never asserted against a target.
 # ============================================================================
-# Fast-break shot-diet oracle — DESIGN DRAFT (Session 38 candidate)
 # The break dictates the base; the shooter's own neutral tendencies pull it;
 # the coach's PaceBias tilts the three share. No team scalar anywhere.
 # Run: python3 tools/fastbreak_diet_oracle.py
@@ -96,7 +95,8 @@ def emit_golden():
     # the byte-identical verification gate must touch tools/fastbreak_golden.json
     # regardless of where the command is run from. (ChatGPT review, round 2.)
     output = Path(__file__).with_name("fastbreak_golden.json")
-    json.dump(out, output.open("w"), indent=1)
+    with output.open("w", encoding="utf-8") as f:
+        json.dump(out, f, indent=1)
     print(f"golden parity fixture written: {output} ({len(vectors)} vectors)")
 
 if __name__=="__main__":
