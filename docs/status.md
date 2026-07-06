@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 41 (2026-07-06; the scoreboard session — assists recentered to 13.7 (OK), turnover mix 50/50 live so steals land 6.5 (OK), rebound instrument audited (C0 diagnostic-only)).
+Last updated: Session 41 (2026-07-06; the scoreboard session — assists recentered to 13.7 (OK), turnover mix 50/50 live so steals land 6.5 (OK), rebound instrument audited (C0 diagnostic-only)). Post-S41 ruling (2026-07-06): OT-LOW parked under the coaching / late-game-strategy layer (diagnosed: score-blind end-game pie).
 
 ---
 
@@ -137,12 +137,12 @@ bench instruments.
   **HIGH** — turnovers 13.8 (t12.5) / TO% 19.6 (mostly a pace echo, its own read); blocks 4.1 (t3.5).
   **LOW** — rebounds 30.7 (t34.5) incl. offensive 8.8 (now an **understood definition gap**, not a mystery —
   S41 audited the credited↔public reconciliation and it degraded to diagnostic-only; see Parked, team-rebound
-  line); OT 2.8% (t4–8%). Also a small routing drift: FG% 45.0 sits a hair over its +1.0 band edge (more live
+  line). Also a small routing drift: FG% 45.0 sits a hair over its +1.0 band edge (more live
   turnovers → more transition → slightly more efficient shots; noted, not chased). **The front-runner is now
-  the turnovers-HIGH pace echo, the blocks-HIGH attribution, or OT-LOW.** Assists-HIGH (17.4) and steals-LOW
+  the turnovers-HIGH pace echo or the blocks-HIGH attribution.** Assists-HIGH (17.4) and steals-LOW
   (4.5) were prior front-runners and are **closed by S41** (assists 13.7 OK via the midpoint recenter + uniform
-  trim; steals 6.5 OK via the 50/50 turnover mix). Pick the gap before drafting; the next-session prompt is its
-  own audited pass.
+  trim; steals 6.5 OK via the 50/50 turnover mix). OT-LOW moved to Parked (diagnosed; needs the coaching layer).
+  Pick the gap before drafting; the next-session prompt is its own audited pass.
 - **Generation-layer bridge opened.** S39 was the first change to the population-selection layer
   (era profile) — the smallest step toward player-generation Pass 2 (below). The oracle-first,
   archetype-table, golden-parity workflow now has a proven generation-side precedent.
@@ -168,6 +168,17 @@ bench instruments.
 
 ## 4. Parked — waiting on a named prerequisite
 
+- **OT-LOW → the coaching / late-game-strategy layer** (parked 2026-07-06). Overtime runs ~2.8% vs
+  the 4–8% target. **Diagnosed, not a mystery:** the end-of-game intent is a flat, *score-blind* pie
+  (HoldShootLast 0.70 / ShootEarly / NoShot) triggered by time-left only — the Governor's own comment
+  calls it "score-blind... a future score-aware layer." So none of the real behaviors that funnel close
+  games into buzzer-ties exist: a trailing team never fouls to extend, it even milks the clock 70% of the
+  time *while losing* (actively killing its own comeback), and a tied team doesn't reliably hold for the
+  last shot. These are coaching-personality knobs (aggressive coach fouls/pushes; conservative coach bleeds
+  clock), so the fix belongs to the coaching layer, not a standalone dial — bolting a score-aware layer on
+  now would be rebuilt when coaching profiles land. This layer is also the parked intentional-fouling FTA
+  source (bridge #3 item 3). Before building, size the prize with a cheap page diagnostic: "games within one
+  possession (≤3) at ~1:00 left → fraction reaching OT" vs the real conversion.
 - **Reconciled team-rebound line** (S41) — the credited-rebound LOW is an understood definition gap:
   public 34.5 includes uncredited team rebounds. S41's C0 audit proved the candidate dead-ball endings
   (OOB-off-offense, jump-ball arrows, loose-ball-foul-on-offense, MissOutOfBoundsLost) are individually
