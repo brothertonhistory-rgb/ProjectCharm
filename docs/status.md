@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 42.1 (2026-07-07; oracle repair micro-session — the Pass-2 oracle re-locked after three bounded fixes: weapon-census offsets on the argmax, ONE shared FT idiosyncrasy draw, age/class labeled a placeholder; Python only, design.md untouched). Prior: Session 42 (2026-07-07; Player-generation Pass 2 — the skill-first generation oracle is locked as the C# port spec, `tools/gen_pass2_skillfirst_oracle.py`, after five adversarial-review rounds; oracle-only, design.md untouched, C# port is next); Session 41 (2026-07-06; scoreboard — assists 13.7 OK, steals 6.5 OK, rebound instrument audited). Post-S41 ruling (2026-07-06): OT-LOW parked under the coaching / late-game-strategy layer.
+Last updated: Session 42.2 (2026-07-08; replay-fixture micro-session — the deterministic math-replay fixture + reference reader for the Pass-2 C# port are committed and locked: `tools/gen_pass2_replay_fixture_s42_2.json` (306 players, seed 20260706) + `tools/gen_pass2_replay_check.py`; a pure recording side-channel, so the default oracle run is byte-identical to S42.1 and NO generation math changed; Python only, design.md untouched; verified green on Emmett's machine — 306 players / 51,714 field checks / 0 failures, recorder cross-check 33,795 players / 0 mismatches). Prior: Session 42.1 (2026-07-07; oracle repair micro-session — the Pass-2 oracle re-locked after three bounded fixes: weapon-census offsets on the argmax, ONE shared FT idiosyncrasy draw, age/class labeled a placeholder; Python only, design.md untouched); Session 42 (2026-07-07; Player-generation Pass 2 — the skill-first generation oracle is locked as the C# port spec, `tools/gen_pass2_skillfirst_oracle.py`, after five adversarial-review rounds; oracle-only, design.md untouched, C# port is next); Session 41 (2026-07-06; scoreboard — assists 13.7 OK, steals 6.5 OK, rebound instrument audited). Post-S41 ruling (2026-07-06): OT-LOW parked under the coaching / late-game-strategy layer.
 
 ---
 
@@ -183,11 +183,18 @@ bench instruments.
   trim; steals 6.5 OK via the 50/50 turnover mix). OT-LOW moved to Parked (diagnosed; needs the coaching layer).
   Pick the gap before drafting; the next-session prompt is its own audited pass.
 - **C# port of the Pass-2 skill-first generation oracle — the named next build (S42; oracle re-locked
-  S42.1).** The oracle is
+  S42.1; validation reference committed S42.2).** The oracle is
   locked at `tools/gen_pass2_skillfirst_oracle.py`; the port is the live-generator rewrite that adds Player
   fields for latent/current/runway/arrival/class, deletes the retired body/package-gate floors
-  (`GenEnforceFloors`/`GenEnforceLegHealth`), and validates against a golden fixture generated from the
-  locked oracle. Preserve the frozen contracts (see Closed-by-ruling, S42 + S42.1): three independent draws;
+  (`GenEnforceFloors`/`GenEnforceLegHealth`), and proves **math parity** by replaying the **committed
+  deterministic fixture** `tools/gen_pass2_replay_fixture_s42_2.json` (S42.2 — 306 players, seed 20260706;
+  raw draws + named intermediates + frozen constants, RNG factored out) through the recompute obligations
+  the reference reader `tools/gen_pass2_replay_check.py` demonstrates (integers exact, floats ≤ 1e-9; the
+  reader reimplements every formula from scratch and tripwires its constants against the fixture echo). The
+  port validates against this committed fixture rather than generating a fresh one at port time. One edge is
+  unexercised by the fixture on the canonical seed and is noted for the port: `height_high_clamp`
+  (Height == 99, ~4.5σ on the post branch; recorded as `NONE` in the fixture header). Preserve the frozen
+  contracts (see Closed-by-ruling, S42 + S42.1): three independent draws;
   only
   orientation→height, size→athleticism, orientation→arrival dependencies; chosen-weapon specialization
   **via the S42.1 offset argmax** (the offset table is part of the spec; the [F3] counterfactual

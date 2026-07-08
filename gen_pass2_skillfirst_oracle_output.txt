@@ -1,0 +1,228 @@
+============================================================================================
+PLAYER-GENERATION PASS 2 -- SKILL-FIRST ORACLE (first cut)   seed=20260706  N_candidate=46000
+============================================================================================
+NOTE: no v1 before/after baseline is shown -- the prior 'v1 skill-first oracle' was never
+      built (the retired body/package gate oracle was a different design); this oracle was
+      built fresh from the model spec per Emmett's ruling, so there is no v1 to diff against.
+Authoritative draws:
+  orientation o ~ Beta(mean=0.446, conc=4.50)  [0=perimeter,1=post; perimeter := o<0.5]
+  skill quality q ~ Beta(2.30,2.70) ; athletic quality a ~ Beta(2.20,2.20) ; specialization s ~ Beta(2.00,2.00)
+  Height (abstract 0-99): logistic-in-o ceiling, MU(o)=53..72, upper Gaussian sigma(o)=7.6..6.0 (knee at o=0.54; bell tail kills 7'3"+ excess), lower-scale=7.0
+  size->ath: Strength +0.42/Height-pt, burst -0.22/Height-pt, sigma(burst)=7 (freak tail)
+  arrival mean(o)=0.72..0.42, E_MIN=0.15, baseline=14  (perimeter developed, post raw)
+  S42.1 weapon = argmax of base+offset over eligible (WEAPON_CENSUS_OFFSET, the ruled table;
+        offsets shift the argmax only, never card math -- proof is the [F3] paired census)
+  S42.1 FT idiosyncrasy: ONE gauss(0,9.0) per player, shared by latent-FT and current-FT
+        (a persistent trait; the [F4] tables prove the tails exist)
+  S42.1 AGE/CLASS IS A PLACEHOLDER projection of arrival: the season layer owns the real
+        population structure, one-class-vs-standing-pool, and the ready-freshman existence
+        requirement -- do not port the age/class labels as spec.
+  RScore = max(perim_weight*perimeter_pathway, post_weight*post_pathway), where perim_weight=1-0.45*o and post_weight=0.55+0.45*o (orientation-weighted, continuous -- not a role table). Perimeter entry = handle/shot, Mid access-gated. Post entry = an interior SKILL cashed through a height-ACCESS curve (~6'2 inflection); rebounding is gated by interior skill and NOT re-amplified by height. | recruitable iff RScore >= 17.0
+
+[A] RATING-SCHEMA ASSERTION -- all 33 keys present on every player
+    players=46000  missing-key hits=0  ->  PASS
+
+[B] ORIENTATION -- realized lean & hybrid density
+    P(o<0.5) perimeter share = 0.602   (target ~0.60)
+    class shares  perimeter(o<0.4)=0.443  hybrid(0.4-0.6)=0.303  post(o>0.6)=0.254
+    o histogram (deciles 0.0..1.0): 38 101 141 160 158 144 114 83 44 10   (per-mille)
+
+[C] ORIENTATION x HEIGHT-BIN  (counts in the 46000-player candidate cohort)
+    bin            perim   hybrid     post
+    5'8-5'9         2757      869      174
+    5'10-5'11       3816     1190      196
+    6'0-6'1         6740     2617      460
+    6'2-6'5         5928     5853     2181
+    6'6-6'7          914     2172     3024
+    6'8-6'9          231     1187     4861
+    6'10-7'0           3       58      721
+    7'1-7'2            0        2       44
+    7'3+               0        0        2
+
+[C2] STRETCH BIG vs POINT-CENTER (recruitable pool of 25736) -- shooting is orientation-neutral,
+     ball-handling is perimeter-locked, so these two diverge as they should:
+    stretch bigs (6'8+, shoots>=55, NO handle) = 149   (of which 6'10+ = 14)
+    point-centers (6'10+, handle>=60 AND shoots) = 0   <- must stay rare (tall + guard handle)
+
+[D] RARE PERIMETER-HEIGHT AUDIT -- perimeter-oriented players in the 6'10"-7'0" bin (80-86)
+    target ~2-3 per RECRUITABLE pool (dial 2)
+    fixed-seed:  candidate-cohort=3   RECRUITABLE=3
+    multi-seed recruitable counts [3, 3, 3, 1, 5, 4]  mean=3.2  zero-count-rate=0.00
+
+[E] QUALITY x HEIGHT CORRELATION  (must be ~0: quality is independent of size)
+    GLOBAL corr(q,Height) = -0.006
+    within perimeter corr(q,Height) = -0.003   (n=20389)
+    within hybrid    corr(q,Height) = -0.011   (n=13948)
+    within post      corr(q,Height) = -0.007   (n=11663)
+
+[F] ELITE-SKILL (latent q >= 90th pct = 0.74) players by Height bin, within orientation
+    bin            perim   hybrid     post
+    5'8-5'9          282       90       16
+    5'10-5'11        376      122       24
+    6'0-6'1          699      276       51
+    6'2-6'5          567      616      216
+    6'6-6'7           74      210      294
+    6'8-6'9           23      127      458
+    6'10-7'0           2        5       70
+    7'1-7'2            0        1        2
+    7'3+               0        0        0
+
+[F2] SPECIALIZATION AUDIT -- does high s make one distinct weapon? (top1 minus top2)
+    s band           top1   top2      gap   gap p10..p90
+    broad  s<0.33    51.6   40.3     11.3   [4 .. 19]  (n=11755)
+    spike  s>0.66    64.2   29.7     34.6   [21 .. 49]  (n=12370)
+    most-drawn weapons: PostMoves 2768, PerimeterDefense 2762, SelfCreation 2755, Playmaking 2753, BallHandling 2747, Passing 2743
+
+[F3] WEAPON CENSUS -- paired counterfactual: S42 raw argmax (BEFORE) vs S42.1 offset
+     argmax (AFTER) on identical pre-weapon bases + eligibility sets.  Offsets:
+       BallHandling -0.006  Close +0.013  Finishing +0.018  FoulDrawing -0.011
+       Mid -0.030  OffBallDefense -0.014  OffBallMovement -0.017  Outside -0.018
+       Passing -0.012  PerimeterDefense -0.005  Playmaking -0.005  PostDefense +0.027
+       PostMoves +0.032  RimProtection +0.025  Screening +0.023  SelfCreation -0.008
+       Steals -0.010
+     weapon changed by the offsets on 5156/46000 players (11.2%); recruitable pool:
+     BEFORE-rule cards 24784 vs AFTER-rule (shipping) cards 25736
+     skill             eligible n/shr    weapon BEFORE     weapon AFTER     perim B/A      post B/A    recr-exp B/A
+     PostMoves          30648   66.6%     1908   4.15%     2768   6.02%      6/26      1233/1671     1686/2422  
+     PerimeterDefense   40293   87.6%     2649   5.76%     2762   6.00%   1901/2063      24/19        875/917   
+     SelfCreation       41767   90.8%     2786   6.06%     2755   5.99%   1949/2017      39/23        919/910   
+     Playmaking         41767   90.8%     2660   5.78%     2753   5.98%   1880/2022      31/25        878/900   
+     BallHandling       40293   87.6%     2679   5.82%     2747   5.97%   1882/2011      28/18       2486/2555  
+     Passing            46000  100.0%     2969   6.45%     2743   5.96%   1898/1872     214/146       958/881   
+     Outside            46000  100.0%     3317   7.21%     2729   5.93%   1838/1663     525/330      2939/2477  
+     OffBallDefense     46000  100.0%     3108   6.76%     2727   5.93%   1822/1725     370/252       999/886   
+     Steals             45201   98.3%     2826   6.14%     2724   5.92%   1903/1937     117/82        915/894   
+     OffBallMovement    46000  100.0%     3279   7.13%     2712   5.90%   1925/1763     421/249      1103/903   
+     Mid                46000  100.0%     4113   8.94%     2689   5.85%   1882/1437    1231/653      2068/1367  
+     FoulDrawing        46000  100.0%     3191   6.94%     2680   5.83%    966/952     1238/908      1052/860   
+     Close              46000  100.0%     2293   4.98%     2663   5.79%    302/472     1195/1253     1898/2138  
+     PostDefense        32091   69.8%     1981   4.31%     2652   5.77%     15/37      1240/1572     1717/2270  
+     Finishing          43260   94.0%     2134   4.64%     2644   5.75%    161/269     1175/1335     1797/2196  
+     Screening          36438   79.2%     2081   4.52%     2628   5.71%     47/95      1268/1500      727/900   
+     RimProtection      32091   69.8%     2026   4.40%     2624   5.70%     12/28      1314/1627     1767/2260  
+     PostMoves vs OffBallDefense (Emmett's question -- post-play identity must not be
+       rarer than off-ball-defense identity unless ruled so):
+       BEFORE  PostMoves 1908 (4.15%)  vs  OffBallDefense 3108 (6.76%)
+       AFTER   PostMoves 2768 (6.02%)  vs  OffBallDefense 2727 (5.93%)
+
+[F4] FT IDIOSYNCRASY -- ONE shared gauss(0,9.0) per player; the tails must exist
+  conditional-spread audit (predeclared current-Outside x Height bins; pass = SD
+  materially nonzero in every bin):
+    guard/wing mid-skill  Out[55,70) x H[51,66)    n= 1062  mean=69.2  SD=8.9  min=37  max=95
+    skilled perimeter     Out[70,99] x H[40,66)    n=  668  mean=74.1  SD=9.2  min=46  max=95
+    weak-shooting big     Out[25,45) x H[71,99]    n= 2846  mean=56.9  SD=9.2  min=25  max=84
+  tails per cohort (count / rate per 46k) -- reachability is proven by >=1 occurrence;
+  whether the RATE is sensible is Emmett's FT_SIGMA ruling, not a pass/fail here:
+    seed 20260706  skilled low-FT hitch (Out>=70 & FT<50):   8 (0.017%)   auto-line weak big (H>=71 & Out<=40 & FT>80):  15 (0.033%)
+    seed 11        skilled low-FT hitch (Out>=70 & FT<50):   2 (0.004%)   auto-line weak big (H>=71 & Out<=40 & FT>80):  22 (0.048%)
+    seed 22        skilled low-FT hitch (Out>=70 & FT<50):   4 (0.009%)   auto-line weak big (H>=71 & Out<=40 & FT>80):  13 (0.028%)
+    seed 33        skilled low-FT hitch (Out>=70 & FT<50):   4 (0.009%)   auto-line weak big (H>=71 & Out<=40 & FT>80):  18 (0.039%)
+    seed 44        skilled low-FT hitch (Out>=70 & FT<50):   2 (0.004%)   auto-line weak big (H>=71 & Out<=40 & FT>80):  13 (0.028%)
+    seed 55        skilled low-FT hitch (Out>=70 & FT<50):   2 (0.004%)   auto-line weak big (H>=71 & Out<=40 & FT>80):  13 (0.028%)
+  FT-hitch archetype, nearest card (rare-but-reachable is the pass condition; judgment
+  on the archetype itself stays deferred to the season layer per the standing ruling):
+    o=0.12(perimeter) H=54(6'0-6'1) q=0.85 a=0.22 s=0.45 arr=0.84 Jr/21y | Str32 Qck36 Vert44 | top: Outside87, Passing69, Mid66, BasketballIQ66 | FT48 | RScore=56.4
+
+[G] RECRUITING-LINE AUDIT   (line is an oracle-only selection proxy; formula printed above)
+    N_candidate=46000   R_LINE=17.0
+    recruitable=25736 (55.9%)   non-recruitable=20264 (44.1%)   [target recruitable 20-30k]
+    multi-seed recruitable counts [25736, 25676, 25811, 25945, 25634, 25953]  mean=25792
+    WORST recruitable, any type (right at the line):
+      o=0.75(post) H=75(6'8-6'9) q=0.58 a=0.32 s=0.37 arr=0.45 So/19y | Str55 Qck46 Vert26 | top: FoulDrawing54, Discipline37, Mid36, BasketballIQ34 | FT51 | RScore=17.0
+
+[G2] THRESHOLD SENSITIVITY -- recruitable count vs R_LINE (canonical cohort)
+    L=13:31545  L=15:28558  L=17:25736  L=19:23028  L=21:20566  L=23:18166
+    (smooth, monotone -> the 20-30k export is not sitting on a cliff edge)
+
+[G3] ARRIVAL / CLASS DECOUPLING -- class correlates with arrival but is NOT identical
+    raw seniors (arr<0.40, age>=22) = 75 (0.16%)   ready frosh (arr>0.75, age<=18) = 15 (0.03%)
+    raw juniors = 2740 (5.96%)   ready sophomores = 266 (0.58%)   (the off-diagonal tails exist)
+    current-vs-latent skill gap by arrival band (mean latent minus mean current, 21 skills):
+      arrival [0.00,0.30): mean per-skill runway = 13.6   (n=2986)
+      arrival [0.30,0.50): mean per-skill runway = 10.1   (n=11952)
+      arrival [0.50,0.70): mean per-skill runway = 6.9   (n=18378)
+      arrival [0.70,1.01): mean per-skill runway = 3.2   (n=12684)
+
+[G4] PATHWAY EXPORT AUDIT -- the recruiting line is pathway-gated, not size-additive
+     principle: a body or one weapon may AMPLIFY a current pathway; neither SUBSTITUTES for every tool
+     selection is ORIENTATION-WEIGHTED: perim_weight=1-0.45*o, post_weight=0.55+0.45*o (continuous)
+  all Height 93+ (7'3"+) candidates -- do they cash their size into a current tool?
+    H=95  RScore=48.0  RECRUITABLE  | via post  | interior SKILL=57 (needs >24, height-amp), rebounding=77 gated to +12.3, o=0.75 -> weighted post=48.0
+    H=93  RScore=36.5  RECRUITABLE  | via post  | interior SKILL=45 (needs >24, height-amp), rebounding=76 gated to +12.2, o=0.78 -> weighted post=36.5
+  the invariant, shown as rows (tool clears / rebound-only scrub does not):
+    tallest real-tool giant:      H=95  RScore=48.0  RECRUITABLE  | interior SKILL=57, rebounding=77 gated to +12.3, o=0.75 -> weighted post=48.0
+    tallest rebound-only scrub:   H=91  RScore=15.5  below line   | interior SKILL=13, rebounding=65 gated to +3.0, o=0.57 -> weighted post=5.7
+    strict 7'3"+ scrub (cross-seed fallback, seed 22):
+      H=93  RScore=10.3  below line   | interior SKILL=20, rebounding=73 gated to +5.2, o=0.94 -> weighted post=10.3
+    read: extreme height with no interior SKILL cannot convert rebounding alone into a
+          roster spot -- as the scrub row(s) above show; only the real interior tool clears
+  lowest recruitable perimeter guard: H=53 o=0.26 RScore=17.0  clears via [perim]  (want perim)
+    entry(handle/shot)=38 (needs >20)  creation-support=40  perimeter-def=43  ath=43  |  weighted perim=17.0 vs post=7.5
+  lowest recruitable post/big: H=75 o=0.75 RScore=17.0  clears via [post]  (want post)
+    interior-skill=33 (needs >24, height-amp)  rebounding=56(+6.6 gated)  post-support=30  ath=41  |  weighted post=17.0 vs perim=7.3
+  tiny post-scorer FAMILY (H40-44, post, PostMoves/Close weapon>=55): 19 candidates / 2 recruitable
+    -> 0 via POST path (target 0: interior skill does not convert at 5'8-5'9), 2 via PERIMETER path (legit: real guard tools, recruited as a small perimeter player -- not as a stranded post savant)
+  cross-path (continuity check, not a role table): 442 perimeter-class recruits clear via POST, 286 post-class recruits clear via PERIMETER  (1.7% / 1.1% of pool -- continuous cross-path exceptions; concentrated near the hybrid band but not restricted to it)
+
+[H] LATENT CONFLUENCE CLASSIFIERS -- counted from LATENT variables, over the RECRUITABLE export
+    (broad three-axis tails; these are NOT the strict basketball-identity unicorns -- see [I2])
+    elite three-axis confluence  := q>=0.84 (97pct) AND Height>=71 (85pct) AND a>=0.88 (97pct)
+      recruitable count = 2   multi-seed [2, 5, 5, 5, 11, 8] mean=6.0   (canonical run may legitimately be 0)
+    extreme size-skill-athletic  := Height>=80 (98.5pct) AND q>=0.65 (80pct) AND burst-residual>=23.8 (96pct)
+      (residual = mean of Quickness/FirstStep/Vertical minus expectation-at-Height; NOT Strength)
+      recruitable count = 6   multi-seed [6, 3, 13, 4, 6, 4] mean=6.0
+
+============================================================================================
+[I] ARCHETYPE / CASE TABLE -- nearest-match in-population (the sign-off medium)
+============================================================================================
+-- RECRUITABLE TIER (the pool this oracle sizes) ------------------------------------------
+  Korver (5'9 spacer)        : HARD: 5'8-5'9, perimeter, Outside weapon >=82 -> low-level floor spacer (NOT a 4)
+      o=0.25(perimeter) H=40(5'8-5'9) q=0.78 a=0.31 s=0.91 arr=0.97 Jr/21y | Str42 Qck50 Vert51 | top: Outside97, Mid59, BallHandling54, Discipline52 | FT80 | RScore=56.9
+      latent-q=0.78  runway(total=12, top-room: Outside+2, Mid+1, FoulDrawing+1, BallHandling+1)
+  Skilled 5'11 guard         : HARD: 5'10-5'11, perimeter, arrived -> very good in college (must survive)
+      o=0.29(perimeter) H=46(5'10-5'11) q=0.80 a=0.52 s=0.44 arr=1.00 Sr/22y | Str54 Qck55 Vert56 | top: OffBallMovement99, Discipline73, Passing72, Playmaking71 | FT81 | RScore=42.6
+      latent-q=0.80  runway(total=0, top-room: )
+  Barkley (6'5 interior athlete) : HARD: 6'2-6'5, hybrid, elite ath, INTERIOR weapon -> undersized bruiser (not a shooter)
+      o=0.53(hybrid) H=61(6'2-6'5) q=0.82 a=0.95 s=0.53 arr=0.70 Sr/23y | Str87 Qck93 Vert89 | top: Close77, PostDefense56, PerimeterDefense56, Playmaking55 | FT70 | RScore=44.1
+      latent-q=0.82  runway(total=249, top-room: Close+22, Playmaking+14, PerimeterDefense+14, PostDefense+14)
+  Wembanyama (7'+ unicorn)   : HARD: 6'10+, HANDLES (BH>=52) AND shoots AND posts AND freak-mobile -> rare/unicorn in sampled worlds (may be no-match; no world->year conversion yet)   [seed=55; NONE in the canonical world]
+      o=0.71(post) H=89(7'1-7'2) q=0.89 a=0.69 s=0.21 arr=0.84 Sr/22y | Str73 Qck59 Vert70 | top: Screening86, HelpDefense74, Close73, FoulDrawing71 | FT75 | RScore=70.0
+      show: Outside66  BallHandling62  PostMoves64  RimProtection58
+      latent-q=0.89  runway(total=156, top-room: Screening+11, HelpDefense+10, Close+9, Mid+9)
+  McGrady (6'9 wing)         : HARD: 6'8-6'9, OFFENSIVE weapon + real scoring/creation (>=55), no interior -> elite scoring wing
+      o=0.20(perimeter) H=72(6'8-6'9) q=0.94 a=0.61 s=0.60 arr=0.86 Jr/21y | Str69 Qck59 Vert52 | top: Mid89, Discipline66, PerimeterDefense63, OffBallDefense61 | FT73 | RScore=58.2
+      latent-q=0.94  runway(total=105, top-room: Mid+10, PerimeterDefense+7, Discipline+7, Passing+6)
+  Junction 7-footer (Bol)    : HARD: 6'10+, RimProtection weapon >=66, horrific else -> useful-but-limited
+      o=0.68(post) H=80(6'10-7'0) q=0.18 a=0.59 s=0.93 arr=0.62 So/19y | Str69 Qck45 Vert52 | top: RimProtection66, BasketballIQ9, Steals8, SelfCreation8 | FT61 | RScore=49.2
+      latent-q=0.18  runway(total=25, top-room: RimProtection+25)
+  Raw big project (6'9)      : HARD: 6'8-6'9, post, raw (arr<0.40), athletic -> fundable project
+      o=0.93(post) H=73(6'8-6'9) q=0.56 a=0.88 s=0.51 arr=0.29 Jr/20y | Str92 Qck89 Vert78 | top: Screening44, PostDefense28, Mid27, Discipline27 | FT35 | RScore=18.5
+      latent-q=0.56  runway(total=279, top-room: Screening+45, PostDefense+22, Discipline+20, Mid+19)
+    paired ready senior      : HARD: same 6'8-6'9 post band, ready (arr>0.75), ~same ath -> better TODAY (arrival has teeth)
+      o=0.64(post) H=73(6'8-6'9) q=0.55 a=0.87 s=0.42 arr=0.77 Jr/21y | Str92 Qck72 Vert86 | top: OffBallMovement75, BallHandling45, SelfCreation41, RimProtection41 | FT53 | RScore=27.9
+      latent-q=0.55  runway(total=109, top-room: OffBallMovement+15, BallHandling+7, Mid+6, FoulDrawing+6)
+  LeBron (elite two-way wing) : HARD: 6'6-6'9, non-post, latent skill AND ath both above the LeBron-class cut, arrived
+      o=0.49(hybrid) H=67(6'6-6'7) q=0.89 a=0.92 s=0.38 arr=0.74 Sr/22y | Str89 Qck74 Vert80 | top: Finishing80, FoulDrawing64, SelfCreation63, Mid61 | FT51 | RScore=54.8
+      latent-q=0.89  runway(total=248, top-room: Finishing+19, FoulDrawing+14, SelfCreation+14, Mid+13)
+  Worst recruitable guard    : lowest RScore among recruitable perimeter guards (the guard floor):
+      o=0.26(perimeter) H=53(6'0-6'1) q=0.70 a=0.30 s=0.21 arr=0.37 Jr/20y | Str32 Qck38 Vert44 | top: Playmaking51, Steals43, SelfCreation40, HelpDefense40 | FT58 | RScore=17.0
+
+-- BELOW THE LINE (non-recruitable; confirms the line falls right) -------------------------
+  5'8 post-scorer (size-capped) : 5'8 elite post skill, height-penalized -> lands below line (RScore=9.9 vs line 17.0)
+      o=0.76(post) H=40(5'8-5'9) q=0.78 a=0.31 s=0.82 arr=0.48 Jr/20y | Str41 Qck47 Vert42 | top: Close61, Discipline41, FoulDrawing36, BasketballIQ35 | FT63 | RScore=9.9
+  5'10 weak guard            : HARD: 5'10-5'11, perimeter, skills beneath the line -> correctly non-recruitable
+      o=0.35(perimeter) H=47(5'10-5'11) q=0.30 a=0.72 s=0.40 arr=0.46 Jr/21y | Str61 Qck73 Vert75 | top: Steals43, PerimeterDefense26, Outside25, Close25 | FT45 | RScore=11.1
+      latent-q=0.30  runway(total=118, top-room: Steals+25, PerimeterDefense+10, Close+9, Outside+9)
+  6'1 post                   : borderline edge case -> lands RECRUITABLE (RScore=17.3 vs line 17.0)
+      o=0.75(post) H=50(5'10-5'11) q=0.54 a=0.82 s=0.61 arr=0.32 So/19y | Str65 Qck66 Vert84 | top: PostMoves50, PostDefense26, OffBallDefense26, FoulDrawing26 | FT53 | RScore=17.3
+
+[I2] MARQUEE UNICORN FREQUENCY across 6 seeds (recruitable pool) -- meant to be rare
+    Wembanyama inside-out    present in 1/6 worlds   per-world counts [0, 0, 0, 0, 0, 1]
+    LeBron two-way wing      present in 5/6 worlds   per-world counts [1, 3, 1, 0, 3, 2]
+
+============================================================================================
+END -- tune the five dials against this table; oracle locks as the port spec on sign-off.
+============================================================================================
+[S42.2] replay fixture written: tools/gen_pass2_replay_fixture_s42_2.json   (players=306: prefix 300 + 6 targeted beyond it; seed=20260706)
+[S42.2] recorder-pass cross-check vs canonical cohort: 33795 players regenerated, 0 mismatches
+[S42.2] coverage: giant_7_3_plus@33794, tiny_post_family@1416, ft_hitch@330, auto_line_weak_big@6273, high_s_spike@155, low_s_broad@178, raw_arrival_post@237, ready_arrival_guard@73, arrival_clamp_bound@110, height_low_clamp@13, height_high_clamp@NONE, ft_floor_clamp@4022, ft_ceiling_clamp@3918

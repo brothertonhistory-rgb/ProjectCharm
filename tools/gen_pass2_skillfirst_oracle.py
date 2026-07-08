@@ -56,6 +56,9 @@ authoritative bin table (see HEIGHT_BINS).  inches ~= 68 + 0.36*(Height-40) is d
 
 import random
 import math
+import json      # S42.2: fixture-dump mode only (pure stdlib; the dump routine does not port)
+import os        # S42.2: fixture path resolution (written beside this script, CWD-independent)
+import sys       # S42.2: the --fixture argv switch
 from collections import defaultdict, OrderedDict
 
 # ============================================================================
@@ -274,7 +277,11 @@ def build_skill_state(base, weapon, s, e, height, ft_idio):
 # ============================================================================
 # THE GENERATOR  --  one honest player, column by column
 # ============================================================================
-def generate_player(r):
+def generate_player(r, rec=None):
+    # S42.2 recording seam: `rec` is an optional plain dict this function writes RAW DRAWS and
+    # non-returned intermediates INTO, strictly AFTER each draw is made and assigned -- the
+    # recorder draws no RNG and returns nothing the math reads, so rec=None (the default, and
+    # every audit path) is byte-for-byte today's behavior. Proof is the §0.1 output diff.
     # ---- 1. three independent quality draws + specialization (quality never touches Height)
     # orientation ~ Beta(mean,conc); a=mean*conc, b=(1-mean)*conc
     o = r.betavariate(ORI_MEAN * ORI_CONC, (1.0 - ORI_MEAN) * ORI_CONC)
@@ -282,16 +289,31 @@ def generate_player(r):
     a = r.betavariate(ATHQ_A, ATHQ_B)           # athletic quality
     s = r.betavariate(SPEC_A, SPEC_B)           # specialization (broad->spike)
     oaxis = 2.0 * o - 1.0                        # -1 perimeter .. +1 post
+    if rec is not None:
+        rec["o"], rec["q"], rec["a"], rec["s"] = o, q, a, s
+        rec["skill_noise"], rec["ath_noise"], rec["ath_raw"] = {}, {}, {}
 
     # ---- 2. orientation -> Height (logistic ceiling in o; quality absent) ------------
     oh       = 1.0 / (1.0 + math.exp(-HT_ORI_STEEP * (o - HT_ORI_MID)))
     mu       = HT_MU_PERIM + oh * (HT_MU_POST - HT_MU_PERIM)
     sigma_up = HT_SIGMA_UP_PERIM + oh * (HT_SIGMA_UP_POST - HT_SIGMA_UP_PERIM)
-    if r.random() < 0.5:
-        h_raw = mu + abs(r.gauss(0.0, sigma_up))          # Gaussian upper tail: kills 7'3"+ excess
+    # S42.2: the two inline draws are hoisted to named locals so the recorder can capture them
+    # after assignment (x = f(); use(x) is identical to use(f()); the RNG call order is unchanged).
+    h_sel = r.random()
+    if h_sel < 0.5:
+        h_noise  = r.gauss(0.0, sigma_up)
+        h_branch = "upper_gauss"
+        h_raw    = mu + abs(h_noise)              # Gaussian upper tail: kills 7'3"+ excess
     else:
-        h_raw = mu - r.expovariate(1.0 / HT_SCALE_DOWN)
+        h_noise  = r.expovariate(1.0 / HT_SCALE_DOWN)
+        h_branch = "lower_exp"
+        h_raw    = mu - h_noise
     Height = int(round(clamp(h_raw, HT_MIN, HT_MAX)))
+    if rec is not None:
+        rec["height_branch_selector_raw"] = h_sel
+        rec["height_branch"]              = h_branch
+        rec["height_noise_raw"]           = h_noise   # upper: pre-abs gauss; lower: the expovariate value
+        rec["oh"], rec["mu"], rec["sigma_up"], rec["h_raw"] = oh, mu, sigma_up, h_raw
 
     # ---- 3. LATENT skill card from (o, q, s) -- body-blind ---------------------------
     # Orientation suppresses opposite-axis skills (-> holes). Specialization is a chosen
@@ -301,7 +323,10 @@ def generate_player(r):
     for k in DRAWN_SKILLS:
         mismatch = max(0.0, -oaxis * PAXIS[k])          # opposite-axis suppression 0..1
         supp = MISMATCH_STRENGTH * mismatch
-        base[k] = q - supp + r.gauss(0.0, SKILL_NOISE)
+        sk_noise = r.gauss(0.0, SKILL_NOISE)            # S42.2: hoisted for the recorder; same call, same order
+        if rec is not None:
+            rec["skill_noise"][k] = sk_noise
+        base[k] = q - supp + sk_noise
     # weapon (S42.1): the identity is the strongest ELIGIBILITY-CORRECTED candidate --
     # argmax of base[k] + WEAPON_CENSUS_OFFSET[k] over the eligible set. Offsets shift the
     # argmax comparison ONLY; base[k] and all downstream card math are untouched.
@@ -310,35 +335,55 @@ def generate_player(r):
     eligible = [k for k in DRAWN_SKILLS
                 if k not in WEAPON_EXCLUDE and max(0.0, -oaxis * PAXIS[k]) < WEAPON_MISMATCH_MAX]
     pool = eligible if eligible else DRAWN_SKILLS
+    if rec is not None:
+        rec["eligible"] = list(eligible)   # never empty: Mid (PAXIS 0.0, not excluded) is always eligible
     weapon_raw = max(pool, key=lambda k: base[k])
     weapon     = max(pool, key=lambda k: base[k] + WEAPON_CENSUS_OFFSET.get(k, 0.0))
     # (latent/current/FT/runway are built AFTER arrival + the FT idiosyncrasy draw, via
     #  build_skill_state -- construction is RNG-free, so moving it does not shift the stream)
 
     # ---- 4. size card (bypasses expression; drawn at current value) ------------------
-    Wingspan = int(clamp(round(Height + r.gauss(4.0, 3.0)), HT_MIN, 99))
+    ws_noise = r.gauss(4.0, 3.0)                        # S42.2: hoisted for the recorder (mean 4.0 INCLUDED in the drawn value)
+    if rec is not None:
+        rec["wingspan_noise"] = ws_noise
+    Wingspan = int(clamp(round(Height + ws_noise), HT_MIN, 99))
     # athletic card (bypasses expression)
     ath = {}
     for k in ATH_KEYS:
         acenter = ATH_BASE_LO + a * (ATH_BASE_HI - ATH_BASE_LO)   # (renamed from `base` in S42.1:
-        val = acenter + SIZE_COEF[k] * (Height - ATH_HEIGHT_CENTER) + r.gauss(0.0, ATH_SIGMA[k])  # the skill base dict now lives past this loop)
+        a_noise = r.gauss(0.0, ATH_SIGMA[k])                      #  the skill base dict now lives past this loop)
+        val = acenter + SIZE_COEF[k] * (Height - ATH_HEIGHT_CENTER) + a_noise
+        if rec is not None:
+            rec["ath_center"]      = acenter        # same value every iteration; recorded once semantically
+            rec["ath_noise"][k]    = a_noise
+            rec["ath_raw"][k]      = val            # pre-round/pre-clamp checkpoint
         ath[k] = int(clamp(round(val), 8, 99))
-    Weight = int(clamp(round(30 + 0.40 * Height + 0.30 * ath["Strength"] + r.gauss(0, 6)), 20, 99))
+    wt_noise = r.gauss(0, 6)                            # S42.2: three hoists; draw order weight -> OREB -> DREB unchanged
+    Weight = int(clamp(round(30 + 0.40 * Height + 0.30 * ath["Strength"] + wt_noise), 20, 99))
     # rebounding lives on the size card (physical; cashes now even for a raw project)
     post_bonus = 8.0 * o
-    OREB = int(clamp(round(20 + 0.34 * Height + 0.14 * ath["Strength"] + post_bonus + r.gauss(0, 7)), 8, 99))
-    DREB = int(clamp(round(22 + 0.36 * Height + 0.18 * ath["Strength"] + post_bonus + r.gauss(0, 7)), 8, 99))
+    oreb_noise = r.gauss(0, 7)
+    OREB = int(clamp(round(20 + 0.34 * Height + 0.14 * ath["Strength"] + post_bonus + oreb_noise), 8, 99))
+    dreb_noise = r.gauss(0, 7)
+    DREB = int(clamp(round(22 + 0.36 * Height + 0.18 * ath["Strength"] + post_bonus + dreb_noise), 8, 99))
+    if rec is not None:
+        rec["weight_noise"], rec["oreb_noise"], rec["dreb_noise"] = wt_noise, oreb_noise, dreb_noise
 
     # ---- 5. arrival stage + expression transform (SKILL card only) -------------------
     arr_mean = ARR_PERIM - o * (ARR_PERIM - ARR_POST)
-    arrival = clamp(r.gauss(arr_mean, ARR_SIGMA), 0.0, 1.0)
+    arr_draw = r.gauss(arr_mean, ARR_SIGMA)             # S42.2: hoisted -- the clamp DESTROYS this raw value when it binds
+    arrival = clamp(arr_draw, 0.0, 1.0)
     e = E_MIN + arrival * (1.0 - E_MIN)
+    if rec is not None:
+        rec["arrival_draw_raw"], rec["arr_mean"] = arr_draw, arr_mean
 
     # ---- FT idiosyncrasy (S42.1): ONE persistent shooter-specific draw per player ----
     # The SAME value feeds both derive_ft calls inside build_skill_state (latent-FT and
     # current-FT). Two independent draws would give one player two FT identities and pollute
     # the runway vector with measurement noise instead of development.
     ft_idio = r.gauss(0.0, FT_SIGMA)
+    if rec is not None:
+        rec["ft_idio"] = ft_idio
 
     # ---- latent / current / FT / runway (RNG-free construction; see build_skill_state)
     latent, current, runway, runway_total = build_skill_state(base, weapon, s, e, Height, ft_idio)
@@ -348,7 +393,10 @@ def generate_player(r):
     # population structure, the one-class-vs-standing-pool question, and the ready-freshman
     # existence requirement. Do NOT port the age/class labels as spec; arrival is the ruled
     # mechanism, the labels are decoration on it.
-    age = int(clamp(round(18 + AGE_ARR_SPAN * arrival + r.gauss(0, AGE_NOISE)), 17, 23))
+    age_noise = r.gauss(0, AGE_NOISE)                   # S42.2: hoisted; recorded as PLACEHOLDER-OUTPUT
+    if rec is not None:                                 # (S42.1 ruling: age/class do not port as spec)
+        rec["age_noise_raw"] = age_noise
+    age = int(clamp(round(18 + AGE_ARR_SPAN * arrival + age_noise), 17, 23))
     cls = "Fr" if age <= 18 else ("So" if age == 19 else ("Jr" if age <= 21 else "Sr"))
 
     # ---- assemble the 33-key card (current) ------------------------------------------
@@ -467,7 +515,269 @@ def find_nearest(pool, target, weights, extra=None):
             best, bestd = p, d
     return best
 
-def main():
+# ============================================================================
+# S42.2: MATH-REPLAY FIXTURE DUMP  (opt-in via --fixture; a pure recording
+# side-channel -- NO generation math changes; the default run is byte-identical)
+# ============================================================================
+FIXTURE_SCHEMA_VERSION = "s42.2-v1"
+FIXTURE_FILENAME       = "gen_pass2_replay_fixture_s42_2.json"
+FIXTURE_PREFIX_COUNT   = 300   # ruled at the S42.2 check-in: first 300 players + targeted edge indices
+
+# The 40-slot RNG stream order per player -- CONTRACTUAL, declared here and echoed into the
+# fixture header so the port never infers it from JSON key order. height_branch (a derived
+# string, not a draw) is recorded beside the selector for readability but is NOT a slot.
+DRAW_ORDER = (["o", "q", "a", "s", "height_branch_selector_raw", "height_noise_raw"]
+              + ["skill_noise.%s" % k for k in DRAWN_SKILLS]
+              + ["wingspan_noise"]
+              + ["ath_noise.%s" % k for k in ATH_KEYS]
+              + ["weight_noise", "oreb_noise", "dreb_noise",
+                 "arrival_draw_raw", "ft_idio", "age_noise_raw"])
+assert len(DRAW_ORDER) == 40
+
+def _fixture_constants_echo():
+    """Every constant the deterministic replay (and the C# port) consumes. The port asserts its
+    transcribed constants equal this echo BEFORE running parity; the Python replay checker fails
+    loudly on any mismatch. A tripwire against silent constant drift, not a second source of truth
+    (the oracle source stays canonical)."""
+    return OrderedDict([
+        ("ORI_MEAN", ORI_MEAN), ("ORI_CONC", ORI_CONC),
+        ("SKILL_Q_A", SKILL_Q_A), ("SKILL_Q_B", SKILL_Q_B),
+        ("SPEC_A", SPEC_A), ("SPEC_B", SPEC_B), ("ATHQ_A", ATHQ_A), ("ATHQ_B", ATHQ_B),
+        ("HT_ORI_MID", HT_ORI_MID), ("HT_ORI_STEEP", HT_ORI_STEEP),
+        ("HT_MU_PERIM", HT_MU_PERIM), ("HT_MU_POST", HT_MU_POST),
+        ("HT_SIGMA_UP_PERIM", HT_SIGMA_UP_PERIM), ("HT_SIGMA_UP_POST", HT_SIGMA_UP_POST),
+        ("HT_SCALE_DOWN", HT_SCALE_DOWN), ("HT_MIN", HT_MIN), ("HT_MAX", HT_MAX),
+        ("ATH_HEIGHT_CENTER", ATH_HEIGHT_CENTER), ("SIZE_COEF", SIZE_COEF), ("ATH_SIGMA", ATH_SIGMA),
+        ("ATH_BASE_LO", ATH_BASE_LO), ("ATH_BASE_HI", ATH_BASE_HI),
+        ("ARR_PERIM", ARR_PERIM), ("ARR_POST", ARR_POST), ("ARR_SIGMA", ARR_SIGMA),
+        ("E_MIN", E_MIN), ("EXPR_BASELINE", EXPR_BASELINE),
+        ("AGE_ARR_SPAN", AGE_ARR_SPAN), ("AGE_NOISE", AGE_NOISE),
+        ("MISMATCH_STRENGTH", MISMATCH_STRENGTH), ("SKILL_NOISE", SKILL_NOISE),
+        ("WEAPON_BUMP", WEAPON_BUMP), ("SUPPORT_DRAIN", SUPPORT_DRAIN),
+        ("WEAPON_MISMATCH_MAX", WEAPON_MISMATCH_MAX), ("WEAPON_EXCLUDE", list(WEAPON_EXCLUDE)),
+        ("WEAPON_CENSUS_OFFSET", WEAPON_CENSUS_OFFSET),
+        ("RATING_LO", RATING_LO), ("RATING_SPAN", RATING_SPAN), ("HOLE_FLOOR", HOLE_FLOOR),
+        ("FT_CENTER", FT_CENTER), ("FT_OUT_SPAN", FT_OUT_SPAN), ("FT_OUT_SCALE", FT_OUT_SCALE),
+        ("FT_HEIGHT_COEF", FT_HEIGHT_COEF), ("FT_MIN", FT_MIN), ("FT_MAX", FT_MAX),
+        ("FT_SIGMA", FT_SIGMA), ("PAXIS", PAXIS),
+        ("R_LINE", R_LINE), ("HF_LO", HF_LO), ("HF_HI", HF_HI), ("HF_RANGE", HF_RANGE),
+        ("HF_STEEP", HF_STEEP), ("HF_MID", HF_MID),
+        ("PERIM_OW", PERIM_OW), ("POST_OW", POST_OW),
+        ("LOW_TAPER_FLOOR", LOW_TAPER_FLOOR), ("LOW_TAPER_TOP", LOW_TAPER_TOP),
+    ])
+
+def _fixture_target_filters():
+    """Edge-creature filters (ruled coverage list + clamp-edge bonuses). Definitions reuse the
+    oracle's own audit language ([F4] hitch/auto-big, the [I]-table tiny-post family, HEIGHT_BINS).
+    Each contributes at most one index: the FIRST match in cohort order (deterministic)."""
+    cur = lambda p, k: p["current"][k]
+    F = []
+    def add(name, desc, pred, fb_desc=None, fb=None):
+        F.append({"name": name, "description": desc, "pred": pred, "fb_desc": fb_desc, "fb": fb})
+    add("giant_7_3_plus", "Height >= 93 (the 7'3\"+ Gaussian-tail giant)",
+        lambda p: p["Height"] >= 93,
+        "fallback: Height >= 87 (7'1\"+)", lambda p: p["Height"] >= 87)
+    add("tiny_post_family", "Height 40-44 (5'8-5'9) AND o > 0.6 AND weapon in (PostMoves, Close)",
+        lambda p: 40 <= p["Height"] <= 44 and p["o"] > 0.6 and p["weapon"] in ("PostMoves", "Close"),
+        "fallback: Height 40-44 AND o > 0.6 (any weapon)",
+        lambda p: 40 <= p["Height"] <= 44 and p["o"] > 0.6)
+    add("ft_hitch", "current Outside >= 70 AND current FreeThrow < 50 (the [F4] skilled low-FT hitch)",
+        lambda p: cur(p, "Outside") >= 70 and cur(p, "FreeThrow") < 50,
+        "fallback near-hitch: current Outside >= 65 AND current FreeThrow < 55",
+        lambda p: cur(p, "Outside") >= 65 and cur(p, "FreeThrow") < 55)
+    add("auto_line_weak_big", "Height >= 71 AND current Outside <= 40 AND current FreeThrow > 80 (the [F4] other tail)",
+        lambda p: p["Height"] >= 71 and cur(p, "Outside") <= 40 and cur(p, "FreeThrow") > 80)
+    add("high_s_spike", "s >= 0.95 (pure one-weapon specialist)",
+        lambda p: p["s"] >= 0.95, "fallback: s >= 0.90", lambda p: p["s"] >= 0.90)
+    add("low_s_broad", "s <= 0.05 (maximally broad; no weapon lean)",
+        lambda p: p["s"] <= 0.05, "fallback: s <= 0.10", lambda p: p["s"] <= 0.10)
+    add("raw_arrival_post", "o > 0.6 AND arrival <= 0.15 (deep raw-project post)",
+        lambda p: p["o"] > 0.6 and p["arrival"] <= 0.15,
+        "fallback: o > 0.6 AND arrival <= 0.20",
+        lambda p: p["o"] > 0.6 and p["arrival"] <= 0.20)
+    add("ready_arrival_guard", "o < 0.4 AND arrival >= 0.95 (arrives essentially finished)",
+        lambda p: p["o"] < 0.4 and p["arrival"] >= 0.95,
+        "fallback: o < 0.4 AND arrival >= 0.90",
+        lambda p: p["o"] < 0.4 and p["arrival"] >= 0.90)
+    add("arrival_clamp_bound", "arrival == 0.0 or 1.0 exactly (the [0,1] clamp bound; the raw draw is otherwise destroyed)",
+        lambda p: p["arrival"] in (0.0, 1.0))
+    add("height_low_clamp", "Height == 40 (HT_MIN clamp region)", lambda p: p["Height"] == 40)
+    add("height_high_clamp", "Height == 99 (HT_MAX clamp; may legitimately be absent -- noted if so)",
+        lambda p: p["Height"] == 99)
+    add("ft_floor_clamp", "current FreeThrow == 25 (FT_MIN clamp)", lambda p: cur(p, "FreeThrow") == 25)
+    add("ft_ceiling_clamp", "current FreeThrow == 95 (FT_MAX clamp; may legitimately be absent -- noted if so)",
+        lambda p: cur(p, "FreeThrow") == 95)
+    return F
+
+def _first_index(coh, pred):
+    for i, p in enumerate(coh):
+        if pred(p):
+            return i
+    return None
+
+def _assemble_row(i, rec, p):
+    parts = rscore_parts(p)
+    draws = OrderedDict()
+    for key in ("o", "q", "a", "s", "height_branch_selector_raw", "height_branch", "height_noise_raw"):
+        draws[key] = rec[key]
+    draws["skill_noise"] = OrderedDict((k, rec["skill_noise"][k]) for k in DRAWN_SKILLS)
+    draws["wingspan_noise"] = rec["wingspan_noise"]
+    draws["ath_noise"] = OrderedDict((k, rec["ath_noise"][k]) for k in ATH_KEYS)
+    for key in ("weight_noise", "oreb_noise", "dreb_noise", "arrival_draw_raw", "ft_idio", "age_noise_raw"):
+        draws[key] = rec[key]
+    cp = OrderedDict()
+    cp["oaxis"] = p["oaxis"]
+    for key in ("oh", "mu", "sigma_up", "h_raw"):
+        cp[key] = rec[key]
+    cp["Height"] = p["Height"]
+    cp["base"] = OrderedDict((k, p["base"][k]) for k in DRAWN_SKILLS)
+    cp["eligible"] = rec["eligible"]
+    cp["weapon_raw"] = p["weapon_raw"]
+    cp["weapon"] = p["weapon"]
+    cp["ath_center"] = rec["ath_center"]
+    cp["ath_raw"] = OrderedDict((k, rec["ath_raw"][k]) for k in ATH_KEYS)
+    for key in ("Wingspan", "Weight", "OffensiveRebounding", "DefensiveRebounding"):
+        cp[key] = p["card"][key]
+    cp["arr_mean"] = rec["arr_mean"]
+    cp["arrival"] = p["arrival"]
+    cp["e"] = p["e"]
+    cp["latent"]  = OrderedDict((k, p["latent"][k]) for k in SKILL_KEYS)
+    cp["current"] = OrderedDict((k, p["current"][k]) for k in SKILL_KEYS)
+    cp["runway"]  = OrderedDict((k, p["runway"][k]) for k in SKILL_KEYS)
+    cp["runway_total"] = p["runway_total"]
+    cp["age"] = p["age"]      # placeholder-output (S42.1 ruling): assert values, do not port formula
+    cp["cls"] = p["cls"]
+    return OrderedDict([
+        ("index", i),
+        ("draws", draws),
+        ("checkpoints", cp),
+        ("card", OrderedDict((k, p["card"][k]) for k in ALL_KEYS)),
+        ("recruiting", OrderedDict([("rscore", parts["rscore"]), ("rscore_parts", parts)])),
+    ])
+
+def dump_replay_fixture(seed, coh):
+    """Selection pass over the already-built canonical cohort (no RNG), then ONE fresh recorder
+    pass with an identical stream (recording draws nothing). Writes the fixture beside this
+    script; returns the trailing announce lines for the audit output."""
+    prefix_n = min(FIXTURE_PREFIX_COUNT, len(coh))
+    sel = set(range(prefix_n))
+    filters_out = []
+    for f in _fixture_target_filters():
+        idx = _first_index(coh, f["pred"])
+        via_fb = False
+        entry = OrderedDict([("name", f["name"]), ("description", f["description"])])
+        if idx is None and f["fb"] is not None:
+            idx = _first_index(coh, f["fb"])
+            via_fb = idx is not None
+            if via_fb:
+                entry["fallback_description"] = f["fb_desc"]
+        entry["matched_index"] = idx
+        entry["via_fallback"] = via_fb
+        filters_out.append(entry)
+        if idx is not None:
+            sel.add(idx)
+    targeted_beyond = sorted(i for i in sel if i >= prefix_n)
+
+    # recorder pass: same seed, same code path (rec never draws) -> the same people. Every
+    # regenerated player is cross-checked against the canonical cohort as the in-run seam proof.
+    limit = max(sel) + 1
+    r2 = random.Random(seed)
+    rows_by_index = {}
+    mismatches = 0
+    for i in range(limit):
+        rec = {} if i in sel else None
+        p2 = generate_player(r2, rec)
+        p1 = coh[i]
+        if (p2["card"] != p1["card"] or p2["weapon"] != p1["weapon"] or p2["latent"] != p1["latent"]
+                or p2["o"] != p1["o"] or p2["ft_idio"] != p1["ft_idio"] or p2["arrival"] != p1["arrival"]):
+            mismatches += 1
+        if rec is not None:
+            rows_by_index[i] = _assemble_row(i, rec, p2)
+
+    schema = OrderedDict([
+        ("schema_version", FIXTURE_SCHEMA_VERSION),
+        ("oracle", "tools/gen_pass2_skillfirst_oracle.py (S42.2 fixture-exporting build of the S42.1 re-locked model)"),
+        ("purpose", "Deterministic MATH-REPLAY fixture for the C# port: every final value is replayable "
+                    "from recorded raw draws + the frozen constants, with named intermediate checkpoints, "
+                    "so the port proves math parity -- never mere deserialization. RNG is factored out."),
+        ("seed", seed),
+        ("n_cohort", len(coh)),
+        ("selection_policy", OrderedDict([
+            ("prefix_count", prefix_n),
+            ("targeted_indices", targeted_beyond),
+            ("selected_total", len(sel)),
+            ("note", "Rows are the first prefix_count players of the canonical cohort PLUS the first "
+                     "cohort index matching each target filter (guaranteed branch coverage; sparse "
+                     "indices are fine because replay never touches the RNG). targeted_indices lists "
+                     "only the matches beyond the prefix; each filter's matched_index shows where its "
+                     "creature lives regardless."),
+            ("target_filters", filters_out),
+        ])),
+        ("draw_order", DRAW_ORDER),
+        ("draw_notes", OrderedDict([
+            ("height_branch", "derived flag, not a draw slot: selector_raw < 0.5 => 'upper_gauss' "
+                              "(h_raw = mu + abs(noise)), else 'lower_exp' (h_raw = mu - noise); "
+                              "height_noise_raw is the PRE-abs gauss on the upper branch, the raw "
+                              "expovariate value on the lower branch"),
+            ("wingspan_noise", "gauss(4.0, 3.0) as drawn -- the 4.0 mean is INCLUDED in the value"),
+            ("arrival_draw_raw", "gauss(arr_mean, ARR_SIGMA) as drawn, PRE-clamp; arrival = clamp(raw, 0, 1)"),
+            ("age_noise_raw", "PLACEHOLDER-OUTPUT (S42.1 ruling): recorded for stream completeness; the "
+                              "age/class labels are decoration on arrival and do NOT port as spec -- the "
+                              "port asserts the recorded age/cls values and never recomputes them as spec"),
+        ])),
+        ("key_orders", OrderedDict([
+            ("DRAWN_SKILLS", DRAWN_SKILLS), ("ATH_KEYS", ATH_KEYS),
+            ("SKILL_KEYS", SKILL_KEYS), ("SIZE_KEYS", SIZE_KEYS), ("ALL_KEYS", ALL_KEYS),
+        ])),
+        ("comparison_convention", "Integer checkpoints (Height, Wingspan, Weight, rebounding, athletic "
+                                  "ratings, latent, current, runway, card, age): EXACT equality. Float "
+                                  "checkpoints: |diff| <= 1e-9 -- the cross-language allowance for exp/tanh, "
+                                  "which Python's libm and .NET may compute ~1 ulp apart; every other "
+                                  "operation is plain IEEE-754 double arithmetic and lands bit-identical "
+                                  "given the same operation order."),
+        ("weapon_selection_contract", "eligible = DRAWN_SKILLS (in list order) where the skill is not in "
+                                      "WEAPON_EXCLUDE and max(0, -oaxis*PAXIS[k]) < WEAPON_MISMATCH_MAX. "
+                                      "eligible is never empty (Mid: PAXIS 0.0, not excluded, always passes); "
+                                      "the code's fall-back to all DRAWN_SKILLS is therefore unreachable. "
+                                      "weapon_raw = argmax of base[k]; weapon = argmax of base[k] + "
+                                      "WEAPON_CENSUS_OFFSET[k]. TIE SEMANTICS: scan in DRAWN_SKILLS order and "
+                                      "take the FIRST maximum (replace only on strictly-greater), matching "
+                                      "Python's max()."),
+        ("recompute_obligations", [
+            "base[k] from q, orientation mismatch (oaxis, PAXIS, MISMATCH_STRENGTH), and skill_noise[k] -- assert vs recorded base",
+            "Height from height_branch + mu + height_noise_raw, then clamp(HT_MIN, HT_MAX) and round -- assert h_raw and final Height",
+            "each athletic rating from ath_center + SIZE_COEF[k]*(Height-ATH_HEIGHT_CENTER) + ath_noise[k] -- assert ath_raw and the rounded/clamped rating",
+            "Wingspan / Weight / rebounding from their formulas + recorded noise -- assert final ints",
+            "arrival = clamp(arrival_draw_raw, 0, 1); e = E_MIN + arrival*(1-E_MIN) -- assert both (and arr_mean from o)",
+            "latent/current per skill via weapon bump / support drain / expression transform -- assert all 20+20",
+            "FreeThrow (latent and current) via the tanh derivation + the ONE shared ft_idio -- assert both",
+            "runway = latent - current (21 keys incl. FreeThrow) + runway_total -- assert all",
+            "the full 33-key card -- assert all",
+            "rscore + every rscore_parts field from the replayed card -- assert all (floats at tolerance)",
+        ]),
+        ("constants_note", "The port asserts its transcribed constants equal this echo BEFORE running "
+                           "parity (the replay checker fails loudly on any mismatch). A tripwire against "
+                           "silent constant drift; the oracle source stays canonical."),
+        ("constants", _fixture_constants_echo()),
+    ])
+    fixture = OrderedDict([("schema", schema),
+                           ("players", [rows_by_index[i] for i in sorted(rows_by_index)])])
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), FIXTURE_FILENAME)
+    with open(path, "w") as f:
+        json.dump(fixture, f, indent=1)
+        f.write("\n")
+
+    lines = []
+    lines.append("[S42.2] replay fixture written: tools/%s   (players=%d: prefix %d + %d targeted beyond it; seed=%d)"
+                 % (FIXTURE_FILENAME, len(sel), prefix_n, len(targeted_beyond), seed))
+    lines.append("[S42.2] recorder-pass cross-check vs canonical cohort: %d players regenerated, %d mismatches"
+                 % (limit, mismatches))
+    lines.append("[S42.2] coverage: " + ", ".join(
+        "%s@%s%s" % (e["name"], e["matched_index"] if e["matched_index"] is not None else "NONE",
+                     "(fb)" if e["via_fallback"] else "") for e in filters_out))
+    return lines
+
+def main(write_fixture=False):
     SEED = 20260706
     MULTI_SEEDS = [20260706, 11, 22, 33, 44, 55]
     L = []
@@ -1036,10 +1346,16 @@ def main():
     P("END -- tune the five dials against this table; oracle locks as the port spec on sign-off.")
     P("=" * 92)
 
+    # S42.2: opt-in fixture dump -- trailing announce lines ONLY, appended after the full normal
+    # audit. The default run (write_fixture=False) adds nothing and stays byte-identical.
+    if write_fixture:
+        for ln in dump_replay_fixture(SEED, coh):
+            P(ln)
+
     out = "\n".join(L)
     print(out)
     with open("gen_pass2_skillfirst_oracle_output.txt", "w") as f:
         f.write(out + "\n")
 
 if __name__ == "__main__":
-    main()
+    main(write_fixture=("--fixture" in sys.argv[1:]))
