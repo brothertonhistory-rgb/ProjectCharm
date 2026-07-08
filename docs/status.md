@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 42 (2026-07-07; Player-generation Pass 2 — the skill-first generation oracle is locked as the C# port spec, `tools/gen_pass2_skillfirst_oracle.py`, after five adversarial-review rounds; oracle-only, design.md untouched, C# port is next). Prior: Session 41 (2026-07-06; scoreboard — assists 13.7 OK, steals 6.5 OK, rebound instrument audited). Post-S41 ruling (2026-07-06): OT-LOW parked under the coaching / late-game-strategy layer.
+Last updated: Session 42.1 (2026-07-07; oracle repair micro-session — the Pass-2 oracle re-locked after three bounded fixes: weapon-census offsets on the argmax, ONE shared FT idiosyncrasy draw, age/class labeled a placeholder; Python only, design.md untouched). Prior: Session 42 (2026-07-07; Player-generation Pass 2 — the skill-first generation oracle is locked as the C# port spec, `tools/gen_pass2_skillfirst_oracle.py`, after five adversarial-review rounds; oracle-only, design.md untouched, C# port is next); Session 41 (2026-07-06; scoreboard — assists 13.7 OK, steals 6.5 OK, rebound instrument audited). Post-S41 ruling (2026-07-06): OT-LOW parked under the coaching / late-game-strategy layer.
 
 ---
 
@@ -122,25 +122,43 @@ bench instruments.
   a **uniform ×0.8909** (.88→.784 / .62→.5524 / .50→.4455 / .43→.3831 / .54→.4811), preserving the ordering;
   per-zone realized assisted shares stay near real-world (three ~78 / rim ~48). Landed **assists 17.4 → 13.7
   (t13.5, OK)** in one pass. The midpoint is a *relative-engine* dial: it follows the population it measures.
-- **Player-generation Pass 2 is skill-first, no-gate, honest-draw** (S42, oracle locked; the C# port is the
-  next build). The locked oracle (`tools/gen_pass2_skillfirst_oracle.py`) is the port spec + calibration
-  reference. Model rulings, hardened over five adversarial-review rounds and now frozen:
+- **Player-generation Pass 2 is skill-first, no-gate, honest-draw** (S42, oracle locked; **re-locked S42.1**
+  after three bounded fixes; the C# port is the next build). The locked oracle
+  (`tools/gen_pass2_skillfirst_oracle.py`) is the port spec + calibration reference. Model rulings, hardened
+  over five adversarial-review rounds (plus one S42.1 round) and now frozen:
   - **Three independent draws** (skill-quality, athletic-quality, specialization) + orientation; only three
     causal dependencies (orientation→height ceiling, size→athleticism landing, orientation→arrival/runway).
-    Quality is body-independent: `corr(q, Height) = +0.001`.
+    Quality is body-independent: `corr(q, Height) ≈ 0`.
   - **Chosen-weapon specialization** (one identity weapon, glue skills excluded): broad at low s, spiked at
-    high s (top1−top2 gap 34.5 vs 11.3).
-  - **Population shape:** 7'3"+ giants ~3/cohort (Gaussian tail, not ~470); stretch bigs exist (~190),
-    point-centers ~0 (shooting orientation-neutral, handle perimeter-locked); marquee unicorns rare (Wemby
-    1/6 sampled worlds, LeBron 3/6) — exact once-per-century framing deferred to the season layer.
+    high s (top1−top2 gap 34.6 vs 11.3).
+  - **Weapon census offsets (S42.1 ruling — Option A):** the weapon is the argmax of
+    `base[k] + WEAPON_CENSUS_OFFSET[k]` over the eligible set — the strongest eligibility-CORRECTED
+    candidate. The S42 raw argmax had a census artifact (universally-eligible skills won
+    disproportionately; "mid-range specialist" was the most common identity at 8.9%, post identity rarer
+    than off-ball-defense identity). Offsets shift the argmax comparison only, never card math; the ruled
+    default target is a near-flat identity census (~5.9% each; AFTER 5.70–6.02%, PostMoves ≥
+    OffBallDefense). Proven by the [F3] paired-counterfactual census (both rules on identical pre-weapon
+    states). **Rejected alternative: Option B, a random weighted lottery** (larger semantic change, not
+    taken). The [F3] scaffolding (`weapon_raw`, `cf_player`) is oracle-audit-only and does NOT port.
+  - **FT idiosyncrasy (S42.1 ruling):** ONE shared per-player draw, `gauss(0, FT_SIGMA=9.0)`, the SAME
+    value in the latent-FT and current-FT derivations — a persistent shooter trait, not a second
+    development axis. Restores the S29 "oddballs in the tails" ruling: the skilled low-FT hitch (Out≥70 &
+    FT<50) runs 2–8 per 46k, the auto-line weak big (H≥71 & Out≤40 & FT>80) 13–22; rare-but-reachable
+    passes, hitch-archetype judgment stays deferred to the season layer. [F4] audits are the proof.
+  - **Population shape:** 7'3"+ giants ~3/cohort (Gaussian tail, not ~470); stretch bigs exist (~150 at
+    S42.1 re-lock, was ~190), point-centers ~0 (shooting orientation-neutral, handle perimeter-locked);
+    marquee unicorns rare (Wemby 1/6 sampled worlds, LeBron 5/6 at re-lock, was 3/6) — exact
+    once-per-century framing deferred to the season layer.
   - **Baked potential / arrival / runway:** latent skill at birth, arrival suppresses current expression
     (guards developed, posts raw), runway = 21-skill latent−current vector.
-  - **The recruiting line is an oracle-only downstream export proxy** (~24.8k recruitable), continuous and
-    **orientation-weighted** (`perim_w=1−0.45·o`, `post_w=0.55+0.45·o`) — NOT a role table. A body or one
-    weapon may amplify a pathway; neither substitutes for every tool. Rebounding is gated by interior skill
-    (a rebound-only 7'3" scrub stays below the line); interior skill cashes by a height-access curve (~6'2
+  - **The recruiting line is an oracle-only downstream export proxy** (~25.7k recruitable at S42.1
+    re-lock, was ~24.8k; six-seed mean 25,792, inside the 20–30k target with R_LINE untouched at 17.0),
+    continuous and **orientation-weighted** (`perim_w=1−0.45·o`, `post_w=0.55+0.45·o`) — NOT a role table.
+    A body or one weapon may amplify a pathway; neither substitutes for every tool. Rebounding is gated by
+    interior skill (a rebound-only tall scrub stays below the line — demonstrated with printed rows in
+    [G4] since S42.1, never asserted from prose); interior skill cashes by a height-access curve (~6'2
     inflection) plus a sub-6'0 taper (the whole 5'8"–5'9" tiny-post family clears zero times via the post
-    path); Mid is access-gated (a lone midrange isn't a guard). Cross-path exceptions ~1.2%/1.7% (hybrid blur).
+    path); Mid is access-gated (a lone midrange isn't a guard). Cross-path exceptions ~1.7%/1.1% (hybrid blur).
   - **Honest draw, no repair:** no redraws, competency repairs, rating floors, or role/position packages —
     the generator stays an honest cohort; the recruiting line is pure downstream selection.
 
@@ -164,17 +182,22 @@ bench instruments.
   (4.5) were prior front-runners and are **closed by S41** (assists 13.7 OK via the midpoint recenter + uniform
   trim; steals 6.5 OK via the 50/50 turnover mix). OT-LOW moved to Parked (diagnosed; needs the coaching layer).
   Pick the gap before drafting; the next-session prompt is its own audited pass.
-- **C# port of the Pass-2 skill-first generation oracle — the named next build (S42).** The oracle is
+- **C# port of the Pass-2 skill-first generation oracle — the named next build (S42; oracle re-locked
+  S42.1).** The oracle is
   locked at `tools/gen_pass2_skillfirst_oracle.py`; the port is the live-generator rewrite that adds Player
   fields for latent/current/runway/arrival/class, deletes the retired body/package-gate floors
   (`GenEnforceFloors`/`GenEnforceLegHealth`), and validates against a golden fixture generated from the
-  locked oracle. Preserve the frozen contracts (see Closed-by-ruling, S42): three independent draws; only
-  orientation→height, size→athleticism, orientation→arrival dependencies; chosen-weapon specialization;
+  locked oracle. Preserve the frozen contracts (see Closed-by-ruling, S42 + S42.1): three independent draws;
+  only
+  orientation→height, size→athleticism, orientation→arrival dependencies; chosen-weapon specialization
+  **via the S42.1 offset argmax** (the offset table is part of the spec; the [F3] counterfactual
+  scaffolding is not); the shared FT idiosyncrasy draw; the age-placeholder non-porting rule (arrival ports
+  as mechanism, the age/class labels do not port as spec);
   current/latent/runway separation; full 33-key emission; honest cohort → downstream recruitable export;
   orientation-weighted continuous pathway selection; no generator repair/rejection/redraw/role-package.
   `design.md` is edited **at the port session** (not the oracle session), against real ported code.
   Do not reopen oracle calibration unless the port reveals a fidelity mismatch or the first real rosters
-  produce a concrete population problem (reviewer's standing condition).
+  produce a concrete population problem (reviewer's standing condition, applied once already at S42.1).
 - **Generation-layer bridge — now crossed for Pass 2.** S39 was the first population-selection change (era
   profile); S42 locked the full Pass-2 skill-first oracle on the same proven oracle→archetype-table→
   golden-parity workflow. The C# port (above) is the build that lands it in the engine.
@@ -218,12 +241,18 @@ bench instruments.
   rebound-origin provenance (jump balls feed from Rolls A/B/F/I/J/K/M). A true team-rebound line needs
   **rebound-provenance instrumentation** (a counter stamping which held-ball/OOB endings arose from a
   Roll I/M rebound scramble). Until then the page prints the candidates as a NOT-reconciled diagnostic only.
-- **Player-generation Pass 2 — oracle LOCKED (S42); the C# port is now an active Open build** (see §3).
+- **Player-generation Pass 2 — oracle LOCKED (S42), re-locked (S42.1); the C# port is now an active Open build** (see §3).
   The skill-first generation model is frozen in `tools/gen_pass2_skillfirst_oracle.py` and the S42
   Closed-by-ruling entry. Two design notes still ride the port, not the oracle: the **tweener-post
   existence requirement** (guard/wing-sized players whose primary package is post play) is satisfied in
   principle by the skill-first orientation model and confirmed at the port; **weakest-leg multiplicative
   development** belongs to the development/season layer, not generation. (Formal notes in memory + journal.)
+- **Age/class population structure → the season layer** (parked 2026-07-07, S42.1). The oracle's age/class
+  labels are a **placeholder projection of arrival** ("guards arrive developed" is currently implemented as
+  "guards arrive old"; ready 18-year-olds ~0.03%). The season layer owns the real population structure, the
+  one-class-vs-standing-pool question (deferred at S29), and the **ready-freshman existence requirement** —
+  the ready freshman is a defining creature of modern college basketball and must exist there. Arrival is
+  the ruled mechanism and ports as spec; the age/class labels are decoration on it and do NOT port as spec.
 - **Roll G lineup-context bend** — teammate spacing/gravity as a *selection* effect
   (gravity/spacing attributes carried on Player, unread). Needs its own design conversation.
 - **`Outside == 0` buzzer heave** at pie time — the only heave residual left after the

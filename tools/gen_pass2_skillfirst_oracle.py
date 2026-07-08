@@ -31,9 +31,24 @@ Authoritative model (each is stated, not implied):
     current = baseline + e*(latent - baseline)  (if latent<baseline, current=latent;
     expression never raises).  Holes barely move; strengths suppressed proportionally.
     Applies to the SKILL card ONLY; size + athletic ratings bypass (drawn at current value).
-    FreeThrow is DERIVED (f of Outside+Height), computed twice: latent-FT from latent
-    Outside, current-FT from current Outside.  Runway = full per-skill (latent-current)
-    vector (21 skills incl. FT) + one summary.  Class/age correlated with arrival, not identical.
+    FreeThrow is DERIVED (f of Outside+Height+idiosyncrasy): ONE persistent per-player
+    idiosyncrasy draw (gauss(0,FT_SIGMA)) feeds BOTH the latent-FT (from latent Outside) and
+    current-FT (from current Outside) derivations -- a shooter-specific trait, so identical
+    inputs no longer give identical FT and the oddball tails (the skilled low-FT hitch, the
+    weak-shooting big who's automatic at the line) exist.  Runway = full per-skill
+    (latent-current) vector (21 skills incl. FT) + one summary.
+
+  WEAPON SELECTION (S42.1): the identity weapon is the argmax of base[k] + census offset
+    over the eligible set -- the strongest eligibility-CORRECTED candidate.  The offsets
+    (WEAPON_CENSUS_OFFSET, the ruled table) correct the S42 census artifact where universally-
+    eligible skills won disproportionately (multiple-comparisons + PAXIS lean); they shift the
+    argmax comparison only, never the card math.  Proven by the [F3] paired-counterfactual
+    census: both rules applied to identical pre-weapon bases and eligibility sets.
+
+  AGE/CLASS IS A PLACEHOLDER projection of arrival.  The season layer owns the real
+    population structure, the one-class-vs-standing-pool question, and the ready-freshman
+    existence requirement.  Do not port the age/class labels as spec; arrival is the ruled
+    mechanism, the labels are decoration on it.
 
 The generated Height value is an abstract 0-99 attribute, NOT inches.  All audits use the
 authoritative bin table (see HEIGHT_BINS).  inches ~= 68 + 0.36*(Height-40) is display only.
@@ -134,6 +149,25 @@ WEAPON_BUMP       = 0.62   # weapon lift at s=1 (in 0..1 units); lets a low-q sp
 SUPPORT_DRAIN     = 0.42   # how far the non-weapon skills drain at s=1 (in 0..1 units)
 WEAPON_MISMATCH_MAX = 0.30 # a skill is weapon-eligible only if its orientation mismatch is below this
 WEAPON_EXCLUDE = ("BasketballIQ", "Discipline", "HelpDefense")  # glue skills are never the "weapon"
+# S42.1: weapon-census offsets -- the argmax correction (the ruled table).
+# The S42 rule (natural-best argmax over the eligible set) had a census artifact: universally-
+# eligible skills (Mid, FoulDrawing, OffBall*) get more chances to be the maximum (a multiple-
+# comparisons effect), and PAXIS lean shifts each skill's expected base by orientation -- so the
+# most common identity in the universe was "mid-range specialist" (8.9%) while post-play identity
+# (4.2%) ran rarer than off-ball-defense identity (7.0%). These offsets are added to base[k]
+# INSIDE THE ARGMAX ONLY (weapon_score[k] = base[k] + offset[k]); base[k] and every piece of
+# downstream card math are untouched -- the weapon's bump and the support drain still apply to
+# the true base. The selected identity is the strongest eligibility-CORRECTED candidate; after
+# offsets it may not be the highest raw base[k] -- that is the accepted tradeoff, stated honestly.
+# Initialized from measured bias and tuned against the [F3] paired-counterfactual census table;
+# the AFTER table, not any formula claim, is the only proof they worked. Default target ruled at
+# the table: near-flat identity census across the 17 weapon-eligible skills (~5.9% each).
+WEAPON_CENSUS_OFFSET = {
+    "Close": +0.013, "Mid": -0.030, "Outside": -0.018, "Finishing": +0.018, "FoulDrawing": -0.011,
+    "BallHandling": -0.006, "Passing": -0.012, "Playmaking": -0.005, "SelfCreation": -0.008,
+    "PostMoves": +0.032, "OffBallMovement": -0.017, "Screening": +0.023, "PerimeterDefense": -0.005,
+    "PostDefense": +0.027, "RimProtection": +0.025, "Steals": -0.010, "OffBallDefense": -0.014,
+}
 RATING_LO         = 18.0   # t=0 -> ~18
 RATING_SPAN       = 70.0   # t=1 -> ~88
 HOLE_FLOOR        = 8       # rating-DOMAIN lower bound (the abstract 0-99 scale's floor, applied at
@@ -142,6 +176,13 @@ HOLE_FLOOR        = 8       # rating-DOMAIN lower bound (the abstract 0-99 scale
 # FreeThrow derivation (mirrors the live "good shooters shoot better FTs" shape)
 FT_CENTER = 66.0; FT_OUT_SPAN = 10.0; FT_OUT_SCALE = 25.0
 FT_HEIGHT_COEF = 6.0; FT_MIN = 25.0; FT_MAX = 95.0
+# S42.1: per-player FT idiosyncrasy -- ONE shared draw per player (r.gauss(0, FT_SIGMA)),
+# added inside derive_ft for BOTH the latent-FT and current-FT derivations (same value in both:
+# a persistent shooter-specific trait, not a second development axis). Restores the Session 29
+# ruling ("skilled players usually shoot better FTs, with real oddballs in the tails") -- before
+# this, identical Outside+Height gave identical FT every time and the tails did not exist.
+# FT_SIGMA is the dial ruled at the [F4] tables.
+FT_SIGMA = 9.0
 
 # ============================================================================
 # ATTRIBUTE TAXONOMY  (the 33-key contract the generator must emit)
@@ -197,6 +238,40 @@ def clamp(x, lo, hi):
     return lo if x < lo else (hi if x > hi else x)
 
 # ============================================================================
+# SKILL-STATE CONSTRUCTION  (S42.1: factored out of generate_player so the [F3]
+# paired-counterfactual census can rebuild the SAME player's card under the
+# alternative weapon choice -- identical inputs, two selection rules)
+# ============================================================================
+def derive_ft(outside, ft_idio, height):
+    # ft_idio is the player's ONE persistent idiosyncrasy draw; the SAME value feeds both the
+    # latent-FT and current-FT calls, so the runway carries no INDEPENDENT measurement noise
+    # between the two states -- it is a trait, not development. (At the [FT_MIN, FT_MAX] clamp
+    # edges the shared term can still shift the FT runway entry by a point or two; the claim is
+    # no independent noise, not perfect cancellation.) Clamped as always.
+    val = (FT_CENTER + FT_OUT_SPAN * math.tanh((outside - 50.0) / FT_OUT_SCALE)
+           - FT_HEIGHT_COEF * ((height - 55.0) / 40.0) + ft_idio)
+    return int(clamp(round(val), FT_MIN, FT_MAX))
+
+def build_skill_state(base, weapon, s, e, height, ft_idio):
+    """latent / current / runway for a GIVEN weapon choice. Everything here is deterministic
+    in its inputs (no RNG), which is what makes the [F3] counterfactual an honest pairing."""
+    latent = {}
+    for k in DRAWN_SKILLS:
+        t = base[k] + (s * WEAPON_BUMP if k == weapon else -s * SUPPORT_DRAIN)
+        latent[k] = int(clamp(round(RATING_LO + t * RATING_SPAN), HOLE_FLOOR, 99))
+    current = {}
+    for k in DRAWN_SKILLS:
+        L = latent[k]
+        if L <= EXPR_BASELINE:
+            current[k] = L
+        else:
+            current[k] = int(round(EXPR_BASELINE + e * (L - EXPR_BASELINE)))
+    latent["FreeThrow"]  = derive_ft(latent["Outside"], ft_idio, height)
+    current["FreeThrow"] = derive_ft(current["Outside"], ft_idio, height)
+    runway = {k: latent[k] - current[k] for k in SKILL_KEYS}
+    return latent, current, runway, sum(runway.values())
+
+# ============================================================================
 # THE GENERATOR  --  one honest player, column by column
 # ============================================================================
 def generate_player(r):
@@ -227,22 +302,26 @@ def generate_player(r):
         mismatch = max(0.0, -oaxis * PAXIS[k])          # opposite-axis suppression 0..1
         supp = MISMATCH_STRENGTH * mismatch
         base[k] = q - supp + r.gauss(0.0, SKILL_NOISE)
-    # weapon = natural-best among weapon-eligible (not opposite-axis) skills
+    # weapon (S42.1): the identity is the strongest ELIGIBILITY-CORRECTED candidate --
+    # argmax of base[k] + WEAPON_CENSUS_OFFSET[k] over the eligible set. Offsets shift the
+    # argmax comparison ONLY; base[k] and all downstream card math are untouched.
+    # weapon_raw (the uncorrected S42 natural-best rule) is kept SOLELY for the [F3]
+    # paired-counterfactual census -- no card math reads it.
     eligible = [k for k in DRAWN_SKILLS
                 if k not in WEAPON_EXCLUDE and max(0.0, -oaxis * PAXIS[k]) < WEAPON_MISMATCH_MAX]
-    weapon = max(eligible, key=lambda k: base[k]) if eligible else max(DRAWN_SKILLS, key=lambda k: base[k])
-    latent = {}
-    for k in DRAWN_SKILLS:
-        t = base[k] + (s * WEAPON_BUMP if k == weapon else -s * SUPPORT_DRAIN)
-        latent[k] = int(clamp(round(RATING_LO + t * RATING_SPAN), HOLE_FLOOR, 99))
+    pool = eligible if eligible else DRAWN_SKILLS
+    weapon_raw = max(pool, key=lambda k: base[k])
+    weapon     = max(pool, key=lambda k: base[k] + WEAPON_CENSUS_OFFSET.get(k, 0.0))
+    # (latent/current/FT/runway are built AFTER arrival + the FT idiosyncrasy draw, via
+    #  build_skill_state -- construction is RNG-free, so moving it does not shift the stream)
 
     # ---- 4. size card (bypasses expression; drawn at current value) ------------------
     Wingspan = int(clamp(round(Height + r.gauss(4.0, 3.0)), HT_MIN, 99))
     # athletic card (bypasses expression)
     ath = {}
     for k in ATH_KEYS:
-        base = ATH_BASE_LO + a * (ATH_BASE_HI - ATH_BASE_LO)
-        val = base + SIZE_COEF[k] * (Height - ATH_HEIGHT_CENTER) + r.gauss(0.0, ATH_SIGMA[k])
+        acenter = ATH_BASE_LO + a * (ATH_BASE_HI - ATH_BASE_LO)   # (renamed from `base` in S42.1:
+        val = acenter + SIZE_COEF[k] * (Height - ATH_HEIGHT_CENTER) + r.gauss(0.0, ATH_SIGMA[k])  # the skill base dict now lives past this loop)
         ath[k] = int(clamp(round(val), 8, 99))
     Weight = int(clamp(round(30 + 0.40 * Height + 0.30 * ath["Strength"] + r.gauss(0, 6)), 20, 99))
     # rebounding lives on the size card (physical; cashes now even for a raw project)
@@ -254,27 +333,21 @@ def generate_player(r):
     arr_mean = ARR_PERIM - o * (ARR_PERIM - ARR_POST)
     arrival = clamp(r.gauss(arr_mean, ARR_SIGMA), 0.0, 1.0)
     e = E_MIN + arrival * (1.0 - E_MIN)
-    current = {}
-    for k in DRAWN_SKILLS:
-        L = latent[k]
-        if L <= EXPR_BASELINE:
-            current[k] = L
-        else:
-            current[k] = int(round(EXPR_BASELINE + e * (L - EXPR_BASELINE)))
 
-    # ---- FreeThrow: derived twice (latent Outside, current Outside) ------------------
-    def derive_ft(outside):
-        val = (FT_CENTER + FT_OUT_SPAN * math.tanh((outside - 50.0) / FT_OUT_SCALE)
-               - FT_HEIGHT_COEF * ((Height - 55.0) / 40.0))
-        return int(clamp(round(val), FT_MIN, FT_MAX))
-    latent["FreeThrow"]  = derive_ft(latent["Outside"])
-    current["FreeThrow"] = derive_ft(current["Outside"])
+    # ---- FT idiosyncrasy (S42.1): ONE persistent shooter-specific draw per player ----
+    # The SAME value feeds both derive_ft calls inside build_skill_state (latent-FT and
+    # current-FT). Two independent draws would give one player two FT identities and pollute
+    # the runway vector with measurement noise instead of development.
+    ft_idio = r.gauss(0.0, FT_SIGMA)
 
-    # ---- 6. runway = full per-skill (latent - current) vector + summary --------------
-    runway = {k: latent[k] - current[k] for k in SKILL_KEYS}
-    runway_total = sum(runway.values())
+    # ---- latent / current / FT / runway (RNG-free construction; see build_skill_state)
+    latent, current, runway, runway_total = build_skill_state(base, weapon, s, e, Height, ft_idio)
 
-    # ---- 7. class / age (correlated with arrival, not identical) ---------------------
+    # ---- 7. class / age -- PLACEHOLDER (S42.1 label; correlated with arrival) ---------
+    # Age/class is a placeholder projection of arrival. The season layer owns the real
+    # population structure, the one-class-vs-standing-pool question, and the ready-freshman
+    # existence requirement. Do NOT port the age/class labels as spec; arrival is the ruled
+    # mechanism, the labels are decoration on it.
     age = int(clamp(round(18 + AGE_ARR_SPAN * arrival + r.gauss(0, AGE_NOISE)), 17, 23))
     cls = "Fr" if age <= 18 else ("So" if age == 19 else ("Jr" if age <= 21 else "Sr"))
 
@@ -289,6 +362,8 @@ def generate_player(r):
         "card": card, "latent": dict(latent), "current": dict(current), "runway": runway,
         "runway_total": runway_total, "o": o, "oaxis": oaxis, "q": q, "a": a, "s": s,
         "arrival": arrival, "e": e, "age": age, "cls": cls, "Height": Height, "weapon": weapon,
+        # S42.1: pre-weapon state + the counterfactual inputs for the [F3] paired census
+        "base": base, "pool": pool, "weapon_raw": weapon_raw, "ft_idio": ft_idio,
     }
 
 # ============================================================================
@@ -416,6 +491,13 @@ def main():
       % (SIZE_COEF["Strength"], SIZE_COEF["Quickness"], ATH_SIGMA["Quickness"]))
     P("  arrival mean(o)=%.2f..%.2f, E_MIN=%.2f, baseline=%.0f  (perimeter developed, post raw)"
       % (ARR_PERIM, ARR_POST, E_MIN, EXPR_BASELINE))
+    P("  S42.1 weapon = argmax of base+offset over eligible (WEAPON_CENSUS_OFFSET, the ruled table;")
+    P("        offsets shift the argmax only, never card math -- proof is the [F3] paired census)")
+    P("  S42.1 FT idiosyncrasy: ONE gauss(0,%.1f) per player, shared by latent-FT and current-FT" % FT_SIGMA)
+    P("        (a persistent trait; the [F4] tables prove the tails exist)" )
+    P("  S42.1 AGE/CLASS IS A PLACEHOLDER projection of arrival: the season layer owns the real")
+    P("        population structure, one-class-vs-standing-pool, and the ready-freshman existence")
+    P("        requirement -- do not port the age/class labels as spec.")
     P("  " + RSCORE_FORMULA.replace("R_LINE", "%.1f" % R_LINE))
     P("")
 
@@ -548,6 +630,122 @@ def main():
     P("    most-drawn weapons: " + ", ".join("%s %d" % (k, v) for k, v in topw))
     P("")
 
+    # ---- (F3) WEAPON CENSUS -- paired counterfactual of the selection rule (S42.1) ----
+    # BEFORE = the S42 raw argmax; AFTER = the S42.1 offset argmax. Both rules are applied
+    # to the SAME generated pre-weapon bases and eligibility sets (weapon_raw vs weapon on
+    # the same player) -- a paired counterfactual of the rule, not two drifting cohorts.
+    # The recruitable-export columns run the unchanged downstream card math separately from
+    # each counterfactual weapon choice on the same pre-weapon state, then evaluate the
+    # unchanged recruiting line on each resulting card: same person, two candidate weapons,
+    # two cards, one recruiting screen.
+    def cf_player(p, w):
+        """The same player under weapon choice w (counterfactual card + rscore inputs)."""
+        if w == p["weapon"]:
+            return p
+        lat, cur, run, _rt = build_skill_state(p["base"], w, p["s"], p["e"], p["Height"], p["ft_idio"])
+        card = dict(p["card"])
+        for k in SKILL_KEYS:
+            card[k] = cur[k]
+        return {"card": card, "current": cur, "Height": p["Height"], "o": p["o"]}
+    P("[F3] WEAPON CENSUS -- paired counterfactual: S42 raw argmax (BEFORE) vs S42.1 offset")
+    P("     argmax (AFTER) on identical pre-weapon bases + eligibility sets.  Offsets:")
+    off_items = ["%s %+0.3f" % (k, WEAPON_CENSUS_OFFSET[k]) for k in sorted(WEAPON_CENSUS_OFFSET)]
+    for i in range(0, len(off_items), 4):
+        P("       " + "  ".join(off_items[i:i + 4]))
+    elig_n = defaultdict(int); bef = defaultdict(int); aft = defaultdict(int)
+    bef_per = defaultdict(int); aft_per = defaultdict(int)
+    bef_post = defaultdict(int); aft_post = defaultdict(int)
+    bef_rec = defaultdict(int); aft_rec = defaultdict(int)
+    n = len(coh)
+    changed = 0
+    for p in coh:
+        for k in p["pool"]:
+            elig_n[k] += 1
+        wb, wa = p["weapon_raw"], p["weapon"]
+        bef[wb] += 1; aft[wa] += 1
+        oc = ori_class(p["o"])
+        if oc == "perimeter":
+            bef_per[wb] += 1; aft_per[wa] += 1
+        elif oc == "post":
+            bef_post[wb] += 1; aft_post[wa] += 1
+        if wb != wa:
+            changed += 1
+        # recruitable-export under each counterfactual card (AFTER card == shipping card)
+        if rscore(cf_player(p, wb)) >= R_LINE:
+            bef_rec[wb] += 1
+        if p["_r"] >= R_LINE:
+            aft_rec[wa] += 1
+    tot_bref = sum(bef_rec.values()); tot_aref = sum(aft_rec.values())
+    P("     weapon changed by the offsets on %d/%d players (%.1f%%); recruitable pool:" % (changed, n, 100.0 * changed / n))
+    P("     BEFORE-rule cards %d vs AFTER-rule (shipping) cards %d" % (tot_bref, tot_aref))
+    P("     %-17s %14s %16s %16s %13s %13s %15s" %
+      ("skill", "eligible n/shr", "weapon BEFORE", "weapon AFTER", "perim B/A", "post B/A", "recr-exp B/A"))
+    order = sorted((k for k in DRAWN_SKILLS if k not in WEAPON_EXCLUDE), key=lambda k: -aft[k])
+    for k in order:
+        P("     %-17s %6d %6.1f%% %8d %6.2f%% %8d %6.2f%% %6d/%-6d %5d/%-6d %6d/%-6d" %
+          (k, elig_n[k], 100.0 * elig_n[k] / n,
+           bef[k], 100.0 * bef[k] / n, aft[k], 100.0 * aft[k] / n,
+           bef_per[k], aft_per[k], bef_post[k], aft_post[k], bef_rec[k], aft_rec[k]))
+    P("     PostMoves vs OffBallDefense (Emmett's question -- post-play identity must not be")
+    P("       rarer than off-ball-defense identity unless ruled so):")
+    P("       BEFORE  PostMoves %d (%.2f%%)  vs  OffBallDefense %d (%.2f%%)" %
+      (bef["PostMoves"], 100.0 * bef["PostMoves"] / n, bef["OffBallDefense"], 100.0 * bef["OffBallDefense"] / n))
+    P("       AFTER   PostMoves %d (%.2f%%)  vs  OffBallDefense %d (%.2f%%)" %
+      (aft["PostMoves"], 100.0 * aft["PostMoves"] / n, aft["OffBallDefense"], 100.0 * aft["OffBallDefense"] / n))
+    P("")
+
+    # ---- (F4) FT IDIOSYNCRASY AUDITS (S42.1) -- operational definitions fixed in the ----
+    # ---- build prompt, printed not asserted; FT_SIGMA is Emmett's dial at these tables ----
+    P("[F4] FT IDIOSYNCRASY -- ONE shared gauss(0,%.1f) per player; the tails must exist" % FT_SIGMA)
+    P("  conditional-spread audit (predeclared current-Outside x Height bins; pass = SD")
+    P("  materially nonzero in every bin):")
+    FT_BINS = [
+        ("guard/wing mid-skill  Out[55,70) x H[51,66)", lambda p: 55 <= p["current"]["Outside"] < 70 and 51 <= p["Height"] < 66),
+        ("skilled perimeter     Out[70,99] x H[40,66)", lambda p: p["current"]["Outside"] >= 70 and p["Height"] < 66),
+        ("weak-shooting big     Out[25,45) x H[71,99]", lambda p: 25 <= p["current"]["Outside"] < 45 and p["Height"] >= 71),
+    ]
+    for name, f in FT_BINS:
+        sub = [p["current"]["FreeThrow"] for p in coh if f(p)]
+        if len(sub) < 2:
+            P("    %-46s n=%d (BIN TOO THIN -- predeclare wider)" % (name, len(sub)))
+            continue
+        m = sum(sub) / len(sub)
+        sd = math.sqrt(sum((x - m) ** 2 for x in sub) / (len(sub) - 1))
+        P("    %-46s n=%5d  mean=%.1f  SD=%.1f  min=%d  max=%d%s" %
+          (name, len(sub), m, sd, min(sub), max(sub), "" if len(sub) >= 100 else "  (n<100!)"))
+    def hitch(p):     # skilled low-FT tail
+        return p["current"]["Outside"] >= 70 and p["current"]["FreeThrow"] < 50
+    def autobig(p):   # weak-shooting-big high-FT tail
+        return p["Height"] >= 71 and p["current"]["Outside"] <= 40 and p["current"]["FreeThrow"] > 80
+    P("  tails per cohort (count / rate per 46k) -- reachability is proven by >=1 occurrence;")
+    P("  whether the RATE is sensible is Emmett's FT_SIGMA ruling, not a pass/fail here:")
+    for sd_ in MULTI_SEEDS:
+        c2 = coh if sd_ == SEED else build_cohort(sd_)
+        h = sum(1 for p in c2 if hitch(p)); ab = sum(1 for p in c2 if autobig(p))
+        P("    seed %-9d skilled low-FT hitch (Out>=70 & FT<50): %3d (%.3f%%)   "
+          "auto-line weak big (H>=71 & Out<=40 & FT>80): %3d (%.3f%%)" %
+          (sd_, h, 100.0 * h / len(c2), ab, 100.0 * ab / len(c2)))
+    hitches = [p for p in coh if hitch(p)]
+    P("  FT-hitch archetype, nearest card (rare-but-reachable is the pass condition; judgment")
+    P("  on the archetype itself stays deferred to the season layer per the standing ruling):")
+    if hitches:
+        best = max(hitches, key=lambda p: p["current"]["Outside"])
+        P("    " + fmt_card_summary(best))
+    else:
+        found = None
+        for sd_ in MULTI_SEEDS[1:]:
+            c2 = build_cohort(sd_)
+            cand = [p for p in c2 if hitch(p)]
+            if cand:
+                found = (sd_, max(cand, key=lambda p: p["current"]["Outside"]))
+                break
+        if found:
+            P("    (none in canonical cohort; cross-seed fallback, seed %d)" % found[0])
+            P("    " + fmt_card_summary(found[1]))
+        else:
+            P("    NONE in any sampled seed -- tail not reachable at this FT_SIGMA (raise the dial)")
+    P("")
+
     # ---- (G) recruiting-line audit ---------------------------------------------------
     multi_rec = []
     for sd in MULTI_SEEDS:
@@ -603,8 +801,50 @@ def main():
                "o=%.2f -> weighted post=%.1f" %
                (b["which"], b["post_skill"], b["glass"], b["reb_val"], b["o"], b["wpost"]))
         P("    H=%d  RScore=%.1f  %-12s | %s" % (p["Height"], b["rscore"], verdict, why))
-    P("    read: extreme height with no interior SKILL (rim/post/finish ~20s) cannot convert rebounding")
-    P("          alone into a roster spot -> the honest 7'3\" scrub stays in the candidate world, not the export")
+    # S42.1: the scrub half of the invariant is DEMONSTRATED with printed rows, never asserted
+    # from prose alone (a PRNG-shifted cohort may have no 7'3"+ scrub, as S42.1's canonical didn't).
+    # tall real tool  := H>=93 and interior skill >= 40  (must clear)
+    # rebound-only scrub := H>=87 and interior skill <= 30 and glass >= 65  (must stay below line)
+    def _g4_row(p):
+        b = rscore_parts(p)
+        v = "RECRUITABLE" if b["rscore"] >= R_LINE else "below line"
+        return ("H=%d  RScore=%.1f  %-12s | interior SKILL=%d, rebounding=%.0f gated to +%.1f, "
+                "o=%.2f -> weighted post=%.1f" %
+                (p["Height"], b["rscore"], v, b["post_skill"], b["glass"], b["reb_val"], b["o"], b["wpost"]))
+    def _ps(p):
+        return rscore_parts(p)["post_skill"]
+    def _gl(p):
+        return (p["card"]["OffensiveRebounding"] + p["card"]["DefensiveRebounding"]) / 2.0
+    P("  the invariant, shown as rows (tool clears / rebound-only scrub does not):")
+    tools = [p for p in coh if p["Height"] >= 93 and _ps(p) >= 40]
+    if tools:
+        P("    tallest real-tool giant:      " + _g4_row(max(tools, key=lambda p: p["Height"])))
+    else:
+        P("    tallest real-tool giant:      (none H>=93 with skill>=40 in canonical cohort)")
+    scrubs = [p for p in coh if p["Height"] >= 87 and _ps(p) <= 30 and _gl(p) >= 65]
+    if scrubs:
+        P("    tallest rebound-only scrub:   " + _g4_row(max(scrubs, key=lambda p: p["Height"])))
+    else:
+        P("    tallest rebound-only scrub:   (none H>=87/skill<=30/glass>=65 in canonical cohort)")
+    strict = [p for p in coh if p["Height"] >= 93 and _ps(p) <= 30 and _gl(p) >= 65]
+    if strict:
+        P("    strict 7'3\"+ scrub:           " + _g4_row(max(strict, key=lambda p: p["Height"])))
+    else:
+        found = None
+        for sd_ in MULTI_SEEDS[1:]:
+            c2 = build_cohort(sd_)
+            cand = [p for p in c2 if p["Height"] >= 93 and _ps(p) <= 30 and _gl(p) >= 65]
+            if cand:
+                found = (sd_, max(cand, key=lambda p: p["Height"]))
+                break
+        if found:
+            P("    strict 7'3\"+ scrub (cross-seed fallback, seed %d):" % found[0])
+            P("      " + _g4_row(found[1]))
+        else:
+            P("    strict 7'3\"+ scrub:           none in any sampled seed (rare by construction; the")
+            P("      H>=87 scrub row above carries the proof at 7'1\"+)")
+    P("    read: extreme height with no interior SKILL cannot convert rebounding alone into a")
+    P("          roster spot -- as the scrub row(s) above show; only the real interior tool clears")
     # lowest recruitable perimeter guard -- must clear via the PERIMETER pathway
     guards = [p for p in rec if ori_class(p["o"]) == "perimeter" and p["Height"] <= 65]
     if guards:
