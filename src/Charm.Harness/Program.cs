@@ -221,6 +221,7 @@ internal static partial class Program
         ok &= Phase56DisplacementCheck(configPath);            // Phase 56
         ok &= Phase57TurnoverClockCheck(configPath, cfgC, game, state); // Phase 57
         ok &= Phase58FastBreakDietCheck(configPath);            // Phase 58
+        ok &= Phase59GenPass2ReplayParityCheck();               // Phase 59 (S43: Pass-2 port, fixture replay)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

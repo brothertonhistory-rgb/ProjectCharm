@@ -951,6 +951,7 @@ internal static partial class Program
         // Port proof first: golden-vector parity against the locked oracle fixture,
         // before either roster is generated. Seed-independent; throws on any mismatch.
         RunTendencyGoldenParity();
+        RunGenPass2ReplayParity();   // S43: Pass-2 generation math vs the S42.2 replay fixture
 
         string genPath;
         if (!string.IsNullOrWhiteSpace(genPathArg))
