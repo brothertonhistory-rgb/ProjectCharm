@@ -6856,6 +6856,101 @@ The derivation runs at **both** generation call sites — the roster path and th
 
 This governs **generated** players only. Explicit JSON rosters, stress-test fixtures, and harness defaults still author tendency values intentionally — those are deliberate inputs, deliberately left untouched.
 
+## Player generation — Pass 2: the skill-first live generator (Sessions 42–44; C# live as of S44, standalone)
+
+The Pass-2 generator produces the honest, positionless candidate cohort the future divvy/season
+bridge (Phase 3) will consume. It is **live C# as of S44** — a real generator producing real 46k
+populations on demand — but deliberately **standalone**: nothing downstream reads it yet. The season
+talent pool, the divvy, and the `gen` demo still run the Pass-1 position-based path above (with its
+floors and enforcers) until Phase 3 designs how positions and quotas *emerge* from orientation. The
+authoritative spec is the locked Python oracle (`tools/gen_pass2_skillfirst_oracle.py`, LOCKED SPEC
+S42.1); the C# is a fixture-proven port of it, and any future tuning happens in the oracle first.
+
+### The model — four independent latent dials, three causal dependencies, no repair
+
+One player is four independent Beta draws plus noise. **Orientation** `o` (perimeter 0 → post 1,
+Beta tuned so P(o<0.5) ≈ 0.60) is the only *identity* dial — it conditions the height ceiling
+(a logistic knee: perimeter height cliffs after ~6'7", post height reaches the true tail), the
+arrival stage (guards arrive developed, posts raw), and the skill base (opposite-axis skills are
+suppressed into honest holes). **Skill quality** `q`, **athletic quality** `a`, and
+**specialization** `s` are pure quality dials, body-blind by construction — `corr(q, Height) ≈ 0`
+is the core architectural claim and a standing audit band. Specialization chooses ONE identity
+weapon (the strongest eligibility-corrected candidate via the S42.1 census-offset argmax) and
+drains the rest: low s is broad, high s is a spike (top1−top2 gap ~35 vs ~11). Latent skill is the
+ceiling; **arrival** suppresses it into the current card (expression toward a baseline, floor
+E_MIN); **runway** is the 21-skill latent−current vector the future development layer spends. One
+shared per-player FT idiosyncrasy draw feeds both the latent-FT and current-FT derivations — a
+persistent shooter trait, never a second development axis. **Honest draw, no repair:** no redraws,
+no competency floors, no leg-health lift, no role packages — the honestly-bad player ships as
+drawn, and the recruiting line (`rscore`, orientation-weighted continuous pathway selection) is
+pure downstream selection, exporting ~26k recruitable of 46k candidates at R_LINE 17.
+
+### The two-layer C# shape: proven math + thin drawing
+
+- **`PlayerGenPass2.cs` (S43, Phase 1 — the math).** Pure RNG-free transforms: every drawn value
+  arrives as an explicit parameter; 57 frozen constants transcribed verbatim with oracle line
+  cites. Proven **bit-for-bit** against the committed S42.2 replay fixture by the Phase 59 gate
+  on every harness run (306 players, 51,714 field checks, absolute 1e-9, historically exactly
+  0.0 deviation). The three port traps are centralized: half-to-even rounding, per-site
+  round/clamp order (Height alone is round-after-clamp), first-max argmax in DRAWN_SKILLS order.
+  S44 added one pure extraction: `ComputeHeightShape(o)` lifts the three height-shape lines
+  (logistic `oh`, location `mu`, upper-tail `sigma_up`) into a shared helper so the live loop —
+  which needs `sigma_up` before drawing height noise — and the transform can never drift; the
+  Phase 59 replay re-proves the extraction numerically inert on every run.
+- **`PlayerGenPass2Live.cs` (S44, Phase 2 — the drawing).** `GeneratePlayer(IRng)` fills the
+  fixture-shaped `Pass2Draws` in the locked 40-slot order and calls `BuildFromDraws` — zero
+  arithmetic of its own, so the math that runs live is the math the fixture proves. The height
+  branch is ONE draw either way (Gaussian upper / Exponential lower), keeping the per-player
+  budget a constant 40 semantic draws (Gaussian slots consume a Box-Muller uniform pair
+  internally; the contract counts values, not uniform calls). `BuildCohort(seed, n)` mirrors the
+  oracle's `build_cohort`; same seed → identical cohort, asserted. The cohort returns
+  `LivePlayer` pairs (Draws + Result) because the audit needs the latent dials q and s, which
+  the locked `Pass2Result` deliberately does not carry.
+
+### The samplers (`Sampling.cs`) — statistical parity, never bit parity
+
+C#'s `System.Random` is a different stream from Python's `random`; byte-identical draws are
+impossible by design and never asserted. **Gaussian:** the `ClockDraw` Box-Muller cos-branch
+core, untruncated (generation noise keeps full tails; ClockDraw's truncation belongs to the shot
+clock). **Exponential:** inverse-CDF `-ln(1-u)/λ`, matching Python's `expovariate`.
+**Beta:** two-gamma `G(a)/(G(a)+G(b))` with Marsaglia–Tsang gamma draws, k ≥ 1 path only —
+every Beta parameter in this spec is ≥ 1 (least 2.007), so the unused k < 1 branch is a loud
+entry assertion rather than dead code.
+
+### Phase 60 — the proof stack for a statistical port
+
+Moments first: N=200k draws per sampler against closed-form mean/variance, all four live Beta
+pairs individually (a swapped orientation α/β shifts the mean by 0.108 against a 0.006
+tolerance — it dies here, not 40 slots deep in a mis-shaped cohort). Then one canonical 46k
+cohort against design-invariant BANDS, each chosen so a broken wiring fails it and an honest
+draw cannot: schema/ranges, perimeter share 0.55–0.65, |corr(q,Height)| < 0.05, 7'3"+ count
+0–40 (zero is a legal class by ruling — the band catches the *hundreds* a miswired tail
+produces), stretch-bigs-exist / point-centers-rare, spike gap > broad gap, census max ≤ 7%
+with PostMoves ≥ OffBallDefense − 0.5pp (the two are near-parity by design; a strict ≥ would
+false-red ~30% of honest cohorts while a missing-offsets port misses by 2.6pp), recruitable
+20k–30k, and same-seed determinism. The oracle's exact seed-specific numbers are never
+asserted — bands test *shape*, which is what a statistical port can honestly prove.
+
+### The dormant Player seats (S44)
+
+`Player` now carries `LatentSkills` / `CurrentSkills` / `Runway` (keyed maps, default empty),
+`Arrival` ([0,1], the ruled mechanism behind class/age), and `PlayerClass` (the S42.1
+placeholder label). None enter `Validate()` (they are not 0–99 authored ratings) and nothing
+reads them — the same proven-occupied-seat discipline as Endurance/Gravity/Spacing, waiting on
+the development/season layer.
+
+### What Pass 2 does NOT do yet (Phase 3's bridge)
+
+The cohort has no position, role, leg, or quota — and the divvy is built on positional quotas
+(80G/60W/60B, coverage roles, the opening-five shape). Bridging them requires a
+positions-from-orientation apportionment design that does not exist yet; Phase 3 opens with
+that design conversation, then swaps the season pool, deletes the Pass-1 enforcers
+(`GenEnforceFloors`/`GenEnforceLegHealth` — the honest-draw ruling made executable), and
+re-checks the season page against the S39–S41 calibration. Two design notes ride that bridge:
+the tweener-post existence requirement (satisfied in principle by orientation being
+size-independent of skill package; confirmed against real rosters at Phase 3+), and
+weakest-leg multiplicative development (the development layer's, not generation's).
+
 ## World Structure — Pass 1: the era-file skeleton (Session 28, 2026-07-02)
 
 The first layer of the world-structure arc (`docs/world-structure-brief.md` is the arc's governing design record; this section is the as-built state). Pass 1 is **data + tooling + proof**: the era-file schema, the stock D1 world, the pyramid seeder, the integrity validator, and the distribution readout. No seasons, no dynamics, no engine change — everything lives in `src/Charm.Harness/Program.World.cs` with the Phase 53 suite block beside it.

@@ -195,6 +195,20 @@ public static class PlayerGenPass2
         return bestK;
     }
 
+    /// <summary>The orientation→Height shape (oracle :297-299): the logistic ceiling
+    /// <c>oh</c>, the location <c>mu</c>, and the upper-tail sigma <c>sigma_up</c>, all
+    /// pure functions of <c>o</c> and frozen constants. S44 extraction — lifted verbatim
+    /// out of <see cref="BuildFromDraws"/> so the Phase-2 live draw loop (which needs
+    /// <c>sigma_up</c> BEFORE drawing height noise) shares the exact same expressions.
+    /// Draws nothing; changes no numerical output (Phase 59 re-proves it every run).</summary>
+    public static (double Oh, double Mu, double SigmaUp) ComputeHeightShape(double o)
+    {
+        var oh      = 1.0 / (1.0 + Math.Exp(-HT_ORI_STEEP * (o - HT_ORI_MID)));
+        var mu      = HT_MU_PERIM + oh * (HT_MU_POST - HT_MU_PERIM);
+        var sigmaUp = HT_SIGMA_UP_PERIM + oh * (HT_SIGMA_UP_POST - HT_SIGMA_UP_PERIM);
+        return (oh, mu, sigmaUp);
+    }
+
     // ========================================================================
     // THE TRANSFORMS — one player from recorded draws (oracle generate_player,
     // :280-421, restructured only in that every draw arrives as a parameter)
@@ -211,9 +225,11 @@ public static class PlayerGenPass2
         var oaxis = 2.0 * o - 1.0;
 
         // ---- 2. orientation -> Height: logistic ceiling (oracle :297-311) ----
-        var oh      = 1.0 / (1.0 + Math.Exp(-HT_ORI_STEEP * (o - HT_ORI_MID)));
-        var mu      = HT_MU_PERIM + oh * (HT_MU_POST - HT_MU_PERIM);
-        var sigmaUp = HT_SIGMA_UP_PERIM + oh * (HT_SIGMA_UP_POST - HT_SIGMA_UP_PERIM);
+        // S44 pure extraction: the three shape lines live in ComputeHeightShape so the
+        // Phase-2 live loop (which needs sigma_up BEFORE drawing the height noise) and
+        // this transform can never drift. Same expressions, same order — Phase 59
+        // re-proves this bit-for-bit against the fixture on every harness run.
+        var (oh, mu, sigmaUp) = ComputeHeightShape(o);
         var branch  = d.HeightBranchSelectorRaw < 0.5 ? "upper_gauss" : "lower_exp";
         var hRaw    = branch == "upper_gauss" ? mu + Math.Abs(d.HeightNoiseRaw) : mu - d.HeightNoiseRaw;
         // Height is round-AFTER-clamp — the one site with this order (oracle :311, A2).

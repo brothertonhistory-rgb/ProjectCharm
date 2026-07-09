@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 43 (2026-07-08; C# port Phase 1 — the DETERMINISTIC MATH of the locked Pass-2 oracle is ported to C# and proven **exact** against the committed S42.2 replay fixture: `src/Charm.Engine/Core/PlayerGenPass2.cs` (pure RNG-free transforms) + `Program.Checks.GenPass2.cs` (the Phase 59 replay gate); green on Emmett's machine — constants echo 57/57, **306 players / 51,714 field checks / 0 failures / max float deviation 0.000E+000** at absolute 1e-9, `ALL CHECKS PASSED` with every prior check unaffected because Phase 1 touches NO live path; ruled at check-in: absolute 1e-9 everywhere (fixture-matching, no contract drift), design.md untouched, deferred to Phase 2. The C# port item is now **split**: Phase 1 Built, Phase 2 Open. Prior: Session 42.2 (2026-07-08; replay-fixture micro-session — the deterministic math-replay fixture + reference reader for the Pass-2 C# port are committed and locked: `tools/gen_pass2_replay_fixture_s42_2.json` (306 players, seed 20260706) + `tools/gen_pass2_replay_check.py`; a pure recording side-channel, so the default oracle run is byte-identical to S42.1 and NO generation math changed; Python only, design.md untouched; verified green on Emmett's machine — 306 players / 51,714 field checks / 0 failures, recorder cross-check 33,795 players / 0 mismatches). Prior: Session 42.1 (2026-07-07; oracle repair micro-session — the Pass-2 oracle re-locked after three bounded fixes: weapon-census offsets on the argmax, ONE shared FT idiosyncrasy draw, age/class labeled a placeholder; Python only, design.md untouched); Session 42 (2026-07-07; Player-generation Pass 2 — the skill-first generation oracle is locked as the C# port spec, `tools/gen_pass2_skillfirst_oracle.py`, after five adversarial-review rounds; oracle-only, design.md untouched, C# port is next); Session 41 (2026-07-06; scoreboard — assists 13.7 OK, steals 6.5 OK, rebound instrument audited). Post-S41 ruling (2026-07-06): OT-LOW parked under the coaching / late-game-strategy layer.
+Last updated: Session 44 (2026-07-09; C# port Phase 2 — the LIVE skill-first generator is built and proven, **standalone**: `src/Charm.Engine/Core/Sampling.cs` (Beta/Gaussian/Exponential on `IRng`; Marsaglia–Tsang k≥1 only) + `PlayerGenPass2Live.cs` (the 40-slot draw loop calling the Phase-1 transforms; `BuildCohort` returns Draws+Result pairs) + the pure `ComputeHeightShape` extraction in the locked transform (re-proven bit-for-bit by Phase 59 every run) + five dormant Player seats (latent/current/runway/arrival/class, outside `Validate()`) + the Phase 60 gate (sampler moments at N=200k against closed forms, all four live Beta pairs; then eight design-invariant bands + determinism on the canonical 46k cohort). Green on Emmett's machine — all moments OK, all bands OK ([B] 0.597, [E] +0.004, [C] 5 giants, [F3] PostMoves 5.89% vs OBD 6.02% inside the −0.5pp band, [G] 25,825 recruitable), Phase 59 still 0 failures / 0.0 deviation, Phases 54/55 unchanged, `ALL CHECKS PASSED`. **Scope reshaped at the S44 draft audit:** enforcer deletion + the season-pool swap + the season re-check are NOT a port — the skill-first cohort is positionless and the divvy is quota-based — so they moved to **Phase 3**, which opens with the positions-from-orientation design conversation. Ruled at the gate: class variation is legal (zero 7'3"+ players is an honest draw). Prior: Session 43 (2026-07-08; C# port Phase 1 — the deterministic MATH ported and proven exact against the S42.2 fixture: 57/57 constants, 306 players / 51,714 checks / 0 failures / 0.0 deviation at absolute 1e-9). Prior: Session 42.2 (replay fixture + reference reader committed); 42.1 (oracle re-locked after three bounded fixes); 42 (skill-first oracle locked as the port spec); 41 (assists 13.7 OK, steals 6.5 OK, rebound instrument audited). Post-S41 ruling: OT-LOW parked under the coaching / late-game-strategy layer.
 
 ---
 
@@ -52,6 +52,10 @@ divvy Pass 1.5 (national pool + prestige draft); world Pass 1 (347 schools,
 32 conferences); season Pass 2 (schedule oracle-fingerprinted, standings, calibration page);
 Roll G displacement (oracle v1, 10-vector golden parity, Phase 56); observation / stress /
 bench instruments.
+**Player generation Pass 2 — LIVE C# generator, standalone (S44):** samplers + 40-slot draw loop
+over the fixture-proven Phase-1 transforms, Phase 60 statistical gate; produces honest positionless
+46k cohorts on demand; NOTHING downstream reads it until the Phase-3 bridge (divvy/season still run
+Pass 1 with its enforcers).
 
 ## 2. Closed by ruling (looks unfinished — is not; do not "fix")
 
@@ -182,34 +186,28 @@ bench instruments.
   (4.5) were prior front-runners and are **closed by S41** (assists 13.7 OK via the midpoint recenter + uniform
   trim; steals 6.5 OK via the 50/50 turnover mix). OT-LOW moved to Parked (diagnosed; needs the coaching layer).
   Pick the gap before drafting; the next-session prompt is its own audited pass.
-- **C# port of the Pass-2 oracle — Phase 1 BUILT (S43); Phase 2 is the active next build.** The port
-  was split into two sessions. **Phase 1 (S43, DONE, green on Emmett's machine):** the deterministic MATH
-  is ported to `src/Charm.Engine/Core/PlayerGenPass2.cs` (pure RNG-free transforms taking drawn values as
-  explicit inputs — the exact functions Phase 2's live generator will call) and proven **bit-for-bit**
-  against the committed S42.2 fixture by the Phase 59 gate `Program.Checks.GenPass2.cs` (`RunGenPass2ReplayParity`,
-  in the default chain + at `RunGen` start): 57/57 constants tripwire, 306 players / 51,714 field checks /
-  0 failures / max float deviation exactly 0.0 at **absolute 1e-9** (ruled at check-in — fixture-matching,
-  no contract drift). The three port traps are handled and documented: half-to-even rounding (never
-  `(int)(x+0.5)`), per-site round/clamp order, first-max argmax in DRAWN_SKILLS order. No live path touched;
-  `design.md` untouched (its commitments belong to Phase 2). **Phase 2 (OPEN, the next build):** the live
-  generator — C# Beta/Gaussian/Exponential samplers on the RNG interface (reuse the `ClockDraw` Box-Muller
-  shape for Gaussian; C# has no Beta/Exponential sampler today), the thin generator that draws and calls the
-  Phase-1 transforms, the `Player` latent/current/runway/arrival/class fields (a real data-shape decision at
-  ~46k actives), deletion of the retired body/package-gate floors (`GenEnforceFloors`/`GenEnforceLegHealth`)
-  and the whole role/leg machinery once the skill-first generator replaces them, the ~46k population regen,
-  a **statistical** population audit against the oracle's [A]–[I2] targets (NOT byte-parity — the C# RNG
-  stream will not match Python's, by design), and the season-page re-check. The one clamp edge the fixture
-  leaves unexercised (`height_high_clamp`, Height == 99, ~4.5σ on the post branch, recorded `NONE` in the
-  fixture header) is noted for Phase 2. Preserve the frozen contracts (see Closed-by-ruling, S42 + S42.1):
-  three independent draws; only orientation→height, size→athleticism, orientation→arrival dependencies;
-  chosen-weapon specialization **via the S42.1 offset argmax** (the offset table is part of the spec; the
-  [F3] counterfactual scaffolding is not); the shared FT idiosyncrasy draw; the age-placeholder non-porting
-  rule (arrival ports as mechanism, the age/class labels do not port as spec); current/latent/runway
-  separation; full 33-key emission; honest cohort → downstream recruitable export; orientation-weighted
-  continuous pathway selection; no generator repair/rejection/redraw/role-package. `design.md` is edited
-  **at the Phase-2 session**, against real ported code. Do not reopen oracle calibration unless the port
-  reveals a fidelity mismatch or the first real rosters produce a concrete population problem (reviewer's
-  standing condition). The Phase-2 prompt is its own audited pass.
+- **C# port of the Pass-2 oracle — Phases 1+2 BUILT (S43/S44); Phase 3 (the divvy/season bridge) is the active next build.**
+  **Phase 1 (S43, DONE):** the deterministic MATH in `src/Charm.Engine/Core/PlayerGenPass2.cs`, proven bit-for-bit
+  against the committed S42.2 fixture by the Phase 59 gate (57/57 constants, 306 players / 51,714 checks / 0
+  failures / 0.0 deviation at absolute 1e-9); re-proven on every harness run. **Phase 2 (S44, DONE):** the LIVE
+  generator, standalone — `Sampling.cs` (Beta via Marsaglia–Tsang two-gamma k≥1-only, Gaussian via the untruncated
+  ClockDraw Box-Muller core, Exponential via inverse-CDF), `PlayerGenPass2Live.cs` (the 40-slot draw loop in fixture
+  order; ONE height-noise draw either branch; `LivePlayer` Draws+Result pairs; `BuildCohort`), the pure
+  `ComputeHeightShape` extraction (Phase-59-protected), five dormant Player seats outside `Validate()`, and the
+  Phase 60 gate: sampler moments (N=200k, closed forms, all four live Beta pairs) then eight design-invariant BANDS +
+  determinism on the canonical 46k cohort — bands, never the oracle's seed numbers (different RNG stream by design);
+  the 7'3"+ band is 0–40 (zero legal by ruling), the [F3] census band is PostMoves ≥ OBD − 0.5pp (near-parity by
+  design; strict ≥ false-reds ~30% of honest cohorts). Green on Emmett's machine; Phases 54/55 untouched.
+  **Phase 3 (OPEN, the next build) — the bridge, reshaped at the S44 draft audit:** the skill-first cohort is
+  positionless (no position, role, leg, or quota) and the divvy is quota-based (80G/60W/60B, coverage roles,
+  opening-five shape), so the swap requires a **positions-from-orientation apportionment design that does not
+  exist yet**. Phase 3 opens with that oracle-side design conversation BEFORE any code, then: swap the season
+  talent pool to the Pass-2 cohort, delete `GenEnforceFloors`/`GenEnforceLegHealth` (both call sites —
+  `Program.Divvy.cs:239-240` and `Program.Gen.cs:883-884`; the honest-draw ruling made executable), and re-check
+  the season page against the S39–S41 calibration (assist midpoint, steal mix, rebound instrument all measured on
+  the Pass-1 population — expect movement, re-measure before re-tuning). Preserve the frozen contracts (see
+  Closed-by-ruling, S42 + S42.1). The one unexercised clamp edge (Height == 99) still rides. The Phase-3 prompt
+  is its own audited pass.
 - **Generation-layer bridge — now crossed for Pass 2.** S39 was the first population-selection change (era
   profile); S42 locked the full Pass-2 skill-first oracle on the same proven oracle→archetype-table→
   golden-parity workflow. The C# port (above) is the build that lands it in the engine.
@@ -253,12 +251,12 @@ bench instruments.
   rebound-origin provenance (jump balls feed from Rolls A/B/F/I/J/K/M). A true team-rebound line needs
   **rebound-provenance instrumentation** (a counter stamping which held-ball/OOB endings arose from a
   Roll I/M rebound scramble). Until then the page prints the candidates as a NOT-reconciled diagnostic only.
-- **Player-generation Pass 2 — oracle LOCKED (S42/S42.1); C# port Phase 1 BUILT (S43); Phase 2 is the active Open build** (see §3).
+- **Player-generation Pass 2 — oracle LOCKED (S42/S42.1); C# port Phases 1+2 BUILT (S43/S44); Phase 3 (the bridge) is the active Open build** (see §3).
   The skill-first generation model is frozen in `tools/gen_pass2_skillfirst_oracle.py` and the S42
   Closed-by-ruling entry; the deterministic math is now ported and fixture-parity-proven (S43). Two design
   notes still ride Phase 2, not the oracle: the **tweener-post existence requirement** (guard/wing-sized
   players whose primary package is post play) is satisfied in principle by the skill-first orientation model
-  and confirmed at Phase 2; **weakest-leg multiplicative development** belongs to the development/season
+  and confirmed against real rosters at Phase 3+; **weakest-leg multiplicative development** belongs to the development/season
   layer, not generation. (Formal notes in memory + journal.)
 - **Age/class population structure → the season layer** (parked 2026-07-07, S42.1). The oracle's age/class
   labels are a **placeholder projection of arrival** ("guards arrive developed" is currently implemented as
