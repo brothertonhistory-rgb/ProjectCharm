@@ -152,3 +152,155 @@ because steals/assists/turnovers *shouldn't* hand a giant free credit for being 
   so a big with a low rebounding draw no longer rebounds like a guard on body alone. Re-measure the
   passive-floor picture on the live pickers **before** sizing any generation-layer rebounding floor —
   it may now be smaller than the S45 note assumed, or unnecessary.
+
+---
+
+## Family D — Scoring (Close, Mid, Outside, Finishing, FreeThrow, FoulDrawing) — measured Session 48
+
+The first measurement taken with the S47-generalized full-box ruler, and the proof that "every
+future family is pure config-and-run" is real: seven text configs, zero engine/readout/code
+changes, 266,000 real games (six isolation walks 0→99 in 5-point steps + a seven-row interaction
+block, 2,000 games/rung, swept slot 5, everything else frozen at 50). SelfCreation was ruled OUT
+at the gate — its only direct engine read is the Roll E bonus-FT-putback shooter picker, no
+make-curve role — so it is measured with Family E (perimeter creation), not here.
+
+**The grain (S47 ruling, applies to every number below).** The swept player's aggregate FG%,
+3P%, FT%, FTr, and PossessionUse are *his*; the Rim/Short/Mid/Long zone FG% lines are **Team A
+level** — a directional proxy diluted by four flat-50 teammates, informative because only the
+swept slot is dialed but never individual attribution. His personal zone curves are therefore
+steeper than the team lines shown.
+
+### The gates — the instrument re-proved itself beyond spec
+
+- **Determinism, seven ways.** All six walks' 50-rungs and FLAT_50_CONTROL are identical to three
+  decimals (9.364 PTS / 34.33 FG% / 49.75 FT%) — seven independent runs, one answer.
+- **FT linearity, exact.** FT% tracks the rating to within 0.74pp at worst across all 21 rungs
+  (0 → 0.0%, 50 → 49.8%, 99 → 99.0%).
+- **Control parity.** Team A ≈ Team B at control (52.8 / 52.9 PTS).
+- **Rebound ripple, right direction everywhere.** Total boards drift down as any make rating
+  climbs (makes end possessions), including the FreeThrow signature: at FT=0 the opponent's
+  total-rebound line is *elevated* (39.3 vs 38.7 baseline) because every bricked free throw is a
+  live rebound chance; at FT=99 it falls to 37.9.
+- **Nothing leaked to defense.** STL/BLK flat under every scoring rating; Team B's box flat under
+  every walk.
+
+### The curves (0 → 50 → 99)
+
+| Rating | His PTS/g | Direct line | His use share |
+|---|---|---|---|
+| **Close** | 7.4 → 9.4 → 13.2 | Team Short FG% 32.7 → 34.2 → 40.5 | 14.4% → 22.3% |
+| **Mid** | 7.6 → 9.4 → 12.8 | Team Mid FG% 27.1 → 27.9 → 34.5 | 14.5% → 22.2% |
+| **Outside** | 7.2 → 9.4 → 15.1 | **Personal 3P% 17.2 → 23.2 → 44.8**; team Long 24.8 → 31.1 + Three 22.8 → 28.7 (one rating, two zones, as wired) | 14.1% → 22.8% |
+| **Finishing** | 8.0 → 9.4 → 12.5 | Team Rim FG% 52.8 → 54.5 → 59.7 | 16.3% → 19.9% |
+| **FreeThrow** | 7.9 → 9.4 → 11.0 | Personal FT% ≈ rating (pure linear) | flat 18.2% |
+| **FoulDrawing** | 9.2 → 9.4 → 9.8 | FTA 2.65 → 3.11 → 4.20; FTr 0.246 → 0.291 → 0.406 | flat |
+
+Per-rating notes:
+
+- **Outside is the biggest single lever** (7.2 → 15.1 PTS) because it owns two zones. The make
+  curve's floor is visible at the bottom: a 0-rated shooter still converts ~17% of threes against
+  even defense — rating 0 means bad, not hopeless, consistent with the standing "open-only, not a
+  non-shooter" ruling.
+- **FreeThrow is the one true zero.** The FT make is pure `rating/100`, so FreeThrow 0 made
+  literally 0.0% over 2,000 games. Every make curve has a floor; FT does not. The full linear
+  line is now charted for the parked FT-curve calibration ruling (see status.md).
+- **FoulDrawing buys trips, never makes** — and the fouled-miss mechanism is visible in the raw
+  counts: his FGA *falls* 10.75 → 10.34 across the walk (a `MissFouled` shot is excluded from
+  FGA, a fouled missed three from 3PA), which is exactly why recorded FG%/3P% tick up ~+0.5pp
+  compositionally with the make probability untouched.
+- **Finishing** also carries the putback-finish channel and shows the smallest usage response
+  (16.3 → 19.9 vs ~8pp for the other zone skills) — plausibly because rim volume partly flows
+  through putbacks and transition rather than half-court selection. Recorded as an observation;
+  the selection site was not opened this session.
+
+### The interaction block (seven rows, all dials on the one swept player)
+
+| Row | Dials | PTS | FG% | 3P% | FT% | FTr | Use |
+|---|---|---|---|---|---|---|---|
+| FLAT_50_CONTROL | — | 9.4 | 34.3 | 23.2 | 49.8 | .291 | 18.2% |
+| ELITE_SHOOTER | Out 90, Mid 70 | 14.8 | 41.4 | 39.2 | 49.4 | .253 | 23.6% |
+| ELITE_RIM | Fin 90, Close 70 | 12.9 | 41.3 | 25.0 | 50.0 | .287 | 21.4% |
+| FREE_POINTS | FD 90, FT 90 | 11.3 | 34.5 | 23.5 | 89.8 | .394 | 18.3% |
+| FOULS_BUT_BRICKS | FD 90, FT 20 | **8.6** | 34.9 | 23.1 | 20.4 | .361 | 18.3% |
+| ALL_SCORING_ELITE | all six 85 | 21.9 | 46.3 | 37.4 | 84.8 | .324 | 29.3% |
+| COMPOSITE_NONSCORER | all six 15 | 3.7 | 30.0 | 20.6 | 14.6 | .306 | 9.9% |
+
+Readings:
+
+- **Hack-a-Shaq emerged.** FOULS_BUT_BRICKS scores *below* control (8.56 vs 9.36) — drawing fouls
+  you can't cash is a net negative, because each fouled trip replaces a shot worth ~0.75 expected
+  points with two 20% free throws worth 0.4. Nobody authored this; it fell out of the math.
+- **ELITE_SHOOTER's FTr *dropped*** (.253 vs .291 control) despite more FTA — his extra attempts
+  are perimeter-tilted, and threes draw far fewer whistles (FoulThree 0.015 vs FoulRim 0.20). FTr
+  is a zone-mix composite, not a FoulDrawing readout.
+- **The usage tax is real.** ALL_SCORING_ELITE's turnovers rise 2.3 → 3.1/g with his 29.3% load —
+  more ball, more giveaways. The non-scorer's fall to 1.7.
+- **The offense routes around a non-scorer** — 3.7 PTS on a 9.9% use share, with his own ORB the
+  highest of any row (2.34): he is almost never the shooter, so the picker's shooter-nerf almost
+  never touches him.
+
+### Mechanisms traced — why cross-stat movement is design, not bugs
+
+Three channels were traced to named source this session; every "suspicious"-list signal
+dispositioned.
+
+1. **Usage follows skill (measured; the other half of the standing ruling).** Raising any zone
+   make skill lifts the swept player's possession-use share from ~14% to ~22–23%; FreeThrow and
+   FoulDrawing move it not at all. The offense hunts shooting skill, not line-trips. The
+   quarantine corollary: team zone lines barely dent at the bottom of a walk (Close=0 costs team
+   Short only −1.5pp while Close=99 adds +6.3pp) because a bad shooter takes few shots (8.2 FGA/g
+   at rating 0 vs 13.3 at 99) — the offense quarantines weakness and amplifies strength
+   automatically. Micro-fingerprint: his own ORB falls as skill rises (2.25 → 2.12) because he is
+   the shooter more often and the rebounder-picker's shooter-nerf engages.
+2. **The shot-diet tilt is the S36 displacement bend, on purpose.** Each zone skill tilts the
+   team attempt mix toward its own zone (Short 16.7 → 19.4 under Close; Mid 15.6 → 18.6; Rim
+   27.5 → 30.5 under Finishing; both Outside zones up; FT/FoulDrawing mixes dead flat).
+   Traced: `DeriveDisplacement` Stage 2 computes per-zone gaps via `OffenseRating(zone, shooter)`
+   — the same zone→skill map the make curve uses — and Stage 5 bends the diet by the residualized
+   gap; the Rim/Short inward gates (Finishing/Close) stack on top. **This corrects the S48 draft
+   prompt's claim:** "no scoring rating feeds shot frequency" is true of the Roll G *base
+   weights* only; the bend reads zone skills by design. Skilled players hunt their spots.
+3. **Gravity verified live — a byproduct finding.** Every make skill faintly lifts the *other*
+   zones' Team-A FG% at the high end, and the lift order matches the `GravityContribution`
+   weights exactly: Finishing (0.35 of gravity) → biggest glow (+2.0–2.4pp at 99); Close (0.25)
+   next; Mid (0.10) small; Outside (0.05) ≈ nothing. Team B flat throughout — an offense-side
+   relief effect, which is what the gravity → attention → relief chain
+   (`Player.GravityContribution` → AttentionGenerator → Roll H C1 relief) is supposed to be. It
+   also explains ELITE_RIM out-lifting ELITE_SHOOTER on *team* points (56.0 vs 55.5 A.PTS)
+   despite fewer personal points: rim threat carries 60% of gravity, perimeter threat 5% — the
+   engine believes an interior monster warps a defense hardest, and the measurement agrees.
+   **Two boundary lines:** "verified" means the wiring fires correctly — whether +2.4pp of
+   teammate lift is the right *size* is a calibration question deferred to a real population; and
+   only gravity (the saturating top-threat composite) was exercised — **spacing** (the
+   accumulating twin) stayed quiet as designed, since one player can't move a team environment,
+   and gets its day in a perimeter-family or team-composition test.
+
+### Open flags (recorded, not chased)
+
+- **The FTA gap.** At identical FoulDrawing 90, FREE_POINTS drew 4.08 FTA/g vs FOULS_BUT_BRICKS'
+  3.77 — ~8%, too large for noise at 2,000 games/row, mechanism untraced (candidate: missed-FT
+  rebound/possession composition differences). Chase only if a later family moves it.
+- **3P% at the rating-0 end of the Close and Mid walks sits ~1–1.5pp above baseline** (25.1 /
+  24.6 at rating 0 vs 23.2 at 50), fading by mid-walk. Borderline against the ~0.7pp per-rung
+  noise; no mid-walk trend. Watch item only.
+
+### Rulings and generation-layer notes
+
+- **SelfCreation belongs to Family E** (ruled at the S48 gate) — no make-curve role; measured
+  with perimeter creation.
+- **What "50" means (interpretation note for every family that follows).** Rating 50 is *not*
+  the league-average player. The make-curve recentering (S31-era, Emmett's ruling: recenter,
+  never compress) anchored the *league's average shooter* — the generated population's effective
+  level, which sits well above 50 — to the real per-zone targets (rim 61 / short 43 / mid 39 /
+  long 36 / three 34). The flat-50 bench player is therefore a below-D1-average shooter facing a
+  defense with no weak link and no mismatch to hunt; his 34.3% FG coexists coherently with the
+  season page's calibrated 44.9%. The bench anchor is a lab reference, not a world prediction —
+  read every curve here as *shape and mechanism*, and read "is this level right?" only on the
+  season page with a real population.
+- **Generation-redesign feed (height→skill-quality).** The redesign's height-conditioned skill
+  leans should be sized against the population's effective average, not the scale midpoint —
+  "average" is already defined at the season page by the recentering ruling, which is closed. A
+  "50 scorer" in generation terms is a below-average one; the leans shift *distributions*, and
+  the season page (not the bench) judges the result.
+- **Gravity magnitude calibration** is deferred until a real population is on the season page;
+  **spacing verification** is pending a test where team composition varies.

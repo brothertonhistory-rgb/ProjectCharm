@@ -1,0 +1,16 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 5,
+  "mode": "cases",
+  "outputName": "scoring_interaction",
+  "cases": [
+    { "label": "FLAT_50_CONTROL",    "dials": {} },
+    { "label": "ELITE_SHOOTER",      "dials": { "Outside": 90, "Mid": 70 } },
+    { "label": "ELITE_RIM",          "dials": { "Finishing": 90, "Close": 70 } },
+    { "label": "FREE_POINTS",        "dials": { "FoulDrawing": 90, "FreeThrow": 90 } },
+    { "label": "FOULS_BUT_BRICKS",   "dials": { "FoulDrawing": 90, "FreeThrow": 20 } },
+    { "label": "ALL_SCORING_ELITE",  "dials": { "Close": 85, "Mid": 85, "Outside": 85, "Finishing": 85, "FreeThrow": 85, "FoulDrawing": 85 } },
+    { "label": "COMPOSITE_NONSCORER","dials": { "Close": 15, "Mid": 15, "Outside": 15, "Finishing": 15, "FreeThrow": 15, "FoulDrawing": 15 } }
+  ]
+}
