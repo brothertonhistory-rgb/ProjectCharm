@@ -1,0 +1,8 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "walk",
+  "outputName": "OffBallMovement",
+  "walk": { "field": "OffBallMovement", "start": 0, "stop": 99, "step": 5 }
+}

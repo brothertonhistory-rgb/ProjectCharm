@@ -304,3 +304,178 @@ dispositioned.
   the season page (not the bench) judges the result.
 - **Gravity magnitude calibration** is deferred until a real population is on the season page;
   **spacing verification** is pending a test where team composition varies.
+
+---
+
+## Family E — Perimeter creation (BallHandling, Passing, Playmaking, SelfCreation, OffBallMovement) — measured Session 49
+
+The second family through the S47 full-box ruler, and the first measured on **slot 1 (the point
+guard)** rather than slot 5. Five isolation walks (0→99 in 5-point steps, 2,000 games/rung,
+everything else frozen at 50) plus an eight-row within-player interaction block — 232,000 real
+games, pure config-and-run (no engine file, no `config.json`, no readout change, no Monte Carlo).
+SelfCreation, ruled out of Family D at the S48 gate, is measured here.
+
+**Why slot 1, and the one thing it buys.** The check-in audit found that in the flat-50 lab
+world, four of the five ratings are **slot-blind** — the assist picker, the usage score, the
+denial contest, and the gravity/spacing terms are all attribute-driven, so BallHandling on slot 2,
+3, or 5 would read the same. The **one** exception is BallHandling's team-turnover channel: it
+flows through guard-heavy position weights (slot 1 = 0.35, slot 5 = 0.08), so it only reads on a
+guard's seat. (A second reason — a post-vs-guard attribution penalty — was investigated and
+**withdrawn**: in a flat-clone world every player has the same body, so nobody counts as more of a
+post, and that penalty is inert here.) The cost of moving off slot 5 is that the S48 scoring
+control does **not** carry; the slot-1 flat-50 box is the new Family-E anchor and is not comparable
+to the slot-5 numbers.
+
+**The grain (applies to every number below).** (1) The swept player's box is *his*; team-zone and
+team-total lines are Team-A-level, diluted by four flat teammates. (2) **The flat-50 bench is a
+below-average *passing* world, by the same logic as Family D's "what 50 means" note.** The assist
+system's lineup-passing pivot was recentered to **71.31** in S41 to track the real generated
+population (whose starters average ~71 assist-weight), and the zone assisted-rates were calibrated
+to the season page (13.7 assists) at that pivot — so a flat-50 lineup sits 21 points *below* the
+pivot and runs its assist existence at ~0.80× normal. Read the passing/playmaking curves here for
+**shape and attribution**; the assist *level* is judged on the season page, never on this bench.
+
+### The gates
+
+- **Determinism.** All five walks' 50-rungs and FLAT_50_CONTROL are the same box (11.6 PTS /
+  35.5 FG% / 21.7% use / 1.5 AST / 2.6 TO) — five runs, one answer at the new slot.
+- **Control parity.** Team A ≈ Team B (52.8 / 52.9 PTS).
+- **Nothing leaked to the defense.** STL/BLK flat under every walk; Team B's box flat everywhere.
+
+### The curves (0 → 50 → 99)
+
+| Rating | His headline line | Read |
+|---|---|---|
+| **SelfCreation** | PTS 7.3 → 11.6 → 18.6; **use 13.4% → 21.7% → 36.2%**; FG% 37.8 → 35.5 → 33.0 | The steepest usage curve of any rating measured. The FG% slide is the designed volume tax. |
+| **OffBallMovement** | PTS 10.8 → 11.6 → 12.3; use 20.3% → 21.7% → 23.0%; FG% flat 35.5 | Getting open lifts his shot volume with no shooting-skill read behind it. Moderate — a fraction of SelfCreation's slope. |
+| **Passing** | AST 0.9 → 1.5 → 2.1; everything else flat | Pure assist attribution — more credit, zero extra shots or made-shot lift. |
+| **Playmaking** | AST 1.1 → 1.5 → 1.9; everything else flat | Same, slightly gentler (lower attribution weight than Passing). |
+| **BallHandling** | **TO 1.6 → 2.6 → 3.2**; everything else flat | **Inverted** — the better the handle, the *more* turnovers he is charged. See Finding 4. |
+
+The BallHandling `use%` line rises 20.3 → 22.6 across its walk, but that is the *turnover term* of
+the possession-use proxy (`FGA + 0.44·FTA + TO`) climbing with his turnover count — his FGA and
+shot mix are dead flat. BallHandling does **not** feed the shooter-selection score, confirmed.
+
+### The interaction block (eight rows, all dials on the swept point guard)
+
+| Row | Dials | PTS | FG% | AST | TO | Use% |
+|---|---|---|---|---|---|---|
+| FLAT_50_CONTROL | — | 11.6 | 35.5 | 1.5 | 2.6 | 21.7 |
+| PURE_POINT | Pass 90, Play 90, BH 85 | 11.7 | 35.7 | **2.3** | 3.1 | 22.3 |
+| ISO_ALPHA | SC 90, BH 70 | **17.6** | 33.5 | 1.3 | 3.8 | **34.1** |
+| MOVEMENT_MAN | OBM 90 | 12.1 | 35.5 | 1.5 | 2.7 | 22.6 |
+| BUTTERFINGERS_VISIONARY | Pass 90, Play 90, BH 10 | 11.5 | 35.5 | **2.3** | **1.8** | 20.6 |
+| WEAK_LINK | Pass 5 | 11.5 | 35.4 | 0.9 | 2.6 | 21.6 |
+| ALL_E_ELITE | all five 85 | 17.4 | 33.8 | 1.9 | 3.9 | 33.9 |
+| COMPOSITE_NONCREATOR | all five 15 | 7.1 | 37.6 | 0.8 | 1.3 | 12.4 |
+
+### Findings
+
+**Finding 1 — SelfCreation is the volume king, exactly as wired.** It carries the single largest
+usage coefficient in the engine (0.35 on one rating), and it shows: use share climbs 13% → 36%,
+points 7 → 19, with FG% sliding 38 → 33 (the designed volume tax on high-usage shot-hunting) and
+his own offensive boards falling 2.30 → 2.00 as the shooter-nerf engages. The shot diet tilts off
+the rim toward mid/perimeter as he creates more of his own looks (rim attempt share 28.8 → 26.9).
+This inherits the whole S48 usage bundle as expected secondaries — nothing suspicious. The gravity
+whisper (SelfCreation feeds the perimeter-access term of `GravityContribution`, ~+4 points at 99)
+is far too small to separate from noise here, as predicted.
+
+**Finding 2 — OffBallMovement is getting-open, no make read.** Raising it lifts his surviving usage
+share (20% → 23%) purely by beating the Roll E denial contest (`OffBallDefense − OffBallMovement`),
+with flat FG%. Real, moderate, and clean — a smaller mirror of SelfCreation's volume channel with
+no shooting-skill component behind it.
+
+**Finding 3 — Passing and Playmaking are almost pure assist-attribution ratings right now, and
+the attribution is passing-dominant (correct).** Both raise the swept player's *share* of the
+team's assists monotonically (Passing 0.9 → 2.1; Playmaking 1.1 → 1.9), and Passing moves it more
+because it carries the larger attribution weight (0.5 vs 0.35) — which is correct basketball (the
+pass that creates the bucket is the assist skill). **The predicted asymmetric make-conversion dip
+did not appear.** Team FG% is dead flat across the Passing walk (35.4 / 35.5 / 35.6) and at
+WEAK_LINK (Pass 5 → 35.4). The RollH passing-conversion bonus wire is real in source, but on this
+instrument it is invisible for two stacked reasons: the below-pivot passing discount (the grain
+note), and — the larger one — the bonus is **gated on gravity/spacing openness**
+(`opportunityGate = lerp(floor, 1, BaseOpenness)`), which is near-zero in a flat world with no
+mismatch to punish. So the conversion channel, like spacing in Family D, needs a
+team-composition/openness test to fire and is **parked** with it. Net: on the bench, passing and
+playmaking reshuffle assist *credit* but do not measurably make teammates shoot better.
+
+**Finding 4 — BallHandling is inverted: it currently carries the *blame* for turnovers but not the
+*protection* against them.** The clearest evidence is one triple in the interaction block, all
+identical except the handle:
+
+| Ball-handling | Turnovers/game |
+|---|---|
+| BUTTERFINGERS_VISIONARY (BH 10) | **1.8** |
+| FLAT_50_CONTROL (BH 50) | 2.6 |
+| PURE_POINT (BH 85) | 3.1 |
+
+The better handler is charged *more* turnovers, because the only live BallHandling turnover
+channels on this bench are the committer-attribution picker (`weight ∝ BallHandling` — the ball is
+in his hands, so he catches more of the team's giveaways) and the team-aggregate matchup, which is
+muted (below). The half that should make a good handler *lose it less* — the halfcourt
+protection matchup — is pressure-gated to zero at the default neutral-pressure setting. So
+BallHandling reads as a net negative. **This is not a bug to patch this session; it is the headline
+design finding** (see the two reshapers below).
+
+### The two reshapers this measurement surfaced
+
+**Reshaper A — the missing ball-dominance / initiation layer (the big one).** The engine models
+who *shoots* (the usage score) but not who *initiates* the possession or *holds the ball*. This
+single gap explains two of this family's disappointments at once:
+
+- **Passing magnitude is capped.** A great passer can only claim a bigger *slice* of a small,
+  fixed assist pie — he cannot grow the pie by running the show, because he gets no more touches
+  than his four flat teammates. Even PURE_POINT (Passing + Playmaking both 90) tops out at 2.3
+  assists. Real floor generals rack up assists by *dominating the ball*.
+- **Ball-handling protection has nowhere to live.** A good handler should reduce turnovers by
+  keeping the ball on the string possession after possession — but without a touches/initiation
+  layer there is no offense-side, defender-independent place for handle-protects-ball to act.
+
+Both point at one absent subsystem: **ball-dominance / who initiates**. Building it would let
+passing manufacture real assists *and* let ball-handling protect the ball. Recommended as the
+highest-value design conversation this whole measurement pass has produced. It also intersects the
+coaching layer (heliocentric vs egalitarian ball distribution).
+
+**Reshaper B — the missing unforced-turnover channel.** The engine's base turnover rate is a flat
+config constant, identical for a maestro and a butterfingers; BallHandling only enters through a
+*defense-relative* matchup (your handle vs their steals), which needs a defender to push against
+and is muted at neutral pressure. There is no **offense-only, defender-independent** "lost it
+yourself" rate — the travel, the ball off the foot, the pass sailing out of bounds. The engine
+already *names* the two categories it would split across (dead-ball turnover = self-inflicted;
+live-ball turnover = stripped/steal), so the fix has a natural home: low BallHandling should raise
+the **dead-ball** rate directly, offense-side, no defender required, while the forced/live-ball
+channel stays the pressure matchup. **Attribution sub-call for Emmett when this is built:** the
+current committer picker pins *more* blame on the *best* handler (usage proxy) — correct for forced
+steals, arguably backwards for unforced dead-balls, which usually belong to the *worse* handle.
+Recommendation on record: lean unforced blame toward the weaker handles; keep forced blame on the
+high-usage handler.
+
+### Muted channels (recorded, not fixed — this is measurement)
+
+- **BallHandling is measured at neutral pressure — PARTIAL, not closed.** Two of its three
+  turnover-rate channels are pressure-gated to zero because the bench's `HomePressure` /
+  `AwayPressure` sit on the neutral pivot (5.0): the halfcourt individual matchup (Roll F) and the
+  halfcourt-entry aggregate (Roll B). Only the transition/entry aggregate (Roll A, fixed
+  `StandardGate`) reads it live, which is why team turnover *rate* barely moved while attribution
+  climbed. **Prerequisite before BallHandling's full meaning is claimed:** the pressure-dialed test
+  (parked to the coaching layer), which lights up Roll B and Roll F. Note also this corrects the
+  S49 draft's mechanism: the mute is the config pressure scalar equalling neutral, **not** a
+  null-coach fallback — there is no live coach-pressure read in the tree yet (`CoachProfileFor` is a
+  comment-only migration path; `CoachProfile` has no `Pressure` property).
+- **The passing make-conversion bonus and team spacing both need a team-composition/openness test**
+  (they are openness-gated and cannot fire in a flat world) — parked together.
+- **Slot-weight sensitivity** is why this family read on slot 1; a full picture of BallHandling's
+  team-security channel across the five position weights is a future refinement, not required here.
+
+### Rulings and generation-layer notes
+
+- **SelfCreation's Family-E placement holds** — no direct make-curve read anywhere; its only reads
+  are the usage-score top coefficient and the gravity perimeter-access term. (The S48 "bonus-FT
+  putback picker reads SelfCreation" line is retired: the fresh audit found no such read in the
+  tree — SelfCreation has exactly two engine reads.)
+- **Generation-redesign feed.** Two perimeter-creation ratings are currently *under-rewarded* by
+  the engine and one is *inverted* — Passing/Playmaking (capped by the missing initiation layer)
+  and BallHandling (blame without protection). Do **not** over-size these ratings in the generation
+  redesign to compensate for engine gaps; the correct fix is the ball-dominance and unforced-
+  turnover layers, not inflated draws. Record the two reshapers as engine work that must land
+  before perimeter-creation ratings can be judged "correctly valued."

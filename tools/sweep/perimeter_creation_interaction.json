@@ -1,0 +1,17 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "cases",
+  "outputName": "perimeter_creation_interaction",
+  "cases": [
+    { "label": "FLAT_50_CONTROL",         "dials": {} },
+    { "label": "PURE_POINT",              "dials": { "Passing": 90, "Playmaking": 90, "BallHandling": 85 } },
+    { "label": "ISO_ALPHA",               "dials": { "SelfCreation": 90, "BallHandling": 70 } },
+    { "label": "MOVEMENT_MAN",            "dials": { "OffBallMovement": 90 } },
+    { "label": "BUTTERFINGERS_VISIONARY", "dials": { "Passing": 90, "Playmaking": 90, "BallHandling": 10 } },
+    { "label": "WEAK_LINK",               "dials": { "Passing": 5 } },
+    { "label": "ALL_E_ELITE",             "dials": { "BallHandling": 85, "Passing": 85, "Playmaking": 85, "SelfCreation": 85, "OffBallMovement": 85 } },
+    { "label": "COMPOSITE_NONCREATOR",    "dials": { "BallHandling": 15, "Passing": 15, "Playmaking": 15, "SelfCreation": 15, "OffBallMovement": 15 } }
+  ]
+}
