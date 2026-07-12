@@ -122,16 +122,17 @@ internal static partial class Program
             Console.WriteLine($"Sweeping {w.Field}: {w.Start}..{w.Stop} step {w.Step} (everything else frozen at 50)");
         Console.WriteLine();
 
-        var results = new List<(SweepRung Rung, SweepRowTotals T)>();
+        var results = new List<(SweepRung Rung, SweepRungResult R)>();
         foreach (var rung in rungs)
         {
             Console.Write($"  {rung.Label,-26} ");
-            var t = RunSweepRung(config, rung, engineConfigPath);
-            results.Add((rung, t));
+            var r = RunSweepRung(config, rung, engineConfigPath);
+            results.Add((rung, r));
             Console.WriteLine(" done");
         }
 
         PrintSweepTable(config, results);
+        PrintSweepBoxHeadline(config, results);
         var csvPath = Path.Combine(AppContext.BaseDirectory, $"attribute_{config.OutputName}_sweep.csv");
         WriteSweepCsv(csvPath, config, results);
         Console.WriteLine();
@@ -204,7 +205,41 @@ internal static partial class Program
         public readonly long[] BDReb = new long[5];
     }
 
-    private static SweepRowTotals RunSweepRung(SweepConfig config, SweepRung rung, string engineConfigPath)
+    // ── S47: the full per-player box, read out of the SAME AttributeGame call the
+    // rebound totals already make. Indices 0–4 = Team A slots 1–5; 5–9 = Team B slots
+    // 1–5 (identical to SweepRowTotals). OReb/DReb are deliberately NOT duplicated here —
+    // they stay in SweepRowTotals as the single reconciled rebound source, and the box
+    // readout reads them from there. Every field below is engine-attributed by
+    // AttributeGame (blocks/steals/DRB credited to the DEFENDER, assists/ORB to the
+    // offense) — there is no re-keying by r.Offense for these; that keys only the team
+    // zone-mix arrays, which are the OFFENSE's own shooting that possession.
+    private sealed class SweepBoxTotals
+    {
+        public readonly long[] Fga    = new long[10];
+        public readonly long[] Fgm    = new long[10];
+        public readonly long[] Tpa    = new long[10];
+        public readonly long[] Tpm    = new long[10];
+        public readonly long[] Fta    = new long[10];
+        public readonly long[] Ftm    = new long[10];
+        public readonly long[] Blk    = new long[10];
+        public readonly long[] Stl    = new long[10];
+        public readonly long[] To     = new long[10];
+        public readonly long[] ShFoul = new long[10];   // shooting fouls COMMITTED (defensive stat)
+        public readonly long[] Ast    = new long[10];
+
+        // Team shot mix, keyed by which logical team was on offense.
+        // Row 0 = Team A offense, row 1 = Team B offense.
+        // Column order: 0 Rim, 1 Short, 2 Mid, 3 Long, 4 Three.
+        // The five columns partition Fga (each is a ShotLocation subset of Fga), so their
+        // row sum is the team's total FGA on its own offensive possessions.
+        public readonly long[,] ZoneFga = new long[2, 5];
+        public readonly long[,] ZoneFgm = new long[2, 5];
+    }
+
+    // What one rung produces: the legacy rebound totals (untouched) plus the S47 box.
+    private sealed record SweepRungResult(SweepRowTotals Reb, SweepBoxTotals Box);
+
+    private static SweepRungResult RunSweepRung(SweepConfig config, SweepRung rung, string engineConfigPath)
     {
         // Build the two teams once for this rung. Team A: swept slot dialed, the rest
         // flat 50. Team B: flat 50 everywhere. Then stamp PlayerIds by logical team.
@@ -235,6 +270,7 @@ internal static partial class Program
         var cfgAttention = AttentionConfig.Load(engineConfigPath);
 
         var totals = new SweepRowTotals { Games = config.GamesPerRung };
+        var box    = new SweepBoxTotals();
 
         for (var i = 0; i < config.GamesPerRung; i++)
         {
@@ -297,9 +333,43 @@ internal static partial class Program
                 totals.BOReb[s] += attributed.OReb[s + 5];
                 totals.BDReb[s] += attributed.DReb[s + 5];
             }
+
+            // S47: the other eleven per-player fields out of the SAME attributed call —
+            // OReb/DReb already read above, so they are not re-summed here. Ownership
+            // (blocks/steals/DRB to the defender) is already resolved by AttributeGame;
+            // we do NOT re-key by r.Offense for the per-player box.
+            for (var p = 0; p < 10; p++)
+            {
+                box.Fga[p]    += attributed.Fga[p];
+                box.Fgm[p]    += attributed.Fgm[p];
+                box.Tpa[p]    += attributed.Tpa[p];
+                box.Tpm[p]    += attributed.Tpm[p];
+                box.Fta[p]    += attributed.Fta[p];
+                box.Ftm[p]    += attributed.Ftm[p];
+                box.Blk[p]    += attributed.Blk[p];
+                box.Stl[p]    += attributed.Stl[p];
+                box.To[p]     += attributed.To[p];
+                box.ShFoul[p] += attributed.ShFoul[p];
+                box.Ast[p]    += attributed.Ast[p];
+            }
+
+            // S47: team shot mix, keyed by which logical team was on offense (the same
+            // r.Offense split the ORB-chance denominator uses). This is the offense's own
+            // shooting, so r.Offense is the correct key. Rim/Short/Mid/Long are the four
+            // two-point zones; Three is carried separately (ThreePa/ThreePm). The five
+            // together partition the possession's Fga.
+            foreach (var r in records)
+            {
+                int ti = r.Offense == teamASide ? 0 : 1;
+                box.ZoneFga[ti, 0] += r.RimFga;   box.ZoneFgm[ti, 0] += r.RimFgm;
+                box.ZoneFga[ti, 1] += r.ShortFga; box.ZoneFgm[ti, 1] += r.ShortFgm;
+                box.ZoneFga[ti, 2] += r.MidFga;   box.ZoneFgm[ti, 2] += r.MidFgm;
+                box.ZoneFga[ti, 3] += r.LongFga;  box.ZoneFgm[ti, 3] += r.LongFgm;
+                box.ZoneFga[ti, 4] += r.ThreePa;  box.ZoneFgm[ti, 4] += r.ThreePm;
+            }
         }
 
-        return totals;
+        return new SweepRungResult(totals, box);
     }
 
     // ── The flat-team-plus-one-dialed-slot builder ──────────────────────────────
@@ -352,7 +422,7 @@ internal static partial class Program
 
     // ── Readout: console table ──────────────────────────────────────────────────
 
-    private static void PrintSweepTable(SweepConfig config, List<(SweepRung Rung, SweepRowTotals T)> results)
+    private static void PrintSweepTable(SweepConfig config, List<(SweepRung Rung, SweepRungResult R)> results)
     {
         int sw = config.SweptSlot;
         string sOrbHdr = $"S{sw}.ORB";
@@ -363,8 +433,9 @@ internal static partial class Program
             $"{sOrbHdr,7}  {sDrbHdr,7}  {"A.TotR",6}  {"B.TotR",6}  {"RebΔ",6}");
         Console.WriteLine($"  {new string('-', 88)}");
 
-        foreach (var (rung, t) in results)
+        foreach (var (rung, rr) in results)
         {
+            var t = rr.Reb;
             double g = t.Games;
 
             double aOrbRate = t.AOrbChances > 0 ? 100.0 * t.AOrbWon / t.AOrbChances : 0.0;
@@ -385,18 +456,26 @@ internal static partial class Program
     // ── Readout: CSV ────────────────────────────────────────────────────────────
 
     private static void WriteSweepCsv(
-        string path, SweepConfig config, List<(SweepRung Rung, SweepRowTotals T)> results)
+        string path, SweepConfig config, List<(SweepRung Rung, SweepRungResult R)> results)
     {
         using var w = new StreamWriter(path);
-        w.WriteLine(
+
+        // Legacy rebound header — VERBATIM (parity anchor). The S47 box groups are
+        // appended after it; the legacy column names/order/values are unchanged.
+        string legacyHeader =
             "RowLabel,Games,TeamA_ORB_pg,TeamB_ORB_pg,TeamA_DRB_pg,TeamB_DRB_pg," +
             "TeamA_TotalReb_pg,TeamB_TotalReb_pg,TeamA_ORB_rate,TeamA_DRB_rate," +
             "Slot1_ORB,Slot1_DRB,Slot1_TotalReb,Slot2_ORB,Slot2_DRB,Slot2_TotalReb," +
             "Slot3_ORB,Slot3_DRB,Slot3_TotalReb,Slot4_ORB,Slot4_DRB,Slot4_TotalReb," +
-            "Slot5_ORB,Slot5_DRB,Slot5_TotalReb");
+            "Slot5_ORB,Slot5_DRB,Slot5_TotalReb";
 
-        foreach (var (rung, t) in results)
+        // Box column names are rung-independent; build them once from the first rung.
+        var headerCols = BuildBoxColumns(config, results[0].Rung, results[0].R.Reb, results[0].R.Box);
+        w.WriteLine(legacyHeader + "," + string.Join(",", headerCols.Select(c => c.Name)));
+
+        foreach (var (rung, rr) in results)
         {
+            var t = rr.Reb;
             double g = t.Games;
 
             double aOrbPg = t.AOReb.Sum() / g;
@@ -419,7 +498,190 @@ internal static partial class Program
                 double drb = t.ADReb[s] / g;
                 sb.Append($",{orb:F3},{drb:F3},{orb + drb:F3}");
             }
+
+            // S47 box groups appended after the legacy columns (same order as the header).
+            var cells = BuildBoxColumns(config, rung, rr.Reb, rr.Box);
+            foreach (var c in cells) sb.Append(',').Append(c.Val);
+
             w.WriteLine(sb.ToString());
+        }
+    }
+
+    // ── S47: the appended box columns, header/row aligned by construction ─────────
+    //
+    // Returns the ordered (columnName, formattedValue) pairs for one rung. WriteSweepCsv
+    // emits the Name of the first rung as the header and every rung's Val as a row, so a
+    // column and its heading can never drift. Counting stats emit BOTH _total (cumulative
+    // rung total) and _pg (= total / Games); rates emit once. Zero denominators produce
+    // 0.0, never NaN/∞. All per-player stats come from AttributeGame's already-correct
+    // attribution; only the team zone-mix is keyed by offense.
+    private static List<(string Name, string Val)> BuildBoxColumns(
+        SweepConfig config, SweepRung rung, SweepRowTotals t, SweepBoxTotals box)
+    {
+        double g = t.Games;
+        int sw0 = config.SweptSlot - 1;                 // 0–4, Team A
+        var cols = new List<(string, string)>();
+
+        long TeamA(long[] a) { long s = 0; for (var i = 0; i < 5; i++) s += a[i];     return s; }
+        long TeamB(long[] a) { long s = 0; for (var i = 5; i < 10; i++) s += a[i];    return s; }
+
+        void Cnt(string name, long total)
+        {
+            cols.Add(($"{name}_total", total.ToString()));
+            cols.Add(($"{name}_pg", (total / g).ToString("F3")));
+        }
+        void Pct(string name, long made, long att) =>
+            cols.Add(($"{name}_pct", (att > 0 ? 100.0 * made / att : 0.0).ToString("F2")));
+        void Rate(string name, double num, double den) =>
+            cols.Add(($"{name}_rate", (den > 0 ? num / den : 0.0).ToString("F4")));
+
+        // ── meta: walk-traceability (empty in cases mode) ────────────────────────
+        string metaField = "", metaValue = "";
+        if (config.Mode == "walk" && config.Walk is { } wk)
+        {
+            metaField = wk.Field;
+            metaValue = rung.Dials.TryGetValue(wk.Field, out var mv) ? mv.ToString() : "";
+        }
+        cols.Add(("meta_swept_field", metaField));
+        cols.Add(("meta_swept_value", metaValue));
+
+        // ── swept slot: full box + derived rates ─────────────────────────────────
+        long sFga = box.Fga[sw0], sFgm = box.Fgm[sw0];
+        long s3pa = box.Tpa[sw0], s3pm = box.Tpm[sw0];
+        long sFta = box.Fta[sw0], sFtm = box.Ftm[sw0];
+        long sOrb = t.AOReb[sw0], sDrb = t.ADReb[sw0];  // legacy rebound source
+        long sReb = sOrb + sDrb;
+        long sAst = box.Ast[sw0], sStl = box.Stl[sw0], sBlk = box.Blk[sw0];
+        long sTo  = box.To[sw0],  sSfl = box.ShFoul[sw0];
+        long sPts = 2 * sFgm + s3pm + sFtm;
+        double sUse = sFga + 0.44 * sFta + sTo;
+
+        Cnt("swept_pts", sPts); Cnt("swept_fga", sFga); Cnt("swept_fgm", sFgm);
+        Cnt("swept_3pa", s3pa); Cnt("swept_3pm", s3pm);
+        Cnt("swept_fta", sFta); Cnt("swept_ftm", sFtm);
+        Cnt("swept_orb", sOrb); Cnt("swept_drb", sDrb); Cnt("swept_reb", sReb);
+        Cnt("swept_ast", sAst); Cnt("swept_stl", sStl); Cnt("swept_blk", sBlk);
+        Cnt("swept_to",  sTo);  Cnt("swept_sfl", sSfl);
+        Pct("swept_fg", sFgm, sFga); Pct("swept_3p", s3pm, s3pa); Pct("swept_ft", sFtm, sFta);
+        Rate("swept_3pa", s3pa, sFga);          // 3PA / FGA
+        Rate("swept_ftr", sFta, sFga);          // FTr = FTA / FGA
+        cols.Add(("swept_possession_use_pg", (sUse / g).ToString("F3")));
+
+        // ── team offense/defense boxes ───────────────────────────────────────────
+        void TeamBox(string tag, Func<long[], long> team, long orb, long drb)
+        {
+            long fga = team(box.Fga), fgm = team(box.Fgm);
+            long p3a = team(box.Tpa), p3m = team(box.Tpm);
+            long fta = team(box.Fta), ftm = team(box.Ftm);
+            long ast = team(box.Ast), to  = team(box.To);
+            long blk = team(box.Blk), stl = team(box.Stl), sfl = team(box.ShFoul);
+            long pts = 2 * fgm + p3m + ftm;
+
+            Cnt($"{tag}_off_pts", pts); Cnt($"{tag}_off_fga", fga); Cnt($"{tag}_off_fgm", fgm);
+            Cnt($"{tag}_off_3pa", p3a); Cnt($"{tag}_off_3pm", p3m);
+            Cnt($"{tag}_off_fta", fta); Cnt($"{tag}_off_ftm", ftm);
+            Cnt($"{tag}_off_ast", ast); Cnt($"{tag}_off_to",  to); Cnt($"{tag}_off_orb", orb);
+            Pct($"{tag}_off_fg", fgm, fga); Pct($"{tag}_off_3p", p3m, p3a); Pct($"{tag}_off_ft", ftm, fta);
+            Rate($"{tag}_off_3pa", p3a, fga);
+            Rate($"{tag}_off_ftr", fta, fga);
+
+            Cnt($"{tag}_def_blk", blk); Cnt($"{tag}_def_stl", stl);
+            Cnt($"{tag}_def_drb", drb); Cnt($"{tag}_def_sfl", sfl);
+        }
+
+        long aOrb = t.AOReb.Sum(), aDrb = t.ADReb.Sum();
+        long bOrb = t.BOReb.Sum(), bDrb = t.BDReb.Sum();
+
+        // PossessionUseShare for the swept slot uses its OWN team's (Team A) use.
+        double teamAUse = TeamA(box.Fga) + 0.44 * TeamA(box.Fta) + TeamA(box.To);
+        cols.Add(("swept_possession_use_share",
+            (teamAUse > 0 ? sUse / teamAUse : 0.0).ToString("F4")));
+
+        TeamBox("teamA", TeamA, aOrb, aDrb);
+        TeamBox("teamB", TeamB, bOrb, bDrb);
+
+        // ── team zone mix (offense-keyed shot shares + zone FG%) ─────────────────
+        string[] zoneNames = { "rim", "short", "mid", "long", "three" };
+        void ZoneMix(string tag, int ti)
+        {
+            long tot = 0; for (var z = 0; z < 5; z++) tot += box.ZoneFga[ti, z];
+            for (var z = 0; z < 5; z++)
+                Rate($"{tag}_zone_{zoneNames[z]}", box.ZoneFga[ti, z], tot);
+            for (var z = 0; z < 5; z++)
+                Pct($"{tag}_zone_{zoneNames[z]}", box.ZoneFgm[ti, z], box.ZoneFga[ti, z]);
+        }
+        ZoneMix("teamA", 0);
+        ZoneMix("teamB", 1);
+
+        return cols;
+    }
+
+    // ── S47: console headline — scannable, NOT a duplicate of the CSV width ───────
+    private static void PrintSweepBoxHeadline(
+        SweepConfig config, List<(SweepRung Rung, SweepRungResult R)> results)
+    {
+        int sw = config.SweptSlot;
+
+        Console.WriteLine();
+        Console.WriteLine($"  Box headline — swept slot (S{sw}) + team scoring");
+        Console.WriteLine(
+            $"  {"Row",-26}  {"PTS",5}  {"FG%",5}  {"3P%",5}  {"FT%",5}  " +
+            $"{"REB",5}  {"AST",4}  {"STL",4}  {"BLK",4}  {"TO",4}  {"Use%",5}  {"A.PTS",6}  {"B.PTS",6}");
+        Console.WriteLine($"  {new string('-', 108)}");
+
+        foreach (var (rung, rr) in results)
+        {
+            var t = rr.Reb; var box = rr.Box;
+            double g = t.Games;
+            int sw0 = sw - 1;
+
+            long sFgm = box.Fgm[sw0], s3pm = box.Tpm[sw0], sFtm = box.Ftm[sw0];
+            long sFga = box.Fga[sw0], s3pa = box.Tpa[sw0], sFta = box.Fta[sw0];
+            long sReb = t.AOReb[sw0] + t.ADReb[sw0];
+            long sPts = 2 * sFgm + s3pm + sFtm;
+            double sUse = sFga + 0.44 * sFta + box.To[sw0];
+
+            double FgP = sFga > 0 ? 100.0 * sFgm / sFga : 0.0;
+            double TpP = s3pa > 0 ? 100.0 * s3pm / s3pa : 0.0;
+            double FtP = sFta > 0 ? 100.0 * sFtm / sFta : 0.0;
+
+            long aFgm = 0, a3pm = 0, aFtm = 0, bFgm = 0, b3pm = 0, bFtm = 0;
+            double teamAUse = 0;
+            for (var i = 0; i < 5; i++)
+            {
+                aFgm += box.Fgm[i]; a3pm += box.Tpm[i]; aFtm += box.Ftm[i];
+                teamAUse += box.Fga[i] + 0.44 * box.Fta[i] + box.To[i];
+            }
+            for (var i = 5; i < 10; i++) { bFgm += box.Fgm[i]; b3pm += box.Tpm[i]; bFtm += box.Ftm[i]; }
+            double aPts = (2 * aFgm + a3pm + aFtm) / g;
+            double bPts = (2 * bFgm + b3pm + bFtm) / g;
+            double useShare = teamAUse > 0 ? 100.0 * sUse / teamAUse : 0.0;
+
+            Console.WriteLine(
+                $"  {rung.Label,-26}  {sPts / g,5:F1}  {FgP,5:F1}  {TpP,5:F1}  {FtP,5:F1}  " +
+                $"{sReb / g,5:F1}  {box.Ast[sw0] / g,4:F1}  {box.Stl[sw0] / g,4:F1}  " +
+                $"{box.Blk[sw0] / g,4:F1}  {box.To[sw0] / g,4:F1}  {useShare,5:F1}  {aPts,6:F1}  {bPts,6:F1}");
+        }
+
+        // Team shot mix (attempt share, %) — Team A then Team B.
+        Console.WriteLine();
+        Console.WriteLine("  Team shot mix — attempt share % (Rim / Short / Mid / Long / 3PA)");
+        Console.WriteLine(
+            $"  {"Row",-26}  {"A:Rim",6}  {"Short",6}  {"Mid",6}  {"Long",6}  {"3PA",6}  " +
+            $"{"B:Rim",6}  {"Short",6}  {"Mid",6}  {"Long",6}  {"3PA",6}");
+        Console.WriteLine($"  {new string('-', 108)}");
+
+        foreach (var (rung, rr) in results)
+        {
+            var box = rr.Box;
+            string Row(int ti)
+            {
+                long tot = 0; for (var z = 0; z < 5; z++) tot += box.ZoneFga[ti, z];
+                var parts = new double[5];
+                for (var z = 0; z < 5; z++) parts[z] = tot > 0 ? 100.0 * box.ZoneFga[ti, z] / tot : 0.0;
+                return $"{parts[0],6:F1}  {parts[1],6:F1}  {parts[2],6:F1}  {parts[3],6:F1}  {parts[4],6:F1}";
+            }
+            Console.WriteLine($"  {rung.Label,-26}  {Row(0)}  {Row(1)}");
         }
     }
 
