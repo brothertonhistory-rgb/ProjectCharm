@@ -1,0 +1,16 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "cases",
+  "outputName": "defense_interaction",
+  "cases": [
+    { "label": "FLAT_50_CONTROL",     "dials": {} },
+    { "label": "LOCKDOWN_POA",        "dials": { "PerimeterDefense": 90, "Steals": 85, "OffBallDefense": 75 } },
+    { "label": "HELP_ANCHOR",         "dials": { "HelpDefense": 90, "OffBallDefense": 90 } },
+    { "label": "BALL_HAWK",           "dials": { "Steals": 95, "Hustle": 85 } },
+    { "label": "DEFENSIVE_LIABILITY", "dials": { "PerimeterDefense": 10, "PostDefense": 10, "RimProtection": 10, "Steals": 10, "HelpDefense": 10, "OffBallDefense": 10 } },
+    { "label": "ALL_G_ELITE",         "dials": { "PerimeterDefense": 85, "PostDefense": 85, "RimProtection": 85, "Steals": 85, "HelpDefense": 85, "OffBallDefense": 85 } },
+    { "label": "G_FLOOR_15",          "dials": { "PerimeterDefense": 15, "PostDefense": 15, "RimProtection": 15, "Steals": 15, "HelpDefense": 15, "OffBallDefense": 15 } }
+  ]
+}

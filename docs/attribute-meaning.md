@@ -746,3 +746,158 @@ feeds touches into — POST_SCORER vs POST_HANDS_NO_FINISH is the whole story. S
 pure **team-make multiplier**: +2.3pp team FG% fully stacked, nothing individual, a five-man
 team good. Neither should be sized as a standalone scoring rating. Recommendation on the
 record: size these after the synthesis pass, with the no-post-hunt gap ruled first.
+
+## Family G — Defense (PerimeterDefense, PostDefense, RimProtection, Steals, HelpDefense, OffBallDefense) — measured Session 52
+
+The fifth family through the S47 ruler, and the largest — six isolation walks (0→99 in 5-point
+steps, 2,000 games/rung) plus **two** interaction blocks. Structurally different from A–F: every
+prior family landed the swept player's effect on his own box or his own team's offense. Defense
+is the mirror — a defender's job is to make the *other* team worse — so the primary signal for
+most of Family G lives on **Team B's box** (B.PTS and the CSV's teamB zone FG%), not the swept
+player's own line.
+
+**Two slot blocks (Emmett's S52 ruling).** Six walks + a seven-row interaction block on **slot 1**
+(reproducing the S49 slot-1 anchor: 11.6 PTS / 35.5 FG% / 21.7% use / 1.5 AST / 2.6 TO), because
+Steals' one live team-turnover channel is guard-weighted and expresses on a guard seat, and every
+make-door curve reads just as fully at slot 1 as slot 5 (on a flat-50 opponent every Team B slot
+attacks the same generic diet regardless of the swept slot). Plus a four-row interior block on
+**slot 5** (reproducing the S48/S50/S51 anchor: 9.4 / 34.3 / 49.8) where the interior-defense
+archetypes carry real bodies — the body×interior-defense compound that slot 1 cannot show. Both
+anchors held exactly. **274,000 games**, pure config-and-run — no engine file, no `config.json`,
+no readout change, no Monte Carlo.
+
+### The measurement wall this family hits (logged, not a bug)
+
+The swept defender **guards one of the opponent's five shooters** (slot-guards-slot). So the three
+"guard-your-man" ratings — PerimeterDefense, PostDefense, RimProtection — move the *team* FG%
+about a fifth as much as they move his own man's shot. A lockdown perimeter defender takes real
+points off the man he covers, but on the team scoreboard that shows up as a **whisper** (sub-half-
+point on B.PTS). This is the ruled-as-is limitation: the instrument has no per-opponent-slot column,
+and the on-ball make door is measured diluted. The clean reads for those three ratings live
+elsewhere — in the block column and (for RimProtection) in second-chance defense.
+
+By contrast, **HelpDefense and OffBallDefense are NOT diluted this way** — they are the four
+off-ball defenders' aggregate on nearly every opponent shot, so their team-suppression reads
+clean. And **Steals + RimProtection** print their real work on the swept player's own box (steals,
+blocks) and on second-chance possessions, both undiluted.
+
+### The six curves (opponent points = B.PTS, neutral 50 → 99)
+
+| Rating | B.PTS 50→99 | What it buys |
+|---|---|---|
+| **RimProtection** | 52.9 → 51.6 (**−1.3**) | The biggest team effect of the six. Own BLK 0.7 → 0.9, opponent pushed off the rim (their rim attempt share 28.8 → 27.4). **Not a whisper** — the second-chance channel escapes the on-ball dilution. |
+| **OffBallDefense** | 52.9 → 52.1 (**−0.8**) | Clean team-suppression channel, zero personal-box footprint. Suppresses the opponent's perimeter makes (Long/Three, Mid partial). |
+| **HelpDefense** | 52.9 → 52.3 (**−0.6**) | Clean team-suppression channel, no personal footprint. Suppresses the opponent's interior makes (Rim/Short, Mid partial). Right in the predicted band. |
+| **PostDefense** | 52.9 → 52.5 (**−0.4**) | Barely touches the scoreboard — but transforms **his own** box: REB 7.7 → 8.7, STL 1.3 → 0.9, TO 2.6 → 2.3. The engine reads him as a *bigger player* (see the postness note). |
+| **PerimeterDefense** | 52.9 → 52.8 (**~0**) | Points whisper (the on-ball dilution) — but reshapes the opponent's diet: their 3PA share 20.4 → 19.2, rim share 28.8 → 30.0. Pushes his man off the arc toward the rim. |
+| **Steals** | 52.9 → 52.8 (**~flat**) | Own STL climbs 0.1 → 2.1 — the cleanest, most monotone curve in the session — but **opponent points do not move.** He *claims* steals; he does not *force* new turnovers. |
+
+### Finding 1 — RimProtection is the only "guard-your-man" rating with a real team effect, because it also does second-chance defense.
+
+The other two interior/perimeter ratings are diluted to a whisper on the scoreboard. RimProtection
+is not, and the mechanism is the reason: beyond contesting his own man's rim shot (diluted like the
+rest), it deters and blocks **putback attempts after the opponent grabs an offensive rebound** — a
+five-defender team read, not a one-on-one, so it is not diluted by the slot-guards-slot wall. B.PTS
+falls a clean −1.3 across the walk, the opponent's rim attempt share falls 28.8 → 27.4, and his own
+block line is the strongest own-box signal of any Group-1 rating. **This is the finding that most
+corrects the going-in expectation:** RimProtection's team value is real and readable, where
+PerimeterDefense/PostDefense's headline job is nearly invisible at team scale on this instrument.
+
+### Finding 2 — PostDefense barely touches the scoreboard, but it is one-third of how the engine decides a player's size.
+
+Walking PostDefense 0→99 leaves opponent points nearly flat (−0.4) but moves the swept player's own
+box hard: rebounds 7.7 → 8.7, steals 1.3 → 0.9, turnover blame 2.6 → 2.3, usage 21.9% → 21.2%. None
+of that is post defense working or failing — it is the engine **reclassifying him as a big.**
+`Matchup.Postness` reads Height, PostDefense, and Strength in equal thirds, so raising PostDefense
+alone raises his "postness," which the rebound-position, steal-share, and turnover-blame pickers all
+read: bigs get better board position, a smaller slice of the team's steals, and less turnover blame.
+**Consequence for the generation redesign: a "great post defender" rating currently reads more as
+"is a big" than "stops post scoring."** Logged for synthesis — a design conversation, not a
+this-session fix.
+
+### Finding 3 — Steals is claim, not creation.
+
+The Steals walk produces the cleanest single curve in the session — own STL 0.1 → 2.1, monotone
+across all 21 rungs — while **opponent points stay flat and opponent turnovers do not rise.** The
+one live team-turnover channel (Roll A, guard-weighted) barely moves the needle at neutral pressure;
+what the rating actually buys is a bigger *share* of his team's existing steals (the StealerPicker
+attribution weight), not more forced turnovers. BALL_HAWK confirms it from the archetype side (below).
+This mirrors the S49 BallHandling finding on the defensive side: the disruption channels are
+pressure-gated toward zero at neutral, so steal *rating* on this bench is an attribution dial, not a
+turnover-forcing dial. The turnover-forcing side needs a non-neutral pressure setting to express —
+recorded, parked to the coaching layer, same as BallHandling's pressure-dialed test.
+
+### Finding 4 — HelpDefense and OffBallDefense are the clean team-suppression pair, and they are symmetric.
+
+Both escape the slot-guards-slot dilution because they aggregate the four off-ball defenders on
+nearly every opponent shot. HelpDefense suppresses interior makes (Rim/Short full, Mid ×0.30, zero
+outside): B.PTS −0.6. OffBallDefense suppresses perimeter makes (Long/Three full, Mid ×0.30, zero
+inside): B.PTS −0.8. Neither leaves any footprint on the swept player's own box — no steals, no
+blocks, no rebounds move — exactly as wired. HELP_ANCHOR (below) is the marquee clean read.
+
+**OffBallDefense's per-man denial channel is live but unmeasurable on this bench.** When the old
+team-wide perimeter selection-squeeze was retired (Phase 46), it was replaced by a per-man version:
+a defender with high OffBallDefense takes touches away from the specific man he covers. On a flat-50
+opponent — five identical clones — taking a touch from one clone and handing it to another changes
+nothing measurable. So this channel is real in the source and correctly invisible here; noted in the
+completeness ledger, not the retired pile. (PostDefense has the same kind of invisible per-man denial
+read, for the same reason.)
+
+### Interaction block A — one defender, slot 1
+
+| Row | B.PTS | Read |
+|---|---|---|
+| FLAT_50_CONTROL | 52.9 | The slot-1 anchor, exactly (11.6 / 35.5 / 21.7% use / 1.5 AST / 2.6 TO). |
+| **HELP_ANCHOR** (HelpDef 90, OffBallDef 90) | **51.8 (−1.1)** | **The cleanest row in the session** — both team channels maxed, zero on-ball skill. One player running two off-ball channels = half of what a full elite defender is worth, spread across interior and perimeter zones. |
+| **BALL_HAWK** (Steals 95, Hustle 85) | 52.8 (~0) | 2.2 personal steals, 8.7 rebounds — **opponent points unchanged.** Textbook confirmation of Finding 3: he stat-pads on steals and boards (Hustle claims share too), the opponent scores the same. |
+| LOCKDOWN_POA (PerimDef 90, Steals 85, OffBallDef 75) | 52.3 (−0.6) | The point-of-attack stopper. Opponent perimeter diet compresses (3PA share 20.4 → 19.6), own STL up to 1.9, modest team-points dip — the on-ball dilution keeping it modest, as ruled. |
+| **DEFENSIVE_LIABILITY** (all six at 10) | **55.0 (+2.1)** | One catastrophic defender lets the opponent score +2.1. He nearly vanishes from the box (0.4 STL, 0.4 BLK). |
+| **ALL_G_ELITE** (all six at 85) | **50.6 (−2.3)** | One complete defender is worth ~2.3 opponent points. The terrible-to-elite swing (LIABILITY→ELITE) is ~4.4 points. |
+| G_FLOOR_15 (all six at 15) | 54.6 (+1.7) | The near-floor mirror, milder than LIABILITY. |
+
+### Interaction block B — the interior anchor, slot 5, with a real body
+
+| Row | B.PTS | Own BLK / REB | Read |
+|---|---|---|---|
+| FLAT_50_CONTROL_S5 | 52.9 | 0.7 / 7.7 | The slot-5 anchor, exactly (9.4 / 34.3 / 49.8). |
+| **RIM_PROTECTOR** (RimProt 90, HelpDef 85, Height 85, Wingspan 85) | **50.9 (−2.0)** | **1.2 / 10.6** | The marquee compound: against the bodiless RimProtection-90 walk row (−0.8, 0.9 BLK), the real frame adds ~1.2 points of suppression and +0.3 blocks. **The body×interior-defense compound is real and visible** — skill and length compounding, exactly the S50 body-amplifier thesis on the defensive side. |
+| **INTERIOR_WALL** (RimProt 90, PostDef 90, HelpDef 90, Height 85, Wingspan 85, Strength 80) | **50.4 (−2.5)** | **1.3 / 11.8** | The full interior package: the biggest single-player suppression measured in the whole session. |
+| POST_STOPPER (PostDef 90, Strength 80, Height 80) | 52.2 (−0.7) | 0.9 / 10.2 | The interior wall against the opponent's short/mid game; the big glass comes from the body plus the postness reclassification (Finding 2). |
+
+### The generation-redesign feed (what the six defensive ratings buy)
+
+- **RimProtection** is the one guard-your-man rating with a real, readable team effect — through
+  second-chance defense (deters and blocks putbacks), not the diluted on-ball door. Its own block
+  line is the strongest individual signal. It compounds with the body (RIM_PROTECTOR vs the bodiless
+  walk row).
+- **HelpDefense + OffBallDefense** are the clean team-suppression pair — undiluted (four off-ball
+  defenders), symmetric (interior vs perimeter), no personal-box footprint. HELP_ANCHOR ≈ −1.1 with
+  two channels; a full defender ≈ −2.3.
+- **Steals** is an attribution dial at neutral pressure — it claims a bigger share of the team's
+  steals but does not force new turnovers. The turnover-forcing side is pressure-gated and needs the
+  coaching layer to express.
+- **PerimeterDefense + PostDefense** do their headline job (worse shots for the man they guard) real
+  but **diluted to a whisper at team scale** on this instrument — their clean reads are the block-
+  attribution column and (PerimeterDefense) the opponent's diet reshape. PostDefense additionally
+  moves the player's size classification more than it moves opponent scoring (Finding 2).
+- The full defensive package is worth ~2.3 opponent points for one perimeter defender and ~2.5 for
+  one interior anchor — real and clean at the archetype level, even though two of the six ratings'
+  headline jobs are diluted at the walk level.
+
+### Completeness ledger (the honest note)
+
+- **Steals + PerimeterDefense** — role-aligned at slot 1; Steals fully measured as an attribution
+  dial, its turnover-forcing side parked to the coaching layer (pressure-gated).
+- **HelpDefense + OffBallDefense** — broadly and cleanly measured (four-off-ball team suppression);
+  OffBallDefense's per-man denial channel is live-but-unmeasurable on a flat-clone opponent.
+- **RimProtection + PostDefense** — curves measured at slot 1, the body×interior compound added on
+  slot 5. The on-ball per-opponent suppression stays diluted (no opponent-slot box exists), and the
+  slot-5 rows are archetype points, not full body-conditioned curves.
+- **No additional Family-G bench work is required before synthesis.** The two-slot design measured
+  everything this instrument can show; the remaining questions (per-opponent-slot suppression, the
+  pressure-dialed turnover-forcing side of Steals, the PostDefense-as-size coupling) are design
+  conversations for synthesis and the coaching layer, not more sweeps.
+- **Adjacent flags carried:** the S50 wingspan→steals wiring question is unchanged by this pass
+  (Steals is an attribution dial, not a deflection engine — long arms buying deflections remains
+  unwired and un-argued-for); the S49 unforced-turnover reshaper sits adjacent to the Steals
+  attribution machinery but is untouched here.

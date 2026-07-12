@@ -1,0 +1,8 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "walk",
+  "outputName": "HelpDefense",
+  "walk": { "field": "HelpDefense", "start": 0, "stop": 99, "step": 5 }
+}

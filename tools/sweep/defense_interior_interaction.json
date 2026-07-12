@@ -1,0 +1,13 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 5,
+  "mode": "cases",
+  "outputName": "defense_interior_interaction",
+  "cases": [
+    { "label": "FLAT_50_CONTROL_S5", "dials": {} },
+    { "label": "RIM_PROTECTOR",      "dials": { "RimProtection": 90, "HelpDefense": 85, "Height": 85, "Wingspan": 85 } },
+    { "label": "POST_STOPPER",       "dials": { "PostDefense": 90, "Strength": 80, "Height": 80 } },
+    { "label": "INTERIOR_WALL",      "dials": { "RimProtection": 90, "PostDefense": 90, "HelpDefense": 90, "Height": 85, "Wingspan": 85, "Strength": 80 } }
+  ]
+}
