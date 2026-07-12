@@ -625,3 +625,124 @@ the leans.
 The time-sliced fatigue bench (Endurance's temporal shape); the JumpBall first-possession
 counter (Wingspan's tip read); the four design questions above. All carried flags from
 S48/S49 unchanged.
+
+---
+
+## Family F — Interior offense (PostMoves, Screening) — measured Session 51
+
+The fourth family and the smallest: two ratings, two isolation walks, one seven-row
+interaction block, all on slot 5 (the S48/S50 anchor seat — every Family F channel is
+attribute-driven or an all-five aggregate, so slot choice buys direct comparison against
+Scoring and Physical at no cost). 2,000 games/rung, 98,000 games total. Config-and-run;
+the S47 full-box readout is the instrument, nothing in the engine moved.
+
+**Determinism.** Both walks' 50-rungs and FLAT_50_CONTROL reproduce the anchor **9.4 PTS
+/ 34.3 FG% / 49.8 FT%** — the world unmoved since S48.
+
+### The wiring (what the source actually reads)
+
+- **PostMoves — three gameplay reads.** (1) Roll E usage score: `(Close + PostMoves)/2 ×
+  0.30` — the *raw* contribution is identical to Close's at equal weight. (2) The Roll E
+  denial post-channel: `PostDefense − (Strength + PostMoves)/2`, blended at the postness
+  weight — a second getting-the-ball channel that survives denial, the only rating measured
+  so far with two stacked ball-getting doors. (3) Gravity postAccess: `(PostMoves +
+  Strength)/2`, whisper-scale (two downstream consumers, both below noise). **No make read,
+  no diet read.**
+- **Screening — one gameplay read.** An all-five offensive aggregate (shooter included, no
+  exclusions), halfcourt-only, bonus-only, lifting make% on **all five zones** (`makePct +=
+  0.15 × (Σ Screening/100 / 5)²`). No usage, picker, defensive, or rebounding read anywhere.
+
+### The two curves (isolated walks, swept player)
+
+| Rating | Usage % (0 → 99) | Swept FG% | Team A FG% | Personal TO | Notes |
+|---|---|---|---|---|---|
+| **PostMoves** | 12.7 → **23.9** | 35.3 → 33.8 (−1.5) | ~34.3 flat | 1.9 → 2.7 | touches up, diet flat, no make term |
+| **Screening** | **18.2 flat** | 33.2 → 35.5 (with team) | 33.2 → **35.5** (+2.3) | 2.3 flat | pure team make; individual line untouched |
+
+### Finding 1 — Screening is the biggest team-wide single-rating channel on the bench
+
+One player walking Screening 0→99 lifts **team A FG% +2.3pp** (33.2 → 35.5) and team points
++2.7 (51.4 → 54.1). Nothing measured prior comes close — S48's best gravity lift was under a
+point. The lift reaches all five zones, threes included (3P% 22.0 → 24.4), confirming the
+Phase 44 all-zone gate live. The swept player's own points rise 9.1 → 9.6 **purely through
+his own FG% climbing with the team on flat 18% usage** — Screening buys him nothing
+individually, only a slice of better team looks. Usage, steals, and blocks are dead-flat
+across all 21 rungs (no wire can move them). Rebound ripple runs **down** (RebΔ −0.6 → +0.2:
+fewer team misses to grab — the standing make-raiser signature).
+
+The +2.3pp landed at the **top** of the pre-stated +1.7–2.3pp band, so the halfcourt share is
+on the high side of the 0.60–0.75 dilution assumption. (A precise dilution number was
+unavailable — the readout has no transition/fast-break-share column; reported at the gate,
+banded not computed.)
+
+### Finding 2 — PostMoves buys touches that arrive at a generic diet (the no-post-hunt gap)
+
+PostMoves lifts usage **12.7% → 23.9%** — steeper than Close's S48 14%→22% at both ends,
+because the two stacked ball-getting channels (usage score *and* denial survival) compound.
+But **the shot mix never moves**: Rim 28.4 → 28.2, Short/Mid/Long/Three all flat across the
+whole walk. **The engine has no way for a post player to hunt post shots through PostMoves.**
+His extra possessions spread across the same generic diet everyone shoots, because the
+displacement diet bend reads `OffenseRating(zone, shooter)` — Outside/Mid/Close/Finishing
+only — and PostMoves is not in that map. This is the interior analog of S49's missing
+ball-dominance layer, and the family's first-order design finding.
+
+His FG% falls 35.3 → 33.8 (−1.5pp): no make term, so extra volume through flat zone skills
+costs efficiency (the milder SelfCreation shape). Personal TO rises 1.9 → 2.7 (more touches,
+more giveaways — the involvement channel; the postness *multipliers* stay pinned on this
+bench, so the rise is pure volume). Steals and blocks flat.
+
+POST_SCORER confirms the mechanism from the other side: it **does** tilt the diet inside
+(Short 17.5 → 19.5), but through its Close/Finishing 90 — not its PostMoves. Skill hunts its
+spots; PostMoves just delivers the ball there.
+
+### Finding 3 — the tweener-post exists (a parked design requirement, closed affirmative)
+
+TWEENER_POST — Height 15, Wingspan 20, Strength 45, PostMoves 90, Close 75, a guard-sized
+body carrying a post skill package — scores **13.5 PTS on 35.4 FG% at 25.4% usage.** A
+genuine interior threat whose skill overrides his size for both getting the ball and keeping
+it. The missing size leg shows exactly where the divisional-sorting principle predicts:
+rebounding collapses (7.7 → 5.8 REB), rim protection drops (BLK 0.7 → 0.5), efficiency barely
+clears control (35.4 vs 34.3) — but none of it strands him. He functions as a D2/D3 big and,
+with a modicum of perimeter skill, would unlock D1. **The generation redesign is now cleared
+to produce him.** (Curiosity, classified noise: steals 1.6 vs 1.2 control, no wire connecting
+his low height to steals, five dials moving — a CSV glance, not a bug lead.)
+
+### The interaction block (seven rows)
+
+| Row | Dials | PTS | FG% | Use % | A.PTS | Read |
+|---|---|---|---|---|---|---|
+| FLAT_50_CONTROL | — | 9.4 | 34.3 | 18.2 | 52.8 | anchor |
+| POST_SCORER | PM90 Cl90 Fin90 Str75 | **17.6** | 42.9 | 28.0 | 57.4 | dominant interior line; tilts inside via Close/Fin |
+| TWEENER_POST | H15 W20 Str45 PM90 Cl75 | 13.5 | 35.4 | 25.4 | 54.2 | **functions** — the marquee row |
+| POST_HANDS_NO_FINISH | PM90 Fin10 Cl10 | 8.7 | 31.2 | 17.8 | 52.4 | interior Hack-a-Shaq, below control |
+| SCREEN_BIG | Scr90 Str85 H85 ORB75 | 9.8 | 36.8 | 17.5 | 55.0 | pure team value; 10.8 REB, +2.2 margin |
+| ALL_F_ELITE | PM85 Scr85 | 11.6 | 34.6 | 22.2 | 54.0 | both channels live |
+| F_FLOOR_15 | PM15 Scr15 | 7.1 | 34.0 | 14.2 | 51.7 | both drag down modestly |
+
+Readings: **POST_SCORER** is the block's biggest personal line, clearing S48's rim-only elite
+(12.9) easily — both touch channels plus real interior finishing plus the heaviest gravity
+levers, and it tilts the team diet inside (its Close/Finishing, not its PostMoves).
+**POST_HANDS_NO_FINISH** scores *below* control (8.7 vs 9.4) — gets post position, bricks, and
+the offense partly quarantines him (Rim 28.8 → 28.0); the interior twin of S48's Hack-a-Shaq.
+**SCREEN_BIG** is read by his margin, not his line — 9.8 personal points but +2.2 team margin
+and 10.8 boards (the S45 body amplifier on the OffReb 75).
+
+### The design bundle this measurement feeds (nothing wired)
+
+- **The no-post-hunt gap (new).** PostMoves gets a post player the ball but the engine cannot
+  express "he hunts post shots" — his volume arrives at a generic diet. The interior analog of
+  S49's missing ball-dominance layer. Whether a PostMoves→interior-diet wire should exist is a
+  design conversation, logged for Emmett.
+- **The tweener-post requirement — CLOSED affirmative** (Finding 3). Removed from the parked
+  list; the generation redesign is cleared to produce guard-sized post-skill players.
+- Sits alongside the still-open S50 questions (chiefly the **height-over-defender make term**,
+  which most gates the height→skill lean sizing) and the S49 reshapers.
+
+### The generation-redesign feed (what PostMoves and Screening buy)
+
+PostMoves is a pure **touch-getter**: +11pp of usage across a full walk, zero diet shaping, a
+mild efficiency tax, no make term. Its value is entirely downstream of the zone skills it
+feeds touches into — POST_SCORER vs POST_HANDS_NO_FINISH is the whole story. Screening is a
+pure **team-make multiplier**: +2.3pp team FG% fully stacked, nothing individual, a five-man
+team good. Neither should be sized as a standalone scoring rating. Recommendation on the
+record: size these after the synthesis pass, with the no-post-hunt gap ruled first.

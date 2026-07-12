@@ -1,0 +1,8 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 5,
+  "mode": "walk",
+  "outputName": "PostMoves",
+  "walk": { "field": "PostMoves", "start": 0, "stop": 99, "step": 5 }
+}

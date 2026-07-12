@@ -1,0 +1,16 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 5,
+  "mode": "cases",
+  "outputName": "interior_offense_interaction",
+  "cases": [
+    { "label": "FLAT_50_CONTROL",      "dials": {} },
+    { "label": "POST_SCORER",          "dials": { "PostMoves": 90, "Close": 90, "Finishing": 90, "Strength": 75 } },
+    { "label": "TWEENER_POST",         "dials": { "Height": 15, "Wingspan": 20, "Strength": 45, "PostMoves": 90, "Close": 75 } },
+    { "label": "POST_HANDS_NO_FINISH", "dials": { "PostMoves": 90, "Finishing": 10, "Close": 10 } },
+    { "label": "SCREEN_BIG",           "dials": { "Screening": 90, "Strength": 85, "Height": 85, "OffensiveRebounding": 75 } },
+    { "label": "ALL_F_ELITE",          "dials": { "PostMoves": 85, "Screening": 85 } },
+    { "label": "F_FLOOR_15",           "dials": { "PostMoves": 15, "Screening": 15 } }
+  ]
+}
