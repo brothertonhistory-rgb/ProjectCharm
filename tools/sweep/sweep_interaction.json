@@ -1,0 +1,17 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 5,
+  "mode": "cases",
+  "outputName": "rebounding_interaction",
+  "cases": [
+    { "label": "FLAT_50_CONTROL",         "dials": {} },
+    { "label": "BODY50_REB0",             "dials": { "OffensiveRebounding": 0,  "DefensiveRebounding": 0 } },
+    { "label": "BODY50_REB50",            "dials": { "OffensiveRebounding": 50, "DefensiveRebounding": 50 } },
+    { "label": "BODY50_REB99",            "dials": { "OffensiveRebounding": 99, "DefensiveRebounding": 99 } },
+    { "label": "TERRIBLE_BODY_GREAT_REB", "dials": { "Height": 15, "Wingspan": 15, "Strength": 15, "OffensiveRebounding": 99, "DefensiveRebounding": 99 } },
+    { "label": "FREAK_BODY_ZERO_REB",     "dials": { "Height": 99, "Wingspan": 99, "Strength": 99, "OffensiveRebounding": 0,  "DefensiveRebounding": 0 } },
+    { "label": "FREAK_BODY_GREAT_REB",    "dials": { "Height": 99, "Wingspan": 99, "Strength": 99, "OffensiveRebounding": 99, "DefensiveRebounding": 99 } },
+    { "label": "TERRIBLE_BODY_ZERO_REB",  "dials": { "Height": 15, "Wingspan": 15, "Strength": 15, "OffensiveRebounding": 0,  "DefensiveRebounding": 0 } }
+  ]
+}

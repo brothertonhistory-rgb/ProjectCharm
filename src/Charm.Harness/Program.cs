@@ -29,6 +29,12 @@ internal static partial class Program
         // dotnet run -- pbblocktest  runs the putback block ladder (block rate, Rim; not in the validation suite).
         if (args.Length > 0 && args[0] == "pbblocktest") { RunPutbackBlockExperiment(configPath); return 0; }
 
+        // dotnet run -- sweep [path]  the general attribute-sweep findings bench (not in the validation
+        // suite). Walks one rating on one Team A slot up its range (or runs named stress rows) through the
+        // real engine and tabulates the outcome. configPath is the engine config.json (for the games);
+        // args[1], if given, is the sweep config path — otherwise "sweep.json" resolves from the cwd.
+        if (args.Length > 0 && args[0] == "sweep") { RunAttributeSweep(configPath, args.Length > 1 ? args[1] : null); return 0; }
+
         // dotnet run -- bench [path]  runs the player-generation lab bench (not in the validation suite).
         // configPath is the engine config.json (for the generators); args[1], if given, is the bench
         // config path — otherwise the bench resolves "bench.json" from the current directory.
