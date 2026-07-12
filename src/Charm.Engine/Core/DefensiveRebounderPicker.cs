@@ -6,12 +6,19 @@ namespace Charm.Engine;
 /// harness <c>WeightedDraw</c> for rebounding.
 ///
 /// <para><b>Weight formula — mirrors <see cref="OffensiveRebounderPicker"/> exactly,
-/// defensive side, no shooterNerf.</b> Each defensive player's pick weight is
-/// <c>max(1, DefensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier)</c>.
+/// defensive side, no shooterNerf (S46 shape).</b> Each defensive player's pick weight is
+/// <c>ReboundLuckWeight + DefensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier
+/// × HustleMultiplier + ReboundBodyPullWeight × max(0, ReboundPhysical − lineupMean)
+/// + ReboundBodyFloorCeiling × tanh(max(0, ReboundPhysical − ReboundBodyFloorReference) / ReboundBodyFloorScale)</c>.
 /// The <see cref="Matchup.ReboundWingspanMultiplier"/> is the same shared helper used by
-/// the offensive picker — a player with longer arms than his defensive teammates pulls a
-/// slightly larger share of his team's defensive boards. The floor of 1 ensures every
-/// populated defensive slot has a nonzero draw probability even when ratings are low.</para>
+/// the offensive picker. The S46 additive body term (the block-picker parallel) gives a
+/// big body standalone individual rebounding pull independent of the rating — one-sided,
+/// so a below-mean body gets zero, never a second penalty. The S46b saturating body
+/// FLOOR is a second, absolute channel — raw size vs a fixed reference (not the lineup
+/// mean) — so a bigger body claims more of the random loose balls regardless of
+/// teammates; tanh saturation keeps a genuine big from ballooning. The luck weight is
+/// every populated slot's equal claim on uncontested bounces; it replaces the retired
+/// floor of 1 and guarantees a nonzero draw probability (weight ≥ Luck &gt; 0).</para>
 ///
 /// <para><b>No shooterNerf.</b> The offense has a shooter whose body is still moving away
 /// from the basket; the defense does not. Confirmed in adversarial check #5: there is no
@@ -32,7 +39,9 @@ public static class DefensiveRebounderPicker
     /// Consumes exactly one <paramref name="rng"/> draw.
     ///
     /// <para>Weight per populated defensive player:
-    /// <c>max(1, DefensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier)</c>,
+    /// <c>Luck + DefensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier
+    /// × HustleMultiplier + BodyPull × max(0, ReboundPhysical − lineupMean)
+    /// + FloorCeiling × tanh(max(0, ReboundPhysical − FloorReference) / FloorScale)</c>,
     /// normalized among the five slots. Null slots contribute 0.
     /// Throws <see cref="InvalidOperationException"/> if no defensive slot is
     /// populated — a defensive rebound with zero defenders on the floor is an
@@ -60,6 +69,7 @@ public static class DefensiveRebounderPicker
         // lineup. Same Matchup statics, same lineup-mean baseline.
         var postnesses  = new double[5];
         var wingspans   = new double[5];
+        var physicals   = new double[5];   // S46: ReboundPhysical per player (body pull)
         var populated   = new bool[5];
         var playerCount = 0;
 
@@ -70,6 +80,7 @@ public static class DefensiveRebounderPicker
             if (p is null) continue;
             postnesses[i] = Matchup.Postness(p, matchupCfg);
             wingspans[i]  = p.Wingspan;
+            physicals[i]  = Matchup.ReboundPhysical(p, matchupCfg);
             populated[i]  = true;
             playerCount++;
         }
@@ -89,12 +100,24 @@ public static class DefensiveRebounderPicker
             if (populated[i]) meanWingspan += wingspans[i];
         meanWingspan /= playerCount;
 
+        // S46: lineup-mean ReboundPhysical — the body pull is centered on it, mirroring
+        // the wingspan multiplier's lineup-mean pattern (same body composite the team
+        // battle uses, so "body" means one thing in both rebound steps).
+        var meanPhysical = 0.0;
+        for (var i = 0; i < 5; i++)
+            if (populated[i]) meanPhysical += physicals[i];
+        meanPhysical /= playerCount;
+
         // ── Stage 2: compute per-player pick weights ──────────────────────────────
-        // weight = max(1, DefensiveRebounding × PositionalWeight(postness)
-        //                                     × ReboundWingspanMultiplier)
+        // weight = Luck + DefensiveRebounding × PositionalWeight(postness)
+        //                                     × ReboundWingspanMultiplier
+        //                                     × HustleMultiplier
+        //               + BodyPull × max(0, ReboundPhysical − lineupMean)
         // No shooterNerf — the defense has no shooter (adversarial check #5).
-        // The floor of 1 ensures every populated defensive slot has a nonzero
-        // draw probability even for a DefReb=0 player or a positionless lineup.
+        // S46: the luck weight (every slot's equal claim on uncontested bounces)
+        // replaces the retired floor of 1 and keeps every populated slot's draw
+        // probability nonzero (weight ≥ Luck > 0). The one-sided body term gives a
+        // big body standalone pull independent of the rating (block-picker parallel).
         var weights     = new double[5];
         var totalWeight = 0.0;
 
@@ -114,7 +137,21 @@ public static class DefensiveRebounderPicker
             var hm = 1.0 + matchupCfg.HustleRebounderSteepness
                          * Math.Tanh((p.Hustle - 50.0) / matchupCfg.HustleRebounderScale);
 
-            weights[i]   = Math.Max(1.0, p.DefensiveRebounding * pw * wm * hm);
+            var bodyPull  = matchupCfg.ReboundBodyPullWeight
+                          * Math.Max(0.0, physicals[i] - meanPhysical);
+
+            // S46b: saturating "big-target" loose-ball floor — ABSOLUTE size vs a FIXED
+            // reference (not the lineup mean), so a bigger body earns more of the random
+            // caroms regardless of teammates; tanh saturates so a genuine big does not
+            // balloon. Separates the mushy bottom of the height ladder.
+            var absFloor  = matchupCfg.ReboundBodyFloorCeiling
+                          * Math.Tanh(Math.Max(0.0, physicals[i] - matchupCfg.ReboundBodyFloorReference)
+                                      / matchupCfg.ReboundBodyFloorScale);
+
+            weights[i]   = matchupCfg.ReboundLuckWeight
+                         + p.DefensiveRebounding * pw * wm * hm
+                         + bodyPull
+                         + absFloor;
             totalWeight += weights[i];
         }
 

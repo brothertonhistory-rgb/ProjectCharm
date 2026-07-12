@@ -9,7 +9,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
 - Keep it short. This is a checklist, not a third journal. One line per item, with the
   session/phase that owns the detail.
 
-Last updated: Session 45 (2026-07-11; **Attribute-Meaning layer opened** — the general `sweep` findings bench is BUILT and proven on Rebounding. One harness instrument (`Program.Checks.AttributeSweep.cs`, token `sweep`) that pins a flat all-50 world, walks one rating up 0→99 on one player (or runs named stress rows), runs N seeded real games per rung, and prints rating → real outcome; a generalization of `sizetest`/`athtest`/`deftest` on the S24 lab-bench builder, aimed by a live-path text config. **Rebounding finding:** rebounding is a rating-gated skill the body *amplifies but does not grant* — a freak body with a zero rebounding rating grabs the same ≈0.2 boards/game a tiny weakling does, because the individual rebounder picker makes the body a multiplier on the rating (floored to 1 at rating 0), not a standalone term; blocks are the correct *additive* template. **Ruling: the 55/45 rebound team split stays** (the culprit is the picker, not the blend). Harness-only, engine untouched, three proof runs green on Emmett's machine with all control anchors holding. **Next: the rebounder-picker body-floor fix** (give the pickers additive height/wingspan/strength terms, the `BlockerWeight` shape) — this redirects the stale "aim at the next family" line. Prior: Session 44 (2026-07-09; C# port Phase 2 — the LIVE skill-first generator is built and proven, **standalone**: `src/Charm.Engine/Core/Sampling.cs` (Beta/Gaussian/Exponential on `IRng`; Marsaglia–Tsang k≥1 only) + `PlayerGenPass2Live.cs` (the 40-slot draw loop calling the Phase-1 transforms; `BuildCohort` returns Draws+Result pairs) + the pure `ComputeHeightShape` extraction in the locked transform (re-proven bit-for-bit by Phase 59 every run) + five dormant Player seats (latent/current/runway/arrival/class, outside `Validate()`) + the Phase 60 gate (sampler moments at N=200k against closed forms, all four live Beta pairs; then eight design-invariant bands + determinism on the canonical 46k cohort). Green on Emmett's machine — all moments OK, all bands OK ([B] 0.597, [E] +0.004, [C] 5 giants, [F3] PostMoves 5.89% vs OBD 6.02% inside the −0.5pp band, [G] 25,825 recruitable), Phase 59 still 0 failures / 0.0 deviation, Phases 54/55 unchanged, `ALL CHECKS PASSED`. **Scope reshaped at the S44 draft audit:** enforcer deletion + the season-pool swap + the season re-check are NOT a port — the skill-first cohort is positionless and the divvy is quota-based — so they moved to **Phase 3**, which opens with the positions-from-orientation design conversation. Ruled at the gate: class variation is legal (zero 7'3"+ players is an honest draw). Prior: Session 43 (2026-07-08; C# port Phase 1 — the deterministic MATH ported and proven exact against the S42.2 fixture: 57/57 constants, 306 players / 51,714 checks / 0 failures / 0.0 deviation at absolute 1e-9). Prior: Session 42.2 (replay fixture + reference reader committed); 42.1 (oracle re-locked after three bounded fixes); 42 (skill-first oracle locked as the port spec); 41 (assists 13.7 OK, steals 6.5 OK, rebound instrument audited). Post-S41 ruling: OT-LOW parked under the coaching / late-game-strategy layer.
+Last updated: Session 46 (2026-07-11; **Rebounder-picker body floor SHIPPED** — the S45-diagnosed bug is fixed. Both rebounder pickers (`OffensiveRebounderPicker`, `DefensiveRebounderPicker`) now weight each player `Luck + Rating × PositionalWeight × WingspanMultiplier × HustleMultiplier + BodyPull × max(0, ReboundPhysical − lineupMean) + FloorCeiling × tanh(max(0, ReboundPhysical − FloorReference) / FloorScale)` (ORB side × shooter nerf on the whole weight) — the block-picker's additive body shape. **Luck** (5.0, flat) replaced the retired floor-of-1; **body pull** (0.35, relative) rewards out-sizing your lineup; **body floor** (ceiling 4.0 / scale 40 / reference 22.5, absolute + saturating) rewards raw size vs a fixed reference so a big target claims more random loose balls, tanh-capped so a genuine big doesn't balloon. Result on the `sweep`: a freak with a zero rebounding rating grabs **0.2 → 4.86 boards/game**, and the mushy bottom of the zero-rating height ladder separates cleanly (5'8 ≈1.2 → 6'4 ≈2.2 → 7'3+ ≈4.9; average-no-hands 1.32 vs weakling-no-hands 0.67); elite anchors held (freak-elite 17.54, weakling-elite 8.65 by ruling, average-elite 12.27), controls uniform, team margins unchanged (freak-no-hands +2.1 — pure attribution). The 55/45 team split was NOT touched. Green on Emmett's machine (full suite + stress + three sweeps). **Next: resume the attribute-meaning family sweeps** — aim the bench at Body or Athleticism. Prior: Session 45 (2026-07-11; **Attribute-Meaning layer opened** — the general `sweep` findings bench is BUILT and proven on Rebounding. One harness instrument (`Program.Checks.AttributeSweep.cs`, token `sweep`) that pins a flat all-50 world, walks one rating up 0→99 on one player (or runs named stress rows), runs N seeded real games per rung, and prints rating → real outcome; a generalization of `sizetest`/`athtest`/`deftest` on the S24 lab-bench builder, aimed by a live-path text config. **Rebounding finding:** rebounding is a rating-gated skill the body *amplifies but does not grant* — a freak body with a zero rebounding rating grabs the same ≈0.2 boards/game a tiny weakling does, because the individual rebounder picker makes the body a multiplier on the rating (floored to 1 at rating 0), not a standalone term; blocks are the correct *additive* template. **Ruling: the 55/45 rebound team split stays** (the culprit is the picker, not the blend). Harness-only, engine untouched, three proof runs green on Emmett's machine with all control anchors holding. **Next: the rebounder-picker body-floor fix** (give the pickers additive height/wingspan/strength terms, the `BlockerWeight` shape) — this redirects the stale "aim at the next family" line. Prior: Session 44 (2026-07-09; C# port Phase 2 — the LIVE skill-first generator is built and proven, **standalone**: `src/Charm.Engine/Core/Sampling.cs` (Beta/Gaussian/Exponential on `IRng`; Marsaglia–Tsang k≥1 only) + `PlayerGenPass2Live.cs` (the 40-slot draw loop calling the Phase-1 transforms; `BuildCohort` returns Draws+Result pairs) + the pure `ComputeHeightShape` extraction in the locked transform (re-proven bit-for-bit by Phase 59 every run) + five dormant Player seats (latent/current/runway/arrival/class, outside `Validate()`) + the Phase 60 gate (sampler moments at N=200k against closed forms, all four live Beta pairs; then eight design-invariant bands + determinism on the canonical 46k cohort). Green on Emmett's machine — all moments OK, all bands OK ([B] 0.597, [E] +0.004, [C] 5 giants, [F3] PostMoves 5.89% vs OBD 6.02% inside the −0.5pp band, [G] 25,825 recruitable), Phase 59 still 0 failures / 0.0 deviation, Phases 54/55 unchanged, `ALL CHECKS PASSED`. **Scope reshaped at the S44 draft audit:** enforcer deletion + the season-pool swap + the season re-check are NOT a port — the skill-first cohort is positionless and the divvy is quota-based — so they moved to **Phase 3**, which opens with the positions-from-orientation design conversation. Ruled at the gate: class variation is legal (zero 7'3"+ players is an honest draw). Prior: Session 43 (2026-07-08; C# port Phase 1 — the deterministic MATH ported and proven exact against the S42.2 fixture: 57/57 constants, 306 players / 51,714 checks / 0 failures / 0.0 deviation at absolute 1e-9). Prior: Session 42.2 (replay fixture + reference reader committed); 42.1 (oracle re-locked after three bounded fixes); 42 (skill-first oracle locked as the port spec); 41 (assists 13.7 OK, steals 6.5 OK, rebound instrument audited). Post-S41 ruling: OT-LOW parked under the coaching / late-game-strategy layer.
 
 ---
 
@@ -58,6 +58,12 @@ the attribute-meaning layer's instrument).
 over the fixture-proven Phase-1 transforms, Phase 60 statistical gate; produces honest positionless
 46k cohorts on demand; NOTHING downstream reads it until the Phase-3 bridge (divvy/season still run
 Pass 1 with its enforcers).
+**Rebounder-picker body attribution — the S46 fix (LIVE, both pickers run every game):** `OffensiveRebounderPicker`
+and `DefensiveRebounderPicker` credit the individual rebounder with a luck weight (flat, replaced the
+floor-of-1) + a relative body pull (out-size your lineup) + a saturating absolute loose-ball floor (raw
+size vs a fixed reference, tanh-capped) — the block-picker's additive shape. A freak body now corrals
+boards on its own (0.2 → 4.86 boards/game at zero rating); the zero-rating height ladder rises cleanly.
+The team battle (55/45 split) is unchanged. Details in Closed-by-ruling (the S46 shape) + `docs/attribute-meaning.md`.
 
 ## 2. Closed by ruling (looks unfinished — is not; do not "fix")
 
@@ -168,31 +174,38 @@ Pass 1 with its enforcers).
   - **Honest draw, no repair:** no redraws, competency repairs, rating floors, or role/position packages —
     the generator stays an honest cohort; the recruiting line is pure downstream selection.
 
-- **The 55/45 rebound team split stays** (S45, Emmett's ruling). The `sweep` measurement proved
+- **The 55/45 rebound team split stays** (S45, Emmett's ruling; **the picker fix that it pointed to shipped in S46**). The `sweep` measurement proved
   rebounding is a genuine size-independent skill under the current blend (`ReboundSizeWeight` 0.45 /
   `ReboundSkillWeight` 0.55): a little-guy-with-great-hands out-rebounds a freak-body-no-hands 9.6 to
-  0.2 at the individual grain. The freak-no-hands 0.2 is NOT a split problem — it is the individual
-  rebounder picker flooring a zero-rating body to weight 1 (body is a multiplier on the rating, not a
-  standalone term). So the split is correct and stays; the picker's body-as-multiplier is the thing to
-  fix (see Open, rebounder-picker body floor). Full finding in `docs/attribute-meaning.md`.
+  0.2 at the individual grain. The freak-no-hands 0.2 was NOT a split problem — it was the individual
+  rebounder picker flooring a zero-rating body to weight 1 (body a multiplier on the rating, not a
+  standalone term). The split stayed; the picker was fixed in S46 (below). Full finding in `docs/attribute-meaning.md`.
+- **Rebounder-picker body attribution — the S46 shape (Emmett's rulings across two design rounds).** Both
+  pickers weight each player `Luck + Rating × PositionalWeight × WingspanMultiplier × HustleMultiplier
+  + BodyPull × max(0, ReboundPhysical − lineupMean) + FloorCeiling × tanh(max(0, ReboundPhysical −
+  FloorReference) / FloorScale)`; the ORB side multiplies the **whole** weight by the shooter nerf. The
+  rulings, all off the sign-off table (archetype table round 1, zero-rating height ladder round 2):
+  (1) **`ReboundLuckWeight` = 5.0** — a flat, body-blind claim on random bounces, replacing the retired
+  floor-of-1 (an inert player lands ≈0.7–0.9 boards/game, not 0.2). (2) **`ReboundBodyPullWeight` = 0.35,
+  one-sided** — the *relative* body pull (out-size your lineup); a below-mean body gets zero, never a
+  second penalty. A **signed** term was rejected (it dragged the weakling-elite below its window —
+  double-penalty on the skilled small rebounder). (3) **The saturating loose-ball floor** (`ReboundBodyFloorCeiling`
+  4.0 / `ReboundBodyFloorScale` 40.0 / `ReboundBodyFloorReference` 22.5) — an *absolute* body channel vs
+  a **fixed** reference (not the lineup mean), tanh-saturated, added because the relative pull alone left
+  an average body tied with a small one (both at their lineup mean). Gentle setting chosen over wider; a
+  5'8 no-rebounder at ≈1.2 boards ruled correct (floor reference stays at the 5'2 extreme). (4) **On the
+  offensive glass the shooter nerf multiplies the whole weight** (luck + body included) — the nerf models
+  reduced availability after shooting, not a skill-specific penalty. (5) **Weakling-elite settling 9.0 →
+  ≈8.65 is accepted** — the structural cost of letting average bodies compete (lifting them lets his
+  average-bodied teammates take a sliver); every separating shape pays this, and 8.65 for a 5'6" elite
+  rebounder is still elite. The **ORB→putback coupling** is accepted and noted (the picked offensive
+  rebounder becomes the Roll K putback shooter — real basketball, a small second-order channel).
+  Body composite is `ReboundPhysical` (same as the team battle). Full derivation: `tools/rebounder_body_floor_model.py`.
 
 ## 3. Open — next-session candidates
 
-- **Rebounder-picker body floor — the S45 measurement finding, the ACTIVE next build.** The `sweep`
-  bench proved a freak body with a zero rebounding rating grabs ≈0.2 boards/game (same as a tiny
-  weakling), because both rebounder pickers weight each player `max(1, Rating × PositionalWeight ×
-  WingspanMultiplier × HustleMultiplier)` — the body only *multiplies* the rating, so a zero rating
-  floors to 1 and the giant's body gives him no individual claim even though it lifts his team's glass
-  margin to +2.1. **Blocks are the correct template:** `BlockerWeight` is additive (`BlkHeight·Height +
-  BlkWingspan·Wingspan + BlkVertical·Vertical + …`), so a freak with a zero shot-blocking rating still
-  swats shots on body alone. The fix: give `OffensiveRebounderPicker` and `DefensiveRebounderPicker`
-  standalone additive height/wingspan/strength terms so a freak body has individual rebounding pull
-  independent of his rating. **Oracle-first**, with an archetype table for sign-off (freak-no-hands
-  0.2 → a sane 3–4, elite instinct holds, weakling-no-hands stays ≈0) before any engine code. This
-  redirects the stale "aim the sweep at the next family" plan — the measurement surfaced a concrete
-  source-confirmed bug and fixing it while fresh is higher-value. Its own audited pass.
 - **Attribute-meaning layer — the `sweep` bench is BUILT (S45); Rebounding is the first family
-  measured, the other seven are Open.** The instrument walks any rating up its range through the real
+  measured and its picker bug is FIXED (S46); the other seven families are Open, the ACTIVE next track.** The instrument walks any rating up its range through the real
   engine (see Built + design.md). The remaining families to sweep, each following the rebounding
   template (each rating in isolation at 5-point steps + an interaction block where it plausibly fights
   another attribute): **A. Body** (Height, Wingspan, Weight) · **C. Athleticism** (7 ratings) ·
@@ -202,7 +215,8 @@ Pass 1 with its enforcers).
   HelpDefense, OffBallDefense) · **H. Cognition** (BasketballIQ, Discipline). This layer unblocks the
   generation redesign (orientation channel for hybrids, height→skill and height→athleticism leans),
   which is blocked behind knowing what the ratings mean. Each family is a light "aim + record" session,
-  not an instrument build. (Order is Emmett's call; the rebounder-picker fix above jumps the queue.)
+  not an instrument build. (Order is Emmett's call. The rebounder-picker fix that jumped the queue
+  shipped in S46 — see Built + Closed-by-ruling — so the family sweeps are now the front-runner.)
 - **Season calibration page — three-point thread CLOSED at S39 (seed 20260703, stock world,
   5205 games).** The full three-point arc is now done across three sessions: S38 fast-break diet
   (transition three 5% → 34.5%), S38.1 make-curve (all five per-zone FG% on target), **S39 volume

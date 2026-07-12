@@ -947,6 +947,26 @@ public sealed class MatchupConfig
         if (cfg.ReboundWingspanSwing < 0.0 || cfg.ReboundWingspanSwing >= 1.0)
             throw new InvalidOperationException(
                 $"ReboundWingspanSwing must be in [0, 1): got {cfg.ReboundWingspanSwing}.");
+        // S46 — luck weight must be strictly positive (it carries the every-populated-
+        // slot-can-draw guarantee the retired floor of 1 used to provide); the body-pull
+        // coefficient is nonnegative like the other rebound weights.
+        if (cfg.ReboundLuckWeight <= 0.0)
+            throw new InvalidOperationException(
+                $"ReboundLuckWeight must be > 0 (it guarantees every populated slot a nonzero pick weight): got {cfg.ReboundLuckWeight}.");
+        if (cfg.ReboundBodyPullWeight < 0.0)
+            throw new InvalidOperationException(
+                $"ReboundBodyPullWeight must be >= 0: got {cfg.ReboundBodyPullWeight}.");
+        // S46b — saturating loose-ball floor: ceiling and reference are nonnegative,
+        // scale strictly positive (it divides the tanh argument).
+        if (cfg.ReboundBodyFloorCeiling < 0.0)
+            throw new InvalidOperationException(
+                $"ReboundBodyFloorCeiling must be >= 0: got {cfg.ReboundBodyFloorCeiling}.");
+        if (cfg.ReboundBodyFloorScale <= 0.0)
+            throw new InvalidOperationException(
+                $"ReboundBodyFloorScale must be > 0: got {cfg.ReboundBodyFloorScale}.");
+        if (cfg.ReboundBodyFloorReference < 0.0)
+            throw new InvalidOperationException(
+                $"ReboundBodyFloorReference must be >= 0: got {cfg.ReboundBodyFloorReference}.");
         if (cfg.ReboundWingspanScale <= 0.0)
             throw new InvalidOperationException(
                 $"ReboundWingspanScale must be > 0: got {cfg.ReboundWingspanScale}.");
@@ -1195,6 +1215,72 @@ public sealed class MatchupConfig
     /// saturation knob). Default 15.0 — mirrors <see cref="ReboundPositionalScale"/>.
     /// Must be &gt; 0 (enforced in Load). Calibration placeholder.</summary>
     public double ReboundWingspanScale { get; set; } = 15.0;
+
+    // --- S46: rebounder-picker luck weight + standalone body pull (both pickers).
+    //     weight_i = Luck + Rating_i * posWeight_i * wingspanMult_i * hustleMult_i
+    //              + BodyPull * max(0, ReboundPhysical_i − lineupMeanReboundPhysical)
+    //     (offensive side: the shooter nerf multiplies the WHOLE weight — S46 ruling:
+    //     the nerf models reduced availability after shooting, body and luck included).
+    //     Luck replaces the retired Math.Max(1, …) floor: an equal per-player claim on
+    //     uncontested bounces, so a zero-rating player still collects garbage boards.
+    //     BodyPull is ONE-SIDED (above-lineup-mean bodies gain; below-mean bodies get
+    //     zero, never a second penalty — their size cost already lives in the postness
+    //     and wingspan multipliers). S46 ruling off the archetype table. ---
+
+    /// <summary>Flat per-player weight every populated slot receives in both rebounder
+    /// pickers — the equal claim on lucky bounces and long caroms. Replaces the retired
+    /// floor of 1 (and subsumes its every-slot-can-draw guarantee: weight ≥ Luck &gt; 0).
+    /// Default 5.0 (S46 ruling: an inert zero-rating player lands ≈0.9 boards/game).
+    /// Must be &gt; 0 (enforced in Load). Calibration placeholder.</summary>
+    public double ReboundLuckWeight { get; set; } = 5.0;
+
+    /// <summary>Coefficient on the standalone additive body term in both rebounder
+    /// pickers: <c>BodyPull * max(0, ReboundPhysical_i − lineupMean)</c>. Gives a big
+    /// body individual rebounding pull independent of the rating (the block-picker
+    /// parallel — S45 finding, S46 fix). One shared value across both pickers: the
+    /// physical claim has one meaning on both ends of the glass. Default 0.35 (S46
+    /// ruling: freak-body/zero-rating center ≈4 boards/game, elite anchors held).
+    /// Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
+    public double ReboundBodyPullWeight { get; set; } = 0.35;
+
+    // --- S46b: saturating "big-target" loose-ball floor (both pickers).
+    //     absFloor_i = ReboundBodyFloorCeiling
+    //                * tanh( max(0, ReboundPhysical_i − ReboundBodyFloorReference)
+    //                        / ReboundBodyFloorScale )
+    //     The SECOND, distinct body channel. ReboundBodyPullWeight (above) is a
+    //     RELATIVE pull (how much you out-size YOUR lineup) — it rewards standing out,
+    //     so an average body on an average team earns nothing from it and ties with a
+    //     small body (both at their lineup mean). This floor is ABSOLUTE: it rewards raw
+    //     size against a FIXED reference, so a bigger body vacuums up more of the random
+    //     loose balls / long caroms regardless of teammates. It SATURATES (tanh) — once
+    //     a player is a genuine big, being even bigger adds little loose-ball presence
+    //     (that extra size shows up in the relative pull instead), which keeps the freak
+    //     from ballooning while lifting the mushy bottom of the height ladder into a clean
+    //     monotone rise. S46b ruling off the zero-rating height-ladder table: at rating 0,
+    //     boards/game climb 5'8≈1.2 → 6'0≈1.6 → 6'4≈2.2 → 7'3+≈4.9, with the ≈5'2 extreme
+    //     staying ≈0. Fixed reference → flat-50 control stays exactly uniform (every body
+    //     equal → every floor equal). ---
+
+    /// <summary>Asymptotic maximum weight the saturating loose-ball floor adds to a very
+    /// large body in both rebounder pickers. Default 4.0 (S46b: gentle setting — an
+    /// average body earns ≈+3.5, a giant ≈+4.0, on top of luck and skill). Equivalent to
+    /// the design-conversation "c_abs 0.10 × scale 40". Must be &gt;= 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double ReboundBodyFloorCeiling { get; set; } = 4.0;
+
+    /// <summary>Physical-point scale of the loose-ball floor's tanh rise. Default 40.0 —
+    /// the floor reaches ~76% of its ceiling one scale above the reference. Larger = a
+    /// gentler, later-saturating climb. Must be &gt; 0 (enforced in Load). Calibration
+    /// placeholder.</summary>
+    public double ReboundBodyFloorScale { get; set; } = 40.0;
+
+    /// <summary>ReboundPhysical value below which the loose-ball floor contributes nothing
+    /// (the tanh argument floors at 0). Default 22.5 — the physical presence of a ~5'2
+    /// extreme-small body (Height/Wingspan/Strength ≈ 15); bodies at or below it get no
+    /// loose-ball floor, so the smallest players stay ≈0. Raise it to start the lift
+    /// higher up the ladder (short players get less). Must be &gt;= 0 (enforced in Load).
+    /// Calibration placeholder.</summary>
+    public double ReboundBodyFloorReference { get; set; } = 22.5;
 
     // --- Phase 10: off-share floor and ceiling.
     //     The tanh saturation asymptotes toward these values without crossing.

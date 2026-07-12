@@ -66,23 +66,52 @@ zone at the bottom, no saturation at the top. The swept center's own boards per 
 The near-zero floor at rating 0 (0.06 / 0.13, not literally 0) is the picker's floor-of-1 term,
 explained below — it is the whole reason the freak-no-hands case is 0.2 and not higher.
 
-### The flaw the finding exposed (diagnosed, not yet fixed)
+### The flaw the finding exposed — FIXED in S46
 
-A rebound resolves in **two engine steps**, and they behave oppositely:
+A rebound resolves in **two engine steps**, and before S46 they behaved oppositely:
 
 1. **Which TEAM gets the board** (`OffensiveReboundShare`): blends team-mean body (45%) and
    team-mean rating (55%). Here the freak's body works exactly right — a freak-body/zero-rating
-   center lifts his team's rebound margin to **+2.1**. His body IS real in the team battle.
+   center lifts his team's rebound margin to **+2.1**. His body IS real in the team battle. (Unchanged
+   by S46 — the 55/45 split was ruled correct and left alone.)
 2. **Which of the five PLAYERS is credited** (`OffensiveRebounderPicker` /
-   `DefensiveRebounderPicker`): each player's pick weight is
-   `max(1, Rating × PositionalWeight × WingspanMultiplier × HustleMultiplier)`. The body enters
-   **only as a multiplier on the rating.** A zero-rating freak's product is zero, floored to 1, so
-   he draws ≈1/200 of his team's boards. His body helped the team win the board but gives *him* no
-   claim to it. That is the entire 0.2.
+   `DefensiveRebounderPicker`): *before S46* each player's pick weight was
+   `max(1, Rating × PositionalWeight × WingspanMultiplier × HustleMultiplier)` — the body entered
+   **only as a multiplier on the rating**, so a zero-rating freak's product was zero, floored to 1, and
+   he drew ≈1/200 of his team's boards. His body helped the team win the board but gave *him* no claim.
+   That was the entire 0.2.
 
-So the physical tools pull weight in the team battle but the **individual selector floors the
-no-rating body out**. This is the one and only per-player selector where a body attribute that
-should confer standalone individual credit is wired multiplicatively.
+**The S46 fix (the block-picker's additive shape) gave the body two standalone channels.** The pick
+weight is now `Luck + Rating × PositionalWeight × WingspanMultiplier × HustleMultiplier
++ BodyPull × max(0, ReboundPhysical − lineupMean)
++ FloorCeiling × tanh(max(0, ReboundPhysical − FloorReference) / FloorScale)` (the ORB side × the
+shooter nerf on the whole weight). **Luck** (5.0) is every slot's equal claim on random bounces — it
+replaced the retired floor-of-1, so an inert player collects the garbage boards a body-blind floor
+should give (weakling-no-hands ≈0.7, average-no-hands ≈1.3). **Body pull** (0.35, *relative*) rewards
+out-sizing your own lineup; **body floor** (ceiling 4.0 / scale 40 / reference 22.5, *absolute* and
+*saturating*) rewards raw size against a fixed reference — a big target loose balls find regardless of
+teammates — tanh-capped so a genuine big doesn't balloon. The absolute floor was added (S46b) because
+the relative pull alone left an average body tied with a small one (both sit at their lineup mean and
+earn nothing from a relative term); the floor un-flattens the mushy bottom of the zero-rating height
+ladder into a clean rise (5'8 ≈1.2 → 6'0 ≈1.6 → 6'4 ≈2.2 → 7'3+ ≈4.9).
+
+**The head-to-head, after S46 (swept center total boards/game, `sweep` interaction, 2,000 games/rung):**
+
+| The center | S45 (before) | S46 (after) |
+|---|---|---|
+| 7-foot freak, **no** instinct (rating 0) | 0.2 | **4.86** |
+| average body, **no** instinct | 0.2 | 1.32 |
+| 5'6" weakling, **no** instinct | 0.2 | 0.67 |
+| 7-foot freak, **elite** instinct | 17.3 | 17.54 |
+| average body, **elite** instinct | 12.9 | 12.27 |
+| 5'6" weakling, **elite** instinct | 9.6 | 8.65 |
+
+The freak's body now earns him boards on its own (0.2 → 4.86); a bigger body separates cleanly from a
+smaller one even at zero rating; and the elite anchors held (the weakling-elite slipped 9.6 → 8.65 by
+ruling — the structural cost of letting average bodies compete). Team margins are unchanged (freak-
+no-hands still +2.1) — the fix was pure individual attribution, not team-total movement. This was the
+one and only per-player selector where a body attribute that should confer standalone credit was wired
+multiplicatively; the cross-selector audit below confirmed no other picker needs it.
 
 ### The cross-selector audit (all seven pickers, S45)
 
@@ -109,16 +138,17 @@ because steals/assists/turnovers *shouldn't* hand a giant free credit for being 
 ### Rulings and notes that fell out
 
 - **Ruling: the 55/45 rebound team split stays.** It delivers the design goal — rebounding is a
-  genuine skill regardless of size. The culprit is the picker's body-as-multiplier, not the team
+  genuine skill regardless of size. The culprit was the picker's body-as-multiplier, not the team
   blend. (Recorded in status.md, Closed-by-ruling.)
-- **The fix is single and well-scoped:** make the two rebounder pickers look like the block picker —
-  give height, wingspan, and strength their own **additive** standalone terms so a freak body has
-  individual rebounding pull independent of his rating. This is the S45 "obvious next session."
-  Target archetype table for sign-off: freak-no-hands 0.2 → a sane 3–4, elite instinct holds, and
-  weakling-no-hands stays ≈0.
-- **Generation-layer corollary (logged, not acted on):** because the engine gives the body almost
-  no *passive individual* rebounding floor, a tall player's board count lives or dies on his
-  rebounding rating. So the eventual generation redesign must give tall players a rebounding-rating
-  floor — otherwise a big with a low rebounding draw would rebound like a guard. (Note that a body
-  floor added to the *picker*, above, changes the passive-floor picture and should be re-measured
-  before the generation floor is sized.)
+- **The fix shipped in S46 (single and well-scoped):** the two rebounder pickers now carry the block
+  picker's additive body shape plus a luck weight and a saturating loose-ball floor (see the FIXED
+  section above). Validated on the `sweep` bench — freak-no-hands 0.2 → 4.86, elite anchors held,
+  average-no-hands (1.32) cleanly above weakling-no-hands (0.67). The signed sign-off was against the
+  archetype table (round 1) and the full zero-rating height ladder (round 2, the S46b floor).
+- **Generation-layer corollary — RE-EVALUATE after S46 (the passive-floor picture changed).** The
+  S45 note said a tall player's board count lives or dies on his rebounding rating, so the generation
+  redesign should give tall players a rebounding-rating floor. **S46 changed this:** a body now confers
+  standalone individual rebounding pull independent of rating (the additive pull + the saturating floor),
+  so a big with a low rebounding draw no longer rebounds like a guard on body alone. Re-measure the
+  passive-floor picture on the live pickers **before** sizing any generation-layer rebounding floor —
+  it may now be smaller than the S45 note assumed, or unnecessary.

@@ -3660,8 +3660,24 @@ invert the tanh bend direction — caught loud at startup rather than producing 
 - **Roll M (free-throw-board rebounds):** same seven-arm vocabulary, different baseline
   (more defensive, lower off-share, no shooter nerf), no shooter position to read. Fast-follow
   next session; these exact rails carry it.
-- **Per-player rebound attribution:** which slot grabbed the board is the deferred attribution
-  pass. Roll I decides only which team.
+- **Per-player rebound attribution — BUILT (Phase 31/35, reshaped S46).** Roll I / this team
+  battle decides only *which team*; the two pickers (`OffensiveRebounderPicker`,
+  `DefensiveRebounderPicker`) decide *which of the five* is credited. Each player's pick weight is
+  `ReboundLuckWeight + Rating × PositionalWeight(Postness) × ReboundWingspanMultiplier × HustleMultiplier
+  + ReboundBodyPullWeight × max(0, ReboundPhysical − lineupMean)
+  + ReboundBodyFloorCeiling × tanh(max(0, ReboundPhysical − ReboundBodyFloorReference) / ReboundBodyFloorScale)`,
+  normalized among the five (the ORB side then × the shooter nerf on the **whole** weight). **S46
+  gave the body two standalone channels** because S45's `sweep` measurement proved the old
+  multiplier-on-the-rating shape floored a zero-rating freak's individual boards to ≈0.2 (his body
+  helped his *team* win the board but gave *him* no claim) — the block-picker's additive shape is the
+  fix. **Luck** is every populated slot's equal claim on random bounces (it replaced the retired
+  floor-of-1). **Body pull** is *relative* (out-size your lineup); **body floor** is *absolute* and
+  *saturating* (raw size vs a fixed reference — a big target that loose balls find regardless of
+  teammates — tanh-capped so a genuine big does not balloon), which un-flattens the mushy bottom of
+  the zero-rating height ladder. The team battle here (the 55/45 size/skill split) is unchanged — the
+  fix was purely attribution. **ORB coupling to note:** the offensive picker's chosen slot also becomes
+  the putback shooter fed into Roll K, so which big secures the board now also decides who takes (and
+  can miss) the putback — real basketball, a small second-order channel on offensive-rebound totals.
 - **Coaching sliders** (crash-glass vs. get-back / crash-vs-break-out): the `finalOffShare`
   returned by `OffensiveReboundShare` is the insertion point; v1 is matchup-only; the seam is
   documented in `RollIGenerator.Generate`.
@@ -3772,8 +3788,11 @@ apply to all three. Calibrating the FT glass is a matter of tuning Roll M's conf
 
 ### Parked items
 
-- **Per-player rebound attribution:** Roll M decides only which TEAM. The attribution pass is
-  separate and deferred.
+- **Per-player rebound attribution — BUILT (Phase 31/35, reshaped S46).** Roll M decides only which
+  TEAM; the same two pickers credit the individual (defensive board → `DefensiveRebounderPicker`,
+  offensive → `OffensiveRebounderPicker`), carrying the S46 luck + relative-body-pull + saturating-
+  body-floor weight described in the Phase 10 attribution note above. The FT glass shares that shape;
+  the DRB picker has no shooter nerf (there is no shooter on a free-throw board).
 - **Coaching sliders** (crash-glass / get-back): the insertion point is after
   `OffensiveReboundShare` returns and before the mass split; v1 is matchup-only; the seam is
   documented in `RollMGenerator.Generate`.

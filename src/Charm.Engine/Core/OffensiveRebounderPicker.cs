@@ -5,16 +5,26 @@ namespace Charm.Engine;
 /// Roll I already awarding the board to the offense (Phase 31, v1; Phase 35
 /// adds the wingspan factor).
 ///
-/// <para><b>Weight formula — echoes the team math exactly.</b> Each offensive
-/// player's pick weight is
-/// <c>OffensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier × shooterNerf</c> —
-/// the identical per-player term that <see cref="Matchup.OffensiveReboundShare"/>
-/// sums to produce the team weighted-mean, now extended with the same
-/// <see cref="Matchup.ReboundWingspanMultiplier"/> added to the battle in Phase 35.
-/// Using the same <see cref="Matchup"/> statics (not a re-implementation) keeps the
-/// two layers provably consistent: whoever the team battle treats as the dominant
-/// rebounder is also whom this pick favors. The shooter nerf fires only on perimeter
-/// zones (Three / Long / Mid), matching the team math's offense loop exactly.</para>
+/// <para><b>Weight formula — echoes BOTH of the team battle's terms (S46).</b> Each
+/// offensive player's pick weight is
+/// <c>(Luck + OffensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier
+/// × HustleMultiplier + BodyPull × max(0, ReboundPhysical − lineupMean)
+/// + FloorCeiling × tanh(max(0, ReboundPhysical − FloorReference) / FloorScale)) × shooterNerf</c>.
+/// The skill product is the identical per-player term that
+/// <see cref="Matchup.OffensiveReboundShare"/> sums into its skill shift; the S46
+/// additive body term mirrors the team battle's SIZE term (same
+/// <see cref="Matchup.ReboundPhysical"/> composite), so the individual pick now
+/// reflects the same body-and-skill mix that won the board — MORE consistent with the
+/// team battle than the old skill-only echo. The body term is one-sided (a below-mean
+/// body gets zero, never a second penalty) and stands alone at rating 0, which the old
+/// multiplier-on-the-rating shape structurally could not provide (S45 finding). The
+/// S46b saturating body FLOOR adds a second, absolute channel — raw size vs a fixed
+/// reference — so a bigger body claims more random loose balls regardless of teammates,
+/// tanh-saturated so a genuine big does not balloon. The luck weight is every slot's
+/// equal claim on uncontested bounces; it replaces the retired floor of 1. The shooter nerf fires only on perimeter zones (Three / Long /
+/// Mid) and multiplies the WHOLE weight — luck and body included — per the S46 ruling
+/// that the nerf models reduced availability after shooting, not a skill-specific
+/// penalty.</para>
 ///
 /// <para><b>Conditional-within-side (Option A).</b> The pick fires DOWNSTREAM of
 /// Roll I's offense-vs-defense verdict — it never re-litigates whether the offense
@@ -40,7 +50,9 @@ public static class OffensiveRebounderPicker
     /// Consumes exactly one <paramref name="rng"/> draw.
     ///
     /// <para>Weight per populated offensive player:
-    /// <c>max(1, OffensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier × shooterNerf)</c>,
+    /// <c>(Luck + OffensiveRebounding × PositionalWeight(Postness) × ReboundWingspanMultiplier
+    /// × HustleMultiplier + BodyPull × max(0, ReboundPhysical − lineupMean)
+    /// + FloorCeiling × tanh(max(0, ReboundPhysical − FloorReference) / FloorScale)) × shooterNerf</c>,
     /// normalized among the five slots. Null slots contribute 0.
     /// Throws <see cref="InvalidOperationException"/> if no offensive slot is
     /// populated — an offensive rebound with zero offensive players is an
@@ -78,6 +90,7 @@ public static class OffensiveRebounderPicker
         // term, same lineup-mean baseline, same Matchup statics.
         var postnesses  = new double[5];
         var wingspans   = new double[5];
+        var physicals   = new double[5];   // S46: ReboundPhysical per player (body pull)
         var populated   = new bool[5];
         var playerCount = 0;
 
@@ -88,6 +101,7 @@ public static class OffensiveRebounderPicker
             if (p is null) continue;
             postnesses[i] = Matchup.Postness(p, matchupCfg);
             wingspans[i]  = p.Wingspan;
+            physicals[i]  = Matchup.ReboundPhysical(p, matchupCfg);
             populated[i]  = true;
             playerCount++;
         }
@@ -107,12 +121,25 @@ public static class OffensiveRebounderPicker
             if (populated[i]) meanWingspan += wingspans[i];
         meanWingspan /= playerCount;
 
+        // S46: lineup-mean ReboundPhysical — the body pull is centered on it, mirroring
+        // the wingspan multiplier's lineup-mean pattern (same body composite the team
+        // battle uses, so "body" means one thing in both rebound steps).
+        var meanPhysical = 0.0;
+        for (var i = 0; i < 5; i++)
+            if (populated[i]) meanPhysical += physicals[i];
+        meanPhysical /= playerCount;
+
         // ── Stage 2: compute per-player pick weights ──────────────────────────────
-        // weight = max(1, OffensiveRebounding × PositionalWeight(postness)
-        //                                     × ReboundWingspanMultiplier
-        //                                     × shooterNerf)
-        // The floor of 1 ensures every populated slot has a positive (if tiny) draw
-        // probability, matching the intent of the team math's positional weighting.
+        // weight = (Luck + OffensiveRebounding × PositionalWeight(postness)
+        //                                      × ReboundWingspanMultiplier
+        //                                      × HustleMultiplier
+        //                + BodyPull × max(0, ReboundPhysical − lineupMean)) × shooterNerf
+        // S46: the luck weight (every slot's equal claim on uncontested bounces)
+        // replaces the retired floor of 1 and keeps every populated slot's draw
+        // probability positive (weight ≥ Luck × nerf > 0). The one-sided body term
+        // gives a big body standalone pull independent of the rating (block-picker
+        // parallel). The nerf multiplies the WHOLE weight — luck and body included —
+        // per the S46 ruling: it models reduced availability after shooting.
         var weights   = new double[5];
         var totalWeight = 0.0;
 
@@ -132,12 +159,28 @@ public static class OffensiveRebounderPicker
 
             // Phase 45: per-player Hustle tilt (tanh, same shape as the wingspan
             // multiplier). A higher-Hustle player absorbs a larger share of his team's
-            // offensive boards; centered at 1.0 for a 50-Hustle player. The Math.Max(1)
-            // floor below keeps even a low-Hustle player drawing.
+            // offensive boards; centered at 1.0 for a 50-Hustle player. The luck
+            // weight below keeps even a low-Hustle player drawing (S46).
             var hm         = 1.0 + matchupCfg.HustleRebounderSteepness
                                  * Math.Tanh((p.Hustle - 50.0) / matchupCfg.HustleRebounderScale);
 
-            weights[i]   = Math.Max(1.0, p.OffensiveRebounding * pw * wm * hm * shooterNerf);
+            var bodyPull   = matchupCfg.ReboundBodyPullWeight
+                           * Math.Max(0.0, physicals[i] - meanPhysical);
+
+            // S46b: saturating "big-target" loose-ball floor — ABSOLUTE size vs a FIXED
+            // reference (not the lineup mean), so a bigger body earns more of the random
+            // caroms regardless of teammates; tanh saturates so a genuine big does not
+            // balloon. Separates the mushy bottom of the height ladder. INSIDE the
+            // shooterNerf grouping (S46 ruling: the nerf reduces the whole weight — luck,
+            // body, and floor included — modeling reduced availability after shooting).
+            var absFloor   = matchupCfg.ReboundBodyFloorCeiling
+                           * Math.Tanh(Math.Max(0.0, physicals[i] - matchupCfg.ReboundBodyFloorReference)
+                                       / matchupCfg.ReboundBodyFloorScale);
+
+            weights[i]   = (matchupCfg.ReboundLuckWeight
+                           + p.OffensiveRebounding * pw * wm * hm
+                           + bodyPull
+                           + absFloor) * shooterNerf;
             totalWeight += weights[i];
         }
 
