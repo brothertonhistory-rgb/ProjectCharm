@@ -1,0 +1,18 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 5,
+  "mode": "cases",
+  "outputName": "physical_package_interaction",
+  "cases": [
+    { "label": "FLAT_50_CONTROL",  "dials": {} },
+    { "label": "FREAK",            "dials": { "Height": 90, "Wingspan": 90, "Strength": 90, "Speed": 90, "Quickness": 90, "FirstStep": 90, "Vertical": 90 } },
+    { "label": "STIFF_GIANT",      "dials": { "Height": 95, "Wingspan": 90, "Strength": 80, "Speed": 15, "Quickness": 15, "FirstStep": 15, "Vertical": 20 } },
+    { "label": "POCKET_ROCKET",    "dials": { "Height": 15, "Wingspan": 20, "Strength": 40, "Speed": 90, "Quickness": 90, "FirstStep": 90, "Vertical": 90 } },
+    { "label": "MOTOR_MAN",        "dials": { "Hustle": 95 } },
+    { "label": "MARATHON_MAN",     "dials": { "Endurance": 95 } },
+    { "label": "GASSED",           "dials": { "Endurance": 5 } },
+    { "label": "ALL_PHYS_ELITE",   "dials": { "Height": 85, "Wingspan": 85, "Weight": 85, "Strength": 85, "Speed": 85, "Quickness": 85, "FirstStep": 85, "Vertical": 85, "Endurance": 85, "Hustle": 85 } },
+    { "label": "PHYSICAL_FLOOR_15", "dials": { "Height": 15, "Wingspan": 15, "Weight": 15, "Strength": 15, "Speed": 15, "Quickness": 15, "FirstStep": 15, "Vertical": 15, "Endurance": 15, "Hustle": 15 } }
+  ]
+}

@@ -479,3 +479,149 @@ high-usage handler.
   redesign to compensate for engine gaps; the correct fix is the ball-dominance and unforced-
   turnover layers, not inflated draws. Record the two reshapers as engine work that must land
   before perimeter-creation ratings can be judged "correctly valued."
+
+---
+
+## Physical package — Families A + C (Height, Wingspan, Weight, Strength, Speed, Quickness, FirstStep, Vertical, Endurance, Hustle) — measured Session 50
+
+Combined into one package by Emmett's S49 close-out ruling: the engine mixes body and
+athleticism in shared composites (the five-member Athleticism mean; LengthRating;
+ReboundPhysical; Postness), and they feed the same generation decision (the
+height→athleticism leans). Ten isolation walks (0→99 step 5, 2,000 games/rung, **slot 5** —
+the S48 anchor reclaimed) plus a nine-row interaction block; 438,000 games, pure
+config-and-run. Eleven configs in `tools/sweep/`.
+
+### The gates
+
+FLAT_50_CONTROL and every walk's 50-rung reproduced the S48 anchor **exactly** — 9.364 PTS /
+34.33 FG% / 49.75 FT% to the third decimal, twelve runs one answer; the world unmoved since
+S48. Team A ≈ Team B at control. Nothing on the suspicious list survived: no usage-shaped FGA
+curve under any body rating (Height FGA 10.65 → 10.74, flat), Hustle never touched FG%
+(34.3 across all 21 rungs), the explosion trio's divergence fully explained by documented
+private channels, and the Weight walk flat with the dial proven applied.
+
+Three draft-map corrections made at the check-in gate, before any walk was read: Roll A's
+slot-weighted entry aggregate reads **both** athleticism and LengthRating (two muted whispers
+at slot 5, not one); displacement's physical term is **one** channel reading **raw**
+athleticism (not fatigue-discounted — Endurance does not flow through the diet bend); and the
+denial-blend postness wake-up is **invisible under Height on a flat bench** (both skill gaps
+are zero, so shifting the mix moves nothing) — it expresses only under Strength, which moves
+the post gap itself.
+
+### The curves (0 → 50 → 99)
+
+| Rating | PTS | FG% | REB | BLK | STL | TO | What it is |
+|---|---|---|---|---|---|---|---|
+| **Height** | 9.2 → 9.4 → 9.5 | 33.5 → 34.3 → 34.8 | 6.5 → 7.7 → 9.5 | 0.57 → 0.70 → 0.88 | 1.59 → 1.25 → 0.91 | 2.55 → 2.30 → 2.07 | Possessions + designed post-shaping |
+| **Wingspan** | 9.2 → 9.4 → 9.5 | 33.4 → 34.3 → 34.5 | 6.6 → 7.7 → 9.4 | 0.55 → 0.70 → 0.89 | flat | flat | The purest length rating |
+| **Weight** | flat | flat | flat | flat | flat | flat | **Cosmetic — zero gameplay reads** |
+| **Strength** | 9.2 → 9.4 → 9.5 | 33.8 → 34.3 → 35.7 | 6.4 → 7.7 → 9.5 | flat | 1.60 → 1.25 → 0.92 | 2.49 → 2.30 → 2.09 | Boards + post getting-open |
+| **Vertical** | 9.2 → 9.4 → 9.7 | 33.3 → 34.3 → 35.5 | ~flat | 0.62 → 0.70 → 0.84 | flat | flat | Best athletic rating for a scorer |
+| **Speed** | flat | 34.1 → 34.3 → 35.3 | flat | flat | flat | 2.3 → 2.2 | Composite door + gravity whisper |
+| **Quickness** | 9.2 → 9.4 → 9.6 | 34.0 → 34.3 → 35.1 | flat | flat | flat | flat | Composite door |
+| **FirstStep** | flat | 34.1 → 34.3 → 35.4 | flat | flat | flat | 2.3 → 2.2 | Composite door + gravity whisper |
+| **Endurance** | flat | 34.3 → 34.3 → 34.5 | flat | flat | flat | flat | **A whisper — see verdict** |
+| **Hustle** | flat | flat | 6.6 → 7.7 → 8.7 | flat | 1.1 → 1.2 → 1.4 | flat | Share-claiming through three pickers |
+
+**Weight — proven cosmetic, the session's headline finding.** All 21 rungs byte-identical in
+every stat column while `meta_swept_value` steps 0→99 (dial applied; `BuildSweepTeam` throws
+on unknown fields, so a silent drop is impossible). Source story confirmed by whole-tree
+grep: read only by `Player.Validate()`, the Pass-2 generator, and roster/bench copies.
+
+**The blocks triple — length both creates and claims.** Under Height, Wingspan, and Vertical,
+team blocks rise (3.47 → 3.75/3.76/3.79) *and* the swept share rises (20% → 23/24/22%): the
+length door creates blocks and the blocker picker hands the length more of them. Strength
+correctly touches neither. Magnitude note for the design bundle: a full 0→99 length walk adds
+~0.3 team blocks/game.
+
+**The postness suppressions — two designed, one newly observed on a walk.** Height and
+Strength (postness coefficients 1/3 each, confirmed in config at the gate) suppress both
+turnover blame (committer picker: TO falls monotonically, magnitudes above — computed from
+the coefficients at the gate and confirmed on the walk) **and steal share** (StealerPicker,
+same tanh shape: share 26% → 14–15% while team steals stay dead flat at ~6.3). The steal
+suppression was predicted for the archetype rows but not listed for the walks — it fired by
+the same designed machinery and is classified direct-by-design. Strength's on-paper
+interior-picker double-up (base weight × rising postness multiplier) **lost its tug-of-war**:
+the general suppression wins and Strength's TO falls smoothly.
+
+**The explosion trio (Speed / Quickness / FirstStep)** — each buys ~+1.2pp FG% across the
+full range, the predicted one-fifth-strength composite doors, directionally identical. The
+only divergence: Speed and FirstStep see usage *dip* at the top (18.2% → 17.6%) while
+Quickness stays flat — their gravity-access term draws defensive attention, which taxes the
+denial contest. Explained by the documented private channel; residual divergence none.
+
+**Endurance — the magnitude verdict is made: a whisper.** 0 vs 99 = +0.2pp FG%, nothing
+else. The channel is live (fatigue accrues every possession on the sweep path, confirmed at
+the gate; fixed lineups mean the swept player never sits and carries his full drain
+difference), it just doesn't cash out on whole-game aggregates. **Aggregate-only by
+construction:** the readout has no time-slice columns, so *when* in the game fatigue lands is
+unmeasurable on this instrument — a time-sliced bench is the recorded prerequisite for the
+temporal-shape question.
+
+**Hustle — textbook share-not-creation.** Boards 6.6 → 8.7 and steals 1.1 → 1.4 while team
+totals stay flat: he claims a bigger slice of the same pile through the three picker tilts.
+First swept player of the entire pass to move his own defensive box. The team-mean nudges
+(Roll F disruption, foul cost) are below noise with one player moving the mean ~+9.8.
+
+**Wingspan's JumpBall read: wired-but-unmeasured.** The opening tip is won on max team
+wingspan (source-confirmed), but no first-possession column exists and one tip/game is
+hopelessly confounded with Wingspan's own block/rebound effects. Recorded, not inferred.
+
+### The interaction block (nine rows)
+
+| Row | PTS | FG% | REB | BLK | Margin | The verdict |
+|---|---|---|---|---|---|---|
+| FLAT_50_CONTROL | 9.4 | 34.3 | 7.7 | 0.7 | −0.1 | The anchor, exact |
+| **FREAK** (both halves 90) | 12.0 | 42.9 | 11.9 | 1.2 | **+6.4** | Body alone laps everything |
+| **STIFF_GIANT** (length, no explosion) | 9.1 | 34.0 | 11.7 | 0.9 | +1.5 | Scores *below average*; lives on possessions |
+| **POCKET_ROCKET** (explosion, no length) | 10.3 | 38.1 | 5.8 | 0.6 | +2.0 | Outscores the giant |
+| MOTOR_MAN (Hustle 95) | 9.4 | 34.4 | 8.7 | 0.7 | +0.1 | The Hustle walk in one row |
+| MARATHON_MAN (End 95) | 9.4 | 34.5 | 7.7 | 0.7 | 0.0 | Indistinguishable from GASSED |
+| GASSED (End 5) | 9.4 | 34.3 | 7.7 | 0.7 | −0.2 | — |
+| ALL_PHYS_ELITE (all ten 85) | 11.5 | 41.5 | 12.6 | 1.1 | +5.6 | Weight-85 contributes nothing |
+| PHYSICAL_FLOOR_15 (all ten 15) | 8.0 | 29.4 | 4.3 | 0.4 | **−3.9** | The body floor is a real team liability |
+
+**The marquee answer: explosion buys points, length buys possessions.** POCKET_ROCKET
+outscores STIFF_GIANT (10.3 on 38.1% vs 9.1 on 34.0%), but the giant wins games anyway
+(+1.5) on 11.7 boards, block share, and the lowest turnover blame on the board — two
+different, both-viable physical archetypes, which is the relative-engine thesis working.
+FREAK is the strongest single-player team effect measured on this bench to date (+6.4 margin
+on zero skill). Both designed postness effects showed on cue in the post-shaped rows (FREAK
+and STIFF_GIANT steal/TO fall).
+
+### The design-question bundle (Emmett's ruling — logged with evidence, nothing touched)
+
+Opened by Emmett's in-session read ("height and wingspan don't impact blocks or steals
+enough and should probably result in higher FG%, especially for a center — a 99 guy should
+be scoring over guys"), sharpened by the numbers:
+
+1. **No height-over-defender term exists in the make chance.** A 99-Height player gains
+   +1.35pp FG%, *all of it* block-avoidance through LengthRating. Shooting over a smaller
+   defender — real efficiency near the rim and in the post — has no wire to live in. A
+   missing wire, not an undersized one. **This is the question that gates the
+   height→skill lean sizing** (below).
+2. **The block channel is modest even fully stacked** — FREAK blocks 1.2/game; a full length
+   walk adds ~0.3 team blocks. Magnitude call; waits for a real population per standing
+   rule, flagged as likely light.
+3. **Wingspan feeds steals nothing.** Whether long arms should buy deflections/steals is a
+   wiring question.
+4. **Weight is cosmetic** — feed Strength-adjacent channels, or stay cosmetic until a
+   body-contact layer exists?
+
+### The generation-redesign feed (what body and athleticism actually buy)
+
+For the height→athleticism lean sizing (Phase 3 of the Pass-2 port): under **current
+wiring**, length is a possession engine (boards +~3/game, blocks +~0.3 team/game across a
+full walk) and nearly not a scoring engine (FG% +1.1–1.4pp); explosion is a modest
+efficiency engine (+1–2pp per rating, stacking to FREAK's +8.6pp); the physical floor is
+punitive (−3.9 margin at 15s). So today's engine prices tall players out of very little
+scoring — the height→skill negative lean would be taxing something height doesn't buy back.
+**But design question 1, if ruled in, changes that materially.** Recommendation on the
+record: run Families F/G/H and the synthesis pass, rule on size-should-score, *then* size
+the leans.
+
+### Parked out of this session
+
+The time-sliced fatigue bench (Endurance's temporal shape); the JumpBall first-possession
+counter (Wingspan's tip read); the four design questions above. All carried flags from
+S48/S49 unchanged.
