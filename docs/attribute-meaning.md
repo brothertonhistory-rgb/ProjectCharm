@@ -901,3 +901,132 @@ read, for the same reason.)
   (Steals is an attribution dial, not a deflection engine — long arms buying deflections remains
   unwired and un-argued-for); the S49 unforced-turnover reshaper sits adjacent to the Steals
   attribution machinery but is untouched here.
+
+## Family H — Cognition (BasketballIQ, Discipline) — measured Session 53
+
+The sixth and final family through the S47 ruler, and the smallest — two isolation walks (0→99 in
+5-point steps, 2,000 games/rung) plus one seven-row interaction block, all on **slot 1**. **98,000
+games**, pure config-and-run — no engine file, no `config.json`, no readout change, no Monte Carlo.
+The slot-1 anchor held exactly (both 50-rungs and FLAT_50_CONTROL reproduced 11.6 PTS / 35.5 FG% /
+21.7% use / 1.5 AST / 2.6 TO). **This section closes the measurement arc: every rating on the Player
+has now been walked through the ruler.**
+
+The two ratings live on opposite surfaces. **BasketballIQ is an offensive read on the swept player
+himself** — his own make%, his own assist share — and reads clean and undiluted on his own box.
+**Discipline is a defensive read** — the defender's light tap in the shooting-foul contest — and is
+slot-guards-slot diluted exactly like the Family G on-ball ratings.
+
+### The wiring (what the source actually reads)
+
+- **BasketballIQ — three source reads, all confirmed at the gate.** (1) The make-door bonus
+  (`RollHGenerator.cs`, Phase 50): the last make% term, a proportional sprinkle on the settled make%,
+  `bump = makePct × IqMakeSensitivity(0.08) × zoneWeight × iqProgress`, where
+  `iqProgress = clamp((IQ − 50)/49, 0, 1)`. Zero at/below IQ 50, zero at the Rim (zone weight 0.0),
+  full at Three/Long (1.0), partial Mid (0.7) / Short (0.3). Driven by the shooter's **own** IQ,
+  absolute. (2) The assist weight (`AssistPicker.cs`): `0.5·Passing + 0.35·Playmaking + 0.15·IQ` —
+  IQ the smallest of the three inputs. (3) The iqFactor (`AttentionGenerator.cs`, 0.85→1.15), which
+  multiplies effective playmaking.
+- **Two of BasketballIQ's reads have small team-level tails, not purely own-box** (flagged at the
+  gate, both confirmed as whispers by the data): the assist weight also feeds `LineupPassingFactor`,
+  so a higher-IQ lineup mean lifts the *team* assisted rate a hair (creation, not just credit); and
+  the iqFactor read routes IQ → effective playmaking → the team's conversion-quality → Roll H's C4
+  passing-converter, a *team* halfcourt make bonus. Both move on the flat bench because the swept
+  player is the only non-clone — but both compute to whispers (team points moved 52.8 → 53.0 across
+  the whole walk), consistent with S49's finding that even *Passing* at the higher 0.5 weight left
+  team FG% dead flat.
+- **Discipline — one source read.** The defender-light half (weight 0.2) of the shooting-foul contest
+  (`Matchup.cs`): `0.8·(FoulDrawing − 50) − 0.2·(Discipline − 50)`, saturating toward a per-zone foul
+  ceiling/floor. It reads on the specific man the swept defender guards (`DefenderPicker`) — the
+  slot-guards-slot wall. No other Discipline read exists anywhere in the tree.
+
+### The two curves (isolated walks, swept player)
+
+| Rating | Signal | Shape |
+|---|---|---|
+| **BasketballIQ** | own FG% 35.5 → 35.5 → **36.6**; own 3P% 22.2 → 22.3 → **24.1** (+1.8pp); own AST 1.3 → 1.5 → **1.7**; PTS 11.6 → 11.9 | **A one-sided hockey-stick.** The make bonus is dead flat across the entire 0→50 half, then rises above the midpoint — and it is **perimeter-only**: the shot mix never moves, there is no rim gain, so this is "a smart player finishes the good look he already had," not more or different shots. The assist claim is the exception to the gate — it rises **gently across the whole range** (the assist weight is linear in IQ, not clamped at 50), a small share-claim, the weakest of the three assist inputs as designed. |
+| **Discipline** | own box dead flat (FG% 35.5–35.6, no curve); Team B points flat at 52.9 across all 21 rungs | **Below the instrument's resolution.** The read is real in the source, but the swept defender bends the foul rate only on the ~1/5 of Team B's shots his own man takes, and the readout has no Team B FTA column — the only proxy (Team B points) is flat. See the ledger: the effect is source-real and arithmetic-bounded, not bench-measured. |
+
+### Finding 1 — BasketballIQ is a perimeter make-finisher plus a small assist claim, and the gate splits the two cleanly.
+
+The make bonus does exactly what its clamp says: nothing from IQ 0 to 50 (own FG% pinned at 35.5),
+then a clean rise to 36.6 by IQ 99, concentrated on the perimeter (3P% +1.8pp, no rim movement). It
+rewards a good look proportionally and is a rounding error on a bad one — a genius-IQ poor shooter is
+still a poor shooter. The assist read is a genuine *claim*: his own assists rise only 1.3 → 1.7
+across the full walk, and — unlike the make bonus — the claim is ungated, drifting up steadily on
+both halves of the range. Nothing fired below the IQ-50 knee (the trace trigger that correctly did
+not fire), no rim bonus appeared (zone weight 0.0), and the AST swing never approached a Passing-sized
+slope (IQ is weight 0.15, not 0.5).
+
+### Finding 2 — the MAESTRO/IQ_ONLY pair proves the split: passing creates the assists, IQ finishes the shots.
+
+`HIGH_IQ_MAESTRO` (IQ 95 with elite passing and playmaking behind it) posts 2.3 assists — the assist
+jump comes almost entirely from the 85 passing/playmaking. `IQ_ONLY` (IQ 95, nothing else) moves
+assists just +0.2 off control (1.5 → 1.7) — the pure 0.15 claim with no passing skill to distribute.
+Both rows carry the **same** make-% lift (FG 36.7 vs 36.5, 3P 24.3 vs 23.9) because both have IQ 95.
+So the two IQ effects are orthogonal and separable: elite passing/playmaking does the assist-creating;
+IQ only claims a slightly bigger slice of it, while independently finishing the perimeter looks. The
+two team-level whisper tails stayed whispers throughout (team points 52.8 → 53.2 at most).
+
+### Finding 3 — Discipline is wired and real, but below this instrument's resolution at team scale (the honest gap).
+
+The swept player's own box is dead flat across the whole Discipline walk (FG% 35.5–35.6, no curve —
+correctly, since Discipline is a defensive read with no offensive wire; a monotonic own-FG curve here
+would have been the trace trigger, and it did not appear). The effect lives on Team B's foul rate,
+and the readout has no Team B FTA column. From the live parameters, the per-man effect is a source-real
+whisper: on the man he guards, the shooting-foul rate bends by roughly +0.7pp (Rim) at Discipline 0
+down to −0.14pp (Rim) at Discipline 99 — **asymmetric**, because the foul ceiling sits far above the
+base while the floor is just beneath it, so an undisciplined defender moves more than a disciplined
+one. Diluted 5:1 to the man he guards, that lands as roughly **−0.02 (Disc 99) to +0.08 (Disc 0)
+FTA/game** on Team B. Team B points staying flat at 52.9 is **consistent** with a whisper of that
+size — it is not a measurement of one. This is the same limitation family as the Family-G on-ball wall
+and the S51 transition-share gap: the per-man effect is real, the instrument dilutes and hides it.
+(Note: `DISCIPLINED_STOPPER`'s Team B shot-mix shift — Rim 28.8 → 29.3, 3PA 20.4 → 20.0 — is the
+PerimeterDefense 80 doing its S52 job, not the Discipline.)
+
+### The interaction block (seven rows, slot 1)
+
+| Row | Dials | Read |
+|---|---|---|
+| FLAT_50_CONTROL | — | The slot-1 anchor, exactly (11.6 / 35.5 / 22.3 3P / 1.5 AST / 2.6 TO). |
+| **HIGH_IQ_MAESTRO** | IQ 95, Pass 85, Play 85 | PTS 11.9, FG 36.7, 3P 24.3, **AST 2.3**, A.PTS 53.2. The floor general — assists jump (from the passing/playmaking) *with* a perimeter make lift (from the IQ). |
+| **IQ_ONLY** | IQ 95 | PTS 11.8, FG 36.5, 3P 23.9, AST 1.7. The clean IQ look: +1.0 FG / +1.6 3P from the make bonus, +0.2 AST from the pure claim, rim flat. |
+| DISCIPLINED_STOPPER | Disc 95, PerimDef 80 | 11.6 / 35.6, B.PTS 52.9. Team B points flat; the visible Team B diet shift (fewer threes, more rim) is the PerimeterDefense 80, not the Discipline. |
+| UNDISCIPLINED | Disc 5 | 11.6 / 35.6, B.PTS 52.9. The hack-happy defender leaves no readable footprint on this instrument (no FTA column, diluted). |
+| ALL_H_ELITE | IQ 85, Disc 85 | 11.8 / 36.4 / 23.8, AST 1.6. Both at once — the perimeter make lift shows, the Discipline half does not. |
+| H_FLOOR_15 | IQ 15, Disc 15 | 11.6 / 35.5 / 22.1, AST 1.4. IQ 15 is below the make gate, so make% is already at floor (no lift); the assist claim is at its smallest (1.4 < 1.5). |
+
+### The generation-redesign feed (what the two cognition ratings buy)
+
+- **BasketballIQ** is a small, proportional **perimeter make-finisher on good looks above the
+  midpoint** (own 3P% +1.8pp at the top, nothing at/below IQ 50, nothing at the rim) plus a **minor
+  assist claim** (the weakest of the three assist inputs — it credits, it does not create). Its two
+  team-level channels (conversion-quality make bonus, lineup-passing assist rate) are real in the
+  source but whisper-scale. It should be sized as a modest efficiency-and-credit rating for perimeter
+  players, not a volume or creation driver.
+- **Discipline** is a **defender-light foul-avoidance tap** — a disciplined defender fouls the man he
+  guards a little less; an undisciplined one hacks a little more (asymmetric, the ceiling has more
+  room than the floor). Real per-man, diluted to a whisper at team scale on this instrument. It is a
+  low-magnitude rating whose value is a foul-economy edge, not a scoreboard mover.
+
+### Completeness ledger (the honest note)
+
+- **BasketballIQ** — measured clean on its own box (the make bonus and the assist claim both read
+  directly on the swept player's line). Its two team-level tails (the conversion-quality make channel
+  and the lineup-passing assist-rate channel) were flagged at the gate and confirmed as whispers by
+  the walk (team points 52.8 → 53.0).
+- **Discipline** — the single source read is confirmed and the per-man magnitude is arithmetic-bounded
+  (roughly −0.02 to +0.08 FTA/game on Team B, asymmetric), but it is **unmeasured on this bench**: no
+  Team B FTA column exists, and the read is diluted 5:1 to the man he guards, so Team B points staying
+  flat is consistent-with, not a measurement-of, the whisper. Same limitation family as the Family-G
+  on-ball wall.
+- **No additional Family-H bench work is required before synthesis**, and no additional bench work of
+  any kind remains — **the measurement arc is complete.** The remaining Discipline question
+  (per-opponent-slot foul suppression) is the same instrument gap logged for Family G, a design/
+  readout conversation, not another sweep.
+- **The next session is the synthesis pass** — reading this whole document end-to-end to produce the
+  cross-family reading the generation redesign has been waiting on (Emmett's S49 standing ruling). The
+  questions it should now answer are carried in the family findings: the S50 height-over-defender make
+  term (the one that most gates the height→skill lean sizing), the S51 no-post-hunt diet gap and the
+  S52 PostDefense-as-size coupling, and the two S49 reshapers (ball-dominance/initiation, unforced
+  turnovers). The pressure-dialed channels (BallHandling, Steals turnover-forcing) are coaching-layer,
+  scoped out of synthesis.

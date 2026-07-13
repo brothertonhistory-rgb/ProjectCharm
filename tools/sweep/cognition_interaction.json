@@ -1,0 +1,16 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "cases",
+  "outputName": "cognition_interaction",
+  "cases": [
+    { "label": "FLAT_50_CONTROL",     "dials": {} },
+    { "label": "HIGH_IQ_MAESTRO",     "dials": { "BasketballIQ": 95, "Passing": 85, "Playmaking": 85 } },
+    { "label": "IQ_ONLY",             "dials": { "BasketballIQ": 95 } },
+    { "label": "DISCIPLINED_STOPPER", "dials": { "Discipline": 95, "PerimeterDefense": 80 } },
+    { "label": "UNDISCIPLINED",       "dials": { "Discipline": 5 } },
+    { "label": "ALL_H_ELITE",         "dials": { "BasketballIQ": 85, "Discipline": 85 } },
+    { "label": "H_FLOOR_15",          "dials": { "BasketballIQ": 15, "Discipline": 15 } }
+  ]
+}
