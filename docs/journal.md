@@ -1,3 +1,20 @@
+## Session 55.1 — The Height/Wingspan sweeps RE-MEASURED against the live post-wire engine: the S55 height-over-defender term shows up exactly as designed, and the S50 "size doesn't score" finding is retired (2026-07-13)
+
+**Scope:** The re-measurement S55 queued and explicitly did not claim — pure config-and-run, **no engine file, no `config.json`, no new sweep config, no Monte Carlo.** The two length walks (`sweep_height.json`, `sweep_wingspan.json`, 0→99 step 5, 2,000 games/rung, slot 5, flat-50 opponent, 42,000 games each) re-run on the live engine that now carries the S55 make-door reach term, diffed against the saved S50 pre-wire curves. Docs only: the attribute-meaning Physical Package section (design question 1 + the generation-redesign feed) and the status board.
+
+**The one honest correction, filed at the check-in gate.** The first read of the pasted output — done before the repo was pulled — matched it against memory of S50 and called it "length barely scores, confirms S50." Wrong baseline: these are the *post-wire* numbers, and the entire reason the walks were queued was to see the S55 term appear. Pulling the source and diffing against the saved curves surfaced the miss before a word was written. The lesson is the standing one (§0 / §2c): diff against the recorded curve read from source, never against memory of a prior session's finding.
+
+**The re-measurement — the term landed exactly as built.** Diffed against the saved S50 curves:
+- **Real, one-sided lift.** Height FG% 33.6 → 34.3 → **36.3** (S50: 33.5 → 34.3 → 34.8); Wingspan 33.5 → 34.3 → **36.0** (S50: 33.4 → 34.3 → 34.5). ~+1.5pp added at the 99-rung on each, roughly doubling length's full-range scoring gain (Height +1.3 → +2.7pp, Wingspan +1.1 → +2.5pp).
+- **Gated at reach parity.** Below the 50-rung the new curves sit on the pre-wire curves (both 34.3% at 50); the whole +1.5pp lands *above* 50, where the swept player out-reaches the flat-50 opponent — the one-sided design (zero for equal/shorter) visible directly on a live walk.
+- **Rim-concentrated, threes flat.** 3P% unmoved on both walks (Height 23.3 → 23.5, Wingspan 23.0 → 22.9) — the Three-zone weight of 0.0 confirmed on real outcomes, not just in the golden fixture; the lift is the two-point zones only.
+- **Isolated to scoring.** Rebounds, blocks, steals, and the defensive per-man line (opponent 2P% still falls as the swept player gets taller — Height 39.8 → 36.6) all unchanged from S50. The wire touched the make door and nothing else.
+
+**What this means for the game:** the S50 "length buys almost no scoring" finding is retired. A genuinely taller player now finishes better over a smaller defender — most at the rim, nothing on threes — and the taller he is the more it helps, up to a saturating cap. Whether +1.5pp at the top is *enough* of a reward is a magnitude question — one dial (`MatchupConfig` MaxBonus 15.0), judged later on a real population, not this lab bench. With this measured, the height→skill lean sizing (Pass-2 Phase 3) can be set against real post-wire curves rather than a pending flag.
+
+**Next:** unchanged from S55 — the **ball-dominance/initiation layer** (the S49 reshaper) leads the remaining wiring track.
+
+---
 ## Session 55 — The height-over-defender make term SHIPPED (v1): size finally has a scoring wire — one-sided, zone-weighted, saturating reach advantage on the make door; oracle-first, 25-case golden parity at zero diff; and the oracle's stale-curve bug caught and fixed mid-session (2026-07-13)
 
 **Scope:** The **first engine change of the wiring arc** — the measurement arc (S47–S53), the undiluted defensive reruns (S54), and the synthesis conversation are behind it. One term added to the make door in `src/Charm.Engine/Core/Matchup.cs`, its constants in `MatchupConfig`, a new Phase 61 suite check, and the committed oracle + golden fixture. Nothing about selection, diet, blocks, fouls, or rebounding moved. Full CONVENTIONS ritual: fresh pull, every §1 read against live source, the check-in gate held (one prompt divergence flagged there, a second mid-build), Emmett's explicit go before the first file.

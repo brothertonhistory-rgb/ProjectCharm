@@ -595,15 +595,31 @@ Opened by Emmett's in-session read ("height and wingspan don't impact blocks or 
 enough and should probably result in higher FG%, especially for a center — a 99 guy should
 be scoring over guys"), sharpened by the numbers:
 
-1. **The height-over-defender make term — RULED AND SHIPPED (Session 55).** As measured here
-   (pre-S55 wiring), a 99-Height player gained +1.35pp FG%, all block-avoidance through
-   LengthRating — shooting over a smaller defender had no wire. The wire now exists: a
+1. **The height-over-defender make term — RULED, SHIPPED (S55), RE-MEASURED.** As first
+   measured here (pre-S55 wiring), a 99-Height player gained +1.35pp FG%, all block-avoidance
+   through LengthRating — shooting over a smaller defender had no wire. The wire now exists: a
    one-sided, zone-weighted (Rim 1.0 → Three 0.0), tanh-saturating reach advantage
-   (reach = (Height+Wingspan)/2) added to the make door's EffectiveRating, on both the
-   primary shot and the putback (Phase 61 golden parity; design.md make-door section).
-   **The S50 curves in this section predate the wire** — the Height and Wingspan walks are
-   queued for re-measurement (diffed against these saved curves) before the height→skill
-   lean is sized; superseded-pending-re-measurement, no new numbers claimed yet.
+   (reach = (Height+Wingspan)/2) added to the make door's EffectiveRating, on both the primary
+   shot and the putback (Phase 61 golden parity; design.md make-door section). **The S50 curves
+   in the table above predate the wire; the post-wire re-measurement — both length walks re-run
+   on the live engine, 42,000 games each — landed exactly as designed:**
+   - **The lift is real and one-sided.** Height FG% 33.6 → 34.3 → **36.3** (was 33.5 → 34.3 →
+     34.8); Wingspan 33.5 → 34.3 → **36.0** (was 33.4 → 34.3 → 34.5). The wire adds **~+1.5pp at
+     the 99-rung** on each, roughly doubling length's full-range scoring gain (+1.3 → +2.7pp
+     Height, +1.1 → +2.5pp Wingspan).
+   - **Gated at reach parity, exactly as built.** Below the 50-rung the new curves sit on the
+     pre-wire curves (both 34.3% at 50); the entire +1.5pp lands *above* 50, where the swept
+     player out-reaches the flat-50 opponent. The one-sided design (zero for equal/shorter) is
+     visible directly on the walk.
+   - **Concentrated at the rim, threes untouched.** 3P% stays flat across both walks (Height
+     23.3 → 23.5, Wingspan 23.0 → 22.9) — the Three-zone weight of 0.0 confirmed on live
+     outcomes; the FG% lift is the two-point/rim zones only.
+   - **Cleanly isolated to scoring.** Rebounds, blocks, steals, and the defensive per-man line
+     (opponent 2P% still falls as the swept player gets taller — Height 39.8 → 36.6) are all
+     unchanged from the S50 curves. No side effects.
+   The **S50 "length buys almost no scoring" finding is retired** — length now buys mismatch
+   scoring. Whether +1.5pp at the top is the *right* magnitude is a calibration question (one
+   dial, `MatchupConfig` MaxBonus 15.0) that waits for a real population per the standing rule.
 2. **The block channel is modest even fully stacked** — FREAK blocks 1.2/game; a full length
    walk adds ~0.3 team blocks. Magnitude call; waits for a real population per standing
    rule, flagged as likely light.
@@ -622,8 +638,11 @@ the physical floor is punitive (−3.9 margin at 15s). **Design question 1 was r
 shipped (S55)** — length now buys mismatch scoring through the height-over-defender term,
 so the "height doesn't buy back scoring" premise no longer holds as written. The S48-S50
 recommendation was followed exactly (Families F/G/H measured, synthesis run, size-should-
-score ruled, the term shipped); what remains before sizing the leans is the queued
-re-measurement of the Height/Wingspan walks against these saved curves.
+score ruled, the term shipped). **The queued re-measurement is now complete** (design question 1
+above): post-wire, length's full-range scoring gain roughly doubled to +2.7pp (Height) / +2.5pp
+(Wingspan), rim-concentrated and gated at reach parity — so length is now a possession engine
+*and* a modest mismatch-scoring engine, no longer "possessions only." The height→skill lean can
+be sized against measured post-wire curves rather than a pending flag.
 
 ### Parked out of this session
 
