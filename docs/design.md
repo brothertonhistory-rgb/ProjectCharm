@@ -767,6 +767,27 @@ PIES. The provenance is likely already free on `PossessionState` (`SelectedSlot`
 null before Roll E, set after), so no new plumbing is needed when this is built.
 Deferred — attribute-model-adjacent.
 
+**Unforced-turnover handling curve (S56, current state — both turnover doors).** The
+neutral-pressure turnover base is no longer flat with respect to handling. A shared
+dimensionless factor `g(handling)` multiplies each door's own flat base share — Roll B by
+the slot-weighted team BallHandling aggregate, Roll F by the named handler's own
+BallHandling — before it enters the existing pressure/matchup disruption math unchanged.
+`g(h) = 1 + SpanFrac × (lift(h) − lift(50))` clamped at `FloorFrac`, with
+`lift(h) = (1 − tanh((h − Mid)/Scale))/2` (`Matchup.UnforcedFactor`; constants in
+`MatchupConfig`, Mid 55 / Scale 18 / SpanFrac 0.443 / FloorFrac 0.72). It is anchored so a
+league-average handler (50) reproduces today's rate exactly and `SpanFrac = 0` is a clean
+kill switch (`g ≡ 1`, byte-identical on the turnover path); bad hands raise the base, good
+hands lower it, on one continuous curve with diminishing returns above ~80 and an elite
+asymptote near 0.72× (the floor clamp is a safety rail below the in-range minimum, never
+active for an authored rating). `actionMass` is held flat — only the turnover numerator is
+scaled, so Proceed / ShotAttempt absorbs the change exactly as pressure already does. This
+gives good handlers real ball protection at neutral pressure, where the defense-relative
+matchup is gated to zero. **Known limit (v1):** it makes the turnover *rate* handling-aware
+but does not touch the usage-weighted *attribution* of team/bad-pass turnovers (committer
+picker, Roll C), so it flattens the S49 personal-turnover inversion rather than fully
+flipping it — the full flip waits on the deferred per-event attribution rework. Full
+record: `docs/unforced-turnover-brief.md`.
+
 **Config lives separately.** Roll F's five weights live in the `"RollF"` section of
 `config.json`, loaded by `RollFConfig`.
 

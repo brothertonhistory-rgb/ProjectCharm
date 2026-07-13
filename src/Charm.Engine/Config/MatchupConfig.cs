@@ -399,6 +399,37 @@ public sealed class MatchupConfig
     /// Must be &gt; 0 (enforced in Load). Default 4.0.</summary>
     public double PressureScale { get; set; } = 4.0;
 
+    // --- Unforced-turnover handling curve (v1).
+    //     A dimensionless factor g(handling) that multiplies each door's own FLAT
+    //     neutral turnover base share (Roll B team-initiation, Roll F individual action).
+    //     Anchored so g(50) = 1 (a league-average handler reproduces today's rate) and
+    //     g == 1 for all handling when SpanFrac = 0 (the kill switch). Bad hands raise
+    //     the base, good hands lower it, on one continuous curve; the elite "floor" is
+    //     the curve's own asymptote, NOT the safety clamp. Same curve for both doors —
+    //     each supplies its own base, so the effect is proportional and exposure-free.
+    //     Locked shape, provisional magnitudes (tunable later on the season page). ---
+
+    /// <summary>Midpoint of the unforced-turnover handling curve. The curve's lift term
+    /// falls from ~1 (bad hands) toward ~0 (elite hands) around this rating. Must be
+    /// within the authored rating range (enforced in Load). Default 55.0.</summary>
+    public double UnforcedMid { get; set; } = 55.0;
+
+    /// <summary>Width of the unforced-turnover handling curve (tanh scale, in rating
+    /// points). Higher = gentler slope. Must be &gt; 0 (enforced in Load). Default 18.0.</summary>
+    public double UnforcedScale { get; set; } = 18.0;
+
+    /// <summary>Span of the unforced-turnover adjustment. 0 = kill switch (g == 1 for all
+    /// handling → reproduces today's flat base bit-for-bit). Higher = stronger handling
+    /// effect. Must be &gt;= 0 (enforced in Load). Default 0.443 → g(99) ≈ 0.722 (the
+    /// approved near-floor value).</summary>
+    public double UnforcedSpanFrac { get; set; } = 0.443;
+
+    /// <summary>Safety-rail lower clamp on the unforced-turnover factor. Set just BELOW
+    /// the curve's in-range minimum (g(99) ≈ 0.722), so it does NOT activate for any
+    /// authored 0–99 rating — the elite floor is the curve's asymptote, not this clamp.
+    /// Must be in (0, 1] (enforced in Load). Default 0.72.</summary>
+    public double UnforcedFloorFrac { get; set; } = 0.72;
+
     // --- Phase 12: pressure saturation knob.
     //     Controls how fast TO and foul rates approach floor/ceiling as pUnit grows.
     //     Deliberately HIGH (relative to the pUnit range) to keep the climb gradual
@@ -1180,6 +1211,21 @@ public sealed class MatchupConfig
                  })
             if (w < 0.0 || w > 1.0)
                 throw new InvalidOperationException($"{name} must be in [0, 1]: got {w}.");
+
+        // Unforced-turnover handling curve (v1) invariants.
+        if (cfg.UnforcedScale <= 0.0)
+            throw new InvalidOperationException(
+                $"UnforcedScale must be > 0: got {cfg.UnforcedScale}.");
+        if (cfg.UnforcedSpanFrac < 0.0)
+            throw new InvalidOperationException(
+                $"UnforcedSpanFrac must be >= 0 (0 = kill switch): got {cfg.UnforcedSpanFrac}.");
+        if (cfg.UnforcedFloorFrac <= 0.0 || cfg.UnforcedFloorFrac > 1.0)
+            throw new InvalidOperationException(
+                $"UnforcedFloorFrac must be in (0, 1] (a floor below the anchor, never raising " +
+                $"the average baseline): got {cfg.UnforcedFloorFrac}.");
+        if (cfg.UnforcedMid < 0.0 || cfg.UnforcedMid > 99.0)
+            throw new InvalidOperationException(
+                $"UnforcedMid must be within the authored rating range [0, 99]: got {cfg.UnforcedMid}.");
 
         return cfg;
     }

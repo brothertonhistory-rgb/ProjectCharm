@@ -230,6 +230,7 @@ internal static partial class Program
         ok &= Phase59GenPass2ReplayParityCheck();               // Phase 59 (S43: Pass-2 port, fixture replay)
         ok &= Phase60GenPass2LiveCheck();                       // Phase 60 (S44: Pass-2 port Phase 2, live generator + population audit)
         ok &= Phase61HeightOverDefenderCheck(configPath);       // Phase 61 (S55: height-over-defender make term, golden parity)
+        ok &= Phase62UnforcedTurnoverCheck(configPath);         // Phase 62 (S56: unforced-turnover handling curve, golden parity)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

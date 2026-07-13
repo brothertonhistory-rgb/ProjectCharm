@@ -126,8 +126,14 @@ public sealed class RollBGenerator : IRollBPieGenerator
         var pressure = _matchup.PressureFor(state.Defense);
 
         // ── Team disruption shares (turnover + foul bends) ──────────────────
+        // actionMass stays FLAT (built from the config constants); only the turnover
+        // NUMERATOR's share is bent by the handling curve, so Proceed absorbs the change
+        // via 1 − toShare − foulShare exactly as pressure already does. offHandling is the
+        // slot-weighted team BallHandling aggregate: sure-handed teams cough it up less at
+        // neutral, butterfingers teams more. g(50)=1 and SpanFrac=0 reproduce today.
         var actionMass       = _cfgB.BaseProceed + _cfgB.BaseFoul + _cfgB.BaseDeadBallTurnover;
-        var baseTurnoverShare = _cfgB.BaseDeadBallTurnover / actionMass;
+        var baseTurnoverShare = (_cfgB.BaseDeadBallTurnover / actionMass)
+                                * Matchup.UnforcedFactor(offHandling, _matchup);
         var baseFoulShare    = _cfgB.BaseFoul              / actionMass;
 
         // ── Phase 45: Hustle disruption + defensive foul cost ───────────────

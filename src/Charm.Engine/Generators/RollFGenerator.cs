@@ -131,8 +131,14 @@ public sealed class RollFGenerator : IRollFPieGenerator
         var pressure = _matchup.PressureFor(state.Defense);
 
         // ── Disruption shares via the new Matchup method ────────────────────
+        // actionMass stays FLAT; only the turnover NUMERATOR's share is bent by the
+        // handling curve, so ShotAttempt absorbs the change via 1 − toShare − foulShare
+        // exactly as pressure already does. The named handler's own BallHandling drives
+        // it: a butterfingers actor shows his own oops at neutral, a sure-handed one fewer.
+        // g(50)=1 and SpanFrac=0 reproduce today.
         var actionMass       = _cfgF.BaseShotAttempt + _cfgF.BaseTurnover + _cfgF.BaseNonShootingFoul;
-        var baseTurnoverShare = _cfgF.BaseTurnover        / actionMass;
+        var baseTurnoverShare = (_cfgF.BaseTurnover        / actionMass)
+                                * Matchup.UnforcedFactor(handler.BallHandling, _matchup);
         var baseFoulShare    = _cfgF.BaseNonShootingFoul  / actionMass;
 
         // ── Phase 45: Hustle disruption + defensive foul cost ───────────────

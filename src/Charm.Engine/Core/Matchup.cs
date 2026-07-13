@@ -960,6 +960,42 @@ public static class Matchup
     }
 
     // =========================================================================
+    // Unforced-turnover handling curve (v1)
+    // =========================================================================
+
+    /// <summary>
+    /// Dimensionless handling multiplier on a <b>neutral-pressure</b> turnover base share.
+    /// Multiplies each door's own FLAT base (Roll B team-initiation, Roll F individual
+    /// action) so that a butterfingers handler coughs it up more and a sure-handed one
+    /// less, even against a passive defense — the base was handling-blind before this.
+    ///
+    /// <para><b>Anchored form.</b>
+    /// <c>lift(h) = (1 − tanh((h − Mid) / Scale)) / 2</c>;
+    /// <c>g = 1 + SpanFrac · (lift(h) − lift(50))</c>, floor-clamped at <c>UnforcedFloorFrac</c>.
+    /// Two anchors fall out for free: <c>g(50) = 1</c> for any span (a league-average
+    /// handler reproduces today's rate), and <c>g ≡ 1</c> for every handling when
+    /// <c>SpanFrac = 0</c> (the kill switch reproduces today bit-for-bit).</para>
+    ///
+    /// <para><b>Same curve, both doors.</b> Each door supplies its own flat base, so the
+    /// team effect is proportional and exposure-free on a uniform-handling lineup — no
+    /// per-door allocation, no exposure measurement. Bad hands raise, good hands lower,
+    /// on ONE continuous curve (not one-sided); diminishing returns above ~80. The elite
+    /// "floor" is the curve's own asymptote (~0.72× at the shipped span), not the safety
+    /// clamp — the clamp sits just below it and does not fire for any authored 0–99 rating.</para>
+    /// </summary>
+    /// <param name="handling">The BallHandling rating driving the curve (Roll F: the named
+    /// handler's; Roll B: the slot-weighted team BallHandling aggregate).</param>
+    /// <param name="cfg">Matchup config — supplies UnforcedMid/Scale/SpanFrac/FloorFrac.</param>
+    /// <returns>A multiplier applied to the flat turnover base share. 1.0 at handling 50
+    /// or at SpanFrac 0.</returns>
+    public static double UnforcedFactor(double handling, MatchupConfig cfg)
+    {
+        double Lift(double h) => (1.0 - Math.Tanh((h - cfg.UnforcedMid) / cfg.UnforcedScale)) / 2.0;
+        var g = 1.0 + cfg.UnforcedSpanFrac * (Lift(handling) - Lift(50.0));
+        return Math.Max(cfg.UnforcedFloorFrac, g);
+    }
+
+    // =========================================================================
     // Phase 12 — pressure / disruption door (Roll F)
     // =========================================================================
 
