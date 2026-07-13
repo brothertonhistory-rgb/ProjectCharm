@@ -2949,11 +2949,34 @@ Roll E so every door in a possession shares one coherent pick.
   Weights are config data.
 - `GapFn(gap, steepness, exponent, scale)` — DEC-5 (below).
 - `EffectiveRating(zone, attacker, defender, cfg)` — DEC-2 composition: `baseline + skillShift +
-  physicalShift`, where the skill shift runs the (baseline − blended-defense) gap through `GapFn` with the
-  skill steepness/exponent and the physical shift runs the (attacker − defender Athleticism) gap through
-  `GapFn` with the physical steepness/exponent. The shifts are summed onto the baseline and the result is
-  fed to the **unchanged** make-curve. A contest is a shooter sliding up or down the shared scale — never
-  a reshaping of the curve.
+  physicalShift + heightShift`, where the skill shift runs the (baseline − blended-defense) gap through
+  `GapFn` with the skill steepness/exponent, the physical shift runs the (attacker − defender Athleticism)
+  gap through `GapFn` with the physical steepness/exponent, and the height shift is the Session 55
+  height-over-defender term (below — the one shift NOT built on `GapFn`). The shifts are summed onto the
+  baseline and the result is fed to the **unchanged** make-curve. A contest is a shooter sliding up or
+  down the shared scale — never a reshaping of the curve.
+- `HeightOverDefenderShift(zone, attacker, defender, cfg)` + `Reach(player)` — **the fourth shift
+  (Session 55): a one-sided, zone-weighted, saturating reach advantage.**
+  `heightShift = HeightZoneWeight(zone) × HeightMaxBonus × tanh(max(0, shooterReach − defenderReach) /
+  HeightReferenceScale)`, with standing reach `(Height + Wingspan) / 2.0` (float divide on purpose —
+  both are int ratings, so an odd sum like 85+88 is 86.5; `Reach` is the single source of the read).
+  Design shape, signed on the S54 archetype table: **one-sided** — it rewards the taller shooter and is
+  exactly zero for the equal or shorter one (defensive length already erases shots through the block
+  channel; the symmetric negative side is a parked v2 call); **zone-weighted** — Rim 1.0 / Short 0.8 /
+  Mid 0.3 / Long 0.05 / Three 0.0, so size scores most at the rim and not at all on a set three;
+  **tanh-saturating** — an extreme mismatch approaches but never exceeds `HeightMaxBonus × zoneWeight`
+  (unlike `GapFn`, which is deliberately uncapped — this term carries its own ceiling because reach gaps,
+  unlike skill gaps, have a hard physical meaning). Deliberately **not** `LengthRating` (which folds in
+  Vertical for the block door); Vertical-in-reach is parked. Because the 4-arg overload delegates to the
+  6-arg body, the term reaches **both** make-door consumers — the primary shot and the putback (a taller
+  rebounder converts putbacks over a smaller defender better; a named behavior, not a leak) — and the
+  null-defender fallbacks on both doors skip `EffectiveRating` entirely, so the term is naturally absent
+  with no defender. Constants in `MatchupConfig`, all tunable; `Load` validation is **range-only**
+  (MaxBonus ≥ 0 with **0 a legal kill switch**, ReferenceScale > 0, each weight in [0,1]) — deliberately
+  no monotonic-zone enforcement, so era experiments can reshape the profile. Proven by the Phase 61
+  golden parity (25 cases vs `tools/height_over_defender_oracle.py`, dual tolerance 1e-6 rating /
+  1e-9 make%, the exact-zero set on the height *contribution*, Long small-positive as the
+  `HeightWeightLong` wire-proof) plus helper and config-guard tests.
 
 ### DEC-5 — the gap function is a signed power law
 

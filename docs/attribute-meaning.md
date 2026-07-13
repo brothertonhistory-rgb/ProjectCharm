@@ -595,11 +595,15 @@ Opened by Emmett's in-session read ("height and wingspan don't impact blocks or 
 enough and should probably result in higher FG%, especially for a center — a 99 guy should
 be scoring over guys"), sharpened by the numbers:
 
-1. **No height-over-defender term exists in the make chance.** A 99-Height player gains
-   +1.35pp FG%, *all of it* block-avoidance through LengthRating. Shooting over a smaller
-   defender — real efficiency near the rim and in the post — has no wire to live in. A
-   missing wire, not an undersized one. **This is the question that gates the
-   height→skill lean sizing** (below).
+1. **The height-over-defender make term — RULED AND SHIPPED (Session 55).** As measured here
+   (pre-S55 wiring), a 99-Height player gained +1.35pp FG%, all block-avoidance through
+   LengthRating — shooting over a smaller defender had no wire. The wire now exists: a
+   one-sided, zone-weighted (Rim 1.0 → Three 0.0), tanh-saturating reach advantage
+   (reach = (Height+Wingspan)/2) added to the make door's EffectiveRating, on both the
+   primary shot and the putback (Phase 61 golden parity; design.md make-door section).
+   **The S50 curves in this section predate the wire** — the Height and Wingspan walks are
+   queued for re-measurement (diffed against these saved curves) before the height→skill
+   lean is sized; superseded-pending-re-measurement, no new numbers claimed yet.
 2. **The block channel is modest even fully stacked** — FREAK blocks 1.2/game; a full length
    walk adds ~0.3 team blocks. Magnitude call; waits for a real population per standing
    rule, flagged as likely light.
@@ -610,15 +614,16 @@ be scoring over guys"), sharpened by the numbers:
 
 ### The generation-redesign feed (what body and athleticism actually buy)
 
-For the height→athleticism lean sizing (Phase 3 of the Pass-2 port): under **current
-wiring**, length is a possession engine (boards +~3/game, blocks +~0.3 team/game across a
-full walk) and nearly not a scoring engine (FG% +1.1–1.4pp); explosion is a modest
-efficiency engine (+1–2pp per rating, stacking to FREAK's +8.6pp); the physical floor is
-punitive (−3.9 margin at 15s). So today's engine prices tall players out of very little
-scoring — the height→skill negative lean would be taxing something height doesn't buy back.
-**But design question 1, if ruled in, changes that materially.** Recommendation on the
-record: run Families F/G/H and the synthesis pass, rule on size-should-score, *then* size
-the leans.
+For the height→athleticism lean sizing (Phase 3 of the Pass-2 port): under the **S50
+wiring these curves measured**, length was a possession engine (boards +~3/game, blocks
++~0.3 team/game across a full walk) and nearly not a scoring engine (FG% +1.1–1.4pp);
+explosion is a modest efficiency engine (+1–2pp per rating, stacking to FREAK's +8.6pp);
+the physical floor is punitive (−3.9 margin at 15s). **Design question 1 was ruled in and
+shipped (S55)** — length now buys mismatch scoring through the height-over-defender term,
+so the "height doesn't buy back scoring" premise no longer holds as written. The S48-S50
+recommendation was followed exactly (Families F/G/H measured, synthesis run, size-should-
+score ruled, the term shipped); what remains before sizing the leans is the queued
+re-measurement of the Height/Wingspan walks against these saved curves.
 
 ### Parked out of this session
 
@@ -735,8 +740,8 @@ and 10.8 boards (the S45 body amplifier on the OffReb 75).
   design conversation, logged for Emmett.
 - **The tweener-post requirement — CLOSED affirmative** (Finding 3). Removed from the parked
   list; the generation redesign is cleared to produce guard-sized post-skill players.
-- Sits alongside the still-open S50 questions (chiefly the **height-over-defender make term**,
-  which most gates the height→skill lean sizing) and the S49 reshapers.
+- Sits alongside the S50 questions (the **height-over-defender make term is now SHIPPED — S55**;
+  the block-channel/wingspan-steals/Weight questions remain open) and the S49 reshapers.
 
 ### The generation-redesign feed (what PostMoves and Screening buy)
 
@@ -1071,12 +1076,12 @@ PerimeterDefense 80 doing its S52 job, not the Discipline.)
   any kind remains — **the measurement arc is complete.** The remaining Discipline question
   (per-opponent-slot foul suppression) is the same instrument gap logged for Family G, a design/
   readout conversation, not another sweep.
-- **The next session is the synthesis pass** — reading this whole document end-to-end to produce the
-  cross-family reading the generation redesign has been waiting on (Emmett's S49 standing ruling). The
-  questions it should now answer are carried in the family findings: the S50 height-over-defender make
-  term (the one that most gates the height→skill lean sizing), the S51 no-post-hunt diet gap and the
-  S52 PostDefense-as-size coupling, the two S49 reshapers (ball-dominance/initiation, unforced
-  turnovers), and the two S54 findings (perimeter defense is point-neutral without a rim deterrent — a
-  diet-shaper that pays only alongside rim protection; Discipline is near-inert even undiluted — a
-  candidate wiring gap). The pressure-dialed channels (BallHandling, Steals turnover-forcing) are coaching-layer,
-  scoped out of synthesis.
+- **The synthesis pass is DONE, and its first ruling is SHIPPED.** This document was read end-to-end
+  (Emmett's S49 standing ruling, satisfied after S54) and produced the cross-family wiring reading
+  (`attribute-wiring-synthesis.md`, Emmett's project files). Its top-ranked item — the S50
+  height-over-defender make term, the one that most gated the height→skill lean sizing — **shipped in
+  Session 55** (see the Physical package section above and design.md's make-door section). The
+  remaining wiring track, in the synthesis's order: the ball-dominance/initiation layer (next), the
+  unforced-turnover channel, the S51 no-post-hunt diet gap, the S54 defensive findings (perimeter-
+  defense point-neutrality; Discipline near-inert), and the remaining S50 physical questions. The
+  pressure-dialed channels (BallHandling, Steals turnover-forcing) stay coaching-layer, scoped out.

@@ -49,6 +49,13 @@
     <None Include="..\..\tools\fastbreak_golden.json" Link="tools\fastbreak_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Height-over-defender golden fixture (emitted by tools/height_over_defender_oracle.py,
+         LOCKED constants signed Session 54, make%% column regenerated against the live
+         recentered curve Session 55), copied beside the binary so the Phase 61 golden
+         parity reads it from AppContext.BaseDirectory (same convention). -->
+    <None Include="..\..\tools\height_over_defender_golden.json" Link="tools\height_over_defender_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- Pass-2 generation replay fixture (emitted by the oracle's fixture switch in
          tools/gen_pass2_skillfirst_oracle.py, S42.2), copied beside the binary so
          RunGenPass2ReplayParity reads it from AppContext.BaseDirectory (same convention). -->

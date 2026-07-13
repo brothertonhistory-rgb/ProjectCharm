@@ -83,6 +83,54 @@ public sealed class MatchupConfig
         _ => throw new InvalidOperationException($"No defense-blend weights for zone '{zone}'.")
     };
 
+    // =========================================================================
+    // Session 55 — height-over-defender make term (v1)
+    //     A one-sided, zone-weighted, saturating reach advantage added to the make
+    //     door's EffectiveRating. Rewards the taller shooter (greater standing reach)
+    //     for scoring over a smaller defender; never docks the shorter shooter (the
+    //     negative side already lives in the block channel). Standing reach is
+    //     (Height + Wingspan) / 2 — deliberately NOT LengthRating (which folds in
+    //     Vertical); Vertical-in-reach is a parked follow-up.
+    //
+    //     heightShift = HeightZoneWeight(zone) * HeightMaxBonus * tanh(gap / HeightReferenceScale),
+    //     gap = max(0, shooterReach - defenderReach).
+    //
+    //     All tunable. HeightMaxBonus = 0 is a legal clean kill switch. Validation is
+    //     range-only (each weight in [0,1]) — NOT monotonic across zones, so era
+    //     experiments can reshape the zone profile without fighting the loader. ---
+
+    /// <summary>Rating points the reach advantage is worth at full saturation and zone
+    /// weight 1.0 (the Rim cap). Must be &gt;= 0 (enforced in Load); 0 is a clean kill
+    /// switch. Default 15.0 (Session 55, signed on the archetype table).</summary>
+    public double HeightMaxBonus { get; set; } = 15.0;
+
+    /// <summary>Length-points that set the tanh saturation speed — the reach gap at which
+    /// the bonus has climbed to tanh(1) ≈ 76% of its zone cap. Must be &gt; 0 (enforced in
+    /// Load). Default 18.0 (Session 55).</summary>
+    public double HeightReferenceScale { get; set; } = 18.0;
+
+    /// <summary>Per-zone weight on the reach advantage — highest at the rim (finishing over
+    /// a smaller defender), fading outward, exactly 0 at Three (length does not help a set
+    /// three-point shot). Each must be in [0,1] (enforced in Load). Session 55 defaults:
+    /// Rim 1.0 / Short 0.8 / Mid 0.3 / Long 0.05 / Three 0.0.</summary>
+    public double HeightWeightRim   { get; set; } = 1.00;
+    public double HeightWeightShort { get; set; } = 0.80;
+    public double HeightWeightMid   { get; set; } = 0.30;
+    public double HeightWeightLong  { get; set; } = 0.05;
+    public double HeightWeightThree { get; set; } = 0.00;
+
+    /// <summary>The per-zone reach-advantage weight (Session 55). Mirrors
+    /// <see cref="BlendWeights"/>: one switch, config data behind it.</summary>
+    public double HeightZoneWeight(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => HeightWeightRim,
+        ShotLocation.Short => HeightWeightShort,
+        ShotLocation.Mid   => HeightWeightMid,
+        ShotLocation.Long  => HeightWeightLong,
+        ShotLocation.Three => HeightWeightThree,
+        _ => throw new InvalidOperationException($"No height zone weight for zone '{zone}'.")
+    };
+
     // --- Phase 7: block-contest skill/length weights, per zone.
     //     At Three the contest is 40% skill / 60% length (Emmett's anchor).
     //     At Rim the reverse: 40% skill / 60% length (physical anchor, same pair).
@@ -1112,6 +1160,26 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"DisplacementShortGateLow must be < DisplacementShortGateHigh: got " +
                 $"{cfg.DisplacementShortGateLow} >= {cfg.DisplacementShortGateHigh}.");
+
+        // Session 55 — height-over-defender make term. Range-only (NOT monotonic across
+        // zones): the loader must not freeze the zone profile so era experiments can reshape
+        // it. HeightMaxBonus = 0 stays legal (clean kill switch).
+        if (cfg.HeightMaxBonus < 0.0)
+            throw new InvalidOperationException(
+                $"HeightMaxBonus must be >= 0 (0 is a legal kill switch): got {cfg.HeightMaxBonus}.");
+        if (cfg.HeightReferenceScale <= 0.0)
+            throw new InvalidOperationException(
+                $"HeightReferenceScale must be > 0: got {cfg.HeightReferenceScale}.");
+        foreach (var (name, w) in new[]
+                 {
+                     (nameof(cfg.HeightWeightRim),   cfg.HeightWeightRim),
+                     (nameof(cfg.HeightWeightShort), cfg.HeightWeightShort),
+                     (nameof(cfg.HeightWeightMid),   cfg.HeightWeightMid),
+                     (nameof(cfg.HeightWeightLong),  cfg.HeightWeightLong),
+                     (nameof(cfg.HeightWeightThree), cfg.HeightWeightThree),
+                 })
+            if (w < 0.0 || w > 1.0)
+                throw new InvalidOperationException($"{name} must be in [0, 1]: got {w}.");
 
         return cfg;
     }

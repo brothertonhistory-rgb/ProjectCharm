@@ -176,9 +176,36 @@ public static class Matchup
                                   cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
         var physicalShift = GapFn(attackerEffectiveAthleticism - defenderEffectiveAthleticism,
                                   cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+        var heightShift   = HeightOverDefenderShift(zone, attacker, defender, cfg);
 
-        return baseline + skillShift + physicalShift;
+        return baseline + skillShift + physicalShift + heightShift;
     }
+
+    /// <summary>
+    /// Session 55 — the height-over-defender make term (v1). A one-sided, zone-weighted,
+    /// saturating reach advantage added to <see cref="EffectiveRating"/>. Standing reach is
+    /// (Height + Wingspan) / 2 — the float divide is deliberate (both are int ratings; an
+    /// odd sum like 85+88 is 86.5, not 86). The gap is ONE-SIDED: it rewards the taller
+    /// shooter and is exactly zero when the shooter is equal or shorter (the shorter
+    /// shooter is already handled by the block channel; the negative side is a parked v2
+    /// call). tanh saturates the advantage so an extreme mismatch approaches, but never
+    /// exceeds, the per-zone cap (HeightMaxBonus × zone weight). Zero at Three by weight.
+    /// This is deliberately NOT <see cref="LengthRating"/>: reach here excludes Vertical.
+    /// </summary>
+    public static double HeightOverDefenderShift(
+        ShotLocation zone, Player attacker, Player defender, MatchupConfig cfg)
+    {
+        var gap = Math.Max(0.0, Reach(attacker) - Reach(defender));   // ONE-SIDED (v1)
+        return cfg.HeightZoneWeight(zone) * cfg.HeightMaxBonus
+             * Math.Tanh(gap / cfg.HeightReferenceScale);
+    }
+
+    /// <summary>Standing reach (Session 55) — the single source of the (Height + Wingspan)/2
+    /// read for the height-over-defender make term. The divide is by 2.0 on purpose: Height
+    /// and Wingspan are int ratings, so an odd sum (e.g. 85+88) is 86.5, never truncated to
+    /// 86. Deliberately excludes Vertical (that is <see cref="LengthRating"/>'s job, for the
+    /// block door).</summary>
+    public static double Reach(Player p) => (p.Height + p.Wingspan) / 2.0;
 
     /// <summary>
     /// The block-specific length composite (Phase 7) — the single place the
