@@ -1,0 +1,10 @@
+{
+  "gamesPerRung": 500,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "cases",
+  "outputName": "equiv_slotmap",
+  "cases": [
+    { "label": "EQ", "slotDials": { "1": { "PerimeterDefense": 99 } } }
+  ]
+}

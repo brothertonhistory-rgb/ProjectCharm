@@ -1,0 +1,14 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "cases",
+  "outputName": "help_stack",
+  "cases": [
+    { "label": "FLAT_50_CONTROL", "dials": {} },
+    { "label": "HELP_1_SLOT",  "slotDials": { "1": { "HelpDefense": 99 } } },
+    { "label": "HELP_2_SLOTS", "slotDials": { "1": { "HelpDefense": 99 }, "2": { "HelpDefense": 99 } } },
+    { "label": "HELP_3_SLOTS", "slotDials": { "1": { "HelpDefense": 99 }, "2": { "HelpDefense": 99 }, "3": { "HelpDefense": 99 } } },
+    { "label": "HELP_5_SLOTS", "slotDials": { "1": { "HelpDefense": 99 }, "2": { "HelpDefense": 99 }, "3": { "HelpDefense": 99 }, "4": { "HelpDefense": 99 }, "5": { "HelpDefense": 99 } } }
+  ]
+}

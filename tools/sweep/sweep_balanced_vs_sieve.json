@@ -1,0 +1,23 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "cases",
+  "outputName": "balanced_vs_sieve",
+  "cases": [
+    { "label": "FLAT_50_CONTROL", "dials": {} },
+    { "label": "BALANCED_DEFENSE", "slotDials": {
+        "1": { "PerimeterDefense": 99 },
+        "2": { "PerimeterDefense": 99 },
+        "4": { "HelpDefense": 99, "OffBallDefense": 99 },
+        "5": { "RimProtection": 99 }
+    } },
+    { "label": "SIEVE_5", "slotDials": {
+        "1": { "PerimeterDefense": 10, "PostDefense": 10, "RimProtection": 10, "Steals": 10, "HelpDefense": 10, "OffBallDefense": 10 },
+        "2": { "PerimeterDefense": 10, "PostDefense": 10, "RimProtection": 10, "Steals": 10, "HelpDefense": 10, "OffBallDefense": 10 },
+        "3": { "PerimeterDefense": 10, "PostDefense": 10, "RimProtection": 10, "Steals": 10, "HelpDefense": 10, "OffBallDefense": 10 },
+        "4": { "PerimeterDefense": 10, "PostDefense": 10, "RimProtection": 10, "Steals": 10, "HelpDefense": 10, "OffBallDefense": 10 },
+        "5": { "PerimeterDefense": 10, "PostDefense": 10, "RimProtection": 10, "Steals": 10, "HelpDefense": 10, "OffBallDefense": 10 }
+    } }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "cases",
+  "outputName": "flat_baseline",
+  "cases": [
+    { "label": "FLAT_50_CONTROL", "dials": {} }
+  ]
+}

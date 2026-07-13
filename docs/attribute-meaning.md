@@ -902,6 +902,52 @@ read, for the same reason.)
   unwired and un-argued-for); the S49 unforced-turnover reshaper sits adjacent to the Steals
   attribution machinery but is untouched here.
 
+### The undiluted reruns (S54 — the per-man readout + lineup stacks)
+
+The slot-guards-slot dilution above (the on-ball ratings reading as a whisper on B.PTS because the
+swept defender guards only ~1/5 of the opponent's shots) was an **instrument artifact, not the
+ratings' meaning**. S54 added a per-man readout — each Team B slot's own attributed shooting line —
+and reran the diluted walks through it. The covered man is the **mirror-slot opponent** (slot-guards-
+slot; his primary shots and his own putbacks are both contested by his mirror), read as a primary-
+matchup proxy that includes all his attributed attempts. On *his own line* the reads are clear:
+
+| Rating (0 → 99 on the swept defender) | Covered man's line | Reading |
+|---|---|---|
+| **PerimeterDefense** | FGA **12.8 → 12.8** (flat); FG% **37.8 → 34.9**; 3P% **29.5 → 19.4**; 2P% 40.0 → 38.7 | On-ball contest. Volume never moves — the offense does not hunt the on-ball mismatch — but his looks get harder, hardest on the three. |
+| **RimProtection** | FGA 12.8 (flat); 2P% **40.5 → 36.7**; 3P% ~23 (flat) | Kills interior makes, not volume or the three. (Plus the S52 second-chance/putback team channel.) |
+| **PostDefense** | FGA **13.7 → 12.0**; 2P% **41.2 → 37.1** | The one that takes **both** — it is a *denial* rating (touch redistribution via postness), so it lowers his volume as well as his efficiency. |
+| **Discipline** | FTA **3.7 → 3.6** (essentially flat); nothing else moves | **Near-inert even undiluted** — see Family H. |
+
+**Finding — perimeter defense is point-neutral without a rim deterrent (the S54 design result).**
+Stacking PerimeterDefense at 99 across 1 → 2 → 3 → 5 slots confirmed the mechanism and surfaced a
+bigger truth. The opponent's shot-diet shift strengthens then **saturates after three slots** (Team B
+three-share 20.4 → 19.2 → 17.7 → 16.8 → 16.8; rim-share 28.8 → 33.0), and **uncovered men never gain
+volume** (slots 3–5 hold 12.1 / 10.7 / 10.6 FGA at every rung — the offense-doesn't-hunt-the-mismatch
+result, a design confirmation). **But B.PTS barely moves and even ticks up mid-ladder** (52.9 → 52.8 →
+53.2 → 53.3 → 52.5): perimeter pressure pushes the opponent off the three and into higher-percentage
+twos, and it nets out even. **Perimeter defense alone is point-neutral; it is a diet-shaper that pays
+only when a rim deterrent is waiting to punish the shots you funnel inside.** Do not size perimeter-
+defense value in isolation. This is exactly why the balanced defense works and a pure perimeter wall
+does not.
+
+**Help defense compounds cleanly.** The help stack lowers the make itself rather than relocating the
+shot, so it compounds **roughly linearly** with no point-neutral problem: B.PTS 52.9 → 52.3 → 51.6 →
+50.9 → **49.5** at five helpers, covered men's interior FG% falling every rung.
+
+**The headline number — a real defense is worth ~10.5 points.** BALANCED_DEFENSE (two lockdown POA +
+a rim protector + a help anchor who also denies off-ball) holds Team B to **50.5** (covered men into
+the low 30s, three-share 18.6%); SIEVE_5 (all six defensive ratings at 10 on all five) bleeds
+**61.0** (everyone ~42% from everywhere). A sensibly-built defense is worth roughly **−10.5 opponent
+points** against a sieve — undiluted, now readable man-by-man.
+
+**A pre-existing bench property, now visible.** The five flat-50 Team B men are *not* identical on the
+per-man surface — guards (slots 1–2) take ~12.8 FGA, bigs (slots 4–5) ~10.6, from the bench's usage
+curve. Not an S54 artifact; read each ladder as each man vs *his own* flat-50 line. And the per-man
+line's putback dilution (a putback reads rim-protection, not the swept perimeter rating) is why the
+covered-man perimeter curve bottoms near 34.9% rather than lower — isolating his rim shooting would
+need a per-slot-per-zone engine emission (out of scope). **These four reads are now measured undiluted;
+synthesis follows S54.**
+
 ## Family H — Cognition (BasketballIQ, Discipline) — measured Session 53
 
 The sixth and final family through the S47 ruler, and the smallest — two isolation walks (0→99 in
@@ -1003,10 +1049,11 @@ PerimeterDefense 80 doing its S52 job, not the Discipline.)
   team-level channels (conversion-quality make bonus, lineup-passing assist rate) are real in the
   source but whisper-scale. It should be sized as a modest efficiency-and-credit rating for perimeter
   players, not a volume or creation driver.
-- **Discipline** is a **defender-light foul-avoidance tap** — a disciplined defender fouls the man he
-  guards a little less; an undisciplined one hacks a little more (asymmetric, the ceiling has more
-  room than the floor). Real per-man, diluted to a whisper at team scale on this instrument. It is a
-  low-magnitude rating whose value is a foul-economy edge, not a scoreboard mover.
+- **Discipline** is a **defender-light foul-avoidance tap** in the source — a disciplined defender
+  fouls the man he guards a little less; an undisciplined one hacks a little more (asymmetric). But
+  the S54 undiluted rerun found it **near-inert even on the covered man's own line** (his FTA moves
+  only 3.7 → 3.6 across the whole walk). Treat it as a candidate wiring gap for synthesis, not a
+  rating to size — as wired it barely earns its place.
 
 ### Completeness ledger (the honest note)
 
@@ -1014,11 +1061,12 @@ PerimeterDefense 80 doing its S52 job, not the Discipline.)
   directly on the swept player's line). Its two team-level tails (the conversion-quality make channel
   and the lineup-passing assist-rate channel) were flagged at the gate and confirmed as whispers by
   the walk (team points 52.8 → 53.0).
-- **Discipline** — the single source read is confirmed and the per-man magnitude is arithmetic-bounded
-  (roughly −0.02 to +0.08 FTA/game on Team B, asymmetric), but it is **unmeasured on this bench**: no
-  Team B FTA column exists, and the read is diluted 5:1 to the man he guards, so Team B points staying
-  flat is consistent-with, not a measurement-of, the whisper. Same limitation family as the Family-G
-  on-ball wall.
+- **Discipline** — at S53 the per-man magnitude was only arithmetic-bounded (no Team B FTA column, the
+  read diluted 5:1). **S54 measured it undiluted** with the per-man readout, and the honest result is
+  stronger than "diluted whisper": on the covered man's own line his free-throw attempts move only
+  **3.7 → 3.6 across the entire 0→99 walk**, and nothing else moves at all. As currently wired
+  Discipline does almost nothing to the man you guard — a **candidate wiring gap**, not merely a
+  read the S53 instrument couldn't see. Logged for synthesis; nothing touched.
 - **No additional Family-H bench work is required before synthesis**, and no additional bench work of
   any kind remains — **the measurement arc is complete.** The remaining Discipline question
   (per-opponent-slot foul suppression) is the same instrument gap logged for Family G, a design/
@@ -1027,6 +1075,8 @@ PerimeterDefense 80 doing its S52 job, not the Discipline.)
   cross-family reading the generation redesign has been waiting on (Emmett's S49 standing ruling). The
   questions it should now answer are carried in the family findings: the S50 height-over-defender make
   term (the one that most gates the height→skill lean sizing), the S51 no-post-hunt diet gap and the
-  S52 PostDefense-as-size coupling, and the two S49 reshapers (ball-dominance/initiation, unforced
-  turnovers). The pressure-dialed channels (BallHandling, Steals turnover-forcing) are coaching-layer,
+  S52 PostDefense-as-size coupling, the two S49 reshapers (ball-dominance/initiation, unforced
+  turnovers), and the two S54 findings (perimeter defense is point-neutral without a rim deterrent — a
+  diet-shaper that pays only alongside rim protection; Discipline is near-inert even undiluted — a
+  candidate wiring gap). The pressure-dialed channels (BallHandling, Steals turnover-forcing) are coaching-layer,
   scoped out of synthesis.

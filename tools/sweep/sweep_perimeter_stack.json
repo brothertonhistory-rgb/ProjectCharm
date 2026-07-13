@@ -1,0 +1,14 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 1000,
+  "sweptSlot": 1,
+  "mode": "cases",
+  "outputName": "perimeter_stack",
+  "cases": [
+    { "label": "FLAT_50_CONTROL", "dials": {} },
+    { "label": "PERIM_1_SLOT",  "slotDials": { "1": { "PerimeterDefense": 99 } } },
+    { "label": "PERIM_2_SLOTS", "slotDials": { "1": { "PerimeterDefense": 99 }, "2": { "PerimeterDefense": 99 } } },
+    { "label": "PERIM_3_SLOTS", "slotDials": { "1": { "PerimeterDefense": 99 }, "2": { "PerimeterDefense": 99 }, "3": { "PerimeterDefense": 99 } } },
+    { "label": "PERIM_5_SLOTS", "slotDials": { "1": { "PerimeterDefense": 99 }, "2": { "PerimeterDefense": 99 }, "3": { "PerimeterDefense": 99 }, "4": { "PerimeterDefense": 99 }, "5": { "PerimeterDefense": 99 } } }
+  ]
+}

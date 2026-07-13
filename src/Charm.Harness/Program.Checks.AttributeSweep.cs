@@ -54,8 +54,14 @@ internal static partial class Program
     private sealed record SweepWalk(string Field, int Start, int Stop, int Step);
 
     /// <summary>Cases mode: one named row. Dials are absolute values applied to the
-    /// swept slot on top of the flat-50 baseline (every unmentioned field stays 50).</summary>
-    private sealed record SweepCase(string Label, Dictionary<string, int> Dials);
+    /// swept slot on top of the flat-50 baseline (every unmentioned field stays 50).
+    /// S54: a case may instead carry a per-slot dial map (SlotDials) that dials any
+    /// subset of Team A's five slots, each with its own dial set. A case uses EITHER
+    /// the legacy single-slot Dials OR SlotDials, never both (enforced by the parser).</summary>
+    private sealed record SweepCase(
+        string Label,
+        Dictionary<string, int> Dials,
+        Dictionary<int, Dictionary<string, int>>? SlotDials = null);
 
     private sealed class SweepConfig
     {
@@ -69,8 +75,13 @@ internal static partial class Program
     }
 
     // A resolved rung: the row label shown in the table + CSV, and the absolute dials
-    // to apply to the swept slot (empty = pure flat-50 control).
-    private sealed record SweepRung(string Label, Dictionary<string, int> Dials);
+    // to apply to the swept slot (empty = pure flat-50 control). S54: SlotDials, when
+    // non-null, is the per-slot dial map (dials any subset of Team A's five slots) and
+    // supersedes the single-slot Dials-on-SweptSlot path for that rung.
+    private sealed record SweepRung(
+        string Label,
+        Dictionary<string, int> Dials,
+        Dictionary<int, Dictionary<string, int>>? SlotDials = null);
 
     // ── Entry point (called from the Program.cs `sweep` dispatch) ───────────────
 
@@ -133,6 +144,7 @@ internal static partial class Program
 
         PrintSweepTable(config, results);
         PrintSweepBoxHeadline(config, results);
+        PrintPerManBlock(config, results);
         var csvPath = Path.Combine(AppContext.BaseDirectory, $"attribute_{config.OutputName}_sweep.csv");
         WriteSweepCsv(csvPath, config, results);
         Console.WriteLine();
@@ -167,7 +179,7 @@ internal static partial class Program
         {
             if (config.Cases.Count == 0)
                 throw new InvalidOperationException("mode is 'cases' but the 'cases' array is empty.");
-            return config.Cases.Select(c => new SweepRung(c.Label, c.Dials)).ToList();
+            return config.Cases.Select(c => new SweepRung(c.Label, c.Dials, c.SlotDials)).ToList();
         }
 
         throw new InvalidOperationException($"unknown mode '{config.Mode}' (allowed: walk, cases).");
@@ -241,10 +253,13 @@ internal static partial class Program
 
     private static SweepRungResult RunSweepRung(SweepConfig config, SweepRung rung, string engineConfigPath)
     {
-        // Build the two teams once for this rung. Team A: swept slot dialed, the rest
-        // flat 50. Team B: flat 50 everywhere. Then stamp PlayerIds by logical team.
-        var teamAPlayers = BuildSweepTeam(rung.Dials, config.SweptSlot, "TeamA");
-        var teamBPlayers = BuildSweepTeam(new Dictionary<string, int>(), sweptSlot: 0, "TeamB");
+        // Build the two teams once for this rung. Team A: dialed slots per the rung's
+        // per-slot map (legacy single-slot rungs resolve to a one-entry map on SweptSlot);
+        // every other slot flat 50. Team B: flat 50 everywhere. Then stamp PlayerIds.
+        var teamADials = rung.SlotDials
+            ?? new Dictionary<int, Dictionary<string, int>> { [config.SweptSlot] = rung.Dials };
+        var teamAPlayers = BuildSweepTeam(teamADials, "TeamA");
+        var teamBPlayers = BuildSweepTeam(new Dictionary<int, Dictionary<string, int>>(), "TeamB");
         for (var i = 0; i < 5; i++) teamAPlayers[i] = StampPlayerId(teamAPlayers[i], i + 1);
         for (var i = 0; i < 5; i++) teamBPlayers[i] = StampPlayerId(teamBPlayers[i], i + 6);
 
@@ -372,12 +387,15 @@ internal static partial class Program
         return new SweepRungResult(totals, box);
     }
 
-    // ── The flat-team-plus-one-dialed-slot builder ──────────────────────────────
+    // ── The flat-team-plus-dialed-slots builder ─────────────────────────────────
     //
     // Reuses the bench's flat-50 baseline, its dialable-field whitelist, its per-slot
-    // validity rules, and its typed constructor. The ONLY difference from the bench
-    // builder is that dials land on a single named slot rather than a per-slot config.
-    private static Player[] BuildSweepTeam(Dictionary<string, int> dials, int sweptSlot, string teamLabel)
+    // validity rules, and its typed constructor. S54: dials are supplied per slot as a
+    // map (slot 1–5 → field→value). The legacy single-slot case is a one-entry map, so a
+    // walk or a legacy `dials` case builds byte-identically to before; a stack case dials
+    // several slots. Slots absent from the map stay flat 50.
+    private static Player[] BuildSweepTeam(
+        IReadOnlyDictionary<int, Dictionary<string, int>> slotDials, string teamLabel)
     {
         var players = new Player[5];
 
@@ -388,8 +406,8 @@ internal static partial class Program
             foreach (var f in BenchRatingFields) values[f] = BenchRatingBaseline;
             values[BenchHierarchyField] = BenchHierarchyBaseline;
 
-            // 2. Apply absolute dials only on the swept slot.
-            if (slot == sweptSlot)
+            // 2. Apply absolute dials for this slot, if any are mapped to it.
+            if (slotDials.TryGetValue(slot, out var dials))
             {
                 foreach (var kv in dials)
                 {
@@ -600,6 +618,31 @@ internal static partial class Program
         TeamBox("teamA", TeamA, aOrb, aDrb);
         TeamBox("teamB", TeamB, bOrb, bDrb);
 
+        // ── S54: Team B per-man shooting lines (mirror-slot opponent proxy) ──────
+        // Each Team B slot's OWN attributed shooting line, read from the same box the
+        // team aggregates use (box indices 5–9). It is the mirror-slot opponent's line:
+        // a primary-matchup proxy that INCLUDES all attributed attempts (putbacks are
+        // counted, A2). Counts emit _total and _pg; FG%/3P%/2P% and FTr (=FTA/FGA) derive
+        // from the summed counts. Zero denominators emit 0.0 here — same CSV convention as
+        // every other rate column (the console block uses a dash sentinel instead).
+        void PerMan(int bSlot)                       // bSlot 1..5 → box index bSlot+4
+        {
+            int bi = bSlot + 4;
+            long fga = box.Fga[bi], fgm = box.Fgm[bi];
+            long p3a = box.Tpa[bi], p3m = box.Tpm[bi];
+            long fta = box.Fta[bi], ftm = box.Ftm[bi];
+            long f2a = fga - p3a,   f2m = fgm - p3m;   // two-point attempts/makes
+            string tag = $"teamB_man{bSlot}";
+            Cnt($"{tag}_fga", fga); Cnt($"{tag}_fgm", fgm);
+            Cnt($"{tag}_3pa", p3a); Cnt($"{tag}_3pm", p3m);
+            Cnt($"{tag}_fta", fta); Cnt($"{tag}_ftm", ftm);
+            Pct($"{tag}_fg", fgm, fga);
+            Pct($"{tag}_3p", p3m, p3a);
+            Pct($"{tag}_2p", f2m, f2a);
+            Rate($"{tag}_ftr", fta, fga);
+        }
+        for (var b = 1; b <= 5; b++) PerMan(b);
+
         // ── team zone mix (offense-keyed shot shares + zone FG%) ─────────────────
         string[] zoneNames = { "rim", "short", "mid", "long", "three" };
         void ZoneMix(string tag, int ti)
@@ -682,6 +725,63 @@ internal static partial class Program
                 return $"{parts[0],6:F1}  {parts[1],6:F1}  {parts[2],6:F1}  {parts[3],6:F1}  {parts[4],6:F1}";
             }
             Console.WriteLine($"  {rung.Label,-26}  {Row(0)}  {Row(1)}");
+        }
+    }
+
+    // ── S54: per-man console block — the mirror-slot opponent's own shooting line ─
+    //
+    // Reads the SAME Team B per-slot box (indices 5–9) the CSV per-man columns use. It is
+    // the primary-matchup proxy: a Team B slot's line is guarded by his mirror on his own
+    // primary shots, but INCLUDES all attributed attempts (a putback he took is contested
+    // by his own mirror too; a putback contest on another slot stays a team channel — A2).
+    //
+    // Walk mode prints just the covered man (Team B slot == SweptSlot, whose defender is
+    // the swept slot) — the one undiluted read the walk exists to produce. Cases mode
+    // prints all five Team B slots per rung so covered-vs-uncovered is visible side by side.
+    // Zero-denominator rates print as a dash, never NaN/∞/0.0.
+    private static void PrintPerManBlock(
+        SweepConfig config, List<(SweepRung Rung, SweepRungResult R)> results)
+    {
+        Console.WriteLine();
+        Console.WriteLine(
+            "  Per-man — mirror-slot opponent shooting line " +
+            "(primary-matchup proxy; incl. all attributed attempts)");
+        Console.WriteLine(
+            $"  {"Row",-26}  {"B.slot",6}  {"FGA",5}  {"FG%",5}  {"3PA",5}  {"3P%",5}  " +
+            $"{"2P%",5}  {"FTA",5}  {"FTr",5}");
+        Console.WriteLine($"  {new string('-', 92)}");
+
+        bool walk = config.Mode == "walk";
+
+        foreach (var (rung, rr) in results)
+        {
+            var box = rr.Box;
+            double g = rr.Reb.Games;
+            int lo = walk ? config.SweptSlot : 1;
+            int hi = walk ? config.SweptSlot : 5;
+
+            for (var bSlot = lo; bSlot <= hi; bSlot++)
+            {
+                int bi = bSlot + 4;
+                long fga = box.Fga[bi], fgm = box.Fgm[bi];
+                long p3a = box.Tpa[bi], p3m = box.Tpm[bi];
+                long fta = box.Fta[bi];
+                long f2a = fga - p3a,  f2m = fgm - p3m;
+
+                string fgP  = fga > 0 ? (100.0 * fgm / fga).ToString("F1") : "—";
+                string tpP  = p3a > 0 ? (100.0 * p3m / p3a).ToString("F1") : "—";
+                string twoP = f2a > 0 ? (100.0 * f2m / f2a).ToString("F1") : "—";
+                string ftr  = fga > 0 ? ((double)fta / fga).ToString("F2") : "—";
+
+                // Row label prints once per rung (on the first slot line).
+                string label = bSlot == lo ? rung.Label : "";
+
+                Console.WriteLine(
+                    $"  {label,-26}  {bSlot,6}  {fga / g,5:F1}  {fgP,5}  {p3a / g,5:F1}  {tpP,5}  " +
+                    $"{twoP,5}  {fta / g,5:F1}  {ftr,5}");
+            }
+
+            if (!walk) Console.WriteLine();   // blank line between rungs in cases mode
         }
     }
 
@@ -772,7 +872,7 @@ internal static partial class Program
                     string ctx = $"cases[{idx}]";
                     if (caseEl.ValueKind != JsonValueKind.Object)
                         throw new InvalidOperationException($"{ctx} must be an object.");
-                    RejectUnknownOrDuplicateKeys(caseEl, ctx, "label", "dials");
+                    RejectUnknownOrDuplicateKeys(caseEl, ctx, "label", "dials", "slotDials");
 
                     if (!caseEl.TryGetProperty("label", out var lEl) || lEl.ValueKind != JsonValueKind.String
                         || string.IsNullOrWhiteSpace(lEl.GetString()))
@@ -781,27 +881,64 @@ internal static partial class Program
                     if (!seenLabels.Add(label))
                         throw new InvalidOperationException($"duplicate case label '{label}'.");
 
-                    var dials = new Dictionary<string, int>(StringComparer.Ordinal);
-                    if (caseEl.TryGetProperty("dials", out var dialsEl))
+                    bool hasDials     = caseEl.TryGetProperty("dials", out var dialsEl);
+                    bool hasSlotDials = caseEl.TryGetProperty("slotDials", out var slotDialsEl);
+                    if (hasDials && hasSlotDials)
+                        throw new InvalidOperationException(
+                            $"{ctx}: a case uses EITHER 'dials' (single slot) OR 'slotDials' (per-slot map), not both.");
+
+                    // Local: parse one field→value object into a validated dial dict.
+                    Dictionary<string, int> ParseDialObject(JsonElement obj, string dctx)
                     {
-                        if (dialsEl.ValueKind != JsonValueKind.Object)
-                            throw new InvalidOperationException($"{ctx} 'dials' must be an object of field→value.");
+                        if (obj.ValueKind != JsonValueKind.Object)
+                            throw new InvalidOperationException($"{dctx} must be an object of field→value.");
+                        var d = new Dictionary<string, int>(StringComparer.Ordinal);
                         var seenFields = new HashSet<string>(StringComparer.Ordinal);
-                        foreach (var d in dialsEl.EnumerateObject())
+                        foreach (var kv in obj.EnumerateObject())
                         {
-                            if (!seenFields.Add(d.Name))
-                                throw new InvalidOperationException($"{ctx}: duplicate dial field '{d.Name}'.");
-                            if (!BenchDialableFields.Contains(d.Name))
+                            if (!seenFields.Add(kv.Name))
+                                throw new InvalidOperationException($"{dctx}: duplicate dial field '{kv.Name}'.");
+                            if (!BenchDialableFields.Contains(kv.Name))
                                 throw new InvalidOperationException(
-                                    $"{ctx}: unknown dial field '{d.Name}' (case-sensitive).");
-                            if (d.Value.ValueKind != JsonValueKind.Number || !d.Value.TryGetInt32(out var dv))
+                                    $"{dctx}: unknown dial field '{kv.Name}' (case-sensitive).");
+                            if (kv.Value.ValueKind != JsonValueKind.Number || !kv.Value.TryGetInt32(out var dv))
                                 throw new InvalidOperationException(
-                                    $"{ctx}: dial '{d.Name}' must be an integer (got {d.Value.GetRawText()}).");
-                            dials[d.Name] = dv;
+                                    $"{dctx}: dial '{kv.Name}' must be an integer (got {kv.Value.GetRawText()}).");
+                            d[kv.Name] = dv;
                         }
+                        return d;
                     }
 
-                    cases.Add(new SweepCase(label, dials));
+                    var dials = new Dictionary<string, int>(StringComparer.Ordinal);
+                    Dictionary<int, Dictionary<string, int>>? slotDials = null;
+
+                    if (hasDials)
+                    {
+                        dials = ParseDialObject(dialsEl, $"{ctx} 'dials'");
+                    }
+                    else if (hasSlotDials)
+                    {
+                        if (slotDialsEl.ValueKind != JsonValueKind.Object)
+                            throw new InvalidOperationException(
+                                $"{ctx} 'slotDials' must be an object of slot(\"1\"–\"5\")→dial-object.");
+                        slotDials = new Dictionary<int, Dictionary<string, int>>();
+                        var seenSlots = new HashSet<int>();
+                        foreach (var sEntry in slotDialsEl.EnumerateObject())
+                        {
+                            if (!int.TryParse(sEntry.Name, out var slotNum) || slotNum < 1 || slotNum > 5)
+                                throw new InvalidOperationException(
+                                    $"{ctx} 'slotDials': key '{sEntry.Name}' must be a slot number \"1\"–\"5\".");
+                            if (!seenSlots.Add(slotNum))
+                                throw new InvalidOperationException(
+                                    $"{ctx} 'slotDials': duplicate slot '{slotNum}'.");
+                            slotDials[slotNum] = ParseDialObject(sEntry.Value, $"{ctx} 'slotDials'[{slotNum}]");
+                        }
+                        if (slotDials.Count == 0)
+                            throw new InvalidOperationException(
+                                $"{ctx} 'slotDials' must dial at least one slot (empty map is not a valid case).");
+                    }
+
+                    cases.Add(new SweepCase(label, dials, slotDials));
                     idx++;
                 }
                 if (outputName == "sweep") outputName = "cases";
