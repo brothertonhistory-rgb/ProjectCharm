@@ -97,6 +97,29 @@ public sealed class RollGConfig
     //     0 = ablation (attention has no location effect). Default: 1.0 placeholder. ---
     public double AttentionShiftAmplifier   { get; set; } = 1.0;
 
+    // --- PostMoves interior self-creation — DIET side (Session 57). Two SEPARATE dials,
+    //     both reading the shooter's PostMoves, both anchored at PostMoves = 50 (average
+    //     post rating = no change) and upside-only (PostMoves <= 50 is exact identity).
+    //     Neither touches make% — the tilt lives on the shot diet, before the matchup bend.
+    //
+    //     postLift = max(0, (PostMoves - 50) / 49)   (0 at <=50, 1 at 99)
+    //
+    //     PostDietSpan — a high-PostMoves shooter hunts more interior shots. His authored
+    //     Rim + Short tendency shares are multiplied by (1 + PostDietSpan * postLift),
+    //     preserving their ratio, so interior weight rises and Mid/Long/Three shed share
+    //     proportionally via renormalization. 0 = ablation (no interior hunt). Provisional
+    //     placeholder; shape locked, magnitude tuned later on the season page. Must be >= 0
+    //     (the 1 + span*lift form stays a valid multiplier for any nonnegative span).
+    //
+    //     PostPressureResistanceSpan — a strong post player resists being displaced OFF an
+    //     interior spot under defensive load: the requested diet shift is scaled by
+    //     (1 - PostPressureResistanceSpan * postLift) when the bent-dominant zone is
+    //     interior. This SHRINKS the demand to vacate, never the intrinsic capacity cap.
+    //     0 = ablation (no territory-hold). Must be in [0, 1] — a span > 1 would drive the
+    //     resistance factor negative and add mass back onto the dominant zone. ---
+    public double PostDietSpan               { get; set; } = 0.50;
+    public double PostPressureResistanceSpan { get; set; } = 0.50;
+
     public static RollGConfig Load(string path)
     {
         var json = File.ReadAllText(path);
@@ -161,6 +184,17 @@ public sealed class RollGConfig
         if (cfg.FastBreakPaceTilt < 0 || cfg.FastBreakPaceTilt >= 0.25)
             throw new InvalidOperationException(
                 $"RollG FastBreakPaceTilt must be in [0, 0.25) (got {cfg.FastBreakPaceTilt}).");
+
+        // Session 57: PostMoves interior diet dials. Diet span only needs >= 0 (the
+        // 1 + span*lift multiplier stays valid for any nonnegative span). Resistance span
+        // is bounded to [0, 1] so 1 - span*lift can never go negative (a negative factor
+        // would add mass back onto the dominant zone — the sign bug this bound prevents).
+        if (cfg.PostDietSpan < 0)
+            throw new InvalidOperationException(
+                $"RollG PostDietSpan must be >= 0 (0 = no interior hunt, ablation-friendly): got {cfg.PostDietSpan}.");
+        if (cfg.PostPressureResistanceSpan < 0 || cfg.PostPressureResistanceSpan > 1.0)
+            throw new InvalidOperationException(
+                $"RollG PostPressureResistanceSpan must be in [0, 1] (a span > 1 drives the resistance factor negative): got {cfg.PostPressureResistanceSpan}.");
 
         return cfg;
     }

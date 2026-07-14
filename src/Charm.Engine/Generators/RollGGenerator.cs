@@ -131,6 +131,24 @@ public sealed class RollGGenerator : IRollGGenerationProvider
         var (tRim, tShort, tMid, tLong, tThree) =
             CoachingPull.Apply(shooter, offCoach, malleability: null);
 
+        // Session 57 — PostMoves interior diet tilt. A high-PostMoves shooter hunts more
+        // interior shots: his coached Rim + Short shares are multiplied by the SAME factor
+        // (authored Rim:Short ratio preserved), so interior weight rises and Mid/Long/Three
+        // shed share only via renormalization. This sits on the shot diet BEFORE the matchup
+        // bend, so it flows through displacement naturally and NEVER calls OffenseRating —
+        // make% is untouched. Fast-break/transition already returned above (a running
+        // possession never posts up), and this feeds BOTH the zero-defender fallback and the
+        // normal path below. Multiplicative → a zero authored Rim or Short stays zero (it
+        // amplifies existing interior intent, never invents a post game).
+        //
+        // IDENTITY-PATH BRANCH lives inside the pure helper: PostDietSpan 0 or PostMoves <= 50
+        // returns the coached vector UNCHANGED (bit-for-bit) — no multiply, no renormalize (a
+        // renormalize by ×1 can still perturb float bits). The intrinsicCapacity read inside
+        // ApplyDietShift stays on the shooter's RAW authored tendencies, deliberately NOT this
+        // tilted vector: appetite is not flexibility.
+        (tRim, tShort, tMid, tLong, tThree) = TiltInteriorDiet(
+            tRim, tShort, tMid, tLong, tThree, shooter.PostMoves, _cfg.PostDietSpan);
+
         // Zero defenders populated: short-circuit to pure-tendency pie.
         // Implementer's call: the shooter IS real and IS under load, so the
         // volume-driven diet shift still applies (the load is real even when
@@ -267,6 +285,16 @@ public sealed class RollGGenerator : IRollGGenerationProvider
         // Bent-profile dominant zone = the zone with the most mass AFTER the matchup bend.
         var bentDomIdx  = Array.IndexOf(bentNorm, bentNorm.Max());
         var bentDomMass = bentNorm[bentDomIdx];
+
+        // Session 57 — PostMoves pressure resistance. A strong post player resists being
+        // pushed OFF an interior spot: shrink the requested shift (which lowers `absorbed`),
+        // never the intrinsicCapacity cap. Gated to an interior bent-dominant zone; the pure
+        // helper returns requestedShift UNCHANGED on the identity path (span 0, PostMoves <= 50,
+        // or a perimeter-dominant zone) so today's displacement is reproduced exactly. Reducing
+        // requestedShift reduces `residual` in step, which is correct: less demand to vacate =
+        // less spillover.
+        requestedShift = ResistPressureShift(
+            requestedShift, bentDomIdx, shooter.PostMoves, _cfg.PostPressureResistanceSpan);
 
         // Zero-destination guard: if nothing exists to redistribute into, the full
         // request becomes residual (no crash, no silent mis-count).
@@ -437,6 +465,50 @@ public sealed class RollGGenerator : IRollGGenerationProvider
             [ShotLocation.Three] = blend[4] / sum,
         };
         return new Pie<ShotLocation>(weights, cfg.Epsilon);
+    }
+
+    /// <summary>
+    /// Session 57 — PostMoves interior diet tilt (pure, testable). Multiplies the Rim + Short
+    /// shares by (1 + span · postLift), preserving their ratio, then renormalizes all five to
+    /// sum 1. postLift = max(0, (PostMoves − 50) / 49). Returns the inputs UNCHANGED
+    /// (bit-for-bit) on the identity path — span 0 or PostMoves ≤ 50 — with no multiply and no
+    /// renormalize. Multiplicative: a zero Rim or Short stays zero (it amplifies existing
+    /// interior intent, never invents a post game). Mid/Long/Three get no direct multiplier;
+    /// their shares fall only via the renormalization.
+    /// </summary>
+    public static (double rim, double shortT, double mid, double lng, double three)
+        TiltInteriorDiet(double rim, double shortT, double mid, double lng, double three,
+                         int postMoves, double postDietSpan)
+    {
+        if (postDietSpan <= 0.0) return (rim, shortT, mid, lng, three);
+        var postLift = Math.Max(0.0, (postMoves - 50.0) / 49.0);
+        if (postLift <= 0.0) return (rim, shortT, mid, lng, three);
+
+        var mult = 1.0 + postDietSpan * postLift;
+        rim    *= mult;
+        shortT *= mult;
+        var sum = rim + shortT + mid + lng + three;
+        if (sum <= 0.0) return (rim, shortT, mid, lng, three);
+        return (rim / sum, shortT / sum, mid / sum, lng / sum, three / sum);
+    }
+
+    /// <summary>
+    /// Session 57 — PostMoves pressure resistance (pure, testable). Shrinks the requested diet
+    /// shift by (1 − span · postLift) when the bent-dominant zone is interior (Rim = index 0,
+    /// Short = index 1). Returns requestedShift UNCHANGED on the identity path — span 0,
+    /// PostMoves ≤ 50, or a perimeter-dominant zone. The [0,1] span bound (enforced in
+    /// RollGConfig.Load) keeps the factor in [0,1], so mass is never added back onto the
+    /// dominant zone. In a non-saturated case (requestedShift is the binding cap), absorbed
+    /// equals this reduced shift, so its monotonicity in PostMoves is absorbed's monotonicity.
+    /// </summary>
+    public static double ResistPressureShift(double requestedShift, int bentDomIdx,
+                                             int postMoves, double resistanceSpan)
+    {
+        if (resistanceSpan <= 0.0) return requestedShift;
+        if (bentDomIdx != 0 && bentDomIdx != 1) return requestedShift;
+        var postLift = Math.Max(0.0, (postMoves - 50.0) / 49.0);
+        if (postLift <= 0.0) return requestedShift;
+        return requestedShift * (1.0 - resistanceSpan * postLift);
     }
 
     private Pie<ShotLocation> BuildPureTendencyPie(

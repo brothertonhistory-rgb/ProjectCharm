@@ -59,6 +59,12 @@
     <None Include="..\..\tools\unforced_turnover_golden.json" Link="tools\unforced_turnover_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- PostMoves interior assist-discount golden fixture (emitted by tools/post_assist_oracle.py,
+         S57), copied beside the binary so the Phase 63 golden parity reads it from
+         AppContext.BaseDirectory (same convention as the other fixtures above). -->
+    <None Include="..\..\tools\post_assist_golden.json" Link="tools\post_assist_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- Pass-2 generation replay fixture (emitted by the oracle's fixture switch in
          tools/gen_pass2_skillfirst_oracle.py, S42.2), copied beside the binary so
          RunGenPass2ReplayParity reads it from AppContext.BaseDirectory (same convention). -->

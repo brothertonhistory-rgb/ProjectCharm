@@ -5897,11 +5897,13 @@ Two questions to answer per eligible made FG: (1) was the bucket assisted? (2) i
 - **Both `Made` and `MadeAndFouled` are eligible.** The and-1 basket is a real made field goal; the assist is credited at the time of the make, before the foul shot.
 - **Free throws are never assisted** — the roll lives in the made-FG branch; FT makes enter via a completely separate path (`FtmBySlot`) and never reach this site. No guard needed; stated so the build does not add one in the wrong place.
 
-### Was it assisted? — Zone × lineup-passing factor
+### Was it assisted? — Zone × lineup-passing factor × PostMoves interior discount
 
 ```
-assistProb = clamp( zoneBase × LineupPassingFactor, AssistRateFloor, AssistRateCeiling )
+assistProb = clamp( zoneBase × LineupPassingFactor × PostAssistFactor, AssistRateFloor, AssistRateCeiling )
 ```
+
+`PostAssistFactor` is the Session 57 interior self-creation discount (below); it is **exactly 1.0** on every non-interior zone and for any shooter with `PostMoves ≤ 50`, so on those paths this reduces to the original two-factor `zoneBase × LineupPassingFactor` with no ×1 reassociation (the identity path is bit-for-bit unchanged — the Resolver branches on `postFactor == 1.0` to guarantee it).
 
 **Zone base rates** come from real hoop-math data (assisted-FG% by zone), then uniformly trimmed at S41 so the league assist total lands 13.5:
 
@@ -5936,6 +5938,18 @@ Defaults: `AssistPassMidpoint = 71.31` (S41; was 50.0), `AssistPassScale = 20.0`
 **S41 recenter — the midpoint tracks the generated population, not the scale midpoint.** The placeholder `AssistPassMidpoint = 50` assumed lineup AssistWeight centers at 50 (the middle of the 0–100 scale). It does not: generated starters average **~71** on the passing/playmaking/IQ blend, so every eligible make drew a pre-clamp factor centered at ~1.19, not 1.0 — inflating league assists to 17.4. Recentering the midpoint to the **eligible-make-weighted mean lineup AssistWeight (71.31, solved by tanh zero-balance bisection so the weighted-mean pre-clamp factor equals exactly 1.0)** is the surgical fix: a league-average lineup now earns factor 1.0 as intended. The recenter alone dropped assists 17.4 → ~15.2; the uniform zone-base trim (above) closed the rest to 13.5. This is a *relative-engine* correctness fix — the midpoint follows the population it measures, so it stays correct as the generated population shifts.
 
 **Why the multiplier is necessary.** Without it, passing attributes only decide *who* gets credited, never the team rate. Every team would post the same zone-averaged assist rate (varying only by shot mix), which cannot reproduce the real 37%→71% spread. The multiplier at the lineup grain is the mechanism that makes a ball-movement roster post a high team rate and a scorer-heavy roster a low one.
+
+**PostAssistFactor — the PostMoves interior self-creation discount (Session 57).** A made interior bucket by a high-`PostMoves` shooter is credited as assisted *less* often, because a post threat creates his own shot. The discount is **passing-scaled**: it is deepest next to a pass-dead lineup and shallowest next to elite passers — the same post move is more self-created beside weak passers and more genuinely fed beside good ones, so assistedness is jointly caused by scorer AND passer, not the scorer alone.
+
+```
+postLift(PM)  = max(0, (PM − 50) / 49)                                       // 0 at ≤50, 1 at 99
+dampPass(pf)  = PostAssistDampFloor + (1 − PostAssistDampFloor)
+                × clamp( (PostAssistPfHi − pf) / (PostAssistPfHi − PostAssistPfLo), 0, 1 )
+PostAssistFactor(zone, PM, pf) = 1 − PostAssistSpan × postLift × dampPass(pf)   // Rim/Short, PM>50
+                               = 1                                              // otherwise
+```
+
+where `pf` is the same `LineupPassingFactor` used above (its (0.75, 1.25) range is why `PfLo/PfHi` default to those bounds). **Interior-only** — Mid/Long/Three always get factor 1.0. **Anchored at 50 and upside-only** — a league-average or below post rating changes nothing. `DampFloor > 0` keeps `dampPass > 0`, so on the active interior path the factor is strictly `< 1` (elite passing reclaims most of the assist credit but never *all* of it). Defaults (shape locked, magnitudes provisional, tuned later on the season page): `PostAssistSpan 0.50`, `PostAssistDampFloor 0.25`, `PostAssistPfLo 0.75`, `PostAssistPfHi 1.25`. `PostAssistFactor` is an instance method on `MatchupConfig` (the config is already in scope at the assist site); the discount lives entirely on assist *credit* and never touches shot diet (tendencies own the diet — the parallel S57 Roll G diet tilt is what raises the interior shot count) or make% (the make door never reads PostMoves). Full record: `docs/postmoves-interior-brief.md`.
 
 ### Who gets credit? — AssistPicker
 
@@ -7283,3 +7297,64 @@ bent truth (rim-runner vs pure-shooter diets differ; the shooter takes more tran
 moves the three share both ways; the null-shooter fallback equals the flat base, not the halfcourt stub).
 The whole suite ran **ALL CHECKS PASSED** on Emmett's machine. The calibration payoff — whether the
 league three-point rate actually climbs toward the ~39% target — is read on the season page, not asserted.
+
+## Roll G — PostMoves interior self-creation: the diet tilt + pressure resistance (Session 57, 2026-07-14)
+
+Closes the **no-post-hunt diet gap** the S51 interior-offense measurement opened: PostMoves got a
+post player the ball but the extra volume arrived at a generic diet, because the displacement bend
+reads `OffenseRating(zone, shooter)` (Outside/Mid/Close/Finishing only) and PostMoves is not in that
+map. Two Roll G wires now let a real post threat both **hunt** interior shots and **hold** his interior
+spot — neither touches make% (Roll G is location-only; `OffenseRating` is never called on this path).
+A third wire, the assist discount, lives at the Resolver's assist site (documented in the assist
+attribution subsystem above). Shared lift `postLift = max(0, (PostMoves − 50) / 49)` — 0 at ≤ 50, 1 at 99.
+
+**The diet tilt (`RollGGenerator.TiltInteriorDiet`, pure static).** The coached tendency vector's Rim
+and Short shares are multiplied by the SAME factor `1 + PostDietSpan · postLift` (authored Rim:Short
+ratio preserved), then all five renormalize to sum 1. Interior weight rises; Mid/Long/Three shed share
+only via the renormalization (no direct multiplier on them). Multiplicative → a zero authored Rim or
+Short stays zero: the tilt amplifies existing interior intent, it never invents a post game. It runs on
+the **coached** vector, right after `CoachingPull.Apply` and BEFORE the matchup bend / displacement, so
+the extra interior share flows through the bend the same way authored tendencies do. Both downstream
+consumers (`BuildPureTendencyPie`, `DeriveDisplacement`) normalize by their own total, so the tilt's
+renormalize can't create a scale discontinuity against the identity path. **Placement covers both live
+paths** (the zero-defender fallback and the normal bend); the fast-break/transition branch returns
+*above* this point, so a running possession never post-hunts (Emmett's "unless it's in transition" — 
+satisfied by construction, not by a separate guard).
+
+**The pressure resistance (`RollGGenerator.ResistPressureShift`, pure static).** Inside `ApplyDietShift`,
+once the bent-dominant zone is known: if it is interior (Rim = index 0, Short = index 1), the requested
+usage-pressure diet shift is scaled by `1 − PostPressureResistanceSpan · postLift`. A strong post man is
+harder to displace off his spot. This shrinks the *requested shift* — which lowers `absorbed` and, in
+step, `residual` (less demand to vacate = less spillover) — and **never the `intrinsicCapacity` cap**
+(that read stays on the shooter's RAW authored tendencies: appetite is not flexibility). The `[0,1]`
+span bound (enforced in `RollGConfig.Load`) keeps the factor in `[0,1]`, so the resistance can never go
+negative and add mass back onto the dominant zone. In a non-saturated case (the requested shift is the
+binding cap), `absorbed` equals the reduced shift, so its monotonicity in PostMoves is `absorbed`'s.
+
+**Anchors and kill switches.** `PostMoves = 50` (postLift 0) returns each helper's inputs unchanged,
+bit-for-bit — no multiply, no renormalize (a renormalize by ×1 can still perturb float bits, so the
+identity path skips it entirely). Each span at 0 is a clean kill switch on its own wire. Both effects
+are **upside-only**: a below-average post rating is identical to average.
+
+**Why pure static helpers.** Mirrors the Session 55 height term (`Matchup.HeightOverDefenderShift` /
+`Reach` exposed for direct harness unit tests). `TiltInteriorDiet` and `ResistPressureShift` are called
+inline from `Generate` / `ApplyDietShift` but tested directly in Phase 63 — shape invariants, exact-bit
+anchors, and resistance monotonicity — with a separate end-to-end check that the tilt actually reaches
+the final pie (interior share rises with PostMoves under real pressure).
+
+**Config.** `RollGConfig`: `PostDietSpan` (default 0.5, `Load` requires ≥ 0 — the `1 + span·lift`
+multiplier is valid for any nonnegative span) and `PostPressureResistanceSpan` (default 0.5, `Load`
+requires `[0,1]`). Both in the `"RollG"` section of `config.json`. All magnitudes are provisional
+placeholders — the shape is locked, the numbers are tuned later on the season page with a real
+population (the flat-50 bench seats PostMoves 50 everywhere, so the wires sit at identity there and the
+feature cannot be measured on the bench — the proof is Phase 63's golden parity and the end-to-end
+interior-share climb). Full record: `docs/postmoves-interior-brief.md`.
+
+**Validation.** Phase 63 (Session 57): per-zone make% leak guard (EffectiveRating bit-identical across
+PostMoves 0→99 — the diet never leaked through `OffenseRating`), assist golden parity at 1e-12, exact-bit
+anchors + kill switches, diet locked-shape invariants + end-to-end wire, resistance monotonicity on
+`absorbed`, assist interaction + zone gate, config guards. Green on Emmett's machine; observation/stress
+reconciled and unmoved (expected — the bench sits at the PostMoves-50 identity point). One prior anchor
+updated: the Phase 9 (d3) "all-attributes-75" uniform-gap-cancellation case had its test shooter's
+PostMoves pinned to 50 (PostMoves is a diet-hunt input, not a matchup-gap attribute — the case isolates
+gap cancellation), so the new interior hunt doesn't confound it.

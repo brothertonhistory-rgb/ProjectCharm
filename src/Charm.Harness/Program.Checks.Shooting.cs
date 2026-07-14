@@ -1202,12 +1202,13 @@ internal static partial class Program
         static Player Mk(int b,
                          int? fin = null, int? outside = null, int? mid = null, int? close = null,
                          int? rimP = null, int? perimD = null, int? postD = null,
-                         int? rimT = null, int? shortT = null, int? midT = null, int? longT = null, int? threeT = null)
+                         int? rimT = null, int? shortT = null, int? midT = null, int? longT = null, int? threeT = null,
+                         int? postM = null)
             => new Player("p")
             {
                 Outside = outside ?? b, Mid = mid ?? b, Close = close ?? b, Finishing = fin ?? b, FreeThrow = b,
                 FoulDrawing = b,
-                BallHandling = b, Passing = b, Playmaking = b, SelfCreation = b, PostMoves = b,
+                BallHandling = b, Passing = b, Playmaking = b, SelfCreation = b, PostMoves = postM ?? b,
                 OffBallMovement = b, Screening = b, OffensiveRebounding = b,
                 PerimeterDefense = perimD ?? b, PostDefense = postD ?? b, RimProtection = rimP ?? b,
                 DefensiveRebounding = b, Steals = b,
@@ -1363,7 +1364,12 @@ internal static partial class Program
 
             // (d3) Plain D1 (everyone 75) vs plain D3 (everyone 45) — uniform attributes.
             // Uniform gaps cancel → mix very close to raw tendencies.
-            var d1Off = Mk(75, rimT: 50, shortT: 25, midT: 15, longT: 5, threeT: 5);
+            // S57: PostMoves is pinned to its 50 anchor here. This test isolates MATCHUP-GAP
+            // cancellation; the S57 interior diet tilt is a PostMoves-driven, gap-independent
+            // interior lift (it fires at PostMoves > 50 regardless of the defender), so a raw
+            // 75 would legitimately raise the rim share above tendencies and confound the
+            // gap-cancellation invariant this case exists to prove.
+            var d1Off = Mk(75, rimT: 50, shortT: 25, midT: 15, longT: 5, threeT: 5, postM: 50);
             var d3Def = Mk(45);
             var d3DefsUniform = Defenders(d3Def, d3Def, d3Def, d3Def, d3Def);
             var mixUniform = Mix(d1Off, d3DefsUniform);

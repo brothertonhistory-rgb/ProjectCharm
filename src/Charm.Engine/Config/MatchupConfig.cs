@@ -1113,6 +1113,19 @@ public sealed class MatchupConfig
                 $"AssistRateFloor ({cfg.AssistRateFloor}) must be less than " +
                 $"AssistRateCeiling ({cfg.AssistRateCeiling}).");
 
+        // Session 57 — PostMoves interior assist-discount invariants. Span bounded to [0,1]
+        // so postFactor = 1 - span*lift*damp can never go negative and hide behind the floor
+        // clamp; DampFloor in (0,1]; PfHi strictly above PfLo (the damper denominator).
+        if (cfg.PostAssistSpan < 0.0 || cfg.PostAssistSpan > 1.0)
+            throw new InvalidOperationException(
+                $"PostAssistSpan must be in [0,1] (a span > 1 drives the assist factor negative): got {cfg.PostAssistSpan}.");
+        if (cfg.PostAssistDampFloor <= 0.0 || cfg.PostAssistDampFloor > 1.0)
+            throw new InvalidOperationException(
+                $"PostAssistDampFloor must be in (0,1]: got {cfg.PostAssistDampFloor}.");
+        if (cfg.PostAssistPfHi <= cfg.PostAssistPfLo)
+            throw new InvalidOperationException(
+                $"PostAssistPfHi ({cfg.PostAssistPfHi}) must be greater than PostAssistPfLo ({cfg.PostAssistPfLo}).");
+
         // Phase 44
         if (cfg.PostnessNeutral <= 0.0)
             throw new InvalidOperationException("PostnessNeutral must be > 0.");
@@ -1853,6 +1866,55 @@ public sealed class MatchupConfig
     /// below the ceiling, so passing quality meaningfully differentiates team assist rates
     /// on threes. Calibration placeholder.</summary>
     public double AssistRateCeiling  { get; set; } = 0.95;
+
+    // ── Session 57 — PostMoves interior self-creation, ASSIST side. ──
+    // A passing-scaled discount on the Rim + Short assisted rate, reading the shooter's
+    // PostMoves. Interior buckets are credited as assisted less often when a high-PostMoves
+    // creator scores from the post — MOST when the team can't pass, LEAST beside elite
+    // passers (the same post move is more self-created next to weak passers, more assisted
+    // next to good ones; assistedness is jointly caused by scorer AND passer). Anchored at
+    // PostMoves 50, upside-only. Mid/Long/Three are never discounted.
+    //
+    //   postLift(PM)  = max(0, (PM - 50) / 49)
+    //   dampPass(pf)  = DampFloor + (1 - DampFloor) * clamp((PfHi - pf)/(PfHi - PfLo), 0, 1)
+    //   postFactor    = 1 - PostAssistSpan * postLift * dampPass(pf)     (interior, PM>50)
+    //   assistProb    = clamp(base(zone) * pf * postFactor, Floor, Ceiling)
+
+    /// <summary>Strength of the interior assist discount. Default 0.50 (provisional).
+    /// Must be in [0,1] (enforced in Load) — a span > 1 drives postFactor negative and
+    /// hides an invalid factor behind the floor clamp. 0 = ablation (no discount).</summary>
+    public double PostAssistSpan     { get; set; } = 0.50;
+
+    /// <summary>Floor on the passing damper: the fraction of the discount that survives
+    /// even beside an elite-passing lineup (elite passing reclaims most of the assist
+    /// credit, but never ALL of it). Default 0.25. Must be in (0,1] (enforced in Load).</summary>
+    public double PostAssistDampFloor { get; set; } = 0.25;
+
+    /// <summary>Passing factor at/below which the damper saturates to 1 (full discount).
+    /// Default 0.75 (the low end of LineupPassingFactor's range). Must be &lt; PfHi.</summary>
+    public double PostAssistPfLo     { get; set; } = 0.75;
+
+    /// <summary>Passing factor at/above which the damper reaches its floor (least discount).
+    /// Default 1.25 (the high end of LineupPassingFactor's range). Must be &gt; PfLo.</summary>
+    public double PostAssistPfHi     { get; set; } = 1.25;
+
+    /// <summary>
+    /// The PostMoves interior assist multiplier for a single made shot. Returns exactly
+    /// 1.0 on every identity case — span 0, PostMoves &lt;= 50, or a non-interior zone —
+    /// so the caller runs today's exact two-factor expression with no ×1 reassociation.
+    /// On the active interior path it returns 1 - PostAssistSpan * postLift * dampPass,
+    /// which is strictly &lt; 1 (DampFloor &gt; 0 keeps dampPass &gt; 0).
+    /// </summary>
+    public double PostAssistFactor(ShotLocation zone, int postMoves, double passFactor)
+    {
+        if (PostAssistSpan <= 0.0) return 1.0;
+        if (zone is not (ShotLocation.Rim or ShotLocation.Short)) return 1.0;
+        var postLift = Math.Max(0.0, (postMoves - 50.0) / 49.0);
+        if (postLift <= 0.0) return 1.0;
+        var t    = Math.Clamp((PostAssistPfHi - passFactor) / (PostAssistPfHi - PostAssistPfLo), 0.0, 1.0);
+        var damp = PostAssistDampFloor + (1.0 - PostAssistDampFloor) * t;
+        return 1.0 - PostAssistSpan * postLift * damp;
+    }
 
     /// <summary>Per-zone base assisted rate switch accessor.</summary>
     public double AssistedRate(ShotLocation zone) => zone switch

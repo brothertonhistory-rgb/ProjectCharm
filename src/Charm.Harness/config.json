@@ -127,7 +127,9 @@
     "FastBreakMeanThree": 0.390,
     "PressureShiftScale": 0.5,
     "PressureShiftCapFraction": 0.8,
-    "AttentionShiftAmplifier": 1.0
+    "AttentionShiftAmplifier": 1.0,
+    "PostDietSpan": 0.5,
+    "PostPressureResistanceSpan": 0.5
   },
   "RollH": {
     "BaseMade": 0.43,
@@ -397,6 +399,10 @@
     "AssistedRateRim": 0.4811,
     "AssistRateFloor": 0.25,
     "AssistRateCeiling": 0.95,
+    "PostAssistSpan": 0.5,
+    "PostAssistDampFloor": 0.25,
+    "PostAssistPfLo": 0.75,
+    "PostAssistPfHi": 1.25,
     "HomePressure": 5.0,
     "AwayPressure": 5.0,
     "PressureNeutral": 5.0,

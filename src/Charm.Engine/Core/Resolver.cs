@@ -718,9 +718,22 @@ public sealed class Resolver
                                     {
                                         var zoneBase   = _matchup.AssistedRate(shotSt.ShotType!.Value);
                                         var passFactor = AssistPicker.LineupPassingFactor(shotSt, _game, _matchup);
-                                        var assistProb = Math.Clamp(zoneBase * passFactor,
-                                                                    _matchup.AssistRateFloor,
-                                                                    _matchup.AssistRateCeiling);
+                                        // Session 57 — PostMoves interior assist discount. Read the shooter's
+                                        // PostMoves off SelectedSlot (non-null per the guard above). PostAssistFactor
+                                        // returns exactly 1.0 on every identity case (span 0, PostMoves <= 50, or a
+                                        // non-interior zone), so we run today's exact two-factor expression with NO
+                                        // ×1 reassociation there — the kill switch reproduces today bit-for-bit.
+                                        var shooter    = _game.RosterFor(shotSt.Offense).PlayerAt(shotSt.SelectedSlot.Value);
+                                        var postFactor = shooter is null
+                                            ? 1.0
+                                            : _matchup.PostAssistFactor(shotSt.ShotType!.Value, shooter.PostMoves, passFactor);
+                                        var assistProb = postFactor == 1.0
+                                            ? Math.Clamp(zoneBase * passFactor,
+                                                         _matchup.AssistRateFloor,
+                                                         _matchup.AssistRateCeiling)
+                                            : Math.Clamp(zoneBase * passFactor * postFactor,
+                                                         _matchup.AssistRateFloor,
+                                                         _matchup.AssistRateCeiling);
                                         if (_rng.NextUnitInterval() < assistProb)
                                             astBySlot = astBySlot.WithSlot(
                                                 AssistPicker.Pick(shotSt, _game, _matchup, _rng).Number, 1);
