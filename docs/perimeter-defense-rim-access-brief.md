@@ -393,17 +393,26 @@ disposition / post-feed. **Pass C** (§6.4) is the off-ball three lever.
   hierarchy**, not "mostly to jumpers." Pass A settles: which zones receive denied
   Rim mass; whether Short mass redistributes differently from Rim mass; whether it
   follows the player's existing outside preference; and whether any share may go to
-  Mid rather than Three. Default candidate: **proportional across an eligible
-  outside bucket** (not a hardcoded destination); the oracle compares at least two
-  plausible forms. Conservation holds throughout (§6.6). R5b (Pass B): the
-  cross-player post-feed — an upstream selection-odds change (§3), gated by a
-  formal **post-threat eligibility** that is NOT tallest / center-position /
-  highest-Rim / highest-PostMoves-alone. A credible post-threat score needs some
-  of: PostMoves, Strength/size, Close/Finishing, usage willingness, ability to
-  establish position / receive the entry — and, crucially, it must respond to
-  **post matchup value vs the interior defender**, not raw offensive post talent:
+  Mid rather than Three. **Ruling (Emmett 2026-07-14):** denied drive share goes to
+  **contested Long/Three** (skip Mid — it is not a pull-up), proportional to the
+  shooter's own outer preference; the make door prices those as worse (contested)
+  shots. R5b (Pass B): the cross-player post-feed — an upstream selection-odds
+  change (§3), gated by a formal **post-threat eligibility** that is NOT tallest /
+  center-position / highest-Rim / highest-PostMoves-alone. A credible post-threat
+  score needs some of: PostMoves, Strength/size, Close/Finishing, usage willingness,
+  ability to establish position / receive the entry — and, crucially, it must respond
+  to **post matchup value vs the interior defender**, not raw offensive post talent:
   a good post man against an elite interior defender should NOT absorb all denied
   guard drives. Post-less lineups get exactly zero post-feed weight.
+  - **6.5a Usage diffusion (Pass B input, logged 2026-07-14 — Emmett).** A strong
+    on-ball defender should also **lower the guarded player's usage** — he is simply
+    less likely to shoot at all against tight defense, not merely relocated. This is
+    the guarded-side view of the R5b pass-off (his lost drives partly become
+    teammates' opportunities, partly just a quieter possession for him). It is a
+    **selection-layer (Roll E) effect**, out of Pass A scope by the same boundary as
+    R5b, and belongs in Pass B: on-ball matchup quality feeds the shared
+    "creation-denied" signal that both raises the post man's selection odds and
+    trims the walled man's usage share. Do not build it in Pass A.
 
 - **6.6 FastBreak / zero-defender bypass (all passes).** Transition returns the
   flat pie before any of this; a zero-defender fallback applies no gate. The build
