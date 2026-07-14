@@ -63,7 +63,7 @@ def orientation(sh):
 def gate(before, sh, matched_perimD, bypass=False):
     """Pure transform: post-displacement pie -> post-gate pie. bypass = FastBreak / zero-defender."""
     if bypass:
-        return dict(before), dict(comp=0.0, gap=0.0, orient=0.0, mult=1.0, removed=0.0, bypass=True)
+        return dict(before), dict(comp=0.0, gap=0.0, orient=0.0, mult=1.0, removed=0.0, raw_sum=1.0, bypass=True)
     comp   = drive_tools(sh)
     gap    = comp - matched_perimD                       # +: offense beats the man; -: walled
     supp   = gapfn(max(0.0, -gap), GATE_STEEP, GATE_EXP)  # suppression-primary: only the wall side
@@ -72,13 +72,20 @@ def gate(before, sh, matched_perimD, bypass=False):
     rim_rem   = before["Rim"]              * orient * (1.0 - mult)
     short_rem = before["Short"]*SHORT_ELIG * orient * (1.0 - mult)
     removed   = rim_rem + short_rem
+    # IDENTITY BRANCH (matches Cap=0 / bypass): nothing removed -> return the input
+    # UNTOUCHED (no subtract-0, no redistribute-0, no renormalize). This is what makes
+    # a live gate at flat-50 / neutral / tools-clause / post-immune bit-identical to the
+    # kill switch, rather than differing by a renormalization ULP on a not-exactly-1 pie.
+    if removed <= 0.0:
+        return dict(before), dict(comp=comp, gap=gap, orient=orient, mult=mult, removed=0.0, raw_sum=1.0, bypass=False)
     after = dict(before); after["Rim"] -= rim_rem; after["Short"] -= short_rem
     # redistribute to contested Long/Three ONLY, proportional to the shooter's outer preference
     ob = {z: before[z] for z in ("Long","Three")}; obs = sum(ob.values())
     if obs <= 0: ob = {"Long":1.0,"Three":1.0}; obs = 2.0
     for z in ("Long","Three"): after[z] += removed * ob[z]/obs
-    s = sum(after.values()); after = {z: after[z]/s for z in Z}   # renormalize (exact; mass conserved)
-    return after, dict(comp=comp, gap=gap, orient=orient, mult=mult, removed=removed, bypass=False)
+    raw_sum = sum(after.values())                                 # conservation lives HERE, pre-renorm
+    after = {z: after[z]/raw_sum for z in Z}                      # renormalize = float hygiene only
+    return after, dict(comp=comp, gap=gap, orient=orient, mult=mult, removed=removed, raw_sum=raw_sum, bypass=False)
 
 # ===========================================================================
 # DISPLACEMENT (mirrored from tools/displacement_oracle.py) — used ONLY to
@@ -213,6 +220,14 @@ def checks():
     # kill switch: CAP 0 -> identity
     global GATE_CAP; keep=GATE_CAP; GATE_CAP=0.0
     a,d=gate(P,drv(50,50,50),85.0); chk("kill switch (CAP=0) -> pie unchanged", all(abs(a[z]-P[z])<1e-12 for z in Z)); GATE_CAP=keep
+    # raw conservation lives pre-renormalization (renorm is only float hygiene)
+    _,dc=gate(P,drv(50,50,50),85.0); chk("raw mass conserved BEFORE renormalize (|Σraw-1|<1e-12)", abs(dc['raw_sum']-1.0)<1e-12, f"Σraw={dc['raw_sum']:.15f}")
+    # both-zero destination: Long=0 AND Three=0, positive removable Rim/Short -> 50/50 split
+    Pbz=dict(Rim=0.55,Short=0.30,Mid=0.15,Long=0.0,Three=0.0)
+    a,d=gate(Pbz,drv(50,50,50),85.0)
+    chk("both-zero outer: removed splits 50/50 to Long/Three; Mid bit-identical; conserved",
+        abs(a["Long"]-a["Three"])<1e-12 and abs(a["Mid"]-Pbz["Mid"])<1e-12 and abs(sum(a.values())-1.0)<1e-12,
+        f"Long={a['Long']:.4f} Three={a['Three']:.4f}")
     # bypass
     a,d=gate(P,drv(50,50,50),85.0,bypass=True); chk("bypass (fastbreak/zero-def) -> pie unchanged", all(abs(a[z]-P[z])<1e-12 for z in Z))
     print(f"\n  INVARIANTS: {'ALL OK' if ok else 'FAIL'}")
@@ -226,6 +241,14 @@ def emit_golden(path):
                 GATE_EXP=GATE_EXP,GATE_TANH_REF=GATE_TANH_REF,GATE_CAP=GATE_CAP,SHORT_ELIG=SHORT_ELIG,
                 POST_PIVOT=POST_PIVOT,POST_RANGE=POST_RANGE,REF_SCALE=REF_SCALE)
     cases=[]
+    # BOUNDARY case with a synthetic 'before' (not displacement-derived): both outer zones 0.
+    bz_before=dict(Rim=0.55,Short=0.30,Mid=0.15,Long=0.0,Three=0.0)
+    bz_sh=dict(FirstStep=50,Quickness=50,BallHandling=50,Height=44,Strength=44,PostMoves=25)
+    bz_after,bz_d=gate(bz_before,bz_sh,85.0)
+    cases.append(dict(name="BOUNDARY both-zero outer (50/50 split)",bypass=False,
+        shooter=bz_sh,matchedPerimeterDefense=85.0,before=bz_before,
+        driveComposite=bz_d["comp"],orient=bz_d["orient"],suppressionMult=bz_d["mult"],removed=bz_d["removed"],
+        after=bz_after))
     for name,sh,md,ln,up,bp in ARCH:
         before=displaced(sh["diet"],sh,ln,up); after,d=gate(before,sh,md["PerimeterDefense"],bp)
         cases.append(dict(name=name,bypass=bp,

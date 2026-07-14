@@ -17,6 +17,37 @@
   "tolerance": 1e-12,
   "cases": [
     {
+      "name": "BOUNDARY both-zero outer (50/50 split)",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 50,
+        "Quickness": 50,
+        "BallHandling": 50,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 85.0,
+      "before": {
+        "Rim": 0.55,
+        "Short": 0.3,
+        "Mid": 0.15,
+        "Long": 0.0,
+        "Three": 0.0
+      },
+      "driveComposite": 50.0,
+      "orient": 1.0,
+      "suppressionMult": 0.5662539740325983,
+      "removed": 0.2971160277876702,
+      "after": {
+        "Rim": 0.31143968571792907,
+        "Short": 0.24144428649440075,
+        "Mid": 0.15,
+        "Long": 0.1485580138938351,
+        "Three": 0.1485580138938351
+      }
+    },
+    {
       "name": "avg creator vs AVG",
       "bypass": false,
       "shooter": {
