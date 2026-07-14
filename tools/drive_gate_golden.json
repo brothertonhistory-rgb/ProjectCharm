@@ -1,0 +1,392 @@
+{
+  "_comment": "PASS A drive-gate golden. Emitted from tools/drive_gate_oracle.py. Locks the gate TRANSFORM (before->after) + internals per case; 'before' pies are fixed inputs so the gate is tested in isolation (displacement regression stays the S36 fixture). Magnitudes are placeholders; constants cross-checked vs config before use.",
+  "constants": {
+    "FS_W": 0.62,
+    "Q_W": 0.38,
+    "HANDLE_LO": 28.0,
+    "HANDLE_HI": 48.0,
+    "GATE_STEEP": 1.0,
+    "GATE_EXP": 1.4,
+    "GATE_TANH_REF": 1.5,
+    "GATE_CAP": 0.55,
+    "SHORT_ELIG": 0.45,
+    "POST_PIVOT": 46.0,
+    "POST_RANGE": 26.0,
+    "REF_SCALE": 25.0
+  },
+  "tolerance": 1e-12,
+  "cases": [
+    {
+      "name": "avg creator vs AVG",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 50,
+        "Quickness": 50,
+        "BallHandling": 50,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 50,
+      "before": {
+        "Rim": 0.27993357522648876,
+        "Short": 0.14998185878034356,
+        "Mid": 0.1399993487767303,
+        "Long": 0.11001228021022896,
+        "Three": 0.3200729370062085
+      },
+      "driveComposite": 50.0,
+      "orient": 1.0,
+      "suppressionMult": 1.0,
+      "removed": 0.0,
+      "after": {
+        "Rim": 0.27993357522648876,
+        "Short": 0.14998185878034356,
+        "Mid": 0.1399993487767303,
+        "Long": 0.11001228021022896,
+        "Three": 0.3200729370062085
+      }
+    },
+    {
+      "name": "avg creator vs ELITE",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 50,
+        "Quickness": 50,
+        "BallHandling": 50,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 85,
+      "before": {
+        "Rim": 0.2498945823684812,
+        "Short": 0.1367040243238844,
+        "Mid": 0.1382224649392701,
+        "Long": 0.11580242185034065,
+        "Three": 0.35937650651802366
+      },
+      "driveComposite": 50.0,
+      "orient": 1.0,
+      "suppressionMult": 0.5662539740325983,
+      "removed": 0.1350734542910184,
+      "after": {
+        "Rim": 0.1415038003553689,
+        "Short": 0.11002135204597825,
+        "Mid": 0.1382224649392701,
+        "Long": 0.1487201970309469,
+        "Three": 0.46153218562843584
+      }
+    },
+    {
+      "name": "ELITE handle/avg burst vs ELITE",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 50,
+        "Quickness": 50,
+        "BallHandling": 88,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 85,
+      "before": {
+        "Rim": 0.2641303047013057,
+        "Short": 0.1402630114703999,
+        "Mid": 0.1364759672278759,
+        "Long": 0.11281888302915391,
+        "Three": 0.34631183357126455
+      },
+      "driveComposite": 50.0,
+      "orient": 1.0,
+      "suppressionMult": 0.5662539740325983,
+      "removed": 0.141942805718728,
+      "after": {
+        "Rim": 0.14956483469955545,
+        "Short": 0.11288567575342218,
+        "Mid": 0.1364759672278759,
+        "Long": 0.1476974660039191,
+        "Three": 0.45337605631522737
+      }
+    },
+    {
+      "name": "avg handle/ELITE firststep vs ELITE",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 88,
+        "Quickness": 72,
+        "BallHandling": 50,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 85,
+      "before": {
+        "Rim": 0.2718989831968028,
+        "Short": 0.13774371560607143,
+        "Mid": 0.13673429309957694,
+        "Long": 0.11169397492638182,
+        "Three": 0.3419290331711671
+      },
+      "driveComposite": 81.92,
+      "orient": 1.0,
+      "suppressionMult": 0.9804591439683897,
+      "removed": 0.006524372437952731,
+      "after": {
+        "Rim": 0.26658584431101284,
+        "Short": 0.13653248205390864,
+        "Mid": 0.13673429309957694,
+        "Long": 0.11330044787525473,
+        "Three": 0.3468469326602469
+      }
+    },
+    {
+      "name": "NO handle/quick vs AVG",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 85,
+        "Quickness": 72,
+        "BallHandling": 28,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 50,
+      "before": {
+        "Rim": 0.2860363923532556,
+        "Short": 0.15250605863590935,
+        "Mid": 0.1412317857881678,
+        "Long": 0.10897938679402458,
+        "Three": 0.3112463764286426
+      },
+      "driveComposite": 0.0,
+      "orient": 1.0,
+      "suppressionMult": 0.48166367482005024,
+      "removed": 0.18383529598057366,
+      "after": {
+        "Rim": 0.1377733398731388,
+        "Short": 0.1169338151354525,
+        "Mid": 0.1412317857881678,
+        "Long": 0.15665437386150066,
+        "Three": 0.4474066853417402
+      }
+    },
+    {
+      "name": "ELITE handle+burst vs ELITE",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 88,
+        "Quickness": 85,
+        "BallHandling": 88,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 85,
+      "before": {
+        "Rim": 0.28832407543333577,
+        "Short": 0.1434130964607028,
+        "Mid": 0.13515688137061513,
+        "Long": 0.10867067847547152,
+        "Three": 0.32443526825987473
+      },
+      "driveComposite": 86.86,
+      "orient": 1.0,
+      "suppressionMult": 1.0,
+      "removed": 0.0,
+      "after": {
+        "Rim": 0.28832407543333577,
+        "Short": 0.1434130964607028,
+        "Mid": 0.13515688137061513,
+        "Long": 0.10867067847547152,
+        "Three": 0.32443526825987473
+      }
+    },
+    {
+      "name": "elite creator vs POOR",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 88,
+        "Quickness": 85,
+        "BallHandling": 88,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 25,
+      "before": {
+        "Rim": 0.3387752067016471,
+        "Short": 0.17038796650540225,
+        "Mid": 0.14476752747686836,
+        "Long": 0.09945936806847765,
+        "Three": 0.24660993124760458
+      },
+      "driveComposite": 86.86,
+      "orient": 1.0,
+      "suppressionMult": 1.0,
+      "removed": 0.0,
+      "after": {
+        "Rim": 0.3387752067016471,
+        "Short": 0.17038796650540225,
+        "Mid": 0.14476752747686836,
+        "Long": 0.09945936806847765,
+        "Three": 0.24660993124760458
+      }
+    },
+    {
+      "name": "POST scorer vs ELITE",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 45,
+        "Quickness": 45,
+        "BallHandling": 32,
+        "Height": 82,
+        "Strength": 80,
+        "PostMoves": 85
+      },
+      "matchedPerimeterDefense": 85,
+      "before": {
+        "Rim": 0.5610778923965143,
+        "Short": 0.2572791517418199,
+        "Mid": 0.09541280241013078,
+        "Long": 0.03907899493299561,
+        "Three": 0.04715115851853939
+      },
+      "driveComposite": 9.0,
+      "orient": 0.0,
+      "suppressionMult": 0.45196936650329755,
+      "removed": 0.0,
+      "after": {
+        "Rim": 0.5610778923965143,
+        "Short": 0.2572791517418199,
+        "Mid": 0.09541280241013078,
+        "Long": 0.03907899493299561,
+        "Three": 0.04715115851853939
+      }
+    },
+    {
+      "name": "point-FORWARD vs ELITE",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 72,
+        "Quickness": 66,
+        "BallHandling": 74,
+        "Height": 62,
+        "Strength": 60,
+        "PostMoves": 40
+      },
+      "matchedPerimeterDefense": 85,
+      "before": {
+        "Rim": 0.3800219587225601,
+        "Short": 0.1550231810313696,
+        "Mid": 0.12416256053786412,
+        "Long": 0.09234777708884787,
+        "Three": 0.24844452261935834
+      },
+      "driveComposite": 69.72,
+      "orient": 0.6923076923076923,
+      "suppressionMult": 0.8225286055581245,
+      "removed": 0.05526242860280484,
+      "after": {
+        "Rim": 0.3333306323843116,
+        "Short": 0.14645207876681327,
+        "Mid": 0.12416256053786412,
+        "Long": 0.10732277048620398,
+        "Three": 0.2887319578248071
+      }
+    },
+    {
+      "name": "OVERRIDE soft paint + ELITE",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 50,
+        "Quickness": 50,
+        "BallHandling": 50,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 85,
+      "before": {
+        "Rim": 0.30766312651849365,
+        "Short": 0.1339939974401533,
+        "Mid": 0.13325173719971134,
+        "Long": 0.10645744459861559,
+        "Three": 0.31863369424302607
+      },
+      "driveComposite": 50.0,
+      "orient": 1.0,
+      "suppressionMult": 0.5662539740325983,
+      "removed": 0.15960137221602128,
+      "after": {
+        "Rim": 0.1742154680543911,
+        "Short": 0.10784028368823459,
+        "Mid": 0.13325173719971134,
+        "Long": 0.1464271186004057,
+        "Three": 0.43826539245725726
+      }
+    },
+    {
+      "name": "reassigned to WEAK matched",
+      "bypass": false,
+      "shooter": {
+        "FirstStep": 50,
+        "Quickness": 50,
+        "BallHandling": 50,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 25,
+      "before": {
+        "Rim": 0.27993357522648876,
+        "Short": 0.14998185878034356,
+        "Mid": 0.1399993487767303,
+        "Long": 0.11001228021022896,
+        "Three": 0.3200729370062085
+      },
+      "driveComposite": 50.0,
+      "orient": 1.0,
+      "suppressionMult": 1.0,
+      "removed": 0.0,
+      "after": {
+        "Rim": 0.27993357522648876,
+        "Short": 0.14998185878034356,
+        "Mid": 0.1399993487767303,
+        "Long": 0.11001228021022896,
+        "Three": 0.3200729370062085
+      }
+    },
+    {
+      "name": "BYPASS fastbreak/zero-def",
+      "bypass": true,
+      "shooter": {
+        "FirstStep": 50,
+        "Quickness": 50,
+        "BallHandling": 50,
+        "Height": 44,
+        "Strength": 44,
+        "PostMoves": 25
+      },
+      "matchedPerimeterDefense": 50,
+      "before": {
+        "Rim": 0.27993357522648876,
+        "Short": 0.14998185878034356,
+        "Mid": 0.1399993487767303,
+        "Long": 0.11001228021022896,
+        "Three": 0.3200729370062085
+      },
+      "driveComposite": 0.0,
+      "orient": 0.0,
+      "suppressionMult": 1.0,
+      "removed": 0.0,
+      "after": {
+        "Rim": 0.27993357522648876,
+        "Short": 0.14998185878034356,
+        "Mid": 0.1399993487767303,
+        "Long": 0.11001228021022896,
+        "Three": 0.3200729370062085
+      }
+    }
+  ]
+}
