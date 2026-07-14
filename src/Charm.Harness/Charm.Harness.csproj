@@ -65,6 +65,12 @@
     <None Include="..\..\tools\post_assist_golden.json" Link="tools\post_assist_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Steal-forcing floor golden fixture (emitted by tools/steal_floor_oracle.py, S58),
+         copied beside the binary so the Phase 64 golden parity reads it from
+         AppContext.BaseDirectory (same convention). -->
+    <None Include="..\..\tools\steal_floor_golden.json" Link="tools\steal_floor_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- Pass-2 generation replay fixture (emitted by the oracle's fixture switch in
          tools/gen_pass2_skillfirst_oracle.py, S42.2), copied beside the binary so
          RunGenPass2ReplayParity reads it from AppContext.BaseDirectory (same convention). -->

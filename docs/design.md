@@ -3872,35 +3872,55 @@ The two faces are deliberately separate. One dial bending four things in opposin
 exactly the interacting-variable trap that sank two prior Python attempts. Build one face,
 calibrate it, then the other.
 
-### The matchup model
+### The matchup model — a live FLOOR (current state, Session 58)
 
-**Single attribute pair: `handler.BallHandling` vs. `defender.Steals`.** Emmett settled on these
-two alone. Broader composites (adding Passing, BasketballIQ, PerimeterDefense, Quickness) were
-considered and rejected — they over-build the door and exceed the settled design.
+**The matchup is a pressure-independent floor, live at a normal defensive setting.** The original
+Phase 12 model multiplied a single steal-vs-handling gap by `pressureGate = max(0, pUnit)` — which
+is **exactly zero** at today's league-wide neutral pressure (Home/Away/Neutral all 5.0), so the
+matchup was inert and only the flat lift moved. **Session 58 replaced that gated term with a floor**
+(`Matchup.StealFloorShift`) that reads at neutral. Three defender-minus-offense gaps, summed:
 
-**Pressure is the master dial.** It does two jobs on the steal/turnover slice:
+1. **Athleticism mismatch (PRIMARY).** `GapFn((Quickness+FirstStep)/2 gap, AthStealSteepness,
+   AthStealExponent, AthStealScale)` — the steepest term. A quicker, faster-off-the-floor defender
+   forces the ball loose. Steepness 0.85 vs the steal term's 0.38 (same exp/scale) makes athleticism
+   dominate at every gap by construction.
+2. **Steal-vs-ball-control (secondary).** `GapFn(defender.Steals − handler.BallHandling,
+   StealFloorSteepness, StealFloorExponent, ReferenceScale)` — the ball-hawk-vs-handle contest that
+   the old model gated to nothing at neutral.
+3. **Wingspan deflection (two-sided, on top).** `WingStealWeight × tanh(wingSigned / WingStealScale)`,
+   `wingSigned = (Wingspan − WingStealRef) × perimW`. Long arms add, short arms cost a little (two-sided,
+   unlike the one-sided height make term). **Perimeter-gated** by `Matchup.WingStealPerimWeight`: `perimW`
+   slides from 1.0 for a guard to `WingStealPerimFloor` for a big, on `Matchup.Postness` (Height/PostDefense/
+   Strength — reads no Wingspan, so it is not circular), pivot `WingStealPostnessPivot` over range
+   `WingStealPostnessRange`. A rangy guard's arms bother the ball; a short-armed seven-footer's length
+   barely enters.
 
-1. **Flat, skill-independent lift.** Even a neutral or unfavorable matchup produces a lift when
-   pressure is above neutral. Backing off suppresses disruption regardless of how good the
-   hands are.
-2. **Pressure gates how much the matchup matters.** At low pressure the handling-vs-steals
-   gap is muted (`pressureGate ≈ 0`). At high pressure the gate opens and the gap drives the
-   outcome. The same lever captures both "high-steals defender climbs faster" and "big gap climbs
-   faster" — one term, not two.
+**Pressure's flat lift stays; its gate on the matchup is gone.** `pressureLift` (0 at neutral) still
+adds to the shift, kept for the future coaching layer that will dial a press; `hustlePressureNudge`
+(Phase 45) still enters pre-saturation. The old `pressureGate × matchupShift` product is removed. **Kill
+switch:** with `AthStealSteepness`, `StealFloorSteepness`, and `WingStealWeight` all 0, an identity branch
+reproduces the original `pressureLift + pressureGate × GapFn(steal gap) + hustlePressureNudge` byte-for-byte.
 
-**Foul slice: pressure only.** Reach-in fouls track aggression. The handling-vs-steals matchup
-does NOT steepen the foul climb — the `foulShift = pressureLift` only. No matchup term.
+**Foul slice: unchanged, matchup-independent.** Reach-in fouls track aggression; no floor attribute enters
+the foul calc — `foulShift = pressureLift` (+ the Phase 45 hustle foul nudge) only. (The final *normalized*
+foul slice can move by a renormalization ULP when the turnover share changes; the raw foul share does not.)
 
-### The math (settled)
+### The math (current state, Session 58)
 
 ```
 pUnit        = (pressure − PressureNeutral) / PressureScale
-pressureLift = pUnit
-pressureGate = max(0, pUnit)
+pressureLift = pUnit            // 0 at neutral; kept for the coaching layer
+                                // pressureGate is retained ONLY on the kill-switch identity path
 
+// live floor (Matchup.StealFloorShift), pressure-INDEPENDENT:
+athGap          = (defender.Quickness+defender.FirstStep)/2 − (handler.Quickness+handler.FirstStep)/2
 stealGap        = defender.Steals − handler.BallHandling
-matchupShift    = GapFn(stealGap, SkillSteepness, SkillExponent, ReferenceScale)
-disruptionShift = pressureLift + pressureGate × matchupShift
+perimW          = WingStealPerimWeight(Postness(defender))      // guard→1, big→WingStealPerimFloor
+wingSigned      = (defender.Wingspan − WingStealRef) × perimW
+stealFloorShift = GapFn(athGap,   AthStealSteepness,   AthStealExponent,   AthStealScale)
+                + GapFn(stealGap, StealFloorSteepness, StealFloorExponent, ReferenceScale)
+                + WingStealWeight × tanh(wingSigned / WingStealScale)
+disruptionShift = stealFloorShift + pressureLift + hustlePressureNudge
 
 // Turnover share (share of actionMass)
 toSpan     = (disruptionShift ≥ 0) ? (TurnoverCeiling − baseTurnoverShare)
@@ -4060,20 +4080,33 @@ with no matchup term.
 
 ### The math
 
+**Current state (Session 58): the aggregate matchup is the same live FLOOR as Roll F.** The steal-vs-
+handling gate was replaced by `Matchup.StealFloorShift` on the team aggregates — pressure-independent,
+live at neutral. The guard-heavy `SlotWeights` already tilt every aggregate toward the players who
+handle the ball, so a non-handling center barely enters the resistance side, and the perimeter weight
+on the wingspan term is applied **per-defender inside the aggregate** before averaging (a short-armed
+big contributes ≈`WingStealPerimFloor` of his length). The kill switch (three floor knobs → 0) reproduces
+the old pressure-gated aggregate expression byte-for-byte via the identity branch.
+
 ```
 // Pressure normalization (shared with Phase 12)
 pUnit        = (pressure − PressureNeutral) / PressureScale
-pressureLift = pUnit
-pressureGate = max(0, pUnit)
+pressureLift = pUnit            // 0 at neutral; kept for the coaching layer
 
-// Team aggregate scores (slot-weighted, normalized over non-null slots)
-offHandling = Σ weight[i] × off_player[i].BallHandling   (i = slots 1–5)
-defSteals   = Σ weight[i] × def_player[i].Steals         (same weights)
+// Team aggregate scores (slot-weighted, normalized over non-null slots) — same weights throughout
+offHandling  = Σ weight[i] × off_player[i].BallHandling            (i = slots 1–5)
+defSteals    = Σ weight[i] × def_player[i].Steals
+offAthletic  = Σ weight[i] × (off_player[i].Quickness + off_player[i].FirstStep)/2
+defAthletic  = Σ weight[i] × (def_player[i].Quickness + def_player[i].FirstStep)/2
+defWingSigned= Σ weight[i] × (def_player[i].Wingspan − WingStealRef) × perimW(def_player[i])
 
-// Team gap → matchup shift (same GapFn as all other doors)
-teamGap        = defSteals − offHandling
-matchupShift   = GapFn(teamGap, SkillSteepness, SkillExponent, ReferenceScale)
-disruptionShift = pressureLift + pressureGate × matchupShift
+// Live floor on the aggregates (Session 58) — pressure-INDEPENDENT
+athGap          = defAthletic − offAthletic
+teamGap         = defSteals − offHandling
+stealFloorShift = GapFn(athGap,  AthStealSteepness,   AthStealExponent,   AthStealScale)
+                + GapFn(teamGap, StealFloorSteepness, StealFloorExponent, ReferenceScale)
+                + WingStealWeight × tanh(defWingSigned / WingStealScale)
+disruptionShift = stealFloorShift + pressureLift + hustlePressureNudge
 
 // Turnover share (share of actionMass) — team-aggregate matchup + pressure
 toSpan       = (disruptionShift ≥ 0) ? (RollBTurnoverCeiling − baseToShare)
@@ -5617,10 +5650,18 @@ Guard-favored attribution helper for live-ball turnovers (BadPassIntercepted, Lo
 ```
 raw  = tanh((defPostness[i] − defLineupMean) / StealerPostnessScale)
 mult = StealerPostFloor + (1 − PostFloor) × (1 − (raw + 1) / 2)
-weight[i] = max(1, Steals × mult)
+hm   = 1 + HustleStealerSteepness × tanh((Hustle − 50) / HustleStealerScale)        // Phase 45
+wm   = 1 + WingspanStealerSteepness × tanh((Wingspan − 50) / WingspanStealerScale)  // Session 58
+weight[i] = max(1, Steals × mult × hm × wm)
 ```
 
-Config keys: `StealerPostFloor` (0.10), `StealerPostnessScale` (40.0).
+Config keys: `StealerPostFloor` (0.10), `StealerPostnessScale` (40.0); `HustleStealerSteepness` (0.15) /
+`HustleStealerScale` (20.0) (Phase 45); `WingspanStealerSteepness` (0.15) / `WingspanStealerScale` (20.0)
+(Session 58). The wingspan tilt is a slight two-sided factor — a longer-armed defender earns a slightly
+larger slice of his team's credited steals, a short-armed one slightly less, centered at 1.0 for a
+50-Wingspan player — but the guard-favoring `mult` (postness gate) still dominates, so a long-armed **big**
+gets fewer credited steals than a long-armed **guard**. `WingspanStealerSteepness = 0` is the identity
+kill switch (today's exact two-factor weight, no `×1` factor).
 
 ### StealerSlot threading
 

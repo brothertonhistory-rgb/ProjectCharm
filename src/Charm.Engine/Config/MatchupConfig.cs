@@ -507,6 +507,75 @@ public sealed class MatchupConfig
     /// Sums to 1.0 (enforced in Load).</summary>
     public double[] SlotWeights => new[] { SlotWeight1, SlotWeight2, SlotWeight3, SlotWeight4, SlotWeight5 };
 
+    // --- Session 58 — the live steal-forcing FLOOR (Roll F 1v1 + Roll B aggregate) ---
+    // The floor replaces the old pressure-gated skill contest. All three GapFn/tanh
+    // terms feed Matchup.StealFloorShift. Setting AthStealSteepness, StealFloorSteepness,
+    // and WingStealWeight all to 0 is the kill switch: the identity branch reproduces the
+    // old neutral-pressure behavior byte-for-byte. Magnitudes are calibrated on the season
+    // page; SHAPE is signed off (the archetype table / golden fixture). ---
+
+    /// <summary>Steepness of the PRIMARY athleticism-mismatch GapFn ((Quickness+FirstStep)/2
+    /// gap). Steepest of the three floor terms — athleticism is primary. 0 disables the ath
+    /// term (part of the kill switch). Must be finite and &gt;= 0 (enforced in Load).</summary>
+    public double AthStealSteepness { get; set; } = 0.85;
+
+    /// <summary>Exponent of the athleticism-mismatch GapFn (convex, flat-bottomed).
+    /// Must be finite and &gt; 0 (enforced in Load).</summary>
+    public double AthStealExponent { get; set; } = 1.4;
+
+    /// <summary>Scale (gap normalizer) of the athleticism-mismatch GapFn. Matches the
+    /// oracle GAP_SCALE. Must be finite and &gt; 0 (enforced in Load).</summary>
+    public double AthStealScale { get; set; } = 25.0;
+
+    /// <summary>Steepness of the secondary steal-vs-ballcontrol GapFn (Steals − BallHandling).
+    /// 0 disables the steal term (part of the kill switch). Reuses
+    /// <see cref="ReferenceScale"/> for its scale. Must be finite and &gt;= 0 (enforced in Load).</summary>
+    public double StealFloorSteepness { get; set; } = 0.38;
+
+    /// <summary>Exponent of the steal-vs-ballcontrol GapFn. Must be finite and &gt; 0
+    /// (enforced in Load).</summary>
+    public double StealFloorExponent { get; set; } = 1.4;
+
+    /// <summary>Weight on the two-sided wingspan deflection term
+    /// (<c>WingStealWeight × tanh(wingSigned / WingStealScale)</c>). 0 disables the wing
+    /// term (part of the kill switch). Must be finite and &gt;= 0 (enforced in Load).</summary>
+    public double WingStealWeight { get; set; } = 0.45;
+
+    /// <summary>Scale (saturation softness) of the wingspan tanh. Must be finite and &gt; 0
+    /// (enforced in Load).</summary>
+    public double WingStealScale { get; set; } = 22.0;
+
+    /// <summary>Reference wingspan the deflection term is centered on — a defender at this
+    /// wingspan contributes zero. Two-sided: above adds, below costs a little. Must be finite
+    /// (enforced in Load).</summary>
+    public double WingStealRef { get; set; } = 50.0;
+
+    /// <summary>Postness value at/below which the wingspan perimeter weight is 1.0 (full
+    /// guard credit). See <see cref="Matchup.WingStealPerimWeight"/>. Must be finite
+    /// (enforced in Load).</summary>
+    public double WingStealPostnessPivot { get; set; } = 50.0;
+
+    /// <summary>Postness span over which the perimeter weight slides from 1.0 down to
+    /// <see cref="WingStealPerimFloor"/>. Must be finite and &gt; 0 (enforced in Load).</summary>
+    public double WingStealPostnessRange { get; set; } = 28.0;
+
+    /// <summary>Floor of the wingspan perimeter weight — the credit a maximal-postness big
+    /// still gets. Must be finite and in [0,1] (enforced in Load).</summary>
+    public double WingStealPerimFloor { get; set; } = 0.20;
+
+    // --- Session 58 — wingspan attribution tilt (StealerPicker), mirrors the Hustle tilt ---
+
+    /// <summary>Steepness of the per-player wingspan tilt in <see cref="StealerPicker"/>
+    /// (<c>1 + steep × tanh((Wingspan−50)/scale)</c>, beside the Hustle multiplier). Slight,
+    /// two-sided. 0 is the identity kill switch (original two-factor weight). Must be finite
+    /// and in [0,1] (enforced in Load) — the upper bound keeps the short-wingspan factor
+    /// (1 − steep) non-negative.</summary>
+    public double WingspanStealerSteepness { get; set; } = 0.15;
+
+    /// <summary>Scale (softness) of the wingspan attribution tilt tanh. Must be finite and
+    /// &gt; 0 (enforced in Load).</summary>
+    public double WingspanStealerScale { get; set; } = 20.0;
+
     // --- Phase 13 — Roll B pressure ceilings/floors (shares of action mass) ---
     // Roll B's baseline foul share (≈0.1206 of action mass) is much higher than
     // Roll F's (≈0.0538), and its baseline TO share (≈0.0302) is lower. The Phase 12
@@ -877,6 +946,47 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"RollBFoulPressureCeiling must exceed RollBFoulPressureFloor: " +
                 $"floor={cfg.RollBFoulPressureFloor}, ceiling={cfg.RollBFoulPressureCeiling}.");
+
+        // Session 58 -- steal-forcing floor bounds (complete: finite + range on every knob).
+        if (!double.IsFinite(cfg.AthStealSteepness) || cfg.AthStealSteepness < 0.0)
+            throw new InvalidOperationException(
+                $"AthStealSteepness must be finite and >= 0: got {cfg.AthStealSteepness}.");
+        if (!double.IsFinite(cfg.AthStealExponent) || cfg.AthStealExponent <= 0.0)
+            throw new InvalidOperationException(
+                $"AthStealExponent must be finite and > 0: got {cfg.AthStealExponent}.");
+        if (!double.IsFinite(cfg.AthStealScale) || cfg.AthStealScale <= 0.0)
+            throw new InvalidOperationException(
+                $"AthStealScale must be finite and > 0: got {cfg.AthStealScale}.");
+        if (!double.IsFinite(cfg.StealFloorSteepness) || cfg.StealFloorSteepness < 0.0)
+            throw new InvalidOperationException(
+                $"StealFloorSteepness must be finite and >= 0: got {cfg.StealFloorSteepness}.");
+        if (!double.IsFinite(cfg.StealFloorExponent) || cfg.StealFloorExponent <= 0.0)
+            throw new InvalidOperationException(
+                $"StealFloorExponent must be finite and > 0: got {cfg.StealFloorExponent}.");
+        if (!double.IsFinite(cfg.WingStealWeight) || cfg.WingStealWeight < 0.0)
+            throw new InvalidOperationException(
+                $"WingStealWeight must be finite and >= 0: got {cfg.WingStealWeight}.");
+        if (!double.IsFinite(cfg.WingStealScale) || cfg.WingStealScale <= 0.0)
+            throw new InvalidOperationException(
+                $"WingStealScale must be finite and > 0: got {cfg.WingStealScale}.");
+        if (!double.IsFinite(cfg.WingStealRef))
+            throw new InvalidOperationException(
+                $"WingStealRef must be finite: got {cfg.WingStealRef}.");
+        if (!double.IsFinite(cfg.WingStealPostnessPivot))
+            throw new InvalidOperationException(
+                $"WingStealPostnessPivot must be finite: got {cfg.WingStealPostnessPivot}.");
+        if (!double.IsFinite(cfg.WingStealPostnessRange) || cfg.WingStealPostnessRange <= 0.0)
+            throw new InvalidOperationException(
+                $"WingStealPostnessRange must be finite and > 0: got {cfg.WingStealPostnessRange}.");
+        if (!double.IsFinite(cfg.WingStealPerimFloor) || cfg.WingStealPerimFloor < 0.0 || cfg.WingStealPerimFloor > 1.0)
+            throw new InvalidOperationException(
+                $"WingStealPerimFloor must be finite and in [0,1]: got {cfg.WingStealPerimFloor}.");
+        if (!double.IsFinite(cfg.WingspanStealerScale) || cfg.WingspanStealerScale <= 0.0)
+            throw new InvalidOperationException(
+                $"WingspanStealerScale must be finite and > 0: got {cfg.WingspanStealerScale}.");
+        if (!double.IsFinite(cfg.WingspanStealerSteepness) || cfg.WingspanStealerSteepness < 0.0 || cfg.WingspanStealerSteepness > 1.0)
+            throw new InvalidOperationException(
+                $"WingspanStealerSteepness must be finite and in [0,1]: got {cfg.WingspanStealerSteepness}.");
 
         // Phase 15 -- full-court press frequency dial
         if (cfg.HomePressFrequency < 1.0 || cfg.HomePressFrequency > 10.0)

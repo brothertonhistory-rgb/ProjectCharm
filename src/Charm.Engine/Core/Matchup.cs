@@ -996,6 +996,52 @@ public static class Matchup
     }
 
     // =========================================================================
+    // Session 58 — steal-forcing FLOOR (live at neutral pressure)
+    // =========================================================================
+
+    /// <summary>
+    /// Continuous perimeter weight for the wingspan deflection term. Slides from
+    /// <c>1.0</c> for a guard (postness at/below <see cref="MatchupConfig.WingStealPostnessPivot"/>)
+    /// down to <see cref="MatchupConfig.WingStealPerimFloor"/> for a big (postness at/above
+    /// pivot + <see cref="MatchupConfig.WingStealPostnessRange"/>). Built on
+    /// <see cref="Postness"/> (Height/PostDefense/Strength — reads NO Wingspan, so a
+    /// wingspan term gated by this is not circular). Absolute pivot, no lineup handle.
+    /// <c>postUnit = clamp((postness − pivot) / range, 0, 1)</c>;
+    /// <c>perimW = 1 − (1 − PerimFloor) × postUnit</c>.
+    /// </summary>
+    public static double WingStealPerimWeight(double postness, MatchupConfig cfg)
+    {
+        var postUnit = Math.Clamp(
+            (postness - cfg.WingStealPostnessPivot) / cfg.WingStealPostnessRange, 0.0, 1.0);
+        return 1.0 - (1.0 - cfg.WingStealPerimFloor) * postUnit;
+    }
+
+    /// <summary>
+    /// The un-gated steal-forcing FLOOR shift (Session 58). Replaces the old
+    /// pressure-gated skill contest, which was inert at today's neutral pressure
+    /// (<c>pressureGate = 0</c>). Three inputs, each a defender-minus-offense gap:
+    /// <list type="bullet">
+    ///   <item><b>Athleticism mismatch</b> (PRIMARY): (Quickness+FirstStep)/2 gap,
+    ///         through <see cref="GapFn"/> with the Ath knobs. Steepest of the three.</item>
+    ///   <item><b>Steal vs ball-control</b> (secondary): Steals − BallHandling, through
+    ///         <see cref="GapFn"/> with the StealFloor knobs (reusing ReferenceScale).</item>
+    ///   <item><b>Wingspan deflection</b> (two-sided, on top): a <c>tanh</c> of the
+    ///         perimeter-gated signed wingspan. Long arms add, short arms cost a little;
+    ///         perimeter-gated so a short-armed big is barely affected.</item>
+    /// </list>
+    /// Pure/static: both the 1v1 door (<see cref="DisruptionShares"/>) and the aggregate
+    /// door (<see cref="TeamDisruptionShares"/>) compute their three inputs and call this,
+    /// so the two contests cannot drift. <paramref name="wingSigned"/> is
+    /// <c>(Wingspan − WingStealRef) × perimW</c>, already perimeter-weighted by the caller
+    /// (per-defender in Roll F; per-player inside the weighted aggregate in Roll B).
+    /// </summary>
+    public static double StealFloorShift(
+        double athGap, double stealGap, double wingSigned, MatchupConfig cfg)
+        => GapFn(athGap,   cfg.AthStealSteepness,   cfg.AthStealExponent,   cfg.AthStealScale)
+         + GapFn(stealGap, cfg.StealFloorSteepness, cfg.StealFloorExponent, cfg.ReferenceScale)
+         + cfg.WingStealWeight * Math.Tanh(wingSigned / cfg.WingStealScale);
+
+    // =========================================================================
     // Phase 12 — pressure / disruption door (Roll F)
     // =========================================================================
 
@@ -1074,20 +1120,34 @@ public static class Matchup
         var pressureLift = pUnit;
         var pressureGate = Math.Max(0.0, pUnit);   // non-negative; 0 when backed off
 
-        // ── Steal/turnover share — two jobs of pressure ──────────────────────
-        // Skill matchup: defender Steals minus handler BallHandling.
-        // Positive = defender edge = steals go up. GapFn captures both "high steals"
-        // and "big gap" as one term (convex, flat-bottomed, no cap — the cap is the
-        // tanh ceiling below).
-        var stealGap       = (double)defender.Steals - handler.BallHandling;
-        var matchupShift   = GapFn(stealGap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
-
-        // Disruption shift: flat lift + pressure-gated matchup.
-        // At low pressure, pressureGate ≈ 0 so matchup is muted regardless of attributes.
-        // At high pressure, matchupShift is scaled in — ball-hawks feast.
-        // Phase 45: hustlePressureNudge is added pre-saturation (NOT gated by pressure —
-        // effort exists at any pressure level, an explicit Phase 45 design decision).
-        var disruptionShift = pressureLift + pressureGate * matchupShift + hustlePressureNudge;
+        // ── Steal/turnover share — the live attribute FLOOR (Session 58) ─────
+        // The old model gated the skill matchup behind pressure (pressureGate = 0 at
+        // neutral → inert). It is replaced by a floor that is LIVE at neutral: an
+        // athleticism mismatch (primary), the steal-vs-handle contest (secondary), and
+        // a two-sided perimeter-gated wingspan term. pressureLift (0 at neutral) stays
+        // for the future coaching layer; the old pressureGate × matchupShift is removed.
+        // Phase 45: hustlePressureNudge stays, added pre-saturation (not pressure-gated).
+        double disruptionShift;
+        if (cfg.AthStealSteepness == 0.0 && cfg.StealFloorSteepness == 0.0 && cfg.WingStealWeight == 0.0)
+        {
+            // Identity path (S57 discipline): all three floor knobs off → reproduce
+            // today's ORIGINAL pressure-gated expression byte-for-byte. No GapFns on the
+            // floor, no 0 × tanh, no re-associated sum. At neutral pressure this is the
+            // flat/hustle path (pressureGate = 0).
+            var stealGapKill  = (double)defender.Steals - handler.BallHandling;
+            var matchupShift  = GapFn(stealGapKill, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+            disruptionShift   = pressureLift + pressureGate * matchupShift + hustlePressureNudge;
+        }
+        else
+        {
+            var athGap     = ((double)defender.Quickness + defender.FirstStep) / 2.0
+                           - ((double)handler.Quickness  + handler.FirstStep)  / 2.0;
+            var stealGap   = (double)defender.Steals - handler.BallHandling;
+            var perimW     = WingStealPerimWeight(Postness(defender, cfg), cfg);
+            var wingSigned = ((double)defender.Wingspan - cfg.WingStealRef) * perimW;
+            disruptionShift = StealFloorShift(athGap, stealGap, wingSigned, cfg)
+                            + pressureLift + hustlePressureNudge;
+        }
 
         var toCeiling   = cfg.TurnoverCeiling;
         var toFloor     = cfg.TurnoverFloor;
@@ -1163,7 +1223,9 @@ public static class Matchup
     /// foul shift. Positive only when the defense has the Hustle advantage. Added to
     /// foulShift BEFORE the tanh so it respects the foul ceiling. Default 0.0.</param>
     public static (double turnoverShare, double foulShare) TeamDisruptionShares(
-        double offenseHandling, double defenseStealers, double pressure,
+        double offenseHandling, double defenseStealers,
+        double offenseAthletic, double defenseAthletic, double defenseWingSigned,
+        double pressure,
         double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg,
         double hustlePressureNudge = 0.0, double hustleFoulNudge = 0.0)
     {
@@ -1172,15 +1234,29 @@ public static class Matchup
         var pressureLift = pUnit;
         var pressureGate = Math.Max(0.0, pUnit);
 
-        // ── Team aggregate steal/turnover share ──────────────────────────────
-        // Defensive steals advantage → positive gap → more turnovers.
-        // pressureGate ≈ 0 at low pressure: matchup is muted regardless of aggregates.
-        // At high pressure the gate opens and the team gap drives the outcome.
-        var teamGap        = defenseStealers - offenseHandling;
-        var matchupShift   = GapFn(teamGap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
-        // Phase 45: hustlePressureNudge added pre-saturation (NOT pressure-gated —
-        // effort exists at any pressure level, an explicit Phase 45 design decision).
-        var disruptionShift = pressureLift + pressureGate * matchupShift + hustlePressureNudge;
+        // ── Team aggregate steal/turnover share — live FLOOR (Session 58) ────
+        // The aggregate analogue of Roll F's defender-vs-handler floor. The guard-heavy
+        // SlotWeights already tilt both aggregates toward the players who handle the ball,
+        // so a non-handling center barely enters the resistance side and athleticism rides
+        // the same touch-weighting as the steal-rating contest beside it. pressureLift
+        // (0 at neutral) stays for the coaching layer; the old pressure-gated matchup is
+        // removed. hustlePressureNudge stays, added pre-saturation (not pressure-gated).
+        double disruptionShift;
+        if (cfg.AthStealSteepness == 0.0 && cfg.StealFloorSteepness == 0.0 && cfg.WingStealWeight == 0.0)
+        {
+            // Identity path (S57 discipline): all three floor knobs off → reproduce
+            // today's ORIGINAL pressure-gated aggregate expression byte-for-byte.
+            var teamGap      = defenseStealers - offenseHandling;
+            var matchupShift = GapFn(teamGap, cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+            disruptionShift  = pressureLift + pressureGate * matchupShift + hustlePressureNudge;
+        }
+        else
+        {
+            var athGap   = defenseAthletic - offenseAthletic;
+            var stealGap = defenseStealers - offenseHandling;
+            disruptionShift = StealFloorShift(athGap, stealGap, defenseWingSigned, cfg)
+                            + pressureLift + hustlePressureNudge;
+        }
 
         var toCeiling  = cfg.RollBTurnoverCeiling;
         var toFloor    = cfg.RollBTurnoverFloor;

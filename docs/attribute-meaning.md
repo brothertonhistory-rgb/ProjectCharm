@@ -623,8 +623,14 @@ be scoring over guys"), sharpened by the numbers:
 2. **The block channel is modest even fully stacked** — FREAK blocks 1.2/game; a full length
    walk adds ~0.3 team blocks. Magnitude call; waits for a real population per standing
    rule, flagged as likely light.
-3. **Wingspan feeds steals nothing.** Whether long arms should buy deflections/steals is a
-   wiring question.
+3. **Wingspan feeds steals nothing.** ~~Whether long arms should buy deflections/steals is a
+   wiring question.~~ **RULED AND SHIPPED (S58).** Long arms now buy deflections: the live
+   steal-forcing floor (Roll F + Roll B) reads a **two-sided, perimeter-gated wingspan** term on the
+   steal contest (long arms add, short arms cost a little; gated by postness so a short-armed big
+   barely enters), and `StealerPicker` gained a slight wingspan tilt on who gets credited. Athleticism
+   ((Quickness+FirstStep)/2) is the **primary** forcing input beside it, the steal rating secondary.
+   See the S55-arc journal and design.md (Roll F/B disruption doors); this also made Steals partly a
+   *create* dial at neutral (see Finding 3 below).
 4. **Weight is cosmetic** — feed Strength-adjacent channels, or stay cosmetic until a
    body-contact layer exists?
 
@@ -851,6 +857,16 @@ pressure-gated toward zero at neutral, so steal *rating* on this bench is an att
 turnover-forcing dial. The turnover-forcing side needs a non-neutral pressure setting to express —
 recorded, parked to the coaching layer, same as BallHandling's pressure-dialed test.
 
+> **UPDATE (S58) — the neutral-pressure gate is now a live floor; Steals is partly a *create* dial.**
+> The finding above described the *pre-S58* engine, where the Roll B/F disruption matchup was gated to
+> zero at neutral. S58 replaced that gate with a pressure-**independent** steal-forcing floor: the
+> steal-vs-ballcontrol contest (plus athleticism-primary and a perimeter-gated wingspan term) now forces
+> turnovers at neutral, so a high steal rating **does** create some turnovers in a base defense, not only
+> claim a share. What is *still* parked to the coaching layer is the pressure **dial** — a press that
+> scales the whole disruption up; the floor is the base level, un-amplified. The attribution finding
+> (the StealerPicker share) is unchanged and now also carries a slight wingspan tilt. See the journal/
+> design.md for the floor; this measurement predates it and is left as the historical neutral-gate read.
+
 ### Finding 4 — HelpDefense and OffBallDefense are the clean team-suppression pair, and they are symmetric.
 
 Both escape the slot-guards-slot dilution because they aggregate the four off-ball defenders on
@@ -921,10 +937,11 @@ read, for the same reason.)
   everything this instrument can show; the remaining questions (per-opponent-slot suppression, the
   pressure-dialed turnover-forcing side of Steals, the PostDefense-as-size coupling) are design
   conversations for synthesis and the coaching layer, not more sweeps.
-- **Adjacent flags carried:** the S50 wingspan→steals wiring question is unchanged by this pass
-  (Steals is an attribution dial, not a deflection engine — long arms buying deflections remains
-  unwired and un-argued-for); the S49 unforced-turnover reshaper sits adjacent to the Steals
-  attribution machinery but is untouched here.
+- **Adjacent flags carried:** the S50 wingspan→steals wiring question was open at this pass (Steals
+  read as an attribution dial, not a deflection engine) — **now CLOSED, wired in S58** (the live
+  steal-forcing floor gives long arms a two-sided perimeter-gated deflection term and makes the steal
+  contest live at neutral; see Finding 3's S58 update above); the S49 unforced-turnover reshaper
+  (shipped S56) sits adjacent to the Steals attribution machinery.
 
 ### The undiluted reruns (S54 — the per-man readout + lineup stacks)
 

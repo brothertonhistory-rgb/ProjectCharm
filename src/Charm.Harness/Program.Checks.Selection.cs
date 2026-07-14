@@ -502,8 +502,13 @@ internal static partial class Program
         catch (Exception ex) { bOk = false; Console.WriteLine($"  FAIL  (b) threw: {ex.Message}"); }
         pass &= bOk;
 
-        // ── (c) Pressure gates the matchup ─────────────────────────────────
-        Console.WriteLine("  (c) Pressure gates matchup — high-pressure delta >> low-pressure delta:");
+        // ── (c) Matchup is a LIVE FLOOR, not pressure-gated (Session 58) ────
+        // The old model multiplied the steal/handling matchup by pressureGate (0 at/below
+        // neutral), so the weak-vs-good delta only appeared under pressure. Session 58
+        // replaces that with a pressure-independent floor: the delta is LIVE at neutral
+        // (it was ~0 before) and is no longer amplified by pressure. (Per S58 §A1: a
+        // pressure sweep of the matchup legitimately differs from the retired model.)
+        Console.WriteLine("  (c) Matchup is a live floor, not pressure-gated (S58):");
         bool cOk;
         try
         {
@@ -519,19 +524,27 @@ internal static partial class Program
             var cfgLow  = WithAwayPressure(2.0);
             var cfgHigh = WithAwayPressure(9.0);
 
+            var toNeutGood = Split(cfgF, cfgMatchup, gGood, stGood)[PlayerActionOutcome.Turnover];
+            var toNeutWeak = Split(cfgF, cfgMatchup, gWeak, stWeak)[PlayerActionOutcome.Turnover];
             var toLowGood  = Split(cfgF, cfgLow,  gGood, stGood)[PlayerActionOutcome.Turnover];
             var toLowWeak  = Split(cfgF, cfgLow,  gWeak, stWeak)[PlayerActionOutcome.Turnover];
             var toHighGood = Split(cfgF, cfgHigh, gGood, stGood)[PlayerActionOutcome.Turnover];
             var toHighWeak = Split(cfgF, cfgHigh, gWeak, stWeak)[PlayerActionOutcome.Turnover];
 
+            var deltaNeut = Math.Abs(toNeutWeak - toNeutGood);
             var deltaLow  = Math.Abs(toLowWeak  - toLowGood);
             var deltaHigh = Math.Abs(toHighWeak - toHighGood);
 
+            Console.WriteLine($"    Neutral delta={deltaNeut:F6}  ({toNeutGood:F6} vs {toNeutWeak:F6})");
             Console.WriteLine($"    Low  pressure delta={deltaLow:F6}  ({toLowGood:F6} vs {toLowWeak:F6})");
             Console.WriteLine($"    High pressure delta={deltaHigh:F6}  ({toHighGood:F6} vs {toHighWeak:F6})");
 
-            cOk = deltaHigh > 3.0 * deltaLow;
-            Console.WriteLine($"    High delta >> low delta: {cOk}  -> {(cOk?"OK":"FAIL")}");
+            // Floor is LIVE at neutral (retired model gave ~0 here), and the matchup is
+            // NOT gated up by pressure (high delta is no longer >> low delta).
+            var liveAtNeutral = deltaNeut > 0.005;
+            var notGated      = deltaHigh <= 3.0 * deltaLow;
+            cOk = liveAtNeutral && notGated;
+            Console.WriteLine($"    live-at-neutral: {liveAtNeutral}  not-pressure-gated: {notGated}  -> {(cOk?"OK":"FAIL")}");
         }
         catch (Exception ex) { cOk = false; Console.WriteLine($"  FAIL  (c) threw: {ex.Message}"); }
         pass &= cOk;

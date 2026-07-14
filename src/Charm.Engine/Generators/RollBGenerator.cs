@@ -120,6 +120,16 @@ public sealed class RollBGenerator : IRollBPieGenerator
         var offHandling  = WeightedAggregate(offPlayers, p => p.BallHandling);
         var defStealers  = WeightedAggregate(defPlayers, p => p.Steals);
 
+        // Session 58 — team athleticism (both sides) and the defense's perimeter-weighted
+        // signed wingspan, all on the SAME guard-heavy SlotWeights as the aggregates above.
+        // The wingspan lambda applies each defender's own perimeter weight before averaging,
+        // so a short-armed big is barely counted (perimW → PerimFloor).
+        var offAthletic  = WeightedAggregate(offPlayers, p => ((double)p.Quickness + p.FirstStep) / 2.0);
+        var defAthletic  = WeightedAggregate(defPlayers, p => ((double)p.Quickness + p.FirstStep) / 2.0);
+        var defWingSigned = WeightedAggregate(defPlayers,
+            p => ((double)p.Wingspan - _matchup.WingStealRef)
+               * Matchup.WingStealPerimWeight(Matchup.Postness(p, _matchup), _matchup));
+
         // ── Pressure for the DEFENDING team ─────────────────────────────────
         // Migration path: when CoachProfile is plumbed, swap to
         //   _game.CoachProfileFor(state.Defense).Pressure
@@ -161,7 +171,9 @@ public sealed class RollBGenerator : IRollBPieGenerator
                                      _matchup.HustleFoulScale);
 
         var (finalToShare, finalFoulShare) = Matchup.TeamDisruptionShares(
-            offHandling, defStealers, pressure,
+            offHandling, defStealers,
+            offAthletic, defAthletic, defWingSigned,
+            pressure,
             baseTurnoverShare, baseFoulShare, _matchup,
             hustlePressureNudge, defensiveFoulNudge);
 

@@ -115,7 +115,21 @@ public static class StealerPicker
             var hm   = 1.0 + matchupCfg.HustleStealerSteepness
                            * Math.Tanh((p.Hustle - 50.0) / matchupCfg.HustleStealerScale);
 
-            weights[i]   = Math.Max(1.0, p.Steals * mult * hm);
+            // Session 58: per-player wingspan tilt (two-sided, slight). Longer arms earn a
+            // slightly larger share of the team's steals, short arms slightly less; centered
+            // at 1.0 for a 50-Wingspan player. The postness gate above still favors guards,
+            // so perimeter players collect the credit. Identity path (S57 discipline): when
+            // the knob is 0, use the ORIGINAL two-factor weight with no ×1.0 wingspan factor.
+            if (matchupCfg.WingspanStealerSteepness == 0.0)
+            {
+                weights[i] = Math.Max(1.0, p.Steals * mult * hm);
+            }
+            else
+            {
+                var wm = 1.0 + matchupCfg.WingspanStealerSteepness
+                             * Math.Tanh((p.Wingspan - 50.0) / matchupCfg.WingspanStealerScale);
+                weights[i] = Math.Max(1.0, p.Steals * mult * hm * wm);
+            }
             totalWeight += weights[i];
         }
 

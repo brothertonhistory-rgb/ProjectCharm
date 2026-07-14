@@ -1,0 +1,384 @@
+{
+  "_comment": "Session 58 steal-forcing floor golden fixture. Emitted from tools/steal_floor_oracle.py. Locks stealFloorShift (and the postness/perimW intermediates) per case; NOT credited steals (the harness proves steals separately). Constants cross-checked against loaded MatchupConfig before use.",
+  "constants": {
+    "AthStealSteepness": 0.85,
+    "AthStealExponent": 1.4,
+    "AthStealScale": 25.0,
+    "StealFloorSteepness": 0.38,
+    "StealFloorExponent": 1.4,
+    "ReferenceScale": 25.0,
+    "WingStealWeight": 0.45,
+    "WingStealScale": 22.0,
+    "WingStealRef": 50.0,
+    "WingStealPostnessPivot": 50.0,
+    "WingStealPostnessRange": 28.0,
+    "WingStealPerimFloor": 0.2
+  },
+  "tolerance": {
+    "steal_floor_shift": 1e-12,
+    "postness": 1e-12,
+    "perimW": 1e-12
+  },
+  "cases": [
+    {
+      "name": "AVERAGE guard vs AVERAGE handler",
+      "def": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "Steals": 50,
+        "Wingspan": 50,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 0.0
+    },
+    {
+      "name": "QUICK LONG GUARD vs PLODDING handler",
+      "def": {
+        "Quickness": 85,
+        "FirstStep": 85,
+        "Steals": 80,
+        "Wingspan": 80,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 35,
+        "FirstStep": 35,
+        "BallHandling": 40
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 3.3716744941746692
+    },
+    {
+      "name": "QUICK LONG GUARD vs ELITE handler",
+      "def": {
+        "Quickness": 85,
+        "FirstStep": 85,
+        "Steals": 80,
+        "Wingspan": 80,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 70,
+        "FirstStep": 70,
+        "BallHandling": 90
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 0.7051456730762953
+    },
+    {
+      "name": "PURE ATHLETE, mediocre steals vs AVERAGE",
+      "def": {
+        "Quickness": 90,
+        "FirstStep": 90,
+        "Steals": 40,
+        "Wingspan": 55,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 1.6364854176471475
+    },
+    {
+      "name": "HIGH STEALS but SLOW vs AVERAGE",
+      "def": {
+        "Quickness": 40,
+        "FirstStep": 40,
+        "Steals": 90,
+        "Wingspan": 55,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 0.5986340661175874
+    },
+    {
+      "name": "LONG-ARMED GUARD, avg quicks vs AVERAGE",
+      "def": {
+        "Quickness": 55,
+        "FirstStep": 55,
+        "Steals": 55,
+        "Wingspan": 88,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 0.5516549343405688
+    },
+    {
+      "name": "ATHLETIC LONG BIG vs AVERAGE handler",
+      "def": {
+        "Quickness": 72,
+        "FirstStep": 72,
+        "Steals": 60,
+        "Wingspan": 88,
+        "Height": 80,
+        "PostDefense": 75,
+        "Strength": 80
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 78.33333333333333,
+      "perimW": 0.19999999999999996,
+      "steal_floor_shift": 0.9656238979497398
+    },
+    {
+      "name": "SLOW LONG BIG vs AVERAGE handler",
+      "def": {
+        "Quickness": 35,
+        "FirstStep": 35,
+        "Steals": 50,
+        "Wingspan": 88,
+        "Height": 80,
+        "PostDefense": 75,
+        "Strength": 80
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 78.33333333333333,
+      "perimW": 0.19999999999999996,
+      "steal_floor_shift": -0.26619627067268825
+    },
+    {
+      "name": "SLOW SHORT-ARMED GUARD vs AVERAGE",
+      "def": {
+        "Quickness": 38,
+        "FirstStep": 38,
+        "Steals": 45,
+        "Wingspan": 42,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": -0.5009072909617269
+    },
+    {
+      "name": "ISOLATED: avg guard, SHORT arms (W40) vs AVG",
+      "def": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "Steals": 50,
+        "Wingspan": 40,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": -0.1915326887557476
+    },
+    {
+      "name": "ISOLATED: avg guard, LONG arms (W88) vs AVG",
+      "def": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "Steals": 50,
+        "Wingspan": 88,
+        "Height": 48,
+        "PostDefense": 45,
+        "Strength": 48
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 47.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 0.42242976636390334
+    },
+    {
+      "name": "ISOLATED: SHORT-armed BIG (W40) vs AVG",
+      "def": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "Steals": 50,
+        "Wingspan": 40,
+        "Height": 80,
+        "PostDefense": 75,
+        "Strength": 80
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 78.33333333333333,
+      "perimW": 0.19999999999999996,
+      "steal_floor_shift": -0.04079676499966808
+    },
+    {
+      "name": "BOUNDARY perimW=1 postness at pivot 50",
+      "def": {
+        "Quickness": 60,
+        "FirstStep": 60,
+        "Steals": 60,
+        "Wingspan": 88,
+        "Height": 50,
+        "PostDefense": 50,
+        "Strength": 50
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 50.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 0.7634570291962355
+    },
+    {
+      "name": "BOUNDARY perimW mid postness 64",
+      "def": {
+        "Quickness": 60,
+        "FirstStep": 60,
+        "Steals": 60,
+        "Wingspan": 88,
+        "Height": 64,
+        "PostDefense": 64,
+        "Strength": 64
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 64.0,
+      "perimW": 0.6,
+      "steal_floor_shift": 0.6904288787299578
+    },
+    {
+      "name": "BOUNDARY perimW=floor postness 78",
+      "def": {
+        "Quickness": 60,
+        "FirstStep": 60,
+        "Steals": 60,
+        "Wingspan": 88,
+        "Height": 78,
+        "PostDefense": 78,
+        "Strength": 78
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 78.0,
+      "perimW": 0.19999999999999996,
+      "steal_floor_shift": 0.4905794780586644
+    },
+    {
+      "name": "BOUNDARY below-pivot clamp postness 30",
+      "def": {
+        "Quickness": 60,
+        "FirstStep": 60,
+        "Steals": 60,
+        "Wingspan": 88,
+        "Height": 30,
+        "PostDefense": 30,
+        "Strength": 30
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 30.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 0.7634570291962355
+    },
+    {
+      "name": "BOUNDARY above-range clamp postness 99",
+      "def": {
+        "Quickness": 60,
+        "FirstStep": 60,
+        "Steals": 60,
+        "Wingspan": 88,
+        "Height": 99,
+        "PostDefense": 99,
+        "Strength": 99
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 99.0,
+      "perimW": 0.19999999999999996,
+      "steal_floor_shift": 0.4905794780586644
+    },
+    {
+      "name": "BOUNDARY wing==ref W50 zero wing term",
+      "def": {
+        "Quickness": 60,
+        "FirstStep": 60,
+        "Steals": 60,
+        "Wingspan": 50,
+        "Height": 50,
+        "PostDefense": 50,
+        "Strength": 50
+      },
+      "handler": {
+        "Quickness": 50,
+        "FirstStep": 50,
+        "BallHandling": 50
+      },
+      "postness": 50.0,
+      "perimW": 1.0,
+      "steal_floor_shift": 0.3410272628323321
+    }
+  ]
+}
