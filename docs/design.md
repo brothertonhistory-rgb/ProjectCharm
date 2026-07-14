@@ -3541,9 +3541,11 @@ the coach's influence.
   isolated harness check constructions (13 stub-only + 1 inside `RollGLocationBatchCheck` for
   baseline regression).
 - `RollGGenerator` — matchup-aware real generator. Ctor takes `(RollGConfig, MatchupConfig,
-  GameState)`. Mirrors `RollHGenerator`'s pattern. The real-defender path now calls
-  `Matchup.DeriveDisplacement` (Session 36) for the bend + displacement, then hands the result to
-  the unchanged Phase 17 diet shift.
+  GameState)`. Mirrors `RollHGenerator`'s pattern. The real-defender path calls
+  `Matchup.DeriveDisplacement` (Session 36) for the bend + displacement, then hands the displaced pie
+  to the **Session 59 drive gate** (`Matchup.ApplyDriveGate` — the per-man rim-access wall), and only
+  then to the unchanged Phase 17 diet shift. The order is load-bearing and is what Phase 65's golden
+  proves: team-shape displacement → one matched man's override → usage shift, LAST.
 - **Roll G itself unchanged in signature.** `RollG.Execute` gained one optional parameter
   (`displacementLevel`) that it stamps onto the possession as a read-only observation fact
   (`ShotDisplacementLevel`), null on FastBreak / no-shooter / zero-defender paths. Only the
@@ -7399,3 +7401,126 @@ reconciled and unmoved (expected — the bench sits at the PostMoves-50 identity
 updated: the Phase 9 (d3) "all-attributes-75" uniform-gap-cancellation case had its test shooter's
 PostMoves pinned to 50 (PostMoves is a diet-hunt input, not a matchup-gap attribute — the case isolates
 gap cancellation), so the new interior hunt doesn't confound it.
+
+---
+
+## Roll G — the perimeter-defense DRIVE GATE: a per-man rim-access wall (Session 59, Pass A, 2026-07-14)
+
+Answers the first third of the **S54 perimeter-defense point-neutrality** finding: a perimeter stack
+pushed the opponent off the three but into higher-% twos, so team points barely moved — perimeter
+defense paid only alongside rim protection. It had no way to deny the drive. This gate gives the ONE
+matched on-ball defender a **rim-access wall**. Shot **DIET only** — `OffenseRating` is never called on
+this path, so make% is untouched (Roll G is location-only, as it has always been).
+
+Locked spec: `tools/drive_gate_oracle.py` + `tools/drive_gate_golden.json` (13 cases). Design record:
+`docs/perimeter-defense-rim-access-brief.md` (frozen). **If the C# and the oracle ever disagree, the
+oracle wins** — a Phase 65 parity failure is a PORT BUG, never a tolerance to widen.
+
+**Why per-man, unlike the rest of Roll G.** Displacement (S36) reads the whole defending team's shape —
+*where is the defense collectively soft?* — for the good reason recorded above ("Why shot location reads
+the whole defense"). This gate reads exactly ONE defender, because *can this man get past the guy in
+front of him* is the single most one-on-one decision in the possession. The per-man read is deliberately
+confined to the drive channel; nothing else in Roll G gained a matched-defender dependency.
+
+**`Matchup.DriveTools(shooter, cfg)` — first step BEATS him; the handle only UNLOCKS it.**
+`beat = FsW·FirstStep + QW·Quickness`, times `unlock = clamp01((BallHandling − HandleLo)/(HandleHi − HandleLo))`.
+The weights are asymmetric by ruling (burst primary, lateral quickness support). The handle is a
+**multiplicative gate, not an additive term**, and that encodes three behaviors at once: an elite handle
+with no burst is walled like an average driver (it scales a mediocre beat); a quick first step with NO
+handle scores **exactly 0** and is walled hardest (he never gets it past the first man — and is
+turnover-prone elsewhere, via the S56 unforced channel); and BallHandling above `HandleHi` changes the
+composite by **exactly 0** — a permission slip, never a scoring edge.
+
+**`Matchup.DriveOrientation(shooter, cfg)` — perimeter-oriented only.**
+`clamp01(1 − (offPostness − Pivot)/Range)` over `offPostness = (Height + Strength + PostMoves)/3`.
+Guard → 1 (fully eligible), post scorer → 0 (**immune** — a perimeter wall does not reach the post
+route), point-forward → partial. **Deliberately NOT `Matchup.Postness`.** That helper reads
+Height/**PostDefense**/Strength — a DEFENSE-side "is he a big," used by the rebounding and wing-steal
+gates. This asks an OFFENSE-side question — "is HE a post player" — so it must read **PostMoves**, his
+post *scoring* skill. The two agree on most players and diverge exactly where it matters (a post scorer
+who can't guard the post; a rim-protecting big with no post game). Reusing Postness here compiles, looks
+right, and silently breaks the golden's POST-scorer case. The composite converts the removed mass;
+orientation only decides *who is eligible for the gate at all*.
+
+**`Matchup.ApplyDriveGate(pie5, shooter, matchedDefender, cfg)` — suppression-PRIMARY.**
+`gap = DriveTools − matched.PerimeterDefense`; only the **wall side** fires:
+`supp = GapFn(max(0, −gap), DriveGateSteepness, DriveGateExponent, ReferenceScale)` — the *shared*
+normalizer, deliberately not a twin knob. `mult = 1 − DriveGateCap·tanh(supp/DriveGateTanhRef)`
+(1.0 = no suppression). Remove `orient·(1−mult)` of Rim and `ShortElig·orient·(1−mult)` of Short —
+Short is only PARTLY drive-derived (floaters yes; post-ups and cuts no), hence the eligibility fraction.
+The removed mass redistributes to the **contested Long/Three only**, proportional to the shooter's own
+pre-gate outer preference; **both-zero is a real branch** (no outer preference to read → an exact 50/50
+split, so a denied drive never vanishes), not a divide-by-zero patch bolted on. Then one renormalize.
+**Mid NEVER moves** — a denied drive becomes a contested jumper from distance, not a pull-up. An offense
+edge (`gap ≥ 0`) removes **exactly 0**: elite D suppresses, average is ~neutral, and poor D does NOT
+help — the weak-defender "leak" is the ABSENCE of a wall, never an added bonus.
+
+**Placement — on the DISPLACED pie, before the usage shift.** The gate composes on `trace.Final` (the
+output of `DeriveDisplacement`, no usage shift yet) and feeds `ApplyDietShift`. The order is the whole
+point: displacement reads where the defending *team* is soft, then the matched man **overrides that
+invitation** — a lockdown defender keeps his man out of a paint the team shape just invited him into
+(Phase 65 proves this by construction: a soft paint pulls the displaced rim share to 26.8% against a
+tendency of 20%, and the wall takes it back to 17.0%). Phase 56 is structurally blind to this — it calls
+`DeriveDisplacement` directly, not through Roll G — so the displacement regression is unaffected and
+stays Phase 56's job. The golden's `before` pies are FIXED INPUTS, so Phase 65 tests the gate in
+isolation.
+
+**The identity branch — and why it is a branch, not an accident.** When `removed <= 0` — orient 0 (post
+scorer), suppression 0 (gap ≥ 0, or a flat-50 world), `DriveGateCap = 0` (kill switch), no eligible
+Rim/Short mass, or a null matched defender (bypass) — the INPUT array is returned untouched: no
+subtract-0, no redistribute-0, **no renormalize**. This is what makes a **live** gate at flat-50
+bit-identical to the kill switch *for the right reason*, rather than differing by a renormalization ULP
+on a pie that does not sum to exactly 1.0. (Same idiom as S57's `TiltInteriorDiet`: a renormalize by ×1
+can still perturb float bits.) **Conservation lives PRE-renormalization** — raw removed equals raw
+added, so `DriveGateTrace.RawSum` is 1.0 within tolerance on any normalized input; the renormalize is
+float hygiene ONLY, never the conservation mechanism, and Phase 65 asserts the raw sum rather than
+trusting the final one.
+
+**The bypass is a real branch.** `DefenderPicker.Pick` is a **pure same-number slot map** — it does NOT
+substitute another body when that slot is empty. So a shooter can have four defenders on the floor and
+still have no man; that is a genuine bypass, distinct from the `populated == 0` short-circuit upstream,
+and the gate does **not** fall back to a phantom default-50 defender. *Flagged call (S59, logged not
+acted on):* `DefenderPicker`'s own note says to promote the pick to a carried
+`PossessionState.DefenderSlot` once a SECOND door consumes it — this gate is that second door. Not
+promoted: the pick is a pure deterministic slot map, so both doors compute the same man and cannot
+disagree. The promotion becomes real the moment the pick turns mismatch-hunting.
+
+**Config — 11 knobs on `MatchupConfig`, all in the `"Matchup"` section of `config.json`.**
+`DriveBeatFirstStepWeight` 0.62 / `DriveBeatQuicknessWeight` 0.38 (each finite and ≥ 0 individually
+**before** the sum check, then summing to 1.0 within the house Eps — never an exact binary `==`);
+`DriveHandleUnlockLo` 28.0 / `DriveHandleUnlockHi` 48.0 (Hi > Lo); `DriveGateSteepness` 1.0 (**≥ 0 — 0
+is intentionally legal**, a redundant kill state alongside Cap = 0); `DriveGateExponent` 1.4 (> 0);
+`DriveGateTanhRef` 1.5 (> 0); `DriveGateCap` 0.55 (**[0,1]; 0 = the KILL SWITCH**);
+`DriveGateShortEligibility` 0.45 ([0,1]); `DriveOrientPostnessPivot` 46.0 / `DriveOrientPostnessRange`
+26.0 (> 0). `REF_SCALE` reuses the existing `ReferenceScale` — no twin. **Every magnitude is a
+calibration PLACEHOLDER**: the shape is signed off (archetype table + golden), the numbers are tuned
+later on the season page with a real population and are never suite-asserted.
+
+**Known property — the gate is NOT level-neutral below rating ~48 (a SPEC property, not a port bug).**
+The unlock ramp is anchored at **28→48 in absolute rating points**, but it multiplies a composite that is
+then compared against a **raw** `PerimeterDefense`. Above 48 the unlock is maxed and the comparison is
+honest. Below it, the offense's number is scaled down while the defense's is not — so a **uniformly
+rated** world, where nobody holds an edge, is walled anyway: all-30 → `DriveTools` 3 vs perimD 30 (rim
+28% → 18%); all-40 → 24 vs 40 (rim 28% → 23%); 48+ → exactly neutral. Invisible in the archetype table
+because every signed-off archetype sits at 44 or above. It bumps into the **relative-engine** principle
+(same drama at D3 as D1) and the D3 flavor ruling ("small and unathletic, NOT unskilled — can
+legitimately score 90–110"): the synthetic WeakVsWeak stress bucket fell 0.787 → 0.758 PPP, rim 26% →
+22%. Far milder on the real divvy'd population (rim 36.3% → 33.8% league-scale), because generated
+players are not rated in the low 30s the way that stress roster is. **Ruled ship-as-is (S59)** — an
+anchor/magnitude question waits for a real population per the page-only calibration principle. It is the
+**first item for the Pass A tuning pass**; measuring the unlock against a population reference instead of
+a fixed 28–48 would be a spec change and its own session.
+
+**Validation.** Phase 65 (Session 59), 42 assertions: golden parity (13 cases at 1e-12 on the after-pie
+AND the internals, constants cross-checked against live config first, bypass exercised through the
+null-matched path); the oracle's structural invariants ported (bit-exact gap-0 identity; conservation;
+monotone in perimD and in drive tools, each stated against **named outputs** — removal *and* post-gate
+Rim; suppression-primary; first-step-beats-handle stated concretely; post-immune/guard-eligible; Mid
+bit-untouched; raw pre-renorm conservation; both-zero 50/50; both kill switches; the identity branch;
+bypass); wiring proofs the oracle cannot do (flat-50 end-to-end bit-identity vs Cap-0; the null-matched
+bypass with a phantom-defender tripwire and a positive control; the walled guard end-to-end; the gate
+surviving `ApplyDietShift` at real usage; the post scorer untouched end-to-end; the soft-paint override);
+12 config-guard throws + both legal kill states. Green on Emmett's machine. **Drift audit:** Phase 9
+(d2) moved as predicted (rim 53.196% → 45.398%, still inside its 6pp band — an average creator vs a
+perimD-65 man is exactly who this gate should wall); observation/stress/season moved as sanctioned
+real-population runs; Phase 56 and every flat-50 anchor unmoved; no unexplained mover.

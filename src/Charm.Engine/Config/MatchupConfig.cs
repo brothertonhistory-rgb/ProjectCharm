@@ -563,6 +563,70 @@ public sealed class MatchupConfig
     /// still gets. Must be finite and in [0,1] (enforced in Load).</summary>
     public double WingStealPerimFloor { get; set; } = 0.20;
 
+    // --- Session 59 — Pass A: the perimeter-defense DRIVE GATE (Roll G, shot DIET only) ---
+    // Eleven knobs feeding Matchup.DriveTools / DriveOrientation / ApplyDriveGate. The gap
+    // normalizer is the shared ReferenceScale — deliberately NOT a twin. DriveGateCap = 0 is
+    // the kill switch: the identity branch returns the displaced pie untouched, bit-for-bit
+    // (DriveGateSteepness = 0 is a second, redundant kill state and is intentionally legal).
+    // Every magnitude is a CALIBRATION PLACEHOLDER, page-tuned after the build and NEVER
+    // suite-asserted; the SHAPE is signed off (archetype table + tools/drive_gate_golden.json).
+
+    /// <summary>Weight on FirstStep in the drive-tools beat. The PRIMARY term — first step
+    /// beats the man; Quickness only supports. Paired with
+    /// <see cref="DriveBeatQuicknessWeight"/>: each must be finite and &gt;= 0, and the two
+    /// must sum to 1.0 within the house tolerance (enforced in Load).</summary>
+    public double DriveBeatFirstStepWeight { get; set; } = 0.62;
+
+    /// <summary>Weight on Quickness in the drive-tools beat — the support term, deliberately
+    /// smaller than <see cref="DriveBeatFirstStepWeight"/>. Must be finite and &gt;= 0, and
+    /// the pair must sum to 1.0 within the house tolerance (enforced in Load).</summary>
+    public double DriveBeatQuicknessWeight { get; set; } = 0.38;
+
+    /// <summary>BallHandling at/below which the drive-tools unlock is 0 — no handle, no
+    /// drive, however quick the first step. Must be finite and &lt;
+    /// <see cref="DriveHandleUnlockHi"/> (enforced in Load).</summary>
+    public double DriveHandleUnlockLo { get; set; } = 28.0;
+
+    /// <summary>BallHandling at/above which the drive-tools unlock is fully 1 — the handle is
+    /// a permission slip, not a scoring edge, so more handle above this changes the composite
+    /// by exactly 0. Must be finite and &gt; <see cref="DriveHandleUnlockLo"/> (enforced in
+    /// Load).</summary>
+    public double DriveHandleUnlockHi { get; set; } = 48.0;
+
+    /// <summary>Steepness of the suppression GapFn (wall side only). 0 is intentionally
+    /// LEGAL — it yields no suppression, a redundant kill state alongside
+    /// <see cref="DriveGateCap"/> = 0. Must be finite and &gt;= 0 (enforced in Load).</summary>
+    public double DriveGateSteepness { get; set; } = 1.0;
+
+    /// <summary>Exponent of the suppression GapFn (convex, flat-bottomed). Must be finite and
+    /// &gt; 0 (enforced in Load).</summary>
+    public double DriveGateExponent { get; set; } = 1.4;
+
+    /// <summary>Softness of the tanh saturating the suppression shift, so an extreme mismatch
+    /// approaches but never exceeds <see cref="DriveGateCap"/>. Must be finite and &gt; 0
+    /// (enforced in Load).</summary>
+    public double DriveGateTanhRef { get; set; } = 1.5;
+
+    /// <summary>The ceiling: the maximum fraction of gate-eligible paint an elite wall can
+    /// remove. 0 is the KILL SWITCH (legal — the identity branch returns the displaced pie
+    /// untouched). Must be finite and in [0,1] (enforced in Load).</summary>
+    public double DriveGateCap { get; set; } = 0.55;
+
+    /// <summary>How much of the Short zone is drive-derived and therefore gate-eligible.
+    /// Below 1 on purpose: floaters come off a drive, post-ups and cuts do not. Must be finite
+    /// and in [0,1] (enforced in Load).</summary>
+    public double DriveGateShortEligibility { get; set; } = 0.45;
+
+    /// <summary>Offense-side postness ((Height+Strength+PostMoves)/3) at/below which drive
+    /// orientation is fully 1 — a pure perimeter player. See
+    /// <see cref="Matchup.DriveOrientation"/>. Must be finite (enforced in Load).</summary>
+    public double DriveOrientPostnessPivot { get; set; } = 46.0;
+
+    /// <summary>Offense-side postness span over which drive orientation slides from 1 down to
+    /// 0 (a post scorer, immune to a perimeter wall). Must be finite and &gt; 0 (enforced in
+    /// Load).</summary>
+    public double DriveOrientPostnessRange { get; set; } = 26.0;
+
     // --- Session 58 — wingspan attribution tilt (StealerPicker), mirrors the Hustle tilt ---
 
     /// <summary>Steepness of the per-player wingspan tilt in <see cref="StealerPicker"/>
@@ -981,6 +1045,52 @@ public sealed class MatchupConfig
         if (!double.IsFinite(cfg.WingStealPerimFloor) || cfg.WingStealPerimFloor < 0.0 || cfg.WingStealPerimFloor > 1.0)
             throw new InvalidOperationException(
                 $"WingStealPerimFloor must be finite and in [0,1]: got {cfg.WingStealPerimFloor}.");
+
+        // --- Session 59 — drive-gate invariants. Each beat weight is checked finite and >= 0
+        // INDIVIDUALLY BEFORE the sum check, so a NaN or a +1.38/-0.38 pair fails on the real
+        // fault rather than sneaking through a sum that happens to land on 1.0. The sum is
+        // compared within the house Eps, never by exact binary ==. ---
+        if (!double.IsFinite(cfg.DriveBeatFirstStepWeight) || cfg.DriveBeatFirstStepWeight < 0.0)
+            throw new InvalidOperationException(
+                $"DriveBeatFirstStepWeight must be finite and >= 0: got {cfg.DriveBeatFirstStepWeight}.");
+        if (!double.IsFinite(cfg.DriveBeatQuicknessWeight) || cfg.DriveBeatQuicknessWeight < 0.0)
+            throw new InvalidOperationException(
+                $"DriveBeatQuicknessWeight must be finite and >= 0: got {cfg.DriveBeatQuicknessWeight}.");
+        if (Math.Abs(cfg.DriveBeatFirstStepWeight + cfg.DriveBeatQuicknessWeight - 1.0) > Eps)
+            throw new InvalidOperationException(
+                "DriveBeatFirstStepWeight + DriveBeatQuicknessWeight must sum to 1.0: got " +
+                $"{cfg.DriveBeatFirstStepWeight + cfg.DriveBeatQuicknessWeight}.");
+        if (!double.IsFinite(cfg.DriveHandleUnlockLo))
+            throw new InvalidOperationException(
+                $"DriveHandleUnlockLo must be finite: got {cfg.DriveHandleUnlockLo}.");
+        if (!double.IsFinite(cfg.DriveHandleUnlockHi) || cfg.DriveHandleUnlockHi <= cfg.DriveHandleUnlockLo)
+            throw new InvalidOperationException(
+                "DriveHandleUnlockHi must be finite and > DriveHandleUnlockLo: got " +
+                $"Hi={cfg.DriveHandleUnlockHi}, Lo={cfg.DriveHandleUnlockLo}.");
+        // 0 is INTENTIONALLY legal — no suppression, a redundant kill state alongside Cap = 0.
+        if (!double.IsFinite(cfg.DriveGateSteepness) || cfg.DriveGateSteepness < 0.0)
+            throw new InvalidOperationException(
+                $"DriveGateSteepness must be finite and >= 0: got {cfg.DriveGateSteepness}.");
+        if (!double.IsFinite(cfg.DriveGateExponent) || cfg.DriveGateExponent <= 0.0)
+            throw new InvalidOperationException(
+                $"DriveGateExponent must be finite and > 0: got {cfg.DriveGateExponent}.");
+        if (!double.IsFinite(cfg.DriveGateTanhRef) || cfg.DriveGateTanhRef <= 0.0)
+            throw new InvalidOperationException(
+                $"DriveGateTanhRef must be finite and > 0: got {cfg.DriveGateTanhRef}.");
+        // 0 is LEGAL — the kill switch.
+        if (!double.IsFinite(cfg.DriveGateCap) || cfg.DriveGateCap < 0.0 || cfg.DriveGateCap > 1.0)
+            throw new InvalidOperationException(
+                $"DriveGateCap must be finite and in [0,1]: got {cfg.DriveGateCap}.");
+        if (!double.IsFinite(cfg.DriveGateShortEligibility)
+            || cfg.DriveGateShortEligibility < 0.0 || cfg.DriveGateShortEligibility > 1.0)
+            throw new InvalidOperationException(
+                $"DriveGateShortEligibility must be finite and in [0,1]: got {cfg.DriveGateShortEligibility}.");
+        if (!double.IsFinite(cfg.DriveOrientPostnessPivot))
+            throw new InvalidOperationException(
+                $"DriveOrientPostnessPivot must be finite: got {cfg.DriveOrientPostnessPivot}.");
+        if (!double.IsFinite(cfg.DriveOrientPostnessRange) || cfg.DriveOrientPostnessRange <= 0.0)
+            throw new InvalidOperationException(
+                $"DriveOrientPostnessRange must be finite and > 0: got {cfg.DriveOrientPostnessRange}.");
         if (!double.IsFinite(cfg.WingspanStealerScale) || cfg.WingspanStealerScale <= 0.0)
             throw new InvalidOperationException(
                 $"WingspanStealerScale must be finite and > 0: got {cfg.WingspanStealerScale}.");

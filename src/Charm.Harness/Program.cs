@@ -233,6 +233,7 @@ internal static partial class Program
         ok &= Phase62UnforcedTurnoverCheck(configPath);         // Phase 62 (S56: unforced-turnover handling curve, golden parity)
         ok &= Phase63PostMovesInteriorCheck(configPath);        // Phase 63 (S57: PostMoves interior self-creation — diet tilt + resistance + assist discount)
         ok &= Phase64StealFloorCheck(configPath);               // Phase 64 (S58: live steal-forcing floor — athleticism mismatch + perimeter wingspan, golden parity)
+        ok &= Phase65DriveGateCheck(configPath);                // Phase 65 (S59: perimeter-defense drive gate — per-man rim-access wall in Roll G, golden parity)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

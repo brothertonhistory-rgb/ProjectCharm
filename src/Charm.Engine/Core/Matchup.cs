@@ -1042,6 +1042,168 @@ public static class Matchup
          + cfg.WingStealWeight * Math.Tanh(wingSigned / cfg.WingStealScale);
 
     // =========================================================================
+    // Session 59 — Pass A: the perimeter-defense DRIVE GATE (Roll G, shot DIET only)
+    //
+    // LOCKED-SPEC PORT — constant-for-constant mirror of tools/drive_gate_oracle.py.
+    // If the C# and the oracle ever disagree, THE ORACLE WINS: a Phase 65 parity failure
+    // is a PORT BUG, never a tolerance to widen and never a fixture to regenerate.
+    // Every magnitude below is a CALIBRATION PLACEHOLDER (page-tuned later, never
+    // suite-asserted).
+    //
+    // WHAT IT IS. A per-man location transform applied AFTER displacement and BEFORE the
+    // usage diet shift: given a shooter's post-displacement shot diet and the ONE matched
+    // perimeter defender, it removes some of a perimeter driver's rim/short access and
+    // re-routes it to his contested Long/Three. Shot DIET only — it NEVER touches make%
+    // (no OffenseRating call lives here).
+    //
+    // WHY IT IS PER-MAN, unlike the rest of Roll G. Displacement reads the whole defending
+    // team's shape (where is the defense collectively soft?). This reads exactly ONE
+    // defender, because "can this man get past the guy in front of him" is the single most
+    // one-on-one decision in the possession. The per-man read is deliberately confined to
+    // the drive channel; nothing else in Roll G gains a matched-defender dependency.
+    // =========================================================================
+
+    /// <summary>
+    /// The drive-tools composite (Session 59) — how well this shooter beats his man off the
+    /// dribble. <c>beat = FsW·FirstStep + QW·Quickness</c>, times a handle UNLOCK ramp
+    /// <c>clamp01((BallHandling − HandleLo)/(HandleHi − HandleLo))</c>.
+    ///
+    /// <para><b>The ruling it encodes (Emmett, 2026-07-14): first step BEATS him; the handle
+    /// only UNLOCKS it.</b> The weights are asymmetric on purpose (FirstStep primary,
+    /// Quickness support), so a burst edge buys more than a lateral-quickness edge. The
+    /// handle is a multiplicative gate, not an additive term: an elite handle with no burst
+    /// is walled like an average driver (it scales a mediocre beat), while a quick first
+    /// step with NO handle scores exactly 0 and is walled HARDEST — he never gets the ball
+    /// past the first man (and is turnover-prone elsewhere, via the S56 unforced channel).
+    /// BallHandling at/above HandleHi changes this by exactly 0 — the unlock is capped at 1,
+    /// so a great handle is a permission slip, never a scoring edge.</para>
+    /// </summary>
+    public static double DriveTools(Player shooter, MatchupConfig cfg)
+    {
+        var beat = cfg.DriveBeatFirstStepWeight * shooter.FirstStep
+                 + cfg.DriveBeatQuicknessWeight * shooter.Quickness;
+        var unlock = Math.Clamp(
+            (shooter.BallHandling - cfg.DriveHandleUnlockLo)
+                / (cfg.DriveHandleUnlockHi - cfg.DriveHandleUnlockLo),
+            0.0, 1.0);
+        return beat * unlock;
+    }
+
+    /// <summary>
+    /// Drive ORIENTATION (Session 59) — is this shooter's scoring identity perimeter-based?
+    /// <c>clamp01(1 − (offPostness − Pivot)/Range)</c> over
+    /// <c>offPostness = (Height + Strength + PostMoves)/3</c>. Perimeter guard → 1 (fully
+    /// gate-eligible); post scorer → 0 (immune — the post route is untouched by a perimeter
+    /// wall); point-forward → partial.
+    ///
+    /// <para><b>Deliberately NOT <see cref="Postness"/>.</b> That helper reads
+    /// Height/<b>PostDefense</b>/Strength — a DEFENSE-side "is he a big" read, used by the
+    /// rebounding and wing-steal gates. This one asks an OFFENSE-side question — "is HE a
+    /// post player" — so it must read <b>PostMoves</b>, his post SCORING skill. The two
+    /// agree on most players and diverge exactly where it matters (a post scorer who can't
+    /// guard the post, a rim-protecting big with no post game). Reusing Postness here
+    /// compiles, looks right, and silently breaks the golden's POST-scorer case. Do not.</para>
+    ///
+    /// <para>Only the composite converts the removed mass; orientation only decides WHO is
+    /// eligible for the gate at all.</para>
+    /// </summary>
+    public static double DriveOrientation(Player shooter, MatchupConfig cfg)
+    {
+        var offPostness = (shooter.Height + shooter.Strength + shooter.PostMoves) / 3.0;
+        return Math.Clamp(
+            1.0 - (offPostness - cfg.DriveOrientPostnessPivot) / cfg.DriveOrientPostnessRange,
+            0.0, 1.0);
+    }
+
+    /// <summary>
+    /// The drive gate itself (Session 59) — pure transform, post-displacement pie →
+    /// post-gate pie. Zone order Rim, Short, Mid, Long, Three (the engine's fixed order).
+    ///
+    /// <para><b>Suppression-PRIMARY.</b> <c>gap = DriveTools − matched.PerimeterDefense</c>;
+    /// only the WALL side fires: <c>supp = GapFn(max(0, −gap), …)</c>. Elite D suppresses,
+    /// average is ~neutral, and poor D does NOT help — the weak-defender "leak" is the
+    /// ABSENCE of a wall, never an added bonus. An offense edge (gap ≥ 0) removes exactly 0.</para>
+    ///
+    /// <para><b>The transform.</b> <c>mult = 1 − Cap·tanh(supp/TanhRef)</c> (1.0 = no
+    /// suppression). Remove <c>orient·(1−mult)</c> of Rim and <c>ShortElig·orient·(1−mult)</c>
+    /// of Short — Short is only PARTLY drive-derived (floaters, yes; post-ups and cuts, no),
+    /// hence the eligibility fraction. The removed mass redistributes to the CONTESTED
+    /// Long/Three only, proportional to the shooter's own pre-gate outer preference (equal
+    /// 50/50 when both outer zones are exactly zero). <b>Mid NEVER moves</b> — a denied drive
+    /// becomes a contested jumper from distance, not a pull-up. (The "passed it / lost the
+    /// possession" outcome is Pass B, not here.)</para>
+    ///
+    /// <para><b>IDENTITY BRANCH.</b> When <c>removed &lt;= 0</c> — nothing to move: orient 0
+    /// (post scorer), suppression 0 (gap ≥ 0, or a flat-50 world), Cap 0 (the kill switch),
+    /// no eligible Rim/Short mass, or a null matched defender (bypass) — the INPUT array is
+    /// returned untouched: no subtract-0, no redistribute-0, no renormalize. This is what
+    /// makes a LIVE gate at flat-50 bit-identical to the Cap-0 kill switch for the RIGHT
+    /// reason, rather than differing by a renormalization ULP on a pie that does not sum to
+    /// exactly 1.0.</para>
+    ///
+    /// <para><b>Conservation lives PRE-renormalization.</b> The raw removed mass equals the
+    /// raw added mass, so <see cref="DriveGateTrace.RawSum"/> is 1.0 within tolerance on any
+    /// normalized input. The renormalize that follows is float hygiene ONLY — never the
+    /// conservation mechanism (Phase 65 asserts the raw sum, not just the final one).</para>
+    ///
+    /// <para><paramref name="matchedDefender"/> is the same-number defending slot resolved by
+    /// <see cref="DefenderPicker"/>; a null (that slot is empty) is the BYPASS — the gate does
+    /// NOT fall back to a phantom default-50 defender.</para>
+    /// </summary>
+    public static DriveGateTrace ApplyDriveGate(
+        IReadOnlyList<double> pie5, Player shooter, Player? matchedDefender, MatchupConfig cfg)
+    {
+        if (pie5.Count != 5)
+            throw new InvalidOperationException(
+                $"ApplyDriveGate: pie5 must have exactly 5 entries (got {pie5.Count}).");
+
+        var input = new double[5];
+        for (var i = 0; i < 5; i++) input[i] = pie5[i];
+
+        // BYPASS — no matched man (empty defending slot), FastBreak, or zero populated
+        // defenders (the last two already returned upstream in RollGGenerator).
+        if (matchedDefender is null)
+            return new DriveGateTrace(0.0, 0.0, 0.0, 1.0, 0.0, 1.0, true, input);
+
+        var comp   = DriveTools(shooter, cfg);
+        var gap    = comp - matchedDefender.PerimeterDefense;
+        var supp   = GapFn(Math.Max(0.0, -gap),
+                           cfg.DriveGateSteepness, cfg.DriveGateExponent, cfg.ReferenceScale);
+        var mult   = 1.0 - cfg.DriveGateCap * Math.Tanh(supp / cfg.DriveGateTanhRef);
+        var orient = DriveOrientation(shooter, cfg);
+
+        var rimRemoved   = input[0] * orient * (1.0 - mult);
+        var shortRemoved = input[1] * cfg.DriveGateShortEligibility * orient * (1.0 - mult);
+        var removed      = rimRemoved + shortRemoved;
+
+        // IDENTITY BRANCH — see the summary. Return the INPUT untouched.
+        if (removed <= 0.0)
+            return new DriveGateTrace(comp, gap, orient, mult, 0.0, 1.0, false, input);
+
+        var after = new double[5];
+        for (var i = 0; i < 5; i++) after[i] = input[i];
+        after[0] -= rimRemoved;
+        after[1] -= shortRemoved;
+
+        // Redistribute to the contested outer zones ONLY (Long = 3, Three = 4), proportional
+        // to the shooter's pre-gate outer preference. Both-zero is a REAL branch, not a
+        // divide-by-zero guard bolted on: with no outer preference to read, the denied drive
+        // splits evenly rather than vanishing.
+        var outerLong  = input[3];
+        var outerThree = input[4];
+        var outerSum   = outerLong + outerThree;
+        if (outerSum <= 0.0) { outerLong = 1.0; outerThree = 1.0; outerSum = 2.0; }
+        after[3] += removed * outerLong  / outerSum;
+        after[4] += removed * outerThree / outerSum;
+
+        var rawSum = 0.0;
+        for (var i = 0; i < 5; i++) rawSum += after[i];      // conservation lives HERE, pre-renorm
+        for (var i = 0; i < 5; i++) after[i] /= rawSum;      // renormalize = float hygiene only
+
+        return new DriveGateTrace(comp, gap, orient, mult, removed, rawSum, false, after);
+    }
+
+    // =========================================================================
     // Phase 12 — pressure / disruption door (Roll F)
     // =========================================================================
 
@@ -1406,3 +1568,34 @@ public static class Matchup
            + cfg.BlkWingspan(zone)         * p.Wingspan
            + cfg.BlkVertical(zone)         * p.Vertical;
 }
+
+/// <summary>
+/// The Session 59 drive-gate trace — every internal the Phase 65 golden pins, so a port bug
+/// fails at the stage that broke rather than only at the final pie. Mirrors the dict the
+/// locked oracle's <c>gate()</c> returns alongside its pie.
+/// </summary>
+/// <param name="Composite">The shooter's drive-tools read
+/// (<see cref="Matchup.DriveTools"/>) — 0 on the bypass path.</param>
+/// <param name="Gap">Composite − matched defender's PerimeterDefense. Positive = the
+/// offense beats his man (no suppression); negative = walled.</param>
+/// <param name="Orient">Perimeter-orientation eligibility
+/// (<see cref="Matchup.DriveOrientation"/>): 1 = guard, 0 = post scorer (immune).</param>
+/// <param name="SuppressionMult">1 − Cap·tanh(supp/TanhRef). 1.0 = no suppression.</param>
+/// <param name="Removed">Total pie mass taken off Rim + eligible Short. Exactly 0 on the
+/// identity branch and on bypass.</param>
+/// <param name="RawSum">The pie sum BEFORE renormalization — where conservation actually
+/// lives. 1.0 (within tolerance) on any normalized input; pinned to 1.0 on the identity and
+/// bypass branches, which never renormalize.</param>
+/// <param name="Bypass">True when there was no matched man (empty defending slot). The
+/// FastBreak and zero-defender paths return before Roll G ever calls the gate.</param>
+/// <param name="Final">The post-gate five shares handed on to the usage diet shift. On the
+/// identity and bypass branches this is the INPUT array, untouched.</param>
+public readonly record struct DriveGateTrace(
+    double Composite,
+    double Gap,
+    double Orient,
+    double SuppressionMult,
+    double Removed,
+    double RawSum,
+    bool Bypass,
+    double[] Final);

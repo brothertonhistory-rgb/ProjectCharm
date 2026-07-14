@@ -71,6 +71,12 @@
     <None Include="..\..\tools\steal_floor_golden.json" Link="tools\steal_floor_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Perimeter-defense drive-gate golden fixture (emitted by tools/drive_gate_oracle.py,
+         S59), copied beside the binary so the Phase 65 golden parity reads it from
+         AppContext.BaseDirectory (same convention). -->
+    <None Include="..\..\tools\drive_gate_golden.json" Link="tools\drive_gate_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- Pass-2 generation replay fixture (emitted by the oracle's fixture switch in
          tools/gen_pass2_skillfirst_oracle.py, S42.2), copied beside the binary so
          RunGenPass2ReplayParity reads it from AppContext.BaseDirectory (same convention). -->

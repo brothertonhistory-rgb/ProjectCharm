@@ -188,10 +188,32 @@ public sealed class RollGGenerator : IRollGGenerationProvider
         var trace = Matchup.DeriveDisplacement(
             coached, shooter, dispDefenders, state.UsagePressure ?? 0.0, _matchup);
 
+        // Session 59 — Pass A: the perimeter-defense DRIVE GATE. Composes on trace.Final (the
+        // DISPLACED pie, no usage shift yet) and BEFORE ApplyDietShift — that placement is
+        // what the Phase 65 golden's fixed "before" pies prove, and it is the whole point:
+        // displacement reads where the defending TEAM is soft, then the gate lets the ONE
+        // matched man override that invitation. A lockdown defender keeps his man out of a
+        // paint the team shape just invited him into. Shot DIET only; make% is untouched.
+        //
+        // The matched defender is the make door's own convention — DefenderPicker's pure
+        // same-number slot map. It does NOT substitute another body when that slot is empty,
+        // so a null here is a REAL bypass (identity), distinct from the populated == 0
+        // short-circuit above: four defenders can be on the floor and this shooter still have
+        // no man. Never gate against a phantom default-50 defender.
+        //
+        // Flagged call (Session 59, logged not acted on): DefenderPicker's own note says to
+        // promote the pick to a carried PossessionState.DefenderSlot once a SECOND door
+        // consumes it — this gate is that second door. Deliberately NOT promoted here: the
+        // pick is a pure deterministic slot map, so both doors compute the same man and cannot
+        // disagree. The promotion becomes real the moment the pick turns mismatch-hunting.
+        var matchedSlot     = DefenderPicker.Pick(state);
+        var matchedDefender = defendingRoster.PlayerAt(matchedSlot);
+        var gated           = Matchup.ApplyDriveGate(trace.Final, shooter, matchedDefender, _matchup);
+
         // Apply usage-driven diet shift (Phase 17 addition) — unchanged,
         // downstream, LAST. The derivation's final shares land exactly where
         // bentNorm went pre-Session-36.
-        var (finalPie, residual) = ApplyDietShift(state, shooter, trace.Final);
+        var (finalPie, residual) = ApplyDietShift(state, shooter, gated.Final);
         return new RollGGeneration(finalPie, residual, trace.Level);
     }
 

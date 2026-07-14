@@ -971,6 +971,22 @@ only when a rim deterrent is waiting to punish the shots you funnel inside.** Do
 defense value in isolation. This is exactly why the balanced defense works and a pure perimeter wall
 does not.
 
+> **STATUS (S59, 2026-07-14) — the wire that answers this has LANDED; the curve above is NOT yet
+> re-measured.** The finding's *mechanism* diagnosis drove the three-pass rim-access design, and
+> **Pass A shipped (S59/P65)**: `Matchup.ApplyDriveGate`, a per-man drive gate in Roll G that lets the
+> matched on-ball defender remove part of a walled perimeter driver's rim/short access and re-route it
+> to a contested Long/Three (diet only — no make% wire). On the real divvy'd population it moves
+> league-scale rim 36.3% → 33.8% and three 36.0% → 38.7%. **But the numbers in this section were
+> measured on the pre-gate engine and stand as-is until the PerimeterDefense stack walk is re-run** —
+> the two S54 sub-results most likely to move are "B.PTS barely moves" (the gate now funnels toward
+> *worse* shots, not better ones) and "uncovered men never gain volume" (which is Pass B's job, not
+> Pass A's, and so should still hold). **Retirement requires a re-measurement, not a wire** — the exact
+> S50→S55→S55.1 pattern (S55 shipped the height term; the "length buys almost no scoring" finding was
+> retired only after S55.1 re-ran the sweeps and diffed the curves). Queued, not claimed. Two further
+> caveats for whoever re-measures: Passes B and C are still unbuilt, so this is a partial answer; and
+> the gate is **not level-neutral below rating ~48** (see status.md Open — an absolute unlock anchor
+> inside a relative comparison), which will bias any low-rated bench world downward.
+
 **Help defense compounds cleanly.** The help stack lowers the make itself rather than relocating the
 shot, so it compounds **roughly linearly** with no point-neutral problem: B.PTS 52.9 → 52.3 → 51.6 →
 50.9 → **49.5** at five helpers, covered men's interior FG% falling every rung.
