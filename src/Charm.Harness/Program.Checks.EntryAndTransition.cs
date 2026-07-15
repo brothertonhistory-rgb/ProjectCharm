@@ -1833,7 +1833,10 @@ internal static partial class Program
         {
             var pie = Generate(state);
             var finalShares = new double[] { 0.2, 0.2, 0.2, 0.2, 0.2 };
-            return new RollEGeneration(pie, finalShares, new double[5]);
+            // Zero pressures AND zero reliefs (S60): the spy models no usage at all, and
+            // its flat 0.2 shares sit exactly on the equal-share pivot anyway — both terms
+            // would compute to 0.0 even if it did.
+            return new RollEGeneration(pie, finalShares, new double[5], new double[5]);
         }
 
         // Tilt passthrough — spy returns the pie unchanged (no attention modelling in test helper).

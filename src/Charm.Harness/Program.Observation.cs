@@ -80,7 +80,7 @@ internal static partial class Program
         var selRng = new SystemRng(cfg.Seed);
         for (var i = 0; i < 8; i++)
         {
-            var r = (Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, selRng);
+            var r = (Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, selRng);
             var s = r.State.SelectedSlot!.Value;
             Console.WriteLine(
                 $"  proceed -> selected {s.Side} slot {s.Number} | next={r.Next}");
@@ -102,7 +102,7 @@ internal static partial class Program
         for (var i = 0; i < 8; i++)
         {
             // Select a player first (Roll E), then resolve the action (Roll F).
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, actRng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, actRng)).State;
             var r = (Continue)RollF.Execute(selected, pieF, actRng);
             var s = r.State.SelectedSlot!.Value;
             Console.WriteLine(
@@ -130,7 +130,7 @@ internal static partial class Program
         {
             // Walk E -> G to deliver a fully-stamped pre-H state, generate the pie
             // for THAT shot's zone, then resolve H.
-            var selectedH = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, shotRng)).State;
+            var selectedH = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, shotRng)).State;
             var withZone = ((Continue)RollG.Execute(selectedH, genGForH.Generate(selectedH), 0.0, shotRng)).State;
             var pieH = genH.Generate(withZone);
             var hr = RollH.Execute(withZone, pieH, shotRng);
@@ -166,7 +166,7 @@ internal static partial class Program
         while (shown < 8 && guard++ < 100000)
         {
             // Walk E -> G -> H; only act on a Miss (the one outcome that feeds I).
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, obsGameI, reboundRng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, obsGameI, reboundRng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genGForH.Generate(sel), 0.0, reboundRng)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), reboundRng);
             if (hRes is not Continue { Next: ContinuationKind.ResolveRebound } missCont) continue;

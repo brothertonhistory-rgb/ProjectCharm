@@ -59,14 +59,20 @@ public sealed class RollEGenerator : IRollEGenerationProvider
     }
 
     /// <summary>
-    /// Generate the selection pie AND per-slot volume pressures in one pass.
-    /// Pressure[i] = max(0, finalShares[i] − 1.0/populatedCount). Zero for
-    /// null/FastBreak slots. This is the method the resolver calls; the base
-    /// interface's <see cref="Generate"/> delegates here.
+    /// Generate the selection pie AND per-slot volume pressures/reliefs in one pass.
+    /// Pressure[i] = max(0, finalShares[i] − 1.0/populatedCount);
+    /// Relief[i]   = max(0, 1.0/populatedCount − finalShares[i])   (Session 60).
+    /// Both zero for null/FastBreak slots, and exactly one of them is non-zero for
+    /// any populated slot off the equal share — same pivot, same shares, one pass.
+    /// This is the method the resolver calls; the base interface's
+    /// <see cref="Generate"/> delegates here.
     /// </summary>
     public RollEGeneration GenerateWithPressure(PossessionState state)
     {
-        // FastBreak passthrough — all pressures zero (no volume load on a transition).
+        // FastBreak passthrough — all pressures AND reliefs zero. Same ruling on both
+        // sides: a transition possession carries no volume load, so there is nothing to
+        // tax and, symmetrically, no light halfcourt load to reward. Keeps every break
+        // bit-identical to pre-S60 (Roll H skips C1/C2/C4 on FastBreak for the same reason).
         if (state.FastBreak)
         {
             var transWeights = new Dictionary<SelectionOutcome, double>
@@ -83,7 +89,7 @@ public sealed class RollEGenerator : IRollEGenerationProvider
             var transShares = new double[5];
             for (var i = 0; i < 5; i++)
                 transShares[i] = transWeights[outcomes[i]];
-            return new RollEGeneration(transPie, transShares, new double[5]);
+            return new RollEGeneration(transPie, transShares, new double[5], new double[5]);
         }
 
         // Read five offense players
@@ -103,6 +109,8 @@ public sealed class RollEGenerator : IRollEGenerationProvider
         var populated = 0;
         foreach (var p in players) if (p is not null) populated++;
 
+        // Empty lineup — no players, so nothing to tax and nobody to relieve. Both
+        // arrays stay zero (the pie falls back to the configured base weights).
         if (populated == 0)
         {
             var baseWeights = new Dictionary<SelectionOutcome, double>
@@ -118,7 +126,7 @@ public sealed class RollEGenerator : IRollEGenerationProvider
             var baseShares   = new double[5];
             for (var i = 0; i < 5; i++)
                 baseShares[i] = baseWeights[outcomes2[i]];
-            return new RollEGeneration(basePie, baseShares, new double[5]);
+            return new RollEGeneration(basePie, baseShares, new double[5], new double[5]);
         }
 
         // Compute raw usage scores
@@ -188,13 +196,24 @@ public sealed class RollEGenerator : IRollEGenerationProvider
         // Apply floor + rail (constrained redistribution)
         shares = ApplyFloorAndRail(shares, expScores, populated);
 
-        // ── Compute volume pressures (one pass, same shares array) ────────────
-        // pressure[i] = max(0, finalShare[i] − equalShare)
-        // equalShare  = 1.0 / populated. Null/empty slots stay 0.
-        var comfortShare = 1.0 / populated;
-        var pressures    = new double[5];
+        // ── Compute volume pressures AND reliefs (one pass, same shares array) ─
+        // pressure[i] = max(0, finalShare[i] − equalShare)   — carrying MORE than even
+        // relief[i]   = max(0, equalShare − finalShare[i])   — carrying LESS than even
+        // equalShare  = 1.0 / populated. Null/empty slots stay 0 on both.
+        //
+        // Session 60 — the relief is the MIRROR of the Phase 17/27 tax, and it is
+        // computed HERE, in the same pass off the same post-floor/rail `shares`
+        // array, precisely so the two can never disagree about where "equal share"
+        // sits. A relief computed on a different basis (pre-rail, say) would pay a
+        // player for a shortfall the tax does not recognize. Exactly one of the two
+        // is non-zero for any populated slot off the pivot; both are exactly 0 AT it.
+        var pressures = new double[5];
+        var reliefs   = new double[5];
         for (var i = 0; i < 5; i++)
-            pressures[i] = players[i] is not null ? Math.Max(0.0, shares[i] - comfortShare) : 0.0;
+        {
+            pressures[i] = players[i] is not null ? PressureAt(shares[i], populated) : 0.0;
+            reliefs[i]   = players[i] is not null ? ReliefAt(shares[i], populated)   : 0.0;
+        }
 
         // Build the pie
         var allOutcomes = Enum.GetValues<SelectionOutcome>();
@@ -203,8 +222,29 @@ public sealed class RollEGenerator : IRollEGenerationProvider
             weights[allOutcomes[i]] = shares[i];
 
         var pie = new Pie<SelectionOutcome>(weights, _cfg.Epsilon);
-        return new RollEGeneration(pie, shares, pressures);
+        return new RollEGeneration(pie, shares, pressures, reliefs);
     }
+
+    /// <summary>
+    /// The volume TAX term (Phase 17/27): the share carried ABOVE an even load.
+    /// <c>max(0, finalShare − 1.0/populated)</c>. Exactly 0 at and below the pivot.
+    /// <para>Extracted as a named static so the pivot lives in exactly ONE place and the
+    /// harness can probe it at exact points (<c>equalShare ± ε</c>) without a numeric
+    /// transition search. The live generator calls this — the check and the engine cannot
+    /// drift apart.</para>
+    /// </summary>
+    public static double PressureAt(double finalShare, int populated) =>
+        Math.Max(0.0, finalShare - 1.0 / populated);
+
+    /// <summary>
+    /// Session 60 — the volume RELIEF term: the share carried BELOW an even load.
+    /// <c>max(0, 1.0/populated − finalShare)</c>. Exactly 0 at and above the pivot.
+    /// <para>The MIRROR of <see cref="PressureAt"/>, sharing its pivot literally rather
+    /// than by convention: for any share, <c>PressureAt − ReliefAt == finalShare −
+    /// 1.0/populated</c> exactly, and at most one of the two is ever non-zero.</para>
+    /// </summary>
+    public static double ReliefAt(double finalShare, int populated) =>
+        Math.Max(0.0, 1.0 / populated - finalShare);
 
     /// <inheritdoc cref="IRollEPieGenerator.Generate"/>
     public Pie<SelectionOutcome> Generate(PossessionState state) =>
@@ -245,9 +285,10 @@ public sealed class RollEGenerator : IRollEGenerationProvider
     ///
     /// <para>One-pass: attention (<paramref name="attentionShares"/>) is computed from
     /// the pre-tilt FinalShares and never recomputed from the result. Pressures
-    /// (<paramref name="gen"/>.Pressures) are pre-tilt and passed unchanged to
-    /// RollE.Execute — the tilt changes WHICH slot is rolled, not the pressure each
-    /// slot carries.</para>
+    /// (<paramref name="gen"/>.Pressures) AND reliefs (<paramref name="gen"/>.Reliefs)
+    /// are pre-tilt and passed unchanged to RollE.Execute — the tilt changes WHICH slot
+    /// is rolled, not the load each slot carries. Both sides of the usage curve read the
+    /// same pre-tilt basis, so the tilt cannot make the tax and the relief disagree.</para>
     /// </summary>
     public Pie<SelectionOutcome> BendByAttention(
         RollEGeneration gen,

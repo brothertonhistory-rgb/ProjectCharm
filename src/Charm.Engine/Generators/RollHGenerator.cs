@@ -66,6 +66,28 @@ public sealed class RollHGenerator : IRollHPieGenerator
     private readonly MatchupConfig _matchup;
     private readonly GameState _game;
 
+    /// <summary>
+    /// Session 60 — the usage-relief transform, extracted as a named static so the golden
+    /// parity check exercises the SAME code the engine runs, not a second copy of the
+    /// formula. Ported constant-for-constant from tools/usage_relief_oracle.py.
+    /// <para><c>makePctAfterRelief = clamp01(makePctBeforeRelief × (1 + relief × scale))</c>,
+    /// where <paramref name="makePctBeforeRelief"/> is the live Roll H make probability
+    /// AFTER the C3 penalty block and BEFORE the C4 passing converter — the input stage the
+    /// golden fixture names.</para>
+    /// <para><b>True identity branch:</b> relief 0 or scale 0 (the legal kill switch)
+    /// returns the input untouched — no multiply, no clamp. Bit-identical for the right
+    /// reason rather than via a harmless ×1.0.</para>
+    /// </summary>
+    public static double ApplyUsageRelief(double makePctBeforeRelief, double relief, double scale)
+    {
+        if (relief <= 0.0 || scale <= 0.0) return makePctBeforeRelief;
+        var raw = makePctBeforeRelief * (1.0 + relief * scale);
+        // Upper edge only — the term is bonus-only and cannot drive makePct negative. The
+        // clamp is REACHABLE (RimCeiling 0.9527 × 1.11 = 1.0575 for a five-man 9%-share rim
+        // finisher), so it is live production code, not a defensive no-op.
+        return raw > 1.0 ? 1.0 : raw;
+    }
+
     public RollHGenerator(RollHConfig cfg, MatchupConfig matchup, GameState game)
     {
         _cfg     = cfg     ?? throw new ArgumentNullException(nameof(cfg));
@@ -247,13 +269,16 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // If BOTH are zero, this block is branch-skipped — zero-pressure possessions
         // are numerically identical to pre-build behavior (the regression guard).
         //
-        // Attribution note (§5 / §6 observability — six separable values):
+        // Attribution note (§5 / §6 observability — SEVEN separable values; the
+        // seventh is Session 60's relief bonus, the mirror of (4)/(5) below):
         //   (1) matchup baseline     → makePct after logistic (before C1/C2/C3)
         //   (2) C1 bonus             → c1Bonus (≥ 0)
         //   (3) C2 zone penalty      → c2Penalty (≥ 0)
         //   (4) Phase 17 base penalty → without C3: pressure × taxScale + residual × residualScale
         //   (5) C3 incremental       → (amplifier − 1) × base penalty
-        //   (6) final make%          → makePct after all adjustments
+        //   (6) S60 relief bonus     → makePct × (relief × UsageReliefBonusScale), the
+        //                              low-usage half; zero for any at/above-share shooter
+        //   (7) final make%          → makePct after all adjustments
         var usagePressure = state.UsagePressure         ?? 0.0;
         var usageResidual = state.UsageResidualPressure ?? 0.0;
 
@@ -280,6 +305,45 @@ public sealed class RollHGenerator : IRollHPieGenerator
             if (makePct < 0.0) makePct = 0.0;
             if (makePct > 1.0) makePct = 1.0;
         }
+
+        // ── Usage relief: the low-usage half of the usage↔efficiency curve (S60) ─
+        // The MIRROR of the Phase 17/27 volume tax above. That block charges a player
+        // for carrying MORE than his equal share; before S60 nothing paid him for
+        // carrying LESS — every below-share shooter read pressure 0 and a 13%-usage
+        // specialist shot identically to a 20%-usage one.
+        //
+        //   makePct ×= (1.0 + relief × UsageReliefBonusScale)
+        //   relief   = max(0, equalShare − finalShare), stamped by Roll E (null → 0.0)
+        //
+        // Emmett's design ruling (2026-07-14): a light load lets anyone shoot "open
+        // shots" and be somewhat efficient regardless of ratings; fed usage, the ratings
+        // show. MULTIPLICATIVE, so it scales the probability the player already earned
+        // from his matchup — a bad shooter on a light load is still a bad shooter, just a
+        // somewhat more efficient one. Fades to exactly zero at the equal share by
+        // construction (the tax and the relief meet at the same pivot).
+        //
+        // ITS OWN BRANCH — deliberately NOT folded into the C3 gate above, which is
+        // gated `usagePressure > 0.0 || usageResidual > 0.0`: that is exactly the branch a
+        // below-share shooter never enters, so folding the relief in would silently mean it
+        // never fires on the very players it exists for.
+        //
+        // ATTENTION DOES NOT AMPLIFY IT. C3AttentionAmplifier scales the PENALTIES for an
+        // above-share, above-attention shooter. Relief is shot-selection and is
+        // deliberately independent — no attention read here, per the locked shape.
+        //
+        // COMPOUNDS WITH GRAVITY, INTENTIONALLY. C1/C4 read TEAM openness/gravity/spacing
+        // (who is around you); relief reads the shooter's OWN final share (how little load
+        // he carries). Different inputs, so a player with both gets both, multiplicatively.
+        // That is the design ("stats are contextual to teammates" composed with the "open
+        // shots" ruling), not double attribution.
+        //
+        // TRUE IDENTITY BRANCH: relief 0 OR scale 0 (the legal kill switch) skips ALL
+        // arithmetic — bit-identical for the right reason, not via a harmless ×1.0.
+        //
+        // FastBreak: relief is stamped 0.0 on a break (no volume load on a transition), so
+        // this is branch-skipped automatically — the same way C3 is.
+        // Putback: already short-circuited above (line 81) — never reached here.
+        makePct = ApplyUsageRelief(makePct, state.UsageRelief ?? 0.0, _cfg.UsageReliefBonusScale);
 
         // ── Passing converter: bonus-only, attention-independent (C4) ─────────
         // Passing CONVERTS the gravity/spacing advantage into a made shot — it does

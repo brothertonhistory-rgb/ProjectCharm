@@ -16,10 +16,19 @@ namespace Charm.Engine;
 /// <param name="Pressures">Per-slot volume pressure: <c>max(0, FinalShares[i] −
 /// 1.0/populatedCount)</c>. Zero for null/empty/FastBreak slots. Length 5,
 /// indexed 0–4 matching Slot1–Slot5.</param>
+/// <param name="Reliefs">Session 60 — the MIRROR of <paramref name="Pressures"/>:
+/// <c>max(0, 1.0/populatedCount − FinalShares[i])</c>. The load a slot is carrying
+/// BELOW an even share. Zero for null/empty/FastBreak slots, and zero for every
+/// slot at or above the equal share — the two terms meet at the same pivot and
+/// neither exists on the other's side. Computed in the SAME pass, off the SAME
+/// post-floor/rail <paramref name="FinalShares"/> array, so relief and pressure can
+/// never disagree about where "equal share" sits. Length 5, indexed 0–4 matching
+/// Slot1–Slot5.</param>
 public readonly record struct RollEGeneration(
     Pie<SelectionOutcome> Pie,
     double[] FinalShares,
-    double[] Pressures);
+    double[] Pressures,
+    double[] Reliefs);
 
 /// <summary>
 /// Derived interface for Roll E's generator — extends
@@ -40,7 +49,8 @@ public interface IRollEGenerationProvider : IRollEPieGenerator
     /// Generate the selection pie AND the per-slot pressures in one pass.
     /// The pie is identical to what <see cref="IRollEPieGenerator.Generate"/>
     /// would return; the pressures are the volume excess above the equal share
-    /// for each populated slot.
+    /// for each populated slot, and the reliefs (Session 60) are the shortfall
+    /// below it — the same pivot, the same shares, one pass.
     /// </summary>
     RollEGeneration GenerateWithPressure(PossessionState state);
 

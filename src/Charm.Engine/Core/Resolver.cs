@@ -359,6 +359,7 @@ public sealed class Resolver
                                 var breakGenE  = _rollEGenerator.GenerateWithPressure(breakState);
                                 var breakAttn  = _attentionGenerator.Generate(breakState, breakGenE.FinalShares);
                                 result = RollE.Execute(breakState, breakGenE.Pie, breakGenE.Pressures,
+                                    breakGenE.Reliefs,
                                     breakAttn.AttentionShares, breakAttn.TeamBaseOpenness,
                                     breakAttn.TeamGravityLevel, breakAttn.TeamSpacingLevel,
                                     breakAttn.TeamConversionQuality, _game, _rng);
@@ -409,10 +410,12 @@ public sealed class Resolver
                             // Phase 27 Session 2 — selection tilt (halfcourt only).
                             // Bends the usage pie by the (usage intent − defensive attention) gap.
                             // FastBreak: not reached here (handled at IntoHalfcourtSet above).
-                            // Pre-tilt pressures passed unchanged — tilt changes WHICH slot is rolled,
-                            // not the pressure each slot carries (one-pass, no feedback loop).
+                            // Pre-tilt pressures AND reliefs passed unchanged — tilt changes WHICH slot
+                            // is rolled, not the load each slot carries (one-pass, no feedback loop).
+                            // Both halves of the usage curve read the same pre-tilt basis, so the tilt
+                            // cannot make the tax and the relief disagree about the pivot.
                             var tiltedPieE = _rollEGenerator.BendByAttention(genE, attn.AttentionShares, _game, _matchup, c.State);
-                            result = RollE.Execute(c.State, tiltedPieE, genE.Pressures,
+                            result = RollE.Execute(c.State, tiltedPieE, genE.Pressures, genE.Reliefs,
                                 attn.AttentionShares, attn.TeamBaseOpenness,
                                 attn.TeamGravityLevel, attn.TeamSpacingLevel,
                                 attn.TeamConversionQuality, _game, _rng);

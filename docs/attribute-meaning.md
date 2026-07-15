@@ -1343,7 +1343,7 @@ where the fence is. This is also *why* the top of the dial is dead: everyone fro
 already against the fence. Emmett's 40% ceiling is therefore **not a tuning job** — dropping the
 rail to ~0.46 would hit 40% while leaving the dial just as dead, one notch lower.
 
-### Finding 4 — volume is FREE (there is no efficiency cost to usage)
+### Finding 4 — volume is FREE at today's calibration (the tax exists; it is tuned to a whisper)
 
 | rank | usage | **FG%** |
 |---|---|---|
@@ -1352,10 +1352,19 @@ rail to ~0.46 would hit 40% while leaving the dial just as dead, one notch lower
 | 7 | 45.1% | 44.9 |
 | 10 | 45.2% | **45.8** |
 
-Usage climbs 16 points and **shooting goes UP**. The Phase 17 usage diet shift is supposed to be the
-price of volume and is not biting at these levels. This blocks Emmett's ruling directly
+Usage climbs 16 points and **shooting goes UP**. This blocks Emmett's ruling directly
 (2026-07-14): *"I'm not against, in extreme situations, it being higher than that, but it should
-come with a pretty hefty efficiency hit."* That player cannot exist today — nothing charges him.
+come with a pretty hefty efficiency hit."* That player cannot exist at these settings.
+
+**CORRECTED (S60): this is a CALIBRATION failure, not a missing mechanism.** The tax has existed
+since Phase 17 and is live on every above-share shooter: `makePct *= (1 − pressure ×
+PressureVolumeTaxScale)` with the scale at **0.12** — a whisper by choice — plus a residual channel
+(`PressureResidualPenaltyScale` 2.0) that *can* bite hard, but only for a forced specialist under
+defensive attention. The earlier phrasing here and in status.md — *"the mechanism is missing, not
+mis-tuned"* — was **correct on the low side and wrong on the high side**. The honest statement: the
+curve was **half-built, and the built half is tuned to a whisper**. S60 built the missing half (see
+Finding 7); the tax's magnitude remains a page question, deliberately untouched under Emmett's
+anchor ruling.
 
 ### Finding 5 — the dial is dead at BOTH ends, and its authority collapses next to good players
 
@@ -1412,19 +1421,63 @@ that.
 teammates → higher efficiency." **Context changes a player's value; role does not.** Emmett's
 role-player misfits therefore half-exist: the good-team half works, the reduced-role half does not.
 
-**This is the SAME hole as Finding 4, from the other side.** Volume has no price *and* scarcity has
-no reward — one flat usage↔efficiency curve, two impossible players (the ball-hog who should pay,
-the specialist who should benefit). **Emmett's anchor ruling (2026-07-14): the ~31.7% at 43% usage
-is plausibly CORRECT; it is the low-usage end that is wrong.** So the fix anchors the top and lifts
-the bottom — it is not a re-tune of the star.
+**This is the SAME hole as Finding 4, from the other side** — but the two sides are not the same
+kind of problem, and S60 separated them. Scarcity had **no reward at all** (no term existed: every
+below-share player read exactly 0). Volume has a price that is **tuned to a whisper** (the tax is
+live; `PressureVolumeTaxScale` is 0.12). One flat usage↔efficiency curve, two impossible players —
+but one half was *missing* and the other merely *quiet*. **Emmett's anchor ruling (2026-07-14): the
+~31.7% at 43% usage is plausibly CORRECT; it is the low-usage end that is wrong.** So the fix
+anchors the top and lifts the bottom — it is not a re-tune of the star. **Finding 7 records what
+shipped.**
 
-### Loose thread (logged, not chased)
+### Finding 7 — the relief half SHIPPED (S60), and it pays on INTENT, not on touches
 
-With the rail artificially lifted, rank 10 posted 39.0 FG% while rank 9 at *identical* usage (54.3
-vs 54.4) posted 45.1. Not live behavior — it only appears with a non-shipping rail — but the shape
-suggests the usage-pressure penalty may be computed from what a player *wants* rather than what he
-*gets*, so a clamped star could be paying a diet penalty for shots he never takes. Worth ten minutes
-in the Roll E session; not a live bug.
+`UsageRelief = max(0, equalShare − finalShare)` is now stamped by Roll E beside the existing
+pressure and paid by Roll H as a multiplicative make% bonus, `makePct × (1 + relief ×
+UsageReliefBonusScale)`, applied after the C3 penalty block and before the C4 passing converter.
+Magnitude (`UsageReliefBonusScale` = 1.0) is a **placeholder**; the shape is what was signed off.
+Emmett's sniper now exists: at 13.5% usage his 3P goes 37.1 → ~39.5 at the placeholder. Full design
+record in `design.md` (Phase 17 + Session 60) and journal S60.
+
+**The finding that changes how this family is described.** The `shares` array both halves of the
+curve read is **post-floor/rail but PRE-tilt and PRE-denial**. Roll E stamps pressure and relief,
+and *then* the pie is bent twice more — by the Phase 27 attention tilt and the Phase 46 per-slot
+denial. So the curve pays on the share a team's offense **intends** to give a man, not the touches
+he actually gets. Measured on the frozen corpus through the live generator (S60):
+
+| player | share the offense INTENDS | realized FGA share | relief | bonus |
+|---|---|---|---|---|
+| Marcus Webb | 20.06% | 22.7% | 0.0000 | none |
+| DeShawn Pryor | 23.89% | 26.8% | 0.0000 | none |
+| Trey Holloway | 22.76% | 23.6% | 0.0000 | none |
+| Javon Okafor | **18.45%** | **13.5%** | 0.0155 | **+1.6%** |
+| Cory Baptiste | 14.84% | 13.2% | 0.0516 | **+5.2%** |
+
+**Okafor and Baptiste take the same ~13% of the shots and are treated completely differently.**
+Okafor's offense intends 18.45% for him — a hair under even — and the defense strips the other five
+points off him; he earns relief for 1.5 points of shortfall, not the 6.5 he actually plays, and his
++1.6% vanishes into sampling noise on ~7,900 attempts (measured: 52.2 → 52.2, while Baptiste went
+42.2 → 44.0 and Thornton 43.7 → 46.1). Three of the five starters read exactly zero relief.
+
+**So the correct sentence for this family is NOT "low-usage players shoot better." It is "players
+their own offense does not feature shoot better."** They come apart precisely for the man the
+defense takes away. This is symmetric with the tax (which has always read the same basis, so the
+two can never disagree about the pivot) and is therefore not a defect — but it is a real design
+question, logged Open for the calibration page.
+
+**League effect at the placeholder:** FG% 43.73% → 44.03% (+0.30pp), PPP 0.9755 → 0.9814.
+
+### Loose thread — RESOLVED (S60)
+
+*Original (S59.2):* with the rail artificially lifted, rank 10 posted 39.0 FG% while rank 9 at
+*identical* usage (54.3 vs 54.4) posted 45.1, suggesting the usage-pressure penalty might read what
+a player *wants* rather than what he *gets* — a clamped star paying for shots he never takes.
+
+*Verdict (S60, from source):* **half right.** The pivot reads **post-floor/rail** shares — so the
+rail's clamping IS reflected and a railed star is **not** paying for shots the rail took away. But
+it reads **pre-tilt and pre-denial**, so the *defense's* denial is invisible to both sides of the
+curve. The rank-9/10 anomaly is the residual+attention compound, not a wants-vs-gets bug. The
+surviving half of the question is Finding 7's intent-vs-touches item, now Open.
 
 ### Not calibrated here
 

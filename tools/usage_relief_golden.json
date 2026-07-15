@@ -1,0 +1,121 @@
+{
+  "_comment": "S60 usage-relief golden. Emitted from tools/usage_relief_oracle.py. Locks the relief TRANSFORM at a NAMED input stage: makePctBeforeRelief is the live Roll H make probability AFTER the C3 penalty block and BEFORE the C4 passing converter. 'relief' is what Roll E stamps (max(0, 1/populated - finalShare), post-floor/rail shares, the SAME pivot the tax reads); 'pressure' is the EXISTING tax term, carried only to pin the shared pivot \u2014 the tax does not move this session. Magnitude is a CALIBRATION PLACEHOLDER; constants cross-checked vs loaded config before use.",
+  "constants": {
+    "UsageReliefBonusScale": 1.0
+  },
+  "tolerance": 1e-12,
+  "cases": [
+    {
+      "name": "equal-share player (five-man, pivot)",
+      "populated": 5,
+      "finalShare": 0.2,
+      "equalShare": 0.2,
+      "scale": 1.0,
+      "relief": 0.0,
+      "pressure": 0.0,
+      "multiplier": 1.0,
+      "makePctBeforeRelief": 0.45,
+      "makePctAfterRelief": 0.45,
+      "clamped": false,
+      "identity": true
+    },
+    {
+      "name": "13.5%-usage SNIPER (the signed-off row)",
+      "populated": 5,
+      "finalShare": 0.135,
+      "equalShare": 0.2,
+      "scale": 1.0,
+      "relief": 0.065,
+      "pressure": 0.0,
+      "multiplier": 1.065,
+      "makePctBeforeRelief": 0.371,
+      "makePctAfterRelief": 0.395115,
+      "clamped": false,
+      "identity": false
+    },
+    {
+      "name": "five-man 9%-share player (low-share bound)",
+      "populated": 5,
+      "finalShare": 0.09,
+      "equalShare": 0.2,
+      "scale": 1.0,
+      "relief": 0.11000000000000001,
+      "pressure": 0.0,
+      "multiplier": 1.11,
+      "makePctBeforeRelief": 0.42,
+      "makePctAfterRelief": 0.4662,
+      "clamped": false,
+      "identity": false
+    },
+    {
+      "name": "four-man lineup, 9% share (pivot moves)",
+      "populated": 4,
+      "finalShare": 0.09,
+      "equalShare": 0.25,
+      "scale": 1.0,
+      "relief": 0.16,
+      "pressure": 0.0,
+      "multiplier": 1.16,
+      "makePctBeforeRelief": 0.42,
+      "makePctAfterRelief": 0.48719999999999997,
+      "clamped": false,
+      "identity": false
+    },
+    {
+      "name": "above-share star (tax side \u2014 relief 0)",
+      "populated": 5,
+      "finalShare": 0.43,
+      "equalShare": 0.2,
+      "scale": 1.0,
+      "relief": 0.0,
+      "pressure": 0.22999999999999998,
+      "multiplier": 1.0,
+      "makePctBeforeRelief": 0.317,
+      "makePctAfterRelief": 0.317,
+      "clamped": false,
+      "identity": true
+    },
+    {
+      "name": "KILL SWITCH scale=0 at a real relief",
+      "populated": 5,
+      "finalShare": 0.135,
+      "equalShare": 0.2,
+      "scale": 0.0,
+      "relief": 0.065,
+      "pressure": 0.0,
+      "multiplier": 1.0,
+      "makePctBeforeRelief": 0.371,
+      "makePctAfterRelief": 0.371,
+      "clamped": false,
+      "identity": true
+    },
+    {
+      "name": "BOUNDARY synthetic clamp (0.95 x 1.11)",
+      "populated": 5,
+      "finalShare": 0.09,
+      "equalShare": 0.2,
+      "scale": 1.0,
+      "relief": 0.11000000000000001,
+      "pressure": 0.0,
+      "multiplier": 1.11,
+      "makePctBeforeRelief": 0.95,
+      "makePctAfterRelief": 1.0,
+      "clamped": true,
+      "identity": false
+    },
+    {
+      "name": "KILL SWITCH at the clamping-capable input",
+      "populated": 5,
+      "finalShare": 0.09,
+      "equalShare": 0.2,
+      "scale": 0.0,
+      "relief": 0.11000000000000001,
+      "pressure": 0.0,
+      "multiplier": 1.0,
+      "makePctBeforeRelief": 0.95,
+      "makePctAfterRelief": 0.95,
+      "clamped": false,
+      "identity": true
+    }
+  ]
+}

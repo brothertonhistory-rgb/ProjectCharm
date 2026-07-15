@@ -62,8 +62,10 @@ public sealed class RollEStubPieGenerator : IRollEGenerationProvider
         for (var i = 0; i < 5; i++)
             finalShares[i] = weights[outcomes[i]];
 
-        // Pressures always zero on the stub — the flat pie has no usage concentration.
-        return new RollEGeneration(pie, finalShares, new double[5]);
+        // Pressures AND reliefs always zero on the stub — the flat pie has no usage
+        // concentration to tax and no shortfall to relieve (a stub world has no shot
+        // selection). Session 60: the relief array joins the pressure array here.
+        return new RollEGeneration(pie, finalShares, new double[5], new double[5]);
     }
 
     /// <param name="state">The carried possession state. The stub reads ONE field:

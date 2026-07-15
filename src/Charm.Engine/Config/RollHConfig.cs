@@ -259,6 +259,24 @@ public sealed class RollHConfig
     //     [CALIBRATION PLACEHOLDER]
     public double C3AttentionAmplifier { get; set; } = 1.5;
 
+    // ── Usage relief — the low-usage half of the curve (Session 60) ────────────
+    //     The MIRROR of the Phase 17/27 volume tax above. The tax charges a player
+    //     for carrying MORE than his equal share; this pays him for carrying LESS.
+    //         relief   = max(0, equalShare − finalShare)     — stamped by Roll E
+    //         makePct ×= (1.0 + relief × UsageReliefBonusScale)
+    //     Multiplicative and bonus-only; fades to exactly zero at the equal share by
+    //     construction. Attention does NOT amplify it (C3 scales the penalties only).
+    //     The tax side does not move: this dial lifts the bottom, it does not
+    //     re-anchor the top.
+
+    /// <summary>Scale on the usage-relief make% bonus. A five-man 9%-share player has
+    /// relief 0.11, so at scale 1.0 his make% is multiplied by 1.11. Invariant: finite
+    /// and ≥ 0 — <b>0 is the legal kill switch</b> (Roll H takes a true identity branch
+    /// at 0, skipping all relief arithmetic), which is why this is not bounded below by a
+    /// positive number the way <see cref="MaxPassingBonus"/> is. [CALIBRATION
+    /// PLACEHOLDER]</summary>
+    public double UsageReliefBonusScale { get; set; } = 1.0;
+
     // ── Passing converter (Phase 27 Session 2) ────────────────────────────────
     // PassingBonus = MaxPassingBonus × conversionQuality × opportunityGate
     //   opportunityGate = lerp(PassingOpportunityFloor, 1.0, TeamBaseOpenness)
@@ -384,6 +402,16 @@ public sealed class RollHConfig
         if (cfg.MaxPassingBonus <= 0 || cfg.MaxPassingBonus > 1.0)
             throw new InvalidOperationException(
                 $"RollH MaxPassingBonus must be in (0, 1] (got {cfg.MaxPassingBonus}).");
+
+        // Session 60 invariant — usage relief.
+        // Finite and >= 0. Zero is LEGAL and load-bearing: it is the kill switch the
+        // Phase 66 bit-identity checks run against, so this guard must not reject it.
+        // No upper bound — like C3AttentionAmplifier, this is a multiplier, not a
+        // percentage-point ceiling, and the make% clamp settles the top edge.
+        if (!double.IsFinite(cfg.UsageReliefBonusScale) || cfg.UsageReliefBonusScale < 0)
+            throw new InvalidOperationException(
+                $"RollH UsageReliefBonusScale must be finite and >= 0 "
+                + $"(got {cfg.UsageReliefBonusScale}).");
 
         // Session 03 invariants
         // Scale: a make%-point suppressor; [0, 1] is the semantically valid range

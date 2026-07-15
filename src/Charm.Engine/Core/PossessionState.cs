@@ -195,6 +195,32 @@ public sealed record PossessionState(
     /// — a reset restarts selection from scratch, so the stale pressure must
     /// not ride through.</para></param>
     double? UsagePressure = null,
+    /// <param name="UsageRelief">Session 60 — the MIRROR of
+    /// <see cref="UsagePressure"/>, stamped by Roll E in the same `with` block from
+    /// the same generator pass. The selected shooter's <b>volume relief</b> —
+    /// <c>max(0, equalShare − finalShare)</c> — where <c>equalShare = 1.0 /
+    /// populatedCount</c> (five on-court players → 0.20). The load he is carrying
+    /// BELOW an even share.
+    /// <para><b>The design ruling (Emmett, 2026-07-14):</b> a light load lets anyone
+    /// shoot "open shots" and be somewhat efficient regardless of ratings; fed usage,
+    /// the ratings show. Before S60 the engine taxed carrying more than an even share
+    /// but paid nothing for carrying less, so a 13%-usage specialist shot identically
+    /// to a 20%-usage one. This field is the low-usage half of that curve. The tax side
+    /// does NOT move (the anchor ruling: anchor the top, lift the bottom).</para>
+    /// <para>Null until Roll E runs (same lifecycle as <see cref="UsagePressure"/>).
+    /// Non-null means Roll E ran: zero when the selected slot is at or above the equal
+    /// share, or on a FastBreak (no volume load on a transition, so no light load to
+    /// reward either). Positive when the shooter is carrying below an even load. At most
+    /// one of <see cref="UsagePressure"/> and this is non-zero — they meet at the same
+    /// pivot, computed off the same post-floor/rail shares in the same pass, and neither
+    /// exists on the other's side.</para>
+    /// <para>Read ONLY by Roll H's relief-bonus term (a multiplicative make% bonus
+    /// applied after the C3 penalty block, before the C4 passing converter). It does NOT
+    /// feed the shot diet — tendencies own the diet.</para>
+    /// <para><b>Leak guard:</b> cleared to null by Roll K's <c>ResetOffense</c>
+    /// alongside <see cref="UsagePressure"/> — a reset restarts selection from
+    /// scratch, so a stale relief must not ride through.</para></param>
+    double? UsageRelief = null,
     /// <param name="UsageResidualPressure">The FIFTH per-possession fact, stamped
     /// by Roll G alongside <see cref="ShotType"/>. The volume load Roll G could
     /// NOT absorb into a wider shot diet this possession — the load that stayed

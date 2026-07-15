@@ -105,7 +105,7 @@ internal static partial class Program
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var result = RollE.Execute(checkState, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, checkGame, rng);
+            var result = RollE.Execute(checkState, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, checkGame, rng);
 
             if (result is not Continue { Next: ContinuationKind.IntoPlayerAction } c
                 || c.State.SelectedSlot is not { } slot
@@ -298,7 +298,7 @@ internal static partial class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Select a player (Roll E), resolve the action (Roll F), then route.
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
             var fResult = RollF.Execute(selected, pieF, rng);
             var routing = resolver.Route(fResult);
             var d = routing.Destination;

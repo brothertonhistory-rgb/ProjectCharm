@@ -4558,12 +4558,22 @@ Clamped to `max(score, MinUsageScore)` before the sharpening exponent. The (Clos
 **Observation delta.** Aggregate stats unchanged from Session 50. Correct: Roll E changes *who* gets the ball, not *what happens* to them. The efficiency coupling arrives with the usage→efficiency curve (next build).
 
 
-## Phase 17: Usage → Efficiency Curve (Session 52)
+## Phase 17 + Session 60: The Usage ↔ Efficiency Curve — BOTH halves
 
-**What this is.** The thesis of Roll E is that shooting share concentration should cost efficiency — a specialist forced into heavy use should shoot worse than a versatile player carrying the same load. Phase 17 delivers that coupling: volume pressure flows from Roll E through Roll G (where it bends the shot diet) into Roll H (where it penalizes the make rate).
+**What this is.** The thesis of Roll E is that a player's shooting share should move his efficiency in both directions: concentration should cost (a specialist forced into heavy use shoots worse than a versatile player carrying the same load), and scarcity should pay (a light load lets anyone shoot open shots and be somewhat efficient regardless of ratings; fed usage, the ratings show). Phase 17 (Session 52) delivered the **tax** half — volume pressure flows from Roll E through Roll G (where it bends the shot diet) into Roll H (where it penalizes the make rate). Session 60 delivered the **relief** half — the mirror term, stamped in the same pass off the same array and paid as a make% bonus in Roll H.
 
-**Two new per-possession facts.**
-- `UsagePressure` (stamped by Roll E): `max(0, finalShare − equalShare)`, where `equalShare = 1.0 / populated`. Zero below the equal share (no penalty for carrying a normal load). Null until Roll E runs; null on FastBreak (no volume load on a transition possession). Cleared to null by Roll K's `ResetOffense`.
+**The two terms are one curve with one pivot.** They are computed together, from the same post-floor/rail `shares` array, against the same `equalShare = 1.0 / populated`:
+
+    pressure = max(0, finalShare − equalShare)     → RollEGenerator.PressureAt
+    relief   = max(0, equalShare − finalShare)     → RollEGenerator.ReliefAt
+
+Both are **named statics** rather than inline arithmetic, so the pivot lives in exactly ONE place and the harness can probe it at exact points (`equalShare ± ε`) without a numeric transition search. The relationship is structural, not a coincidence of two similar-looking formulas — for any share, `PressureAt − ReliefAt == finalShare − equalShare` **exactly**, and at most one of the two is ever non-zero. Phase 66 asserts both identities on every slot of a live Roll E run.
+
+**Emmett's anchor ruling (2026-07-14):** the ~31.7% FG at 43% usage is plausibly CORRECT. The fix **anchors the top and lifts the bottom** — Session 60 did not re-tune the star, and the tax side did not move.
+
+**Three per-possession facts.**
+- `UsagePressure` (stamped by Roll E): `max(0, finalShare − equalShare)`. Zero at or below the equal share (no penalty for carrying a normal load). Null until Roll E runs; zero on FastBreak (no volume load on a transition possession). Cleared to null by Roll K's `ResetOffense`.
+- `UsageRelief` (stamped by Roll E, Session 60): `max(0, equalShare − finalShare)`. Zero at or above the equal share; zero on FastBreak (same ruling on both sides — a transition possession carries no volume load, so there is nothing to tax and, symmetrically, no light halfcourt load to reward). Cleared to null by Roll K's `ResetOffense`.
 - `UsageResidualPressure` (stamped by Roll G): the load Roll G could NOT absorb into a wider shot diet. Zero when fully absorbed (versatile shooter, ordinary defense). Positive for a forced specialist. Cleared to null by Roll K's `ResetOffense`.
 
 **The two-stage mechanism.**
@@ -4571,6 +4581,27 @@ Clamped to `max(score, MinUsageScore)` before the sharpening exponent. The (Clos
 2. **Roll H — efficiency penalties (what the cost is):** Two terms applied after the matchup logistic, before `BuildRealPie`: (b) volume-tax `makePct *= (1 − pressure × PressureVolumeTaxScale)` — small, hits everyone carrying load; (c) residual penalty `makePct -= residual × PressureResidualPenaltyScale` — large, hits only the specialist. Attribution is derivable from the two separate scalars in the harness output.
 
 **Why these are separate (not merged into one penalty).** The volume-tax is real even for a versatile player: volume load is taxing regardless of shot variety. The residual penalty is specifically the efficiency loss of *being unable to vary*. Merging them would hide the specialist vs versatile distinction — the exact thesis the system is supposed to demonstrate. Keeping them named also means the harness output shows the split (Phase 17 (b): `vol-tax=2.5pts  residual-penalty=12.0pts`).
+
+**The relief half (Session 60) — Roll H pays for a light load.**
+
+    makePctAfterRelief = clamp01(makePctBeforeRelief × (1.0 + relief × UsageReliefBonusScale))
+
+One named static, `RollHGenerator.ApplyUsageRelief`, ported constant-for-constant from `tools/usage_relief_oracle.py` and called by both the live generator and the Phase 66 golden parity — so parity binds to the engine, never to a second copy of the formula. Four design properties, each deliberate:
+
+- **Placement is named and locked.** It sits **after the C3 penalty block and before the C4 passing converter**. `makePctBeforeRelief` — the Roll H make probability at exactly that stage — is what every golden case carries, so parity can never be "achieved" against the wrong stage.
+- **It is its OWN branch, deliberately not folded into C3.** The Phase 17 block is gated `if (usagePressure > 0.0 || usageResidual > 0.0)` — precisely the branch a below-share shooter never enters. Folding the relief in would mean it silently never fires on the players it exists for, and a green suite would not catch it.
+- **Multiplicative, not additive.** It scales the probability the player already earned from his matchup, so a bad shooter on a light load is still a bad shooter — just a somewhat more efficient one. It fades to exactly zero at the equal share by construction.
+- **True identity branch.** `relief <= 0 || scale <= 0` returns the input untouched — no multiply, no clamp. `UsageReliefBonusScale = 0` is the legal kill switch and is bit-identical *for the right reason*, not via a harmless ×1.0. The upper clamp is **live production code, not a defensive no-op**: `RimCeiling` 0.9527 × 1.11 = 1.0575, so a five-man 9%-share rim finisher genuinely reaches it.
+
+**Attention does NOT amplify the relief.** `C3AttentionAmplifier` scales the *penalties* for an above-share, above-attention shooter. Relief is shot-selection and is independent by the locked shape — no attention read.
+
+**Gravity and relief COMPOUND, intentionally.** They read different inputs: C1/C4 read team openness/gravity/spacing (who is around you); relief reads the shooter's own share (how little load he carries). Because relief multiplies the current make probability, a player with both gets both, multiplicatively. That is Emmett's *"stats are contextual to teammates"* ruling composed with his *"open shots"* ruling — not double attribution. Phase 66 proves the **input** independence (C4 neutralized via `TeamConversionQuality = 0`, inputs chosen so neither branch clamps → the live/kill ratio equals the relief multiplier in both gravity states) and separately proves the compounding is real (gravity off +2.59pp, gravity on +4.35pp). The architectural claim is input independence, **not** equality of final ratios through arbitrary downstream transforms — C4 runs after relief and would legitimately break raw final-ratio equality.
+
+**STANDING PROPERTY — the curve reads INTENT, not touches (measured S60, both sides).** The `shares` array both terms read is **post-floor/rail but PRE-tilt and PRE-denial**. Roll E computes the shares, stamps pressure and relief off them, and *then* the pie is bent twice more: by the Phase 27 selection tilt (where the defense is looking) and by the Phase 46 per-slot denial (whether his man is beating him). `RollEGenerator.BendByAttention` says so outright: *"the tilt changes WHICH slot is rolled, not the load each slot carries."* So **both halves of the curve pay on the share a team's offense INTENDS to give a man, not on the touches he actually ends up with.**
+
+This is symmetric — the tax has always read the same basis, and the two can never disagree about the pivot — but it is not neutral. Measured on the frozen corpus (S60, through the live generator): Javon Okafor's offense intends **18.45%** for him, a hair under even, so he earns a **+1.6%** bonus; the tilt and the denial then strip him to **13.5%** of the actual attempts. By the eye test he is the lightest-load player on the floor; by the engine's books he is carrying nearly a full one. Cory Baptiste — genuinely not featured at **14.84%** intent — collects the real **+5.2%**. Three of the five starters read exactly zero.
+
+The consequence for how this is described: *"low-usage players shoot better"* is the wrong sentence; ***"players their own offense does not feature shoot better"*** is the right one. They come apart precisely for the man the defense takes away. This also settles the S59.2 loose thread — the pivot reads **post-rail**, so a railed star is NOT paying for shots the rail took away; but it reads **pre-tilt**, so the defense's denial is invisible to both sides of the curve. Whether the denied big should earn relief is an open calibration-page question (status.md), not a defect.
 
 **Zero-pressure branch-skip.** When both scalars are 0.0 (or null), the Phase 17 block in `RollHGenerator` is a complete branch-skip. The zero-pressure case is numerically identical to pre-build behavior — confirmed by Phase 17 (a). This is the regression guard.
 
@@ -4588,14 +4619,17 @@ Clamped to `max(score, MinUsageScore)` before the sharpening exponent. The (Clos
 | `PressureShiftCapFraction` | RollGConfig | Max fraction of dominant zone movable | 0.8 |
 | `PressureVolumeTaxScale` | RollHConfig | Vol-tax multiplier | 0.12 |
 | `PressureResidualPenaltyScale` | RollHConfig | Residual-penalty multiplier | 2.0 |
+| `UsageReliefBonusScale` | RollHConfig | Relief-bonus multiplier (**0 = kill switch**) | 1.0 |
 
 `PressureShiftScale = 0` ablates the diet shift (residual always 0; only vol-tax fires). All four at 0 fully ablates Phase 17 while leaving plumbing intact — useful for calibration comparison.
 
-**Interface widening (engineering note).** `_rollEGenerator` and `_rollGGenerator` in `Resolver` were widened from the base pie interfaces to derived `IRollEGenerationProvider` / `IRollGGenerationProvider`. Both stubs implement the new interfaces (returning zero pressures/residual), so all 20 harness Resolver construction sites compile unchanged. The base interfaces remain for callers that only need the pie.
+**Interface widening (engineering note).** `_rollEGenerator` and `_rollGGenerator` in `Resolver` were widened from the base pie interfaces to derived `IRollEGenerationProvider` / `IRollGGenerationProvider`. Both stubs implement the new interfaces (returning zero pressures/residual/reliefs), so all 20 harness Resolver construction sites compile unchanged. The base interfaces remain for callers that only need the pie.
 
-**Deferred.** The four config dials are calibration placeholders. The correct values emerge once rosters have real star/role distinctions — a realistic alpha commands 35–40% share, producing measurable pressure. On the current test roster (near-equal shares) the effect is present but small at game scale. Calibration of these dials is the natural follow-on once player-model depth exists.
+**`RollEGeneration` carries four members** (Session 60 added `Reliefs` as the fourth positional): `Pie`, `FinalShares`, `Pressures`, `Reliefs`. Five construction sites, all verified by repo-wide grep: `RollEGenerator` ~86 (FastBreak passthrough), ~121 (empty-lineup fallback), ~206 (the real path — the only one that computes), `RollEStubPieGenerator` ~66, and the Phase 16 `RollESpyGenerator` in the harness. **`RollE.Execute` does NOT take the record** — it takes `double[] pressures, double[] reliefs` as loose positional parameters, so both arrays are threaded from `Resolver`'s two call sites (`genE.Reliefs` on the halfcourt path, `breakGenE.Reliefs` on the press-break FastBreak path) and every harness call site passes `new double[5]`. Worth knowing before touching the signature: it is 15 call sites, all compile-loud.
 
-**Observation run.** FG% and PPP unchanged from Session 51 (test-roster shares are near-equal; pressures are small). The mechanism is wired, proven, and waiting for realistic usage concentration.
+**Deferred — the magnitudes, not the shape.** All five config dials are calibration placeholders, page-tuned against a real population and **never suite-asserted** (the page-only calibration principle). The correct values emerge once rosters have real star/role distinctions. **The tax side is tuned to a whisper today** (`PressureVolumeTaxScale` 0.12): S59.2 measured usage climbing 29.1→45.2% while FG% *rose* 44.5→45.8 — volume is effectively free at current settings. That is a **calibration** fact, not a missing mechanism; the tax has existed since Phase 17 and the residual channel can bite hard under attention. (An earlier framing — *"the mechanism is missing, not mis-tuned"* — was correct on the low side and wrong on the high side; corrected in the S60 docs pass.)
+
+**Observation run.** Phase 17 alone left FG%/PPP unchanged from Session 51 (test-roster shares are near-equal; pressures are small). **Session 60's relief moved the corpus for the first time:** league FG% **43.73% → 44.03%** (+0.30pp), PPP 0.9755 → 0.9814 — driven almost entirely by the two genuinely-unfeatured slot-5 shooters (Baptiste 42.2→44.0, Thornton 43.7→46.1), with three of five starters at exactly zero relief. The curve is now wired on both sides; its magnitudes wait on realistic usage concentration.
 
 
 ## Phase 18: Roll L Real Generator — FreeThrow Attribute Wired (Session 53)

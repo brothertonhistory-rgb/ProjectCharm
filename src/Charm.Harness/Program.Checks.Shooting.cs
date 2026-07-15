@@ -152,7 +152,7 @@ internal static partial class Program
         {
             // Select a real slot (Roll E), then hand the resolver a clean
             // IntoShotType continuation — exactly what Roll F emits on a ShotAttempt.
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
             var shotTicket = new Continue(ContinuationKind.IntoShotType, selected);
             var d = resolver.Route(shotTicket).Destination;
 
@@ -246,7 +246,7 @@ internal static partial class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Fresh slot + zone, then the zone-aware pie for THAT zone.
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
             var preH = ((Continue)RollG.Execute(selected, genG.Generate(selected), 0.0, rng)).State;
             var zone = preH.ShotType!.Value;
             var pieH = isolatedGenH.Generate(preH);
@@ -468,7 +468,7 @@ internal static partial class Program
             // Select a slot (Roll E) and stamp a zone (Roll G), then hand the
             // resolver a clean IntoShotResolution continuation — exactly what Roll G
             // emits — to isolate the Roll H hop.
-            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
+            var selected = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
             var withZone = ((Continue)RollG.Execute(selected, genG.Generate(selected), 0.0, rng)).State;
             var shotTicket = new Continue(ContinuationKind.IntoShotResolution, withZone);
             var d = resolver.Route(shotTicket).Destination;

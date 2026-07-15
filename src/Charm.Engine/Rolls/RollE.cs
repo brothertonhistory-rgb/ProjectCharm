@@ -40,7 +40,7 @@ namespace Charm.Engine;
 public static class RollE
 {
     public static RollResult Execute(
-        PossessionState state, Pie<SelectionOutcome> pie, double[] pressures,
+        PossessionState state, Pie<SelectionOutcome> pie, double[] pressures, double[] reliefs,
         double[] attentionShares, double teamBaseOpenness, double teamGravityLevel, double teamSpacingLevel,
         double teamConversionQuality,
         GameState game, IRng rng)
@@ -54,15 +54,21 @@ public static class RollE
         var slotNumber = (int)outcome + 1;                       // Slot1 -> 1, ... Slot5 -> 5
         var slot = game.LineupFor(state.Offense).SlotAt(slotNumber);
 
-        // 3. Stamp the chosen slot, volume pressure, attention share for the selected
-        //    shooter, team-level openness scalars, and conversion quality onto the
-        //    possession as per-possession facts. One `with` keeps all writes atomic.
-        //    pressures[] and attentionShares[] are indexed by slotNumber - 1 (0-based),
-        //    matching the Slot1–Slot5 ordering in the generators' output.
+        // 3. Stamp the chosen slot, volume pressure, volume relief, attention share for
+        //    the selected shooter, team-level openness scalars, and conversion quality onto
+        //    the possession as per-possession facts. One `with` keeps all writes atomic.
+        //    pressures[], reliefs[] and attentionShares[] are indexed by slotNumber - 1
+        //    (0-based), matching the Slot1–Slot5 ordering in the generators' output.
+        //
+        //    Session 60 — UsageRelief is the mirror of UsagePressure and is stamped from
+        //    the same generator pass off the same shares. At most one of the two is
+        //    non-zero: above the equal share the player is taxed, below it he is relieved,
+        //    at it both read exactly 0.
         var selectedState = state with
         {
             SelectedSlot             = slot,
             UsagePressure            = pressures[slotNumber - 1],
+            UsageRelief              = reliefs[slotNumber - 1],
             ShooterAttentionShare    = attentionShares[slotNumber - 1],
             TeamBaseOpenness         = teamBaseOpenness,
             TeamGravityLevel         = teamGravityLevel,

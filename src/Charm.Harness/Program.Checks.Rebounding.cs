@@ -75,7 +75,7 @@ internal static partial class Program
         for (var i = 0; i < cfg.BatchSize; i++)
         {
             // Walk E -> G -> H; keep only the misses (the one feed into Roll I).
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), rng);
             if (hRes is not Continue { Next: ContinuationKind.ResolveRebound } miss) continue;
@@ -558,7 +558,7 @@ internal static partial class Program
 
         for (var i = 0; i < cfg.BatchSize; i++)
         {
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rngR)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rngR)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rngR)).State;
             var hRes = RollH.Execute(zoned, genH.Generate(zoned), rngR);
 
@@ -651,7 +651,7 @@ internal static partial class Program
             // and the ResetOffense arm's wipe are both observable. FastBreak=true
             // simulates a possession that PUSHED, missed, and grabbed its own board —
             // so the ResetOffense leak-guard (FastBreak must clear) is exercised.
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var stamped = zoned with { Result = ShotResult.Miss, FastBreak = true };
 
@@ -1324,7 +1324,7 @@ internal static partial class Program
             // Build a fully-stamped post-miss state and ENTER Roll K directly by
             // handing the resolver the offensive-rebound continuation — the resolver
             // then walks the whole loop internally and returns once it ends/parks.
-            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
+            var sel = ((Continue)RollE.Execute(state, pieE, new double[5], new double[5], new double[5], 0.0, 0.0, 0.0, 0.0, game, rng)).State;
             var zoned = ((Continue)RollG.Execute(sel, genG.Generate(sel), 0.0, rng)).State;
             var stamped = zoned with { Result = ShotResult.Miss };
             var entry = new Continue(ContinuationKind.ResolveOffensiveRebound, stamped);

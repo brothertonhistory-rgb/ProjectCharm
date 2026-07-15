@@ -185,6 +185,7 @@
     "C1ReliefScale": 2.0,
     "C2ImbalanceScale": 0.08,
     "C3AttentionAmplifier": 1.5,
+    "UsageReliefBonusScale": 1.0,
     "PassingOpportunityFloor": 0.1,
     "MaxPassingBonus": 0.08,
     "HelpDefenseSuppressionScale": 0.15,
