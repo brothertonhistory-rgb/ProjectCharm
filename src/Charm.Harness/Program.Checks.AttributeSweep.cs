@@ -72,6 +72,15 @@ internal static partial class Program
         public string OutputName { get; init; } = "sweep";
         public SweepWalk? Walk   { get; init; }
         public List<SweepCase> Cases { get; init; } = new();
+
+        /// <summary>S59.1 — optional per-slot dials for the OPPONENT (logical Team B).
+        /// Null/empty = the historical flat all-50 opponent, so every pre-S59.1 sweep
+        /// config reproduces byte-for-byte. FIXED across every rung by design: the
+        /// opponent is the *neighborhood*, held still while the swept player walks, so
+        /// the curve stays the swept attribute's pure signal against a named, constant
+        /// level of competition. Dialing the opponent per-rung would move two things at
+        /// once and is deliberately not offered.</summary>
+        public Dictionary<int, Dictionary<string, int>>? OpponentDials { get; init; }
     }
 
     // A resolved rung: the row label shown in the table + CSV, and the absolute dials
@@ -127,7 +136,12 @@ internal static partial class Program
         }
 
         int totalGames = rungs.Count * config.GamesPerRung;
-        Console.WriteLine($"Mode: {config.Mode}  |  swept slot: {config.SweptSlot} (logical Team A)  |  opponent: flat all-50");
+        var oppDesc = config.OpponentDials is null
+            ? "flat all-50"
+            : "DIALED — " + string.Join("; ", config.OpponentDials.OrderBy(kv => kv.Key).Select(kv =>
+                  $"S{kv.Key} " + string.Join(",", kv.Value.OrderBy(d => d.Key, StringComparer.Ordinal)
+                                                       .Select(d => $"{d.Key}={d.Value}"))));
+        Console.WriteLine($"Mode: {config.Mode}  |  swept slot: {config.SweptSlot} (logical Team A)  |  opponent: {oppDesc}");
         Console.WriteLine($"{config.GamesPerRung:N0} games / rung  |  {rungs.Count} rungs  |  {totalGames:N0} total games");
         if (config.Mode == "walk" && config.Walk is { } w)
             Console.WriteLine($"Sweeping {w.Field}: {w.Start}..{w.Stop} step {w.Step} (everything else frozen at 50)");
@@ -255,11 +269,14 @@ internal static partial class Program
     {
         // Build the two teams once for this rung. Team A: dialed slots per the rung's
         // per-slot map (legacy single-slot rungs resolve to a one-entry map on SweptSlot);
-        // every other slot flat 50. Team B: flat 50 everywhere. Then stamp PlayerIds.
+        // every other slot flat 50. Team B: flat 50 everywhere, UNLESS config.OpponentDials
+        // names a level of competition (S59.1) — fixed across every rung either way, so the
+        // curve remains the swept attribute's pure signal. Then stamp PlayerIds.
         var teamADials = rung.SlotDials
             ?? new Dictionary<int, Dictionary<string, int>> { [config.SweptSlot] = rung.Dials };
         var teamAPlayers = BuildSweepTeam(teamADials, "TeamA");
-        var teamBPlayers = BuildSweepTeam(new Dictionary<int, Dictionary<string, int>>(), "TeamB");
+        var teamBPlayers = BuildSweepTeam(
+            config.OpponentDials ?? new Dictionary<int, Dictionary<string, int>>(), "TeamB");
         for (var i = 0; i < 5; i++) teamAPlayers[i] = StampPlayerId(teamAPlayers[i], i + 1);
         for (var i = 0; i < 5; i++) teamBPlayers[i] = StampPlayerId(teamBPlayers[i], i + 6);
 
@@ -787,6 +804,31 @@ internal static partial class Program
 
     // ── Strict config parser (tree-walk; unknown + duplicate keys rejected) ─────
 
+    /// <summary>Parses one dial object (field→integer). Hoisted from a local function inside
+    /// the cases parser in S59.1 so root-level <c>opponentDials</c> reuses the SAME validation
+    /// — unknown field, duplicate field, and non-integer all reject identically for the
+    /// opponent as for a case, rather than via a second copy that could drift.</summary>
+    private static Dictionary<string, int> ParseDialObject(JsonElement obj, string dctx)
+    {
+        if (obj.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException($"{dctx} must be an object of field→value.");
+        var d = new Dictionary<string, int>(StringComparer.Ordinal);
+        var seenFields = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var kv in obj.EnumerateObject())
+        {
+            if (!seenFields.Add(kv.Name))
+                throw new InvalidOperationException($"{dctx}: duplicate dial field '{kv.Name}'.");
+            if (!BenchDialableFields.Contains(kv.Name))
+                throw new InvalidOperationException(
+                    $"{dctx}: unknown dial field '{kv.Name}' (case-sensitive).");
+            if (kv.Value.ValueKind != JsonValueKind.Number || !kv.Value.TryGetInt32(out var dv))
+                throw new InvalidOperationException(
+                    $"{dctx}: dial '{kv.Name}' must be an integer (got {kv.Value.GetRawText()}).");
+            d[kv.Name] = dv;
+        }
+        return d;
+    }
+
     private static SweepConfig ParseSweepConfig(string json)
     {
         JsonDocument doc;
@@ -804,7 +846,8 @@ internal static partial class Program
 
             RejectUnknownOrDuplicateKeys(
                 root, "root",
-                "gamesPerRung", "baseSeed", "sweptSlot", "mode", "outputName", "walk", "cases");
+                "gamesPerRung", "baseSeed", "sweptSlot", "mode", "outputName", "walk", "cases",
+                "opponentDials");
 
             var gamesPerRung = RequireIntProperty(root, "gamesPerRung", "root");
             if (gamesPerRung <= 0)
@@ -888,26 +931,9 @@ internal static partial class Program
                             $"{ctx}: a case uses EITHER 'dials' (single slot) OR 'slotDials' (per-slot map), not both.");
 
                     // Local: parse one field→value object into a validated dial dict.
-                    Dictionary<string, int> ParseDialObject(JsonElement obj, string dctx)
-                    {
-                        if (obj.ValueKind != JsonValueKind.Object)
-                            throw new InvalidOperationException($"{dctx} must be an object of field→value.");
-                        var d = new Dictionary<string, int>(StringComparer.Ordinal);
-                        var seenFields = new HashSet<string>(StringComparer.Ordinal);
-                        foreach (var kv in obj.EnumerateObject())
-                        {
-                            if (!seenFields.Add(kv.Name))
-                                throw new InvalidOperationException($"{dctx}: duplicate dial field '{kv.Name}'.");
-                            if (!BenchDialableFields.Contains(kv.Name))
-                                throw new InvalidOperationException(
-                                    $"{dctx}: unknown dial field '{kv.Name}' (case-sensitive).");
-                            if (kv.Value.ValueKind != JsonValueKind.Number || !kv.Value.TryGetInt32(out var dv))
-                                throw new InvalidOperationException(
-                                    $"{dctx}: dial '{kv.Name}' must be an integer (got {kv.Value.GetRawText()}).");
-                            d[kv.Name] = dv;
-                        }
-                        return d;
-                    }
+                    // (dial-object parsing lives in the shared static ParseDialObject —
+                    //  hoisted in S59.1 so opponentDials at root reuses the SAME parser,
+                    //  rather than a second copy that could drift from this one.)
 
                     var dials = new Dictionary<string, int>(StringComparer.Ordinal);
                     Dictionary<int, Dictionary<string, int>>? slotDials = null;
@@ -944,15 +970,42 @@ internal static partial class Program
                 if (outputName == "sweep") outputName = "cases";
             }
 
+            // S59.1 — the opponent (Team B). Absent = flat all-50, the historical default,
+            // so every pre-S59.1 config is byte-identical. Same slot("1"–"5")→dial-object
+            // shape as a case's slotDials, and the same field validation runs downstream in
+            // BuildSweepTeam/ValidateBenchSpec.
+            Dictionary<int, Dictionary<string, int>>? opponentDials = null;
+            if (root.TryGetProperty("opponentDials", out var oppEl))
+            {
+                if (oppEl.ValueKind != JsonValueKind.Object)
+                    throw new InvalidOperationException(
+                        "root 'opponentDials' must be an object of slot(\"1\"–\"5\")→dial-object.");
+                opponentDials = new Dictionary<int, Dictionary<string, int>>();
+                foreach (var sEntry in oppEl.EnumerateObject())
+                {
+                    if (!int.TryParse(sEntry.Name, out var slotNum) || slotNum < 1 || slotNum > 5)
+                        throw new InvalidOperationException(
+                            $"root 'opponentDials': key '{sEntry.Name}' must be a slot number \"1\"–\"5\".");
+                    if (opponentDials.ContainsKey(slotNum))
+                        throw new InvalidOperationException(
+                            $"root 'opponentDials': duplicate slot '{slotNum}'.");
+                    opponentDials[slotNum] = ParseDialObject(sEntry.Value, $"root 'opponentDials'[{slotNum}]");
+                }
+                if (opponentDials.Count == 0)
+                    throw new InvalidOperationException(
+                        "root 'opponentDials' must dial at least one slot; omit the key entirely for a flat all-50 opponent.");
+            }
+
             return new SweepConfig
             {
-                GamesPerRung = gamesPerRung,
-                BaseSeed     = baseSeed,
-                SweptSlot    = sweptSlot,
-                Mode         = mode,
-                OutputName   = outputName,
-                Walk         = walk,
-                Cases        = cases,
+                GamesPerRung  = gamesPerRung,
+                BaseSeed      = baseSeed,
+                SweptSlot     = sweptSlot,
+                Mode          = mode,
+                OutputName    = outputName,
+                Walk          = walk,
+                Cases         = cases,
+                OpponentDials = opponentDials,
             };
         }
     }

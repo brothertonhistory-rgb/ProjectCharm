@@ -17,6 +17,43 @@ re-measured and this doc is updated in place (journal.md holds the history).
 balance should move" conclusion is a finding recorded here for a future build session, not a
 change made in the sweep session.
 
+> ## ⚠ DOCUMENT-WIDE CAVEAT (added S59.2, 2026-07-14) — every finding below the S59.2 section is a **FLAT-50-OPPONENT** finding
+>
+> **Read this before trusting any number in this document.** Until S59.2 the sweep bench
+> **hardcoded the opponent at flat all-50** — there was no way to dial Team B, so every family
+> from S45 to S55.1 was measured against average-everything competition. That is not a neutral
+> choice. It caps the body gap between the swept player and his defender at about ±30 rating
+> points, and **the engine's skill-muting mechanism does not meaningfully engage until the gap is
+> larger than that.**
+>
+> S59.2 measured the same walk twice — once vs flat-50, once vs a real high-major roster — and the
+> answers disagree badly. What an elite scoring edge is worth (FG%, elite minus average):
+>
+> | swept player's body | vs flat-50 | vs a real high-major team |
+> |---|---|---|
+> | 20 (small, slow) | +11.2 | **+6.0** |
+> | 50 (even) | +11.6 | +10.6 |
+> | 80 (freak) | +11.1 | +9.9 |
+>
+> Against flat-50 the rating's value is a **flat line** — which reads as "body mismatch does not
+> mute skill." Against real talent it **nearly halves** for the small player. The mechanism was
+> always there (the bounded logistic's tails compress rating differences once a big physical gap
+> shoves a player toward the floor); flat-50 simply never pushed anyone far enough down the curve
+> to show it. The same shape holds for rebounding (rating worth +2.7 vs flat-50 at body 20, +1.6
+> vs a real front line).
+>
+> **So:** every pre-S59.2 finding here is true *as measured* and is the **even-bodied, average-
+> competition** answer. None of them is the general answer. Any finding whose headline is "this
+> rating is worth X" should be read as "worth X **against average competition**," and any finding
+> that concluded a rating is **flat, inert, or unaffected by the body** is the one most likely to
+> change on re-measurement — that is precisely the conclusion flat-50 manufactures. Re-measuring
+> the eight families against dialed opponents is **Open** (see status.md); nothing below has been
+> re-run yet. **Queued, not claimed.**
+>
+> The instrument was fixed in S59.2 (`opponentDials`, see design.md). The finding that the
+> instrument had been lying by omission was Emmett's — he rejected "50s across the board" as
+> not-real talent, and he was right.
+
 ---
 
 ## Family B — Rebounding (OffensiveRebounding, DefensiveRebounding) — measured Session 45
@@ -1137,3 +1174,262 @@ PerimeterDefense 80 doing its S52 job, not the Discipline.)
   unforced-turnover channel, the S51 no-post-hunt diet gap, the S54 defensive findings (perimeter-
   defense point-neutrality; Discipline near-inert), and the remaining S50 physical questions. The
   pressure-dialed channels (BallHandling, Steals turnover-forcing) stay coaching-layer, scoped out.
+
+---
+
+## Cross-cutting — the BODY-GAP GATE and divisional sorting — measured Session 59.2 (2026-07-14)
+
+**The first sweep run against a DIALED opponent** (the `opponentDials` upgrade shipped this
+session — see design.md). Not one attribute family: the question underneath all of them, and the
+one the world/divvy layer is downstream of. Emmett's framing: *"this is how virtually every
+attribute that counts stats should work — when athleticism and/or size are major advantages, skill
+advantages get muted hard; when the bodies equalize, skill is felt hardest. It's the size and
+athleticism which dictate where you can play, more than anything else."*
+
+### The headline finding
+
+**The gate is real, it works, and it was already built.** Same player, same elite scoring rating,
+walked up four levels of competition. Real level-appropriate rosters on BOTH sides (his teammates
+too — an earlier cut of this bench left his teammates at flat-50 and had to be thrown out).
+
+**The relative-engine control — this had to hold first:**
+
+| level | a typical player at that level | team score |
+|---|---|---|
+| D3 | 11.6 pts / 35.3% | 53.6 – 53.4 |
+| D2 | 12.1 / 36.9% | 54.7 – 54.6 |
+| Mid-major | 12.2 / 38.8% | 56.0 – 56.0 |
+| High-major | 12.3 / 38.9% | 56.9 – 56.7 |
+
+A typical player scores ~12 at **every** level and every game is even. **The relative engine is
+verified end-to-end across four levels of competition** — "the same mathematical drama at D3 as at
+D1" is not an aspiration, it is measured.
+
+**The gate — one player (elite scoring skill 85), two bodies, four levels:**
+
+| level | typical | **6'1", slow** (body 30) | **big, athletic** (body 78) |
+|---|---|---|---|
+| D3 | 11.6 / 35.3% | **19.6 / 44.5%** — star | **27.6 / 57.6%** — monster |
+| D2 | 12.1 / 36.9% | **17.8 / 42.8%** — very good | **24.1 / 53.8%** |
+| Mid-major | 12.2 / 38.8% | **14.0 / 38.0%** — ordinary, already shooting below average | **19.8 / 48.9%** |
+| High-major | 12.3 / 38.9% | **10.7 / 32.0%** — BELOW average | **16.6 / 44.0%** — still a star |
+
+**Identical skill ratings. The body alone sets the ceiling.** The small player tops out around D2
+and is a below-average high-major player; the big one is a star in any league. His shooting decays
+44.5 → 42.8 → 38.0 → 32.0 as he climbs — that decay *is* the muting. **Every part of the divisional
+thesis checks out: bodies sort divisions, skill decides among equals, and the D3 star is stranded
+when he plays up.**
+
+### The mechanism (and why it was missed twice)
+
+It is **not** a gating multiplier in the rating math. Every door composes skill and body
+**additively** — make (`baseline + skill + physical + height`), diet (`skillLevel + physLevel`),
+block (fixed per-zone weights × skill + × length). Nothing reaches over and shrinks the other's
+term. The muting is delivered **by the bounded logistic that converts rating → probability**: a
+large body gap shoves a player toward the curve's floor, where the same rating difference buys a
+much smaller make% difference. design.md's Phase-4 additive-vs-multiplicative ruling named this
+explicitly ("a monster physical edge crushes a player toward the floor, where the make%-distance
+between him and a scrub **compresses** — athleticism 'wipes out the skill gap' in the box score").
+**The design intended this from the start and the engine delivers it.**
+
+Two ways this was mis-called during the S59.2 conversation, both recorded because both are
+instructive: (1) reading the additive rating math and concluding "no muting exists anywhere" —
+wrong, because the muting lives one stage later, in the curve, not the arithmetic; (2) measuring it
+against a flat-50 opponent, getting a flat line, and concluding the mechanism was absent — wrong,
+because flat-50 caps the gap at ~±30 and the compression does not bite until well past that. See
+the document-wide caveat at the top.
+
+### Rebounding — the same shape, on Emmett's own example
+
+His test case: *"an extremely skilled 6'4", 190, weak-athlete rebounder just doesn't do much against
+a front line of 6'10" hyper athletes, sort of regardless of how good their rebounding is."*
+Rebounds/game, swept slot 5, vs a dialed high-major front line (bodies ~80, hands 68):
+
+| his body | avg hands (50) | elite (85) | perfect (99) | what hands are WORTH |
+|---|---|---|---|---|
+| 20 — his archetype | 3.2 | **4.8** | 5.3 | **+1.6** |
+| 50 | 5.0 | 7.2 | 8.0 | +2.2 |
+| 80 | 7.8 | 10.5 | 11.4 | **+2.7** |
+
+**Perfect hands + tiny body = 5.3 boards. Average hands + freak body = 7.8.** The freak wins by 47%
+with worse hands — the ruling holds. Against flat-50 the same player got 8.1 boards and the
+rating's value *rose* monotonically with body (+2.7 → +3.7, never collapsing): the flat-50 bench
+inverted the finding.
+
+**Note the tension with the S45 finding above** (rebounding is rating-gated; the body amplifies but
+does not grant). The two are **compatible, not contradictory**: S45/S46 fixed the body being a pure
+*multiplier* on the rating (a freak with zero rating grabbed nothing), giving the body an additive
+floor so it pays unconditionally. This finding is about the *opponent's* body gap muting the
+rating. Body unconditional + rating conditional-on-parity is one coherent model, and both are live.
+
+### The open magnitude question (NOT closed here)
+
+Emmett's ruling is "not much, *sort of regardless* of rating." Today the small player's rating still
+buys him +1.6 boards and +6.0 FG% at the extreme. Is that "not much," or should it be nearer zero?
+**Deliberately not answered**: that is a magnitude question, and per the page-only calibration
+principle it waits for a real generated population. Emmett's call (2026-07-14): *"until we get an
+actual variety of real players, I'm not sure we get much from this"* — the synthetic bench had
+already produced three wrong readings, and a fourth would not have taught us anything.
+
+### Side finding — athleticism raises three-point shooting
+
+Walking body alone (rating held at 50), 3P% climbs 20.6% → 27.4%. The physical shift is applied
+**zone-independently**, so a pure athletic edge helps from 25 feet exactly as it helps at the rim.
+Recorded, not judged. May be correct, may be a wiring question; it has never been ruled on.
+
+---
+
+## HierarchyRank / usage — the dial is broken and the RAIL is doing the design's job — measured Session 59.2 (2026-07-14)
+
+Reached by chasing one number: the D3 star above scored 19.6, and Emmett wants D3's best scorers
+around 25. He diagnosed it immediately — *"no coaching strategy as well as 50s across the board
+tilting usage."* Half right, and the half that was wrong is the interesting half: the teammates were
+NOT flat-50 (they were level-appropriate). **`HierarchyRank` was pinned at its baseline 5 for every
+player the bench has ever built**, so no sweep in this document has ever had a go-to guy.
+
+### Finding 1 — the top half of the depth chart is dead
+
+Teammates frozen at rank 5, only the star's rank walked (D3, skill 85, body 30):
+
+| rank | usage | pts |
+|---|---|---|
+| 5 | 29.1% | 19.6 |
+| 6 | 40.4% | 27.3 |
+| 7 | **45.1%** | 30.7 |
+| 8 | **45.1%** | 30.9 |
+| 9 | **45.2%** | 31.0 |
+| 10 | **45.2%** | 31.0 |
+
+**Ranks 7, 8, 9 and 10 are the same player** — identical to a tenth of a point. A coach cannot
+distinguish a first option from a franchise player. Proven to be `RollE.UsageRail` (0.52) by lifting
+it to 0.95 and re-running: 7/8/9/10 then separate to 48.6 / 54.3 / 54.3 / 54.4 — i.e. they **hit a
+second wall** at 54%, which is `RollE.UsageFloor` (0.09) × 4 teammates guaranteeing 36%, capping any
+one player at 64% of selections. Two hard clamps stacked.
+
+### Finding 2 — one rank step is worth ELEVEN usage points
+
+Rank 5 → 29.1%, rank 6 → 40.4%. **There is no setting that produces the ~33% a 25-point D3 scorer
+needs**; the dial steps straight over it. And rank 6 (40.4%) is already past what real college
+basketball produces (~32–36% for its most ball-dominant players), so the scale spends its entire
+working range at or beyond realism before the rail even catches it.
+
+**The whole depth chart, identical players, chart 10/7/5/3/1** (so this is the dial alone):
+
+| slot | rank | usage |
+|---|---|---|
+| 1 | 10 | 45.7% |
+| 2 | 7 | 22.0% |
+| 3 | 5 | 12.4% |
+| 4 | 3 | 10.1% |
+| 5 | 1 | 9.9% |
+
+One star and four ghosts. **Slots 3/4/5 are mashed against the 9% floor and indistinguishable** —
+the middle of the roster does not exist. Lowering `HierarchyExponentNeutral` (1.0 → 0.7 → 0.5 →
+0.35) moves the top (45.7 → 42.6 → 38.9 → 35.5) and **cannot move the bottom at all** (#4/#5 stay
+welded at ~9.9 at every exponent).
+
+### Finding 3 (the structural one) — the star's usage is not designed, it is CLAMPED
+
+On identical players, exponent 0.5 lands the #1 at 38.9% and looks like a fix. **On a realistic
+roster it does nothing**: with talent 85/64/58/55/52 aligned to chart 10/7/5/3/1, the #1 posts
+**44.8% at exponent 1.0 and 44.8% at exponent 0.5** — unchanged, because *skill alone* already
+pushes him past the rail before the depth chart speaks. Only at exponent 0.35 does he drop below it
+(42.6%).
+
+**So `UsageRail` — designed as participation protection, an emergency brake — is the thing actually
+authoring every real star's usage.** Two channels (skill and depth chart) compound past realism, and
+a hard clamp catches the result at ~45%. Nobody ever decided he should be at 45%; that is simply
+where the fence is. This is also *why* the top of the dial is dead: everyone from rank 7 up is
+already against the fence. Emmett's 40% ceiling is therefore **not a tuning job** — dropping the
+rail to ~0.46 would hit 40% while leaving the dial just as dead, one notch lower.
+
+### Finding 4 — volume is FREE (there is no efficiency cost to usage)
+
+| rank | usage | **FG%** |
+|---|---|---|
+| 5 | 29.1% | 44.5 |
+| 6 | 40.4% | 44.7 |
+| 7 | 45.1% | 44.9 |
+| 10 | 45.2% | **45.8** |
+
+Usage climbs 16 points and **shooting goes UP**. The Phase 17 usage diet shift is supposed to be the
+price of volume and is not biting at these levels. This blocks Emmett's ruling directly
+(2026-07-14): *"I'm not against, in extreme situations, it being higher than that, but it should
+come with a pretty hefty efficiency hit."* That player cannot exist today — nothing charges him.
+
+### Finding 5 — the dial is dead at BOTH ends, and its authority collapses next to good players
+
+The role-player probe (below) exposed what the star-only walk could not: **ranks 1, 2 and 3 are also
+the same player** (13.0/13.1/13.1% usage, 34.5% FG, identical to a tenth of a point) — all floored.
+So the scale is dead 1–3, dead 7–10, and only **4/5/6/7 do anything: four working settings out of
+ten.** Worse, on a roster of *elite* teammates (skill 90) the dial stops working almost entirely:
+ranks 1 through 7 all produce 13.5% usage and 37.1% 3P%, and even rank 10 only reaches 20.3%,
+because the teammates' skill channel drowns the hierarchy weight. **`HierarchyRank`'s authority is
+not merely coarse — it is a function of the surrounding talent**, and next to good players a coach
+cannot make a specialist a high-usage option at all.
+
+### Finding 6 — ROLE does nothing; TEAMMATE GRAVITY does everything (the decomposition)
+
+Emmett's design claim (2026-07-14): *"an underathletic but really good shooter, even in a Big 12
+environment, would still shoot okay if he was truly the fourth or fifth option and allowed to just
+shoot open threes. But forced to be the top option, that percentage might be right. In general,
+lower usage results in higher efficiency."* Measured on exactly that archetype — Outside 90, body
+30, everything else ordinary — on a high-major roster vs high-major opponents. **The two halves
+separate completely.**
+
+**Teammate gravity (his role held fixed at low usage) — LIVE and strong:**
+
+| his teammates' skill | his 3P% | his FG% |
+|---|---|---|
+| 55 | 27.7 | 30.9 |
+| 68 | 32.1 | 33.7 |
+| 80 | 34.1 | 36.3 |
+| 90 | **37.1** | 38.3 |
+| 97 | **37.7** | 39.2 |
+
+**+10 points of three-point shooting from teammate gravity alone.** The S48
+gravity→attention→relief channel is real and substantial, and it delivers Emmett's player: the
+underathletic sniper hits **37.1% from three in a Big 12 environment** as a low-usage option beside
+real talent.
+
+**His role (elite teammates held fixed) — DEAD:**
+
+| rank | usage | 3P% | FG% |
+|---|---|---|---|
+| 1 | 13.5% | 37.1 | 38.3 |
+| 2 | 13.5% | 37.1 | 38.3 |
+| 4 | 13.6% | 37.1 | 38.3 |
+| 5 | 13.6% | 37.1 | 38.3 |
+| 7 | 13.7% | 36.7 | 38.0 |
+| 10 | 20.3% | 36.1 | 36.9 |
+
+**He shoots 37.1% whether he is the first option or the fifth.** On a skill-68 roster the same
+decomposition gives 34.5% at 13% usage vs 31.7% at 43% usage — **a thirty-point usage drop buys 2.8
+points of shooting**, roughly 0.1pp per usage point, where real basketball is three to five times
+that.
+
+**So the ruling "lower usage results in higher efficiency" is NOT wired.** What is wired is "better
+teammates → higher efficiency." **Context changes a player's value; role does not.** Emmett's
+role-player misfits therefore half-exist: the good-team half works, the reduced-role half does not.
+
+**This is the SAME hole as Finding 4, from the other side.** Volume has no price *and* scarcity has
+no reward — one flat usage↔efficiency curve, two impossible players (the ball-hog who should pay,
+the specialist who should benefit). **Emmett's anchor ruling (2026-07-14): the ~31.7% at 43% usage
+is plausibly CORRECT; it is the low-usage end that is wrong.** So the fix anchors the top and lifts
+the bottom — it is not a re-tune of the star.
+
+### Loose thread (logged, not chased)
+
+With the rail artificially lifted, rank 10 posted 39.0 FG% while rank 9 at *identical* usage (54.3
+vs 54.4) posted 45.1. Not live behavior — it only appears with a non-shipping rail — but the shape
+suggests the usage-pressure penalty may be computed from what a player *wants* rather than what he
+*gets*, so a clamped star could be paying a diet penalty for shots he never takes. Worth ten minutes
+in the Roll E session; not a live bug.
+
+### Not calibrated here
+
+Emmett's spec (2026-07-14): usage above ~40% unrealistic, below ~8–10% unrealistic. `UsageFloor` at
+0.09 already matches the lower bound. **No constant was changed** — all rail/exponent numbers above
+came from temporary edits to the *build-output* config, reverted, with the committed `config.json`
+verified byte-identical afterward. This is a findings entry for the Roll E usage session (Open in
+status.md), not a tune.
