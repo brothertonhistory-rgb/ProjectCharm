@@ -427,6 +427,38 @@ The team battle (55/45 split) is unchanged. Details in Closed-by-ruling (the S46
   the wiring work it depends on — and the height→skill lean can now be sized against measured curves:
   the queued S55 sweep re-measurement is DONE (S55.1 — length adds ~+1.5pp FG% at the top,
   rim-concentrated, gated at reach parity; the S50 "size doesn't score" finding retired).
+- **HelpDefense overhelp / rotation cost — never had a home until now (recovered S60).** Help defense
+  compounds **nearly linearly**: five helpers take the opponent 52.9 → 49.5 with no penalty anywhere for
+  over-rotating. Real basketball punishes that — an over-helping team gives up open shooters and blown
+  rotations. Whether the engine should punish it is **open**. Note the honest limit both synthesis reads
+  landed on: **the flat bench has no spacing to punish it with**, so this is a *test-with-spacing* item,
+  not a confirmed too-strong. Needs the spacing/gravity side exercised on a real population first.
+
+- **BasketballIQ's dead lower half — should low IQ actively HURT? (recovered S60).** The measurement is
+  recorded (`attribute-meaning.md`, Family H): the make bonus is **dead flat 0→50**, then a perimeter-only
+  hockey stick 50→99. So a 10-IQ player and a 50-IQ player are the same player — **half the rating's range
+  does nothing, by design.** The design question that was never tracked: should a genuinely dumb player
+  take *bad shots*, make *bad passes*, and blow *late-clock reads* — an active penalty — rather than
+  merely forgoing a bonus? Emmett's call. Pairs naturally with the Discipline question below (both are
+  decision-making ratings that currently barely earn roster space).
+
+- **On-ball mismatch hunting — the deferred `DefenderPicker` promotion (recovered S60).** The offense does
+  **not** shift volume toward a soft *on-ball* defender (S54: the covered man's FGA stays flat at 12.8
+  across the whole PerimeterDefense walk). **Off-ball feeding already works** (S54 DEFENSIVE_LIABILITY: the
+  man guarded by a weak off-ball defender took 12.8 → 15.1 FGA), so this is a specific missing behavior,
+  not a general one. The mechanism is named in source: promote `DefenderPicker.Pick` to a carried
+  `PossessionState.DefenderSlot` once a second door consumes it. S59's drive gate **is** that second door
+  and declined the promotion — correctly, because the pick is still a pure deterministic slot map (both
+  doors compute the same man). **It becomes real only when the pick turns mismatch-hunting**, which is this
+  item. A future want, deliberately deferred — not an unflagged gap.
+
+- **Refresh `docs/attribute-wiring-synthesis.md` when the attribute map moves (S60).** The classification
+  doc — what each rating *means* in the live engine, and which problems are the coefficient vs the missing
+  subsystem — is the one thing this board does not carry. It was written at S54, lived uncommitted for six
+  sessions, and **the three items above were lost the whole time**. Now committed and refreshed. It does
+  NOT own the build order (this board does; its old tier list was cut at S60). Touch it when a rating
+  changes bucket, not every session.
+
 - **The S50 physical-package design questions — (1) is RULED AND SHIPPED (S55); (2)–(4) remain open.**
   Opened by Emmett's in-session read ("a 99 guy should be scoring over guys"): (1) **the
   height-over-defender make term — SHIPPED S55** (one-sided, zone-weighted, saturating reach advantage
