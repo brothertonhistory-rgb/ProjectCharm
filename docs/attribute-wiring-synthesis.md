@@ -42,6 +42,14 @@ Re-measuring the eight families against dialed opponents is **Open** on the boar
 been re-run**. Treat §2 as the honest even-bodied map and expect the body-interaction column to be
 missing everywhere.
 
+**[S60.2] The escape hatch turned out to already exist, and it is not the bench.** A 347-school world
+(`worlds/stock-d1.world.json`), the divvy, and the season page have been in the suite since S29, and
+S59 already measured the drive gate on the real divvy'd population. The `opponentDials` fix landed at
+S59.2 — and **zero of the 47 committed sweep configs use it**, so every committed bench config still
+plays flat-50. The first findings ever taken against a real generated population (S60.2, 3,000 games,
+100 teams from the live Pass-2 cohort) are in journal S60.2 and `attribute-meaning.md` Findings 4 and
+7. **The lesson for this document: when a §2 bucket matters, read it off the page, not the bench.**
+
 ---
 
 ## 1. The convergent diagnosis (both reads, independently)

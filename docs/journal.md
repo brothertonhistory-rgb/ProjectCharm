@@ -1,3 +1,117 @@
+## Session 60.2 — MEASUREMENT: the first read off a REAL POPULATION. Volume is FREE — the ball-hog is MORE efficient than his even-share teammate. The tax prices him but can never stop him. And the 347-team world we were about to build already exists (2026-07-16)
+
+**Register:** a measurement/design conversation. **NOTHING SHIPPED — no engine change, no config change, no commit.** All code written this session was scratch, lived in the sandbox, and is gone. This entry exists because the findings are not.
+
+**THE CORRECTION THAT OPENED IT (Claude wrong twice; Emmett's instinct right).** Emmett: *"I'm beginning to think we need to start making some realistic teams for these guys to play against, 5 50's across the board is a very unrealistic team."* Claude first pushed back (authoring a "realistic" team is a guess wearing a nicer suit — flat-50's sin with better manners) and then recommended building the divvy. **Both the pushback and the recommendation were wrong on the facts.** The truth, found by looking:
+
+- **`worlds/stock-d1.world.json` has 347 schools**, 32 conferences, 4 tiers. The divvy exists. The season page exists (`season <world.json> <seed>`, Phase 55, in the suite since S29). **Emmett's "eventually we will need 360 unique teams" described something already built.**
+- **His prestige instinct was already the ruling**, in the divvy's own header: *"Prestige stops generating quality and becomes what it is: ACCESS."* One national pool, prestige-weighted access, the Gonzaga mechanism. He was arguing for a decision he made at S29.
+- **S59 already used it** — the drive gate's league read (rim 36.3%→33.8%) came off the real divvy'd population, not a bench.
+- **What IS true:** the pool still runs the Pass-1 position-based generator, and **not one of the 47 committed sweep configs uses `opponentDials`.** S59.2 built the dial, committed the parser, and the four-level divisional-ladder rosters that proved the body gate were never committed — run in-sandbox, thrown away. **The instrument got fixed and nothing was ever pointed through it.** That is the S36.1 stale-plan pattern inverted: the board reads "instrument upgrade shipped," which is true, and misses that it is unused.
+
+**THE INSTRUMENT (scratch, sandbox-only, not committed).** 100 teams × 30 games = 3,000 games. Players drawn from the **live Pass-2 cohort** (`BuildCohort(seed, 46000)`), top 500 by the generator's **own** `Rscore` — the recruiting line, *"value of the player's best viable pathway to minutes"* — so the quality sort was **not** a scalar Claude invented; the generator already computes it and it is oracle-locked. Tendencies came from the committed, golden-proven `DeriveTendencies` (skill-derived, not authored). Random 5-man teams, no prestige, no depth chart (**all HierarchyRank 5**, so skill alone authored usage). Cut at Rscore 57.3 vs a cohort median of 19.2 — roughly the top 1%.
+
+---
+
+### FINDING 1 — Volume is FREE, and hoarding is a FREE LUNCH (league scale, real population)
+
+Archetype table, tax at today's `PressureVolumeTaxScale` = **0.12**:
+
+| | USG% | FG% | PPP | PPG |
+|---|---|---|---|---|
+| **chucker** (top usage decile) | 39.2% | 39.6% | **0.853** | 26.4 |
+| **even-share** (median decile) | 17.7% | 37.1% | **0.775** | 10.8 |
+
+**The man taking 39% of his team's shots is MORE efficient than the man taking 18%, at 2.2× the load.** Gap **+0.078 PPP**. The engine's current advice is: always feed one guy. There is no cost anywhere.
+
+**And reshaping usage across the entire range costs the league 0.4 points a game.** Walking `UsageExponent` 2.0 → 1.0 moves max usage 47.9% → 35.6% and median 17.4% → 19.8%, while league FG% moves **38.3% → 37.9%**, team PPG **62.7 → 62.3**, TO% **17.8 → 17.7**. Going from "one man takes 48%" to "everybody takes 20%" is worth four tenths of a point.
+
+**The arithmetic confirms the dial does exactly what 0.12 predicts, which is nothing.** At 48% usage, pressure = 0.28; × 0.12 = a 3.4% haircut on make odds ≈ 1.4pp of FG% on a 40% shooter; spread over half a team's shots ≈ 0.4pp league-wide. **Observed: 0.4pp.**
+
+**This closes attribute-meaning Finding 4's open question with a number instead of a flat-50 inference**, and confirms the S60 docs correction: the mechanism was never missing, it is *mis-tuned to a whisper*.
+
+### FINDING 2 — The tax PRICES the chucker; no setting of it ever STOPS him
+
+Walking `PressureVolumeTaxScale`, usage dials held fixed:
+
+| taxScale | chucker USG% | chucker FG% | chucker PPP | even-share PPP | **gap** |
+|---|---|---|---|---|---|
+| 0.12 (today) | 39.2% | 39.6% | 0.853 | 0.775 | **+0.078** |
+| 0.40 | 39.0% | 38.2% | 0.825 | 0.778 | +0.046 |
+| 0.60 | 39.0% | 37.3% | 0.807 | 0.773 | +0.034 |
+| **1.00** | 38.9% | 35.0% | 0.771 | 0.770 | **+0.001** |
+
+**Look at the USG% column: 39.2 → 38.9 across an 8× crank. Frozen.** The tax lives in Roll H on make%; usage is decided upstream in Roll E and never hears the result. **Nothing self-corrects.** No dial in the engine takes the ball away from a man shooting 25.4%.
+
+At **1.00** the star's efficiency edge closes to exactly zero — 2.2× the load for identical PPP, close to what a real alpha looks like. **Claude's recommendation: ~0.7** (a real star probably should keep a small edge). At 0.7 the 48%-usage man pays ~6pp of FG% (Memphis2 1: 41.7 → 35.8; Kentucky4 1: 32.0 → 25.4, a genuine drag) while Auburn 1 still shoots 42.3% on 43% usage because he is good enough to carry it. **That distinction does not exist at 0.12.** Emmett ruled: fix it, but **in a separate calibration session** — wiring first.
+
+### FINDING 3 — Usage LEVELS are historical outliers, and it is the exponent, not the rail
+
+`USG% max 48.1 | p90 32.9 | median 17.6 | min 7.8` — **twenty players above 39% in a 500-player league.** Westbrook's all-time record season is 41.7%.
+
+| exponent | rail | maxUSG | p90 | median | n>35% | n>40% |
+|---|---|---|---|---|---|---|
+| 2.0 | 0.52 | 47.9% | 32.4% | 17.4% | 40 | 20 |
+| 1.5 | 0.52 | 45.5% | 30.4% | 18.8% | 24 | 5 |
+| 1.0 | 0.52 | 35.6% | 27.9% | 19.8% | 2 | 0 |
+| 2.0 | 0.35 | 37.5% | 30.9% | 18.6% | 4 | 0 |
+
+**The exponent shapes the whole curve; the rail only clips the tip** (0.52 → 0.35 moves p90 just 32.4 → 30.9 — it never binds below the very top). **DO NOT fix this with the exponent** — dropping it to 1.0 makes every number look right by making the 45%-usage alpha *impossible to generate*, contradicting Emmett's own ruling (*"I'm not against, in extreme situations, it being higher than that, but it should come with a pretty hefty efficiency hit"*). **He wants that player to exist and to pay. The exponent deletes him; the tax charges him.**
+
+**Note the median: 17.6%, BELOW the 20% even share.** The stars eat so much that the median player is starved — which is why S60's relief fired on three-of-five starters. Same root.
+
+### FINDING 4 — Usage is AUTHORED BY THE PLAYER'S RATINGS, not by any coach
+
+He chucks because his SelfCreation is high. Nobody chose him; no coach can bench him; a 3-for-19 night changes nothing. The dial *meant* to express a coach's plan is `HierarchyRank` — **and S59.2 already found it broken** (only 4 of 10 settings do anything; one step is worth 11 usage points). It is Parked. **This finding is the reason to un-park it.** Emmett's framing, the clearest statement of the problem all session: ***"Nobody chose him. He chose himself."***
+
+### FINDING 5 — The S60 relief is roughly 10× too quiet, and the intent-vs-touches Open is why
+
+Walking `UsageReliefBonusScale`; FG% by usage decile (lowest usage → highest):
+
+| scale | d1 | d2 | d3 | d4 | d5 | d6 | d7 | d8 | d9 | d10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0.0 | 35.8 | 39.5 | 37.8 | 36.4 | 37.3 | 36.8 | 36.9 | 38.2 | 37.5 | 39.9 |
+| **1.0 (today)** | **37.0** | 40.6 | 39.9 | 37.8 | 39.0 | 35.8 | 36.1 | 38.4 | 38.0 | 39.6 |
+| 4.0 | **45.3** | 44.7 | 42.0 | 42.8 | 40.9 | 36.6 | 37.1 | 38.0 | 37.4 | 40.4 |
+
+At **0** the curve is flat. At **4** it is the shape Emmett asked for: 45.3% for low-usage men sliding to 40.4% for ball-hogs. **At 1.0 the bottom decile gains 1.2pp — invisible.** Emmett noticed unprompted (*"I am also concerned as to why the players with lower usage aren't shooting a little bit higher to simulate them getting more open shots"*): the wire is live and firing, at a tenth of the volume the basketball wants.
+
+**It is also quieter than DESIGNED.** Decile 1 averages 9.1% usage → relief should be 0.109 → +10.9% relative → ~+3.9pp. **Observed: +1.2pp.** The likely cause is S60's own Open item: **the relief pays on the share the offense INTENDS, not the touches a man gets.** These are exactly the players the defense sags off, so the tilt strips them further below what the books say they carry, and they are paid for the smaller gap — the mechanism that left Okafor at 52.2 → 52.2. **Rule intent-vs-touches BEFORE tuning this scale**, or the scale gets tuned to compensate for a bonus computed off the wrong number and a later fix makes it twice too strong.
+
+### FINDING 6 — TO% is NORMAL. Claude's turnover flag was noise; Emmett killed it.
+
+Claude flagged "6–7 turnovers a game" off the first run. **Emmett:** *"6 turnovers isn't crazy if it comes with 50% usage. TO% is much more indicative of any issues."* Correct — the counting stat was the wrong lens.
+
+**League TO% = 17.8** (real D1: 17–19). The **twenty highest-usage players average 15.8%** — *better* than league average, exactly how it should look. Alabama 1's "6.4 turnovers" is a **17.6% rate at 45.7% usage.** There is no turnover problem on a real population. (The S49 attribution inversion concerns *blame*, not rate, and stays open on its own terms.)
+
+### FINDING 7 — Efficiency reads LOW across the board, and it is NOT a distribution problem
+
+Top-1% field: **FG% 38.4 | 3P% 28.8 | FT% 63.1 | team PPG 62.9**, against real D1 of roughly 44 / 34 / 71 / 72. Every number 5–8 points light, all the same direction — a field of blue-chips shooting worse than an average real team.
+
+**Claude's hypothesis — that concentration on bad shooters dragged FG% down — is DEAD:**
+- attempt-weighted league FG% **38.4** vs per-player mean **38.5** → concentration costs **0.1pp**
+- **r(USG%, FG%) = −0.004** (top 500) and **+0.082** (full cohort, variance intact)
+
+**The zero was checked for the artifact it looks like.** A "no effect" headline is exactly what a restricted range manufactures (S59.2's standing rule), and the top-500 pool was selected on Rscore, which correlates with both usage and shooting — so the correlation was re-run on the **unrestricted 46,000-player cohort**. It survives. Not a selection artifact.
+
+**A caveat on Claude's own metric, recorded so nobody over-reads the flat correlation:** FG% is confounded by shot location. The diet is skill-derived, so the best shooter takes *threes* and posts a low FG% **by design**, while a rim-runner posts a high one for dunking. **PPP is the right lens**, and on PPP the top usage decile *is* modestly better (0.74 → 0.85 top-1%; 0.62 → 0.69 full cohort). **Flat-ish PPP-vs-usage is arguably CORRECT basketball** — the usage-efficiency tradeoff is real and the skill-curve debate lands near flat. Emmett's call, not a bug.
+
+So the low levels are a **curve** read, not a distribution read — the first ever taken against a real population, and what S47's FT note (*"flat-50 FT% ~49.8, a calibration note for later"*) has been waiting for.
+
+**A spread worth a real check, not a shrug:** the random-world field (all 46,000, median Rscore 19.2) ran **FG% 27.8 / team PPG 50.8**; the top-1% field ran **38.4 / 62.9** — a 12-point PPG spread. S59.2's divisional ladder found scores nearly flat across levels (53–53 at D3, 57–57 at high-major). Not necessarily a contradiction — these endpoints are far wider than D3-to-D1, since "everyone in the pool" includes thousands who would never play anywhere — but it is unexplained and should not be assumed benign.
+
+---
+
+**Claude's errors this session — all caught in-sandbox, none reaching Emmett's machine:**
+1. **`PlayerId` is a BOX ADDRESS, not an identity.** `PlayerBoxTotals` is indexed `PlayerId - 1` (0–19), so it must be 1–5 home / 6–10 away, **restamped every game** (`StampPlayerId` exists for exactly this). Claude assigned global IDs 1–160; every stat landed outside the array or on the wrong man, and the first run reported a team PPG of **3.4**. Assumed a field's meaning instead of reading it — the §1 failure mode, **third occurrence in two sessions** (after `HierarchyRank`).
+2. **Name collisions merged players.** A 32-name list wrapped across 100 teams, so four different players accumulated into "Duke 1" and one man "played 252 games."
+3. **`--no-build` hid a config change.** `config.json` copies to the output directory at build time; running `--no-build` after editing it produced a byte-identical result that would have been reported as *"the tax does nothing."* Caught only because the numbers were **suspiciously identical**, not by process. **Standing note: after touching config.json, rebuild before running.**
+4. **Reached for league aggregates twice** where the archetype view was right (the tax's league FG% moves only 1.7pp at an 8× crank because ~4% of players are chuckers and the other 96% pay nothing — the aggregate is diluted by design).
+
+**Housekeeping — a future session must NOT "build the divvy."** `worlds/`, `Program.Divvy.cs`, `Program.Season.cs`, `Program.Checks.Divvy.cs`, `Program.Checks.Season.cs`, `Program.Gen.cs` all exist and are in the suite. Phase 3 is a **swap** — point the existing divvy at the Pass-2 cohort — and it opens with the positions-from-orientation conversation, because the generated player carries a continuous orientation (−1 perimeter → +1 interior) plus height plus a named weapon, and **never a position string** (zero occurrences repo-wide). He is not missing information; the divvy's three buckets want *less* of it than he has.
+
+**Emmett's ruling on sequence:** *"We need to mess with the missing wiring a bit first and then we can get more into calibration."* The tax, the relief scale, and the curve levels are all calibration and all wait. **Next is wiring.**
+
 ## Session 60 — The USAGE-RELIEF bonus SHIPPED (v1): the low-usage half of the usage↔efficiency curve. Emmett's underathletic sniper can now exist. And the wire pays on what your offense INTENDS to give a man, not what the defense lets him have — measured, not assumed (2026-07-14)
 
 **Register:** a build session. Full CONVENTIONS ritual — fresh pull, required reads, check-in gate, oracle-first, sandbox pre-check, green on Emmett's machine, then docs. **One engine behavior added; the tax side did not move.**

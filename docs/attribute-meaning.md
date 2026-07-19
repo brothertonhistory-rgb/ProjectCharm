@@ -1345,6 +1345,24 @@ rail to ~0.46 would hit 40% while leaving the dial just as dead, one notch lower
 
 ### Finding 4 — volume is FREE at today's calibration (the tax exists; it is tuned to a whisper)
 
+> **[S60.2] MEASURED ON A REAL POPULATION — this finding is no longer a flat-50 inference.**
+> 3,000 games, 100 teams drawn from the live Pass-2 cohort (top 500 of 46,000 by the generator's
+> own `Rscore`). The result is worse than "free" — **hoarding is a FREE LUNCH:**
+>
+> | | USG% | FG% | PPP | PPG |
+> |---|---|---|---|---|
+> | chucker (top usage decile) | 39.2% | 39.6% | **0.853** | 26.4 |
+> | even-share (median decile) | 17.7% | 37.1% | **0.775** | 10.8 |
+>
+> **The man taking 39% of the shots is MORE efficient than the man taking 18%, at 2.2× the load.**
+> The engine currently advises: always feed one guy. And **reshaping usage across the entire range
+> costs the league 0.4 points a game** (`UsageExponent` 2.0 → 1.0: max usage 47.9% → 35.6%, league
+> FG% 38.3% → 37.9%). The arithmetic matches the dial exactly — pressure 0.28 × scale 0.12 = a 3.4%
+> haircut ≈ 0.4pp league-wide. **`PressureVolumeTaxScale` = 0.12 is doing precisely what 0.12
+> predicts.** Walking it to **1.00** closes the chucker's edge to +0.001; **~0.7** leaves a real star
+> a small edge and makes a 48%-usage man pay ~6pp of FG%. Calibration, deferred by Emmett's ruling
+> (wiring first). Full record: journal S60.2.
+
 | rank | usage | **FG%** |
 |---|---|---|
 | 5 | 29.1% | 44.5 |
@@ -1466,6 +1484,22 @@ two can never disagree about the pivot) and is therefore not a defect — but it
 question, logged Open for the calibration page.
 
 **League effect at the placeholder:** FG% 43.73% → 44.03% (+0.30pp), PPP 0.9755 → 0.9814.
+
+**[S60.2] MEASURED ON A REAL POPULATION — the wire is live and roughly 10× too quiet.** FG% by
+usage decile (lowest usage → highest), same field, only `UsageReliefBonusScale` moving:
+
+| scale | d1 | d2 | d3 | d4 | d5 | d6 | d7 | d8 | d9 | d10 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0.0 | 35.8 | 39.5 | 37.8 | 36.4 | 37.3 | 36.8 | 36.9 | 38.2 | 37.5 | 39.9 |
+| **1.0 (today)** | **37.0** | 40.6 | 39.9 | 37.8 | 39.0 | 35.8 | 36.1 | 38.4 | 38.0 | 39.6 |
+| 4.0 | **45.3** | 44.7 | 42.0 | 42.8 | 40.9 | 36.6 | 37.1 | 38.0 | 37.4 | 40.4 |
+
+At 0 the curve is flat; at 4 it is the intended shape (open men shoot 45.3%, ball-hogs 40.4%). **At
+1.0 the bottom decile gains 1.2pp — invisible.** It is also quieter than *designed*: decile 1
+averages 9.1% usage, so relief should be 0.109 → ~+3.9pp, and it delivers +1.2pp. **The
+intent-vs-touches Open above is the likely cause** — low-usage men are exactly who the defense sags
+off, so the tilt strips them below what the books say they carry. **Rule intent-vs-touches BEFORE
+tuning this scale**, or the scale absorbs the error and a later fix makes it twice too strong.
 
 ### Loose thread — RESOLVED (S60)
 
