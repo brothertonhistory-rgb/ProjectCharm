@@ -367,6 +367,29 @@ public sealed class RollHConfig
     /// [0.0, 0.20]. 0.0 = IQ make-door OFF. [CALIBRATION PLACEHOLDER]</summary>
     public double IqMakeSensitivity { get; set; } = 0.08;
 
+    // Session 61 — DISCIPLINE make-% shave (Effect A). A small, ABSOLUTE, per-man
+    // defensive-restraint reduction on the man's make%, read off the DEFENDER's OWN
+    // Discipline (no shooter term — absolute, unlike the foul contest). MULTIPLICATIVE,
+    // so the proportional reduction is FLAT across every zone (the signed invariant):
+    //   progress = clamp((defenderDiscipline − 50) / 49, −1, +1)   // symmetric about 50
+    //   shave    = DisciplineMakeShaveScale × progress
+    //   makePct ×= (1 − shave)                                      // then clamp [0,1]
+    // SYMMETRIC about the midpoint (Emmett's ruling, S61): a lockdown defender (99) shaves
+    // his man's make%, an AVERAGE defender (50) is neutral, and a LIABILITY (0) gives up a
+    // cleaner look. The make-curve already bakes in an average defender, so 50 is the true
+    // neutral point. Modest by design: at 0.015 a max-Discipline defender moves one shot
+    // ~1.5% relative (50.0% → 49.25%) — barely a game; five of them turn a close one.
+    // The zone-independence is what MULTIPLICATIVE buys and is the Phase 67 flat-across-
+    // zones assertion. 0.0 = shave OFF (the inertness anchor for the zero-knob byte-
+    // compare). Load-guarded to [0.0, 0.05] — a DESIGN bound on the most one defender's
+    // restraint may ever move a single shot. [CALIBRATION PLACEHOLDER]
+
+    /// <summary>Single tunable for the Phase 67 Discipline make-% shave — sizes the
+    /// symmetric, absolute, per-man proportional reduction on the settled make%. Ships at
+    /// 0.015 (~1.5% relative at max Discipline); Load-guarded to [0.0, 0.05]. 0.0 = shave
+    /// OFF. [CALIBRATION PLACEHOLDER]</summary>
+    public double DisciplineMakeShaveScale { get; set; } = 0.015;
+
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
@@ -468,6 +491,15 @@ public sealed class RollHConfig
         if (cfg.IqMakeSensitivity < 0.0 || cfg.IqMakeSensitivity > 0.20)
             throw new InvalidOperationException(
                 $"RollH IqMakeSensitivity must be in [0.0, 0.20] (got {cfg.IqMakeSensitivity}).");
+
+        // Session 61 invariant — Discipline make-% shave scale. Bounded on BOTH sides on
+        // purpose: 0.0 = shave OFF (the inertness anchor for the zero-knob byte-compare);
+        // the 0.05 ceiling is a DESIGN bound on the most one defender's restraint may ever
+        // move a single shot (~5% relative). Modest by design; ships at 0.015 (~1.5%).
+        if (!double.IsFinite(cfg.DisciplineMakeShaveScale)
+            || cfg.DisciplineMakeShaveScale < 0.0 || cfg.DisciplineMakeShaveScale > 0.05)
+            throw new InvalidOperationException(
+                $"RollH DisciplineMakeShaveScale must be in [0.0, 0.05] (got {cfg.DisciplineMakeShaveScale}).");
 
         // Session 21 invariant — putback make penalty. A make%-point shift applied to the
         // putback's matchup rim make% before the carve; [0, 1] is the semantically valid

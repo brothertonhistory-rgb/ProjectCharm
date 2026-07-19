@@ -196,7 +196,8 @@
     "OffBallDefenseSuppressionScale": 0.15,
     "OffBallDefenseAggregateExponent": 2.0,
     "OffBallDefenseMidMultiplier": 0.30,
-    "IqMakeSensitivity": 0.08
+    "IqMakeSensitivity": 0.08,
+    "DisciplineMakeShaveScale": 0.015
   },
   "Attention": {
     "GravityBlendWeight": 0.5,

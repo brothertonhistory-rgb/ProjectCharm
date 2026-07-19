@@ -83,6 +83,12 @@
     <None Include="..\..\tools\usage_relief_golden.json" Link="tools\usage_relief_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Discipline make-% shave golden fixture (emitted by tools/discipline_shave_oracle.py,
+         S61), copied beside the binary so the Phase 67 golden parity reads it from
+         AppContext.BaseDirectory (same convention). -->
+    <None Include="..\..\tools\discipline_shave_golden.json" Link="tools\discipline_shave_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- Pass-2 generation replay fixture (emitted by the oracle's fixture switch in
          tools/gen_pass2_skillfirst_oracle.py, S42.2), copied beside the binary so
          RunGenPass2ReplayParity reads it from AppContext.BaseDirectory (same convention). -->

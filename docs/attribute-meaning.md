@@ -994,7 +994,7 @@ matchup proxy that includes all his attributed attempts. On *his own line* the r
 | **PerimeterDefense** | FGA **12.8 → 12.8** (flat); FG% **37.8 → 34.9**; 3P% **29.5 → 19.4**; 2P% 40.0 → 38.7 | On-ball contest. Volume never moves — the offense does not hunt the on-ball mismatch — but his looks get harder, hardest on the three. |
 | **RimProtection** | FGA 12.8 (flat); 2P% **40.5 → 36.7**; 3P% ~23 (flat) | Kills interior makes, not volume or the three. (Plus the S52 second-chance/putback team channel.) |
 | **PostDefense** | FGA **13.7 → 12.0**; 2P% **41.2 → 37.1** | The one that takes **both** — it is a *denial* rating (touch redistribution via postness), so it lowers his volume as well as his efficiency. |
-| **Discipline** | FTA **3.7 → 3.6** (essentially flat); nothing else moves | **Near-inert even undiluted** — see Family H. |
+| **Discipline** | FTA **3.7 → 3.6** (essentially flat); nothing else moves | **Was measured on the WRONG meter (S61 correction).** FTA is shooting-fouls-only, vs a flat-50 shooter — its foul wire IS live (moves the shooting-foul rate ~5% vs an average drawer, more vs a magnet). Make-% was the unbuilt half; **the Discipline make-shave SHIPPED S61 (Effect A)**. See Family H. |
 
 **Finding — perimeter defense is point-neutral without a rim deterrent (the S54 design result).**
 Stacking PerimeterDefense at 99 across 1 → 2 → 3 → 5 slots confirmed the mechanism and surfaced a
@@ -1123,6 +1123,29 @@ and the S51 transition-share gap: the per-man effect is real, the instrument dil
 (Note: `DISCIPLINED_STOPPER`'s Team B shot-mix shift — Rim 28.8 → 29.3, 3PA 20.4 → 20.0 — is the
 PerimeterDefense 80 doing its S52 job, not the Discipline.)
 
+### Finding 3 CORRECTED and half-ANSWERED (S61): Discipline was quiet on the WRONG meter; now wired on two channels.
+
+The S53/S54 "near-inert" read measured **the wrong meter twice over**, confirmed by an S61 audit
+against live source + a real run:
+- **The foul wire is LIVE, not dead.** `Matchup.FoulRate` reads `defender.Discipline` and is called only
+  from the **shooting-foul** door (`RollHGenerator.cs:601`). A 0→99 Discipline walk moves the *shooting-foul
+  rate* ~5% relative against an average foul-drawer, and up to ~37% against a foul-magnet — a two-sided
+  drawing-vs-restraint contest, so the swing rides on where the shooter's FoulDrawing sits on the tanh
+  curve. The "FTA 3.7 → 3.6" read looked flat because **FTA is shooting-fouls-only** (35% of defensive
+  fouls) **and** the bench shooter was flat-50 (a small swing on an already-small base). Quiet by tuning
+  (`DefenseFoulWeight` 0.2), not absent.
+- **The make-% shave was the genuinely-unbuilt half — and it SHIPPED (S61, Effect A).** Discipline touched
+  make% nowhere (confirmed by grep of the make chain, `EffectiveRating`, and the Roll G blend). S61 added
+  `RollHGenerator.ApplyDisciplineShave`: a small, ABSOLUTE, FLAT-across-zones reduction on the man's make%,
+  read off the defender's own Discipline, symmetric about 50 (lockdown shaves, average neutral, liability
+  gives up a cleaner look). This is the **man-to-man** wire (per the S61 scheme-toggle ruling). Modest by
+  design (~1.5% relative at max Discipline); magnitude page-tuned. See design.md "Session 61" and Phase 67.
+- **Effect B (the "fouls committed" half) is deferred.** 65% of defensive fouls are non-shooting (reach-ins
+  / off-ball grabs), authored as a team rate in Roll B and charged anonymously in Roll D — Discipline reads
+  nothing there. Emmett ruled non-shooting fouls must eventually be attributed to an individual, so Effect B
+  is a per-man non-shooting foul model in its own session (status.md Open). **So Discipline is no longer a
+  "candidate wiring gap": one channel shipped, the other has a ruled build path.**
+
 ### The interaction block (seven rows, slot 1)
 
 | Row | Dials | Read |
@@ -1143,11 +1166,14 @@ PerimeterDefense 80 doing its S52 job, not the Discipline.)
   team-level channels (conversion-quality make bonus, lineup-passing assist rate) are real in the
   source but whisper-scale. It should be sized as a modest efficiency-and-credit rating for perimeter
   players, not a volume or creation driver.
-- **Discipline** is a **defender-light foul-avoidance tap** in the source — a disciplined defender
-  fouls the man he guards a little less; an undisciplined one hacks a little more (asymmetric). But
-  the S54 undiluted rerun found it **near-inert even on the covered man's own line** (his FTA moves
-  only 3.7 → 3.6 across the whole walk). Treat it as a candidate wiring gap for synthesis, not a
-  rating to size — as wired it barely earns its place.
+- **Discipline** is a **two-channel defensive-restraint rating** (as of S61, and no longer a "candidate
+  wiring gap"): (1) a defender-light tap in the **shooting-foul** contest (live, quiet at
+  `DefenseFoulWeight` 0.2 — the S53/S54 "near-inert" read measured this on shooting-fouls-only FTA vs a
+  flat-50 shooter and missed it), and (2) the **make-% shave** shipped S61 (Effect A) — a small, absolute,
+  flat-across-zones reduction on the man's make%, symmetric about 50, man-to-man. Its third intended channel
+  — reduced **non-shooting** fouls committed (Effect B, 65% of defensive fouls) — is a ruled per-man
+  foul-model build, not yet in. Size it as a modest, small-magnitude defensive rating: worthwhile stacked
+  across five defenders, barely a game from one. Magnitudes page-tuned, never suite-asserted.
 
 ### Completeness ledger (the honest note)
 
@@ -1155,12 +1181,12 @@ PerimeterDefense 80 doing its S52 job, not the Discipline.)
   directly on the swept player's line). Its two team-level tails (the conversion-quality make channel
   and the lineup-passing assist-rate channel) were flagged at the gate and confirmed as whispers by
   the walk (team points 52.8 → 53.0).
-- **Discipline** — at S53 the per-man magnitude was only arithmetic-bounded (no Team B FTA column, the
-  read diluted 5:1). **S54 measured it undiluted** with the per-man readout, and the honest result is
-  stronger than "diluted whisper": on the covered man's own line his free-throw attempts move only
-  **3.7 → 3.6 across the entire 0→99 walk**, and nothing else moves at all. As currently wired
-  Discipline does almost nothing to the man you guard — a **candidate wiring gap**, not merely a
-  read the S53 instrument couldn't see. Logged for synthesis; nothing touched.
+- **Discipline** — the S53/S54 "3.7 → 3.6 near-inert" read was **corrected in S61**: it measured
+  shooting-fouls-only FTA (35% of defensive fouls) against a flat-50 shooter, hiding a live-but-quiet foul
+  wire (the shooting-foul rate moves ~5% vs an average drawer, more vs a magnet). The genuinely-unbuilt half
+  — make% — was **shipped in S61 (Effect A, the make-% shave)**, and the "fouls committed" half (Effect B,
+  non-shooting) has a ruled per-man build path. **No longer a candidate wiring gap.** (See Finding 3
+  CORRECTED above.)
 - **No additional Family-H bench work is required before synthesis**, and no additional bench work of
   any kind remains — **the measurement arc is complete.** The remaining Discipline question
   (per-opponent-slot foul suppression) is the same instrument gap logged for Family G, a design/

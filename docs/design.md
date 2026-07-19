@@ -3251,6 +3251,8 @@ Two attributes participate in the foul contest:
 - **Shooter: `FoulDrawing`** — the dominant signal (weight 0.80).
 - **Defender: `Discipline`** — a light tap (weight 0.20).
 
+*(This is one of Discipline's TWO wires. The other, added S61, is the make-% shave — see "Session 61: The Discipline make-% shave." The two are distinct: the foul wire is a two-sided contest reaching only the SHOOTING-foul door in Roll H; the make shave is absolute, per-man, and reaches every make. Non-shooting fouls read no Discipline — deferred to the per-man foul model, Effect B.)*
+
 Both are expressed as deviations from an `AttributeMidpoint` (default 50.0), so an average player
 contributes zero:
 
@@ -4630,6 +4632,34 @@ The consequence for how this is described: *"low-usage players shoot better"* is
 **Deferred — the magnitudes, not the shape.** All five config dials are calibration placeholders, page-tuned against a real population and **never suite-asserted** (the page-only calibration principle). The correct values emerge once rosters have real star/role distinctions. **The tax side is tuned to a whisper today** (`PressureVolumeTaxScale` 0.12): S59.2 measured usage climbing 29.1→45.2% while FG% *rose* 44.5→45.8 — volume is effectively free at current settings. That is a **calibration** fact, not a missing mechanism; the tax has existed since Phase 17 and the residual channel can bite hard under attention. (An earlier framing — *"the mechanism is missing, not mis-tuned"* — was correct on the low side and wrong on the high side; corrected in the S60 docs pass.)
 
 **Observation run.** Phase 17 alone left FG%/PPP unchanged from Session 51 (test-roster shares are near-equal; pressures are small). **Session 60's relief moved the corpus for the first time:** league FG% **43.73% → 44.03%** (+0.30pp), PPP 0.9755 → 0.9814 — driven almost entirely by the two genuinely-unfeatured slot-5 shooters (Baptiste 42.2→44.0, Thornton 43.7→46.1), with three of five starters at exactly zero relief. The curve is now wired on both sides; its magnitudes wait on realistic usage concentration.
+
+
+## Session 61: The Discipline make-% shave (Effect A) — the MAN-TO-MAN wire
+
+**What this is.** Discipline is a small, absolute, per-man defensive-restraint rating. Effect A is the first of its two intended effects: the matched defender's own Discipline shaves his man's make% by a small RELATIVE amount, seated in Roll H beside the multiplicative usage siblings (volume tax, relief), AFTER the C3 block. It is the IQ ruling applied to the defender — the engine has no possession-by-possession "did he stay disciplined" stage, so the effect has nowhere to live except the make surface directly, and writing it there is not double-counting *because* there is no separate stage to pay twice.
+
+**Scheme note — this is the MAN-TO-MAN wire (Emmett's ruling, S61).** The shave routes through the man-to-man matchup like every defensive rating. When the zone/scheme layer lands, defensive scheme will **toggle distinct wiring sets** (man reads the matchup; zone reads areas/rotations) rather than one scheme-agnostic wire, so Discipline — and every defensive rating — gets a *per-scheme* implementation. This wire is explicitly the man-to-man one; a future session must not mistake it for the universal version.
+
+**The form.** `RollHGenerator.ApplyDisciplineShave` (a named static, so the Phase 67 golden binds to the engine's own code, not a copy), ported constant-for-constant from `tools/discipline_shave_oracle.py`:
+
+    progress = clamp((defenderDiscipline − 50) / 49, −1, +1)   // symmetric about the midpoint
+    shave    = DisciplineMakeShaveScale × progress
+    makePct  = clamp01(makePct × (1 − shave))
+
+Four design properties, each deliberate:
+
+- **Absolute.** Reads the DEFENDER's own Discipline, no shooter term — the same defender applies the same relative shave to any man he guards. This is unlike Discipline's *other* wire, the foul contest (`Matchup.FoulRate`), which is and stays a two-sided drawing-vs-restraint contest. Emmett specified *absolute* for the make% only.
+- **Flat across zones.** Multiplicative, so the proportional reduction is constant across every zone — the signed invariant Emmett approved. Phase 67 proves the live/kill make ratio equals (1 − shave) at every zone.
+- **Symmetric about 50 (S61 ruling).** A lockdown defender (99) shaves the make%, an average defender (50) is neutral, a liability (0) gives up a cleaner look. The make-curve already bakes in an average defender (`DefenseRating` blends PerimeterDefense/PostDefense/RimProtection — Discipline is not in it), so 50 is the true neutral point, and a 0-Discipline defender is a real liability rather than merely "not helping."
+- **True identity branch.** `scale <= 0` (the legal kill switch) OR a null defender (empty slot, DEC-6, guarded at the call site) returns the input untouched — no multiply, no clamp. Bit-identical for the right reason, not via a harmless ×1.0.
+
+**Modest by design.** At `DisciplineMakeShaveScale` = 0.015 a max-Discipline defender moves one shot ~1.5% relative (60% rim finisher → 59.1%, 34% shooter → 33.5%) — barely a game from one man; five disciplined defenders shave ~1.5% off the whole other team, where a close one turns. The magnitude is a **calibration placeholder**, page-tuned later, never suite-asserted; Load-guarded to [0.0, 0.05] (a design ceiling on how much one defender's restraint may ever move a single shot). 0 is the inertness anchor for the zero-knob byte-compare.
+
+**Config home — RollHConfig, not MatchupConfig (an engineering call, S61).** `DisciplineMakeShaveScale` lives in `RollHConfig` alongside its make-chain siblings (`PressureVolumeTaxScale`, `UsageReliefBonusScale`, `IqMakeSensitivity`), all read via `_cfg` right where the shave seats — so it reads the same way as the terms beside it. Discipline's *foul* weight (`DefenseFoulWeight`) remains on `MatchupConfig`, because that wire is a `Matchup` static.
+
+**Effect B (fouls) is NOT built — deferred as a foundation piece.** The other half of the spec — a disciplined defender commits fewer fouls — is not this session. A real-season measurement found 65% of defensive fouls are non-shooting (reach-ins, off-ball grabs), and those are authored as a *team* rate in Roll B and charged anonymously in Roll D (no per-man attribution). Emmett ruled that non-shooting fouls must eventually be attributed to an individual, which rules out a team-blend stopgap and makes Effect B a per-man foul-generation model — its own build. The existing shooting-foul wire (`DefenseFoulWeight` 0.2) is left untouched. Full reasoning: journal S61.
+
+**Proven by Phase 67** (golden parity 8 cases at 1e-12, worst |Δ| = 0.0e0; formula invariants — symmetric, neutral-at-50, monotone, bounded, absolute; through the real Roll H path — flat across zones at (1 − shave), exactly one shave, absolute for weak/avg/elite shooters, null-defender bit-identical, composes cleanly with the relief + IQ terms, kill switch bit-identical; config guards). Season sanity with the shave live: league FG% 45.7 → 45.4 (a small directional drop — disciplined defenses shave a hair off the league).
 
 
 ## Phase 18: Roll L Real Generator — FreeThrow Attribute Wired (Session 53)

@@ -88,6 +88,38 @@ public sealed class RollHGenerator : IRollHPieGenerator
         return raw > 1.0 ? 1.0 : raw;
     }
 
+    /// <summary>
+    /// Session 61 — the Discipline make-% shave (Effect A), extracted as a named static so
+    /// the golden parity check exercises the SAME code the engine runs, not a second copy
+    /// of the formula. Ported constant-for-constant from tools/discipline_shave_oracle.py.
+    /// <para><c>makePctAfterShave = clamp01(makePctBeforeShave × (1 − scale × progress))</c>,
+    /// where <c>progress = clamp((defenderDiscipline − 50) / 49, −1, +1)</c> — the DEFENDER's
+    /// OWN Discipline as a symmetric deviation from the midpoint. ABSOLUTE: no shooter term,
+    /// so the same defender applies the same RELATIVE shave to any man he guards. The shave
+    /// is a constant proportional reduction, so it is FLAT across zones by construction (the
+    /// Phase 67 invariant).</para>
+    /// <para><b>Symmetric about 50 (S61 ruling):</b> Discipline 99 shaves the make%,
+    /// Discipline 50 is neutral, Discipline 0 (a liability) yields a cleaner look. The
+    /// make-curve already bakes in an average defender, so 50 is the true neutral point.</para>
+    /// <para><b>True identity branch:</b> scale 0 (the legal kill switch) OR a null defender
+    /// (empty defending slot, DEC-6) returns the input untouched — no multiply, no clamp.
+    /// Bit-identical for the right reason rather than via a harmless ×1.0. The null-defender
+    /// guard is the caller's responsibility (same pattern as the make/foul doors).</para>
+    /// </summary>
+    public static double ApplyDisciplineShave(double makePctBeforeShave, double defenderDiscipline, double scale)
+    {
+        if (scale <= 0.0) return makePctBeforeShave;
+        // Symmetric absolute restraint: deviation from the midpoint, clamped to [−1, +1].
+        // Hardcoded 50.0 / 49.0 mirrors the IQ sibling's iqProgress (same house convention).
+        var progress = Math.Clamp((defenderDiscipline - 50.0) / 49.0, -1.0, 1.0);
+        var shave    = scale * progress;
+        var raw      = makePctBeforeShave * (1.0 - shave);
+        // Both edges reachable: the boost arm (Discipline < 50) can push a near-ceiling make%
+        // above 1.0; the shave arm cannot drive it below 0 for a positive input, but the lower
+        // clamp is kept for symmetry and finite-safety. Clamp is live code, not a no-op.
+        return Math.Clamp(raw, 0.0, 1.0);
+    }
+
     public RollHGenerator(RollHConfig cfg, MatchupConfig matchup, GameState game)
     {
         _cfg     = cfg     ?? throw new ArgumentNullException(nameof(cfg));
@@ -344,6 +376,16 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // this is branch-skipped automatically — the same way C3 is.
         // Putback: already short-circuited above (line 81) — never reached here.
         makePct = ApplyUsageRelief(makePct, state.UsageRelief ?? 0.0, _cfg.UsageReliefBonusScale);
+
+        // ── Discipline make-% shave (S61, Effect A) ──────────────────────────
+        // The matched defender's OWN Discipline shaves the man's make% by a small,
+        // ABSOLUTE, FLAT-across-zones amount — seated beside the multiplicative usage
+        // siblings (volume tax, relief) that all reduce this same makePct. It reads no
+        // shooter term (absolute) and no zone term (flat). Null defender (empty slot,
+        // DEC-6) → skipped, keeping the zero-arithmetic identity honest (same guard the
+        // make/foul doors use). scale 0 is the kill switch inside the static.
+        if (defender is not null)
+            makePct = ApplyDisciplineShave(makePct, defender.Discipline, _cfg.DisciplineMakeShaveScale);
 
         // ── Passing converter: bonus-only, attention-independent (C4) ─────────
         // Passing CONVERTS the gravity/spacing advantage into a made shot — it does
