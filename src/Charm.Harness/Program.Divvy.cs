@@ -22,43 +22,59 @@ namespace Charm.Harness;
 // is a blue blood getting more cracks while occasionally losing one (the Gonzaga
 // mechanism — see DivvyOddsK).
 //
-// RNG contract (mirrored bit-for-bit by the Python oracle, S28 pattern):
-//   Sequential stream: one WorldRng(divvySeed), consumed in fixed phase order —
-//     Phase A: leg-tier Fisher-Yates shuffle (i = P-1 .. 1, one draw each)
-//     Phase B: one role draw per player, in player-id order
-//     Phase C: ratings per player in id order (GenLegPriority, GenRatings,
-//              the third-leg redraw, the FT recompute where SIZE was redrawn)
-//     Phase D: one winner draw per pick
+// RNG contract (Session 63 — the generation bridge):
+//   THE POOL IS THE REAL PASS-2 COHORT. The old in-place pool generation
+//   (leg-tier shuffle, role draws, GenRatings — the S29 Phases A-C) is RETIRED;
+//   the pool is now `PlayerGenPass2Live.BuildCohort(divvySeed ^ DivvyCohortSeedXor,
+//   10 × schoolCount)` — the oracle-locked skill-first generator, its own stream.
+//   Positions are stamped by EXACT COUNT in orientation rank (Emmett ruling
+//   2026-07-20: position follows the game, not the body); roles are derived by
+//   rank within position at the OLD pool's density (ruling 0.2). Both are
+//   deterministic sorts — no draws.
+//   Sequential stream: one WorldRng(divvySeed), consumed ONLY by Phase D
+//     (one winner draw per pick).
 //   Per-pair stream: board noise is drawn from a FRESH SplitMix64 seeded by a
 //     mix of (divvySeed, schoolId, poolPlayerId) — random-access, order-free
-//     (assumption 6: a sequential stream would make each perturbation depend on
-//     draft order, exactly the reroll incoherence the brief forbids).
+//     (a sequential stream would make each perturbation depend on draft order,
+//     exactly the reroll incoherence the S29 brief forbids). Unchanged by S63.
 // ============================================================================
 
 internal static partial class Program
 {
-    // ── The pool mix (ALL placeholders; Emmett-approved at the S29 check-in) ────
-    private const double DivvyThreeLegFrac = 0.008;   // ~28 at n=347 — the All-American tier
-    private const double DivvyTwoLegFrac   = 0.32;    // thickened middle class (was 24% in the draft prompt)
-    private const double DivvyOneLegFrac   = 0.672;   // the mass
-    // Third-leg gradient inside the two-leg population (disjoint inclusive integer
-    // bands on the generic 0-99 scale — one definition shared with the oracle):
-    private const double DivvyBorderlineFrac = 0.15;  // "2.5-leg" players
-    private const double DivvyUsefulFrac     = 0.35;
-    private const double DivvyScarceFrac     = 0.50;
-    private const int DivvyBorderlineLo = 56, DivvyBorderlineHi = 70;
-    private const int DivvyUsefulLo     = 46, DivvyUsefulHi     = 55;
-    private const int DivvyScarceLo     = 34, DivvyScarceHi     = 45;
+    // ── The pool source (Session 63): the real Pass-2 skill-first cohort ────────
+    // The S29 authored pool mix (leg-count fracs, gradient bands, the pool-path
+    // leg-health floor) is RETIRED with the old builder — the cohort's shape is
+    // whatever the oracle-locked generator draws. The cohort seed derives from the
+    // divvy seed by a named XOR (the schedule's committed pattern), so the pool
+    // stays a pure function of (world, seed).
+    private const long DivvyCohortSeedXor = 0x5EEDC0D3;
 
     // Positions: exact quotas per school (4G/3W/3B), so global coverage is feasible
     // by construction; the preflight validator still asserts it loudly.
-    // Role quotas guarantee coverage supply with 20% headroom over one-per-team.
+    // Role quotas guarantee coverage supply with 20% headroom over one-per-team —
+    // since S63 this quota is asserted as a FLOOR (ruling 0.2), never the target.
     private const double DivvyRoleHeadroom = 1.2;
 
-    // The pool path's leg-health floor (Emmett's call at the S29 check-in: 20, so
-    // the scarce gradient band ships as drawn — a leg can be bad, never broken).
-    // The `gen` lab mode keeps its original 40 via the default parameter.
-    private const int DivvyLegHealthFloor = 20;
+    // ── Ruling 0.2 (Emmett, 2026-07-20): roles are tagged at the OLD pool's density,
+    //    with the headroom quota as a FLOOR. The old pool had no explicit density
+    //    constant — density EMERGED from committed machinery: the first ceil(1.2n)
+    //    guards were FORCED into lead roles and every other guard drew uniformly over
+    //    the four guard role names, TWO of which are lead (GenLeadRoles is a subset of
+    //    GenGuardRoles); wings likewise, ONE of two names being the wing defender.
+    //    These targets reproduce that expected density exactly, rounded UP (err toward
+    //    supply). For the stock world: leads 903 of 1,388 guards (65%), wing defenders
+    //    729 of 1,041 wings (70%); quota floor 417 each. ──────────────────────────────
+    private static int DivvyLeadRoleTarget(int n)
+    {
+        var quota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
+        return (int)Math.Ceiling(quota + (4.0 * n - quota) * GenLeadRoles.Length / GenGuardRoles.Length);
+    }
+
+    private static int DivvyTdwRoleTarget(int n)
+    {
+        var quota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
+        return (int)Math.Ceiling(quota + (3.0 * n - quota) * 1.0 / GenWingRoles.Length);
+    }
 
     // ── The odds curve — THE constitutional dial (placeholder until burn-in) ────
     // Each pick is won by weight (currentPrestige + 10)^k among schools with a
@@ -96,190 +112,114 @@ internal static partial class Program
         return 44.0 + (v - oLo) * DivvyNormSlope;
     }
 
-    private static int DivvyGenericToSize(double g, string pos)
-    {
-        var (_, _, oLo, _) = GenSizeBand(pos);
-        return (int)Math.Round(oLo + (g - 44.0) / DivvyNormSlope);
-    }
-
-    // ── System.Random adapter over WorldRng, so GenRatings is reused VERBATIM ───
-    // (assumption 1: the rating draw takes a Random; reproducibility on any runtime
-    // requires SplitMix64 — this adapter is the seam, flagged not slipped).
-    // Contract: every Next overload consumes exactly ONE double, derived as
-    // min + (int)(u * (max - min)) — mirrored by the oracle's next_int.
-    private sealed class SplitMixRandom : Random
-    {
-        private readonly WorldRng _rng;
-        public SplitMixRandom(WorldRng rng) => _rng = rng;
-        public override double NextDouble() => _rng.NextDouble();
-        protected override double Sample() => _rng.NextDouble();
-        public override int Next() => (int)(_rng.NextDouble() * int.MaxValue);
-        public override int Next(int maxValue) => (int)(_rng.NextDouble() * maxValue);
-        public override int Next(int minValue, int maxValue)
-            => minValue + (int)(_rng.NextDouble() * ((long)maxValue - minValue));
-        public override void NextBytes(byte[] buffer)
-        {
-            for (var i = 0; i < buffer.Length; i++)
-                buffer[i] = (byte)(_rng.NextDouble() * 256);
-        }
-    }
-
-    // ── Largest-remainder apportionment (canonical-order ties — the WorldApportion
-    //    pattern with rng: null; fractions are the caller's, so it is its own fn) ─
-    private static int[] DivvyApportion(int total, double[] fractions)
-    {
-        var quotas = fractions.Select(f => total * f).ToArray();
-        var counts = quotas.Select(q => (int)q).ToArray();
-        var leftover = total - counts.Sum();
-        var order = Enumerable.Range(0, fractions.Length)
-            .OrderByDescending(i => quotas[i] - counts[i])
-            .ThenBy(i => i)
-            .ToArray();
-        for (var k = 0; k < leftover; k++)
-            counts[order[k]] += 1;
-        return counts;
-    }
+    // (DivvyGenericToSize, the SplitMixRandom adapter, and DivvyApportion are RETIRED
+    //  with the old builder — they served the third-leg redraw, the verbatim GenRatings
+    //  reuse, and the authored leg-count mix, none of which exist on the S63 pool.
+    //  DivvySizeToGeneric survives: the scout rank still reads it.)
 
     // ── One pool player ──────────────────────────────────────────────────────────
     // PoolId is the pool index 0..P-1 (never a PlayerId — stamping happens only at
     // a sim seam, per A0.7). ScoutRank lives HERE, on the pool row: it is consumed
     // by the draft and the readout's tables only, never written to the Player,
     // never printed on a roster sheet, never sorts anything outside the board.
+    // Session 63: LegCount/GradientTier/PlusLegs are RETIRED (old-pool shape —
+    // nothing mechanical read them; the diagnostics that printed them are rewritten).
+    // Oaxis (−1 perimeter .. +1 post) and the generator's named Weapon ride along
+    // for the page and the Phase 54 boundary guards.
     private sealed record PoolPlayer(
-        int PoolId, string Pos, string Role, int LegCount, string? GradientTier,
-        HashSet<string> PlusLegs, Dictionary<string, int> Ratings, Player Player,
-        double ScoutRank);
+        int PoolId, string Pos, string Role, double Oaxis, string Weapon,
+        Dictionary<string, int> Ratings, Player Player, double ScoutRank);
 
-    // ── Pool generation ──────────────────────────────────────────────────────────
-    private static List<PoolPlayer> BuildDivvyPool(int schoolCount, WorldRng rng)
+    // The season/smoke row adapters still construct the gen lab's GenPlayerRow, whose
+    // ctor carries LegCount + PlusLegs. Both are mechanically DEAD on those paths
+    // (the game consumes Player/Slot/Pos/Starter only — traced end-to-end, S63 A6)
+    // and are never printed there; 0 / empty marks "not applicable", never a claim.
+    private static readonly HashSet<string> DivvyNoPlusLegs = new(StringComparer.Ordinal);
+
+    // ── Pool generation (Session 63): the real Pass-2 cohort, bridged ────────────
+    private static List<PoolPlayer> BuildDivvyPool(int schoolCount, long divvySeed)
     {
         var n = schoolCount;
         var P = 10 * n;
 
-        // Positions fixed by pool id: 4n guards, then 3n wings, then 3n bigs.
+        // The real skill-first cohort (S44 live generator; the transform is
+        // oracle-locked and Phase 59/60 re-prove it — the bridge draws, never edits).
+        var cohortSeed = unchecked((int)(divvySeed ^ DivvyCohortSeedXor));
+        var cohort = PlayerGenPass2Live.BuildCohort(cohortSeed, P);
+
+        // Ruling 0.1: position follows the game, not the body — assigned by EXACT
+        // COUNT in orientation rank. Oaxis = 2·o − 1: −1 perimeter .. +1 post (the
+        // oracle's own axis comment; the height ceiling and the PAXIS suppression
+        // both confirm the direction). Deterministic total ordering: Oaxis ascending,
+        // immutable cohort index as the tiebreak. The 4n most perimeter-oriented are
+        // Guards, the 3n most interior-oriented are Bigs, the middle 3n are Wings.
+        // Height gets no vote.
+        var order = Enumerable.Range(0, P)
+            .OrderBy(i => cohort[i].Result.Oaxis).ThenBy(i => i).ToArray();
+
+        // Cards + Players first (roles need rank-within-position, a second pass).
+        var cards = new Dictionary<string, int>[P];
+        var players = new Player[P];
         var pos = new string[P];
-        for (var i = 0; i < 4 * n; i++) pos[i] = "G";
-        for (var i = 4 * n; i < 7 * n; i++) pos[i] = "W";
-        for (var i = 7 * n; i < P; i++) pos[i] = "B";
-
-        // Leg tiers: hierarchical apportionment — top-level mix over the pool first,
-        // gradient tiers over the REALIZED two-leg count (so the two roundings cannot
-        // disagree at small n).
-        var top = DivvyApportion(P, new[] { DivvyThreeLegFrac, DivvyTwoLegFrac, DivvyOneLegFrac });
-        var grad = DivvyApportion(top[1], new[] { DivvyBorderlineFrac, DivvyUsefulFrac, DivvyScarceFrac });
-        var labels = new List<(int LegCount, string? Tier)>(P);
-        for (var i = 0; i < top[0]; i++) labels.Add((3, null));
-        for (var i = 0; i < grad[0]; i++) labels.Add((2, "borderline"));
-        for (var i = 0; i < grad[1]; i++) labels.Add((2, "useful"));
-        for (var i = 0; i < grad[2]; i++) labels.Add((2, "scarce"));
-        for (var i = 0; i < top[2]; i++) labels.Add((1, null));
-
-        // Phase A: Fisher-Yates over the label list (one draw per swap, i = P-1..1).
-        for (var i = P - 1; i > 0; i--)
-        {
-            var j = (int)(rng.NextDouble() * (i + 1));
-            (labels[i], labels[j]) = (labels[j], labels[i]);
-        }
-
-        // Phase B: roles — exactly one draw per player in id order. The first
-        // ceil(1.2n) guards are forced into lead-handler roles and the first
-        // ceil(1.2n) wings are forced ThreeAndDWing (the draw picks within the
-        // forced set, or is consumed-and-ignored where the set has one member),
-        // guaranteeing coverage supply with headroom; the rest draw uniformly.
-        var leadQuota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
-        var tdwQuota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
-        var roles = new string[P];
-        int gSeen = 0, wSeen = 0;
         for (var pid = 0; pid < P; pid++)
         {
-            var u = rng.NextDouble();
-            switch (pos[pid])
-            {
-                case "G":
-                    roles[pid] = gSeen < leadQuota ? GenLeadRoles[(int)(u * 2)] : GenGuardRoles[(int)(u * 4)];
-                    gSeen++;
-                    break;
-                case "W":
-                    roles[pid] = wSeen < tdwQuota ? GenWingDefenderRole : GenWingRoles[(int)(u * 2)];
-                    wSeen++;
-                    break;
-                default:
-                    roles[pid] = GenBigRoles[(int)(u * 3)];
-                    break;
-            }
+            pos[pid] = pid < 4 * n ? "G" : pid < 7 * n ? "W" : "B";
+            // The 33-key Current card + derived tendencies, mapped through the
+            // committed GenMapToPlayer. A COPY — Result.Card is the replay-fixture
+            // shape and must never be mutated by the bridge.
+            var v = new Dictionary<string, int>(cohort[order[pid]].Result.Card, StringComparer.Ordinal);
+            DeriveAndStampTendencies(v);   // AFTER the card is final, BEFORE mapping
+            players[pid] = GenMapToPlayer(v, $"Pool_{pid}");
+            var errs = players[pid].Validate();
+            if (errs.Count > 0)
+                throw new InvalidOperationException(
+                    $"pool bridge bug — pool player {pid} failed Player.Validate():\n  " +
+                    string.Join("\n  ", errs));
+            cards[pid] = v;
         }
 
-        // Phase C: ratings, in player-id order. Session 26 machinery verbatim,
-        // then the third-leg gradient redraw for two-leg players, then the floors
-        // and the (pool-floor) leg-health guarantee.
-        var r = new SplitMixRandom(rng);
+        // Ruling 0.2: protected roles by rank within position, at the OLD pool's
+        // density, deterministic tiebreak (composite descending, then pool id).
+        // Lead handlers: top guards by the BallHandling/Playmaking composite.
+        // Wing defenders: top wings by PerimeterDefense.
+        var leadSet = new HashSet<int>(
+            Enumerable.Range(0, 4 * n)
+                .OrderByDescending(pid => cards[pid]["BallHandling"] + cards[pid]["Playmaking"])
+                .ThenBy(pid => pid)
+                .Take(DivvyLeadRoleTarget(n)));
+        var tdwSet = new HashSet<int>(
+            Enumerable.Range(4 * n, 3 * n)
+                .OrderByDescending(pid => cards[pid]["PerimeterDefense"])
+                .ThenBy(pid => pid)
+                .Take(DivvyTdwRoleTarget(n)));
+
         var pool = new List<PoolPlayer>(P);
         for (var pid = 0; pid < P; pid++)
         {
-            var (lc, tier) = labels[pid];
-            var (v, plusLegs) = GenRatings(roles[pid], pos[pid], lc, r);
-
-            if (lc == 2)
+            var v = cards[pid];
+            // Role STRINGS reuse the existing gen-lab names (Phase 54's coverage
+            // checks read GenLeadRoles / GenWingDefenderRole membership, so the
+            // protected tags must come from those constants). Non-protected roles
+            // are labels only (mechanically inert — S63 A3/A6) and are picked
+            // deterministically from the player's own card.
+            var role = pos[pid] switch
             {
-                var (bandLo, bandHi) = tier switch
-                {
-                    "borderline" => (DivvyBorderlineLo, DivvyBorderlineHi),
-                    "useful"     => (DivvyUsefulLo, DivvyUsefulHi),
-                    _            => (DivvyScarceLo, DivvyScarceHi),
-                };
-                // The third leg is the leg NOT in the plus set — derived from the
-                // plus set directly, never via a second GenLegPriority call (which
-                // would consume an extra wing draw and diverge from the oracle's
-                // consumption contract). SKILL is never third: every position's
-                // priority puts SKILL in the top two, so the third is SIZE or ATH.
-                var third = plusLegs.Contains("SIZE") ? "ATH" : "SIZE";
-                DivvyRedrawThirdLeg(v, pos[pid], third, bandLo, bandHi, r);
-            }
+                "G" when leadSet.Contains(pid) =>
+                    v["Playmaking"] >= v["Passing"] ? GenLeadRoles[0] : GenLeadRoles[1],   // FloorGeneral / PassFirstGuard
+                "G" => v["Outside"] >= v["SelfCreation"] ? GenGuardRoles[2] : GenGuardRoles[3],   // PerimeterShooter / Slasher
+                "W" when tdwSet.Contains(pid) => GenWingDefenderRole,
+                "W" => GenWingRoles[1],                                                    // WingScorer
+                _ => v["PostMoves"] >= v["Finishing"] && v["PostMoves"] >= v["Vertical"]
+                        ? GenBigRoles[0]                                                   // PostScorer
+                        : v["Finishing"] >= v["Vertical"] ? GenBigRoles[1] : GenBigRoles[2],   // RimRunner / AthleticBig
+            };
 
-            GenEnforceFloors(v, pos[pid]);
-            GenEnforceLegHealth(v, pos[pid], DivvyLegHealthFloor);
-            DeriveAndStampTendencies(v);   // AFTER all rating mutation (incl. third-leg redraw), BEFORE mapping
-
-            var player = GenMapToPlayer(v, $"Pool_{pid}");
-            var errs = player.Validate();
-            if (errs.Count > 0)
-                throw new InvalidOperationException(
-                    $"pool generation bug — pool player {pid} ({roles[pid]}) failed Player.Validate():\n  " +
-                    string.Join("\n  ", errs));
-
-            pool.Add(new PoolPlayer(pid, pos[pid], roles[pid], lc, tier, plusLegs, v, player,
-                DivvyScoutRank(v, pos[pid])));
+            pool.Add(new PoolPlayer(pid, pos[pid], role,
+                cohort[order[pid]].Result.Oaxis, cohort[order[pid]].Result.Weapon,
+                v, players[pid], DivvyScoutRank(v, pos[pid])));
         }
 
         return pool;
-    }
-
-    // Two-leg players only: overwrite the third leg's ratings from the gradient
-    // band. Consumption is the leg's rating-array order; a SIZE redraw changes
-    // Height, so FreeThrow is recomputed (3 draws) to keep its shape coherent.
-    // A big's ATH third applies the downshift AFTER the band draw (assumption 3);
-    // the SIZE path maps the band through the position scaling and — as found in
-    // GenRatings — never consults the permitted-hole set.
-    private static void DivvyRedrawThirdLeg(
-        Dictionary<string, int> v, string pos, string third, int bandLo, int bandHi, Random r)
-    {
-        if (third == "SIZE")
-        {
-            var lo = DivvyGenericToSize(bandLo, pos);
-            var hi = DivvyGenericToSize(bandHi, pos);
-            foreach (var rt in GenSizeRatings)
-                v[rt] = r.Next(lo, hi + 1);
-            v["FreeThrow"] = DrawFreeThrowGen(v["Outside"], v["Height"], r);
-        }
-        else   // ATH — SKILL is never the third leg
-        {
-            foreach (var rt in GenAthRatings)
-            {
-                var val = r.Next(bandLo, bandHi + 1);
-                if (pos == "B") val = Math.Max(0, val - GenBigAthDownshift);
-                v[rt] = val;
-            }
-        }
     }
 
     // ── Scout rank ───────────────────────────────────────────────────────────────
@@ -361,8 +301,8 @@ internal static partial class Program
     private static DivvyResult RunDivvyDraft(WorldFile world, long divvySeed)
     {
         var n = world.Schools.Count;
-        var rng = new WorldRng(divvySeed);
-        var pool = BuildDivvyPool(n, rng);
+        var rng = new WorldRng(divvySeed);   // consumed ONLY by Phase D (winner draws)
+        var pool = BuildDivvyPool(n, divvySeed);
         ValidateDivvyPool(pool, n);
 
         var P = pool.Count;
@@ -600,29 +540,34 @@ internal static partial class Program
             RunDivvySmokeSim(res, world, idA, idB, seed, engineConfigPath);
     }
 
-    private static string DivvyGroupOf(PoolPlayer p)
-        => p.LegCount == 3 ? "three-leg" : p.LegCount == 2 ? $"two ({p.GradientTier})" : "one-leg";
-
     private static void PrintPoolSheet(DivvyResult res, int n)
     {
         var pool = res.Pool;
         var P = pool.Count;
-        var top = DivvyApportion(P, new[] { DivvyThreeLegFrac, DivvyTwoLegFrac, DivvyOneLegFrac });
-        var grad = DivvyApportion(top[1], new[] { DivvyBorderlineFrac, DivvyUsefulFrac, DivvyScarceFrac });
 
-        Console.WriteLine($"--- THE POOL ({P} players; the one authored distribution) ---");
-        Console.WriteLine($"  leg-count mix    target {top[0]}/{top[1]}/{top[2]} (3/2/1-leg)  " +
-                          $"generated {pool.Count(p => p.LegCount == 3)}/{pool.Count(p => p.LegCount == 2)}/{pool.Count(p => p.LegCount == 1)}");
-        Console.WriteLine($"  gradient tiers   target {grad[0]}/{grad[1]}/{grad[2]} (borderline/useful/scarce)  " +
-                          $"generated {pool.Count(p => p.GradientTier == "borderline")}/{pool.Count(p => p.GradientTier == "useful")}/{pool.Count(p => p.GradientTier == "scarce")}");
-        Console.WriteLine($"  positions        {pool.Count(p => p.Pos == "G")}G / {pool.Count(p => p.Pos == "W")}W / {pool.Count(p => p.Pos == "B")}B  (quotas {4 * n}/{3 * n}/{3 * n})");
-        Console.WriteLine($"  coverage supply  lead-handlers {pool.Count(p => GenLeadRoles.Contains(p.Role))}, " +
-                          $"{GenWingDefenderRole} {pool.Count(p => p.Role == GenWingDefenderRole)}  (quota >= {(int)Math.Ceiling(DivvyRoleHeadroom * n)} each)");
-        Console.WriteLine("  scout rank by group (mean [min..max]) — the divvy's board, never a game input:");
-        foreach (var g in new[] { "three-leg", "two (borderline)", "two (useful)", "two (scarce)", "one-leg" })
+        Console.WriteLine($"--- THE POOL ({P} players; the Pass-2 skill-first cohort, positions by orientation rank) ---");
+        Console.WriteLine($"  positions        {pool.Count(p => p.Pos == "G")}G / {pool.Count(p => p.Pos == "W")}W / {pool.Count(p => p.Pos == "B")}B  (exact-count quotas {4 * n}/{3 * n}/{3 * n})");
+        Console.WriteLine($"  coverage supply  lead-handlers {pool.Count(p => GenLeadRoles.Contains(p.Role))} (target {DivvyLeadRoleTarget(n)}), " +
+                          $"{GenWingDefenderRole} {pool.Count(p => p.Role == GenWingDefenderRole)} (target {DivvyTdwRoleTarget(n)})  " +
+                          $"(quota FLOOR {(int)Math.Ceiling(DivvyRoleHeadroom * n)} each)");
+        Console.WriteLine("  orientation (Oaxis, -1 perimeter .. +1 post) and height by position:");
+        foreach (var ps in new[] { "G", "W", "B" })
         {
-            var rs = pool.Where(p => DivvyGroupOf(p) == g).Select(p => p.ScoutRank).ToList();
-            Console.WriteLine($"    {g,-18} {rs.Average(),6:F1}  [{rs.Min(),5:F1} .. {rs.Max(),5:F1}]   n={rs.Count}");
+            var rows = pool.Where(p => p.Pos == ps).ToList();
+            var hts = rows.Select(p => p.Ratings["Height"]).ToList();
+            Console.WriteLine(FormattableString.Invariant(
+                $"    {ps}  Oaxis [{rows.Min(p => p.Oaxis),6:F3} .. {rows.Max(p => p.Oaxis),6:F3}]  height mean {hts.Average(),5:F1} [{hts.Min()} .. {hts.Max()}]   n={rows.Count}"));
+        }
+        Console.WriteLine("  weapon census (top 8):");
+        foreach (var kv in pool.GroupBy(p => p.Weapon).OrderByDescending(g => g.Count()).Take(8))
+            Console.WriteLine(FormattableString.Invariant(
+                $"    {kv.Key,-18} {kv.Count(),5}  ({100.0 * kv.Count() / P:F1}%)"));
+        Console.WriteLine("  scout rank by position (mean [min..max]) — the divvy's board, never a game input:");
+        foreach (var ps in new[] { "G", "W", "B" })
+        {
+            var rs = pool.Where(p => p.Pos == ps).Select(p => p.ScoutRank).ToList();
+            Console.WriteLine(FormattableString.Invariant(
+                $"    {ps,-3} {rs.Average(),6:F1}  [{rs.Min(),6:F1} .. {rs.Max(),6:F1}]   n={rs.Count}"));
         }
         Console.WriteLine();
     }
@@ -652,14 +597,14 @@ internal static partial class Program
         var pickOf = res.Picks.ToDictionary(p => p.PoolId);
 
         Console.WriteLine("  draft surprises (largest access deviation among top-decile-rank players):");
-        Console.WriteLine($"    {"pool#",-6}{"grp",-17}{"global",-8}{"perceived",-10}{"pick",-6}{"selector (prestige)",-30}{"boardDev",-9}accessDev");
+        Console.WriteLine($"    {"pool#",-6}{"pos/weapon",-19}{"global",-8}{"perceived",-10}{"pick",-6}{"selector (prestige)",-30}{"boardDev",-9}accessDev");
         var rows = topDecile.Select(pid => (pid, dev: pickOf[pid].PickNumber - expectedPick[pid]))
                             .OrderByDescending(t => Math.Abs(t.dev)).Take(10);
         foreach (var (pid, dev) in rows)
         {
             var pk = pickOf[pid];
             var p = res.Pool[pid];
-            Console.WriteLine($"    {pid,-6}{DivvyGroupOf(p),-17}{p.ScoutRank,-8:F1}{pk.PerceivedRank,-10:F1}{pk.PickNumber,-6}" +
+            Console.WriteLine($"    {pid,-6}{p.Pos + "/" + p.Weapon,-19}{p.ScoutRank,-8:F1}{pk.PerceivedRank,-10:F1}{pk.PickNumber,-6}" +
                               $"{names[pk.SchoolId] + " (" + prestige[pk.SchoolId] + ")",-30}{pk.PerceivedRank - p.ScoutRank,-9:F1}{dev:+0;-0;0}");
         }
 
@@ -701,20 +646,14 @@ internal static partial class Program
         var roster = res.Rosters[school.Id];
         var five = new HashSet<int>(BuildOpeningFive(roster, pid => res.Pool[pid].Pos));
         Console.WriteLine($"  === {school.Name} ({school.Abbr})  prestige {school.CurrentPrestige} ===");
-        Console.WriteLine($"    {"Acq",-5}{"Pos",-4}{"Role",-17}{"Legs",-22}{"Size",5}{"Ath",5}{"Skl",5}{"FT",5}  Depth");
+        Console.WriteLine($"    {"Acq",-5}{"Pos",-4}{"Role",-17}{"Oax",7}{"Ht",5}{"Size",6}{"Ath",5}{"Skl",5}{"FT",5}  Weapon");
         for (var i = 0; i < roster.Count; i++)
         {
             var p = res.Pool[roster[i]];
             var holes = GenPermittedHoles[p.Pos];
-            var legsStr = string.Join(" ", new[] { "SIZE", "ATH", "SKILL" }
-                .Select(l => (p.PlusLegs.Contains(l) ? "+" : "~") + l[0]));
             var star = five.Contains(roster[i]) ? "*" : " ";
-            Console.WriteLine($"    {star}{i + 1,-4}{p.Pos,-4}{p.Role,-17}{legsStr,-22}" +
-                              $"{GenLegMeanExHoles(p.Ratings, "SIZE", holes),5:F0}" +
-                              $"{GenLegMeanExHoles(p.Ratings, "ATH", holes),5:F0}" +
-                              $"{GenLegMeanExHoles(p.Ratings, "SKILL", holes),5:F0}" +
-                              $"{p.Ratings["FreeThrow"],5}  " +
-                              (p.LegCount == 3 ? "three-leg" : p.LegCount == 2 ? $"two-leg ({p.GradientTier})" : "one-leg"));
+            Console.WriteLine(FormattableString.Invariant(
+                $"    {star}{i + 1,-4}{p.Pos,-4}{p.Role,-17}{p.Oaxis,7:F2}{p.Ratings["Height"],5}{GenLegMeanExHoles(p.Ratings, "SIZE", holes),6:F0}{GenLegMeanExHoles(p.Ratings, "ATH", holes),5:F0}{GenLegMeanExHoles(p.Ratings, "SKILL", holes),5:F0}{p.Ratings["FreeThrow"],5}  {p.Weapon}"));
         }
     }
 
@@ -722,15 +661,19 @@ internal static partial class Program
     {
         var prestige = world.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);
         Console.WriteLine("--- VARIANCE & OVERLAP (the Pass 3 assumption, observed early) ---");
+        // Session 63: the retired leg tiers no longer exist; "quality depth" is read
+        // as roster count of pool-wide TOP-THIRD scout-rank players instead.
+        var sortedRanks = res.Pool.Select(p => p.ScoutRank).OrderBy(x => x).ToList();
+        var topThirdCut = sortedRanks[sortedRanks.Count * 2 / 3];
         var bands = new[] { (0, 19), (20, 39), (40, 59), (60, 79), (80, 99) };
         var stats = new List<(string Label, double Mean, int Min, int Max)>();
         foreach (var (lo, hi) in bands)
         {
             var counts = res.Rosters.Where(kv => prestige[kv.Key] >= lo && prestige[kv.Key] <= hi)
-                                    .Select(kv => kv.Value.Count(pid => res.Pool[pid].LegCount >= 2)).ToList();
+                                    .Select(kv => kv.Value.Count(pid => res.Pool[pid].ScoutRank >= topThirdCut)).ToList();
             if (counts.Count == 0) continue;
             stats.Add(($"{lo}-{hi}", counts.Average(), counts.Min(), counts.Max()));
-            Console.WriteLine($"  prestige {lo,2}-{hi,-2}  multi-leg per roster: mean {counts.Average():F2}  spread [{counts.Min()}..{counts.Max()}]  (n={counts.Count})");
+            Console.WriteLine($"  prestige {lo,2}-{hi,-2}  top-third-rank per roster: mean {counts.Average():F2}  spread [{counts.Min()}..{counts.Max()}]  (n={counts.Count})");
         }
         for (var i = 0; i + 1 < stats.Count; i++)
         {
@@ -764,8 +707,10 @@ internal static partial class Program
             return roster.Select((pid, i) =>
             {
                 var p = res.Pool[pid];
-                return new GenPlayerRow(i + 1, p.Pos, p.Role, five.Contains(pid), p.LegCount,
-                                        p.PlusLegs, p.Ratings, p.Player);
+                // LegCount 0 / empty PlusLegs = "not applicable" (S63; mechanically
+                // dead on this path and never printed — see DivvyNoPlusLegs).
+                return new GenPlayerRow(i + 1, p.Pos, p.Role, five.Contains(pid), 0,
+                                        DivvyNoPlusLegs, p.Ratings, p.Player);
             }).ToList();
         }
 

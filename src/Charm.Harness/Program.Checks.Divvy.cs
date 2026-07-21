@@ -3,14 +3,24 @@ using Charm.Engine;
 namespace Charm.Harness;
 
 // ============================================================================
-// Phase 54 — Roster Genesis Pass 1.5: national pool + prestige-weighted divvy.
+// Phase 54 — the national pool + prestige-weighted divvy, SPLIT at Session 63.
 //
-// Every numeric constant asserted below was EXPORTED BY THE PYTHON ORACLE
-// (S29 oracle run, 260 seeded drafts green at n=347 and n=20). The pattern is
-// S23/S28's: a wrong formula fails the constant, wrong wiring fails the
-// cross-read. What a green block proves: wiring correctness, formula fidelity
-// to the oracle, determinism, and the legality invariants — NOT that the pool
-// magnitudes are basketball truth (placeholders by design, tuned at burn-in).
+// The pool is now the REAL Pass-2 skill-first cohort (positions by exact-count
+// orientation rank, roles at the old pool's density — Emmett rulings 2026-07-20).
+// KEPT from the S29 suite: draft determinism, the order-free board-noise
+// fixtures (oracle exports, still bit-valid — the noise stream is untouched),
+// roster legality, the infeasibility throws (rigged from REAL pool rows, so
+// they now prove rejection against the new distribution), the scout-rank
+// formula fixtures + convexity + monotonicity (formula-level, pool-independent),
+// prestige-as-access, protected supply, and the 29.1 fair-scouting checks.
+// RETIRED: every old-pool-SHAPE assertion (leg-count apportionment, gradient
+// tiers, tier ordering/overlap — that authored distribution no longer exists).
+// ADDED: the new pool's own guards — exact 4n/3n/3n position counts, the
+// orientation BOUNDARY invariants, role counts == the ruling-0.2 density target
+// and >= the quota floor, and byte-identical pool determinism.
+// What a green block proves: wiring correctness, determinism, and the legality
+// invariants — NOT that the cohort is basketball truth (the S63 baseline read
+// is the instrument for that, page-only).
 // ============================================================================
 
 internal static partial class Program
@@ -18,7 +28,7 @@ internal static partial class Program
     private static bool Phase54DivvyCheck()
     {
         Console.WriteLine();
-        Console.WriteLine("== Phase 54 — Roster Genesis Pass 1.5 (national pool + prestige divvy) ==");
+        Console.WriteLine("== Phase 54 — National pool + prestige divvy (S63: the Pass-2 cohort bridge) ==");
         var pass = true;
 
         void Check(string name, bool ok, string detail = "")
@@ -51,6 +61,24 @@ internal static partial class Program
             Check("stock: same seed twice -> identical draft", SameDraft(stockA, stockB));
             var tinyC = RunDivvyDraft(tiny, seed + 1);
             Check("fixture: different seed -> different draft", !SameDraft(tinyA, tinyC));
+
+            // Session 63: the pool itself is byte-identical under the same seed —
+            // every position, every role, every rating, orientation, and rank.
+            bool SamePool(DivvyResult x, DivvyResult y) =>
+                x.Pool.Count == y.Pool.Count &&
+                x.Pool.Zip(y.Pool).All(p =>
+                    p.First.PoolId == p.Second.PoolId &&
+                    p.First.Pos == p.Second.Pos &&
+                    p.First.Role == p.Second.Role &&
+                    p.First.Oaxis == p.Second.Oaxis &&
+                    p.First.Weapon == p.Second.Weapon &&
+                    p.First.ScoutRank == p.Second.ScoutRank &&
+                    p.First.Ratings.Count == p.Second.Ratings.Count &&
+                    p.First.Ratings.All(kv =>
+                        p.Second.Ratings.TryGetValue(kv.Key, out var v2) && v2 == kv.Value));
+            Check("fixture: same seed twice -> byte-identical pool (pos/role/ratings/rank/orientation)",
+                SamePool(tinyA, tinyB));
+            Check("stock: same seed twice -> byte-identical pool", SamePool(stockA, stockB));
 
             // ── 2. Board noise: stable, order-free, matches the oracle bit-for-bit. ────
             Check("noise fixture (20260702, 1, 0)",
@@ -90,39 +118,41 @@ internal static partial class Program
             Check("fixture: every drafted player passes Player.Validate()",
                 tinyA.Pool.All(p => p.Player.Validate().Count == 0));
 
-            // ── 4. The pool's shape matches the oracle's apportionment constants. ──────
-            // (hierarchical largest-remainder: top-level mix over the pool, gradient
-            // tiers over the realized two-leg count — canonical-order ties)
-            var top347 = DivvyApportion(3470, new[] { DivvyThreeLegFrac, DivvyTwoLegFrac, DivvyOneLegFrac });
-            var grad347 = DivvyApportion(top347[1], new[] { DivvyBorderlineFrac, DivvyUsefulFrac, DivvyScarceFrac });
-            Check("apportionment n=347: 28 / 1110 / 2332 (3/2/1-leg)",
-                top347.SequenceEqual(new[] { 28, 1110, 2332 }), string.Join("/", top347));
-            Check("apportionment n=347 gradient: 167 / 388 / 555 (borderline/useful/scarce)",
-                grad347.SequenceEqual(new[] { 167, 388, 555 }), string.Join("/", grad347));
-            var top20 = DivvyApportion(200, new[] { DivvyThreeLegFrac, DivvyTwoLegFrac, DivvyOneLegFrac });
-            var grad20 = DivvyApportion(top20[1], new[] { DivvyBorderlineFrac, DivvyUsefulFrac, DivvyScarceFrac });
-            Check("apportionment n=20: 2 / 64 / 134", top20.SequenceEqual(new[] { 2, 64, 134 }), string.Join("/", top20));
-            Check("apportionment n=20 gradient: 10 / 22 / 32", grad20.SequenceEqual(new[] { 10, 22, 32 }), string.Join("/", grad20));
-            foreach (var (tag, res, t, g) in new[] { ("fixture", tinyA, top20, grad20), ("stock", stockA, top347, grad347) })
+            // ── 4. The Session 63 pool guards: exact counts, orientation boundaries,
+            //       role density (target AND floor). The old apportionment/leg-tier
+            //       assertions are RETIRED — that authored shape no longer exists. ──────
+            foreach (var (tag, res) in new[] { ("fixture", tinyA), ("stock", stockA) })
             {
                 var pool = res.Pool;
-                Check($"{tag} pool: generated leg counts match apportionment",
-                    pool.Count(p => p.LegCount == 3) == t[0] &&
-                    pool.Count(p => p.LegCount == 2) == t[1] &&
-                    pool.Count(p => p.LegCount == 1) == t[2]);
-                Check($"{tag} pool: generated gradient tiers match apportionment",
-                    pool.Count(p => p.GradientTier == "borderline") == g[0] &&
-                    pool.Count(p => p.GradientTier == "useful") == g[1] &&
-                    pool.Count(p => p.GradientTier == "scarce") == g[2]);
                 var n = res.Rosters.Count;
-                Check($"{tag} pool: positional quotas exact",
+                Check($"{tag} pool: positions by EXACT COUNT (4n/3n/3n)",
                     pool.Count(p => p.Pos == "G") == 4 * n &&
                     pool.Count(p => p.Pos == "W") == 3 * n &&
-                    pool.Count(p => p.Pos == "B") == 3 * n);
+                    pool.Count(p => p.Pos == "B") == 3 * n,
+                    $"{pool.Count(p => p.Pos == "G")}G/{pool.Count(p => p.Pos == "W")}W/{pool.Count(p => p.Pos == "B")}B");
+
+                // Orientation boundaries (ruling 0.1, A2-resolved direction: +1 = post):
+                // every Big at least as interior as every Wing, every Wing at least as
+                // interior as every Guard. Non-strict — equal-Oaxis players may straddle
+                // a cut (the cohort-index tiebreak decides which side they land on).
+                var maxG = pool.Where(p => p.Pos == "G").Max(p => p.Oaxis);
+                var minW = pool.Where(p => p.Pos == "W").Min(p => p.Oaxis);
+                var maxW = pool.Where(p => p.Pos == "W").Max(p => p.Oaxis);
+                var minB = pool.Where(p => p.Pos == "B").Min(p => p.Oaxis);
+                Check($"{tag} pool: orientation boundaries monotone (B >= W >= G, post-positive)",
+                    minB >= maxW && minW >= maxG,
+                    FormattableString.Invariant($"G max {maxG:F4} <= W [{minW:F4}..{maxW:F4}] <= B min {minB:F4}"));
+
+                // Roles at the old pool's density (ruling 0.2): count == target, >= floor.
                 var quota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
-                Check($"{tag} pool: coverage-role quotas honored",
-                    pool.Count(p => GenLeadRoles.Contains(p.Role)) >= quota &&
-                    pool.Count(p => p.Role == GenWingDefenderRole) >= quota);
+                var lead = pool.Count(p => GenLeadRoles.Contains(p.Role));
+                var tdw = pool.Count(p => p.Role == GenWingDefenderRole);
+                Check($"{tag} pool: lead handlers == old-density target and >= quota floor",
+                    lead == DivvyLeadRoleTarget(n) && lead >= quota,
+                    $"{lead} (target {DivvyLeadRoleTarget(n)}, floor {quota})");
+                Check($"{tag} pool: wing defenders == old-density target and >= quota floor",
+                    tdw == DivvyTdwRoleTarget(n) && tdw >= quota,
+                    $"{tdw} (target {DivvyTdwRoleTarget(n)}, floor {quota})");
             }
 
             // ── 5. An infeasible pool is rejected LOUDLY, naming the shortfall,
@@ -170,34 +200,8 @@ internal static partial class Program
                 }
             }
             Check("rank monotone in every feeding rating (20-player spot check)", mono);
-            // group ordering (29.1, per Emmett's rulings): three > borderline >
-            // useful > scarce strictly on means, one-leg mean below useful — but NO
-            // order asserted between scarce and one-leg (fair grading revealed they
-            // sit even: two strong legs + one bad leg ≈ one strong leg + two passable
-            // ones; a future coach layer bends boards toward its own preference).
-            // Overlap: with positions co-located inside each tier, spreads narrowed —
-            // true-rank overlap is only robust low on the board (oracle, 60 stock
-            // seeds: scarce/one-leg 60/60, useful/scarce 55/60; borderline/useful 0/60,
-            // three/borderline 24/60). Asserted: the two robust true-rank overlaps,
-            // plus the borderline-useful gap sitting UNDER the board-noise sigma —
-            // the tiers separate in truth and blur through scouting error.
-            var groups = new[] { "three-leg", "two (borderline)", "two (useful)", "two (scarce)", "one-leg" };
-            var ranksByGroup = groups.Select(g =>
-                stockA.Pool.Where(p => DivvyGroupOf(p) == g).Select(p => p.ScoutRank).ToList()).ToArray();
-            var gm = ranksByGroup.Select(r => r.Average()).ToArray();
-            Check("stock pool: means strictly ordered three > borderline > useful > scarce",
-                gm[0] > gm[1] && gm[1] > gm[2] && gm[2] > gm[3],
-                string.Join(" > ", gm.Take(4).Select(m => m.ToString("F0"))));
-            Check("stock pool: one-leg mean below useful mean (scarce vs one-leg deliberately unordered)",
-                gm[4] < gm[2], $"one-leg {gm[4]:F1} vs useful {gm[2]:F1} (scarce {gm[3]:F1})");
-            Check("stock pool: useful/scarce true-rank overlap",
-                ranksByGroup[3].Max() > ranksByGroup[2].Min());
-            Check("stock pool: scarce/one-leg true-rank overlap",
-                ranksByGroup[4].Max() > ranksByGroup[3].Min());
-            var buGap = ranksByGroup[1].Min() - ranksByGroup[2].Max();
-            var noiseSigma = stockA.NoiseScale / Math.Sqrt(6.0);
-            Check("stock pool: borderline-useful gap under board-noise sigma (tiers blur through scouting error)",
-                buGap < noiseSigma, $"gap {buGap:F2} < sigma {noiseSigma:F2}");
+            // (The S29 leg-tier group ordering/overlap assertions are RETIRED with the
+            //  tiers themselves — the S63 pool has no authored tier structure to order.)
 
             // ── 7. Access sanity on the fixed seed: prestige buys cracks, not players. ─
             var prestige = stock.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);

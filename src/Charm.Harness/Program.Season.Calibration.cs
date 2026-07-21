@@ -60,6 +60,16 @@ internal static partial class Program
         // From the box (attributed, all 20 indices — side-symmetric by construction):
         public long OReb, DReb, Ast, Stl, Blk;
 
+        // Session 63: the baseline-read lines (page-only, never asserted). Full-game
+        // foul totals from the attribution arrays (SFL = shooting fouls, NSF =
+        // non-shooting — the S62 split), and a per-(school, depth-slot) usage
+        // accumulator so the league usage SPREAD (max/p90/median/min) is readable on
+        // the page. Usage = (FGA + 0.44·FTA + TO) / the same team total — the
+        // standard box-score possession-share proxy.
+        public long SflTotal, NsfTotal;
+        public readonly Dictionary<(int SchoolId, int Slot), (long Fga, long Fta, long To)> PlayerUsage = new();
+        public readonly Dictionary<int, (long Fga, long Fta, long To)> TeamUsage = new();
+
         // From the game/result:
         public long OtGames, OtPeriods;
         public double TotalSeconds;
@@ -115,7 +125,8 @@ internal static partial class Program
         public long JbTipRetainedN,   JbTipAwardedN,   JbArrowRetainedN,   JbArrowAwardedN;
         public double JbTipRetainedS, JbTipAwardedS,   JbArrowRetainedS,   JbArrowAwardedS;
 
-        public void Accumulate(GameState game, GovernorRunResult result, PlayerBoxTotals box)
+        public void Accumulate(GameState game, GovernorRunResult result, PlayerBoxTotals box,
+                               int homeSchoolId, int awaySchoolId)
         {
             Games++;
             PointsFromScores += game.HomeScore + game.AwayScore;
@@ -127,6 +138,18 @@ internal static partial class Program
             {
                 OReb += box.OReb[i]; DReb += box.DReb[i];
                 Ast  += box.Ast[i];  Stl  += box.Stl[i];  Blk += box.Blk[i];
+
+                // Session 63: fouls + usage. Box index i maps to (school, depth slot)
+                // exactly as the season stamps PlayerIds: home rows are ids 1-10
+                // (indices 0-9), away rows 11-20 (indices 10-19) — see BuildSeasonSide.
+                SflTotal += box.ShFoul[i]; NsfTotal += box.NsFoul[i];
+                var school = i < 10 ? homeSchoolId : awaySchoolId;
+                var slot = (i % 10) + 1;
+                var pk = (school, slot);
+                var pv = PlayerUsage.TryGetValue(pk, out var p0) ? p0 : (0L, 0L, 0L);
+                PlayerUsage[pk] = (pv.Item1 + box.Fga[i], pv.Item2 + box.Fta[i], pv.Item3 + box.To[i]);
+                var tv = TeamUsage.TryGetValue(school, out var t0) ? t0 : (0L, 0L, 0L);
+                TeamUsage[school] = (tv.Item1 + box.Fga[i], tv.Item2 + box.Fta[i], tv.Item3 + box.To[i]);
             }
 
             var elapsedSum = 0.0;
@@ -405,6 +428,71 @@ internal static partial class Program
                     $"    arrow: offense retained n={s.JbArrowRetainedN} (mean {Avg(s.JbArrowRetainedS, s.JbArrowRetainedN):F1}s)") + Inv(
                     $" | defense awarded n={s.JbArrowAwardedN} (mean {Avg(s.JbArrowAwardedS, s.JbArrowAwardedN):F1}s)"));
             }
+        }
+    }
+
+    // ── Session 63: the baseline-read lines (the calibration arc's starting picture).
+    //    Page-only, never asserted. PPP and the foul split come straight from the
+    //    accumulator; the usage spread is computed over every (school, slot) player
+    //    from the season-long box sums. ──────────────────────────────────────────────
+    private static void PrintBaselineReadout(SeasonLeagueStats s)
+    {
+        static string Inv(FormattableString f) => FormattableString.Invariant(f);
+        Console.WriteLine("--- BASELINE LINES (Session 63; page-only, never asserted) ---");
+        if (s.Games == 0) { Console.WriteLine("  no games accumulated."); return; }
+        var g2 = 2.0 * s.Games;
+
+        var ppp = s.PossessionRecords > 0 ? (double)s.PointsFromScores / s.PossessionRecords : 0.0;
+        Console.WriteLine(Inv($"  PPP (points / possession records)      {ppp:F4}"));
+        Console.WriteLine(Inv($"  fouls/team/game (full game)            {(s.SflTotal + s.NsfTotal) / g2:F2}") +
+                          Inv($"   [shooting {s.SflTotal / g2:F2} | non-shooting {s.NsfTotal / g2:F2}]"));
+
+        // Usage spread: (FGA + 0.44·FTA + TO) / same team total, per player-season.
+        var usages = new List<double>();
+        foreach (var kv in s.PlayerUsage)
+        {
+            var (fga, fta, to) = kv.Value;
+            var (tf, tt, tv) = s.TeamUsage[kv.Key.SchoolId];
+            var teamPoss = tf + 0.44 * tt + tv;
+            if (teamPoss > 0) usages.Add(100.0 * (fga + 0.44 * fta + to) / teamPoss);
+        }
+        usages.Sort();
+        if (usages.Count > 0)
+        {
+            double At(double p) => usages[Math.Min(usages.Count - 1, (int)(p * usages.Count))];
+            Console.WriteLine(Inv($"  usage spread (n={usages.Count} player-seasons): ") +
+                Inv($"max {usages[^1]:F1}%  p90 {At(0.90):F1}%  median {At(0.50):F1}%  min {usages[0]:F1}%"));
+        }
+    }
+
+    // ── Session 63: the roster census — proves roster SUPPLY was not silently
+    //    distorted while standings conservation stayed green. Page-only. ─────────────
+    private static void PrintRosterCensus(DivvyResult res, WorldFile world)
+    {
+        static string Inv(FormattableString f) => FormattableString.Invariant(f);
+        Console.WriteLine("--- ROSTER CENSUS (Session 63; page-only) ---");
+        var pool = res.Pool;
+        var all = res.Rosters.Values.SelectMany(r => r).ToList();
+        var drafted = all.Count;
+        var distinct = all.Distinct().Count();
+        var posOk = res.Rosters.Values.Count(r =>
+            r.Count(pid => pool[pid].Pos == "G") == 4 &&
+            r.Count(pid => pool[pid].Pos == "W") == 3 &&
+            r.Count(pid => pool[pid].Pos == "B") == 3);
+        var covOk = res.Rosters.Values.Count(r =>
+            r.Any(pid => GenLeadRoles.Contains(pool[pid].Role)) &&
+            r.Any(pid => pool[pid].Role == GenWingDefenderRole));
+        Console.WriteLine(Inv($"  players drafted {drafted} of pool {pool.Count} (distinct {distinct}; undrafted {pool.Count - distinct})"));
+        Console.WriteLine(Inv($"  rosters exactly 4G/3W/3B: {posOk}/{res.Rosters.Count}   protected roles covered: {covOk}/{res.Rosters.Count}"));
+
+        var prestige = world.Schools.ToDictionary(x => x.Id, x => x.CurrentPrestige);
+        Console.WriteLine("  drafted scout-rank spread by prestige band (mean [min..max]):");
+        foreach (var (lo, hi) in SeasonBands)
+        {
+            var ranks = res.Rosters.Where(kv => prestige[kv.Key] >= lo && prestige[kv.Key] <= hi)
+                                   .SelectMany(kv => kv.Value).Select(pid => pool[pid].ScoutRank).ToList();
+            if (ranks.Count == 0) continue;
+            Console.WriteLine(Inv($"    prestige {lo,2}-{hi,-2}  {ranks.Average(),6:F1}  [{ranks.Min(),6:F1} .. {ranks.Max(),6:F1}]  (n={ranks.Count})"));
         }
     }
 }

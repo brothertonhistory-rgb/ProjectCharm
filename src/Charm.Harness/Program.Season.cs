@@ -370,8 +370,10 @@ internal static partial class Program
             var list = roster.Select((pid, i) =>
             {
                 var p = res.Pool[pid];
-                return new GenPlayerRow(i + 1, p.Pos, p.Role, five.Contains(pid), p.LegCount,
-                                        p.PlusLegs, p.Ratings, p.Player);
+                // LegCount 0 / empty PlusLegs = "not applicable" (S63; mechanically
+                // dead on this path — the game consumes Player/Slot/Pos/Starter only).
+                return new GenPlayerRow(i + 1, p.Pos, p.Role, five.Contains(pid), 0,
+                                        DivvyNoPlusLegs, p.Ratings, p.Player);
             }).ToList();
             if (verbose)
             {
@@ -429,7 +431,7 @@ internal static partial class Program
 
             // Session 31: keep the attribution the loop used to discard and feed the
             // calibration accumulator. Nothing else about the loop changes.
-            league.Accumulate(game, result, attributed);
+            league.Accumulate(game, result, attributed, sg.HomeId, sg.AwayId);
 
             // GameState.HomeScore is credited to HomeSchool, AwayScore to AwaySchool,
             // full stop (a flipped attribution passes conservation and determinism —
@@ -549,9 +551,8 @@ internal static partial class Program
             var leaked = run.Divvy.Rosters[id].Where(pid => topDecile.Contains(pid)).Select(pid =>
             {
                 var p = run.Divvy.Pool[pid];
-                var tier = p.LegCount == 3 ? "three-leg"
-                         : p.LegCount == 2 ? $"two-leg {p.GradientTier}" : "one-leg";
-                return $"{p.Pos} {p.Role} (pool #{pid}, rank {p.ScoutRank:F1}, {tier})";
+                return FormattableString.Invariant(
+                    $"{p.Pos} {p.Role} (pool #{pid}, rank {p.ScoutRank:F1}, wpn {p.Weapon})");
             }).ToList();
             var band = BandOf(prestige[id]);
             Console.WriteLine($"  {names[id]} (prestige {prestige[id]}, band {band.Item1}-{band.Item2}): " +
@@ -573,5 +574,11 @@ internal static partial class Program
 
         // (v) Session 31: the calibration instrument — sim vs the D1 decade blend.
         PrintCalibrationReadout(run.League);
+        Console.WriteLine();
+
+        // (vi) Session 63: the baseline lines + the roster census.
+        PrintBaselineReadout(run.League);
+        Console.WriteLine();
+        PrintRosterCensus(run.Divvy, world);
     }
 }
