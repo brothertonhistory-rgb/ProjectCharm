@@ -169,6 +169,9 @@ internal static partial class Program
         public long[] To   = new long[20];
         // Phase 25: shooting fouls committed (SFL) — weighted draw, separate seed+3 RNG.
         public long[] ShFoul = new long[20];
+        // Session 62: non-shooting fouls committed (NSF) — reach-in/situational propensity
+        // draw, separate seed+4 RNG.
+        public long[] NsFoul = new long[20];
         // Phase 39: assist counts — engine-stamped on-walk from AstBySlot.
         public long[] Ast  = new long[20];
         public static bool AllEqual(PlayerBoxTotals a, PlayerBoxTotals b) =>
@@ -178,18 +181,21 @@ internal static partial class Program
             a.OReb.SequenceEqual(b.OReb) && a.DReb.SequenceEqual(b.DReb) &&
             a.Blk.SequenceEqual(b.Blk)   && a.Stl.SequenceEqual(b.Stl) &&
             a.To.SequenceEqual(b.To)     && a.ShFoul.SequenceEqual(b.ShFoul) &&
+            a.NsFoul.SequenceEqual(b.NsFoul) &&
             a.Ast.SequenceEqual(b.Ast);
     }
 
     /// <summary>Run the full per-game attribution pass. Calling twice with the same
     /// (result, game, seed) must produce AllEqual output — that is the reproducibility contract.</summary>
     private static PlayerBoxTotals AttributeGame(
-        GovernorRunResult result, GameState game, int seed)
+        GovernorRunResult result, GameState game, int seed, MatchupConfig matchupCfg)
     {
         var t = new PlayerBoxTotals();
         // Phase 36: seed+2 RNG (BLK WeightedDraw) retired — BlockerPicker now runs engine-side.
-        // seed+3 (shooting fouls) is the only remaining harness-side attribution draw.
-        var foulRng = new Random(seed + 3);
+        // seed+3 (shooting fouls), and Session 62 seed+4 (non-shooting fouls), are the
+        // harness-side attribution draws. Distinct streams keep each byte-for-byte stable.
+        var foulRng   = new Random(seed + 3);
+        var nsFoulRng = new Random(seed + 4);
         var homeRoster = game.RosterFor(TeamSide.Home);
         var awayRoster = game.RosterFor(TeamSide.Away);
         Roster RosterFor(TeamSide s) => s == TeamSide.Home ? homeRoster : awayRoster;
@@ -280,6 +286,17 @@ internal static partial class Program
                     var fSlot = DrawFoulingDefender(foulRng, r.Defense, defRoster, sf.Zone, sf.ShooterSlot, r.Number);
                     var fp = defRoster.PlayerAt(new Slot(r.Defense, fSlot), r.Number);
                     if (fp != null && fp.PlayerId >= 1 && fp.PlayerId <= 20) t.ShFoul[fp.PlayerId - 1]++;
+                }
+            // Session 62: non-shooting-foul attribution. seed+4 RNG (nsFoulRng), a separate
+            // stream so it never perturbs the shooting-foul draw. Reach-in fouls draw in
+            // proportion to each defender's full reach-in propensity; situational fouls draw
+            // on the Discipline factor alone. One credited committer per event.
+            if (r.NonShootingFouls is { } nsfs)
+                foreach (var nsf in nsfs)
+                {
+                    var nSlot = DrawNonShootingFouler(nsFoulRng, r.Defense, defRoster, nsf.IsReachIn, r.Number, matchupCfg);
+                    var np = defRoster.PlayerAt(new Slot(r.Defense, nSlot), r.Number);
+                    if (np != null && np.PlayerId >= 1 && np.PlayerId <= 20) t.NsFoul[np.PlayerId - 1]++;
                 }
         }
         return t;
@@ -409,6 +426,71 @@ internal static partial class Program
         }
 
         // ── Cumulative draw (same shape as WeightedDraw) ─────────────────────
+        var total = weights.Sum();
+        var draw  = rng.NextDouble() * total;
+        var cumul = 0.0;
+        for (var i = 0; i < slots.Count - 1; i++)
+        {
+            cumul += weights[i];
+            if (draw < cumul) return slots[i].Slot;
+        }
+        return slots[slots.Count - 1].Slot;
+    }
+
+    /// <summary>
+    /// Session 62: draw the defending slot that committed a non-shooting foul. Unlike the
+    /// shooting-foul draw there is no shooter to anchor a "matched man" — a non-shooting
+    /// foul is a property of the defense alone, so all five defenders are candidates,
+    /// weighted by their reach-in propensity.
+    ///
+    /// <para><paramref name="isReachIn"/> selects the weighting. Reach-in fouls (A/B/F) draw
+    /// in proportion to each defender's FULL reach-in propensity
+    /// (<see cref="Matchup.ReachInPropensity"/>) — Discipline-primary, small athleticism
+    /// secondary, slight perimeter lean, orientation taken relative to the lineup mean.
+    /// Situational fouls (I/J/K/M) draw on the Discipline factor alone
+    /// (<see cref="Matchup.ReachInDisciplineFactor"/>): candidate (b), since the perimeter
+    /// lean is meaningless in a rebound scrum or transition bump. Weights are always
+    /// positive (propensity ≥ LuckFloor; the Discipline factor ≥ 1 − DiscSpan &gt; 0), so
+    /// the draw never degenerates.</para>
+    ///
+    /// <para>Reads the defenders on the floor AT this possession (post-substitution), the
+    /// same as <see cref="DrawFoulingDefender"/>.</para>
+    /// </summary>
+    private static int DrawNonShootingFouler(
+        Random rng, TeamSide side, Roster roster,
+        bool isReachIn, int atPossession, MatchupConfig cfg)
+    {
+        // Gather the five defenders on the floor at this possession.
+        var slots = new List<(int Slot, Player P)>(5);
+        for (var s = 1; s <= 5; s++)
+        {
+            var p = roster.PlayerAt(new Slot(side, s), atPossession);
+            if (p != null) slots.Add((s, p));
+        }
+        if (slots.Count == 0)
+            throw new InvalidOperationException(
+                $"DrawNonShootingFouler: team {side} has no populated slots — cannot attribute non-shooting foul.");
+
+        // Lineup mean postness — denominator for the lineup-relative perimeter orientation.
+        var meanPostness = slots.Average(x => Matchup.Postness(x.P, cfg));
+
+        double[] weights = new double[slots.Count];
+        for (var i = 0; i < slots.Count; i++)
+        {
+            var p = slots[i].P;
+            if (isReachIn)
+            {
+                var ath = ((double)p.Quickness + p.FirstStep) / 2.0;
+                var o   = Matchup.ReachInPerimOrientation(Matchup.Postness(p, cfg), meanPostness, cfg);
+                weights[i] = Matchup.ReachInPropensity(p.Discipline, ath, o, cfg);
+            }
+            else
+            {
+                weights[i] = Matchup.ReachInDisciplineFactor(p.Discipline, cfg);
+            }
+        }
+
+        // ── Cumulative draw (same shape as DrawFoulingDefender / WeightedDraw) ──
         var total = weights.Sum();
         var draw  = rng.NextDouble() * total;
         var cumul = 0.0;

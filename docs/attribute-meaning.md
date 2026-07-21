@@ -994,7 +994,7 @@ matchup proxy that includes all his attributed attempts. On *his own line* the r
 | **PerimeterDefense** | FGA **12.8 → 12.8** (flat); FG% **37.8 → 34.9**; 3P% **29.5 → 19.4**; 2P% 40.0 → 38.7 | On-ball contest. Volume never moves — the offense does not hunt the on-ball mismatch — but his looks get harder, hardest on the three. |
 | **RimProtection** | FGA 12.8 (flat); 2P% **40.5 → 36.7**; 3P% ~23 (flat) | Kills interior makes, not volume or the three. (Plus the S52 second-chance/putback team channel.) |
 | **PostDefense** | FGA **13.7 → 12.0**; 2P% **41.2 → 37.1** | The one that takes **both** — it is a *denial* rating (touch redistribution via postness), so it lowers his volume as well as his efficiency. |
-| **Discipline** | FTA **3.7 → 3.6** (essentially flat); nothing else moves | **Was measured on the WRONG meter (S61 correction).** FTA is shooting-fouls-only, vs a flat-50 shooter — its foul wire IS live (moves the shooting-foul rate ~5% vs an average drawer, more vs a magnet). Make-% was the unbuilt half; **the Discipline make-shave SHIPPED S61 (Effect A)**. See Family H. |
+| **Discipline** | FTA **3.7 → 3.6** (essentially flat); nothing else moves | **Was measured on the WRONG meter (S61 correction).** FTA is shooting-fouls-only, vs a flat-50 shooter — its foul wire IS live (moves the shooting-foul rate ~5% vs an average drawer, more vs a magnet). Make-% was one unbuilt half; **the Discipline make-shave SHIPPED S61 (Effect A)**. The **non-shooting foul half SHIPPED S62 (Effect B)** — Discipline now gates each defender's own reach-in rate PER-MAN (hacker 1.48 / average 1.13 / lockdown 0.78 propensity), and every non-shooting foul carries his name. Now wired on THREE channels. See Family H. |
 
 **Finding — perimeter defense is point-neutral without a rim deterrent (the S54 design result).**
 Stacking PerimeterDefense at 99 across 1 → 2 → 3 → 5 slots confirmed the mechanism and surfaced a
@@ -1123,7 +1123,7 @@ and the S51 transition-share gap: the per-man effect is real, the instrument dil
 (Note: `DISCIPLINED_STOPPER`'s Team B shot-mix shift — Rim 28.8 → 29.3, 3PA 20.4 → 20.0 — is the
 PerimeterDefense 80 doing its S52 job, not the Discipline.)
 
-### Finding 3 CORRECTED and half-ANSWERED (S61): Discipline was quiet on the WRONG meter; now wired on two channels.
+### Finding 3 CORRECTED and FULLY ANSWERED (S61 + S62): Discipline was quiet on the WRONG meter; now wired on three channels.
 
 The S53/S54 "near-inert" read measured **the wrong meter twice over**, confirmed by an S61 audit
 against live source + a real run:
@@ -1140,11 +1140,20 @@ against live source + a real run:
   read off the defender's own Discipline, symmetric about 50 (lockdown shaves, average neutral, liability
   gives up a cleaner look). This is the **man-to-man** wire (per the S61 scheme-toggle ruling). Modest by
   design (~1.5% relative at max Discipline); magnitude page-tuned. See design.md "Session 61" and Phase 67.
-- **Effect B (the "fouls committed" half) is deferred.** 65% of defensive fouls are non-shooting (reach-ins
-  / off-ball grabs), authored as a team rate in Roll B and charged anonymously in Roll D — Discipline reads
-  nothing there. Emmett ruled non-shooting fouls must eventually be attributed to an individual, so Effect B
-  is a per-man non-shooting foul model in its own session (status.md Open). **So Discipline is no longer a
-  "candidate wiring gap": one channel shipped, the other has a ruled build path.**
+- **Effect B (the "fouls committed" half) SHIPPED (S62).** 65% of defensive fouls are non-shooting (reach-ins
+  / off-ball grabs), and were authored as an anonymous team rate in Roll B/F and charged with no name — Discipline
+  read nothing there. S62 rebuilt that: each defender carries his own reach-in propensity, Discipline PRIMARY
+  (`discFactor = 1 − ReachInDiscSpan·clamp((D−50)/49,−1,1)`, symmetric about 50, low D → more fouls; propensity
+  hacker 1.48 / average 1.13 / lockdown 0.78, a ±31% swing), with a small athleticism secondary and a slight
+  lineup-relative perimeter lean. The five propensities set the team rate through an aggregate that is exactly
+  1.0 at five-average (today's rate preserved; one hacker → 1.062, adds not redistributes; stacking linear), and
+  every non-shooting foul carries a committer's name — drawn ∝ propensity for reach-ins, ∝ the Discipline factor
+  for situational fouls. The Hustle→foul coupling was retired to the coach layer. **So Discipline is no longer a
+  "candidate wiring gap": all three channels are live** — the shooting-foul contest (quiet by tuning), the make-%
+  shave (S61), and the per-man non-shooting foul rate (S62). See design.md "Session 62" and Phase 68. What the
+  bench still cannot show: the per-man spread needs Discipline to VARY across a lineup (the flat-50 bench seats it
+  at 50 everywhere, so the aggregate sits at 1.0 and the box reads flat) — the spread is proven in Phase 68's
+  draw test with deliberately varied Discipline, and shows in the box score's new NSF column on a real population.
 
 ### The interaction block (seven rows, slot 1)
 

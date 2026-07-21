@@ -189,6 +189,13 @@ public sealed class RollAGenerator : IRollAPieGenerator
                 baseTurnoverShare, baseDefFoulShare, baseOffFoulShare,
                 _matchup);
 
+        // ── Session 62: per-man reach-in RATE ───────────────────────────────
+        // The entry DEFENSIVE foul is a reach-in on the ball-handler in the backcourt —
+        // scale it by the five defenders' aggregate reach-in propensity (exactly 1.0 at
+        // five-average). The OFFENSIVE entry foul is an offensive-player charge, not a
+        // reach-in, so it is left untouched. Applied BEFORE the overflow guard.
+        finalDefFoulShare *= Matchup.ReachInPerManAggregate(defPlayers, _matchup);
+
         // ── Overflow guard ───────────────────────────────────────────────────
         // With sane Standard ceilings (sum < 1.0 enforced at Load) this never fires.
         // A misconfigured ceiling set with sum >= 1 would make CleanEntry negative.

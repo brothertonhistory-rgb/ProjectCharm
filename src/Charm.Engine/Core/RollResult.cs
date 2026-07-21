@@ -206,6 +206,16 @@ public sealed record Continue(ContinuationKind Next, PossessionState State) : Ro
     public FoulFlavor? Flavor { get; init; }
 
     /// <summary>
+    /// Session 62: the attributable non-shooting-foul event this continuation carries —
+    /// FUNCTIONAL payload for the per-defender foul count, the parallel of the shooting
+    /// path's <c>ShootingFouls</c>. Set only by <see cref="DefensiveFoulCharge.Resolve"/>
+    /// (every non-shooting foul in the game passes through it), carrying whether the foul
+    /// is a reach-in (A/B/F) or situational (I/J/K/M). Null on every non-foul continuation.
+    /// The resolver harvests it into the possession's <c>NonShootingFouls</c> list.
+    /// </summary>
+    public NonShootingFoulEvent? NonShootingFoul { get; init; }
+
+    /// <summary>
     /// The turnover CONTEXT TICKET a turnover continuation carries to Roll C — the
     /// within-possession ticket memory that selects which turnover pie Roll C uses.
     /// FUNCTIONAL payload (it changes the odds), the same optional-payload shape as

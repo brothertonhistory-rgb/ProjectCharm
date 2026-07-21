@@ -816,6 +816,92 @@ public static class Matchup
          + cfg.PostnessPostDefense * p.PostDefense
          + cfg.PostnessStrength    * p.Strength;
 
+    // ── Session 62: per-man NON-SHOOTING (reach-in) foul propensity ───────────
+    // Each defender's own propensity to draw a reach-in whistle. Discipline is the
+    // PRIMARY driver (symmetric about 50, low D → more fouls — a hacker); athleticism a
+    // SMALL secondary; a SLIGHT perimeter lean. Base is fixed at 1.0; the LuckFloor is the
+    // only additive knob, keeping every propensity > 0 (no defender un-drawable). Public
+    // and static so the harness/oracle can bind to these exact expressions — same pattern
+    // as BlockWeight / FoulRate. The team reach-in RATE scales by the per-man aggregate of
+    // the five (Rolls A/B/F), and the same propensities weight WHO committed the foul.
+
+    /// <summary>The discipline factor of the reach-in propensity — PRIMARY, symmetric about
+    /// 50. <c>1 − DiscSpan·clamp((D−50)/49, −1, +1)</c>: D=0 → 1+span (hacker), D=99 → 1−span
+    /// (lockdown), D=50 → 1. Also the situational-foul committer weight (candidate (b)).</summary>
+    public static double ReachInDisciplineFactor(double discipline, MatchupConfig cfg)
+        => 1.0 - cfg.ReachInDiscSpan * Math.Clamp((discipline - 50.0) / 49.0, -1.0, 1.0);
+
+    /// <summary>The athleticism factor of the reach-in propensity — SMALL secondary.
+    /// <c>1 − AthSpan·clamp((A−50)/49, −1, +1)</c>: higher athleticism → slightly fewer
+    /// reach-ins. Athleticism is the defender's own Quickness+FirstStep composite.</summary>
+    public static double ReachInAthFactor(double athleticism, MatchupConfig cfg)
+        => 1.0 - cfg.ReachInAthSpan * Math.Clamp((athleticism - 50.0) / 49.0, -1.0, 1.0);
+
+    /// <summary>Map a defender's raw <see cref="Postness"/> and his lineup's mean postness
+    /// into a [0,1] PERIMETER orientation (0 = deepest post, 1 = furthest perimeter, 0.5 at
+    /// the lineup mean): <c>0.5 − 0.5·tanh((postness − mean)/PostnessScale)</c>. Lineup-
+    /// relative (same idiom as <see cref="PositionalWeight"/>) so the perimeter lean nets to
+    /// zero across a balanced lineup — it reweights WHO fouls, not the team rate.</summary>
+    public static double ReachInPerimOrientation(double postness, double lineupMeanPostness, MatchupConfig cfg)
+        => 0.5 - 0.5 * Math.Tanh((postness - lineupMeanPostness) / cfg.ReachInPostnessScale);
+
+    /// <summary>The perimeter factor of the reach-in propensity — SLIGHT lean.
+    /// <c>1 + PerimSpan·(2o − 1)</c> for orientation o in [0,1]: o=1 (perimeter) → 1+span,
+    /// o=0 (post) → 1−span, o=0.5 → 1.</summary>
+    public static double ReachInPerimFactor(double orientation, MatchupConfig cfg)
+        => 1.0 + cfg.ReachInPerimSpan * (2.0 * orientation - 1.0);
+
+    /// <summary>One defender's full reach-in propensity:
+    /// <c>LuckFloor + disciplineFactor·athFactor·perimFactor</c> (Base fixed at 1.0). Always
+    /// &gt; 0. Drives both the reach-in RATE (via the per-man aggregate over the five
+    /// defenders) and the reach-in committer draw. <paramref name="orientation"/> is the
+    /// [0,1] value from <see cref="ReachInPerimOrientation"/>.</summary>
+    public static double ReachInPropensity(double discipline, double athleticism, double orientation, MatchupConfig cfg)
+        => cfg.ReachInLuckFloor
+         + ReachInDisciplineFactor(discipline, cfg)
+         * ReachInAthFactor(athleticism, cfg)
+         * ReachInPerimFactor(orientation, cfg);
+
+    /// <summary>The reference propensity of an average defender (D=50, A=50, o=0.5) —
+    /// <c>LuckFloor + 1</c>. The per-man aggregate normalizes by 5× this, so a five-average
+    /// lineup yields exactly 1.0 (today's reach-in rate is preserved).</summary>
+    public static double ReachInReferencePropensity(MatchupConfig cfg)
+        => cfg.ReachInLuckFloor + 1.0;
+
+    /// <summary>The team reach-in RATE multiplier: <c>Σ propensityᵢ / (5 · refProp)</c> over
+    /// the five defenders. Exactly 1.0 at five-average (anchor preserved); above 1.0 when the
+    /// lineup out-hacks average (a hacker ADDS fouls, does not merely redistribute), below
+    /// when it out-disciplines. Linear in each defender's propensity (stackable).</summary>
+    public static double ReachInPerManAggregate(IReadOnlyList<Player?> defenders, MatchupConfig cfg)
+    {
+        if (defenders is null) return 1.0;
+
+        // Mean postness over the populated defenders (denominator for the lineup-relative
+        // perimeter orientation). Unpopulated slots are skipped — in production all five are
+        // present, but a short lineup must never crash or skew the anchor.
+        var meanPostness = 0.0;
+        var count = 0;
+        for (var i = 0; i < defenders.Count; i++)
+        {
+            if (defenders[i] is null) continue;
+            meanPostness += Postness(defenders[i]!, cfg);
+            count++;
+        }
+        if (count == 0) return 1.0;
+        meanPostness /= count;
+
+        var sum = 0.0;
+        for (var i = 0; i < defenders.Count; i++)
+        {
+            var p = defenders[i];
+            if (p is null) continue;
+            var ath = ((double)p.Quickness + p.FirstStep) / 2.0;
+            var o   = ReachInPerimOrientation(Postness(p, cfg), meanPostness, cfg);
+            sum += ReachInPropensity(p.Discipline, ath, o, cfg);
+        }
+        return sum / (count * ReachInReferencePropensity(cfg));
+    }
+
     /// <summary>
     /// The positional weight for one player within a lineup (Phase 10, stage 2).
     /// Returns a value in <c>(1 − swing, 1 + swing)</c> ≈ <c>(0.8, 1.2)</c> at
@@ -1266,14 +1352,10 @@ public static class Matchup
     /// <param name="hustlePressureNudge">Phase 45: pre-saturation Hustle contribution
     /// to the turnover disruption shift. Positive when the defense out-hustles. Added to
     /// disruptionShift BEFORE the tanh so it respects the turnover ceiling. Default 0.0.</param>
-    /// <param name="hustleFoulNudge">Phase 45: pre-saturation Hustle contribution to the
-    /// foul shift. Positive only when the defense has the Hustle advantage (the caller
-    /// passes max(0, -hustleGap) through the foul GapFn). Added to foulShift BEFORE the
-    /// tanh so it respects the foul ceiling. Default 0.0.</param>
     public static (double turnoverShare, double foulShare) DisruptionShares(
         Player handler, Player defender, double pressure,
         double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg,
-        double hustlePressureNudge = 0.0, double hustleFoulNudge = 0.0)
+        double hustlePressureNudge = 0.0)
     {
         // ── Pressure normalization ───────────────────────────────────────────
         // Map the 1–10 dial to a signed unit around neutral.
@@ -1324,9 +1406,10 @@ public static class Matchup
         // ── Foul share — flat-lift only, no matchup term ─────────────────────
         // Reach-in non-shooting fouls track aggression, not skill: any level of
         // BallHandling/Steals matchup produces the same foul rate at the same pressure.
-        // Phase 45: hustleFoulNudge is added pre-saturation. The caller passes a value
-        // that is positive only when the defense out-hustles (defense-only foul cost).
-        var foulShift    = pressureLift + hustleFoulNudge;   // NO matchupShift term
+        // Session 62: the Hustle foul nudge is RETIRED. The reach-in RATE is now per-man —
+        // the caller (RollFGenerator) scales the returned foul share by the five defenders'
+        // aggregate reach-in propensity. Only pressureLift (the coach layer) bends it here.
+        var foulShift    = pressureLift;   // NO matchupShift term
         var foulCeiling  = cfg.FoulPressureCeiling;
         var foulFloor    = cfg.FoulPressureFloor;
         var foulSpan     = foulShift >= 0.0
@@ -1381,15 +1464,12 @@ public static class Matchup
     /// <param name="hustlePressureNudge">Phase 45: pre-saturation Hustle contribution to
     /// the turnover disruption shift. Positive when the defense out-hustles. Added to
     /// disruptionShift BEFORE the tanh so it respects the turnover ceiling. Default 0.0.</param>
-    /// <param name="hustleFoulNudge">Phase 45: pre-saturation Hustle contribution to the
-    /// foul shift. Positive only when the defense has the Hustle advantage. Added to
-    /// foulShift BEFORE the tanh so it respects the foul ceiling. Default 0.0.</param>
     public static (double turnoverShare, double foulShare) TeamDisruptionShares(
         double offenseHandling, double defenseStealers,
         double offenseAthletic, double defenseAthletic, double defenseWingSigned,
         double pressure,
         double baseTurnoverShare, double baseFoulShare, MatchupConfig cfg,
-        double hustlePressureNudge = 0.0, double hustleFoulNudge = 0.0)
+        double hustlePressureNudge = 0.0)
     {
         // ── Pressure normalization ───────────────────────────────────────────
         var pUnit        = (pressure - cfg.PressureNeutral) / cfg.PressureScale;
@@ -1429,9 +1509,11 @@ public static class Matchup
         var finalToShare = baseTurnoverShare + toBend;   // plain addition; tanh supplies sign
 
         // ── Foul share — pressure-only, no matchup term ──────────────────────
-        // Phase 45: hustleFoulNudge added pre-saturation; positive only when the
-        // defense out-hustles (defense-only foul cost).
-        var foulShift   = pressureLift + hustleFoulNudge;
+        // Session 62: the Hustle foul nudge is RETIRED. The reach-in RATE is now per-man —
+        // the caller (RollBGenerator) scales the returned foul share by the five defenders'
+        // aggregate reach-in propensity. Only pressureLift (the coach/pressure layer) bends
+        // the share here; team-aggression fouls belong to the coach layer, not this seam.
+        var foulShift   = pressureLift;
         var foulCeiling = cfg.RollBFoulPressureCeiling;
         var foulFloor   = cfg.RollBFoulPressureFloor;
         var foulSpan    = foulShift >= 0.0

@@ -146,11 +146,11 @@ public sealed class RollBGenerator : IRollBPieGenerator
                                 * Matchup.UnforcedFactor(offHandling, _matchup);
         var baseFoulShare    = _cfgB.BaseFoul              / actionMass;
 
-        // ── Phase 45: Hustle disruption + defensive foul cost ───────────────
+        // ── Phase 45: Hustle turnover disruption ────────────────────────────
         // Reuse the offPlayers/defPlayers arrays already built above. Team-aggregate
-        // Hustle gap (offense mean − defense mean), fixed-denominator-5 discipline.
-        // Both nudges feed the pre-saturation shifts inside TeamDisruptionShares so
-        // they respect the Roll-B-specific ceilings (never a raw post-bend addition).
+        // Hustle gap (offense mean − defense mean) feeds the turnover pre-saturation shift
+        // inside TeamDisruptionShares (respecting the Roll-B ceiling). Session 62: the Hustle
+        // FOUL nudge is retired — the reach-in RATE is now per-man (aggregate below).
         var hustleGap = Matchup.HustleGap(offPlayers, defPlayers);
 
         // Turnover: -hustleGap is positive when the defense out-hustles → more turnovers.
@@ -160,22 +160,18 @@ public sealed class RollBGenerator : IRollBPieGenerator
                                      _matchup.HustlePressureExponent,
                                      _matchup.HustlePressureScale);
 
-        // Defensive foul cost (defense-only): positive only when the defense out-hustles.
-        // hustleGap = offense − defense, so the defense's advantage is max(0, -hustleGap).
-        // If the offense has equal or greater Hustle, this is exactly 0.0.
-        var defensiveHustleAdvantage = Math.Max(0.0, -hustleGap);
-        var defensiveFoulNudge = _matchup.HustleFoulWeight
-            * Matchup.HustleGapShift(defensiveHustleAdvantage,
-                                     _matchup.HustleFoulSteepness,
-                                     _matchup.HustleFoulExponent,
-                                     _matchup.HustleFoulScale);
-
         var (finalToShare, finalFoulShare) = Matchup.TeamDisruptionShares(
             offHandling, defStealers,
             offAthletic, defAthletic, defWingSigned,
             pressure,
             baseTurnoverShare, baseFoulShare, _matchup,
-            hustlePressureNudge, defensiveFoulNudge);
+            hustlePressureNudge);
+
+        // ── Session 62: per-man reach-in RATE ───────────────────────────────
+        // Scale the pressure-bent foul share by the five defenders' aggregate reach-in
+        // propensity. Exactly 1.0 at five-average (today's rate preserved); a hack-happy
+        // lineup ADDS fouls, a disciplined one sheds them. Applied BEFORE the overflow guard.
+        finalFoulShare *= Matchup.ReachInPerManAggregate(defPlayers, _matchup);
 
         // ── Overflow guard ───────────────────────────────────────────────────
         // With sane Roll-B-specific ceilings this never fires, but a misconfigured

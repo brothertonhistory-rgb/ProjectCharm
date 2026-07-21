@@ -767,7 +767,7 @@ internal static partial class Program
             }
 
             // ── Attribution pass ──────────────────────────────────────────────
-            var attributed = AttributeGame(result, game, seed);
+            var attributed = AttributeGame(result, game, seed, cfgMatchup);
             for (var i = 0; i < 10; i++)
             {
                 bsFga [i] += attributed.Fga [i]; bsFgm [i] += attributed.Fgm [i];

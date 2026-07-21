@@ -252,6 +252,7 @@ public sealed class Resolver
         // Phase 25: shooting-foul events (one per MadeAndFouled / MissFouled edge hit).
         // A possession with no shooting foul stays empty; a putback possession can carry two.
         var shootingFouls = new List<ShootingFoulEvent>();
+        var nonShootingFouls = new List<NonShootingFoulEvent>();   // Session 62
         while (true)
         {
             if (++iterations > IterationCeiling)
@@ -341,12 +342,18 @@ public sealed class Resolver
                           TurnoverOffSlot     = turnoverOffSlot,
                           TurnoverWasLiveBall = turnoverWasLiveBall,
                           ShootingFouls  = shootingFouls.ToArray(),
+                          NonShootingFouls = nonShootingFouls.ToArray(),
                           OrbBySlot      = orbBySlot,
                           StealerSlot    = stealerSlot,
                           DefensiveRebounderSlot = defensiveRebounderSlot,
                           AstBySlot      = astBySlot };
 
                 case Continue c:
+                    // Session 62: harvest any non-shooting foul this continuation carries,
+                    // before routing on Next. Every foul charge (reach-in A/B/F or situational
+                    // I/J/K/M) rides out on a Continue from DefensiveFoulCharge, so this single
+                    // point captures them all regardless of the bonus branch taken.
+                    if (c.NonShootingFoul is { } nsf) nonShootingFouls.Add(nsf);
                     switch (c.Next)
                     {
                         // Roll A's clean entry -> execute Roll B, loop.

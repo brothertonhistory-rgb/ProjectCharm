@@ -3381,49 +3381,42 @@ internal static partial class Program
             Console.WriteLine($"  (c) {(cOk ? "ok — Hustle inserted pre-saturation" : "FAIL")}");
         }
 
-        // ── (d) Foul direction: defense-only ─────────────────────────────────
-        Console.WriteLine("  (d) Foul direction (defense-only):");
+        // ── (d) Foul arm Hustle-INDEPENDENT (Session 62 reach-in retirement) ──
+        // The reach-in RATE is now per-man (Discipline-primary), so the S45
+        // defensiveFoulNudge was retired: the Roll B/F foul arm no longer moves with
+        // Hustle (unchanged whether offense or defense out-hustles), while the TURNOVER
+        // arm still responds to Hustle (that nudge is retained). This sub-check now guards
+        // that the coupling stays retired.
+        Console.WriteLine("  (d) Foul arm Hustle-independent (S62); turnover arm still responds:");
         {
             var dOk = true;
             var neutral = WithAwayPressure(5.0);   // isolates Hustle (pressure lift = 0, matchup gated off)
 
-            // Pre-saturation nudge ordering (mirrors the Python pre-check).
-            var foulNudge     = cfgM.HustleFoulWeight
-                              * Matchup.HustleGapShift(60.0, cfgM.HustleFoulSteepness, cfgM.HustleFoulExponent, cfgM.HustleFoulScale);
-            var pressureNudge = cfgM.HustlePressureWeight
-                              * Matchup.HustleGapShift(60.0, cfgM.HustlePressureSteepness, cfgM.HustlePressureExponent, cfgM.HustlePressureScale);
-            var preOrderOk = foulNudge < pressureNudge && foulNudge > 0.0;
-            Console.WriteLine($"    pre-saturation: foulNudge={foulNudge:F6} < pressureNudge={pressureNudge:F6} → {(preOrderOk ? "ok" : "FAIL")}");
-            dOk &= preOrderOk;
+            // Roll F: the foul arm is identical at even / offense-adv / defense-adv Hustle.
+            var fEven   = RollFArms(neutral, 50, 50)[PlayerActionOutcome.NonShootingFoul];
+            var fOffAdv = RollFArms(neutral, 80, 20)[PlayerActionOutcome.NonShootingFoul];
+            var fDefAdv = RollFArms(neutral, 20, 80)[PlayerActionOutcome.NonShootingFoul];
+            var fFoulFlat = Math.Abs(fOffAdv - fEven) < TightEps && Math.Abs(fDefAdv - fEven) < TightEps;
+            Console.WriteLine($"    Roll F foul: even={fEven:F6}  off-adv={fOffAdv:F6}  def-adv={fDefAdv:F6}  (all equal → {(fFoulFlat ? "ok" : "FAIL")})");
+            dOk &= fFoulFlat;
 
-            // Roll F: offense advantage → foul arm unchanged; defense advantage → foul arm rises.
-            var fEven = RollFArms(neutral, 50, 50)[PlayerActionOutcome.NonShootingFoul];
-            var fOffAdv = RollFArms(neutral, 80, 20)[PlayerActionOutcome.NonShootingFoul];   // offense out-hustles → no def foul
-            var fDefAdv = RollFArms(neutral, 20, 80)[PlayerActionOutcome.NonShootingFoul];   // defense out-hustles → foul rises
-            var fOffUnchanged = Math.Abs(fOffAdv - fEven) < TightEps;
-            var fDefRises      = fDefAdv > fEven + Eps;
-            Console.WriteLine($"    Roll F foul: even={fEven:F6}  off-adv={fOffAdv:F6} (==even → {(fOffUnchanged ? "ok" : "FAIL")})  def-adv={fDefAdv:F6} (>even → {(fDefRises ? "ok" : "FAIL")})");
-            dOk &= fOffUnchanged && fDefRises;
-
-            // Roll B: same defense-only behaviour on the Foul arm.
-            var bEven = RollBArms(neutral, 50, 50)[HalfcourtOutcome.Foul];
+            // Roll B: same — foul arm flat across Hustle.
+            var bEven   = RollBArms(neutral, 50, 50)[HalfcourtOutcome.Foul];
             var bOffAdv = RollBArms(neutral, 80, 20)[HalfcourtOutcome.Foul];
             var bDefAdv = RollBArms(neutral, 20, 80)[HalfcourtOutcome.Foul];
-            var bOffUnchanged = Math.Abs(bOffAdv - bEven) < TightEps;
-            var bDefRises      = bDefAdv > bEven + Eps;
-            Console.WriteLine($"    Roll B foul: even={bEven:F6}  off-adv={bOffAdv:F6} (==even → {(bOffUnchanged ? "ok" : "FAIL")})  def-adv={bDefAdv:F6} (>even → {(bDefRises ? "ok" : "FAIL")})");
-            dOk &= bOffUnchanged && bDefRises;
+            var bFoulFlat = Math.Abs(bOffAdv - bEven) < TightEps && Math.Abs(bDefAdv - bEven) < TightEps;
+            Console.WriteLine($"    Roll B foul: even={bEven:F6}  off-adv={bOffAdv:F6}  def-adv={bDefAdv:F6}  (all equal → {(bFoulFlat ? "ok" : "FAIL")})");
+            dOk &= bFoulFlat;
 
-            // Post-saturation: final foul-arm delta < final turnover-arm delta (defense advantage).
-            var fFoulDelta = fDefAdv - fEven;
-            var fToDelta   = RollFArms(neutral, 20, 80)[PlayerActionOutcome.Turnover]
-                           - RollFArms(neutral, 50, 50)[PlayerActionOutcome.Turnover];
-            var postOrderOk = fFoulDelta < fToDelta && fFoulDelta > Eps;
-            Console.WriteLine($"    post-saturation (Roll F): foul Δ={fFoulDelta*100:F4}pp < turnover Δ={fToDelta*100:F4}pp → {(postOrderOk ? "ok" : "FAIL")}");
-            dOk &= postOrderOk;
+            // The TURNOVER arm still rises when the defense out-hustles (nudge retained).
+            var fToEven = RollFArms(neutral, 50, 50)[PlayerActionOutcome.Turnover];
+            var fToDef  = RollFArms(neutral, 20, 80)[PlayerActionOutcome.Turnover];
+            var toStillResponds = fToDef > fToEven + Eps;
+            Console.WriteLine($"    Roll F turnover: even={fToEven:F6}  def-adv={fToDef:F6}  (def-adv rises → {(toStillResponds ? "ok" : "FAIL")})");
+            dOk &= toStillResponds;
 
             pass &= dOk;
-            Console.WriteLine($"  (d) {(dOk ? "ok — defense-only, foul < turnover" : "FAIL")}");
+            Console.WriteLine($"  (d) {(dOk ? "ok — foul arm Hustle-independent; turnover arm responds" : "FAIL")}");
         }
 
         // ── (f) Transition defense: FastBreak only, halfcourt unaffected ─────

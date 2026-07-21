@@ -805,7 +805,7 @@ internal static partial class Program
             var cohortFta    = new long[10]; var cohortFtm    = new long[10];
             var cohortOReb   = new long[10]; var cohortDReb   = new long[10];
             var cohortBlk    = new long[10]; var cohortStl    = new long[10];
-            var cohortTo     = new long[10]; var cohortShFoul = new long[10];
+            var cohortTo     = new long[10]; var cohortShFoul = new long[10]; var cohortNsFoul = new long[10];
             var cohortAst    = new long[10];
 
             for (var variantIdx = 0; variantIdx < 10; variantIdx++)
@@ -986,7 +986,7 @@ internal static partial class Program
                     // is touched, and before vs.ValidGames is incremented. A throw here causes
                     // a continue so the game contributes to neither numerator nor denominator.
                     PlayerBoxTotals attributed;
-                    try { attributed = AttributeGame(result, game, gameSeed); }
+                    try { attributed = AttributeGame(result, game, gameSeed, cfgMatchup); }
                     catch (Exception attrEx)
                     {
                         failures.Add($"B{bucketNum} V{variantIdx} seed={gameSeed}: AttributeGame failed: {attrEx.Message}");
@@ -1003,7 +1003,7 @@ internal static partial class Program
                         cohortFta   [i] += attributed.Fta  [i]; cohortFtm   [i] += attributed.Ftm  [i];
                         cohortOReb  [i] += attributed.OReb [i]; cohortDReb  [i] += attributed.DReb [i];
                         cohortBlk   [i] += attributed.Blk  [i]; cohortStl   [i] += attributed.Stl  [i];
-                        cohortTo    [i] += attributed.To   [i]; cohortShFoul[i] += attributed.ShFoul[i];
+                        cohortTo    [i] += attributed.To   [i]; cohortShFoul[i] += attributed.ShFoul[i]; cohortNsFoul[i] += attributed.NsFoul[i];
                         cohortAst   [i] += attributed.Ast  [i];
                     }
 
@@ -1431,8 +1431,8 @@ internal static partial class Program
                 Console.WriteLine($"  for one logical slot/archetype cohort, not one persistent named player. ({totalValid} accepted games)");
                 if (bucketNum == 5)
                     Console.WriteLine("  Note: Team A Slot 1 is an Elite-tier Slasher star; all other Team A slots are Good tier.");
-                Console.WriteLine($"  {"Row",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5}");
-                Console.WriteLine(new string('─', 121));
+                Console.WriteLine($"  {"Row",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5} {"NSF",5}");
+                Console.WriteLine(new string('─', 127));
                 double g = totalValid;
                 for (var i = 0; i < 10; i++)
                 {
@@ -1447,6 +1447,7 @@ internal static partial class Program
                     var orb  = cohortOReb [i] / g; var drb  = cohortDReb [i] / g;
                     var blk  = cohortBlk  [i] / g; var stl  = cohortStl  [i] / g;
                     var to   = cohortTo   [i] / g; var sfl  = cohortShFoul[i] / g;
+                    var nsf  = cohortNsFoul[i] / g;
                     var ast  = cohortAst  [i] / g;
                     var pts  = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
                     var fgPct = fga > 0 ? fgm / fga * 100 : 0.0;
@@ -1455,7 +1456,7 @@ internal static partial class Program
                     Console.WriteLine(
                         $"  {label,-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
                         $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
-                        $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1} {sfl,5:F1}");
+                        $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1} {sfl,5:F1} {nsf,5:F1}");
                 }
                 Console.WriteLine($"=== END COHORT BOX SCORE — Bucket {bucketNum} ===");
                 Console.WriteLine();

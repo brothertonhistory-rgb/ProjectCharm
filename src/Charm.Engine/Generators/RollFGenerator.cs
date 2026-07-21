@@ -173,19 +173,17 @@ public sealed class RollFGenerator : IRollFPieGenerator
                                      _matchup.HustlePressureExponent,
                                      _matchup.HustlePressureScale);
 
-        // Defensive foul cost (defense-only): positive only when the defense out-hustles.
-        // hustleGap = offense − defense, so the defense's advantage is max(0, -hustleGap).
-        // If the offense has equal or greater Hustle, this is exactly 0.0.
-        var defensiveHustleAdvantage = Math.Max(0.0, -hustleGap);
-        var defensiveFoulNudge = _matchup.HustleFoulWeight
-            * Matchup.HustleGapShift(defensiveHustleAdvantage,
-                                     _matchup.HustleFoulSteepness,
-                                     _matchup.HustleFoulExponent,
-                                     _matchup.HustleFoulScale);
-
+        // Session 62: the Hustle FOUL nudge is retired — the reach-in RATE is now per-man
+        // (aggregate below). Only the turnover nudge remains on the Hustle path.
         var (finalToShare, finalFoulShare) = Matchup.DisruptionShares(
             handler, defender, pressure, baseTurnoverShare, baseFoulShare, _matchup,
-            hustlePressureNudge, defensiveFoulNudge);
+            hustlePressureNudge);
+
+        // ── Session 62: per-man reach-in RATE ───────────────────────────────
+        // Scale the pressure-bent foul share by the five defenders' aggregate reach-in
+        // propensity (defHustle is the full defensive lineup). Exactly 1.0 at five-average;
+        // a hack-happy lineup ADDS fouls. Applied BEFORE the overflow guard.
+        finalFoulShare *= Matchup.ReachInPerManAggregate(defHustle, _matchup);
 
         // ── Overflow guard ───────────────────────────────────────────────────
         // At sane ceiling values this never fires, but a misconfigured ceiling

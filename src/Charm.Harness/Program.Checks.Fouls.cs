@@ -842,7 +842,7 @@ internal static partial class Program
                 else                             totalAwayDefEvents += r.ShootingFouls.Count;
             }
 
-            var attributed = AttributeGame(result, game, seed);
+            var attributed = AttributeGame(result, game, seed, cfgMatchup);
             for (var i = 0; i < 10; i++) bsShFoul25[i] += attributed.ShFoul[i];
         }
 

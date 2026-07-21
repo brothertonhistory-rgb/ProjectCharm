@@ -358,6 +358,18 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// </summary>
     public IReadOnlyList<ShootingFoulEvent> ShootingFouls { get; init; } = Array.Empty<ShootingFoulEvent>();
 
+    // ── Session 62: non-shooting-foul attribution ─────────────────────────────
+    /// <summary>
+    /// Every non-shooting defensive-foul event that occurred during this possession's
+    /// walk — one entry per team-foul increment at <see cref="DefensiveFoulCharge.Resolve"/>,
+    /// covering the reach-in (A/B/F) and situational (I/J/K/M) fouls alike. Empty (never
+    /// null) on possessions with no non-shooting foul; a possession can carry more than one
+    /// (e.g. a foul on the entry and again on a putback). The parallel of
+    /// <see cref="ShootingFouls"/>. Init-only with an empty-array default, so every existing
+    /// positional construction is untouched — a pure append.
+    /// </summary>
+    public IReadOnlyList<NonShootingFoulEvent> NonShootingFouls { get; init; } = Array.Empty<NonShootingFoulEvent>();
+
     // ── Phase 31: offensive-rebounder attribution ─────────────────────────────
     /// <summary>
     /// Per-slot offensive-rebound counts for this possession — stamped by

@@ -179,7 +179,11 @@ public sealed record PossessionRecord(
     // possession's putback carries FastBreak but is rim-forced, not a diet shot).
     int FastBreakFga = 0,
     int FastBreakThreePa = 0,
-    int FastBreakThreePm = 0);
+    int FastBreakThreePm = 0,
+    // Session 62: non-shooting-foul events for this possession (reach-in A/B/F + situational
+    // I/J/K/M), the parallel of ShootingFouls. Appended last so every existing positional
+    // construction is unaffected; empty/null on possessions with no non-shooting foul.
+    IReadOnlyList<NonShootingFoulEvent>? NonShootingFouls = null);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -381,6 +385,7 @@ public sealed class Governor
             int?  possessionTurnoverOffSlot    = null;
             var   possessionTurnoverWasLiveBall = false;
             IReadOnlyList<ShootingFoulEvent>? possessionShootingFouls = null;
+            IReadOnlyList<NonShootingFoulEvent>? possessionNonShootingFouls = null;   // Session 62
             var possessionOrbBySlot = new SlotGroup();
             int? possessionStealerSlot = null;
             int? possessionDefensiveRebounderSlot = null;
@@ -506,6 +511,7 @@ public sealed class Governor
                 possessionTurnoverOffSlot     = outcome.TurnoverOffSlot;
                 possessionTurnoverWasLiveBall = outcome.TurnoverWasLiveBall;
                 possessionShootingFouls       = outcome.ShootingFouls;
+                possessionNonShootingFouls    = outcome.NonShootingFouls;
                 possessionOrbBySlot           = outcome.OrbBySlot;
                 possessionStealerSlot         = outcome.StealerSlot;
                 possessionDefensiveRebounderSlot = outcome.DefensiveRebounderSlot;
@@ -562,7 +568,8 @@ public sealed class Governor
                 possessionFtaBonusUnattributed, possessionFtaShootingSelected,
                 possessionFtaShootingNoSlot,
                 recordTimeProfile, recordTurnoverRaw, recordShotClockPeriods,
-                possessionFastBreakFga, possessionFastBreakThreePa, possessionFastBreakThreePm));
+                possessionFastBreakFga, possessionFastBreakThreePa, possessionFastBreakThreePm,
+                possessionNonShootingFouls));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(

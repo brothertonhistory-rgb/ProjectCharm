@@ -356,6 +356,7 @@ internal static partial class Program
         var bsAst  = new long[10];
         // Phase 25: shooting fouls committed (SFL) per player — weighted draw, seed+3 RNG.
         var bsShFoul = new long[10];
+        var bsNsFoul = new long[10];   // Session 62: non-shooting fouls committed
         var bsGames = 0;
         var attributionOk = true;   // hard-fail flag for post-loop attribution checks
         GovernorRunResult? seedOneResult = null;  // captured for reproducibility check
@@ -962,7 +963,7 @@ internal static partial class Program
             // ── Phase 23: per-game attribution ───────────────────────────────
             // AttributeGame uses Random(seed+2) — independent of all gameplay RNGs.
             bsGames++;
-            var attributed = AttributeGame(result, game, seed);
+            var attributed = AttributeGame(result, game, seed, cfgMatchup);
             for (var i = 0; i < 10; i++)
             {
                 bsFga [i] += attributed.Fga [i]; bsFgm [i] += attributed.Fgm [i];
@@ -973,6 +974,7 @@ internal static partial class Program
                 bsTo  [i] += attributed.To  [i];
                 // Phase 25: accumulate shooting-foul credits (seed+3 RNG — seed+2 unchanged).
                 bsShFoul[i] += attributed.ShFoul[i];
+                bsNsFoul[i] += attributed.NsFoul[i];
                 // Phase 39: accumulate assist credits (engine-stamped — no additional RNG).
                 bsAst [i] += attributed.Ast [i];
             }
@@ -1241,8 +1243,8 @@ internal static partial class Program
                     repRoster.SetStarter(repLineup.SlotAt(i + 1), StampPlayerId(repConfigs[i].ToPlayer(), newId));
                 }
             }
-            var rep1 = AttributeGame(seedOneResult, repGame, 1);
-            var rep2 = AttributeGame(seedOneResult, repGame, 1);
+            var rep1 = AttributeGame(seedOneResult, repGame, 1, cfgMatchup);
+            var rep2 = AttributeGame(seedOneResult, repGame, 1, cfgMatchup);
             if (!PlayerBoxTotals.AllEqual(rep1, rep2))
             {
                 Console.WriteLine("  [FAIL] Same-seed reproducibility: AttributeGame produced different results on identical inputs");
@@ -1297,9 +1299,9 @@ internal static partial class Program
         Console.WriteLine($"=== PER-PLAYER BOX SCORE (per-game averages, {bsGames} games) ===");
         Console.WriteLine("  Exact attribution: FGA, FGM, 3PA, 3PM, FTA, FTM.");
         Console.WriteLine("  Weighted credit (probabilistic): ORB, DRB, REB, STL, BLK, TO (post-Roll-E exact; pre-Roll-E by BallHandling weight).");
-        Console.WriteLine("  SFL = shooting fouls committed; excludes all non-shooting and offensive fouls.");
-        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5}");
-        Console.WriteLine(new string('─', 121));
+        Console.WriteLine("  SFL = shooting fouls committed; NSF = non-shooting (reach-in + situational) fouls committed; both exclude offensive fouls.");
+        Console.WriteLine($"  {"Player",-22} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5} {"NSF",5}");
+        Console.WriteLine(new string('─', 127));
         for (var i = 0; i < 10; i++)
         {
             var player = boxPlayers[i];
@@ -1313,6 +1315,7 @@ internal static partial class Program
                 var stl  = bsStl[i]   / g;  var blk  = bsBlk[i]   / g;
                 var to   = bsTo[i]    / g;
                 var sfl  = bsShFoul[i]/ g;
+                var nsf  = bsNsFoul[i]/ g;
                 var ast  = bsAst[i]   / g;
                 var pts  = (fgm - tpm) * 2.0 + tpm * 3.0 + ftm;
                 var fgPct  = fga  > 0 ? fgm  / fga  * 100 : 0.0;
@@ -1323,7 +1326,7 @@ internal static partial class Program
                 Console.WriteLine(
                     $"  {label,-22} {pts,5:F1} {fga,5:F1} {fgm,5:F1} {fgPct,5:F1} " +
                     $"{tpa,5:F1} {tpm,5:F1} {tpPct,5:F1} {fta,5:F1} {ftm,5:F1} {ftPct,5:F1} " +
-                    $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1} {sfl,5:F1}");
+                    $"{orb,5:F1} {drb,5:F1} {(orb+drb),5:F1} {stl,5:F1} {blk,5:F1} {ast,5:F1} {to,5:F1} {sfl,5:F1} {nsf,5:F1}");
             }
         }
         Console.WriteLine($"=== END PER-PLAYER BOX SCORE ===");

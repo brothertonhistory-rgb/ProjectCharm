@@ -357,7 +357,7 @@ internal static partial class Program
             totals.BOrbWon     += records.Where(r => r.Offense == teamBSide).Sum(r => (long)r.OrbWon);
 
             // Per-player boards — engine-stamped attribution (same source as the box score).
-            var attributed = AttributeGame(result, game, gameSeed);
+            var attributed = AttributeGame(result, game, gameSeed, cfgMatchup);
             for (var s = 0; s < 5; s++)
             {
                 totals.AOReb[s] += attributed.OReb[s];

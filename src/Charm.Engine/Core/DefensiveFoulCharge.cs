@@ -71,7 +71,13 @@ public static class DefensiveFoulCharge
         return new Continue(next, state)
         {
             Bonus = bonus,
-            Flavor = flavor
+            Flavor = flavor,
+            // Session 62: every non-shooting foul emits exactly one attributable event here
+            // — the sole increment site, so no charge is ever missed. flavor.HasValue is
+            // true for the reach-in bucket (A/B/F route through Roll D, which rolls a flavor)
+            // and false for the situational bucket (I/J/K/M carry none): the two pick
+            // different committer weightings in the harness draw.
+            NonShootingFoul = new NonShootingFoulEvent(IsReachIn: flavor.HasValue)
         };
     }
 }

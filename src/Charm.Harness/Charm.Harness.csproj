@@ -89,6 +89,12 @@
     <None Include="..\..\tools\discipline_shave_golden.json" Link="tools\discipline_shave_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+
+    <!-- Non-shooting (reach-in) foul golden fixture (emitted by tools/nonshooting_foul_oracle.py,
+         S62), copied beside the binary so Phase 68 can replay it. -->
+    <None Include="..\..\tools\nonshooting_foul_golden.json" Link="tools\nonshooting_foul_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- Pass-2 generation replay fixture (emitted by the oracle's fixture switch in
          tools/gen_pass2_skillfirst_oracle.py, S42.2), copied beside the binary so
          RunGenPass2ReplayParity reads it from AppContext.BaseDirectory (same convention). -->

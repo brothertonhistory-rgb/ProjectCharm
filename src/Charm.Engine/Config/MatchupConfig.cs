@@ -851,6 +851,25 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"PutbackBlockReferenceShift must be > 0: got {cfg.PutbackBlockReferenceShift}.");
 
+        // Session 62: reach-in propensity spans are fractional shave/lift magnitudes; each
+        // must lie in [0,1) so a factor never collapses to ≤0 at the clamp extremes. The
+        // luck floor must be ≥0, and the postness tanh scale must be >0.
+        if (cfg.ReachInDiscSpan < 0.0 || cfg.ReachInDiscSpan >= 1.0)
+            throw new InvalidOperationException(
+                $"ReachInDiscSpan must be in [0,1): got {cfg.ReachInDiscSpan}.");
+        if (cfg.ReachInAthSpan < 0.0 || cfg.ReachInAthSpan >= 1.0)
+            throw new InvalidOperationException(
+                $"ReachInAthSpan must be in [0,1): got {cfg.ReachInAthSpan}.");
+        if (cfg.ReachInPerimSpan < 0.0 || cfg.ReachInPerimSpan >= 1.0)
+            throw new InvalidOperationException(
+                $"ReachInPerimSpan must be in [0,1): got {cfg.ReachInPerimSpan}.");
+        if (cfg.ReachInLuckFloor < 0.0)
+            throw new InvalidOperationException(
+                $"ReachInLuckFloor must be >= 0: got {cfg.ReachInLuckFloor}.");
+        if (cfg.ReachInPostnessScale <= 0.0)
+            throw new InvalidOperationException(
+                $"ReachInPostnessScale must be > 0: got {cfg.ReachInPostnessScale}.");
+
         const double Eps = 1e-9;
 
         // Skill + length weights must sum to 1.0 per zone.
@@ -2282,6 +2301,44 @@ public sealed class MatchupConfig
     /// Deliberately smaller than HustlePressureWeight so the foul-arm effect stays below
     /// the turnover-arm effect (the within-disruption calibration contract). [CALIBRATION PLACEHOLDER]</summary>
     public double HustleFoulWeight { get; set; } = 0.02;
+
+    // --- Session 62: per-man NON-SHOOTING (reach-in) foul propensity. ---
+    // Each defender carries his own reach-in propensity; the team reach-in RATE is the
+    // sum of the five (Rolls A/B/F scale their foul share by the per-man aggregate), and
+    // the same five numbers weight WHO committed it. Discipline is PRIMARY (symmetric
+    // about 50, low D → more fouls); athleticism a SMALL secondary; perimeter a SLIGHT
+    // lean. Base is fixed at 1.0 in code — only the LuckFloor is an additive knob.
+    // Magnitudes are page-tuned on a real population later, never suite-asserted.
+
+    /// <summary>Discipline span — the fraction the reach-in propensity's discipline factor
+    /// shaves/lifts at the clamp extremes (D=99 → 1−span; D=0 → 1+span). PRIMARY driver.
+    /// Default 0.35 → a hacker (D0) fouls ≈+31% vs average, a lockdown (D99) ≈−31%. Must be
+    /// in [0,1) (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double ReachInDiscSpan { get; set; } = 0.35;
+
+    /// <summary>Athleticism span — SMALL secondary factor on the reach-in propensity
+    /// (athleticism = the defender's own Quickness+FirstStep composite). Higher athleticism
+    /// → slightly fewer reach-ins. Default 0.12. Must be in [0,1) (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double ReachInAthSpan { get; set; } = 0.12;
+
+    /// <summary>Perimeter span — SLIGHT lean on the reach-in propensity toward perimeter
+    /// defenders (orientation o=1 → 1+span; post o=0 → 1−span). Reach-in whistles lean to
+    /// on-ball perimeter pressure. Default 0.10. Must be in [0,1) (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double ReachInPerimSpan { get; set; } = 0.10;
+
+    /// <summary>Luck floor added to every reach-in propensity so no defender is ever
+    /// un-drawable (propensity always &gt; 0) and the hacker/lockdown spread is bounded.
+    /// Default 0.13 (with Base=1.0 → the ±31% spread above). Must be ≥ 0 (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double ReachInLuckFloor { get; set; } = 0.13;
+
+    /// <summary>Tanh scale mapping a defender's raw <see cref="Postness"/> gap from his
+    /// lineup mean into the [0,1] perimeter orientation (larger → gentler lean). Same idiom
+    /// as <see cref="ReboundPositionalScale"/>. Default 25.0. Must be &gt; 0 (enforced in
+    /// Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double ReachInPostnessScale { get; set; } = 25.0;
 
     // --- Transition defense (RollHGenerator C8, FastBreak only). ---
 

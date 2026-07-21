@@ -236,6 +236,7 @@ internal static partial class Program
         ok &= Phase65DriveGateCheck(configPath);                // Phase 65 (S59: perimeter-defense drive gate — per-man rim-access wall in Roll G, golden parity)
         ok &= Phase66UsageReliefCheck(configPath);             // Phase 66 (S60: usage-relief bonus — the low-usage half of the usage↔efficiency curve, golden parity)
         ok &= Phase67DisciplineShaveCheck(configPath);          // Phase 67 (S61: Discipline make-% shave — small absolute per-man defensive-restraint reduction, golden parity)
+        ok &= Phase68NonShootingFoulCheck(configPath);           // Phase 68 (S62: per-man non-shooting reach-in foul model — rate + committer, golden parity)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

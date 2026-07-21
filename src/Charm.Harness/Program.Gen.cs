@@ -1222,7 +1222,7 @@ internal static partial class Program
         var firstState = TipPossession.CreateFromTip(game, governorRng, possessionNumber: 1);
 
         var result = governor.Run(firstState);
-        var attributed = AttributeGame(result, game, resolverSeed);
+        var attributed = AttributeGame(result, game, resolverSeed, c.Matchup);
 
         return (game, result, attributed);
     }
