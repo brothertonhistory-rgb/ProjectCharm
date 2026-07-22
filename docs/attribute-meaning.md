@@ -17,6 +17,20 @@ re-measured and this doc is updated in place (journal.md holds the history).
 balance should move" conclusion is a finding recorded here for a future build session, not a
 change made in the sweep session.
 
+> ## ⚠ DOCUMENT-WIDE RE-BASE (added 2026-07-21) — every make-percentage LEVEL below was measured on the PRE-RECENTER curve
+>
+> The 2026-07-21 make-curve recenter re-fit all five zone logistics to Emmett's ruled scenario
+> anchors (design.md, "The make dial"): at effective 50 the zones now read Rim 61 / Short 43 /
+> Mid 39 / Long 36 / Three 34 — roughly **+8–11pp above the old curve at the same rating** through
+> the middle, with the elite end near-unmoved at Three and re-spread at Rim (77 at the pool's best
+> finisher). Consequences for this document: every absolute FG%/3P%/zone-make **level** recorded
+> below (the flat-50 anchors 34.33 FG% / 9.364 PTS, every walk's make column, every interaction
+> row's shooting line) describes the old curve and is stale as a level. **Relative findings
+> survive** — orderings, which-channel-moves-what, share-claiming vs creation, the walk SHAPES —
+> because the recenter moved the curve every shot passes through, not any wiring. Do not re-run
+> the families to refresh levels for their own sake (the S59.2 flat-50 caveat below already
+> queues the re-measurement that matters); read levels here as pre-recenter currency.
+>
 > ## ⚠ DOCUMENT-WIDE CAVEAT (added S59.2, 2026-07-14) — every finding below the S59.2 section is a **FLAT-50-OPPONENT** finding
 >
 > **Read this before trusting any number in this document.** Until S59.2 the sweep bench

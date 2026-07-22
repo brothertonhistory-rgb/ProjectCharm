@@ -25,12 +25,13 @@ REF_SCALE = 25.0
 # carry the recenter arc (S31+); the code defaults are the stale pre-recenter values and the
 # original v1 oracle was wrongly built against them (caught at S55 build, Emmett-ruled fix:
 # regenerate against live). Floors/ceilings/K are identical in both. (floor, ceil, K, midpoint)
-CURVE = {
-    'Rim':   (0.3582, 0.9527, 0.024666,  68.7559),
-    'Short': (0.1316, 0.7045, 0.021592,  75.9276),
-    'Mid':   (0.1042, 0.6447, 0.021592,  90.3196),
-    'Long':  (0.1934, 0.6034, 0.034190,  99.3440),
-    'Three': (0.1608, 0.6328, 0.029646, 106.5661),
+CURVE = {   # recentered at the make-curve recenter session (2026-07-21) — values bind
+            # to tools/make_curve_recenter_fit.json (the emitted fit), never hand-typed
+    'Rim': (0.3582, 0.9527, 0.015557513691679676, 69.81166871382257),
+    'Short': (0.1316, 0.7045, 0.011938270692857083, 43.00706027465346),
+    'Mid': (0.1042, 0.6447, 0.00917002641099569, 37.436690108960505),
+    'Long': (0.1934, 0.6034, 0.01097406313324468, 84.54604244732406),
+    'Three': (0.0, 0.5727407827206303, 0.012771099421707786, 20.322030128205114),
 }
 ZONES = ['Rim', 'Short', 'Mid', 'Long', 'Three']
 

@@ -1,0 +1,102 @@
+{
+  "_comment": "Make-curve recenter fit (session 2026-07-21). Emitted by tools/make_curve_recenter_oracle.py \u2014 the build session binds config.json's RollH zone constants to THESE values, never hand-transcribed display output. Pins/provenance per the brief \u00a74; every moved constant carries its forcing miss.",
+  "zones": {
+    "Rim": {
+      "old": {
+        "Floor": 0.3582,
+        "Ceiling": 0.9527,
+        "K": 0.024666,
+        "Midpoint": 68.7559
+      },
+      "new": {
+        "Floor": 0.3582,
+        "Ceiling": 0.9527,
+        "K": 0.015557513691679676,
+        "Midpoint": 69.81166871382257
+      },
+      "moved": [
+        "Midpoint",
+        "K"
+      ],
+      "forcingMiss": null
+    },
+    "Short": {
+      "old": {
+        "Floor": 0.1316,
+        "Ceiling": 0.7045,
+        "K": 0.021592,
+        "Midpoint": 75.9276
+      },
+      "new": {
+        "Floor": 0.1316,
+        "Ceiling": 0.7045,
+        "K": 0.011938270692857083,
+        "Midpoint": 43.00706027465346
+      },
+      "moved": [
+        "Midpoint",
+        "K"
+      ],
+      "forcingMiss": null
+    },
+    "Mid": {
+      "old": {
+        "Floor": 0.1042,
+        "Ceiling": 0.6447,
+        "K": 0.021592,
+        "Midpoint": 90.3196
+      },
+      "new": {
+        "Floor": 0.1042,
+        "Ceiling": 0.6447,
+        "K": 0.00917002641099569,
+        "Midpoint": 37.436690108960505
+      },
+      "moved": [
+        "Midpoint",
+        "K"
+      ],
+      "forcingMiss": null
+    },
+    "Long": {
+      "old": {
+        "Floor": 0.1934,
+        "Ceiling": 0.6034,
+        "K": 0.03419,
+        "Midpoint": 99.344
+      },
+      "new": {
+        "Floor": 0.1934,
+        "Ceiling": 0.6034,
+        "K": 0.01097406313324468,
+        "Midpoint": 84.54604244732406
+      },
+      "moved": [
+        "Midpoint",
+        "K"
+      ],
+      "forcingMiss": null
+    },
+    "Three": {
+      "old": {
+        "Floor": 0.1608,
+        "Ceiling": 0.6328,
+        "K": 0.029646,
+        "Midpoint": 106.5661
+      },
+      "new": {
+        "Floor": 0.0,
+        "Ceiling": 0.5727407827206303,
+        "K": 0.012771099421707786,
+        "Midpoint": 20.322030128205114
+      },
+      "moved": [
+        "Midpoint",
+        "K",
+        "Floor",
+        "Ceiling"
+      ],
+      "forcingMiss": "stage-1 misses: elite +0.66pp, poor +1.48pp (poor dominates) -> Floor unlocked; Floor clamped at its 0 bound with P3 still +0.65pp -> Ceiling unlocked (step 3, minimum-move closure)"
+    }
+  }
+}
