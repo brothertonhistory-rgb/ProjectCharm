@@ -440,12 +440,15 @@ internal static partial class Program
     // ---- v2 constants (oracle names + comments, verbatim) ----
     private const double TendCreationLo = 45, TendCreationHi = 78;   // what "having a creation game" means
     private const double TendMidCredLo = 44, TendMidCredHi = 62;     // a mid jumper is a real shot above here (catch-&-shoot credible)
-    // THREE — two paths blended by perimeter-ness (v2 ruling 1):
-    //   perimeter path: COMPRESSED frequency — rating drives efficiency/usage, not diet
-    //   interior path:  stretch-gated — a big earns arc volume only through a real stretch rating
-    private const double TendThreeBase = 28.0, TendThreeSlope = 0.55;    // compressed signal = 28 + 0.55*Outside (25 -> 41.8, 88 -> 76.4)
-    private const double TendThreeExistLo = 2, TendThreeExistHi = 18;    // only the near-zero truly fades out of the compressed path
-    private const double TendThreeStretchLo = 32, TendThreeStretchHi = 50; // the interior path's gate: a real stretch rating
+    // THREE — v3 (S65 reversal): volume follows the rating. Two rules blended by
+    // perimeter-ness; each rule's FLOOR half lives in the opportunity floor (share-
+    // pinned, companion-independent), its RAW half here (the skill-responsive climb).
+    private const double TendThreePerimMain = 38.0;                       // the shooter's climb: main ramp height
+    private const double TendThreePerimMainLo = 34, TendThreePerimMainHi = 54; // where the three becomes HIS shot, not just in-the-flow
+    private const double TendThreePerimTop = 26.0;                        // the elite extension on top of the main ramp
+    private const double TendThreePerimTopLo = 50, TendThreePerimTopHi = 88;
+    private const double TendThreeStretch = 46.0;                         // interior stretch ramp height (real arc volume)
+    private const double TendThreeStretchLo = 38, TendThreeStretchHi = 63; // a big earns real arc volume only through here
     private const double TendRimFedW = 0.72, TendRimCreateW = 0.60;  // rim = fed finish + self-created downhill (downhill is primary for creators)
     private const double TendFloaterScale = 0.55;                    // the floater is a secondary/counter shot, below the rim it replaces
     private const double TendPostTouchLo = 55, TendPostTouchHi = 85; // a post touch needs a REAL post game, not ordinary PostMoves
@@ -462,8 +465,14 @@ internal static partial class Program
                                                                      // (foot on the line, bumped off the rim, chased off the arc)
     private const double TendFloorInside = 0.025;                    // the layup, floater, wide-open 12-footer basketball hands everyone
     private const double TendFloorLongPerim = 0.030;                 // a perimeter player pulls up from midrange a few times a year
-    private const double TendFloorThreeCap = 0.040;                  // v2 ruling 2: ANY player with Outside>0 is capable — universal floor
-    private const double TendFloorThreePerimExtra = 0.020;           // perimeter players a touch more (kick-outs find them)
+    // The three floor — v3: a p-blend of the two rules' own floors (mirrors the raw
+    // path's blend so each rule lives on its own side of BOTH stages):
+    private const double TendFloorThreeEmergency = 0.012;            // interior, any Outside>0: the season's couple of desperation heaves
+    private const double TendFloorThreeAllow = 0.055;                // the big's rare wide-open allowance (the threshold's small opening)...
+    private const double TendFloorThreeAllowLo = 26, TendFloorThreeAllowHi = 40; // ...opening as Outside crosses ~30
+    private const double TendFloorThreePerimBase = 0.055;            // everyone out there shoots his ~20 a season — no perimeter zero
+    private const double TendFloorThreePerimRamp = 0.115;            // in-the-flow volume grows with credibility below the shooter threshold
+    private const double TendFloorThreePerimRampLo = 14, TendFloorThreePerimRampHi = 46;
 
     // THE ERA PROFILE (v2 ruling 3): weight-space multipliers applied AFTER peakedness,
     // Rim/Short/Mid/Long/Three. Encodes the modern shot-selection culture, cleanly
@@ -501,14 +510,19 @@ internal static partial class Program
         var midAccess = TendClamp(TendGate(a["Mid"], TendMidCredLo, TendMidCredHi) + 0.70 * creation, 0, 1);
         var rMid = a["Mid"] * midAccess;
 
-        // THREE (v2 ruling 1): two paths blended by perimeter-ness.
-        //   Perimeter: COMPRESSED — frequency is broad and only weakly rating-dependent;
-        //     the rating's punishment is efficiency (make curve) and usage, not the diet.
-        //   Interior: stretch-gated — a big earns arc volume only via a real stretch rating.
+        // THREE (v3, the S65 reversal): volume follows the rating. Two ramps blended by
+        // perimeter-ness — both are ZERO below their thresholds ON PURPOSE: a raw signal
+        // here competes through gamma/era against the player's other signals, so any
+        // nonzero raw handed to a below-threshold player becomes three-dominance for a
+        // player with nothing else (the retired v2 paradox). Below-threshold volume is
+        // the opportunity floor's job (share-pinned, companion-independent).
+        //   Perimeter: the shooter's climb — main ramp plus an elite extension.
+        //   Interior: the stretch ramp — a big earns arc volume only through a real rating.
         var p = TendPerimeterNess(a);
-        var compressed = (TendThreeBase + TendThreeSlope * a["Outside"]) * TendGate(a["Outside"], TendThreeExistLo, TendThreeExistHi);
-        var gated = a["Outside"] * TendGate(a["Outside"], TendThreeStretchLo, TendThreeStretchHi);
-        var rThree = TendClamp(p * compressed + (1 - p) * gated, 0, 99);
+        var perimThree = TendThreePerimMain * TendGate(a["Outside"], TendThreePerimMainLo, TendThreePerimMainHi)
+                         + TendThreePerimTop * TendGate(a["Outside"], TendThreePerimTopLo, TendThreePerimTopHi);
+        var interThree = TendThreeStretch * TendGate(a["Outside"], TendThreeStretchLo, TendThreeStretchHi);
+        var rThree = TendClamp(p * perimThree + (1 - p) * interThree, 0, 99);
 
         // SHORT: two routes that STACK (each earns its own volume), each near-zero without its real skill
         var postTouch = TendGate(a["PostMoves"], TendPostTouchLo, TendPostTouchHi)
@@ -562,23 +576,31 @@ internal static partial class Program
     }
 
     // opportunity_floor: no zone a player can plausibly reach is ever exactly zero.
-    // Inside shots are handed to everyone. The three (v2 ruling 2): NONZERO RATING =
-    // CAPABLE — any player with Outside > 0 carries a small universal floor (a rating-3
-    // big fires his occasional wide-open one), with a perimeter extra on top (kick-outs
-    // find perimeter players).
-    //
-    // The once-deferred Roll G emergency heave is now largely ABSORBED by this floor:
-    // only a literal Outside==0 player still reads a zero three tendency, and that
-    // residual (~0.2% buzzer heave) remains Roll G's, at pie time, if ever needed.
+    // Inside shots are handed to everyone. The three (v3): a p-blend of the two rules'
+    // own floors, mirroring the raw path's blend so neither rule contaminates the other —
+    //   INTERIOR floor = emergency heaves (any Outside>0, a couple all season) + the rare
+    //     wide-open ALLOWANCE that opens as Outside crosses ~30 (the threshold's small
+    //     opening; the raw stretch ramp takes over above it);
+    //   PERIMETER floor = the structural in-the-flow volume (kick-outs, rhythm — everyone
+    //     out there shoots some), growing modestly with credibility below the shooter
+    //     threshold. Share-pinned HERE, not in the raw path, so it is companion-
+    //     independent: a skill-less perimeter player reads the floor, never dominance.
+    // Only a literal Outside==0 INTERIOR player reads a zero three tendency (that
+    // residual ~0.2% buzzer heave remains Roll G's, at pie time, if ever needed); a
+    // perimeter player never reads zero (v3 ruling 1).
     private static double[] TendOpportunityFloor(double[] w, Dictionary<string, int> a)
     {
         var s = w.Sum();
         var d = s > 0 ? w.Select(x => x / s).ToArray() : (double[])w.Clone();
         var perim = TendPerimeterNess(a);
         var capable = a["Outside"] > 0 ? 1.0 : 0.0;
+        var interiorFloor = TendFloorThreeEmergency * capable
+                            + TendFloorThreeAllow * TendGate(a["Outside"], TendFloorThreeAllowLo, TendFloorThreeAllowHi);
+        var perimFloor = TendFloorThreePerimBase
+                         + TendFloorThreePerimRamp * TendGate(a["Outside"], TendFloorThreePerimRampLo, TendFloorThreePerimRampHi);
         var floors = new[] { TendFloorInside, TendFloorInside, TendFloorInside,
                              TendFloorLongPerim * perim,
-                             TendFloorThreeCap * capable + TendFloorThreePerimExtra * perim };
+                             perim * perimFloor + (1 - perim) * interiorFloor };
         var outW = new double[5];
         for (var i = 0; i < 5; i++) outW[i] = Math.Max(d[i], floors[i]);
         return outW;
