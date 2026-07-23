@@ -155,6 +155,39 @@ internal static partial class Program
                     $"{tdw} (target {DivvyTdwRoleTarget(n)}, floor {quota})");
             }
 
+            // ── 4b. Session 66: the recruiting line at the bridge. ─────────────────────
+            // Every drafted player clears the generator's own line; the census stays
+            // exact; and the CONTRACT is proven, not just same-seed reproducibility —
+            // prefix stability means the growth chunk size is invisible, so two
+            // different initial chunk sizes must yield the IDENTICAL ordered pool.
+            {
+                var rlSeed = unchecked((int)(seed ^ DivvyCohortSeedXor));
+                const int rlP = 3470;
+                var recA = BuildRecruitedCohort(rlSeed, rlP, 2 * rlP);   // no doubling at ~56% acceptance
+                var recB = BuildRecruitedCohort(rlSeed, rlP, 4000);      // forces >=1 doubling (4000 draws accept ~2,240)
+                Check("recruited cohort: exactly 10n accepted", recA.Length == rlP, $"{recA.Length}");
+                Check("recruited cohort: every accepted player clears the line",
+                    recA.All(lp => lp.Result.Rscore >= PlayerGenPass2.R_LINE),
+                    $"Rscore >= {PlayerGenPass2.R_LINE:F1}");
+                Check("recruited cohort: two growth chunk sizes -> identical ordered pool (prefix stability)",
+                    recA.Length == recB.Length && recA.Zip(recB).All(p =>
+                        p.First.Result.Rscore == p.Second.Result.Rscore &&
+                        p.First.Result.Height == p.Second.Result.Height &&
+                        p.First.Result.Oaxis == p.Second.Result.Oaxis &&
+                        p.First.Result.Weapon == p.Second.Result.Weapon));
+                // Draw order preserved: the accepted pool equals the first-past-the-line
+                // subsequence of the raw stream, independently refiltered.
+                var raw = PlayerGenPass2Live.BuildCohort(rlSeed, 16000);
+                var refiltered = raw.Where(lp => lp.Result.Rscore >= PlayerGenPass2.R_LINE)
+                                    .Take(rlP).ToArray();
+                Check("recruited cohort: accepted draw order preserved (matches an independent refilter)",
+                    refiltered.Length == rlP && recA.Zip(refiltered).All(p =>
+                        p.First.Result.Rscore == p.Second.Result.Rscore &&
+                        p.First.Result.Height == p.Second.Result.Height &&
+                        p.First.Result.Oaxis == p.Second.Result.Oaxis &&
+                        p.First.Result.Weapon == p.Second.Result.Weapon));
+            }
+
             // ── 5. An infeasible pool is rejected LOUDLY, naming the shortfall,
             //       before the first pick (never a stranded team at pick 3,400). ────────
             var rigged = new List<PoolPlayer>(tinyA.Pool);
@@ -218,7 +251,7 @@ internal static partial class Program
             var leaks = stockA.Rosters.Where(kv => prestige[kv.Key] < med)
                                       .Sum(kv => kv.Value.Count(pid => topDecile.Contains(pid)));
             Check("stock: at least one top-decile player leaks below median prestige",
-                leaks >= 1, $"leaks = {leaks} (oracle at this seed: 54)");
+                leaks >= 1, $"leaks = {leaks} (recruited pool at this seed: 64)");
 
             // ── 8. Protected supply + the opening five's contract. ─────────────────────
             // The coverage guarantee is a hard constraint: remaining supply of a

@@ -144,8 +144,10 @@ internal static partial class Program
 
         // The real skill-first cohort (S44 live generator; the transform is
         // oracle-locked and Phase 59/60 re-prove it — the bridge draws, never edits).
+        // Session 66: the generator's own recruiting line is now APPLIED at the
+        // bridge — the pool is the first 10n players of the stream who clear it.
         var cohortSeed = unchecked((int)(divvySeed ^ DivvyCohortSeedXor));
-        var cohort = PlayerGenPass2Live.BuildCohort(cohortSeed, P);
+        var cohort = BuildRecruitedCohort(cohortSeed, P, 2 * P);
 
         // Ruling 0.1: position follows the game, not the body — assigned by EXACT
         // COUNT in orientation rank. Oaxis = 2·o − 1: −1 perimeter .. +1 post (the
@@ -220,6 +222,39 @@ internal static partial class Program
         }
 
         return pool;
+    }
+
+    // ── The recruiting line at the bridge (Session 66, Emmett ruling 2026-07-23:
+    //    the line stands at the generator's own R_LINE = 17.0) ────────────────────
+    // Consume the deterministic cohort stream IN ORDER until exactly P players
+    // clear the generator's own scholarship line (`Rscore >= PlayerGenPass2.R_LINE`);
+    // accepted players keep draw order. First-past-the-line is "all of college" —
+    // top-N-by-Rscore would be D1 selection, which waits for the divisional layer
+    // (the standing divisional-sorting ruling). ~56% of the stream clears the line,
+    // so filling 3,470 costs ~6,300 draws, once per season command.
+    //
+    // The growth rule is safe because the stream is PREFIX-STABLE: BuildCohort runs
+    // one sequential per-player stream with no pool-level pass and no draw that
+    // depends on the cohort size, so the first k players are identical for ANY
+    // cohort size >= k (Phase 54 proves the contract structurally — two different
+    // growth chunk sizes must produce the identical ordered accepted pool, not
+    // merely the same pool under the same seed). Start at 2×P (~1.12× the expected
+    // need — a shortfall at that margin is a ~10-sigma event), double on shortfall;
+    // a doubling regenerates from the seed, which prefix stability makes harmless.
+    private static PlayerGenPass2Live.LivePlayer[] BuildRecruitedCohort(
+        int cohortSeed, int P, int initialSize)
+    {
+        for (var m = Math.Max(initialSize, 1); ; m *= 2)
+        {
+            var cohort = PlayerGenPass2Live.BuildCohort(cohortSeed, m);
+            var accepted = new List<PlayerGenPass2Live.LivePlayer>(P);
+            foreach (var lp in cohort)
+            {
+                if (lp.Result.Rscore < PlayerGenPass2.R_LINE) continue;
+                accepted.Add(lp);
+                if (accepted.Count == P) return accepted.ToArray();
+            }
+        }
     }
 
     // ── Scout rank ───────────────────────────────────────────────────────────────
