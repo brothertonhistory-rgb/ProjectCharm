@@ -111,12 +111,17 @@ for _h in range(40, 100):
     HEIGHT_CDF.append((_acc, _h))
 HEIGHT_CDF[-1] = (1.0, HEIGHT_CDF[-1][1])
 
-def draw_height(r):
-    u = r.random()
+def height_from_u(u):
+    """Deterministic inverse-CDF lookup (the S69 seam split: transform only, no RNG)."""
     for cum, h in HEIGHT_CDF:
         if u <= cum:
             return h
     return 99
+
+def draw_height(r, rec=None):
+    u = r.random()
+    if rec is not None: rec["height_u"] = u          # S69 recorder: after the draw, no RNG
+    return height_from_u(u)
 
 # ============================================================================
 # BODY MACHINERY (surviving unchanged from the locked oracle -- o-free, verified S68 §0)
@@ -168,9 +173,11 @@ POST_FAMS  = ("InteriorOffense", "InteriorDefense", "Rebounding")
 DEF_MID, DEF_STEEP = 62.0, 9.0     # logistic center/scale in Height
 DEF_NOISE = 0.10                    # modest dice: body dominates, does not dictate
 
-def draw_def_plane(r, height):
+def draw_def_plane(r, height, rec=None):
     base = 1.0 / (1.0 + math.exp(-(height - DEF_MID) / DEF_STEEP))
-    d = clamp(base + r.gauss(0.0, DEF_NOISE), 0.0, 1.0)
+    g = r.gauss(0.0, DEF_NOISE)
+    if rec is not None: rec["def_noise"] = g         # S69 recorder: after the draw, no RNG
+    d = clamp(base + g, 0.0, 1.0)
     cat = "PerimD" if d < 0.35 else ("WingD" if d < 0.65 else "PostD")
     return d, cat
 
@@ -200,9 +207,11 @@ def role_odds(height):
     tot = sum(w.values())
     return {ro: w[ro] / tot for ro in ROLES}
 
-def draw_role(r, height):
+def draw_role(r, height, rec=None):
     odds = role_odds(height)
-    u = r.random(); acc = 0.0
+    u = r.random()
+    if rec is not None: rec["role_u"] = u            # S69 recorder: after the draw, no RNG
+    acc = 0.0
     for ro in ROLES:
         acc += odds[ro]
         if u <= acc:
@@ -218,8 +227,9 @@ BUDGET_SPAN = 620.0
 BUDGET_POW  = 1.35                 # top-heavier than linear: elite budgets rarer
 CONC_A, CONC_B = 2.0, 2.0          # per-player concentration dice (quality-INDEPENDENT)
 
-def draw_budget(r):
+def draw_budget(r, rec=None):
     q = r.betavariate(TALENT_A, TALENT_B)
+    if rec is not None: rec["q"] = q                 # S69 recorder: after the draw, no RNG
     B = BUDGET_LO + (q ** BUDGET_POW) * BUDGET_SPAN
     return q, B
 
@@ -240,7 +250,7 @@ ROLE_FAM_PREF = {
 }
 GLUE_PREF = 0.32                   # glue pulls WEAK for everyone (S67 ruling 3)
 
-def family_pulls(r, role, height, dplane):
+def family_pulls(r, role, height, dplane, rec=None):
     """pull = role preference x body factor x dice, floored at epsilon."""
     hf = clamp((height - HFRAC_LO) / (HFRAC_HI - HFRAC_LO), 0.0, 1.0)
     pref = dict(ROLE_FAM_PREF[role])
@@ -255,7 +265,9 @@ def family_pulls(r, role, height, dplane):
     pref["Glue"]            = GLUE_PREF
     pulls = {}
     for fam in FAMILIES:
-        dice = math.exp(r.gauss(0.0, PULL_DICE_SIGMA))
+        g = r.gauss(0.0, PULL_DICE_SIGMA)
+        if rec is not None: rec["pull_gauss"][fam] = g   # S69 recorder: after the draw, no RNG
+        dice = math.exp(g)
         pulls[fam] = max(PULL_EPS, pref[fam] * dice)
     return pulls
 
@@ -320,30 +332,43 @@ def derive_ft(outside, ft_idio, height):
            - FT_HEIGHT_COEF * ((height - 55.0) / 40.0) + ft_idio)
     return int(clamp(round(val), FT_MIN, FT_MAX))
 
-def generate_player(r):
+def generate_player(r, rec=None):
+    # S69 recorder seam (S42.2 pattern): rec is an optional dict, every write lands
+    # strictly AFTER its draw is assigned, and the recorder itself draws no RNG --
+    # the full oracle run (rec=None) is byte-identical pre/post seam, asserted at port.
+    if rec is not None:
+        rec["ath_noise"] = {}; rec["pull_gauss"] = {}
+        rec["within_gauss"] = {}; rec["base_jitter_gauss"] = {}
     # ---- 1. BODY FIRST (D1): height from the preserved marginal ------------------
-    Height = draw_height(r)
+    Height = draw_height(r, rec)
     ws_noise = r.gauss(4.0, 3.0)
+    if rec is not None: rec["ws_noise"] = ws_noise
     Wingspan = int(clamp(round(Height + ws_noise), 40, 99))
     a = r.betavariate(ATHQ_A, ATHQ_B)
+    if rec is not None: rec["a"] = a
     ath = {}
     for k in ATH_KEYS:
         acenter = ATH_BASE_LO + a * (ATH_BASE_HI - ATH_BASE_LO)
-        val = acenter + SIZE_COEF[k] * (Height - ATH_HEIGHT_CENTER) + r.gauss(0.0, ATH_SIGMA[k])
+        g = r.gauss(0.0, ATH_SIGMA[k])
+        if rec is not None: rec["ath_noise"][k] = g
+        val = acenter + SIZE_COEF[k] * (Height - ATH_HEIGHT_CENTER) + g
         ath[k] = int(clamp(round(val), 8, 99))
-    Weight = int(clamp(round(30 + 0.40 * Height + 0.30 * ath["Strength"] + r.gauss(0, 6)), 20, 99))
+    wg = r.gauss(0, 6)
+    if rec is not None: rec["weight_noise"] = wg
+    Weight = int(clamp(round(30 + 0.40 * Height + 0.30 * ath["Strength"] + wg), 20, 99))
 
     # ---- 2. THE TWO PLANES (role drawn FROM the body; height biases, never dictates)
-    dplane, dcat = draw_def_plane(r, Height)
-    role = draw_role(r, Height)
+    dplane, dcat = draw_def_plane(r, Height, rec)
+    role = draw_role(r, Height, rec)
 
     # ---- 3. THE BUDGET (talent) + concentration (independent dice) ---------------
-    q, B = draw_budget(r)
+    q, B = draw_budget(r, rec)
     c = r.betavariate(CONC_A, CONC_B)
+    if rec is not None: rec["c"] = c
     gamma = GAMMA_LO + c * (GAMMA_HI - GAMMA_LO)
 
     # ---- 4. PULLS -> family-first allocation -> within-family second stage --------
-    pulls = family_pulls(r, role, Height, dplane)
+    pulls = family_pulls(r, role, Height, dplane, rec)
     fam_share = sharpen(pulls, gamma)
     fam_budget = {f: B * fam_share[f] for f in FAMILIES}
 
@@ -352,7 +377,9 @@ def generate_player(r):
         wp = WITHIN_PREF.get(role, {})
         mw = {}
         for k in members:
-            dice = math.exp(r.gauss(0.0, WITHIN_DICE_SIGMA))
+            g = r.gauss(0.0, WITHIN_DICE_SIGMA)
+            if rec is not None: rec["within_gauss"][k] = g   # member keys unique across families
+            dice = math.exp(g)
             mw[k] = max(PULL_EPS, wp.get(k, 1.0) * dice)
         mshare = sharpen(mw, max(0.75, 0.55 * gamma + 0.35))
         for k in members:
@@ -362,7 +389,9 @@ def generate_player(r):
     latent = {}
     caps = {}
     for k in SPEND_SKILLS:
-        base = clamp(FLAT_BASE + abs(r.gauss(0.0, BASE_JITTER)), 8.0, 16.0)
+        g = r.gauss(0.0, BASE_JITTER)
+        if rec is not None: rec["base_jitter_gauss"][k] = g  # pre-abs raw draw
+        base = clamp(FLAT_BASE + abs(g), 8.0, 16.0)
         cap = body_cap(k, Height)
         caps[k] = cap
         latent[k] = int(clamp(round(price(spend[k], base, cap)), 8, 99))
@@ -370,7 +399,9 @@ def generate_player(r):
     # ---- 6. ARRIVAL (D2: mean follows the BODY; dice on top) + expression ---------
     hb = clamp((Height - ARRB_LO) / (ARRB_HI - ARRB_LO), 0.0, 1.0)
     arr_mean = ARR_READY - hb * (ARR_READY - ARR_RAW)
-    arrival = clamp(r.gauss(arr_mean, ARR_SIGMA), 0.0, 1.0)
+    ag = r.gauss(arr_mean, ARR_SIGMA)
+    if rec is not None: rec["arrival_raw"] = ag              # pre-clamp raw draw
+    arrival = clamp(ag, 0.0, 1.0)
     e = E_MIN + arrival * (1.0 - E_MIN)
     current = {}
     for k in SPEND_SKILLS:
@@ -379,6 +410,7 @@ def generate_player(r):
 
     # ---- 7. FreeThrow (derived; ONE persistent idiosyncrasy draw) -----------------
     ft_idio = r.gauss(0.0, FT_SIGMA)
+    if rec is not None: rec["ft_idio"] = ft_idio
     latent_ft  = derive_ft(latent["Outside"], ft_idio, Height)
     current_ft = derive_ft(current["Outside"], ft_idio, Height)
 
@@ -732,5 +764,202 @@ def run(argv=None):
     print("\n" + ("!!! CHECK FAILURES: " + ", ".join(fails) if fails else "ALL ORACLE CHECKS OK"))
     return 1 if fails else 0
 
+# ============================================================================
+# S69 FIXTURE DUMP (--fixture [path]) -- the C# port's parity medium.
+# Additive only: never touches the math above. Selection is BRANCH-REPRESENTATIVE
+# (S69 prompt): every role x plane pairing, conc extremes, cap-binding interior
+# spend, a near-epsilon pull floor, the short post-role and tall-shooter cards --
+# then a deterministic stride pad to N_FIXTURE. Plus the inverse-CDF edge table:
+# hand-picked uniforms at every cumulative height-bin boundary (boundary-eps /
+# boundary / boundary+eps) so a '<' vs '<=' mismatch in a port dies loudly.
+# ============================================================================
+N_FIXTURE = 300
+EDGE_EPS  = 1e-12
+
+def _flat_draws(rec):
+    """THE DRAW-ORDER CONTRACT, one home (imported by the replay checker; the C# live
+    generator mirrors this order). (kind, value) per semantic slot, in stream order:
+    height uniform -> wingspan gauss -> athletic-quality beta -> 7 ath gauss (ATH_KEYS)
+    -> weight gauss -> def-plane gauss -> role uniform -> talent beta -> concentration
+    beta -> 7 family-pull gauss (FAMILIES order) -> within-member gauss (family order,
+    member order inside each family) -> 22 base-jitter gauss (SPEND_SKILLS) -> arrival
+    gauss -> ft-idio gauss. 68 semantic slots."""
+    out = [("random", rec["height_u"]), ("gauss", rec["ws_noise"]), ("beta", rec["a"])]
+    out += [("gauss", rec["ath_noise"][k]) for k in ATH_KEYS]
+    out += [("gauss", rec["weight_noise"]), ("gauss", rec["def_noise"]),
+            ("random", rec["role_u"]), ("beta", rec["q"]), ("beta", rec["c"])]
+    out += [("gauss", rec["pull_gauss"][f]) for f in FAMILIES]
+    out += [("gauss", rec["within_gauss"][k]) for f, ks in FAMILIES.items() for k in ks]
+    out += [("gauss", rec["base_jitter_gauss"][k]) for k in SPEND_SKILLS]
+    out += [("gauss", rec["arrival_raw"]), ("gauss", rec["ft_idio"])]
+    return out
+
+class _ReplayR:
+    """Replays recorded semantic draws in contract order; asserts each call KIND.
+    A reordered or missing draw in a port dies here loudly, not in a soft moment check."""
+    def __init__(self, flat):
+        self.flat = list(flat); self.i = 0
+    def _pop(self, kind):
+        assert self.i < len(self.flat), f"over-consumed at slot {self.i} ({kind})"
+        k, v = self.flat[self.i]
+        assert k == kind, f"slot {self.i}: recorded kind {k}, generator asked for {kind}"
+        self.i += 1
+        return v
+    def random(self):                 return self._pop("random")
+    def gauss(self, mu, sigma):       return self._pop("gauss")
+    def betavariate(self, a, b):      return self._pop("beta")
+    def fully_consumed(self):         return self.i == len(self.flat)
+
+def _constants_echo():
+    return {
+        "SEED": SEED, "N_CANDIDATE": N_CANDIDATE, "R_LINE": R_LINE,
+        "HEIGHT_MARGINAL": {str(k): v for k, v in HEIGHT_MARGINAL.items()},
+        "ATH_HEIGHT_CENTER": ATH_HEIGHT_CENTER, "SIZE_COEF": SIZE_COEF, "ATH_SIGMA": ATH_SIGMA,
+        "ATH_BASE_LO": ATH_BASE_LO, "ATH_BASE_HI": ATH_BASE_HI, "ATHQ_A": ATHQ_A, "ATHQ_B": ATHQ_B,
+        "ARR_READY": ARR_READY, "ARR_RAW": ARR_RAW, "ARRB_LO": ARRB_LO, "ARRB_HI": ARRB_HI,
+        "ARR_SIGMA": ARR_SIGMA, "E_MIN": E_MIN, "EXPR_BASELINE": EXPR_BASELINE,
+        "FT_CENTER": FT_CENTER, "FT_OUT_SPAN": FT_OUT_SPAN, "FT_OUT_SCALE": FT_OUT_SCALE,
+        "FT_HEIGHT_COEF": FT_HEIGHT_COEF, "FT_MIN": FT_MIN, "FT_MAX": FT_MAX, "FT_SIGMA": FT_SIGMA,
+        "FAMILIES": {f: list(ks) for f, ks in FAMILIES.items()},
+        "FAMILY_ORDER": list(FAMILIES.keys()), "SPEND_SKILLS": SPEND_SKILLS,
+        "ATH_KEYS": ATH_KEYS, "ROLES": ROLES,
+        "DEF_MID": DEF_MID, "DEF_STEEP": DEF_STEEP, "DEF_NOISE": DEF_NOISE,
+        "ROLE_PRIOR": ROLE_PRIOR, "HFRAC_LO": HFRAC_LO, "HFRAC_HI": HFRAC_HI,
+        "PERIM_DECAY": PERIM_DECAY, "POST_DECAY": POST_DECAY,
+        "TALENT_A": TALENT_A, "TALENT_B": TALENT_B,
+        "BUDGET_LO": BUDGET_LO, "BUDGET_SPAN": BUDGET_SPAN, "BUDGET_POW": BUDGET_POW,
+        "CONC_A": CONC_A, "CONC_B": CONC_B,
+        "PULL_EPS": PULL_EPS, "PULL_DICE_SIGMA": PULL_DICE_SIGMA,
+        "ROLE_FAM_PREF": ROLE_FAM_PREF, "GLUE_PREF": GLUE_PREF,
+        "WITHIN_PREF": WITHIN_PREF, "WITHIN_DICE_SIGMA": WITHIN_DICE_SIGMA,
+        "GAMMA_LO": GAMMA_LO, "GAMMA_HI": GAMMA_HI,
+        "FLAT_BASE": FLAT_BASE, "BASE_JITTER": BASE_JITTER,
+        "IDCAP_LO_H": IDCAP_LO_H, "IDCAP_HI_H": IDCAP_HI_H,
+        "IDCAP_MIN": IDCAP_MIN, "REBCAP_MIN": REBCAP_MIN, "PRICE_TAU": PRICE_TAU,
+        "HF_LO": HF_LO, "HF_HI": HF_HI, "HF_RANGE": HF_RANGE, "HF_STEEP": HF_STEEP, "HF_MID": HF_MID,
+        "LOW_TAPER_FLOOR": LOW_TAPER_FLOOR, "LOW_TAPER_TOP": LOW_TAPER_TOP,
+        "PATHWAY_W_FLOOR": PATHWAY_W_FLOOR,
+        "WS_NOISE_MEAN": 4.0, "WS_NOISE_SIGMA": 3.0, "WEIGHT_NOISE_SIGMA": 6.0,
+    }
+
+def _edge_table():
+    """Every cumulative boundary probed at boundary-eps / boundary / boundary+eps,
+    expected height computed through height_from_u itself (the transform of record)."""
+    rows = []
+    for cum, h in HEIGHT_CDF:
+        for u in (cum - EDGE_EPS, cum, cum + EDGE_EPS):
+            if 0.0 <= u <= 1.0:
+                rows.append({"u": u, "expected_height": height_from_u(u)})
+    rows.append({"u": 0.0, "expected_height": height_from_u(0.0)})
+    return rows
+
+def _checkpoints(p):
+    parts = rscore_parts(p)
+    return {
+        "Height": p["Height"], "Wingspan": p["Wingspan"], "Weight": p["Weight"],
+        "ath": p["ath"], "dplane": p["dplane"], "dcat": p["dcat"], "role": p["role"],
+        "budget": p["budget"], "gamma": p["gamma"],
+        "pulls": p["pulls"], "fam_share": p["fam_share"], "spend": p["spend"], "caps": p["caps"],
+        "latent": p["latent"], "current": p["current"],
+        "latent_ft": p["latent_ft"], "current_ft": p["current_ft"],
+        "arrival": p["arrival"], "e": p["e"], "runway_total": p["runway_total"],
+        "rscore": parts["rscore"], "rscore_which": parts["which"],
+    }
+
+def dump_fixture(path):
+    import json
+    r = random.Random(SEED)
+    cohort = []
+    for i in range(N_CANDIDATE):
+        rec = {}
+        p = generate_player(r, rec)
+        cohort.append((i, p, rec))
+
+    chosen, tags = [], {}
+    def take(i, tag):
+        if i not in tags:
+            tags[i] = []
+            chosen.append(i)
+        tags[i].append(tag)
+
+    # every role x plane pairing
+    for ro in ROLES:
+        for dc in ("PerimD", "WingD", "PostD"):
+            for i, p, _ in cohort:
+                if p["role"] == ro and p["dcat"] == dc:
+                    take(i, f"pair:{ro}x{dc}"); break
+    # concentration extremes
+    hi = [i for i, p, _ in cohort if p["conc"] >= 0.92][:3]
+    lo = [i for i, p, _ in cohort if p["conc"] <= 0.08][:3]
+    for i in hi: take(i, "conc-high")
+    for i in lo: take(i, "conc-low")
+    # cap-binding interior spend on a small body (saturated toward a sub-99 cap)
+    nb = [i for i, p, _ in cohort if p["Height"] < IDCAP_HI_H
+          and (p["latent"]["PostDefense"] >= p["caps"]["PostDefense"] - 0.5
+               or p["latent"]["RimProtection"] >= p["caps"]["RimProtection"] - 0.5)][:3]
+    for i in nb: take(i, "cap-binding")
+    # near-epsilon pull (the max(PULL_EPS, .) floor fired)
+    ne = [i for i, p, _ in cohort if min(p["pulls"].values()) == PULL_EPS][:3]
+    for i in ne: take(i, "pull-floor")
+    # the ruled edge cards
+    sp = [i for i, p, _ in cohort if p["Height"] <= 56 and p["role"] == "PostScorer"][:3]
+    ts = [i for i, p, _ in cohort if p["Height"] >= 80 and p["role"] == "Shooter"][:3]
+    for i in sp: take(i, "short-post-role")
+    for i in ts: take(i, "tall-shooter")
+    # deterministic stride pad to N_FIXTURE
+    stride = max(1, N_CANDIDATE // (N_FIXTURE - len(chosen) + 1))
+    i = 0
+    while len(chosen) < N_FIXTURE and i < N_CANDIDATE:
+        if i not in tags:
+            take(i, "stride")
+        i += stride
+
+    players = []
+    for i in sorted(chosen):
+        _, p, rec = cohort[i]
+        players.append({"index": i, "tags": tags[i], "draws": rec, "checkpoints": _checkpoints(p)})
+
+    # SYNTHETIC pull-floor row (S69 finding: at the locked constants the epsilon floor
+    # needs a ~-7-sigma dice draw and NO real cohort player reaches it -- so the branch
+    # gets a hand-built draws row, checkpointed through generate_player itself).
+    syn = {k: (dict(v) if isinstance(v, dict) else v) for k, v in cohort[0][2].items()}
+    syn["pull_gauss"]["Glue"] = -9.0          # fires max(PULL_EPS, ...) at the family stage
+    syn["within_gauss"]["Screening"] = -9.0   # fires max(PULL_EPS, ...) at the member stage
+    rr = _ReplayR(_flat_draws(syn))
+    ps = generate_player(rr)
+    assert rr.fully_consumed(), "synthetic row: draw-count contract violated"
+    assert min(ps["pulls"].values()) == PULL_EPS, "synthetic row failed to fire the pull floor"
+    players.append({"index": -1, "tags": ["synthetic:pull-floor"], "draws": syn,
+                    "checkpoints": _checkpoints(ps)})
+
+    draw_order = (["height_u", "ws_noise", "a"]
+                  + [f"ath_noise.{k}" for k in ATH_KEYS]
+                  + ["weight_noise", "def_noise", "role_u", "q", "c"]
+                  + [f"pull_gauss.{f}" for f in FAMILIES]
+                  + [f"within_gauss.{k}" for k in SPEND_SKILLS]     # family order, member order inside
+                  + [f"base_jitter_gauss.{k}" for k in SPEND_SKILLS]
+                  + ["arrival_raw", "ft_idio"])                     # 68 semantic slots
+    fx = {"schema": {"schema_version": "s69-1", "seed": SEED, "n_cohort": N_CANDIDATE,
+                     "n_players": len(players), "float_tolerance": 1e-9,
+                     "draw_order": draw_order,
+                     "key_orders": {"ATH_KEYS": ATH_KEYS, "SPEND_SKILLS": SPEND_SKILLS,
+                                    "FAMILY_ORDER": list(FAMILIES.keys()), "ROLES": ROLES},
+                     "constants": _constants_echo(),
+                     "note": "S69 branch-representative replay fixture; draws recorded by the "
+                             "output-neutral recorder seam (byte-diff proven); ints EXACT, floats 1e-9."},
+          "edge_table": _edge_table(), "players": players}
+    with open(path, "w") as f:
+        json.dump(fx, f, indent=1)
+    counts = Counter(t for ts_ in tags.values() for t in ts_ if not t.startswith("pair:"))
+    npair = sum(1 for ts_ in tags.values() for t in ts_ if t.startswith("pair:"))
+    print(f"fixture written: {path}  players={len(players)}  role-x-plane pairs={npair}  "
+          f"special={dict(counts)}  edge rows={len(_edge_table())}")
+    return 0
+
 if __name__ == "__main__":
+    if "--fixture" in sys.argv[1:]:
+        args = sys.argv[1:]
+        j = args.index("--fixture")
+        out = args[j + 1] if j + 1 < len(args) else "tools/gen_pass3_replay_fixture_s69.json"
+        sys.exit(dump_fixture(out))
     sys.exit(run(sys.argv[1:]))

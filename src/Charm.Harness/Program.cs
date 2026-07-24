@@ -237,6 +237,8 @@ internal static partial class Program
         ok &= Phase66UsageReliefCheck(configPath);             // Phase 66 (S60: usage-relief bonus — the low-usage half of the usage↔efficiency curve, golden parity)
         ok &= Phase67DisciplineShaveCheck(configPath);          // Phase 67 (S61: Discipline make-% shave — small absolute per-man defensive-restraint reduction, golden parity)
         ok &= Phase68NonShootingFoulCheck(configPath);           // Phase 68 (S62: per-man non-shooting reach-in foul model — rate + committer, golden parity)
+        ok &= Phase69GenPass3ReplayParityCheck();                // Phase 69 (S69: Pass-3 two-plane budget generator port — fixture replay parity, STANDALONE)
+        ok &= Phase70GenPass3LiveCheck();                        // Phase 70 (S69: Pass-3 live generator — sampler moments + exact invariants + ruled bands, STANDALONE)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

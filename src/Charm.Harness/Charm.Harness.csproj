@@ -101,6 +101,12 @@
     <None Include="..\..\tools\gen_pass2_replay_fixture_s42_2.json" Link="tools\gen_pass2_replay_fixture_s42_2.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- Pass-3 two-plane budget generation replay fixture (emitted by the oracle's
+         fixture switch in tools/gen_pass3_budget_oracle.py, S69), copied beside the
+         binary so RunGenPass3ReplayParity reads it from AppContext.BaseDirectory. -->
+    <None Include="..\..\tools\gen_pass3_replay_fixture_s69.json" Link="tools\gen_pass3_replay_fixture_s69.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>
