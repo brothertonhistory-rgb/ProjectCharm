@@ -14,14 +14,14 @@ namespace Charm.Engine;
 /// file post-recorder-seam). The fixture's constants echo is asserted against
 /// <see cref="ConstantsEcho"/> BEFORE any replay runs.</para>
 ///
-/// <para><b>STANDALONE BY RULING (S69 scope wall):</b> nothing downstream consumes this
-/// yet — <see cref="PlayerGenPass2Live"/> stays the live generator until the bridge-swap
-/// session. <b>Warning that session inherits (A5):</b> the card contract shifts here —
-/// OffensiveRebounding/DefensiveRebounding LEAVE the size card (the old
-/// <c>post_bonus = 8*o</c> + height stamp is RETIRED) and become SPENDABLE, expressed
+/// <para><b>LIVE SINCE S70 (the bridge swap):</b> the divvy's <c>BuildRecruitedCohort</c>
+/// draws this generator; position follows the DEFENSIVE PLANE by exact-count rank
+/// (Emmett's 2026-07-24 ruling). <b>The A5 card shift, executed:</b>
+/// OffensiveRebounding/DefensiveRebounding LEFT the size card (the old
+/// <c>post_bonus = 8*o</c> + height stamp is RETIRED) and became SPENDABLE, expressed
 /// skills carried on latent/current/runway. The 33-key card keeps the SAME key names, so
 /// downstream readers (tendency derivation, rebounder pickers, scout rank) keep
-/// compiling — but the VALUES become current-expressed skill, which is that session's
+/// compiling — but the VALUES became current-expressed skill, which is the S70 page's
 /// baseline story. Also gone relative to Pass 2: orientation <c>o</c>, weapon/argmax,
 /// age/class placeholders; new: the defensive plane, the offensive role, the budget,
 /// concentration, family allocation, body caps, and concave pricing.</para>
@@ -158,6 +158,23 @@ public static class PlayerGenPass3
         foreach (var f in FAMILY_ORDER) ks.AddRange(FAMILIES[f]);
         return ks.ToArray();
     }
+
+    // --- The 33-key card contract (S70) — the exact key set GenMapToPlayer consumes.
+    // FROZEN VERBATIM, deliberately not derived from the families above: BuildCard
+    // assembles the card FROM the live families and asserts it against THIS list, so
+    // a FAMILIES/ATH_KEYS edit that drifts the card off the consumer's contract throws
+    // at generation time instead of stamping meaning nowhere. Matches Pass 2's ALL_KEYS
+    // key-for-key (set-verified S70); frozen here so retiring Pass 2 breaks nothing.
+    public static readonly string[] CARD_KEYS =
+    {
+        "Height", "Wingspan", "Weight",
+        "Strength", "Speed", "Quickness", "FirstStep", "Vertical", "Endurance", "Hustle",
+        "Close", "Mid", "Outside", "Finishing", "FreeThrow", "FoulDrawing",
+        "BallHandling", "Passing", "Playmaking", "SelfCreation", "PostMoves",
+        "OffBallMovement", "Screening", "OffensiveRebounding", "DefensiveRebounding",
+        "PerimeterDefense", "PostDefense", "RimProtection", "Steals",
+        "HelpDefense", "OffBallDefense", "BasketballIQ", "Discipline",
+    };
     public static readonly string[] PERIM_FAMS = { "Shooting", "Creation", "PerimDefense" };
     public static readonly string[] POST_FAMS  = { "InteriorOffense", "InteriorDefense", "Rebounding" };
 
@@ -511,7 +528,7 @@ public static class PlayerGenPass3
         // ---- Rscore, from the realized card (D3: label-free by construction) ----
         var (rscore, which, parts) = ComputeRscoreParts(current, ath, height);
 
-        return new Pass3Result
+        var result = new Pass3Result
         {
             Height = height, Wingspan = wingspan, Weight = weight, Ath = ath,
             DPlane = dplane, DCat = dcat, Role = role,
@@ -523,6 +540,37 @@ public static class PlayerGenPass3
             Runway = runway, RunwayTotal = runwayTotal,
             Rscore = rscore, RscoreWhich = which, RscoreParts = parts,
         };
+        result.Card = BuildCard(result);   // S70: the ONE assembly site (see BuildCard)
+        return result;
+    }
+
+    /// <summary>S70 — the canonical 33-key CURRENT card, the shape the bridge feeds
+    /// <c>GenMapToPlayer</c>: 3 size + the 7 <see cref="ATH_KEYS"/> + the 22
+    /// <see cref="SPEND_SKILLS"/> + <c>CurrentFt</c> under <c>FreeThrow</c>. The ONLY
+    /// assembly site — any fixture or diagnostic that needs the card calls this, so a
+    /// second drifting assembly cannot exist. Asserts the exact key SET against the
+    /// frozen <see cref="CARD_KEYS"/> contract (33 wrong keys is still 33 keys).
+    /// Pure — consumes no RNG; prefix stability (A4) untouched.</summary>
+    public static Dictionary<string, int> BuildCard(Pass3Result r)
+    {
+        var card = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            ["Height"] = r.Height, ["Wingspan"] = r.Wingspan, ["Weight"] = r.Weight,
+        };
+        foreach (var k in ATH_KEYS) card[k] = r.Ath[k];
+        foreach (var k in SPEND_SKILLS) card[k] = r.Current[k];
+        card["FreeThrow"] = r.CurrentFt;
+
+        // Exact key-SET assertion against the frozen contract, both directions:
+        // count equality + every contract key present == set equality (extras included).
+        if (card.Count != CARD_KEYS.Length)
+            throw new InvalidOperationException(
+                $"Pass-3 card contract broken: {card.Count} keys, expected {CARD_KEYS.Length}.");
+        foreach (var k in CARD_KEYS)
+            if (!card.ContainsKey(k))
+                throw new InvalidOperationException(
+                    $"Pass-3 card contract broken: expected key '{k}' missing.");
+        return card;
     }
 
     /// <summary>The realized-card family mass (oracle <c>family_mass</c>, :415-416):
@@ -665,6 +713,7 @@ public sealed class Pass3Result
     public Dictionary<string, double> Caps = new(StringComparer.Ordinal);
     public Dictionary<string, int> Latent = new(StringComparer.Ordinal);
     public Dictionary<string, int> Current = new(StringComparer.Ordinal);
+    public Dictionary<string, int> Card = new(StringComparer.Ordinal);   // S70: BuildCard's output — the 33-key GenMapToPlayer shape
     public int LatentFt, CurrentFt;
     public double Arrival, E;
     public Dictionary<string, int> Runway = new(StringComparer.Ordinal);

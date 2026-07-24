@@ -1,0 +1,19 @@
+{
+  "gamesPerRung": 2000,
+  "baseSeed": 7000,
+  "sweptSlot": 5,
+  "mode": "cases",
+  "outputName": "rebound_body_vs_skill",
+  "opponentDials": {
+    "4": { "Height": 74, "Wingspan": 76, "Strength": 70, "OffensiveRebounding": 62, "DefensiveRebounding": 64 },
+    "5": { "Height": 80, "Wingspan": 82, "Strength": 74, "OffensiveRebounding": 68, "DefensiveRebounding": 70 }
+  },
+  "cases": [
+    { "label": "FLAT_50_CONTROL",     "dials": {} },
+    { "label": "SMALL_LOW_SKILL",     "dials": { "Height": 45, "Wingspan": 46, "Strength": 45, "OffensiveRebounding": 26, "DefensiveRebounding": 25 } },
+    { "label": "BIG_LOW_SKILL",       "dials": { "Height": 80, "Wingspan": 82, "Strength": 74, "OffensiveRebounding": 26, "DefensiveRebounding": 25 } },
+    { "label": "SMALL_HIGH_SKILL",    "dials": { "Height": 45, "Wingspan": 46, "Strength": 45, "OffensiveRebounding": 80, "DefensiveRebounding": 82 } },
+    { "label": "BIG_HIGH_SKILL",      "dials": { "Height": 80, "Wingspan": 82, "Strength": 74, "OffensiveRebounding": 80, "DefensiveRebounding": 82 } },
+    { "label": "BIG_CEILING_SKILL_34", "dials": { "Height": 80, "Wingspan": 82, "Strength": 74, "OffensiveRebounding": 34, "DefensiveRebounding": 34 } }
+  ]
+}

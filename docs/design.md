@@ -7088,15 +7088,17 @@ The derivation runs at **both** generation call sites — the roster path and th
 
 This governs **generated** players only. Explicit JSON rosters, stress-test fixtures, and harness defaults still author tendency values intentionally — those are deliberate inputs, deliberately left untouched.
 
-## Player generation — Pass 2: the skill-first live generator (Sessions 42–44; C# live as of S44, standalone)
+## Player generation — Pass 2: the skill-first generator (Sessions 42–44; RETAINED, gate-proven, UNWIRED since S70)
 
-The Pass-2 generator produces the honest, positionless candidate cohort the future divvy/season
-bridge (Phase 3) will consume. It is **live C# as of S44** — a real generator producing real 46k
-populations on demand — but deliberately **standalone**: nothing downstream reads it yet. The season
-talent pool, the divvy, and the `gen` demo still run the Pass-1 position-based path above (with its
-floors and enforcers) until Phase 3 designs how positions and quotas *emerge* from orientation. The
+The Pass-2 generator produced the honest, positionless candidate cohort the divvy consumed from
+the S63 bridge through the S66 recruiting line. **As of S70 it no longer feeds anything in the
+game** — the bridge draws the Pass-3 two-plane budget generator (its own section below). Pass 2
+remains committed and gate-proven (Phases 59/60 run every suite pass: 51,714-check fixture parity
+at 0 failures plus the live sampler/population audit) per the S70 scope ruling: retiring a working,
+gate-proven generator in the same pass that first exercises its replacement is expensive to undo,
+so the retirement is its own future micro-session. The
 authoritative spec is the locked Python oracle (`tools/gen_pass2_skillfirst_oracle.py`, LOCKED SPEC
-S42.1); the C# is a fixture-proven port of it, and any future tuning happens in the oracle first.
+S42.1); the C# is a fixture-proven port of it.
 
 ### The model — four independent latent dials, three causal dependencies, no repair
 
@@ -7174,17 +7176,54 @@ placeholder label). None enter `Validate()` (they are not 0–99 authored rating
 reads them — the same proven-occupied-seat discipline as Endurance/Gravity/Spacing, waiting on
 the development/season layer.
 
-### What Pass 2 does NOT do yet (Phase 3's bridge)
+### The bridge, resolved (S63 → S66 → S70)
 
-The cohort has no position, role, leg, or quota — and the divvy is built on positional quotas
-(80G/60W/60B, coverage roles, the opening-five shape). Bridging them requires a
-positions-from-orientation apportionment design that does not exist yet; Phase 3 opens with
-that design conversation, then swaps the season pool, deletes the Pass-1 enforcers
-(`GenEnforceFloors`/`GenEnforceLegHealth` — the honest-draw ruling made executable), and
-re-checks the season page against the S39–S41 calibration. Two design notes ride that bridge:
-the tweener-post existence requirement (satisfied in principle by orientation being
-size-independent of skill package; confirmed against real rosters at Phase 3+), and
-weakest-leg multiplicative development (the development layer's, not generation's).
+The "positions-from-orientation apportionment design that does not exist yet" was designed and
+shipped in stages: S63 bridged the divvy to the Pass-2 cohort with positions by exact-count
+orientation rank; S66 applied the generator's own recruiting line; **S70 swapped the stream to
+Pass 3 and superseded the orientation sort with the defensive-plane ruling** (position is who the
+player can guard — the Roster genesis section carries the current mechanics). The Pass-1 enforcers
+(`GenEnforceFloors`/`GenEnforceLegHealth`) survive only inside the legacy `gen` lab path behind its
+byte-for-byte wall; no divvy or season path reaches them (single-caller, verified S70). The
+tweener-post existence requirement was confirmed affirmative on the bench at S51 and exists in the
+live world; weakest-leg multiplicative development remains the development layer's.
+
+## Player generation — Pass 3: the two-plane budget generator (S67 design / S68 oracle / S69 port; LIVE as of S70)
+
+The live world generator. Every player is drawn body-first (the preserved total height marginal,
+inverse-CDF, bin-checked every run), then two independent planes: a **defensive plane** (0 pure
+perimeter .. 1 pure post — who he can guard) and an **offensive role** (Creator / Shooter / Slasher /
+PostScorer / Connector — what he does with the ball), with pairing odds sliding asymmetrically with
+size (undersized post types outnumber oversized perimeter types by ruling). A talent beta buys a
+**budget that purchases CEILINGS** (who he can become — development stays growth; no career wallet);
+an independent concentration roll shapes how the budget spreads across the **seven families**
+(Shooting / InteriorOffense / Creation / PerimDefense / InteriorDefense / **Rebounding — spendable
+by the S67 ruling** / Glue), with **concave pricing** (elite costs more than good — the ruling that
+killed the nothing-but-freaks overshoot) and body caps on interior skills. The body's gifts are paid
+**live by the game** (the S46 rebounder body floor, the block channel, the reach term), never
+double-stamped by the generator. Arrival's mean follows the BODY (small ready, big raw; dice on
+top). `Rscore` is **label-free by construction** — pathway weights derive from the realized card's
+family mass; role and plane are not even parameters — and the recruiting line is the generator's own
+`R_LINE = 17.0`.
+
+**The card contract (S70).** `Pass3Result.Card` is the 33-key current card the bridge feeds
+`GenMapToPlayer` — key-for-key identical to Pass 2's (3 size + 7 athletic + 22 spend skills +
+FreeThrow), with the **provenance shift**: OffensiveRebounding/DefensiveRebounding are now
+current-expressed SPENDABLE skills (the old body stamps retired), same key names, changed meaning.
+Assembly runs through **one canonical named static, `PlayerGenPass3.BuildCard`**, which asserts the
+exact key SET against the frozen verbatim `CARD_KEYS` contract at generation time (33 wrong keys is
+still 33 keys) — a future family edit that drifts the card off the consumer's contract throws
+loudly instead of stamping meaning nowhere. `BuildCard` is pure (no RNG), so **prefix stability
+holds**: `BuildCohort` is one seeded stream, 68 fixed-order slots per player, no size-dependent
+branch — the first k players are identical for any cohort size ≥ k, and Phase 54's two-chunk-size
+check proves the contract structurally every run.
+
+**Proof chain.** Locked oracle `tools/gen_pass3_budget_oracle.py` (S68, Emmett-ruled table on real
+bodies); fixture `gen_pass3_replay_fixture_s69.json` (301 branch-representative players + the
+176-row inverse-CDF edge table); Phase 69 replays every checkpoint from recorded draws (the
+NeumaierSum port lesson lives here); Phase 70 audits the live drawing (sampler moments, exact
+invariants — budget conservation, caps, anti-target 0, label-flip 0 — and the ruled bands) on the
+canonical 46k. Any future tuning happens in the oracle first.
 
 ## World Structure — Pass 1: the era-file skeleton (Session 28, 2026-07-02)
 
@@ -7246,20 +7285,20 @@ Governing records: `docs/roster-genesis-brief.md` (design conversation of 2026-0
 
 **The frame.** Every school in a world file gets a ten-man roster from **one national talent pool** (10 × school count — a bootstrap standing in for four absorbed recruiting classes; classes/ages are recruiting-arc design) divided by **prestige-weighted selection**. Prestige is **access**, never quality. Talent is zero-sum: elite players are scarce because the pool says how many exist. Since Session 63 the pool is no longer an authored distribution — it is **the real Pass-2 cohort** drawn from the oracle-locked skill-first generator; since Session 66 it is the **recruitable** slice of that cohort — the first 10n players of the stream who clear the generator's own line, so the world is "**all of college**" rather than a raw slice of humanity. Top-of-class selection (D1 vs the rest) stays deferred to the divisional layer per the standing divisional-sorting ruling; first-past-the-line is deliberately NOT a quality sort. The Session 26 `gen` mode and its machinery survive untouched as a lab instrument behind their byte-for-byte wall; the prestige→depth relationship still emerges from access (S63 page, top-third-rank per roster by band: 0.41 / 1.55 / 3.65 / 5.53 / 7.60 bottom to top, every adjacent band overlapping).
 
-### The pool (Session 63 — the Pass-2 cohort, bridged; Session 66 — the recruiting line applied)
+### The pool (S63 bridge → S66 recruiting line → S70: the Pass-3 cohort, positions by defensive plane)
 
-- **Source:** `BuildRecruitedCohort(divvySeed ^ DivvyCohortSeedXor, 10 × schoolCount, 2 × 10n)` — the S44 live generator on its own derived stream (the schedule's committed XOR pattern), consumed IN ORDER until exactly 10n players satisfy `Rscore >= PlayerGenPass2.R_LINE` (17.0, the constant the Phase-59 port already carried); accepted players keep draw order. The pool stays a pure function of (world, seed); the transform is oracle-locked; the bridge draws and filters, never edits (Phase 59/60 re-prove parity every run).
-- **The recruiting line (Session 66, Emmett ruling: the line stands at 17, explicitly reversible).** ~56% of the raw stream clears it, so filling 3,470 costs ~6,300 draws, once per season command (the run measured 6,940 generated at the 2×P initial size, no doubling). Acceptance leans post and tall by design (the height-access curve doing its job — raw candidates clear at ~72% post-leaning vs ~48% perimeter-leaning; ~41% at 5'8"–5'9" vs ~78% at 6'10"+); the stamped guard population's Outside median moved 29 → 40, sub-35-Outside guard share 66% → 32%. The growth rule is safe because the stream is **prefix-stable** — `BuildCohort` runs one sequential per-player stream with no pool-level pass and no size-dependent draw, so the first k players are identical for any cohort size ≥ k; Phase 54 proves the CONTRACT structurally (two different growth chunk sizes → the identical ordered accepted pool), not merely same-seed reproducibility. Start 2×P, double on shortfall (a ~10-sigma event at the stock margin).
-- **Positions by EXACT COUNT in orientation rank (Emmett ruling 2026-07-20 — position follows the game, not the body).** Sort on `Pass2Result.Oaxis` (= 2·o − 1: **−1 perimeter .. +1 post**, the oracle's own axis comment, confirmed mechanically by the height ceiling and the PAXIS suppression), cohort index as the deterministic tiebreak. The **4n most perimeter-oriented are Guards, the 3n most interior-oriented are Bigs, the remaining 3n are Wings** — 1,388/1,041/1,041 at stock, the divvy's aggregate quota demand exactly. Height gets no vote (assigned-position heights overlap massively; the 6'4" post monster is a Big). Phase 54 asserts the boundaries monotone (every B ≥ every W ≥ every G on Oaxis, non-strict for straddling ties).
-- **Roles at the OLD pool's density, quota as a FLOOR (ruling 0.2).** The old density emerged from committed machinery (forced ⌈1.2n⌉ quota + uniform draws over role lists where 2-of-4 guard names are lead and 1-of-2 wing names is the defender); `DivvyLeadRoleTarget`/`DivvyTdwRoleTarget` reproduce that expectation exactly, rounded up — stock **903 leads / 729 wing defenders**, floor 417 each. Protected roles by rank within position (leads: BallHandling+Playmaking composite; ThreeAndDWing: PerimeterDefense), deterministic tiebreak. Non-protected roles are **labels only** (mechanically inert — the game consumes Player/Slot/Pos/Starter, traced end-to-end S63) and stamp deterministically from each player's own card. `ValidateDivvyPool` still asserts the floor loudly before pick one.
-- **Card → Player:** a COPY of the 33-key `Result.Card` (the replay-fixture shape is never mutated) → the committed golden-proven `DeriveAndStampTendencies` → `GenMapToPlayer` → `Player.Validate()`. HierarchyRank stays at its default.
-- **Retired with the old builder (S63):** the S29 leg-count/gradient apportionment, the third-leg redraw, the pool leg-health floor, `SplitMixRandom`, `DivvyApportion`, `DivvyGenericToSize`. Rows no longer carry LegCount/GradientTier/PlusLegs (nothing mechanical ever read them; the diagnostics that printed them are rewritten); they carry `Oaxis` and the generator's named `Weapon` for the page and the boundary guards.
+- **Source (S70):** `BuildRecruitedCohort(divvySeed ^ DivvyCohortSeedXor, 10 × schoolCount, 2 × 10n)` — the **Pass-3 two-plane budget generator** (`PlayerGenPass3Live.BuildCohort`) on its own derived stream, consumed IN ORDER until exactly 10n players satisfy `Rscore >= PlayerGenPass3.R_LINE` (17.0 — the same standing line, now the Pass-3 generator's own constant); accepted players keep draw order. The pool stays a pure function of (world, seed); the transform is oracle-locked; the bridge draws and filters, never edits (Phases 69/70 re-prove parity every run).
+- **The recruiting line (S66 ruling, standing at 17, explicitly reversible; S70: the deeper stream).** ~79.5% of the Pass-3 stream clears it (the S68 "college gets deeper" ruling — the budget model floors everyone at real tools), so filling 3,470 costs ~4,400 draws, once per season command; the 2×P initial size never doubles at stock. The growth rule is safe because the stream is **prefix-stable** — one sequential per-player stream, 68 fixed-order slots, no pool-level pass, no size-dependent draw, so the first k players are identical for any cohort size ≥ k; Phase 54 proves the CONTRACT structurally (two different growth chunk sizes → the identical ordered accepted pool; the 4,000-draw second chunk accepts ~3,185 < 3,470 at the check's seed, so the doubling branch is genuinely exercised).
+- **Positions by EXACT COUNT in DEFENSIVE-PLANE rank (Emmett ruling 2026-07-24 — position is who the player can GUARD; supersedes the S63 orientation-rank form, same exact-count shape).** Sort on `Pass3Result.DPlane` (0 pure perimeter .. 1 pure post) ascending, cohort index as the deterministic tiebreak. The **4n most perimeter defenders are Guards, the 3n most interior are Bigs, the middle 3n are Wings** — 1,388/1,041/1,041 at stock. Height gets no vote and the offensive role rides along as flavor — **the 6'5" Guard and the 6'2" Big are ruled-correct output, not defects** (Phase 54 prints the extremes and the tall-guard/short-big counts on every run as the standing guard against a later system quietly assuming Guards are short; stock at the check's seed: 47 guards over 6'3", 116 bigs under 6'5"). The fixed `DCat` bucketing (0.35/0.65) is page flavor only — it lands 38/38/23 and can never hit the exact-count quota; position ranks the continuous plane. Phase 54 asserts the plane boundaries monotone (every B ≥ every W ≥ every G, non-strict for straddling ties).
+- **Roles at the OLD pool's density, quota as a FLOOR (ruling 0.2, unchanged through the swap).** `DivvyLeadRoleTarget`/`DivvyTdwRoleTarget` reproduce the old expected density exactly — stock **903 leads / 729 wing defenders**, floor 417 each. Protected roles by rank within position (leads: BallHandling+Playmaking composite; ThreeAndDWing: PerimeterDefense), deterministic tiebreak. Non-protected roles are **labels only** (mechanically inert — traced end-to-end S63) and stamp deterministically from each player's own card. `ValidateDivvyPool` still asserts the floor loudly before pick one.
+- **Card → Player (S70):** a COPY of the 33-key `Result.Card` (the generator's canonical card, assembled by `PlayerGenPass3.BuildCard` and set-asserted at generation; never mutated by the bridge) → the committed golden-proven `DeriveAndStampTendencies` (reads 13 keys, none of them rebounding — the card shift cannot ripple into the diet, verified S70) → `GenMapToPlayer` → `Player.Validate()`. HierarchyRank stays at its default. **The provenance shift:** OffensiveRebounding/DefensiveRebounding on the card are now current-expressed SPENDABLE skills (Pass 2's body stamps retired); same key names, changed meaning — the S70 page diff is the recorded consequence.
+- **Retired with the old builder (S63), renamed at the swap (S70):** the S29 apportionment machinery stays retired; pool rows carry **`DefensivePlane`** (was `Oaxis` — the sort key changed meaning with the ruling) and **`OffensiveRole`** (was `Weapon` — now the Pass-3 Role: Creator/Shooter/Slasher/PostScorer/Connector) for the page and the boundary guards. No stale name survives on a changed meaning.
 
 ### The scout rank (the quarantined exception to the no-scalar wall)
 
 `rank = L1 + 0.9·L2 + 0.4·L3 + 0.045·max(0, L3−30)²` over the three leg means, sorted descending. Grading (Session 29.1): the SIZE leg is normalized by the per-position affine map (ordinary-lo → 44, slope 44/24); the SKILL mean excludes the position's permitted holes **and FreeThrow** (shooting buys no access; the FT column stands); a big's ATH mean re-adds `GenBigAthDownshift`. Properties still suite-pinned: **monotone** in every feeding rating, **convex in the third leg**, FT-blind bit-identically. **Quarantine unchanged:** the rank lives on the pool row only — never on a `Player`, never printed as an overall, never sorting anything outside the draft board.
 
-**★ S63 standing caveats — the rank is PRESERVED with two stale assumptions, deliberately (one variable per session; modernization is its own ruled session):** (1) **the big-ATH +8 add-back inverts a dock the Pass-2 generator never applies** — every assigned-Big's ATH grade is inflated by 8 for free; (2) **the position-relative SIZE map, under function-based position assignment, produces extreme tails** (a 6'7" assigned-Guard grades ~107 on a 44–88 scale; a tiny assigned-Big near zero) and a **guard-leaning board** (stock rank means G 140.9 / W 120.3 / B 116.4 — visible in the draft as leaked elite guards dominating the escapes list). A third: a stretch big's Outside is invisible to his SKILL grade (the B hole set excludes it). The S29.1 tier-ordering/overlap findings are retired with the tiers themselves. The S63 baseline census is read THROUGH this board; treat rank-by-band comparisons across the swap accordingly.
+**★ S63 standing caveats — the rank is PRESERVED with two stale assumptions, deliberately (one variable per session; modernization is its own ruled session):** (1) **the big-ATH +8 add-back inverts a dock the Pass-2 generator never applies** — every assigned-Big's ATH grade is inflated by 8 for free; (2) **the position-relative SIZE map, under function-based position assignment, produces extreme tails** (a 6'7" assigned-Guard grades ~107 on a 44–88 scale; a tiny assigned-Big near zero) and a **guard-leaning board** (stock rank means G 140.9 / W 120.3 / B 116.4 — visible in the draft as leaked elite guards dominating the escapes list). A third: a stretch big's Outside is invisible to his SKILL grade (the B hole set excludes it). The S29.1 tier-ordering/overlap findings are retired with the tiers themselves. The S63 baseline census is read THROUGH this board; treat rank-by-band comparisons across the swap accordingly. **S70 re-base:** the Pass-3 card shift dropped the rank SCALE roughly 25 points everywhere (spent-skill rebounding feeds the SIZE leg where body stamps used to — stock band means now 85.5 → 126.0 bottom-to-top vs the S66 board's 109.1 → 155.3); the ordering, prestige-band monotonicity, and leak mechanism all held (62 leaks at stock), so the board still works — it just speaks the new card's currency. Cross-era rank comparisons are meaningless by construction.
 
 ### The divvy
 
@@ -7286,7 +7325,7 @@ Proven: wiring correctness, determinism (draft AND pool, byte-level), and every 
 
 ### The S63 baseline (the calibration arc's starting picture — same engine, same seed 20260720, only the pool differs)
 
-Old pool → Pass-2 cohort: points 73.8 → 50.9; FG% 45.5 → 28.2; 3P% 33.8 → 22.0; FT% 70.5 → 61.2; PPP 1.052 → 0.732; pace 70.1 → 69.5; 3PA rate 0.39 → **0.69**; TO% 18.3 → 22.4; fouls 17.4 → 16.2 (shooting 6.65 → 3.37, non-shooting 10.71 → 12.79); usage max/p90/median 27.1/20.4/7.5 → **46.9**/25.6/7.6. Census clean (3,470/3,470 drafted; 347/347 exact rosters; 347/347 protected coverage). **Cross-checked:** S60.2's random-cohort field (FG% 27.8 / PPG 50.8) matches this world (28.2 / 50.9) through independent plumbing — the levels are the cohort's real curve, not a bridge artifact. Recorded here as the swap's fixed capture. The arc's CURRENT recorded reference is the **S66 page** (recruiting line applied, seed 20260720): points 69.7, FG% 46.0, 3P% 34.3, 3PA rate 0.30, FT% 62.0, FTA 21.6, PPP 0.9825, TO% 21.3, pace 71.0, fouls 19.97 (7.36 shooting / 12.61 non-shooting), usage max/p90/median 44.5/25.0/7.6, census clean — every calibration session diffs against that page, never against memory.
+Old pool → Pass-2 cohort: points 73.8 → 50.9; FG% 45.5 → 28.2; 3P% 33.8 → 22.0; FT% 70.5 → 61.2; PPP 1.052 → 0.732; pace 70.1 → 69.5; 3PA rate 0.39 → **0.69**; TO% 18.3 → 22.4; fouls 17.4 → 16.2 (shooting 6.65 → 3.37, non-shooting 10.71 → 12.79); usage max/p90/median 27.1/20.4/7.5 → **46.9**/25.6/7.6. Census clean (3,470/3,470 drafted; 347/347 exact rosters; 347/347 protected coverage). **Cross-checked:** S60.2's random-cohort field (FG% 27.8 / PPG 50.8) matches this world (28.2 / 50.9) through independent plumbing — the levels are the cohort's real curve, not a bridge artifact. Recorded here as the swap's fixed capture. The arc's CURRENT recorded reference is the **S70 page** (Pass-3 cohort, positions by defensive plane, seed 20260720): points 71.5, FG% 46.4, 3P% 36.6, 3PA rate 0.36, FT% 61.9, FTA 21.3, PPP 1.0088, TO% 21.2, pace 70.9, rebounds credited 30.5, fouls 20.28 (6.50 shooting / 13.78 non-shooting), usage max/p90/median 46.2/24.3/8.0, census clean — every calibration session diffs against that page, never against memory. (The superseded chain, kept for the diff trail: the S63 capture above; the S66 page — points 69.7, FG% 46.0, 3P% 34.3, 3PA rate 0.30, FT% 62.0, FTA 21.6, PPP 0.9825, TO% 21.3, pace 71.0, fouls 19.97 = 7.36/12.61, usage 44.5/25.0/7.6.)
 
 ### Emergent observations (and their resolution)
 

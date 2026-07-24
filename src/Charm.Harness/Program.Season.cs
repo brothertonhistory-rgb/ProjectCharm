@@ -552,7 +552,7 @@ internal static partial class Program
             {
                 var p = run.Divvy.Pool[pid];
                 return FormattableString.Invariant(
-                    $"{p.Pos} {p.Role} (pool #{pid}, rank {p.ScoutRank:F1}, wpn {p.Weapon})");
+                    $"{p.Pos} {p.Role} (pool #{pid}, rank {p.ScoutRank:F1}, role {p.OffensiveRole})");
             }).ToList();
             var band = BandOf(prestige[id]);
             Console.WriteLine($"  {names[id]} (prestige {prestige[id]}, band {band.Item1}-{band.Item2}): " +

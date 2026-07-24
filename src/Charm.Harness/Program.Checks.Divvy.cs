@@ -5,8 +5,9 @@ namespace Charm.Harness;
 // ============================================================================
 // Phase 54 — the national pool + prestige-weighted divvy, SPLIT at Session 63.
 //
-// The pool is now the REAL Pass-2 skill-first cohort (positions by exact-count
-// orientation rank, roles at the old pool's density — Emmett rulings 2026-07-20).
+// The pool is the REAL Pass-3 two-plane budget cohort (S70: positions by
+// exact-count DEFENSIVE-PLANE rank — Emmett ruling 2026-07-24; roles at the old
+// pool's density — ruling 2026-07-20).
 // KEPT from the S29 suite: draft determinism, the order-free board-noise
 // fixtures (oracle exports, still bit-valid — the noise stream is untouched),
 // roster legality, the infeasibility throws (rigged from REAL pool rows, so
@@ -28,7 +29,7 @@ internal static partial class Program
     private static bool Phase54DivvyCheck()
     {
         Console.WriteLine();
-        Console.WriteLine("== Phase 54 — National pool + prestige divvy (S63: the Pass-2 cohort bridge) ==");
+        Console.WriteLine("== Phase 54 — National pool + prestige divvy (S70: the Pass-3 cohort bridge) ==");
         var pass = true;
 
         void Check(string name, bool ok, string detail = "")
@@ -70,8 +71,8 @@ internal static partial class Program
                     p.First.PoolId == p.Second.PoolId &&
                     p.First.Pos == p.Second.Pos &&
                     p.First.Role == p.Second.Role &&
-                    p.First.Oaxis == p.Second.Oaxis &&
-                    p.First.Weapon == p.Second.Weapon &&
+                    p.First.DefensivePlane == p.Second.DefensivePlane &&
+                    p.First.OffensiveRole == p.Second.OffensiveRole &&
                     p.First.ScoutRank == p.Second.ScoutRank &&
                     p.First.Ratings.Count == p.Second.Ratings.Count &&
                     p.First.Ratings.All(kv =>
@@ -131,17 +132,38 @@ internal static partial class Program
                     pool.Count(p => p.Pos == "B") == 3 * n,
                     $"{pool.Count(p => p.Pos == "G")}G/{pool.Count(p => p.Pos == "W")}W/{pool.Count(p => p.Pos == "B")}B");
 
-                // Orientation boundaries (ruling 0.1, A2-resolved direction: +1 = post):
-                // every Big at least as interior as every Wing, every Wing at least as
-                // interior as every Guard. Non-strict — equal-Oaxis players may straddle
-                // a cut (the cohort-index tiebreak decides which side they land on).
-                var maxG = pool.Where(p => p.Pos == "G").Max(p => p.Oaxis);
-                var minW = pool.Where(p => p.Pos == "W").Min(p => p.Oaxis);
-                var maxW = pool.Where(p => p.Pos == "W").Max(p => p.Oaxis);
-                var minB = pool.Where(p => p.Pos == "B").Min(p => p.Oaxis);
-                Check($"{tag} pool: orientation boundaries monotone (B >= W >= G, post-positive)",
+                // Defensive-plane boundaries (S70 ruling, 0 perimeter .. 1 post):
+                // every Big at least as interior a DEFENDER as every Wing, every Wing
+                // at least as interior as every Guard. Non-strict — equal-plane players
+                // may straddle a cut (the cohort-index tiebreak decides their side).
+                var maxG = pool.Where(p => p.Pos == "G").Max(p => p.DefensivePlane);
+                var minW = pool.Where(p => p.Pos == "W").Min(p => p.DefensivePlane);
+                var maxW = pool.Where(p => p.Pos == "W").Max(p => p.DefensivePlane);
+                var minB = pool.Where(p => p.Pos == "B").Min(p => p.DefensivePlane);
+                Check($"{tag} pool: defensive-plane boundaries monotone (B >= W >= G, post-positive)",
                     minB >= maxW && minW >= maxG,
                     FormattableString.Invariant($"G max {maxG:F4} <= W [{minW:F4}..{maxW:F4}] <= B min {minB:F4}"));
+
+                // S70 extreme-case diagnostics (PRINTED, never asserted): the ruled
+                // world accepts tall Guards and short Bigs — position follows the
+                // defensive plane, height gets no vote. Making them visible on every
+                // run is the cheap guard against a later system quietly assuming
+                // Guards are short. ht: card code -> displayed feet-inches.
+                static string Ht(int code)
+                {
+                    var inches = (int)Math.Round(68.0 + 0.36 * (code - 40), MidpointRounding.ToEven);
+                    return $"{inches / 12}'{inches % 12}\"";
+                }
+                var tallG = pool.Where(p => p.Pos == "G")
+                    .OrderByDescending(p => p.Ratings["Height"]).ThenByDescending(p => p.DefensivePlane).First();
+                var shortB = pool.Where(p => p.Pos == "B")
+                    .OrderBy(p => p.Ratings["Height"]).ThenBy(p => p.DefensivePlane).First();
+                var tallGuardCount = pool.Count(p => p.Pos == "G" && p.Ratings["Height"] >= 60);
+                var shortBigCount = pool.Count(p => p.Pos == "B" && p.Ratings["Height"] <= 64);
+                Console.WriteLine(FormattableString.Invariant(
+                    $"  [{tag}] tallest Guard  {Ht(tallG.Ratings["Height"])} {tallG.OffensiveRole,-11} plane {tallG.DefensivePlane:F3}   shortest Big {Ht(shortB.Ratings["Height"])} {shortB.OffensiveRole,-11} plane {shortB.DefensivePlane:F3}"));
+                Console.WriteLine(FormattableString.Invariant(
+                    $"  [{tag}] guards over 6'3\": {tallGuardCount}   bigs under 6'5\": {shortBigCount}   (ruled-correct output, not defects)"));
 
                 // Roles at the old pool's density (ruling 0.2): count == target, >= floor.
                 var quota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
@@ -155,7 +177,7 @@ internal static partial class Program
                     $"{tdw} (target {DivvyTdwRoleTarget(n)}, floor {quota})");
             }
 
-            // ── 4b. Session 66: the recruiting line at the bridge. ─────────────────────
+            // ── 4b. Session 66 (S70: the Pass-3 stream): the recruiting line at the bridge.
             // Every drafted player clears the generator's own line; the census stays
             // exact; and the CONTRACT is proven, not just same-seed reproducibility —
             // prefix stability means the growth chunk size is invisible, so two
@@ -163,29 +185,29 @@ internal static partial class Program
             {
                 var rlSeed = unchecked((int)(seed ^ DivvyCohortSeedXor));
                 const int rlP = 3470;
-                var recA = BuildRecruitedCohort(rlSeed, rlP, 2 * rlP);   // no doubling at ~56% acceptance
-                var recB = BuildRecruitedCohort(rlSeed, rlP, 4000);      // forces >=1 doubling (4000 draws accept ~2,240)
+                var recA = BuildRecruitedCohort(rlSeed, rlP, 2 * rlP);   // no doubling at ~79.5% acceptance
+                var recB = BuildRecruitedCohort(rlSeed, rlP, 4000);      // forces >=1 doubling (4000 draws accept ~3,180 < 3,470)
                 Check("recruited cohort: exactly 10n accepted", recA.Length == rlP, $"{recA.Length}");
                 Check("recruited cohort: every accepted player clears the line",
-                    recA.All(lp => lp.Result.Rscore >= PlayerGenPass2.R_LINE),
-                    $"Rscore >= {PlayerGenPass2.R_LINE:F1}");
+                    recA.All(lp => lp.Result.Rscore >= PlayerGenPass3.R_LINE),
+                    $"Rscore >= {PlayerGenPass3.R_LINE:F1}");
                 Check("recruited cohort: two growth chunk sizes -> identical ordered pool (prefix stability)",
                     recA.Length == recB.Length && recA.Zip(recB).All(p =>
                         p.First.Result.Rscore == p.Second.Result.Rscore &&
                         p.First.Result.Height == p.Second.Result.Height &&
-                        p.First.Result.Oaxis == p.Second.Result.Oaxis &&
-                        p.First.Result.Weapon == p.Second.Result.Weapon));
+                        p.First.Result.DPlane == p.Second.Result.DPlane &&
+                        p.First.Result.Role == p.Second.Result.Role));
                 // Draw order preserved: the accepted pool equals the first-past-the-line
                 // subsequence of the raw stream, independently refiltered.
-                var raw = PlayerGenPass2Live.BuildCohort(rlSeed, 16000);
-                var refiltered = raw.Where(lp => lp.Result.Rscore >= PlayerGenPass2.R_LINE)
+                var raw = PlayerGenPass3Live.BuildCohort(rlSeed, 16000);
+                var refiltered = raw.Where(lp => lp.Result.Rscore >= PlayerGenPass3.R_LINE)
                                     .Take(rlP).ToArray();
                 Check("recruited cohort: accepted draw order preserved (matches an independent refilter)",
                     refiltered.Length == rlP && recA.Zip(refiltered).All(p =>
                         p.First.Result.Rscore == p.Second.Result.Rscore &&
                         p.First.Result.Height == p.Second.Result.Height &&
-                        p.First.Result.Oaxis == p.Second.Result.Oaxis &&
-                        p.First.Result.Weapon == p.Second.Result.Weapon));
+                        p.First.Result.DPlane == p.Second.Result.DPlane &&
+                        p.First.Result.Role == p.Second.Result.Role));
             }
 
             // ── 5. An infeasible pool is rejected LOUDLY, naming the shortfall,
@@ -251,7 +273,7 @@ internal static partial class Program
             var leaks = stockA.Rosters.Where(kv => prestige[kv.Key] < med)
                                       .Sum(kv => kv.Value.Count(pid => topDecile.Contains(pid)));
             Check("stock: at least one top-decile player leaks below median prestige",
-                leaks >= 1, $"leaks = {leaks} (recruited pool at this seed: 64)");
+                leaks >= 1, $"leaks = {leaks} (Pass-3 recruited pool at this seed: 62)");
 
             // ── 8. Protected supply + the opening five's contract. ─────────────────────
             // The coverage guarantee is a hard constraint: remaining supply of a

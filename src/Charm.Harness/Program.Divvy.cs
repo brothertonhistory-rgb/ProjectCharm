@@ -23,14 +23,15 @@ namespace Charm.Harness;
 // mechanism — see DivvyOddsK).
 //
 // RNG contract (Session 63 — the generation bridge):
-//   THE POOL IS THE REAL PASS-2 COHORT. The old in-place pool generation
+//   THE POOL IS THE REAL PASS-3 COHORT (S70). The old in-place pool generation
 //   (leg-tier shuffle, role draws, GenRatings — the S29 Phases A-C) is RETIRED;
-//   the pool is now `PlayerGenPass2Live.BuildCohort(divvySeed ^ DivvyCohortSeedXor,
-//   10 × schoolCount)` — the oracle-locked skill-first generator, its own stream.
-//   Positions are stamped by EXACT COUNT in orientation rank (Emmett ruling
-//   2026-07-20: position follows the game, not the body); roles are derived by
-//   rank within position at the OLD pool's density (ruling 0.2). Both are
-//   deterministic sorts — no draws.
+//   the pool is `PlayerGenPass3Live.BuildCohort(divvySeed ^ DivvyCohortSeedXor, …)`
+//   consumed first-past-the-line at the generator's own R_LINE — the oracle-locked
+//   two-plane budget generator, its own stream. Positions are stamped by EXACT
+//   COUNT in DEFENSIVE-PLANE rank (Emmett ruling 2026-07-24: position is who the
+//   player can guard; height gets no vote; offensive role is flavor); roles are
+//   derived by rank within position at the OLD pool's density (ruling 0.2). Both
+//   are deterministic sorts — no draws.
 //   Sequential stream: one WorldRng(divvySeed), consumed ONLY by Phase D
 //     (one winner draw per pick).
 //   Per-pair stream: board noise is drawn from a FRESH SplitMix64 seeded by a
@@ -41,7 +42,7 @@ namespace Charm.Harness;
 
 internal static partial class Program
 {
-    // ── The pool source (Session 63): the real Pass-2 skill-first cohort ────────
+    // ── The pool source (S63 bridge, S70 swap): the real Pass-3 budget cohort ───
     // The S29 authored pool mix (leg-count fracs, gradient bands, the pool-path
     // leg-health floor) is RETIRED with the old builder — the cohort's shape is
     // whatever the oracle-locked generator draws. The cohort seed derives from the
@@ -124,10 +125,12 @@ internal static partial class Program
     // never printed on a roster sheet, never sorts anything outside the board.
     // Session 63: LegCount/GradientTier/PlusLegs are RETIRED (old-pool shape —
     // nothing mechanical read them; the diagnostics that printed them are rewritten).
-    // Oaxis (−1 perimeter .. +1 post) and the generator's named Weapon ride along
-    // for the page and the Phase 54 boundary guards.
+    // Session 70: Oaxis → DefensivePlane (0 perimeter .. 1 post — position's sort key,
+    // per Emmett's 2026-07-24 ruling) and Weapon → OffensiveRole (the Pass-3 Role:
+    // Creator / Shooter / Slasher / PostScorer / Connector — flavor, never a sort key).
+    // Both ride along for the page and the Phase 54 boundary guards.
     private sealed record PoolPlayer(
-        int PoolId, string Pos, string Role, double Oaxis, string Weapon,
+        int PoolId, string Pos, string Role, double DefensivePlane, string OffensiveRole,
         Dictionary<string, int> Ratings, Player Player, double ScoutRank);
 
     // The season/smoke row adapters still construct the gen lab's GenPlayerRow, whose
@@ -136,28 +139,28 @@ internal static partial class Program
     // and are never printed there; 0 / empty marks "not applicable", never a claim.
     private static readonly HashSet<string> DivvyNoPlusLegs = new(StringComparer.Ordinal);
 
-    // ── Pool generation (Session 63): the real Pass-2 cohort, bridged ────────────
+    // ── Pool generation (S63 bridge, S70 swap): the real Pass-3 cohort ───────────
     private static List<PoolPlayer> BuildDivvyPool(int schoolCount, long divvySeed)
     {
         var n = schoolCount;
         var P = 10 * n;
 
-        // The real skill-first cohort (S44 live generator; the transform is
-        // oracle-locked and Phase 59/60 re-prove it — the bridge draws, never edits).
-        // Session 66: the generator's own recruiting line is now APPLIED at the
-        // bridge — the pool is the first 10n players of the stream who clear it.
+        // The real two-plane budget cohort (S69 live generator; the transform is
+        // oracle-locked and Phases 69/70 re-prove it — the bridge draws, never edits).
+        // Session 66's recruiting line stands, now at the Pass-3 generator's own
+        // R_LINE — the pool is the first 10n players of the stream who clear it.
         var cohortSeed = unchecked((int)(divvySeed ^ DivvyCohortSeedXor));
         var cohort = BuildRecruitedCohort(cohortSeed, P, 2 * P);
 
-        // Ruling 0.1: position follows the game, not the body — assigned by EXACT
-        // COUNT in orientation rank. Oaxis = 2·o − 1: −1 perimeter .. +1 post (the
-        // oracle's own axis comment; the height ceiling and the PAXIS suppression
-        // both confirm the direction). Deterministic total ordering: Oaxis ascending,
-        // immutable cohort index as the tiebreak. The 4n most perimeter-oriented are
-        // Guards, the 3n most interior-oriented are Bigs, the middle 3n are Wings.
-        // Height gets no vote.
+        // Ruling S70 (2026-07-24, supersedes the S63 Oaxis form): position is assigned
+        // by the DEFENSIVE PLANE — who the player can guard — by EXACT COUNT in plane
+        // rank. DPlane: 0 = pure perimeter .. 1 = pure post (the generator's own axis).
+        // Deterministic total ordering: DPlane ascending, immutable cohort index as the
+        // tiebreak. The 4n most perimeter defenders are Guards, the 3n most interior
+        // are Bigs, the middle 3n are Wings. Height gets no vote; offensive role rides
+        // along as flavor — the 6'5" Guard and the 6'2" Big are ruled-correct output.
         var order = Enumerable.Range(0, P)
-            .OrderBy(i => cohort[i].Result.Oaxis).ThenBy(i => i).ToArray();
+            .OrderBy(i => cohort[i].Result.DPlane).ThenBy(i => i).ToArray();
 
         // Cards + Players first (roles need rank-within-position, a second pass).
         var cards = new Dictionary<string, int>[P];
@@ -167,8 +170,9 @@ internal static partial class Program
         {
             pos[pid] = pid < 4 * n ? "G" : pid < 7 * n ? "W" : "B";
             // The 33-key Current card + derived tendencies, mapped through the
-            // committed GenMapToPlayer. A COPY — Result.Card is the replay-fixture
-            // shape and must never be mutated by the bridge.
+            // committed GenMapToPlayer. A COPY — Result.Card is the generator's
+            // canonical card (S70 BuildCard, set-asserted at generation) and must
+            // never be mutated by the bridge; tendencies stamp into the copy.
             var v = new Dictionary<string, int>(cohort[order[pid]].Result.Card, StringComparer.Ordinal);
             DeriveAndStampTendencies(v);   // AFTER the card is final, BEFORE mapping
             players[pid] = GenMapToPlayer(v, $"Pool_{pid}");
@@ -217,40 +221,42 @@ internal static partial class Program
             };
 
             pool.Add(new PoolPlayer(pid, pos[pid], role,
-                cohort[order[pid]].Result.Oaxis, cohort[order[pid]].Result.Weapon,
+                cohort[order[pid]].Result.DPlane, cohort[order[pid]].Result.Role,
                 v, players[pid], DivvyScoutRank(v, pos[pid])));
         }
 
         return pool;
     }
 
-    // ── The recruiting line at the bridge (Session 66, Emmett ruling 2026-07-23:
-    //    the line stands at the generator's own R_LINE = 17.0) ────────────────────
+    // ── The recruiting line at the bridge (Session 66 ruling, standing; Session 70:
+    //    the stream is the Pass-3 budget generator, its own R_LINE = 17.0) ─────────
     // Consume the deterministic cohort stream IN ORDER until exactly P players
-    // clear the generator's own scholarship line (`Rscore >= PlayerGenPass2.R_LINE`);
+    // clear the generator's own scholarship line (`Rscore >= PlayerGenPass3.R_LINE`);
     // accepted players keep draw order. First-past-the-line is "all of college" —
     // top-N-by-Rscore would be D1 selection, which waits for the divisional layer
-    // (the standing divisional-sorting ruling). ~56% of the stream clears the line,
-    // so filling 3,470 costs ~6,300 draws, once per season command.
+    // (the standing divisional-sorting ruling). ~79.5% of the stream clears the line
+    // (the S68 "college gets deeper" ruling — the budget model floors everyone at
+    // real tools), so filling 3,470 costs ~4,400 draws, once per season command.
     //
     // The growth rule is safe because the stream is PREFIX-STABLE: BuildCohort runs
     // one sequential per-player stream with no pool-level pass and no draw that
     // depends on the cohort size, so the first k players are identical for ANY
     // cohort size >= k (Phase 54 proves the contract structurally — two different
     // growth chunk sizes must produce the identical ordered accepted pool, not
-    // merely the same pool under the same seed). Start at 2×P (~1.12× the expected
-    // need — a shortfall at that margin is a ~10-sigma event), double on shortfall;
-    // a doubling regenerates from the seed, which prefix stability makes harmless.
-    private static PlayerGenPass2Live.LivePlayer[] BuildRecruitedCohort(
+    // merely the same pool under the same seed). Start at 2×P (~1.59× the expected
+    // need — a shortfall at that margin is astronomically unlikely), double on
+    // shortfall; a doubling regenerates from the seed, harmless under prefix
+    // stability.
+    private static PlayerGenPass3Live.LivePlayer[] BuildRecruitedCohort(
         int cohortSeed, int P, int initialSize)
     {
         for (var m = Math.Max(initialSize, 1); ; m *= 2)
         {
-            var cohort = PlayerGenPass2Live.BuildCohort(cohortSeed, m);
-            var accepted = new List<PlayerGenPass2Live.LivePlayer>(P);
+            var cohort = PlayerGenPass3Live.BuildCohort(cohortSeed, m);
+            var accepted = new List<PlayerGenPass3Live.LivePlayer>(P);
             foreach (var lp in cohort)
             {
-                if (lp.Result.Rscore < PlayerGenPass2.R_LINE) continue;
+                if (lp.Result.Rscore < PlayerGenPass3.R_LINE) continue;
                 accepted.Add(lp);
                 if (accepted.Count == P) return accepted.ToArray();
             }
@@ -580,21 +586,21 @@ internal static partial class Program
         var pool = res.Pool;
         var P = pool.Count;
 
-        Console.WriteLine($"--- THE POOL ({P} players; the Pass-2 skill-first cohort, positions by orientation rank) ---");
+        Console.WriteLine($"--- THE POOL ({P} players; the Pass-3 two-plane budget cohort, positions by defensive-plane rank) ---");
         Console.WriteLine($"  positions        {pool.Count(p => p.Pos == "G")}G / {pool.Count(p => p.Pos == "W")}W / {pool.Count(p => p.Pos == "B")}B  (exact-count quotas {4 * n}/{3 * n}/{3 * n})");
         Console.WriteLine($"  coverage supply  lead-handlers {pool.Count(p => GenLeadRoles.Contains(p.Role))} (target {DivvyLeadRoleTarget(n)}), " +
                           $"{GenWingDefenderRole} {pool.Count(p => p.Role == GenWingDefenderRole)} (target {DivvyTdwRoleTarget(n)})  " +
                           $"(quota FLOOR {(int)Math.Ceiling(DivvyRoleHeadroom * n)} each)");
-        Console.WriteLine("  orientation (Oaxis, -1 perimeter .. +1 post) and height by position:");
+        Console.WriteLine("  defensive plane (0 perimeter .. 1 post) and height by position:");
         foreach (var ps in new[] { "G", "W", "B" })
         {
             var rows = pool.Where(p => p.Pos == ps).ToList();
             var hts = rows.Select(p => p.Ratings["Height"]).ToList();
             Console.WriteLine(FormattableString.Invariant(
-                $"    {ps}  Oaxis [{rows.Min(p => p.Oaxis),6:F3} .. {rows.Max(p => p.Oaxis),6:F3}]  height mean {hts.Average(),5:F1} [{hts.Min()} .. {hts.Max()}]   n={rows.Count}"));
+                $"    {ps}  DPlane [{rows.Min(p => p.DefensivePlane),6:F3} .. {rows.Max(p => p.DefensivePlane),6:F3}]  height mean {hts.Average(),5:F1} [{hts.Min()} .. {hts.Max()}]   n={rows.Count}"));
         }
-        Console.WriteLine("  weapon census (top 8):");
-        foreach (var kv in pool.GroupBy(p => p.Weapon).OrderByDescending(g => g.Count()).Take(8))
+        Console.WriteLine("  offensive-role census:");
+        foreach (var kv in pool.GroupBy(p => p.OffensiveRole).OrderByDescending(g => g.Count()).Take(8))
             Console.WriteLine(FormattableString.Invariant(
                 $"    {kv.Key,-18} {kv.Count(),5}  ({100.0 * kv.Count() / P:F1}%)"));
         Console.WriteLine("  scout rank by position (mean [min..max]) — the divvy's board, never a game input:");
@@ -632,14 +638,14 @@ internal static partial class Program
         var pickOf = res.Picks.ToDictionary(p => p.PoolId);
 
         Console.WriteLine("  draft surprises (largest access deviation among top-decile-rank players):");
-        Console.WriteLine($"    {"pool#",-6}{"pos/weapon",-19}{"global",-8}{"perceived",-10}{"pick",-6}{"selector (prestige)",-30}{"boardDev",-9}accessDev");
+        Console.WriteLine($"    {"pool#",-6}{"pos/role",-19}{"global",-8}{"perceived",-10}{"pick",-6}{"selector (prestige)",-30}{"boardDev",-9}accessDev");
         var rows = topDecile.Select(pid => (pid, dev: pickOf[pid].PickNumber - expectedPick[pid]))
                             .OrderByDescending(t => Math.Abs(t.dev)).Take(10);
         foreach (var (pid, dev) in rows)
         {
             var pk = pickOf[pid];
             var p = res.Pool[pid];
-            Console.WriteLine($"    {pid,-6}{p.Pos + "/" + p.Weapon,-19}{p.ScoutRank,-8:F1}{pk.PerceivedRank,-10:F1}{pk.PickNumber,-6}" +
+            Console.WriteLine($"    {pid,-6}{p.Pos + "/" + p.OffensiveRole,-19}{p.ScoutRank,-8:F1}{pk.PerceivedRank,-10:F1}{pk.PickNumber,-6}" +
                               $"{names[pk.SchoolId] + " (" + prestige[pk.SchoolId] + ")",-30}{pk.PerceivedRank - p.ScoutRank,-9:F1}{dev:+0;-0;0}");
         }
 
@@ -681,14 +687,14 @@ internal static partial class Program
         var roster = res.Rosters[school.Id];
         var five = new HashSet<int>(BuildOpeningFive(roster, pid => res.Pool[pid].Pos));
         Console.WriteLine($"  === {school.Name} ({school.Abbr})  prestige {school.CurrentPrestige} ===");
-        Console.WriteLine($"    {"Acq",-5}{"Pos",-4}{"Role",-17}{"Oax",7}{"Ht",5}{"Size",6}{"Ath",5}{"Skl",5}{"FT",5}  Weapon");
+        Console.WriteLine($"    {"Acq",-5}{"Pos",-4}{"Role",-17}{"DPl",7}{"Ht",5}{"Size",6}{"Ath",5}{"Skl",5}{"FT",5}  OffRole");
         for (var i = 0; i < roster.Count; i++)
         {
             var p = res.Pool[roster[i]];
             var holes = GenPermittedHoles[p.Pos];
             var star = five.Contains(roster[i]) ? "*" : " ";
             Console.WriteLine(FormattableString.Invariant(
-                $"    {star}{i + 1,-4}{p.Pos,-4}{p.Role,-17}{p.Oaxis,7:F2}{p.Ratings["Height"],5}{GenLegMeanExHoles(p.Ratings, "SIZE", holes),6:F0}{GenLegMeanExHoles(p.Ratings, "ATH", holes),5:F0}{GenLegMeanExHoles(p.Ratings, "SKILL", holes),5:F0}{p.Ratings["FreeThrow"],5}  {p.Weapon}"));
+                $"    {star}{i + 1,-4}{p.Pos,-4}{p.Role,-17}{p.DefensivePlane,7:F2}{p.Ratings["Height"],5}{GenLegMeanExHoles(p.Ratings, "SIZE", holes),6:F0}{GenLegMeanExHoles(p.Ratings, "ATH", holes),5:F0}{GenLegMeanExHoles(p.Ratings, "SKILL", holes),5:F0}{p.Ratings["FreeThrow"],5}  {p.OffensiveRole}"));
         }
     }
 

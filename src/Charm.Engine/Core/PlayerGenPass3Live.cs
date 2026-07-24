@@ -18,14 +18,14 @@ namespace Charm.Engine;
 /// values, not uniform calls (each Gaussian consumes a uniform pair internally).
 /// Do not reorder.</para>
 ///
-/// <para><b>STANDALONE BY RULING (S69 scope wall):</b> nothing downstream reads this —
-/// <see cref="PlayerGenPass2Live"/> remains the live generator wired to the divvy until
-/// the bridge-swap session. <b>Warning that session inherits (A5):</b> the card contract
-/// shifts — OffensiveRebounding/DefensiveRebounding leave the size card (the old
+/// <para><b>LIVE SINCE S70 (the bridge swap):</b> the divvy's <c>BuildRecruitedCohort</c>
+/// consumes this stream — first-past-the-line at <c>PlayerGenPass3.R_LINE</c>, positions
+/// by defensive-plane rank. <b>The A5 card shift, executed:</b> the card contract
+/// shifted — OffensiveRebounding/DefensiveRebounding left the size card (the old
 /// <c>post_bonus</c> height/strength stamps at <see cref="PlayerGenPass2Live"/> are
-/// retired) and arrive here as SPENDABLE, current-expressed skills under the SAME key
-/// names. Downstream readers keep compiling; their values change meaning. That is the
-/// swap session's baseline story, not this one's.</para>
+/// retired from the live path) and arrive here as SPENDABLE, current-expressed skills
+/// under the SAME key names. Downstream readers kept compiling; their values changed
+/// meaning. That is the S70 page's baseline story.</para>
 /// </summary>
 public static class PlayerGenPass3Live
 {

@@ -299,9 +299,9 @@ public sealed class Player
     // Pass-2 generation seats (S44) — dormant-pending-module, deliberately UNREAD
     // -------------------------------------------------------------------------
     // Same discipline as Endurance/Gravity/Spacing above: real, occupied seats that
-    // no generator reads yet. The Pass-2 live generator (PlayerGenPass2Live) produces
-    // these per player; the development/season layer is the module that will consume
-    // them. None of these enter Validate() — they are not 0-99 authored ratings
+    // no generator reads yet. The live generator (PlayerGenPass3Live since S70, the
+    // budget model) produces these per player; the development/season layer is the
+    // module that will consume them. None of these enter Validate() — they are not 0-99 authored ratings
     // (Arrival is a stage in [0,1]; PlayerClass is a placeholder label per the S42.1
     // ruling; the three maps are keyed skill states, validated at generation time by
     // the Phase-59/60 gates, not per-construction).
