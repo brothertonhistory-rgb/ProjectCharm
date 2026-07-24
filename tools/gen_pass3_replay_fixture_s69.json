@@ -222,13 +222,14 @@
    "ARR_SIGMA": 0.18,
    "E_MIN": 0.15,
    "EXPR_BASELINE": 14.0,
-   "FT_CENTER": 66.0,
-   "FT_OUT_SPAN": 10.0,
+   "FT_CENTER": 71.5,
+   "FT_OUT_ANCHOR": 36.0,
+   "FT_OUT_SPAN": 9.0,
    "FT_OUT_SCALE": 25.0,
-   "FT_HEIGHT_COEF": 6.0,
-   "FT_MIN": 25.0,
-   "FT_MAX": 95.0,
-   "FT_SIGMA": 9.0,
+   "FT_HEIGHT_COEF": 9.0,
+   "FT_MIN": 40.0,
+   "FT_MAX": 96.0,
+   "FT_SIGMA": 6.0,
    "FAMILIES": {
     "Shooting": [
      "Outside",
@@ -427,7 +428,7 @@
    "WS_NOISE_SIGMA": 3.0,
    "WEIGHT_NOISE_SIGMA": 6.0
   },
-  "note": "S69 branch-representative replay fixture; draws recorded by the output-neutral recorder seam (byte-diff proven); ints EXACT, floats 1e-9."
+  "note": "S69 branch-representative replay fixture, regenerated at S71 under the re-anchored FT derivation (FT_OUT_ANCHOR named; 72 constants echoed); draws recorded by the output-neutral recorder seam; ints EXACT, floats 1e-9."
  },
  "edge_table": [
   {
@@ -1217,7 +1218,7 @@
     "q": 0.2841126446370602,
     "c": 0.35604599640327717,
     "arrival_raw": 0.23191549888969978,
-    "ft_idio": -11.182460514268612
+    "ft_idio": -7.454973676179075
    },
    "checkpoints": {
     "Height": 77,
@@ -1351,11 +1352,11 @@
      "Discipline": 18,
      "HelpDefense": 17
     },
-    "latent_ft": 43,
-    "current_ft": 43,
+    "latent_ft": 54,
+    "current_ft": 53,
     "arrival": 0.23191549888969978,
     "e": 0.3471281740562448,
-    "runway_total": 263,
+    "runway_total": 264,
     "rscore": 15.972729957027614,
     "rscore_which": "post"
    }
@@ -1441,7 +1442,7 @@
     "q": 0.22323042755368544,
     "c": 0.10740578782700112,
     "arrival_raw": 0.5672036581231217,
-    "ft_idio": 1.513936452065426
+    "ft_idio": 1.0092909680436173
    },
    "checkpoints": {
     "Height": 70,
@@ -1575,8 +1576,8 @@
      "Discipline": 17,
      "HelpDefense": 15
     },
-    "latent_ft": 64,
-    "current_ft": 60,
+    "latent_ft": 73,
+    "current_ft": 69,
     "arrival": 0.5672036581231217,
     "e": 0.6321231094046534,
     "runway_total": 144,
@@ -1665,7 +1666,7 @@
     "q": 0.20396961407073205,
     "c": 0.6188645665641209,
     "arrival_raw": 0.9513923251037599,
-    "ft_idio": 5.50237999752135
+    "ft_idio": 3.6682533316809005
    },
    "checkpoints": {
     "Height": 51,
@@ -1799,8 +1800,8 @@
      "Discipline": 12,
      "HelpDefense": 9
     },
-    "latent_ft": 77,
-    "current_ft": 77,
+    "latent_ft": 83,
+    "current_ft": 83,
     "arrival": 0.9513923251037599,
     "e": 0.958683476338196,
     "runway_total": 13,
@@ -1889,7 +1890,7 @@
     "q": 0.7690664540611067,
     "c": 0.3538778417595291,
     "arrival_raw": 1.054953524030954,
-    "ft_idio": 6.033808296027121
+    "ft_idio": 4.02253886401808
    },
    "checkpoints": {
     "Height": 69,
@@ -2023,8 +2024,8 @@
      "Discipline": 20,
      "HelpDefense": 15
     },
-    "latent_ft": 72,
-    "current_ft": 72,
+    "latent_ft": 78,
+    "current_ft": 78,
     "arrival": 1.0,
     "e": 1.0,
     "runway_total": 0,
@@ -2113,7 +2114,7 @@
     "q": 0.695910809394656,
     "c": 0.6836979683245716,
     "arrival_raw": 0.8119691875900483,
-    "ft_idio": 13.336018210554874
+    "ft_idio": 8.890678807036583
    },
    "checkpoints": {
     "Height": 65,
@@ -2248,10 +2249,10 @@
      "HelpDefense": 12
     },
     "latent_ft": 87,
-    "current_ft": 85,
+    "current_ft": 86,
     "arrival": 0.8119691875900483,
     "e": 0.8401738094515411,
-    "runway_total": 71,
+    "runway_total": 70,
     "rscore": 39.55933189235008,
     "rscore_which": "perim"
    }
@@ -2337,7 +2338,7 @@
     "q": 0.17232661177000536,
     "c": 0.7222986427982281,
     "arrival_raw": 0.9985712807343943,
-    "ft_idio": -6.28373597482137
+    "ft_idio": -4.189157316547581
    },
    "checkpoints": {
     "Height": 51,
@@ -2471,8 +2472,8 @@
      "Discipline": 14,
      "HelpDefense": 11
     },
-    "latent_ft": 63,
-    "current_ft": 63,
+    "latent_ft": 74,
+    "current_ft": 74,
     "arrival": 0.9985712807343943,
     "e": 0.9987855886242352,
     "runway_total": 0,
@@ -2561,7 +2562,7 @@
     "q": 0.47404692877994553,
     "c": 0.6505281041340765,
     "arrival_raw": 0.8934885133544817,
-    "ft_idio": 13.752462237035497
+    "ft_idio": 9.168308158023663
    },
    "checkpoints": {
     "Height": 40,
@@ -2695,8 +2696,8 @@
      "Discipline": 13,
      "HelpDefense": 10
     },
-    "latent_ft": 73,
-    "current_ft": 73,
+    "latent_ft": 78,
+    "current_ft": 78,
     "arrival": 0.8934885133544817,
     "e": 0.9094652363513094,
     "runway_total": 37,
@@ -2785,7 +2786,7 @@
     "q": 0.06037601635486305,
     "c": 0.3384609849323761,
     "arrival_raw": 0.7549966887437919,
-    "ft_idio": 6.1480312338109915
+    "ft_idio": 4.098687489207328
    },
    "checkpoints": {
     "Height": 52,
@@ -2919,11 +2920,11 @@
      "Discipline": 13,
      "HelpDefense": 11
     },
-    "latent_ft": 82,
-    "current_ft": 80,
+    "latent_ft": 85,
+    "current_ft": 84,
     "arrival": 0.7549966887437919,
     "e": 0.7917471854322231,
-    "runway_total": 47,
+    "runway_total": 46,
     "rscore": 40.22533333333334,
     "rscore_which": "perim"
    }
@@ -3009,7 +3010,7 @@
     "q": 0.5473587627499001,
     "c": 0.40235405616342956,
     "arrival_raw": 0.7591754694325699,
-    "ft_idio": -0.6566833007512008
+    "ft_idio": -0.43778886716746723
    },
    "checkpoints": {
     "Height": 61,
@@ -3143,8 +3144,8 @@
      "Discipline": 12,
      "HelpDefense": 9
     },
-    "latent_ft": 64,
-    "current_ft": 61,
+    "latent_ft": 74,
+    "current_ft": 71,
     "arrival": 0.7591754694325699,
     "e": 0.7952991490176844,
     "runway_total": 102,
@@ -3233,7 +3234,7 @@
     "q": 0.6096516352583805,
     "c": 0.7605722617612568,
     "arrival_raw": 0.9815846754375648,
-    "ft_idio": 15.505367067855527
+    "ft_idio": 10.33691137857035
    },
    "checkpoints": {
     "Height": 59,
@@ -3367,8 +3368,8 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 72,
-    "current_ft": 72,
+    "latent_ft": 74,
+    "current_ft": 74,
     "arrival": 0.9815846754375648,
     "e": 0.9843469741219301,
     "runway_total": 4,
@@ -3457,7 +3458,7 @@
     "q": 0.20224724004017314,
     "c": 0.35975048530965664,
     "arrival_raw": 0.5988404831304605,
-    "ft_idio": -2.2895234828025344
+    "ft_idio": -1.526348988535023
    },
    "checkpoints": {
     "Height": 54,
@@ -3591,11 +3592,11 @@
      "Discipline": 14,
      "HelpDefense": 12
     },
-    "latent_ft": 72,
-    "current_ft": 66,
+    "latent_ft": 79,
+    "current_ft": 76,
     "arrival": 0.5988404831304605,
     "e": 0.6590144106608914,
-    "runway_total": 92,
+    "runway_total": 89,
     "rscore": 31.803449999999998,
     "rscore_which": "perim"
    }
@@ -3681,7 +3682,7 @@
     "q": 0.6346704240282733,
     "c": 0.8775616135074299,
     "arrival_raw": 0.5855016637633736,
-    "ft_idio": 6.463610109470632
+    "ft_idio": 4.309073406313755
    },
    "checkpoints": {
     "Height": 63,
@@ -3815,11 +3816,11 @@
      "Discipline": 15,
      "HelpDefense": 12
     },
-    "latent_ft": 63,
-    "current_ft": 62,
+    "latent_ft": 68,
+    "current_ft": 68,
     "arrival": 0.5855016637633736,
     "e": 0.6476764141988676,
-    "runway_total": 138,
+    "runway_total": 137,
     "rscore": 13.295476160384702,
     "rscore_which": "post"
    }
@@ -3905,7 +3906,7 @@
     "q": 0.24382937089197432,
     "c": 0.011791047641988645,
     "arrival_raw": 0.47962000349511325,
-    "ft_idio": -6.19734291916098
+    "ft_idio": -4.13156194610732
    },
    "checkpoints": {
     "Height": 66,
@@ -4039,8 +4040,8 @@
      "Discipline": 22,
      "HelpDefense": 18
     },
-    "latent_ft": 52,
-    "current_ft": 50,
+    "latent_ft": 63,
+    "current_ft": 61,
     "arrival": 0.47962000349511325,
     "e": 0.5576770029708462,
     "runway_total": 178,
@@ -4129,7 +4130,7 @@
     "q": 0.19085787425945758,
     "c": 0.0798140435313967,
     "arrival_raw": 0.8309463944952504,
-    "ft_idio": -1.9670734699281889
+    "ft_idio": -1.3113823132854592
    },
    "checkpoints": {
     "Height": 65,
@@ -4263,8 +4264,8 @@
      "Discipline": 20,
      "HelpDefense": 22
     },
-    "latent_ft": 54,
-    "current_ft": 54,
+    "latent_ft": 62,
+    "current_ft": 62,
     "arrival": 0.8309463944952504,
     "e": 0.8563044353209629,
     "runway_total": 50,
@@ -4353,7 +4354,7 @@
     "q": 0.16996744080633225,
     "c": 0.24817481694268054,
     "arrival_raw": 0.619003232830074,
-    "ft_idio": 3.690904484468812
+    "ft_idio": 2.4606029896458748
    },
    "checkpoints": {
     "Height": 57,
@@ -4487,8 +4488,8 @@
      "Discipline": 13,
      "HelpDefense": 14
     },
-    "latent_ft": 60,
-    "current_ft": 60,
+    "latent_ft": 67,
+    "current_ft": 67,
     "arrival": 0.619003232830074,
     "e": 0.6761527479055629,
     "runway_total": 83,
@@ -4577,7 +4578,7 @@
     "q": 0.40149253727299766,
     "c": 0.3505332888467505,
     "arrival_raw": 0.8683495177200726,
-    "ft_idio": -5.671825041064603
+    "ft_idio": -3.781216694043069
    },
    "checkpoints": {
     "Height": 40,
@@ -4711,8 +4712,8 @@
      "Discipline": 16,
      "HelpDefense": 17
     },
-    "latent_ft": 53,
-    "current_ft": 53,
+    "latent_ft": 64,
+    "current_ft": 64,
     "arrival": 0.8683495177200726,
     "e": 0.8880970900620617,
     "runway_total": 30,
@@ -4801,7 +4802,7 @@
     "q": 0.6059345363034099,
     "c": 0.9591962303035106,
     "arrival_raw": 0.5400797784782536,
-    "ft_idio": 10.952633249279208
+    "ft_idio": 7.301755499519472
    },
    "checkpoints": {
     "Height": 68,
@@ -4936,10 +4937,10 @@
      "HelpDefense": 13
     },
     "latent_ft": 85,
-    "current_ft": 80,
+    "current_ft": 83,
     "arrival": 0.5400797784782536,
     "e": 0.6090678117065156,
-    "runway_total": 108,
+    "runway_total": 105,
     "rscore": 33.09085342657343,
     "rscore_which": "perim"
    }
@@ -5025,7 +5026,7 @@
     "q": 0.8453824916274922,
     "c": 0.09472492113570984,
     "arrival_raw": 0.4468930714389756,
-    "ft_idio": -5.012717275657795
+    "ft_idio": -3.3418115171051967
    },
    "checkpoints": {
     "Height": 60,
@@ -5159,11 +5160,11 @@
      "Discipline": 21,
      "HelpDefense": 34
     },
-    "latent_ft": 66,
-    "current_ft": 57,
+    "latent_ft": 75,
+    "current_ft": 69,
     "arrival": 0.4468930714389756,
     "e": 0.5298591107231293,
-    "runway_total": 344,
+    "runway_total": 341,
     "rscore": 24.346209523809527,
     "rscore_which": "perim"
    }
@@ -5249,7 +5250,7 @@
     "q": 0.3795437121637762,
     "c": 0.9265312791463821,
     "arrival_raw": 0.6650085507690842,
-    "ft_idio": -13.9418853220081
+    "ft_idio": -9.294590214672066
    },
    "checkpoints": {
     "Height": 56,
@@ -5383,8 +5384,8 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 43,
-    "current_ft": 43,
+    "latent_ft": 55,
+    "current_ft": 55,
     "arrival": 0.6650085507690842,
     "e": 0.7152572681537216,
     "runway_total": 67,
@@ -5473,7 +5474,7 @@
     "q": 0.691108877028599,
     "c": 0.6997330277521104,
     "arrival_raw": 0.8075661267332186,
-    "ft_idio": 3.023772001179019
+    "ft_idio": 2.0158480007860122
    },
    "checkpoints": {
     "Height": 56,
@@ -5607,8 +5608,8 @@
      "Discipline": 20,
      "HelpDefense": 10
     },
-    "latent_ft": 60,
-    "current_ft": 60,
+    "latent_ft": 66,
+    "current_ft": 66,
     "arrival": 0.8075661267332186,
     "e": 0.8364312077232358,
     "runway_total": 66,
@@ -5697,7 +5698,7 @@
     "q": 0.2403851904572231,
     "c": 0.5406386781638015,
     "arrival_raw": 0.5582286696484835,
-    "ft_idio": -6.593963056148701
+    "ft_idio": -4.3959753707658
    },
    "checkpoints": {
     "Height": 56,
@@ -5831,8 +5832,8 @@
      "Discipline": 23,
      "HelpDefense": 38
     },
-    "latent_ft": 50,
-    "current_ft": 50,
+    "latent_ft": 60,
+    "current_ft": 60,
     "arrival": 0.5582286696484835,
     "e": 0.6244943692012109,
     "runway_total": 80,
@@ -5921,7 +5922,7 @@
     "q": 0.6174765852578228,
     "c": 0.9342969610076004,
     "arrival_raw": 0.4165051005756377,
-    "ft_idio": -9.23782066926012
+    "ft_idio": -6.158547112840081
    },
    "checkpoints": {
     "Height": 78,
@@ -6055,8 +6056,8 @@
      "Discipline": 10,
      "HelpDefense": 11
     },
-    "latent_ft": 44,
-    "current_ft": 44,
+    "latent_ft": 53,
+    "current_ft": 53,
     "arrival": 0.4165051005756377,
     "e": 0.5040293354892921,
     "runway_total": 139,
@@ -6145,7 +6146,7 @@
     "q": 0.3773599576109602,
     "c": 0.06814842588239901,
     "arrival_raw": 0.67946870105161,
-    "ft_idio": -12.918442363486092
+    "ft_idio": -8.612294908990728
    },
    "checkpoints": {
     "Height": 63,
@@ -6279,11 +6280,11 @@
      "Discipline": 15,
      "HelpDefense": 20
     },
-    "latent_ft": 48,
-    "current_ft": 46,
+    "latent_ft": 63,
+    "current_ft": 60,
     "arrival": 0.67946870105161,
     "e": 0.7275483958938684,
-    "runway_total": 106,
+    "runway_total": 107,
     "rscore": 19.603381238011714,
     "rscore_which": "post"
    }
@@ -6369,7 +6370,7 @@
     "q": 0.4993947728328783,
     "c": 0.2991141278381407,
     "arrival_raw": 0.36681570050854717,
-    "ft_idio": 17.433937103697577
+    "ft_idio": 11.622624735798384
    },
    "checkpoints": {
     "Height": 61,
@@ -6503,11 +6504,11 @@
      "Discipline": 15,
      "HelpDefense": 15
     },
-    "latent_ft": 91,
-    "current_ft": 81,
+    "latent_ft": 90,
+    "current_ft": 85,
     "arrival": 0.36681570050854717,
     "e": 0.46179334543226513,
-    "runway_total": 212,
+    "runway_total": 207,
     "rscore": 31.129575757575758,
     "rscore_which": "perim"
    }
@@ -6593,7 +6594,7 @@
     "q": 0.6703690011432658,
     "c": 0.26779320631459613,
     "arrival_raw": 0.7649003608322267,
-    "ft_idio": -6.584304982749125
+    "ft_idio": -4.389536655166083
    },
    "checkpoints": {
     "Height": 66,
@@ -6727,8 +6728,8 @@
      "Discipline": 22,
      "HelpDefense": 18
     },
-    "latent_ft": 50,
-    "current_ft": 50,
+    "latent_ft": 61,
+    "current_ft": 61,
     "arrival": 0.7649003608322267,
     "e": 0.8001653067073927,
     "runway_total": 97,
@@ -6817,7 +6818,7 @@
     "q": 0.31587997381057475,
     "c": 0.9113437344181858,
     "arrival_raw": 0.4811219137550295,
-    "ft_idio": 6.646419692161681
+    "ft_idio": 4.4309464614411205
    },
    "checkpoints": {
     "Height": 83,
@@ -6951,11 +6952,11 @@
      "Discipline": 9,
      "HelpDefense": 9
     },
-    "latent_ft": 76,
-    "current_ft": 67,
+    "latent_ft": 78,
+    "current_ft": 73,
     "arrival": 0.4811219137550295,
     "e": 0.5589536266917751,
-    "runway_total": 178,
+    "runway_total": 174,
     "rscore": 22.983164685314687,
     "rscore_which": "perim"
    }
@@ -7041,7 +7042,7 @@
     "q": 0.5299528014698156,
     "c": 0.669642872654604,
     "arrival_raw": 0.7337239449958566,
-    "ft_idio": 14.361779361652983
+    "ft_idio": 9.574519574435321
    },
    "checkpoints": {
     "Height": 57,
@@ -7175,11 +7176,11 @@
      "Discipline": 16,
      "HelpDefense": 14
     },
-    "latent_ft": 86,
-    "current_ft": 83,
+    "latent_ft": 88,
+    "current_ft": 87,
     "arrival": 0.7337239449958566,
     "e": 0.7736653532464781,
-    "runway_total": 102,
+    "runway_total": 100,
     "rscore": 46.17148170731708,
     "rscore_which": "perim"
    }
@@ -7265,7 +7266,7 @@
     "q": 0.7031628692555183,
     "c": 0.6663559993033686,
     "arrival_raw": 0.350498809601154,
-    "ft_idio": -2.788683860811958
+    "ft_idio": -1.8591225738746386
    },
    "checkpoints": {
     "Height": 63,
@@ -7399,8 +7400,8 @@
      "Discipline": 14,
      "HelpDefense": 14
     },
-    "latent_ft": 54,
-    "current_ft": 53,
+    "latent_ft": 63,
+    "current_ft": 62,
     "arrival": 0.350498809601154,
     "e": 0.4479239881609809,
     "runway_total": 248,
@@ -7489,7 +7490,7 @@
     "q": 0.7496141279790202,
     "c": 0.43341519323961003,
     "arrival_raw": 0.7001917113530585,
-    "ft_idio": -4.421151380680454
+    "ft_idio": -2.9474342537869695
    },
    "checkpoints": {
     "Height": 47,
@@ -7623,8 +7624,8 @@
      "Discipline": 12,
      "HelpDefense": 10
     },
-    "latent_ft": 54,
-    "current_ft": 54,
+    "latent_ft": 64,
+    "current_ft": 64,
     "arrival": 0.7001917113530585,
     "e": 0.7451629546500997,
     "runway_total": 93,
@@ -7713,7 +7714,7 @@
     "q": 0.6527821906527707,
     "c": 0.9361385585568671,
     "arrival_raw": 0.6602735063972476,
-    "ft_idio": -5.953490949812562
+    "ft_idio": -3.968993966541708
    },
    "checkpoints": {
     "Height": 66,
@@ -7847,11 +7848,11 @@
      "Discipline": 12,
      "HelpDefense": 10
     },
-    "latent_ft": 52,
-    "current_ft": 51,
+    "latent_ft": 63,
+    "current_ft": 61,
     "arrival": 0.6602735063972476,
     "e": 0.7112324804376604,
-    "runway_total": 83,
+    "runway_total": 84,
     "rscore": 29.10895662563605,
     "rscore_which": "post"
    }
@@ -7937,7 +7938,7 @@
     "q": 0.3867996846358024,
     "c": 0.9750062928710341,
     "arrival_raw": 0.5788499891776678,
-    "ft_idio": -18.573398131189833
+    "ft_idio": -12.382265420793221
    },
    "checkpoints": {
     "Height": 64,
@@ -8071,8 +8072,8 @@
      "Discipline": 12,
      "HelpDefense": 14
     },
-    "latent_ft": 37,
-    "current_ft": 37,
+    "latent_ft": 51,
+    "current_ft": 51,
     "arrival": 0.5788499891776678,
     "e": 0.6420224908010176,
     "runway_total": 114,
@@ -8161,7 +8162,7 @@
     "q": 0.5113453164748168,
     "c": 0.29717306785439507,
     "arrival_raw": 0.8282668565226166,
-    "ft_idio": -11.041077915446644
+    "ft_idio": -7.360718610297763
    },
    "checkpoints": {
     "Height": 57,
@@ -8295,8 +8296,8 @@
      "Discipline": 39,
      "HelpDefense": 40
     },
-    "latent_ft": 50,
-    "current_ft": 49,
+    "latent_ft": 64,
+    "current_ft": 63,
     "arrival": 0.8282668565226166,
     "e": 0.854026828044224,
     "runway_total": 79,
@@ -8385,7 +8386,7 @@
     "q": 0.6223528458102411,
     "c": 0.2671115868192172,
     "arrival_raw": 0.5172599868795056,
-    "ft_idio": 0.1046768084282648
+    "ft_idio": 0.06978453895217653
    },
    "checkpoints": {
     "Height": 61,
@@ -8519,11 +8520,11 @@
      "Discipline": 12,
      "HelpDefense": 15
     },
-    "latent_ft": 59,
-    "current_ft": 58,
+    "latent_ft": 69,
+    "current_ft": 66,
     "arrival": 0.5172599868795056,
     "e": 0.5896709888475797,
-    "runway_total": 201,
+    "runway_total": 203,
     "rscore": 38.12525510204082,
     "rscore_which": "perim"
    }
@@ -8609,7 +8610,7 @@
     "q": 0.6541644194210815,
     "c": 0.38490343219403556,
     "arrival_raw": 0.7596332672304532,
-    "ft_idio": 10.334465413124285
+    "ft_idio": 6.889643608749523
    },
    "checkpoints": {
     "Height": 69,
@@ -8743,11 +8744,11 @@
      "Discipline": 15,
      "HelpDefense": 13
     },
-    "latent_ft": 79,
-    "current_ft": 76,
+    "latent_ft": 83,
+    "current_ft": 81,
     "arrival": 0.7596332672304532,
     "e": 0.7956882771458852,
-    "runway_total": 123,
+    "runway_total": 122,
     "rscore": 36.96594092127712,
     "rscore_which": "perim"
    }
@@ -8833,7 +8834,7 @@
     "q": 0.2984223364395601,
     "c": 0.14517971719457137,
     "arrival_raw": 0.5027692972943334,
-    "ft_idio": 5.459471885788964
+    "ft_idio": 3.639647923859309
    },
    "checkpoints": {
     "Height": 75,
@@ -8967,11 +8968,11 @@
      "Discipline": 13,
      "HelpDefense": 11
     },
-    "latent_ft": 60,
-    "current_ft": 60,
+    "latent_ft": 65,
+    "current_ft": 64,
     "arrival": 0.5027692972943334,
     "e": 0.5773539027001834,
-    "runway_total": 184,
+    "runway_total": 185,
     "rscore": 17.704260451091834,
     "rscore_which": "post"
    }
@@ -9057,7 +9058,7 @@
     "q": 0.6273867593085317,
     "c": 0.4901353850273733,
     "arrival_raw": 0.1581937479662513,
-    "ft_idio": 20.47301808736493
+    "ft_idio": 13.648678724909955
    },
    "checkpoints": {
     "Height": 86,
@@ -9191,11 +9192,11 @@
      "Discipline": 15,
      "HelpDefense": 11
     },
-    "latent_ft": 91,
-    "current_ft": 76,
+    "latent_ft": 87,
+    "current_ft": 78,
     "arrival": 0.1581937479662513,
     "e": 0.28446468577131356,
-    "runway_total": 296,
+    "runway_total": 290,
     "rscore": 13.86319090909091,
     "rscore_which": "perim"
    }
@@ -9281,7 +9282,7 @@
     "q": 0.16159541753579074,
     "c": 0.32957944128102773,
     "arrival_raw": 0.5126490001652011,
-    "ft_idio": -14.11205588711285
+    "ft_idio": -9.408037258075233
    },
    "checkpoints": {
     "Height": 66,
@@ -9415,11 +9416,11 @@
      "Discipline": 21,
      "HelpDefense": 18
     },
-    "latent_ft": 42,
-    "current_ft": 42,
+    "latent_ft": 55,
+    "current_ft": 54,
     "arrival": 0.5126490001652011,
     "e": 0.585751650140421,
-    "runway_total": 138,
+    "runway_total": 139,
     "rscore": 13.335285147966017,
     "rscore_which": "post"
    }
@@ -9505,7 +9506,7 @@
     "q": 0.898283390703667,
     "c": 0.39305915100871475,
     "arrival_raw": 0.33886571815389055,
-    "ft_idio": -2.723962568070744
+    "ft_idio": -1.8159750453804961
    },
    "checkpoints": {
     "Height": 80,
@@ -9639,11 +9640,11 @@
      "Discipline": 15,
      "HelpDefense": 14
     },
-    "latent_ft": 69,
-    "current_ft": 59,
+    "latent_ft": 73,
+    "current_ft": 68,
     "arrival": 0.33886571815389055,
     "e": 0.438035860430807,
-    "runway_total": 333,
+    "runway_total": 328,
     "rscore": 21.24921553911205,
     "rscore_which": "perim"
    }
@@ -9729,7 +9730,7 @@
     "q": 0.819332947815517,
     "c": 0.3178766214191867,
     "arrival_raw": 0.5840197412360839,
-    "ft_idio": -6.488908807128994
+    "ft_idio": -4.325939204752663
    },
    "checkpoints": {
     "Height": 53,
@@ -9863,11 +9864,11 @@
      "Discipline": 23,
      "HelpDefense": 19
     },
-    "latent_ft": 61,
-    "current_ft": 56,
+    "latent_ft": 73,
+    "current_ft": 69,
     "arrival": 0.5840197412360839,
     "e": 0.6464167800506713,
-    "runway_total": 223,
+    "runway_total": 222,
     "rscore": 32.73114193548387,
     "rscore_which": "perim"
    }
@@ -9953,7 +9954,7 @@
     "q": 0.10878458397937164,
     "c": 0.5894431759588932,
     "arrival_raw": 0.6941243869780029,
-    "ft_idio": -6.84341957847773
+    "ft_idio": -4.5622797189851525
    },
    "checkpoints": {
     "Height": 67,
@@ -10087,8 +10088,8 @@
      "Discipline": 14,
      "HelpDefense": 11
     },
-    "latent_ft": 49,
-    "current_ft": 49,
+    "latent_ft": 58,
+    "current_ft": 58,
     "arrival": 0.6941243869780029,
     "e": 0.7400057289313025,
     "runway_total": 82,
@@ -10177,7 +10178,7 @@
     "q": 0.5362621603636483,
     "c": 0.537336996845583,
     "arrival_raw": 0.3811755261595854,
-    "ft_idio": 0.7756187081674903
+    "ft_idio": 0.5170791387783269
    },
    "checkpoints": {
     "Height": 68,
@@ -10311,8 +10312,8 @@
      "Discipline": 12,
      "HelpDefense": 15
     },
-    "latent_ft": 56,
-    "current_ft": 56,
+    "latent_ft": 62,
+    "current_ft": 62,
     "arrival": 0.3811755261595854,
     "e": 0.47399919723564754,
     "runway_total": 155,
@@ -10401,7 +10402,7 @@
     "q": 0.5292412184384939,
     "c": 0.4199771467602059,
     "arrival_raw": 0.8105546707975053,
-    "ft_idio": 3.5536523193983007
+    "ft_idio": 2.369101546265534
    },
    "checkpoints": {
     "Height": 40,
@@ -10535,11 +10536,11 @@
      "Discipline": 20,
      "HelpDefense": 18
     },
-    "latent_ft": 64,
-    "current_ft": 63,
+    "latent_ft": 72,
+    "current_ft": 72,
     "arrival": 0.8105546707975053,
     "e": 0.8389714701778795,
-    "runway_total": 77,
+    "runway_total": 76,
     "rscore": 17.93162773892774,
     "rscore_which": "perim"
    }
@@ -10625,7 +10626,7 @@
     "q": 0.7566936217470934,
     "c": 0.9592910687026222,
     "arrival_raw": 0.599102382031712,
-    "ft_idio": 3.610189577518345
+    "ft_idio": 2.4067930516788967
    },
    "checkpoints": {
     "Height": 76,
@@ -10759,8 +10760,8 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 57,
-    "current_ft": 57,
+    "latent_ft": 62,
+    "current_ft": 62,
     "arrival": 0.599102382031712,
     "e": 0.6592370247269552,
     "runway_total": 147,
@@ -10849,7 +10850,7 @@
     "q": 0.40538154503755286,
     "c": 0.6828819432977051,
     "arrival_raw": 0.3567189911157095,
-    "ft_idio": -3.0866006305475273
+    "ft_idio": -2.0577337536983515
    },
    "checkpoints": {
     "Height": 66,
@@ -10983,11 +10984,11 @@
      "Discipline": 15,
      "HelpDefense": 17
     },
-    "latent_ft": 53,
-    "current_ft": 53,
+    "latent_ft": 62,
+    "current_ft": 61,
     "arrival": 0.3567189911157095,
     "e": 0.45321114244835303,
-    "runway_total": 184,
+    "runway_total": 185,
     "rscore": 16.101212834224597,
     "rscore_which": "perim"
    }
@@ -11073,7 +11074,7 @@
     "q": 0.651402838996518,
     "c": 0.5056177523814066,
     "arrival_raw": 0.44196430835553036,
-    "ft_idio": -6.333607518939443
+    "ft_idio": -4.222405012626295
    },
    "checkpoints": {
     "Height": 47,
@@ -11207,8 +11208,8 @@
      "Discipline": 12,
      "HelpDefense": 14
     },
-    "latent_ft": 52,
-    "current_ft": 52,
+    "latent_ft": 62,
+    "current_ft": 62,
     "arrival": 0.44196430835553036,
     "e": 0.5256696621022008,
     "runway_total": 244,
@@ -11297,7 +11298,7 @@
     "q": 0.42989349753873796,
     "c": 0.4353082890422785,
     "arrival_raw": 0.8241139520405402,
-    "ft_idio": 18.567469660073755
+    "ft_idio": 12.378313106715837
    },
    "checkpoints": {
     "Height": 52,
@@ -11431,11 +11432,11 @@
      "Discipline": 23,
      "HelpDefense": 13
     },
-    "latent_ft": 91,
-    "current_ft": 88,
+    "latent_ft": 92,
+    "current_ft": 91,
     "arrival": 0.8241139520405402,
     "e": 0.8504968592344592,
-    "runway_total": 57,
+    "runway_total": 55,
     "rscore": 26.245260802833535,
     "rscore_which": "perim"
    }
@@ -11521,7 +11522,7 @@
     "q": 0.259536561021902,
     "c": 0.1486469559856746,
     "arrival_raw": 0.7451094399429695,
-    "ft_idio": 7.628196683132865
+    "ft_idio": 5.08546445542191
    },
    "checkpoints": {
     "Height": 70,
@@ -11655,11 +11656,11 @@
      "Discipline": 15,
      "HelpDefense": 15
     },
-    "latent_ft": 64,
-    "current_ft": 64,
+    "latent_ft": 70,
+    "current_ft": 69,
     "arrival": 0.7451094399429695,
     "e": 0.7833430239515241,
-    "runway_total": 80,
+    "runway_total": 81,
     "rscore": 14.019555359447883,
     "rscore_which": "perim"
    }
@@ -11745,7 +11746,7 @@
     "q": 0.3405921161601065,
     "c": 0.472078941391826,
     "arrival_raw": 0.5491623538335695,
-    "ft_idio": -12.682356234009976
+    "ft_idio": -8.45490415600665
    },
    "checkpoints": {
     "Height": 61,
@@ -11879,11 +11880,11 @@
      "Discipline": 13,
      "HelpDefense": 13
     },
-    "latent_ft": 61,
-    "current_ft": 56,
+    "latent_ft": 70,
+    "current_ft": 68,
     "arrival": 0.5491623538335695,
     "e": 0.616788000758534,
-    "runway_total": 141,
+    "runway_total": 138,
     "rscore": 32.145785958173285,
     "rscore_which": "perim"
    }
@@ -11969,7 +11970,7 @@
     "q": 0.6516280998036175,
     "c": 0.5403411307367961,
     "arrival_raw": 0.8626660166696225,
-    "ft_idio": 7.429182902970913
+    "ft_idio": 4.952788601980608
    },
    "checkpoints": {
     "Height": 68,
@@ -12103,8 +12104,8 @@
      "Discipline": 22,
      "HelpDefense": 17
     },
-    "latent_ft": 68,
-    "current_ft": 67,
+    "latent_ft": 75,
+    "current_ft": 74,
     "arrival": 0.8626660166696225,
     "e": 0.8832661141691791,
     "runway_total": 67,
@@ -12193,7 +12194,7 @@
     "q": 0.49453315512579593,
     "c": 0.8046783018801686,
     "arrival_raw": 0.49339919148332095,
-    "ft_idio": 3.228657545660786
+    "ft_idio": 2.1524383637738573
    },
    "checkpoints": {
     "Height": 53,
@@ -12327,11 +12328,11 @@
      "Discipline": 10,
      "HelpDefense": 13
     },
-    "latent_ft": 75,
-    "current_ft": 67,
+    "latent_ft": 82,
+    "current_ft": 77,
     "arrival": 0.49339919148332095,
     "e": 0.5693893127608228,
-    "runway_total": 184,
+    "runway_total": 181,
     "rscore": 34.94433333333333,
     "rscore_which": "perim"
    }
@@ -12417,7 +12418,7 @@
     "q": 0.6033249480641106,
     "c": 0.2879096059222239,
     "arrival_raw": 0.6088766695788566,
-    "ft_idio": 2.2037601189228937
+    "ft_idio": 1.4691734126152625
    },
    "checkpoints": {
     "Height": 57,
@@ -12551,11 +12552,11 @@
      "Discipline": 22,
      "HelpDefense": 20
     },
-    "latent_ft": 71,
-    "current_ft": 65,
+    "latent_ft": 79,
+    "current_ft": 75,
     "arrival": 0.6088766695788566,
     "e": 0.6675451691420281,
-    "runway_total": 199,
+    "runway_total": 197,
     "rscore": 33.80123025641026,
     "rscore_which": "perim"
    }
@@ -12641,7 +12642,7 @@
     "q": 0.6836815025243629,
     "c": 0.5979476597448541,
     "arrival_raw": 0.6008899236697601,
-    "ft_idio": -9.338118545411838
+    "ft_idio": -6.225412363607893
    },
    "checkpoints": {
     "Height": 61,
@@ -12775,11 +12776,11 @@
      "Discipline": 12,
      "HelpDefense": 13
     },
-    "latent_ft": 65,
-    "current_ft": 62,
+    "latent_ft": 73,
+    "current_ft": 72,
     "arrival": 0.6008899236697601,
     "e": 0.6607564351192962,
-    "runway_total": 132,
+    "runway_total": 130,
     "rscore": 34.201984198000964,
     "rscore_which": "perim"
    }
@@ -12865,7 +12866,7 @@
     "q": 0.8944064025931734,
     "c": 0.1603712168854283,
     "arrival_raw": 0.5493515589790438,
-    "ft_idio": 8.900912641719065
+    "ft_idio": 5.933941761146043
    },
    "checkpoints": {
     "Height": 78,
@@ -12999,8 +13000,8 @@
      "Discipline": 28,
      "HelpDefense": 26
     },
-    "latent_ft": 66,
-    "current_ft": 64,
+    "latent_ft": 71,
+    "current_ft": 69,
     "arrival": 0.5493515589790438,
     "e": 0.6169488251321872,
     "runway_total": 272,
@@ -13089,7 +13090,7 @@
     "q": 0.06832583986982844,
     "c": 0.06465644705711546,
     "arrival_raw": 0.5668690965030677,
-    "ft_idio": -4.0459674924576365
+    "ft_idio": -2.6973116616384245
    },
    "checkpoints": {
     "Height": 64,
@@ -13223,8 +13224,8 @@
      "Discipline": 19,
      "HelpDefense": 25
     },
-    "latent_ft": 57,
-    "current_ft": 54,
+    "latent_ft": 68,
+    "current_ft": 65,
     "arrival": 0.5668690965030677,
     "e": 0.6318387320276075,
     "runway_total": 112,
@@ -13313,7 +13314,7 @@
     "q": 0.36127151833664717,
     "c": 0.2635835035168064,
     "arrival_raw": 0.7133167764052455,
-    "ft_idio": 0.3268760332600814
+    "ft_idio": 0.21791735550672092
    },
    "checkpoints": {
     "Height": 56,
@@ -13447,11 +13448,11 @@
      "Discipline": 19,
      "HelpDefense": 16
     },
-    "latent_ft": 61,
-    "current_ft": 60,
+    "latent_ft": 72,
+    "current_ft": 70,
     "arrival": 0.7133167764052455,
     "e": 0.7563192599444587,
-    "runway_total": 102,
+    "runway_total": 103,
     "rscore": 29.66722038567493,
     "rscore_which": "perim"
    }
@@ -13537,7 +13538,7 @@
     "q": 0.4662254856562797,
     "c": 0.3497462640431448,
     "arrival_raw": 0.5137044808858399,
-    "ft_idio": 6.246188220220114
+    "ft_idio": 4.164125480146743
    },
    "checkpoints": {
     "Height": 53,
@@ -13671,11 +13672,11 @@
      "Discipline": 13,
      "HelpDefense": 15
     },
-    "latent_ft": 64,
-    "current_ft": 64,
+    "latent_ft": 72,
+    "current_ft": 71,
     "arrival": 0.5137044808858399,
     "e": 0.5866488087529639,
-    "runway_total": 152,
+    "runway_total": 153,
     "rscore": 22.111727272727272,
     "rscore_which": "perim"
    }
@@ -13761,7 +13762,7 @@
     "q": 0.6480574895242974,
     "c": 0.7669537848289544,
     "arrival_raw": 0.4761878728625182,
-    "ft_idio": -8.777801067235549
+    "ft_idio": -5.851867378157033
    },
    "checkpoints": {
     "Height": 73,
@@ -13895,8 +13896,8 @@
      "Discipline": 15,
      "HelpDefense": 11
     },
-    "latent_ft": 52,
-    "current_ft": 48,
+    "latent_ft": 64,
+    "current_ft": 60,
     "arrival": 0.4761878728625182,
     "e": 0.5547596919331405,
     "runway_total": 191,
@@ -13985,7 +13986,7 @@
     "q": 0.21235368370245136,
     "c": 0.6057436272027336,
     "arrival_raw": 0.5724338636001525,
-    "ft_idio": -2.5441091995881844
+    "ft_idio": -1.6960727997254563
    },
    "checkpoints": {
     "Height": 62,
@@ -14119,8 +14120,8 @@
      "Discipline": 9,
      "HelpDefense": 18
     },
-    "latent_ft": 54,
-    "current_ft": 54,
+    "latent_ft": 63,
+    "current_ft": 63,
     "arrival": 0.5724338636001525,
     "e": 0.6365687840601296,
     "runway_total": 108,
@@ -14209,7 +14210,7 @@
     "q": 0.5926031125798613,
     "c": 0.4593971601771042,
     "arrival_raw": 0.7715559241567194,
-    "ft_idio": -13.916382990834439
+    "ft_idio": -9.277588660556292
    },
    "checkpoints": {
     "Height": 53,
@@ -14343,11 +14344,11 @@
      "Discipline": 27,
      "HelpDefense": 42
     },
-    "latent_ft": 56,
-    "current_ft": 53,
+    "latent_ft": 69,
+    "current_ft": 68,
     "arrival": 0.7715559241567194,
     "e": 0.8058225355332115,
-    "runway_total": 99,
+    "runway_total": 97,
     "rscore": 34.43872727272728,
     "rscore_which": "perim"
    }
@@ -14433,7 +14434,7 @@
     "q": 0.35807388225843517,
     "c": 0.5869938398007771,
     "arrival_raw": 0.667519041220829,
-    "ft_idio": -0.046488255405084736
+    "ft_idio": -0.03099217027005649
    },
    "checkpoints": {
     "Height": 40,
@@ -14567,8 +14568,8 @@
      "Discipline": 15,
      "HelpDefense": 14
     },
-    "latent_ft": 59,
-    "current_ft": 59,
+    "latent_ft": 69,
+    "current_ft": 69,
     "arrival": 0.667519041220829,
     "e": 0.7173911850377046,
     "runway_total": 91,
@@ -14657,7 +14658,7 @@
     "q": 0.13782979024813535,
     "c": 0.38019068963228453,
     "arrival_raw": 0.47248726539505065,
-    "ft_idio": 6.864410331977008
+    "ft_idio": 4.576273554651339
    },
    "checkpoints": {
     "Height": 52,
@@ -14791,8 +14792,8 @@
      "Discipline": 12,
      "HelpDefense": 11
     },
-    "latent_ft": 64,
-    "current_ft": 64,
+    "latent_ft": 71,
+    "current_ft": 71,
     "arrival": 0.47248726539505065,
     "e": 0.5516141755857931,
     "runway_total": 119,
@@ -14881,7 +14882,7 @@
     "q": 0.08130259136042921,
     "c": 0.728321227200435,
     "arrival_raw": 0.705103855013073,
-    "ft_idio": 3.2090758376177497
+    "ft_idio": 2.1393838917451666
    },
    "checkpoints": {
     "Height": 62,
@@ -15015,8 +15016,8 @@
      "Discipline": 16,
      "HelpDefense": 13
     },
-    "latent_ft": 59,
-    "current_ft": 59,
+    "latent_ft": 66,
+    "current_ft": 66,
     "arrival": 0.705103855013073,
     "e": 0.7493382767611121,
     "runway_total": 67,
@@ -15105,7 +15106,7 @@
     "q": 0.39778135775973045,
     "c": 0.5463936522877277,
     "arrival_raw": 0.3630336865259797,
-    "ft_idio": 13.376777348840903
+    "ft_idio": 8.917851565893937
    },
    "checkpoints": {
     "Height": 83,
@@ -15239,8 +15240,8 @@
      "Discipline": 10,
      "HelpDefense": 12
     },
-    "latent_ft": 66,
-    "current_ft": 66,
+    "latent_ft": 67,
+    "current_ft": 67,
     "arrival": 0.3630336865259797,
     "e": 0.4585786335470827,
     "runway_total": 140,
@@ -15329,7 +15330,7 @@
     "q": 0.39337873278034236,
     "c": 0.8096060870338877,
     "arrival_raw": 0.78974598674647,
-    "ft_idio": 1.2739570139054126
+    "ft_idio": 0.8493046759369417
    },
    "checkpoints": {
     "Height": 55,
@@ -15463,8 +15464,8 @@
      "Discipline": 11,
      "HelpDefense": 12
     },
-    "latent_ft": 58,
-    "current_ft": 58,
+    "latent_ft": 66,
+    "current_ft": 66,
     "arrival": 0.78974598674647,
     "e": 0.8212840887344995,
     "runway_total": 47,
@@ -15553,7 +15554,7 @@
     "q": 0.230444629092556,
     "c": 0.6765642787125903,
     "arrival_raw": 0.8362407083760601,
-    "ft_idio": 8.467984647206334
+    "ft_idio": 5.645323098137556
    },
    "checkpoints": {
     "Height": 56,
@@ -15687,11 +15688,11 @@
      "Discipline": 13,
      "HelpDefense": 12
     },
-    "latent_ft": 67,
-    "current_ft": 67,
+    "latent_ft": 74,
+    "current_ft": 73,
     "arrival": 0.8362407083760601,
     "e": 0.8608046021196512,
-    "runway_total": 40,
+    "runway_total": 41,
     "rscore": 13.351030303030305,
     "rscore_which": "perim"
    }
@@ -15777,7 +15778,7 @@
     "q": 0.1528585316374055,
     "c": 0.5386059236456007,
     "arrival_raw": 0.5223494161803361,
-    "ft_idio": 12.794808438148026
+    "ft_idio": 8.529872292098684
    },
    "checkpoints": {
     "Height": 54,
@@ -15911,11 +15912,11 @@
      "Discipline": 9,
      "HelpDefense": 11
     },
-    "latent_ft": 74,
-    "current_ft": 72,
+    "latent_ft": 80,
+    "current_ft": 77,
     "arrival": 0.5223494161803361,
     "e": 0.5939970037532857,
-    "runway_total": 95,
+    "runway_total": 96,
     "rscore": 21.080727272727273,
     "rscore_which": "perim"
    }
@@ -16001,7 +16002,7 @@
     "q": 0.38130682552941453,
     "c": 0.4738162133292536,
     "arrival_raw": 0.6010366289805278,
-    "ft_idio": 11.632212892211772
+    "ft_idio": 7.754808594807848
    },
    "checkpoints": {
     "Height": 53,
@@ -16135,11 +16136,11 @@
      "Discipline": 15,
      "HelpDefense": 11
     },
-    "latent_ft": 81,
-    "current_ft": 75,
+    "latent_ft": 86,
+    "current_ft": 82,
     "arrival": 0.6010366289805278,
     "e": 0.6608811346334487,
-    "runway_total": 137,
+    "runway_total": 135,
     "rscore": 31.671618060202636,
     "rscore_which": "perim"
    }
@@ -16225,7 +16226,7 @@
     "q": 0.6521046370765571,
     "c": 0.4903058732952505,
     "arrival_raw": 0.5611114468979718,
-    "ft_idio": -3.5448950294279715
+    "ft_idio": -2.363263352951981
    },
    "checkpoints": {
     "Height": 59,
@@ -16359,11 +16360,11 @@
      "Discipline": 15,
      "HelpDefense": 11
     },
-    "latent_ft": 64,
-    "current_ft": 58,
+    "latent_ft": 74,
+    "current_ft": 70,
     "arrival": 0.5611114468979718,
     "e": 0.626944729863276,
-    "runway_total": 218,
+    "runway_total": 216,
     "rscore": 32.5976447761194,
     "rscore_which": "perim"
    }
@@ -16449,7 +16450,7 @@
     "q": 0.7358385682873472,
     "c": 0.29219857860616566,
     "arrival_raw": 0.8372944317793953,
-    "ft_idio": -1.439782934302002
+    "ft_idio": -0.9598552895346681
    },
    "checkpoints": {
     "Height": 63,
@@ -16583,8 +16584,8 @@
      "Discipline": 35,
      "HelpDefense": 23
     },
-    "latent_ft": 56,
-    "current_ft": 55,
+    "latent_ft": 65,
+    "current_ft": 64,
     "arrival": 0.8372944317793953,
     "e": 0.861700267012486,
     "runway_total": 88,
@@ -16673,7 +16674,7 @@
     "q": 0.4102209383578259,
     "c": 0.3641121058827409,
     "arrival_raw": 0.4710089502242316,
-    "ft_idio": 8.464577609042841
+    "ft_idio": 5.643051739361894
    },
    "checkpoints": {
     "Height": 67,
@@ -16807,11 +16808,11 @@
      "Discipline": 18,
      "HelpDefense": 16
     },
-    "latent_ft": 64,
-    "current_ft": 64,
+    "latent_ft": 70,
+    "current_ft": 69,
     "arrival": 0.4710089502242316,
     "e": 0.5503576076905968,
-    "runway_total": 184,
+    "runway_total": 185,
     "rscore": 22.65760983676077,
     "rscore_which": "post"
    }
@@ -16897,7 +16898,7 @@
     "q": 0.16850394211541747,
     "c": 0.6780983573254292,
     "arrival_raw": 0.2539123951598008,
-    "ft_idio": -5.299497143894255
+    "ft_idio": -3.5329980959295035
    },
    "checkpoints": {
     "Height": 62,
@@ -17031,8 +17032,8 @@
      "Discipline": 15,
      "HelpDefense": 16
     },
-    "latent_ft": 51,
-    "current_ft": 51,
+    "latent_ft": 60,
+    "current_ft": 60,
     "arrival": 0.2539123951598008,
     "e": 0.36582553588583067,
     "runway_total": 173,
@@ -17121,7 +17122,7 @@
     "q": 0.4556603389334435,
     "c": 0.5717504995341464,
     "arrival_raw": 0.7025270758907289,
-    "ft_idio": 12.936922650303162
+    "ft_idio": 8.624615100202107
    },
    "checkpoints": {
     "Height": 57,
@@ -17255,11 +17256,11 @@
      "Discipline": 9,
      "HelpDefense": 10
     },
-    "latent_ft": 73,
-    "current_ft": 72,
+    "latent_ft": 79,
+    "current_ft": 77,
     "arrival": 0.7025270758907289,
     "e": 0.7471480145071197,
-    "runway_total": 105,
+    "runway_total": 106,
     "rscore": 27.82292034070336,
     "rscore_which": "post"
    }
@@ -17345,7 +17346,7 @@
     "q": 0.3170142729715621,
     "c": 0.19596406249511866,
     "arrival_raw": 0.6410825281027741,
-    "ft_idio": -8.182462856558034
+    "ft_idio": -5.454975237705356
    },
    "checkpoints": {
     "Height": 64,
@@ -17479,8 +17480,8 @@
      "Discipline": 15,
      "HelpDefense": 21
     },
-    "latent_ft": 49,
-    "current_ft": 48,
+    "latent_ft": 60,
+    "current_ft": 59,
     "arrival": 0.6410825281027741,
     "e": 0.694920148887358,
     "runway_total": 128,
@@ -17569,7 +17570,7 @@
     "q": 0.23615566433772958,
     "c": 0.5297760303609712,
     "arrival_raw": 0.6709621041164718,
-    "ft_idio": -2.5488153804425275
+    "ft_idio": -1.6992102536283518
    },
    "checkpoints": {
     "Height": 60,
@@ -17703,8 +17704,8 @@
      "Discipline": 20,
      "HelpDefense": 17
     },
-    "latent_ft": 54,
-    "current_ft": 54,
+    "latent_ft": 63,
+    "current_ft": 63,
     "arrival": 0.6709621041164718,
     "e": 0.7203177884990011,
     "runway_total": 71,
@@ -17793,7 +17794,7 @@
     "q": 0.13722677134451178,
     "c": 0.9411109740877435,
     "arrival_raw": 0.5175198038521668,
-    "ft_idio": 2.095133211925813
+    "ft_idio": 1.3967554746172086
    },
    "checkpoints": {
     "Height": 81,
@@ -17927,8 +17928,8 @@
      "Discipline": 10,
      "HelpDefense": 9
     },
-    "latent_ft": 55,
-    "current_ft": 55,
+    "latent_ft": 61,
+    "current_ft": 61,
     "arrival": 0.5175198038521668,
     "e": 0.5898918332743417,
     "runway_total": 114,
@@ -18017,7 +18018,7 @@
     "q": 0.4265304189339758,
     "c": 0.24829171739871608,
     "arrival_raw": 0.44881221721854914,
-    "ft_idio": 1.5120866257380576
+    "ft_idio": 1.0080577504920383
    },
    "checkpoints": {
     "Height": 62,
@@ -18151,8 +18152,8 @@
      "Discipline": 33,
      "HelpDefense": 20
     },
-    "latent_ft": 59,
-    "current_ft": 58,
+    "latent_ft": 67,
+    "current_ft": 66,
     "arrival": 0.44881221721854914,
     "e": 0.5314903846357667,
     "runway_total": 196,
@@ -18241,7 +18242,7 @@
     "q": 0.6453074232484405,
     "c": 0.5023858465399487,
     "arrival_raw": 0.5810307162895856,
-    "ft_idio": -3.8971362427503973
+    "ft_idio": -2.598090828500265
    },
    "checkpoints": {
     "Height": 53,
@@ -18375,11 +18376,11 @@
      "Discipline": 19,
      "HelpDefense": 17
     },
-    "latent_ft": 69,
-    "current_ft": 62,
+    "latent_ft": 77,
+    "current_ft": 74,
     "arrival": 0.5810307162895856,
     "e": 0.6438761088461478,
-    "runway_total": 174,
+    "runway_total": 170,
     "rscore": 29.94980410557185,
     "rscore_which": "perim"
    }
@@ -18465,7 +18466,7 @@
     "q": 0.6256159195824643,
     "c": 0.8995448320305565,
     "arrival_raw": 0.6140482257497145,
-    "ft_idio": 6.9829559880620184
+    "ft_idio": 4.655303992041346
    },
    "checkpoints": {
     "Height": 52,
@@ -18599,8 +18600,8 @@
      "Discipline": 13,
      "HelpDefense": 15
     },
-    "latent_ft": 64,
-    "current_ft": 64,
+    "latent_ft": 70,
+    "current_ft": 70,
     "arrival": 0.6140482257497145,
     "e": 0.6719409918872573,
     "runway_total": 114,
@@ -18689,7 +18690,7 @@
     "q": 0.8035245711506783,
     "c": 0.6697470782490819,
     "arrival_raw": 0.7214463145006299,
-    "ft_idio": 0.42919149241991167
+    "ft_idio": 0.28612766161327446
    },
    "checkpoints": {
     "Height": 53,
@@ -18823,8 +18824,8 @@
      "Discipline": 39,
      "HelpDefense": 29
     },
-    "latent_ft": 60,
-    "current_ft": 59,
+    "latent_ft": 70,
+    "current_ft": 69,
     "arrival": 0.7214463145006299,
     "e": 0.7632293673255355,
     "runway_total": 150,
@@ -18913,7 +18914,7 @@
     "q": 0.8694841278161741,
     "c": 0.8453030210964658,
     "arrival_raw": 0.32981304722003546,
-    "ft_idio": 3.609394077724441
+    "ft_idio": 2.4062627184829606
    },
    "checkpoints": {
     "Height": 74,
@@ -19047,11 +19048,11 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 66,
-    "current_ft": 60,
+    "latent_ft": 74,
+    "current_ft": 67,
     "arrival": 0.32981304722003546,
     "e": 0.43034109013703015,
-    "runway_total": 179,
+    "runway_total": 180,
     "rscore": 31.061398278258977,
     "rscore_which": "post"
    }
@@ -19137,7 +19138,7 @@
     "q": 0.2607916886319925,
     "c": 0.4129743373729618,
     "arrival_raw": 0.3102627779643533,
-    "ft_idio": 14.813991229995693
+    "ft_idio": 9.875994153330462
    },
    "checkpoints": {
     "Height": 79,
@@ -19271,11 +19272,11 @@
      "Discipline": 12,
      "HelpDefense": 14
     },
-    "latent_ft": 69,
-    "current_ft": 69,
+    "latent_ft": 72,
+    "current_ft": 70,
     "arrival": 0.3102627779643533,
     "e": 0.41372336126970033,
-    "runway_total": 216,
+    "runway_total": 218,
     "rscore": 11.166303077920498,
     "rscore_which": "post"
    }
@@ -19361,7 +19362,7 @@
     "q": 0.5963253047300192,
     "c": 0.0558692165258611,
     "arrival_raw": 0.7437882797318403,
-    "ft_idio": 7.536398976533646
+    "ft_idio": 5.024265984355765
    },
    "checkpoints": {
     "Height": 48,
@@ -19495,11 +19496,11 @@
      "Discipline": 19,
      "HelpDefense": 23
     },
-    "latent_ft": 82,
-    "current_ft": 79,
+    "latent_ft": 86,
+    "current_ft": 85,
     "arrival": 0.7437882797318403,
     "e": 0.7822200377720642,
-    "runway_total": 108,
+    "runway_total": 106,
     "rscore": 35.4066625927323,
     "rscore_which": "perim"
    }
@@ -19585,7 +19586,7 @@
     "q": 0.8660913044242855,
     "c": 0.44993457611065196,
     "arrival_raw": 0.3363103316100229,
-    "ft_idio": 9.584448421743453
+    "ft_idio": 6.389632281162301
    },
    "checkpoints": {
     "Height": 51,
@@ -19719,11 +19720,11 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 83,
-    "current_ft": 72,
+    "latent_ft": 87,
+    "current_ft": 80,
     "arrival": 0.3363103316100229,
     "e": 0.4358637818685195,
-    "runway_total": 146,
+    "runway_total": 142,
     "rscore": 17.301848484848485,
     "rscore_which": "perim"
    }
@@ -19809,7 +19810,7 @@
     "q": 0.1882456922353691,
     "c": 0.04443201811225453,
     "arrival_raw": 0.6679284085638171,
-    "ft_idio": 3.7555906455745633
+    "ft_idio": 2.5037270970497087
    },
    "checkpoints": {
     "Height": 56,
@@ -19943,11 +19944,11 @@
      "Discipline": 17,
      "HelpDefense": 20
     },
-    "latent_ft": 76,
-    "current_ft": 71,
+    "latent_ft": 82,
+    "current_ft": 79,
     "arrival": 0.6679284085638171,
     "e": 0.7177391472792445,
-    "runway_total": 91,
+    "runway_total": 89,
     "rscore": 32.734762918660294,
     "rscore_which": "perim"
    }
@@ -20033,7 +20034,7 @@
     "q": 0.5763944204163839,
     "c": 0.7275593974100044,
     "arrival_raw": 0.5246039814322594,
-    "ft_idio": 2.200368665406305
+    "ft_idio": 1.4669124436042031
    },
    "checkpoints": {
     "Height": 64,
@@ -20167,11 +20168,11 @@
      "Discipline": 11,
      "HelpDefense": 11
     },
-    "latent_ft": 60,
-    "current_ft": 59,
+    "latent_ft": 69,
+    "current_ft": 67,
     "arrival": 0.5246039814322594,
     "e": 0.5959133842174205,
-    "runway_total": 144,
+    "runway_total": 145,
     "rscore": 26.54378076093846,
     "rscore_which": "post"
    }
@@ -20257,7 +20258,7 @@
     "q": 0.36756039812128555,
     "c": 0.22601700657819948,
     "arrival_raw": 0.5301381742642552,
-    "ft_idio": 1.4651461650836537
+    "ft_idio": 0.9767641100557691
    },
    "checkpoints": {
     "Height": 59,
@@ -20391,8 +20392,8 @@
      "Discipline": 20,
      "HelpDefense": 17
     },
-    "latent_ft": 59,
-    "current_ft": 58,
+    "latent_ft": 67,
+    "current_ft": 66,
     "arrival": 0.5301381742642552,
     "e": 0.6006174481246169,
     "runway_total": 170,
@@ -20481,7 +20482,7 @@
     "q": 0.9547884798014342,
     "c": 0.359507987979558,
     "arrival_raw": 0.5980310628267274,
-    "ft_idio": -11.668947965418049
+    "ft_idio": -7.779298643612032
    },
    "checkpoints": {
     "Height": 54,
@@ -20615,11 +20616,11 @@
      "Discipline": 31,
      "HelpDefense": 21
     },
-    "latent_ft": 56,
-    "current_ft": 51,
+    "latent_ft": 69,
+    "current_ft": 65,
     "arrival": 0.5980310628267274,
     "e": 0.6583264034027183,
-    "runway_total": 247,
+    "runway_total": 246,
     "rscore": 32.857730402830704,
     "rscore_which": "perim"
    }
@@ -20705,7 +20706,7 @@
     "q": 0.8313132229164507,
     "c": 0.674809775587309,
     "arrival_raw": 0.5664397579452174,
-    "ft_idio": -10.947370845407768
+    "ft_idio": -7.298247230271845
    },
    "checkpoints": {
     "Height": 56,
@@ -20839,8 +20840,8 @@
      "Discipline": 11,
      "HelpDefense": 16
     },
-    "latent_ft": 46,
-    "current_ft": 46,
+    "latent_ft": 57,
+    "current_ft": 57,
     "arrival": 0.5664397579452174,
     "e": 0.6314737942534348,
     "runway_total": 131,
@@ -20929,7 +20930,7 @@
     "q": 0.5708327373091878,
     "c": 0.5984032147451983,
     "arrival_raw": 0.7983446683774976,
-    "ft_idio": 17.46194848000154
+    "ft_idio": 11.641298986667692
    },
    "checkpoints": {
     "Height": 42,
@@ -21063,8 +21064,8 @@
      "Discipline": 17,
      "HelpDefense": 12
     },
-    "latent_ft": 76,
-    "current_ft": 76,
+    "latent_ft": 79,
+    "current_ft": 79,
     "arrival": 0.7983446683774976,
     "e": 0.828592968120873,
     "runway_total": 69,
@@ -21153,7 +21154,7 @@
     "q": 0.5645991640486486,
     "c": 0.3339206400447619,
     "arrival_raw": 0.5265277232311751,
-    "ft_idio": 6.473436192076937
+    "ft_idio": 4.315624128051291
    },
    "checkpoints": {
     "Height": 63,
@@ -21287,8 +21288,8 @@
      "Discipline": 18,
      "HelpDefense": 19
     },
-    "latent_ft": 63,
-    "current_ft": 63,
+    "latent_ft": 68,
+    "current_ft": 68,
     "arrival": 0.5265277232311751,
     "e": 0.5975485647464989,
     "runway_total": 180,
@@ -21377,7 +21378,7 @@
     "q": 0.22327000666792293,
     "c": 0.4363623898748203,
     "arrival_raw": 0.31502961692280035,
-    "ft_idio": 3.7603669424639734
+    "ft_idio": 2.506911294975982
    },
    "checkpoints": {
     "Height": 58,
@@ -21511,11 +21512,11 @@
      "Discipline": 14,
      "HelpDefense": 18
     },
-    "latent_ft": 63,
-    "current_ft": 61,
+    "latent_ft": 72,
+    "current_ft": 68,
     "arrival": 0.31502961692280035,
     "e": 0.4177751743843803,
-    "runway_total": 208,
+    "runway_total": 210,
     "rscore": 18.534909090909093,
     "rscore_which": "perim"
    }
@@ -21601,7 +21602,7 @@
     "q": 0.18157815554302514,
     "c": 0.8347081250683746,
     "arrival_raw": 1.021346688378507,
-    "ft_idio": -0.35400020416243655
+    "ft_idio": -0.23600013610829104
    },
    "checkpoints": {
     "Height": 52,
@@ -21735,8 +21736,8 @@
      "Discipline": 11,
      "HelpDefense": 13
     },
-    "latent_ft": 57,
-    "current_ft": 57,
+    "latent_ft": 65,
+    "current_ft": 65,
     "arrival": 1.0,
     "e": 1.0,
     "runway_total": 0,
@@ -21825,7 +21826,7 @@
     "q": 0.7410735438850851,
     "c": 0.37594651837849913,
     "arrival_raw": 0.6238837165669149,
-    "ft_idio": 3.0429579972289433
+    "ft_idio": 2.0286386648192956
    },
    "checkpoints": {
     "Height": 59,
@@ -21959,11 +21960,11 @@
      "Discipline": 10,
      "HelpDefense": 16
     },
-    "latent_ft": 78,
-    "current_ft": 75,
+    "latent_ft": 81,
+    "current_ft": 80,
     "arrival": 0.6238837165669149,
     "e": 0.6803011590818776,
-    "runway_total": 138,
+    "runway_total": 136,
     "rscore": 38.51748420123565,
     "rscore_which": "perim"
    }
@@ -22049,7 +22050,7 @@
     "q": 0.8616659079504306,
     "c": 0.23883799776188705,
     "arrival_raw": 0.6099439890330065,
-    "ft_idio": 15.065652935594553
+    "ft_idio": 10.0437686237297
    },
    "checkpoints": {
     "Height": 54,
@@ -22184,10 +22185,10 @@
      "HelpDefense": 21
     },
     "latent_ft": 90,
-    "current_ft": 84,
+    "current_ft": 88,
     "arrival": 0.6099439890330065,
     "e": 0.6684523906780555,
-    "runway_total": 237,
+    "runway_total": 233,
     "rscore": 32.460649251233264,
     "rscore_which": "perim"
    }
@@ -22273,7 +22274,7 @@
     "q": 0.48484783823247174,
     "c": 0.2337441658404882,
     "arrival_raw": 0.6403004098024708,
-    "ft_idio": -4.469058808060173
+    "ft_idio": -2.979372538706782
    },
    "checkpoints": {
     "Height": 45,
@@ -22407,11 +22408,11 @@
      "Discipline": 15,
      "HelpDefense": 15
     },
-    "latent_ft": 55,
-    "current_ft": 55,
+    "latent_ft": 66,
+    "current_ft": 65,
     "arrival": 0.6403004098024708,
     "e": 0.6942553483321002,
-    "runway_total": 124,
+    "runway_total": 125,
     "rscore": 6.051381411951661,
     "rscore_which": "post"
    }
@@ -22497,7 +22498,7 @@
     "q": 0.2986848670853361,
     "c": 0.7784294262035133,
     "arrival_raw": 0.8143736892249205,
-    "ft_idio": -5.358993014873172
+    "ft_idio": -3.5726620099154482
    },
    "checkpoints": {
     "Height": 51,
@@ -22631,8 +22632,8 @@
      "Discipline": 19,
      "HelpDefense": 32
     },
-    "latent_ft": 53,
-    "current_ft": 53,
+    "latent_ft": 63,
+    "current_ft": 63,
     "arrival": 0.8143736892249205,
     "e": 0.8422176358411824,
     "runway_total": 57,
@@ -22721,7 +22722,7 @@
     "q": 0.8654586810133036,
     "c": 0.6958963319977619,
     "arrival_raw": 0.7396096521470241,
-    "ft_idio": -11.4553724966143
+    "ft_idio": -7.636914997742867
    },
    "checkpoints": {
     "Height": 54,
@@ -22855,11 +22856,11 @@
      "Discipline": 40,
      "HelpDefense": 18
     },
-    "latent_ft": 59,
-    "current_ft": 55,
+    "latent_ft": 71,
+    "current_ft": 69,
     "arrival": 0.7396096521470241,
     "e": 0.7786682043249705,
-    "runway_total": 149,
+    "runway_total": 147,
     "rscore": 46.083576660219215,
     "rscore_which": "perim"
    }
@@ -22945,7 +22946,7 @@
     "q": 0.655789995175915,
     "c": 0.8006104409065871,
     "arrival_raw": 0.6724885096911952,
-    "ft_idio": 6.588103786152507
+    "ft_idio": 4.392069190768338
    },
    "checkpoints": {
     "Height": 62,
@@ -23079,8 +23080,8 @@
      "Discipline": 11,
      "HelpDefense": 13
     },
-    "latent_ft": 63,
-    "current_ft": 63,
+    "latent_ft": 69,
+    "current_ft": 69,
     "arrival": 0.6724885096911952,
     "e": 0.721615233237516,
     "runway_total": 127,
@@ -23169,7 +23170,7 @@
     "q": 0.6166333613924297,
     "c": 0.7264743829040697,
     "arrival_raw": 0.5874517683712627,
-    "ft_idio": -7.284696829986171
+    "ft_idio": -4.8564645533241135
    },
    "checkpoints": {
     "Height": 65,
@@ -23303,11 +23304,11 @@
      "Discipline": 19,
      "HelpDefense": 16
     },
-    "latent_ft": 53,
-    "current_ft": 51,
+    "latent_ft": 65,
+    "current_ft": 62,
     "arrival": 0.5874517683712627,
     "e": 0.6493340031155732,
-    "runway_total": 175,
+    "runway_total": 176,
     "rscore": 31.07122980342132,
     "rscore_which": "post"
    }
@@ -23393,7 +23394,7 @@
     "q": 0.2909200154288863,
     "c": 0.39909210795578703,
     "arrival_raw": 0.41794579488213307,
-    "ft_idio": 10.988826709250759
+    "ft_idio": 7.325884472833839
    },
    "checkpoints": {
     "Height": 57,
@@ -23527,11 +23528,11 @@
      "Discipline": 12,
      "HelpDefense": 13
     },
-    "latent_ft": 68,
-    "current_ft": 68,
+    "latent_ft": 74,
+    "current_ft": 73,
     "arrival": 0.41794579488213307,
     "e": 0.5052539256498131,
-    "runway_total": 168,
+    "runway_total": 169,
     "rscore": 17.143689857727306,
     "rscore_which": "post"
    }
@@ -23617,7 +23618,7 @@
     "q": 0.7681149987919406,
     "c": 0.3776642271890024,
     "arrival_raw": 0.8443766800692217,
-    "ft_idio": 1.874580512885385
+    "ft_idio": 1.24972034192359
    },
    "checkpoints": {
     "Height": 68,
@@ -23751,11 +23752,11 @@
      "Discipline": 29,
      "HelpDefense": 22
     },
-    "latent_ft": 75,
-    "current_ft": 75,
+    "latent_ft": 79,
+    "current_ft": 78,
     "arrival": 0.8443766800692217,
     "e": 0.8677201780588385,
-    "runway_total": 67,
+    "runway_total": 68,
     "rscore": 47.15409358288771,
     "rscore_which": "perim"
    }
@@ -23841,7 +23842,7 @@
     "q": 0.8169077759345524,
     "c": 0.3123609708822443,
     "arrival_raw": 0.9045013996931404,
-    "ft_idio": -2.2959133047568754
+    "ft_idio": -1.5306088698379168
    },
    "checkpoints": {
     "Height": 58,
@@ -23975,8 +23976,8 @@
      "Discipline": 23,
      "HelpDefense": 15
     },
-    "latent_ft": 72,
-    "current_ft": 72,
+    "latent_ft": 78,
+    "current_ft": 78,
     "arrival": 0.9045013996931404,
     "e": 0.9188261897391693,
     "runway_total": 37,
@@ -24065,7 +24066,7 @@
     "q": 0.5723972685943723,
     "c": 0.32575684005957534,
     "arrival_raw": 0.5661965821567124,
-    "ft_idio": 11.693701089822248
+    "ft_idio": 7.7958007265481655
    },
    "checkpoints": {
     "Height": 53,
@@ -24199,11 +24200,11 @@
      "Discipline": 18,
      "HelpDefense": 34
     },
-    "latent_ft": 80,
-    "current_ft": 74,
+    "latent_ft": 86,
+    "current_ft": 81,
     "arrival": 0.5661965821567124,
     "e": 0.6312670948332055,
-    "runway_total": 177,
+    "runway_total": 176,
     "rscore": 17.401605488850773,
     "rscore_which": "perim"
    }
@@ -24289,7 +24290,7 @@
     "q": 0.44238303897400383,
     "c": 0.7029914724362795,
     "arrival_raw": 0.7536111925110267,
-    "ft_idio": -5.067046241473221
+    "ft_idio": -3.3780308276488142
    },
    "checkpoints": {
     "Height": 52,
@@ -24423,11 +24424,11 @@
      "Discipline": 9,
      "HelpDefense": 11
     },
-    "latent_ft": 70,
-    "current_ft": 68,
+    "latent_ft": 77,
+    "current_ft": 77,
     "arrival": 0.7536111925110267,
     "e": 0.7905695136343727,
-    "runway_total": 86,
+    "runway_total": 84,
     "rscore": 47.727636363636364,
     "rscore_which": "perim"
    }
@@ -24513,7 +24514,7 @@
     "q": 0.19511169245384882,
     "c": 0.6115231070949976,
     "arrival_raw": 0.5533850266166656,
-    "ft_idio": -1.6391571258205493
+    "ft_idio": -1.0927714172136995
    },
    "checkpoints": {
     "Height": 48,
@@ -24647,11 +24648,11 @@
      "Discipline": 15,
      "HelpDefense": 15
     },
-    "latent_ft": 74,
-    "current_ft": 69,
+    "latent_ft": 81,
+    "current_ft": 79,
     "arrival": 0.5533850266166656,
     "e": 0.6203772726241658,
-    "runway_total": 94,
+    "runway_total": 91,
     "rscore": 36.00063636363637,
     "rscore_which": "perim"
    }
@@ -24737,7 +24738,7 @@
     "q": 0.18238844360557427,
     "c": 0.16625152579850563,
     "arrival_raw": 0.9166483136125287,
-    "ft_idio": 3.743505551794642
+    "ft_idio": 2.4956703678630947
    },
    "checkpoints": {
     "Height": 66,
@@ -24871,8 +24872,8 @@
      "Discipline": 27,
      "HelpDefense": 24
     },
-    "latent_ft": 60,
-    "current_ft": 60,
+    "latent_ft": 66,
+    "current_ft": 66,
     "arrival": 0.9166483136125287,
     "e": 0.9291510665706494,
     "runway_total": 23,
@@ -24961,7 +24962,7 @@
     "q": 0.6561661200616832,
     "c": 0.7319674251949061,
     "arrival_raw": 0.8498730658260564,
-    "ft_idio": -6.427713584497691
+    "ft_idio": -4.285142389665127
    },
    "checkpoints": {
     "Height": 69,
@@ -25095,8 +25096,8 @@
      "Discipline": 30,
      "HelpDefense": 23
     },
-    "latent_ft": 49,
-    "current_ft": 49,
+    "latent_ft": 59,
+    "current_ft": 59,
     "arrival": 0.8498730658260564,
     "e": 0.8723921059521479,
     "runway_total": 69,
@@ -25185,7 +25186,7 @@
     "q": 0.6081472629780027,
     "c": 0.7967152658594173,
     "arrival_raw": 0.9737962230509785,
-    "ft_idio": 17.742791382102666
+    "ft_idio": 11.828527588068443
    },
    "checkpoints": {
     "Height": 52,
@@ -25319,8 +25320,8 @@
      "Discipline": 11,
      "HelpDefense": 10
     },
-    "latent_ft": 75,
-    "current_ft": 75,
+    "latent_ft": 77,
+    "current_ft": 77,
     "arrival": 0.9737962230509785,
     "e": 0.9777267895933317,
     "runway_total": 11,
@@ -25409,7 +25410,7 @@
     "q": 0.5670796526911683,
     "c": 0.4862920003128584,
     "arrival_raw": 0.7598024949881397,
-    "ft_idio": 1.0958532046289668
+    "ft_idio": 0.7305688030859778
    },
    "checkpoints": {
     "Height": 61,
@@ -25543,11 +25544,11 @@
      "Discipline": 39,
      "HelpDefense": 32
     },
-    "latent_ft": 75,
-    "current_ft": 72,
+    "latent_ft": 79,
+    "current_ft": 78,
     "arrival": 0.7598024949881397,
     "e": 0.7958321207399187,
-    "runway_total": 110,
+    "runway_total": 108,
     "rscore": 36.79694492453048,
     "rscore_which": "perim"
    }
@@ -25633,7 +25634,7 @@
     "q": 0.6133169691312294,
     "c": 0.7260489085830415,
     "arrival_raw": 0.9010848931761768,
-    "ft_idio": -4.3687162882751736
+    "ft_idio": -2.9124775255167825
    },
    "checkpoints": {
     "Height": 66,
@@ -25767,8 +25768,8 @@
      "Discipline": 16,
      "HelpDefense": 13
     },
-    "latent_ft": 53,
-    "current_ft": 53,
+    "latent_ft": 63,
+    "current_ft": 63,
     "arrival": 0.9010848931761768,
     "e": 0.9159221591997503,
     "runway_total": 41,
@@ -25857,7 +25858,7 @@
     "q": 0.1714027768405585,
     "c": 0.7843500671319938,
     "arrival_raw": 0.6137936806950489,
-    "ft_idio": -3.339348965236142
+    "ft_idio": -2.226232643490761
    },
    "checkpoints": {
     "Height": 52,
@@ -25991,11 +25992,11 @@
      "Discipline": 11,
      "HelpDefense": 15
     },
-    "latent_ft": 63,
-    "current_ft": 59,
+    "latent_ft": 74,
+    "current_ft": 71,
     "arrival": 0.6137936806950489,
     "e": 0.6717246285907916,
-    "runway_total": 100,
+    "runway_total": 99,
     "rscore": 16.586674782608696,
     "rscore_which": "perim"
    }
@@ -26081,7 +26082,7 @@
     "q": 0.36543782308344874,
     "c": 0.8579155926099032,
     "arrival_raw": 0.7282766808346405,
-    "ft_idio": -0.14470361711195137
+    "ft_idio": -0.09646907807463424
    },
    "checkpoints": {
     "Height": 60,
@@ -26215,8 +26216,8 @@
      "Discipline": 18,
      "HelpDefense": 17
     },
-    "latent_ft": 63,
-    "current_ft": 61,
+    "latent_ft": 73,
+    "current_ft": 71,
     "arrival": 0.7282766808346405,
     "e": 0.7690351787094444,
     "runway_total": 88,
@@ -26305,7 +26306,7 @@
     "q": 0.4949966710341211,
     "c": 0.1090109763426909,
     "arrival_raw": 0.4883425860936709,
-    "ft_idio": -4.290198832647458
+    "ft_idio": -2.860132555098305
    },
    "checkpoints": {
     "Height": 42,
@@ -26439,11 +26440,11 @@
      "Discipline": 18,
      "HelpDefense": 16
     },
-    "latent_ft": 59,
-    "current_ft": 56,
+    "latent_ft": 72,
+    "current_ft": 68,
     "arrival": 0.4883425860936709,
     "e": 0.5650911981796203,
-    "runway_total": 213,
+    "runway_total": 214,
     "rscore": 23.336727272727273,
     "rscore_which": "perim"
    }
@@ -26529,7 +26530,7 @@
     "q": 0.48137063738524993,
     "c": 0.516817902297172,
     "arrival_raw": 0.5099345879413584,
-    "ft_idio": 6.559548215784782
+    "ft_idio": 4.373032143856522
    },
    "checkpoints": {
     "Height": 74,
@@ -26663,8 +26664,8 @@
      "Discipline": 10,
      "HelpDefense": 15
     },
-    "latent_ft": 61,
-    "current_ft": 61,
+    "latent_ft": 65,
+    "current_ft": 65,
     "arrival": 0.5099345879413584,
     "e": 0.5834443997501546,
     "runway_total": 208,
@@ -26753,7 +26754,7 @@
     "q": 0.24667083773715,
     "c": 0.5741616035428486,
     "arrival_raw": 0.5353949887434277,
-    "ft_idio": -0.8907808572741978
+    "ft_idio": -0.5938539048494651
    },
    "checkpoints": {
     "Height": 56,
@@ -26887,8 +26888,8 @@
      "Discipline": 11,
      "HelpDefense": 9
     },
-    "latent_ft": 56,
-    "current_ft": 56,
+    "latent_ft": 65,
+    "current_ft": 65,
     "arrival": 0.5353949887434277,
     "e": 0.6050857404319135,
     "runway_total": 125,
@@ -26977,7 +26978,7 @@
     "q": 0.823943424421483,
     "c": 0.2500109831965416,
     "arrival_raw": 0.4115400922145871,
-    "ft_idio": 11.002819044571112
+    "ft_idio": 7.335212696380741
    },
    "checkpoints": {
     "Height": 78,
@@ -27111,11 +27112,11 @@
      "Discipline": 22,
      "HelpDefense": 17
     },
-    "latent_ft": 79,
-    "current_ft": 69,
+    "latent_ft": 81,
+    "current_ft": 75,
     "arrival": 0.4115400922145871,
     "e": 0.49980907838239896,
-    "runway_total": 372,
+    "runway_total": 368,
     "rscore": 33.162199415459455,
     "rscore_which": "post"
    }
@@ -27201,7 +27202,7 @@
     "q": 0.873441167101838,
     "c": 0.6948216101790806,
     "arrival_raw": 0.37822957667189794,
-    "ft_idio": -7.6720234319497385
+    "ft_idio": -5.114682287966493
    },
    "checkpoints": {
     "Height": 74,
@@ -27335,11 +27336,11 @@
      "Discipline": 16,
      "HelpDefense": 9
     },
-    "latent_ft": 50,
-    "current_ft": 48,
+    "latent_ft": 61,
+    "current_ft": 58,
     "arrival": 0.37822957667189794,
     "e": 0.47149514017111327,
-    "runway_total": 341,
+    "runway_total": 342,
     "rscore": 32.40953421121758,
     "rscore_which": "post"
    }
@@ -27425,7 +27426,7 @@
     "q": 0.5895302409090493,
     "c": 0.2772517089164984,
     "arrival_raw": 0.693491109978995,
-    "ft_idio": -3.277115458711156
+    "ft_idio": -2.1847436391407706
    },
    "checkpoints": {
     "Height": 68,
@@ -27559,11 +27560,11 @@
      "Discipline": 18,
      "HelpDefense": 14
     },
-    "latent_ft": 70,
-    "current_ft": 67,
+    "latent_ft": 75,
+    "current_ft": 74,
     "arrival": 0.693491109978995,
     "e": 0.7394674434821458,
-    "runway_total": 130,
+    "runway_total": 128,
     "rscore": 39.94452045454546,
     "rscore_which": "perim"
    }
@@ -27649,7 +27650,7 @@
     "q": 0.37827669176156403,
     "c": 0.610566528135359,
     "arrival_raw": 0.7865662569038236,
-    "ft_idio": -10.965372841004074
+    "ft_idio": -7.310248560669383
    },
    "checkpoints": {
     "Height": 57,
@@ -27783,8 +27784,8 @@
      "Discipline": 12,
      "HelpDefense": 10
     },
-    "latent_ft": 49,
-    "current_ft": 48,
+    "latent_ft": 63,
+    "current_ft": 62,
     "arrival": 0.7865662569038236,
     "e": 0.8185813183682501,
     "runway_total": 82,
@@ -27873,7 +27874,7 @@
     "q": 0.7001301639654437,
     "c": 0.5291635658353275,
     "arrival_raw": 0.3783454592904648,
-    "ft_idio": -8.75533875140341
+    "ft_idio": -5.836892500935607
    },
    "checkpoints": {
     "Height": 78,
@@ -28007,8 +28008,8 @@
      "Discipline": 17,
      "HelpDefense": 13
     },
-    "latent_ft": 45,
-    "current_ft": 45,
+    "latent_ft": 54,
+    "current_ft": 54,
     "arrival": 0.3783454592904648,
     "e": 0.4715936403968951,
     "runway_total": 245,
@@ -28097,7 +28098,7 @@
     "q": 0.7634087057232365,
     "c": 0.7268131900275376,
     "arrival_raw": 0.9571467286978051,
-    "ft_idio": -6.5912539239982095
+    "ft_idio": -4.394169282665473
    },
    "checkpoints": {
     "Height": 51,
@@ -28231,8 +28232,8 @@
      "Discipline": 17,
      "HelpDefense": 38
     },
-    "latent_ft": 51,
-    "current_ft": 51,
+    "latent_ft": 62,
+    "current_ft": 62,
     "arrival": 0.9571467286978051,
     "e": 0.9635747193931343,
     "runway_total": 16,
@@ -28321,7 +28322,7 @@
     "q": 0.0902463460574107,
     "c": 0.055338398152425056,
     "arrival_raw": 0.5366513203388383,
-    "ft_idio": -1.5525624146591017
+    "ft_idio": -1.0350416097727344
    },
    "checkpoints": {
     "Height": 59,
@@ -28455,11 +28456,11 @@
      "Discipline": 11,
      "HelpDefense": 15
     },
-    "latent_ft": 65,
-    "current_ft": 59,
+    "latent_ft": 75,
+    "current_ft": 70,
     "arrival": 0.5366513203388383,
     "e": 0.6061536222880126,
-    "runway_total": 113,
+    "runway_total": 112,
     "rscore": 22.10358518518519,
     "rscore_which": "perim"
    }
@@ -28545,7 +28546,7 @@
     "q": 0.45292945044731986,
     "c": 0.300615351107155,
     "arrival_raw": 0.8554303325978828,
-    "ft_idio": -4.9993789406912255
+    "ft_idio": -3.3329192937941503
    },
    "checkpoints": {
     "Height": 56,
@@ -28679,8 +28680,8 @@
      "Discipline": 14,
      "HelpDefense": 16
     },
-    "latent_ft": 55,
-    "current_ft": 55,
+    "latent_ft": 67,
+    "current_ft": 67,
     "arrival": 0.8554303325978828,
     "e": 0.8771157827082003,
     "runway_total": 58,
@@ -28769,7 +28770,7 @@
     "q": 0.36092081165525913,
     "c": 0.5920505757080632,
     "arrival_raw": 0.6494367856301699,
-    "ft_idio": 4.0841602025239965
+    "ft_idio": 2.722773468349331
    },
    "checkpoints": {
     "Height": 62,
@@ -28903,8 +28904,8 @@
      "Discipline": 12,
      "HelpDefense": 13
     },
-    "latent_ft": 60,
-    "current_ft": 60,
+    "latent_ft": 66,
+    "current_ft": 66,
     "arrival": 0.6494367856301699,
     "e": 0.7020212677856444,
     "runway_total": 108,
@@ -28993,7 +28994,7 @@
     "q": 0.5361147107726435,
     "c": 0.7011742971546606,
     "arrival_raw": 0.46963588280813684,
-    "ft_idio": -2.2160377094965313
+    "ft_idio": -1.4773584729976874
    },
    "checkpoints": {
     "Height": 47,
@@ -29127,11 +29128,11 @@
      "Discipline": 11,
      "HelpDefense": 11
     },
-    "latent_ft": 75,
-    "current_ft": 69,
+    "latent_ft": 81,
+    "current_ft": 79,
     "arrival": 0.46963588280813684,
     "e": 0.5491905003869163,
-    "runway_total": 114,
+    "runway_total": 110,
     "rscore": 32.17869696969697,
     "rscore_which": "perim"
    }
@@ -29217,7 +29218,7 @@
     "q": 0.20024788295748625,
     "c": 0.41114677238520997,
     "arrival_raw": 0.8646516892645576,
-    "ft_idio": -4.4289326612009585
+    "ft_idio": -2.952621774133972
    },
    "checkpoints": {
     "Height": 53,
@@ -29351,8 +29352,8 @@
      "Discipline": 13,
      "HelpDefense": 13
     },
-    "latent_ft": 57,
-    "current_ft": 56,
+    "latent_ft": 69,
+    "current_ft": 68,
     "arrival": 0.8646516892645576,
     "e": 0.8849539358748739,
     "runway_total": 39,
@@ -29441,7 +29442,7 @@
     "q": 0.7077507207655632,
     "c": 0.7328540849269469,
     "arrival_raw": 0.6965719927186768,
-    "ft_idio": -1.4933620239667549
+    "ft_idio": -0.9955746826445032
    },
    "checkpoints": {
     "Height": 63,
@@ -29575,11 +29576,11 @@
      "Discipline": 19,
      "HelpDefense": 15
     },
-    "latent_ft": 61,
-    "current_ft": 59,
+    "latent_ft": 72,
+    "current_ft": 69,
     "arrival": 0.6965719927186768,
     "e": 0.7420861938108753,
-    "runway_total": 146,
+    "runway_total": 147,
     "rscore": 34.57062328656231,
     "rscore_which": "post"
    }
@@ -29665,7 +29666,7 @@
     "q": 0.3779674468514946,
     "c": 0.6201601567527325,
     "arrival_raw": 0.3865514506786051,
-    "ft_idio": -5.057720551584927
+    "ft_idio": -3.3718137010566176
    },
    "checkpoints": {
     "Height": 55,
@@ -29799,8 +29800,8 @@
      "Discipline": 25,
      "HelpDefense": 29
     },
-    "latent_ft": 53,
-    "current_ft": 52,
+    "latent_ft": 63,
+    "current_ft": 62,
     "arrival": 0.3865514506786051,
     "e": 0.47856873307681436,
     "runway_total": 177,
@@ -29889,7 +29890,7 @@
     "q": 0.5142945162731897,
     "c": 0.852597778401743,
     "arrival_raw": 0.5936916198903179,
-    "ft_idio": -9.991512196933275
+    "ft_idio": -6.661008131288851
    },
    "checkpoints": {
     "Height": 59,
@@ -30023,11 +30024,11 @@
      "Discipline": 9,
      "HelpDefense": 12
     },
-    "latent_ft": 47,
-    "current_ft": 47,
+    "latent_ft": 60,
+    "current_ft": 59,
     "arrival": 0.5936916198903179,
     "e": 0.6546378769067702,
-    "runway_total": 164,
+    "runway_total": 165,
     "rscore": 17.368540576323987,
     "rscore_which": "post"
    }
@@ -30113,7 +30114,7 @@
     "q": 0.35493837588132876,
     "c": 0.5162887792009596,
     "arrival_raw": 0.6674018125499187,
-    "ft_idio": 2.8218861226865237
+    "ft_idio": 1.8812574151243493
    },
    "checkpoints": {
     "Height": 53,
@@ -30247,11 +30248,11 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 62,
-    "current_ft": 61,
+    "latent_ft": 70,
+    "current_ft": 70,
     "arrival": 0.6674018125499187,
     "e": 0.717291540667431,
-    "runway_total": 109,
+    "runway_total": 108,
     "rscore": 18.930894660194177,
     "rscore_which": "perim"
    }
@@ -30337,7 +30338,7 @@
     "q": 0.2268752499380701,
     "c": 0.25875079420452907,
     "arrival_raw": 0.502917872920906,
-    "ft_idio": 20.23525433033539
+    "ft_idio": 13.490169553556926
    },
    "checkpoints": {
     "Height": 64,
@@ -30471,8 +30472,8 @@
      "Discipline": 15,
      "HelpDefense": 12
     },
-    "latent_ft": 77,
-    "current_ft": 76,
+    "latent_ft": 79,
+    "current_ft": 78,
     "arrival": 0.502917872920906,
     "e": 0.57748019198277,
     "runway_total": 130,
@@ -30561,7 +30562,7 @@
     "q": 0.06106797784113859,
     "c": 0.41714516077854014,
     "arrival_raw": 0.5026783212832986,
-    "ft_idio": -8.81386909261075
+    "ft_idio": -5.875912728407166
    },
    "checkpoints": {
     "Height": 56,
@@ -30695,8 +30696,8 @@
      "Discipline": 13,
      "HelpDefense": 13
     },
-    "latent_ft": 48,
-    "current_ft": 48,
+    "latent_ft": 59,
+    "current_ft": 59,
     "arrival": 0.5026783212832986,
     "e": 0.5772765730908038,
     "runway_total": 116,
@@ -30785,7 +30786,7 @@
     "q": 0.8944420189309535,
     "c": 0.3392235590491998,
     "arrival_raw": 0.6698154050445827,
-    "ft_idio": 5.496767135218862
+    "ft_idio": 3.664511423479241
    },
    "checkpoints": {
     "Height": 60,
@@ -30919,8 +30920,8 @@
      "Discipline": 20,
      "HelpDefense": 23
     },
-    "latent_ft": 62,
-    "current_ft": 62,
+    "latent_ft": 68,
+    "current_ft": 68,
     "arrival": 0.6698154050445827,
     "e": 0.7193430942878953,
     "runway_total": 159,
@@ -31009,7 +31010,7 @@
     "q": 0.2801254734626629,
     "c": 0.2342271095869947,
     "arrival_raw": 0.6653264788519776,
-    "ft_idio": 0.8411860042628793
+    "ft_idio": 0.5607906695085862
    },
    "checkpoints": {
     "Height": 49,
@@ -31143,11 +31144,11 @@
      "Discipline": 20,
      "HelpDefense": 19
     },
-    "latent_ft": 75,
-    "current_ft": 70,
+    "latent_ft": 81,
+    "current_ft": 79,
     "arrival": 0.6653264788519776,
     "e": 0.715527507024181,
-    "runway_total": 105,
+    "runway_total": 102,
     "rscore": 33.012,
     "rscore_which": "perim"
    }
@@ -31233,7 +31234,7 @@
     "q": 0.4254264508850271,
     "c": 0.8133499835209883,
     "arrival_raw": 0.48618625380550745,
-    "ft_idio": 14.166737825397771
+    "ft_idio": 9.444491883598515
    },
    "checkpoints": {
     "Height": 62,
@@ -31367,11 +31368,11 @@
      "Discipline": 10,
      "HelpDefense": 13
     },
-    "latent_ft": 89,
-    "current_ft": 84,
+    "latent_ft": 88,
+    "current_ft": 86,
     "arrival": 0.48618625380550745,
     "e": 0.5632583157346813,
-    "runway_total": 104,
+    "runway_total": 101,
     "rscore": 37.128,
     "rscore_which": "perim"
    }
@@ -31457,7 +31458,7 @@
     "q": 0.29769505256944173,
     "c": 0.8151671436027528,
     "arrival_raw": 0.6988067860658541,
-    "ft_idio": -12.375834014318418
+    "ft_idio": -8.250556009545612
    },
    "checkpoints": {
     "Height": 68,
@@ -31591,8 +31592,8 @@
      "Discipline": 20,
      "HelpDefense": 13
     },
-    "latent_ft": 43,
-    "current_ft": 43,
+    "latent_ft": 54,
+    "current_ft": 54,
     "arrival": 0.6988067860658541,
     "e": 0.7439857681559761,
     "runway_total": 88,
@@ -31681,7 +31682,7 @@
     "q": 0.3788782558487246,
     "c": 0.40577970591057433,
     "arrival_raw": 0.04664403785822596,
-    "ft_idio": 4.195714524673942
+    "ft_idio": 2.797143016449295
    },
    "checkpoints": {
     "Height": 74,
@@ -31815,11 +31816,11 @@
      "Discipline": 15,
      "HelpDefense": 13
     },
-    "latent_ft": 76,
-    "current_ft": 60,
+    "latent_ft": 79,
+    "current_ft": 67,
     "arrival": 0.04664403785822596,
     "e": 0.18964743217949206,
-    "runway_total": 338,
+    "runway_total": 334,
     "rscore": 9.840000000000002,
     "rscore_which": "perim"
    }
@@ -31905,7 +31906,7 @@
     "q": 0.3076137888144118,
     "c": 0.298557549781088,
     "arrival_raw": 0.9518410436612662,
-    "ft_idio": 3.029438629861052
+    "ft_idio": 2.0196257532407014
    },
    "checkpoints": {
     "Height": 52,
@@ -32039,11 +32040,11 @@
      "Discipline": 12,
      "HelpDefense": 17
     },
-    "latent_ft": 77,
-    "current_ft": 77,
+    "latent_ft": 83,
+    "current_ft": 82,
     "arrival": 0.9518410436612662,
     "e": 0.9590648871120763,
-    "runway_total": 13,
+    "runway_total": 14,
     "rscore": 45.034916599190296,
     "rscore_which": "perim"
    }
@@ -32129,7 +32130,7 @@
     "q": 0.2807688251362817,
     "c": 0.7853264707629997,
     "arrival_raw": 0.8456498093596838,
-    "ft_idio": 10.29942866646914
+    "ft_idio": 6.866285777646093
    },
    "checkpoints": {
     "Height": 69,
@@ -32263,11 +32264,11 @@
      "Discipline": 31,
      "HelpDefense": 15
     },
-    "latent_ft": 80,
-    "current_ft": 78,
+    "latent_ft": 83,
+    "current_ft": 82,
     "arrival": 0.8456498093596838,
     "e": 0.8688023379557313,
-    "runway_total": 51,
+    "runway_total": 50,
     "rscore": 27.286647375886524,
     "rscore_which": "perim"
    }
@@ -32353,7 +32354,7 @@
     "q": 0.21999509814980905,
     "c": 0.6313954868682436,
     "arrival_raw": 0.5119183101040227,
-    "ft_idio": -1.4423630693860052
+    "ft_idio": -0.9615753795906701
    },
    "checkpoints": {
     "Height": 54,
@@ -32487,8 +32488,8 @@
      "Discipline": 11,
      "HelpDefense": 15
     },
-    "latent_ft": 55,
-    "current_ft": 55,
+    "latent_ft": 64,
+    "current_ft": 64,
     "arrival": 0.5119183101040227,
     "e": 0.5851305635884192,
     "runway_total": 103,
@@ -32577,7 +32578,7 @@
     "q": 0.4534860067681812,
     "c": 0.5558739443965963,
     "arrival_raw": 0.5530988002780621,
-    "ft_idio": 3.6080338702322545
+    "ft_idio": 2.4053559134881697
    },
    "checkpoints": {
     "Height": 58,
@@ -32711,11 +32712,11 @@
      "Discipline": 20,
      "HelpDefense": 20
     },
-    "latent_ft": 64,
-    "current_ft": 62,
+    "latent_ft": 73,
+    "current_ft": 70,
     "arrival": 0.5530988002780621,
     "e": 0.6201339802363528,
-    "runway_total": 164,
+    "runway_total": 165,
     "rscore": 10.436757024793389,
     "rscore_which": "perim"
    }
@@ -32801,7 +32802,7 @@
     "q": 0.4304291402580116,
     "c": 0.5140602660427531,
     "arrival_raw": 0.33438633965542996,
-    "ft_idio": -8.07289285219249
+    "ft_idio": -5.381928568128327
    },
    "checkpoints": {
     "Height": 69,
@@ -32935,11 +32936,11 @@
      "Discipline": 34,
      "HelpDefense": 25
     },
-    "latent_ft": 47,
-    "current_ft": 47,
+    "latent_ft": 58,
+    "current_ft": 57,
     "arrival": 0.33438633965542996,
     "e": 0.43422838870711544,
-    "runway_total": 255,
+    "runway_total": 256,
     "rscore": 24.882989883513645,
     "rscore_which": "post"
    }
@@ -33025,7 +33026,7 @@
     "q": 0.6621583975167453,
     "c": 0.1627223311111283,
     "arrival_raw": 0.967598389029174,
-    "ft_idio": -9.711230642014112
+    "ft_idio": -6.474153761342741
    },
    "checkpoints": {
     "Height": 40,
@@ -33159,8 +33160,8 @@
      "Discipline": 22,
      "HelpDefense": 16
     },
-    "latent_ft": 64,
-    "current_ft": 64,
+    "latent_ft": 76,
+    "current_ft": 76,
     "arrival": 0.967598389029174,
     "e": 0.972458630674798,
     "runway_total": 11,
@@ -33249,7 +33250,7 @@
     "q": 0.3494548129197961,
     "c": 0.1029054551313308,
     "arrival_raw": 0.47684496428463585,
-    "ft_idio": -6.85775052932693
+    "ft_idio": -4.571833686217953
    },
    "checkpoints": {
     "Height": 56,
@@ -33383,11 +33384,11 @@
      "Discipline": 19,
      "HelpDefense": 21
     },
-    "latent_ft": 59,
-    "current_ft": 53,
+    "latent_ft": 71,
+    "current_ft": 66,
     "arrival": 0.47684496428463585,
     "e": 0.5553182196419405,
-    "runway_total": 200,
+    "runway_total": 199,
     "rscore": 13.685182068620087,
     "rscore_which": "perim"
    }
@@ -33473,7 +33474,7 @@
     "q": 0.42457407287341087,
     "c": 0.8442286641756512,
     "arrival_raw": 0.19016495342166634,
-    "ft_idio": -1.3158594041330816
+    "ft_idio": -0.8772396027553877
    },
    "checkpoints": {
     "Height": 67,
@@ -33607,11 +33608,11 @@
      "Discipline": 18,
      "HelpDefense": 14
     },
-    "latent_ft": 58,
-    "current_ft": 55,
+    "latent_ft": 68,
+    "current_ft": 63,
     "arrival": 0.19016495342166634,
     "e": 0.3116402104084164,
-    "runway_total": 281,
+    "runway_total": 283,
     "rscore": 17.824337370778967,
     "rscore_which": "post"
    }
@@ -33697,7 +33698,7 @@
     "q": 0.4249825304820884,
     "c": 0.43340838629940176,
     "arrival_raw": 0.541185021388282,
-    "ft_idio": -11.47853676370426
+    "ft_idio": -7.652357842469508
    },
    "checkpoints": {
     "Height": 61,
@@ -33831,11 +33832,11 @@
      "Discipline": 18,
      "HelpDefense": 15
     },
-    "latent_ft": 63,
-    "current_ft": 59,
+    "latent_ft": 71,
+    "current_ft": 70,
     "arrival": 0.541185021388282,
     "e": 0.6100072681800396,
-    "runway_total": 105,
+    "runway_total": 102,
     "rscore": 37.35054545454546,
     "rscore_which": "perim"
    }
@@ -33921,7 +33922,7 @@
     "q": 0.34436324843774485,
     "c": 0.6271232644887643,
     "arrival_raw": 0.48556218239431914,
-    "ft_idio": -6.618298502054227
+    "ft_idio": -4.412199001369485
    },
    "checkpoints": {
     "Height": 59,
@@ -34055,8 +34056,8 @@
      "Discipline": 9,
      "HelpDefense": 10
     },
-    "latent_ft": 50,
-    "current_ft": 50,
+    "latent_ft": 59,
+    "current_ft": 59,
     "arrival": 0.48556218239431914,
     "e": 0.5627278550351713,
     "runway_total": 119,
@@ -34145,7 +34146,7 @@
     "q": 0.36670616243328735,
     "c": 0.31434922432243334,
     "arrival_raw": 0.6187856453756797,
-    "ft_idio": 11.090070828808981
+    "ft_idio": 7.393380552539321
    },
    "checkpoints": {
     "Height": 66,
@@ -34279,11 +34280,11 @@
      "Discipline": 12,
      "HelpDefense": 14
     },
-    "latent_ft": 77,
-    "current_ft": 72,
+    "latent_ft": 82,
+    "current_ft": 78,
     "arrival": 0.6187856453756797,
     "e": 0.6759677985693278,
-    "runway_total": 135,
+    "runway_total": 134,
     "rscore": 25.506599438202247,
     "rscore_which": "perim"
    }
@@ -34369,7 +34370,7 @@
     "q": 0.7571898276585216,
     "c": 0.437399045407542,
     "arrival_raw": 0.21186420228500996,
-    "ft_idio": 3.1715553979891045
+    "ft_idio": 2.1143702653260696
    },
    "checkpoints": {
     "Height": 73,
@@ -34503,11 +34504,11 @@
      "Discipline": 18,
      "HelpDefense": 15
     },
-    "latent_ft": 70,
-    "current_ft": 60,
+    "latent_ft": 76,
+    "current_ft": 67,
     "arrival": 0.21186420228500996,
     "e": 0.3300845719422585,
-    "runway_total": 446,
+    "runway_total": 445,
     "rscore": 18.839900539571516,
     "rscore_which": "post"
    }
@@ -34593,7 +34594,7 @@
     "q": 0.3442206709345572,
     "c": 0.8184867431732824,
     "arrival_raw": 0.5225230484701241,
-    "ft_idio": -8.111233083839537
+    "ft_idio": -5.407488722559691
    },
    "checkpoints": {
     "Height": 67,
@@ -34727,11 +34728,11 @@
      "Discipline": 11,
      "HelpDefense": 9
     },
-    "latent_ft": 48,
-    "current_ft": 48,
+    "latent_ft": 59,
+    "current_ft": 58,
     "arrival": 0.5225230484701241,
     "e": 0.5941445911996055,
-    "runway_total": 131,
+    "runway_total": 132,
     "rscore": 34.525445532409286,
     "rscore_which": "post"
    }
@@ -34817,7 +34818,7 @@
     "q": 0.6083422614023267,
     "c": 0.8463941245090008,
     "arrival_raw": 0.768868488258095,
-    "ft_idio": -5.208591195749538
+    "ft_idio": -3.4723941304996915
    },
    "checkpoints": {
     "Height": 40,
@@ -34951,8 +34952,8 @@
      "Discipline": 9,
      "HelpDefense": 15
     },
-    "latent_ft": 56,
-    "current_ft": 55,
+    "latent_ft": 69,
+    "current_ft": 68,
     "arrival": 0.768868488258095,
     "e": 0.8035382150193807,
     "runway_total": 58,
@@ -35041,7 +35042,7 @@
     "q": 0.413724352761914,
     "c": 0.33326359182741183,
     "arrival_raw": 0.3352247051372774,
-    "ft_idio": -10.996076373855123
+    "ft_idio": -7.330717582570082
    },
    "checkpoints": {
     "Height": 73,
@@ -35175,11 +35176,11 @@
      "Discipline": 16,
      "HelpDefense": 10
     },
-    "latent_ft": 44,
-    "current_ft": 43,
+    "latent_ft": 54,
+    "current_ft": 54,
     "arrival": 0.3352247051372774,
     "e": 0.43494099936668584,
-    "runway_total": 210,
+    "runway_total": 209,
     "rscore": 27.229497511860455,
     "rscore_which": "post"
    }
@@ -35265,7 +35266,7 @@
     "q": 0.7347788275259274,
     "c": 0.6603758493979331,
     "arrival_raw": 0.5532827717425802,
-    "ft_idio": -15.503011486440215
+    "ft_idio": -10.335340990960145
    },
    "checkpoints": {
     "Height": 49,
@@ -35399,11 +35400,11 @@
      "Discipline": 9,
      "HelpDefense": 11
     },
-    "latent_ft": 61,
-    "current_ft": 57,
+    "latent_ft": 71,
+    "current_ft": 70,
     "arrival": 0.5532827717425802,
     "e": 0.6202903559811932,
-    "runway_total": 126,
+    "runway_total": 123,
     "rscore": 41.5699696969697,
     "rscore_which": "perim"
    }
@@ -35489,7 +35490,7 @@
     "q": 0.30976378589178943,
     "c": 0.4662816893696504,
     "arrival_raw": 0.6576736710104697,
-    "ft_idio": -0.06757705730835491
+    "ft_idio": -0.04505137153890327
    },
    "checkpoints": {
     "Height": 58,
@@ -35623,8 +35624,8 @@
      "Discipline": 18,
      "HelpDefense": 18
     },
-    "latent_ft": 56,
-    "current_ft": 56,
+    "latent_ft": 64,
+    "current_ft": 64,
     "arrival": 0.6576736710104697,
     "e": 0.7090226203588993,
     "runway_total": 114,
@@ -35713,7 +35714,7 @@
     "q": 0.2744067114718045,
     "c": 0.7040041504106844,
     "arrival_raw": 0.5212729747589842,
-    "ft_idio": 10.535790243754525
+    "ft_idio": 7.023860162503016
    },
    "checkpoints": {
     "Height": 60,
@@ -35847,8 +35848,8 @@
      "Discipline": 15,
      "HelpDefense": 11
     },
-    "latent_ft": 67,
-    "current_ft": 67,
+    "latent_ft": 71,
+    "current_ft": 71,
     "arrival": 0.5212729747589842,
     "e": 0.5930820285451365,
     "runway_total": 145,
@@ -35937,7 +35938,7 @@
     "q": 0.44171389073182216,
     "c": 0.04569108844331151,
     "arrival_raw": 0.5206790672744551,
-    "ft_idio": -1.8311643823703398
+    "ft_idio": -1.22077625491356
    },
    "checkpoints": {
     "Height": 66,
@@ -36071,11 +36072,11 @@
      "Discipline": 23,
      "HelpDefense": 19
     },
-    "latent_ft": 56,
-    "current_ft": 55,
+    "latent_ft": 66,
+    "current_ft": 64,
     "arrival": 0.5206790672744551,
     "e": 0.5925772071832869,
-    "runway_total": 209,
+    "runway_total": 210,
     "rscore": 19.359802395043534,
     "rscore_which": "post"
    }
@@ -36161,7 +36162,7 @@
     "q": 0.5871220793984474,
     "c": 0.5341302411293882,
     "arrival_raw": 0.8246819693466031,
-    "ft_idio": -2.4708259053964827
+    "ft_idio": -1.6472172702643217
    },
    "checkpoints": {
     "Height": 46,
@@ -36295,8 +36296,8 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 74,
-    "current_ft": 73,
+    "latent_ft": 81,
+    "current_ft": 80,
     "arrival": 0.8246819693466031,
     "e": 0.8509796739446126,
     "runway_total": 38,
@@ -36385,7 +36386,7 @@
     "q": 0.39613216189554135,
     "c": 0.20242252568296565,
     "arrival_raw": 0.992466444437571,
-    "ft_idio": 3.338281604796512
+    "ft_idio": 2.2255210698643415
    },
    "checkpoints": {
     "Height": 47,
@@ -36519,8 +36520,8 @@
      "Discipline": 13,
      "HelpDefense": 14
     },
-    "latent_ft": 80,
-    "current_ft": 80,
+    "latent_ft": 84,
+    "current_ft": 84,
     "arrival": 0.992466444437571,
     "e": 0.9935964777719354,
     "runway_total": 1,
@@ -36609,7 +36610,7 @@
     "q": 0.32741917367280976,
     "c": 0.7361902560523449,
     "arrival_raw": 0.5423517782112234,
-    "ft_idio": 11.04898200000004
+    "ft_idio": 7.365988000000026
    },
    "checkpoints": {
     "Height": 68,
@@ -36743,11 +36744,11 @@
      "Discipline": 12,
      "HelpDefense": 10
     },
-    "latent_ft": 80,
-    "current_ft": 73,
+    "latent_ft": 83,
+    "current_ft": 79,
     "arrival": 0.5423517782112234,
     "e": 0.6109990114795398,
-    "runway_total": 122,
+    "runway_total": 119,
     "rscore": 28.116514038342608,
     "rscore_which": "perim"
    }
@@ -36833,7 +36834,7 @@
     "q": 0.47722881536786266,
     "c": 0.20358075921277646,
     "arrival_raw": 0.654621236765066,
-    "ft_idio": -14.702529355956584
+    "ft_idio": -9.80168623730439
    },
    "checkpoints": {
     "Height": 40,
@@ -36967,11 +36968,11 @@
      "Discipline": 17,
      "HelpDefense": 19
     },
-    "latent_ft": 46,
-    "current_ft": 46,
+    "latent_ft": 62,
+    "current_ft": 61,
     "arrival": 0.654621236765066,
     "e": 0.7064280512503062,
-    "runway_total": 124,
+    "runway_total": 125,
     "rscore": 28.858818181818187,
     "rscore_which": "perim"
    }
@@ -37057,7 +37058,7 @@
     "q": 0.24583300570182853,
     "c": 0.33472339643336013,
     "arrival_raw": 0.7735504058017475,
-    "ft_idio": -10.583318985043242
+    "ft_idio": -7.055545990028828
    },
    "checkpoints": {
     "Height": 53,
@@ -37191,11 +37192,11 @@
      "Discipline": 19,
      "HelpDefense": 19
     },
-    "latent_ft": 60,
-    "current_ft": 57,
+    "latent_ft": 72,
+    "current_ft": 70,
     "arrival": 0.7735504058017475,
     "e": 0.8075178449314854,
-    "runway_total": 75,
+    "runway_total": 74,
     "rscore": 29.509212121212123,
     "rscore_which": "perim"
    }
@@ -37281,7 +37282,7 @@
     "q": 0.6374016626420144,
     "c": 0.4277435242563657,
     "arrival_raw": 0.5668579860855492,
-    "ft_idio": 7.4448523117366125
+    "ft_idio": 4.963234874491075
    },
    "checkpoints": {
     "Height": 67,
@@ -37415,8 +37416,8 @@
      "Discipline": 11,
      "HelpDefense": 13
     },
-    "latent_ft": 66,
-    "current_ft": 64,
+    "latent_ft": 73,
+    "current_ft": 71,
     "arrival": 0.5668579860855492,
     "e": 0.6318292881727168,
     "runway_total": 189,
@@ -37505,7 +37506,7 @@
     "q": 0.8496292240143027,
     "c": 0.5551566196979905,
     "arrival_raw": 0.3119525890523177,
-    "ft_idio": 1.994920454299013
+    "ft_idio": 1.3299469695326753
    },
    "checkpoints": {
     "Height": 69,
@@ -37639,11 +37640,11 @@
      "Discipline": 15,
      "HelpDefense": 12
     },
-    "latent_ft": 75,
-    "current_ft": 65,
+    "latent_ft": 79,
+    "current_ft": 74,
     "arrival": 0.3119525890523177,
     "e": 0.41515970069447006,
-    "runway_total": 290,
+    "runway_total": 285,
     "rscore": 22.733997019374073,
     "rscore_which": "perim"
    }
@@ -37729,7 +37730,7 @@
     "q": 0.5392459917900138,
     "c": 0.8955768878051638,
     "arrival_raw": 0.6996254103848683,
-    "ft_idio": -2.9798325968000055
+    "ft_idio": -1.986555064533337
    },
    "checkpoints": {
     "Height": 59,
@@ -37863,11 +37864,11 @@
      "Discipline": 21,
      "HelpDefense": 33
     },
-    "latent_ft": 54,
-    "current_ft": 54,
+    "latent_ft": 64,
+    "current_ft": 63,
     "arrival": 0.6996254103848683,
     "e": 0.744681598827138,
-    "runway_total": 90,
+    "runway_total": 91,
     "rscore": 19.695005717893217,
     "rscore_which": "post"
    }
@@ -37953,7 +37954,7 @@
     "q": 0.5210251673319228,
     "c": 0.7746273782071391,
     "arrival_raw": 0.6149392037759142,
-    "ft_idio": -1.5895697870027228
+    "ft_idio": -1.0597131913351485
    },
    "checkpoints": {
     "Height": 43,
@@ -38087,11 +38088,11 @@
      "Discipline": 9,
      "HelpDefense": 11
     },
-    "latent_ft": 76,
-    "current_ft": 73,
+    "latent_ft": 82,
+    "current_ft": 81,
     "arrival": 0.6149392037759142,
     "e": 0.672698323209527,
-    "runway_total": 97,
+    "runway_total": 95,
     "rscore": 39.641909090909095,
     "rscore_which": "perim"
    }
@@ -38177,7 +38178,7 @@
     "q": 0.33155061233257926,
     "c": 0.38038217509158684,
     "arrival_raw": 0.512310015440084,
-    "ft_idio": -4.4259480065804
+    "ft_idio": -2.950632004386933
    },
    "checkpoints": {
     "Height": 66,
@@ -38311,8 +38312,8 @@
      "Discipline": 17,
      "HelpDefense": 18
     },
-    "latent_ft": 54,
-    "current_ft": 52,
+    "latent_ft": 65,
+    "current_ft": 63,
     "arrival": 0.512310015440084,
     "e": 0.5854635131240714,
     "runway_total": 151,
@@ -38401,7 +38402,7 @@
     "q": 0.18845560958277358,
     "c": 0.4191413671196858,
     "arrival_raw": 0.7988566229351388,
-    "ft_idio": 2.4508318283145147
+    "ft_idio": 1.6338878855430097
    },
    "checkpoints": {
     "Height": 44,
@@ -38535,11 +38536,11 @@
      "Discipline": 11,
      "HelpDefense": 11
     },
-    "latent_ft": 79,
-    "current_ft": 77,
+    "latent_ft": 84,
+    "current_ft": 83,
     "arrival": 0.7988566229351388,
     "e": 0.829028129494868,
-    "runway_total": 49,
+    "runway_total": 48,
     "rscore": 43.220424242424244,
     "rscore_which": "perim"
    }
@@ -38625,7 +38626,7 @@
     "q": 0.08458083355287085,
     "c": 0.8321967859505485,
     "arrival_raw": 0.788138948911306,
-    "ft_idio": -9.74378721309226
+    "ft_idio": -6.495858142061507
    },
    "checkpoints": {
     "Height": 50,
@@ -38759,8 +38760,8 @@
      "Discipline": 13,
      "HelpDefense": 11
     },
-    "latent_ft": 66,
-    "current_ft": 65,
+    "latent_ft": 75,
+    "current_ft": 74,
     "arrival": 0.788138948911306,
     "e": 0.8199181065746101,
     "runway_total": 34,
@@ -38849,7 +38850,7 @@
     "q": 0.7483375869949178,
     "c": 0.2246702028620309,
     "arrival_raw": 0.7915196882537264,
-    "ft_idio": 5.533738285308621
+    "ft_idio": 3.689158856872414
    },
    "checkpoints": {
     "Height": 55,
@@ -38983,11 +38984,11 @@
      "Discipline": 20,
      "HelpDefense": 23
     },
-    "latent_ft": 75,
-    "current_ft": 72,
+    "latent_ft": 82,
+    "current_ft": 80,
     "arrival": 0.7915196882537264,
     "e": 0.8227917350156675,
-    "runway_total": 121,
+    "runway_total": 120,
     "rscore": 35.89751337973705,
     "rscore_which": "perim"
    }
@@ -39073,7 +39074,7 @@
     "q": 0.3436554250930361,
     "c": 0.3932252732688859,
     "arrival_raw": 0.7763621275725079,
-    "ft_idio": -4.56659119835568
+    "ft_idio": -3.0443941322371204
    },
    "checkpoints": {
     "Height": 57,
@@ -39207,8 +39208,8 @@
      "Discipline": 12,
      "HelpDefense": 10
     },
-    "latent_ft": 59,
-    "current_ft": 57,
+    "latent_ft": 71,
+    "current_ft": 69,
     "arrival": 0.7763621275725079,
     "e": 0.8099078084366317,
     "runway_total": 66,
@@ -39297,7 +39298,7 @@
     "q": 0.3771651337736392,
     "c": 0.030613387349311714,
     "arrival_raw": 0.47406631271043437,
-    "ft_idio": -0.14213762622701193
+    "ft_idio": -0.09475841748467462
    },
    "checkpoints": {
     "Height": 63,
@@ -39431,8 +39432,8 @@
      "Discipline": 20,
      "HelpDefense": 17
     },
-    "latent_ft": 64,
-    "current_ft": 59,
+    "latent_ft": 74,
+    "current_ft": 69,
     "arrival": 0.47406631271043437,
     "e": 0.5529563658038692,
     "runway_total": 190,
@@ -39521,7 +39522,7 @@
     "q": 0.3117060565157519,
     "c": 0.41535766817986935,
     "arrival_raw": 0.6429064907310957,
-    "ft_idio": -6.807271320405158
+    "ft_idio": -4.538180880270105
    },
    "checkpoints": {
     "Height": 55,
@@ -39655,8 +39656,8 @@
      "Discipline": 15,
      "HelpDefense": 22
     },
-    "latent_ft": 50,
-    "current_ft": 50,
+    "latent_ft": 61,
+    "current_ft": 61,
     "arrival": 0.6429064907310957,
     "e": 0.6964705171214314,
     "runway_total": 110,
@@ -39745,7 +39746,7 @@
     "q": 0.40634226056407036,
     "c": 0.6911147665394862,
     "arrival_raw": 0.8394032234683821,
-    "ft_idio": 7.194671643034684
+    "ft_idio": 4.7964477620231225
    },
    "checkpoints": {
     "Height": 66,
@@ -39879,11 +39880,11 @@
      "Discipline": 16,
      "HelpDefense": 18
     },
-    "latent_ft": 72,
-    "current_ft": 70,
+    "latent_ft": 78,
+    "current_ft": 77,
     "arrival": 0.8394032234683821,
     "e": 0.8634927399481248,
-    "runway_total": 56,
+    "runway_total": 55,
     "rscore": 32.641783957219246,
     "rscore_which": "perim"
    }
@@ -39969,7 +39970,7 @@
     "q": 0.20356346980977774,
     "c": 0.8824073923243722,
     "arrival_raw": 0.3086549855794322,
-    "ft_idio": 5.302361544732105
+    "ft_idio": 3.53490769648807
    },
    "checkpoints": {
     "Height": 57,
@@ -40103,11 +40104,11 @@
      "Discipline": 11,
      "HelpDefense": 8
     },
-    "latent_ft": 65,
-    "current_ft": 63,
+    "latent_ft": 73,
+    "current_ft": 70,
     "arrival": 0.3086549855794322,
     "e": 0.41235673774251735,
-    "runway_total": 169,
+    "runway_total": 170,
     "rscore": 10.232529629204501,
     "rscore_which": "perim"
    }
@@ -40193,7 +40194,7 @@
     "q": 0.5662681063888133,
     "c": 0.4183198884047196,
     "arrival_raw": 0.5234222594369058,
-    "ft_idio": 6.334123229472621
+    "ft_idio": 4.222748819648414
    },
    "checkpoints": {
     "Height": 51,
@@ -40327,8 +40328,8 @@
      "Discipline": 24,
      "HelpDefense": 18
     },
-    "latent_ft": 68,
-    "current_ft": 65,
+    "latent_ft": 76,
+    "current_ft": 73,
     "arrival": 0.5234222594369058,
     "e": 0.5949089205213699,
     "runway_total": 231,
@@ -40417,7 +40418,7 @@
     "q": 0.314866583387859,
     "c": 0.5441447317233739,
     "arrival_raw": 0.48068556111524885,
-    "ft_idio": -3.154984109751178
+    "ft_idio": -2.1033227398341188
    },
    "checkpoints": {
     "Height": 40,
@@ -40551,11 +40552,11 @@
      "Discipline": 13,
      "HelpDefense": 11
     },
-    "latent_ft": 66,
-    "current_ft": 60,
+    "latent_ft": 78,
+    "current_ft": 73,
     "arrival": 0.48068556111524885,
     "e": 0.5585827269479615,
-    "runway_total": 115,
+    "runway_total": 114,
     "rscore": 28.033225181103965,
     "rscore_which": "perim"
    }
@@ -40641,7 +40642,7 @@
     "q": 0.46991760164533813,
     "c": 0.6569462638444726,
     "arrival_raw": 0.40677406763867474,
-    "ft_idio": 7.145927327537332
+    "ft_idio": 4.763951551691554
    },
    "checkpoints": {
     "Height": 61,
@@ -40775,8 +40776,8 @@
      "Discipline": 14,
      "HelpDefense": 12
     },
-    "latent_ft": 63,
-    "current_ft": 63,
+    "latent_ft": 69,
+    "current_ft": 69,
     "arrival": 0.40677406763867474,
     "e": 0.49575795749287355,
     "runway_total": 177,
@@ -40865,7 +40866,7 @@
     "q": 0.5914143539880293,
     "c": 0.1874413509462991,
     "arrival_raw": 0.621891955640186,
-    "ft_idio": -9.944745533298898
+    "ft_idio": -6.629830355532598
    },
    "checkpoints": {
     "Height": 53,
@@ -40999,11 +41000,11 @@
      "Discipline": 23,
      "HelpDefense": 17
     },
-    "latent_ft": 60,
-    "current_ft": 54,
+    "latent_ft": 72,
+    "current_ft": 68,
     "arrival": 0.621891955640186,
     "e": 0.6786081622941581,
-    "runway_total": 165,
+    "runway_total": 163,
     "rscore": 32.75202516408323,
     "rscore_which": "perim"
    }
@@ -41089,7 +41090,7 @@
     "q": 0.5954878168314153,
     "c": 0.6555878952675047,
     "arrival_raw": 0.7765221104376463,
-    "ft_idio": 0.11909545755166395
+    "ft_idio": 0.0793969717011093
    },
    "checkpoints": {
     "Height": 63,
@@ -41223,8 +41224,8 @@
      "Discipline": 13,
      "HelpDefense": 15
     },
-    "latent_ft": 57,
-    "current_ft": 57,
+    "latent_ft": 66,
+    "current_ft": 66,
     "arrival": 0.7765221104376463,
     "e": 0.8100437938719993,
     "runway_total": 90,
@@ -41313,7 +41314,7 @@
     "q": 0.08170646614502824,
     "c": 0.7880913619660213,
     "arrival_raw": 0.3820275190530593,
-    "ft_idio": 11.141074496643158
+    "ft_idio": 7.4273829977621055
    },
    "checkpoints": {
     "Height": 60,
@@ -41447,8 +41448,8 @@
      "Discipline": 19,
      "HelpDefense": 36
     },
-    "latent_ft": 67,
-    "current_ft": 67,
+    "latent_ft": 71,
+    "current_ft": 71,
     "arrival": 0.3820275190530593,
     "e": 0.47472339119510043,
     "runway_total": 138,
@@ -41537,7 +41538,7 @@
     "q": 0.37787859920441313,
     "c": 0.6422133885285278,
     "arrival_raw": 0.907748018598546,
-    "ft_idio": -5.237960703746278
+    "ft_idio": -3.491973802497519
    },
    "checkpoints": {
     "Height": 42,
@@ -41671,11 +41672,11 @@
      "Discipline": 11,
      "HelpDefense": 12
     },
-    "latent_ft": 62,
-    "current_ft": 60,
+    "latent_ft": 75,
+    "current_ft": 74,
     "arrival": 0.907748018598546,
     "e": 0.9215858158087641,
-    "runway_total": 31,
+    "runway_total": 30,
     "rscore": 25.135272727272728,
     "rscore_which": "perim"
    }
@@ -41761,7 +41762,7 @@
     "q": 0.9176780910519569,
     "c": 0.3380340458127682,
     "arrival_raw": 0.6451236398695666,
-    "ft_idio": -7.9046645010892
+    "ft_idio": -5.2697763340594665
    },
    "checkpoints": {
     "Height": 61,
@@ -41895,11 +41896,11 @@
      "Discipline": 14,
      "HelpDefense": 20
     },
-    "latent_ft": 59,
-    "current_ft": 54,
+    "latent_ft": 71,
+    "current_ft": 67,
     "arrival": 0.6451236398695666,
     "e": 0.6983550938891315,
-    "runway_total": 208,
+    "runway_total": 207,
     "rscore": 28.724799354338842,
     "rscore_which": "perim"
    }
@@ -41985,7 +41986,7 @@
     "q": 0.3365976856340811,
     "c": 0.2494108078957605,
     "arrival_raw": 0.17718844830426805,
-    "ft_idio": 13.056704052965006
+    "ft_idio": 8.704469368643338
    },
    "checkpoints": {
     "Height": 60,
@@ -42119,8 +42120,8 @@
      "Discipline": 16,
      "HelpDefense": 16
     },
-    "latent_ft": 69,
-    "current_ft": 69,
+    "latent_ft": 73,
+    "current_ft": 73,
     "arrival": 0.17718844830426805,
     "e": 0.3006101810586278,
     "runway_total": 283,
@@ -42209,7 +42210,7 @@
     "q": 0.18177158481819353,
     "c": 0.95640727739357,
     "arrival_raw": 0.2664060928820646,
-    "ft_idio": -2.028359137316736
+    "ft_idio": -1.352239424877824
    },
    "checkpoints": {
     "Height": 52,
@@ -42343,11 +42344,11 @@
      "Discipline": 12,
      "HelpDefense": 8
     },
-    "latent_ft": 74,
-    "current_ft": 62,
+    "latent_ft": 80,
+    "current_ft": 74,
     "arrival": 0.2664060928820646,
     "e": 0.37644517894975493,
-    "runway_total": 174,
+    "runway_total": 168,
     "rscore": 20.922909090909094,
     "rscore_which": "perim"
    }
@@ -42433,7 +42434,7 @@
     "q": 0.2824706622675981,
     "c": 0.18623365920081317,
     "arrival_raw": 0.4298192831477178,
-    "ft_idio": -13.003656914714071
+    "ft_idio": -8.66910460980938
    },
    "checkpoints": {
     "Height": 72,
@@ -42567,8 +42568,8 @@
      "Discipline": 17,
      "HelpDefense": 18
     },
-    "latent_ft": 43,
-    "current_ft": 42,
+    "latent_ft": 55,
+    "current_ft": 54,
     "arrival": 0.4298192831477178,
     "e": 0.5153463906755601,
     "runway_total": 184,
@@ -42657,7 +42658,7 @@
     "q": 0.141505053010195,
     "c": 0.7092087368184321,
     "arrival_raw": 0.2302133497540476,
-    "ft_idio": 3.661052777469743
+    "ft_idio": 2.4407018516464953
    },
    "checkpoints": {
     "Height": 71,
@@ -42791,11 +42792,11 @@
      "Discipline": 13,
      "HelpDefense": 9
     },
-    "latent_ft": 61,
-    "current_ft": 59,
+    "latent_ft": 68,
+    "current_ft": 65,
     "arrival": 0.2302133497540476,
     "e": 0.34568134729094047,
-    "runway_total": 197,
+    "runway_total": 198,
     "rscore": 9.32320624288096,
     "rscore_which": "post"
    }
@@ -42881,7 +42882,7 @@
     "q": 0.585470224656949,
     "c": 0.3480289913919633,
     "arrival_raw": 0.5648809736258026,
-    "ft_idio": 1.6570028176855143
+    "ft_idio": 1.1046685451236762
    },
    "checkpoints": {
     "Height": 65,
@@ -43015,11 +43016,11 @@
      "Discipline": 26,
      "HelpDefense": 21
     },
-    "latent_ft": 75,
-    "current_ft": 70,
+    "latent_ft": 79,
+    "current_ft": 77,
     "arrival": 0.5648809736258026,
     "e": 0.6301488275819321,
-    "runway_total": 194,
+    "runway_total": 191,
     "rscore": 31.34142680543755,
     "rscore_which": "perim"
    }
@@ -43105,7 +43106,7 @@
     "q": 0.7738690765030263,
     "c": 0.4452927471854817,
     "arrival_raw": 0.39743804923299597,
-    "ft_idio": 17.69828322053468
+    "ft_idio": 11.798855480356453
    },
    "checkpoints": {
     "Height": 59,
@@ -43239,8 +43240,8 @@
      "Discipline": 15,
      "HelpDefense": 14
     },
-    "latent_ft": 78,
-    "current_ft": 75,
+    "latent_ft": 82,
+    "current_ft": 79,
     "arrival": 0.39743804923299597,
     "e": 0.4878223418480465,
     "runway_total": 347,
@@ -43329,7 +43330,7 @@
     "q": 0.28738084306817235,
     "c": 0.886929377969598,
     "arrival_raw": 0.3924769203901734,
-    "ft_idio": -6.95318010330107
+    "ft_idio": -4.635453402200714
    },
    "checkpoints": {
     "Height": 63,
@@ -43463,11 +43464,11 @@
      "Discipline": 11,
      "HelpDefense": 12
     },
-    "latent_ft": 51,
-    "current_ft": 50,
+    "latent_ft": 62,
+    "current_ft": 60,
     "arrival": 0.3924769203901734,
     "e": 0.4836053823316474,
-    "runway_total": 194,
+    "runway_total": 195,
     "rscore": 20.846724554637287,
     "rscore_which": "perim"
    }
@@ -43553,7 +43554,7 @@
     "q": 0.27787735773516864,
     "c": 0.6325094843885678,
     "arrival_raw": 0.34654929712083465,
-    "ft_idio": -13.764333595636998
+    "ft_idio": -9.176222397091331
    },
    "checkpoints": {
     "Height": 59,
@@ -43687,11 +43688,11 @@
      "Discipline": 14,
      "HelpDefense": 14
     },
-    "latent_ft": 45,
-    "current_ft": 44,
+    "latent_ft": 60,
+    "current_ft": 57,
     "arrival": 0.34654929712083465,
     "e": 0.4445669025527095,
-    "runway_total": 193,
+    "runway_total": 195,
     "rscore": 6.672860696517412,
     "rscore_which": "post"
    }
@@ -43777,7 +43778,7 @@
     "q": 0.7133482151470054,
     "c": 0.5452998614422553,
     "arrival_raw": 0.49791648092437213,
-    "ft_idio": -4.962842462483087
+    "ft_idio": -3.308561641655391
    },
    "checkpoints": {
     "Height": 58,
@@ -43911,11 +43912,11 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 70,
-    "current_ft": 64,
+    "latent_ft": 76,
+    "current_ft": 74,
     "arrival": 0.49791648092437213,
     "e": 0.5732290087857163,
-    "runway_total": 138,
+    "runway_total": 134,
     "rscore": 34.62227272727273,
     "rscore_which": "perim"
    }
@@ -44001,7 +44002,7 @@
     "q": 0.4306552330993794,
     "c": 0.5043373019730994,
     "arrival_raw": 0.5623471287845512,
-    "ft_idio": 7.863933424534161
+    "ft_idio": 5.242622283022774
    },
    "checkpoints": {
     "Height": 57,
@@ -44135,8 +44136,8 @@
      "Discipline": 10,
      "HelpDefense": 17
     },
-    "latent_ft": 68,
-    "current_ft": 66,
+    "latent_ft": 75,
+    "current_ft": 73,
     "arrival": 0.5623471287845512,
     "e": 0.6279950594668685,
     "runway_total": 152,
@@ -44225,7 +44226,7 @@
     "q": 0.6104118819591239,
     "c": 0.49051008695622844,
     "arrival_raw": 0.9090040153551207,
-    "ft_idio": 7.748652129601893
+    "ft_idio": 5.165768086401261
    },
    "checkpoints": {
     "Height": 53,
@@ -44359,11 +44360,11 @@
      "Discipline": 12,
      "HelpDefense": 20
     },
-    "latent_ft": 84,
-    "current_ft": 83,
+    "latent_ft": 86,
+    "current_ft": 86,
     "arrival": 0.9090040153551207,
     "e": 0.9226534130518526,
-    "runway_total": 34,
+    "runway_total": 33,
     "rscore": 52.72083529411765,
     "rscore_which": "perim"
    }
@@ -44449,7 +44450,7 @@
     "q": 0.4275126936226679,
     "c": 0.6332983650763122,
     "arrival_raw": 0.7431385061535156,
-    "ft_idio": 10.816913148784968
+    "ft_idio": 7.211275432523312
    },
    "checkpoints": {
     "Height": 72,
@@ -44583,8 +44584,8 @@
      "Discipline": 16,
      "HelpDefense": 15
     },
-    "latent_ft": 65,
-    "current_ft": 65,
+    "latent_ft": 68,
+    "current_ft": 68,
     "arrival": 0.7431385061535156,
     "e": 0.7816677302304883,
     "runway_total": 96,
@@ -44673,7 +44674,7 @@
     "q": 0.23838917637125653,
     "c": 0.6913661372611506,
     "arrival_raw": 0.5006330899917348,
-    "ft_idio": 17.923949166238323
+    "ft_idio": 11.949299444158882
    },
    "checkpoints": {
     "Height": 59,
@@ -44808,10 +44809,10 @@
      "HelpDefense": 10
     },
     "latent_ft": 91,
-    "current_ft": 83,
+    "current_ft": 87,
     "arrival": 0.5006330899917348,
     "e": 0.5755381264929746,
-    "runway_total": 145,
+    "runway_total": 141,
     "rscore": 26.117239160839162,
     "rscore_which": "perim"
    }
@@ -44897,7 +44898,7 @@
     "q": 0.3582904986665173,
     "c": 0.51680588540129,
     "arrival_raw": 0.7039959389348072,
-    "ft_idio": -5.292641261811491
+    "ft_idio": -3.5284275078743272
    },
    "checkpoints": {
     "Height": 63,
@@ -45031,8 +45032,8 @@
      "Discipline": 13,
      "HelpDefense": 14
     },
-    "latent_ft": 50,
-    "current_ft": 50,
+    "latent_ft": 59,
+    "current_ft": 59,
     "arrival": 0.7039959389348072,
     "e": 0.7483965480945861,
     "runway_total": 97,
@@ -45121,7 +45122,7 @@
     "q": 0.0682842981610298,
     "c": 0.8920722203645193,
     "arrival_raw": 0.21541723825129327,
-    "ft_idio": -9.275838778169188
+    "ft_idio": -6.183892518779459
    },
    "checkpoints": {
     "Height": 68,
@@ -45255,11 +45256,11 @@
      "Discipline": 12,
      "HelpDefense": 9
     },
-    "latent_ft": 61,
-    "current_ft": 49,
+    "latent_ft": 70,
+    "current_ft": 61,
     "arrival": 0.21541723825129327,
     "e": 0.3331046525135993,
-    "runway_total": 174,
+    "runway_total": 171,
     "rscore": 15.414210000000002,
     "rscore_which": "perim"
    }
@@ -45345,7 +45346,7 @@
     "q": 0.7176361125123265,
     "c": 0.9169427431004701,
     "arrival_raw": 0.7149014572335705,
-    "ft_idio": -4.492072493775581
+    "ft_idio": -2.994714995850387
    },
    "checkpoints": {
     "Height": 49,
@@ -45479,8 +45480,8 @@
      "Discipline": 11,
      "HelpDefense": 12
     },
-    "latent_ft": 56,
-    "current_ft": 55,
+    "latent_ft": 67,
+    "current_ft": 66,
     "arrival": 0.7149014572335705,
     "e": 0.7576662386485349,
     "runway_total": 109,
@@ -45569,7 +45570,7 @@
     "q": 0.5393568851290629,
     "c": 0.6234796740586848,
     "arrival_raw": 0.6508881988514141,
-    "ft_idio": 1.1807378109903413
+    "ft_idio": 0.7871585406602275
    },
    "checkpoints": {
     "Height": 61,
@@ -45703,11 +45704,11 @@
      "Discipline": 39,
      "HelpDefense": 41
     },
-    "latent_ft": 58,
-    "current_ft": 57,
+    "latent_ft": 65,
+    "current_ft": 65,
     "arrival": 0.6508881988514141,
     "e": 0.703254969023702,
-    "runway_total": 152,
+    "runway_total": 151,
     "rscore": 27.02915485703701,
     "rscore_which": "post"
    }
@@ -45793,7 +45794,7 @@
     "q": 0.15015268596106512,
     "c": 0.47991758528028855,
     "arrival_raw": 0.3588253777978742,
-    "ft_idio": 10.199590445411294
+    "ft_idio": 6.7997269636075295
    },
    "checkpoints": {
     "Height": 48,
@@ -45927,8 +45928,8 @@
      "Discipline": 15,
      "HelpDefense": 15
     },
-    "latent_ft": 68,
-    "current_ft": 68,
+    "latent_ft": 73,
+    "current_ft": 73,
     "arrival": 0.3588253777978742,
     "e": 0.45500157112819306,
     "runway_total": 127,
@@ -46017,7 +46018,7 @@
     "q": 0.5991213212673145,
     "c": 0.820625749311013,
     "arrival_raw": 0.6283634971937295,
-    "ft_idio": 3.4566569271434053
+    "ft_idio": 2.3044379514289366
    },
    "checkpoints": {
     "Height": 55,
@@ -46151,11 +46152,11 @@
      "Discipline": 9,
      "HelpDefense": 15
     },
-    "latent_ft": 79,
-    "current_ft": 77,
+    "latent_ft": 83,
+    "current_ft": 82,
     "arrival": 0.6283634971937295,
     "e": 0.6841089726146701,
-    "runway_total": 80,
+    "runway_total": 79,
     "rscore": 41.096606060606064,
     "rscore_which": "perim"
    }
@@ -46241,7 +46242,7 @@
     "q": 0.6127529028248481,
     "c": 0.134397868286273,
     "arrival_raw": 0.7458847840466886,
-    "ft_idio": -25.24150904791099
+    "ft_idio": -16.827672698607326
    },
    "checkpoints": {
     "Height": 62,
@@ -46375,8 +46376,8 @@
      "Discipline": 19,
      "HelpDefense": 23
     },
-    "latent_ft": 33,
-    "current_ft": 32,
+    "latent_ft": 51,
+    "current_ft": 50,
     "arrival": 0.7458847840466886,
     "e": 0.7840020664396853,
     "runway_total": 125,
@@ -46465,7 +46466,7 @@
     "q": 0.2588477333985937,
     "c": 0.4536806751117555,
     "arrival_raw": 0.600552071586343,
-    "ft_idio": -2.2684449997899416
+    "ft_idio": -1.5122966665266278
    },
    "checkpoints": {
     "Height": 54,
@@ -46599,11 +46600,11 @@
      "Discipline": 25,
      "HelpDefense": 15
     },
-    "latent_ft": 72,
-    "current_ft": 67,
+    "latent_ft": 79,
+    "current_ft": 77,
     "arrival": 0.600552071586343,
     "e": 0.6604692608483916,
-    "runway_total": 120,
+    "runway_total": 117,
     "rscore": 35.051144863013704,
     "rscore_which": "perim"
    }
@@ -46689,7 +46690,7 @@
     "q": 0.4395237849110628,
     "c": 0.425386246356389,
     "arrival_raw": 0.5861051396122239,
-    "ft_idio": 3.3701536414236486
+    "ft_idio": 2.2467690942824325
    },
    "checkpoints": {
     "Height": 55,
@@ -46823,11 +46824,11 @@
      "Discipline": 14,
      "HelpDefense": 14
     },
-    "latent_ft": 76,
-    "current_ft": 69,
+    "latent_ft": 82,
+    "current_ft": 78,
     "arrival": 0.5861051396122239,
     "e": 0.6481893686703902,
-    "runway_total": 128,
+    "runway_total": 125,
     "rscore": 36.655728194993415,
     "rscore_which": "perim"
    }
@@ -46913,7 +46914,7 @@
     "q": 0.20779057573143592,
     "c": 0.7071330032853463,
     "arrival_raw": 0.18868362829108842,
-    "ft_idio": 6.0829722769112315
+    "ft_idio": 4.055314851274154
    },
    "checkpoints": {
     "Height": 42,
@@ -47047,8 +47048,8 @@
      "Discipline": 12,
      "HelpDefense": 14
     },
-    "latent_ft": 67,
-    "current_ft": 65,
+    "latent_ft": 75,
+    "current_ft": 73,
     "arrival": 0.18868362829108842,
     "e": 0.31038108404742515,
     "runway_total": 223,
@@ -47137,7 +47138,7 @@
     "q": 0.5003203376728342,
     "c": 0.9079698967911732,
     "arrival_raw": 0.6752525824027359,
-    "ft_idio": 14.899798700092104
+    "ft_idio": 9.933199133394737
    },
    "checkpoints": {
     "Height": 42,
@@ -47271,11 +47272,11 @@
      "Discipline": 9,
      "HelpDefense": 9
     },
-    "latent_ft": 92,
-    "current_ft": 90,
+    "latent_ft": 93,
+    "current_ft": 92,
     "arrival": 0.6752525824027359,
     "e": 0.7239646950423255,
-    "runway_total": 98,
+    "runway_total": 97,
     "rscore": 46.61716393606394,
     "rscore_which": "perim"
    }
@@ -47361,7 +47362,7 @@
     "q": 0.18886501803497682,
     "c": 0.16016348195592045,
     "arrival_raw": 0.33335517677710896,
-    "ft_idio": 5.610715964209938
+    "ft_idio": 3.7404773094732917
    },
    "checkpoints": {
     "Height": 48,
@@ -47495,11 +47496,11 @@
      "Discipline": 21,
      "HelpDefense": 18
     },
-    "latent_ft": 81,
-    "current_ft": 70,
+    "latent_ft": 85,
+    "current_ft": 79,
     "arrival": 0.33335517677710896,
     "e": 0.4333519002605426,
-    "runway_total": 175,
+    "runway_total": 170,
     "rscore": 25.74369696969697,
     "rscore_which": "perim"
    }
@@ -47585,7 +47586,7 @@
     "q": 0.5450235800945166,
     "c": 0.2293822135274346,
     "arrival_raw": 0.47812979403093236,
-    "ft_idio": 12.511182104533066
+    "ft_idio": 8.340788069688712
    },
    "checkpoints": {
     "Height": 55,
@@ -47719,8 +47720,8 @@
      "Discipline": 17,
      "HelpDefense": 14
     },
-    "latent_ft": 78,
-    "current_ft": 73,
+    "latent_ft": 84,
+    "current_ft": 79,
     "arrival": 0.47812979403093236,
     "e": 0.5564103249262925,
     "runway_total": 204,
@@ -47809,7 +47810,7 @@
     "q": 0.1487647317845024,
     "c": 0.7183456669277062,
     "arrival_raw": 0.6025744479967284,
-    "ft_idio": 6.362921593831294
+    "ft_idio": 4.241947729220863
    },
    "checkpoints": {
     "Height": 63,
@@ -47943,8 +47944,8 @@
      "Discipline": 13,
      "HelpDefense": 16
     },
-    "latent_ft": 64,
-    "current_ft": 63,
+    "latent_ft": 70,
+    "current_ft": 69,
     "arrival": 0.6025744479967284,
     "e": 0.6621882807972191,
     "runway_total": 109,
@@ -48033,7 +48034,7 @@
     "q": 0.4071641144922485,
     "c": 0.23809968987458507,
     "arrival_raw": 0.36081435835854236,
-    "ft_idio": 2.6375331191540847
+    "ft_idio": 1.75835541276939
    },
    "checkpoints": {
     "Height": 65,
@@ -48167,8 +48168,8 @@
      "Discipline": 19,
      "HelpDefense": 18
     },
-    "latent_ft": 58,
-    "current_ft": 58,
+    "latent_ft": 65,
+    "current_ft": 65,
     "arrival": 0.36081435835854236,
     "e": 0.456692204604761,
     "runway_total": 230,
@@ -48257,7 +48258,7 @@
     "q": 0.29825215273963995,
     "c": 0.8658578413603858,
     "arrival_raw": 0.680421229971421,
-    "ft_idio": -0.9103744743513187
+    "ft_idio": -0.6069163162342125
    },
    "checkpoints": {
     "Height": 60,
@@ -48391,8 +48392,8 @@
      "Discipline": 22,
      "HelpDefense": 28
     },
-    "latent_ft": 62,
-    "current_ft": 59,
+    "latent_ft": 73,
+    "current_ft": 70,
     "arrival": 0.680421229971421,
     "e": 0.7283580454757078,
     "runway_total": 99,
@@ -48481,7 +48482,7 @@
     "q": 0.35762430004031,
     "c": 0.6457097951000966,
     "arrival_raw": 1.0947396664052893,
-    "ft_idio": -4.380727298251421
+    "ft_idio": -2.9204848655009474
    },
    "checkpoints": {
     "Height": 51,
@@ -48615,8 +48616,8 @@
      "Discipline": 14,
      "HelpDefense": 11
     },
-    "latent_ft": 64,
-    "current_ft": 64,
+    "latent_ft": 75,
+    "current_ft": 75,
     "arrival": 1.0,
     "e": 1.0,
     "runway_total": 0,
@@ -48705,7 +48706,7 @@
     "q": 0.8336722914858623,
     "c": 0.8693208080128927,
     "arrival_raw": 0.5258259966407386,
-    "ft_idio": 18.15496358149959
+    "ft_idio": 12.10330905433306
    },
    "checkpoints": {
     "Height": 54,
@@ -48839,8 +48840,8 @@
      "Discipline": 10,
      "HelpDefense": 15
     },
-    "latent_ft": 77,
-    "current_ft": 76,
+    "latent_ft": 80,
+    "current_ft": 79,
     "arrival": 0.5258259966407386,
     "e": 0.5969520971446278,
     "runway_total": 195,
@@ -48929,7 +48930,7 @@
     "q": 0.5705501522438431,
     "c": 0.37843740166333173,
     "arrival_raw": 0.57855992621532,
-    "ft_idio": -6.685297250154855
+    "ft_idio": -4.45686483343657
    },
    "checkpoints": {
     "Height": 58,
@@ -49063,11 +49064,11 @@
      "Discipline": 13,
      "HelpDefense": 15
     },
-    "latent_ft": 68,
-    "current_ft": 65,
+    "latent_ft": 75,
+    "current_ft": 74,
     "arrival": 0.57855992621532,
     "e": 0.6417759372830221,
-    "runway_total": 123,
+    "runway_total": 121,
     "rscore": 38.866757575757575,
     "rscore_which": "perim"
    }
@@ -49153,7 +49154,7 @@
     "q": 0.14458382698312786,
     "c": 0.6093149213502213,
     "arrival_raw": 0.25454907405738036,
-    "ft_idio": -4.24119528417679
+    "ft_idio": -2.8274635227845266
    },
    "checkpoints": {
     "Height": 72,
@@ -49287,8 +49288,8 @@
      "Discipline": 14,
      "HelpDefense": 14
     },
-    "latent_ft": 50,
-    "current_ft": 50,
+    "latent_ft": 58,
+    "current_ft": 58,
     "arrival": 0.25454907405738036,
     "e": 0.3663667129487733,
     "runway_total": 156,
@@ -49377,7 +49378,7 @@
     "q": 0.39673533328999855,
     "c": 0.4963272228427104,
     "arrival_raw": 0.5722775996703141,
-    "ft_idio": -14.21955687067565
+    "ft_idio": -9.479704580450434
    },
    "checkpoints": {
     "Height": 70,
@@ -49511,11 +49512,11 @@
      "Discipline": 13,
      "HelpDefense": 13
     },
-    "latent_ft": 42,
-    "current_ft": 41,
+    "latent_ft": 54,
+    "current_ft": 54,
     "arrival": 0.5722775996703141,
     "e": 0.636435959719767,
-    "runway_total": 165,
+    "runway_total": 164,
     "rscore": 29.167883046089703,
     "rscore_which": "post"
    }
@@ -49601,7 +49602,7 @@
     "q": 0.626796713711778,
     "c": 0.30957298084181556,
     "arrival_raw": 0.5480783836785033,
-    "ft_idio": 11.4911812220626
+    "ft_idio": 7.660787481375067
    },
    "checkpoints": {
     "Height": 59,
@@ -49735,8 +49736,8 @@
      "Discipline": 16,
      "HelpDefense": 14
     },
-    "latent_ft": 71,
-    "current_ft": 69,
+    "latent_ft": 77,
+    "current_ft": 75,
     "arrival": 0.5480783836785033,
     "e": 0.6158666261267277,
     "runway_total": 208,
@@ -49825,7 +49826,7 @@
     "q": 0.10711950108818426,
     "c": 0.40949600704244354,
     "arrival_raw": 0.5154322498815974,
-    "ft_idio": -14.15238346801402
+    "ft_idio": -9.434922312009348
    },
    "checkpoints": {
     "Height": 57,
@@ -49959,11 +49960,11 @@
      "Discipline": 11,
      "HelpDefense": 14
     },
-    "latent_ft": 45,
-    "current_ft": 44,
+    "latent_ft": 60,
+    "current_ft": 58,
     "arrival": 0.5154322498815974,
     "e": 0.5881174123993578,
-    "runway_total": 124,
+    "runway_total": 125,
     "rscore": 12.549946354166668,
     "rscore_which": "perim"
    }
@@ -50049,7 +50050,7 @@
     "q": 0.5031033129330145,
     "c": 0.33281805102751466,
     "arrival_raw": 0.9348830294227621,
-    "ft_idio": -3.970557587190534
+    "ft_idio": -2.647038391460356
    },
    "checkpoints": {
     "Height": 46,
@@ -50183,11 +50184,11 @@
      "Discipline": 13,
      "HelpDefense": 12
     },
-    "latent_ft": 60,
-    "current_ft": 60,
+    "latent_ft": 73,
+    "current_ft": 72,
     "arrival": 0.9348830294227621,
     "e": 0.9446505750093478,
-    "runway_total": 25,
+    "runway_total": 26,
     "rscore": 46.34,
     "rscore_which": "perim"
    }
@@ -50273,7 +50274,7 @@
     "q": 0.9148910770719499,
     "c": 0.8976012584076118,
     "arrival_raw": 0.42655019339039985,
-    "ft_idio": 2.0732029146640647
+    "ft_idio": 1.3821352764427097
    },
    "checkpoints": {
     "Height": 62,
@@ -50407,11 +50408,11 @@
      "Discipline": 15,
      "HelpDefense": 9
     },
-    "latent_ft": 75,
-    "current_ft": 66,
+    "latent_ft": 80,
+    "current_ft": 75,
     "arrival": 0.42655019339039985,
     "e": 0.5125676643818399,
-    "runway_total": 221,
+    "runway_total": 217,
     "rscore": 29.325142424242433,
     "rscore_which": "perim"
    }
@@ -50497,7 +50498,7 @@
     "q": 0.15365620156316315,
     "c": 0.7561819231599879,
     "arrival_raw": 0.6423114896917417,
-    "ft_idio": 6.337514887552971
+    "ft_idio": 4.225009925035314
    },
    "checkpoints": {
     "Height": 70,
@@ -50631,11 +50632,11 @@
      "Discipline": 9,
      "HelpDefense": 10
     },
-    "latent_ft": 75,
-    "current_ft": 70,
+    "latent_ft": 80,
+    "current_ft": 77,
     "arrival": 0.6423114896917417,
     "e": 0.6959647662379804,
-    "runway_total": 108,
+    "runway_total": 106,
     "rscore": 24.215159770114944,
     "rscore_which": "perim"
    }
@@ -50721,7 +50722,7 @@
     "q": 0.23632224748056818,
     "c": 0.18316663987262213,
     "arrival_raw": 0.6011602070247626,
-    "ft_idio": -12.999503507223194
+    "ft_idio": -8.66633567148213
    },
    "checkpoints": {
     "Height": 40,
@@ -50855,11 +50856,11 @@
      "Discipline": 13,
      "HelpDefense": 12
     },
-    "latent_ft": 56,
-    "current_ft": 51,
+    "latent_ft": 72,
+    "current_ft": 68,
     "arrival": 0.6011602070247626,
     "e": 0.6609861759710483,
-    "runway_total": 111,
+    "runway_total": 110,
     "rscore": 31.270575757575763,
     "rscore_which": "perim"
    }
@@ -50945,7 +50946,7 @@
     "q": 0.30704580087559535,
     "c": 0.18161009318109236,
     "arrival_raw": 0.2407445252392888,
-    "ft_idio": -12.785356044289413
+    "ft_idio": -8.523570696192943
    },
    "checkpoints": {
     "Height": 67,
@@ -51079,11 +51080,11 @@
      "Discipline": 25,
      "HelpDefense": 20
     },
-    "latent_ft": 47,
-    "current_ft": 43,
+    "latent_ft": 61,
+    "current_ft": 56,
     "arrival": 0.2407445252392888,
     "e": 0.35463284645339543,
-    "runway_total": 261,
+    "runway_total": 262,
     "rscore": 9.40743245243129,
     "rscore_which": "perim"
    }
@@ -51169,7 +51170,7 @@
     "q": 0.44271806021784865,
     "c": 0.2822671826278804,
     "arrival_raw": 0.6255335505745842,
-    "ft_idio": 5.224120341337063
+    "ft_idio": 3.482746894224708
    },
    "checkpoints": {
     "Height": 40,
@@ -51303,11 +51304,11 @@
      "Discipline": 17,
      "HelpDefense": 12
     },
-    "latent_ft": 83,
-    "current_ft": 80,
+    "latent_ft": 87,
+    "current_ft": 86,
     "arrival": 0.6255335505745842,
     "e": 0.6817035179883966,
-    "runway_total": 85,
+    "runway_total": 83,
     "rscore": 37.96578918153499,
     "rscore_which": "perim"
    }
@@ -51393,7 +51394,7 @@
     "q": 0.27836658952899707,
     "c": 0.24811011272973998,
     "arrival_raw": 0.667478421859532,
-    "ft_idio": -1.573617464167893
+    "ft_idio": -1.049078309445262
    },
    "checkpoints": {
     "Height": 64,
@@ -51527,11 +51528,11 @@
      "Discipline": 12,
      "HelpDefense": 14
     },
-    "latent_ft": 68,
-    "current_ft": 62,
+    "latent_ft": 75,
+    "current_ft": 72,
     "arrival": 0.667478421859532,
     "e": 0.7173566585806022,
-    "runway_total": 116,
+    "runway_total": 113,
     "rscore": 20.899656876456877,
     "rscore_which": "perim"
    }
@@ -51617,7 +51618,7 @@
     "q": 0.5206861388248457,
     "c": 0.10703782835169424,
     "arrival_raw": 0.900098115383917,
-    "ft_idio": -5.237144678056665
+    "ft_idio": -3.49142978537111
    },
    "checkpoints": {
     "Height": 52,
@@ -51751,8 +51752,8 @@
      "Discipline": 25,
      "HelpDefense": 28
     },
-    "latent_ft": 56,
-    "current_ft": 55,
+    "latent_ft": 68,
+    "current_ft": 67,
     "arrival": 0.900098115383917,
     "e": 0.9150833980763294,
     "runway_total": 46,
@@ -51841,7 +51842,7 @@
     "q": 0.6669935014761642,
     "c": 0.5864315357271259,
     "arrival_raw": 0.3199540171139823,
-    "ft_idio": -2.615502254545717
+    "ft_idio": -1.7436681696971448
    },
    "checkpoints": {
     "Height": 66,
@@ -51975,8 +51976,8 @@
      "Discipline": 18,
      "HelpDefense": 30
     },
-    "latent_ft": 53,
-    "current_ft": 53,
+    "latent_ft": 61,
+    "current_ft": 61,
     "arrival": 0.3199540171139823,
     "e": 0.4219609145468849,
     "runway_total": 348,
@@ -52065,7 +52066,7 @@
     "q": 0.5721608722791748,
     "c": 0.5419199733354156,
     "arrival_raw": 0.623185098060971,
-    "ft_idio": 0.6567792215195525
+    "ft_idio": 0.43785281434636836
    },
    "checkpoints": {
     "Height": 68,
@@ -52199,11 +52200,11 @@
      "Discipline": 17,
      "HelpDefense": 24
     },
-    "latent_ft": 73,
-    "current_ft": 68,
+    "latent_ft": 77,
+    "current_ft": 76,
     "arrival": 0.623185098060971,
     "e": 0.6797073333518253,
-    "runway_total": 148,
+    "runway_total": 144,
     "rscore": 28.791163462374953,
     "rscore_which": "perim"
    }
@@ -52289,7 +52290,7 @@
     "q": 0.8681557161215778,
     "c": 0.15657302277405746,
     "arrival_raw": 0.6911433327973171,
-    "ft_idio": 2.464355474740139
+    "ft_idio": 1.6429036498267595
    },
    "checkpoints": {
     "Height": 42,
@@ -52423,11 +52424,11 @@
      "Discipline": 34,
      "HelpDefense": 38
     },
-    "latent_ft": 73,
-    "current_ft": 69,
+    "latent_ft": 82,
+    "current_ft": 79,
     "arrival": 0.6911433327973171,
     "e": 0.7374718328777196,
-    "runway_total": 181,
+    "runway_total": 180,
     "rscore": 34.86467774707562,
     "rscore_which": "perim"
    }
@@ -52513,7 +52514,7 @@
     "q": 0.5494045025223159,
     "c": 0.2265728794420978,
     "arrival_raw": 0.8993349156490562,
-    "ft_idio": 11.231583135170526
+    "ft_idio": 7.487722090113684
    },
    "checkpoints": {
     "Height": 55,
@@ -52647,11 +52648,11 @@
      "Discipline": 17,
      "HelpDefense": 20
     },
-    "latent_ft": 82,
-    "current_ft": 80,
+    "latent_ft": 86,
+    "current_ft": 85,
     "arrival": 0.8993349156490562,
     "e": 0.9144346783016978,
-    "runway_total": 45,
+    "runway_total": 44,
     "rscore": 30.659681818181816,
     "rscore_which": "perim"
    }
@@ -52737,7 +52738,7 @@
     "q": 0.4785178165020056,
     "c": 0.5531639751187458,
     "arrival_raw": 0.5967930479875123,
-    "ft_idio": -10.269040902663876
+    "ft_idio": -6.846027268442584
    },
    "checkpoints": {
     "Height": 47,
@@ -52871,11 +52872,11 @@
      "Discipline": 10,
      "HelpDefense": 14
     },
-    "latent_ft": 50,
-    "current_ft": 49,
+    "latent_ft": 64,
+    "current_ft": 62,
     "arrival": 0.5967930479875123,
     "e": 0.6572740907893855,
-    "runway_total": 153,
+    "runway_total": 154,
     "rscore": 14.289286990551224,
     "rscore_which": "perim"
    }
@@ -52961,7 +52962,7 @@
     "q": 0.5697540896008303,
     "c": 0.40001731299704274,
     "arrival_raw": 0.5509931169971214,
-    "ft_idio": 10.20307096838071
+    "ft_idio": 6.802047312253807
    },
    "checkpoints": {
     "Height": 51,
@@ -53095,11 +53096,11 @@
      "Discipline": 11,
      "HelpDefense": 11
     },
-    "latent_ft": 86,
-    "current_ft": 82,
+    "latent_ft": 88,
+    "current_ft": 87,
     "arrival": 0.5509931169971214,
     "e": 0.6183441494475531,
-    "runway_total": 103,
+    "runway_total": 100,
     "rscore": 37.62818181818182,
     "rscore_which": "perim"
    }
@@ -53185,7 +53186,7 @@
     "q": 0.2026182953204332,
     "c": 0.782796947171518,
     "arrival_raw": 0.08675991282336082,
-    "ft_idio": -4.1585254023375215
+    "ft_idio": -2.7723502682250145
    },
    "checkpoints": {
     "Height": 76,
@@ -53319,11 +53320,11 @@
      "Discipline": 8,
      "HelpDefense": 10
     },
-    "latent_ft": 50,
-    "current_ft": 50,
+    "latent_ft": 59,
+    "current_ft": 58,
     "arrival": 0.08675991282336082,
     "e": 0.2237459258998567,
-    "runway_total": 174,
+    "runway_total": 175,
     "rscore": 12.643641137714216,
     "rscore_which": "post"
    }
@@ -53409,7 +53410,7 @@
     "q": 0.292698123375154,
     "c": 0.45406773590385113,
     "arrival_raw": 0.8648792822705367,
-    "ft_idio": 1.566807794828735
+    "ft_idio": 1.0445385298858232
    },
    "checkpoints": {
     "Height": 49,
@@ -53543,8 +53544,8 @@
      "Discipline": 12,
      "HelpDefense": 13
     },
-    "latent_ft": 59,
-    "current_ft": 59,
+    "latent_ft": 67,
+    "current_ft": 67,
     "arrival": 0.8648792822705367,
     "e": 0.8851473899299562,
     "runway_total": 38,
@@ -53633,7 +53634,7 @@
     "q": 0.48309317551524694,
     "c": 0.3185256884792092,
     "arrival_raw": 1.0375420510075397,
-    "ft_idio": 20.024444782768533
+    "ft_idio": 13.349629855179023
    },
    "checkpoints": {
     "Height": 48,
@@ -53767,8 +53768,8 @@
      "Discipline": 11,
      "HelpDefense": 11
     },
-    "latent_ft": 90,
-    "current_ft": 90,
+    "latent_ft": 93,
+    "current_ft": 93,
     "arrival": 1.0,
     "e": 1.0,
     "runway_total": 0,
@@ -53857,7 +53858,7 @@
     "q": 0.3569378388644897,
     "c": 0.4513474677736595,
     "arrival_raw": 0.6422930978259542,
-    "ft_idio": 0.23109927358412385
+    "ft_idio": 0.1540661823894159
    },
    "checkpoints": {
     "Height": 72,
@@ -53991,11 +53992,11 @@
      "Discipline": 22,
      "HelpDefense": 20
     },
-    "latent_ft": 55,
-    "current_ft": 55,
+    "latent_ft": 63,
+    "current_ft": 62,
     "arrival": 0.6422930978259542,
     "e": 0.6959491331520611,
-    "runway_total": 131,
+    "runway_total": 132,
     "rscore": 30.122613067852463,
     "rscore_which": "post"
    }
@@ -54081,7 +54082,7 @@
     "q": 0.6908257754484401,
     "c": 0.09836510884741775,
     "arrival_raw": 0.5561606605290647,
-    "ft_idio": 1.4537117617645814
+    "ft_idio": 0.9691411745097209
    },
    "checkpoints": {
     "Height": 66,
@@ -54215,11 +54216,11 @@
      "Discipline": 35,
      "HelpDefense": 30
     },
-    "latent_ft": 59,
-    "current_ft": 58,
+    "latent_ft": 68,
+    "current_ft": 66,
     "arrival": 0.5561606605290647,
     "e": 0.6227365614497049,
-    "runway_total": 253,
+    "runway_total": 254,
     "rscore": 21.468973727263418,
     "rscore_which": "post"
    }
@@ -54305,7 +54306,7 @@
     "q": 0.571108088556764,
     "c": 0.5803568879512332,
     "arrival_raw": 0.6558912644401669,
-    "ft_idio": -9.055824581932841
+    "ft_idio": -6.037216387955228
    },
    "checkpoints": {
     "Height": 52,
@@ -54439,8 +54440,8 @@
      "Discipline": 11,
      "HelpDefense": 8
     },
-    "latent_ft": 49,
-    "current_ft": 49,
+    "latent_ft": 61,
+    "current_ft": 61,
     "arrival": 0.6558912644401669,
     "e": 0.7075075747741418,
     "runway_total": 91,
@@ -54529,7 +54530,7 @@
     "q": 0.44301304059686936,
     "c": 0.7933555554852127,
     "arrival_raw": 0.6091217025526744,
-    "ft_idio": -0.35049685472561964
+    "ft_idio": -0.23366456981707978
    },
    "checkpoints": {
     "Height": 63,
@@ -54663,8 +54664,8 @@
      "Discipline": 9,
      "HelpDefense": 12
     },
-    "latent_ft": 55,
-    "current_ft": 55,
+    "latent_ft": 62,
+    "current_ft": 62,
     "arrival": 0.6091217025526744,
     "e": 0.6677534471697733,
     "runway_total": 106,
@@ -54753,7 +54754,7 @@
     "q": 0.5275930634412057,
     "c": 0.5481887576896385,
     "arrival_raw": 0.821189743218425,
-    "ft_idio": 11.901372197039423
+    "ft_idio": 7.934248131359615
    },
    "checkpoints": {
     "Height": 40,
@@ -54887,8 +54888,8 @@
      "Discipline": 11,
      "HelpDefense": 10
     },
-    "latent_ft": 89,
-    "current_ft": 88,
+    "latent_ft": 92,
+    "current_ft": 91,
     "arrival": 0.821189743218425,
     "e": 0.8480112817356612,
     "runway_total": 55,
@@ -54977,7 +54978,7 @@
     "q": 0.16621616737506598,
     "c": 0.6912542242373709,
     "arrival_raw": 0.417387461978233,
-    "ft_idio": 25.104425412703797
+    "ft_idio": 16.736283608469197
    },
    "checkpoints": {
     "Height": 48,
@@ -55201,7 +55202,7 @@
     "q": 0.28384910297201155,
     "c": 0.5500492807636147,
     "arrival_raw": 0.4670974030155159,
-    "ft_idio": 2.7599444551049386
+    "ft_idio": 1.839962970069959
    },
    "checkpoints": {
     "Height": 67,
@@ -55335,11 +55336,11 @@
      "Discipline": 11,
      "HelpDefense": 12
     },
-    "latent_ft": 76,
-    "current_ft": 70,
+    "latent_ft": 79,
+    "current_ft": 77,
     "arrival": 0.4670974030155159,
     "e": 0.5470327925631885,
-    "runway_total": 126,
+    "runway_total": 122,
     "rscore": 32.710575232523254,
     "rscore_which": "perim"
    }
@@ -55425,7 +55426,7 @@
     "q": 0.5581783236040837,
     "c": 0.8020437781423346,
     "arrival_raw": 0.6269299921732165,
-    "ft_idio": -1.0732897842735112
+    "ft_idio": -0.7155265228490074
    },
    "checkpoints": {
     "Height": 52,
@@ -55559,11 +55560,11 @@
      "Discipline": 29,
      "HelpDefense": 22
     },
-    "latent_ft": 57,
-    "current_ft": 57,
+    "latent_ft": 67,
+    "current_ft": 66,
     "arrival": 0.6269299921732165,
     "e": 0.6828904933472341,
-    "runway_total": 129,
+    "runway_total": 130,
     "rscore": 12.12258683394166,
     "rscore_which": "post"
    }
@@ -55649,7 +55650,7 @@
     "q": 0.5904460294001846,
     "c": 0.16857446698080375,
     "arrival_raw": 0.8660827775346742,
-    "ft_idio": 0.6771635043297034
+    "ft_idio": 0.4514423362198023
    },
    "checkpoints": {
     "Height": 53,
@@ -55783,11 +55784,11 @@
      "Discipline": 26,
      "HelpDefense": 18
     },
-    "latent_ft": 61,
-    "current_ft": 61,
+    "latent_ft": 72,
+    "current_ft": 71,
     "arrival": 0.8660827775346742,
     "e": 0.8861703609044731,
-    "runway_total": 58,
+    "runway_total": 59,
     "rscore": 16.845066403162058,
     "rscore_which": "perim"
    }
@@ -55873,7 +55874,7 @@
     "q": 0.3098738269144914,
     "c": 0.2220252567037178,
     "arrival_raw": 0.7907059426456032,
-    "ft_idio": -2.6284421482788134
+    "ft_idio": -1.752294765519209
    },
    "checkpoints": {
     "Height": 61,
@@ -56007,11 +56008,11 @@
      "Discipline": 16,
      "HelpDefense": 15
     },
-    "latent_ft": 71,
-    "current_ft": 70,
+    "latent_ft": 77,
+    "current_ft": 77,
     "arrival": 0.7907059426456032,
     "e": 0.8221000512487627,
-    "runway_total": 52,
+    "runway_total": 51,
     "rscore": 46.31032542372883,
     "rscore_which": "perim"
    }
@@ -56097,7 +56098,7 @@
     "q": 0.5637756943597665,
     "c": 0.1973863778753631,
     "arrival_raw": 0.3829506894591873,
-    "ft_idio": -5.149950124274223
+    "ft_idio": -3.433300082849482
    },
    "checkpoints": {
     "Height": 63,
@@ -56231,11 +56232,11 @@
      "Discipline": 13,
      "HelpDefense": 17
     },
-    "latent_ft": 67,
-    "current_ft": 57,
+    "latent_ft": 74,
+    "current_ft": 68,
     "arrival": 0.3829506894591873,
     "e": 0.47550808604030925,
-    "runway_total": 275,
+    "runway_total": 271,
     "rscore": 18.64222266666667,
     "rscore_which": "perim"
    }
@@ -56321,7 +56322,7 @@
     "q": 0.6199398918422921,
     "c": 0.6661085468295644,
     "arrival_raw": 0.6333026340314407,
-    "ft_idio": -2.3805573497238193
+    "ft_idio": -1.587038233149213
    },
    "checkpoints": {
     "Height": 40,
@@ -56455,8 +56456,8 @@
      "Discipline": 13,
      "HelpDefense": 12
     },
-    "latent_ft": 59,
-    "current_ft": 58,
+    "latent_ft": 70,
+    "current_ft": 69,
     "arrival": 0.6333026340314407,
     "e": 0.6883072389267246,
     "runway_total": 131,
@@ -56545,7 +56546,7 @@
     "q": 0.3909311755715967,
     "c": 0.27905751058198663,
     "arrival_raw": 0.7323432659437115,
-    "ft_idio": -1.0144752643479402
+    "ft_idio": -0.6763168428986268
    },
    "checkpoints": {
     "Height": 43,
@@ -56679,11 +56680,11 @@
      "Discipline": 16,
      "HelpDefense": 18
     },
-    "latent_ft": 73,
-    "current_ft": 69,
+    "latent_ft": 81,
+    "current_ft": 80,
     "arrival": 0.7323432659437115,
     "e": 0.7724917760521548,
-    "runway_total": 107,
+    "runway_total": 104,
     "rscore": 29.098943163922694,
     "rscore_which": "perim"
    }
@@ -56769,7 +56770,7 @@
     "q": 0.49502271196248987,
     "c": 0.15498828849814775,
     "arrival_raw": 0.5284917679305405,
-    "ft_idio": 3.2903623801668362
+    "ft_idio": 2.193574920111224
    },
    "checkpoints": {
     "Height": 44,
@@ -56903,11 +56904,11 @@
      "Discipline": 17,
      "HelpDefense": 19
     },
-    "latent_ft": 67,
-    "current_ft": 64,
+    "latent_ft": 78,
+    "current_ft": 74,
     "arrival": 0.5284917679305405,
     "e": 0.5992180027409595,
-    "runway_total": 195,
+    "runway_total": 196,
     "rscore": 12.364111809991812,
     "rscore_which": "perim"
    }
@@ -56993,7 +56994,7 @@
     "q": 0.4250086257297816,
     "c": 0.5393404612700747,
     "arrival_raw": 0.5883126450941705,
-    "ft_idio": -9.30778994703567
+    "ft_idio": -6.205193298023781
    },
    "checkpoints": {
     "Height": 55,
@@ -57127,11 +57128,11 @@
      "Discipline": 11,
      "HelpDefense": 14
     },
-    "latent_ft": 50,
-    "current_ft": 49,
+    "latent_ft": 63,
+    "current_ft": 61,
     "arrival": 0.5883126450941705,
     "e": 0.6500657483300449,
-    "runway_total": 138,
+    "runway_total": 139,
     "rscore": 15.141190000000002,
     "rscore_which": "perim"
    }
@@ -57217,7 +57218,7 @@
     "q": 0.4123521662881079,
     "c": 0.14315856936156154,
     "arrival_raw": 0.5019352214181003,
-    "ft_idio": 1.3035985666334353
+    "ft_idio": 0.8690657110889568
    },
    "checkpoints": {
     "Height": 44,
@@ -57351,11 +57352,11 @@
      "Discipline": 16,
      "HelpDefense": 15
     },
-    "latent_ft": 67,
-    "current_ft": 63,
+    "latent_ft": 78,
+    "current_ft": 73,
     "arrival": 0.5019352214181003,
     "e": 0.5766449382053852,
-    "runway_total": 171,
+    "runway_total": 172,
     "rscore": 16.800848484848487,
     "rscore_which": "perim"
    }
@@ -57441,7 +57442,7 @@
     "q": 0.583206466273689,
     "c": 0.19242042919117047,
     "arrival_raw": 0.4826776917071578,
-    "ft_idio": 8.411532481728214
+    "ft_idio": 5.607688321152143
    },
    "checkpoints": {
     "Height": 63,
@@ -57575,8 +57576,8 @@
      "Discipline": 20,
      "HelpDefense": 25
     },
-    "latent_ft": 72,
-    "current_ft": 67,
+    "latent_ft": 79,
+    "current_ft": 74,
     "arrival": 0.4826776917071578,
     "e": 0.5602760379510842,
     "runway_total": 257,
@@ -57665,7 +57666,7 @@
     "q": 0.22928714038423384,
     "c": 0.6998587374559524,
     "arrival_raw": 0.6690870098259503,
-    "ft_idio": 7.341899312729003
+    "ft_idio": 4.8945995418193355
    },
    "checkpoints": {
     "Height": 73,
@@ -57799,8 +57800,8 @@
      "Discipline": 16,
      "HelpDefense": 14
     },
-    "latent_ft": 61,
-    "current_ft": 61,
+    "latent_ft": 65,
+    "current_ft": 65,
     "arrival": 0.6690870098259503,
     "e": 0.7187239583520577,
     "runway_total": 104,
@@ -57889,7 +57890,7 @@
     "q": 0.6307577755538805,
     "c": 0.5607237790950733,
     "arrival_raw": 0.6657788087374581,
-    "ft_idio": 12.875799409414954
+    "ft_idio": 8.583866272943304
    },
    "checkpoints": {
     "Height": 64,
@@ -58023,11 +58024,11 @@
      "Discipline": 11,
      "HelpDefense": 11
     },
-    "latent_ft": 83,
-    "current_ft": 78,
+    "latent_ft": 85,
+    "current_ft": 83,
     "arrival": 0.6657788087374581,
     "e": 0.7159119874268394,
-    "runway_total": 120,
+    "runway_total": 117,
     "rscore": 30.380061236802415,
     "rscore_which": "perim"
    }
@@ -58113,7 +58114,7 @@
     "q": 0.7712087475322856,
     "c": 0.5896869610421681,
     "arrival_raw": 0.8215256950706349,
-    "ft_idio": 17.284734544081548
+    "ft_idio": 11.523156362721032
    },
    "checkpoints": {
     "Height": 65,
@@ -58247,8 +58248,8 @@
      "Discipline": 18,
      "HelpDefense": 12
     },
-    "latent_ft": 73,
-    "current_ft": 73,
+    "latent_ft": 74,
+    "current_ft": 74,
     "arrival": 0.8215256950706349,
     "e": 0.8482968408100396,
     "runway_total": 69,
@@ -58337,7 +58338,7 @@
     "q": 0.3740734487381384,
     "c": 0.7080131268245672,
     "arrival_raw": 0.6900079351093669,
-    "ft_idio": 17.393162825528368
+    "ft_idio": 11.595441883685579
    },
    "checkpoints": {
     "Height": 40,
@@ -58471,11 +58472,11 @@
      "Discipline": 11,
      "HelpDefense": 14
     },
-    "latent_ft": 79,
-    "current_ft": 78,
+    "latent_ft": 85,
+    "current_ft": 83,
     "arrival": 0.6900079351093669,
     "e": 0.7365067448429619,
-    "runway_total": 89,
+    "runway_total": 90,
     "rscore": 33.744912950558216,
     "rscore_which": "perim"
    }
@@ -58561,7 +58562,7 @@
     "q": 0.49377172444066664,
     "c": 0.2811519481239034,
     "arrival_raw": 0.3175346718062346,
-    "ft_idio": 2.267657103272489
+    "ft_idio": 1.5117714021816593
    },
    "checkpoints": {
     "Height": 63,
@@ -58695,11 +58696,11 @@
      "Discipline": 14,
      "HelpDefense": 14
     },
-    "latent_ft": 76,
-    "current_ft": 64,
+    "latent_ft": 80,
+    "current_ft": 74,
     "arrival": 0.3175346718062346,
     "e": 0.4199044710352994,
-    "runway_total": 218,
+    "runway_total": 212,
     "rscore": 20.468009090909092,
     "rscore_which": "perim"
    }
@@ -58785,7 +58786,7 @@
     "q": 0.5885324801185515,
     "c": 0.33608669437101707,
     "arrival_raw": 0.5258426805669574,
-    "ft_idio": 4.7265284225609925
+    "ft_idio": 3.151018948373995
    },
    "checkpoints": {
     "Height": 59,
@@ -58919,8 +58920,8 @@
      "Discipline": 19,
      "HelpDefense": 13
     },
-    "latent_ft": 70,
-    "current_ft": 65,
+    "latent_ft": 78,
+    "current_ft": 73,
     "arrival": 0.5258426805669574,
     "e": 0.5969662784819137,
     "runway_total": 219,
@@ -59009,7 +59010,7 @@
     "q": 0.19489157290870843,
     "c": 0.6537108101988947,
     "arrival_raw": 0.5640743694109608,
-    "ft_idio": 11.455163973057946
+    "ft_idio": 7.63677598203863
    },
    "checkpoints": {
     "Height": 53,
@@ -59143,11 +59144,11 @@
      "Discipline": 9,
      "HelpDefense": 12
     },
-    "latent_ft": 87,
-    "current_ft": 83,
+    "latent_ft": 88,
+    "current_ft": 87,
     "arrival": 0.5640743694109608,
     "e": 0.6294632139993166,
-    "runway_total": 100,
+    "runway_total": 97,
     "rscore": 35.30364301075269,
     "rscore_which": "perim"
    }
@@ -59233,7 +59234,7 @@
     "q": 0.046200623768608076,
     "c": 0.4204880623038758,
     "arrival_raw": 0.7588142492434394,
-    "ft_idio": -6.414628539154207
+    "ft_idio": -4.276419026102804
    },
    "checkpoints": {
     "Height": 57,
@@ -59367,11 +59368,11 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 52,
-    "current_ft": 52,
+    "latent_ft": 64,
+    "current_ft": 63,
     "arrival": 0.7588142492434394,
     "e": 0.7949921118569235,
-    "runway_total": 45,
+    "runway_total": 46,
     "rscore": 13.744558545454545,
     "rscore_which": "perim"
    }
@@ -59457,7 +59458,7 @@
     "q": 0.4728115252162318,
     "c": 0.8659271899003195,
     "arrival_raw": 0.7252211903499141,
-    "ft_idio": 3.0809609009390257
+    "ft_idio": 2.0539739339593504
    },
    "checkpoints": {
     "Height": 40,
@@ -59591,8 +59592,8 @@
      "Discipline": 13,
      "HelpDefense": 16
     },
-    "latent_ft": 62,
-    "current_ft": 62,
+    "latent_ft": 70,
+    "current_ft": 70,
     "arrival": 0.7252211903499141,
     "e": 0.766438011797427,
     "runway_total": 69,
@@ -59681,7 +59682,7 @@
     "q": 0.4082265189702776,
     "c": 0.44188803977308483,
     "arrival_raw": 0.4835507791810822,
-    "ft_idio": 12.737765479310067
+    "ft_idio": 8.491843652873378
    },
    "checkpoints": {
     "Height": 72,
@@ -59815,8 +59816,8 @@
      "Discipline": 9,
      "HelpDefense": 11
     },
-    "latent_ft": 67,
-    "current_ft": 67,
+    "latent_ft": 70,
+    "current_ft": 70,
     "arrival": 0.4835507791810822,
     "e": 0.5610181623039199,
     "runway_total": 170,
@@ -59905,7 +59906,7 @@
     "q": 0.41397446348501815,
     "c": 0.3920170567074733,
     "arrival_raw": 0.564415210523302,
-    "ft_idio": -3.5469813377999646
+    "ft_idio": -2.3646542251999763
    },
    "checkpoints": {
     "Height": 55,
@@ -60039,11 +60040,11 @@
      "Discipline": 22,
      "HelpDefense": 15
     },
-    "latent_ft": 57,
-    "current_ft": 55,
+    "latent_ft": 69,
+    "current_ft": 66,
     "arrival": 0.564415210523302,
     "e": 0.6297529289448067,
-    "runway_total": 186,
+    "runway_total": 187,
     "rscore": 24.31207233899658,
     "rscore_which": "perim"
    }
@@ -60129,7 +60130,7 @@
     "q": 0.17017295547608513,
     "c": 0.3682277357311955,
     "arrival_raw": 0.7319650627612746,
-    "ft_idio": 14.487739127489322
+    "ft_idio": 9.658492751659548
    },
    "checkpoints": {
     "Height": 54,
@@ -60263,8 +60264,8 @@
      "Discipline": 16,
      "HelpDefense": 12
     },
-    "latent_ft": 76,
-    "current_ft": 74,
+    "latent_ft": 82,
+    "current_ft": 80,
     "arrival": 0.7319650627612746,
     "e": 0.7721703033470834,
     "runway_total": 78,
@@ -60353,7 +60354,7 @@
     "q": 0.8822989506007342,
     "c": 0.38704943598435515,
     "arrival_raw": 0.46999096164710163,
-    "ft_idio": -8.628016649321975
+    "ft_idio": -5.752011099547984
    },
    "checkpoints": {
     "Height": 50,
@@ -60487,11 +60488,11 @@
      "Discipline": 17,
      "HelpDefense": 14
     },
-    "latent_ft": 63,
-    "current_ft": 54,
+    "latent_ft": 74,
+    "current_ft": 68,
     "arrival": 0.46999096164710163,
     "e": 0.5494923174000363,
-    "runway_total": 289,
+    "runway_total": 286,
     "rscore": 30.58269710464974,
     "rscore_which": "perim"
    }
@@ -60577,7 +60578,7 @@
     "q": 0.759542411562923,
     "c": 0.7811394004338037,
     "arrival_raw": 0.5292480331264005,
-    "ft_idio": -4.693824677246823
+    "ft_idio": -3.129216451497882
    },
    "checkpoints": {
     "Height": 69,
@@ -60711,8 +60712,8 @@
      "Discipline": 22,
      "HelpDefense": 10
     },
-    "latent_ft": 50,
-    "current_ft": 50,
+    "latent_ft": 58,
+    "current_ft": 58,
     "arrival": 0.5292480331264005,
     "e": 0.5998608281574404,
     "runway_total": 103,
@@ -60801,7 +60802,7 @@
     "q": 0.6726865962100225,
     "c": 0.4086921849816698,
     "arrival_raw": 0.5366624167129401,
-    "ft_idio": 9.48065782194641
+    "ft_idio": 6.320438547964273
    },
    "checkpoints": {
     "Height": 56,
@@ -60935,8 +60936,8 @@
      "Discipline": 11,
      "HelpDefense": 22
     },
-    "latent_ft": 67,
-    "current_ft": 67,
+    "latent_ft": 72,
+    "current_ft": 72,
     "arrival": 0.5366624167129401,
     "e": 0.6061630542059991,
     "runway_total": 204,
@@ -61025,7 +61026,7 @@
     "q": 0.6323129937156351,
     "c": 0.38017514692051846,
     "arrival_raw": 0.6089271408910188,
-    "ft_idio": -4.984735348246991
+    "ft_idio": -3.3231568988313276
    },
    "checkpoints": {
     "Height": 62,
@@ -61159,11 +61160,11 @@
      "Discipline": 13,
      "HelpDefense": 10
     },
-    "latent_ft": 61,
-    "current_ft": 56,
+    "latent_ft": 72,
+    "current_ft": 68,
     "arrival": 0.6089271408910188,
     "e": 0.6675880697573661,
-    "runway_total": 167,
+    "runway_total": 166,
     "rscore": 23.422708568846033,
     "rscore_which": "post"
    }
@@ -61249,7 +61250,7 @@
     "q": 0.6270561611335513,
     "c": 0.4506452468551981,
     "arrival_raw": 0.641904783424725,
-    "ft_idio": -6.9622616091442815
+    "ft_idio": -4.641507739429521
    },
    "checkpoints": {
     "Height": 57,
@@ -61383,11 +61384,11 @@
      "Discipline": 20,
      "HelpDefense": 17
     },
-    "latent_ft": 65,
-    "current_ft": 60,
+    "latent_ft": 74,
+    "current_ft": 71,
     "arrival": 0.641904783424725,
     "e": 0.6956190659110163,
-    "runway_total": 172,
+    "runway_total": 170,
     "rscore": 31.26900421179302,
     "rscore_which": "perim"
    }
@@ -61473,7 +61474,7 @@
     "q": 0.576717232298296,
     "c": 0.7210818968535428,
     "arrival_raw": 0.5853537473082681,
-    "ft_idio": 3.1534777943106365
+    "ft_idio": 2.1023185295404243
    },
    "checkpoints": {
     "Height": 56,
@@ -61607,11 +61608,11 @@
      "Discipline": 11,
      "HelpDefense": 14
     },
-    "latent_ft": 61,
-    "current_ft": 61,
+    "latent_ft": 69,
+    "current_ft": 68,
     "arrival": 0.5853537473082681,
     "e": 0.6475506852120279,
-    "runway_total": 146,
+    "runway_total": 147,
     "rscore": 37.16630303030303,
     "rscore_which": "perim"
    }
@@ -61697,7 +61698,7 @@
     "q": 0.47262970318687514,
     "c": 0.23246028113650946,
     "arrival_raw": 0.4742377220036391,
-    "ft_idio": -1.9510450959051755
+    "ft_idio": -1.3006967306034503
    },
    "checkpoints": {
     "Height": 61,
@@ -61831,11 +61832,11 @@
      "Discipline": 21,
      "HelpDefense": 32
     },
-    "latent_ft": 57,
-    "current_ft": 56,
+    "latent_ft": 68,
+    "current_ft": 65,
     "arrival": 0.4742377220036391,
     "e": 0.5531020637030932,
-    "runway_total": 214,
+    "runway_total": 216,
     "rscore": 9.588818667293086,
     "rscore_which": "perim"
    }
@@ -61921,7 +61922,7 @@
     "q": 0.700703909821103,
     "c": 0.20314938983022626,
     "arrival_raw": 0.41543578131806674,
-    "ft_idio": -10.341510721967753
+    "ft_idio": -6.894340481311835
    },
    "checkpoints": {
     "Height": 78,
@@ -62055,11 +62056,11 @@
      "Discipline": 21,
      "HelpDefense": 21
     },
-    "latent_ft": 58,
-    "current_ft": 49,
+    "latent_ft": 67,
+    "current_ft": 61,
     "arrival": 0.41543578131806674,
     "e": 0.5031204141203567,
-    "runway_total": 310,
+    "runway_total": 307,
     "rscore": 33.51866498841928,
     "rscore_which": "post"
    }
@@ -62145,7 +62146,7 @@
     "q": 0.40687391039066206,
     "c": 0.8309997264658471,
     "arrival_raw": 0.7535845774425349,
-    "ft_idio": -13.696601380731677
+    "ft_idio": -9.131067587154451
    },
    "checkpoints": {
     "Height": 60,
@@ -62279,11 +62280,11 @@
      "Discipline": 10,
      "HelpDefense": 13
     },
-    "latent_ft": 60,
-    "current_ft": 58,
+    "latent_ft": 70,
+    "current_ft": 69,
     "arrival": 0.7535845774425349,
     "e": 0.7905468908261547,
-    "runway_total": 77,
+    "runway_total": 76,
     "rscore": 36.18695384615385,
     "rscore_which": "perim"
    }
@@ -62369,7 +62370,7 @@
     "q": 0.6259029350766007,
     "c": 0.6923677554612682,
     "arrival_raw": 0.5501866857004074,
-    "ft_idio": -5.570435842133761
+    "ft_idio": -3.7136238947558406
    },
    "checkpoints": {
     "Height": 63,
@@ -62503,11 +62504,11 @@
      "Discipline": 12,
      "HelpDefense": 10
     },
-    "latent_ft": 57,
-    "current_ft": 53,
+    "latent_ft": 68,
+    "current_ft": 65,
     "arrival": 0.5501866857004074,
     "e": 0.6176586828453463,
-    "runway_total": 109,
+    "runway_total": 108,
     "rscore": 33.59274066985647,
     "rscore_which": "perim"
    }
@@ -62593,7 +62594,7 @@
     "q": 0.3867592905870447,
     "c": 0.23271913673882838,
     "arrival_raw": 0.7672333612124043,
-    "ft_idio": 9.452532018608384
+    "ft_idio": 6.301688012405589
    },
    "checkpoints": {
     "Height": 58,
@@ -62727,11 +62728,11 @@
      "Discipline": 18,
      "HelpDefense": 23
     },
-    "latent_ft": 75,
-    "current_ft": 72,
+    "latent_ft": 81,
+    "current_ft": 79,
     "arrival": 0.7672333612124043,
     "e": 0.8021483570305437,
-    "runway_total": 95,
+    "runway_total": 94,
     "rscore": 21.999469316596933,
     "rscore_which": "perim"
    }
@@ -62817,7 +62818,7 @@
     "q": 0.9369789572199823,
     "c": 0.4371282529964409,
     "arrival_raw": 0.2532644335080999,
-    "ft_idio": -8.523347520103755
+    "ft_idio": -5.682231680069171
    },
    "checkpoints": {
     "Height": 69,
@@ -62951,11 +62952,11 @@
      "Discipline": 17,
      "HelpDefense": 17
     },
-    "latent_ft": 60,
-    "current_ft": 49,
+    "latent_ft": 70,
+    "current_ft": 61,
     "arrival": 0.2532644335080999,
     "e": 0.3652747684818849,
-    "runway_total": 422,
+    "runway_total": 420,
     "rscore": 19.63415776626858,
     "rscore_which": "post"
    }
@@ -63041,7 +63042,7 @@
     "q": 0.37742779811400323,
     "c": 0.4381224718043721,
     "arrival_raw": 1.0623972025059039,
-    "ft_idio": 8.934106699520653
+    "ft_idio": 5.956071133013769
    },
    "checkpoints": {
     "Height": 50,
@@ -63175,8 +63176,8 @@
      "Discipline": 19,
      "HelpDefense": 12
     },
-    "latent_ft": 67,
-    "current_ft": 67,
+    "latent_ft": 72,
+    "current_ft": 72,
     "arrival": 1.0,
     "e": 1.0,
     "runway_total": 0,
@@ -63265,7 +63266,7 @@
     "q": 0.3630251264086138,
     "c": 0.22377490284956048,
     "arrival_raw": 0.5813480809252397,
-    "ft_idio": 2.0411239652958417
+    "ft_idio": 1.3607493101972277
    },
    "checkpoints": {
     "Height": 58,
@@ -63399,11 +63400,11 @@
      "Discipline": 21,
      "HelpDefense": 17
     },
-    "latent_ft": 61,
-    "current_ft": 60,
+    "latent_ft": 70,
+    "current_ft": 68,
     "arrival": 0.5813480809252397,
     "e": 0.6441458687864537,
-    "runway_total": 153,
+    "runway_total": 154,
     "rscore": 12.007618807807601,
     "rscore_which": "post"
    }
@@ -63489,7 +63490,7 @@
     "q": 0.6914118424445024,
     "c": 0.46150577160308337,
     "arrival_raw": 0.29320370246174643,
-    "ft_idio": -16.69475490480225
+    "ft_idio": -11.129836603201499
    },
    "checkpoints": {
     "Height": 65,
@@ -63623,8 +63624,8 @@
      "Discipline": 11,
      "HelpDefense": 11
     },
-    "latent_ft": 39,
-    "current_ft": 39,
+    "latent_ft": 51,
+    "current_ft": 51,
     "arrival": 0.29320370246174643,
     "e": 0.39922314709248446,
     "runway_total": 192,
@@ -63713,7 +63714,7 @@
     "q": 0.4571965512154705,
     "c": 0.3528537308034641,
     "arrival_raw": 1.2731492685480341,
-    "ft_idio": 11.519124446030217
+    "ft_idio": 7.679416297353478
    },
    "checkpoints": {
     "Height": 46,
@@ -63847,8 +63848,8 @@
      "Discipline": 45,
      "HelpDefense": 45
     },
-    "latent_ft": 71,
-    "current_ft": 71,
+    "latent_ft": 78,
+    "current_ft": 78,
     "arrival": 1.0,
     "e": 1.0,
     "runway_total": 0,
@@ -63937,7 +63938,7 @@
     "q": 0.2689508854983018,
     "c": 0.6324341962140347,
     "arrival_raw": 0.009121482355886612,
-    "ft_idio": -10.251559513154552
+    "ft_idio": -6.834373008769701
    },
    "checkpoints": {
     "Height": 65,
@@ -64071,8 +64072,8 @@
      "Discipline": 12,
      "HelpDefense": 10
     },
-    "latent_ft": 46,
-    "current_ft": 45,
+    "latent_ft": 57,
+    "current_ft": 56,
     "arrival": 0.009121482355886612,
     "e": 0.15775326000250361,
     "runway_total": 300,
@@ -64161,7 +64162,7 @@
     "q": 0.6093450641573095,
     "c": 0.5484081032110188,
     "arrival_raw": 0.9180858201521216,
-    "ft_idio": 1.684637567658092
+    "ft_idio": 1.1230917117720614
    },
    "checkpoints": {
     "Height": 54,
@@ -64295,8 +64296,8 @@
      "Discipline": 13,
      "HelpDefense": 19
     },
-    "latent_ft": 61,
-    "current_ft": 61,
+    "latent_ft": 70,
+    "current_ft": 70,
     "arrival": 0.9180858201521216,
     "e": 0.9303729471293034,
     "runway_total": 32,
@@ -64385,7 +64386,7 @@
     "q": 0.4718197003137682,
     "c": 0.3786901562890548,
     "arrival_raw": 0.3195568403934671,
-    "ft_idio": -1.5958682071652812
+    "ft_idio": -1.0639121381101875
    },
    "checkpoints": {
     "Height": 76,
@@ -64519,11 +64520,11 @@
      "Discipline": 19,
      "HelpDefense": 20
     },
-    "latent_ft": 54,
-    "current_ft": 53,
+    "latent_ft": 62,
+    "current_ft": 60,
     "arrival": 0.3195568403934671,
     "e": 0.421623314334447,
-    "runway_total": 297,
+    "runway_total": 298,
     "rscore": 17.518623592836423,
     "rscore_which": "post"
    }
@@ -64609,7 +64610,7 @@
     "q": 0.3669016244901893,
     "c": 0.607185310955567,
     "arrival_raw": 0.39596499957905795,
-    "ft_idio": -6.133372908271948
+    "ft_idio": -4.088915272181299
    },
    "checkpoints": {
     "Height": 65,
@@ -64743,11 +64744,11 @@
      "Discipline": 14,
      "HelpDefense": 10
     },
-    "latent_ft": 56,
-    "current_ft": 51,
+    "latent_ft": 68,
+    "current_ft": 62,
     "arrival": 0.39596499957905795,
     "e": 0.4865702496421992,
-    "runway_total": 140,
+    "runway_total": 141,
     "rscore": 25.030281866572373,
     "rscore_which": "post"
    }
@@ -64833,7 +64834,7 @@
     "q": 0.6399473471567271,
     "c": 0.2820187143235793,
     "arrival_raw": 0.7791756882583193,
-    "ft_idio": -10.317570672386205
+    "ft_idio": -6.87838044825747
    },
    "checkpoints": {
     "Height": 66,
@@ -64967,11 +64968,11 @@
      "Discipline": 12,
      "HelpDefense": 18
     },
-    "latent_ft": 49,
-    "current_ft": 48,
+    "latent_ft": 63,
+    "current_ft": 61,
     "arrival": 0.7791756882583193,
     "e": 0.8122993350195714,
-    "runway_total": 101,
+    "runway_total": 102,
     "rscore": 32.476119917611186,
     "rscore_which": "post"
    }
@@ -65057,7 +65058,7 @@
     "q": 0.561612632040759,
     "c": 0.6845528926285772,
     "arrival_raw": 0.34414006007933845,
-    "ft_idio": -9.85085064598949
+    "ft_idio": -6.567233763992993
    },
    "checkpoints": {
     "Height": 52,
@@ -65191,11 +65192,11 @@
      "Discipline": 15,
      "HelpDefense": 22
     },
-    "latent_ft": 59,
-    "current_ft": 50,
+    "latent_ft": 71,
+    "current_ft": 64,
     "arrival": 0.34414006007933845,
     "e": 0.4425190510674377,
-    "runway_total": 227,
+    "runway_total": 225,
     "rscore": 17.757224073546332,
     "rscore_which": "perim"
    }
@@ -65281,7 +65282,7 @@
     "q": 0.26622337043762534,
     "c": 0.17398689744985416,
     "arrival_raw": 0.6952469671876724,
-    "ft_idio": 0.19399139210187796
+    "ft_idio": 0.12932759473458533
    },
    "checkpoints": {
     "Height": 64,
@@ -65415,8 +65416,8 @@
      "Discipline": 19,
      "HelpDefense": 23
     },
-    "latent_ft": 57,
-    "current_ft": 56,
+    "latent_ft": 65,
+    "current_ft": 64,
     "arrival": 0.6952469671876724,
     "e": 0.7409599221095216,
     "runway_total": 100,
@@ -65505,7 +65506,7 @@
     "q": 0.4900132377373565,
     "c": 0.27329597828414876,
     "arrival_raw": 0.4224030568918443,
-    "ft_idio": 7.112111767552024
+    "ft_idio": 4.741407845034683
    },
    "checkpoints": {
     "Height": 58,
@@ -65639,11 +65640,11 @@
      "Discipline": 20,
      "HelpDefense": 17
     },
-    "latent_ft": 77,
-    "current_ft": 68,
+    "latent_ft": 82,
+    "current_ft": 76,
     "arrival": 0.4224030568918443,
     "e": 0.5090425983580676,
-    "runway_total": 239,
+    "runway_total": 236,
     "rscore": 24.078606774818898,
     "rscore_which": "perim"
    }
@@ -65729,7 +65730,7 @@
     "q": 0.6664589365909779,
     "c": 0.6341521524881994,
     "arrival_raw": 0.7388365421027618,
-    "ft_idio": 1.5636526297663322
+    "ft_idio": 1.042435086510888
    },
    "checkpoints": {
     "Height": 65,
@@ -65863,11 +65864,11 @@
      "Discipline": 15,
      "HelpDefense": 13
     },
-    "latent_ft": 76,
-    "current_ft": 74,
+    "latent_ft": 79,
+    "current_ft": 79,
     "arrival": 0.7388365421027618,
     "e": 0.7780110607873476,
-    "runway_total": 94,
+    "runway_total": 92,
     "rscore": 47.163933410049864,
     "rscore_which": "perim"
    }
@@ -65953,7 +65954,7 @@
     "q": 0.5267762018366755,
     "c": 0.4720314960161697,
     "arrival_raw": 0.7525084330861191,
-    "ft_idio": 2.335096295308555
+    "ft_idio": 1.5567308635390367
    },
    "checkpoints": {
     "Height": 60,
@@ -66087,11 +66088,11 @@
      "Discipline": 30,
      "HelpDefense": 31
     },
-    "latent_ft": 64,
-    "current_ft": 63,
+    "latent_ft": 74,
+    "current_ft": 72,
     "arrival": 0.7525084330861191,
     "e": 0.7896321681232013,
-    "runway_total": 103,
+    "runway_total": 104,
     "rscore": 18.540433333333336,
     "rscore_which": "perim"
    }
@@ -66177,7 +66178,7 @@
     "q": 0.46482740551446483,
     "c": 0.8939989108377794,
     "arrival_raw": 0.7024187673511267,
-    "ft_idio": -3.129658278800233
+    "ft_idio": -2.086438852533489
    },
    "checkpoints": {
     "Height": 47,
@@ -66311,8 +66312,8 @@
      "Discipline": 9,
      "HelpDefense": 11
     },
-    "latent_ft": 56,
-    "current_ft": 56,
+    "latent_ft": 66,
+    "current_ft": 66,
     "arrival": 0.7024187673511267,
     "e": 0.7470559522484578,
     "runway_total": 94,
@@ -66401,7 +66402,7 @@
     "q": 0.6364762829002801,
     "c": 0.7091714431505459,
     "arrival_raw": 0.7300429949022409,
-    "ft_idio": 8.166334094122382
+    "ft_idio": 5.444222729414921
    },
    "checkpoints": {
     "Height": 48,
@@ -66535,8 +66536,8 @@
      "Discipline": 15,
      "HelpDefense": 15
     },
-    "latent_ft": 75,
-    "current_ft": 72,
+    "latent_ft": 83,
+    "current_ft": 80,
     "arrival": 0.7300429949022409,
     "e": 0.7705365456669048,
     "runway_total": 98,
@@ -66625,7 +66626,7 @@
     "q": 0.525579279481494,
     "c": 0.11908401949480761,
     "arrival_raw": 0.5838991868218102,
-    "ft_idio": 4.738466336120938
+    "ft_idio": 3.1589775574139587
    },
    "checkpoints": {
     "Height": 54,
@@ -66759,11 +66760,11 @@
      "Discipline": 17,
      "HelpDefense": 20
     },
-    "latent_ft": 64,
-    "current_ft": 63,
+    "latent_ft": 73,
+    "current_ft": 71,
     "arrival": 0.5838991868218102,
     "e": 0.6463143087985387,
-    "runway_total": 177,
+    "runway_total": 178,
     "rscore": 17.781443864386443,
     "rscore_which": "perim"
    }
@@ -66849,7 +66850,7 @@
     "q": 0.20169491111967525,
     "c": 0.49384924878466224,
     "arrival_raw": 0.288321160667925,
-    "ft_idio": -2.224964693827552
+    "ft_idio": -1.4833097958850345
    },
    "checkpoints": {
     "Height": 63,
@@ -66983,8 +66984,8 @@
      "Discipline": 10,
      "HelpDefense": 10
     },
-    "latent_ft": 61,
-    "current_ft": 55,
+    "latent_ft": 71,
+    "current_ft": 65,
     "arrival": 0.288321160667925,
     "e": 0.39507298656773626,
     "runway_total": 182,
@@ -67073,7 +67074,7 @@
     "q": 0.7008093429995235,
     "c": 0.1522493257071831,
     "arrival_raw": 0.6444952711224686,
-    "ft_idio": -6.522729105893719
+    "ft_idio": -4.348486070595813
    },
    "checkpoints": {
     "Height": 54,
@@ -67207,11 +67208,11 @@
      "Discipline": 20,
      "HelpDefense": 29
     },
-    "latent_ft": 54,
-    "current_ft": 53,
+    "latent_ft": 67,
+    "current_ft": 65,
     "arrival": 0.6444952711224686,
     "e": 0.6978209804540983,
-    "runway_total": 179,
+    "runway_total": 180,
     "rscore": 13.280717164262553,
     "rscore_which": "perim"
    }
@@ -67297,7 +67298,7 @@
     "q": 0.5148004860717014,
     "c": 0.7869529130349209,
     "arrival_raw": 0.5708431326114748,
-    "ft_idio": 7.8711887875223905
+    "ft_idio": 5.247459191681594
    },
    "checkpoints": {
     "Height": 58,
@@ -67431,11 +67432,11 @@
      "Discipline": 11,
      "HelpDefense": 10
     },
-    "latent_ft": 82,
-    "current_ft": 77,
+    "latent_ft": 85,
+    "current_ft": 83,
     "arrival": 0.5708431326114748,
     "e": 0.6352166627197535,
-    "runway_total": 180,
+    "runway_total": 177,
     "rscore": 32.94600188487749,
     "rscore_which": "perim"
    }
@@ -67521,7 +67522,7 @@
     "q": 0.4631448593662721,
     "c": 0.41324186448582756,
     "arrival_raw": 0.23579049652671025,
-    "ft_idio": -1.3808434903325622
+    "ft_idio": -0.9205623268883747
    },
    "checkpoints": {
     "Height": 65,
@@ -67655,8 +67656,8 @@
      "Discipline": 13,
      "HelpDefense": 13
     },
-    "latent_ft": 54,
-    "current_ft": 54,
+    "latent_ft": 62,
+    "current_ft": 62,
     "arrival": 0.23579049652671025,
     "e": 0.3504219220477037,
     "runway_total": 251,
@@ -67745,7 +67746,7 @@
     "q": 0.7538424723798492,
     "c": 0.40788587540176857,
     "arrival_raw": 0.6185991548285829,
-    "ft_idio": 3.0460727672706676
+    "ft_idio": 2.030715178180445
    },
    "checkpoints": {
     "Height": 58,
@@ -67879,11 +67880,11 @@
      "Discipline": 17,
      "HelpDefense": 28
     },
-    "latent_ft": 61,
-    "current_ft": 61,
+    "latent_ft": 69,
+    "current_ft": 68,
     "arrival": 0.6185991548285829,
     "e": 0.6758092816042954,
-    "runway_total": 219,
+    "runway_total": 220,
     "rscore": 16.056060862825674,
     "rscore_which": "post"
    }
@@ -67969,7 +67970,7 @@
     "q": 0.30485724079550836,
     "c": 0.03503754720571211,
     "arrival_raw": 0.786638699184598,
-    "ft_idio": -14.480101780529651
+    "ft_idio": -9.653401187019767
    },
    "checkpoints": {
     "Height": 54,
@@ -68103,8 +68104,8 @@
      "Discipline": 20,
      "HelpDefense": 23
     },
-    "latent_ft": 47,
-    "current_ft": 46,
+    "latent_ft": 62,
+    "current_ft": 61,
     "arrival": 0.786638699184598,
     "e": 0.8186428943069083,
     "runway_total": 75,
@@ -68193,7 +68194,7 @@
     "q": 0.4119076503479064,
     "c": 0.41033220488286426,
     "arrival_raw": 0.29993348806513587,
-    "ft_idio": -1.0904215319647506
+    "ft_idio": -0.7269476879765003
    },
    "checkpoints": {
     "Height": 72,
@@ -68327,11 +68328,11 @@
      "Discipline": 20,
      "HelpDefense": 15
     },
-    "latent_ft": 54,
-    "current_ft": 54,
+    "latent_ft": 62,
+    "current_ft": 61,
     "arrival": 0.29993348806513587,
     "e": 0.4049434648553655,
-    "runway_total": 228,
+    "runway_total": 229,
     "rscore": 18.21260750486723,
     "rscore_which": "post"
    }
@@ -68417,7 +68418,7 @@
     "q": 0.2841126446370602,
     "c": 0.35604599640327717,
     "arrival_raw": 0.23191549888969978,
-    "ft_idio": -11.182460514268612
+    "ft_idio": -7.454973676179075
    },
    "checkpoints": {
     "Height": 77,
@@ -68551,11 +68552,11 @@
      "Discipline": 12,
      "HelpDefense": 9
     },
-    "latent_ft": 43,
-    "current_ft": 43,
+    "latent_ft": 54,
+    "current_ft": 53,
     "arrival": 0.23191549888969978,
     "e": 0.3471281740562448,
-    "runway_total": 243,
+    "runway_total": 244,
     "rscore": 18.773552679953504,
     "rscore_which": "post"
    }

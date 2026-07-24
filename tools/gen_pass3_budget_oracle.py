@@ -144,10 +144,15 @@ ARR_SIGMA = 0.18        # the per-player dice (D2: ready 6'11" / raw 6'0" both l
 E_MIN     = 0.15
 EXPR_BASELINE = 14.0
 
-# FreeThrow derivation (unchanged; reads the NEW card's Outside + idio + height)
-FT_CENTER = 66.0; FT_OUT_SPAN = 10.0; FT_OUT_SCALE = 25.0
-FT_HEIGHT_COEF = 6.0; FT_MIN = 25.0; FT_MAX = 95.0
-FT_SIGMA = 9.0
+# FreeThrow derivation (S71 ruling 2026-07-24: mirror real-life FT shooting — median
+# ~70, low-90s tail real, hack-target floor 40). Re-anchored at the population's own
+# Outside center: the old inline anchor (Outside 50) sat far above the league's actual
+# Outside median (~32), so any span strong enough to separate shooters dragged the
+# middle down. FT_OUT_ANCHOR is now a NAMED constant, and FT_CENTER is legible: it IS
+# what the median player shoots. FT_OUT_SCALE reaffirmed at 25.0.
+FT_CENTER = 71.5; FT_OUT_ANCHOR = 36.0; FT_OUT_SPAN = 9.0; FT_OUT_SCALE = 25.0
+FT_HEIGHT_COEF = 9.0; FT_MIN = 40.0; FT_MAX = 96.0
+FT_SIGMA = 6.0
 
 # ============================================================================
 # THE SEVEN FAMILIES (journal S67, every member assigned; Rebounding SPENDABLE)
@@ -328,7 +333,7 @@ def clamp(x, lo, hi):
 # THE GENERATOR -- one honest player, column by column
 # ============================================================================
 def derive_ft(outside, ft_idio, height):
-    val = (FT_CENTER + FT_OUT_SPAN * math.tanh((outside - 50.0) / FT_OUT_SCALE)
+    val = (FT_CENTER + FT_OUT_SPAN * math.tanh((outside - FT_OUT_ANCHOR) / FT_OUT_SCALE)
            - FT_HEIGHT_COEF * ((height - 55.0) / 40.0) + ft_idio)
     return int(clamp(round(val), FT_MIN, FT_MAX))
 
@@ -818,7 +823,8 @@ def _constants_echo():
         "ATH_BASE_LO": ATH_BASE_LO, "ATH_BASE_HI": ATH_BASE_HI, "ATHQ_A": ATHQ_A, "ATHQ_B": ATHQ_B,
         "ARR_READY": ARR_READY, "ARR_RAW": ARR_RAW, "ARRB_LO": ARRB_LO, "ARRB_HI": ARRB_HI,
         "ARR_SIGMA": ARR_SIGMA, "E_MIN": E_MIN, "EXPR_BASELINE": EXPR_BASELINE,
-        "FT_CENTER": FT_CENTER, "FT_OUT_SPAN": FT_OUT_SPAN, "FT_OUT_SCALE": FT_OUT_SCALE,
+        "FT_CENTER": FT_CENTER, "FT_OUT_ANCHOR": FT_OUT_ANCHOR, "FT_OUT_SPAN": FT_OUT_SPAN,
+        "FT_OUT_SCALE": FT_OUT_SCALE,
         "FT_HEIGHT_COEF": FT_HEIGHT_COEF, "FT_MIN": FT_MIN, "FT_MAX": FT_MAX, "FT_SIGMA": FT_SIGMA,
         "FAMILIES": {f: list(ks) for f, ks in FAMILIES.items()},
         "FAMILY_ORDER": list(FAMILIES.keys()), "SPEND_SKILLS": SPEND_SKILLS,
@@ -945,8 +951,9 @@ def dump_fixture(path):
                      "key_orders": {"ATH_KEYS": ATH_KEYS, "SPEND_SKILLS": SPEND_SKILLS,
                                     "FAMILY_ORDER": list(FAMILIES.keys()), "ROLES": ROLES},
                      "constants": _constants_echo(),
-                     "note": "S69 branch-representative replay fixture; draws recorded by the "
-                             "output-neutral recorder seam (byte-diff proven); ints EXACT, floats 1e-9."},
+                     "note": "S69 branch-representative replay fixture, regenerated at S71 under the "
+                             "re-anchored FT derivation (FT_OUT_ANCHOR named; 72 constants echoed); "
+                             "draws recorded by the output-neutral recorder seam; ints EXACT, floats 1e-9."},
           "edge_table": _edge_table(), "players": players}
     with open(path, "w") as f:
         json.dump(fx, f, indent=1)

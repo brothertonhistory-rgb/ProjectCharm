@@ -7218,6 +7218,28 @@ holds**: `BuildCohort` is one seeded stream, 68 fixed-order slots per player, no
 branch — the first k players are identical for any cohort size ≥ k, and Phase 54's two-chunk-size
 check proves the contract structurally every run.
 
+**The FreeThrow derivation (S71 recalibration, Emmett ruling 2026-07-24: mirror real-life FT
+shooting — "guys in the low 90s and guys who struggle to get to 50%").** FreeThrow is DERIVED,
+never spent, and Rscore-blind: `derive_ft(outside, ft_idio, height) = FT_CENTER +
+FT_OUT_SPAN·tanh((Outside − FT_OUT_ANCHOR)/FT_OUT_SCALE) − FT_HEIGHT_COEF·((Height−55)/40) +
+ft_idio`, round-then-clamp `[FT_MIN, FT_MAX]`, called twice per player (current and latent Outside)
+with ONE shared idiosyncrasy draw (`gauss(0, FT_SIGMA)`, slot 68 — a persistent shooter trait,
+never a second development axis; CurrentFt ≤ LatentFt is structural). The S71 constants:
+CENTER 71.5, **ANCHOR 36.0 (named — the old inline `50.0` retired)**, SPAN 9.0, SCALE 25.0,
+HEIGHT_COEF 9.0, MIN 40, MAX 96, SIGMA 6.0. The re-anchoring is the structural fix: the old anchor
+(Outside 50) sat far above the league's actual Outside median (~32), so any span strong enough to
+separate shooters dragged the middle down — the anchor now sits at the population's own center and
+`FT_CENTER` is legible (it IS what the median player shoots). The calibration target is the page
+readout's own D1 decade blend (2015-16..2024-25) — a ruled college distribution, not a universal FT
+law. **Roll L stays a literal 1:1** (a 72-rated shooter makes 72%, `RollLGenerator` reads the
+rating straight through; no curve exists anywhere in the engine) — the entire S70 61.9-vs-71 gap
+was the generated distribution, and this recalibration closed it (world accepted 3,470 at seed
+20260720: median 70, guards 74.4 / bigs 65.0, p10/p90 58/82, 51 at 90+, sub-50 0.69%; league page
+FT% 61.9 → 70.6, target line OK). Phase 70 pins the ruled shape with three bands on the canonical
+line-clearing subset (median 70±3, sub-50 ≤3%, 90+ [200,1000] as a collapse/explosion guard —
+the discriminating pair is the median and the sub-50 share; the 90+ count does not discriminate
+old-vs-new).
+
 **Proof chain.** Locked oracle `tools/gen_pass3_budget_oracle.py` (S68, Emmett-ruled table on real
 bodies); fixture `gen_pass3_replay_fixture_s69.json` (301 branch-representative players + the
 176-row inverse-CDF edge table); Phase 69 replays every checkpoint from recorded draws (the
@@ -7325,7 +7347,7 @@ Proven: wiring correctness, determinism (draft AND pool, byte-level), and every 
 
 ### The S63 baseline (the calibration arc's starting picture — same engine, same seed 20260720, only the pool differs)
 
-Old pool → Pass-2 cohort: points 73.8 → 50.9; FG% 45.5 → 28.2; 3P% 33.8 → 22.0; FT% 70.5 → 61.2; PPP 1.052 → 0.732; pace 70.1 → 69.5; 3PA rate 0.39 → **0.69**; TO% 18.3 → 22.4; fouls 17.4 → 16.2 (shooting 6.65 → 3.37, non-shooting 10.71 → 12.79); usage max/p90/median 27.1/20.4/7.5 → **46.9**/25.6/7.6. Census clean (3,470/3,470 drafted; 347/347 exact rosters; 347/347 protected coverage). **Cross-checked:** S60.2's random-cohort field (FG% 27.8 / PPG 50.8) matches this world (28.2 / 50.9) through independent plumbing — the levels are the cohort's real curve, not a bridge artifact. Recorded here as the swap's fixed capture. The arc's CURRENT recorded reference is the **S70 page** (Pass-3 cohort, positions by defensive plane, seed 20260720): points 71.5, FG% 46.4, 3P% 36.6, 3PA rate 0.36, FT% 61.9, FTA 21.3, PPP 1.0088, TO% 21.2, pace 70.9, rebounds credited 30.5, fouls 20.28 (6.50 shooting / 13.78 non-shooting), usage max/p90/median 46.2/24.3/8.0, census clean — every calibration session diffs against that page, never against memory. (The superseded chain, kept for the diff trail: the S63 capture above; the S66 page — points 69.7, FG% 46.0, 3P% 34.3, 3PA rate 0.30, FT% 62.0, FTA 21.6, PPP 0.9825, TO% 21.3, pace 71.0, fouls 19.97 = 7.36/12.61, usage 44.5/25.0/7.6.)
+Old pool → Pass-2 cohort: points 73.8 → 50.9; FG% 45.5 → 28.2; 3P% 33.8 → 22.0; FT% 70.5 → 61.2; PPP 1.052 → 0.732; pace 70.1 → 69.5; 3PA rate 0.39 → **0.69**; TO% 18.3 → 22.4; fouls 17.4 → 16.2 (shooting 6.65 → 3.37, non-shooting 10.71 → 12.79); usage max/p90/median 27.1/20.4/7.5 → **46.9**/25.6/7.6. Census clean (3,470/3,470 drafted; 347/347 exact rosters; 347/347 protected coverage). **Cross-checked:** S60.2's random-cohort field (FG% 27.8 / PPG 50.8) matches this world (28.2 / 50.9) through independent plumbing — the levels are the cohort's real curve, not a bridge artifact. Recorded here as the swap's fixed capture. The arc's CURRENT recorded reference is the **S71 page** (Pass-3 cohort, FT generation recalibrated, seed 20260720): points 73.4, FGA 54.8, FG% 46.4, 3P% 36.6, 3PA rate 0.37, FT% 70.6 (target line OK), FTA 21.5, PPP 1.0326, TO% 21.3, pace 71.1, rebounds credited 29.4, fouls 20.28 (6.46 shooting / 13.82 non-shooting), usage max/p90/median 46.5/24.3/8.0, census clean, schedule fingerprint 93d8c853… — every calibration session diffs against that page, never against memory. (The superseded chain, kept for the diff trail: the S63 capture above; the S66 page — points 69.7, FG% 46.0, 3P% 34.3, 3PA rate 0.30, FT% 62.0, FTA 21.6, PPP 0.9825, TO% 21.3, pace 71.0, fouls 19.97 = 7.36/12.61, usage 44.5/25.0/7.6; the S70 page — points 71.5, FG% 46.4, 3P% 36.6, 3PA rate 0.36, FT% 61.9, FTA 21.3, PPP 1.0088, TO% 21.2, pace 70.9, rebounds credited 30.5, fouls 20.28 = 6.50/13.78, usage 46.2/24.3/8.0.)
 
 ### Emergent observations (and their resolution)
 

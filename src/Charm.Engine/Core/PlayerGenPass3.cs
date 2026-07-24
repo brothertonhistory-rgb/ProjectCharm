@@ -129,14 +129,21 @@ public static class PlayerGenPass3
     public const double E_MIN     = 0.15;
     public const double EXPR_BASELINE = 14.0;
 
-    // --- FreeThrow derivation (oracle :142-145) ---
-    public const double FT_CENTER = 66.0;
-    public const double FT_OUT_SPAN = 10.0;
+    // --- FreeThrow derivation (oracle :153-155; S71 ruling 2026-07-24: mirror real-life
+    //     FT shooting — median ~70, low-90s tail real, hack-target floor 40). Re-anchored
+    //     at the population's own Outside center: the old inline anchor (Outside 50) sat
+    //     far above the league's actual Outside median (~32), so any span strong enough
+    //     to separate shooters dragged the middle down. FT_OUT_ANCHOR is a NAMED constant
+    //     (the old inline 50.0 is retired) and FT_CENTER is legible: it IS what the
+    //     median player shoots. FT_OUT_SCALE reaffirmed at 25.0. ---
+    public const double FT_CENTER = 71.5;
+    public const double FT_OUT_ANCHOR = 36.0;
+    public const double FT_OUT_SPAN = 9.0;
     public const double FT_OUT_SCALE = 25.0;
-    public const double FT_HEIGHT_COEF = 6.0;
-    public const double FT_MIN = 25.0;
-    public const double FT_MAX = 95.0;
-    public const double FT_SIGMA = 9.0;
+    public const double FT_HEIGHT_COEF = 9.0;
+    public const double FT_MIN = 40.0;
+    public const double FT_MAX = 96.0;
+    public const double FT_SIGMA = 6.0;
 
     // --- The seven families (oracle :150-163; Rebounding SPENDABLE per S67 ruling 2) ---
     public static readonly string[] FAMILY_ORDER =
@@ -336,11 +343,12 @@ public static class PlayerGenPass3
     public static double Price(double spend, double baseVal, double cap)
         => baseVal + (cap - baseVal) * (1.0 - Math.Exp(-spend / PRICE_TAU));
 
-    /// <summary>FreeThrow derivation (oracle <c>derive_ft</c>, :325-328): tanh on Outside,
-    /// height penalty, plus the player's ONE persistent idiosyncrasy. Round-then-clamp.</summary>
+    /// <summary>FreeThrow derivation (oracle <c>derive_ft</c>, :335-338): tanh on Outside
+    /// about the NAMED population anchor (S71), height penalty, plus the player's ONE
+    /// persistent idiosyncrasy. Round-then-clamp.</summary>
     public static int DeriveFt(int outside, double ftIdio, int height)
     {
-        var val = FT_CENTER + FT_OUT_SPAN * Math.Tanh((outside - 50.0) / FT_OUT_SCALE)
+        var val = FT_CENTER + FT_OUT_SPAN * Math.Tanh((outside - FT_OUT_ANCHOR) / FT_OUT_SCALE)
                 - FT_HEIGHT_COEF * ((height - 55.0) / 40.0) + ftIdio;
         return (int)Clamp(RoundHalfEven(val), FT_MIN, FT_MAX);
     }
@@ -650,7 +658,8 @@ public static class PlayerGenPass3
         ["ATHQ_A"] = ATHQ_A, ["ATHQ_B"] = ATHQ_B,
         ["ARR_READY"] = ARR_READY, ["ARR_RAW"] = ARR_RAW, ["ARRB_LO"] = ARRB_LO, ["ARRB_HI"] = ARRB_HI,
         ["ARR_SIGMA"] = ARR_SIGMA, ["E_MIN"] = E_MIN, ["EXPR_BASELINE"] = EXPR_BASELINE,
-        ["FT_CENTER"] = FT_CENTER, ["FT_OUT_SPAN"] = FT_OUT_SPAN, ["FT_OUT_SCALE"] = FT_OUT_SCALE,
+        ["FT_CENTER"] = FT_CENTER, ["FT_OUT_ANCHOR"] = FT_OUT_ANCHOR, ["FT_OUT_SPAN"] = FT_OUT_SPAN,
+        ["FT_OUT_SCALE"] = FT_OUT_SCALE,
         ["FT_HEIGHT_COEF"] = FT_HEIGHT_COEF, ["FT_MIN"] = FT_MIN, ["FT_MAX"] = FT_MAX, ["FT_SIGMA"] = FT_SIGMA,
         ["FAMILIES"] = FAMILIES, ["FAMILY_ORDER"] = FAMILY_ORDER, ["SPEND_SKILLS"] = SPEND_SKILLS,
         ["ATH_KEYS"] = ATH_KEYS, ["ROLES"] = ROLES,

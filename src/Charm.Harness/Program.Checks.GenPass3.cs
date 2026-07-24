@@ -582,6 +582,30 @@ internal static partial class Program
             $"corr(talent, concentration) = {corr:F4} (band |corr| < 0.02)",
             "the two dice share state — concentration is leaking talent information");
 
+        // [BAND ft-distribution] S71 ruling (2026-07-24): the FT derivation mirrors real
+        // college shooting. Measured on the canonical cohort's line-clearing subset
+        // (Rscore ≥ R_LINE), the population the world actually drafts from. Oracle
+        // canonical (seed 20260724, n=36,580): median 70, sub-50 share 0.63%, 90+ 485.
+        // The DISCRIMINATING pair is the median (OLD world: 61 — clearly outside) and
+        // the sub-50 share (OLD world: ~13.5% — clearly outside); the 90+ count does
+        // NOT discriminate old-vs-new (old ~220 per 36.6k, new 485 — both inside any
+        // honest band) and guards tail collapse/explosion only.
+        var ftAccepted = coh.Where(p => p.Result.Rscore >= PlayerGenPass3.R_LINE)
+            .Select(p => p.Result.CurrentFt).OrderBy(v => v).ToArray();
+        var ftN = ftAccepted.Length;
+        var ftMedian = (ftAccepted[(ftN - 1) / 2] + ftAccepted[ftN / 2]) / 2.0;
+        var ftSub50 = ftAccepted.Count(v => v < 50) / (double)ftN;
+        var ft90 = ftAccepted.Count(v => v >= 90);
+        Band(Math.Abs(ftMedian - 70.0) <= 3.0, "ft-median",
+            $"accepted median CurrentFt {ftMedian:F1} (band 70 ± 3; oracle canonical 70; OLD world 61)",
+            "the FT center drifted — the median player no longer shoots like a median college shooter");
+        Band(ftSub50 <= 0.03, "ft-sub50",
+            $"accepted sub-50 CurrentFt share {ftSub50 * 100:F2}% (band ≤ 3%; oracle canonical 0.63%; OLD world ~13.5%)",
+            "the low tail re-fattened — hack targets are common again instead of rare");
+        Band(ft90 >= 200 && ft90 <= 1000, "ft-90plus",
+            $"accepted 90+ CurrentFt count {ft90} (band [200, 1000]; oracle canonical 485; collapse/explosion guard only)",
+            "the elite FT tail collapsed or exploded — the low-90s shooter is gone or everywhere");
+
         Console.WriteLine("[OK] Phase 70: live drawing proven — moments, exact invariants, and every ruled band green.");
     }
 }
