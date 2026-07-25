@@ -2384,6 +2384,58 @@ layer that writes or reads a starting lineup — the coach screen, the save file
 at the same JSON contract. `PlayerConfig` (the DTO) and `RosterConfig` (the loader) follow the
 nested `GetProperty` pattern established by `RollHConfig`.
 
+### The config↔class contract (Phase 71, S74)
+
+**The rule: the settings file and the config classes declare the same key names.** `config.json` is
+the authoring surface for every tunable dial; each section deserializes into one config class. Phase 71
+asserts, for every surface, that the JSON key set and the class's configuration-property set agree **in
+both directions** — an orphan key (present in JSON, bound to nothing) and an absent key (declared on the
+class, missing from JSON) both fail the suite loudly.
+
+**A missing key stays quiet at runtime and becomes loud at test time** (Emmett's ruling, 2026-07-25).
+The compiled default applies and the game boots; the suite is where the drift surfaces. Refuse-to-boot
+was considered and rejected — it would force every future dial into two places forever. S74's twelve
+newly-explicit `Matchup` dials (seven S55 `Height*`, five S62 `ReachIn*`) are exactly the case the rule
+exists for: they had never been in `config.json`, the engine had been reading compiled defaults, and
+nothing was visibly wrong.
+
+**What Phase 71 proves, and what it does not.** It proves key-name parity, token-kind compatibility for
+keys present on both sides, and — for `RollEConfig` alone — that each key binds to *its own* property.
+It does **not** prove value correctness, range sanity, or that the sectioned deserializer honours intent
+beyond name matching; those remain the job of each `Load`'s own invariant guards.
+
+**Three loader shapes, recorded as a deliberate un-normalized divergence.** Eighteen sections use the
+common shape (`JsonDocument.Parse` → `GetProperty("RollX")` → `Deserialize<T>`); `RollAConfig` is
+**root-flat** (its ten scalars live at the JSON root, with no section of its own); `RollEConfig` is
+**hand-walked** (nineteen explicit `GetProperty(...).GetDouble()` assignments, no `Deserialize`).
+Normalizing the three is its own session with its own drift audit; until then the divergence is declared
+in an explicit loader-contract registry whose **completeness is itself asserted** — every config class
+exposing a `public static T Load(string path)` must appear in exactly one entry, and every top-level
+section must be claimed by exactly one entry, so a new class or section nobody registered fails the phase.
+
+**Why only RollE gets a behavioural binding test.** Name parity does not prove binding: a reflected name
+comparison is green even if the loader reads `BaseSlot1 = e.GetProperty("BaseSlot2")`. The sectioned
+loaders bind by name through the serializer and cannot cross wires this way; RollE's hand-written
+assignments can. So RollE is loaded from a fixture carrying a distinct legal value per field and every
+property is asserted to hold **its own** key's value.
+
+**Two deliberate calls, both reversible.** (1) The check requires **exact-case** matches although every
+loader sets `PropertyNameCaseInsensitive = true` — a key differing only in case binds at runtime by
+accident, and catching that is the point. (2) A **configuration property** is defined by the
+serialization contract (public instance property, public set *or init* accessor, not `[JsonIgnore]`,
+effective name from `[JsonPropertyName]`) rather than by today's shortcut. Both clauses are load-bearing
+now, not defensively: `RollEConfig` is declared `{ get; init; }` throughout, so a "public `set`" rule
+would see zero properties there and pass RollE vacuously; and `MatchupConfig.SlotWeights` is a computed
+getter-only array that is correctly outside the set.
+
+**A known limit of the token-kind arm.** For the config's current types — every property is a plain
+`double`/`int`/`bool` — a token-kind mismatch is already fatal at load time: System.Text.Json throws
+while deserializing, so the harness aborts before Phase 71 runs and the arm cannot be demonstrated
+against production. It is proven by the in-memory self-test and earns its keep for the lenient cases
+(enums accept number *or* string, `JsonElement` accepts any kind, nullables accept null) and for any
+future non-scalar property. **`Rosters` is excluded by name**, with its reason recorded: its content is
+arrays of player objects, which key-name parity cannot inspect inside.
+
 ### Rating scale
 
 0–99 integer. 99 is the ceiling; 100 is impossible. The 1:1 free-throw calibration note in
@@ -2992,7 +3044,11 @@ Roll E so every door in a possession shares one coherent pick.
   6-arg body, the term reaches **both** make-door consumers — the primary shot and the putback (a taller
   rebounder converts putbacks over a smaller defender better; a named behavior, not a leak) — and the
   null-defender fallbacks on both doors skip `EffectiveRating` entirely, so the term is naturally absent
-  with no defender. Constants in `MatchupConfig`, all tunable; `Load` validation is **range-only**
+  with no defender. Constants in `MatchupConfig`, all tunable; **the seven dials live in `config.json`'s
+  `Matchup` section** — `HeightMaxBonus`, `HeightReferenceScale`, and the five zone weights
+  `HeightWeightRim` / `Short` / `Mid` / `Long` / `Three`, written explicitly since **S74**. Before that
+  the settings file carried no key for any of them: the compiled defaults were the live values, and the
+  `HeightMaxBonus = 0` kill switch was reachable only by hand-adding the key. `Load` validation is **range-only**
   (MaxBonus ≥ 0 with **0 a legal kill switch**, ReferenceScale > 0, each weight in [0,1]) — deliberately
   no monotonic-zone enforcement, so era experiments can reshape the profile. Proven by the Phase 61
   golden parity (25 cases vs `tools/height_over_defender_oracle.py`, dual tolerance 1e-6 rating /

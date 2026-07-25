@@ -237,6 +237,7 @@ internal static partial class Program
         ok &= Phase68NonShootingFoulCheck(configPath);           // Phase 68 (S62: per-man non-shooting reach-in foul model — rate + committer, golden parity)
         ok &= Phase69GenPass3ReplayParityCheck();                // Phase 69 (S69: Pass-3 two-plane budget generator port — fixture replay parity, STANDALONE)
         ok &= Phase70GenPass3LiveCheck();                        // Phase 70 (S69: Pass-3 live generator — sampler moments + exact invariants + ruled bands, STANDALONE)
+        ok &= Phase71ConfigKeyNameParityCheck(configPath);       // Phase 71 (S74: config KEY-NAME parity — registry completeness, bidirectional names, token kind, RollE binding; NOT value/semantic correctness)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

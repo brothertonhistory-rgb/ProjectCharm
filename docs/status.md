@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 73** (2026-07-25; repository consolidation — behavior-preserving; season byte-identical).
+Last updated: **Session 74** (2026-07-25; config key-name parity + Phase 71; season byte-identical).
 
 ## Current baseline
 
@@ -19,10 +19,16 @@ fingerprint `93d8c853…`): points 72.8, FG% 45.9, 3P% 36.2, FT% 70.6, PPP 1.024
 pace 71.0, fouls 20.23/team/game (6.46 shooting / 13.77 non-shooting), usage max/p90/median
 46.0% / 24.3% / 8.0%, census clean (3,470/3,470 drafted; 347/347 exact rosters; 347/347
 protected coverage). Every calibration session diffs against that page, never against memory.
-S73 re-proved it byte-identical after the consolidation (ninth consecutive sandbox↔Windows
-season match). Engine state: all Rolls A–M real; the world drafts the Pass-3 two-plane budget
-cohort (S70 bridge); `PressureVolumeTaxScale` 0.30 is the one calibrated dial (S72); Pass 2 is
-retired and archived (S73).
+S73 re-proved it byte-identical after the consolidation, and **S74 again after the config-parity
+work (tenth consecutive sandbox↔Windows season match)**. Engine state: all Rolls A–M real; the world
+drafts the Pass-3 two-plane budget cohort (S70 bridge); `PressureVolumeTaxScale` 0.30 is the one
+calibrated dial (S72); Pass 2 is retired and archived (S73); **the settings file and the config classes
+are name-parity-locked by Phase 71 (S74)** — `config.json` SHA-256 `5094367e…`.
+
+**Note on comparing runs:** only the **season** page is byte-comparable between Claude's sandbox and
+Emmett's machine. The suite/observation page is not — the sandbox runs under invariant culture and
+prints `49.8 %` where Windows prints `49.8%` (S74 finding). Do not hash suite output as an acceptance
+artifact.
 
 ## Red blockers — resolve before major new work
 
@@ -77,6 +83,11 @@ retired and archived (S73).
 - **O-19 — Refresh `docs/attribute-wiring-synthesis.md` when the attribute map moves (S60).**
 - **O-20 — `game` demo: upgrade to real generators or retire (labeled as stub-driven on its
   banner at S73).** Micro-session, or rides any session touching Program.Game.cs.
+- **O-21 — Normalize the three config loader shapes (S74 deferral).** Eighteen sections are sectioned
+  `Deserialize`; `RollAConfig` is root-flat; `RollEConfig` is nineteen hand-written `GetProperty`
+  assignments. The divergence is declared and asserted by Phase 71's registry, not hidden — but folding
+  RollA/RollE into the common shape is its own session with its own drift audit. Not urgent: RollE's
+  binding is now behaviourally proven.
 
 ## Parked — waiting on a named prerequisite
 
@@ -142,11 +153,19 @@ retired and archived (S73).
   skill overlaps heavily and is premium-overridable (Emmett ruling 2026-07-12).**
 - **C-24 — Pass 2 (skill-first generator) is RETIRED and archived (S73); its oracle rulings
   (S42/S42.1) are historical record under `tools/archive/pass2/` and journal S42–S44.**
+- **C-25 — A missing config key stays QUIET AT RUNTIME (compiled default applies, the game boots)
+  and becomes LOUD AT TEST TIME via Phase 71 (Emmett ruling 2026-07-25).** Refuse-to-boot was
+  considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
 
-- **S74 — the strict config loader + config↔class parity session** (named and deliberately
-  separated by the S73 prompt): a loader that throws on unknown/missing keys instead of
-  silently falling back to compiled defaults, plus a parity check that config.json carries
-  exactly the keys the config classes declare. The S73 HustleFoul deletion is the motivating
-  case — orphan keys are invisible today and become loud under the strict loader.
+- **S75 — rotation and foul-outs (clears Red blocker R-1).** Starters take 87.9% of possessions,
+  279 players never play, and no foul-out logic exists anywhere. Every calibration item behind R-1
+  (the S72 tax value, relief tuning, Pass A page-tuning) was measured in a five-man world with no
+  fatigue or foul cost, so this unblocks the calibration arc rather than adding to it.
+
+*(S74 shipped — config key-name parity + Phase 71; historical detail in journal S74. Note the
+"strict loader" framing it was originally given is retired: Emmett ruled quiet-at-runtime /
+loud-at-test (C-25), and the scope narrowed to key-name parity plus RollE binding. The board's
+motivating premise was also measurably wrong — zero orphan keys existed; the real gap ran the other
+way, twelve properties with no key.)*
