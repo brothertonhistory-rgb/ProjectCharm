@@ -227,8 +227,6 @@ internal static partial class Program
         ok &= Phase56DisplacementCheck(configPath);            // Phase 56
         ok &= Phase57TurnoverClockCheck(configPath, cfgC, game, state); // Phase 57
         ok &= Phase58FastBreakDietCheck(configPath);            // Phase 58
-        ok &= Phase59GenPass2ReplayParityCheck();               // Phase 59 (S43: Pass-2 port, fixture replay)
-        ok &= Phase60GenPass2LiveCheck();                       // Phase 60 (S44: Pass-2 port Phase 2, live generator + population audit)
         ok &= Phase61HeightOverDefenderCheck(configPath);       // Phase 61 (S55: height-over-defender make term, golden parity)
         ok &= Phase62UnforcedTurnoverCheck(configPath);         // Phase 62 (S56: unforced-turnover handling curve, golden parity)
         ok &= Phase63PostMovesInteriorCheck(configPath);        // Phase 63 (S57: PostMoves interior self-creation — diet tilt + resistance + assist discount)

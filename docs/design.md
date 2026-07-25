@@ -4631,7 +4631,10 @@ The consequence for how this is described: *"low-usage players shoot better"* is
 
 **`RollEGeneration` carries four members** (Session 60 added `Reliefs` as the fourth positional): `Pie`, `FinalShares`, `Pressures`, `Reliefs`. Five construction sites, all verified by repo-wide grep: `RollEGenerator` ~86 (FastBreak passthrough), ~121 (empty-lineup fallback), ~206 (the real path — the only one that computes), `RollEStubPieGenerator` ~66, and the Phase 16 `RollESpyGenerator` in the harness. **`RollE.Execute` does NOT take the record** — it takes `double[] pressures, double[] reliefs` as loose positional parameters, so both arrays are threaded from `Resolver`'s two call sites (`genE.Reliefs` on the halfcourt path, `breakGenE.Reliefs` on the press-break FastBreak path) and every harness call site passes `new double[5]`. Worth knowing before touching the signature: it is 15 call sites, all compile-loud.
 
-**Magnitudes — the tax is CALIBRATED (S72); the rest remain placeholders.** The config dials are page-tuned against the real population and **never suite-asserted** (the page-only calibration principle). **`PressureVolumeTaxScale` = 0.30, set at S72 from a five-rung walk (0.12/0.3/0.5/0.7/1.0) on the real 5,205-game world** under Emmett's outcome-B ruling: the attention machinery is active and context-sensitive (matched twins split ~+6 attention points on teammate quality) but deliberately quiet because **defensive game-planning does not exist yet** — no coach can choose to swarm a one-man team or trust a lone stopper. So 0.30 prices only the BASELINE cost of heavy lifting against a straight defense (a 51%-intent carrier pays ~6pp of make per halfcourt shot; volume is no longer free), and the one-man-team's extra swarm price stays **intentionally unpaid**. **Coupled pair, mandatory revisit:** attention MULTIPLIES the tax (C3), so when the defensive-settings layer lands, this value gets re-walked — setting it high enough now to punish the swarmed alpha would double-punish him later. The S60.2 ~0.7 recommendation is superseded (it predates the context ruling and the real world). Also measured at S72: **the residual channel is effectively dead on the real population** (mean residual ~0.0002 — the diet shift absorbs the load; an observation, not a dial), and relief pays below-share men ~+1.5% relative at scale 1.0 (still parked behind intent-vs-touches).
+**Magnitudes — the tax is CALIBRATED (S72); the rest remain placeholders.** The config dials are page-tuned against the real population and **never suite-asserted** (the page-only calibration principle). **`PressureVolumeTaxScale` = 0.30, set at S72 from a five-rung walk (0.12/0.3/0.5/0.7/1.0) on the real 5,205-game world** under Emmett's outcome-B ruling: the attention machinery is active and context-sensitive (matched twins split ~+6 attention points on teammate quality) but deliberately quiet because **defensive game-planning does not exist yet** — no coach can choose to swarm a one-man team or trust a lone stopper. So 0.30 prices only the BASELINE cost of heavy lifting against a straight defense (a 51%-intent carrier pays ~6pp of make per halfcourt shot; volume is no longer free), and the one-man-team's extra swarm price stays **intentionally unpaid**. **Coupled pair, mandatory revisit:** attention MULTIPLIES the tax (C3), so when the defensive-settings layer lands, this value gets re-walked — setting it high enough now to punish the swarmed alpha would double-punish him later. The S60.2 ~0.7 recommendation is superseded (it predates the context ruling and the real world).
+**S73 note: the 0.30 value was calibrated in a five-man rotation with no fatigue or foul
+consequence (starters 87.9% of possessions, no foul-out logic) and is provisional pending the
+rotation layer, alongside the defensive-settings revisit above.** Also measured at S72: **the residual channel is effectively dead on the real population** (mean residual ~0.0002 — the diet shift absorbs the load; an observation, not a dial), and relief pays below-share men ~+1.5% relative at scale 1.0 (still parked behind intent-vs-touches).
 
 **Observation run.** Phase 17 alone left FG%/PPP unchanged from Session 51 (test-roster shares are near-equal; pressures are small). **Session 60's relief moved the corpus for the first time:** league FG% **43.73% → 44.03%** (+0.30pp), PPP 0.9755 → 0.9814 — driven almost entirely by the two genuinely-unfeatured slot-5 shooters (Baptiste 42.2→44.0, Thornton 43.7→46.1), with three of five starters at exactly zero relief. The curve is now wired on both sides; its magnitudes wait on realistic usage concentration.
 
@@ -4697,15 +4700,24 @@ The five named statics live on `Matchup` (`ReachInDisciplineFactor`, `ReachInAth
 **FreeThrow is absolute, not relative.** Every other attribute is on a 50 = average relative scale. FreeThrow is literal: a 72-rated shooter makes exactly 72% of free throws. The value is a real-world percentage — 72 = a typical D1 average, 85 = a very good shooter, 55 = a poor one. No calibration pass is needed; the attribute IS the rate.
 
 **The generator is the simplest real generator in the engine.** `RollLGenerator.Generate(state)`:
-1. If `state.SelectedSlot` is null → use `config.MakeProbability` (fallback).
-2. If `state.SelectedSlot` is non-null, walk `game.RosterFor(state.Offense).PlayerAt(slot)`. If the player is null (unpopulated slot) → use `config.MakeProbability` (fallback).
-3. Otherwise: `makeProbability = player.FreeThrow / 100.0`.
+1. Resolve the shooter as `state.FreeThrowShooterSlot ?? state.SelectedSlot` (Phase 51: the
+   pre-Roll-E bonus foul-draw pick wins when set, else the Roll E selected shooter).
+2. If BOTH are null → use `config.MakeProbability` (fallback). If the resolved slot's player is
+   null (unpopulated slot, isolation-test game) → same fallback.
+3. Otherwise: `makeProbability = player.FreeThrow / 100.0` — a literal 1:1, no curve (re-proven
+   at the S71 gate).
 4. `Math.Clamp(makeProbability, 0.0, 1.0)` as a safety net.
 5. Build and return `Pie<FreeThrowOutcome>` with Make = makeProbability, Miss = 1.0 − makeProbability.
 
 **`RoadMakePenalty` is dormant.** The `RollLConfig.RoadMakePenalty` field (0.0) is a documented seam for a future home/road FT effect. The real generator does NOT read it — not even conditionally. The principle: do not introduce any contextual modifier in the same build that establishes FreeThrow as an absolute attribute. The seam is named; the build that wires it is its own session.
 
-**The null-slot fallback is a named loose end, not a bug.** Not all free throw attempts are shooter-attributed. Bonus foul trips that arrive before Roll E has selected a shooter carry `SelectedSlot = null`. The generator falls back to `config.MakeProbability` (72%) for these. The reported FT% is therefore a blend of player-attributed ratings and the 72% flat fallback. This is visible in the observation run and stress test output via the printed note. The fix (passing shooter identity through the bonus foul path) is a future task, not a Phase 18 scope item.
+**The flat fallback is narrow (Phase 51), a named loose end, not a bug.** Phase 51 passed the
+bonus foul-draw shooter through as `FreeThrowShooterSlot`, so most bonus trips are now
+player-attributed; the `config.MakeProbability` (72%) fallback fires only when *both*
+`FreeThrowShooterSlot` and `SelectedSlot` are null — a fully empty roster, or the parked
+putback exception (a shooting foul where Roll E never ran and no picker fired). On populated
+rosters its volume is ~0 (the S71 recalibration read league FT% as a pure generation question
+for exactly this reason). The residual path is on the board's parked tail.
 
 **Interface pattern.** `IRollLPieGenerator` follows the same pattern as `IRollMPieGenerator`: single one-arg `Generate(PossessionState state)` method; both the stub and the real generator implement it; the Resolver field is typed to the interface. The stub ignores its state parameter; the real generator reads `SelectedSlot` off it.
 
@@ -7088,17 +7100,23 @@ The derivation runs at **both** generation call sites — the roster path and th
 
 This governs **generated** players only. Explicit JSON rosters, stress-test fixtures, and harness defaults still author tendency values intentionally — those are deliberate inputs, deliberately left untouched.
 
-## Player generation — Pass 2: the skill-first generator (Sessions 42–44; RETAINED, gate-proven, UNWIRED since S70)
+## Player generation — Pass 2: the skill-first generator (Sessions 42–44; RETIRED AND ARCHIVED at S73)
 
 The Pass-2 generator produced the honest, positionless candidate cohort the divvy consumed from
-the S63 bridge through the S66 recruiting line. **As of S70 it no longer feeds anything in the
-game** — the bridge draws the Pass-3 two-plane budget generator (its own section below). Pass 2
-remains committed and gate-proven (Phases 59/60 run every suite pass: 51,714-check fixture parity
-at 0 failures plus the live sampler/population audit) per the S70 scope ruling: retiring a working,
-gate-proven generator in the same pass that first exercises its replacement is expensive to undo,
-so the retirement is its own future micro-session. The
-authoritative spec is the locked Python oracle (`tools/gen_pass2_skillfirst_oracle.py`, LOCKED SPEC
-S42.1); the C# is a fixture-proven port of it.
+the S63 bridge through the S66 recruiting line. **As of S70 it no longer fed anything in the
+game** — the bridge draws the Pass-3 two-plane budget generator (its own section below) — and
+**at S73 it was retired from the tree**: `PlayerGenPass2.cs`, `PlayerGenPass2Live.cs`, and suite
+Phases 59/60 were deleted (season output proven byte-identical across the removal), and the
+oracle, replay checker, and golden fixture were archived under `tools/archive/pass2/`.
+`Sampling.cs` — the shared draw layer built alongside Pass 2 — stays in the engine; the Pass-3
+live generator draws through it. The `Player.cs` seats Pass 2 introduced (LatentSkills /
+CurrentSkills / Runway / Arrival / PlayerClass) also stay: they are deliberate
+dormant-pending-development-layer seats, read by no live path (S73 source-verified), waiting for
+the development/season layer.
+
+The remainder of this section is the historical record of the retired model — the
+authoritative spec was the locked Python oracle (now `tools/archive/pass2/gen_pass2_skillfirst_oracle.py`,
+LOCKED SPEC S42.1); the C# was a fixture-proven port of it.
 
 ### The model — four independent latent dials, three causal dependencies, no repair
 
@@ -7122,18 +7140,18 @@ Session 66 it is APPLIED at the divvy bridge: the world's pool is the first 10n 
 the deterministic stream who clear the line (Emmett ruling 2026-07-23: the line stands at 17,
 explicitly reversible — one named constant). The generator itself is untouched by the bridge.
 
-### The two-layer C# shape: proven math + thin drawing
+### The two-layer C# shape: proven math + thin drawing (both files DELETED at S73 — historical record)
 
 - **`PlayerGenPass2.cs` (S43, Phase 1 — the math).** Pure RNG-free transforms: every drawn value
   arrives as an explicit parameter; 57 frozen constants transcribed verbatim with oracle line
-  cites. Proven **bit-for-bit** against the committed S42.2 replay fixture by the Phase 59 gate
-  on every harness run (306 players, 51,714 field checks, absolute 1e-9, historically exactly
-  0.0 deviation). The three port traps are centralized: half-to-even rounding, per-site
+  cites. Was proven **bit-for-bit** against the committed S42.2 replay fixture by the Phase 59 gate
+  on every harness run through S72 (306 players, 51,714 field checks, absolute 1e-9,
+  historically exactly 0.0 deviation). The three port traps are centralized: half-to-even rounding, per-site
   round/clamp order (Height alone is round-after-clamp), first-max argmax in DRAWN_SKILLS order.
   S44 added one pure extraction: `ComputeHeightShape(o)` lifts the three height-shape lines
   (logistic `oh`, location `mu`, upper-tail `sigma_up`) into a shared helper so the live loop —
-  which needs `sigma_up` before drawing height noise — and the transform can never drift; the
-  Phase 59 replay re-proves the extraction numerically inert on every run.
+  which needs `sigma_up` before drawing height noise — and the transform could never drift; the
+  Phase 59 replay re-proved the extraction numerically inert on every run through S72.
 - **`PlayerGenPass2Live.cs` (S44, Phase 2 — the drawing).** `GeneratePlayer(IRng)` fills the
   fixture-shaped `Pass2Draws` in the locked 40-slot order and calls `BuildFromDraws` — zero
   arithmetic of its own, so the math that runs live is the math the fixture proves. The height
@@ -7144,17 +7162,19 @@ explicitly reversible — one named constant). The generator itself is untouched
   `LivePlayer` pairs (Draws + Result) because the audit needs the latent dials q and s, which
   the locked `Pass2Result` deliberately does not carry.
 
-### The samplers (`Sampling.cs`) — statistical parity, never bit parity
+### The samplers (`Sampling.cs`) — SHARED and STILL LIVE; statistical parity, never bit parity
 
-C#'s `System.Random` is a different stream from Python's `random`; byte-identical draws are
-impossible by design and never asserted. **Gaussian:** the `ClockDraw` Box-Muller cos-branch
-core, untruncated (generation noise keeps full tails; ClockDraw's truncation belongs to the shot
-clock). **Exponential:** inverse-CDF `-ln(1-u)/λ`, matching Python's `expovariate`.
-**Beta:** two-gamma `G(a)/(G(a)+G(b))` with Marsaglia–Tsang gamma draws, k ≥ 1 path only —
-every Beta parameter in this spec is ≥ 1 (least 2.007), so the unused k < 1 branch is a loud
-entry assertion rather than dead code.
+`Sampling.cs` was built with Pass 2 but survives its retirement — the Pass-3 live generator
+draws through it (Gauss + Betavariate), so it stays in the engine (S73 A2 verification: keep
+the file, fix its comments). C#'s `System.Random` is a different stream from Python's
+`random`; byte-identical draws are impossible by design and never asserted. **Gaussian:** the
+`ClockDraw` Box-Muller cos-branch core, untruncated (generation noise keeps full tails;
+ClockDraw's truncation belongs to the shot clock). **Exponential:** inverse-CDF `-ln(1-u)/λ`,
+matching Python's `expovariate`. **Beta:** two-gamma `G(a)/(G(a)+G(b))` with Marsaglia–Tsang
+gamma draws, k ≥ 1 path only — every Beta parameter the live generator (Pass 3) draws is ≥ 1
+(least 2.0), so the unused k < 1 branch is a loud entry assertion rather than dead code.
 
-### Phase 60 — the proof stack for a statistical port
+### Phase 60 — the proof stack for a statistical port (DELETED at S73 — historical record)
 
 Moments first: N=200k draws per sampler against closed-form mean/variance, all four live Beta
 pairs individually (a swapped orientation α/β shifts the mean by 0.108 against a 0.006

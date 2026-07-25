@@ -22,7 +22,8 @@ namespace Charm.Engine;
 /// consumes this stream — first-past-the-line at <c>PlayerGenPass3.R_LINE</c>, positions
 /// by defensive-plane rank. <b>The A5 card shift, executed:</b> the card contract
 /// shifted — OffensiveRebounding/DefensiveRebounding left the size card (the old
-/// <c>post_bonus</c> height/strength stamps at <see cref="PlayerGenPass2Live"/> are
+/// <c>post_bonus</c> height/strength stamps of the retired Pass-2 generator — removed
+/// from the tree at S73, archived under <c>tools/archive/pass2/</c> — are
 /// retired from the live path) and arrive here as SPENDABLE, current-expressed skills
 /// under the SAME key names. Downstream readers kept compiling; their values changed
 /// meaning. That is the S70 page's baseline story.</para>

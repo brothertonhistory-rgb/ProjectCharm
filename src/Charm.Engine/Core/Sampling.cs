@@ -1,17 +1,19 @@
 namespace Charm.Engine;
 
 /// <summary>
-/// Distribution samplers on <see cref="IRng"/> — the Phase-2 (S44) draw layer for the
-/// Pass-2 live player generator. All three draw exclusively via
-/// <see cref="IRng.NextUnitInterval"/>, so a seeded run reproduces end to end.
+/// Distribution samplers on <see cref="IRng"/> — the SHARED draw layer for player
+/// generation, built at S44 for the (since-retired) Pass-2 generator and consumed
+/// today by <see cref="PlayerGenPass3Live"/>, the live generator. All three draw
+/// exclusively via <see cref="IRng.NextUnitInterval"/>, so a seeded run reproduces
+/// end to end.
 ///
-/// <para><b>Statistical parity, not bit parity.</b> The oracle
-/// (<c>tools/gen_pass2_skillfirst_oracle.py</c>) draws from Python's <c>random</c>;
-/// C#'s <c>System.Random</c> is a different stream and different internal algorithms,
-/// so byte-identical draws are impossible BY DESIGN and never asserted. What is
-/// asserted (Phase 60, gate (0)): each sampler's sample mean and variance match the
-/// closed-form distribution moments at N≥200k — a swapped Beta α/β, a wrong Gaussian
-/// variance, or an inverted Exponential λ dies there, before any cohort is trusted.</para>
+/// <para><b>Statistical parity, not bit parity.</b> The Python oracles draw from
+/// Python's <c>random</c>; C#'s <c>System.Random</c> is a different stream and
+/// different internal algorithms, so byte-identical draws are impossible BY DESIGN
+/// and never asserted. Sampler correctness was proven by moment checks (sample mean
+/// and variance vs the closed-form distribution moments at N≥200k — a swapped Beta
+/// α/β, a wrong Gaussian variance, or an inverted Exponential λ dies there); the
+/// original gate and oracle are archived under <c>tools/archive/pass2/</c>.</para>
 ///
 /// <para><b>Gaussian</b> — Box-Muller cos branch, the same core as
 /// <see cref="ClockDraw.Sample"/> but UNTRUNCATED (ClockDraw truncates + rejects for
@@ -61,16 +63,16 @@ public static class Sampling
     }
 
     /// <summary>One Gamma(k, scale 1) draw, Marsaglia–Tsang (2000), k ≥ 1 path ONLY.
-    /// Every Beta pair in the Pass-2 spec has both parameters ≥ 1 (least is 2.007),
-    /// so the k &lt; 1 boost branch is deliberately not written — a future caller
-    /// that needs it hits the loud assertion, not a silent wrong answer.</summary>
+    /// Every Beta pair the live generator (Pass 3) draws has both parameters ≥ 1
+    /// (least is 2.0), so the k &lt; 1 boost branch is deliberately not written — a
+    /// future caller that needs it hits the loud assertion, not a silent wrong answer.</summary>
     public static double GammaMT(IRng rng, double k)
     {
         if (k < 1.0)
             throw new ArgumentOutOfRangeException(nameof(k),
                 $"GammaMT implements only the Marsaglia–Tsang k >= 1 path (got k={k}). " +
-                "Every Pass-2 Beta parameter is >= 1; add the k < 1 boost branch only " +
-                "when a real caller needs it.");
+                "Every live-generator Beta parameter is >= 1; add the k < 1 boost branch " +
+                "only when a real caller needs it.");
 
         var d = k - 1.0 / 3.0;
         var c = 1.0 / Math.Sqrt(9.0 * d);

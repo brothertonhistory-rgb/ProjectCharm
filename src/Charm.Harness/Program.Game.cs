@@ -13,6 +13,7 @@ internal static partial class Program
     {
         Console.WriteLine();
         Console.WriteLine("=== PROJECT CHARM :: Game Simulation ===");
+        Console.WriteLine("  NOTE: this demo runs on STUB generators (fixed pies), not the real matchup engine — use 'season' or 'gen' for real-engine games.");
         Console.WriteLine();
 
         var cfg      = RollAConfig.Load(configPath);

@@ -95,12 +95,6 @@
     <None Include="..\..\tools\nonshooting_foul_golden.json" Link="tools\nonshooting_foul_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <!-- Pass-2 generation replay fixture (emitted by the oracle's fixture switch in
-         tools/gen_pass2_skillfirst_oracle.py, S42.2), copied beside the binary so
-         RunGenPass2ReplayParity reads it from AppContext.BaseDirectory (same convention). -->
-    <None Include="..\..\tools\gen_pass2_replay_fixture_s42_2.json" Link="tools\gen_pass2_replay_fixture_s42_2.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <!-- Pass-3 two-plane budget generation replay fixture (emitted by the oracle's
          fixture switch in tools/gen_pass3_budget_oracle.py, S69), copied beside the
          binary so RunGenPass3ReplayParity reads it from AppContext.BaseDirectory. -->

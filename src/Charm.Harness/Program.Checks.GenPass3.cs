@@ -608,4 +608,21 @@ internal static partial class Program
 
         Console.WriteLine("[OK] Phase 70: live drawing proven — moments, exact invariants, and every ruled band green.");
     }
+
+    // Relocated at S73 from the deleted Program.Checks.GenPass2.cs (its original home,
+    // S43) — this Pass-3 check file is now the helper's only caller. Body unchanged
+    // except the error-message prefix, which stalely said "gen pass2" even when
+    // rejecting a Pass-3 fixture.
+    private static void AssertKeyOrder(JsonElement keyOrders, string name, string[] expected)
+    {
+        if (!keyOrders.TryGetProperty(name, out var el) || el.GetArrayLength() != expected.Length)
+            throw new InvalidOperationException(
+                $"fixture rejected: key_orders.{name} missing or wrong length " +
+                $"(expected {expected.Length}).");
+        for (var i = 0; i < expected.Length; i++)
+            if (el[i].GetString() != expected[i])
+                throw new InvalidOperationException(
+                    $"fixture rejected: key_orders.{name}[{i}] is '{el[i].GetString()}', " +
+                    $"expected '{expected[i]}'. The fixture does not match the locked contract.");
+    }
 }

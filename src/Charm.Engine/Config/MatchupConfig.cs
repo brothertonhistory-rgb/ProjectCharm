@@ -1398,7 +1398,6 @@ public sealed class MatchupConfig
         {
             ("HustleRebound",           cfg.HustleReboundSteepness,           cfg.HustleReboundExponent,           cfg.HustleReboundScale,           cfg.HustleReboundWeight),
             ("HustlePressure",          cfg.HustlePressureSteepness,          cfg.HustlePressureExponent,          cfg.HustlePressureScale,          cfg.HustlePressureWeight),
-            ("HustleFoul",             cfg.HustleFoulSteepness,             cfg.HustleFoulExponent,             cfg.HustleFoulScale,             cfg.HustleFoulWeight),
             ("HustleTransitionDefense", cfg.HustleTransitionDefenseSteepness, cfg.HustleTransitionDefenseExponent, cfg.HustleTransitionDefenseScale, cfg.HustleTransitionDefenseWeight),
         })
         {
@@ -2281,26 +2280,6 @@ public sealed class MatchupConfig
     /// pre-saturation disruption shift. Default 0.04. Must be in (0, 1) (enforced in Load).
     /// [CALIBRATION PLACEHOLDER]</summary>
     public double HustlePressureWeight { get; set; } = 0.04;
-
-    // --- Defensive Hustle foul cost (Roll B + Roll F, defense-only, pre-saturation). ---
-
-    /// <summary>Steepness of the Hustle gap → defensive foul shift (GapFn). Default 0.009.
-    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
-    public double HustleFoulSteepness { get; set; } = 0.009;
-
-    /// <summary>Exponent of the Hustle gap → defensive foul shift (GapFn). Default 2.0.
-    /// Must be &gt; 1 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
-    public double HustleFoulExponent { get; set; } = 2.0;
-
-    /// <summary>Reference scale of the Hustle gap → defensive foul shift (GapFn). Default 25.0.
-    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
-    public double HustleFoulScale { get; set; } = 25.0;
-
-    /// <summary>Weight applied to the Hustle foul GapFn output before it is added to the
-    /// pre-saturation foul shift. Default 0.02. Must be in (0, 1) (enforced in Load).
-    /// Deliberately smaller than HustlePressureWeight so the foul-arm effect stays below
-    /// the turnover-arm effect (the within-disruption calibration contract). [CALIBRATION PLACEHOLDER]</summary>
-    public double HustleFoulWeight { get; set; } = 0.02;
 
     // --- Session 62: per-man NON-SHOOTING (reach-in) foul propensity. ---
     // Each defender carries his own reach-in propensity; the team reach-in RATE is the
