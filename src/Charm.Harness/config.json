@@ -180,7 +180,7 @@
     "RimCeiling": 0.9527,
     "RimK": 0.015557513691679676,
     "RimMidpoint": 69.81166871382257,
-    "PressureVolumeTaxScale": 0.12,
+    "PressureVolumeTaxScale": 0.30,
     "PressureResidualPenaltyScale": 2.0,
     "C1ReliefScale": 2.0,
     "C2ImbalanceScale": 0.08,
