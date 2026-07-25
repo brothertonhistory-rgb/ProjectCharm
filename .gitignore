@@ -487,3 +487,16 @@ after.stdout
 after.stderr
 harness.stdout
 harness.stderr
+
+# S73: root run dumps must never be committed again (exact names removed that session)
+suite.txt
+suite-run.txt
+suite-output.txt
+harness_run.txt
+output.txt
+deftest.txt
+sizetest.txt
+size_ladder_v2.txt
+size_ladder_v3.txt
+gen_pass2_skillfirst_oracle_output.txt
+gen_pass3_budget_oracle_output.txt
