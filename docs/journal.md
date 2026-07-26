@@ -1,3 +1,66 @@
+## Session 76 — THE MINUTES ALLOCATOR. Per-position depth charts, residual control, bounded cascades; the fatigue fence retired. **Top-five share 88% → 69.7%.** Suite `ALL CHECKS PASSED` in-sandbox; season rebaselined as the S76 STRUCTURAL reference. (2026-07-26)
+
+**Register:** build session under `PROMPT-minutes-allocator-s76-FINAL` (r11; ten external review rounds folded). Scope: depth order to the seam; stored-group charts; the allocator with residual control and bounded cascades; flow feasibility; stability rules; diagnostics; retiring the fence. **No foul-outs, no coach profile, no opening-five fix, no scout-rank fix.**
+
+**Why the session existed, in Emmett's words:** *"I just don't think it matters too much. We just need some rough, realistic, minute distributions to get some calibration done."* The minute distribution is not a thing to get right — it is a thing to get out of the way. Five men took ~88% of every team's possessions, so every calibration number on the season page described a league where the average man on the floor plays 35 minutes. What is **ruled** is the model's shape; every minute value is a placeholder, marked as one in code and docs.
+
+**★ EMMETT'S TEN-MAN RULING, and the reasoning that produced it (2026-07-26).** The prompt gave all thirteen men a positive target, with a one-minute tail, so that §4's participation gate would be meaningful. Emmett rejected the premise, not the number: *"He HAS to play? I feel like that 10-13 are just there for foul trouble instances."* Correct basketball — a 13th man on a scholarship roster gets a DNP most nights. Claude's duty here was to surface what the ruling *costs* before he made it, and it did: **nothing in the game can call on a zero-target man yet.** Foul-outs are S77, injuries do not exist, so a zero target is not "he sits unless something happens" — it is "he never touches the floor, all season." Emmett took the trade knowingly and chose a **ten-man** rotation over eight or nine. The three inert men are recorded in `status.md` as a named consequence, not an accident.
+
+The ladder was rebuilt around it — `32 30 28 26 24 20 16 12 8 4` = 200 — and re-verified: all three shapes reach max flow 200, with minimum cross-position flow **5.0% / 5.0% / 14.0%**.
+
+**★ THE FINDING THAT JUSTIFIED THE CHECK-IN GATE: deleting the fence would have silently killed bench fatigue recovery.** `RecoverBenched` lived *inside* `FlatFatigueFencePolicy`, and it is the **only production caller of `FatigueTracker.Recover` in the entire tree** — the engine's own halftime call rests the on-floor five only, and every other call site is a check fixture. A8's "the fatigue MODEL survives" is true of the tracker and false of the thing that drives it. Deleting the fence without carrying this across leaves benched players unable to recover for the rest of the season, and it **compiles, runs, and passes every existing check**; the only symptom is that the entire bench is permanently exhausted. Carried over deliberately into the allocator; **Phase 52 sub-check 2 is now the assertion that notices** if it is ever dropped again. This was found by reading the source at the gate, not by reasoning about the architecture — the architecture story ("the model is in the engine, the policy is in the harness") is exactly what makes it invisible.
+
+**★ THE PROMPT SAID TWO PRODUCERS OF `GenPlayerRow`. THERE ARE THREE.** A2 named the season path and `GenRoster`. The **divvy smoke sim** (`Program.Divvy.cs:759–770`) is the third, and it also had `res.Pool[pid].ScoutRank` in scope and discarded it. Adding rank as a required positional field breaks its call site, so `Program.Divvy.cs` had to join the manifest — Emmett approved the addition. The alternative, giving the field a default of 0, is precisely the silent failure A2 exists to warn about: every player equal, chart ordered by id, plausible, meaningless.
+
+**★ PHASE 52 WAS MOSTLY SEAM PROOF, NOT FENCE PROOF — so it was rewritten, not deleted.** Seven of its nine sub-checks drove the fence directly, but what they *prove* is the engine seam contract, and the allocator has to honour every clause: dead-ball gating, across-sub attribution off-by-one, the meter following who is on the floor, halftime rest reaching the bench, overtime slice-only, the terminal guard, no phantom substitution. Deleting the fence would have taken those with it. `Program.Checks.Substitutions.cs` is therefore a rewrite rather than the edit the manifest implied. Sub-check 4 changed meaning honestly: the fence's "a recovered starter reclaims his slot" has no S76 equivalent — the allocator has **no concept of slot ownership** — so it became "every positive-target man reaches the floor."
+
+**★ THE ONE-POLICY GUARANTEE WAS ALREADY STRUCTURAL — §5b overstated its cost.** The prompt framed "structural vs asserted" as needing an API-shape change at the call site. `Governor` already holds a single `ISubstitutionPolicy?` field and its constructor takes one, so more than one is **unrepresentable**. Structural shipped for free.
+
+**A found defect, fixed in passing (Emmett ruled "fix").** `BuildGenIdentity` read `map[row.Slot + 10]` — a hardcoded literal left behind when S75 moved the roster from 10 to 13. With `AwayIdOffset` at 13, team B's rows landed on keys 11..23 instead of 14..26, so **B's first three men overwrote A's last three bench labels** and every remaining B label shifted three seats. Cosmetic only — no simulation path reads the map — but it corrupts exactly the per-player tables S76 adds, which is how it surfaced. Also refreshed: the box-score header still said "Ten-man rosters (1..10)", and `BuildOpeningFive`'s error string still said "4G/3W/3B".
+
+**★ EXACTLY THREE OPENING SHAPES ARE REACHABLE, AND IT IS PROVABLE.** S75 *observed* three. S76 needed to know whether a fourth could appear, because the allocator fails loud on one. `BuildOpeningFive` seats under a quota floor of 2G/1W/1B, which fixes four of the five seats; the fifth is a G, a W or a B. There is no fourth possibility. So the fail-loud is safe and a fourth shape genuinely means a seating bug. The season page confirms the counts exactly: 324 / 14 / 9.
+
+**A6's spill figures were verified with the right instrument, and the obvious one is wrong.** The naive "sum of each group's over-capacity" gives 6/8/16 for the original 13-man tables; the true minima are **6/9/24**, because a group sitting under its own capacity can still be squeezed out of its seats by another group's overflow. It is a min-cost flow, not a subtraction. The same correction applies to the ten-man tables (naive 5/5/8, true 5/5/14). Recorded because the wrong instrument produces a plausible number that would have made the cross-position readout look twice as alarming as it is.
+
+**★ HONEST SCOPE CHANGE ON A REQUESTED TEST.** §2.8 asked for a candidate cascade forced to **fail final validation**, with every counter asserted unchanged. That failure mode is **not reachable** in this implementation, and the reason is worth recording rather than faking: legality is proved on the candidate before it is added to the move list, and the two seat writes commit only after a move wins the tie-break. There is no path that mutates and then validates, so a partially-applied cascade is *unrepresentable*, not merely untaken. What shipped tests the observable consequences instead — a dead ball at which every candidate is refused leaves lineup, log, counters and relocation memory untouched, and across **125 applied moves there were zero illegal fives**. A test that cannot fail is not a test; saying so is cheaper than dressing one up.
+
+**A fixture bug of Claude's own, caught by the harness and worth recording.** The first version of that sub-check asserted "no legal improving move exists," then built a perfectly ordinary roster — the premise was false and a move fired. The second version miscounted by one: the dead-ball call itself credits a record *before* evaluating, so a snapshot taken after two records faces an evaluation at R=3. Both were Claude's instrument, not the allocator. The allocator was green throughout.
+
+### What shipped
+
+- **`Program.SideDepth.cs` (NEW)** — `SideDepth` extracted out of the fence **before** the fence was deleted (deleting the file first would have taken the structure with it), plus `RankById` and `DepthChartFor(group)`. `ScoutRank` is a required positional field with no default, on purpose.
+- **`Program.MinutesAllocator.cs` (NEW)** — the policy. Residual control, game-local horizon, straight + cascade move set, per-move scoring against a no-move baseline advanced by the same record, the five-key tie-break ladder, the carried-over bench-recovery driver, and per-side diagnostics.
+- **`Program.Checks.MinutesAllocator.cs` (NEW)** — Phase 72, six sub-checks, convergence at the production dead-ball cadence.
+- **`Program.Checks.Substitutions.cs`** — Phase 52 rewritten around the allocator; every seam contract preserved.
+- **`Program.Gen.cs` / `Program.Season.cs` / `Program.Divvy.cs`** — rank carried through all three `GenPlayerRow` producers; the allocator installed at the one production construction site; the `+10` identity bug fixed.
+- **`Program.Season.Calibration.cs`** — the **ROTATION DEPTH** readout. Keyed by *realized* rank rather than acquisition index or target, so it cannot be flattered by the plan it is measuring.
+- **`Program.FatigueFence.cs` (DELETED)**.
+
+### Measured
+
+Minutes by realized rotation rank, mean over 10,410 team-games at 142.3 records/team-game — target above, realized below:
+
+```
+rank      1     2     3     4     5     6     7     8     9    10    11
+target   32    30    28    26    24    20    16    12     8     4     0
+actual  31.8  29.9  27.9  25.9  23.9  20.0  16.1  12.1   8.1   4.2   0.1
+```
+
+**Top-five share 88% → 69.7%.** Usage spread median 8.0% → **5.0%**, p90 24.3% → **19.5%**, max 46.0% → **42.0%**. Credit identity exact (7,405,830 / 740,583 = 10.0, dropped 0). Rosters 347/347. Zero DNPs among positive-target men across the Phase 72 convergence runs.
+
+The **rank-11 residue of 0.1 minutes** is the A7 collision staying visible: the opening five is still rank-blind (O-22), so occasionally a zero-target man tips off, serves his protected stint and is pulled. The ruling held — no special early-game path, no correcting opening-five selection through the back door.
+
+### Two flags raised, neither resolved, neither asserted
+
+1. **Cross-position occupancy 24.49%** against S75's 7.57% and arithmetic floors of 5/5/14%. The allocator reaches across position about twice as often as feasibility requires, and out-of-position play is currently free (O-24).
+2. **Substitutions 34–39 per team-game** against a real-basketball 20–25. Structural: there is no timeout model, so substitutions cannot clump at media breaks and spread evenly instead.
+
+Both are coaching-layer gaps rather than allocator defects. Recorded so a future session does not read either as an accident.
+
+### Emmett's standing doubt, recorded because it is probably right
+
+*"I honestly don't see how useful this is yet, and feel like it's a lot of time spent on something that will be replaced by the coaching strategy aspect later."* Correct about the numbers — every minute value here is replaced when coach ideology sets the rotation. Not correct about the machinery: something has to chase a target vector once the coaching layer produces one, and game-local was ruled precisely so that layer inherits a controller instead of fighting a ledger. The concrete payoff is that calibration now runs against a league with a real rotation instead of one where five men play 35 minutes.
+
 ## Session 75 — ROSTER 13 AT 5G/4W/4B, and the one-step positional eligibility ladder. Five missed player-id sites found — including a silent CROSS-TEAM MISATTRIBUTION that every conservation check passed. **Suite `ALL CHECKS PASSED`; season rebaselined ON PURPOSE to `271e2e2b…` as the S75 STRUCTURAL reference (not a calibration verdict).** (2026-07-25)
 
 **Register:** build session under `PROMPT-roster13-ladder-s75-r4` (ChatGPT review rounds folded at r2 and r4, cleared at r4). Scope: remove the three structural blockers that make any rotation impossible, and produce the measured 13-man league S76 designs against. **No minutes allocator, no foul-outs.**

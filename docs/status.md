@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 75** (2026-07-25; roster 13 at 5G/4W/4B + the one-step eligibility ladder; season rebaselined ON PURPOSE).
+Last updated: **Session 76** (2026-07-26; the minutes allocator — per-position depth charts, residual control, bounded cascades; the fatigue fence retired; season rebaselined ON PURPOSE).
 
 ## Current baseline
 
@@ -32,14 +32,18 @@ artifact.
 
 ## Red blockers — resolve before major new work
 
-- **R-1 (PARTIALLY CLEARED, S75) — the structural blockers are gone; the rotation itself is not
-  built.** S75 removed the three things that made any rotation impossible: a 10-man roster
+- **R-1 (CLEARED, S76) — the rotation is built.** S75 removed the three things that made any rotation impossible: a 10-man roster
   (now 13 at 5G/4W/4B), a player-id ceiling that silently dropped the bench (now 1–13 / 14–26,
   asserted), and same-position-only substitution, which froze each position group at a 10.0-minute
   ceiling against a 13-man parity of 15.4 (now the one-step ladder — all observed lineup shapes reach
   15.4 exactly). The fatigue fence's thresholds are UNCHANGED, so starter share and the minutes
   distribution have not been fixed — that is S76. Measured on the S75 page: cross-position occupancy
   7.57% of floor time, usage-spread median 3.0%, deep bench barely playing.
+  **S76 closed it.** The minutes allocator replaced the fence. Minutes by realized rotation rank now read
+  31.8 / 29.9 / 27.9 / 25.9 / 23.9 / 20.0 / 16.1 / 12.1 / 8.1 / 4.2 against a placeholder ladder of
+  32/30/28/26/24/20/16/12/8/4. **Top-five share 88% → 69.7%**; usage spread median 8.0% → 5.0%, p90
+  24.3% → 19.5%, max 46.0% → 42.0%. Calibration may now be run against a league with a real rotation.
+  The minute VALUES remain placeholders and the depth chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
@@ -55,9 +59,13 @@ artifact.
   Attention multiplies the tax; when the defensive-settings layer lands, 0.30 gets re-walked.
 - **O-5 — Residual channel is dead on the real population (S72 observation).** Mean ~0.0002;
   understand-or-retire, not a dial session.
-- **O-6 — Scout-rank modernization (S63, re-based S70).** Three old-pool assumptions on the
-  record: big-ATH +8 add-back, position-relative SIZE tails / guard-leaning board, stretch-big
-  Outside invisible to SKILL. One ruled session.
+- **O-6 — ★ RAISED PRIORITY (S76) — Scout-rank modernization (S63, re-based S70).** Three old-pool
+  assumptions on the record: big-ATH +8 add-back, position-relative SIZE tails / guard-leaning board,
+  stretch-big Outside invisible to SKILL. One ruled session. **S76 promoted this from cosmetic to
+  consequential:** until now these shaped who got RECRUITED; from S76 they decide WHO PLAYS, because the
+  depth chart orders the minute targets. Targets fall sharply within a group (32→8 for guards, 26→4 for
+  bigs), so a single rank inversion is a large minute swing. The chart is labelled **provisional** in
+  design.md until this lands.
 - **O-7 — Drive gate Pass B: post-feed + usage diffusion (S59).** The "he gave it up" outcome —
   a denied drive currently always becomes his own contested jumper, never someone else's shot.
 - **O-8 — Drive gate Pass C: the off-ball open-three lever (S59).**
@@ -97,8 +105,18 @@ artifact.
   role layer: screening, off-ball movement, spacing, rotation duty and out-of-position ballhandling
   are absent rather than mispriced. S75 added no modifier by ruling. **Any future model must be
   gap-shaped** — see C-26.
-- **O-25 — `s74.txt` was committed to the repo root in S74.** A delivery-note run command redirected
-  into the repo and `git add -A` swept it in. `git rm s74.txt` when convenient.
+- **O-26 — ★ Cross-position occupancy is 24.49% (S76 measurement).** Against S75's 7.57% and arithmetic
+  floors of 5.0/5.0/14.0% by shape, the allocator reaches across position roughly twice as often as
+  feasibility requires. Out-of-position play is currently free (O-24), so this is unpriced volume, not
+  necessarily wrong volume. Page-only, never asserted. Understand before tuning.
+- **O-27 — Substitutions run 34–39 per team-game (S76 measurement)** against a real-basketball 20–25.
+  Structural cause: there is no timeout model, so substitutions cannot clump at media breaks and spread
+  evenly instead. Belongs with the coaching layer, not the allocator.
+- **O-28 — The three zero-target men are inert until S77 (S76 named consequence, NOT a defect).**
+  Emmett's ten-man ruling gives the bottom guard, wing and big a target of zero. Planned is always 0, so
+  their residual can never reach a positive enter threshold and they cannot check in. Nothing in the game
+  can call on them until foul-outs (S77) and injuries exist. Ruled knowingly; recorded so a future session
+  does not read it as an accident.
 - **O-21 — Normalize the three config loader shapes (S74 deferral).** Eighteen sections are sectioned
   `Deserialize`; `RollAConfig` is root-flat; `RollEConfig` is nineteen hand-written `GetProperty`
   assignments. The divergence is declared and asserted by Phase 71's registry, not hidden — but folding

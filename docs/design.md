@@ -6264,7 +6264,7 @@ If regulation ends tied, the Governor runs 5-minute OT periods (configurable via
 
 ### The substitution seam (Phase 52)
 
-The Governor's lifecycle is also where substitutions hook in, through a single position-agnostic seam: the Governor holds an **optional** `ISubstitutionPolicy` (a 7th constructor parameter defaulting null) and calls two methods on it. `OnPossessionBoundary` fires at every within-period boundary that has a real successor possession in the same period, passing the successor's number, the just-ended possession's elapsed clock, and whether the successor begins from a dead ball (`Entry != Transition` — both dead-ball entry kinds, the normal inbound *and* the frontcourt ball-advanced inbound, are legal substitution moments; a live-ball transition is not). `OnPeriodBreak` fires at every **non-terminal** period boundary — a regulation halftime, or an overtime boundary reached because the prior period ended tied — carrying a `PeriodBreakKind` (Halftime / Overtime) and the final possession's elapsed clock. The engine knows nothing about rosters, positions, fatigue, or rotations; all of that lives in the policy (see the fatigue section — the flat fatigue fence is the current implementation).
+The Governor's lifecycle is also where substitutions hook in, through a single position-agnostic seam: the Governor holds an **optional** `ISubstitutionPolicy` (a 7th constructor parameter defaulting null) and calls two methods on it. `OnPossessionBoundary` fires at every within-period boundary that has a real successor possession in the same period, passing the successor's number, the just-ended possession's elapsed clock, and whether the successor begins from a dead ball (`Entry != Transition` — both dead-ball entry kinds, the normal inbound *and* the frontcourt ball-advanced inbound, are legal substitution moments; a live-ball transition is not). `OnPeriodBreak` fires at every **non-terminal** period boundary — a regulation halftime, or an overtime boundary reached because the prior period ended tied — carrying a `PeriodBreakKind` (Halftime / Overtime) and the final possession's elapsed clock. The engine knows nothing about rosters, positions, fatigue, or rotations; all of that lives in the policy (see the minutes-allocator section — the S76 minutes allocator is the current implementation; the S52 flat fatigue fence it replaced is deleted).
 
 Three placement facts make the seam correct. **Null is a strict no-op** — every existing construction site passes no policy, so the whole validation suite is byte-for-byte unchanged. **The ordering holds** because on-floor accrual happens at the possession tail before either callback fires, so the players who played possession N have already tired from N when the boundary after N is reported; a substitution is stamped with the *successor* number, which is why attribution and the meter both attribute N to the outgoing player and N+1 onward to the incoming one. **The terminal guard** is structural: the boundary hook is guarded by "the period continues," the halftime hook sits inside the existing `half < Halves` block, and the overtime hook fires at the *top* of each overtime loop iteration — entering that body means the prior period ended tied, so a period that ends the game (regulation or OT ending untied) never triggers a callback. The captured "last possession's elapsed seconds" the callbacks read is published right after accrual, so a period-break callback (whose ordinary boundary callback is suppressed across the break) still has the final possession's clock to hand.
 
@@ -6779,11 +6779,15 @@ Adding required state to `GameState` would mean editing all ~100 `new GameState(
 
 No consumer reads the meter; no outcome changes. *(Superseded: Phase 49 wired the five athleticism consumer sites, and Phase 52 wired substitutions — see below. The meter is no longer inert.)* No magnitude is calibrated — every config value is a placeholder. Tuning against a stub-heavy, not-yet-feature-complete engine would chase a moving target.
 
-### The fence: off-floor recovery and the substitution consumer (Phase 52)
+### Off-floor recovery and the substitution consumer (Phase 52 → S76)
 
-Substitutions are the meter's second consumer (after the Phase 49 athleticism discount), and they drive its previously-dormant off-floor path. The mechanism lives behind the Governor's substitution seam (see the Game Boundaries section) as a harness policy, the **flat fatigue fence**: an on-floor player who tires to or past a pull-line comes off for his freshest benched same-position teammate at the next dead ball, and a benched starter who recovers below a return-line reclaims his slot. The lines (75 / 35) are **placeholders**, deliberately uncalibrated — the point of this pass was the machinery, not the values.
+Substitutions are the meter's second consumer (after the Phase 49 athleticism discount), and they drive its previously-dormant off-floor path. The mechanism lives behind the Governor's substitution seam (see the Game Boundaries section) as a harness policy. **S52 shipped the flat fatigue fence; S76 replaced it with the minutes allocator** (see the minutes-allocator section). What changed is *why* a man comes off — a fatigue line, then a minutes plan. What did **not** change is the meter's off-floor contract, which the allocator carries over verbatim.
 
-Two meter facts the fence establishes. **Off-floor recovery**: every possession, the benched players recover by that possession's elapsed clock through the shared `Recover(seconds)` primitive; the on-floor five are never recovered by the policy (the engine already tired them at the possession tail). **Halftime reaches the bench**: the engine still rests the on-floor five at halftime through `ApplyHalftimeRecovery`; the fence rests the benched five by the *same* `HalftimeRestEquivalentSeconds` (read from the one shared fatigue config, so the magnitudes match exactly) — so a halftime break reaches all ten. An **overtime** break applies **no rest chunk** — recovery is regulation-only — so at an OT boundary the fence gives the bench only the final-possession recovery slice the (suppressed-across-the-break) ordinary callback would have applied, matching the on-floor five, who get no OT rest either. The recovery clamp ("fresh stays fresh," multiplier in [0,1]) makes recovering the whole bench every possession safe and idempotent at the floor. Calibration note 3 above — the recovery-rate vs drain-rate ratio "meaningless to tune before the off-floor path is driven" — is now the live lever, and stays deferred until the generated population is broad enough to tune against.
+**★ The off-floor recovery driver lives in the POLICY, not the model — and that is a standing hazard.** `RecoverBenched` is the only production caller of `FatigueTracker.Recover`; the engine's own halftime call rests the **on-floor** five only, and every other `Recover` call site in the tree is a check fixture. So a future session that retires or replaces the substitution policy without carrying this across leaves the bench unable to recover for the rest of the season — and it **compiles, runs, and passes every existing check**, because nothing else asserts on it. It merely makes every reserve permanently exhausted. S76 hit exactly this migration and carried the driver over deliberately; **Phase 52 sub-check 2 is the assertion that notices** if it is ever dropped again.
+
+Two meter facts the policy establishes. **Off-floor recovery**: every possession, the benched players recover by that possession's elapsed clock through the shared `Recover(seconds)` primitive; the on-floor five are never recovered by the policy (the engine already tired them at the possession tail). **Halftime reaches the bench**: the engine still rests the on-floor five at halftime through `ApplyHalftimeRecovery`; the policy rests the benched men by the *same* `HalftimeRestEquivalentSeconds` (read from the one shared fatigue config, so the magnitudes match exactly) — so a halftime break reaches the whole roster. An **overtime** break applies **no rest chunk** — recovery is regulation-only — so at an OT boundary the policy gives the bench only the final-possession recovery slice the (suppressed-across-the-break) ordinary callback would have applied, matching the on-floor five, who get no OT rest either. The recovery clamp ("fresh stays fresh," multiplier in [0,1]) makes recovering the whole bench every possession safe and idempotent at the floor.
+
+**Fatigue's role in the rotation changed at S76, and the docs must not overstate it.** Under the fence, fatigue *was* the plan. Under the allocator, the plan is the minutes target and **fatigue only breaks ties inside the hysteresis band** — it is the third and fourth key on the tie-break ladder, after projected residual improvement and entrant/exit residual. S76 did **not** restore meaningful fatigue effects on the rotation and no doc should claim it did. Calibration note 3 above — the recovery-rate vs drain-rate ratio "meaningless to tune before the off-floor path is driven" — remains the live lever and stays deferred until the population is broad enough to tune against.
 
 ### Invariants
 
@@ -7418,8 +7422,8 @@ evaluated from the player's **stored** position and **never transitively**:
 | Wing | yes | yes | yes |
 | Big | **no** | yes | yes |
 
-`PositionalEligibility.IsEligibleForSeat` is the single authority — read by the fence, by Phase 52, and by
-the season legality assertions — and it **throws on an unrecognised label** rather than returning false,
+`PositionalEligibility.IsEligibleForSeat` is the single authority — read by the minutes allocator, by
+Phase 52 and Phase 72, and by the season legality assertions — and it **throws on an unrecognised label** rather than returning false,
 because positions are plain strings and a silent false would remove a player from every rotation while
 looking like a rotation choice.
 
@@ -7429,7 +7433,8 @@ consume only `40 × its seat count` minutes. Measured against the live 347-schoo
 opening shape leaves at least one group holding a single seat, and that bottleneck **caps a uniform
 thirteen-man distribution at 10.0 minutes a man** against a parity of 15.4. No legal seat arrangement fixes
 it — thirteen players cannot divide 5/4/4 across five frozen seats. With the ladder, all three observed
-shapes reach exactly **15.4**, the theoretical maximum. Without it, S76 has nothing feasible to allocate.
+shapes reach exactly **15.4**, the theoretical maximum. Without it, S76 would have had nothing feasible to
+allocate; with it, S76's placeholder tables reach max flow 200 in all three shapes.
 
 **No out-of-position penalty is added, and the reason is architectural rather than an oversight.** The
 engine has no concept of position at all — seats are numbered and `DefenderPicker` matches seat N against
@@ -7447,6 +7452,136 @@ size term is a **gap** between the two teams (`sizeShift`/`skillShift`/`hustleSh
 a neutral rebounding split. A flat "worse at playing the 3" penalty would be the **first absolute physical
 term in the codebase** and would break exactly the property that makes small-ball coherent. Any future role
 cost must be gap-shaped. The Session 26 `gen` mode and its machinery survive untouched as a lab instrument behind their byte-for-byte wall; the prestige→depth relationship still emerges from access (S63 page, top-third-rank per roster by band: 0.41 / 1.55 / 3.65 / 5.53 / 7.60 bottom to top, every adjacent band overlapping).
+
+## The minutes allocator (Session 76, 2026-07-26)
+
+**What it is.** The substitution policy that replaced the flat fatigue fence. The fence substituted on a fatigue line and nothing else, and the consequence was measured: **five men took ~88% of every team's floor time**, so every figure on the season page described a league where the average man on the floor plays 35 minutes. The allocator distributes floor time toward a per-player target instead.
+
+**★ What is ruled is the MODEL'S SHAPE, not the numbers.** Every minute value is a placeholder, marked as one in code and here. The eventual coaching layer sets the target vector; this is the controller that chases whatever vector it is handed. Shape is expensive to change later and numbers are not, so the shape got the design attention: one target per player, targets assigned by stored-group depth, a residual control signal, bounded cascades, a game-local horizon.
+
+### The control signal — a time-dependent residual
+
+After `R` completed possession records **in this game**, for each player:
+
+```
+planned[i]  = targetShare[i] × Lineup.Size × R
+residual[i] = planned[i] − actual[i]          POSITIVE MEANS BEHIND PLAN
+```
+
+Credits are player-possessions: one credit is one record with that man on the floor. A team issues `5 × R` credits a game, so at a typical 140-record game a nominal minute is 17.5 credits.
+
+This is deliberately **not** "realized share minus target share," which is wildly volatile early — after one record every on-floor player reads 20% and every bench player 0%, so a 4-minute man and a 32-minute man show the identical error. The residual grows smoothly with elapsed possessions and asks the right question: *who is furthest behind the floor time he should have accumulated by now?* Overtime needs no special case; `R` simply keeps increasing.
+
+### ★ The horizon is GAME-LOCAL (Emmett's ruling)
+
+`R` and the credits are **this game's**. The residual resets at tipoff and **no debt crosses a game boundary**. The criterion was *"whatever makes the eventual coaching layer simpler."*
+
+- Every deferred coaching behaviour — foul trouble, a cold shooter, a blowout, a close finish — is a **within-game reactor**. A season ledger would force that layer to reason about two horizons at once and to *fight* the books: the coach wants to sit the 13th man in a two-point game while the ledger says he is owed forty credits from three weeks ago.
+- **DNPs are the coaching layer's job to produce**, not a bookkeeping artifact. Manufacturing them now with accounting means the real mechanism arrives later and has to undo them.
+- Coach ideology **changes the target vector**, and cumulative debt accrued against a target table that no longer exists is incoherent.
+- The structural cost is avoided: the policy is constructed fresh per game and the season persists nothing. Season debt would need new cross-game state keyed on **(school, acquisition index)** — never `PlayerId`, because a man is id 3 at home and id 16 away, so a `PlayerId`-keyed ledger would compile, run, and silently merge two players' debt.
+
+**Named consequence, accepted:** under game-local the deep rotation plays a little in most games rather than sitting several and then appearing. Less realistic; realism there is the coaching layer's job.
+
+### The depth chart — per position, never across
+
+Depth is **scout rank descending within a stored group**, ties broken by ascending PlayerId. Emmett's ruling: per-position charts are *"the only way the '6th man' concept can work."*
+
+**★ Rank is comparable WITHIN a stored group and never across one.** `DivvyScoutRank` builds its legs with position-specific hole sets, a position-specific size transform and a big-only athleticism add-back before calling the position-agnostic `DivvyRankFromLegs`. Same group → identical transforms → comparable. Different groups → not. A global sort across all thirteen yields a clean, monotone, entirely plausible chart that mostly encodes **position mix**: the S75 page shows acquisition index 1 is G297/W27/B23 and index 13 is B218/W129.
+
+The rank reaches the seam through `GenPlayerRow.ScoutRank` → `BuildGenSideData` → `SideDepth.RankById`. Before S76 the divvy computed it and **discarded it one line before the seam needed it**. It is a required positional field with no default, on purpose: a default of 0 makes every player equal and the allocator falls back to id order, producing an ordered, stable, entirely meaningless rotation that no aggregate check would catch.
+
+`SideDepth` was extracted out of the fence into its own file **before** the fence was deleted — it was never fence-specific, and deleting the fence file first would have taken the structure with it.
+
+### ★ Placeholder targets — a ten-man rotation
+
+**Emmett's ruling (2026-07-26): the rotation is TEN.** The bottom guard, wing and big on each roster hold a target of **zero**. A 13th man on a scholarship roster gets a DNP most nights; giving him a token minute was a testing convenience, not a basketball reason.
+
+A fixed ten-slot ladder summing to exactly 200 — `32 30 28 26 24 20 16 12 8 4` — distributed across the stored groups in the proportion the opening-lineup composition implies:
+
+| shape | schools | guards | wings | bigs |
+|---|---|---|---|---|
+| **3G/1W/1B** | 324 | 32 / 30 / 28 / 20 | 26 / 16 / 8 | 24 / 12 / 4 |
+| **2G/2W/1B** | 14 | 32 / 30 / 20 / 8 | 28 / 26 / 16 | 24 / 12 / 4 |
+| **2G/1W/2B** | 9 | 32 / 30 / 20 / 8 | 28 / 16 / 4 | 26 / 24 / 12 |
+
+**★ Exactly three shapes are reachable, and that is provable rather than observed.** `BuildOpeningFive` seats under a quota floor of 2G/1W/1B, which fixes four of the five seats; the fifth is a guard, a wing or a big, and there is no fourth possibility. A fourth shape therefore means a seating bug, and the allocator **fails loud** rather than defaulting.
+
+**★ Targets are assigned strictly by stored-group rank.** "Guards 1→4" means the four guards ranked *within group G*. Tipoff status and acquisition order do not affect target ownership — the rank-blind opening five gets no claim on the leading targets merely by starting. The seat composition decided the table's *shape*; it never decides *which player* holds a value.
+
+**★ One target per player, never one per chart.** A player has exactly one total planned share and his minutes in *every* seat count toward it. Appearing on several seat candidate lists is ordering only, never additional target — a side's targets can sum to 200 while individual targets are triple-counted and the total still prints correctly, which is why this is enforced by construction: each vector is walked exactly once.
+
+**★ Zero-target men are structurally inert until S77.** Planned is always 0, so their residual can never reach a positive enter threshold and they cannot check in. Until foul-outs (S77) and injuries exist, nothing can call on them. Accepted on the record, not an accident.
+
+### Feasibility is a simultaneous flow problem
+
+Per-seat capacity checks are **insufficient** and would pass while the plan is impossible: one wing's 30 minutes appear available to the G, W *and* B seats when each is checked alone. Feasibility is solved as max flow — source → group (capacity = the group's summed targets), group → each permitted seat type, seat type → sink (capacity = `40 × seat count`) — and must equal **200** before any game is simulated.
+
+The **minimum cross-position flow** implied by these tables is **5.0% / 5.0% / 14.0%** by shape. These are floors, not predictions: at least one group's target exceeds its own seat capacity in every shape, so some group *must* occupy seats outside its type. Note the correct instrument — the naive "sum of each group's over-capacity" gives 5/5/8 and is **wrong**, because a group under its own capacity can still be squeezed out of its seats by another group's overflow. It is a min-cost flow, not a subtraction.
+
+**What this proves, precisely:** the **eligibility ladder** is load-bearing. It does **not** prove a cascade is required — a wing reaches a guard seat perfectly well through an ordinary straight substitution. Cascades are ruled into the architecture from the start regardless (Emmett: *"yes, from the start"*) because they express coordinated lineup change, are the mechanism by which a versatile sixth man earns minutes at several spots, and because retrofitting them into a one-for-one allocator is a rewrite of its core loop.
+
+### The move set
+
+**Straight substitution.** A bench player replaces a seat's occupant; both eligible for that seat type.
+
+**★ Cascade — three players, two seats.** Choose destination seat **A** and source seat **B**: the occupant of **A exits** to the bench; the occupant of **B relocates into A** and must be eligible for A's seat type; a **bench player enters B** and must be eligible for B's seat type. This is Emmett's *"the backup center checks in, my starting center moves to the 4."* All **three** players enter objective scoring, stint validation, legality checks, logging and target accounting — naming only the relocating and entering men would leave the displaced occupant unlogged, unprotected by minimum stint, and possibly still on the floor as a sixth man.
+
+A cascade is **one rotation move** for the one-move-per-dead-ball limit. Chains of length three or more are refused.
+
+**★ Atomicity is structural, not policed.** Legality is proved on the candidate **before** it is ever added to the move list, and the two seat writes commit only after a move has won the tie-break. There is no code path that mutates and then validates, so a partially-applied cascade is **unrepresentable** rather than merely untaken. Legality applies to **live** lineups: the five before the move and the five after must each be unique, on-side, one seat each, every occupant eligible. Temporary vacancies while *building* an uncommitted candidate are not live states — a three-step cascade necessarily passes through a four-player arrangement in scratch state, and requiring five there is impossible.
+
+### Move evaluation
+
+1. **Enumerate** every complete legal straight and cascade move.
+2. **Reject** any violating lineup legality, minimum stint, or hysteresis.
+3. **Score** each by projected reduction in **total absolute residual** across the affected players, advanced one record forward. **★ The baseline is the NO-MOVE state advanced by the same one record** — comparing against the current *unadvanced* state would fold the ordinary passage of time into the apparent effect of substituting.
+4. **★ If no surviving move has strictly positive projected improvement, make no substitution.** "Greatest reduction" must never mean "least harmful."
+5. **Tie-break**, in order: greatest improvement → greatest entrant residual → greatest exiting surplus → lower entrant fatigue → higher exiting fatigue → fewer cross-position occupants after → `(playerId, seat)` tuple.
+
+Ordering is over **moves**, not candidates — a cascade has three players, so a per-player key is undefined for it until the move is the unit being scored. This creates no global quality scalar: residual is a planning remainder, not a rating.
+
+**The hysteresis test** is per-player on the entering and exiting men, and separately on the move's objective:
+
+```
+entrant:  residual >=  EnterThreshold      // behind by at least this much
+exiting:  residual <= -ExitThreshold       // ahead  by at least this much
+```
+
+The signed form is stated because "ahead by at least ExitThreshold" is unambiguous in prose and a one-character mistake in code. **★ The relocating player is exempt from both** — he never leaves the floor, so he is neither an entrant nor an exit, and his stint does not reset either. **★ Minimum stint protects the EXITING occupant only**; the entrant has no pre-entry stint requirement (he is on the bench and has no on-court stint to have completed — requiring one would either mean nothing or silently invent a minimum *bench* duration) and acquires a fresh protected stint on arrival.
+
+### The constants, and why they pair
+
+`EnterThreshold 2.5 credits` · `ExitThreshold 0.75` · `MinimumStint 4 records`.
+
+**The smallest target sets the ceiling.** A man on the floor gains 1 actual credit per record while earning only `(target/200) × 5` planned, so he drifts toward surplus at `(1 − rate)` per record. Entering at residual `E` and serving `N` records he leaves at `E − N(1−rate)`. For the 4-minute tail (rate 0.10) at Enter 2.5 / stint 4 that is **−1.10**, so `ExitThreshold` must sit at or under 1.10 or he cannot leave at first eligibility and overshoots. 0.75 is chosen over the ceiling to leave real headroom.
+
+**The pairing matters as much as either value.** At Enter 3.0 with a 3-record stint the tail exits at **+0.08 — still behind plan** — so no exit threshold could ever release him and he would sit until something else displaced him.
+
+**★ No target is self-sustaining, and that is what makes the controller stable.** A man would need a 40-minute target to hold rate 1.0 and consume exactly what he earns; the largest placeholder is 32 at rate 0.8. So **every** player drifts toward surplus while on the floor and eventually becomes exit-eligible — nobody is locked on. Rotation players simply hold their seats far longer than the tail. That is emergent, not encoded.
+
+**The ten-man ruling made the tail healthier.** The 4-minute man crosses the enter threshold at record 25 of a typical 140 and needs only a 29-record game to also complete a stint, so the "short game strands the tail" failure the 1-minute placeholder had is gone. Measured DNPs for positive-target men across the Phase 72 convergence runs: **zero**.
+
+### Measured (S76, sandbox; season seed 20260720, world stock-d1)
+
+Minutes by realized rotation rank, mean over 10,410 team-games at 142.3 records/team-game:
+
+| rank | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| target | 32 | 30 | 28 | 26 | 24 | 20 | 16 | 12 | 8 | 4 | 0 |
+| realized | 31.8 | 29.9 | 27.9 | 25.9 | 23.9 | 20.0 | 16.1 | 12.1 | 8.1 | 4.2 | 0.1 |
+
+**Top-five share fell from ~88% to 69.7%.** Usage spread moved with it: median 8.0% → **5.0%**, p90 24.3% → **19.5%**, max 46.0% → **42.0%**. Credit identity exact (7,405,830 credits / 740,583 records = 10.0, dropped 0); 347/347 rosters intact.
+
+The rank-11 residue of 0.1 minutes is the **A7 collision made visible**: the opening five is still rank-blind (O-22), so occasionally a zero-target man tips off, plays his protected stint and is pulled. The ruling stands — the tipoff five is not corrected through the back door; correction happens only through ordinary stint and hysteresis rules — and the residue is the deferred defect staying visible rather than laundered.
+
+**Two open flags, recorded not resolved.** **(1) Cross-position occupancy is 24.49%**, against S75's 7.57% and arithmetic floors of 5/5/14%. The allocator reaches across position roughly twice as often as feasibility requires, and out-of-position play is currently free (O-24). **(2) Substitutions run 34–39 per team-game** against a real-basketball 20–25. The cause is structural — there is no timeout model, so substitutions cannot clump at media breaks and spread evenly instead. Both are coaching-layer gaps, neither is an allocator defect, and neither is asserted.
+
+### What a green Phase 72 does and does not prove
+
+**Does:** the three target tables each reach max flow 200; one target per player, summing to exactly 200, with exactly three zeros; targets follow stored-group rank order **exactly** (the anti-id-fallback proof, which inspects targets rather than outcomes); seat-split conservation per player and per seat type; the credit identity; no completed stint under the protected minimum; cascades fire and log all three legs; a dead ball at which every candidate is refused leaves lineup, log, counters and relocation memory untouched; across 125 applied moves, zero illegal fives; and every positive-target man converges inside a tier-aware tolerance at the **production dead-ball cadence**.
+
+**Does not:** say anything about whether the minute *values* are right — they are placeholders. Nor whether out-of-position play is correctly priced (O-24), nor whether the depth chart ranks the right men (O-6, and the chart is labelled **provisional** pending it).
 
 ### The pool (S63 bridge → S66 recruiting line → S70: the Pass-3 cohort, positions by defensive plane)
 
