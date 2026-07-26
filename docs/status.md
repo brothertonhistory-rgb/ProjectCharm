@@ -10,18 +10,25 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 76** (2026-07-26; the minutes allocator — per-position depth charts, residual control, bounded cascades; the fatigue fence retired; season rebaselined ON PURPOSE).
+Last updated: **Session 76.1** (2026-07-26; the sixth silent-drop site — one surviving `>= 20` ceiling in the attribution pass was dropping 56,714 shot attempts a season; found at the S77 check-in gate).
 
 ## Current baseline
 
-**The S76 page is the arc's recorded reference** (seed 20260720, world `stock-d1`, schedule
-fingerprint `93d8c853…`, season SHA-256 `dfcda923…`): points 72.4, FG% 45.8,
+**The S76.1 page is the arc's recorded reference** (seed 20260720, world `stock-d1`, schedule
+fingerprint `93d8c853…`, season SHA-256 `38ec0e9f…`): points 72.4, FG% 45.8,
 3P% 35.9, FT% 70.5, PPP 1.0176, TO% 21.6, pace 71.1, fouls 20.23/team/game (6.47 shooting /
-13.76 non-shooting), usage max/p90/median 42.0% / 19.5% / 5.0%, top-five share of floor time 69.7%,
+13.76 non-shooting), usage max/p90/median 38.8% / 18.1% / 6.3%, top-five share of floor time 69.7%,
 cross-position occupancy 24.49%, census clean (4,511/4,511 drafted; 347/347 exact rosters; 347/347
 protected coverage). Every calibration session diffs against that page, never against memory.
 
-**Why it moved from S72 (deliberate, S76).** No dial was touched. The minutes allocator changed WHO IS ON
+**Why it moved from S76 (S76.1, one line).** No dial, no engine path, nothing simulated. `AttributeGame`'s
+per-slot shooting block still carried the literal `>= 20` guard S75 replaced everywhere else, so stamped ids
+21–26 logged no FGA/FGM/3PA/3PM/FTA/FTM at all — 56,714 shot attempts a season, ~10% of the league, every
+road game. Attribution is post-hoc, so **492 of 493 page lines are byte-identical**; only the box-sourced
+usage line moved, 42.0/19.5/5.0 → 38.8/18.1/6.3. Journal S76.1 carries the measurement and the reason it
+survived two sessions.
+
+**Why S76 moved from S72 (deliberate, S76).** No dial was touched. The minutes allocator changed WHO IS ON
 THE FLOOR, so every rate shifted slightly: PPP 1.0246 → 1.0176, points 72.8 → 72.4, FG% 45.9 → 45.8,
 3P% 36.2 → 35.9, TO% 21.3 → 21.6. **This is the point of the session** — the S72 numbers described a league
 where five men played 35 minutes, so they were never the right calibration target. Engine state: all Rolls
@@ -31,18 +38,10 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Red blockers — resolve before major new work
 
-- **R-1 (CLEARED, S76) — the rotation is built.** S75 removed the three things that made any rotation impossible: a 10-man roster
-  (now 13 at 5G/4W/4B), a player-id ceiling that silently dropped the bench (now 1–13 / 14–26,
-  asserted), and same-position-only substitution, which froze each position group at a 10.0-minute
-  ceiling against a 13-man parity of 15.4 (now the one-step ladder — all observed lineup shapes reach
-  15.4 exactly). The fatigue fence's thresholds are UNCHANGED, so starter share and the minutes
-  distribution have not been fixed — that is S76. Measured on the S75 page: cross-position occupancy
-  7.57% of floor time, usage-spread median 3.0%, deep bench barely playing.
-  **S76 closed it.** The minutes allocator replaced the fence. Minutes by realized rotation rank now read
-  31.8 / 29.9 / 27.9 / 25.9 / 23.9 / 20.0 / 16.1 / 12.1 / 8.1 / 4.2 against a placeholder ladder of
-  32/30/28/26/24/20/16/12/8/4. **Top-five share 88% → 69.7%**; usage spread median 8.0% → 5.0%, p90
-  24.3% → 19.5%, max 46.0% → 42.0%. Calibration may now be run against a league with a real rotation.
-  The minute VALUES remain placeholders and the depth chart is PROVISIONAL pending O-6.
+*None open.* **R-1 (the rotation) shipped in S76** — the minutes allocator replaced the fatigue fence and
+took top-five share of floor time from 88% to 69.7%; historical detail in journal S76. Calibration may now
+be run against a league with a real rotation, though the minute VALUES remain placeholders and the depth
+chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
@@ -203,21 +202,41 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Next approved candidate — exactly ONE
 
-- **S76 — the minutes-target allocator.** Everything external review round 1 required of it carries
-  forward: a feasibility assertion per team before simulating, a minimum stint and hysteresis band so
-  a dead-ball target-chaser cannot thrash, target error reported as mean/p95/max per player rather
-  than depth-rank averages, starter share gated at exactly 70% (140/200) inside a band declared
-  BEFORE running, and "never played" defined as *zero players with a positive target logging zero
-  possessions*. **Two S75 findings constrain it before it starts:** acquisition order is not a depth
-  chart (A10 — index 1 is G297/W27/B23, index 13 is B218/W129), AND the scout rank underneath it is
-  **position-normalised** (`DivvyScoutRank` excludes different attributes per position, scales size
-  per position, and downshifts big athleticism), so a roster cannot be depth-ordered by sorting it
-  either. S76's first job is defining what a depth chart actually is.
+- **S77 — the season stat page.** Roll the existing per-game boxes up per player across a season and
+  print three readouts (leaderboards, one team in full, league distributions) plus gates that prove the
+  roll-up is honest. Page-only: no engine file, no Roll, no attribution math, no dial. Its purpose is to
+  be **looked at** — the gates prove arithmetic, Emmett's read of the leaderboard is the actual result.
+  Two things settled at the S77 check-in, before any code:
+  - **The season record is keyed by the PLAYER, not by `(school, acquisition index)`** (Emmett, 2026-07-26:
+    *"do whatever you think is the best for having a long term save… NO short cuts"*). A seat-shaped key is
+    correct for one season and wrong for every season after it, and a transferring player's record would
+    stay behind with the seat. The pool id is already in scope at `BuildSeasonRows` and discarded one line
+    early — the same shape as ScoutRank before S76 grabbed it. This buys no career stats today (nothing
+    persists between seasons; the world is rebuilt from the seed every run) — it buys not having to rewrite
+    the stat layer when persistence arrives.
+  - **The declared one-line scope widening is two lines**: per-player minutes and games played come from
+    the occupancy walk, which cannot know a man's school, so `NoteOccupancy` needs the identity argument as
+    well as `Accumulate`. The prompt's scope wall and its own Gates 3/4 disagreed; the gates win.
+
+- **★ FOUL-OUTS HAVE LOST THEIR HOME — the board said S77 and S77 is the stat page (found S76.1).** S75
+  deferred foul-outs to "S77" and O-28 still reads *"the three zero-target men are inert until S77."* The
+  session that actually became S77 is page-only reporting, so nothing about disqualification is being built
+  and the three inert men stay inert. The deferral itself is unchanged and still correct (committer
+  selection is post-hoc in the harness, so disqualification needs an RNG restructuring that must not share
+  a diff with a roster change) — it simply needs a real next home rather than a session number that has
+  been taken. Do not read O-28's "until S77" as satisfied.
+
+*(S76 shipped — the minutes allocator, per-position depth charts, residual control, bounded cascades, the
+fatigue fence retired; R-1 closed. Historical detail in journal S76. Two flags raised and not resolved:
+cross-position occupancy 24.49% against arithmetic floors of 5/5/14% (O-26), and substitutions 34–39 per
+team-game against a real-basketball 20–25 (O-27) — both coaching-layer gaps, neither an allocator defect.)*
+
+*(S76.1 shipped — the sixth silent-drop site; the last literal-20 player-id ceiling in the tree, which had
+been dropping 56,714 shot attempts a season. Season rebaselined on exactly one line. Historical detail in
+journal S76.1.)*
 
 *(S75 shipped — roster 13, the player-id widening, the eligibility ladder, and the measured league;
-historical detail in journal S75. Foul-outs moved to S77 on a source finding: committer selection is
-post-hoc in the harness, so disqualification needs an RNG restructuring that must not share a diff
-with a roster change.)*
+historical detail in journal S75.)*
 
 *(S74 shipped — config key-name parity + Phase 71; historical detail in journal S74. Note the
 "strict loader" framing it was originally given is retired: Emmett ruled quiet-at-runtime /

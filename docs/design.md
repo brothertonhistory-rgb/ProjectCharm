@@ -7396,8 +7396,8 @@ incompatible forms** — group counts (`4 * n`) and an index boundary (`pid < 7 
 them. Changing one without the other reclassifies wings as bigs while every total still sums correctly and
 the divvy's own infeasibility assertion passes green. Both forms now derive from the same four numbers.
 
-**Stamped player ids and the silent-drop class of bug (S75).** Home program ids are `1..Size`, away
-`Size+1..2*Size`; at S75 that is 1–13 and 14–26. Every per-player box-score array is
+**Stamped player ids and the silent-drop class of bug (S75, completed S76.1).** Home program ids are
+`1..Size`, away `Size+1..2*Size`; at S75 that is 1–13 and 14–26. Every per-player box-score array is
 `RosterShape.PlayerArrayWidth` wide behind `RosterShape.IsLegalPlayerId`. This matters because the guard
 form — `if (id >= 1 && id <= 20)` — **does not throw when the roster grows; it silently drops** the players
 above the ceiling, and the season's conservation checks verify wins, losses and ties rather than player
@@ -7409,6 +7409,26 @@ an offset **argument** inside a check, and a **ternary plus modulo** (`i < 10 ? 
 `(i % 10) + 1`) that produced not a drop but a silent **cross-team misattribution** — home players 11–13
 credited to the opposing school with colliding slot keys, invisible to every conservation check because the
 totals still balanced.
+
+**★ A SIXTH SITE SURVIVED S75 AND RAN FOR TWO SESSIONS (S76.1).** The paragraph above read
+*"every per-player box-score array is … behind `RosterShape.IsLegalPlayerId`"* while
+`AttributeGame`'s per-slot shooting block still read `if (oi < 0 || oi >= 20) continue`. Ten of the eleven
+attribution sites had been migrated; the eleventh — the one carrying FGA/FGM/3PA/3PM/FTA/FTM — had not, so
+away players at stamped ids 21–26 recorded rebounds, assists, steals, blocks, turnovers and both foul types
+normally and **logged no shooting at all**. Measured on the S76 stock season: **56,714 shot attempts,
+23,653 free-throw attempts and 16,912 three-point attempts**, about 11 shots per road team per game, ~10%
+of the league. Nothing simulated changed — attribution runs post-hoc — so the only page line affected was
+the box-sourced usage spread, which moved **max 42.0 → 38.8%, p90 19.5 → 18.1%, median 5.0 → 6.3%**: the
+six men gained real usage (median up) and the team denominators stopped being short (max/p90 down).
+
+**The lesson, which is the reason this is recorded in design.md and not only the journal.** A session that
+fixes *N* instances of a bug class produces a completeness claim as a side effect — "S75 found five missed
+sites" reads as *there were five*. It was not; there were six, and the sentence asserting the guard was
+universal is what made a sixth look impossible to a later reader. Per CONVENTIONS §2c the absolute
+("every … behind `IsLegalPlayerId`") needed a whole-tree grep behind it, and had one only after S76.1 ran
+it. The class is now closed by measurement rather than by inference: zero surviving literal-20 ceilings on
+any player-id path in the tree.
+
 
 ### Positional eligibility — the one-step ladder (S75)
 

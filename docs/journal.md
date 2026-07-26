@@ -1,3 +1,42 @@
+## Session 76.1 — THE SIXTH SILENT-DROP SITE. One surviving `>= 20` ceiling in the attribution pass was dropping **56,714 shot attempts** a season — every road game, the away side's last six roster spots, shooting only. Found at the S77 check-in gate, before a line of S77 was written. Suite `ALL CHECKS PASSED`; season rebaselined on one line. (2026-07-26)
+
+**Register:** micro-session, opened inside the S77 check-in. Emmett's ruling on the finding was *"Just fix it now"* — the fix collapsed into this session rather than waiting for its own container, but kept as its **own commit**, so a number that moves during S77 is answerable to one change and not two.
+
+**How it was found, which is the part worth keeping.** It was not found by a check, a harness or a suspicion. The S77 prompt's Gate 1 is *summed per-player season totals equal the existing league totals, field by field*. Reading the source to see whether that gate could go green surfaced the reason it could not: the per-player shooting arrays are fed through a guard the league totals do not use. The prompt described itself as *"the cheapest bug-finder available"* — a page a human can eyeball. It found one before the page existed, at the gate, from the reads alone.
+
+**The defect.** `AttributeGame`'s per-slot offense block (`Program.Harness.Shared.cs:213–214`) read `var oi = op.PlayerId - 1; if (oi < 0 || oi >= 20) continue;`. Ten of the eleven attribution sites in that method had been migrated to `RosterShape.IsLegalPlayerId` at S75; this one had not. With `MaxPlayerId = 26`, stamped ids **21–26** — the away side's acquisition indices 8–13 — fell through it. Those men recorded OREB, DREB, AST, STL, BLK, TO, SFL and NSF normally, because those eight sites already used the shared guard, and recorded **no shooting whatsoever**: FGA, FGM, 3PA, 3PM, FTA, FTM all dropped, in every away game, all season.
+
+**Measured before it was fixed, not argued.** A throwaway probe build counted the drops on the stock season at the recorded S76 seed: **FGA 56,714 | FTA 23,653 | 3PA 16,912**, ids 21–26 exactly. Against a league total of 569,608 FGA that is **9.96%** — roughly 11 shots per road team per game. The measurement came first specifically so the ruling was made on a number rather than on a diagnosis.
+
+**★ WHY IT SURVIVED TWO SESSIONS: a completeness claim written as a side effect.** `design.md`'s S75 section said *"Every per-player box-score array is `RosterShape.PlayerArrayWidth` wide behind `RosterShape.IsLegalPlayerId`"* and, one sentence later, *"S75 found five missed sites this way."* The second sentence makes the first read as proven. It was inference: five were found, so five was taken to be all. This is CONVENTIONS §2c's overconfident closure in its purest form — a load-bearing absolute ("every") with no grep behind it, sitting inside a paragraph detailed enough to look settled. The design.md section is now rewritten to say what is actually proven and to record why the earlier phrasing concealed the sixth.
+
+**What did NOT change, and why that is the interesting half.** Attribution runs **post-hoc**, after `governor.Run()` returns — it reads possession records, it does not feed them. So no simulated outcome could move, and none did: the season page is **byte-identical on 492 of 493 lines**. Points 72.4, FG% 45.8, 3P% 35.9, FT% 70.5, PPP 1.0176, TO% 21.6, pace 71.1, fouls 20.23 (6.47/13.76), the rotation ladder 31.8…4.2/0.1, top-five share 69.7%, cross-position 24.49%, credit identity 7,405,830 / 740,583 = 10.0 dropped 0, census 4,511/4,511, schedule fingerprint `93d8c853…`, all 347 standings rows — every one unchanged.
+
+The single moved line is the one computed **from the box** rather than from the records:
+
+```
+usage spread (n=4511 player-seasons):  max 42.0%  p90 19.5%  median 5.0%   <- S76
+usage spread (n=4511 player-seasons):  max 38.8%  p90 18.1%  median 6.3%   <- S76.1
+```
+
+Both halves moved, which is what makes it a confirmation rather than a coincidence. Usage is `(FGA + 0.44·FTA + TO)` over the same team total, so a dropped shot was missing from **both** the man's numerator and his team's denominator: the six affected men read too low (**median up**, 5.0 → 6.3%) and everyone else was measured against a short denominator and read too high (**max and p90 down**). A one-sided move would have meant something else was wrong.
+
+### What shipped
+
+- **`Program.Harness.Shared.cs`** — the guard replaced with `RosterShape.IsLegalPlayerId`, matching its ten siblings, plus a note naming the defect at the site. The stale `PlayerBoxTotals` doc comment (*"Indexed by PlayerId - 1 (0–19)"*, *"Phase 52: widened 10 → 20"*) corrected in the same pass — it was S77 prompt item A5, and leaving it stale beside the fix is exactly the sediment CONVENTIONS §6c forbids.
+- **`docs/design.md`** — the S75 silent-drop section rewritten in place: the sixth site, the measured volume, and the lesson about completeness claims.
+- **`docs/status.md`** — the S76 baseline's usage line and season SHA-256 updated to the new reference; **R-1 moved out of "Red blockers"** and its superseded S75 prose cut (S76 sediment, S77 prompt item A5).
+
+### The new recorded reference
+
+Season SHA-256 **`38ec0e9f03d6104d252c5d6873953ef1ea514bd481797f8b3aa64a006765a84c`** (seed 20260720, world `stock-d1`, Release, Emmett's machine; schedule fingerprint `93d8c853…` unchanged). Every S77 "nothing moved" diff runs against this page, not against S76's.
+
+**Validation.** Baseline captured on the untouched pull FIRST and reproduced exactly — the S76 page to the digit, twelfth consecutive sandbox↔Windows match. After the edit: clean build (0 warnings, 0 errors), full suite `ALL CHECKS PASSED` in-sandbox in 88s, season re-run diffed against the pre-fix baseline at **exactly one line**. Drift audit against a second pristine pull: **one file**, brace-balanced. **Green on Emmett's machine — `ALL CHECKS PASSED`, `STRESS TEST PASSED`, and 25 spot-checked page lines (standings rows 1/51/347, the full calibration block, zone mix, rotation ladder, cross-position table, census, prestige bands) matching the sandbox verbatim — the THIRTEENTH consecutive match.**
+
+**A process miss, recorded because it cost Emmett a minute of wall-clock and a confused question.** The delivery's run command omitted `-c Release`, which the README carries and which working-with-emmett §6 says to include exactly. Emmett noticed the sim had slowed and asked whether the new code was responsible. It was not — measured pre-fix Release 32s, post-fix Release 32s, Debug 84s — but the honest answer required going and measuring rather than defending the change, and the miss was Claude's.
+
+**Also outstanding, raised here rather than lost:** the recorded season SHA-256 is produced by a recipe that exists nowhere in the repo — the sandbox cannot reproduce it under LF, CRLF or CRLF-without-final-newline, so the number can only ever come from Emmett's machine. Proposed fix (offered, not yet ruled): write the exact capture command into CONVENTIONS so the reference stops being folklore.
+
 ## Session 76 — THE MINUTES ALLOCATOR. Per-position depth charts, residual control, bounded cascades; the fatigue fence retired. **Top-five share 88% → 69.7%.** Suite `ALL CHECKS PASSED` in-sandbox; season rebaselined as the S76 STRUCTURAL reference. (2026-07-26)
 
 **Register:** build session under `PROMPT-minutes-allocator-s76-FINAL` (r11; ten external review rounds folded). Scope: depth order to the seam; stored-group charts; the allocator with residual control and bounded cascades; flow feasibility; stability rules; diagnostics; retiring the fence. **No foul-outs, no coach profile, no opening-five fix, no scout-rank fix.**

@@ -154,11 +154,13 @@ internal static partial class Program
         OffBallDefense      = p.OffBallDefense,
     };
 
-    /// <summary>Per-player stat totals for one game. Indexed by PlayerId - 1 (0–19).
-    /// Phase 52: widened 10 → 20 so a ten-man-per-side gen game (PlayerIds 1–20) can log
-    /// stats. A five-per-side run (PlayerIds 1–10) fills only indices 0–9 and leaves 10–19
-    /// zero, so the equality/reproducibility check (SequenceEqual over the full arrays) is
-    /// unaffected and every existing run is byte-for-byte unchanged.</summary>
+    /// <summary>Per-player stat totals for one game. Indexed by PlayerId - 1, width
+    /// <see cref="RosterShape.PlayerArrayWidth"/> (= MaxPlayerId, 26 at S75's 13-man roster:
+    /// home 1–13, away 14–26). A narrower run (a five-per-side bench at PlayerIds 1–10) fills
+    /// only the low indices and leaves the rest zero, so the equality/reproducibility check
+    /// (SequenceEqual over the full arrays) is unaffected.
+    /// S77: the width has always been derived, but ONE consumer guard was still the literal 20
+    /// and dropped ids 21–26 — see the note in AttributeGame. Nothing here restates a size.</summary>
     private sealed class PlayerBoxTotals
     {
         public long[] Fga  = new long[RosterShape.PlayerArrayWidth]; public long[] Fgm  = new long[RosterShape.PlayerArrayWidth];
@@ -210,8 +212,16 @@ internal static partial class Program
             {
                 var op = offRoster.PlayerAt(new Slot(r.Offense, slot), r.Number);
                 if (op is null) continue;
+                // S77: was `oi < 0 || oi >= 20` — the LAST surviving hardcoded 20-ceiling,
+                // and the one site S75 missed when the roster went 10 -> 13. It silently
+                // dropped FGA/FGM/3PA/3PM/FTA/FTM for stamped ids 21-26 (away acquisition
+                // indices 8-13) — 56,714 shot attempts on the S76 stock season, ~11 per road
+                // team per game, while the same men's REB/AST/STL/BLK/TO/fouls recorded
+                // normally because those ten sites already used the RosterShape guard. Every
+                // per-player array is PlayerArrayWidth (= MaxPlayerId) wide; this guard is now
+                // the same one its ten siblings use, so a future roster change moves one number.
+                if (!RosterShape.IsLegalPlayerId(op.PlayerId)) continue; // guard: unset PlayerId
                 var oi = op.PlayerId - 1;
-                if (oi < 0 || oi >= 20) continue; // guard: unset PlayerId
                 t.Fga [oi] += GetSlotFga(r, slot); t.Fgm [oi] += GetSlotFgm(r, slot);
                 t.Tpa [oi] += r.ThreePaBySlot[slot]; t.Tpm [oi] += r.ThreePmBySlot[slot];
                 t.Fta [oi] += r.FtaBySlot[slot];    t.Ftm [oi] += r.FtmBySlot[slot];
