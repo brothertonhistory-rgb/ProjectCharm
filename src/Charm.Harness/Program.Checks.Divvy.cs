@@ -104,13 +104,15 @@ internal static partial class Program
             {
                 var pool = res.Pool;
                 var all = res.Rosters.Values.SelectMany(r => r).ToList();
-                Check($"{tag}: every roster exactly 10", res.Rosters.Values.All(r => r.Count == 10));
+                Check($"{tag}: every roster exactly {RosterShape.Size}",
+                    res.Rosters.Values.All(r => r.Count == RosterShape.Size));
                 Check($"{tag}: every pool player drafted exactly once",
                     all.Count == pool.Count && all.Distinct().Count() == pool.Count);
-                Check($"{tag}: every roster 4G/3W/3B", res.Rosters.Values.All(r =>
-                    r.Count(pid => pool[pid].Pos == "G") == 4 &&
-                    r.Count(pid => pool[pid].Pos == "W") == 3 &&
-                    r.Count(pid => pool[pid].Pos == "B") == 3));
+                Check($"{tag}: every roster {RosterShape.Guards}G/{RosterShape.Wings}W/{RosterShape.Bigs}B",
+                    res.Rosters.Values.All(r =>
+                        r.Count(pid => pool[pid].Pos == PositionalEligibility.Guard) == RosterShape.Guards &&
+                        r.Count(pid => pool[pid].Pos == PositionalEligibility.Wing)  == RosterShape.Wings &&
+                        r.Count(pid => pool[pid].Pos == PositionalEligibility.Big)   == RosterShape.Bigs));
                 Check($"{tag}: every roster covered (lead handler + wing defender + interior bodies)",
                     res.Rosters.Values.All(r =>
                         r.Any(pid => GenLeadRoles.Contains(pool[pid].Role)) &&
@@ -126,10 +128,10 @@ internal static partial class Program
             {
                 var pool = res.Pool;
                 var n = res.Rosters.Count;
-                Check($"{tag} pool: positions by EXACT COUNT (4n/3n/3n)",
-                    pool.Count(p => p.Pos == "G") == 4 * n &&
-                    pool.Count(p => p.Pos == "W") == 3 * n &&
-                    pool.Count(p => p.Pos == "B") == 3 * n,
+                Check($"{tag} pool: positions by EXACT COUNT ({RosterShape.Guards}n/{RosterShape.Wings}n/{RosterShape.Bigs}n)",
+                    pool.Count(p => p.Pos == PositionalEligibility.Guard) == RosterShape.GuardCount(n) &&
+                    pool.Count(p => p.Pos == PositionalEligibility.Wing)  == RosterShape.WingCount(n) &&
+                    pool.Count(p => p.Pos == PositionalEligibility.Big)   == RosterShape.BigCount(n),
                     $"{pool.Count(p => p.Pos == "G")}G/{pool.Count(p => p.Pos == "W")}W/{pool.Count(p => p.Pos == "B")}B");
 
                 // Defensive-plane boundaries (S70 ruling, 0 perimeter .. 1 post):
@@ -184,10 +186,10 @@ internal static partial class Program
             // different initial chunk sizes must yield the IDENTICAL ordered pool.
             {
                 var rlSeed = unchecked((int)(seed ^ DivvyCohortSeedXor));
-                const int rlP = 3470;
+                var rlP = RosterShape.PoolSize(347);
                 var recA = BuildRecruitedCohort(rlSeed, rlP, 2 * rlP);   // no doubling at ~79.5% acceptance
                 var recB = BuildRecruitedCohort(rlSeed, rlP, 4000);      // forces >=1 doubling (4000 draws accept ~3,180 < 3,470)
-                Check("recruited cohort: exactly 10n accepted", recA.Length == rlP, $"{recA.Length}");
+                Check($"recruited cohort: exactly {RosterShape.Size}n accepted", recA.Length == rlP, $"{recA.Length}");
                 Check("recruited cohort: every accepted player clears the line",
                     recA.All(lp => lp.Result.Rscore >= PlayerGenPass3.R_LINE),
                     $"Rscore >= {PlayerGenPass3.R_LINE:F1}");

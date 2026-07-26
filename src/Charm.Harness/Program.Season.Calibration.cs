@@ -125,6 +125,44 @@ internal static partial class Program
         public long JbTipRetainedN,   JbTipAwardedN,   JbArrowRetainedN,   JbArrowAwardedN;
         public double JbTipRetainedS, JbTipAwardedS,   JbArrowRetainedS,   JbArrowAwardedS;
 
+        // ── S75 measurement: cross-position occupancy ────────────────────────────
+        //  Primary measure is TIME (possession credits) outside the occupant's stored
+        //  position, not substitution counts — many short cross-position stints and few
+        //  long ones look identical in a substitution tally and nothing alike on a page.
+        //  Height is carried because it is the signal that motivated the ladder; it is
+        //  explicitly NOT sufficient on its own to judge whether the ladder is priced.
+        public readonly Dictionary<string, long> XCredits = new(StringComparer.Ordinal);
+        public readonly Dictionary<string, long> XHeightSum = new(StringComparer.Ordinal);
+        public readonly Dictionary<string, long> XSeatHeightSum = new(StringComparer.Ordinal);
+        public long PossessionCredits, XPossessionRecords, DroppedCredits;
+
+        public void NoteOccupancy(
+            IReadOnlyList<PossessionRecord> records, GameState game,
+            IReadOnlyDictionary<int, string> storedPos,
+            IReadOnlyDictionary<(TeamSide, int), string> seatPos,
+            IReadOnlyDictionary<(TeamSide, int), int> seatStarterHeight)
+        {
+            long credited = 0;
+            foreach (var r in records)
+                for (var slot = 1; slot <= Lineup.Size; slot++)
+                    foreach (var side in new[] { r.Offense, r.Defense })
+                    {
+                        var p = game.RosterFor(side).PlayerAt(new Slot(side, slot), r.Number);
+                        if (p is null) continue;
+                        credited++;
+                        if (!RosterShape.IsLegalPlayerId(p.PlayerId)) { DroppedCredits++; continue; }
+                        if (!storedPos.TryGetValue(p.PlayerId, out var stored)) continue;
+                        if (!seatPos.TryGetValue((side, slot), out var seat)) continue;
+                        var key = PositionalEligibility.TransitionLabel(stored, seat);
+                        XCredits[key]   = XCredits.TryGetValue(key, out var c) ? c + 1 : 1;
+                        XHeightSum[key] = (XHeightSum.TryGetValue(key, out var h) ? h : 0) + p.Height;
+                        XSeatHeightSum[key] = (XSeatHeightSum.TryGetValue(key, out var sh) ? sh : 0)
+                                            + (seatStarterHeight.TryGetValue((side, slot), out var v) ? v : p.Height);
+                    }
+            PossessionCredits += credited;
+            XPossessionRecords += records.Count;
+        }
+
         public void Accumulate(GameState game, GovernorRunResult result, PlayerBoxTotals box,
                                int homeSchoolId, int awaySchoolId)
         {
@@ -134,17 +172,25 @@ internal static partial class Program
             if (result.OvertimePeriods > 0) OtGames++;
             OtPeriods += result.OvertimePeriods;
 
-            for (var i = 0; i < 20; i++)
+            for (var i = 0; i < RosterShape.PlayerArrayWidth; i++)
             {
                 OReb += box.OReb[i]; DReb += box.DReb[i];
                 Ast  += box.Ast[i];  Stl  += box.Stl[i];  Blk += box.Blk[i];
 
-                // Session 63: fouls + usage. Box index i maps to (school, depth slot)
-                // exactly as the season stamps PlayerIds: home rows are ids 1-10
-                // (indices 0-9), away rows 11-20 (indices 10-19) — see BuildSeasonSide.
+                // Session 63: fouls + usage. Box index i maps to (school, acquisition-order
+                // index) exactly as the season stamps PlayerIds: home rows are ids
+                // 1..RosterShape.Size (indices 0..Size-1), away rows the next Size — see
+                // BuildSeasonSide.
+                //
+                // ★ S75: these two lines were hardcoded to 10 and did NOT throw or drop when
+                // the roster grew — home players 11-13 landed at indices 10-12, were credited
+                // to the AWAY school, and their slot keys wrapped into collisions. A silent
+                // cross-team MISATTRIBUTION, invisible to every conservation check because the
+                // totals still balanced. The tell was `n=3470` player-seasons on a 4,511-player
+                // league: (i % 10) can only ever produce ten distinct slots.
                 SflTotal += box.ShFoul[i]; NsfTotal += box.NsFoul[i];
-                var school = i < 10 ? homeSchoolId : awaySchoolId;
-                var slot = (i % 10) + 1;
+                var school = i < RosterShape.Size ? homeSchoolId : awaySchoolId;
+                var slot = (i % RosterShape.Size) + 1;
                 var pk = (school, slot);
                 var pv = PlayerUsage.TryGetValue(pk, out var p0) ? p0 : (0L, 0L, 0L);
                 PlayerUsage[pk] = (pv.Item1 + box.Fga[i], pv.Item2 + box.Fta[i], pv.Item3 + box.To[i]);
@@ -438,6 +484,35 @@ internal static partial class Program
     private static void PrintBaselineReadout(SeasonLeagueStats s)
     {
         static string Inv(FormattableString f) => FormattableString.Invariant(f);
+        // ── S75: cross-position occupancy (page-only; the S76 design input) ────────
+        {
+            static string Inv2(FormattableString f) => FormattableString.Invariant(f);
+            Console.WriteLine("--- CROSS-POSITION OCCUPANCY (Session 75; page-only, never asserted) ---");
+            var total = s.XCredits.Values.Sum();
+            if (total == 0)
+            {
+                Console.WriteLine("  no occupancy recorded (instrument not wired) — treat every minutes number as unproven.");
+            }
+            else
+            {
+                var cross = s.XCredits.Where(kv => kv.Key[0] != kv.Key[^1]).Sum(kv => kv.Value);
+                Console.WriteLine(Inv2($"  floor time outside stored position: {100.0 * cross / total,5:F2} % of {total} player-possession credits"));
+                Console.WriteLine(Inv2($"  credit identity: {s.PossessionCredits} credits / {s.XPossessionRecords} records = {(s.XPossessionRecords == 0 ? 0 : (double)s.PossessionCredits / s.XPossessionRecords),4:F1} (expect {2 * Lineup.Size}.0); dropped {s.DroppedCredits}"));
+                Console.WriteLine("  by transition (share of all floor time; mean occupant height vs the seat's own starter):");
+                foreach (var key in PositionalEligibility.LegalTransitions)
+                {
+                    if (!s.XCredits.TryGetValue(key, out var c) || c == 0) { Console.WriteLine(Inv2($"    {key}   —")); continue; }
+                    var occH = (double)s.XHeightSum[key] / c;
+                    var seatH = (double)s.XSeatHeightSum[key] / c;
+                    var tag = key[0] == key[^1] ? " " : "*";
+                    Console.WriteLine(Inv2($"    {key}{tag} {100.0 * c / total,6:F2} %   occupant {occH,5:F1}  seat-starter {seatH,5:F1}  gap {occH - seatH,+6:F1}"));
+                }
+                Console.WriteLine("    (* = cross-position. Height is the signal that motivated the ladder, NOT a");
+                Console.WriteLine("     sufficient test of whether out-of-position play is priced — see A11.)");
+            }
+            Console.WriteLine();
+        }
+
         Console.WriteLine("--- BASELINE LINES (Session 63; page-only, never asserted) ---");
         if (s.Games == 0) { Console.WriteLine("  no games accumulated."); return; }
         var g2 = 2.0 * s.Games;
@@ -476,14 +551,56 @@ internal static partial class Program
         var drafted = all.Count;
         var distinct = all.Distinct().Count();
         var posOk = res.Rosters.Values.Count(r =>
-            r.Count(pid => pool[pid].Pos == "G") == 4 &&
-            r.Count(pid => pool[pid].Pos == "W") == 3 &&
-            r.Count(pid => pool[pid].Pos == "B") == 3);
+            r.Count(pid => pool[pid].Pos == PositionalEligibility.Guard) == RosterShape.Guards &&
+            r.Count(pid => pool[pid].Pos == PositionalEligibility.Wing)  == RosterShape.Wings &&
+            r.Count(pid => pool[pid].Pos == PositionalEligibility.Big)   == RosterShape.Bigs);
         var covOk = res.Rosters.Values.Count(r =>
             r.Any(pid => GenLeadRoles.Contains(pool[pid].Role)) &&
             r.Any(pid => pool[pid].Role == GenWingDefenderRole));
         Console.WriteLine(Inv($"  players drafted {drafted} of pool {pool.Count} (distinct {distinct}; undrafted {pool.Count - distinct})"));
-        Console.WriteLine(Inv($"  rosters exactly 4G/3W/3B: {posOk}/{res.Rosters.Count}   protected roles covered: {covOk}/{res.Rosters.Count}"));
+        Console.WriteLine(Inv($"  rosters exactly {RosterShape.Guards}G/{RosterShape.Wings}W/{RosterShape.Bigs}B: {posOk}/{res.Rosters.Count}   protected roles covered: {covOk}/{res.Rosters.Count}"));
+
+        // ── S75 measurement product: the numbers S76 designs its allocator against ──
+        //  Page-only, never asserted. A9 ruling: the opening-five histogram is EVIDENCE,
+        //  not a target — no distribution is expected and lineup selection is untouched.
+        var shapes = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var kv in res.Rosters)
+        {
+            var five = BuildOpeningFive(kv.Value, pid => pool[pid].Pos);
+            int fg = 0, fw = 0, fb = 0;
+            foreach (var pid in five)
+            {
+                var q = pool[pid].Pos;
+                if (q == PositionalEligibility.Guard) fg++;
+                else if (q == PositionalEligibility.Wing) fw++;
+                else fb++;
+            }
+            var key = Inv($"{fg}G/{fw}W/{fb}B");
+            shapes[key] = shapes.TryGetValue(key, out var c) ? c + 1 : 1;
+        }
+        Console.WriteLine("  opening-five shapes (S75 evidence; lineup selection is UNCHANGED — see A9):");
+        foreach (var kv in shapes.OrderByDescending(x => x.Value))
+            Console.WriteLine(Inv($"    {kv.Key}  {kv.Value,4} schools"));
+
+        Console.WriteLine("  drafted height by position (pool means survive the divvy?):");
+        foreach (var q in new[] { PositionalEligibility.Guard, PositionalEligibility.Wing, PositionalEligibility.Big })
+        {
+            var hs = all.Where(pid => pool[pid].Pos == q).Select(pid => (double)pool[pid].Player.Height).ToList();
+            if (hs.Count == 0) continue;
+            Console.WriteLine(Inv($"    {q}  mean {hs.Average(),5:F1}  [{hs.Min(),3:F0}..{hs.Max(),3:F0}]  (n={hs.Count})"));
+        }
+
+        Console.WriteLine("  scout rank by acquisition-order index (NOT a depth chart — see A10):");
+        for (var idx = 0; idx < RosterShape.Size; idx++)
+        {
+            var rs = res.Rosters.Values.Where(r => r.Count > idx).Select(r => pool[r[idx]].ScoutRank).ToList();
+            if (rs.Count == 0) continue;
+            var posMix = res.Rosters.Values.Where(r => r.Count > idx)
+                .GroupBy(r => pool[r[idx]].Pos)
+                .OrderByDescending(gp => gp.Count())
+                .Select(gp => Inv($"{gp.Key}{gp.Count()}"));
+            Console.WriteLine(Inv($"    idx {idx + 1,2}  rank {rs.Average(),6:F1}  [{rs.Min(),6:F1} .. {rs.Max(),6:F1}]  pos {string.Join("/", posMix)}"));
+        }
 
         var prestige = world.Schools.ToDictionary(x => x.Id, x => x.CurrentPrestige);
         Console.WriteLine("  drafted scout-rank spread by prestige band (mean [min..max]):");

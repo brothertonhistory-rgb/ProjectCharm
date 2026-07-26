@@ -124,12 +124,19 @@ internal static partial class Program
     private const string GenWingDefenderRole = "ThreeAndDWing";                               // reserved wing defender
 
     // ── PRESTIGE -> leg count (§6 placeholder; steeper depth gap for back slots) ─
-    // per depth-slot 1..10 anchors: P(>=2 legs) at prestige 30 and 90
-    private static readonly double[] GenP2At30 = { 0.62, 0.42, 0.28, 0.16, 0.10, 0.06, 0.03, 0.02, 0.01, 0.01 };
-    private static readonly double[] GenP2At90 = { 0.96, 0.90, 0.83, 0.75, 0.66, 0.56, 0.47, 0.39, 0.31, 0.25 };
+    // per acquisition-order index 1..13 anchors: P(>=2 legs) at prestige 30 and 90.
+    // S75 extended slots 11-13 (Emmett's ruling): the prestige-30 tail was already
+    // flat at 0.01, and the prestige-90 curve continues its decay 0.31 -> 0.25 ->
+    // 0.20, 0.16, 0.13 — a blue-blood's 13th man has roughly a one-in-eight shot at
+    // being good at more than one thing; a low-prestige program's 13th man never is.
+    // Three-leg stays zero past slot 3, so those two tables extend with zeros.
+    // These tables are read ONLY by the standalone `gen` demo path — Program.Divvy.cs
+    // states outright that the pool never calls GenLegCountFor.
+    private static readonly double[] GenP2At30 = { 0.62, 0.42, 0.28, 0.16, 0.10, 0.06, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01, 0.01 };
+    private static readonly double[] GenP2At90 = { 0.96, 0.90, 0.83, 0.75, 0.66, 0.56, 0.47, 0.39, 0.31, 0.25, 0.20, 0.16, 0.13 };
     // P(3 legs) — only the top slots, only high prestige ("sometimes a star, not every roster")
-    private static readonly double[] GenP3At30 = { 0.01, 0.00, 0.00, 0, 0, 0, 0, 0, 0, 0 };
-    private static readonly double[] GenP3At90 = { 0.15, 0.06, 0.02, 0, 0, 0, 0, 0, 0, 0 };
+    private static readonly double[] GenP3At30 = { 0.01, 0.00, 0.00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    private static readonly double[] GenP3At90 = { 0.15, 0.06, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     private const double GenFrac30 = 30 / 99.0;
     private const double GenFrac90 = 90 / 99.0;
 
@@ -274,6 +281,10 @@ internal static partial class Program
 
     private static int GenLegCountFor(int slotIdx, int prestige, Random r)
     {
+        if (slotIdx < 0 || slotIdx >= GenP2At30.Length)
+            throw new ArgumentOutOfRangeException(
+                nameof(slotIdx), slotIdx,
+                $"leg-count anchors cover {GenP2At30.Length} roster slots; RosterShape.Size is {RosterShape.Size}.");
         var frac = GenFracOf(prestige);
         var p2 = Math.Max(0.0, Math.Min(1.0, GenInterp(GenP2At30[slotIdx], GenP2At90[slotIdx], frac)));
         var p3 = Math.Max(0.0, Math.Min(1.0, GenInterp(GenP3At30[slotIdx], GenP3At90[slotIdx], frac)));
@@ -851,11 +862,14 @@ internal static partial class Program
     };
 
     // ============================================================================
-    // Roster assembly (§5): coverage-first, ~4G/3W/3B, 5 starters + 5 bench, NO sort.
+    // Roster assembly (§5): coverage-first, 5G/4W/4B, 5 starters + 8 bench, NO sort.
+    // S75: was 4G/3W/3B with 5 bench. The shape now derives from RosterShape.
     // ============================================================================
 
     // One generated player + the metadata the roster sheet reads. Slot is the roster
-    // depth position 1..10 (NOT PlayerId; A0.7): 1 = top starter, 10 = last bench.
+    // ACQUISITION-ORDER INDEX 1..RosterShape.Size (NOT PlayerId; A0.7) — 1 = top
+    // starter, Size = last bench. S75 note: this is an ordering, NOT a depth chart;
+    // a real depth chart does not exist until S76 defines one.
     private sealed record GenPlayerRow(
         int Slot, string Pos, string Role, bool Starter, int LegCount,
         HashSet<string> PlusLegs, Dictionary<string, int> Ratings, Player Player);
@@ -876,9 +890,14 @@ internal static partial class Program
             ("B", GenBigRoles[r.Next(GenBigRoles.Length)],   true),   // interior body
         };
 
-        // Remaining composition to reach 4G/3W/3B: 3 more guards, 2 wings, 2 bigs.
-        // First two of the remaining join the starting five; the other five are bench.
-        var remaining = new List<string> { "G", "G", "G", "W", "W", "B", "B" };
+        // Remaining composition to reach RosterShape's 5G/4W/4B: the three reserved
+        // coverage roles above already supply one of each, so the remainder is
+        // (Guards-1) guards, (Wings-1) wings, (Bigs-1) bigs — at S75, 4G/3W/3B.
+        // First two of the remaining join the starting five; the rest are bench.
+        var remaining = new List<string>();
+        for (var i = 1; i < RosterShape.Guards; i++) remaining.Add(PositionalEligibility.Guard);
+        for (var i = 1; i < RosterShape.Wings;  i++) remaining.Add(PositionalEligibility.Wing);
+        for (var i = 1; i < RosterShape.Bigs;   i++) remaining.Add(PositionalEligibility.Big);
         GenShuffle(remaining, r);
         for (var i = 0; i < remaining.Count; i++)
         {
@@ -888,7 +907,7 @@ internal static partial class Program
             plan.Add((pos, role, i < 2));
         }
 
-        // Order: starters first (depth slots 1-5), bench (6-10). Depth drives leg count.
+        // Order: starters first (indices 1-5), bench after. Index drives leg count.
         // There is NO rating sort and NO "best five" — inventing an overall would smuggle
         // in the scalar the whole engine forbids. A coherent five is generated as such.
         var starters = plan.Where(p => p.Starter).ToList();
@@ -941,7 +960,7 @@ internal static partial class Program
         Console.WriteLine($"=== ROSTER SHEET: Program {tag}  (prestige {program.Prestige}, lean {program.Lean}) ===");
         Console.WriteLine("  Legs: + = a strength (plus leg), ~ = ordinary. Size/Ath/Skl = leg strength");
         Console.WriteLine("  (mean of that leg's ratings, excluding position-permitted holes). Slot = roster");
-        Console.WriteLine("  depth 1..10 (1 = top starter); this is NOT PlayerId.");
+        Console.WriteLine($"  acquisition-order index 1..{RosterShape.Size} (1 = top starter); this is NOT PlayerId.");
         Console.WriteLine($"  {"Slot",-9}{"Pos",-4}{"Role",-16}{"Legs",-22}{"Size",5}{"Ath",5}{"Skl",5}{"FT",6}  Depth");
         Console.WriteLine("  " + new string('-', 78));
 
@@ -1088,9 +1107,10 @@ internal static partial class Program
             if (rows[i].Starter) { starters.Add(stamped[i]); starterPos.Add(rows[i].Pos); }
             else                 { reserves.Add(stamped[i]); reservePos.Add(rows[i].Pos); }
         }
-        if (starters.Count != 5 || reserves.Count != 5)
+        if (starters.Count != Lineup.Size || reserves.Count != RosterShape.Size - Lineup.Size)
             throw new InvalidOperationException(
-                $"assembly bug — a program must split into five starters and five reserves " +
+                $"assembly bug — a program must split into {Lineup.Size} starters and " +
+                $"{RosterShape.Size - Lineup.Size} reserves " +
                 $"(got {starters.Count} starters, {reserves.Count} reserves).");
         return new GenSideData(starters.ToArray(), starterPos.ToArray(), reserves.ToArray(), reservePos.ToArray());
     }
@@ -1142,7 +1162,19 @@ internal static partial class Program
                 c, sideA, sideB, teamASide, teamBSide,
                 resolverSeed: gameSeed, governorSeed: gameSeed + 1);
 
-            stats.Accumulate(result.Possessions, game, attributed, teamASide, teamBSide);
+            var storedPos = new Dictionary<int, string>();
+            var seatPos   = new Dictionary<(TeamSide, int), string>();
+            foreach (var (sd, sd_side) in new[] { (sideA, teamASide), (sideB, teamBSide) })
+            {
+                for (var k = 0; k < sd.Starters.Length; k++)
+                {
+                    storedPos[sd.Starters[k].PlayerId] = sd.StarterPositions[k];
+                    seatPos[(sd_side, k + 1)] = sd.StarterPositions[k];   // the seat's position is fixed all game
+                }
+                for (var k = 0; k < sd.Reserves.Length; k++)
+                    storedPos[sd.Reserves[k].PlayerId] = sd.ReservePositions[k];
+            }
+            stats.Accumulate(result.Possessions, game, attributed, teamASide, teamBSide, storedPos, seatPos);
         }
 
         return stats;
@@ -1278,18 +1310,29 @@ internal static partial class Program
         public readonly long[] BSlotFga = new long[5];
 
         // 20-player arrays (index = PlayerId - 1; A = 0..9, B = 10..19).
-        public readonly long[] PlayerFga  = new long[20]; public readonly long[] PlayerFgm  = new long[20];
-        public readonly long[] PlayerTpa  = new long[20]; public readonly long[] PlayerTpm  = new long[20];
-        public readonly long[] PlayerFta  = new long[20]; public readonly long[] PlayerFtm  = new long[20];
-        public readonly long[] PlayerOReb = new long[20]; public readonly long[] PlayerDReb = new long[20];
-        public readonly long[] PlayerBlk  = new long[20]; public readonly long[] PlayerStl  = new long[20];
-        public readonly long[] PlayerShFoul = new long[20];
-        public readonly long[] PlayerAst  = new long[20]; public readonly long[] PlayerTo   = new long[20];
-        public readonly long[] PlayerPoss = new long[20];   // possessions on the floor (either side)
+        public readonly long[] PlayerFga  = new long[RosterShape.PlayerArrayWidth]; public readonly long[] PlayerFgm  = new long[RosterShape.PlayerArrayWidth];
+        public readonly long[] PlayerTpa  = new long[RosterShape.PlayerArrayWidth]; public readonly long[] PlayerTpm  = new long[RosterShape.PlayerArrayWidth];
+        public readonly long[] PlayerFta  = new long[RosterShape.PlayerArrayWidth]; public readonly long[] PlayerFtm  = new long[RosterShape.PlayerArrayWidth];
+        public readonly long[] PlayerOReb = new long[RosterShape.PlayerArrayWidth]; public readonly long[] PlayerDReb = new long[RosterShape.PlayerArrayWidth];
+        public readonly long[] PlayerBlk  = new long[RosterShape.PlayerArrayWidth]; public readonly long[] PlayerStl  = new long[RosterShape.PlayerArrayWidth];
+        public readonly long[] PlayerShFoul = new long[RosterShape.PlayerArrayWidth];
+        public readonly long[] PlayerAst  = new long[RosterShape.PlayerArrayWidth]; public readonly long[] PlayerTo   = new long[RosterShape.PlayerArrayWidth];
+        public readonly long[] PlayerPoss = new long[RosterShape.PlayerArrayWidth];   // possessions on the floor (either side)
+        // S75: the A5 credit identity, accumulated so the season page can restate it.
+        public long PossessionCredits;
+        public long PossessionRecords;
+        // S75 measurement: possession credits spent OUTSIDE the occupant's stored position,
+        // keyed "G->W" etc. The primary occupancy measure (review round 2): a high count of
+        // cross-position SUBSTITUTIONS can still mean low cross-position TIME if the stints
+        // are short, so time is what gets reported, with substitution counts beside it.
+        public readonly Dictionary<string, long> CreditsByTransition = new(StringComparer.Ordinal);
+        public readonly Dictionary<string, long> HeightGapByTransition = new(StringComparer.Ordinal);
 
         public void Accumulate(
             IReadOnlyList<PossessionRecord> records, GameState game,
-            PlayerBoxTotals attributed, TeamSide teamASide, TeamSide teamBSide)
+            PlayerBoxTotals attributed, TeamSide teamASide, TeamSide teamBSide,
+            IReadOnlyDictionary<int, string>? storedPos = null,
+            IReadOnlyDictionary<(TeamSide, int), string>? seatPos = null)
         {
             Games++;
 
@@ -1341,7 +1384,7 @@ internal static partial class Program
                 BSlotFga[s] += SumB(r => GetSlotFga(r, s + 1));
             }
 
-            for (var i = 0; i < 20; i++)
+            for (var i = 0; i < RosterShape.PlayerArrayWidth; i++)
             {
                 PlayerFga[i]    += attributed.Fga[i];
                 PlayerFgm[i]    += attributed.Fgm[i];
@@ -1361,14 +1404,68 @@ internal static partial class Program
             // Possessions-played: every on-floor player of BOTH sides, per record. A player
             // appears on exactly one side per possession, so each on-floor player gets +1;
             // a player subbed out stops accruing from the possession he leaves.
+            //
+            // ★ S75 (A2/A5): the id guard below is a SILENT DROP if the width is wrong —
+            // a player above the ceiling simply accrues nothing, and the season's
+            // conservation checks verify wins and losses rather than player stats, so
+            // they stay green. So the drop is counted and asserted rather than trusted.
+            long creditedThisGame = 0, droppedThisGame = 0;
             foreach (var r in records)
-                for (var slot = 1; slot <= 5; slot++)
+                for (var slot = 1; slot <= Lineup.Size; slot++)
                 {
                     var op = game.RosterFor(r.Offense).PlayerAt(new Slot(r.Offense, slot), r.Number);
-                    if (op != null && op.PlayerId >= 1 && op.PlayerId <= 20) PlayerPoss[op.PlayerId - 1]++;
+                    if (op != null)
+                    {
+                        if (RosterShape.IsLegalPlayerId(op.PlayerId)) { PlayerPoss[op.PlayerId - 1]++; creditedThisGame++; }
+                        else droppedThisGame++;
+                        NoteOccupancy(op, r.Offense, slot, storedPos, seatPos);
+                    }
                     var dp = game.RosterFor(r.Defense).PlayerAt(new Slot(r.Defense, slot), r.Number);
-                    if (dp != null && dp.PlayerId >= 1 && dp.PlayerId <= 20) PlayerPoss[dp.PlayerId - 1]++;
+                    if (dp != null)
+                    {
+                        if (RosterShape.IsLegalPlayerId(dp.PlayerId)) { PlayerPoss[dp.PlayerId - 1]++; creditedThisGame++; }
+                        else droppedThisGame++;
+                        NoteOccupancy(dp, r.Defense, slot, storedPos, seatPos);
+                    }
                 }
+
+            if (droppedThisGame > 0)
+                throw new InvalidOperationException(
+                    $"S75 player-id ceiling breached — {droppedThisGame} possession credits fell outside " +
+                    $"1..{RosterShape.MaxPlayerId}. A widening site was missed; every per-player number " +
+                    $"below this point is unreliable.");
+
+            // A5's identity: each possession record credits every on-floor player of BOTH
+            // sides, so a record issues 2 x Lineup.Size credits. This is what makes
+            // "share of credits" convertible to minutes at all.
+            var expected = (long)records.Count * 2 * Lineup.Size;
+            if (creditedThisGame != expected)
+                throw new InvalidOperationException(
+                    $"S75 possession-credit identity broken — credited {creditedThisGame}, " +
+                    $"expected {expected} ({records.Count} records x {2 * Lineup.Size}).");
+
+            PossessionCredits += creditedThisGame;
+            PossessionRecords += records.Count;
+        }
+
+        /// <summary>One possession of floor time for one occupant, tallied by the transition
+        /// he represents. Height gap is (occupant - the seat's own starter) so a wing sliding
+        /// into a guard seat shows a POSITIVE gap and a guard covering a wing seat a negative
+        /// one. Height alone is not sufficient to judge the ladder (review round 2) but it is
+        /// the signal that motivated it, and the full gap set rides on the season page.</summary>
+        private void NoteOccupancy(
+            Player occupant, TeamSide side, int slot,
+            IReadOnlyDictionary<int, string>? storedPos,
+            IReadOnlyDictionary<(TeamSide, int), string>? seatPos)
+        {
+            if (storedPos is null || seatPos is null) return;
+            if (!storedPos.TryGetValue(occupant.PlayerId, out var stored)) return;
+            if (!seatPos.TryGetValue((side, slot), out var seat)) return;
+
+            var key = PositionalEligibility.TransitionLabel(stored, seat);
+            CreditsByTransition[key] = CreditsByTransition.TryGetValue(key, out var c) ? c + 1 : 1;
+            HeightGapByTransition[key] =
+                (HeightGapByTransition.TryGetValue(key, out var h) ? h : 0) + occupant.Height;
         }
     }
 
@@ -1388,7 +1485,7 @@ internal static partial class Program
         // side mapping inverted for some games, or a sub mis-attributed a committer.
         long aPlayerTo = 0, bPlayerTo = 0;
         for (var i = 0;  i < 10; i++) aPlayerTo += s.PlayerTo[i];
-        for (var i = 10; i < 20; i++) bPlayerTo += s.PlayerTo[i];
+        for (var i = RosterShape.AwayIdOffset; i < RosterShape.PlayerArrayWidth; i++) bPlayerTo += s.PlayerTo[i];
         bool aOk = aPlayerTo == s.ACommitterTo;
         bool bOk = bPlayerTo == s.BCommitterTo;
         Console.WriteLine("Turnover reconciliation (per-player attribution vs. committer possessions):");
@@ -1451,7 +1548,7 @@ internal static partial class Program
         Console.WriteLine(new string('─', 133));
 
         double g = s.Games;
-        for (var i = 0; i < 20; i++)
+        for (var i = 0; i < RosterShape.PlayerArrayWidth; i++)
         {
             if (s.PlayerPoss[i] <= 0) continue;   // never took the floor
 
@@ -1490,7 +1587,7 @@ internal static partial class Program
         // attempts that carry no slot attribution.)
         long aPlayerFga = 0, bPlayerFga = 0, aUsageFga = 0, bUsageFga = 0;
         for (var i = 0;  i < 10; i++) aPlayerFga += s.PlayerFga[i];
-        for (var i = 10; i < 20; i++) bPlayerFga += s.PlayerFga[i];
+        for (var i = RosterShape.AwayIdOffset; i < RosterShape.PlayerArrayWidth; i++) bPlayerFga += s.PlayerFga[i];
         for (var i = 0;  i < 5;  i++) { aUsageFga += s.ASlotFga[i]; bUsageFga += s.BSlotFga[i]; }
         bool aFgaOk = aPlayerFga == aUsageFga;
         bool bFgaOk = bPlayerFga == bUsageFga;

@@ -204,8 +204,8 @@ internal static partial class Program
             var stockRows = BuildSeasonRows(stockDivvy, stock, verbose: false);
             var prestigeAfter = stock.Schools.OrderBy(s => s.Id)
                 .Select(s => (s.Id, s.CurrentPrestige)).ToList();
-            Check("stock prep: rows built for all 347 schools, ten players each",
-                  stockRows.Count == 347 && stockRows.Values.All(r => r.Count == 10));
+            Check($"stock prep: rows built for all 347 schools, {RosterShape.Size} players each",
+                  stockRows.Count == 347 && stockRows.Values.All(r => r.Count == RosterShape.Size));
             Check("stock prep: the loaded world is unmutated (every CurrentPrestige unchanged)",
                   prestigeBefore.SequenceEqual(prestigeAfter));
 
@@ -250,7 +250,7 @@ internal static partial class Program
             var (replayGame, _, _) = RunSingleGenGame(
                 cfgs,
                 BuildSeasonSide(replayRows[g0.HomeId], 0),
-                BuildSeasonSide(replayRows[g0.AwayId], 10),
+                BuildSeasonSide(replayRows[g0.AwayId], RosterShape.AwayIdOffset),
                 TeamSide.Home, TeamSide.Away,
                 resolverSeed: unchecked(seasonBase + 0),
                 governorSeed: unchecked(seasonBase + 1));

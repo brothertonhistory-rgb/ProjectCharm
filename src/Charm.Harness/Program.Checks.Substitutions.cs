@@ -27,7 +27,7 @@ internal static partial class Program
     private static bool Phase52SubstitutionsCheck(string configPath)
     {
         Console.WriteLine();
-        Console.WriteLine("== Phase 52 — Substitutions (flat fatigue fence) ==");
+        Console.WriteLine("== Phase 52 — Substitutions (fatigue fence + S75 one-step eligibility ladder) ==");
         var pass = true;
 
         var cfgFat = FatigueConfig.Load(configPath);
@@ -182,8 +182,12 @@ internal static partial class Program
         Console.WriteLine("  Sub-check 3: bench exhausted at a position -> the tired starter stays in (no phantom sub)");
         {
             var g = NewGame();
-            // slot 1 is a Guard, but NO guard sits on the bench (reserves are W,W,B,B,W).
-            var home = BuildSide(g, TeamSide.Home, 1, new[] { "G", "W", "W", "B", "B" }, new[] { "W", "W", "B", "B", "W" });
+            // S75 (the ladder): a guard seat draws from guards AND wings, so exhausting it
+            // now means NO guard and NO wing on the bench — every reserve must be a big,
+            // the one group with no route to a guard seat. Under the old same-position
+            // rule the wings here were ineligible; they are legal entrants now, which is
+            // the ladder working, not the fallback breaking.
+            var home = BuildSide(g, TeamSide.Home, 1, new[] { "G", "W", "W", "B", "B" }, new[] { "B", "B", "B", "B", "B" });
             var away = DummyAway(g);
             var policy = new FlatFatigueFencePolicy(home, away, halftimeEq);
 
@@ -195,7 +199,7 @@ internal static partial class Program
 
             pass &= stayedIn;
             Console.WriteLine(stayedIn
-                ? "    no guard on the bench -> tired guard stays in -> ok"
+                ? "    no guard or wing on the bench -> tired guard stays in -> ok"
                 : $"    FAIL: slot-1 occupant is now id {occ.PlayerId} (expected the tired starter, id {s1.PlayerId})");
         }
 
@@ -342,6 +346,85 @@ internal static partial class Program
             Console.WriteLine(ok
                 ? $"    starter pulled ({result.Possessions.Count} poss); a reserve entered and accrued -> ok"
                 : $"    FAIL: subLogged={subLogged} anyReserveAccrued={anyReserveAccrued}");
+        }
+
+        // ── Sub-check 8 (S75): the eligibility matrix, all nine cells ─────────────────
+        //  Prose is not implementation. Every cell is asserted directly so a future
+        //  reader cannot re-derive the rule from a sentence and get it wrong.
+        Console.WriteLine("  Sub-check 8: the one-step eligibility matrix — all nine cells, non-transitive");
+        {
+            const string G = PositionalEligibility.Guard;
+            const string W = PositionalEligibility.Wing;
+            const string B = PositionalEligibility.Big;
+            var expected = new (string Stored, string Seat, bool Legal)[]
+            {
+                (G, G, true ), (G, W, true ), (G, B, false),
+                (W, G, true ), (W, W, true ), (W, B, true ),
+                (B, G, false), (B, W, true ), (B, B, true ),
+            };
+            var wrong = new List<string>();
+            foreach (var (stored, seat, legal) in expected)
+                if (PositionalEligibility.IsEligibleForSeat(stored, seat) != legal)
+                    wrong.Add($"{stored}->{seat} expected {(legal ? "legal" : "illegal")}");
+
+            var nonTransitive = !PositionalEligibility.IsEligibleForSeat(G, B)
+                             && !PositionalEligibility.IsEligibleForSeat(B, G);
+
+            // Unknown labels must THROW, not quietly read as ineligible — a silent false
+            // would remove a player from every rotation and look like a rotation choice.
+            var loud = 0;
+            foreach (var bad in new[] { "", "g", "C", "PG", "Wing" })
+            {
+                try { PositionalEligibility.IsEligibleForSeat(bad, G); }
+                catch (ArgumentOutOfRangeException) { loud++; }
+            }
+
+            var ok7 = wrong.Count == 0 && nonTransitive && loud == 5;
+            pass &= ok7;
+            Console.WriteLine(ok7
+                ? "    9/9 cells correct; G->B and B->G both refused; 5/5 unknown labels threw -> ok"
+                : $"    FAIL: cells [{string.Join(", ", wrong)}] nonTransitive={nonTransitive} loudRejects={loud}/5");
+        }
+
+        // ── Sub-check 9 (S75): a cross-position entrant is legal, and the lineup stays legal ──
+        Console.WriteLine("  Sub-check 9: an adjacent-position reserve may enter, and the live five stays legal");
+        {
+            var g = NewGame();
+            // Slot 1 is a Guard seat; the bench holds no guard but does hold wings, which
+            // the ladder makes eligible. Under the old rule the tired guard would stay in.
+            var home = BuildSide(g, TeamSide.Home, 1, new[] { "G", "W", "W", "B", "B" }, new[] { "W", "W", "W", "B", "B" });
+            var away = DummyAway(g);
+            var policy = new FlatFatigueFencePolicy(home, away, halftimeEq);
+
+            var s1 = g.RosterFor(TeamSide.Home).PlayerAt(new Slot(TeamSide.Home, 1))!;
+            Tire(g.Fatigue, s1, 500);
+            policy.OnPossessionBoundary(g, 5, 18.0, true);
+
+            var roster = g.RosterFor(TeamSide.Home);
+            var occ = roster.PlayerAt(new Slot(TeamSide.Home, 1))!;
+            var entered = occ.PlayerId != s1.PlayerId;
+            var entrantEligible = PositionalEligibility.IsEligibleForSeat(
+                home.PosById[occ.PlayerId], home.SlotPos[1]);
+
+            // Full live-lineup legality: five unique players, all on this side, one seat
+            // each, every occupant eligible for the seat he holds.
+            var ids = new List<int>();
+            var allEligible = true;
+            for (var slot = 1; slot <= Lineup.Size; slot++)
+            {
+                var p = roster.PlayerAt(new Slot(TeamSide.Home, slot))!;
+                ids.Add(p.PlayerId);
+                if (!home.PlayerById.ContainsKey(p.PlayerId)) allEligible = false;
+                else if (!PositionalEligibility.IsEligibleForSeat(home.PosById[p.PlayerId], home.SlotPos[slot]))
+                    allEligible = false;
+            }
+            var unique = ids.Distinct().Count() == Lineup.Size;
+
+            var ok8 = entered && entrantEligible && unique && allEligible;
+            pass &= ok8;
+            Console.WriteLine(ok8
+                ? $"    wing id {occ.PlayerId} entered the guard seat; five unique, all eligible -> ok"
+                : $"    FAIL: entered={entered} entrantEligible={entrantEligible} unique={unique} allEligible={allEligible}");
         }
 
         Console.WriteLine(pass ? "  Phase 52 substitutions: ok" : "  Phase 52 substitutions: FAIL");

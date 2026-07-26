@@ -140,7 +140,10 @@ internal sealed class FlatFatigueFencePolicy : ISubstitutionPolicy
             foreach (var pid in side.PlayerById.Keys)
             {
                 if (onFloor.Contains(pid)) continue;             // must be benched
-                if (side.PosById[pid] != slotPos) continue;      // same position only
+                // S75: the one-step ladder replaces the same-position filter. Evaluated
+                // from the player's STORED position, never transitively — see
+                // PositionalEligibility. Same-position remains a subcase.
+                if (!PositionalEligibility.IsEligibleForSeat(side.PosById[pid], slotPos)) continue;
                 var lvl = game.Fatigue.LevelFor(pid);
                 if (lvl < bestLevel || (lvl == bestLevel && pid < bestId))
                 {
@@ -201,10 +204,26 @@ internal sealed class FlatFatigueFencePolicy : ISubstitutionPolicy
             IReadOnlyList<Player> starters, IReadOnlyList<string> starterPositions,
             IReadOnlyList<Player> reserves, IReadOnlyList<string> reservePositions)
         {
-            if (starters.Count != 5 || starterPositions.Count != 5)
-                throw new ArgumentException("A side has exactly five starters with five positions.");
-            if (reserves.Count != 5 || reservePositions.Count != 5)
-                throw new ArgumentException("A side has exactly five reserves with five positions.");
+            // S75: the STARTER count is a rule of basketball and stays exact. The RESERVE
+            // count is not asserted here — SideDepth is generic and serves both real
+            // 13-man divvied rosters (8 reserves) and the synthetic archetype fixtures
+            // the stress and observation runs build (5). Roster size is asserted where it
+            // is actually a contract: the divvy and season checks.
+            if (starters.Count != Lineup.Size || starterPositions.Count != Lineup.Size)
+                throw new ArgumentException(
+                    $"A side has exactly {Lineup.Size} starters with {Lineup.Size} positions " +
+                    $"(got {starters.Count} / {starterPositions.Count}).");
+            if (reserves.Count != reservePositions.Count)
+                throw new ArgumentException(
+                    $"reserve count and position count disagree " +
+                    $"(got {reserves.Count} / {reservePositions.Count}).");
+            // S75: every stored position must be a label the eligibility ladder knows.
+            // Positions are plain strings, so an empty string or a typo would otherwise
+            // read as "ineligible everywhere" and silently remove a player from every
+            // rotation instead of failing.
+            foreach (var q in starterPositions.Concat(reservePositions))
+                if (!PositionalEligibility.IsPosition(q))
+                    throw new ArgumentException($"unrecognised roster position label \"{q}\".");
 
             Side = side;
             var byId    = new Dictionary<int, Player>();
@@ -212,7 +231,7 @@ internal sealed class FlatFatigueFencePolicy : ISubstitutionPolicy
             var slotOwn = new Dictionary<int, int>();
             var slotPos = new Dictionary<int, string>();
 
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < starters.Count; i++)
             {
                 var s = starters[i];
                 byId[s.PlayerId]    = s;
@@ -220,7 +239,7 @@ internal sealed class FlatFatigueFencePolicy : ISubstitutionPolicy
                 slotOwn[i + 1]      = s.PlayerId;      // starters seated into slots 1..5 in order
                 slotPos[i + 1]      = starterPositions[i];
             }
-            for (var i = 0; i < 5; i++)
+            for (var i = 0; i < reserves.Count; i++)
             {
                 var r = reserves[i];
                 byId[r.PlayerId] = r;

@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 74** (2026-07-25; config key-name parity + Phase 71; season byte-identical).
+Last updated: **Session 75** (2026-07-25; roster 13 at 5G/4W/4B + the one-step eligibility ladder; season rebaselined ON PURPOSE).
 
 ## Current baseline
 
@@ -32,13 +32,14 @@ artifact.
 
 ## Red blockers — resolve before major new work
 
-- **R-1 — Rotation has no consequences: starters take 87.9% of possessions, 279 players
-  never play, and no foul-out logic exists anywhere (S72 Phase-M finding; S73 corrected
-  wording).** The fatigue-fence substitution policy IS wired into the season runner
-  (`RunSingleGenGame` passes it; S73 source-verified) but is nearly inert in outcome. This
-  blocks every calibration item that prices effort or load — the S72 tax value, relief
-  tuning, Pass A page-tuning — because they were all measured in a five-man world with no
-  fatigue or foul cost. Rotation/foul-outs are their own session (S75+ per the S73 prompt).
+- **R-1 (PARTIALLY CLEARED, S75) — the structural blockers are gone; the rotation itself is not
+  built.** S75 removed the three things that made any rotation impossible: a 10-man roster
+  (now 13 at 5G/4W/4B), a player-id ceiling that silently dropped the bench (now 1–13 / 14–26,
+  asserted), and same-position-only substitution, which froze each position group at a 10.0-minute
+  ceiling against a 13-man parity of 15.4 (now the one-step ladder — all observed lineup shapes reach
+  15.4 exactly). The fatigue fence's thresholds are UNCHANGED, so starter share and the minutes
+  distribution have not been fixed — that is S76. Measured on the S75 page: cross-position occupancy
+  7.57% of floor time, usage-spread median 3.0%, deep bench barely playing.
 
 ## Open — next-session candidates
 
@@ -83,6 +84,21 @@ artifact.
 - **O-19 — Refresh `docs/attribute-wiring-synthesis.md` when the attribute map moves (S60).**
 - **O-20 — `game` demo: upgrade to real generators or retire (labeled as stub-driven on its
   banner at S73).** Micro-session, or rides any session touching Program.Game.cs.
+- **O-22 — Opening-five selection is rank-blind (S75 measurement).** 93% of the league starts three
+  guards (324/347 at 5/4/4) because `BuildOpeningFive` walks acquisition order under a quota floor,
+  never rank or ratings. Evidence, not failure — but it belongs with coach-driven roster construction.
+- **O-23 — Mismatch-hunting (S75 deferral, Emmett: "we can delay that for later").**
+  `DefenderPicker` is slot-guards-slot and its own docs call it *"v1 logic"* with *"the eventual
+  mismatch-hunting picker drops in here."* Consequence: a tall wing faces the opposing wing every
+  possession and, in 93% of games, never sees a guard — so a big wing cannot exploit a three-guard
+  lineup. The S75 ladder created the engine's FIRST cross-position matchups (7.57% of floor time,
+  W→G at a +9.7 height gap); whether they are correctly priced is A11's open question.
+- **O-24 — Role cost for out-of-position play (S75, measure before building).** The engine has no
+  role layer: screening, off-ball movement, spacing, rotation duty and out-of-position ballhandling
+  are absent rather than mispriced. S75 added no modifier by ruling. **Any future model must be
+  gap-shaped** — see C-26.
+- **O-25 — `s74.txt` was committed to the repo root in S74.** A delivery-note run command redirected
+  into the repo and `git add -A` swept it in. `git rm s74.txt` when convenient.
 - **O-21 — Normalize the three config loader shapes (S74 deferral).** Eighteen sections are sectioned
   `Deserialize`; `RollAConfig` is root-flat; `RollEConfig` is nineteen hand-written `GetProperty`
   assignments. The divergence is declared and asserted by Phase 71's registry, not hidden — but folding
@@ -153,16 +169,38 @@ artifact.
   skill overlaps heavily and is premium-overridable (Emmett ruling 2026-07-12).**
 - **C-24 — Pass 2 (skill-first generator) is RETIRED and archived (S73); its oracle rulings
   (S42/S42.1) are historical record under `tools/archive/pass2/` and journal S42–S44.**
+- **C-26 — Size is priced RELATIVELY, never absolutely, and any future role cost must be
+  gap-shaped (Emmett ruling 2026-07-25).** *"You only get punished for size if the other team can
+  punish it."* Verified against source: rebounding composes sizeShift/skillShift/hustleShift, each
+  `GapFn(offense − defense)`, bent through tanh — equal teams get zero bend, so two five-guard teams
+  get the same rebounding split as two five-big teams. Blocking is the same shape. There is no
+  absolute size floor. A flat out-of-position penalty would be the first absolute physical term in
+  the codebase and would break small-ball coherence.
+- **C-27 — Positional eligibility is the ONE-STEP ladder, evaluated from the stored position and
+  NOT transitive (Emmett ruling 2026-07-25).** G↔W and W↔B; a guard never reaches a big seat and a
+  big never reaches a guard seat. Emmett: *"Every PG can play SG. Every SG can play SF, etc… not
+  well, but there is real position flexibility baked into basketball."*
 - **C-25 — A missing config key stays QUIET AT RUNTIME (compiled default applies, the game boots)
   and becomes LOUD AT TEST TIME via Phase 71 (Emmett ruling 2026-07-25).** Refuse-to-boot was
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
 
-- **S75 — rotation and foul-outs (clears Red blocker R-1).** Starters take 87.9% of possessions,
-  279 players never play, and no foul-out logic exists anywhere. Every calibration item behind R-1
-  (the S72 tax value, relief tuning, Pass A page-tuning) was measured in a five-man world with no
-  fatigue or foul cost, so this unblocks the calibration arc rather than adding to it.
+- **S76 — the minutes-target allocator.** Everything external review round 1 required of it carries
+  forward: a feasibility assertion per team before simulating, a minimum stint and hysteresis band so
+  a dead-ball target-chaser cannot thrash, target error reported as mean/p95/max per player rather
+  than depth-rank averages, starter share gated at exactly 70% (140/200) inside a band declared
+  BEFORE running, and "never played" defined as *zero players with a positive target logging zero
+  possessions*. **Two S75 findings constrain it before it starts:** acquisition order is not a depth
+  chart (A10 — index 1 is G297/W27/B23, index 13 is B218/W129), AND the scout rank underneath it is
+  **position-normalised** (`DivvyScoutRank` excludes different attributes per position, scales size
+  per position, and downshifts big athleticism), so a roster cannot be depth-ordered by sorting it
+  either. S76's first job is defining what a depth chart actually is.
+
+*(S75 shipped — roster 13, the player-id widening, the eligibility ladder, and the measured league;
+historical detail in journal S75. Foul-outs moved to S77 on a source finding: committer selection is
+post-hoc in the harness, so disqualification needs an RNG restructuring that must not share a diff
+with a roster change.)*
 
 *(S74 shipped — config key-name parity + Phase 71; historical detail in journal S74. Note the
 "strict loader" framing it was originally given is retired: Emmett ruled quiet-at-runtime /

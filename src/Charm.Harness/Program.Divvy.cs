@@ -68,13 +68,17 @@ internal static partial class Program
     private static int DivvyLeadRoleTarget(int n)
     {
         var quota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
-        return (int)Math.Ceiling(quota + (4.0 * n - quota) * GenLeadRoles.Length / GenGuardRoles.Length);
+        // NOTE the explicit double: the original expression led with `4.0 * n`, so the
+        // whole chain was double arithmetic. RosterShape.GuardCount returns int, and
+        // without this cast the trailing `/ GenGuardRoles.Length` becomes INTEGER
+        // division and silently changes the target.
+        return (int)Math.Ceiling(quota + (double)(RosterShape.GuardCount(n) - quota) * GenLeadRoles.Length / GenGuardRoles.Length);
     }
 
     private static int DivvyTdwRoleTarget(int n)
     {
         var quota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
-        return (int)Math.Ceiling(quota + (3.0 * n - quota) * 1.0 / GenWingRoles.Length);
+        return (int)Math.Ceiling(quota + (RosterShape.WingCount(n) - quota) * 1.0 / GenWingRoles.Length);
     }
 
     // ── The odds curve — THE constitutional dial (placeholder until burn-in) ────
@@ -143,7 +147,7 @@ internal static partial class Program
     private static List<PoolPlayer> BuildDivvyPool(int schoolCount, long divvySeed)
     {
         var n = schoolCount;
-        var P = 10 * n;
+        var P = RosterShape.PoolSize(n);
 
         // The real two-plane budget cohort (S69 live generator; the transform is
         // oracle-locked and Phases 69/70 re-prove it — the bridge draws, never edits).
@@ -168,7 +172,7 @@ internal static partial class Program
         var pos = new string[P];
         for (var pid = 0; pid < P; pid++)
         {
-            pos[pid] = pid < 4 * n ? "G" : pid < 7 * n ? "W" : "B";
+            pos[pid] = RosterShape.PositionForPoolIndex(pid, n);
             // The 33-key Current card + derived tendencies, mapped through the
             // committed GenMapToPlayer. A COPY — Result.Card is the generator's
             // canonical card (S70 BuildCard, set-asserted at generation) and must
@@ -189,12 +193,12 @@ internal static partial class Program
         // Lead handlers: top guards by the BallHandling/Playmaking composite.
         // Wing defenders: top wings by PerimeterDefense.
         var leadSet = new HashSet<int>(
-            Enumerable.Range(0, 4 * n)
+            Enumerable.Range(0, RosterShape.GuardCount(n))
                 .OrderByDescending(pid => cards[pid]["BallHandling"] + cards[pid]["Playmaking"])
                 .ThenBy(pid => pid)
                 .Take(DivvyLeadRoleTarget(n)));
         var tdwSet = new HashSet<int>(
-            Enumerable.Range(4 * n, 3 * n)
+            Enumerable.Range(RosterShape.WingBlockStart(n), RosterShape.WingCount(n))
                 .OrderByDescending(pid => cards[pid]["PerimeterDefense"])
                 .ThenBy(pid => pid)
                 .Take(DivvyTdwRoleTarget(n)));
@@ -310,11 +314,12 @@ internal static partial class Program
     {
         var n = schoolCount;
         int g = pool.Count(p => p.Pos == "G"), w = pool.Count(p => p.Pos == "W"), b = pool.Count(p => p.Pos == "B");
-        if (g != 4 * n || w != 3 * n || b != 3 * n)
+        int wantG = RosterShape.GuardCount(n), wantW = RosterShape.WingCount(n), wantB = RosterShape.BigCount(n);
+        if (g != wantG || w != wantW || b != wantB)
             throw new InvalidOperationException(
-                $"DIVVY INFEASIBLE: positional quotas broken — need {4 * n}G/{3 * n}W/{3 * n}B, " +
+                $"DIVVY INFEASIBLE: positional quotas broken — need {wantG}G/{wantW}W/{wantB}B, " +
                 $"pool has {g}G/{w}W/{b}B (shortfall: " +
-                $"G {4 * n - g:+0;-0;0}, W {3 * n - w:+0;-0;0}, B {3 * n - b:+0;-0;0}).");
+                $"G {wantG - g:+0;-0;0}, W {wantW - w:+0;-0;0}, B {wantB - b:+0;-0;0}).");
         var lead = pool.Count(p => GenLeadRoles.Contains(p.Role));
         var tdw = pool.Count(p => p.Role == GenWingDefenderRole);
         var quota = (int)Math.Ceiling(DivvyRoleHeadroom * n);
@@ -367,7 +372,16 @@ internal static partial class Program
             perceived[s.Id] = board;
         }
 
-        var caps = world.Schools.ToDictionary(s => s.Id, _ => new Dictionary<string, int> { ["G"] = 4, ["W"] = 3, ["B"] = 3 });
+        // S75: per-school positional capacity, derived from RosterShape rather than
+        // restated. This literal (4/3/3) was the site that made the divvy stall at the
+        // OLD pool size when the pool grew — the pool and the caps must agree or the
+        // draft runs out of legal seats before it runs out of players.
+        var caps = world.Schools.ToDictionary(s => s.Id, _ => new Dictionary<string, int>
+        {
+            [PositionalEligibility.Guard] = RosterShape.Guards,
+            [PositionalEligibility.Wing]  = RosterShape.Wings,
+            [PositionalEligibility.Big]   = RosterShape.Bigs,
+        });
         var needLead = world.Schools.ToDictionary(s => s.Id, _ => true);
         var needTdw = world.Schools.ToDictionary(s => s.Id, _ => true);
         var rosters = world.Schools.ToDictionary(s => s.Id, _ => new List<int>());
@@ -515,8 +529,9 @@ internal static partial class Program
     // The absent-position warnings downstream stay as never-fire sentinels.
     private static int[] BuildOpeningFive(IReadOnlyList<int> acquisitionOrder, Func<int, string> positionOf)
     {
-        if (acquisitionOrder.Count != 10)
-            throw new InvalidOperationException($"BuildOpeningFive needs a full ten-man roster (got {acquisitionOrder.Count}).");
+        if (acquisitionOrder.Count != RosterShape.Size)
+            throw new InvalidOperationException(
+                $"BuildOpeningFive needs a full {RosterShape.Size}-man roster (got {acquisitionOrder.Count}).");
         var five = new List<int>(5);
         int needB = 1, needG = 2, needW = 1;
         foreach (var pid in acquisitionOrder)
@@ -587,7 +602,7 @@ internal static partial class Program
         var P = pool.Count;
 
         Console.WriteLine($"--- THE POOL ({P} players; the Pass-3 two-plane budget cohort, positions by defensive-plane rank) ---");
-        Console.WriteLine($"  positions        {pool.Count(p => p.Pos == "G")}G / {pool.Count(p => p.Pos == "W")}W / {pool.Count(p => p.Pos == "B")}B  (exact-count quotas {4 * n}/{3 * n}/{3 * n})");
+        Console.WriteLine($"  positions        {pool.Count(p => p.Pos == "G")}G / {pool.Count(p => p.Pos == "W")}W / {pool.Count(p => p.Pos == "B")}B  (exact-count quotas {RosterShape.GuardCount(n)}/{RosterShape.WingCount(n)}/{RosterShape.BigCount(n)})");
         Console.WriteLine($"  coverage supply  lead-handlers {pool.Count(p => GenLeadRoles.Contains(p.Role))} (target {DivvyLeadRoleTarget(n)}), " +
                           $"{GenWingDefenderRole} {pool.Count(p => p.Role == GenWingDefenderRole)} (target {DivvyTdwRoleTarget(n)})  " +
                           $"(quota FLOOR {(int)Math.Ceiling(DivvyRoleHeadroom * n)} each)");
@@ -772,10 +787,10 @@ internal static partial class Program
         var rowsB = Rows(schoolB);
         WarnAbsentPositions(schoolA, rowsA);
         WarnAbsentPositions(schoolB, rowsB);
-        var stampedA = new Player[10];
-        var stampedB = new Player[10];
-        for (var i = 0; i < 10; i++) stampedA[i] = StampPlayerId(rowsA[i].Player, rowsA[i].Slot);
-        for (var i = 0; i < 10; i++) stampedB[i] = StampPlayerId(rowsB[i].Player, rowsB[i].Slot + 10);
+        var stampedA = new Player[RosterShape.Size];
+        var stampedB = new Player[RosterShape.Size];
+        for (var i = 0; i < RosterShape.Size; i++) stampedA[i] = StampPlayerId(rowsA[i].Player, rowsA[i].Slot);
+        for (var i = 0; i < RosterShape.Size; i++) stampedB[i] = StampPlayerId(rowsB[i].Player, rowsB[i].Slot + RosterShape.AwayIdOffset);
         var sideA = BuildGenSideData(rowsA, stampedA);
         var sideB = BuildGenSideData(rowsB, stampedB);
         var identity = BuildGenIdentity(rowsA, rowsB);

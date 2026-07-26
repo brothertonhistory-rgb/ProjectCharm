@@ -392,8 +392,9 @@ internal static partial class Program
 
     private static GenSideData BuildSeasonSide(List<GenPlayerRow> rows, int idOffset)
     {
-        var stamped = new Player[10];
-        for (var i = 0; i < 10; i++) stamped[i] = StampPlayerId(rows[i].Player, rows[i].Slot + idOffset);
+        var stamped = new Player[RosterShape.Size];
+        for (var i = 0; i < RosterShape.Size; i++)
+            stamped[i] = StampPlayerId(rows[i].Player, rows[i].Slot + idOffset);
         return BuildGenSideData(rows, stamped);
     }
 
@@ -423,7 +424,7 @@ internal static partial class Program
             // need uniqueness within a game; sides are stamped per matchup, never
             // cached across games where a school flips sides).
             var sideHome = BuildSeasonSide(rowsBySchool[sg.HomeId], 0);
-            var sideAway = BuildSeasonSide(rowsBySchool[sg.AwayId], 10);
+            var sideAway = BuildSeasonSide(rowsBySchool[sg.AwayId], RosterShape.AwayIdOffset);
             var (game, result, attributed) = RunSingleGenGame(
                 cfgs, sideHome, sideAway, TeamSide.Home, TeamSide.Away,
                 resolverSeed: unchecked(baseSeed + 2 * g),
@@ -432,6 +433,25 @@ internal static partial class Program
             // Session 31: keep the attribution the loop used to discard and feed the
             // calibration accumulator. Nothing else about the loop changes.
             league.Accumulate(game, result, attributed, sg.HomeId, sg.AwayId);
+
+            // S75: cross-position occupancy. Seat position is the seat's STARTER's
+            // position and is fixed for the game (SlotPos), so it is read straight off
+            // the side data rather than from the policy.
+            var storedPos = new Dictionary<int, string>();
+            var seatPos = new Dictionary<(TeamSide, int), string>();
+            var seatH = new Dictionary<(TeamSide, int), int>();
+            foreach (var (sd, sdSide) in new[] { (sideHome, TeamSide.Home), (sideAway, TeamSide.Away) })
+            {
+                for (var k = 0; k < sd.Starters.Length; k++)
+                {
+                    storedPos[sd.Starters[k].PlayerId] = sd.StarterPositions[k];
+                    seatPos[(sdSide, k + 1)] = sd.StarterPositions[k];
+                    seatH[(sdSide, k + 1)] = sd.Starters[k].Height;
+                }
+                for (var k = 0; k < sd.Reserves.Length; k++)
+                    storedPos[sd.Reserves[k].PlayerId] = sd.ReservePositions[k];
+            }
+            league.NoteOccupancy(result.Possessions, game, storedPos, seatPos, seatH);
 
             // GameState.HomeScore is credited to HomeSchool, AwayScore to AwaySchool,
             // full stop (a flipped attribution passes conservation and determinism —

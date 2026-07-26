@@ -7381,7 +7381,72 @@ No seasons in Pass 1 itself — **Pass 2 shipped in Session 30: the minimal seas
 
 Governing records: `docs/roster-genesis-brief.md` (design conversation of 2026-07-02, shipped Session 29); the Session 63 generation bridge (Emmett rulings 2026-07-20, shipped 2026-07-21), which retired the authored pool and pointed the divvy at the real Pass-2 skill-first cohort; and the Session 66 recruiting line (shooting-supply design conversation 2026-07-22, boundary-table ruling 2026-07-23), which made the bridge honor the generator's own scholarship line.
 
-**The frame.** Every school in a world file gets a ten-man roster from **one national talent pool** (10 × school count — a bootstrap standing in for four absorbed recruiting classes; classes/ages are recruiting-arc design) divided by **prestige-weighted selection**. Prestige is **access**, never quality. Talent is zero-sum: elite players are scarce because the pool says how many exist. Since Session 63 the pool is no longer an authored distribution — it is **the real Pass-2 cohort** drawn from the oracle-locked skill-first generator; since Session 66 it is the **recruitable** slice of that cohort — the first 10n players of the stream who clear the generator's own line, so the world is "**all of college**" rather than a raw slice of humanity. Top-of-class selection (D1 vs the rest) stays deferred to the divisional layer per the standing divisional-sorting ruling; first-past-the-line is deliberately NOT a quality sort. The Session 26 `gen` mode and its machinery survive untouched as a lab instrument behind their byte-for-byte wall; the prestige→depth relationship still emerges from access (S63 page, top-third-rank per roster by band: 0.41 / 1.55 / 3.65 / 5.53 / 7.60 bottom to top, every adjacent band overlapping).
+**The frame.** Every school in a world file gets a **thirteen-man roster at 5G/4W/4B** from **one national talent pool** (13 × school count — a bootstrap standing in for four absorbed recruiting classes; classes/ages are recruiting-arc design) divided by **prestige-weighted selection**. Prestige is **access**, never quality. Talent is zero-sum: elite players are scarce because the pool says how many exist. Since Session 63 the pool is no longer an authored distribution — it is **the real Pass-2 cohort** drawn from the oracle-locked skill-first generator; since Session 66 it is the **recruitable** slice of that cohort — the first 10n players of the stream who clear the generator's own line, so the world is "**all of college**" rather than a raw slice of humanity. Top-of-class selection (D1 vs the rest) stays deferred to the divisional layer per the standing divisional-sorting ruling; first-past-the-line is deliberately NOT a quality sort.
+
+**Roster shape is one constant set (S75).** `RosterShape` (harness, standalone — deliberately NOT a
+`Program` partial, because `Program.FatigueFence.cs` is the one harness file outside that partial and is
+exactly the file that needs it) holds `Size = 13`, `Guards = 5`, `Wings = 4`, `Bigs = 4`, and derives
+everything else: pool size, the two position **index boundaries**, the away-side id offset, and the
+per-player array width. Before S75 the shape was ~30 literals across eight files, and it appeared in **two
+incompatible forms** — group counts (`4 * n`) and an index boundary (`pid < 7 * n`) that had to agree with
+them. Changing one without the other reclassifies wings as bigs while every total still sums correctly and
+the divvy's own infeasibility assertion passes green. Both forms now derive from the same four numbers.
+
+**Stamped player ids and the silent-drop class of bug (S75).** Home program ids are `1..Size`, away
+`Size+1..2*Size`; at S75 that is 1–13 and 14–26. Every per-player box-score array is
+`RosterShape.PlayerArrayWidth` wide behind `RosterShape.IsLegalPlayerId`. This matters because the guard
+form — `if (id >= 1 && id <= 20)` — **does not throw when the roster grows; it silently drops** the players
+above the ceiling, and the season's conservation checks verify wins, losses and ties rather than player
+stats, so they stay green while six players a game accumulate nothing. The season now **counts dropped
+credits and throws**, and asserts the identity `Σ credits == 2 × Lineup.Size × records` per game, so the
+instrument cannot quietly under-report. S75 found five missed sites this way, in four syntactic forms that
+no single grep covers: array declarations, range guards, **loop bounds** (`for (var i = 0; i < 20; i++)`),
+an offset **argument** inside a check, and a **ternary plus modulo** (`i < 10 ? home : away`,
+`(i % 10) + 1`) that produced not a drop but a silent **cross-team misattribution** — home players 11–13
+credited to the opposing school with colliding slot keys, invisible to every conservation check because the
+totals still balanced.
+
+### Positional eligibility — the one-step ladder (S75)
+
+**Emmett's ruling:** *"Every PG can play SG. Every SG can play SF, etc… not well, but there is real
+position flexibility baked into basketball."* In the three-bucket taxonomy that is one step along G–W–B,
+evaluated from the player's **stored** position and **never transitively**:
+
+| stored group | guard seat | wing seat | big seat |
+|---|---|---|---|
+| Guard | yes | yes | **no** |
+| Wing | yes | yes | yes |
+| Big | **no** | yes | yes |
+
+`PositionalEligibility.IsEligibleForSeat` is the single authority — read by the fence, by Phase 52, and by
+the season legality assertions — and it **throws on an unrecognised label** rather than returning false,
+because positions are plain strings and a silent false would remove a player from every rotation while
+looking like a rotation choice.
+
+**Why it had to ship with the roster growth rather than later.** Each seat's position is frozen for the
+game (`SlotPos` is set once at construction), so under same-position-only substitution a position group can
+consume only `40 × its seat count` minutes. Measured against the live 347-school world, every observed
+opening shape leaves at least one group holding a single seat, and that bottleneck **caps a uniform
+thirteen-man distribution at 10.0 minutes a man** against a parity of 15.4. No legal seat arrangement fixes
+it — thirteen players cannot divide 5/4/4 across five frozen seats. With the ladder, all three observed
+shapes reach exactly **15.4**, the theoretical maximum. Without it, S76 has nothing feasible to allocate.
+
+**No out-of-position penalty is added, and the reason is architectural rather than an oversight.** The
+engine has no concept of position at all — seats are numbered and `DefenderPicker` matches seat N against
+the opponent's seat N — so an occupant is priced against whoever actually holds the mirror seat, through
+the existing size/strength/post-defense math. The **defensive core** of a role difference is therefore
+already paid for: `Matchup.Postness` reads Height, PostDefense and Strength, and the generator assigns
+position by defensive plane, the same axis. What is **not** priced is screening, off-ball movement,
+interior spacing, rotation responsibility and ballhandling out of position — those are *absent* rather than
+mispriced, and S75 measures rather than assumes their absence is harmless.
+
+**★ Constraint on any future role-cost model.** Emmett's relative-pricing premise — *"You only get punished
+for size if the other team can punish it"* — is not a preference, it is how the engine already works: every
+size term is a **gap** between the two teams (`sizeShift`/`skillShift`/`hustleShift` are each
+`GapFn(offense − defense)`, bent through `tanh`), so equal teams get zero bend and two five-guard teams get
+a neutral rebounding split. A flat "worse at playing the 3" penalty would be the **first absolute physical
+term in the codebase** and would break exactly the property that makes small-ball coherent. Any future role
+cost must be gap-shaped. The Session 26 `gen` mode and its machinery survive untouched as a lab instrument behind their byte-for-byte wall; the prestige→depth relationship still emerges from access (S63 page, top-third-rank per roster by band: 0.41 / 1.55 / 3.65 / 5.53 / 7.60 bottom to top, every adjacent band overlapping).
 
 ### The pool (S63 bridge → S66 recruiting line → S70: the Pass-3 cohort, positions by defensive plane)
 
