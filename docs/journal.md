@@ -48,6 +48,8 @@ actual  31.8  29.9  27.9  25.9  23.9  20.0  16.1  12.1   8.1   4.2   0.1
 
 **Top-five share 88% → 69.7%.** Usage spread median 8.0% → **5.0%**, p90 24.3% → **19.5%**, max 46.0% → **42.0%**. Credit identity exact (7,405,830 / 740,583 = 10.0, dropped 0). Rosters 347/347. Zero DNPs among positive-target men across the Phase 72 convergence runs.
 
+**THE NEW BASELINE IS STRUCTURAL, NOT CALIBRATED.** Season SHA-256 `dfcda923fae87c1db20202c2e98f8ce4f95a1b18711dd42daf396d9070e78ebf` (seed 20260720, world `stock-d1`, schedule fingerprint `93d8c853…` — unchanged, the schedule did not move). The calibration lines moved a little because the rotation changed who is on the floor, not because any dial was touched: PPP 1.0246 → 1.0176, points 72.8 → 72.4, FG% 45.9 → 45.8, 3P% 36.2 → 35.9, TO% 21.3 → 21.6, pace 71.0 → 71.1, fouls 20.23 unchanged. **Eleventh consecutive sandbox↔Windows season match** — Emmett's run and the sandbox agree on every checked line, and the suite is `ALL CHECKS PASSED` on his machine.
+
 The **rank-11 residue of 0.1 minutes** is the A7 collision staying visible: the opening five is still rank-blind (O-22), so occasionally a zero-target man tips off, serves his protected stint and is pulled. The ruling held — no special early-game path, no correcting opening-five selection through the back door.
 
 ### Two flags raised, neither resolved, neither asserted

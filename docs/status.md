@@ -14,21 +14,20 @@ Last updated: **Session 76** (2026-07-26; the minutes allocator — per-position
 
 ## Current baseline
 
-**The S72 page is the arc's recorded reference** (seed 20260720, world `stock-d1`, schedule
-fingerprint `93d8c853…`): points 72.8, FG% 45.9, 3P% 36.2, FT% 70.6, PPP 1.0246, TO% 21.3,
-pace 71.0, fouls 20.23/team/game (6.46 shooting / 13.77 non-shooting), usage max/p90/median
-46.0% / 24.3% / 8.0%, census clean (3,470/3,470 drafted; 347/347 exact rosters; 347/347
+**The S76 page is the arc's recorded reference** (seed 20260720, world `stock-d1`, schedule
+fingerprint `93d8c853…`, season SHA-256 `dfcda923…`): points 72.4, FG% 45.8,
+3P% 35.9, FT% 70.5, PPP 1.0176, TO% 21.6, pace 71.1, fouls 20.23/team/game (6.47 shooting /
+13.76 non-shooting), usage max/p90/median 42.0% / 19.5% / 5.0%, top-five share of floor time 69.7%,
+cross-position occupancy 24.49%, census clean (4,511/4,511 drafted; 347/347 exact rosters; 347/347
 protected coverage). Every calibration session diffs against that page, never against memory.
-S73 re-proved it byte-identical after the consolidation, and **S74 again after the config-parity
-work (tenth consecutive sandbox↔Windows season match)**. Engine state: all Rolls A–M real; the world
-drafts the Pass-3 two-plane budget cohort (S70 bridge); `PressureVolumeTaxScale` 0.30 is the one
-calibrated dial (S72); Pass 2 is retired and archived (S73); **the settings file and the config classes
-are name-parity-locked by Phase 71 (S74)** — `config.json` SHA-256 `5094367e…`.
 
-**Note on comparing runs:** only the **season** page is byte-comparable between Claude's sandbox and
-Emmett's machine. The suite/observation page is not — the sandbox runs under invariant culture and
-prints `49.8 %` where Windows prints `49.8%` (S74 finding). Do not hash suite output as an acceptance
-artifact.
+**Why it moved from S72 (deliberate, S76).** No dial was touched. The minutes allocator changed WHO IS ON
+THE FLOOR, so every rate shifted slightly: PPP 1.0246 → 1.0176, points 72.8 → 72.4, FG% 45.9 → 45.8,
+3P% 36.2 → 35.9, TO% 21.3 → 21.6. **This is the point of the session** — the S72 numbers described a league
+where five men played 35 minutes, so they were never the right calibration target. Engine state: all Rolls
+A–M real; the world drafts the Pass-3 two-plane budget cohort (S70 bridge); `PressureVolumeTaxScale` 0.30 is
+the one calibrated dial (S72); the settings file and the config classes are name-parity-locked by Phase 71
+(S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Red blockers — resolve before major new work
 
