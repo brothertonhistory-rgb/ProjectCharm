@@ -877,7 +877,15 @@ internal static partial class Program
     // to id order, producing an ordered, stable, entirely meaningless rotation.
     private sealed record GenPlayerRow(
         int Slot, string Pos, string Role, bool Starter, int LegCount,
-        HashSet<string> PlusLegs, Dictionary<string, int> Ratings, Player Player, double ScoutRank);
+        HashSet<string> PlusLegs, Dictionary<string, int> Ratings, Player Player, double ScoutRank,
+        int PoolId);
+
+    /// <summary>`PoolId` for a row with no pool behind it — the two-program gen demo invents
+    /// its players rather than drafting them, so there is no person to point at. Named rather
+    /// than a bare -1 so the "not applicable" reading is unmistakable at the call site, in the
+    /// shape of <see cref="DivvyNoPlusLegs"/>. S77: any consumer keying a season record by
+    /// PoolId must skip these; the season and smoke-sim paths never produce one.</summary>
+    private const int GenNoPoolId = -1;
 
     private static List<GenPlayerRow> GenRoster(int prestige, string lean, Random r, string programTag)
     {
@@ -947,7 +955,7 @@ internal static partial class Program
             // production function rather than the acquisition index means the gen demo
             // exercises the real depth chart instead of a stand-in that could diverge.
             rows.Add(new GenPlayerRow(depth + 1, pos, role, starter, lc, plusLegs, v, player,
-                                      DivvyScoutRank(v, pos)));
+                                      DivvyScoutRank(v, pos), GenNoPoolId));
         }
 
         return rows;

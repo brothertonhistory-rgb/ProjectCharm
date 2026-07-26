@@ -10,16 +10,22 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 76.1** (2026-07-26; the sixth silent-drop site — one surviving `>= 20` ceiling in the attribution pass was dropping 56,714 shot attempts a season; found at the S77 check-in gate).
+Last updated: **Session 77** (2026-07-26; the season stat page — per-player season records keyed by the person, three readouts, Phase 73's twenty-two gates; no simulated number moved).
 
 ## Current baseline
 
-**The S76.1 page is the arc's recorded reference** (seed 20260720, world `stock-d1`, schedule
-fingerprint `93d8c853…`, season SHA-256 `38ec0e9f…`): points 72.4, FG% 45.8,
+**The S77 page is the arc's recorded reference** (seed 20260720, world `stock-d1`, schedule
+fingerprint `93d8c853…`, season SHA-256 `96eb2c3a…`, 627 lines): points 72.4, FG% 45.8,
 3P% 35.9, FT% 70.5, PPP 1.0176, TO% 21.6, pace 71.1, fouls 20.23/team/game (6.47 shooting /
 13.76 non-shooting), usage max/p90/median 38.8% / 18.1% / 6.3%, top-five share of floor time 69.7%,
 cross-position occupancy 24.49%, census clean (4,511/4,511 drafted; 347/347 exact rosters; 347/347
 protected coverage). Every calibration session diffs against that page, never against memory.
+
+**S77 changed no simulated number.** The page grew from 493 lines to 627 by appending the stat section;
+the 493 pre-existing lines are **byte-identical** to S76.1, proven by line diff, not by hash. Only the
+fingerprint moved (`38ec0e9f…` → `96eb2c3a…`). New on the page: 4,511 player-seasons, 1,018 of whom never
+took the floor; qualifiers `>=100 3470 | >=250 2810 | >=500 2082 | >=900 439`; league per-game medians
+points 4.4, rebounds 2.1, assists 0.6, minutes 16.1.
 
 **Why it moved from S76 (S76.1, one line).** No dial, no engine path, nothing simulated. `AttributeGame`'s
 per-slot shooting block still carried the literal `>= 20` guard S75 replaced everywhere else, so stamped ids
@@ -110,11 +116,34 @@ chart is PROVISIONAL pending O-6.
 - **O-27 — Substitutions run 34–39 per team-game (S76 measurement)** against a real-basketball 20–25.
   Structural cause: there is no timeout model, so substitutions cannot clump at media breaks and spread
   evenly instead. Belongs with the coaching layer, not the allocator.
-- **O-28 — The three zero-target men are inert until S77 (S76 named consequence, NOT a defect).**
-  Emmett's ten-man ruling gives the bottom guard, wing and big a target of zero. Planned is always 0, so
-  their residual can never reach a positive enter threshold and they cannot check in. Nothing in the game
-  can call on them until foul-outs (S77) and injuries exist. Ruled knowingly; recorded so a future session
-  does not read it as an accident.
+- **O-28 — The three zero-target men are inert, and the session that was meant to change that never came
+  (S76 ruling; re-dated S77).** Emmett's ten-man ruling gives the bottom guard, wing and big a target of
+  zero, so their residual can never reach a positive enter threshold and they cannot check in. Ruled
+  knowingly. **The "until S77" in the original wording is void** — see O-30. Now VISIBLE rather than
+  inferred: the S77 page shows 1,018 of 4,511 player-seasons with zero games played.
+
+- **★ O-29 — Blocks are FLAT and positionally scrambled (S77 page finding, first run).** Ranks 1–10 of the
+  block leaderboard span **1.1 down to 1.0** — no separation between the league's best shot-blocker and its
+  tenth — and four guards at heights 53–59 sit interleaved with bigs at 74–89. A height-55 guard blocks at
+  the same rate as a height-89 big. This is the exact implausibility the S77 prompt named in advance as the
+  reason to build the page. Measurement first, not a dial session.
+
+- **O-30 — ★ FOUL-OUTS HAVE NO SCHEDULED HOME (orphaned, found S77).** S75 deferred foul-outs to "S77" and
+  S77 became the stat page, so nothing is scheduled to build them. The deferral itself is still correct —
+  committer selection is post-hoc in the harness, so disqualification needs an RNG restructuring that must
+  not share a diff with a roster change. It needs a real session number. Blocks O-28.
+
+- **O-31 — Per-GAME retention: game logs, home/away and conference splits, streaks (S77 deferral,
+  EMMETT'S CALL).** S77 keeps season totals only. Cheap to add later at the same seam (`Accumulate` already
+  sees one game at a time); the open questions are what the finished game should show a player and the
+  save-size arithmetic at career scale. Also the only way to re-derive the S76 per-RANK minutes ladder by
+  identity, which season totals cannot do.
+
+- **O-32 — The season page should print its OWN fingerprint (proposed S77, not ruled).** The recorded
+  season SHA-256 comes from a recipe that exists nowhere in the repo; the sandbox cannot reproduce it under
+  any line-ending convention, so the reference can only come from Emmett's machine via a hand-run shell
+  command. The page already prints `Schedule fingerprint:` — a self-computed page fingerprint would be
+  reproducible anywhere, immune to line endings and console encoding, and would retire the copy-paste step.
 - **O-21 — Normalize the three config loader shapes (S74 deferral).** Eighteen sections are sectioned
   `Deserialize`; `RollAConfig` is root-flat; `RollEConfig` is nineteen hand-written `GetProperty`
   assignments. The divergence is declared and asserted by Phase 71's registry, not hidden — but folding
@@ -202,44 +231,36 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-- **S77 — the season stat page.** Roll the existing per-game boxes up per player across a season and
-  print three readouts (leaderboards, one team in full, league distributions) plus gates that prove the
-  roll-up is honest. Page-only: no engine file, no Roll, no attribution math, no dial. Its purpose is to
-  be **looked at** — the gates prove arithmetic, Emmett's read of the leaderboard is the actual result.
-  Two things settled at the S77 check-in, before any code:
-  - **The season record is keyed by the PLAYER, not by `(school, acquisition index)`** (Emmett, 2026-07-26:
-    *"do whatever you think is the best for having a long term save… NO short cuts"*). A seat-shaped key is
-    correct for one season and wrong for every season after it, and a transferring player's record would
-    stay behind with the seat. The pool id is already in scope at `BuildSeasonRows` and discarded one line
-    early — the same shape as ScoutRank before S76 grabbed it. This buys no career stats today (nothing
-    persists between seasons; the world is rebuilt from the seed every run) — it buys not having to rewrite
-    the stat layer when persistence arrives.
-  - **The declared one-line scope widening is two lines**: per-player minutes and games played come from
-    the occupancy walk, which cannot know a man's school, so `NoteOccupancy` needs the identity argument as
-    well as `Accumulate`. The prompt's scope wall and its own Gates 3/4 disagreed; the gates win.
+*Not yet chosen — Emmett's call.* S77 shipped and produced findings that reshape the queue, so the honest
+state of this section is a recommendation rather than a decision.
 
-- **★ FOUL-OUTS HAVE LOST THEIR HOME — the board said S77 and S77 is the stat page (found S76.1).** S75
-  deferred foul-outs to "S77" and O-28 still reads *"the three zero-target men are inert until S77."* The
-  session that actually became S77 is page-only reporting, so nothing about disqualification is being built
-  and the three inert men stay inert. The deferral itself is unchanged and still correct (committer
-  selection is post-hoc in the harness, so disqualification needs an RNG restructuring that must not share
-  a diff with a roster change) — it simply needs a real next home rather than a session number that has
-  been taken. Do not read O-28's "until S77" as satisfied.
+**Claude's pick: O-6, scout-rank modernization.** Reasons, in order. It was already RAISED PRIORITY at S76
+because the depth chart decides WHO PLAYS and a single rank inversion is a large minute swing (targets fall
+32→8 for guards, 26→4 for bigs). The S77 page now makes that visible for the first time — rotation order,
+minutes per man, and who is getting the shots are all readable off one screen, so the session can be judged
+rather than reasoned about. And every other open item downstream of it moves when it lands: the block board
+(O-29), the all-guard scoring leaderboard, the usage spread, and the calibration queue (O-15) are all read
+against a rotation that is currently ordered by a rank the board itself labels provisional.
+
+**The strongest counter-candidate: O-29, why blocks are flat.** It is the loudest thing on the new page and
+it is a *measurement* question, not a dial question, so it is cheap. Take it first if the page bothers you
+more than the rotation does.
+
+**Recommended NOT next:** O-30 (foul-outs). Real, orphaned, and blocking O-28 — but it needs an RNG
+restructuring, which is a poor thing to run immediately after a session that just rebaselined the page.
+
+*(S77 shipped — per-player season records keyed by the person, the three readouts, Phase 73's twenty-two
+gates. No engine file touched; the 493 pre-existing page lines byte-identical. Historical detail in
+journal S77. Five items opened: O-29 through O-32 plus the O-28 re-dating.)*
+
+*(S76.1 shipped — the sixth silent-drop site; the last literal-20 player-id ceiling in the tree, which had
+been dropping 56,714 shot attempts a season. Season rebaselined on exactly one line. Historical detail in
+journal S76.1.)*
 
 *(S76 shipped — the minutes allocator, per-position depth charts, residual control, bounded cascades, the
 fatigue fence retired; R-1 closed. Historical detail in journal S76. Two flags raised and not resolved:
 cross-position occupancy 24.49% against arithmetic floors of 5/5/14% (O-26), and substitutions 34–39 per
 team-game against a real-basketball 20–25 (O-27) — both coaching-layer gaps, neither an allocator defect.)*
 
-*(S76.1 shipped — the sixth silent-drop site; the last literal-20 player-id ceiling in the tree, which had
-been dropping 56,714 shot attempts a season. Season rebaselined on exactly one line. Historical detail in
-journal S76.1.)*
-
 *(S75 shipped — roster 13, the player-id widening, the eligibility ladder, and the measured league;
 historical detail in journal S75.)*
-
-*(S74 shipped — config key-name parity + Phase 71; historical detail in journal S74. Note the
-"strict loader" framing it was originally given is retired: Emmett ruled quiet-at-runtime /
-loud-at-test (C-25), and the scope narrowed to key-name parity plus RollE binding. The board's
-motivating premise was also measurably wrong — zero orphan keys existed; the real gap ran the other
-way, twelve properties with no key.)*

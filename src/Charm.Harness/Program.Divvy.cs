@@ -770,7 +770,7 @@ internal static partial class Program
                 // does, so the smoke sim runs the real depth chart rather than a chart
                 // where every player is equal.
                 return new GenPlayerRow(i + 1, p.Pos, p.Role, five.Contains(pid), 0,
-                                        DivvyNoPlusLegs, p.Ratings, p.Player, p.ScoutRank);
+                                        DivvyNoPlusLegs, p.Ratings, p.Player, p.ScoutRank, pid);
             }).ToList();
         }
 

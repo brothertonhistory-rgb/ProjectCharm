@@ -103,6 +103,80 @@ internal static partial class Program
         public int Ties { get; init; }
     }
 
+    /// <summary>Everything the two accumulators need to turn a stamped player id back into a
+    /// PERSON, for one game. Passed rather than recomputed: the season loop already holds all
+    /// six pieces at the call site and used to throw four of them away one line early.
+    ///
+    /// <para>★ S77 — why this is a bundle and not two ints. `Accumulate` needs the school to
+    /// file a box line; `NoteOccupancy` needs it too, for floor time and games played, and had
+    /// no way to know it. The S77 prompt's wall permitted one changed line, at `Accumulate`'s
+    /// call site, but its own Gates 3 and 4 require per-player MINUTES and GAMES PLAYED, which
+    /// are produced by the occupancy walk. The gates win; both call sites take the bundle.</para>
+    ///
+    /// <para>The rows are the season's own per-school tables, built ONCE before the game loop
+    /// and never rebuilt (A1). The sides are the stamped copies actually handed to the engine —
+    /// `StampPlayerId` returns `new Player(p.Name)`, so a stamped man and his row's man are
+    /// distinct objects carrying the same name. That is what makes the Gate 2 identity check two
+    /// independent paths rather than one path checked against itself.</para></summary>
+    private sealed record SeasonGameIdentity(
+        int HomeSchoolId, int AwaySchoolId,
+        List<GenPlayerRow> HomeRows, List<GenPlayerRow> AwayRows,
+        GenSideData HomeSide, GenSideData AwaySide)
+    {
+        /// <summary>Stamped id -> the school he plays for and the season row that IS him.
+        /// Home ids are `1..Size`, away `Size+1..2*Size` (RosterShape). This is the one place
+        /// the offset arithmetic lives for the stat layer; the roll-up and the identity gate
+        /// both come through here, so a mapping error cannot disagree with itself.</summary>
+        public (int SchoolId, GenPlayerRow Row) Resolve(int stampedId)
+        {
+            if (!RosterShape.IsLegalPlayerId(stampedId))
+                throw new InvalidOperationException(
+                    $"S77 identity: stamped id {stampedId} is outside 1..{RosterShape.MaxPlayerId}.");
+            var isHome = stampedId <= RosterShape.Size;
+            var index  = isHome ? stampedId : stampedId - RosterShape.AwayIdOffset;
+            var rows   = isHome ? HomeRows : AwayRows;
+            return (isHome ? HomeSchoolId : AwaySchoolId, rows[index - 1]);
+        }
+
+        /// <summary>Every stamped player handed to this game — all 26, starters AND reserves.
+        /// ★ NOT read off `Roster`: a Roster knows only the five seats it is holding, so a man
+        /// who never checks in is not there at all. Gate 2 checks all 26 unconditionally, which
+        /// is only possible from the side data the roster is seated FROM.</summary>
+        public IEnumerable<Player> StampedPlayers()
+        {
+            foreach (var p in HomeSide.Starters) yield return p;
+            foreach (var p in HomeSide.Reserves) yield return p;
+            foreach (var p in AwaySide.Starters) yield return p;
+            foreach (var p in AwaySide.Reserves) yield return p;
+        }
+    }
+
+    /// <summary>Assert, ONCE before the season loop, that a name identifies exactly one man on a
+    /// roster, and a pool id exactly one man in the league. Gate 2 compares names across two
+    /// paths; that comparison is only evidence if names are unique, so the uniqueness is proven
+    /// here rather than argued. Pool ids are the season record's KEY, so a duplicate would merge
+    /// two men's careers silently — the loudest possible failure is the cheapest one.</summary>
+    private static void AssertSeasonIdentitiesDistinct(Dictionary<int, List<GenPlayerRow>> rowsBySchool)
+    {
+        var seenPool = new Dictionary<int, int>();
+        foreach (var (schoolId, rows) in rowsBySchool.OrderBy(kv => kv.Key))
+        {
+            var names = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var r in rows)
+            {
+                if (!names.Add(r.Player.Name))
+                    throw new InvalidOperationException(
+                        $"S77 identity: school {schoolId} carries two men named '{r.Player.Name}'. " +
+                        "Gate 2 compares names across two paths and cannot tell them apart.");
+                if (seenPool.TryGetValue(r.PoolId, out var other))
+                    throw new InvalidOperationException(
+                        $"S77 identity: pool id {r.PoolId} is on school {schoolId} AND school {other}. " +
+                        "The season record is keyed by pool id; one man cannot hold two rosters.");
+                seenPool[r.PoolId] = schoolId;
+            }
+        }
+    }
+
     private static int SeasonNextInt(WorldRng rng, int n) => (int)(rng.NextDouble() * n);
 
     // ── Preflight (necessary conditions; the construction is the final ATTEMPT) ──
@@ -375,8 +449,14 @@ internal static partial class Program
                 // S76: p.ScoutRank was in scope here and discarded one line before the
                 // seam needed it. It is the stored-group depth order the minutes
                 // allocator sorts each chart by.
+                // S77: `pid` is the POOL index — the person. It was in scope here and
+                // discarded one line early, exactly as ScoutRank was before S76. A season
+                // record keyed by (school, acquisition index) is keyed by a SEAT: next
+                // season school 200's seventh pick is a different human being, and a
+                // transferring player's record would stay behind with the seat. Carrying
+                // the pool id keys the stat layer by the man instead.
                 return new GenPlayerRow(i + 1, p.Pos, p.Role, five.Contains(pid), 0,
-                                        DivvyNoPlusLegs, p.Ratings, p.Player, p.ScoutRank);
+                                        DivvyNoPlusLegs, p.Ratings, p.Player, p.ScoutRank, pid);
             }).ToList();
             if (verbose)
             {
@@ -410,6 +490,7 @@ internal static partial class Program
         var fingerprint = ScheduleFingerprint(schedule);
         var divvy = RunDivvyDraft(world, seasonSeed);
         var rowsBySchool = BuildSeasonRows(divvy, world, verbose);
+        AssertSeasonIdentitiesDistinct(rowsBySchool);
         var cfgs = LoadGenEngineConfigs(engineConfigPath);
 
         var wins = world.Schools.ToDictionary(s => s.Id, _ => 0);
@@ -423,11 +504,17 @@ internal static partial class Program
         {
             var sg = schedule[g];
             // HomeSchool -> the engine's Home side, AwaySchool -> Away: the §1b
-            // invariant. Home rows stamp PlayerIds 1-10, away rows 11-20 (ids only
-            // need uniqueness within a game; sides are stamped per matchup, never
-            // cached across games where a school flips sides).
+            // invariant. Home rows stamp PlayerIds 1..RosterShape.Size, away rows the
+            // next Size — at S75's 13-man roster that is 1-13 and 14-26 (the comment
+            // here said 1-10 / 11-20 until S77; the numbers had been wrong since S75
+            // and sat directly above the code that maps them). Ids need uniqueness only
+            // within a game; sides are stamped per matchup, never cached across games
+            // where a school flips sides.
             var sideHome = BuildSeasonSide(rowsBySchool[sg.HomeId], 0);
             var sideAway = BuildSeasonSide(rowsBySchool[sg.AwayId], RosterShape.AwayIdOffset);
+            var identity = new SeasonGameIdentity(
+                sg.HomeId, sg.AwayId,
+                rowsBySchool[sg.HomeId], rowsBySchool[sg.AwayId], sideHome, sideAway);
             var (game, result, attributed) = RunSingleGenGame(
                 cfgs, sideHome, sideAway, TeamSide.Home, TeamSide.Away,
                 resolverSeed: unchecked(baseSeed + 2 * g),
@@ -435,7 +522,7 @@ internal static partial class Program
 
             // Session 31: keep the attribution the loop used to discard and feed the
             // calibration accumulator. Nothing else about the loop changes.
-            league.Accumulate(game, result, attributed, sg.HomeId, sg.AwayId);
+            league.Accumulate(game, result, attributed, identity);
 
             // S75: cross-position occupancy. Seat position is the seat's STARTER's
             // position and is fixed for the game (SlotPos), so it is read straight off
@@ -454,7 +541,7 @@ internal static partial class Program
                 for (var k = 0; k < sd.Reserves.Length; k++)
                     storedPos[sd.Reserves[k].PlayerId] = sd.ReservePositions[k];
             }
-            league.NoteOccupancy(result.Possessions, game, storedPos, seatPos, seatH);
+            league.NoteOccupancy(result.Possessions, game, storedPos, seatPos, seatH, identity);
 
             // GameState.HomeScore is credited to HomeSchool, AwayScore to AwaySchool,
             // full stop (a flipped attribution passes conservation and determinism —
@@ -485,8 +572,22 @@ internal static partial class Program
     {
         if (args.Length < 3)
         {
-            Console.WriteLine("usage: season <world.json> <seed>");
+            Console.WriteLine("usage: season <world.json> <seed> [minutes-floor: 100|250|500|900]");
             return;
+        }
+        // S77: reporting-only leaderboard filter. Applied after the roll-up is complete; it
+        // touches neither simulation nor accumulation, and deliberately does NOT live in
+        // config.json (Phase 71 parity-locks that file's key names).
+        var minuteFloor = SeasonDefaultMinuteFloor;
+        if (args.Length > 3)
+        {
+            if (!int.TryParse(args[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out minuteFloor)
+                || !SeasonMinuteTiers.Contains(minuteFloor))
+            {
+                Console.WriteLine($"SEASON ERROR: minutes floor '{args[3]}' must be one of " +
+                                  string.Join(", ", SeasonMinuteTiers) + ".");
+                return;
+            }
         }
         if (!long.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var seed))
         {
@@ -603,5 +704,10 @@ internal static partial class Program
         PrintBaselineReadout(run.League);
         Console.WriteLine();
         PrintRosterCensus(run.Divvy, world);
+        Console.WriteLine();
+
+        // (vii) Session 77: the season stat page. Appended AFTER every pre-existing section,
+        // so the S76.1 reference page is byte-identical above this line.
+        PrintSeasonStatPage(run.League, world, minuteFloor);
     }
 }

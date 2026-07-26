@@ -67,6 +67,15 @@ internal static partial class Program
         // the page. Usage = (FGA + 0.44·FTA + TO) / the same team total — the
         // standard box-score possession-share proxy.
         public long SflTotal, NsfTotal;
+
+        //  S77: the engine's OWN unattributed buckets, carried so Gate 1 can be an EXACT
+        //  identity rather than a tolerance. A possession can produce a field-goal attempt that
+        //  belongs to no slot (`SlotUnattributedFga/Fgm`, stamped by the Resolver) and a bonus
+        //  free-throw trip that reached the line before Roll E selected a shooter
+        //  (`FtaBonusUnattributed` — the named loose end the bench readout has always printed as
+        //  `Unattr`). These are not roll-up losses; they are shots the engine never assigned to a
+        //  man. Summing them is what turns "per-player totals ≈ league totals" into "==".
+        public long UnattributedFga, UnattributedFgm, UnattributedFta;
         public readonly Dictionary<(int SchoolId, int Slot), (long Fga, long Fta, long To)> PlayerUsage = new();
         public readonly Dictionary<int, (long Fga, long Fta, long To)> TeamUsage = new();
 
@@ -150,11 +159,90 @@ internal static partial class Program
         public readonly long[] RotationRankCredits = new long[RosterShape.Size];
         public long RotationTeamGames, RotationRecords;
 
+        //  Session 77 — THE PER-PLAYER SEASON RECORD.
+        //
+        //  ★ Keyed by POOL ID — the person — never by (school, acquisition index).
+        //  A (school, seat) key is correct for exactly one season: next season school 200's
+        //  seventh pick is a different human being, and a transferring player's record would
+        //  stay behind with the seat rather than moving with him. Nothing persists between
+        //  seasons today (the world is rebuilt from the seed every run), so this buys no career
+        //  totals yet — it buys not having to rewrite the stat layer when persistence lands.
+        //  The school rides ON the record as data, which is the shape a career row wants anyway.
+        //
+        //  Fed from BOTH accumulators and from neither exclusively: `Accumulate` supplies the
+        //  box (shooting, boards, playmaking, fouls) and `NoteOccupancy` supplies floor time and
+        //  games played, because minutes are not in the box at all (A3).
+        public readonly Dictionary<int, SeasonPlayerRecord> PlayerSeasons = new();
+
+        /// <summary>Fetch-or-create the record for a person, stamping the identity fields on
+        /// first sight. Metadata is written ONCE and thereafter only re-verified — see the
+        /// drift counter, which is how a scrambled mapping shows up as something other than a
+        /// silently-overwritten field.</summary>
+        private SeasonPlayerRecord RecordFor(int schoolId, GenPlayerRow row)
+        {
+            if (PlayerSeasons.TryGetValue(row.PoolId, out var rec))
+            {
+                if (rec.SchoolId != schoolId || rec.Pos != row.Pos
+                    || rec.Height != row.Player.Height || rec.ScoutRank != row.ScoutRank)
+                    IdentityDriftObservations++;
+                return rec;
+            }
+            rec = new SeasonPlayerRecord
+            {
+                PoolId           = row.PoolId,
+                SchoolId         = schoolId,
+                AcquisitionIndex = row.Slot,
+                Name             = row.Player.Name,
+                Pos              = row.Pos,
+                Height           = row.Player.Height,
+                ScoutRank        = row.ScoutRank,
+            };
+            PlayerSeasons[row.PoolId] = rec;
+            return rec;
+        }
+
+        /// <summary>Secondary Gate 2 check: across every observation of an independently
+        /// resolved identity, stored position, height, school and scout rank stay put.
+        /// Asserted 0 by Phase 73. This is the WEAK half of the gate on purpose — stable
+        /// metadata proves the metadata is stable and nothing about whose statistics landed
+        /// under it, which is why the name comparison below exists as well.</summary>
+        public long IdentityDriftObservations;
+
+        /// <summary>Gate 2, the strong half — run once per game BEFORE a single box field,
+        /// floor-time credit or game played is written, over ALL 26 stamped identities.
+        ///
+        /// <para>Two INDEPENDENT paths to the same person. Path A is the season row table read
+        /// positionally, `rows[index - 1].Player.Name`. Path B is the `Player` object the engine
+        /// was actually handed, carrying stamped id `k`, reporting his own name. They are
+        /// different objects — `StampPlayerId` returns `new Player(p.Name)` and never mutates
+        /// the generated player — so agreement is evidence rather than tautology.</para>
+        ///
+        /// <para>★ Deliberately NOT "re-derive the index from the id and check the key matches":
+        /// that checks the code against itself and passes by construction. And deliberately
+        /// unconditional over all 26 rather than over men with a nonzero box line — a man can
+        /// play four minutes and record a completely blank line, which is ordinary basketball,
+        /// and under an events-only check his identity would go unverified while his minutes and
+        /// his game played were credited to whoever a broken mapping named.</para></summary>
+        private void AssertIdentity(SeasonGameIdentity id)
+        {
+            foreach (var seated in id.StampedPlayers())
+            {
+                var (_, row) = id.Resolve(seated.PlayerId);
+                if (!string.Equals(row.Player.Name, seated.Name, StringComparison.Ordinal))
+                    throw new InvalidOperationException(
+                        $"S77 Gate 2: stamped id {seated.PlayerId} is '{seated.Name}' on the floor " +
+                        $"but '{row.Player.Name}' in the season row table. The index->person mapping " +
+                        "is scrambled; every per-player total is landing on the wrong man. " +
+                        "(Conservation cannot see this — the league sums are right either way.)");
+            }
+        }
+
         public void NoteOccupancy(
             IReadOnlyList<PossessionRecord> records, GameState game,
             IReadOnlyDictionary<int, string> storedPos,
             IReadOnlyDictionary<(TeamSide, int), string> seatPos,
-            IReadOnlyDictionary<(TeamSide, int), int> seatStarterHeight)
+            IReadOnlyDictionary<(TeamSide, int), int> seatStarterHeight,
+            SeasonGameIdentity identity)
         {
             long credited = 0;
             // S76: per-side, per-player floor time for THIS game, so the rotation depth
@@ -193,6 +281,26 @@ internal static partial class Program
                     RotationRankCredits[i] += ranked[i];
                 RotationTeamGames++;
                 RotationRecords += records.Count;
+
+                //  S77: the SAME per-side, per-player bucket the S76 rank distribution is
+                //  sorted from — not a second walk. Extending this one rather than inventing
+                //  another is what guarantees the two readouts can never disagree: re-ranking
+                //  these numbers within each team-game reproduces the S76 ladder by identity.
+                //
+                //  ★ Games played is defined here, and the definition is load-bearing: a man
+                //  receives ONE game played for POSITIVE floor-time credit in this team-game,
+                //  and a man with zero credit receives none. Roster membership would yield 30
+                //  for everybody, which is not merely useless — it would CONCEAL the DNPs this
+                //  page exists to expose. S76's zero-target men should surface as near-zero
+                //  games played; that is the instrument working, not a defect to repair.
+                foreach (var (stampedId, credits) in perSide[side])
+                {
+                    if (credits <= 0) continue;
+                    var (schoolId, row) = identity.Resolve(stampedId);
+                    var rec = RecordFor(schoolId, row);
+                    rec.Credits += credits;
+                    rec.GamesPlayed++;        // at most one per team-game, by the loop shape
+                }
             }
 
             PossessionCredits += credited;
@@ -200,8 +308,16 @@ internal static partial class Program
         }
 
         public void Accumulate(GameState game, GovernorRunResult result, PlayerBoxTotals box,
-                               int homeSchoolId, int awaySchoolId)
+                               SeasonGameIdentity identity)
         {
+            // Gate 2 runs FIRST — before any box field, any floor-time credit, any game played.
+            // `Accumulate` is called before `NoteOccupancy` at the one production call site, so
+            // "first here" is "first at all" for the whole per-player layer.
+            AssertIdentity(identity);
+
+            var homeSchoolId = identity.HomeSchoolId;
+            var awaySchoolId = identity.AwaySchoolId;
+
             Games++;
             PointsFromScores += game.HomeScore + game.AwayScore;
             TotalSeconds += result.TotalSeconds;
@@ -232,6 +348,19 @@ internal static partial class Program
                 PlayerUsage[pk] = (pv.Item1 + box.Fga[i], pv.Item2 + box.Fta[i], pv.Item3 + box.To[i]);
                 var tv = TeamUsage.TryGetValue(school, out var t0) ? t0 : (0L, 0L, 0L);
                 TeamUsage[school] = (tv.Item1 + box.Fga[i], tv.Item2 + box.Fta[i], tv.Item3 + box.To[i]);
+
+                // S77: the same box index, filed under the PERSON. Box index i is stamped id
+                // i+1 (PlayerBoxTotals is indexed by PlayerId - 1), and `Resolve` owns the one
+                // copy of the offset arithmetic — this loop never restates it.
+                var (recSchool, recRow) = identity.Resolve(i + 1);
+                var rec = RecordFor(recSchool, recRow);
+                rec.Fga    += box.Fga[i];    rec.Fgm    += box.Fgm[i];
+                rec.Tpa    += box.Tpa[i];    rec.Tpm    += box.Tpm[i];
+                rec.Fta    += box.Fta[i];    rec.Ftm    += box.Ftm[i];
+                rec.OReb   += box.OReb[i];   rec.DReb   += box.DReb[i];
+                rec.Ast    += box.Ast[i];    rec.Stl    += box.Stl[i];
+                rec.Blk    += box.Blk[i];    rec.To     += box.To[i];
+                rec.ShFoul += box.ShFoul[i]; rec.NsFoul += box.NsFoul[i];
             }
 
             var elapsedSum = 0.0;
@@ -248,6 +377,16 @@ internal static partial class Program
                 MidFga   += r.MidFga;   MidFgm   += r.MidFgm;
                 LongFga  += r.LongFga;  LongFgm  += r.LongFgm;
                 FastBreakFga += r.FastBreakFga; FastBreakThreePa += r.FastBreakThreePa; FastBreakThreePm += r.FastBreakThreePm;
+
+                UnattributedFga += r.SlotUnattributedFga;
+                UnattributedFgm += r.SlotUnattributedFgm;
+                //  Phase 51 decomposes every FTA into exactly five buckets which reconcile to
+                //  Fta: FtaBonusPicker + FtaBonusSelected + FtaBonusUnattributed +
+                //  FtaShootingSelected + FtaShootingNoSlot. TWO of the five have no owning
+                //  slot — the bonus trip that reached the line before Roll E selected a
+                //  shooter, AND a shooting foul carrying no slot. Counting only the first left
+                //  a 30-attempt hole in the fixture season; both are the unattributed side.
+                UnattributedFta += r.FtaBonusUnattributed + r.FtaShootingNoSlot;
 
                 var isTo = IsTurnoverPossession(r);
                 if (isTo) TurnoverPossessions++;
