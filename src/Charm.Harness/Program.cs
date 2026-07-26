@@ -238,6 +238,7 @@ internal static partial class Program
         ok &= Phase69GenPass3ReplayParityCheck();                // Phase 69 (S69: Pass-3 two-plane budget generator port — fixture replay parity, STANDALONE)
         ok &= Phase70GenPass3LiveCheck();                        // Phase 70 (S69: Pass-3 live generator — sampler moments + exact invariants + ruled bands, STANDALONE)
         ok &= Phase71ConfigKeyNameParityCheck(configPath);       // Phase 71 (S74: config KEY-NAME parity — registry completeness, bidirectional names, token kind, RollE binding; NOT value/semantic correctness)
+        ok &= Phase72MinutesAllocatorCheck(configPath);           // Phase 72 (S76: minutes allocator — per-position depth charts, residual control, bounded cascades)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

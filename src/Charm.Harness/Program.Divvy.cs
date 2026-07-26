@@ -546,7 +546,7 @@ internal static partial class Program
             needB = nb; needG = ng; needW = nw;
         }
         if (five.Count != 5)
-            throw new InvalidOperationException("BuildOpeningFive could not seat a legal five (roster-shape bug — every roster must be 4G/3W/3B).");
+            throw new InvalidOperationException($"BuildOpeningFive could not seat a legal five (roster-shape bug — every roster must be {RosterShape.Guards}G/{RosterShape.Wings}W/{RosterShape.Bigs}B).");
         return five.ToArray();
     }
 
@@ -765,8 +765,12 @@ internal static partial class Program
                 var p = res.Pool[pid];
                 // LegCount 0 / empty PlusLegs = "not applicable" (S63; mechanically
                 // dead on this path and never printed — see DivvyNoPlusLegs).
+                // S76: the smoke sim is the THIRD GenPlayerRow producer (the S76 prompt
+                // named only two). It carries the pool rank the same way the season path
+                // does, so the smoke sim runs the real depth chart rather than a chart
+                // where every player is equal.
                 return new GenPlayerRow(i + 1, p.Pos, p.Role, five.Contains(pid), 0,
-                                        DivvyNoPlusLegs, p.Ratings, p.Player);
+                                        DivvyNoPlusLegs, p.Ratings, p.Player, p.ScoutRank);
             }).ToList();
         }
 

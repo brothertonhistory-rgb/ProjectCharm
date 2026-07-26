@@ -136,6 +136,20 @@ internal static partial class Program
         public readonly Dictionary<string, long> XSeatHeightSum = new(StringComparer.Ordinal);
         public long PossessionCredits, XPossessionRecords, DroppedCredits;
 
+        //  Session 76 — THE ROTATION DEPTH DISTRIBUTION.
+        //
+        //  The single number this session exists to move. Before S76 five men took ~88% of
+        //  every team's possessions, so every calibration figure on this page described a
+        //  league where the average man on the floor plays 35 minutes.
+        //
+        //  Deliberately keyed by REALIZED rank, not by acquisition index and not by target:
+        //  it asks "how much did this team's most-used man play, its second most-used, and
+        //  so on", which needs no knowledge of the plan and therefore cannot be flattered by
+        //  it. A per-game sort is the honest instrument — a man who is 4th one night and 8th
+        //  the next contributes to both buckets, exactly as a rotation actually behaves.
+        public readonly long[] RotationRankCredits = new long[RosterShape.Size];
+        public long RotationTeamGames, RotationRecords;
+
         public void NoteOccupancy(
             IReadOnlyList<PossessionRecord> records, GameState game,
             IReadOnlyDictionary<int, string> storedPos,
@@ -143,6 +157,14 @@ internal static partial class Program
             IReadOnlyDictionary<(TeamSide, int), int> seatStarterHeight)
         {
             long credited = 0;
+            // S76: per-side, per-player floor time for THIS game, so the rotation depth
+            // distribution can be ranked within the game that produced it.
+            var perSide = new Dictionary<TeamSide, Dictionary<int, long>>
+            {
+                [TeamSide.Home] = new(),
+                [TeamSide.Away] = new(),
+            };
+
             foreach (var r in records)
                 for (var slot = 1; slot <= Lineup.Size; slot++)
                     foreach (var side in new[] { r.Offense, r.Defense })
@@ -151,6 +173,10 @@ internal static partial class Program
                         if (p is null) continue;
                         credited++;
                         if (!RosterShape.IsLegalPlayerId(p.PlayerId)) { DroppedCredits++; continue; }
+
+                        var bucket = perSide[side];
+                        bucket[p.PlayerId] = bucket.TryGetValue(p.PlayerId, out var pc) ? pc + 1 : 1;
+
                         if (!storedPos.TryGetValue(p.PlayerId, out var stored)) continue;
                         if (!seatPos.TryGetValue((side, slot), out var seat)) continue;
                         var key = PositionalEligibility.TransitionLabel(stored, seat);
@@ -159,6 +185,16 @@ internal static partial class Program
                         XSeatHeightSum[key] = (XSeatHeightSum.TryGetValue(key, out var sh) ? sh : 0)
                                             + (seatStarterHeight.TryGetValue((side, slot), out var v) ? v : p.Height);
                     }
+
+            foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
+            {
+                var ranked = perSide[side].Values.OrderByDescending(v => v).ToList();
+                for (var i = 0; i < ranked.Count && i < RosterShape.Size; i++)
+                    RotationRankCredits[i] += ranked[i];
+                RotationTeamGames++;
+                RotationRecords += records.Count;
+            }
+
             PossessionCredits += credited;
             XPossessionRecords += records.Count;
         }
@@ -484,6 +520,47 @@ internal static partial class Program
     private static void PrintBaselineReadout(SeasonLeagueStats s)
     {
         static string Inv(FormattableString f) => FormattableString.Invariant(f);
+
+        // ── S76: rotation depth — the distribution this session exists to move ──────
+        {
+            static string Inv3(FormattableString f) => FormattableString.Invariant(f);
+            Console.WriteLine("--- ROTATION DEPTH (Session 76; page-only, never asserted) ---");
+            var totalCredits = s.RotationRankCredits.Sum();
+            if (s.RotationTeamGames == 0 || totalCredits == 0)
+            {
+                Console.WriteLine("  no rotation data recorded (instrument not wired) — treat every minutes number as unproven.");
+            }
+            else
+            {
+                // Nominal minutes per team-game for the Nth most-used man. Records per
+                // team-game x 40 minutes / records = the 200-minute pie, so a credit is
+                // worth 40 / (records per team-game) minutes.
+                var recordsPerTeamGame = s.RotationRecords / (double)s.RotationTeamGames;
+                var minutesPerCredit = recordsPerTeamGame > 0 ? 40.0 / recordsPerTeamGame : 0.0;
+
+                long topFive = 0;
+                for (var i = 0; i < Lineup.Size && i < s.RotationRankCredits.Length; i++) topFive += s.RotationRankCredits[i];
+
+                Console.WriteLine(Inv3(
+                    $"  minutes by realized rotation rank (mean over {s.RotationTeamGames} team-games, {recordsPerTeamGame:F1} records/team-game):"));
+                var parts = new List<string>();
+                for (var i = 0; i < s.RotationRankCredits.Length; i++)
+                {
+                    var mins = s.RotationRankCredits[i] / (double)s.RotationTeamGames * minutesPerCredit;
+                    parts.Add(FormattableString.Invariant($"{i + 1,2}:{mins,5:F1}"));
+                }
+                for (var i = 0; i < parts.Count; i += 7)
+                    Console.WriteLine("    " + string.Join("  ", parts.Skip(i).Take(7)));
+
+                Console.WriteLine(Inv3(
+                    $"  top-5 share of floor time: {100.0 * topFive / totalCredits:F1} %   (S75 measured ~88 % — the concentration this session set out to break)"));
+                var played = s.RotationRankCredits.Count(c => c > 0);
+                Console.WriteLine(Inv3(
+                    $"  men used per team-game: {played} of {RosterShape.Size} roster slots see floor time at some rank"));
+            }
+            Console.WriteLine();
+        }
+
         // ── S75: cross-position occupancy (page-only; the S76 design input) ────────
         {
             static string Inv2(FormattableString f) => FormattableString.Invariant(f);

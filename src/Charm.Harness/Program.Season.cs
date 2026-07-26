@@ -372,8 +372,11 @@ internal static partial class Program
                 var p = res.Pool[pid];
                 // LegCount 0 / empty PlusLegs = "not applicable" (S63; mechanically
                 // dead on this path — the game consumes Player/Slot/Pos/Starter only).
+                // S76: p.ScoutRank was in scope here and discarded one line before the
+                // seam needed it. It is the stored-group depth order the minutes
+                // allocator sorts each chart by.
                 return new GenPlayerRow(i + 1, p.Pos, p.Role, five.Contains(pid), 0,
-                                        DivvyNoPlusLegs, p.Ratings, p.Player);
+                                        DivvyNoPlusLegs, p.Ratings, p.Player, p.ScoutRank);
             }).ToList();
             if (verbose)
             {

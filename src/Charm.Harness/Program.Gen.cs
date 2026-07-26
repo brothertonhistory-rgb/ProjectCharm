@@ -870,9 +870,14 @@ internal static partial class Program
     // ACQUISITION-ORDER INDEX 1..RosterShape.Size (NOT PlayerId; A0.7) — 1 = top
     // starter, Size = last bench. S75 note: this is an ordering, NOT a depth chart;
     // a real depth chart does not exist until S76 defines one.
+    // S76: ScoutRank carries the STORED-GROUP DEPTH ORDER to the seam. Higher is better,
+    // comparable only against another player of the same stored group (see SideDepth).
+    // It is deliberately a required positional field with NO default: a default of 0
+    // would make every player equal and the minutes allocator would silently fall back
+    // to id order, producing an ordered, stable, entirely meaningless rotation.
     private sealed record GenPlayerRow(
         int Slot, string Pos, string Role, bool Starter, int LegCount,
-        HashSet<string> PlusLegs, Dictionary<string, int> Ratings, Player Player);
+        HashSet<string> PlusLegs, Dictionary<string, int> Ratings, Player Player, double ScoutRank);
 
     private static List<GenPlayerRow> GenRoster(int prestige, string lean, Random r, string programTag)
     {
@@ -936,7 +941,13 @@ internal static partial class Program
                     $"generation bug — Program {programTag} slot {depth + 1} ({role}) failed Player.Validate():\n  " +
                     string.Join("\n  ", errs));
 
-            rows.Add(new GenPlayerRow(depth + 1, pos, role, starter, lc, plusLegs, v, player));
+            // S76: the gen lab has no divvy pool, so it computes the SAME scout rank the
+            // pool path stores — DivvyScoutRank reads exactly the two things a gen row
+            // already carries (the rating dictionary and the stored position). Using the
+            // production function rather than the acquisition index means the gen demo
+            // exercises the real depth chart instead of a stand-in that could diverge.
+            rows.Add(new GenPlayerRow(depth + 1, pos, role, starter, lc, plusLegs, v, player,
+                                      DivvyScoutRank(v, pos)));
         }
 
         return rows;
@@ -1095,35 +1106,44 @@ internal static partial class Program
     // with their positions, and the five reserves with theirs. The stamped Player at index
     // i corresponds to rows[i] (depth slot i+1), so starters land in depth order.
     private sealed record GenSideData(
-        Player[] Starters, string[] StarterPositions,
-        Player[] Reserves, string[] ReservePositions);
+        Player[] Starters, string[] StarterPositions, double[] StarterRanks,
+        Player[] Reserves, string[] ReservePositions, double[] ReserveRanks);
 
     private static GenSideData BuildGenSideData(List<GenPlayerRow> rows, Player[] stamped)
     {
-        var starters = new List<Player>();  var starterPos = new List<string>();
-        var reserves = new List<Player>();  var reservePos = new List<string>();
+        var starters = new List<Player>();  var starterPos = new List<string>();  var starterRank = new List<double>();
+        var reserves = new List<Player>();  var reservePos = new List<string>();  var reserveRank = new List<double>();
         for (var i = 0; i < rows.Count; i++)
         {
-            if (rows[i].Starter) { starters.Add(stamped[i]); starterPos.Add(rows[i].Pos); }
-            else                 { reserves.Add(stamped[i]); reservePos.Add(rows[i].Pos); }
+            if (rows[i].Starter) { starters.Add(stamped[i]); starterPos.Add(rows[i].Pos); starterRank.Add(rows[i].ScoutRank); }
+            else                 { reserves.Add(stamped[i]); reservePos.Add(rows[i].Pos); reserveRank.Add(rows[i].ScoutRank); }
         }
         if (starters.Count != Lineup.Size || reserves.Count != RosterShape.Size - Lineup.Size)
             throw new InvalidOperationException(
                 $"assembly bug — a program must split into {Lineup.Size} starters and " +
                 $"{RosterShape.Size - Lineup.Size} reserves " +
                 $"(got {starters.Count} starters, {reserves.Count} reserves).");
-        return new GenSideData(starters.ToArray(), starterPos.ToArray(), reserves.ToArray(), reservePos.ToArray());
+        return new GenSideData(starters.ToArray(), starterPos.ToArray(), starterRank.ToArray(),
+                               reserves.ToArray(), reservePos.ToArray(), reserveRank.ToArray());
     }
 
-    // PlayerId → who this is, for the box-score row labels. A → depth slot (1..10),
-    // B → depth slot + 10 (11..20).
+    // PlayerId → who this is, for the box-score row labels. A → depth slot 1..Size,
+    // B → depth slot + AwayIdOffset.
+    //
+    // S76 FIX: this read `row.Slot + 10` — a hardcoded literal left behind when S75 moved
+    // the roster from 10 to 13. With AwayIdOffset at 13, team B's rows landed on keys
+    // 11..23 instead of 14..26, so B's first three men OVERWROTE A's last three bench
+    // labels and every remaining B label was shifted three seats. Cosmetic only — no
+    // simulation path reads this map — but it corrupts exactly the per-player tables S76
+    // adds, which is how it was found.
     private sealed record GenIdentity(string Team, int Slot, string Pos, string Role, bool Starter);
 
     private static Dictionary<int, GenIdentity> BuildGenIdentity(List<GenPlayerRow> rowsA, List<GenPlayerRow> rowsB)
     {
         var map = new Dictionary<int, GenIdentity>();
-        foreach (var row in rowsA) map[row.Slot]      = new GenIdentity("A", row.Slot, row.Pos, row.Role, row.Starter);
-        foreach (var row in rowsB) map[row.Slot + 10] = new GenIdentity("B", row.Slot, row.Pos, row.Role, row.Starter);
+        foreach (var row in rowsA) map[row.Slot] = new GenIdentity("A", row.Slot, row.Pos, row.Role, row.Starter);
+        foreach (var row in rowsB) map[row.Slot + RosterShape.AwayIdOffset] =
+            new GenIdentity("B", row.Slot, row.Pos, row.Role, row.Starter);
         return map;
     }
 
@@ -1236,13 +1256,22 @@ internal static partial class Program
 
         // Build each side's depth chart with its PHYSICAL side for this game, then hand
         // the policy the Home/Away pair and the shared halftime-equivalent magnitude.
-        var aDepth = new FlatFatigueFencePolicy.SideDepth(
-            teamASide, sideA.Starters, sideA.StarterPositions, sideA.Reserves, sideA.ReservePositions);
-        var bDepth = new FlatFatigueFencePolicy.SideDepth(
-            teamBSide, sideB.Starters, sideB.StarterPositions, sideB.Reserves, sideB.ReservePositions);
+        var aDepth = new SideDepth(
+            teamASide, sideA.Starters, sideA.StarterPositions, sideA.StarterRanks,
+                       sideA.Reserves, sideA.ReservePositions, sideA.ReserveRanks);
+        var bDepth = new SideDepth(
+            teamBSide, sideB.Starters, sideB.StarterPositions, sideB.StarterRanks,
+                       sideB.Reserves, sideB.ReservePositions, sideB.ReserveRanks);
         var homeDepth = teamASide == TeamSide.Home ? aDepth : bDepth;
         var awayDepth = teamASide == TeamSide.Home ? bDepth : aDepth;
-        var policy = new FlatFatigueFencePolicy(homeDepth, awayDepth, c.Fat.HalftimeRestEquivalentSeconds);
+
+        // ★ EXACTLY ONE SUBSTITUTION POLICY IS INSTALLED, AND THE GUARANTEE IS STRUCTURAL,
+        // not asserted at runtime: the Governor holds a single ISubstitutionPolicy? field
+        // and its constructor takes one, so more than one is UNREPRESENTABLE. If both a
+        // fence and an allocator ran, minutes would still land somewhere and the suite
+        // would stay green — the tell would be stint pathology, not a failed check. The
+        // type system removes the possibility instead of watching for it.
+        var policy = new MinutesAllocatorPolicy(homeDepth, awayDepth, c.Fat.HalftimeRestEquivalentSeconds);
 
         var resolverRng = new SystemRng(resolverSeed);
         var governorRng = new SystemRng(governorSeed);
@@ -1540,9 +1569,10 @@ internal static partial class Program
     private static void PrintGenBoxScore(GenStats s, Dictionary<int, GenIdentity> identity)
     {
         Console.WriteLine($"--- PER-PLAYER BOX SCORE (per-game averages, {s.Games} games) ---");
-        Console.WriteLine("  Ten-man rosters: [A]/[B] with roster depth slot (1..10) and role. POSS = per-game");
-        Console.WriteLine("  possessions on the floor (either side of the ball) — starters near the full count,");
-        Console.WriteLine("  reserves a fraction if the fatigue fence used them; a reserve never used is omitted.");
+        Console.WriteLine($"  {RosterShape.Size}-man rosters: [A]/[B] with roster acquisition index (1..{RosterShape.Size}) and role.");
+        Console.WriteLine("  POSS = per-game possessions on the floor (either side of the ball). S76: the minutes");
+        Console.WriteLine("  allocator drives this, so POSS tracks each man's target — the three zero-target men");
+        Console.WriteLine("  (bottom guard, wing and big by stored-group rank) are omitted, having never played.");
         Console.WriteLine("  Exact attribution: FGA FGM 3PA 3PM FTA FTM ORB DRB STL BLK AST TO. Weighted: SFL only.");
         Console.WriteLine($"  {"Player",-24} {"POSS",5} {"PTS",5} {"FGA",5} {"FGM",5} {"FG%",5} {"3PA",5} {"3PM",5} {"3P%",5} {"FTA",5} {"FTM",5} {"FT%",5} {"ORB",5} {"DRB",5} {"REB",5} {"STL",5} {"BLK",5} {"AST",5} {"TO",5} {"SFL",5}");
         Console.WriteLine(new string('─', 133));
