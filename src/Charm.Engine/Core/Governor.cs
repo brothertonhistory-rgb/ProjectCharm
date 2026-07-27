@@ -145,6 +145,14 @@ public sealed record PossessionRecord(
     // Phase 36: engine-stamped per-slot block counts. BlkBySlot.Total == BlkCount on every
     // possession (harness-asserted). Default (all zeros) on possessions with no blocks.
     SlotGroup BlkBySlot = default,
+
+    // Session 79, PAGE-ONLY: block credit split by whether the credited defender was the man
+    // guarding the shooter, near the rim (Rim/Short) vs out (Mid/Long/Three). Never asserted;
+    // it separates credit REDISTRIBUTION from a real RATE change on the season page.
+    int       BlkMatchedNear = 0,
+    int       BlkHelperNear  = 0,
+    int       BlkMatchedOut  = 0,
+    int       BlkHelperOut   = 0,
     // Phase 39: engine-stamped per-slot assist counts. AstBySlot.Total <= Fgm on every
     // possession (harness-asserted). Default (all zeros) on possessions with no made FGs
     // or possessions where every make was a putback or null-SelectedSlot (bonus-FT edge).
@@ -390,6 +398,8 @@ public sealed class Governor
             int? possessionStealerSlot = null;
             int? possessionDefensiveRebounderSlot = null;
             var possessionBlkBySlot = new SlotGroup();
+            var possessionBlkMatchedNear = 0; var possessionBlkHelperNear = 0;
+            var possessionBlkMatchedOut  = 0; var possessionBlkHelperOut  = 0;
             var possessionAstBySlot = new SlotGroup();
 
             if (intent == EndOfHalfIntent.NoShot)
@@ -516,6 +526,10 @@ public sealed class Governor
                 possessionStealerSlot         = outcome.StealerSlot;
                 possessionDefensiveRebounderSlot = outcome.DefensiveRebounderSlot;
                 possessionBlkBySlot = outcome.BlkBySlot;
+                possessionBlkMatchedNear = outcome.BlkMatchedNear;
+                possessionBlkHelperNear  = outcome.BlkHelperNear;
+                possessionBlkMatchedOut  = outcome.BlkMatchedOut;
+                possessionBlkHelperOut   = outcome.BlkHelperOut;
                 possessionAstBySlot = outcome.AstBySlot;
             }
 
@@ -563,6 +577,10 @@ public sealed class Governor
                 possessionStealerSlot,
                 possessionDefensiveRebounderSlot,
                 possessionBlkBySlot,
+                possessionBlkMatchedNear,
+                possessionBlkHelperNear,
+                possessionBlkMatchedOut,
+                possessionBlkHelperOut,
                 possessionAstBySlot,
                 possessionFtaBonusPicker, possessionFtaBonusSelected,
                 possessionFtaBonusUnattributed, possessionFtaShootingSelected,

@@ -240,6 +240,7 @@ internal static partial class Program
         ok &= Phase71ConfigKeyNameParityCheck(configPath);       // Phase 71 (S74: config KEY-NAME parity — registry completeness, bidirectional names, token kind, RollE binding; NOT value/semantic correctness)
         ok &= Phase72MinutesAllocatorCheck(configPath);           // Phase 72 (S76: minutes allocator — per-position depth charts, residual control, bounded cascades)
         ok &= Phase73SeasonStatsCheck(configPath);                // Phase 73 (S77: per-player season roll-up — conservation, two-path identity, minutes reconciliation, games played)
+        ok &= Phase74BlockHelpCheck(configPath);                 // Phase 74 (S79: block help arm + contribution-based credit — golden parity, rate invariants, config guards)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

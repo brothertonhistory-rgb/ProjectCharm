@@ -257,6 +257,23 @@ public static class Matchup
     /// </summary>
     public static double BlockWeight(ShotLocation zone, Player shooter, Player defender,
                                      double baseBlockWeight, MatchupConfig cfg)
+        => BlockBend(zone, BlockDuelShift(zone, shooter, defender, cfg), baseBlockWeight, cfg);
+
+    /// <summary>
+    /// The shooter-vs-matched-defender duel shift (Session 79 extraction) — the pre-tanh
+    /// quantity <see cref="BlockWeight"/> has always computed, pulled out under a name so the
+    /// S79 help arm can be added to it in the SAME shift space and so the oracle/harness bind
+    /// to this exact expression rather than a copy of it.
+    ///
+    /// <para><b>Byte-identical to the pre-S79 inline arithmetic.</b> Same operations, same
+    /// order, same association — an extraction, not a rewrite. Phase 7 is unmoved.</para>
+    ///
+    /// <para><b>Shooter-RELATIVE.</b> Unlike <see cref="BlockDefenderThreat"/> (which reads a
+    /// defender against a neutral attacker), this is a duel: both terms are differences against
+    /// THIS shooter. It is negative whenever the shooter wins the matchup.</para>
+    /// </summary>
+    public static double BlockDuelShift(ShotLocation zone, Player shooter, Player defender,
+                                        MatchupConfig cfg)
     {
         // Skill contribution: defender's zone defensive read minus shooter's zone skill.
         // Positive = defender advantage = raises block rate.
@@ -270,21 +287,248 @@ public static class Matchup
 
         // Weighted sum: per-zone skill/length split (e.g. 40/60 at Rim and Three).
         var (sw, lw) = cfg.BlockContestWeights(zone);
-        var totalShift = sw * skillShift + lw * lengthShift;
+        return sw * skillShift + lw * lengthShift;
+    }
 
-        // Tanh saturation toward ceiling (defender edge) or floor (shooter edge).
-        // span is the headroom available in the relevant direction from the baseline.
+    /// <summary>
+    /// The tanh saturation from a total pre-bend shift to a block rate (Session 79 extraction).
+    /// span is the headroom from the baseline toward the ceiling (defender edge) or the floor
+    /// (shooter edge); tanh is odd and bounded in (−1, +1), so the result never crosses either
+    /// asymptote however extreme the shift.
+    ///
+    /// <para>bend is naturally negative when the shift is negative, so a plain addition bends
+    /// down toward the floor for a shooter edge and up toward the ceiling for a defender edge —
+    /// no sign flip. The original spec's <c>(shift >= 0 ? bend : -bend)</c> was wrong: negating
+    /// an already-negative bend returns a positive value, bending the wrong way (Session 38).</para>
+    ///
+    /// <para><b>Monotone across the sign change.</b> The span switches at shift 0, but tanh(0) = 0
+    /// on both sides and both slopes are positive, so the rate is continuous and non-decreasing in
+    /// the shift — the invariant the S79 help arm relies on when it pushes a negative duel
+    /// positive.</para>
+    /// </summary>
+    public static double BlockBend(ShotLocation zone, double totalShift,
+                                   double baseBlockWeight, MatchupConfig cfg)
+    {
         var ceiling = cfg.BlockCeiling(zone);
         var floor   = cfg.BlockFloor(zone);
         var span    = totalShift >= 0.0 ? (ceiling - baseBlockWeight) : (baseBlockWeight - floor);
         var bend    = span * Math.Tanh(totalShift / cfg.BlockReferenceShift);
-
-        // Add bend: positive totalShift bends up, negative bends down.
-        // bend is naturally negative when totalShift is negative (tanh is odd), so a plain
-        // addition bends down toward floor for shooter edge and up toward ceiling for defender
-        // edge — no sign flip needed. The spec's "(shift >= 0 ? bend : -bend)" was wrong:
-        // -bend when bend is already negative returns a positive value, bending the wrong way.
         return baseBlockWeight + bend;
+    }
+
+    // =========================================================================
+    // Session 79 — THE HELP ARM: a weakside shot blocker who is guarding nobody
+    // =========================================================================
+    //
+    // Emmett's model (2026-07-26): at the rim roughly half of blocks are not the man
+    // guarding the shooter; the tie to the matched man strengthens as shots move out.
+    // High help defense PLUS high rim protection is a shot-blocking menace. Help scales
+    // with how deep a man plays — a 5's help is worth more than a 1's — with a floor so a
+    // point guard with real instincts still gets paid.
+    //
+    // Before S79 the located-shot block rate consulted exactly ONE defender, so an elite
+    // rim protector not guarding the ball changed the team block rate by ZERO. The help arm
+    // is composed with the duel in PRE-TANH SHIFT SPACE, before the existing floor/ceiling
+    // transform, so there is one probability calculus, the zone ceiling still binds, and the
+    // shape matches PutbackBlockRate (which has always been a team stack at the rim).
+
+    /// <summary>
+    /// How deep a man plays (Session 79) — a BODY-ONLY read, deliberately distinct from
+    /// <see cref="Postness"/>.
+    ///
+    /// <para><b>Why not Postness.</b> Postness folds in PostDefense, which is also a
+    /// <see cref="BlockDefenderThreat"/> input. Because the positional multiplier is
+    /// LINEUP-RELATIVE, a shared input couples the two: improving one man's post defense
+    /// raised his depth, which raised the lineup mean, which shrank all four teammates'
+    /// multipliers — and the team blocked FEWER shots because one defender got better. That
+    /// violated the ruled invariant "a better defender never lowers the rate" on 8,237 of
+    /// 40,000 sampled real matchups. Reading depth off the body alone decouples them
+    /// completely: a skill-only improvement cannot move any depth, so the invariant holds
+    /// exactly. Where a man plays is a body fact, not a skill.</para>
+    ///
+    /// <para>Rebounding's <see cref="Postness"/> is UNCHANGED and still includes PostDefense —
+    /// it is a different read for a different job, and the two must not be unified.</para>
+    /// </summary>
+    public static double BlockHelpDepth(Player p, MatchupConfig cfg)
+        => cfg.BlockHelpDepthHeight * p.Height + cfg.BlockHelpDepthStrength * p.Strength;
+
+    /// <summary>The mean <see cref="BlockHelpDepth"/> over the POPULATED defenders — the
+    /// denominator for the lineup-relative positional multiplier. Unpopulated slots are
+    /// skipped (never counted as a zero-depth player, which would drag the mean down and
+    /// silently inflate everyone's multiplier). Returns 0 on an all-empty defense, which the
+    /// callers never reach with a live block.</summary>
+    public static double BlockHelpMeanDepth(IReadOnlyList<Player?> defenders, MatchupConfig cfg)
+    {
+        var sum = 0.0;
+        var count = 0;
+        for (var i = 0; i < defenders.Count; i++)
+        {
+            if (defenders[i] is null) continue;
+            sum += BlockHelpDepth(defenders[i]!, cfg);
+            count++;
+        }
+        return count == 0 ? 0.0 : sum / count;
+    }
+
+    /// <summary>
+    /// One defender's blocking threat against a NEUTRAL attacker
+    /// (<see cref="MatchupConfig.AttributeMidpoint"/>) — the defender-only read
+    /// <see cref="PutbackBlockRate"/> has always used, now shared with the located-shot help
+    /// arm and with block CREDIT.
+    ///
+    /// <para>Finisher-independent on purpose: a defender's blocking tools are the same
+    /// whatever he is blocking. The shooter enters the RATE once, through
+    /// <see cref="BlockDuelShift"/>; he does not enter credit at all (who was in position to
+    /// swat is a defender property).</para>
+    /// </summary>
+    public static double BlockDefenderThreat(ShotLocation zone, Player d, MatchupConfig cfg)
+    {
+        var (sw, lw) = cfg.BlockContestWeights(zone);
+        var skill  = GapFn(DefenseRating(zone, d, cfg) - cfg.AttributeMidpoint,
+                           cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+        var length = GapFn(LengthRating(d, cfg) - cfg.AttributeMidpoint,
+                           cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+        return sw * skill + lw * length;
+    }
+
+    /// <summary>
+    /// A helper's readiness to rotate (Session 79) — his help instincts, scaled by how deep he
+    /// plays relative to his own lineup: <c>(HelpDefense/100) · (1 + swing·tanh((depth −
+    /// lineupMeanDepth)/scale))</c>.
+    ///
+    /// <para><b>Readiness MULTIPLIES threat, it never substitutes for it</b> (see
+    /// <see cref="BlockHelpShift"/>) — elite help defense cannot manufacture a shot blocker out
+    /// of a man with no tools. tanh supplies the floor Emmett asked for: a point guard with real
+    /// instincts is damped, never zeroed. Lineup-relative, the same idiom as
+    /// <see cref="PositionalWeight"/>, so a short D3 frontline still has a relative big.</para>
+    /// </summary>
+    public static double BlockHelpReadiness(Player d, double lineupMeanDepth, MatchupConfig cfg)
+        => (d.HelpDefense / 100.0)
+         * (1.0 + cfg.BlockHelpPositionalSwing
+                * Math.Tanh((BlockHelpDepth(d, cfg) - lineupMeanDepth) / cfg.BlockHelpPositionalScale));
+
+    /// <summary>One off-ball defender's contribution to the block rate:
+    /// <c>max(0, threat) · readiness</c>. The per-defender no-drag floor is
+    /// <see cref="PutbackBlockRate"/>'s rule — a below-average helper contributes nothing rather
+    /// than dragging the team total down.</summary>
+    public static double BlockHelpShift(ShotLocation zone, Player d, double lineupMeanDepth,
+                                        MatchupConfig cfg)
+        => Math.Max(0.0, BlockDefenderThreat(zone, d, cfg))
+         * BlockHelpReadiness(d, lineupMeanDepth, cfg);
+
+    /// <summary>The summed help contribution of the four NON-matched defenders. Null slots
+    /// contribute zero and are NOT renormalized away — the sum IS the design (same rule as
+    /// <see cref="PutbackBlockRate"/>; contrast the AVERAGING aggregates in RollHGenerator's
+    /// C5.5/C6/C7, which divide by capacity).</summary>
+    public static double BlockHelpSum(ShotLocation zone, IReadOnlyList<Player?> defenders,
+                                      int matchedIndex, MatchupConfig cfg)
+    {
+        var meanDepth = BlockHelpMeanDepth(defenders, cfg);
+        var sum = 0.0;
+        for (var i = 0; i < defenders.Count; i++)
+        {
+            if (i == matchedIndex) continue;      // his contest is the duel arm, not the help arm
+            var d = defenders[i];
+            if (d is null) continue;
+            sum += BlockHelpShift(zone, d, meanDepth, cfg);
+        }
+        return sum;
+    }
+
+    /// <summary>
+    /// The Session 79 located-shot block rate: the matched-defender duel PLUS the zone-weighted
+    /// help of the other four, composed before the tanh.
+    ///
+    /// <c>totalShift = duelShift + BlockHelpShare(zone) · Σ helpShift(d)</c>, then
+    /// <see cref="BlockBend"/> with the EXISTING per-zone floor, ceiling and reference shift.
+    ///
+    /// <para>Help is non-negative by the no-drag floor, so adding or improving a helper can
+    /// never lower the rate; and because the bend is the existing one, help can never push the
+    /// rate past the zone ceiling.</para>
+    ///
+    /// <para><b>Empty matched slot.</b> Callers keep the DEC-6 fallback and do NOT reach this
+    /// method — same contract as <see cref="BlockWeight"/>, which this replaces at the Roll H
+    /// call site.</para>
+    /// </summary>
+    public static double BlockWeightWithHelp(ShotLocation zone, Player shooter, Player defender,
+                                             IReadOnlyList<Player?> defenders, int matchedIndex,
+                                             double baseBlockWeight, MatchupConfig cfg)
+    {
+        var duel = BlockDuelShift(zone, shooter, defender, cfg);
+        var help = cfg.BlockHelpShare(zone) * BlockHelpSum(zone, defenders, matchedIndex, cfg);
+        return BlockBend(zone, duel + help, baseBlockWeight, cfg);
+    }
+
+    /// <summary>
+    /// WHO gets credited for a located-shot block (Session 79) — the raw per-slot weights
+    /// <see cref="BlockerPicker"/> normalizes. Retires <c>BlockerWeight</c>, the six-attribute
+    /// weighted sum whose p99/median spread was only 1.48×, so the best rim protector in the
+    /// country took 30% of his lineup's blocks against each guard's 17%.
+    ///
+    /// <para><b>Credit is DEFENDER-ONLY — the shooter is deliberately absent.</b> The prompt's
+    /// original rule scored the matched man by <c>max(0, duelShift)</c>; measured on a real
+    /// population that is exactly zero 44% of the time (whenever the shooter wins the duel),
+    /// which pins the help arm at 100% of the credit in those cases and makes the split
+    /// untunable at any share. The shooter decides WHETHER a shot is blocked; he does not decide
+    /// WHICH defender got there.</para>
+    ///
+    /// <para><b>The luck floor.</b> <c>max(0, threat)</c> alone is a hard zero on roughly half
+    /// the population — a single elite big beside four average men took 100% of his team's
+    /// blocks. <see cref="MatchupConfig.BlockCreditLuckFloor"/> keeps every populated defender
+    /// drawable, the same device as <see cref="ReachInPropensity"/>'s LuckFloor and the retired
+    /// <c>max(1, …)</c> in the picker. It also makes a zero-mass draw unreachable rather than a
+    /// live ~2% path.</para>
+    ///
+    /// <para>Matched man: <c>LuckFloor + max(0, threat)</c> — no readiness factor, he is ON the
+    /// ball and his rotation instincts are irrelevant to his own contest. Helper:
+    /// <c>BlockHelpShare(zone) · (LuckFloor + helpShift)</c> — the zone weight scales the whole
+    /// helper term, floor included, which is what makes the help share fall away from the rim
+    /// (Rim 64% / Short 61% / Mid 37% / Long 20% / Three 14%).</para>
+    ///
+    /// <para><paramref name="matchedIndex"/> is −1 when no matched defender is resolvable; every
+    /// populated slot is then a helper. Null slots weigh exactly 0.</para>
+    /// </summary>
+    public static double[] BlockCreditWeights(ShotLocation zone, IReadOnlyList<Player?> defenders,
+                                              int matchedIndex, MatchupConfig cfg)
+    {
+        var meanDepth = BlockHelpMeanDepth(defenders, cfg);
+        var share     = cfg.BlockHelpShare(zone);
+        var w         = new double[5];
+        for (var i = 0; i < 5; i++)
+        {
+            var d = i < defenders.Count ? defenders[i] : null;
+            if (d is null) { w[i] = 0.0; continue; }
+
+            w[i] = i == matchedIndex
+                 ? cfg.BlockCreditLuckFloor + Math.Max(0.0, BlockDefenderThreat(zone, d, cfg))
+                 : share * (cfg.BlockCreditLuckFloor + BlockHelpShift(zone, d, meanDepth, cfg));
+        }
+        return w;
+    }
+
+    /// <summary>
+    /// WHO gets credited for a PUTBACK block (Session 79). The putback RATE is unchanged — a
+    /// five-defender stack against a neutral finisher — and its per-defender shifts, which
+    /// <see cref="PutbackBlockRate"/> computed and then discarded, are exactly the credit.
+    ///
+    /// <para><b>No matched arm, no zone share.</b> A go-back-up at the rim is contested by the
+    /// whole interior; the defender matched to the rebounder has no special role in the putback
+    /// rate (RollHGenerator says so explicitly), so he gets none in the credit either. The
+    /// shifts are finisher-independent, so this needs no rebounder — which also sidesteps the
+    /// bonus-FT putback edge, where the offensive shooter slot is null.</para>
+    /// </summary>
+    public static double[] PutbackBlockCreditWeights(IReadOnlyList<Player?> defenders,
+                                                     MatchupConfig cfg)
+    {
+        var w = new double[5];
+        for (var i = 0; i < 5; i++)
+        {
+            var d = i < defenders.Count ? defenders[i] : null;
+            w[i] = d is null
+                 ? 0.0
+                 : cfg.BlockCreditLuckFloor + Math.Max(0.0, PutbackDefenderShift(d, cfg));
+        }
+        return w;
     }
 
     /// <summary>
@@ -332,6 +576,27 @@ public static class Matchup
     /// null-rebounder / unpopulated-roster fallback returns the flat legacy putback pie BEFORE
     /// reaching this method, so it is only ever called with a real rebounder.</para>
     /// </summary>
+    /// <summary>
+    /// One defender's PRE-FLOOR putback blocking threat (Session 79 extraction) — his rim
+    /// defensive read and length composite above neutral, blended by the Rim skill/length split.
+    /// Byte-identical to the arithmetic <see cref="PutbackBlockRate"/> ran inline; pulled out so
+    /// the rate and <see cref="PutbackBlockCreditWeights"/> bind to ONE expression instead of two
+    /// copies that can drift.
+    ///
+    /// <para>Identical in form to <see cref="BlockDefenderThreat"/> at the Rim zone, and kept
+    /// separate on purpose: the putback door is pinned to Rim by construction, while
+    /// BlockDefenderThreat is zone-parameterised. Both read the same neutral.</para>
+    /// </summary>
+    public static double PutbackDefenderShift(Player d, MatchupConfig cfg)
+    {
+        var (skillW, lengthW) = cfg.BlockContestWeights(ShotLocation.Rim);
+        var skill  = GapFn(DefenseRating(ShotLocation.Rim, d, cfg) - cfg.AttributeMidpoint,
+                           cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+        var length = GapFn(LengthRating(d, cfg) - cfg.AttributeMidpoint,
+                           cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+        return skillW * skill + lengthW * length;
+    }
+
     public static double PutbackBlockRate(
         Player rebounder, IReadOnlyList<Player?> defenders,
         double baseBlockWeight, MatchupConfig cfg)
@@ -357,13 +622,8 @@ public static class Matchup
             var d = defenders[i];
             if (d is null) continue;   // a missing slot contributes zero (no renormalization)
 
-            var skill  = GapFn(DefenseRating(ShotLocation.Rim, d, cfg) - cfg.AttributeMidpoint,
-                               cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
-            var length = GapFn(LengthRating(d, cfg) - cfg.AttributeMidpoint,
-                               cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
-            var shift  = skillW * skill + lengthW * length;
-
-            teamDrive += Math.Max(0.0, shift);   // no-drag floor: a weak defender adds nothing
+            // no-drag floor: a weak defender adds nothing rather than dragging the total down
+            teamDrive += Math.Max(0.0, PutbackDefenderShift(d, cfg));
         }
 
         // Finisher resistance vs a NEUTRAL defense — the finisher's finishing/length above neutral
@@ -1629,26 +1889,16 @@ public static class Matchup
         return (finalToShare, finalDefFoulShare, finalOffFoulShare);
     }
 
-    // ── Phase 36: BLK attribution weight ─────────────────────────────────────
-
-    /// <summary>
-    /// Returns the raw (pre-floor) block-attribution weight for one defensive player
-    /// at a given shot zone. A straight weighted sum of six blocking attributes with
-    /// zone-specific coefficients from config. The floor of 1 is applied by the
-    /// caller (<see cref="BlockerPicker"/>), not here.
-    ///
-    /// <para>Rim/Short: RimProtection and Height dominate — help-side bigs rotating.
-    /// Three/Long: PerimeterDefense leads — perimeter closeout. Wingspan is meaningful
-    /// at every zone (reach that deflects the ball). Mid is between the two extremes.
-    /// </para>
-    /// </summary>
-    public static double BlockerWeight(ShotLocation zone, Player p, MatchupConfig cfg)
-        =>   cfg.BlkRimProtection(zone)    * p.RimProtection
-           + cfg.BlkPerimeterDefense(zone) * p.PerimeterDefense
-           + cfg.BlkPostDefense(zone)      * p.PostDefense
-           + cfg.BlkHeight(zone)           * p.Height
-           + cfg.BlkWingspan(zone)         * p.Wingspan
-           + cfg.BlkVertical(zone)         * p.Vertical;
+    // ── Phase 36: BLK attribution weight — RETIRED at Session 79 ─────────────
+    //
+    // Matchup.BlockerWeight was a straight weighted sum of six blocking attributes with
+    // thirty per-zone coefficients. It was structurally incapable of expressing a shot
+    // blocker: averaging six broadly-correlated ratings compressed the whole population
+    // into a p99/median spread of 1.48x, and because BlockerPicker normalizes the weights
+    // into shares, ANY affine rescale of the coefficients was a no-op — the fix could
+    // never have been a re-tune. Credit is now contribution-based: see
+    // BlockCreditWeights and PutbackBlockCreditWeights above. The thirty Blk* config
+    // keys are deleted with it.
 }
 
 /// <summary>

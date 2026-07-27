@@ -238,6 +238,9 @@ public sealed class Resolver
         var ftaBySlot     = new SlotGroup();
         var ftmBySlot     = new SlotGroup();
         var blkCount      = 0;
+        // Session 79, PAGE-ONLY: was the credited blocker the man guarding the shooter?
+        var blkMatchedNear = 0; var blkHelperNear = 0;
+        var blkMatchedOut  = 0; var blkHelperOut  = 0;
         // Phase 36: per-slot block accumulator. Total == BlkCount on every possession.
         var blkBySlot     = new SlotGroup();
         // Phase 39: per-slot assist accumulator. Total <= FGM on every possession.
@@ -339,6 +342,10 @@ public sealed class Resolver
                           FtmBySlot      = ftmBySlot,
                           BlkCount       = blkCount,
                           BlkBySlot      = blkBySlot,
+                          BlkMatchedNear = blkMatchedNear,
+                          BlkHelperNear  = blkHelperNear,
+                          BlkMatchedOut  = blkMatchedOut,
+                          BlkHelperOut   = blkHelperOut,
                           TurnoverOffSlot     = turnoverOffSlot,
                           TurnoverWasLiveBall = turnoverWasLiveBall,
                           ShootingFouls  = shootingFouls.ToArray(),
@@ -713,8 +720,23 @@ public sealed class Resolver
                                     if (shotSt.Result == ShotResult.Blocked)
                                     {
                                         blkCount++;
-                                        blkBySlot = blkBySlot.WithSlot(
-                                            BlockerPicker.Pick(shotSt, _game, _matchup, _rng).Number, 1);
+                                        // Session 79: the putback flag lives on the continuation,
+                                        // not on PossessionState, and the two block doors have
+                                        // different credit rules — the putback rate is a
+                                        // five-defender stack with no matched man. Pass it through.
+                                        var blkSlot = BlockerPicker.Pick(shotSt, _game, _matchup,
+                                                                         _rng, c.Putback).Number;
+                                        blkBySlot = blkBySlot.WithSlot(blkSlot, 1);
+
+                                        // PAGE-ONLY tally. A putback has no matched man by
+                                        // construction, so it always counts as help.
+                                        var blkZone = shotSt.ShotType ?? ShotLocation.Rim;
+                                        var near    = blkZone is ShotLocation.Rim or ShotLocation.Short;
+                                        var wasMatched = !c.Putback
+                                                      && shotSt.SelectedSlot is not null
+                                                      && blkSlot == shotSt.SelectedSlot.Value.Number;
+                                        if (near) { if (wasMatched) blkMatchedNear++; else blkHelperNear++; }
+                                        else      { if (wasMatched) blkMatchedOut++;  else blkHelperOut++;  }
                                     }
                                     // Phase 39: assist attribution on-walk. Ordinary putbacks carry
                                     // the original shooter slot forward but are self-created (no pass

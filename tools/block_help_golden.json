@@ -1,0 +1,5272 @@
+{
+ "schema": "s79-1",
+ "float_tolerance": 1e-12,
+ "constants": {
+  "SkillSteepness": 6.0,
+  "SkillExponent": 2.0,
+  "PhysicalSteepness": 11.5,
+  "PhysicalExponent": 1.75,
+  "ReferenceScale": 25.0,
+  "AttributeMidpoint": 50.0,
+  "BlockReferenceShift": 20.0,
+  "BlockHelpDepthHeight": 0.5,
+  "BlockHelpDepthStrength": 0.5,
+  "BlockHelpPositionalSwing": 0.35,
+  "BlockHelpPositionalScale": 15.0,
+  "BlockHelpShareRim": 0.5,
+  "BlockHelpShareShort": 0.42,
+  "BlockHelpShareMid": 0.15,
+  "BlockHelpShareLong": 0.06,
+  "BlockHelpShareThree": 0.04,
+  "BlockCreditLuckFloor": 1.5,
+  "LengthHeight": 0.3333333333333333,
+  "LengthWingspan": 0.3333333333333333,
+  "LengthVertical": 0.3333333333333334
+ },
+ "players": {
+  "menace": {
+   "name": "menace",
+   "Height": 78,
+   "Wingspan": 85,
+   "Vertical": 70,
+   "Strength": 80,
+   "PerimeterDefense": 50,
+   "PostDefense": 88,
+   "RimProtection": 95,
+   "HelpDefense": 85,
+   "Finishing": 50,
+   "Close": 50,
+   "Mid": 50,
+   "Outside": 50
+  },
+  "tools": {
+   "name": "tools",
+   "Height": 78,
+   "Wingspan": 85,
+   "Vertical": 70,
+   "Strength": 80,
+   "PerimeterDefense": 50,
+   "PostDefense": 70,
+   "RimProtection": 88,
+   "HelpDefense": 15,
+   "Finishing": 50,
+   "Close": 50,
+   "Mid": 50,
+   "Outside": 50
+  },
+  "leaper": {
+   "name": "leaper",
+   "Height": 68,
+   "Wingspan": 74,
+   "Vertical": 92,
+   "Strength": 55,
+   "PerimeterDefense": 50,
+   "PostDefense": 35,
+   "RimProtection": 60,
+   "HelpDefense": 70,
+   "Finishing": 50,
+   "Close": 50,
+   "Mid": 50,
+   "Outside": 50
+  },
+  "post": {
+   "name": "post",
+   "Height": 76,
+   "Wingspan": 78,
+   "Vertical": 32,
+   "Strength": 85,
+   "PerimeterDefense": 50,
+   "PostDefense": 80,
+   "RimProtection": 55,
+   "HelpDefense": 45,
+   "Finishing": 50,
+   "Close": 50,
+   "Mid": 50,
+   "Outside": 50
+  },
+  "guard": {
+   "name": "guard",
+   "Height": 38,
+   "Wingspan": 40,
+   "Vertical": 60,
+   "Strength": 32,
+   "PerimeterDefense": 50,
+   "PostDefense": 30,
+   "RimProtection": 25,
+   "HelpDefense": 75,
+   "Finishing": 50,
+   "Close": 50,
+   "Mid": 50,
+   "Outside": 50
+  },
+  "ordinary": {
+   "name": "ordinary",
+   "Height": 50,
+   "Wingspan": 50,
+   "Vertical": 50,
+   "Strength": 50,
+   "PerimeterDefense": 50,
+   "PostDefense": 50,
+   "RimProtection": 50,
+   "HelpDefense": 50,
+   "Finishing": 50,
+   "Close": 50,
+   "Mid": 50,
+   "Outside": 50
+  },
+  "shooter": {
+   "name": "shooter",
+   "Height": 55,
+   "Wingspan": 57,
+   "Vertical": 62,
+   "Strength": 50,
+   "PerimeterDefense": 50,
+   "PostDefense": 50,
+   "RimProtection": 50,
+   "HelpDefense": 50,
+   "Finishing": 62,
+   "Close": 58,
+   "Mid": 55,
+   "Outside": 54
+  },
+  "elite_shooter": {
+   "name": "elite_shooter",
+   "Height": 70,
+   "Wingspan": 76,
+   "Vertical": 85,
+   "Strength": 50,
+   "PerimeterDefense": 50,
+   "PostDefense": 50,
+   "RimProtection": 50,
+   "HelpDefense": 50,
+   "Finishing": 95,
+   "Close": 90,
+   "Mid": 88,
+   "Outside": 92
+  }
+ },
+ "lineups": {
+  "all_ordinary": [
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "ordinary"
+  ],
+  "one_menace": [
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "menace"
+  ],
+  "two_menace": [
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "menace",
+   "menace"
+  ],
+  "menace_matched": [
+   "menace",
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "ordinary"
+  ],
+  "tools_no_help": [
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "tools"
+  ],
+  "leaper": [
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "leaper"
+  ],
+  "below_rim_post": [
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "post"
+  ],
+  "instinct_guard": [
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "ordinary",
+   "guard"
+  ],
+  "all_weak": [
+   "guard",
+   "guard",
+   "guard",
+   "guard",
+   "guard"
+  ],
+  "short_lineup": [
+   "ordinary",
+   "ordinary",
+   "menace",
+   null,
+   null
+  ]
+ },
+ "rows": [
+  {
+   "lineup": "all_ordinary",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.4923837872363628,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.11404151973400896,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.3333333333333333,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.12,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -15.67079146330703,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.06762130900135034,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.3333333333333333,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.12,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.1376184716333326,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.057727213682376544,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.373134328358209,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.06,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.148892174698112,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.035637123484907246,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.373134328358209,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.06,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9028531560303024,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.02909775964043373,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.625,
+    0.09375,
+    0.09375,
+    0.09375,
+    0.09375
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.03,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -13.510192886089191,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.018228151221864355,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.625,
+    0.09375,
+    0.09375,
+    0.09375,
+    0.09375
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.03,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9726216609951507,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.01927110826901116,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.8064516129032259,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.02,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.74407974786346,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.010588206436365677,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.8064516129032259,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.02,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.0008637872363628,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.009649989804968914,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.8620689655172414,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.01,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.668551463307029,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.005623895216640815,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.8620689655172414,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": 0.01,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.4923837872363628,
+   "help_sum": 17.04000382056712,
+   "mean_depth": 55.8,
+   "rate": 0.18076793405667266,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    9.27000191028356
+   ],
+   "credit_shares": [
+    0.115207356368762,
+    0.057603678184381,
+    0.057603678184381,
+    0.057603678184381,
+    0.711981609078095
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 17.04000382056712,
+   "mean_depth": 55.8,
+   "rate": 0.19235516152464563,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    9.27000191028356
+   ],
+   "credit_shares": [
+    0.06112468486018904,
+    0.06112468486018904,
+    0.06112468486018904,
+    0.06112468486018904,
+    0.7555012605592438
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -15.67079146330703,
+   "help_sum": 17.04000382056712,
+   "mean_depth": 55.8,
+   "rate": 0.09255640793188512,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    9.27000191028356
+   ],
+   "credit_shares": [
+    0.115207356368762,
+    0.057603678184381,
+    0.057603678184381,
+    0.057603678184381,
+    0.711981609078095
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 17.04000382056712,
+   "mean_depth": 55.8,
+   "rate": 0.19235516152464563,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    9.27000191028356
+   ],
+   "credit_shares": [
+    0.06112468486018904,
+    0.06112468486018904,
+    0.06112468486018904,
+    0.06112468486018904,
+    0.7555012605592438
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.1376184716333326,
+   "help_sum": 13.526984797037763,
+   "mean_depth": 55.8,
+   "rate": 0.09126986702941609,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    6.31133361475586
+   ],
+   "credit_shares": [
+    0.15461791744987302,
+    0.06493952532894667,
+    0.06493952532894667,
+    0.06493952532894667,
+    0.6505635065632869
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 13.526984797037763,
+   "mean_depth": 55.8,
+   "rate": 0.09873305704309679,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    6.31133361475586
+   ],
+   "credit_shares": [
+    0.0713369041961412,
+    0.0713369041961412,
+    0.0713369041961412,
+    0.0713369041961412,
+    0.7146523832154353
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.148892174698112,
+   "help_sum": 13.526984797037763,
+   "mean_depth": 55.8,
+   "rate": 0.04400910666074913,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    6.31133361475586
+   ],
+   "credit_shares": [
+    0.15461791744987302,
+    0.06493952532894667,
+    0.06493952532894667,
+    0.06493952532894667,
+    0.6505635065632869
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 13.526984797037763,
+   "mean_depth": 55.8,
+   "rate": 0.09873305704309679,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    6.31133361475586
+   ],
+   "credit_shares": [
+    0.0713369041961412,
+    0.0713369041961412,
+    0.0713369041961412,
+    0.0713369041961412,
+    0.7146523832154353
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9028531560303024,
+   "help_sum": 9.64504738526742,
+   "mean_depth": 55.8,
+   "rate": 0.031903194666833015,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.671757107790113
+   ],
+   "credit_shares": [
+    0.3899388388630861,
+    0.05849082582946291,
+    0.05849082582946291,
+    0.05849082582946291,
+    0.43458868364852515
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.64504738526742,
+   "mean_depth": 55.8,
+   "rate": 0.03505483602796703,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.671757107790113
+   ],
+   "credit_shares": [
+    0.08748882206583669,
+    0.08748882206583669,
+    0.08748882206583669,
+    0.08748882206583669,
+    0.6500447117366533
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -13.510192886089191,
+   "help_sum": 9.64504738526742,
+   "mean_depth": 55.8,
+   "rate": 0.019213946081912604,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.671757107790113
+   ],
+   "credit_shares": [
+    0.3899388388630861,
+    0.05849082582946291,
+    0.05849082582946291,
+    0.05849082582946291,
+    0.43458868364852515
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.64504738526742,
+   "mean_depth": 55.8,
+   "rate": 0.03505483602796703,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.671757107790113
+   ],
+   "credit_shares": [
+    0.08748882206583669,
+    0.08748882206583669,
+    0.08748882206583669,
+    0.08748882206583669,
+    0.6500447117366533
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9726216609951507,
+   "help_sum": 9.080550775794045,
+   "mean_depth": 55.8,
+   "rate": 0.019679207459363097,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.6348330465476426
+   ],
+   "credit_shares": [
+    0.6237439235764773,
+    0.03742463541458864,
+    0.03742463541458864,
+    0.03742463541458864,
+    0.2639821701797567
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.080550775794045,
+   "mean_depth": 55.8,
+   "rate": 0.02108939662324772,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.6348330465476426
+   ],
+   "credit_shares": [
+    0.09046744105689486,
+    0.09046744105689486,
+    0.09046744105689486,
+    0.09046744105689486,
+    0.6381302357724206
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.74407974786346,
+   "help_sum": 9.080550775794045,
+   "mean_depth": 55.8,
+   "rate": 0.01084020179630083,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.6348330465476426
+   ],
+   "credit_shares": [
+    0.6237439235764773,
+    0.03742463541458864,
+    0.03742463541458864,
+    0.03742463541458864,
+    0.2639821701797567
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.080550775794045,
+   "mean_depth": 55.8,
+   "rate": 0.02108939662324772,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.6348330465476426
+   ],
+   "credit_shares": [
+    0.09046744105689486,
+    0.09046744105689486,
+    0.09046744105689486,
+    0.09046744105689486,
+    0.6381302357724206
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.0008637872363628,
+   "help_sum": 9.241665651200103,
+   "mean_depth": 55.8,
+   "rate": 0.009779154311298378,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.42966662604800415
+   ],
+   "credit_shares": [
+    0.711012811919919,
+    0.028440512476796763,
+    0.028440512476796763,
+    0.028440512476796763,
+    0.20366565064969053
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.241665651200103,
+   "mean_depth": 55.8,
+   "rate": 0.010554436802441523,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.42966662604800415
+   ],
+   "credit_shares": [
+    0.08959681976998951,
+    0.08959681976998951,
+    0.08959681976998951,
+    0.08959681976998951,
+    0.6416127209200418
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.668551463307029,
+   "help_sum": 9.241665651200103,
+   "mean_depth": 55.8,
+   "rate": 0.0057036248449702205,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.42966662604800415
+   ],
+   "credit_shares": [
+    0.711012811919919,
+    0.028440512476796763,
+    0.028440512476796763,
+    0.028440512476796763,
+    0.20366565064969053
+   ]
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.241665651200103,
+   "mean_depth": 55.8,
+   "rate": 0.010554436802441523,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.42966662604800415
+   ],
+   "credit_shares": [
+    0.08959681976998951,
+    0.08959681976998951,
+    0.08959681976998951,
+    0.08959681976998951,
+    0.6416127209200418
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.4923837872363628,
+   "help_sum": 33.24667703100747,
+   "mean_depth": 61.6,
+   "rate": 0.23502702099171452,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    9.061669257751868,
+    9.061669257751868
+   ],
+   "credit_shares": [
+    0.07101150222532562,
+    0.03550575111266281,
+    0.03550575111266281,
+    0.4289884977746744,
+    0.4289884977746744
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 33.24667703100747,
+   "mean_depth": 61.6,
+   "rate": 0.24259837660984906,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    9.061669257751868,
+    9.061669257751868
+   ],
+   "credit_shares": [
+    0.03681281786140567,
+    0.03681281786140567,
+    0.03681281786140567,
+    0.4447807732078915,
+    0.4447807732078915
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -15.67079146330703,
+   "help_sum": 33.24667703100747,
+   "mean_depth": 61.6,
+   "rate": 0.12856644717357524,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    9.061669257751868,
+    9.061669257751868
+   ],
+   "credit_shares": [
+    0.07101150222532562,
+    0.03550575111266281,
+    0.03550575111266281,
+    0.4289884977746744,
+    0.4289884977746744
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 33.24667703100747,
+   "mean_depth": 61.6,
+   "rate": 0.24259837660984906,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    9.061669257751868,
+    9.061669257751868
+   ],
+   "credit_shares": [
+    0.03681281786140567,
+    0.03681281786140567,
+    0.03681281786140567,
+    0.4447807732078915,
+    0.4447807732078915
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.1376184716333326,
+   "help_sum": 26.392440957533488,
+   "mean_depth": 61.6,
+   "rate": 0.12440541370525132,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    6.172412601082033,
+    6.172412601082033
+   ],
+   "credit_shares": [
+    0.09930601512588808,
+    0.04170852635287299,
+    0.04170852635287299,
+    0.40863846608418297,
+    0.40863846608418297
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 26.392440957533488,
+   "mean_depth": 61.6,
+   "rate": 0.1305169074607204,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    6.172412601082033,
+    6.172412601082033
+   ],
+   "credit_shares": [
+    0.044257656209520824,
+    0.044257656209520824,
+    0.044257656209520824,
+    0.43361351568571876,
+    0.43361351568571876
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.148892174698112,
+   "help_sum": 26.392440957533488,
+   "mean_depth": 61.6,
+   "rate": 0.053919365179584317,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    6.172412601082033,
+    6.172412601082033
+   ],
+   "credit_shares": [
+    0.09930601512588808,
+    0.04170852635287299,
+    0.04170852635287299,
+    0.40863846608418297,
+    0.40863846608418297
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 26.392440957533488,
+   "mean_depth": 61.6,
+   "rate": 0.1305169074607204,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    6.172412601082033,
+    6.172412601082033
+   ],
+   "credit_shares": [
+    0.044257656209520824,
+    0.044257656209520824,
+    0.044257656209520824,
+    0.43361351568571876,
+    0.43361351568571876
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9028531560303024,
+   "help_sum": 18.818409828037044,
+   "mean_depth": 61.6,
+   "rate": 0.03669911403131554,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.6363807371027783,
+    1.6363807371027783
+   ],
+   "credit_shares": [
+    0.28720438553594246,
+    0.04308065783039137,
+    0.04308065783039137,
+    0.31331714940163735,
+    0.31331714940163735
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 18.818409828037044,
+   "mean_depth": 61.6,
+   "rate": 0.03981458285396851,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.6363807371027783,
+    1.6363807371027783
+   ],
+   "credit_shares": [
+    0.05699432487756337,
+    0.05699432487756337,
+    0.05699432487756337,
+    0.41450851268365496,
+    0.41450851268365496
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -13.510192886089191,
+   "help_sum": 18.818409828037044,
+   "mean_depth": 61.6,
+   "rate": 0.020225687097451397,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.6363807371027783,
+    1.6363807371027783
+   ],
+   "credit_shares": [
+    0.28720438553594246,
+    0.04308065783039137,
+    0.04308065783039137,
+    0.31331714940163735,
+    0.31331714940163735
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 18.818409828037044,
+   "mean_depth": 61.6,
+   "rate": 0.03981458285396851,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.6363807371027783,
+    1.6363807371027783
+   ],
+   "credit_shares": [
+    0.05699432487756337,
+    0.05699432487756337,
+    0.05699432487756337,
+    0.41450851268365496,
+    0.41450851268365496
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9726216609951507,
+   "help_sum": 17.717022958768403,
+   "mean_depth": 61.6,
+   "rate": 0.020180798201811446,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.621510688763052,
+    0.621510688763052
+   ],
+   "credit_shares": [
+    0.5131676461666946,
+    0.030790058770001676,
+    0.030790058770001676,
+    0.21262611814665103,
+    0.21262611814665103
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 17.717022958768403,
+   "mean_depth": 61.6,
+   "rate": 0.022124042965618963,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.621510688763052,
+    0.621510688763052
+   ],
+   "credit_shares": [
+    0.05948362748658337,
+    0.05948362748658337,
+    0.05948362748658337,
+    0.4107745587701249,
+    0.4107745587701249
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.74407974786346,
+   "help_sum": 17.717022958768403,
+   "mean_depth": 61.6,
+   "rate": 0.011087781480290737,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.621510688763052,
+    0.621510688763052
+   ],
+   "credit_shares": [
+    0.5131676461666946,
+    0.030790058770001676,
+    0.030790058770001676,
+    0.21262611814665103,
+    0.21262611814665103
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 17.717022958768403,
+   "mean_depth": 61.6,
+   "rate": 0.022124042965618963,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.621510688763052,
+    0.621510688763052
+   ],
+   "credit_shares": [
+    0.05948362748658337,
+    0.05948362748658337,
+    0.05948362748658337,
+    0.4107745587701249,
+    0.4107745587701249
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.0008637872363628,
+   "help_sum": 18.031373488493696,
+   "mean_depth": 61.6,
+   "rate": 0.009902143278678837,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.4206274697698739,
+    0.4206274697698739
+   ],
+   "credit_shares": [
+    0.6094451963925763,
+    0.02437780785570305,
+    0.02437780785570305,
+    0.17089959394800885,
+    0.17089959394800885
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 18.031373488493696,
+   "mean_depth": 61.6,
+   "rate": 0.011081413649304046,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.4206274697698739,
+    0.4206274697698739
+   ],
+   "credit_shares": [
+    0.05875124582216502,
+    0.05875124582216502,
+    0.05875124582216502,
+    0.41187313126675246,
+    0.41187313126675246
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.668551463307029,
+   "help_sum": 18.031373488493696,
+   "mean_depth": 61.6,
+   "rate": 0.00578115275394248,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.4206274697698739,
+    0.4206274697698739
+   ],
+   "credit_shares": [
+    0.6094451963925763,
+    0.02437780785570305,
+    0.02437780785570305,
+    0.17089959394800885,
+    0.17089959394800885
+   ]
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 18.031373488493696,
+   "mean_depth": 61.6,
+   "rate": 0.011081413649304046,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.4206274697698739,
+    0.4206274697698739
+   ],
+   "credit_shares": [
+    0.05875124582216502,
+    0.05875124582216502,
+    0.05875124582216502,
+    0.41187313126675246,
+    0.41187313126675246
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": 8.117896052893165,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.18929666178291144,
+   "credit_weights": [
+    16.691406216673187,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.8476492756794674,
+    0.03808768108013317,
+    0.03808768108013317,
+    0.03808768108013317,
+    0.03808768108013317
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 17.04000382056712,
+   "mean_depth": 55.8,
+   "rate": 0.19235516152464563,
+   "credit_weights": [
+    9.27000191028356,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.7555012605592438,
+    0.06112468486018904,
+    0.06112468486018904,
+    0.06112468486018904,
+    0.06112468486018904
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -0.010907484150579681,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.11995637006772333,
+   "credit_weights": [
+    16.691406216673187,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.8476492756794674,
+    0.03808768108013317,
+    0.03808768108013317,
+    0.03808768108013317,
+    0.03808768108013317
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 17.04000382056712,
+   "mean_depth": 55.8,
+   "rate": 0.19235516152464563,
+   "credit_weights": [
+    9.27000191028356,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.7555012605592438,
+    0.06112468486018904,
+    0.06112468486018904,
+    0.06112468486018904,
+    0.06112468486018904
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": 6.707096715152067,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.1052653735268251,
+   "credit_weights": [
+    13.559499698617088,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.8432787059776038,
+    0.03918032350559905,
+    0.03918032350559905,
+    0.03918032350559905,
+    0.03918032350559905
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 13.526984797037763,
+   "mean_depth": 55.8,
+   "rate": 0.09873305704309679,
+   "credit_weights": [
+    6.31133361475586,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.7146523832154353,
+    0.0713369041961412,
+    0.0713369041961412,
+    0.0713369041961412,
+    0.0713369041961412
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -0.24500252713803147,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.05951001945521952,
+   "credit_weights": [
+    13.559499698617088,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.8432787059776038,
+    0.03918032350559905,
+    0.03918032350559905,
+    0.03918032350559905,
+    0.03918032350559905
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 13.526984797037763,
+   "mean_depth": 55.8,
+   "rate": 0.09873305704309679,
+   "credit_weights": [
+    6.31133361475586,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.7146523832154353,
+    0.0713369041961412,
+    0.0713369041961412,
+    0.0713369041961412,
+    0.0713369041961412
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": 4.719145377410971,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.046217152221079555,
+   "credit_weights": [
+    10.09869718056099,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.9181721266414486,
+    0.020456968339637824,
+    0.020456968339637824,
+    0.020456968339637824,
+    0.020456968339637824
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.64504738526742,
+   "mean_depth": 55.8,
+   "rate": 0.03505483602796703,
+   "credit_weights": [
+    1.671757107790113,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.6500447117366533,
+    0.08748882206583669,
+    0.08748882206583669,
+    0.08748882206583669,
+    0.08748882206583669
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -1.7226815701254832,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.028281566062073916,
+   "credit_weights": [
+    10.09869718056099,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.9181721266414486,
+    0.020456968339637824,
+    0.020456968339637824,
+    0.020456968339637824,
+    0.020456968339637824
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.64504738526742,
+   "mean_depth": 55.8,
+   "rate": 0.03505483602796703,
+   "credit_weights": [
+    1.671757107790113,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.6500447117366533,
+    0.08748882206583669,
+    0.08748882206583669,
+    0.08748882206583669,
+    0.08748882206583669
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": 4.394533117796726,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.02865030065442186,
+   "credit_weights": [
+    9.595440409450749,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.9638388674740849,
+    0.0090402831314788,
+    0.0090402831314788,
+    0.0090402831314788,
+    0.0090402831314788
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.080550775794045,
+   "mean_depth": 55.8,
+   "rate": 0.02108939662324772,
+   "credit_weights": [
+    0.6348330465476426,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.6381302357724206,
+    0.09046744105689486,
+    0.09046744105689486,
+    0.09046744105689486,
+    0.09046744105689486
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -5.30118870134556,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.01611467491663069,
+   "credit_weights": [
+    9.595440409450749,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.9638388674740849,
+    0.0090402831314788,
+    0.0090402831314788,
+    0.0090402831314788,
+    0.0090402831314788
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.080550775794045,
+   "mean_depth": 55.8,
+   "rate": 0.02108939662324772,
+   "credit_weights": [
+    0.6348330465476426,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.6381302357724206,
+    0.09046744105689486,
+    0.09046744105689486,
+    0.09046744105689486,
+    0.09046744105689486
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": 4.472574452893165,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.016599218168994092,
+   "credit_weights": [
+    9.739076616673188,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.9759496785906018,
+    0.006012580352349546,
+    0.006012580352349546,
+    0.006012580352349546,
+    0.006012580352349546
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.241665651200103,
+   "mean_depth": 55.8,
+   "rate": 0.010554436802441523,
+   "credit_weights": [
+    0.42966662604800415,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.6416127209200418,
+    0.08959681976998951,
+    0.08959681976998951,
+    0.08959681976998951,
+    0.08959681976998951
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -6.761617884150579,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": 0.00771965885036872,
+   "credit_weights": [
+    9.739076616673188,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.9759496785906018,
+    0.006012580352349546,
+    0.006012580352349546,
+    0.006012580352349546,
+    0.006012580352349546
+   ]
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.241665651200103,
+   "mean_depth": 55.8,
+   "rate": 0.010554436802441523,
+   "credit_weights": [
+    0.42966662604800415,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.6416127209200418,
+    0.08959681976998951,
+    0.08959681976998951,
+    0.08959681976998951,
+    0.08959681976998951
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.4923837872363628,
+   "help_sum": 2.394707040660921,
+   "mean_depth": 55.8,
+   "rate": 0.1188199645258519,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    1.9473535203304606
+   ],
+   "credit_shares": [
+    0.2632801343022499,
+    0.13164006715112495,
+    0.13164006715112495,
+    0.13164006715112495,
+    0.3417996642443752
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 2.394707040660921,
+   "mean_depth": 55.8,
+   "rate": 0.1307633256707279,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    1.9473535203304606
+   ],
+   "credit_shares": [
+    0.15159620126558154,
+    0.15159620126558154,
+    0.15159620126558154,
+    0.15159620126558154,
+    0.3936151949376737
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -15.67079146330703,
+   "help_sum": 2.394707040660921,
+   "mean_depth": 55.8,
+   "rate": 0.07046571124742548,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    1.9473535203304606
+   ],
+   "credit_shares": [
+    0.2632801343022499,
+    0.13164006715112495,
+    0.13164006715112495,
+    0.13164006715112495,
+    0.3417996642443752
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 2.394707040660921,
+   "mean_depth": 55.8,
+   "rate": 0.1307633256707279,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    1.9473535203304606
+   ],
+   "credit_shares": [
+    0.15159620126558154,
+    0.15159620126558154,
+    0.15159620126558154,
+    0.15159620126558154,
+    0.3936151949376737
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.1376184716333326,
+   "help_sum": 1.7421054196285164,
+   "mean_depth": 55.8,
+   "rate": 0.05918824307565421,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    1.361684276243977
+   ],
+   "credit_shares": [
+    0.3156775393304734,
+    0.13258456651879882,
+    0.13258456651879882,
+    0.13258456651879882,
+    0.2865687611131301
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.7421054196285164,
+   "mean_depth": 55.8,
+   "rate": 0.065119506147112,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    1.361684276243977
+   ],
+   "credit_shares": [
+    0.16230068062351663,
+    0.16230068062351663,
+    0.16230068062351663,
+    0.16230068062351663,
+    0.3507972775059335
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.148892174698112,
+   "help_sum": 1.7421054196285164,
+   "mean_depth": 55.8,
+   "rate": 0.03657817741812509,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    1.361684276243977
+   ],
+   "credit_shares": [
+    0.3156775393304734,
+    0.13258456651879882,
+    0.13258456651879882,
+    0.13258456651879882,
+    0.2865687611131301
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.7421054196285164,
+   "mean_depth": 55.8,
+   "rate": 0.065119506147112,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    1.361684276243977
+   ],
+   "credit_shares": [
+    0.16230068062351663,
+    0.16230068062351663,
+    0.16230068062351663,
+    0.16230068062351663,
+    0.3507972775059335
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9028531560303024,
+   "help_sum": 1.4540819705048549,
+   "mean_depth": 55.8,
+   "rate": 0.029315526559559827,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.4431122955757282
+   ],
+   "credit_shares": [
+    0.5729318801698484,
+    0.08593978202547725,
+    0.08593978202547725,
+    0.08593978202547725,
+    0.16924877375371972
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.4540819705048549,
+   "mean_depth": 55.8,
+   "rate": 0.030763362771890908,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.4431122955757282
+   ],
+   "credit_shares": [
+    0.16752136120051916,
+    0.16752136120051916,
+    0.16752136120051916,
+    0.16752136120051916,
+    0.32991455519792345
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -13.510192886089191,
+   "help_sum": 1.4540819705048549,
+   "mean_depth": 55.8,
+   "rate": 0.01837161566815615,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.4431122955757282
+   ],
+   "credit_shares": [
+    0.5729318801698484,
+    0.08593978202547725,
+    0.08593978202547725,
+    0.08593978202547725,
+    0.16924877375371972
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.4540819705048549,
+   "mean_depth": 55.8,
+   "rate": 0.030763362771890908,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.4431122955757282
+   ],
+   "credit_shares": [
+    0.16752136120051916,
+    0.16752136120051916,
+    0.16752136120051916,
+    0.16752136120051916,
+    0.32991455519792345
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9726216609951507,
+   "help_sum": 1.5837024546409602,
+   "mean_depth": 55.8,
+   "rate": 0.019342222483600676,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.18502214727845762
+   ],
+   "credit_shares": [
+    0.7672547352407829,
+    0.046035284114446975,
+    0.046035284114446975,
+    0.046035284114446975,
+    0.0946394124158761
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.5837024546409602,
+   "mean_depth": 55.8,
+   "rate": 0.020190042864611863,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.18502214727845762
+   ],
+   "credit_shares": [
+    0.1651309042199675,
+    0.1651309042199675,
+    0.1651309042199675,
+    0.1651309042199675,
+    0.33947638312013007
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.74407974786346,
+   "help_sum": 1.5837024546409602,
+   "mean_depth": 55.8,
+   "rate": 0.010631544454314898,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.18502214727845762
+   ],
+   "credit_shares": [
+    0.7672547352407829,
+    0.046035284114446975,
+    0.046035284114446975,
+    0.046035284114446975,
+    0.0946394124158761
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.5837024546409602,
+   "mean_depth": 55.8,
+   "rate": 0.020190042864611863,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.18502214727845762
+   ],
+   "credit_shares": [
+    0.1651309042199675,
+    0.1651309042199675,
+    0.1651309042199675,
+    0.1651309042199675,
+    0.33947638312013007
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.0008637872363628,
+   "help_sum": 1.6308821737411947,
+   "mean_depth": 55.8,
+   "rate": 0.00967276870549595,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.12523528694964778
+   ],
+   "credit_shares": [
+    0.8309166183731033,
+    0.03323666473492413,
+    0.03323666473492413,
+    0.03323666473492413,
+    0.06937338742212437
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.6308821737411947,
+   "mean_depth": 55.8,
+   "rate": 0.010097852583403361,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.12523528694964778
+   ],
+   "credit_shares": [
+    0.16427766468323676,
+    0.16427766468323676,
+    0.16427766468323676,
+    0.16427766468323676,
+    0.3428893412670529
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.668551463307029,
+   "help_sum": 1.6308821737411947,
+   "mean_depth": 55.8,
+   "rate": 0.005637832545612757,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.12523528694964778
+   ],
+   "credit_shares": [
+    0.8309166183731033,
+    0.03323666473492413,
+    0.03323666473492413,
+    0.03323666473492413,
+    0.06937338742212437
+   ]
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.6308821737411947,
+   "mean_depth": 55.8,
+   "rate": 0.010097852583403361,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.12523528694964778
+   ],
+   "credit_shares": [
+    0.16427766468323676,
+    0.16427766468323676,
+    0.16427766468323676,
+    0.16427766468323676,
+    0.3428893412670529
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.4923837872363628,
+   "help_sum": 7.020958006101449,
+   "mean_depth": 52.3,
+   "rate": 0.13810146361879144,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    4.260479003050724
+   ],
+   "credit_shares": [
+    0.1872547196526871,
+    0.09362735982634356,
+    0.09362735982634356,
+    0.09362735982634356,
+    0.5318632008682822
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 7.020958006101449,
+   "mean_depth": 52.3,
+   "rate": 0.15127380081315092,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    4.260479003050724
+   ],
+   "credit_shares": [
+    0.10329896962512575,
+    0.10329896962512575,
+    0.10329896962512575,
+    0.10329896962512575,
+    0.586804121499497
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -15.67079146330703,
+   "help_sum": 7.020958006101449,
+   "mean_depth": 52.3,
+   "rate": 0.07658170105258409,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    4.260479003050724
+   ],
+   "credit_shares": [
+    0.1872547196526871,
+    0.09362735982634356,
+    0.09362735982634356,
+    0.09362735982634356,
+    0.5318632008682822
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 7.020958006101449,
+   "mean_depth": 52.3,
+   "rate": 0.15127380081315092,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    4.260479003050724
+   ],
+   "credit_shares": [
+    0.10329896962512575,
+    0.10329896962512575,
+    0.10329896962512575,
+    0.10329896962512575,
+    0.586804121499497
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.1376184716333326,
+   "help_sum": 5.84567940777788,
+   "mean_depth": 52.3,
+   "rate": 0.06920964885307145,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    3.0851853512667096
+   ],
+   "credit_shares": [
+    0.23165360041879915,
+    0.09729451217589564,
+    0.09729451217589564,
+    0.09729451217589564,
+    0.4764628630535139
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 5.84567940777788,
+   "mean_depth": 52.3,
+   "rate": 0.0771004831334168,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    3.0851853512667096
+   ],
+   "credit_shares": [
+    0.11239592636443807,
+    0.11239592636443807,
+    0.11239592636443807,
+    0.11239592636443807,
+    0.5504162945422477
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.148892174698112,
+   "help_sum": 5.84567940777788,
+   "mean_depth": 52.3,
+   "rate": 0.038957500418782084,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    3.0851853512667096
+   ],
+   "credit_shares": [
+    0.23165360041879915,
+    0.09729451217589564,
+    0.09729451217589564,
+    0.09729451217589564,
+    0.4764628630535139
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 5.84567940777788,
+   "mean_depth": 52.3,
+   "rate": 0.0771004831334168,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    3.0851853512667096
+   ],
+   "credit_shares": [
+    0.11239592636443807,
+    0.11239592636443807,
+    0.11239592636443807,
+    0.11239592636443807,
+    0.5504162945422477
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9028531560303024,
+   "help_sum": 5.621479971953501,
+   "mean_depth": 52.3,
+   "rate": 0.0299403690164629,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.068221995793025
+   ],
+   "credit_shares": [
+    0.46250302999478254,
+    0.06937545449921738,
+    0.06937545449921738,
+    0.06937545449921738,
+    0.3293706065075653
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 5.621479971953501,
+   "mean_depth": 52.3,
+   "rate": 0.03294952953873851,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.068221995793025
+   ],
+   "credit_shares": [
+    0.11431637309253027,
+    0.11431637309253027,
+    0.11431637309253027,
+    0.11431637309253027,
+    0.542734507629879
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -13.510192886089191,
+   "help_sum": 5.621479971953501,
+   "mean_depth": 52.3,
+   "rate": 0.018792927209282953,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.068221995793025
+   ],
+   "credit_shares": [
+    0.46250302999478254,
+    0.06937545449921738,
+    0.06937545449921738,
+    0.06937545449921738,
+    0.3293706065075653
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 5.621479971953501,
+   "mean_depth": 52.3,
+   "rate": 0.03294952953873851,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    1.068221995793025
+   ],
+   "credit_shares": [
+    0.11431637309253027,
+    0.11431637309253027,
+    0.11431637309253027,
+    0.11431637309253027,
+    0.542734507629879
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9726216609951507,
+   "help_sum": 6.765068279758318,
+   "mean_depth": 52.3,
+   "rate": 0.01957507554781844,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.495904096785499
+   ],
+   "credit_shares": [
+    0.6619874169114037,
+    0.039719245014684226,
+    0.039719245014684226,
+    0.039719245014684226,
+    0.2188548480445435
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 6.765068279758318,
+   "mean_depth": 52.3,
+   "rate": 0.020811696751928056,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.495904096785499
+   ],
+   "credit_shares": [
+    0.10515196777070131,
+    0.10515196777070131,
+    0.10515196777070131,
+    0.10515196777070131,
+    0.5793921289171948
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.74407974786346,
+   "help_sum": 6.765068279758318,
+   "mean_depth": 52.3,
+   "rate": 0.010775136805387546,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.495904096785499
+   ],
+   "credit_shares": [
+    0.6619874169114037,
+    0.039719245014684226,
+    0.039719245014684226,
+    0.039719245014684226,
+    0.2188548480445435
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 6.765068279758318,
+   "mean_depth": 52.3,
+   "rate": 0.020811696751928056,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.495904096785499
+   ],
+   "credit_shares": [
+    0.10515196777070131,
+    0.10515196777070131,
+    0.10515196777070131,
+    0.10515196777070131,
+    0.5793921289171948
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.0008637872363628,
+   "help_sum": 7.0159546962876815,
+   "mean_depth": 52.3,
+   "rate": 0.009748029950085335,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.3406381878515073
+   ],
+   "credit_shares": [
+    0.7423397266360247,
+    0.029693589065440985,
+    0.029693589065440985,
+    0.029693589065440985,
+    0.1685795061676525
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 7.0159546962876815,
+   "mean_depth": 52.3,
+   "rate": 0.01042092965589781,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.3406381878515073
+   ],
+   "credit_shares": [
+    0.10333457436207147,
+    0.10333457436207147,
+    0.10333457436207147,
+    0.10333457436207147,
+    0.5866617025517142
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.668551463307029,
+   "help_sum": 7.0159546962876815,
+   "mean_depth": 52.3,
+   "rate": 0.005684256234776599,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.3406381878515073
+   ],
+   "credit_shares": [
+    0.7423397266360247,
+    0.029693589065440985,
+    0.029693589065440985,
+    0.029693589065440985,
+    0.1685795061676525
+   ]
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 7.0159546962876815,
+   "mean_depth": 52.3,
+   "rate": 0.01042092965589781,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.3406381878515073
+   ],
+   "credit_shares": [
+    0.10333457436207147,
+    0.10333457436207147,
+    0.10333457436207147,
+    0.10333457436207147,
+    0.5866617025517142
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.4923837872363628,
+   "help_sum": 1.5704435630195486,
+   "mean_depth": 56.1,
+   "rate": 0.11717253017535224,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    1.5352217815097742
+   ],
+   "credit_shares": [
+    0.2838102282193181,
+    0.14190511410965906,
+    0.14190511410965906,
+    0.14190511410965906,
+    0.29047442945170476
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.5704435630195486,
+   "mean_depth": 56.1,
+   "rate": 0.12706336717046063,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    1.5352217815097742
+   ],
+   "credit_shares": [
+    0.1653722874276559,
+    0.1653722874276559,
+    0.1653722874276559,
+    0.1653722874276559,
+    0.33851085028937644
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -15.67079146330703,
+   "help_sum": 1.5704435630195486,
+   "mean_depth": 56.1,
+   "rate": 0.06946214678289239,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    1.5352217815097742
+   ],
+   "credit_shares": [
+    0.2838102282193181,
+    0.14190511410965906,
+    0.14190511410965906,
+    0.14190511410965906,
+    0.29047442945170476
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.5704435630195486,
+   "mean_depth": 56.1,
+   "rate": 0.12706336717046063,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    1.5352217815097742
+   ],
+   "credit_shares": [
+    0.1653722874276559,
+    0.1653722874276559,
+    0.1653722874276559,
+    0.1653722874276559,
+    0.33851085028937644
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.1376184716333326,
+   "help_sum": 2.7166747210487263,
+   "mean_depth": 56.1,
+   "rate": 0.06002369437822369,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    1.7710033828404648
+   ],
+   "credit_shares": [
+    0.29064115807156166,
+    0.12206928639005589,
+    0.12206928639005589,
+    0.12206928639005589,
+    0.3431509827582706
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 2.7166747210487263,
+   "mean_depth": 56.1,
+   "rate": 0.06797836976611435,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    1.7710033828404648
+   ],
+   "credit_shares": [
+    0.14681880758224114,
+    0.14681880758224114,
+    0.14681880758224114,
+    0.14681880758224114,
+    0.41272476967103544
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.148892174698112,
+   "help_sum": 2.7166747210487263,
+   "mean_depth": 56.1,
+   "rate": 0.03712258238559801,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    1.7710033828404648
+   ],
+   "credit_shares": [
+    0.29064115807156166,
+    0.12206928639005589,
+    0.12206928639005589,
+    0.12206928639005589,
+    0.3431509827582706
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 2.7166747210487263,
+   "mean_depth": 56.1,
+   "rate": 0.06797836976611435,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    1.7710033828404648
+   ],
+   "credit_shares": [
+    0.14681880758224114,
+    0.14681880758224114,
+    0.14681880758224114,
+    0.14681880758224114,
+    0.41272476967103544
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9028531560303024,
+   "help_sum": 1.59169832792863,
+   "mean_depth": 56.1,
+   "rate": 0.029336145556502574,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.4637547491892945
+   ],
+   "credit_shares": [
+    0.5684499480146253,
+    0.08526749220219379,
+    0.08526749220219379,
+    0.08526749220219379,
+    0.17574757537879337
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.59169832792863,
+   "mean_depth": 56.1,
+   "rate": 0.03083560192878088,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.4637547491892945
+   ],
+   "credit_shares": [
+    0.16498567659159744,
+    0.16498567659159744,
+    0.16498567659159744,
+    0.16498567659159744,
+    0.34005729363361037
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -13.510192886089191,
+   "help_sum": 1.59169832792863,
+   "mean_depth": 56.1,
+   "rate": 0.01838528817526716,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.4637547491892945
+   ],
+   "credit_shares": [
+    0.5684499480146253,
+    0.08526749220219379,
+    0.08526749220219379,
+    0.08526749220219379,
+    0.17574757537879337
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.59169832792863,
+   "mean_depth": 56.1,
+   "rate": 0.03083560192878088,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.4637547491892945
+   ],
+   "credit_shares": [
+    0.16498567659159744,
+    0.16498567659159744,
+    0.16498567659159744,
+    0.16498567659159744,
+    0.34005729363361037
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9726216609951507,
+   "help_sum": 1.1486214701115005,
+   "mean_depth": 56.1,
+   "rate": 0.01932268261821002,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.15891728820669002
+   ],
+   "credit_shares": [
+    0.7776383203006836,
+    0.04665829921804101,
+    0.04665829921804101,
+    0.04665829921804101,
+    0.08238678204519337
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.1486214701115005,
+   "mean_depth": 56.1,
+   "rate": 0.020137834030867566,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.15891728820669002
+   ],
+   "credit_shares": [
+    0.17343804503224045,
+    0.17343804503224045,
+    0.17343804503224045,
+    0.17343804503224045,
+    0.30624781987103816
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.74407974786346,
+   "help_sum": 1.1486214701115005,
+   "mean_depth": 56.1,
+   "rate": 0.0106196127776072,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.15891728820669002
+   ],
+   "credit_shares": [
+    0.7776383203006836,
+    0.04665829921804101,
+    0.04665829921804101,
+    0.04665829921804101,
+    0.08238678204519337
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.1486214701115005,
+   "mean_depth": 56.1,
+   "rate": 0.020137834030867566,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.15891728820669002
+   ],
+   "credit_shares": [
+    0.17343804503224045,
+    0.17343804503224045,
+    0.17343804503224045,
+    0.17343804503224045,
+    0.30624781987103816
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.0008637872363628,
+   "help_sum": 1.1379074989156357,
+   "mean_depth": 56.1,
+   "rate": 0.009665882461923285,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.10551629995662543
+   ],
+   "credit_shares": [
+    0.8400931428273373,
+    0.03360372571309349,
+    0.03360372571309349,
+    0.03360372571309349,
+    0.05909568003338232
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.1379074989156357,
+   "mean_depth": 56.1,
+   "rate": 0.010068274332063126,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.10551629995662543
+   ],
+   "credit_shares": [
+    0.17365316775947223,
+    0.17365316775947223,
+    0.17365316775947223,
+    0.17365316775947223,
+    0.3053873289621111
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.668551463307029,
+   "help_sum": 1.1379074989156357,
+   "mean_depth": 56.1,
+   "rate": 0.005633613656810738,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.10551629995662543
+   ],
+   "credit_shares": [
+    0.8400931428273373,
+    0.03360372571309349,
+    0.03360372571309349,
+    0.03360372571309349,
+    0.05909568003338232
+   ]
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 1.1379074989156357,
+   "mean_depth": 56.1,
+   "rate": 0.010068274332063126,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.10551629995662543
+   ],
+   "credit_shares": [
+    0.17365316775947223,
+    0.17365316775947223,
+    0.17365316775947223,
+    0.17365316775947223,
+    0.3053873289621111
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.4923837872363628,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.11404151973400896,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.3333333333333333,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.12,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -15.67079146330703,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.06762130900135034,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.3333333333333333,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.12,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.1376184716333326,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.057727213682376544,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.373134328358209,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.06,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.148892174698112,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.035637123484907246,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.373134328358209,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.06,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9028531560303024,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.02909775964043373,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.625,
+    0.09375,
+    0.09375,
+    0.09375,
+    0.09375
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.03,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -13.510192886089191,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.018228151221864355,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.625,
+    0.09375,
+    0.09375,
+    0.09375,
+    0.09375
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.03,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9726216609951507,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.01927110826901116,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.8064516129032259,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.02,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.74407974786346,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.010588206436365677,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.8064516129032259,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.02,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.0008637872363628,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.009649989804968914,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.8620689655172414,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.01,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.668551463307029,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.005623895216640815,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.8620689655172414,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655
+   ]
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": 0.01,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -6.681386736867432,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.09422619969663086,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.3333333333333333,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.12,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -27.94091737779096,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.049223085366957076,
+   "credit_weights": [
+    1.5,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.3333333333333333,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666,
+    0.16666666666666666
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.12,
+   "credit_weights": [
+    0.75,
+    0.75,
+    0.75,
+    0.75,
+    0.75
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -4.450784508795146,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.051242523487619165,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.373134328358209,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.06,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -23.25180759630838,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.02712470896725954,
+   "credit_weights": [
+    1.5,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.373134328358209,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777,
+    0.15671641791044777
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.06,
+   "credit_weights": [
+    0.63,
+    0.63,
+    0.63,
+    0.63,
+    0.63
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -2.67162228072286,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.02734415584420032,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.625,
+    0.09375,
+    0.09375,
+    0.09375,
+    0.09375
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.03,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -19.437497814825804,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.015009459267762443,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.625,
+    0.09375,
+    0.09375,
+    0.09375,
+    0.09375
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.03,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998,
+    0.22499999999999998
+   ],
+   "credit_shares": [
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998,
+    0.19999999999999998
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -2.0438498456385172,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.01847242655590715,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.8064516129032259,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.02,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -17.88362546519793,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.009298207922395524,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.8064516129032259,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355,
+    0.04838709677419355
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.02,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.09,
+    0.09,
+    0.09
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.9713867368674316,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.009312240604430552,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.8620689655172414,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.01,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -16.82771737779096,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.005194203113985569,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.8620689655172414,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655,
+    0.034482758620689655
+   ]
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": 0.01,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.06,
+    0.06,
+    0.06
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.4923837872363628,
+   "help_sum": 16.794152581549092,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.17978567005148816,
+   "credit_weights": [
+    1.5,
+    0.75,
+    9.147076290774546,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.13161270151487772,
+    0.06580635075743886,
+    0.8025809477276834,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Rim",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 16.794152581549092,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.19142530886432355,
+   "credit_weights": [
+    0.75,
+    0.75,
+    9.147076290774546,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.07044187338545307,
+    0.07044187338545307,
+    0.8591162532290938,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -15.67079146330703,
+   "help_sum": 16.794152581549092,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.09212348714850291,
+   "credit_weights": [
+    1.5,
+    0.75,
+    9.147076290774546,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.13161270151487772,
+    0.06580635075743886,
+    0.8025809477276834,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Rim",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 16.794152581549092,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.19142530886432355,
+   "credit_weights": [
+    0.75,
+    0.75,
+    9.147076290774546,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.07044187338545307,
+    0.07044187338545307,
+    0.8591162532290938,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.1376184716333326,
+   "help_sum": 13.3318189973379,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.09072420822789393,
+   "credit_weights": [
+    1.5,
+    0.63,
+    6.229363978881918,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.17943948891200548,
+    0.0753645853430423,
+    0.7451959257449522,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Short",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 13.3318189973379,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.09820259067868047,
+   "credit_weights": [
+    0.63,
+    0.63,
+    6.229363978881918,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.08411929260968463,
+    0.08411929260968463,
+    0.8317614147806308,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.148892174698112,
+   "help_sum": 13.3318189973379,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.04387159390125511,
+   "credit_weights": [
+    1.5,
+    0.63,
+    6.229363978881918,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.17943948891200548,
+    0.0753645853430423,
+    0.7451959257449522,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Short",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 13.3318189973379,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.09820259067868047,
+   "credit_weights": [
+    0.63,
+    0.63,
+    6.229363978881918,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.08411929260968463,
+    0.08411929260968463,
+    0.8317614147806308,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9028531560303024,
+   "help_sum": 9.505889737474321,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.03183018886196825,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    1.6508834606211482,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.44432813439715313,
+    0.06664922015957296,
+    0.4890226454432739,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Mid",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.505889737474321,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.034982153775917714,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    1.6508834606211482,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.10709780157604573,
+    0.10709780157604573,
+    0.7858043968479087,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -13.510192886089191,
+   "help_sum": 9.505889737474321,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.019199151813189787,
+   "credit_weights": [
+    1.5,
+    0.22499999999999998,
+    1.6508834606211482,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.44432813439715313,
+    0.06664922015957296,
+    0.4890226454432739,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Mid",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.505889737474321,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.034982153775917714,
+   "credit_weights": [
+    0.22499999999999998,
+    0.22499999999999998,
+    1.6508834606211482,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.10709780157604573,
+    0.10709780157604573,
+    0.7858043968479087,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -0.9726216609951507,
+   "help_sum": 8.949537620943664,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.019673314613687754,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.6269722572566198,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.6765984531787361,
+    0.040595907190724166,
+    0.28280563963053973,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Long",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 8.949537620943664,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.021073686538641213,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.6269722572566198,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.1115279976364537,
+    0.1115279976364537,
+    0.7769440047270926,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.74407974786346,
+   "help_sum": 8.949537620943664,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.010836505542269293,
+   "credit_weights": [
+    1.5,
+    0.09,
+    0.6269722572566198,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.6765984531787361,
+    0.040595907190724166,
+    0.28280563963053973,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Long",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 8.949537620943664,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.021073686538641213,
+   "credit_weights": [
+    0.09,
+    0.09,
+    0.6269722572566198,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.1115279976364537,
+    0.1115279976364537,
+    0.7769440047270926,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": 0,
+   "duel_shift": -1.0008637872363628,
+   "help_sum": 9.108327949233423,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.009777289457277898,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.4243331179693369,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.7559214662178404,
+    0.030236858648713616,
+    0.213841675133446,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Three",
+   "shooter": "average",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.108327949233423,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.010546439233632646,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.4243331179693369,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.11022662046328015,
+    0.11022662046328015,
+    0.7795467590734397,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": 0,
+   "duel_shift": -14.668551463307029,
+   "help_sum": 9.108327949233423,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.0057024615245034795,
+   "credit_weights": [
+    1.5,
+    0.06,
+    0.4243331179693369,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.7559214662178404,
+    0.030236858648713616,
+    0.213841675133446,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Three",
+   "shooter": "elite",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 9.108327949233423,
+   "mean_depth": 59.666666666666664,
+   "rate": 0.010546439233632646,
+   "credit_weights": [
+    0.06,
+    0.06,
+    0.4243331179693369,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.11022662046328015,
+    0.11022662046328015,
+    0.7795467590734397,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "lineup": "all_ordinary",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 50.0,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "one_menace",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    16.691406216673187
+   ],
+   "credit_shares": [
+    0.0661043209784782,
+    0.0661043209784782,
+    0.0661043209784782,
+    0.0661043209784782,
+    0.7355827160860872
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "two_menace",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 61.6,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    1.5,
+    16.691406216673187,
+    16.691406216673187
+   ],
+   "credit_shares": [
+    0.03959579301666694,
+    0.03959579301666694,
+    0.03959579301666694,
+    0.4406063104749996,
+    0.4406063104749996
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "menace_matched",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": null,
+   "credit_weights": [
+    16.691406216673187,
+    1.5,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "credit_shares": [
+    0.7355827160860872,
+    0.0661043209784782,
+    0.0661043209784782,
+    0.0661043209784782,
+    0.0661043209784782
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "tools_no_help",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 55.8,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    13.597854216673188
+   ],
+   "credit_shares": [
+    0.07653899163735237,
+    0.07653899163735237,
+    0.07653899163735237,
+    0.07653899163735237,
+    0.6938440334505905
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "leaper",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 52.3,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    9.919576161501457
+   ],
+   "credit_shares": [
+    0.0942236140449186,
+    0.0942236140449186,
+    0.0942236140449186,
+    0.0942236140449186,
+    0.6231055438203256
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "below_rim_post",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 56.1,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    4.135946736867433
+   ],
+   "credit_shares": [
+    0.14798814939941,
+    0.14798814939941,
+    0.14798814939941,
+    0.14798814939941,
+    0.40804740240236
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "instinct_guard",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 47.0,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "all_weak",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 35.0,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    1.5,
+    1.5,
+    1.5
+   ],
+   "credit_shares": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+   ],
+   "putback": true
+  },
+  {
+   "lineup": "short_lineup",
+   "zone": "Rim",
+   "shooter": "putback",
+   "matched_index": -1,
+   "duel_shift": 0.0,
+   "help_sum": 0.0,
+   "mean_depth": 59.666666666666664,
+   "rate": null,
+   "credit_weights": [
+    1.5,
+    1.5,
+    16.691406216673187,
+    0.0,
+    0.0
+   ],
+   "credit_shares": [
+    0.07617536216026634,
+    0.07617536216026634,
+    0.8476492756794674,
+    0.0,
+    0.0
+   ],
+   "putback": true
+  }
+ ]
+}

@@ -1289,28 +1289,43 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"ReboundWingspanScale must be > 0: got {cfg.ReboundWingspanScale}.");
 
-        // Phase 36 — BLK attribution: all 30 blocker weight coefficients must be >= 0.
-        foreach (var zone in new[] { ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid,
-                                     ShotLocation.Long, ShotLocation.Three })
+        // Session 79 — block help arm + block credit.
+        if (cfg.BlockHelpDepthHeight < 0.0 || cfg.BlockHelpDepthStrength < 0.0)
+            throw new InvalidOperationException(
+                $"BlockHelpDepth weights must be >= 0: got height {cfg.BlockHelpDepthHeight}, " +
+                $"strength {cfg.BlockHelpDepthStrength}.");
+        if (cfg.BlockHelpDepthHeight + cfg.BlockHelpDepthStrength <= 0.0)
+            throw new InvalidOperationException(
+                "BlockHelpDepth weights must not both be zero: depth would be identical for every " +
+                "defender, so the positional multiplier would be exactly 1 for everyone.");
+        if (cfg.BlockHelpPositionalSwing < 0.0 || cfg.BlockHelpPositionalSwing >= 1.0)
+            throw new InvalidOperationException(
+                $"BlockHelpPositionalSwing must lie in [0, 1): got {cfg.BlockHelpPositionalSwing}. " +
+                "At 1.0 a below-mean helper zeroes out, removing the guard's floor.");
+        if (cfg.BlockHelpPositionalScale <= 0.0)
+            throw new InvalidOperationException(
+                $"BlockHelpPositionalScale must be > 0: got {cfg.BlockHelpPositionalScale}.");
+        if (cfg.BlockCreditLuckFloor <= 0.0)
+            throw new InvalidOperationException(
+                $"BlockCreditLuckFloor must be > 0: got {cfg.BlockCreditLuckFloor}. A zero floor " +
+                "gives a lone elite rim protector 100% of his team's block credit.");
+
+        // Help share: strictly positive everywhere (no defender un-drawable at any zone) and
+        // non-increasing away from the rim (Emmett's ruling on where blocks happen).
+        var helpShareZones = new[] { ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid,
+                                     ShotLocation.Long, ShotLocation.Three };
+        for (var i = 0; i < helpShareZones.Length; i++)
         {
-            if (cfg.BlkRimProtection(zone) < 0.0)
+            var share = cfg.BlockHelpShare(helpShareZones[i]);
+            if (share <= 0.0 || share > 1.0)
                 throw new InvalidOperationException(
-                    $"BlkRimProtection for zone {zone} must be >= 0: got {cfg.BlkRimProtection(zone)}.");
-            if (cfg.BlkPerimeterDefense(zone) < 0.0)
+                    $"BlockHelpShare for zone {helpShareZones[i]} must lie in (0, 1]: got {share}. " +
+                    "Zero would make the four off-ball defenders un-drawable at that zone.");
+            if (i > 0 && share > cfg.BlockHelpShare(helpShareZones[i - 1]))
                 throw new InvalidOperationException(
-                    $"BlkPerimeterDefense for zone {zone} must be >= 0: got {cfg.BlkPerimeterDefense(zone)}.");
-            if (cfg.BlkPostDefense(zone) < 0.0)
-                throw new InvalidOperationException(
-                    $"BlkPostDefense for zone {zone} must be >= 0: got {cfg.BlkPostDefense(zone)}.");
-            if (cfg.BlkHeight(zone) < 0.0)
-                throw new InvalidOperationException(
-                    $"BlkHeight for zone {zone} must be >= 0: got {cfg.BlkHeight(zone)}.");
-            if (cfg.BlkWingspan(zone) < 0.0)
-                throw new InvalidOperationException(
-                    $"BlkWingspan for zone {zone} must be >= 0: got {cfg.BlkWingspan(zone)}.");
-            if (cfg.BlkVertical(zone) < 0.0)
-                throw new InvalidOperationException(
-                    $"BlkVertical for zone {zone} must be >= 0: got {cfg.BlkVertical(zone)}.");
+                    $"BlockHelpShare must be non-increasing from Rim to Three: " +
+                    $"{helpShareZones[i]} {share} exceeds {helpShareZones[i - 1]} " +
+                    $"{cfg.BlockHelpShare(helpShareZones[i - 1])}.");
         }
 
         // Phase 39 — Assist attribution invariants.
@@ -1833,191 +1848,92 @@ public sealed class MatchupConfig
     public double FouledPlayerPickFloor { get; set; } = 0.05;
 
     // =========================================================================
-    // Phase 36 — BLK attribution: zone-aware blocker weight coefficients
+    // Session 79 — the block HELP arm and block CREDIT
     // =========================================================================
-
-    // --- Per-zone coefficients for six blocking attributes (6 attributes × 5 zones = 30 weights).
-    //     Formula (in Matchup.BlockerWeight):
-    //       BlockerWeight = BlkRimProtection(zone) * p.RimProtection
-    //                     + BlkPerimeterDefense(zone) * p.PerimeterDefense
-    //                     + BlkPostDefense(zone)      * p.PostDefense
-    //                     + BlkHeight(zone)           * p.Height
-    //                     + BlkWingspan(zone)         * p.Wingspan
-    //                     + BlkVertical(zone)         * p.Vertical
-    //     No sum-to-one constraint — this is a weighted read, not a distribution
-    //     (same convention as ReboundPhysical). All weights >= 0 (enforced in Load).
-    //     Calibration placeholders — shape (not magnitude) is what matters now.
     //
-    //     Direction:
-    //       Rim/Short: bigs favored — RimProtection and Height dominate.
-    //       Three/Long: perimeter favored — PerimeterDefense leads.
-    //       Wingspan meaningful everywhere (the reach that deflects the ball).
-    //       Mid: between the two extremes. ---
+    // Replaces Phase 36's thirty Blk* attribution coefficients, which were deleted with
+    // Matchup.BlockerWeight. Two jobs live here now:
+    //   RATE   — how much a weakside defender adds to the team's block rate.
+    //   CREDIT — whose name goes on the block once one happens.
+    // BlockHelpShare does BOTH, which is what ties them together: the same zone weight
+    // that decides how much help matters also decides how much credit help takes.
 
-    /// <summary>RimProtection coefficient for block attribution at Rim zone.
-    /// Default 0.40. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkRimProtectionRim   { get; set; } = 0.40;
-    /// <summary>RimProtection coefficient for block attribution at Short zone.
-    /// Default 0.35. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkRimProtectionShort { get; set; } = 0.35;
-    /// <summary>RimProtection coefficient for block attribution at Mid zone.
-    /// Default 0.20. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkRimProtectionMid   { get; set; } = 0.20;
-    /// <summary>RimProtection coefficient for block attribution at Long zone.
-    /// Default 0.05. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkRimProtectionLong  { get; set; } = 0.05;
-    /// <summary>RimProtection coefficient for block attribution at Three zone.
-    /// Default 0.03. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkRimProtectionThree { get; set; } = 0.03;
+    // --- How deep a man plays: a BODY-ONLY read (Matchup.BlockHelpDepth).
+    //     Deliberately NOT Postness, which folds in PostDefense — a threat input. Sharing an
+    //     input with the threat term coupled them through the lineup-relative mean and let a
+    //     BETTER defender lower his own team's block rate. Body-only decouples it exactly.
+    //     Weights need not sum to 1 (a weighted read, like LengthRating). ---
 
-    /// <summary>PerimeterDefense coefficient for block attribution at Rim zone.
-    /// Default 0.03. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPerimeterDefenseRim   { get; set; } = 0.03;
-    /// <summary>PerimeterDefense coefficient for block attribution at Short zone.
-    /// Default 0.05. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPerimeterDefenseShort { get; set; } = 0.05;
-    /// <summary>PerimeterDefense coefficient for block attribution at Mid zone.
-    /// Default 0.15. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPerimeterDefenseMid   { get; set; } = 0.15;
-    /// <summary>PerimeterDefense coefficient for block attribution at Long zone.
-    /// Default 0.30. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPerimeterDefenseLong  { get; set; } = 0.30;
-    /// <summary>PerimeterDefense coefficient for block attribution at Three zone.
-    /// Default 0.40. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPerimeterDefenseThree { get; set; } = 0.40;
+    /// <summary>Height weight in the block help-depth read. Default 0.50.
+    /// Must be &gt;= 0 (enforced in Load).</summary>
+    public double BlockHelpDepthHeight   { get; set; } = 0.50;
 
-    /// <summary>PostDefense coefficient for block attribution at Rim zone.
-    /// Default 0.07. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPostDefenseRim   { get; set; } = 0.07;
-    /// <summary>PostDefense coefficient for block attribution at Short zone.
-    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPostDefenseShort { get; set; } = 0.10;
-    /// <summary>PostDefense coefficient for block attribution at Mid zone.
-    /// Default 0.15. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPostDefenseMid   { get; set; } = 0.15;
-    /// <summary>PostDefense coefficient for block attribution at Long zone.
-    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPostDefenseLong  { get; set; } = 0.10;
-    /// <summary>PostDefense coefficient for block attribution at Three zone.
-    /// Default 0.05. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkPostDefenseThree { get; set; } = 0.05;
+    /// <summary>Strength weight in the block help-depth read. Default 0.50.
+    /// Must be &gt;= 0 (enforced in Load).</summary>
+    public double BlockHelpDepthStrength { get; set; } = 0.50;
 
-    /// <summary>Height coefficient for block attribution at Rim zone.
-    /// Default 0.20. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkHeightRim   { get; set; } = 0.20;
-    /// <summary>Height coefficient for block attribution at Short zone.
-    /// Default 0.18. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkHeightShort { get; set; } = 0.18;
-    /// <summary>Height coefficient for block attribution at Mid zone.
-    /// Default 0.15. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkHeightMid   { get; set; } = 0.15;
-    /// <summary>Height coefficient for block attribution at Long zone.
-    /// Default 0.12. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkHeightLong  { get; set; } = 0.12;
-    /// <summary>Height coefficient for block attribution at Three zone.
-    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkHeightThree { get; set; } = 0.10;
+    // --- The positional multiplier on help readiness (Matchup.BlockHelpReadiness):
+    //       1 + swing * tanh((depth - lineupMeanDepth) / scale)
+    //     Emmett's ruling: a 5's help is worth more than a 1's, with a floor so a point guard
+    //     with real instincts still gets paid. tanh supplies that floor. S79 gets its OWN pair —
+    //     it does NOT share the rebounding positional constants. ---
 
-    /// <summary>Wingspan coefficient for block attribution at Rim zone.
-    /// Default 0.20. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkWingspanRim   { get; set; } = 0.20;
-    /// <summary>Wingspan coefficient for block attribution at Short zone.
-    /// Default 0.22. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkWingspanShort { get; set; } = 0.22;
-    /// <summary>Wingspan coefficient for block attribution at Mid zone.
-    /// Default 0.25. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkWingspanMid   { get; set; } = 0.25;
-    /// <summary>Wingspan coefficient for block attribution at Long zone.
-    /// Default 0.28. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkWingspanLong  { get; set; } = 0.28;
-    /// <summary>Wingspan coefficient for block attribution at Three zone.
-    /// Default 0.30. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkWingspanThree { get; set; } = 0.30;
+    /// <summary>Swing of the block help positional multiplier. Default 0.35 — roughly a 2:1
+    /// span between a deep post and a perimeter guard, deliberately wider than rebounding's
+    /// 0.20. Must lie in [0, 1) (enforced in Load): at 1.0 a below-mean helper would zero out,
+    /// removing the floor Emmett asked for.</summary>
+    public double BlockHelpPositionalSwing { get; set; } = 0.35;
 
-    /// <summary>Vertical coefficient for block attribution at Rim zone.
-    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkVerticalRim   { get; set; } = 0.10;
-    /// <summary>Vertical coefficient for block attribution at Short zone.
-    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkVerticalShort { get; set; } = 0.10;
-    /// <summary>Vertical coefficient for block attribution at Mid zone.
-    /// Default 0.10. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkVerticalMid   { get; set; } = 0.10;
-    /// <summary>Vertical coefficient for block attribution at Long zone.
-    /// Default 0.15. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkVerticalLong  { get; set; } = 0.15;
-    /// <summary>Vertical coefficient for block attribution at Three zone.
-    /// Default 0.12. Must be &gt;= 0 (enforced in Load). Calibration placeholder.</summary>
-    public double BlkVerticalThree { get; set; } = 0.12;
+    /// <summary>Depth points that reach ~76% of the positional swing. Default 15.0.
+    /// Must be &gt; 0 (enforced in Load).</summary>
+    public double BlockHelpPositionalScale { get; set; } = 15.0;
 
-    // --- Switch helpers: return the per-zone coefficient for each attribute.
-    //     Same pattern as BlockContestWeights, BlockFloor, BlockCeiling. ---
+    // --- Per-zone help share. Scales the help arm into the rate AND scales the whole helper
+    //     credit term (floor included), so help fades toward the perimeter on both.
+    //     Emmett's ruling (2026-07-26): blocked shots happen rarely at mid, long and three;
+    //     the vast majority happen near the rim, and the tie to the matched man strengthens as
+    //     shots move out. Must be non-increasing Rim -> Three (enforced in Load) and never
+    //     exactly zero at any zone — a zero would make four defenders un-drawable there,
+    //     breaking the engine-wide "no defender is un-drawable" contract. ---
 
-    /// <summary>Per-zone RimProtection coefficient for block attribution.</summary>
-    public double BlkRimProtection(ShotLocation zone) => zone switch
+    /// <summary>Help share at Rim. Default 0.50.</summary>
+    public double BlockHelpShareRim   { get; set; } = 0.50;
+    /// <summary>Help share at Short. Default 0.42.</summary>
+    public double BlockHelpShareShort { get; set; } = 0.42;
+    /// <summary>Help share at Mid. Default 0.15.</summary>
+    public double BlockHelpShareMid   { get; set; } = 0.15;
+    /// <summary>Help share at Long. Default 0.06 — small, never zero.</summary>
+    public double BlockHelpShareLong  { get; set; } = 0.06;
+    /// <summary>Help share at Three. Default 0.04 — a big rotating out to swat a three is
+    /// rare, not impossible.</summary>
+    public double BlockHelpShareThree { get; set; } = 0.04;
+
+    /// <summary>The per-zone help share. Read by <see cref="Matchup.BlockWeightWithHelp"/>
+    /// (rate) and <see cref="Matchup.BlockCreditWeights"/> (credit).</summary>
+    public double BlockHelpShare(ShotLocation zone) => zone switch
     {
-        ShotLocation.Rim   => BlkRimProtectionRim,
-        ShotLocation.Short => BlkRimProtectionShort,
-        ShotLocation.Mid   => BlkRimProtectionMid,
-        ShotLocation.Long  => BlkRimProtectionLong,
-        ShotLocation.Three => BlkRimProtectionThree,
-        _                  => BlkRimProtectionRim,
+        ShotLocation.Rim   => BlockHelpShareRim,
+        ShotLocation.Short => BlockHelpShareShort,
+        ShotLocation.Mid   => BlockHelpShareMid,
+        ShotLocation.Long  => BlockHelpShareLong,
+        ShotLocation.Three => BlockHelpShareThree,
+        _                  => BlockHelpShareRim,
     };
 
-    /// <summary>Per-zone PerimeterDefense coefficient for block attribution.</summary>
-    public double BlkPerimeterDefense(ShotLocation zone) => zone switch
-    {
-        ShotLocation.Rim   => BlkPerimeterDefenseRim,
-        ShotLocation.Short => BlkPerimeterDefenseShort,
-        ShotLocation.Mid   => BlkPerimeterDefenseMid,
-        ShotLocation.Long  => BlkPerimeterDefenseLong,
-        ShotLocation.Three => BlkPerimeterDefenseThree,
-        _                  => BlkPerimeterDefenseRim,
-    };
+    // --- The credit luck floor. Every populated defender carries this before his own
+    //     contribution is added, so nobody is ever un-drawable and the zero-mass draw is
+    //     unreachable. Same device as ReachInLuckFloor and the retired max(1, BlockerWeight).
+    //     It is ALSO the concentration dial: it sets how much of a lineup's block credit the
+    //     best rim protector takes. Measured on the S78 generated population, one elite rim
+    //     protector beside four ordinary men:
+    //       floor 0.5 -> 64%   floor 1.0 -> 58%   floor 1.5 -> 50%   floor 3.0 -> 38%
+    //     Emmett ruled roughly half, which is 1.5. ---
 
-    /// <summary>Per-zone PostDefense coefficient for block attribution.</summary>
-    public double BlkPostDefense(ShotLocation zone) => zone switch
-    {
-        ShotLocation.Rim   => BlkPostDefenseRim,
-        ShotLocation.Short => BlkPostDefenseShort,
-        ShotLocation.Mid   => BlkPostDefenseMid,
-        ShotLocation.Long  => BlkPostDefenseLong,
-        ShotLocation.Three => BlkPostDefenseThree,
-        _                  => BlkPostDefenseRim,
-    };
-
-    /// <summary>Per-zone Height coefficient for block attribution.</summary>
-    public double BlkHeight(ShotLocation zone) => zone switch
-    {
-        ShotLocation.Rim   => BlkHeightRim,
-        ShotLocation.Short => BlkHeightShort,
-        ShotLocation.Mid   => BlkHeightMid,
-        ShotLocation.Long  => BlkHeightLong,
-        ShotLocation.Three => BlkHeightThree,
-        _                  => BlkHeightRim,
-    };
-
-    /// <summary>Per-zone Wingspan coefficient for block attribution.</summary>
-    public double BlkWingspan(ShotLocation zone) => zone switch
-    {
-        ShotLocation.Rim   => BlkWingspanRim,
-        ShotLocation.Short => BlkWingspanShort,
-        ShotLocation.Mid   => BlkWingspanMid,
-        ShotLocation.Long  => BlkWingspanLong,
-        ShotLocation.Three => BlkWingspanThree,
-        _                  => BlkWingspanRim,
-    };
-
-    /// <summary>Per-zone Vertical coefficient for block attribution.</summary>
-    public double BlkVertical(ShotLocation zone) => zone switch
-    {
-        ShotLocation.Rim   => BlkVerticalRim,
-        ShotLocation.Short => BlkVerticalShort,
-        ShotLocation.Mid   => BlkVerticalMid,
-        ShotLocation.Long  => BlkVerticalLong,
-        ShotLocation.Three => BlkVerticalThree,
-        _                  => BlkVerticalRim,
-    };
+    /// <summary>Per-defender baseline block-credit weight. Default 1.5 (Emmett's ruling: the
+    /// best rim protector in the country takes about half his lineup's rim blocks). Must be
+    /// &gt; 0 (enforced in Load) — a zero floor hands a lone elite big 100% of his team's
+    /// blocks, because roughly half the population sits at or below neutral threat.</summary>
+    public double BlockCreditLuckFloor { get; set; } = 1.5;
 
     // ── Phase 39: Assist attribution ─────────────────────────────────────────
     //

@@ -60,6 +60,12 @@ internal static partial class Program
         // From the box (attributed, all 20 indices — side-symmetric by construction):
         public long OReb, DReb, Ast, Stl, Blk;
 
+        // Session 79, PAGE-ONLY. Block credit split by whether the credited defender was the
+        // man guarding the shooter, near the rim (Rim/Short) vs out (Mid/Long/Three).
+        // Never asserted — it separates credit REDISTRIBUTION from a real RATE change, which
+        // a leaderboard alone cannot do.
+        public long BlkMatchedNear, BlkHelperNear, BlkMatchedOut, BlkHelperOut;
+
         // Session 63: the baseline-read lines (page-only, never asserted). Full-game
         // foul totals from the attribution arrays (SFL = shooting fouls, NSF =
         // non-shooting — the S62 split), and a per-(school, depth-slot) usage
@@ -367,6 +373,8 @@ internal static partial class Program
             foreach (var r in result.Possessions)
             {
                 PossessionRecords++;
+                BlkMatchedNear += r.BlkMatchedNear; BlkHelperNear += r.BlkHelperNear;
+                BlkMatchedOut  += r.BlkMatchedOut;  BlkHelperOut  += r.BlkHelperOut;
                 elapsedSum        += r.Elapsed;
                 PointsFromRecords += r.Points;
                 Fga += r.Fga; Fgm += r.Fgm;
@@ -586,6 +594,17 @@ internal static partial class Program
         RowAbs("TO% of possessions",        Pct(s.TurnoverPossessions, s.PossessionRecords), 18.5, 1.5);
         RowRel("steals",                    s.Stl / g2,               6.2);
         RowRel("blocks",                    s.Blk / g2,               3.5);
+        {
+            // Session 79, PAGE-ONLY: WHERE blocks happen and WHO is credited. Emmett's ruling
+            // (2026-07-26): blocks should be rare at mid, long and three; the vast majority
+            // happen near the rim. The matched/helper split is the S79 structural claim — an
+            // elite rim protector guarding nobody should still be blocking shots.
+            var near = s.BlkMatchedNear + s.BlkHelperNear;
+            var outq = s.BlkMatchedOut  + s.BlkHelperOut;
+            var all  = near + outq;
+            Console.WriteLine(Inv($"    block location: near the rim {Pct(near, all):F1}% / out {Pct(outq, all):F1}%   (Rim+Short vs Mid+Long+Three; {all} credited blocks)"));
+            Console.WriteLine(Inv($"    credited to a HELPER — near the rim {Pct(s.BlkHelperNear, near):F1}% / out {Pct(s.BlkHelperOut, outq):F1}%   (pre-S79 ~80% at every zone: the picker ignored who was matched)"));
+        }
         RowRel("pace (poss/team, OT incl.)", s.PossessionRecords / g2, 69.0);
         RowRel("3PA rate (3PA/FGA)",        s.Fga > 0 ? (double)s.ThreePa / s.Fga : 0.0, 0.39, "F2");
         RowRel("FT rate (FTA/FGA)",         s.Fga > 0 ? (double)s.Fta / s.Fga : 0.0,     0.34, "F2");

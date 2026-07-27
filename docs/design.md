@@ -5955,46 +5955,137 @@ All three are calibration placeholders. Direction and shape are what Phase 35 va
 
 ---
 
-## Phase 36 — BlockerPicker: BLK Attribution On-Walk (Session 71, 2026-06-19)
+## Phase 36 / Phase 74 — Block credit and the help arm (Session 71, REBUILT Session 79, 2026-07-27)
 
-### Problem
+### Problem, as it stood after S78
 
-BLK attribution was the last remaining post-hoc harness `WeightedDraw`. After a possession resolved, the harness looped `for (var i = 0; i < r.BlkCount; i++)` and drew a slot from a flat attribute-sum (`RimProtection + Height + Wingspan + Vertical`) with no zone awareness — the same weight formula regardless of whether the block came on a Rim put-back or a Three-point closeout. This was Phase 23 scaffolding: correct enough to validate plumbing, wrong for anything resembling real basketball.
+Two separate defects, one visible symptom.
 
-### Design
+**The rate consulted one man.** Phase 7's block door priced a single duel — the shooter against the
+defender in his own slot. An elite rim protector who was not guarding the ball changed his team's
+block rate by exactly **zero**. That is the opposite of how rim protection works: the whole point of
+a shot blocker is the shots he ends that he was never assigned to.
 
-**Zone-aware weight formula.** Each defensive player's weight is `max(1, BlockerWeight(zone, player, cfg))` where `BlockerWeight` is a straight weighted sum of six attributes with zone-specific coefficients:
+**Credit compressed.** `Matchup.BlockerWeight` was a straight weighted sum of six blocking attributes
+with thirty per-zone coefficients. Averaging six broadly-correlated ratings collapsed the population
+into a p99/median spread of **1.48x**, so the best rim protector in the country took ~30% of his
+lineup's blocks against each guard's ~17%. The S78 season board read ranks 1–10 as 1.2 down to 1.0 —
+nine guards and one wing, per-minute rates flat at 0.038 / 0.040 / 0.035.
+
+**★ The compression was NOT a coefficient problem.** `BlockerPicker` normalizes the weights into
+shares, so **any affine rescale of the thirty coefficients is a no-op**. "Make them sum above 1.0"
+would have changed nothing. The fix had to be structural, which is why `BlockerWeight` was retired
+rather than re-weighted.
+
+### The rate — a duel plus a help arm, composed before the tanh
 
 ```
-BlockerWeight = BlkRimProtection(zone) * p.RimProtection
-              + BlkPerimeterDefense(zone) * p.PerimeterDefense
-              + BlkPostDefense(zone)      * p.PostDefense
-              + BlkHeight(zone)           * p.Height
-              + BlkWingspan(zone)         * p.Wingspan
-              + BlkVertical(zone)         * p.Vertical
+duelShift  = sw*GapFn(DefenseRating(z, matched) - OffenseRating(z, shooter))
+           + lw*GapFn(LengthRating(matched)     - LengthRating(shooter))
+threat(d)  = sw*GapFn(DefenseRating(z, d) - AttributeMidpoint)
+           + lw*GapFn(LengthRating(d)     - AttributeMidpoint)
+readiness  = (HelpDefense/100) * (1 + swing*tanh((depth(d) - lineupMeanDepth)/scale))
+helpShift  = max(0, threat(d)) * readiness                      # per-man no-drag floor
+totalShift = duelShift + BlockHelpShare(z) * SUM_{d != matched} helpShift(d)
+rate       = BlockBend(z, totalShift)                           # the EXISTING span/floor/ceiling
 ```
 
-Direction: Rim/Short blocks favor help-side bigs — RimProtection and Height dominate, PostDefense contributes. Three/Long blocks favor perimeter defenders — PerimeterDefense leads, Wingspan remains high (the reach that contests). Wingspan is meaningful at every zone; it is the one attribute that bridges rim protection and perimeter contests. Vertical contributes everywhere for timing. Mid is between the two extremes.
+Composition happens in **pre-tanh shift space**, which buys three things at once: one probability
+calculus, the zone floor and ceiling still bind (help can never push past the ceiling), and the shape
+matches `PutbackBlockRate`, which has always been a team stack at the rim.
 
-No tanh, no gap function. `Matchup.BlockerWeight` (Phase 36, attribution) is intentionally distinct from `Matchup.BlockWeight` (Phase 7, shot-block door) — the former asks "given a block occurred, who gets credit?" while the latter asks "does this matchup produce a block?" Conflating them would be incorrect.
+**Readiness multiplies threat; it never substitutes for it.** Elite help instincts cannot manufacture
+a shot blocker out of a man with no tools — a guard with HelpDefense 75 and no length contributes
+exactly zero, because `max(0, threat)` floors him. Verified as a Phase 74 assertion, not a hope.
 
-**All five defenders eligible.** Unlike some attribution pickers that narrow the draw (e.g. steals favor guards), every defensive slot is in the pool on every block. A help-side big can block a three-point attempt by rotating in time; a rangy wing can block a post shot by rotating baseline. The zone weighting handles the probability differential without hard exclusions.
+**Height re-enters the help arm through depth, and that is intended.** Where a man plays is a
+positional fact. What height no longer does is inflate *credit* as a standalone term.
 
-**Floor of 1.** The floor is applied by `BlockerPicker`, not by `BlockerWeight`. This follows the existing picker convention (same as `OffensiveRebounderPicker`, `DefensiveRebounderPicker`) and keeps `BlockerWeight` a pure computation.
+### Why help-depth is BODY-ONLY, and is not `Postness`
 
-**`BlkBySlot` is a `SlotGroup`, not `int?`.** BLK can fire multiple times per possession. A possession can contain a primary shot, an ORB, a putback attempt, another ORB, another putback — each of which can be blocked. `StealerSlot` and `DefensiveRebounderSlot` are `int?` because those events fire at most once per possession. `BlkBySlot` mirrors `OrbBySlot` by accumulating via `blkBySlot.WithSlot(slot, 1)` on each block. `BlkCount` is retained as the reconciliation target: `BlkBySlot.Total == BlkCount` is asserted on every possession.
+`BlockHelpDepth = wH*Height + wS*Strength`. It deliberately excludes `PostDefense`, which `Postness`
+(rebounding's read) includes.
 
-**`SelectedSlot` is irrelevant.** BLK attribution is a defensive question; `SelectedSlot` is offense-side shooter attribution stamped by Roll E. The zone (`ShotType`) from `shotSt` — not the offensive slot — determines which defensive attributes are weighted. Note: the prompt's claim that Roll K's PutBack arm nulls `SelectedSlot` was incorrect per live source. PutBack does `state with { ShotType = ShotLocation.Rim }`; it is the ResetOffense arm that nulls `SelectedSlot`. The design conclusion is unchanged (BlockerPicker does not use `SelectedSlot`), but the reasoning differs.
+The reason is a measured failure, not taste. The positional multiplier is **lineup-relative**, so it
+divides by the lineup mean. `PostDefense` is simultaneously a `threat` input and a `Postness` input,
+so improving one man's post defense raised his depth, which raised the lineup mean, which shrank all
+four teammates' multipliers — and **the team blocked fewer shots because one defender got better.**
+That violated the ruled monotonicity invariant on **8,237 of 40,000** sampled matchups. Reading depth
+off the body alone decouples the two completely: a skill-only improvement cannot move any depth, and
+the invariant then holds exactly (0 of 40,000). `Postness` is unchanged and still serves rebounding;
+the two reads must not be unified.
 
-**Null `ShotType` fallback → Rim.** Roll G stamps `ShotType` on all non-putback paths; Roll K's PutBack arm forces `ShotLocation.Rim`. In current routing, `ShotType` is never null at a block site. The fallback is a defensive guard for future routing changes. Rim is the correct fallback because all putbacks are Rim zone by forcing.
+### Credit — defender-only, with a luck floor
 
-### Structural location
+```
+matched:  BlockCreditLuckFloor + max(0, threat(d))            # on the ball, no readiness factor
+helper :  BlockHelpShare(z) * (BlockCreditLuckFloor + helpShift(d))
+putback:  BlockCreditLuckFloor + max(0, PutbackDefenderShift(d))
+```
 
-`BlockerPicker.cs` lives in `src/Charm.Engine/Core/` alongside `DefensiveRebounderPicker.cs`, `StealerPicker.cs`, `TurnoverCommitterPicker.cs`, and `TurnoverInteriorPicker.cs`. `Matchup.BlockerWeight` is appended to `Matchup.cs` as a public static helper, following the existing pattern (`Matchup.BlockWeight`, `Matchup.FoulRate`, `Matchup.ReboundWingspanMultiplier`).
+**The shooter is deliberately absent from credit.** He decides *whether* a shot is blocked — he is
+priced into the rate through the duel arm — but not *which* defender got there. The design brief's
+original rule scored the matched man by `max(0, duelShift)`; measured on the real generated
+population that is **exactly zero 44% of the time** (whenever the shooter wins the duel), which pins
+the help arm at 100% of the credit in those cases and makes the split untunable at any zone share.
 
-### Config additions
+**The luck floor is load-bearing, not cosmetic.** `max(0, threat)` alone is a hard zero for roughly
+half the population, because the pool's median rim `DefenseRating` sits at ~31 against a neutral of
+50. A lone elite big beside four average men therefore took **100%** of his team's blocks — the fix
+over-corrected from "too flat" to "one man blocked every shot." The floor is the same device as
+`ReachInPropensity`'s LuckFloor and the retired `max(1, BlockerWeight)`, and it doubles as the
+**concentration dial**: measured on the S78 population, one elite rim protector beside four ordinary
+men takes 64% at floor 0.5, 58% at 1.0, **50% at 1.5**, 38% at 3.0. Emmett ruled roughly half.
 
-**`MatchupConfig` (30 new properties):** Six attributes × five zones = 30 `Blk{Attr}{Zone}` properties (e.g. `BlkRimProtectionRim`, `BlkWingspanThree`). Six switch helpers (`BlkRimProtection(zone)`, etc.) follow the `BlockContestWeights`/`BlockFloor`/`BlockCeiling` pattern. All 30 coefficients must be `>= 0` (enforced in Load). No sum-to-one constraint — these are weighted reads, not distributions. All defaults are calibration placeholders.
+It also makes the zero-mass draw **unreachable** rather than a live ~2% path, so `BlockerPicker` has
+no fallback branch to take.
+
+**`BlockHelpShare` scales the whole helper term, floor included.** That is what makes the help share
+fade with distance rather than sitting flat: a zone-independent floor would pin it near 4-in-5 at
+every zone, since there are four helpers and one matched man.
+
+### Two formulas, one call site
+
+`BlockerPicker.Pick` remains the single engine consumer, at the `ShotResult.Blocked` exit in
+`Resolver`, and still consumes exactly one RNG draw per block. But the two doors have different
+credit rules, and the Resolver passes `c.Putback` to say which fired. A putback's rate has always
+been a five-defender stack with **no matched man**, so its credit is the per-defender shifts that
+stack already computed and previously discarded — no duel arm, no zone share, and no rebounder
+needed, which also sidesteps the bonus-FT putback edge where `SelectedSlot` is null.
+
+**The putback RATE is unchanged.** Only its credit is new.
+
+### Where blocks happen (Emmett's ruling, 2026-07-26)
+
+Blocked shots should be rare at mid, long and three; the vast majority happen near the rim, and the
+tie to the matched man strengthens as shots move out. Verified rather than assumed: on the recorded
+shot diet the engine already put **84%** of blocks at rim-or-short before S79, and S79 leaves that at
+~85% — the per-zone baselines (Rim 12% down to Three 1%) do that work, not the help arm. `Load` now
+enforces `BlockHelpShare` non-increasing Rim → Three, and strictly positive at every zone: a zero
+would make the four off-ball defenders **un-drawable** there, breaking the engine-wide
+"no defender is un-drawable" contract.
+
+Realized help share, 40,000 random real matchups: Rim 62% / Short 58% / Mid 37% / Long 20% /
+Three 15%.
+
+### Config
+
+Thirty `Blk{Attr}{Zone}` properties deleted with `BlockerWeight`. Ten added: `BlockHelpDepthHeight`,
+`BlockHelpDepthStrength`, `BlockHelpPositionalSwing` (0.35 — roughly 2:1 between a deep post and a
+guard, deliberately wider than rebounding's 0.20), `BlockHelpPositionalScale`, the five
+`BlockHelpShare{Zone}` values, and `BlockCreditLuckFloor`. Phase 71 is reflection-driven bidirectional
+name parity, so the properties and the `config.json` keys had to move in the same commit.
+
+### Validation
+
+`tools/block_help_oracle.py` is the locked oracle; `tools/block_help_golden.json` (210 rows) is
+replayed by Phase 74 at 1e-12. `BlockDuelShift` and `BlockBend` were **extracted** out of
+`BlockWeight` — same operations, same order — and Phase 74 asserts
+`BlockWeight == BlockBend(BlockDuelShift(...))` at exact zero difference over 1,620 cases, so Phase 7
+is provably unmoved by the seam.
+
+**Note for future sessions: this was the first block-door oracle.** The S79 prompt assumed Phase 7
+had a golden to re-lock; it did not — Phase 7 is a direct-assertion check.
 
 ### Attribution family: complete
 
@@ -7119,7 +7210,7 @@ A rating draws from one of three bands: **strong** 70–88 (role-primary at the 
 
 ### Rebounding rides size (the one cross-leg sliver), and the coherence invariant
 
-`OffensiveRebounding`/`DefensiveRebounding` ratings travel with the **size** leg, not skill — the single deliberate piece of otherwise-deferred cross-leg work — because the engine treats blocking and rebounding oppositely. **Blocking is size-floored:** `Matchup.BlockerWeight` is an additive weighted sum of six inputs (RimProtection, PerimeterDefense, PostDefense, Height, Wingspan, Vertical), so a tall, long, springy defender blocks even with a mediocre block rating. **Rebounding is not:** the individual rebounder pick weight is the rebounding *rating* multiplied by ~1.0-centered body tilts (positional, wingspan, hustle), so a zero-rated rebounder collapses to the floor of 1 and is out-drawn by a teammate with a real rating — while the *team* board battle (`ReboundPhysical`, a Strength+Height+Wingspan mean vs the opponent's) still counts a big's body regardless of rating. So a big needs a **size-driven rebounding rating** to personally collect the boards his body earns; without one, a teammate collects and he under-boards on his own line. The standing consequence: **judge big-man coherence by ORB/DRB in the readout, never BLK** — a broken-rebounding big's blocks look fine because they are size-floored.
+`OffensiveRebounding`/`DefensiveRebounding` ratings travel with the **size** leg, not skill — the single deliberate piece of otherwise-deferred cross-leg work — because the engine treats blocking and rebounding oppositely. **Blocking WAS size-floored** (superseded at S79): `Matchup.BlockerWeight` was an additive weighted sum of six inputs, so a tall, long, springy defender blocked even with a mediocre block rating. S79 retired that function — block credit is now a defender's positive blocking *contribution* over a luck floor, and rim-protection skill drives it through `GapFn`'s convexity. The cross-leg reasoning below still holds for rebounding, but the blocking half of the contrast no longer does. **Rebounding is not:** the individual rebounder pick weight is the rebounding *rating* multiplied by ~1.0-centered body tilts (positional, wingspan, hustle), so a zero-rated rebounder collapses to the floor of 1 and is out-drawn by a teammate with a real rating — while the *team* board battle (`ReboundPhysical`, a Strength+Height+Wingspan mean vs the opponent's) still counts a big's body regardless of rating. So a big needs a **size-driven rebounding rating** to personally collect the boards his body earns; without one, a teammate collects and he under-boards on his own line. The S78 consequence was: **judge big-man coherence by ORB/DRB, never BLK** — a broken-rebounding big's blocks looked fine because they were size-floored. **S79 retired that warning.** BLK is now a real signal: on the S79 verification run the two bigs took 2.9 and 3.1 blocks a game against the guards' 0.3–0.5, roughly 10:1, where S78's whole top ten spanned 1.2 down to 1.0.
 
 ### Assembly — coverage-first, no scalar
 
@@ -7425,6 +7516,10 @@ that one symptom into two unrelated problems:
   defender-only function `BlockerPicker` uses to choose who is *credited*) is handing credit out
   nearly evenly, and it is a different function from `BlockWeight` (which prices the shooter-vs-
   defender duel and does have real headroom).
+  **CLOSED at S79 — and the diagnosis was half right.** Credit was indeed the visible defect, and
+  `BlockerWeight` is retired. But the S78 framing missed that the RATE was also blind: the door
+  consulted one defender, so an unmatched rim protector moved the team block rate by zero. S79 fixed
+  both. See the Phase 36 / Phase 74 section above.
 
 **The layering lesson, ruled at S78 and worth keeping.** The obvious response to "a 5'9" man is
 eighth in the country in blocks" is to thin the small-body tail in the generator. That would be a

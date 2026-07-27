@@ -1,3 +1,61 @@
+## Session 79 — THE RIM PROTECTOR BECOMES REAL. The block door stops consulting one man: a weakside shot blocker now ends possessions he was never assigned to, and credit follows the threat that produced the block. `BlockerWeight` and its 30 config keys deleted. Suite `ALL CHECKS PASSED` on Emmett's machine; Phase 74 golden parity 210 rows at 2.8E-017. The block board went from flat to roughly 10:1. (2026-07-27)
+
+**Register:** build session under `PROMPT-block-help-s79` (r2). Oracle-first. Scope wall: `Matchup` block functions, `BlockerPicker`, the Roll H block-door call site, Phase 7/36, one page-only readout, docs. Out: C6's aggregate, the drive gate, the putback RATE, off-ball defense, the generator.
+
+**★ EMMETT'S RULINGS THAT THE SESSION IMPLEMENTS.** *(2026-07-26)* At the rim roughly half of blocks are not the man guarding the shooter; the tie to the matched man strengthens as shots move out. High help defense plus high rim protection is a shot-blocking menace. Help scales with how deep a man plays — a 5's help is worth more than a 1's — with a floor so a point guard with real instincts still gets paid. *(2026-07-27, mid-session)* The best rim protector in the country should own **roughly half** his lineup's rim blocks. Blocked shots should happen **rarely at mid, long and three**; the vast majority happen near the rim.
+
+### What the check-in found, and why it reshaped the build
+
+The gate paid for itself four times. Every finding below came from reading the pulled source and running a Python transcription of it against the committed S78 replay fixture (301 real generated players) — before a line of C# was written.
+
+**(1) The "rim ≈ even" target was already exceeded, in the opposite direction.** `BlockerWeight` ignored who was matched, so the probability a block went to someone *other* than the matched man was **80.0%** (measured, 200k random real five-man defenses). Emmett's model says roughly half. Moving to 50% would have meant crediting the matched man MORE than the engine already did — the reverse of the session's direction. The metric and the target were pointing at each other.
+
+**(2) The prompt's credit rule could not reach any target, at any dial setting.** Across `ZoneHelpShare` 0.2 → 1.0 the help arm's share of positive credit mass ran 58% → 72% (mean). Scaling it down does not move it: the matched man's credit was `max(0, duelShift)`, which is **exactly zero 44% of the time**, and in those cases the help arm takes 100% at any positive scale. Structural, not a dial. Resolution: credit is scored off the defender's own tools against a neutral attacker, not against this particular shooter.
+
+**(3) The hard zero floor handed one man everything.** With one elite big beside four men at the population median (whose threat is ≈ 0 — a knife-edge, measured −0.46), the big took **100%** of his team's blocks. The fix over-corrected from "too flat" to "one man blocked every shot." An S62-style luck floor fixed it and doubles as the concentration dial. It also drove the zero-mass fallback from a live 2.06% path to **unreachable**.
+
+**(4) §2a mis-described C6.** C6 excludes the matched defender and divides by **4.0**; the all-five/5.0 aggregate is Roll E's selection compression, a different door. Consequence: C6 and the new help arm read *the same four men*, which made "different doors" a harder claim, not an easier one — so it was measured rather than asserted. Swapping an ordinary lineup for a menace lineup moves C6's make-shave by **0.12 percentage points** and the S79 block rate by **3.6**. Separable in both quantity and size, because C6 reads only HelpDefense, which S78 generates on its own isolated stream, uncorrelated with body or rim protection.
+
+**Also caught: there was no Phase 7 golden.** The prompt's A3 said Phase 7's golden "does" touch the block door and S79 "re-locks" it. Phase 7 is a direct-assertion check; `tools/` had no block oracle and no block golden. S79 wrote the first ones.
+
+### The flat-baseline trap, caught mid-session
+
+The first zero-mass measurement used five identical median clones and read the fallback as firing on **every** ordinary possession. That was the S59.2 artifact again — a flattened dial is an assumption, not a control. On real varied lineups it is 2.06%. Recording the correction rather than the first number, because the first number would have justified a much heavier fix.
+
+### The monotonicity failure, and the body-only fix
+
+The ruled invariant — a better defender never lowers his team's block rate — failed **8,237 of 40,000** times. Cause: the positional multiplier is lineup-relative, and `PostDefense` is simultaneously a threat input and a `Postness` input. Improving one man's post defense raised his depth, raised the lineup mean, and shrank all four teammates' multipliers. The team blocked fewer shots because one defender got better.
+
+Fix, surfaced as a call Emmett could have made differently: read how deep a man plays from his **body alone** — height and strength. Where a man plays is a body fact, not a skill. The invariant then holds exactly: **0 of 40,000**. `Postness` is untouched and still serves rebounding.
+
+### What shipped
+
+`BlockWeightWithHelp` composes the duel and the zone-weighted help arm in pre-tanh shift space, then runs the existing `BlockBend` — so the per-zone floor and ceiling still bind and help can never push past the ceiling. `BlockCreditWeights` and `PutbackBlockCreditWeights` replace `BlockerWeight`, which is deleted along with its thirty config keys. `BlockDuelShift`, `BlockBend` and `PutbackDefenderShift` were **extracted** so the rate, the credit and the oracle bind to one expression each instead of copies that can drift.
+
+Ten new config values, all with `Load` guards: a zero luck floor throws (it hands a lone elite big 100%), a swing of 1.0 throws (it removes the guard's floor), a zero help share at any zone throws (it makes four defenders un-drawable there), and a non-monotone Rim → Three schedule throws.
+
+### Verification
+
+Suite `ALL CHECKS PASSED` on Emmett's machine. Phase 74: golden parity 210 rows, worst |Δ| **2.8E-017** on Windows (0.0E+000 in the sandbox — a last-bit `tanh`/`pow` platform difference, five orders inside the 1e-12 tolerance). `BlockWeight == BlockBend(BlockDuelShift(...))` at **exact zero** over 1,620 cases, so Phase 7 is provably unmoved. Rate bounded, help non-negative, credit strictly positive, better-defender monotonicity, and help share non-increasing — all green over 40,000 random real matchups.
+
+The defect itself, asserted: an unmatched elite rim protector takes the team from **11.40% to 18.08%** at the rim, where the old duel reads 11.40% for both lineups. Same body with HelpDefense 15 instead of 85 reaches only 11.88%. A guard with elite instincts and no tools lands at exactly the baseline.
+
+Phase 36 gained three sub-checks, because sub-checks 1–7 build a state with no `SelectedSlot` and therefore **never fire the matched-man branch** — they passed without testing the new model. Slot 1 goes 20.07% as a helper to 33.34% as the matched man; the putback path drops him to 9.99% and lifts the big to 60.49%; the matched man's share climbs Rim 33.4% → Three 86.2%.
+
+### The board, before and after
+
+S78: block ranks 1–10 read 1.2 down to 1.0, nine guards and one wing, per-minute rates flat at 0.038 / 0.040 / 0.035. S79 observation run: the two bigs at **2.9 and 3.1** blocks a game, the wings at 1.3, the guards at 0.3–0.5 — roughly **10:1**. The stress test agrees across archetypes (EliteVsElite RimRunner 2.1 / PostScorer 1.5 / guards 0.3).
+
+**Read AverageVsAverage correctly:** every cohort sits at 0.6–0.7, flat. That is not the defect returning — an average roster has RimProtection ~39, below neutral, so nobody clears the threat floor and the luck floor governs. A team with no rim protector should not have a block leader.
+
+**Buckets 6/7/8 look inverted and are not.** The skill team's defenders out-block the athletic team's despite worse rim protection, because the athletic team takes 48% of its shots at the rim against the skill team's 15%. Shot diet, not credit.
+
+### Recorded, not chased
+
+Blocks read **4.2 against the 3.5 target**, up from S78's 4.1. Expected — the help arm only ever adds. That is a calibration finding for the dial pass, not a reason to shrink the help term until the page looks nice.
+
+**The dead heat worth watching.** On real generated players the elite rim protector (46.5%) and a chase-down wing with 80 vertical and *average* rim defense (45.9%) finish nearly tied. It traces to `BlockContestWeights` pricing rim-protection **skill** at 0.40 at the rim — the same weight it carries on a three-pointer — while the source comment beside those weights says skill should count for more near the rim. The configured schedule is Rim 0.40 / Short 0.45 / Mid 0.50 / Long 0.42 / Three 0.40, an inverted U peaking at Mid, which contradicts the stated intent. Emmett's Phase 7 anchor; flagged, parked, not touched.
+
 ## Session 78 — THE BODY WALL COMES DOWN. `BodyCap` returns 99 for every skill at every body; the interior/rebounding bid re-based; Glue leaves the budget and the three intangibles generate on their own isolated stream. Suite `ALL CHECKS PASSED` on Emmett's machine; Phase 69 replay **bit-identical** (max deviation 0.000E+000 across 35,092 field checks); the season page moved as an expected red. (2026-07-26)
 
 **Register:** build session under `PROMPT-generator-body-cap-s78` (r3). Oracle-first. Scope wall: `PlayerGenPass3.cs`, the live drawer, the oracle, the fixture, Phase 70's bands, one page-only census, docs. Nothing under `Rolls/` or `Generators/`, no `config.json` dial, no `HierarchyRank`, no O-6.

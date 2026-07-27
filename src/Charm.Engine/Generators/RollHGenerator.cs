@@ -627,13 +627,41 @@ public sealed class RollHGenerator : IRollHPieGenerator
         makePct         += iqBump;
         if (makePct > 1.0) makePct = 1.0;            // own clamp; no-op when knob = 0
 
-        // Phase 7 — matchup-aware block door. Compute the bent block weight from the
-        // matchup, or fall back to the configured baseline if the defending slot is empty
-        // (DEC-6, same guard as the make door above).
+        // Phase 7 + Session 79 — matchup-aware block door, now a duel PLUS a help arm.
+        //
+        // Before S79 this door consulted exactly ONE defender, so an elite rim protector who
+        // was not guarding the ball changed the team's block rate by ZERO. Matchup.
+        // BlockWeightWithHelp adds the four off-ball defenders' threat — each floored at zero
+        // (no drag), scaled by his own help instincts and by how deep he plays relative to this
+        // lineup, then weighted by the zone's help share — to the matched-man duel BEFORE the
+        // tanh, so the existing per-zone floor and ceiling still bind and help can never push
+        // the rate past the zone ceiling.
+        //
+        // This is a DIFFERENT DOOR from C6 above. C6 is the same four off-ball men suppressing
+        // the shooter's MAKE rate on an accelerating HelpDefense-only curve; this is their
+        // tools ending the possession outright. Measured on the S78 population, swapping an
+        // ordinary lineup for a menace lineup moves C6's make-shave by 0.12 percentage points
+        // and this door's block rate by 3.6 — separable in both quantity and size.
+        //
+        // DEC-6 (unchanged): an empty matched slot still falls back to the flat configured
+        // baseline with NO help term. That is a harness-only state (an unpopulated roster);
+        // keeping it flat preserves the Phase 7 fallback assertion exactly.
+        var blkDefRoster = _game.RosterFor(state.Defense);
+        var blkDefLineup = _game.LineupFor(state.Defense);
+        var blockDefenders = new Player?[]
+        {
+            blkDefRoster.PlayerAt(blkDefLineup.SlotAt(1)),
+            blkDefRoster.PlayerAt(blkDefLineup.SlotAt(2)),
+            blkDefRoster.PlayerAt(blkDefLineup.SlotAt(3)),
+            blkDefRoster.PlayerAt(blkDefLineup.SlotAt(4)),
+            blkDefRoster.PlayerAt(blkDefLineup.SlotAt(5)),
+        };
+
         var blockWeight = defender is null
             ? _cfg.BlockWeight(zone)
-            : Matchup.BlockWeight(zone, player, defender,
-                                  _cfg.BlockWeight(zone), _matchup);
+            : Matchup.BlockWeightWithHelp(zone, player, defender,
+                                          blockDefenders, defenderSlot.Number - 1,
+                                          _cfg.BlockWeight(zone), _matchup);
 
         // Phase 8 — matchup-aware foul door. Compute the bent foul rate from the
         // matchup, or fall back to the configured per-zone baseline (DEC-6, same

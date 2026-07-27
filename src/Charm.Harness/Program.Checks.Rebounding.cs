@@ -3153,6 +3153,98 @@ internal static partial class Program
                     : "    [FAIL] null ShotType results differ from Rim zone results");
         }
 
+        // ── Sub-check 8 (S79) — the MATCHED-defender branch ───────────────────
+        // Sub-checks 1-7 build a state with no SelectedSlot, so matchedIndex is -1 and every
+        // defender is scored as a helper. That path alone cannot see the S79 split. Here the
+        // shooter's slot IS stamped, so slot 1 is the matched man: credited off his own tools
+        // with NO zone scaling, while the other four carry the zone's help share.
+        {
+            Console.WriteLine("  Sub-check 8 (S79): matched defender is credited on his own terms");
+            var def = new[] { MkP36(1, 50), MkP36(2, 50), MkP36(3, 50), MkP36(4, 50), MkP36(5, 50) };
+            var game = BuildGame36(offDummy, def);
+
+            var unmatched = MkState36(ShotLocation.Rim);
+            var matched   = MkState36(ShotLocation.Rim) with { SelectedSlot = new Slot(TeamSide.Home, 1) };
+
+            var cU = new int[5]; var cM = new int[5];
+            var rU = new SystemRng(36801); var rM = new SystemRng(36801);
+            for (var i = 0; i < N; i++)
+            {
+                cU[BlockerPicker.Pick(unmatched, game, matchupCfg, rU).Number - 1]++;
+                cM[BlockerPicker.Pick(matched,   game, matchupCfg, rM).Number - 1]++;
+            }
+            var uShare = (double)cU[0] / N; var mShare = (double)cM[0] / N;
+            Console.WriteLine($"    five identical defenders — slot1 as helper={uShare:P2}  as matched man={mShare:P2}");
+            // Five identical men with no matched slot split evenly; naming one of them the
+            // matched defender lifts him above the others because his term is unscaled.
+            var sub8Ok = Math.Abs(uShare - 0.20) < 0.01 && mShare > uShare + 0.05;
+            ok &= sub8Ok;
+            Console.WriteLine(sub8Ok
+                ? "    [OK] matched man rises above an even split; helpers share the remainder"
+                : "    [FAIL] matched-defender branch did not change the split");
+        }
+
+        // ── Sub-check 9 (S79) — the PUTBACK branch is a different formula ──────
+        // A putback's rate has always been a five-defender stack with no matched man, so its
+        // credit ignores SelectedSlot entirely and reads PutbackBlockCreditWeights.
+        {
+            Console.WriteLine("  Sub-check 9 (S79): putback credit ignores the matched slot");
+            var def = new[]
+            {
+                MkP36(1, 50), MkP36(2, 50),
+                MkP36(3, 50, rimProt: 90, height: 78, wingspan: 85),   // the rim protector
+                MkP36(4, 50), MkP36(5, 50),
+            };
+            var game  = BuildGame36(offDummy, def);
+            var state = MkState36(ShotLocation.Rim) with { SelectedSlot = new Slot(TeamSide.Home, 1) };
+
+            var cLoc = new int[5]; var cPut = new int[5];
+            var rL = new SystemRng(36901); var rP = new SystemRng(36901);
+            for (var i = 0; i < N; i++)
+            {
+                cLoc[BlockerPicker.Pick(state, game, matchupCfg, rL, putback: false).Number - 1]++;
+                cPut[BlockerPicker.Pick(state, game, matchupCfg, rP, putback: true ).Number - 1]++;
+            }
+            Console.WriteLine($"    located: slot1(matched)={(double)cLoc[0] / N:P2} big(slot3)={(double)cLoc[2] / N:P2}");
+            Console.WriteLine($"    putback: slot1         ={(double)cPut[0] / N:P2} big(slot3)={(double)cPut[2] / N:P2}");
+            // On the putback path slot 1 has no privileged status, so the big takes MORE of the
+            // credit and slot 1 takes less than he did as the matched man.
+            var sub9Ok = cPut[2] > cLoc[2] && cPut[0] < cLoc[0]
+                      && Enumerable.Range(0, 5).All(i => cPut[i] > 0);
+            ok &= sub9Ok;
+            Console.WriteLine(sub9Ok
+                ? "    [OK] putback drops the matched-man arm; every slot still drawable"
+                : "    [FAIL] putback path did not differ from the located-shot path");
+        }
+
+        // ── Sub-check 10 (S79) — help credit fades away from the rim ───────────
+        // Emmett's ruling (2026-07-26): the tie to the matched man strengthens as shots move
+        // out. The matched defender's realized share must RISE from Rim to Three.
+        {
+            Console.WriteLine("  Sub-check 10 (S79): the matched man's share rises as shots move out");
+            var def = new[] { MkP36(1, 50), MkP36(2, 50), MkP36(3, 50), MkP36(4, 50), MkP36(5, 50) };
+            var game  = BuildGame36(offDummy, def);
+            var zonesS79 = new[] { ShotLocation.Rim, ShotLocation.Short, ShotLocation.Mid,
+                                   ShotLocation.Long, ShotLocation.Three };
+            var shares = new double[5];
+            for (var z = 0; z < 5; z++)
+            {
+                var st = MkState36(zonesS79[z]) with { SelectedSlot = new Slot(TeamSide.Home, 1) };
+                var rng = new SystemRng(37001 + z);
+                var c = new int[5];
+                for (var i = 0; i < N; i++) c[BlockerPicker.Pick(st, game, matchupCfg, rng).Number - 1]++;
+                shares[z] = (double)c[0] / N;
+            }
+            Console.WriteLine("    matched-man share: " + string.Join("  ",
+                zonesS79.Select((z, i) => $"{z} {shares[i]:P1}")));
+            var sub10Ok = Enumerable.Range(1, 4).All(i => shares[i] > shares[i - 1] - 0.005)
+                       && shares[4] > shares[0];
+            ok &= sub10Ok;
+            Console.WriteLine(sub10Ok
+                ? "    [OK] matched-man share rises monotonically Rim -> Three"
+                : "    [FAIL] matched-man share does not rise away from the rim");
+        }
+
         // ── Governor run invariants A and B ───────────────────────────────────────
         {
             Console.WriteLine("  Governor run invariants (Phase 36):");

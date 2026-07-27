@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 78** (2026-07-26; the body wall comes down — `BodyCap` returns 99 at every body, the interior/rebounding bid re-based, Glue leaves the budget and the three intangibles generate on their own isolated stream).
+Last updated: **Session 79** (2026-07-27; the rim protector becomes real — the block door gains a help arm so a weakside blocker ends possessions he was never assigned to, and block credit becomes contribution-based; `BlockerWeight` and its 30 config keys deleted).
 
 ## Current baseline
 
@@ -50,6 +50,15 @@ where five men played 35 minutes, so they were never the right calibration targe
 A–M real; the world drafts the Pass-3 two-plane budget cohort (S70 bridge); `PressureVolumeTaxScale` 0.30 is
 the one calibrated dial (S72); the settings file and the config classes are name-parity-locked by Phase 71
 (S74) — `config.json` SHA-256 `5094367e…`.
+
+## Shipped since the last board update
+
+- **S79 — the block help arm + contribution credit.** `Matchup.BlockWeightWithHelp` composes the matched
+  duel with a zone-weighted help arm in pre-tanh shift space; `BlockCreditWeights` /
+  `PutbackBlockCreditWeights` replace `BlockerWeight`. Help depth is **body-only** (height + strength),
+  NOT `Postness` — sharing `PostDefense` with the threat term let a better defender lower his own team's
+  block rate on 8,237 of 40,000 matchups. New: `tools/block_help_oracle.py`, `tools/block_help_golden.json`
+  (210 rows), Phase 74, Phase 36 sub-checks 8–10, one page-only season readout. Closes O-29.
 
 ## Red blockers — resolve before major new work
 
@@ -134,17 +143,11 @@ chart is PROVISIONAL pending O-6.
   knowingly. **The "until S77" in the original wording is void** — see O-30. Now VISIBLE rather than
   inferred: the S77 page shows 1,018 of 4,511 player-seasons with zero games played.
 
-- **★ O-29 — BLOCK CREDIT IS FLAT PER MINUTE (S77 finding; DIAGNOSED and NARROWED at S78).** Ranks 1–10 of
-  the block board still span **1.2 down to 1.0** after S78 removed the generator's body ceiling — nine
-  guards and one wing, heights 40–64, a 5'8" man eighth in the country. **S78 predicted this reading in
-  writing as its own failure signal, and it failed on those terms.** The S78 ladder narrowed the cause:
-  normalised for playing time the top blockers run **0.038 / 0.040 / 0.035 per minute — flat across
-  bodies**, so this is NOT the minutes skew (see O-33) and NOT the generator (stages 1 and 2 are clean).
-  The suspect is `Matchup.BlockerWeight` — the defender-only function `BlockerPicker` uses to choose who is
-  **credited**, distinct from `BlockWeight`, which prices the shooter-vs-defender duel and does have real
-  headroom. **★ Ruled at S78: this is fixed in the ENGINE, never by thinning the generator's small-body
-  tail** — the board was already flat when small men were capped at 34–43 rim protection, so the generator
-  was only hiding the defect. Measurement first, not a dial session.
+- **~~O-29~~ — BLOCK CREDIT IS FLAT PER MINUTE. ★ SHIPPED S79** (moved to Built). `BlockerWeight` retired
+  and deleted with its 30 config keys; credit is now the defender's positive blocking contribution over a
+  luck floor. S79 also found the half of the defect S78's diagnosis missed: the block RATE consulted one
+  defender, so an unmatched rim protector moved the team block rate by zero. Both fixed. The board went
+  from a top-ten spanning 1.2–1.0 (nine guards) to bigs at 2.9/3.1 against guards' 0.3–0.5.
 
 - **★ O-33 — MINUTES ARE SKEWED AGAINST BIGS (S78 ladder finding; split out of O-29).** Bigs average ~24
   mpg against guards' ~32, and every per-game leaderboard is minutes-weighted, so the better man loses the
@@ -201,6 +204,28 @@ chart is PROVISIONAL pending O-6.
   assignments. The divergence is declared and asserted by Phase 71's registry, not hidden — but folding
   RollA/RollE into the common shape is its own session with its own drift audit. Not urgent: RollE's
   binding is now behaviourally proven.
+
+- **★ O-39 — THE BLOCK CONTEST UNDER-WEIGHTS RIM-PROTECTION SKILL AT THE RIM (S79 finding, PARKED BY
+  EMMETT).** `BlockContestWeights` prices skill at Rim **0.40** — identical to Three — against a configured
+  schedule of Rim 0.40 / Short 0.45 / Mid 0.50 / Long 0.42 / Three 0.40, an inverted U peaking at Mid. The
+  source comment beside those weights says skill should count for MORE near the rim; the numbers do not.
+  Measured consequence: on real generated players the elite rim protector (46.5% of his lineup's rim
+  blocks) and a chase-down wing with 80 vertical and *average* rim defense (45.9%) finish in a dead heat.
+  A Phase 7 anchor Emmett set; flagged at S79 and explicitly parked, not touched. One-line change when he
+  rules.
+
+- **O-40 — BLOCK RATE CALIBRATION (S79, expected).** Blocks read 4.2 against the 3.5 target, up from S78's
+  4.1. The help arm only ever adds, so this was predicted in the prompt and recorded rather than chased.
+  Dials: `BlockHelpShare{Zone}` and `BlockHelpPositionalSwing`. Belongs to a calibration session against a
+  real generated population, not to the session that shipped the mechanism.
+
+- **O-41 — THE C6 MAKE-DOOR HELP AGGREGATE IS UNWEIGHTED (S79 audit finding, RULED OUT of S79).** Roll H's
+  C6 aggregates the four off-ball defenders' HelpDefense on a fixed denominator of 4.0 with **no positional
+  weighting** — a point guard's help suppresses the make rate as much as a centre's — and it never reads
+  `RimProtection`. (Roll E carries a parallel all-five/5.0 aggregate into selection.) Ruled out of S79
+  because moving make% through a second door in the same session makes the season page unattributable.
+  Own session. Measured size for scale: swapping an ordinary lineup for a menace lineup moves C6's
+  make-shave by 0.12 percentage points, against the S79 block door's 3.6.
 
 ## Parked — waiting on a named prerequisite
 
@@ -283,18 +308,23 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-*Not yet chosen — Emmett's call.* S78 shipped and reshaped this section: the item that was one loud symptom
-at S77 is now two separate, individually measured defects with different owners.
+*Not yet chosen — Emmett's call.* O-29 shipped at S79, which empties the S78 recommendation.
 
-**Claude's pick: O-29, block credit.** S78 recommended it in advance and then earned the right to recommend
-it — the session predicted, in writing, that a flat block board would mean it failed to express, and the
-board came back flat. The generator is now provably clean at stages 1 and 2, and the per-minute rates are
-flat across bodies, so the remaining suspect is narrow and named: `BlockerWeight`, the credit function, as
-distinct from `BlockWeight`, the pricing function. It is a **measurement** question first, not a dial
-question, so it is cheap. And it is the standing test of the S78 ruling: the generator now says a 6'6" man
-can own elite shot-blocking skill, and the whole ruling rests on the engine being the thing that decides
-whether it is felt. Right now the engine is not deciding — length is not priced. Until that is fixed the
-S78 ruling is a promise the engine cannot keep.
+**Claude's pick: O-6, scout-rank modernization (feeding O-33, the minutes skew).** It was already the
+standing counter-candidate, and S79 removed the reason to keep deferring it. The block board is now sorted
+by who protects the rim, so the last loud per-game leaderboard distortion left is playing time: bigs
+average ~24 mpg against guards' ~32, and every per-game board is minutes-weighted. Fixing credit while
+leaving minutes skewed means the boards stay half-wrong for a reason nobody can see from the page.
+
+**The strongest counter-candidate: O-41, C6's flat help aggregate.** It is the natural pair to S79 — the
+same four off-ball defenders, the other door — and S79 has already measured its effect size (0.12
+percentage points of make%, against the block door's 3.6), so the session would start with its instrument
+already built. Take it first if the appetite is to finish the help-defense model while it is fresh, rather
+than to fix the leaderboards.
+
+**Not yet: O-40, block-rate calibration.** Blocks read high, but calibration against a population that is
+itself provisional is the exact wrong sequencing — attribute measurement before generation redesign,
+generation before calibration.
 
 **The strongest counter-candidate: O-6, scout-rank modernization** (feeding O-33, the minutes skew). Still
 RAISED PRIORITY, and it is what makes bigs play 24 minutes against guards' 32. Take it first if the

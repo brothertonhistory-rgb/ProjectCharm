@@ -92,6 +92,11 @@
 
     <!-- Non-shooting (reach-in) foul golden fixture (emitted by tools/nonshooting_foul_oracle.py,
          S62), copied beside the binary so Phase 68 can replay it. -->
+    <!-- Block help-arm + credit golden fixture (emitted by tools/block_help_oracle.py,
+         LOCKED SPEC 2026-07-27, S79), read by Phase74BlockHelpCheck. -->
+    <None Include="..\..\tools\block_help_golden.json" Link="tools\block_help_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="..\..\tools\nonshooting_foul_golden.json" Link="tools\nonshooting_foul_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

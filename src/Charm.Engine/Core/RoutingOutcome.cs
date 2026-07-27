@@ -333,6 +333,20 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// (<c>new RoutingOutcome(false, "STUB:…")</c>) is untouched — a pure append,
     /// like every prior init field.</para></summary>
     public SlotGroup BlkBySlot { get; init; }
+
+    /// <summary>Session 79, PAGE-ONLY. How many of this possession's blocks were credited to
+    /// the defender matched to the shooter, split by whether the shot was near the rim
+    /// (Rim/Short) or out (Mid/Long/Three). Never asserted; it exists so the season page can
+    /// separate two things a leaderboard cannot distinguish — credit REDISTRIBUTION (the same
+    /// blocks, different names) from a real RATE change. A board can improve while the
+    /// structural claim stays wrong.</summary>
+    public int BlkMatchedNear { get; init; }
+    /// <inheritdoc cref="BlkMatchedNear"/>
+    public int BlkHelperNear { get; init; }
+    /// <inheritdoc cref="BlkMatchedNear"/>
+    public int BlkMatchedOut { get; init; }
+    /// <inheritdoc cref="BlkMatchedNear"/>
+    public int BlkHelperOut { get; init; }
     /// <summary>The offensive slot that committed the turnover. Null for team
     /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
     /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for
