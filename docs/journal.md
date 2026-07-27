@@ -1,3 +1,138 @@
+## Session 78 — THE BODY WALL COMES DOWN. `BodyCap` returns 99 for every skill at every body; the interior/rebounding bid re-based; Glue leaves the budget and the three intangibles generate on their own isolated stream. Suite `ALL CHECKS PASSED` on Emmett's machine; Phase 69 replay **bit-identical** (max deviation 0.000E+000 across 35,092 field checks); the season page moved as an expected red. (2026-07-26)
+
+**Register:** build session under `PROMPT-generator-body-cap-s78` (r3). Oracle-first. Scope wall: `PlayerGenPass3.cs`, the live drawer, the oracle, the fixture, Phase 70's bands, one page-only census, docs. Nothing under `Rolls/` or `Generators/`, no `config.json` dial, no `HierarchyRank`, no O-6.
+
+**★ EMMETT'S RULINGS (2026-07-26) THAT THE SESSION IMPLEMENTS.** Every attribute must reach the top of the scale at **any** body. Height may *influence* what a player becomes but must not *decide* it. A 6'6" man may own elite shot-blocking **skill**, and his body is what stops it being **felt** — that pricing belongs to the engine (`Matchup.BlockWeight` prices skill gap and length gap separately), not to the generator. The intangibles "generate on their own, those points don't cost." Skill is roughly common across all of college; **size and athleticism separate the divisions.**
+
+### The defect, measured before it was touched
+
+Three mechanisms all pushed one way. (1) A hard height ceiling: `PostDefense`/`RimProtection` capped at `34 + 65·clamp((h−46)/28)`, both rebounds at `52 + 47·(same)`. (2) `GLUE_PREF = 0.32`, flat — the only family that never varied by role or body, so the three intangibles could never be preferred. (3) A bid table that handed the perimeter a head start, then handed small bodies a second Creation/Shooting bonus on top.
+
+**The cap was the wall at the top of every band below 6'8".** Measured on the 46k generated cohort before any edit, per-band observed maximum against `BodyCap` evaluated at the band's tallest man: 33 vs 34.0 · 43 vs 43.3 · 57 vs 57.2 · 78 vs 78.1 · 90 vs 89.7 for interior defense, and the same story for rebounding — **within about one rating point in 19 of 20 cells.** The counterweight, measured the same way: only **0.35%** of players sat at their own cap. So the wall truncated the small-body top tail and left the median alone, which is exactly why the evidence had to be per-band **max and p99**, not global means.
+
+### What shipped — five changes, one direction
+
+| # | change | from | to |
+|---|---|---|---|
+| 1 | `BodyCap` | height-gated ceiling | returns 99 for every skill, every body |
+| 2 | interior/perimeter defense bid | `0.30 + 0.85·x` | `0.55 + 0.60·x` |
+| 3 | rebounding bid | `0.22 + 0.80·hf` | `0.50 + 0.50·hf` |
+| 4 | small-body bonuses | Creation `0.45`, Shooting `0.25` | `0.25`, `0.15` |
+| 5 | `Glue` | inside the budget at flat `0.32` | leaves `FAMILIES`; drawn independently |
+
+Changes 2 and 3 raise the bid **floor** and leave the **ceiling** where it was: at the leaning end (dplane 1, hf 1) the number is unchanged; at the off-lean end it roughly doubles. That is the shape the ruling asks for — height still influences preference and allocation, it just stops deciding.
+
+**The six new bid coefficients are NAMED constants, echoed in the fixture** (`DEF_BID_LO/SPAN`, `REB_BID_LO/SPAN`, `SMALL_CREATION_BONUS`, `SMALL_SHOOTING_BONUS`). An inline literal is a transcription channel the constants tripwire cannot police; the echo went 74 → 80 and is checked 80/80 every run.
+
+### The result — the ruling holds, and it is not inflation
+
+Per-band `RimProtection`, before → after (latent):
+
+| band | max | mean | share ≥80 |
+|---|---|---|---|
+| 5'8-5'9 | 34 → **99** | 13.2 → 33.4 | 0.0% → 4.2% |
+| 5'10-5'11 | 42 → **99** | 15.1 → 36.0 | 0.0% → 5.0% |
+| 6'0-6'1 | 57 → **99** | 19.7 → 39.3 | 0.0% → 6.6% |
+| 6'2-6'5 | 78 → **99** | 29.4 → 45.1 | 0.0% → 11.2% |
+| 6'6-6'7 | 90 → **99** | 41.6 → 49.6 | 4.1% → 15.0% |
+| 6'8-6'9 | 99 → 99 | 50.5 → 53.0 | 15.8% → 18.9% |
+| 6'10-7'0 | 99 → 99 | 53.9 → 54.3 | 19.6% → 20.2% |
+
+Every band can reach the top; the mean still climbs 33 → 54 across the range and the elite share still climbs 4% → 20%. **Height influences, no longer decides.** `PostDefense` and both rebounds move the same way.
+
+**Not population-wide inflation:** mean latent across the 19 surviving spend skills went **34.01 → 36.14** on a mean spend rise of **473.86 → 486.90 (+3.08%)** — Glue's 3.0% share redistributed, nothing created. The interior gain came out of the perimeter: small-body `BallHandling` 41.8 → 39.3, `Outside` 53.7 → 50.2. Verified so nobody re-litigates it: multiplying the budget 1.0 → 3.0 moves mean skill only 29 → 42, because the price curve saturates. Out of scope, and it stayed out.
+
+### ★ THE PROMPT'S ISOLATION GATE COULD NOT PASS AS WRITTEN — SPLIT, IT PASSES BY CONSTRUCTION
+
+r3's §2e.2 asked that toggling "change 5" leave every pre-existing draw byte-identical for the same seed and index. It cannot: Glue leaving the spend set removes **seven** draws per player from the main stream (1 family pull + 3 within + 3 base jitter), which shifts every later player. That is the same defect r3 had already fixed once in r2 and it survived underneath.
+
+Factored into **5a** (Glue leaves `FAMILIES`) and **5b** (the intangibles are drawn on the isolated stream), both gates run and both pass. Gate 1: with all toggles off the oracle reproduces the pre-S78 population **byte-for-byte**. Gate 2: holding 1–4 and 5a fixed, toggling 5b alone leaves every main-stream draw and every non-intangible value **byte-identical** at the same seed and index.
+
+The same split explains the two role-asymmetry bands moving slightly (sub-6'2" PostScorers 973 → 987, 6'10"+ Creators/Shooters 51 → 58). A3 claimed movement there would prove gate 2 failed. **That claim is only true holding 5a fixed** — under 5a the whole main stream shifts, so the role draw is a different draw for every man. Movement there is expected, not a leak.
+
+### The intangibles — construction frozen, centre explicitly un-ruled
+
+Three values over [8, 99] with a shared component: one shared beta plus one idiosyncratic beta each, blended at `INT_SHARED = 0.55`, so a smart man is usually disciplined without the three being welded together. Four draws on a **separate `IRng`**, seeded per player *index* by `IntangibleStreamSeed(seed, index)` — plain integer arithmetic, no hashing, no tuple seeds, identical in both languages. Index-keying is safe because the recruiting bridge doubles its request and regenerates from index 0, so player *i* is always player *i*.
+
+Landed at mean **53.5** each, max 97, ~3.5% ≥ 80 — against a pre-S78 world where `BasketballIQ` had **two** players ≥ 80 in 21,000 and `HelpDefense` had **zero**.
+
+**Written identically to latent and current, runway exactly zero.** No development delta; a named comment marks this provisional pending an intangible-development session. **`INT_A`/`INT_B` (the centre) are a PLACEHOLDER and explicitly UN-RULED** — Emmett's position is that it cannot be judged before there are stats. Expect it to move after the first season.
+
+### ★ A1 WAS REAL, AND ITS TRAP IS GUARDED
+
+`BuildCard` fills from `SPEND_SKILLS` (22 → 19) and then asserts the key **set** against the frozen 33-key `CARD_KEYS`, so the moment Glue left the budget the card came up 30 and threw. Fixed with one explicit stamping line for the three. But the assert is a *set* check — stamping from the wrong source still gives 33 keys and still goes green. The real guard is a new EXACT Phase 70 gate asserting `Current == Latent` for the three **and** that the card value equals `Current`, per player. A mis-sourced stamp now dies loudly instead of stamping wrong values quietly.
+
+### Phase 70 — every gate classified, ONE band re-ruled
+
+The phase has **14** assertions plus 3 sampler-moment gates, not the five A3 named. Classified in full at the check-in gate. Outcomes:
+
+- **`body-caps` went vacuous** — with the wall down, `latent > cap + 0.51` can never fire, so a green there proves nothing. **REPLACED** by the §4b ceiling-provenance gate: `BodyCap` must return exactly 99 for the four formerly capped skills at every legal height (240 probes, 0 bad).
+- **`ceiling-pressure` broke by construction** and is the only band re-ruled. OLD 23% ± 3pp, ruled against the population S78 replaces. NEW **26.5% ± 2.5pp**, centre from a FIXED five-seed panel (20260724..28: 26.31 / 26.41 / 26.47 / 26.57 / 26.74). Panel spread 0.43pp, so the tolerance is ~6× the observed seed noise. **Not widened to fit** — the observation sits dead centre, and the committed run reads 26.2%.
+- **Survived untouched:** `line-17` (79.9–80.5 against 78–81), both role-asymmetry bands, all three free-throw bands (median 69 on all five seeds), `conc-independence`, `height-marginal`, `budget-conservation`, `label-flip`.
+- **`bounds` coverage shrank** when the three left `SPEND_SKILLS`; the new intangibles gate covers them.
+
+### ★ THE ANTI-TARGET GATE — DEMOTED TO PAGE-ONLY, WITH A NAMED END DATE
+
+Flagged as a live risk at the check-in gate, before it fired: over today's 22 skills the gate reads 0, but **96 of the top 347 cards had a Glue skill as their card minimum**, and the closest card sat at 34 against a threshold of 35. Glue was doing real work as the guaranteed hole for over a quarter of the top class. It fired at 1–3 across the five-seed panel, 1 on the committed run.
+
+**Emmett's ruling: page-only for S78.** The reasoning is his, and it is the right one — the rule was written when the intangibles were dead. A 17 in IQ was a real hole because IQ did nothing you could feel. Now the three land at ~53 and route into make%, defensive attention and assist credit, so whether a "flat" card is actually flat is a **season-page** question, not a generator question. Recorded honestly as a **loosening**: a hard gate became a printed number for one session, proposed by Claude, and it comes back the moment the page says what flat plays like.
+
+### ★ THE SMALL-BODY TAIL — RULED LEAVE IT, AND THE REASONING IS THE VALUABLE PART
+
+4.2% of sub-5'10" players now generate with elite shot-blocking skill. Surfaced as a basketball question (Emmett's ruling used a 6'6" man; does it reach to 5'9"?). His answer: *"I don't know, we don't know they perform yet"* — correctly refusing to rule on a stage-4 question at stage 1.
+
+Claude's recommendation, accepted: **leave it, and fix blocking next.** The reason is not basketball but layering. O-29 already showed the block board flat at ~1.0 with guards interleaved among bigs — at a point when the generator was capping small men at 34–43 rim protection. Length is already not being priced, *while the generator was doing the work of hiding it*. Thinning the tail now would use the generator to paper over an engine defect: a compensating error in the wrong layer, still sitting there two years later when someone fixes blocking and cannot work out why bigs suddenly rebound wrong. The clean structure is the one already ruled — **the generator says what a man can do; the engine says whether it is felt.** Named counterweight, honestly: "elite rim protector, 5'9"" reads as a bug on a card. That fix belongs in presentation, and there is no presentation layer yet, so nothing breaks by waiting.
+
+### The ladder ran, and it separated two different problems
+
+`generated → rostered → played → expressed`, per §7. Stage 2 shipped as a page-only body-band census in `PrintRosterCensus`.
+
+**★ MEASURED AND RECORDED SO NOBODY RE-DERIVES IT: the accepted pool is drafted ONE-FOR-ONE (4,511 → 4,511).** `BuildRecruitedCohort` returns exactly `PoolSize` players and every one lands on a roster, so a pool→rostered transition count is 100% **by construction** and can never detect anything. Draft-level masking is structurally impossible. That does not clear O-6, it **relocates** it: the scout rank still decides which school and which depth-chart slot, so it can bury this session's players in *minutes*. The census now says that on the page instead of printing a meaningless 100%. Also noted: the roster bridge carries only the 33-key **current** card (`PoolPlayer.Ratings`) — latent does not survive the crossing — so stage 2 is current-vs-current by necessity, and comparing generated-latent against rostered-current would confound arrival expression with draft selection.
+
+### §7 PREDICTIONS, SCORED — the headline one FAILED, as pre-registered
+
+- **"A board still flat at ~1.0 across ranks 1–10 means the session failed to express." → FAILED.** Blocks ranks 1–10 read **1.2 down to 1.0**, nine guards and one wing, heights 64/42/46/59/45/54/48/56/40/50. A 5'8" man is eighth in the country in blocks. S78 did not express, and the signal that says so was written down before the run.
+- **League block and rebound totals "may or may not move."** Blocks 3.5-target line reads HIGH at 4.1.
+- **"Several calibration verdicts red." → HIT.** Seventeen.
+
+**But the ladder earned its keep by splitting the failure in two.** Rebounding is a **minutes** problem: the big at rebound rank 2 takes 10.4 boards in 23.7 minutes against the leader's 10.8 in 31.8 — **0.44/min vs 0.34/min**, comfortably the better rebounder, losing the leaderboard on playing time (bigs ~24 mpg, guards ~32). Blocking is a **credit** problem: per minute the top blockers run 0.038 / 0.040 / 0.035 — flat across bodies, nobody out-blocking anyone per possession. Two separate defects, now individually named with numbers attached instead of one vague "blocks look wrong."
+
+### The season page — expected red, page-only, never asserted
+
+Against the recorded S77 reference (points 72.4, FG% 45.8, 3P% 35.9, FT% 70.5, PPP 1.0176, TO% 21.6, pace 71.1, fouls 20.23 = 6.47/13.76):
+
+points **68.5**, FG% **42.9**, 3P% 34.9, FT% 69.9, PPP **0.9651**, TO% 22.2, pace 71.0, fouls **17.95 = 6.31/11.64**. Seventeen HIGH/LOW verdicts. `PrintCalibrationReadout` is a `void` print — the page says *page-only, never asserted* — so none of this fails anything, and **no dial was chased.**
+
+**★ CLAUDE'S PREDICTION WAS WRONG AND THE CORRECTION IS THE FINDING.** The delivery note predicted scoring would rise, because Roll H's IQ make-bonus is `clamp((IQ − 50)/49)` — zero at or below 50 — and league IQ went ~17 → ~53, switching that term on for the first time ever. Scoring **fell**. Defense outran it: the interior and perimeter bids both rose, `HelpDefense` went ~17 → ~53 into Roll E and Roll H, and small-body ballhandling and shooting fell in every band. The offense lost more than the sprinkle gained.
+
+**The biggest single mover was not predicted at all: fouls 20.23 → 17.95, reach-ins alone 13.76 → 11.64.** `Discipline` went ~17 → ~53 and S62 wired it straight into reach-in foul propensity. Fewer fouls → FTA 18.2 (LOW) → fewer free points, which accounts for a good share of the four-point drop. This is a **correct engine response to a corrected population**, not a regression.
+
+Also corrected at the check-in gate: the prompt's §6 claimed `BasketballIQ` is "wired into ball security." It is not. IQ enters at exactly three sites — Roll H's make-percentage sprinkle, `AttentionGenerator`, and assist **credit**. Turnover rate runs off `BallHandling` and `Steals` (`Matchup.UnforcedFactor`); Roll E's own header says IQ is *intentionally* excluded. Turnovers did rise, but through ballhandling falling, not through IQ.
+
+Everything structural held: schedule fingerprint `93d8c853…` unchanged, census 4,511/4,511, rotation ladder 31.8…4.2 identical, top-five share 69.7%, cross-position 24.44% against 24.49%.
+
+### The fixture was RENAMED, not just regenerated
+
+`gen_pass3_replay_fixture_s69.json` → `_s78.json`, and the old file deleted. Claude's call, flagged at delivery: the **contract** changed, not just the values — 61 main-stream slots instead of 68, plus a separate 4-slot isolated intangibles block with its own `intangible_draw_order` — so the s69 name would have been a lie about the shape. S71 regenerated in place under an unchanged contract and rightly kept its name; this is the other case. Journal S69/S71 and git history hold the old population.
+
+The isolated draws live in their own `intangible_draws` block, never in `draws`, so `draw_order` stays the main-stream contract and the two streams can never be conflated. Phase 69 asserts both orders independently.
+
+**Parity convention confirmed from source, and r2's figure corrected in r3 was right:** integers EXACT, floats ABSOLUTE **1e-9** (`GenPass3Tol`). The `1e-12` in the tree is `EDGE_EPS`, a height-CDF boundary probe, not a tolerance. One imprecision noted for a future session: the fixture declares `float_tolerance: 1e-9` in its header but the C# check uses its own const and never reads it — a drift channel worth closing.
+
+### Validation
+
+Oracle green (10 checks, including the two new ones). Both §2e gates pass. Middle rung taken in full: SDK from the Ubuntu feed, both gates run, the five-seed panel run, `dotnet build` 0 errors, full suite green in-sandbox, the 5,205-game season run in-sandbox and diffed against the **recorded** S77 page, never memory. Drift audit against a fresh pristine pull: exactly seven files changed, all on the manifest, plus the one fixture rename. Brace balance checked per file. Stale-reference sweep clean.
+
+**GREEN ON EMMETT'S MACHINE: `ALL CHECKS PASSED`.** Phase 69 **max float deviation 0.000E+000** across 35,092 field checks on 301 players — bit-identical, not merely inside tolerance; constants tripwire 80/80. Phase 70 all fourteen bands plus the two new EXACT gates OK. Observation and stress runs untouched as expected (hand-authored rosters — S78 cannot reach them).
+
+**One run-command note for the record:** the delivery's two-line PowerShell block chained `cd src\Charm.Harness` twice; PowerShell keeps the directory between lines, so the second `cd` failed with `PathNotFound`. Harmless, but the fault was the note's, not the tree's. Future deliveries: one `cd`, then the commands.
+
+### Deferred, named
+
+The anti-target re-ruling (after the season page shows what a flat card plays like). The intangibles centre `INT_A`/`INT_B` (after the first season's stats). The fixture-declared tolerance not being read by the C# check. The presentation-layer answer to "elite rim protector, 5'9"" on a card. And the two now-separated engine defects the ladder isolated — the minutes skew against bigs, and flat block credit.
+
+---
+
 ## Session 77 — THE SEASON STAT PAGE. Per-player season records **keyed by the person, not the seat**; three readouts; Phase 73's twenty-two gates. Suite `ALL CHECKS PASSED` and `Phase 73 PASSED` on Emmett's machine; the pre-existing 493-line page **byte-identical**. (2026-07-26)
 
 **Register:** build session under `PROMPT-season-stat-page-s77` (r4). Page-only reporting: no engine file, no Roll, no generator, no resolver, no attribution math, no dial, nothing in `config.json`. The scope wall held — nothing under `src/Charm.Engine/` was touched.

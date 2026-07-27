@@ -5,7 +5,7 @@ namespace Charm.Engine;
 /// player-generation oracle (<c>tools/gen_pass3_budget_oracle.py</c>, LOCKED 2026-07-24,
 /// S68). Pure functions only — every transform takes its drawn value(s) as EXPLICIT
 /// inputs and draws nothing. The parity gate (Phase 69) replays the committed fixture
-/// <c>tools/gen_pass3_replay_fixture_s69.json</c> through <see cref="BuildFromDraws"/>;
+/// <c>tools/gen_pass3_replay_fixture_s78.json</c> through <see cref="BuildFromDraws"/>;
 /// the live generator (<see cref="PlayerGenPass3Live"/>) draws from <see cref="IRng"/>
 /// and calls THESE SAME functions, so the math proven by replay is the math that ships.
 ///
@@ -146,8 +146,11 @@ public static class PlayerGenPass3
     public const double FT_SIGMA = 6.0;
 
     // --- The seven families (oracle :150-163; Rebounding SPENDABLE per S67 ruling 2) ---
+    // S78: SIX families. Glue left the budget entirely (Emmett ruling 2026-07-26 —
+    // "they generate on their own, those points don't cost"); its three members are
+    // drawn on an isolated stream, see INTANGIBLES below.
     public static readonly string[] FAMILY_ORDER =
-        { "Shooting", "InteriorOffense", "Creation", "PerimDefense", "InteriorDefense", "Rebounding", "Glue" };
+        { "Shooting", "InteriorOffense", "Creation", "PerimDefense", "InteriorDefense", "Rebounding" };
     public static readonly Dictionary<string, string[]> FAMILIES = new(StringComparer.Ordinal)
     {
         ["Shooting"]        = new[] { "Outside", "Mid", "OffBallMovement" },
@@ -156,12 +159,11 @@ public static class PlayerGenPass3
         ["PerimDefense"]    = new[] { "PerimeterDefense", "Steals", "OffBallDefense" },
         ["InteriorDefense"] = new[] { "PostDefense", "RimProtection" },
         ["Rebounding"]      = new[] { "OffensiveRebounding", "DefensiveRebounding" },
-        ["Glue"]            = new[] { "BasketballIQ", "Discipline", "HelpDefense" },
     };
-    public static readonly string[] SPEND_SKILLS = BuildSpendSkills();   // 22, family order
+    public static readonly string[] SPEND_SKILLS = BuildSpendSkills();   // 19, family order
     private static string[] BuildSpendSkills()
     {
-        var ks = new List<string>(22);
+        var ks = new List<string>(19);
         foreach (var f in FAMILY_ORDER) ks.AddRange(FAMILIES[f]);
         return ks.ToArray();
     }
@@ -221,7 +223,29 @@ public static class PlayerGenPass3
         ["PostScorer"] = new(StringComparer.Ordinal) { ["Shooting"] = 0.42, ["InteriorOffense"] = 1.90, ["Creation"] = 0.30 },
         ["Connector"]  = new(StringComparer.Ordinal) { ["Shooting"] = 0.80, ["InteriorOffense"] = 0.80, ["Creation"] = 0.80 },
     };
-    public const double GLUE_PREF = 0.32;
+    // --- S78: the re-based bid table (oracle :~272). NAMED, not inline — an inline
+    //     literal is a transcription channel the constants tripwire cannot police.
+    //     The bid FLOOR rises, the CEILING stays put: at the leaning end (dplane 1 /
+    //     hf 1) the number is unchanged; at the off-lean end it roughly doubles. ---
+    public const double DEF_BID_LO   = 0.55;   // was 0.30
+    public const double DEF_BID_SPAN = 0.60;   // was 0.85
+    public const double REB_BID_LO   = 0.50;   // was 0.22
+    public const double REB_BID_SPAN = 0.50;   // was 0.80
+    public const double SMALL_CREATION_BONUS = 0.25;   // was 0.45
+    public const double SMALL_SHOOTING_BONUS = 0.15;   // was 0.25
+
+    // --- S78: THE INTANGIBLES — outside the budget, drawn on an ISOLATED per-player
+    //     stream. Three values over [8,99] sharing one component, so a smart man is
+    //     usually disciplined without the three being welded together.
+    //     The CENTRE is a placeholder and explicitly UN-RULED: it cannot be judged
+    //     before there are season stats. Expect INT_A/INT_B to move. ---
+    public static readonly string[] INTANGIBLES = { "BasketballIQ", "Discipline", "HelpDefense" };
+    public const double INT_A = 2.0;
+    public const double INT_B = 2.0;
+    public const double INT_SHARED = 0.55;
+    public const double INT_LO = 8.0;
+    public const double INT_HI = 99.0;
+    public const double INT_STREAM_SALT = 780000017.0;
 
     // --- Within-family member preferences (oracle :269-280) ---
     public static readonly Dictionary<string, Dictionary<string, double>> WITHIN_PREF = new(StringComparer.Ordinal)
@@ -245,10 +269,8 @@ public static class PlayerGenPass3
     // --- Body caps + pricing (oracle :295-317) ---
     public const double FLAT_BASE = 8.0;
     public const double BASE_JITTER = 2.2;
-    public const double IDCAP_LO_H = 46.0;
-    public const double IDCAP_HI_H = 74.0;
-    public const double IDCAP_MIN = 34.0;
-    public const double REBCAP_MIN = 52.0;
+    // S78: IDCAP_LO_H / IDCAP_HI_H / IDCAP_MIN / REBCAP_MIN are GONE, not zeroed —
+    // the height ceiling they parameterised no longer exists. See BodyCap.
     public const double PRICE_TAU = 52.0;
 
     // --- Rscore (oracle :409-413; D3 realized-card weights) ---
@@ -320,23 +342,20 @@ public static class PlayerGenPass3
         return share;
     }
 
-    /// <summary>The oracle's <c>body_cap</c> (oracle :304-311): interior-defense skills
-    /// hard-capped low on small bodies; rebounding craft milder; everything else open
-    /// (the 7'0" pure shooter is legal).</summary>
-    public static double BodyCap(string skill, int height)
-    {
-        if (skill == "PostDefense" || skill == "RimProtection")
-        {
-            var t = Clamp((height - IDCAP_LO_H) / (IDCAP_HI_H - IDCAP_LO_H), 0.0, 1.0);
-            return IDCAP_MIN + (99.0 - IDCAP_MIN) * t;
-        }
-        if (skill == "OffensiveRebounding" || skill == "DefensiveRebounding")
-        {
-            var t = Clamp((height - IDCAP_LO_H) / (IDCAP_HI_H - IDCAP_LO_H), 0.0, 1.0);
-            return REBCAP_MIN + (99.0 - REBCAP_MIN) * t;
-        }
-        return 99.0;
-    }
+    /// <summary>The oracle's <c>body_cap</c>. <b>S78 — THE BODY WALL IS DOWN.</b>
+    /// Emmett's ruling 2026-07-26: every attribute must reach the top of the scale at
+    /// ANY body. Height may INFLUENCE what a player becomes — it still does, through
+    /// the bid table and the budget — but it may not impose a post-allocation hard
+    /// ceiling. A 6'6" man may own elite shot-blocking SKILL; his body is what stops it
+    /// being FELT, and that pricing lives in the ENGINE (<c>Matchup.BlockWeight</c>
+    /// prices skill gap and length gap separately), not in the generator.
+    ///
+    /// <para>The parameters are retained because <c>Caps</c> stays a recorded
+    /// checkpoint and the Price curve still takes a cap argument — the curve saturates
+    /// toward 99 for every skill now. This is the ONE ceiling function; Phase 70's
+    /// provenance gate asserts it returns exactly 99 for the four formerly capped
+    /// skills at every legal height.</para></summary>
+    public static double BodyCap(string skill, int height) => 99.0;
 
     /// <summary>The oracle's <c>price</c> (oracle :315-317): the ONE concave curve, same
     /// for every skill and player — ratings SATURATE toward the cap and never seek it.</summary>
@@ -418,14 +437,16 @@ public static class PlayerGenPass3
         var hf = Clamp((height - HFRAC_LO) / (HFRAC_HI - HFRAC_LO), 0.0, 1.0);
         var pref = new Dictionary<string, double>(StringComparer.Ordinal);
         foreach (var kv in ROLE_FAM_PREF[role]) pref[kv.Key] = kv.Value;
-        pref["PerimDefense"]    = 0.30 + 0.85 * (1.0 - dplane);
-        pref["InteriorDefense"] = 0.30 + 0.85 * dplane;
-        pref["Rebounding"]      = 0.22 + 0.80 * hf;
+        pref["PerimDefense"]    = DEF_BID_LO + DEF_BID_SPAN * (1.0 - dplane);
+        pref["InteriorDefense"] = DEF_BID_LO + DEF_BID_SPAN * dplane;
+        pref["Rebounding"]      = REB_BID_LO + REB_BID_SPAN * hf;
         // small-body handle/shoot pull lean — the .get(k, 0.8) default mirrors the oracle
         // but is unreachable (every role names Creation and Shooting in ROLE_FAM_PREF).
-        pref["Creation"] = (pref.TryGetValue("Creation", out var cr) ? cr : 0.8) * (1.0 + 0.45 * (1.0 - hf));
-        pref["Shooting"] = (pref.TryGetValue("Shooting", out var sh) ? sh : 0.8) * (1.0 + 0.25 * (1.0 - hf));
-        pref["Glue"] = GLUE_PREF;
+        // S78: the lean SURVIVES, softened — it was stacking on top of an already
+        // perimeter-tilted bid table and double-paying the small body.
+        pref["Creation"] = (pref.TryGetValue("Creation", out var cr) ? cr : 0.8) * (1.0 + SMALL_CREATION_BONUS * (1.0 - hf));
+        pref["Shooting"] = (pref.TryGetValue("Shooting", out var sh) ? sh : 0.8) * (1.0 + SMALL_SHOOTING_BONUS * (1.0 - hf));
+        // S78: no Glue entry — Glue is not a family any more.
         return pref;
     }
 
@@ -436,6 +457,35 @@ public static class PlayerGenPass3
     {
         var hb = Clamp((height - ARRB_LO) / (ARRB_HI - ARRB_LO), 0.0, 1.0);
         return ARR_READY - hb * (ARR_READY - ARR_RAW);
+    }
+
+    /// <summary>S78 — the ISOLATED intangibles stream seed, per player INDEX. Plain
+    /// integer arithmetic on purpose: no hashing, no tuple seeds, deterministic on
+    /// every platform and identical in both languages (oracle
+    /// <c>intangible_stream_seed</c>). Index-keyed because the live bridge's cohort
+    /// builder doubles its request and regenerates from index 0, so player i is always
+    /// player i.</summary>
+    public static int IntangibleStreamSeed(int seed, int index)
+    {
+        // 64-bit intermediate, then the oracle's mod 2^31-1 — matches Python's
+        // arbitrary-precision arithmetic exactly for every index this generator reaches.
+        var v = (long)seed * 1000003L + (long)index * 2654435761L + 780000017L;
+        return (int)(((v % 2147483647L) + 2147483647L) % 2147483647L);
+    }
+
+    /// <summary>S78 — the three intangibles from their four recorded draws: one shared
+    /// component plus one idiosyncratic component each, blended at <see cref="INT_SHARED"/>
+    /// and mapped onto [8,99]. The shared term is what makes a smart man usually
+    /// disciplined without welding the three together (oracle <c>draw_intangibles</c>).</summary>
+    public static Dictionary<string, int> IntangiblesFromDraws(double intShared, Dictionary<string, double> intIdio)
+    {
+        var vals = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var k in INTANGIBLES)
+        {
+            var u = INT_SHARED * intShared + (1.0 - INT_SHARED) * intIdio[k];
+            vals[k] = (int)Clamp(RoundHalfEven(INT_LO + (INT_HI - INT_LO) * u), INT_LO, INT_HI);
+        }
+        return vals;
     }
 
     // ========================================================================
@@ -519,6 +569,16 @@ public static class PlayerGenPass3
                 : (int)RoundHalfEven(EXPR_BASELINE + e * (latentK - EXPR_BASELINE));
         }
 
+        // ---- 6b. THE INTANGIBLES (S78) — drawn on the ISOLATED stream, outside the
+        //      budget entirely. Written IDENTICALLY to latent and current: no
+        //      development delta, so runway is exactly zero for all three.
+        //      PROVISIONAL pending an intangible-development session. ----
+        foreach (var kv in IntangiblesFromDraws(d.IntShared, d.IntIdio))
+        {
+            latent[kv.Key] = kv.Value;
+            current[kv.Key] = kv.Value;
+        }
+
         // ---- 7. FreeThrow (derived; the ONE persistent idiosyncrasy feeds both) ----
         var latentFt = DeriveFt(latent["Outside"], d.FtIdio, height);
         var currentFt = DeriveFt(current["Outside"], d.FtIdio, height);
@@ -530,6 +590,7 @@ public static class PlayerGenPass3
             runway[k] = latent[k] - current[k];
             runwayTotal += runway[k];
         }
+        foreach (var k in INTANGIBLES) runway[k] = 0;   // by construction: drawn once, no delta
         runway["FreeThrow"] = latentFt - currentFt;
         runwayTotal += runway["FreeThrow"];
 
@@ -553,8 +614,10 @@ public static class PlayerGenPass3
     }
 
     /// <summary>S70 — the canonical 33-key CURRENT card, the shape the bridge feeds
-    /// <c>GenMapToPlayer</c>: 3 size + the 7 <see cref="ATH_KEYS"/> + the 22
-    /// <see cref="SPEND_SKILLS"/> + <c>CurrentFt</c> under <c>FreeThrow</c>. The ONLY
+    /// <c>GenMapToPlayer</c>: 3 size + the 7 <see cref="ATH_KEYS"/> + the 19
+    /// <see cref="SPEND_SKILLS"/> + the 3 <see cref="INTANGIBLES"/> + <c>CurrentFt</c>
+    /// under <c>FreeThrow</c>. Still 33 keys — the intangibles moved SOURCE (isolated
+    /// draw, not budget spend), not name, so every downstream reader is unaffected. The ONLY
     /// assembly site — any fixture or diagnostic that needs the card calls this, so a
     /// second drifting assembly cannot exist. Asserts the exact key SET against the
     /// frozen <see cref="CARD_KEYS"/> contract (33 wrong keys is still 33 keys).
@@ -567,6 +630,11 @@ public static class PlayerGenPass3
         };
         foreach (var k in ATH_KEYS) card[k] = r.Ath[k];
         foreach (var k in SPEND_SKILLS) card[k] = r.Current[k];
+        // S78: the three intangibles are no longer in SPEND_SKILLS, so they get their
+        // own stamping line. A1's trap: the assert below is a key-SET check, so a wrong
+        // SOURCE here still yields 33 keys and goes green — Phase 70 asserts
+        // Current == Latent for these three so a mis-sourced stamp dies loudly.
+        foreach (var k in INTANGIBLES) card[k] = r.Current[k];
         card["FreeThrow"] = r.CurrentFt;
 
         // Exact key-SET assertion against the frozen contract, both directions:
@@ -670,12 +738,18 @@ public static class PlayerGenPass3
         ["BUDGET_LO"] = BUDGET_LO, ["BUDGET_SPAN"] = BUDGET_SPAN, ["BUDGET_POW"] = BUDGET_POW,
         ["CONC_A"] = CONC_A, ["CONC_B"] = CONC_B,
         ["PULL_EPS"] = PULL_EPS, ["PULL_DICE_SIGMA"] = PULL_DICE_SIGMA,
-        ["ROLE_FAM_PREF"] = ROLE_FAM_PREF, ["GLUE_PREF"] = GLUE_PREF,
+        ["ROLE_FAM_PREF"] = ROLE_FAM_PREF,
+        ["DEF_BID_LO"] = DEF_BID_LO, ["DEF_BID_SPAN"] = DEF_BID_SPAN,
+        ["REB_BID_LO"] = REB_BID_LO, ["REB_BID_SPAN"] = REB_BID_SPAN,
+        ["SMALL_CREATION_BONUS"] = SMALL_CREATION_BONUS,
+        ["SMALL_SHOOTING_BONUS"] = SMALL_SHOOTING_BONUS,
+        ["INTANGIBLES"] = INTANGIBLES,
+        ["INT_A"] = INT_A, ["INT_B"] = INT_B, ["INT_SHARED"] = INT_SHARED,
+        ["INT_LO"] = INT_LO, ["INT_HI"] = INT_HI, ["INT_STREAM_SALT"] = INT_STREAM_SALT,
         ["WITHIN_PREF"] = WITHIN_PREF, ["WITHIN_DICE_SIGMA"] = WITHIN_DICE_SIGMA,
         ["GAMMA_LO"] = GAMMA_LO, ["GAMMA_HI"] = GAMMA_HI,
         ["FLAT_BASE"] = FLAT_BASE, ["BASE_JITTER"] = BASE_JITTER,
-        ["IDCAP_LO_H"] = IDCAP_LO_H, ["IDCAP_HI_H"] = IDCAP_HI_H,
-        ["IDCAP_MIN"] = IDCAP_MIN, ["REBCAP_MIN"] = REBCAP_MIN, ["PRICE_TAU"] = PRICE_TAU,
+        ["PRICE_TAU"] = PRICE_TAU,
         ["HF_LO"] = HF_LO, ["HF_HI"] = HF_HI, ["HF_RANGE"] = HF_RANGE,
         ["HF_STEEP"] = HF_STEEP, ["HF_MID"] = HF_MID,
         ["LOW_TAPER_FLOOR"] = LOW_TAPER_FLOOR, ["LOW_TAPER_TOP"] = LOW_TAPER_TOP,
@@ -686,7 +760,9 @@ public static class PlayerGenPass3
 }
 
 /// <summary>The raw recorded draws for one player — the fixture's <c>draws</c> block
-/// (68 semantic slots; the contract's single home is the oracle's <c>_flat_draws</c>).
+/// (61 main-stream slots at S78, down from 68 when Glue left the budget; the contract's
+/// single home is the oracle's <c>_flat_draws</c>) plus the 4-slot isolated intangibles
+/// block (oracle's <c>_flat_int_draws</c>).
 /// The live generator fills this same shape from <see cref="IRng"/>.</summary>
 public sealed class Pass3Draws
 {
@@ -704,6 +780,12 @@ public sealed class Pass3Draws
     public Dictionary<string, double> BaseJitterGauss = new(StringComparer.Ordinal);   // per SPEND_SKILLS, pre-abs
     public double ArrivalRaw;      // pre-clamp (mean included in the drawn value)
     public double FtIdio;          // the ONE shared FT idiosyncrasy
+
+    // ── S78: the ISOLATED intangibles stream (4 slots, NOT part of the 61-slot main
+    //    draw_order). Separate object, separate seed — toggling this draw perturbs
+    //    nothing on the main stream, which is what gate 2e.2 proves. ──
+    public double IntShared;                                                    // shared beta
+    public Dictionary<string, double> IntIdio = new(StringComparer.Ordinal);    // per INTANGIBLES
 }
 
 /// <summary>Every checkpoint of one generated player — the shape the fixture records.

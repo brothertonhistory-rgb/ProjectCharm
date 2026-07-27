@@ -756,6 +756,69 @@ internal static partial class Program
         }
     }
 
+    // ── S78: STAGE 2 of the diagnostic ladder — the ROSTERED population by body band.
+    //    Page-only, never asserted, void by design.
+    //
+    //    Why this exists: a season page alone cannot validate the generator. O-6's
+    //    guard-leaning scout rank could drop every big-skilled player S78 creates, and
+    //    the page would look unchanged while the generator worked perfectly. Stage 1
+    //    (the oracle's generated table) says what was MADE; this says what got DRAFTED.
+    //    A gap between the two is a DRAFT problem, not a generator problem.
+    //
+    //    NOTE ON WHAT IS MEASURED: the roster bridge carries only the 33-key CURRENT
+    //    card (PoolPlayer.Ratings) — latent does not survive the crossing. So these are
+    //    CURRENT ratings, and the oracle's stage-1 table prints current alongside latent
+    //    so the two are comparable. Comparing generated-LATENT against rostered-CURRENT
+    //    would confound arrival expression with draft selection, which is exactly the
+    //    thing this ladder exists to separate.
+    private static void PrintS78BodyBandCensus(DivvyResult res)
+    {
+        static string Inv(FormattableString f) => FormattableString.Invariant(f);
+        var bands = new (string Name, int Lo, int Hi)[]
+        {
+            ("5'8-5'9", 40, 44), ("5'10-5'11", 45, 50), ("6'0-6'1", 51, 56),
+            ("6'2-6'5", 57, 65), ("6'6-6'7", 66, 70), ("6'8-6'9", 71, 79),
+            ("6'10-7'0", 80, 86), ("7'1+", 87, 99),
+        };
+        var watched = new[]
+        {
+            "RimProtection", "PostDefense", "OffensiveRebounding", "DefensiveRebounding",
+            "BallHandling", "Outside", "BasketballIQ", "Discipline", "HelpDefense",
+        };
+        var pool = res.Pool;
+        var drafted = new HashSet<int>(res.Rosters.Values.SelectMany(r => r));
+
+        Console.WriteLine("--- S78 BODY-BAND CENSUS, ROSTERED (stage 2 of the ladder; CURRENT ratings; page-only) ---");
+        Console.WriteLine($"  {"band",-11}{"n",5}   " + string.Join("  ", watched.Select(w => $"{w[..Math.Min(6, w.Length)],6}")));
+        foreach (var (name, lo, hi) in bands)
+        {
+            var sub = pool.Where(p => drafted.Contains(p.PoolId)
+                                      && p.Ratings["Height"] >= lo && p.Ratings["Height"] <= hi).ToList();
+            if (sub.Count == 0) continue;
+            var cells = watched.Select(w => Inv($"{sub.Average(p => p.Ratings[w]),6:F1}"));
+            Console.WriteLine($"  {name,-11}{sub.Count,5}   " + string.Join("  ", cells));
+        }
+
+        // S78 MEASURED FINDING, recorded here so nobody re-derives it: the accepted pool
+        // is drafted ONE-FOR-ONE (BuildRecruitedCohort returns exactly PoolSize players
+        // and every one lands on a roster), so a pool->rostered transition count is
+        // 100% BY CONSTRUCTION and can never detect anything. Draft-level masking is
+        // structurally impossible.
+        //
+        // That relocates the O-6 masking risk rather than clearing it: the scout rank
+        // decides WHICH SCHOOL and WHAT DEPTH-CHART SLOT, so it can still bury this
+        // session's players in minutes. The live test is stage 3 — minutes by man on the
+        // S77 page — not this seam.
+        Console.WriteLine($"  accepted pool {pool.Count} -> rostered {drafted.Count} " +
+                          "(1:1 by construction — draft-level masking is impossible; " +
+                          "the O-6 risk is MINUTES, read it on the stage-3 page)");
+        foreach (var w in watched.Take(4))
+        {
+            var hi = pool.Count(p => p.Ratings[w] >= 80);
+            Console.WriteLine(Inv($"    {w,-22} rostered with current >= 80: {hi,5} ({100.0 * hi / Math.Max(1, pool.Count),5:F2}%)"));
+        }
+    }
+
     // ── Session 63: the roster census — proves roster SUPPLY was not silently
     //    distorted while standings conservation stayed green. Page-only. ─────────────
     private static void PrintRosterCensus(DivvyResult res, WorldFile world)
@@ -797,6 +860,8 @@ internal static partial class Program
         Console.WriteLine("  opening-five shapes (S75 evidence; lineup selection is UNCHANGED — see A9):");
         foreach (var kv in shapes.OrderByDescending(x => x.Value))
             Console.WriteLine(Inv($"    {kv.Key}  {kv.Value,4} schools"));
+
+        PrintS78BodyBandCensus(res);
 
         Console.WriteLine("  drafted height by position (pool means survive the divvy?):");
         foreach (var q in new[] { PositionalEligibility.Guard, PositionalEligibility.Wing, PositionalEligibility.Big })

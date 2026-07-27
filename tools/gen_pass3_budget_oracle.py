@@ -157,7 +157,7 @@ FT_SIGMA = 6.0
 # ============================================================================
 # THE SEVEN FAMILIES (journal S67, every member assigned; Rebounding SPENDABLE)
 # ============================================================================
-FAMILIES = OrderedDict([
+FAMILIES_FULL = OrderedDict([
     ("Shooting",        ["Outside", "Mid", "OffBallMovement"]),
     ("InteriorOffense", ["Close", "Finishing", "PostMoves", "Screening"]),
     ("Creation",        ["BallHandling", "Passing", "Playmaking", "SelfCreation", "FoulDrawing"]),
@@ -166,11 +166,91 @@ FAMILIES = OrderedDict([
     ("Rebounding",      ["OffensiveRebounding", "DefensiveRebounding"]),
     ("Glue",            ["BasketballIQ", "Discipline", "HelpDefense"]),
 ])
-SPEND_SKILLS = [k for fam in FAMILIES.values() for k in fam]     # 22 spendable skills
-assert len(SPEND_SKILLS) == 22 and len(set(SPEND_SKILLS)) == 22
-SKILL_TO_FAM = {k: f for f, ks in FAMILIES.items() for k in ks}
+INTANGIBLES = list(FAMILIES_FULL["Glue"])        # the three that leave the budget at S78
 PERIM_FAMS = ("Shooting", "Creation", "PerimDefense")
 POST_FAMS  = ("InteriorOffense", "InteriorDefense", "Rebounding")
+
+# ============================================================================
+# S78 EXPERIMENT TOGGLES -- ORACLE ONLY (S78 ss2a).  Production C# implements the
+# final ruled combination; there is no runtime switch, no config key, and no
+# dormant pathway on the C# side.  These exist so the session can ATTRIBUTE the
+# population shift to individual changes, and so the two ss2e gates can be run.
+#
+# Change 5 is factored into 5a and 5b DELIBERATELY.  The prompt's gate 2e.2 asks
+# that toggling "change 5" leave every pre-existing draw byte-identical -- but
+# Glue leaving the spend set necessarily removes 7 draws per player from the MAIN
+# stream (1 family pull + 3 within + 3 base jitter), which shifts every later
+# player.  As one flag the gate cannot pass, the same defect r3 fixed elsewhere.
+# Split, it passes by construction: 5a changes the main stream (and is covered by
+# gate 1's baseline reproduction), 5b adds the ISOLATED stream and must perturb
+# nothing.  Gate 2 toggles 5b alone, holding 5a on.
+# ============================================================================
+TOGGLES = {
+    "uncap":       True,   # change 1: body_cap returns 99 for every skill
+    "defbid":      True,   # change 2: interior/perimeter defense bid 0.30+0.85x -> 0.55+0.60x
+    "rebbid":      True,   # change 3: rebounding bid 0.22+0.80hf -> 0.50+0.50hf
+    "smallbonus":  True,   # change 4: small-body Creation .45->.25, Shooting .25->.15
+    "glue_out":    True,   # change 5a: Glue leaves FAMILIES / SPEND_SKILLS
+    "intangibles": True,   # change 5b: the three are drawn on the isolated stream
+}
+BASELINE_TOGGLES = {k: False for k in TOGGLES}
+
+def set_toggles(**kw):
+    """Set toggles and rebuild the derived family globals.  Unknown keys are a
+    loud error -- a typo must not silently leave a change disabled."""
+    for k in kw:
+        if k not in TOGGLES:
+            raise KeyError(f"unknown S78 toggle {k!r}; known: {sorted(TOGGLES)}")
+    TOGGLES.update(kw)
+    _apply_toggles()
+
+def _apply_toggles():
+    global FAMILIES, SPEND_SKILLS, SKILL_TO_FAM
+    FAMILIES = OrderedDict((f, list(ks)) for f, ks in FAMILIES_FULL.items()
+                           if not (TOGGLES["glue_out"] and f == "Glue"))
+    SPEND_SKILLS = [k for fam in FAMILIES.values() for k in fam]
+    assert len(SPEND_SKILLS) == (19 if TOGGLES["glue_out"] else 22)
+    assert len(set(SPEND_SKILLS)) == len(SPEND_SKILLS)
+    SKILL_TO_FAM = {k: f for f, ks in FAMILIES.items() for k in ks}
+
+FAMILIES = SPEND_SKILLS = SKILL_TO_FAM = None
+_apply_toggles()
+
+# ---------------------------------------------------------------------------
+# THE INTANGIBLES DRAW (S78 ss2b) -- construction FROZEN here, centre UN-RULED.
+#
+# Three values over [8, 99] with a shared component, so a smart man is usually
+# disciplined without the three being welded together.  One shared beta plus one
+# idiosyncratic beta per skill; the blend weight is INT_SHARED.
+#
+# INT_CENTRE_NOTE: the centre (mean ~53.5, set by the symmetric beta) is a
+# PLACEHOLDER and explicitly UN-RULED -- Emmett's position is that it cannot be
+# judged before there are stats.  Expect to move INT_A/INT_B after the first
+# season.  The SHAPE is what this session locks.
+# ---------------------------------------------------------------------------
+INT_A, INT_B  = 2.0, 2.0     # symmetric: centre 53.5 on the [8,99] scale
+INT_SHARED    = 0.55         # weight on the shared component
+INT_LO, INT_HI = 8.0, 99.0
+INT_DRAW_ORDER = ["int_shared"] + [f"int_idio.{k}" for k in INTANGIBLES]   # 4 slots
+INT_STREAM_SALT = 780000017  # S78; keeps the derived stream clear of the main seed
+
+def intangible_stream_seed(seed, index):
+    """The isolated per-player stream seed.  Plain integer arithmetic on purpose:
+    no hashing, no tuple seeds, deterministic on every platform and both
+    languages.  Transcribed verbatim into C#."""
+    return (seed * 1000003 + index * 2654435761 + INT_STREAM_SALT) % 2147483647
+
+def draw_intangibles(r_int, rec=None):
+    """Four draws on the ISOLATED stream: one shared, one per intangible."""
+    s = r_int.betavariate(INT_A, INT_B)
+    if rec is not None: rec["int_shared"] = s
+    vals = {}
+    for k in INTANGIBLES:
+        x = r_int.betavariate(INT_A, INT_B)
+        if rec is not None: rec["int_idio"][k] = x
+        u = INT_SHARED * s + (1.0 - INT_SHARED) * x
+        vals[k] = int(clamp(round(INT_LO + (INT_HI - INT_LO) * u), INT_LO, INT_HI))
+    return vals
 
 # ============================================================================
 # PLANE 1 -- DEFENSIVE POSITION (body-dominated: who can you guard)
@@ -253,21 +333,43 @@ ROLE_FAM_PREF = {
     "PostScorer": {"Shooting": 0.42, "InteriorOffense": 1.90, "Creation": 0.30},
     "Connector":  {"Shooting": 0.80, "InteriorOffense": 0.80, "Creation": 0.80},
 }
-GLUE_PREF = 0.32                   # glue pulls WEAK for everyone (S67 ruling 3)
+GLUE_PREF = 0.32                   # glue pulls WEAK for everyone (S67 ruling 3) -- DEAD at S78
+
+# S78 -- the re-based bid table.  NAMED so the C# constants tripwire can see them:
+# an inline literal is a transcription channel the echo cannot police.
+# The FLOOR rises, the CEILING stays put: at the leaning end (dplane 1 / hf 1) the
+# number is unchanged; at the off-lean end it roughly doubles.  Height keeps
+# influencing preference and allocation; it stops deciding.
+DEF_BID_LO,  DEF_BID_SPAN = 0.55, 0.60      # was 0.30, 0.85
+REB_BID_LO,  REB_BID_SPAN = 0.50, 0.50      # was 0.22, 0.80
+SMALL_CREATION_BONUS      = 0.25            # was 0.45
+SMALL_SHOOTING_BONUS      = 0.15            # was 0.25
 
 def family_pulls(r, role, height, dplane, rec=None):
     """pull = role preference x body factor x dice, floored at epsilon."""
     hf = clamp((height - HFRAC_LO) / (HFRAC_HI - HFRAC_LO), 0.0, 1.0)
     pref = dict(ROLE_FAM_PREF[role])
     # body leans defense + rebounding (S67 ruling 3); the defensive PLANE carries the split
-    pref["PerimDefense"]    = 0.30 + 0.85 * (1.0 - dplane)
-    pref["InteriorDefense"] = 0.30 + 0.85 * dplane
-    pref["Rebounding"]      = 0.22 + 0.80 * hf          # the ruled Rebounding body-factor lean
+    # S78 changes 2 and 3: the bid FLOOR rises, the bid CEILING stays put.  At the
+    # leaning end (dplane 1 for interior, hf 1 for rebounding) the number is
+    # unchanged; at the off-lean end it roughly doubles.  That is the shape the
+    # ruling asks for -- height still influences preference and allocation, it
+    # just stops deciding.  Same reading for perimeter defense, mirrored.
+    dlo, dspan = (DEF_BID_LO, DEF_BID_SPAN) if TOGGLES["defbid"] else (0.30, 0.85)
+    rlo, rspan = (REB_BID_LO, REB_BID_SPAN) if TOGGLES["rebbid"] else (0.22, 0.80)
+    pref["PerimDefense"]    = dlo + dspan * (1.0 - dplane)
+    pref["InteriorDefense"] = dlo + dspan * dplane
+    pref["Rebounding"]      = rlo + rspan * hf          # the ruled Rebounding body-factor lean
     # S68 Emmett ruling: "there are no 5'9\" elite defenders who can't dribble at all" --
-    # small bodies lean handle/shoot (a pull lean, budget-paid with dice; NOT a free floor)
-    pref["Creation"] = pref.get("Creation", 0.8) * (1.0 + 0.45 * (1.0 - hf))
-    pref["Shooting"] = pref.get("Shooting", 0.8) * (1.0 + 0.25 * (1.0 - hf))
-    pref["Glue"]            = GLUE_PREF
+    # small bodies lean handle/shoot (a pull lean, budget-paid with dice; NOT a free floor).
+    # S78 change 4: the lean SURVIVES, softened -- it was stacking on top of an already
+    # perimeter-tilted bid table and double-paying the small body.
+    cbon, sbon = ((SMALL_CREATION_BONUS, SMALL_SHOOTING_BONUS)
+                  if TOGGLES["smallbonus"] else (0.45, 0.25))
+    pref["Creation"] = pref.get("Creation", 0.8) * (1.0 + cbon * (1.0 - hf))
+    pref["Shooting"] = pref.get("Shooting", 0.8) * (1.0 + sbon * (1.0 - hf))
+    if not TOGGLES["glue_out"]:
+        pref["Glue"]        = GLUE_PREF
     pulls = {}
     for fam in FAMILIES:
         g = r.gauss(0.0, PULL_DICE_SIGMA)
@@ -312,6 +414,14 @@ IDCAP_MIN = 34.0                      # the small guy's real reach-in craft ceil
 REBCAP_MIN = 52.0                     # rebounding craft: milder small-body cap
 
 def body_cap(skill, height):
+    # S78 change 1 (Emmett ruling 2026-07-26): every attribute must reach the top
+    # of the scale at ANY body.  Height may INFLUENCE what a player becomes (it
+    # still does, through the bid and the budget) but it may not impose a
+    # post-allocation hard ceiling.  A 6'6" man may own elite shot-blocking SKILL;
+    # his body is what stops it being FELT, and that pricing lives in the engine
+    # (Matchup.BlockWeight), not here.
+    if TOGGLES["uncap"]:
+        return 99.0
     if skill in ("PostDefense", "RimProtection"):
         t = clamp((height - IDCAP_LO_H) / (IDCAP_HI_H - IDCAP_LO_H), 0.0, 1.0)
         return IDCAP_MIN + (99.0 - IDCAP_MIN) * t
@@ -337,13 +447,14 @@ def derive_ft(outside, ft_idio, height):
            - FT_HEIGHT_COEF * ((height - 55.0) / 40.0) + ft_idio)
     return int(clamp(round(val), FT_MIN, FT_MAX))
 
-def generate_player(r, rec=None):
+def generate_player(r, rec=None, r_int=None):
     # S69 recorder seam (S42.2 pattern): rec is an optional dict, every write lands
     # strictly AFTER its draw is assigned, and the recorder itself draws no RNG --
     # the full oracle run (rec=None) is byte-identical pre/post seam, asserted at port.
     if rec is not None:
         rec["ath_noise"] = {}; rec["pull_gauss"] = {}
         rec["within_gauss"] = {}; rec["base_jitter_gauss"] = {}
+        rec["int_idio"] = {}
     # ---- 1. BODY FIRST (D1): height from the preserved marginal ------------------
     Height = draw_height(r, rec)
     ws_noise = r.gauss(4.0, 3.0)
@@ -413,6 +524,18 @@ def generate_player(r, rec=None):
         L = latent[k]
         current[k] = L if L <= EXPR_BASELINE else int(round(EXPR_BASELINE + e * (L - EXPR_BASELINE)))
 
+    # ---- 6b. THE INTANGIBLES (S78) -- drawn on the ISOLATED stream, outside the
+    #      budget entirely.  Emmett's ruling: "they generate on their own, those
+    #      points don't cost."  Written IDENTICALLY to latent and current: no
+    #      development delta, so runway is exactly zero for all three.
+    #      PROVISIONAL pending an intangible-development session (S78 ss2c).
+    if TOGGLES["intangibles"]:
+        if r_int is None:
+            raise ValueError("intangibles toggle is on but no isolated stream was supplied")
+        for k, v in draw_intangibles(r_int, rec).items():
+            latent[k] = v
+            current[k] = v
+
     # ---- 7. FreeThrow (derived; ONE persistent idiosyncrasy draw) -----------------
     ft_idio = r.gauss(0.0, FT_SIGMA)
     if rec is not None: rec["ft_idio"] = ft_idio
@@ -420,6 +543,9 @@ def generate_player(r, rec=None):
     current_ft = derive_ft(current["Outside"], ft_idio, Height)
 
     runway = {k: latent[k] - current[k] for k in SPEND_SKILLS}
+    if TOGGLES["intangibles"]:
+        for k in INTANGIBLES:
+            runway[k] = 0        # by construction (ss2c): drawn once, no delta
     runway["FreeThrow"] = latent_ft - current_ft
 
     return {
@@ -487,8 +613,15 @@ def rscore(p):
 # COHORT + CHECKS + DIAGNOSTICS + TABLES
 # ============================================================================
 def build_cohort(seed=SEED, n=N_CANDIDATE):
+    """One seeded MAIN stream in sequence, plus one ISOLATED intangibles stream per
+    player INDEX.  Index-keyed on purpose: the live bridge's cohort builder doubles
+    its request and regenerates from index 0, so player i is always player i."""
     r = random.Random(seed)
-    return [generate_player(r) for _ in range(n)]
+    out = []
+    for i in range(n):
+        r_int = random.Random(intangible_stream_seed(seed, i)) if TOGGLES["intangibles"] else None
+        out.append(generate_player(r, None, r_int))
+    return out
 
 def ht_str(h):
     inches = 68 + 0.36 * (h - 40)
@@ -530,7 +663,8 @@ def run(argv=None):
         p2 = None
         rr = random.Random(SEED)
         for j in range(i + 1):
-            p2 = generate_player(rr)
+            ri = random.Random(intangible_stream_seed(SEED, j)) if TOGGLES["intangibles"] else None
+            p2 = generate_player(rr, None, ri)
         same = (p2["latent"] == coh[i]["latent"] and p2["Height"] == coh[i]["Height"]
                 and p2["role"] == coh[i]["role"] and abs(p2["budget"] - coh[i]["budget"]) < 1e-12)
         check(f"determinism player {i}", same)
@@ -538,7 +672,14 @@ def run(argv=None):
     # bounds + latent>=current + budget conservation (exact)
     ok_b = all(8 <= p["latent"][k] <= 99 and 8 <= p["current"][k] <= 99 and p["current"][k] <= p["latent"][k]
                for p in coh for k in SPEND_SKILLS)
-    check("bounds + current<=latent (all 46k x 22)", ok_b)
+    check(f"bounds + current<=latent (all {len(coh)} x {len(SPEND_SKILLS)})", ok_b)
+
+    # S78: the intangibles are outside the budget, so they need their own bounds gate
+    # -- and current MUST equal latent exactly (ss2c: no development delta).
+    if TOGGLES["intangibles"]:
+        ok_i = all(8 <= p["latent"][k] <= 99 and p["current"][k] == p["latent"][k]
+                   for p in coh for k in INTANGIBLES)
+        check("S78 intangibles in [8,99] and current == latent exactly", ok_i)
     ok_c = all(abs(sum(p["spend"].values()) - p["budget"]) < 1e-6 for p in coh)
     check("budget conservation exact (spend sums to nominal)", ok_c)
 
@@ -566,10 +707,18 @@ def run(argv=None):
     flipped["dcat"] = "PostD" if probe["dcat"] != "PostD" else "PerimD"; flipped["dplane"] = 1.0 - probe["dplane"]
     check("D3 Rscore label-flip sensitivity == 0", rscore(flipped) == r_before, f"{r_before:.3f}")
 
-    # interior-defense cap honored (no small body walls off centers)
-    ok_cap = all(p["latent"]["PostDefense"] <= body_cap("PostDefense", p["Height"]) + 0.51
-                 and p["latent"]["RimProtection"] <= body_cap("RimProtection", p["Height"]) + 0.51 for p in coh)
-    check("interior-defense body cap honored (all 46k)", ok_cap)
+    # S78 ss4b -- CEILING PROVENANCE.  With the wall down, "cap honored" is vacuously
+    # true (nothing can exceed 99), so a green there proves nothing.  The gate that
+    # still has teeth is the opposite one: the ceiling function must return EXACTLY
+    # 99 for every formerly capped skill at every supported body.
+    CAPPED_4 = ["PostDefense", "RimProtection", "OffensiveRebounding", "DefensiveRebounding"]
+    if TOGGLES["uncap"]:
+        ok_prov = all(body_cap(k, h) == 99.0 for k in CAPPED_4 for h in range(40, 100))
+        check("S78 4b ceiling provenance: body_cap == 99 for the 4 formerly capped skills, h 40-99", ok_prov)
+    else:
+        ok_cap = all(p["latent"]["PostDefense"] <= body_cap("PostDefense", p["Height"]) + 0.51
+                     and p["latent"]["RimProtection"] <= body_cap("RimProtection", p["Height"]) + 0.51 for p in coh)
+        check("interior-defense body cap honored (all 46k)", ok_cap)
 
     # ---------- DIAGNOSTICS ----------
     print("\n---------- DIAGNOSTICS ----------")
@@ -688,7 +837,7 @@ def run(argv=None):
         for blo, bhi, blbl in ((40, 56, "small"), (57, 70, "mid"), (71, 99, "big")):
             sub = [p for p in decs[dl:dh] if blo <= p["Height"] <= bhi]
             if not sub: continue
-            landed = sum(sum(p["latent"][k] for k in SPEND_SKILLS) - 22 * FLAT_BASE for p in sub) / len(sub)
+            landed = sum(sum(p["latent"][k] for k in SPEND_SKILLS) - len(SPEND_SKILLS) * FLAT_BASE for p in sub) / len(sub)
             wf = sum(waste_frac(p) for p in sub) / len(sub)
             print(f"  {lbl:13s} {blbl:5s} n={len(sub):4d}  landed {landed:6.0f} pts  saturation-waste {100*wf:4.1f}%")
 
@@ -799,6 +948,13 @@ def _flat_draws(rec):
     out += [("gauss", rec["arrival_raw"]), ("gauss", rec["ft_idio"])]
     return out
 
+def _flat_int_draws(rec):
+    """THE ISOLATED-STREAM CONTRACT (S78), one home.  Four semantic slots on a
+    stream that is NOT the main Pass-3 stream: the shared component, then one
+    idiosyncratic component per intangible in INTANGIBLES order."""
+    return ([("beta", rec["int_shared"])]
+            + [("beta", rec["int_idio"][k]) for k in INTANGIBLES])
+
 class _ReplayR:
     """Replays recorded semantic draws in contract order; asserts each call KIND.
     A reordered or missing draw in a port dies here loudly, not in a soft moment check."""
@@ -836,12 +992,23 @@ def _constants_echo():
         "BUDGET_LO": BUDGET_LO, "BUDGET_SPAN": BUDGET_SPAN, "BUDGET_POW": BUDGET_POW,
         "CONC_A": CONC_A, "CONC_B": CONC_B,
         "PULL_EPS": PULL_EPS, "PULL_DICE_SIGMA": PULL_DICE_SIGMA,
-        "ROLE_FAM_PREF": ROLE_FAM_PREF, "GLUE_PREF": GLUE_PREF,
+        "ROLE_FAM_PREF": ROLE_FAM_PREF,
+        **({} if TOGGLES["glue_out"] else {"GLUE_PREF": GLUE_PREF}),
+        "DEF_BID_LO": DEF_BID_LO, "DEF_BID_SPAN": DEF_BID_SPAN,
+        "REB_BID_LO": REB_BID_LO, "REB_BID_SPAN": REB_BID_SPAN,
+        "SMALL_CREATION_BONUS": SMALL_CREATION_BONUS,
+        "SMALL_SHOOTING_BONUS": SMALL_SHOOTING_BONUS,
+        **({"INT_A": INT_A, "INT_B": INT_B, "INT_SHARED": INT_SHARED,
+            "INT_LO": INT_LO, "INT_HI": INT_HI,
+            "INT_STREAM_SALT": float(INT_STREAM_SALT),
+            "INTANGIBLES": list(INTANGIBLES)} if TOGGLES["intangibles"] else {}),
         "WITHIN_PREF": WITHIN_PREF, "WITHIN_DICE_SIGMA": WITHIN_DICE_SIGMA,
         "GAMMA_LO": GAMMA_LO, "GAMMA_HI": GAMMA_HI,
         "FLAT_BASE": FLAT_BASE, "BASE_JITTER": BASE_JITTER,
-        "IDCAP_LO_H": IDCAP_LO_H, "IDCAP_HI_H": IDCAP_HI_H,
-        "IDCAP_MIN": IDCAP_MIN, "REBCAP_MIN": REBCAP_MIN, "PRICE_TAU": PRICE_TAU,
+        **({} if TOGGLES["uncap"] else
+           {"IDCAP_LO_H": IDCAP_LO_H, "IDCAP_HI_H": IDCAP_HI_H,
+            "IDCAP_MIN": IDCAP_MIN, "REBCAP_MIN": REBCAP_MIN}),
+        "PRICE_TAU": PRICE_TAU,
         "HF_LO": HF_LO, "HF_HI": HF_HI, "HF_RANGE": HF_RANGE, "HF_STEEP": HF_STEEP, "HF_MID": HF_MID,
         "LOW_TAPER_FLOOR": LOW_TAPER_FLOOR, "LOW_TAPER_TOP": LOW_TAPER_TOP,
         "PATHWAY_W_FLOOR": PATHWAY_W_FLOOR,
@@ -878,7 +1045,8 @@ def dump_fixture(path):
     cohort = []
     for i in range(N_CANDIDATE):
         rec = {}
-        p = generate_player(r, rec)
+        ri = random.Random(intangible_stream_seed(SEED, i)) if TOGGLES["intangibles"] else None
+        p = generate_player(r, rec, ri)
         cohort.append((i, p, rec))
 
     chosen, tags = [], {}
@@ -923,19 +1091,32 @@ def dump_fixture(path):
     players = []
     for i in sorted(chosen):
         _, p, rec = cohort[i]
-        players.append({"index": i, "tags": tags[i], "draws": rec, "checkpoints": _checkpoints(p)})
+        players.append({"index": i, "tags": tags[i],
+                        "draws": {k: v for k, v in rec.items()
+                                  if k not in ("int_shared", "int_idio")},
+                        "intangible_draws": ({"int_shared": rec["int_shared"],
+                                              "int_idio": rec["int_idio"]}
+                                             if TOGGLES["intangibles"] else {}),
+                        "checkpoints": _checkpoints(p)})
 
     # SYNTHETIC pull-floor row (S69 finding: at the locked constants the epsilon floor
     # needs a ~-7-sigma dice draw and NO real cohort player reaches it -- so the branch
     # gets a hand-built draws row, checkpointed through generate_player itself).
     syn = {k: (dict(v) if isinstance(v, dict) else v) for k, v in cohort[0][2].items()}
-    syn["pull_gauss"]["Glue"] = -9.0          # fires max(PULL_EPS, ...) at the family stage
-    syn["within_gauss"]["Screening"] = -9.0   # fires max(PULL_EPS, ...) at the member stage
+    syn["pull_gauss"][list(FAMILIES)[-1]] = -9.0   # fires max(PULL_EPS, ...) at the family stage
+    syn["within_gauss"]["Screening"] = -9.0        # fires max(PULL_EPS, ...) at the member stage
     rr = _ReplayR(_flat_draws(syn))
-    ps = generate_player(rr)
+    rri = _ReplayR(_flat_int_draws(syn)) if TOGGLES["intangibles"] else None
+    ps = generate_player(rr, None, rri)
     assert rr.fully_consumed(), "synthetic row: draw-count contract violated"
+    assert rri is None or rri.fully_consumed(), "synthetic row: intangible draw-count violated"
     assert min(ps["pulls"].values()) == PULL_EPS, "synthetic row failed to fire the pull floor"
-    players.append({"index": -1, "tags": ["synthetic:pull-floor"], "draws": syn,
+    players.append({"index": -1, "tags": ["synthetic:pull-floor"],
+                    "draws": {k: v for k, v in syn.items()
+                              if k not in ("int_shared", "int_idio")},
+                    "intangible_draws": ({"int_shared": syn["int_shared"],
+                                          "int_idio": syn["int_idio"]}
+                                         if TOGGLES["intangibles"] else {}),
                     "checkpoints": _checkpoints(ps)})
 
     draw_order = (["height_u", "ws_noise", "a"]
@@ -944,16 +1125,21 @@ def dump_fixture(path):
                   + [f"pull_gauss.{f}" for f in FAMILIES]
                   + [f"within_gauss.{k}" for k in SPEND_SKILLS]     # family order, member order inside
                   + [f"base_jitter_gauss.{k}" for k in SPEND_SKILLS]
-                  + ["arrival_raw", "ft_idio"])                     # 68 semantic slots
-    fx = {"schema": {"schema_version": "s69-1", "seed": SEED, "n_cohort": N_CANDIDATE,
+                  + ["arrival_raw", "ft_idio"])                     # main stream: 61 slots at S78
+    fx = {"schema": {"schema_version": "s78-1", "seed": SEED, "n_cohort": N_CANDIDATE,
                      "n_players": len(players), "float_tolerance": 1e-9,
                      "draw_order": draw_order,
+                     **({"intangible_draw_order": list(INT_DRAW_ORDER)}
+                        if TOGGLES["intangibles"] else {}),
+                     "toggles": dict(TOGGLES),
                      "key_orders": {"ATH_KEYS": ATH_KEYS, "SPEND_SKILLS": SPEND_SKILLS,
                                     "FAMILY_ORDER": list(FAMILIES.keys()), "ROLES": ROLES},
                      "constants": _constants_echo(),
                      "note": "S69 branch-representative replay fixture, regenerated at S71 under the "
-                             "re-anchored FT derivation (FT_OUT_ANCHOR named; 72 constants echoed); "
-                             "draws recorded by the output-neutral recorder seam; ints EXACT, floats 1e-9."},
+                             "re-anchored FT derivation; REGENERATED at S78 under the body-cap removal, "
+                             "the re-based bid table, and Glue's exit from the budget. The three intangibles "
+                             "are drawn on an ISOLATED per-player stream and recorded in their own block; "
+                             "draw_order is the MAIN stream only. Ints EXACT, floats 1e-9 ABSOLUTE."},
           "edge_table": _edge_table(), "players": players}
     with open(path, "w") as f:
         json.dump(fx, f, indent=1)

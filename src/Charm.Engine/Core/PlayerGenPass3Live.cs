@@ -7,16 +7,22 @@ namespace Charm.Engine;
 /// <see cref="PlayerGenPass3.BuildFromDraws"/>, so the math that runs live is the math
 /// the Phase-69 fixture replay proves against the locked oracle every harness run.
 ///
-/// <para><b>The 68-slot draw order is a contract</b> (the fixture's <c>draw_order</c>,
-/// asserted by Phase 69; single home: the oracle's <c>_flat_draws</c>): height uniform,
-/// wingspan gauss, athletic-quality beta, 7 athletic gauss in ATH_KEYS order, weight
-/// gauss, def-plane gauss, role uniform, talent beta, concentration beta, 7 family-pull
-/// gauss in FAMILY_ORDER, 22 within-member gauss in SPEND_SKILLS order (= family order,
-/// member order inside — the oracle interleaves these with allocation arithmetic that
-/// draws NOTHING, so the flat fill below consumes the identical stream), 22 base-jitter
-/// gauss in SPEND_SKILLS order, arrival gauss, ft-idio gauss. The slots are SEMANTIC
-/// values, not uniform calls (each Gaussian consumes a uniform pair internally).
-/// Do not reorder.</para>
+/// <para><b>The 61-slot main draw order is a contract</b> (the fixture's
+/// <c>draw_order</c>, asserted by Phase 69; single home: the oracle's
+/// <c>_flat_draws</c>): height uniform, wingspan gauss, athletic-quality beta, 7
+/// athletic gauss in ATH_KEYS order, weight gauss, def-plane gauss, role uniform, talent
+/// beta, concentration beta, 6 family-pull gauss in FAMILY_ORDER, 19 within-member gauss
+/// in SPEND_SKILLS order (= family order, member order inside — the oracle interleaves
+/// these with allocation arithmetic that draws NOTHING, so the flat fill below consumes
+/// the identical stream), 19 base-jitter gauss in SPEND_SKILLS order, arrival gauss,
+/// ft-idio gauss. The slots are SEMANTIC values, not uniform calls (each Gaussian
+/// consumes a uniform pair internally). Do not reorder.</para>
+///
+/// <para><b>S78 — the SECOND stream.</b> The three intangibles are drawn from a
+/// SEPARATE <see cref="IRng"/>, seeded per player INDEX by
+/// <see cref="PlayerGenPass3.IntangibleStreamSeed"/>. They are not appended to the main
+/// order: appending would shift every later player's draws, which is exactly what the
+/// isolation gate forbids. Two streams, one player, no interaction.</para>
 ///
 /// <para><b>LIVE SINCE S70 (the bridge swap):</b> the divvy's <c>BuildRecruitedCohort</c>
 /// consumes this stream — first-past-the-line at <c>PlayerGenPass3.R_LINE</c>, positions
@@ -39,12 +45,13 @@ public static class PlayerGenPass3Live
         public required Pass3Result Result { get; init; }
     }
 
-    /// <summary>Draw one player: fill the 68 slots in fixture order, then run the locked
+    /// <summary>Draw one player: fill the 61 main slots in fixture order plus the 4
+    /// isolated intangible slots, then run the locked
     /// transform. This method contains ZERO arithmetic beyond the oracle's own draw
     /// parameters — the one computed input (the arrival MEAN, which follows the body per
     /// D2) comes from <see cref="PlayerGenPass3.ComputeArrivalMean"/>, the same shared
     /// home <see cref="PlayerGenPass3.BuildFromDraws"/> sits beside.</summary>
-    public static LivePlayer GeneratePlayer(IRng rng)
+    public static LivePlayer GeneratePlayer(IRng rng, IRng intangibleRng)
     {
         var d = new Pass3Draws();
 
@@ -74,26 +81,32 @@ public static class PlayerGenPass3Live
         d.Q = Sampling.Betavariate(rng, PlayerGenPass3.TALENT_A, PlayerGenPass3.TALENT_B);
         d.C = Sampling.Betavariate(rng, PlayerGenPass3.CONC_A, PlayerGenPass3.CONC_B);
 
-        // slots 16-22: the 7 family-pull gauss in FAMILY_ORDER (oracle :268-270)
+        // slots 16-21: the 6 family-pull gauss in FAMILY_ORDER (S78: Glue is gone)
         foreach (var f in PlayerGenPass3.FAMILY_ORDER)
             d.PullGauss[f] = Sampling.Gauss(rng, 0.0, PlayerGenPass3.PULL_DICE_SIGMA);
 
-        // slots 23-44: the 22 within-member gauss, family order + member order inside
+        // slots 22-40: the 19 within-member gauss, family order + member order inside
         // (= SPEND_SKILLS order; the oracle's interleaved allocation draws nothing)
         foreach (var k in PlayerGenPass3.SPEND_SKILLS)
             d.WithinGauss[k] = Sampling.Gauss(rng, 0.0, PlayerGenPass3.WITHIN_DICE_SIGMA);
 
-        // slots 45-66: the 22 base-jitter gauss in SPEND_SKILLS order (oracle :392)
+        // slots 41-59: the 19 base-jitter gauss in SPEND_SKILLS order
         foreach (var k in PlayerGenPass3.SPEND_SKILLS)
             d.BaseJitterGauss[k] = Sampling.Gauss(rng, 0.0, PlayerGenPass3.BASE_JITTER);
 
-        // slot 67: arrival gauss — the MEAN follows the BODY (D2, oracle :400-403);
+        // slot 60: arrival gauss — the MEAN follows the BODY (D2, oracle :400-403);
         // Height is a deterministic function of slot 1, so no extra RNG is consumed.
         var height = PlayerGenPass3.HeightFromU(d.HeightU);
         d.ArrivalRaw = Sampling.Gauss(rng, PlayerGenPass3.ComputeArrivalMean(height), PlayerGenPass3.ARR_SIGMA);
 
-        // slot 68: the ONE persistent FT idiosyncrasy (oracle :413)
+        // slot 61: the ONE persistent FT idiosyncrasy
         d.FtIdio = Sampling.Gauss(rng, 0.0, PlayerGenPass3.FT_SIGMA);
+
+        // ── the ISOLATED stream: 4 slots, a DIFFERENT IRng. One shared component,
+        //    then one idiosyncratic per intangible in INTANGIBLES order. ──
+        d.IntShared = Sampling.Betavariate(intangibleRng, PlayerGenPass3.INT_A, PlayerGenPass3.INT_B);
+        foreach (var k in PlayerGenPass3.INTANGIBLES)
+            d.IntIdio[k] = Sampling.Betavariate(intangibleRng, PlayerGenPass3.INT_A, PlayerGenPass3.INT_B);
 
         return new LivePlayer { Draws = d, Result = PlayerGenPass3.BuildFromDraws(d) };
     }
@@ -106,7 +119,7 @@ public static class PlayerGenPass3Live
         var rng = new SystemRng(seed);
         var cohort = new LivePlayer[n];
         for (var i = 0; i < n; i++)
-            cohort[i] = GeneratePlayer(rng);
+            cohort[i] = GeneratePlayer(rng, new SystemRng(PlayerGenPass3.IntangibleStreamSeed(seed, i)));
         return cohort;
     }
 }

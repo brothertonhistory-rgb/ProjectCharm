@@ -7268,7 +7268,7 @@ byte-for-byte wall; no divvy or season path reaches them (single-caller, verifie
 tweener-post existence requirement was confirmed affirmative on the bench at S51 and exists in the
 live world; weakest-leg multiplicative development remains the development layer's.
 
-## Player generation — Pass 3: the two-plane budget generator (S67 design / S68 oracle / S69 port; LIVE as of S70)
+## Player generation — Pass 3: the two-plane budget generator (S67 design / S68 oracle / S69 port; LIVE as of S70; **body wall removed and Glue freed at S78**)
 
 The live world generator. Every player is drawn body-first (the preserved total height marginal,
 inverse-CDF, bin-checked every run), then two independent planes: a **defensive plane** (0 pure
@@ -7276,27 +7276,84 @@ perimeter .. 1 pure post — who he can guard) and an **offensive role** (Creato
 PostScorer / Connector — what he does with the ball), with pairing odds sliding asymmetrically with
 size (undersized post types outnumber oversized perimeter types by ruling). A talent beta buys a
 **budget that purchases CEILINGS** (who he can become — development stays growth; no career wallet);
-an independent concentration roll shapes how the budget spreads across the **seven families**
+an independent concentration roll shapes how the budget spreads across the **six spendable families**
 (Shooting / InteriorOffense / Creation / PerimDefense / InteriorDefense / **Rebounding — spendable
-by the S67 ruling** / Glue), with **concave pricing** (elite costs more than good — the ruling that
-killed the nothing-but-freaks overshoot) and body caps on interior skills. The body's gifts are paid
+by the S67 ruling**), with **concave pricing** (elite costs more than good — the ruling that
+killed the nothing-but-freaks overshoot). The body's gifts are paid
 **live by the game** (the S46 rebounder body floor, the block channel, the reach term), never
-double-stamped by the generator. Arrival's mean follows the BODY (small ready, big raw; dice on
+double-stamped by the generator.
+
+**★ THERE IS NO BODY CEILING (S78, Emmett ruling 2026-07-26).** `BodyCap` returns **99 for every
+skill at every body** — it survives as the one named ceiling function so `Caps` stays a recorded
+checkpoint and the price curve keeps its cap argument, but it no longer gates anything. The ruling:
+every attribute must reach the top of the scale at any body; height may *influence* what a player
+becomes but must not *decide* it. A 6'6" man may own elite shot-blocking **skill**, and his body is
+what stops it being **felt** — that pricing lives in the ENGINE (`Matchup.BlockWeight` prices skill
+gap and length gap separately, blended per zone), not here. **The generator says what a man can do;
+the engine says whether it is felt.** Phase 70's ceiling-provenance gate asserts the 99 at every
+legal height for the four formerly capped skills, because with the wall down the old
+"cap honored" check is vacuously true and proves nothing.
+
+Height still shapes the card, through **preference and allocation** rather than a post-allocation
+wall. The interior/perimeter defense bid reads `DEF_BID_LO + DEF_BID_SPAN·x` (0.55 + 0.60) and
+rebounding reads `REB_BID_LO + REB_BID_SPAN·hf` (0.50 + 0.50): the **floor** rose, the **ceiling**
+did not move — at the leaning end the number is unchanged, at the off-lean end it roughly doubles.
+The S68 small-body handle/shoot lean survives, softened to `SMALL_CREATION_BONUS` 0.25 /
+`SMALL_SHOOTING_BONUS` 0.15, because it had been stacking on top of an already perimeter-tilted bid
+table and double-paying the small body. **All six coefficients are named constants carried in the
+fixture's constants echo** — an inline literal is a transcription channel the C# tripwire cannot
+police.
+
+The measured shape after S78, per height band (latent `RimProtection`, max / mean / share ≥80):
+5'8-5'9 **99** / 33.4 / 4.2% · 6'2-6'5 **99** / 45.1 / 11.2% · 6'8-6'9 99 / 53.0 / 18.9% ·
+6'10-7'0 99 / 54.3 / 20.2%. Every band reaches the top; the mean still climbs 33 → 54 and the elite
+share still climbs 4% → 20%. **Influence without decision.** This is not inflation: mean latent
+across the 19 surviving spend skills moved 34.01 → 36.14 on a 3.08% spend rise (Glue's share
+redistributed), and the interior gain came out of the perimeter.
+
+**★ THE THREE INTANGIBLES ARE OUTSIDE THE BUDGET (S78).** `BasketballIQ`, `Discipline` and
+`HelpDefense` left `FAMILIES` entirely — Emmett's ruling, "they generate on their own, those points
+don't cost." They had been the one family that never varied by role or body (`GLUE_PREF = 0.32`,
+flat), so they could never be preferred and never got bought: pre-S78, `BasketballIQ` had two
+players ≥ 80 in 21,000 and `HelpDefense` had none.
+
+They are now drawn on a **separate `IRng`, seeded per player INDEX** by `IntangibleStreamSeed(seed,
+index)` — plain integer arithmetic, no hashing, deterministic in both languages. Four draws: one
+shared beta plus one idiosyncratic beta each, blended at `INT_SHARED = 0.55` and mapped onto [8,99],
+so a smart man is usually disciplined without the three being welded together. Landing at mean ~53.5,
+max 97, ~3.5% ≥ 80. **A separate stream, not appended slots** — appending would shift every later
+player's draws, which is precisely what the isolation gate forbids.
+
+Written **identically to latent and current, runway exactly zero**: drawn once, no development delta.
+Provisional pending an intangible-development session. **`INT_A`/`INT_B` (the centre) are a
+PLACEHOLDER and explicitly UN-RULED** — it cannot be judged before there are season stats; expect it
+to move. Arrival's mean follows the BODY (small ready, big raw; dice on
 top). `Rscore` is **label-free by construction** — pathway weights derive from the realized card's
 family mass; role and plane are not even parameters — and the recruiting line is the generator's own
 `R_LINE = 17.0`.
 
-**The card contract (S70).** `Pass3Result.Card` is the 33-key current card the bridge feeds
-`GenMapToPlayer` — key-for-key identical to Pass 2's (3 size + 7 athletic + 22 spend skills +
-FreeThrow), with the **provenance shift**: OffensiveRebounding/DefensiveRebounding are now
-current-expressed SPENDABLE skills (the old body stamps retired), same key names, changed meaning.
+**The card contract (S70; sources shifted at S78).** `Pass3Result.Card` is the 33-key current card
+the bridge feeds `GenMapToPlayer` — key-for-key identical to Pass 2's (3 size + 7 athletic + **19
+spend skills + the 3 intangibles** + FreeThrow), with two **provenance shifts** and no key changes:
+OffensiveRebounding/DefensiveRebounding are current-expressed SPENDABLE skills (S70, the old body
+stamps retired), and the three intangibles are now stamped from the **isolated draw** rather than
+from budget spend (S78). Same 33 names, changed meaning, every downstream reader unaffected.
+
+**★ The card assert is a key-SET check, so it cannot catch a wrong SOURCE** — stamping the three
+from the wrong place still yields 33 keys and still goes green. The real guard is a Phase 70 EXACT
+gate asserting `Current == Latent` for the three and that the card value equals `Current`, per
+player. This is the S78 instance of a standing lesson: a completeness check and a correctness check
+are different checks, and the one that passes while wrong is the dangerous one.
 Assembly runs through **one canonical named static, `PlayerGenPass3.BuildCard`**, which asserts the
 exact key SET against the frozen verbatim `CARD_KEYS` contract at generation time (33 wrong keys is
 still 33 keys) — a future family edit that drifts the card off the consumer's contract throws
 loudly instead of stamping meaning nowhere. `BuildCard` is pure (no RNG), so **prefix stability
-holds**: `BuildCohort` is one seeded stream, 68 fixed-order slots per player, no size-dependent
-branch — the first k players are identical for any cohort size ≥ k, and Phase 54's two-chunk-size
-check proves the contract structurally every run.
+holds**: `BuildCohort` is one seeded main stream, **61** fixed-order slots per player (68 before S78
+took Glue's 1 family pull + 3 within + 3 base jitter out) plus the 4-slot isolated intangibles
+stream, no size-dependent branch — the first k players are identical for any cohort size ≥ k, and
+Phase 54's two-chunk-size check proves the contract structurally every run. Index-keying the second
+stream is safe for exactly this reason: the recruiting bridge doubles its request and regenerates
+from index 0, so player *i* is always player *i*.
 
 **The FreeThrow derivation (S71 recalibration, Emmett ruling 2026-07-24: mirror real-life FT
 shooting — "guys in the low 90s and guys who struggle to get to 50%").** FreeThrow is DERIVED,
@@ -7326,6 +7383,58 @@ bodies); fixture `gen_pass3_replay_fixture_s69.json` (301 branch-representative 
 NeumaierSum port lesson lives here); Phase 70 audits the live drawing (sampler moments, exact
 invariants — budget conservation, caps, anti-target 0, label-flip 0 — and the ruled bands) on the
 canonical 46k. Any future tuning happens in the oracle first.
+
+## The generator diagnostic ladder (Session 78, 2026-07-26)
+
+A season page alone cannot validate the generator. If the draft or the depth chart drops every
+player a generation session creates, the page looks unchanged while the generator worked perfectly.
+So generator sessions read four stages, and a failure at each has a different owner:
+
+| stage | readout | failure here means |
+|---|---|---|
+| 1. **generated** | the oracle's 46k cohort by body band and skill | the generator |
+| 2. **rostered** | the body-band census in `PrintRosterCensus` (page-only) | the draft / scout rank |
+| 3. **played** | minutes by man (S76/S77 pages) | the depth chart |
+| 4. **expressed** | the season leaderboards (S77 page) | the engine, or attribution |
+
+Stage 1 reports latent **and** current; stage 2 can only report **current**, because the roster
+bridge carries the 33-key card (`PoolPlayer.Ratings`) and latent does not survive the crossing.
+Comparing generated-latent against rostered-current would confound arrival expression with draft
+selection — the exact thing the ladder exists to separate — so stage 2 is current-vs-current.
+
+**★ MEASURED AT S78, RECORDED SO IT IS NOT RE-DERIVED: the accepted pool is drafted ONE-FOR-ONE.**
+`BuildRecruitedCohort` returns exactly `PoolSize` players and every one lands on a roster
+(4,511 → 4,511), so a pool→rostered transition count is 100% **by construction** and can never
+detect anything. **Draft-level masking is structurally impossible.** This does not clear the scout
+rank; it relocates its risk. The rank still decides which school and which depth-chart slot, so it
+can bury a generation session's players in **minutes** — stage 3, not stage 2.
+
+### What the ladder found at S78 — two defects, previously conflated
+
+S78 removed the body ceiling and predicted, in writing, that a block board still flat at ~1.0 across
+ranks 1–10 would mean the session failed to express. It read 1.2 down to 1.0, nine guards and one
+wing. **The prediction failed on its own recorded terms.** The value came from the ladder splitting
+that one symptom into two unrelated problems:
+
+- **Rebounding is a MINUTES problem.** Per minute the bigs win comfortably — the big at rebound rank
+  2 takes 10.4 boards in 23.7 minutes (0.44/min) against the leader's 10.8 in 31.8 (0.34/min). Bigs
+  average ~24 mpg against guards' ~32, and per-game leaderboards are minutes-weighted, so the better
+  rebounder loses the board on playing time. The generator and the credit are both fine.
+- **Blocking is a CREDIT problem.** Per minute the top blockers run 0.038 / 0.040 / 0.035 — flat
+  across bodies. Nobody out-blocks anyone per possession. That is not minutes; `BlockerWeight` (the
+  defender-only function `BlockerPicker` uses to choose who is *credited*) is handing credit out
+  nearly evenly, and it is a different function from `BlockWeight` (which prices the shooter-vs-
+  defender duel and does have real headroom).
+
+**The layering lesson, ruled at S78 and worth keeping.** The obvious response to "a 5'9" man is
+eighth in the country in blocks" is to thin the small-body tail in the generator. That would be a
+compensating error in the wrong layer: the block board was *already* flat and positionally scrambled
+(O-29) at a time when the generator capped small men at 34–43 rim protection, which means length was
+never being priced and the generator was merely hiding it. Bending the generator would leave both
+real defects undiagnosed and leave an unjustifiable dial in the bid table for whoever fixes blocking
+years later. **Fix the layer that is wrong.** The named counterweight: "elite rim protector, 5'9""
+reads as a bug on a card, and that is real — but it belongs to a presentation layer that does not
+exist yet, so nothing breaks by waiting.
 
 ## World Structure — Pass 1: the era-file skeleton (Session 28, 2026-07-02)
 
@@ -7606,7 +7715,7 @@ The rank-11 residue of 0.1 minutes is the **A7 collision made visible**: the ope
 ### The pool (S63 bridge → S66 recruiting line → S70: the Pass-3 cohort, positions by defensive plane)
 
 - **Source (S70):** `BuildRecruitedCohort(divvySeed ^ DivvyCohortSeedXor, 10 × schoolCount, 2 × 10n)` — the **Pass-3 two-plane budget generator** (`PlayerGenPass3Live.BuildCohort`) on its own derived stream, consumed IN ORDER until exactly 10n players satisfy `Rscore >= PlayerGenPass3.R_LINE` (17.0 — the same standing line, now the Pass-3 generator's own constant); accepted players keep draw order. The pool stays a pure function of (world, seed); the transform is oracle-locked; the bridge draws and filters, never edits (Phases 69/70 re-prove parity every run).
-- **The recruiting line (S66 ruling, standing at 17, explicitly reversible; S70: the deeper stream).** ~79.5% of the Pass-3 stream clears it (the S68 "college gets deeper" ruling — the budget model floors everyone at real tools), so filling 3,470 costs ~4,400 draws, once per season command; the 2×P initial size never doubles at stock. The growth rule is safe because the stream is **prefix-stable** — one sequential per-player stream, 68 fixed-order slots, no pool-level pass, no size-dependent draw, so the first k players are identical for any cohort size ≥ k; Phase 54 proves the CONTRACT structurally (two different growth chunk sizes → the identical ordered accepted pool; the 4,000-draw second chunk accepts ~3,185 < 3,470 at the check's seed, so the doubling branch is genuinely exercised).
+- **The recruiting line (S66 ruling, standing at 17, explicitly reversible; S70: the deeper stream).** ~79.5% of the Pass-3 stream clears it (the S68 "college gets deeper" ruling — the budget model floors everyone at real tools), so filling 3,470 costs ~4,400 draws, once per season command; the 2×P initial size never doubles at stock. The growth rule is safe because the stream is **prefix-stable** — one sequential per-player main stream of 61 fixed-order slots (S78; 68 before Glue left the budget) plus a per-index isolated intangibles stream, no pool-level pass, no size-dependent draw, so the first k players are identical for any cohort size ≥ k; Phase 54 proves the CONTRACT structurally (two different growth chunk sizes → the identical ordered accepted pool; the 4,000-draw second chunk accepts ~3,185 < 3,470 at the check's seed, so the doubling branch is genuinely exercised).
 - **Positions by EXACT COUNT in DEFENSIVE-PLANE rank (Emmett ruling 2026-07-24 — position is who the player can GUARD; supersedes the S63 orientation-rank form, same exact-count shape).** Sort on `Pass3Result.DPlane` (0 pure perimeter .. 1 pure post) ascending, cohort index as the deterministic tiebreak. The **4n most perimeter defenders are Guards, the 3n most interior are Bigs, the middle 3n are Wings** — 1,388/1,041/1,041 at stock. Height gets no vote and the offensive role rides along as flavor — **the 6'5" Guard and the 6'2" Big are ruled-correct output, not defects** (Phase 54 prints the extremes and the tall-guard/short-big counts on every run as the standing guard against a later system quietly assuming Guards are short; stock at the check's seed: 47 guards over 6'3", 116 bigs under 6'5"). The fixed `DCat` bucketing (0.35/0.65) is page flavor only — it lands 38/38/23 and can never hit the exact-count quota; position ranks the continuous plane. Phase 54 asserts the plane boundaries monotone (every B ≥ every W ≥ every G, non-strict for straddling ties).
 - **Roles at the OLD pool's density, quota as a FLOOR (ruling 0.2, unchanged through the swap).** `DivvyLeadRoleTarget`/`DivvyTdwRoleTarget` reproduce the old expected density exactly — stock **903 leads / 729 wing defenders**, floor 417 each. Protected roles by rank within position (leads: BallHandling+Playmaking composite; ThreeAndDWing: PerimeterDefense), deterministic tiebreak. Non-protected roles are **labels only** (mechanically inert — traced end-to-end S63) and stamp deterministically from each player's own card. `ValidateDivvyPool` still asserts the floor loudly before pick one.
 - **Card → Player (S70):** a COPY of the 33-key `Result.Card` (the generator's canonical card, assembled by `PlayerGenPass3.BuildCard` and set-asserted at generation; never mutated by the bridge) → the committed golden-proven `DeriveAndStampTendencies` (reads 13 keys, none of them rebounding — the card shift cannot ripple into the diet, verified S70) → `GenMapToPlayer` → `Player.Validate()`. HierarchyRank stays at its default. **The provenance shift:** OffensiveRebounding/DefensiveRebounding on the card are now current-expressed SPENDABLE skills (Pass 2's body stamps retired); same key names, changed meaning — the S70 page diff is the recorded consequence.
@@ -7643,7 +7752,19 @@ Proven: wiring correctness, determinism (draft AND pool, byte-level), and every 
 
 ### The S63 baseline (the calibration arc's starting picture — same engine, same seed 20260720, only the pool differs)
 
-Old pool → Pass-2 cohort: points 73.8 → 50.9; FG% 45.5 → 28.2; 3P% 33.8 → 22.0; FT% 70.5 → 61.2; PPP 1.052 → 0.732; pace 70.1 → 69.5; 3PA rate 0.39 → **0.69**; TO% 18.3 → 22.4; fouls 17.4 → 16.2 (shooting 6.65 → 3.37, non-shooting 10.71 → 12.79); usage max/p90/median 27.1/20.4/7.5 → **46.9**/25.6/7.6. Census clean (3,470/3,470 drafted; 347/347 exact rosters; 347/347 protected coverage). **Cross-checked:** S60.2's random-cohort field (FG% 27.8 / PPG 50.8) matches this world (28.2 / 50.9) through independent plumbing — the levels are the cohort's real curve, not a bridge artifact. Recorded here as the swap's fixed capture. The arc's CURRENT recorded reference is the **S71 page** (Pass-3 cohort, FT generation recalibrated, seed 20260720): points 73.4, FGA 54.8, FG% 46.4, 3P% 36.6, 3PA rate 0.37, FT% 70.6 (target line OK), FTA 21.5, PPP 1.0326, TO% 21.3, pace 71.1, rebounds credited 29.4, fouls 20.28 (6.46 shooting / 13.82 non-shooting), usage max/p90/median 46.5/24.3/8.0, census clean, schedule fingerprint 93d8c853… — every calibration session diffs against that page, never against memory. (The superseded chain, kept for the diff trail: the S63 capture above; the S66 page — points 69.7, FG% 46.0, 3P% 34.3, 3PA rate 0.30, FT% 62.0, FTA 21.6, PPP 0.9825, TO% 21.3, pace 71.0, fouls 19.97 = 7.36/12.61, usage 44.5/25.0/7.6; the S70 page — points 71.5, FG% 46.4, 3P% 36.6, 3PA rate 0.36, FT% 61.9, FTA 21.3, PPP 1.0088, TO% 21.2, pace 70.9, rebounds credited 30.5, fouls 20.28 = 6.50/13.78, usage 46.2/24.3/8.0.)
+Old pool → Pass-2 cohort: points 73.8 → 50.9; FG% 45.5 → 28.2; 3P% 33.8 → 22.0; FT% 70.5 → 61.2; PPP 1.052 → 0.732; pace 70.1 → 69.5; 3PA rate 0.39 → **0.69**; TO% 18.3 → 22.4; fouls 17.4 → 16.2 (shooting 6.65 → 3.37, non-shooting 10.71 → 12.79); usage max/p90/median 27.1/20.4/7.5 → **46.9**/25.6/7.6. Census clean (3,470/3,470 drafted; 347/347 exact rosters; 347/347 protected coverage). **Cross-checked:** S60.2's random-cohort field (FG% 27.8 / PPG 50.8) matches this world (28.2 / 50.9) through independent plumbing — the levels are the cohort's real curve, not a bridge artifact. Recorded here as the swap's fixed capture. **★ The arc's CURRENT recorded reference is the S78 page** (seed 20260720, world `stock-d1`,
+schedule fingerprint 93d8c853… unchanged): points 68.5, FGA 56.5, FG% 42.9, 3P% 34.9, 3PA rate 0.37,
+FT% 69.9, FTA 18.2, PPP 0.9651, TO% 22.2, pace 71.0, rebounds credited 31.4, fouls **17.95 (6.31
+shooting / 11.64 non-shooting)**, blocks 4.1, steals 7.5, assists 9.9, census 4,511/4,511, rotation
+ladder 31.8…4.2, top-five share 69.7%, cross-position 24.44%. **Seventeen calibration verdicts read
+HIGH or LOW and NONE of them was chased** — the readout is a `void` print, page-only, never asserted.
+The page moved because the POPULATION was corrected, not because a dial turned: `Discipline` went
+~17 → ~53 and S62 wired it into reach-in foul propensity, so fouls fell 20.23 → 17.95 (reach-ins
+13.76 → 11.64), FTA fell with them, and free points went with that. Defense also strengthened league
+-wide (both defensive bids re-floored, `HelpDefense` ~17 → ~53), which outran Roll H's IQ make-bonus
+switching on for the first time — that term is `clamp((IQ − 50)/49)`, dead at the old league mean of
+~17. **This page is the arc's new recorded reference and is PROVISIONAL pending a calibration
+session.** The previous reference was the **S71/S77 page** (Pass-3 cohort, FT generation recalibrated, seed 20260720): points 73.4, FGA 54.8, FG% 46.4, 3P% 36.6, 3PA rate 0.37, FT% 70.6 (target line OK), FTA 21.5, PPP 1.0326, TO% 21.3, pace 71.1, rebounds credited 29.4, fouls 20.28 (6.46 shooting / 13.82 non-shooting), usage max/p90/median 46.5/24.3/8.0, census clean, schedule fingerprint 93d8c853… — every calibration session diffs against that page, never against memory. (The superseded chain, kept for the diff trail: the S63 capture above; the S66 page — points 69.7, FG% 46.0, 3P% 34.3, 3PA rate 0.30, FT% 62.0, FTA 21.6, PPP 0.9825, TO% 21.3, pace 71.0, fouls 19.97 = 7.36/12.61, usage 44.5/25.0/7.6; the S70 page — points 71.5, FG% 46.4, 3P% 36.6, 3PA rate 0.36, FT% 61.9, FTA 21.3, PPP 1.0088, TO% 21.2, pace 70.9, rebounds credited 30.5, fouls 20.28 = 6.50/13.78, usage 46.2/24.3/8.0.)
 
 ### Emergent observations (and their resolution)
 

@@ -96,9 +96,12 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <!-- Pass-3 two-plane budget generation replay fixture (emitted by the oracle's
-         fixture switch in tools/gen_pass3_budget_oracle.py, S69), copied beside the
-         binary so RunGenPass3ReplayParity reads it from AppContext.BaseDirectory. -->
-    <None Include="..\..\tools\gen_pass3_replay_fixture_s69.json" Link="tools\gen_pass3_replay_fixture_s69.json">
+         fixture switch in tools/gen_pass3_budget_oracle.py). REGENERATED AND RENAMED at
+         S78: the CONTRACT changed, not just the values — 61 main slots instead of 68,
+         plus a separate 4-slot isolated intangibles block — so the s69 name would have
+         been a lie about the shape. The s69 file is retired; journal S69/S71 and git
+         history hold the old population. -->
+    <None Include="..\..\tools\gen_pass3_replay_fixture_s78.json" Link="tools\gen_pass3_replay_fixture_s78.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

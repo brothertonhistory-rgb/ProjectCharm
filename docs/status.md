@@ -10,16 +10,25 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 77** (2026-07-26; the season stat page — per-player season records keyed by the person, three readouts, Phase 73's twenty-two gates; no simulated number moved).
+Last updated: **Session 78** (2026-07-26; the body wall comes down — `BodyCap` returns 99 at every body, the interior/rebounding bid re-based, Glue leaves the budget and the three intangibles generate on their own isolated stream).
 
 ## Current baseline
 
-**The S77 page is the arc's recorded reference** (seed 20260720, world `stock-d1`, schedule
-fingerprint `93d8c853…`, season SHA-256 `96eb2c3a…`, 627 lines): points 72.4, FG% 45.8,
-3P% 35.9, FT% 70.5, PPP 1.0176, TO% 21.6, pace 71.1, fouls 20.23/team/game (6.47 shooting /
-13.76 non-shooting), usage max/p90/median 38.8% / 18.1% / 6.3%, top-five share of floor time 69.7%,
-cross-position occupancy 24.49%, census clean (4,511/4,511 drafted; 347/347 exact rosters; 347/347
-protected coverage). Every calibration session diffs against that page, never against memory.
+**The S78 page is the arc's recorded reference — and it is PROVISIONAL pending a calibration session**
+(seed 20260720, world `stock-d1`, schedule fingerprint `93d8c853…` unchanged): points 68.5, FG% 42.9,
+3P% 34.9, FT% 69.9, PPP 0.9651, TO% 22.2, pace 71.0, rebounds credited 31.4, fouls **17.95/team/game
+(6.31 shooting / 11.64 non-shooting)**, blocks 4.1, steals 7.5, assists 9.9, usage max/p90/median
+36.9% / 18.0% / 6.2%, top-five share of floor time 69.7%, cross-position occupancy 24.44%, census
+clean (4,511/4,511 drafted; 347/347 exact rosters; 347/347 protected coverage). Every calibration
+session diffs against that page, never against memory. *(Previous reference: the S77 page — points
+72.4, FG% 45.8, 3P% 35.9, FT% 70.5, PPP 1.0176, TO% 21.6, pace 71.1, fouls 20.23 = 6.47/13.76.)*
+
+**Why it moved at S78, and why NOTHING was chased.** Seventeen calibration verdicts read HIGH or LOW.
+`PrintCalibrationReadout` is a `void` print — page-only, never asserted — and no dial was touched.
+The page moved because the POPULATION was corrected: `Discipline` went ~17 → ~53 and S62 wired it
+into reach-in foul propensity, so fouls fell 20.23 → 17.95, FTA fell with them, and free points went
+with that. Defense also strengthened league-wide, which outran Roll H's IQ make-bonus finally
+switching on (`clamp((IQ − 50)/49)` — dead at the old league mean of ~17).
 
 **S77 changed no simulated number.** The page grew from 493 lines to 627 by appending the stat section;
 the 493 pre-existing lines are **byte-identical** to S76.1, proven by line diff, not by hash. Only the
@@ -69,7 +78,10 @@ chart is PROVISIONAL pending O-6.
   consequential:** until now these shaped who got RECRUITED; from S76 they decide WHO PLAYS, because the
   depth chart orders the minute targets. Targets fall sharply within a group (32→8 for guards, 26→4 for
   bigs), so a single rank inversion is a large minute swing. The chart is labelled **provisional** in
-  design.md until this lands.
+  design.md until this lands. **S78 relocated the risk precisely:** the accepted pool is drafted
+  ONE-FOR-ONE (4,511 → 4,511), so draft-level masking is structurally impossible — the rank cannot stop a
+  player making a roster. What it still decides is which school and which depth-chart slot, i.e. **minutes**
+  (O-33). Any future "did the scout rank hide my players?" question is a stage-3 question, not stage-2.
 - **O-7 — Drive gate Pass B: post-feed + usage diffusion (S59).** The "he gave it up" outcome —
   a denied drive currently always becomes his own contested jumper, never someone else's shot.
 - **O-8 — Drive gate Pass C: the off-ball open-three lever (S59).**
@@ -122,11 +134,51 @@ chart is PROVISIONAL pending O-6.
   knowingly. **The "until S77" in the original wording is void** — see O-30. Now VISIBLE rather than
   inferred: the S77 page shows 1,018 of 4,511 player-seasons with zero games played.
 
-- **★ O-29 — Blocks are FLAT and positionally scrambled (S77 page finding, first run).** Ranks 1–10 of the
-  block leaderboard span **1.1 down to 1.0** — no separation between the league's best shot-blocker and its
-  tenth — and four guards at heights 53–59 sit interleaved with bigs at 74–89. A height-55 guard blocks at
-  the same rate as a height-89 big. This is the exact implausibility the S77 prompt named in advance as the
-  reason to build the page. Measurement first, not a dial session.
+- **★ O-29 — BLOCK CREDIT IS FLAT PER MINUTE (S77 finding; DIAGNOSED and NARROWED at S78).** Ranks 1–10 of
+  the block board still span **1.2 down to 1.0** after S78 removed the generator's body ceiling — nine
+  guards and one wing, heights 40–64, a 5'8" man eighth in the country. **S78 predicted this reading in
+  writing as its own failure signal, and it failed on those terms.** The S78 ladder narrowed the cause:
+  normalised for playing time the top blockers run **0.038 / 0.040 / 0.035 per minute — flat across
+  bodies**, so this is NOT the minutes skew (see O-33) and NOT the generator (stages 1 and 2 are clean).
+  The suspect is `Matchup.BlockerWeight` — the defender-only function `BlockerPicker` uses to choose who is
+  **credited**, distinct from `BlockWeight`, which prices the shooter-vs-defender duel and does have real
+  headroom. **★ Ruled at S78: this is fixed in the ENGINE, never by thinning the generator's small-body
+  tail** — the board was already flat when small men were capped at 34–43 rim protection, so the generator
+  was only hiding the defect. Measurement first, not a dial session.
+
+- **★ O-33 — MINUTES ARE SKEWED AGAINST BIGS (S78 ladder finding; split out of O-29).** Bigs average ~24
+  mpg against guards' ~32, and every per-game leaderboard is minutes-weighted, so the better man loses the
+  board on playing time. Measured: the big at rebound rank 2 takes **0.44 boards/min** against the
+  leader's **0.34** and still finishes second. Unlike O-29 this is NOT a credit problem — the rebounding
+  credit tracks the right men — it is who the depth chart puts on the floor, which is **O-6's** territory.
+  Kept as its own line because S77 conflated the two symptoms under O-29 and they have different owners.
+
+- **O-34 — ★ THE ANTI-TARGET GATE IS PAGE-ONLY, ON LOAN (S78 ruling, named end date).** The "no elite
+  recruit is flat" rule was an EXACT gate that threw; S78 demoted it to a printed number because Glue was
+  silently doing the work of the guaranteed hole (96 of the top 347 cards had a Glue skill as their card
+  minimum) and the rule was written when the intangibles were dead. It fires at 1–3 now. **This is a
+  recorded LOOSENING, proposed by Claude and accepted:** re-rule it once the season page shows what a flat
+  card actually plays like. It does not leave Open by fading.
+
+- **O-35 — The intangibles CENTRE is a placeholder (S78, explicitly UN-RULED).** `INT_A`/`INT_B` put
+  BasketballIQ / Discipline / HelpDefense at mean ~53.5. Emmett's position: it cannot be judged before
+  there are stats. The SHAPE is locked (shared component + idiosyncratic, [8,99], current == latent,
+  runway zero); only the centre is open. Revisit after the first season's numbers.
+
+- **O-36 — The intangibles have no DEVELOPMENT (S78, provisional by design).** All three are written
+  identically to latent and current, so runway is exactly zero and they cannot grow. A named comment marks
+  it. Belongs to an intangible-development session, not to a generator session.
+
+- **O-37 — The fixture declares a tolerance the C# never reads (S78, small).** The Pass-3 fixture header
+  carries `float_tolerance: 1e-9` and `Program.Checks.GenPass3.cs` uses its own `GenPass3Tol` const. They
+  agree today; nothing asserts they must. One line to close, worth closing because S78 just exercised the
+  fixture contract.
+
+- **O-38 — "Elite rim protector, 5'9"" reads as a bug on a card (S78, presentation).** A consequence of
+  the S78 ruling that the generator states capability and the engine prices expression. The honest fix is
+  presentation — show expressed production beside the rating, or scout language that accounts for body —
+  and there is no presentation layer yet, so nothing breaks by waiting. Recorded so it is not
+  re-discovered as a generator bug.
 
 - **O-30 — ★ FOUL-OUTS HAVE NO SCHEDULED HOME (orphaned, found S77).** S75 deferred foul-outs to "S77" and
   S77 became the stat page, so nothing is scheduled to build them. The deferral itself is still correct —
@@ -231,23 +283,35 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-*Not yet chosen — Emmett's call.* S77 shipped and produced findings that reshape the queue, so the honest
-state of this section is a recommendation rather than a decision.
+*Not yet chosen — Emmett's call.* S78 shipped and reshaped this section: the item that was one loud symptom
+at S77 is now two separate, individually measured defects with different owners.
 
-**Claude's pick: O-6, scout-rank modernization.** Reasons, in order. It was already RAISED PRIORITY at S76
-because the depth chart decides WHO PLAYS and a single rank inversion is a large minute swing (targets fall
-32→8 for guards, 26→4 for bigs). The S77 page now makes that visible for the first time — rotation order,
-minutes per man, and who is getting the shots are all readable off one screen, so the session can be judged
-rather than reasoned about. And every other open item downstream of it moves when it lands: the block board
-(O-29), the all-guard scoring leaderboard, the usage spread, and the calibration queue (O-15) are all read
-against a rotation that is currently ordered by a rank the board itself labels provisional.
+**Claude's pick: O-29, block credit.** S78 recommended it in advance and then earned the right to recommend
+it — the session predicted, in writing, that a flat block board would mean it failed to express, and the
+board came back flat. The generator is now provably clean at stages 1 and 2, and the per-minute rates are
+flat across bodies, so the remaining suspect is narrow and named: `BlockerWeight`, the credit function, as
+distinct from `BlockWeight`, the pricing function. It is a **measurement** question first, not a dial
+question, so it is cheap. And it is the standing test of the S78 ruling: the generator now says a 6'6" man
+can own elite shot-blocking skill, and the whole ruling rests on the engine being the thing that decides
+whether it is felt. Right now the engine is not deciding — length is not priced. Until that is fixed the
+S78 ruling is a promise the engine cannot keep.
 
-**The strongest counter-candidate: O-29, why blocks are flat.** It is the loudest thing on the new page and
-it is a *measurement* question, not a dial question, so it is cheap. Take it first if the page bothers you
-more than the rotation does.
+**The strongest counter-candidate: O-6, scout-rank modernization** (feeding O-33, the minutes skew). Still
+RAISED PRIORITY, and it is what makes bigs play 24 minutes against guards' 32. Take it first if the
+leaderboards bother you more than the mechanism does. Note the S78 narrowing: the rank cannot stop anyone
+making a roster, so this is now purely a minutes question.
 
-**Recommended NOT next:** O-30 (foul-outs). Real, orphaned, and blocking O-28 — but it needs an RNG
-restructuring, which is a poor thing to run immediately after a session that just rebaselined the page.
+**Recommended NOT next:** any calibration session. Seventeen verdicts are red and the page is explicitly
+provisional, which makes chasing them now the exact wrong move — several will move on their own when O-29
+and O-6 land. **Also NOT next:** O-30 (foul-outs), unchanged reasoning — an RNG restructuring is a poor
+thing to run immediately after a rebaselined page.
+
+*(S78 shipped — the body wall down (`BodyCap` ≡ 99), the interior/rebounding bid re-based, the small-body
+handle/shoot lean softened, and Glue out of the budget with the three intangibles on an isolated per-player
+stream. Suite `ALL CHECKS PASSED`; Phase 69 bit-identical (0.000E+000 across 35,092 checks); one Phase 70
+band re-ruled (ceiling-pressure 23%±3 → 26.5%±2.5, from a fixed five-seed panel); the old body-cap gate
+replaced by a ceiling-provenance gate; the anti-target gate demoted to page-only (O-34). Historical detail
+in journal S78. Six items opened: O-33 through O-38; O-29 narrowed and O-6 relocated.)*
 
 *(S77 shipped — per-player season records keyed by the person, the three readouts, Phase 73's twenty-two
 gates. No engine file touched; the 493 pre-existing page lines byte-identical. Historical detail in

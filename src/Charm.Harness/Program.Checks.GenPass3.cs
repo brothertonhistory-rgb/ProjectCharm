@@ -8,8 +8,8 @@ namespace Charm.Harness;
 // Phase 70 — Pass-3 LIVE generator: sampler moments + the 46k invariant/band audit.
 //
 // The executable spec is tools/gen_pass3_budget_oracle.py (LOCKED SPEC 2026-07-24,
-// S68); the committed replay fixture tools/gen_pass3_replay_fixture_s69.json
-// (schema s69-1, seed 20260724, 301 players: 300 branch-representative rows off the
+// S68, REOPENED AND RE-LOCKED S78); the committed replay fixture
+// tools/gen_pass3_replay_fixture_s78.json (schema s78-1, seed 20260724, 301 players: 300 branch-representative rows off the
 // canonical 46k cohort — every role x plane pairing, concentration extremes,
 // cap-binding interior spend, the short post-role and tall-shooter cards — plus ONE
 // SYNTHETIC row for the epsilon pull floor, which no real player reaches at the
@@ -17,7 +17,8 @@ namespace Charm.Harness;
 // generate_player). Phase 69 does exactly what tools/gen_pass3_replay_check.py
 // proved sufficient: from the RECORDED DRAWS + FROZEN CONSTANTS ALONE,
 // PlayerGenPass3.BuildFromDraws rebuilds every checkpoint for every player —
-// integers EXACT, floats within the fixture-declared ABSOLUTE 1e-9 (the S43 ruling:
+// integers EXACT, floats within the ABSOLUTE 1e-9 declared at GenPass3Tol below and
+// echoed in the fixture header as float_tolerance (the S43 ruling:
 // the allowance exists for exp/tanh/pow libm gaps; everything else is plain IEEE-754
 // and lands bit-identical given the same operation order). The committed edge table
 // probes every height-CDF cumulative boundary at ±1e-12, so a '<' vs '<=' mismatch
@@ -38,15 +39,24 @@ namespace Charm.Harness;
 // ============================================================================
 internal static partial class Program
 {
-    private const string GenPass3FixtureFile = "gen_pass3_replay_fixture_s69.json";
+    private const string GenPass3FixtureFile = "gen_pass3_replay_fixture_s78.json";
     private const double GenPass3Tol = 1e-9;         // ABSOLUTE — the fixture header's declared convention
     private const int GenPass3LiveSeed = 20260724;   // the oracle's canonical seed
     private const int GenPass3LiveN = 46000;         // the oracle's N_CANDIDATE
     private const int GenPass3MomentN = 200_000;
 
-    // The fixture's draw_order contract: the 68 semantic RNG slots per player, in
-    // stream order (single home: the oracle's _flat_draws).
+    // The fixture's draw_order contract: the 61 semantic MAIN-stream RNG slots per
+    // player, in stream order (single home: the oracle's _flat_draws). S78 took this
+    // from 68 to 61 when Glue left the budget (-1 family pull, -3 within, -3 jitter).
+    // The 4 ISOLATED intangible slots are a SEPARATE contract — see below.
     private static readonly string[] GenPass3DrawOrder = BuildGenPass3DrawOrder();
+    private static readonly string[] GenPass3IntDrawOrder = BuildGenPass3IntDrawOrder();
+    private static string[] BuildGenPass3IntDrawOrder()
+    {
+        var slots = new List<string> { "int_shared" };
+        foreach (var k in PlayerGenPass3.INTANGIBLES) slots.Add($"int_idio.{k}");
+        return slots.ToArray();   // 4
+    }
     private static string[] BuildGenPass3DrawOrder()
     {
         var slots = new List<string> { "height_u", "ws_noise", "a" };
@@ -56,7 +66,7 @@ internal static partial class Program
         foreach (var k in PlayerGenPass3.SPEND_SKILLS) slots.Add($"within_gauss.{k}");
         foreach (var k in PlayerGenPass3.SPEND_SKILLS) slots.Add($"base_jitter_gauss.{k}");
         slots.AddRange(new[] { "arrival_raw", "ft_idio" });
-        return slots.ToArray();   // 68
+        return slots.ToArray();   // 61 at S78
     }
 
     private static bool Phase69GenPass3ReplayParityCheck()
@@ -91,12 +101,24 @@ internal static partial class Program
         if (!schema.TryGetProperty("draw_order", out var drawOrder)
             || drawOrder.GetArrayLength() != GenPass3DrawOrder.Length)
             throw new InvalidOperationException(
-                "gen pass3 fixture rejected: draw_order missing or not exactly 68 slots.");
+                $"gen pass3 fixture rejected: draw_order missing or not exactly " +
+                $"{GenPass3DrawOrder.Length} slots.");
         for (var i = 0; i < GenPass3DrawOrder.Length; i++)
             if (drawOrder[i].GetString() != GenPass3DrawOrder[i])
                 throw new InvalidOperationException(
                     $"gen pass3 fixture rejected: draw_order[{i}] is '{drawOrder[i].GetString()}', " +
                     $"expected '{GenPass3DrawOrder[i]}'. The fixture does not match the locked contract.");
+
+        if (!schema.TryGetProperty("intangible_draw_order", out var intOrder)
+            || intOrder.GetArrayLength() != GenPass3IntDrawOrder.Length)
+            throw new InvalidOperationException(
+                $"gen pass3 fixture rejected: intangible_draw_order missing or not exactly " +
+                $"{GenPass3IntDrawOrder.Length} slots. S78's isolated stream is a contract of its own.");
+        for (var i = 0; i < GenPass3IntDrawOrder.Length; i++)
+            if (intOrder[i].GetString() != GenPass3IntDrawOrder[i])
+                throw new InvalidOperationException(
+                    $"gen pass3 fixture rejected: intangible_draw_order[{i}] is " +
+                    $"'{intOrder[i].GetString()}', expected '{GenPass3IntDrawOrder[i]}'.");
 
         if (!schema.TryGetProperty("key_orders", out var keyOrders))
             throw new InvalidOperationException("gen pass3 fixture rejected: no key_orders block.");
@@ -201,6 +223,13 @@ internal static partial class Program
             foreach (var k in PlayerGenPass3.SPEND_SKILLS)
                 draws.BaseJitterGauss[k] = jitterEl.GetProperty(k).GetDouble();
 
+            // S78 — the ISOLATED stream lives in its own block, never in draws.
+            var intEl = row.GetProperty("intangible_draws");
+            draws.IntShared = intEl.GetProperty("int_shared").GetDouble();
+            var intIdioEl = intEl.GetProperty("int_idio");
+            foreach (var k in PlayerGenPass3.INTANGIBLES)
+                draws.IntIdio[k] = intIdioEl.GetProperty(k).GetDouble();
+
             var res = PlayerGenPass3.BuildFromDraws(draws);
 
             // ── asserts, in the reference reader's order ─────────────────────────
@@ -230,6 +259,12 @@ internal static partial class Program
             {
                 ChkFloat(idx, $"spend.{k}", spendCp.GetProperty(k).GetDouble(), res.Spend[k]);
                 ChkFloat(idx, $"caps.{k}", capsCp.GetProperty(k).GetDouble(), res.Caps[k]);
+                ChkInt(idx, $"latent.{k}", latentCp.GetProperty(k).GetInt32(), res.Latent[k]);
+                ChkInt(idx, $"current.{k}", currentCp.GetProperty(k).GetInt32(), res.Current[k]);
+            }
+            // S78 — the three intangibles carry no spend and no cap, only a value.
+            foreach (var k in PlayerGenPass3.INTANGIBLES)
+            {
                 ChkInt(idx, $"latent.{k}", latentCp.GetProperty(k).GetInt32(), res.Latent[k]);
                 ChkInt(idx, $"current.{k}", currentCp.GetProperty(k).GetInt32(), res.Current[k]);
             }
@@ -459,15 +494,37 @@ internal static partial class Program
             $"max |Σspend − budget| = {worstBudgetGap:E2} (< 1e-6) across all {n}",
             "the two-stage share allocation leaks or double-spends points — Sharpen or the family split is broken");
 
-        // [EXACT caps] interior-defense and rebounding latents honor the body cap on EVERY player.
-        var capViolations = 0;
+        // [EXACT ceiling-provenance] S78 §4b, REPLACING the old body-caps gate. With the
+        // wall down, "cap honored" is VACUOUSLY true — nothing can exceed 99, so a green
+        // there would prove nothing. The gate that still has teeth is the opposite one:
+        // the ceiling function must return EXACTLY 99 for every formerly capped skill at
+        // every legal body. This is mechanical ELIGIBILITY; per-band maxima (page-only,
+        // stage 1) are what show it is practically REACHABLE.
+        var provBad = 0;
+        foreach (var k in new[] { "PostDefense", "RimProtection", "OffensiveRebounding", "DefensiveRebounding" })
+            for (var h = 40; h <= 99; h++)
+                if (PlayerGenPass3.BodyCap(k, h) != 99.0)
+                    provBad++;
+        Exact(provBad == 0, "ceiling-provenance",
+            $"BodyCap != 99 on {provBad} of 240 (skill x height) probes for the 4 formerly capped skills (must be 0)",
+            "a body-dependent hard ceiling survived S78 — the wall is not actually down");
+
+        // [EXACT intangibles] S78 — the three sit OUTSIDE the budget, so the bounds gate
+        // below (which walks SPEND_SKILLS) no longer covers them. current MUST equal
+        // latent exactly: they are drawn once, with no development delta (§2c). This is
+        // also A1's real guard — the card assert is a key-SET check, so a wrong SOURCE
+        // still yields 33 keys and goes green; a mis-sourced stamp dies HERE.
+        int intBad = 0, intCardBad = 0;
         foreach (var p in coh)
-            foreach (var k in new[] { "PostDefense", "RimProtection", "OffensiveRebounding", "DefensiveRebounding" })
-                if (p.Result.Latent[k] > p.Result.Caps[k] + 0.51)
-                    capViolations++;
-        Exact(capViolations == 0, "body-caps",
-            $"latent > body_cap + 0.51 on {capViolations} player-skills (must be 0)",
-            "small bodies are walling off centers — BodyCap or the Price cap argument is miswired");
+            foreach (var k in PlayerGenPass3.INTANGIBLES)
+            {
+                var (L, C) = (p.Result.Latent[k], p.Result.Current[k]);
+                if (L < 8 || L > 99 || C != L) intBad++;
+                if (p.Result.Card[k] != C) intCardBad++;
+            }
+        Exact(intBad == 0 && intCardBad == 0, "intangibles",
+            $"out-of-range or current!=latent on {intBad} player-intangibles; card mis-sourced on {intCardBad} (both must be 0)",
+            "the isolated intangibles draw is miswired, or BuildCard stamped them from the wrong source");
 
         // [EXACT bounds] every rating in [8,99]-legal range and current <= latent everywhere.
         var boundsBad = 0;
@@ -496,9 +553,18 @@ internal static partial class Program
             }
             if (min >= 35 && max < 92) antiTarget++;
         }
-        Exact(antiTarget == 0, "anti-target",
-            $"flat no-weapon-no-hole latent cards in the top 347 by budget: {antiTarget} (must be EXACTLY 0)",
-            "concentration/sharpening is too weak — the roster-filler shape reached the top of the class");
+        // S78 RULING (Emmett, 2026-07-26): DEMOTED TO PAGE-ONLY FOR THIS SESSION.
+        // The rule was written when the intangibles were dead — a 17 in IQ was a real
+        // hole because IQ did nothing you could feel. Now they land ~53 and route into
+        // make%, defensive attention and assist credit, so whether a "flat" card is
+        // actually flat is a SEASON-PAGE question, not a generator question. It fires
+        // at 1-3 on the five-seed panel. Printed, never thrown. RE-RULE once the page
+        // shows what those players do — this is a loosening with a named end date.
+        var antiWorst = coh.OrderByDescending(p => p.Result.Budget).Take(347)
+            .Max(p => PlayerGenPass3.SPEND_SKILLS.Min(k => p.Result.Latent[k]));
+        Console.WriteLine($"  [PAGE anti-target] flat no-weapon-no-hole latent cards in the top 347 by budget: " +
+                          $"{antiTarget}   (highest top-347 card minimum: {antiWorst}; threshold 35)   " +
+                          "S78: page-only, never asserted — re-rule after the season page");
 
         // [EXACT label-flip] Rscore is label-free BY CONSTRUCTION (ComputeRscoreParts takes
         // only current/ath/height — role and plane are not parameters); executed numerically
@@ -564,8 +630,15 @@ internal static partial class Program
                     return true;
             return false;
         }) / (double)n;
-        Band(Math.Abs(ceiling - 0.23) <= 0.03, "ceiling-pressure",
-            $"any-latent-≥95 share {ceiling * 100:F1}% (band 23% ± 3pp; oracle canonical 23.9%)",
+        // S78 RE-RULED (approved 2026-07-26). OLD: 23% ± 3pp, ruled against the
+        // population S78 replaces — it broke BY CONSTRUCTION, because four skills that
+        // were ceilinged on most bodies can now reach 95. NEW CENTRE 26.5%, from the
+        // FIXED five-seed panel (20260724..28): 26.31 / 26.41 / 26.47 / 26.57 / 26.74.
+        // Panel spread 0.43pp; tolerance ±2.5pp is ~6x the observed seed noise — wide
+        // enough not to be brittle, tight enough to catch a real move. NOT widened to
+        // fit an observation: the observation sits dead centre.
+        Band(Math.Abs(ceiling - 0.265) <= 0.025, "ceiling-pressure",
+            $"any-latent-≥95 share {ceiling * 100:F1}% (band 26.5% ± 2.5pp; S78 panel 26.31–26.74%)",
             "the budget/pricing top end moved — elite ceilings are too common or too rare");
 
         // [BAND independence] concentration ⊥ talent (drawn independently by design).
