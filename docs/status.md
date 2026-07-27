@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 79** (2026-07-27; the rim protector becomes real — the block door gains a help arm so a weakside blocker ends possessions he was never assigned to, and block credit becomes contribution-based; `BlockerWeight` and its 30 config keys deleted).
+Last updated: **Session 79 + the post-S79 design conversation** (2026-07-27; S79 shipped the block help arm and contribution credit. The conversation after it traced the long-running "minutes are skewed" complaint to its actual cause — lineup shape, not the recruiting board — and produced two new design rulings, O-42 and O-43.)
 
 ## Current baseline
 
@@ -153,8 +153,10 @@ chart is PROVISIONAL pending O-6.
   mpg against guards' ~32, and every per-game leaderboard is minutes-weighted, so the better man loses the
   board on playing time. Measured: the big at rebound rank 2 takes **0.44 boards/min** against the
   leader's **0.34** and still finishes second. Unlike O-29 this is NOT a credit problem — the rebounding
-  credit tracks the right men — it is who the depth chart puts on the floor, which is **O-6's** territory.
-  Kept as its own line because S77 conflated the two symptoms under O-29 and they have different owners.
+  credit tracks the right men — it is who the depth chart puts on the floor. **★ CAUSE FOUND (post-S79):
+  it is NOT O-6's territory either.** 321 of 347 schools open 3G/1W/1B, so four bigs share one seat's 40
+  minutes while five guards share three seats' 120. The board only orders men within a group that was
+  already capped by the shape. **This is O-42**, and O-33 closes when O-42 ships.
 
 - **O-34 — ★ THE ANTI-TARGET GATE IS PAGE-ONLY, ON LOAN (S78 ruling, named end date).** The "no elite
   recruit is flat" rule was an EXACT gate that threw; S78 demoted it to a printed number because Glue was
@@ -226,6 +228,50 @@ chart is PROVISIONAL pending O-6.
   because moving make% through a second door in the same session makes the season page unattributable.
   Own session. Measured size for scale: swapping an ordinary lineup for a menace lineup moves C6's
   make-shave by 0.12 percentage points, against the S79 block door's 3.6.
+
+- **★ O-42 — LINEUP SHAPE NEVER VARIES, AND IT IS THE REAL CAUSE OF O-33 (design conversation after S79).**
+  Every roster is exactly 5G/4W/4B, the seating floor is 2G/1W/1B, and the fifth seat goes to best
+  available — so **321 of 347 schools open 3G/1W/1B**. Four bigs and four wings each compete for ONE seat
+  (40 minutes); five guards share three seats (120). That is the whole 24-vs-32 minute gap, and it is NOT
+  the scout rank: the board only decides *which* big gets the 40, the shape already decided there are only
+  40. Compounding it, defenders are assigned by **slot parity**, so identical shapes league-wide mean a
+  wing is always guarded by a wing — no size mismatch can ever occur, nothing punishes three guards, and
+  the loop is self-sealing.
+  **★ Emmett's ruling (2026-07-27):** a good wing with size should have a field day against three shorter
+  guards, and that should force the other team to answer with its own wing — "a great wing is too big for a
+  guard and too quick for a post." **The engine already prices both halves** (the S55 height-over-defender
+  make bonus and the athleticism gap in `EffectiveRating`); they never fire because the matchup never
+  happens. **Shape variety alone lights the fuse under the existing man-to-man wiring** — two teams in
+  different shapes produce a wing-on-guard through slot parity, with no matchup-assignment layer needed.
+  **★ Build-shape ruling: a team must OWN A SET of deployable lineups and initially deploy one**, not merely
+  get a smarter opening five. Same visible result; the difference is that in-game looks and matchup counters
+  later become *choosing a different member of a set that already exists* rather than a rewrite.
+  **★ THE STANDING ACCEPTANCE TEST for this whole arc, in Emmett's words:** *a 6'10" plodding big who
+  averages 4 minutes plays 14 against the one team in the conference with a 6'11" center.* Nothing short of
+  that counts. Four things stand between here and it: (1) shape is not a concept anywhere in the code;
+  (2) minute targets are per-season, identical every game, and blind to the opponent; (3) slot parity cannot
+  express "I brought him in to guard their guy"; (4) nothing observes the game in progress, so "if I don't
+  feel like my lineup can function" has no input.
+
+- **★ O-43 — THE ON-BALL CONTEST SHOULD BLEND THE OTHER FOUR DEFENDERS (Emmett's design, 2026-07-27).**
+  Today the make contest reads `DefenseRating(matched defender)` alone. Ruled shape: read roughly
+  **80% matched man + 20% the aggregate of the other four's ON-BALL defense** — and down the line make that
+  blend a **coaching switch setting** (a switch-everything coach moves toward 50/50, and a switching team
+  with poor defenders gets burned for it).
+  Why this shape and not the alternative: Emmett first proposed a positional **bleed** (~10% toward each
+  neighbouring slot) and then **rejected it himself** in favour of this. Correctly — bleed would make slot
+  order *spatial*, and the source is explicit that slot 1–5 is a list index with no floor meaning, so
+  adjacency would be a load-bearing architectural commitment everywhere at once (and ~24% of floor time is
+  already someone playing out of position, who would inherit a seat's neighbours along with the seat).
+  The blend needs none of that.
+  Three properties that make it cheap: it is **not a new effect** — same single wiring site, different
+  input, so nothing double-counts; the other four contribute their **on-ball** ratings, NOT HelpDefense,
+  which keeps it from colliding with the help door (O-41); and because the contest already weights perimeter
+  vs post defense **by zone**, a switch-everything team whose bigs cannot guard the perimeter should get
+  burned *specifically on threes* with nothing extra wired. **Verify that last one before relying on it.**
+  It also delivers what the possession-interior idea was reaching for — an elite perimeter defender is no
+  longer glued to one man — **without** modelling time inside a possession, which was by far the largest
+  build discussed.
 
 ## Parked — waiting on a named prerequisite
 
@@ -308,19 +354,20 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-*Not yet chosen — Emmett's call.* O-29 shipped at S79, which empties the S78 recommendation.
+*Not yet chosen — Emmett's call.* **The S79 pick below was falsified by the design conversation that
+followed it**, which is exactly what this section exists to catch.
 
-**Claude's pick: O-6, scout-rank modernization (feeding O-33, the minutes skew).** It was already the
-standing counter-candidate, and S79 removed the reason to keep deferring it. The block board is now sorted
-by who protects the rim, so the last loud per-game leaderboard distortion left is playing time: bigs
-average ~24 mpg against guards' ~32, and every per-game board is minutes-weighted. Fixing credit while
-leaving minutes skewed means the boards stay half-wrong for a reason nobody can see from the page.
+**Claude's pick: O-42, lineup shape.** I recommended O-6 (scout ranks) immediately after S79 on the
+evidence that bigs play 24 minutes to guards' 32. That reasoning was wrong: the shape caps the big group at
+40 minutes before any rank is consulted, so re-ordering the board moves nobody onto the floor. O-42 is the
+cause, O-33 closes with it, and O-6 drops back to what it always was — a recruiting-realism item, not a
+minutes item. It is also the front edge of the coaching layer and the first step toward the standing
+acceptance test recorded in O-42.
 
-**The strongest counter-candidate: O-41, C6's flat help aggregate.** It is the natural pair to S79 — the
-same four off-ball defenders, the other door — and S79 has already measured its effect size (0.12
-percentage points of make%, against the block door's 3.6), so the session would start with its instrument
-already built. Take it first if the appetite is to finish the help-defense model while it is fresh, rather
-than to fix the leaderboards.
+**The strongest counter-candidate: O-43, the on-ball blend.** Smaller, self-contained, one wiring site, and
+it makes an elite perimeter defender matter on possessions he is not assigned to — the first real team
+defense in the game. Take it first if the appetite is for a contained win rather than opening the coaching
+layer. It pairs naturally with O-41 (the help door) if the two are ever done together.
 
 **Not yet: O-40, block-rate calibration.** Blocks read high, but calibration against a population that is
 itself provisional is the exact wrong sequencing — attribute measurement before generation redesign,
