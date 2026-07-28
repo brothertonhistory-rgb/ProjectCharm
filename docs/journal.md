@@ -1,3 +1,92 @@
+## Session 79.3 — THE LEADERBOARDS BECAME PERCENTAGES. Five rate boards against exactly-counted on-floor denominators; the per-game block board's ~1.33× playing-time handicap is now visible and priced around. Phase 73 gained twelve gates that prove totals and honestly do not prove attribution. Every existing page block byte-identical, proven by line diff. Suite `ALL CHECKS PASSED` and the full stock season green on Emmett's machine. Claude misread a sandbox artifact as a provenance incident and had to walk it back. (2026-07-28)
+
+**Register:** micro-session, build, under `PROMPT-percentage-boards-s79_3-r6`. Two code files, page-only. No engine, config, generator, fixture or dial.
+
+### The defect, and why it is a presentation fix
+
+A per-game board multiplies every man by his playing time before ability is consulted. Bigs run ~24 mpg against guards' ~32, so every counting board applies a ~**1.33×** handicap to every big. Measured on the committed page: the block top ten held **Pool_1517 (G, 6'4") first at 2.4/gm on 0.076 per minute** and **Pool_4503 (B, 7'2") second at 0.091** — the better blocker ranked lower — while **Pool_85 (G) sat ninth on the worst per-minute rate in the ten**. S78 diagnosed the identical thing for rebounding and it was never acted on.
+
+**★ What the S79.2 evidence does and does not license.** It proves the generated population's rim-block *ability ordering* is positionally plausible (top 25 = 24 bigs, 1 wing, 0 guards). It does **not** prove block rates are calibrated or that S79's credit allocation is right. The finding is narrow: the ability ordering is sound and the per-game board obscures it through volume. So this session changes **what the page ranks**, not what the engine produces.
+
+**Emmett's ruling: percentages, because they are readable and baselined.** Per-100 was rejected for the non-scoring stats — on the real season a per-100 block board reads 6.91 for a 4.1-mpg man against 5.13 for the league's best rim protector, a scale with no external referent; BLK% puts the same two at 11.45 and 10.15. Points keep per-100 because scoring has no percentage.
+
+### The architecture finding that shaped the build
+
+**`NoteOccupancy` is two loops, not one, and the check-in caught it before a line was written.** The record walk (`:262-281`) is the only place a `PossessionRecord` is in scope and the only place `side == r.Offense` can be tested; the roll-up below it (`:283-310`) is the only place `RecordFor` is called and has no access to `r` at all. So "fed inside the existing walk" and "rolls up through `RecordFor`" cannot be the same statement.
+
+Two ways to close it: resolve the person inside the record walk (~7.4M `identity.Resolve` calls on the stock season, undoing a hoist the existing design made deliberately), or **stage** the four counters in a per-side, per-player tally during the walk and drain them in the existing roll-up. **Option (b), Claude's call, flagged at check-in and approved.** It keeps one `Resolve` per person per team-game, and because the staging is keyed by the same stamped id and drained by the same `Resolve`, the denominators **cannot land on a different man than his credits did**.
+
+**★ One placement detail is load-bearing:** the staging writes sit *below* the same dropped-credit guard (`:269`) as the credit itself, so a credit can never be dropped without its denominators or the reverse, and the four league identities stay exact under any future drop. Phase 73 already pins dropped at 0.
+
+### ★ Threes are blockable — so BLK% is a rate, not a bounded fraction
+
+`RollHConfig.cs:37` sets `BlockThree = 0.01`, `BlockWeight` maps Three to it, and `BuildRealPie` puts `Blocked` in the pie at **every** zone. Per-player `Blk` is fed from `BlkBySlot` with no zone filter (`Program.Harness.Shared.cs:271-278`), so it contains blocked threes — which `OpponentTwoPaOnFloor` excludes. The ratio is therefore **not bounded by 1**, and `Blk <= OpponentTwoPaOnFloor` is deliberately **not** asserted. Keeping total blocks over opponent two-point attempts is exactly what published BLK% does, so the familiar scale survives; what does not survive is any claim it is a share of blockable opportunities, and the page says so.
+
+**The magnitude is unknown and the page does not guess it.** Threes are 37.4% of attempts (219,987 of 588,888) but carry the lowest block weight, 0.01 against the rim's 0.12.
+
+**A near/out split exists and does not help — recorded so it is not re-derived.** `PossessionRecord` carries S79's `BlkMatchedNear / BlkHelperNear / BlkMatchedOut / BlkHelperOut` (`Governor.cs:152-155`, stamped `Resolver.cs:733-739`). But "out" lumps **Mid, Long and Three together**, and those four are possession totals with **no slot**, while `BlkBySlot` carries the slot and no zone. No field carries both, so a per-player two-point block count does not exist anywhere in the tree. Making one available is a small engine-side zone-split slot group — out of scope here, and worth knowing before anyone assumes a true opportunity rate is cheap.
+
+### Two rules that are semantic, not defensive
+
+A man whose denominator is zero is **excluded before sorting**, never given a rate of 0.0 and left in — a zero denominator means the question was never asked of him, which is not the same answer as "never did it." The arithmetic guard stops a NaN reaching a comparator; the eligibility filter is the rule. Ranking runs on **full precision**, formatting after, reusing `CountingBoard`'s `.ThenBy(PoolId)`. Raw counts print beside every percentage (`326 of 1193`) because Emmett ruled the extremes are wanted — *"lets see what the extremes are even if small sample size"* — and the counts are what make a 4-minute man topping BLK% on 131 attempts faced readable rather than misleading.
+
+### ★ What Phase 73's twelve new gates prove, and what they honestly do not
+
+Green on Emmett's machine, tiny fixture, all exact:
+
+```
+Σ OffensiveCredits        == 5  × records        213215 vs 5 x 42643
+Σ OpponentTwoPaOnFloor    == 5  × (FGA − 3PA)    111225 vs 5 x (33423 - 11178)
+Σ SecuredBoardsOnFloor    == 10 × secured boards 187180 vs 10 x 18718
+Σ OffensiveTeamFgmOnFloor == 5  × FGM             71815 vs 5 x 14363
+```
+
+**They prove TOTALS and are blind to ATTRIBUTION.** Swap two players' counters wholesale and every one stays exact. The five per-player feasibility bounds are structural — each numerator is a subset of the events its denominator counts — but **weak**: headroom on the fixture reads `reb/boards 0.2160, ast/tmFGM 0.2464, stl/defposs 0.0636` against a bound of 1.0. They catch a counter fed on both sides, a sign error, or a wholesale skip; they do **not** catch a swap, and the delivery says so rather than calling them attribution protection.
+
+**Two candidates were CUT in r6, and both were the same error** — a fact measured true on the committed season written as a structural law, which is the §2c failure this project has a standing rule against. It survived three review rounds because each bound was tested against the very population that produced it. (1) `Credits > 0 ⇒ all four counters > 0` — the thinnest positive-credit man has 141 credits on the stock season, but 141 is a property of the rotation, not of the counters; a short stint or a small fixture reaches zero at once. It ships as a **printed diagnostic that cannot fail** (fixture: 201 of 201, thinnest 167 credits / 42 opp 2PA / 65 boards / 22 team makes). (2) `Blk <= OpponentTwoPaOnFloor` — killed by `BlockThree` above. The two side-specific zero-consistency implications survive but are labelled **VACUOUS**: nobody on any real population plays only one end, so they pass without testing anything and are counted as contract, not coverage.
+
+**Nothing in Phase 73 reads a board or its ordering.** A percentage with the wrong denominator leaves the whole gate green. Attribution is proven only by the locked lists below, and only for this seed.
+
+### The locked boards — the attribution gate for seed 20260720, reproduced exactly
+
+Sandbox and Emmett's machine agree to the digit.
+
+```
+BLK%    1 Pool_4422 11.45 (15 of 131)   2 Pool_4437 10.43   3 Pool_3150 10.23
+        4 Pool_4465 10.19   5 Pool_4503 10.15 (66 of 650)   6 Pool_4157 10.00
+        7 Pool_4326  9.57   8 Pool_4079  9.36   9 Pool_3486  9.35  10 Pool_4121 9.29
+REB%    1 Pool_3924 27.33 (326 of 1193) 2 Pool_3219 25.50   3 Pool_4420 24.65
+AST%    1 Pool_1079 26.30 (71 of 270)   2 Pool_549  24.73   3 Pool_2459 24.53
+STL%    1 Pool_313   6.93 (118 of 1703) 2 Pool_1309  6.45   3 Pool_314   6.34
+PTS/100 1 Pool_546  54.05 (840 of 1554) 2 Pool_1038 52.60   3 Pool_1034 48.13
+```
+
+**Both falsifiers hold.** Pool_85 is gone from the block top ten; Pool_4503 ranks 5th with Pool_1517 absent. Distribution medians land on the drafted expectations: BLK% 2.2, REB% 9.7, AST% 9.5, STL% 1.8. ★ Those medians are **the sandbox's own numbers** — the real-basketball comparison behind them has no committed source in this repo, so they are recorded to make a gross departure visible and are **not** a pass/fail gate.
+
+**Non-interference, proven by line diff and not by eye.** Full page against a freshly-built committed baseline at the same seed: **10 lines removed, 77 added.** The removed 10 are the minutes-board rows, and with the appended `off poss | def poss` columns stripped they are **byte-identical** to the originals. All 77 added lines categorise into the four permitted buckets with zero residue. Drift audit: exactly two files differ from the committed tree.
+
+### ★ The honest error — Claude misread a sandbox artifact as a provenance incident
+
+Between the check-in report and Emmett's "go", the two target files in Claude's working tree were rewritten by something Claude could not account for, containing a complete S79.3 implementation. Claude verified the committed state (434/993 lines, zero S79.3 identifiers), confirmed only those two files had changed, and reported it as a possible injection — noting that the code implemented Claude's own check-in recommendation *including a detail Claude had originated*, and treating that as evidence of something unaccountable.
+
+**Emmett asked one question — "Didn't you start this already?" — and it was the right one.** Further inspection found MSBuild activity continuing past Claude's last action and both working directories deleted by something running the same `rm -rf charm && mkdir charm` pull ritual from CONVENTIONS §0. The parsimonious explanation was a concurrent instance of the same session, not an attacker. The code implemented Claude's recommendation *because it was Claude's recommendation being executed*.
+
+**The lesson, which is §2c pointed the other way.** The standing rule is about overconfident closure toward *confidence*; this was the same error aimed at *alarm* — a coherent narrative built on one suggestive fact and written up as settled, with the simpler explanation available and unexamined. What survived the correction, and should: Claude will not certify code it has not written or reviewed to someone who cannot audit C#. What did not survive: the framing. The build was then done from a clean pull in a uniquely-named directory, every line written and verified in-session.
+
+Two smaller misses, both Emmett's time: run commands delivered without the directory they must run from (the harness lives at `src\Charm.Harness`, and the season's relative world path depends on it), then a `--project` variant whose world path was wrong for the shell he was standing in.
+
+### Noticed in passing, not acted on
+
+Phase 74's golden parity reads `worst |Δ| = 2.8E-017` on Windows against `0.0E+000` in the Linux sandbox — the known libm gap, eleven orders inside the 1E-012 tolerance, in code this session did not touch. Recorded so it is not later mistaken for drift.
+
+### ★ O-46 — no player in the engine runs an offence
+
+The AST% board makes it readable for the first time. League median **9.52**; the league's best passer sits at **26.3%** (Pool_1079, 71 of 270); elite real-world college point guards reach **35–40%**. The middle looks ordinary and **the elite tail is absent**. Note the shape: assists are not merely globally low (the calibration page reads 9.8 against 13.5) — the *distribution has no top*. Whether that is a generation question (nobody carries the passing/playmaking package a primary creator needs) or a Roll C question (the assist door cannot concentrate credit on one man however good he is) is unresolved and is the first thing to determine. **Documentation only this session.**
+
+### The standing trap, restated because it will be tempting
+
+These numbers will look unfamiliar. **This session reports possession outcomes the engine already produced; it does not recalibrate them, and it proves nothing about whether they are calibrated.** Block rates, steal rates, assist completeness and rebound ecology all remain open questions this page can now *inform* and does not *answer*. If a percentage looks wrong: first hypothesis the denominator, second the attribution, third that real basketball disagrees with the expectation. Moving a dial is not on the list.
+
 ## Session 79.2 — THE CHECK-IN GATE EARNS ITS KEEP. The S80 prompt did not clear: five defects, one blocking, all found by reading source before a line of C#. Emmett ruled the perimeter mirror; the session shipped the position census instead — the instrument S80 will be ruled on. Suite `ALL CHECKS PASSED` on Emmett's machine. A 5'8" guard with 96 rim protection got a name and an item. (2026-07-27)
 
 **Register:** build session under `PROMPT-interior-defense-bid-s80-r3`. Scope: the check-in gate. Shipped: one page-only readout. NOT shipped: S80 itself.

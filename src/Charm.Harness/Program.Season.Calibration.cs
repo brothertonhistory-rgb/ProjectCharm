@@ -54,6 +54,12 @@ internal static partial class Program
         // Session 38: fast-break shot-diet totals (page-only, never asserted on the page).
         public long FastBreakFga, FastBreakThreePa, FastBreakThreePm;
         public long PossessionRecords;       // every record — the pace numerator
+        //  S79.3: league secured boards — the sum of PossessionRecord.OrbChances, and the
+        //  league-side leg of the SecuredBoardsOnFloor identity. It exists for no other reason.
+        //  ★ SECURED, not available: a defensive-rebound terminal or an offensive-rebound
+        //  continue each count one; fouls, out-of-bounds and jump balls are excluded by the
+        //  resolver (Resolver.cs:800-810), matching the box-score rebounding convention.
+        public long SecuredBoards;
         public long TurnoverPossessions;     // via IsTurnoverPossession, all records
         public long MetadataDriftRecords;    // TO metadata present but classifier says no
 
@@ -243,6 +249,25 @@ internal static partial class Program
             }
         }
 
+        /// <summary>S79.3 — one team-game's worth of on-floor DENOMINATORS for one man, staged
+        /// during the record walk and drained into his season record inside the same method.
+        ///
+        /// <para>★ Why staged rather than written straight onto the record: NoteOccupancy is two
+        /// loops, not one. Only the record walk can see a <see cref="PossessionRecord"/>, and
+        /// only the roll-up below calls <c>RecordFor</c>. Writing through directly would mean
+        /// resolving a person ten times per possession instead of once per team-game.</para>
+        ///
+        /// <para>The four travel together in one object rather than in four parallel dictionaries
+        /// because they are written at one site and read at one site — four dictionaries would
+        /// only create four chances to keep one and drop another.</para></summary>
+        private sealed class OnFloorTally
+        {
+            public long OffensiveCredits;
+            public long OpponentTwoPa;
+            public long SecuredBoards;
+            public long OffensiveTeamFgm;
+        }
+
         public void NoteOccupancy(
             IReadOnlyList<PossessionRecord> records, GameState game,
             IReadOnlyDictionary<int, string> storedPos,
@@ -254,6 +279,13 @@ internal static partial class Program
             // S76: per-side, per-player floor time for THIS game, so the rotation depth
             // distribution can be ranked within the game that produced it.
             var perSide = new Dictionary<TeamSide, Dictionary<int, long>>
+            {
+                [TeamSide.Home] = new(),
+                [TeamSide.Away] = new(),
+            };
+            //  S79.3: the four on-floor denominators, staged EXACTLY like the credit bucket
+            //  above and drained in the same roll-up below, keyed by the same stamped id.
+            var perSideDen = new Dictionary<TeamSide, Dictionary<int, OnFloorTally>>
             {
                 [TeamSide.Home] = new(),
                 [TeamSide.Away] = new(),
@@ -270,6 +302,30 @@ internal static partial class Program
 
                         var bucket = perSide[side];
                         bucket[p.PlayerId] = bucket.TryGetValue(p.PlayerId, out var pc) ? pc + 1 : 1;
+
+                        //  S79.3 — the four on-floor denominators, in the SAME pass over the
+                        //  records and BELOW the SAME dropped-credit guard as the credit above.
+                        //  ★ That placement is load-bearing: a credit can never be dropped
+                        //  without its denominators, or the reverse, so the four league
+                        //  identities stay exact under any future drop.
+                        //
+                        //  ★ Which end: `side` is either r.Offense or r.Defense, and those are
+                        //  never the same team, so `side == r.Offense` is an exact one-side test.
+                        //  Three counters land on one side each; secured boards land on BOTH,
+                        //  because a board is contested with all ten men on the floor.
+                        var denBucket = perSideDen[side];
+                        if (!denBucket.TryGetValue(p.PlayerId, out var den))
+                            denBucket[p.PlayerId] = den = new OnFloorTally();
+                        if (side == r.Offense)
+                        {
+                            den.OffensiveCredits++;
+                            den.OffensiveTeamFgm += r.Fgm;   // all five offensive men's makes, his own included
+                        }
+                        else
+                        {
+                            den.OpponentTwoPa += r.Fga - r.ThreePa;
+                        }
+                        den.SecuredBoards += r.OrbChances;
 
                         if (!storedPos.TryGetValue(p.PlayerId, out var stored)) continue;
                         if (!seatPos.TryGetValue((side, slot), out var seat)) continue;
@@ -306,6 +362,19 @@ internal static partial class Program
                     var rec = RecordFor(schoolId, row);
                     rec.Credits += credits;
                     rec.GamesPlayed++;        // at most one per team-game, by the loop shape
+
+                    //  S79.3: the denominators ride THIS roll-up — same stamped id, same
+                    //  Resolve, same RecordFor — so they cannot land on a different man than his
+                    //  credits did. Every id in perSide has a tally by construction (both are
+                    //  written at the same site under the same guard); the TryGetValue is a
+                    //  guard against a future divergence, not an expected miss.
+                    if (perSideDen[side].TryGetValue(stampedId, out var den))
+                    {
+                        rec.OffensiveCredits        += den.OffensiveCredits;
+                        rec.OpponentTwoPaOnFloor    += den.OpponentTwoPa;
+                        rec.SecuredBoardsOnFloor    += den.SecuredBoards;
+                        rec.OffensiveTeamFgmOnFloor += den.OffensiveTeamFgm;
+                    }
                 }
             }
 
@@ -385,6 +454,7 @@ internal static partial class Program
                 MidFga   += r.MidFga;   MidFgm   += r.MidFgm;
                 LongFga  += r.LongFga;  LongFgm  += r.LongFgm;
                 FastBreakFga += r.FastBreakFga; FastBreakThreePa += r.FastBreakThreePa; FastBreakThreePm += r.FastBreakThreePm;
+                SecuredBoards += r.OrbChances;   // S79.3 — the league leg of the REB% identity
 
                 UnattributedFga += r.SlotUnattributedFga;
                 UnattributedFgm += r.SlotUnattributedFgm;

@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 79.2** (2026-07-27; the S80 check-in gate ran and did NOT clear — five defects in the prompt, one of them blocking. Emmett ruled the perimeter mirror (C-28). S79.2 shipped the position census instead, the instrument S80 will be ruled on. Three findings opened O-44, O-45 and re-scoped O-39.)
+Last updated: **Session 79.3** (2026-07-28; the season leaderboards became percentages — BLK%, REB%, AST%, STL% and PTS/100 against exactly-counted on-floor denominators. Phase 73 gained twelve gates. The per-game block board's playing-time handicap is now visible and priced around. Opened O-46.)
 
 ## Current baseline
 
@@ -52,6 +52,17 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **S79.3 — the leaderboards became percentages (page-only).** Four exact on-floor counters on
+  `SeasonPlayerRecord` (`OffensiveCredits`, `OpponentTwoPaOnFloor`, `SecuredBoardsOnFloor`,
+  `OffensiveTeamFgmOnFloor`), staged in the existing `NoteOccupancy` record walk and drained in its
+  existing roll-up. Five rate boards — BLK%, REB%, AST%, STL%, PTS/100 — plus five distribution rows on
+  the qualified pool and `off poss | def poss` on the minutes board. Phase 73 gained **twelve** gates
+  (four league identities, five feasibility bounds, three zero-consistency) and two honest diagnostics.
+  Every existing page block byte-identical, proven by line diff against the committed build at the same
+  seed. **The defect it fixes:** the per-game block board still reads a 6'4" guard first and its worst
+  per-minute blocker ninth; BLK% is ten bigs. Denominators counted, never estimated — a `Credits / 2`
+  estimate was measured to reorder the points top ten. No engine, config, generator, fixture or dial.
 
 - **S79.2 — the position census (page-only instrument).** `PrintS80PositionCensus` in
   `Program.Season.Calibration.cs`: rostered players split G/W/B, sixteen skills grouped by which
@@ -332,7 +343,20 @@ chart is PROVISIONAL pending O-6.
   generator half shipped; the engine half never did. **This item is that missing half — it is not a
   regression and the answer is not to restore the cap.**
 
+- **★ O-46 — NO PLAYER IN THE ENGINE RUNS AN OFFENCE (S79.3 measurement; documentation only, NOT acted on).**
+  The AST% board S79.3 shipped makes it readable for the first time. League median AST% is **9.52**; the
+  league's **best passer sits at 26.3%** (Pool_1079, 71 of 270). Elite real-world college point guards
+  reach **35–40%**. So the middle looks ordinary and **the elite tail is simply absent** — the engine has
+  no player who is the reason his team scores. Note the shape of the miss: it is not that assists are
+  globally too low (the calibration page reads assists 9.8 against 13.5, LOW but not absurd) — it is that
+  the DISTRIBUTION has no top. Whether this is a generation question (nobody is generated with the
+  passing/playmaking package a primary creator needs) or a Roll C question (the assist door cannot
+  concentrate credit on one man however good he is) is **unresolved and is the first thing to determine**.
+  Belongs to neither S80 nor O-44/O-45. Emmett's call when to take it.
+
 ## Parked — waiting on a named prerequisite
+
+
 
 - **P-1 — Shooting-foul positional lean (~50.7/49.3) → the help-defense/rotation model (S62).**
 - **P-2 — Steals' pressure-DIAL side → the coaching/pressure layer (S52, updated S58).**

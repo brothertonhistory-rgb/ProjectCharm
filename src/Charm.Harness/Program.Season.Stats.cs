@@ -60,8 +60,21 @@ internal static partial class Program
         public long OReb, DReb, Ast, Stl, Blk, To;
         public long ShFoul, NsFoul;
 
+        //  Session 79.3 — THE ON-FLOOR DENOMINATORS. Four exact counts, fed by NoteOccupancy
+        //  from the same walk that credits floor time, so every rate below is measured against
+        //  what this man was actually on the floor for rather than against his playing time.
+        //  ★ Published BLK%/STL%/AST%/TRB% ESTIMATE these from minutes share. These are counted.
+        public long OffensiveCredits;          // his possessions on offence; defensive = Credits - this
+        public long OpponentTwoPaOnFloor;      // opponent two-point attempts he faced
+        public long SecuredBoardsOnFloor;      // secured boards contested with him on — BOTH ends
+        //  ★ The name is load-bearing: this is NOT "teammate makes". It accumulates the WHOLE
+        //  offensive team's makes for each of the five men on the floor, which is why the league
+        //  identity is 5 x league FGM. The subtraction to teammate-only happens at the board.
+        public long OffensiveTeamFgmOnFloor;
+
         public long Points => 2 * Fgm + Tpm + Ftm;
         public long Reb    => OReb + DReb;
+        public long DefensiveCredits => Credits - OffensiveCredits;
 
         /// <summary>Per-game average, or 0 for a man who never played. ★ The zero guard is not
         /// defensive tidiness: a NaN or an infinity reaching a sort comparator reorders a
@@ -171,7 +184,12 @@ internal static partial class Program
                 var r = top[i];
                 Console.WriteLine(
                     Inv($"      {i + 1,2}. {r.Name,-12} {Team(r),-6} {r.Pos} {r.Height,2}  ") +
-                    Inv($"{SeasonMinutes(r, mpc) / Math.Max(1, r.GamesPlayed),5:F1}   ({r.GamesPlayed,2} gp)"));
+                    Inv($"{SeasonMinutes(r, mpc) / Math.Max(1, r.GamesPlayed),5:F1}   ({r.GamesPlayed,2} gp)") +
+                    //  S79.3: the two halves printed SEPARATELY rather than as one ambiguous
+                    //  "poss" column. The split is now measured and exact, and printing both
+                    //  puts the denominator architecture on the page: PTS/100 is read against
+                    //  the first, BLK% and STL% against the second.
+                    Inv($"  {r.OffensiveCredits,6} off poss | {r.DefensiveCredits,6} def poss"));
             }
         }
         Console.WriteLine();
@@ -219,6 +237,62 @@ internal static partial class Program
         ShootingBoard("FT%", SeasonFtAttemptFloor, r => r.Ftm, r => r.Fta);
         Console.WriteLine();
 
+        // ── (a2) Rate boards ────────────────────────────────────────────────────
+        //  ★ THE DEFECT THESE EXIST TO FIX. A per-game board multiplies every man by his
+        //  playing time before ability is consulted. Bigs run ~24 mpg against guards' ~32, so
+        //  the per-game block board applies a ~1.33x handicap to every big — and the worst
+        //  per-minute shot blocker in its top ten sat NINTH. Rate boards rank production per
+        //  unit of the thing that was actually available to him.
+        //
+        //  ★ R7 — THESE ARE DIRECT INTERNAL RATES, NOT COPIES OF EXTERNAL ESTIMATORS.
+        //  Published BLK%/STL%/AST%/TRB% estimate on-floor denominators from minutes share.
+        //  This engine COUNTS them. Same familiar units, different provenance; no claim of
+        //  formula identity is made anywhere on this page.
+        //
+        //  ★ EVERY RATE IS AN OUTCOME THE ENGINE ALREADY PRODUCED. This section reports; it
+        //  does not recalibrate, and it proves nothing about whether these rates are right.
+        Console.WriteLine(Inv($"  RATES — per-opportunity, {qualified.Count} men clearing the >={minuteFloor} minute floor"));
+        Console.WriteLine("    (direct on-floor counters, not minutes-share estimates — may differ from external providers'");
+        Console.WriteLine("     box-score estimators though expressed in the same familiar units. BLK% is total blocks over");
+        Console.WriteLine("     opponent TWO-point attempts faced, the usual convention: threes are blockable in this engine,");
+        Console.WriteLine("     so it is NOT a strict share of blockable opportunities.)");
+
+        void RateBoard(string label, string definition, string suffix,
+                       Func<SeasonPlayerRecord, long> num, Func<SeasonPlayerRecord, long> den)
+        {
+            //  ★ ELIGIBILITY, not a zero guard. A man whose denominator is zero is removed
+            //  BEFORE sorting rather than handed a rate of 0.0 and left in the pool — a zero
+            //  denominator means the question was never asked of him, which is not the same
+            //  answer as "never did it". The arithmetic guard below stops a NaN reaching a
+            //  comparator; this filter is the semantic rule.
+            var pool = qualified.Where(r => den(r) > 0).ToList();
+            var top  = pool
+                .OrderByDescending(r => num(r) / (double)den(r))   // rank on FULL precision
+                .ThenBy(r => r.PoolId)                             // the CountingBoard secondary key
+                .Take(10).ToList();
+            Console.WriteLine(Inv($"    {label}  {definition}   ({pool.Count} eligible)"));
+            for (var i = 0; i < top.Count; i++)
+            {
+                var r = top[i];
+                var v = den(r) > 0 ? 100.0 * num(r) / den(r) : 0.0;
+                Console.WriteLine(
+                    Inv($"      {i + 1,2}. {r.Name,-12} {Team(r),-6} {r.Pos} {r.Height,2}  ") +
+                    //  R3: the raw counts sit in the same row as the rate, always, so sample
+                    //  size cannot be missed — a 4-minute man topping a board is WANTED (R4),
+                    //  and this is what makes him readable rather than misleading.
+                    Inv($"{v,6:F2}{suffix,-1}  ({num(r),5} of {den(r),-6})  ") +
+                    Inv($"({r.GamesPlayed,2} gp, {SeasonMinutes(r, mpc) / Math.Max(1, r.GamesPlayed),4:F1} mpg)"));
+            }
+        }
+
+        RateBoard("BLK%   ", "blk / opp 2PA faced",  "%", r => r.Blk,    r => r.OpponentTwoPaOnFloor);
+        RateBoard("REB%   ", "reb / secured boards", "%", r => r.Reb,    r => r.SecuredBoardsOnFloor);
+        RateBoard("AST%   ", "ast / teammate FGM",   "%", r => r.Ast,    r => r.OffensiveTeamFgmOnFloor - r.Fgm);
+        RateBoard("STL%   ", "stl / def poss",       "%", r => r.Stl,    r => r.DefensiveCredits);
+        //  R1: scoring has no percentage, and per-100 IS the real unit for it.
+        RateBoard("PTS/100", "pts / off poss",       "",  r => r.Points, r => r.OffensiveCredits);
+        Console.WriteLine();
+
         // ── (b) One team, in full ───────────────────────────────────────────────
         var teamRows = all.Where(r => r.SchoolId == SeasonFullTeamSchoolId)
                           .OrderByDescending(r => r.Credits)
@@ -259,9 +333,13 @@ internal static partial class Program
         Console.WriteLine(Inv($"  LEAGUE DISTRIBUTION — all {all.Count} player-seasons, unfiltered (per game)"));
         Console.WriteLine($"    {"stat",-10}{"rk1",7}{"rk10",7}{"rk50",7}{"rk100",7}{"rk500",7}{"rk1000",8}{"median",8}");
 
-        void Distribution(string label, Func<SeasonPlayerRecord, double> value)
+        //  S79.3: the population is now a parameter so the rate rows below can run on the
+        //  QUALIFIED pool while the existing per-game rows keep running on everybody. The
+        //  existing four calls pass `all` and their output is unchanged.
+        void DistributionOver(IReadOnlyList<SeasonPlayerRecord> pop, string label,
+                              Func<SeasonPlayerRecord, double> value, string trailer = "")
         {
-            var sorted = all.Select(value).OrderByDescending(v => v).ToList();
+            var sorted = pop.Select(value).OrderByDescending(v => v).ToList();
             double At(int rank) => rank <= sorted.Count ? sorted[rank - 1] : double.NaN;
             var median = sorted.Count == 0 ? 0.0
                        : sorted.Count % 2 == 1 ? sorted[sorted.Count / 2]
@@ -269,13 +347,38 @@ internal static partial class Program
             string F(double v) => double.IsNaN(v) ? "—" : v.ToString("F1", CultureInfo.InvariantCulture);
             Console.WriteLine(
                 Inv($"    {label,-10}{F(At(1)),7}{F(At(10)),7}{F(At(50)),7}{F(At(100)),7}") +
-                Inv($"{F(At(500)),7}{F(At(1000)),8}{F(median),8}"));
+                Inv($"{F(At(500)),7}{F(At(1000)),8}{F(median),8}") + trailer);
         }
+
+        void Distribution(string label, Func<SeasonPlayerRecord, double> value)
+            => DistributionOver(all, label, value);
 
         Distribution("points",   r => r.PerGame(r.Points));
         Distribution("rebounds", r => r.PerGame(r.Reb));
         Distribution("assists",  r => r.PerGame(r.Ast));
         Distribution("minutes",  r => r.GamesPlayed > 0 ? SeasonMinutes(r, mpc) / r.GamesPlayed : 0.0);
+
+        //  S79.3: the same shape for the five rates, on the QUALIFIED population — the floor
+        //  is in force here and is NOT in force on the rows above, so the header says which
+        //  population produced which row. The pool moves with the CLI tier.
+        //  ★ Per-row eligibility: a man with a zero denominator is dropped from HIS row only,
+        //  for the same reason he is dropped from the board — the question was never asked of
+        //  him. Each row therefore prints its own n.
+        Console.WriteLine(Inv(
+            $"    — rates below: {qualified.Count} of {all.Count} clearing the >={minuteFloor} minute floor"));
+
+        void RateDistribution(string label, Func<SeasonPlayerRecord, long> num,
+                              Func<SeasonPlayerRecord, long> den)
+        {
+            var pop = qualified.Where(r => den(r) > 0).ToList();
+            DistributionOver(pop, label, r => 100.0 * num(r) / den(r), Inv($"   n={pop.Count}"));
+        }
+
+        RateDistribution("BLK%",    r => r.Blk,    r => r.OpponentTwoPaOnFloor);
+        RateDistribution("REB%",    r => r.Reb,    r => r.SecuredBoardsOnFloor);
+        RateDistribution("AST%",    r => r.Ast,    r => r.OffensiveTeamFgmOnFloor - r.Fgm);
+        RateDistribution("STL%",    r => r.Stl,    r => r.DefensiveCredits);
+        RateDistribution("PTS/100", r => r.Points, r => r.OffensiveCredits);
         Console.WriteLine();
     }
 
@@ -406,6 +509,97 @@ internal static partial class Program
                   $"{all.Count(r => r.Credits > 0 && r.GamesPlayed == 0)} violations");
             Console.WriteLine($"        DNP-visible: {all.Count(r => r.GamesPlayed == 0)} of {all.Count} player-seasons never took the floor");
 
+            // ── Gate 4b: the on-floor denominators (S79.3) ──────────────────────
+            //
+            //  ★ WHAT THESE PROVE, AND WHAT THEY DO NOT. The four identities below prove
+            //  TOTALS. They are blind to ATTRIBUTION: swapping two players' counters wholesale
+            //  leaves every one of them exact. Attribution is proven only by the locked
+            //  expected boards recorded in the journal for this seed, and only for that seed.
+            //  Nothing in Phase 73 reads a board or its ordering, so a percentage with the
+            //  wrong denominator leaves this whole gate green.
+            Check("denominators: sum OffensiveCredits == 5 x possession records",
+                  SumOf(r => r.OffensiveCredits) == Lineup.Size * s.XPossessionRecords,
+                  $"{SumOf(r => r.OffensiveCredits)} vs {Lineup.Size} x {s.XPossessionRecords}");
+            Check("denominators: sum OpponentTwoPaOnFloor == 5 x league two-point attempts",
+                  SumOf(r => r.OpponentTwoPaOnFloor) == Lineup.Size * (s.Fga - s.ThreePa),
+                  $"{SumOf(r => r.OpponentTwoPaOnFloor)} vs {Lineup.Size} x ({s.Fga} - {s.ThreePa})");
+            Check("denominators: sum SecuredBoardsOnFloor == 10 x league secured boards",
+                  SumOf(r => r.SecuredBoardsOnFloor) == 2L * Lineup.Size * s.SecuredBoards,
+                  $"{SumOf(r => r.SecuredBoardsOnFloor)} vs {2L * Lineup.Size} x {s.SecuredBoards}");
+            Check("denominators: sum OffensiveTeamFgmOnFloor == 5 x league FGM",
+                  SumOf(r => r.OffensiveTeamFgmOnFloor) == Lineup.Size * s.Fgm,
+                  $"{SumOf(r => r.OffensiveTeamFgmOnFloor)} vs {Lineup.Size} x {s.Fgm}");
+
+            //  Per-player feasibility: a numerator can never exceed its own denominator.
+            //  Structural — each numerator counts a SUBSET of the events its denominator counts.
+            //  ★ `Blk <= OpponentTwoPaOnFloor` is DELIBERATELY ABSENT. RollHConfig sets
+            //  BlockThree = 0.01, so threes are blockable and a player's block total contains
+            //  events the two-point denominator excludes. The ratio is not bounded by 1 and
+            //  asserting it would be asserting a property of today's population, not a law.
+            Check("denominators: 0 <= OffensiveCredits <= Credits",
+                  all.All(r => r.OffensiveCredits >= 0 && r.OffensiveCredits <= r.Credits),
+                  $"{all.Count(r => r.OffensiveCredits < 0 || r.OffensiveCredits > r.Credits)} violations");
+            Check("denominators: 0 <= REB <= SecuredBoardsOnFloor",
+                  all.All(r => r.Reb >= 0 && r.Reb <= r.SecuredBoardsOnFloor),
+                  $"{all.Count(r => r.Reb < 0 || r.Reb > r.SecuredBoardsOnFloor)} violations");
+            Check("denominators: 0 <= FGM <= OffensiveTeamFgmOnFloor",
+                  all.All(r => r.Fgm >= 0 && r.Fgm <= r.OffensiveTeamFgmOnFloor),
+                  $"{all.Count(r => r.Fgm < 0 || r.Fgm > r.OffensiveTeamFgmOnFloor)} violations");
+            Check("denominators: 0 <= AST <= teammate FGM",
+                  all.All(r => r.Ast >= 0 && r.Ast <= r.OffensiveTeamFgmOnFloor - r.Fgm),
+                  $"{all.Count(r => r.Ast < 0 || r.Ast > r.OffensiveTeamFgmOnFloor - r.Fgm)} violations");
+            Check("denominators: 0 <= STL <= defensive possessions",
+                  all.All(r => r.Stl >= 0 && r.Stl <= r.DefensiveCredits),
+                  $"{all.Count(r => r.Stl < 0 || r.Stl > r.DefensiveCredits)} violations");
+
+            //  ★ SAY PLAINLY HOW WEAK THOSE BOUNDS ARE. On a real season the observed maxima
+            //  sit three to eleven times away from 1.0. They catch a counter fed on both sides,
+            //  a sign error or a wholesale skip. They do NOT catch two players' counters being
+            //  swapped, and must not be described as attribution protection.
+            double MaxRatio(Func<SeasonPlayerRecord, long> n, Func<SeasonPlayerRecord, long> d)
+            {
+                var pool = all.Where(r => d(r) > 0).ToList();
+                return pool.Count == 0 ? 0.0 : pool.Max(r => n(r) / (double)d(r));
+            }
+            string R4(double v) => v.ToString("F4", CultureInfo.InvariantCulture);
+            var hReb = R4(MaxRatio(r => r.Reb, r => r.SecuredBoardsOnFloor));
+            var hAst = R4(MaxRatio(r => r.Ast, r => r.OffensiveTeamFgmOnFloor - r.Fgm));
+            var hStl = R4(MaxRatio(r => r.Stl, r => r.DefensiveCredits));
+            Console.WriteLine($"        bound headroom (WEAK — nowhere near binding): reb/boards {hReb} " +
+                              $"ast/tmFGM {hAst} stl/defposs {hStl}  (bound is 1.0000 in each case)");
+
+            //  Zero-consistency. Only the FIRST of these is load-bearing; the other two are
+            //  contract statements that are VACUOUS on any population where every man who
+            //  played took the floor on both ends. They pass without testing anything, and are
+            //  recorded as contract rather than counted as coverage.
+            Check("denominators: a man with zero credits has all four counters zero",
+                  all.All(r => r.Credits != 0 || (r.OffensiveCredits == 0 && r.OpponentTwoPaOnFloor == 0 &&
+                                                  r.SecuredBoardsOnFloor == 0 && r.OffensiveTeamFgmOnFloor == 0)),
+                  $"{all.Count(r => r.Credits == 0 && (r.OffensiveCredits != 0 || r.OpponentTwoPaOnFloor != 0 || r.SecuredBoardsOnFloor != 0 || r.OffensiveTeamFgmOnFloor != 0))} violations " +
+                  $"over {all.Count(r => r.Credits == 0)} zero-credit records");
+            Check("denominators: zero offensive credits implies zero team FGM on floor (VACUOUS if nobody qualifies)",
+                  all.All(r => r.OffensiveCredits != 0 || r.OffensiveTeamFgmOnFloor == 0),
+                  $"{all.Count(r => r.OffensiveCredits == 0 && r.OffensiveTeamFgmOnFloor != 0)} violations, " +
+                  $"over {all.Count(r => r.Credits > 0 && r.OffensiveCredits == 0)} men who played only on defence");
+            Check("denominators: zero defensive credits implies zero opponent 2PA (VACUOUS if nobody qualifies)",
+                  all.All(r => r.DefensiveCredits != 0 || r.OpponentTwoPaOnFloor == 0),
+                  $"{all.Count(r => r.DefensiveCredits == 0 && r.OpponentTwoPaOnFloor != 0)} violations, " +
+                  $"over {all.Count(r => r.Credits > 0 && r.DefensiveCredits == 0)} men who played only on offence");
+
+            //  ★ REPORTED, NOT ASSERTED. On a full season every positive-credit man happens to
+            //  have all four counters positive — but that is a property of the ROTATION, not of
+            //  the counters. A short stint can contain no secured board, no opponent two-point
+            //  attempt and no team make; this tiny fixture reaches zero far more easily. An
+            //  earlier draft proposed asserting it and was wrong to.
+            var thin = all.Where(r => r.Credits > 0)
+                          .OrderBy(r => r.Credits)
+                          .FirstOrDefault();
+            var allFourPositive = all.Count(r => r.Credits > 0 && r.OffensiveCredits > 0 &&
+                                                 r.OpponentTwoPaOnFloor > 0 && r.SecuredBoardsOnFloor > 0 &&
+                                                 r.OffensiveTeamFgmOnFloor > 0);
+            Console.WriteLine($"        diagnostic (NOT a gate): {allFourPositive} of {all.Count(r => r.Credits > 0)} positive-credit men have all four counters positive; " +
+                              $"thinnest is {thin?.Credits ?? 0} credits / {thin?.OpponentTwoPaOnFloor ?? 0} opp 2PA / {thin?.SecuredBoardsOnFloor ?? 0} boards / {thin?.OffensiveTeamFgmOnFloor ?? 0} team makes");
+
             // ── Gate 5: determinism ─────────────────────────────────────────────
             var run2 = RunSeasonCore(tiny, seed, configPath, verbose: false);
             var a1 = all.OrderBy(r => r.PoolId).ToList();
@@ -419,7 +613,13 @@ internal static partial class Program
                 p.First.OReb == p.Second.OReb && p.First.DReb == p.Second.DReb &&
                 p.First.Ast == p.Second.Ast && p.First.Stl == p.Second.Stl &&
                 p.First.Blk == p.Second.Blk && p.First.To == p.Second.To &&
-                p.First.ShFoul == p.Second.ShFoul && p.First.NsFoul == p.Second.NsFoul);
+                p.First.ShFoul == p.Second.ShFoul && p.First.NsFoul == p.Second.NsFoul &&
+                // S79.3 — the four on-floor denominators reproduce too, or a rate is not
+                // reproducible even though every counting stat is.
+                p.First.OffensiveCredits == p.Second.OffensiveCredits &&
+                p.First.OpponentTwoPaOnFloor == p.Second.OpponentTwoPaOnFloor &&
+                p.First.SecuredBoardsOnFloor == p.Second.SecuredBoardsOnFloor &&
+                p.First.OffensiveTeamFgmOnFloor == p.Second.OffensiveTeamFgmOnFloor);
             Check("determinism: same seed reproduces every per-player record", same,
                   $"{a1.Count} records compared field by field");
         }
