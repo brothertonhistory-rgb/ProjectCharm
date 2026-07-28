@@ -7484,9 +7484,24 @@ So generator sessions read four stages, and a failure at each has a different ow
 | stage | readout | failure here means |
 |---|---|---|
 | 1. **generated** | the oracle's 46k cohort by body band and skill | the generator |
-| 2. **rostered** | the body-band census in `PrintRosterCensus` (page-only) | the draft / scout rank |
+| 2. **rostered** | the body-band census **and the position census**, both in `PrintRosterCensus` (page-only) | the draft / scout rank |
 | 3. **played** | minutes by man (S76/S77 pages) | the depth chart |
 | 4. **expressed** | the season leaderboards (S77 page) | the engine, or attribution |
+
+**Stage 2 carries TWO readouts, and they answer different questions (S79.2).** The body-band census
+(`PrintS78BodyBandCensus`) bands by height and prints **means** — it is S78's recorded baseline and is
+kept unchanged so S78's numbers stay comparable across sessions. It cannot see a change that lands on
+guards **as a class**: height bands split guards across three rows, and a mean hides both the tail and
+the direction. The position census (`PrintS80PositionCensus`) splits G/W/B and prints **median, p10,
+p90, and the share at or under 10 and 20** — the low end, because a generation session that moves a
+distribution's floor is invisible to a mean.
+
+Its skills are grouped by **what competes for the same family budget**, not alphabetically, because
+`PlayerGenPass3` normalizes family pulls into shares of a fixed total (`Sharpen`, `:529-531`): budget a
+player stops spending on one family necessarily lands on another, so the collateral rows are part of
+reading the primary ones. Interior defence prints directly above perimeter defence to make **C-28's
+mirror** inspectable — the two bids run off one constant pair, so a big's perimeter tail widening is
+intended behaviour and the page has to show it beside the guard's interior tail, not bury it.
 
 Stage 1 reports latent **and** current; stage 2 can only report **current**, because the roster
 bridge carries the 33-key card (`PoolPlayer.Ratings`) and latent does not survive the crossing.

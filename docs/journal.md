@@ -1,3 +1,63 @@
+## Session 79.2 — THE CHECK-IN GATE EARNS ITS KEEP. The S80 prompt did not clear: five defects, one blocking, all found by reading source before a line of C#. Emmett ruled the perimeter mirror; the session shipped the position census instead — the instrument S80 will be ruled on. Suite `ALL CHECKS PASSED` on Emmett's machine. A 5'8" guard with 96 rim protection got a name and an item. (2026-07-27)
+
+**Register:** build session under `PROMPT-interior-defense-bid-s80-r3`. Scope: the check-in gate. Shipped: one page-only readout. NOT shipped: S80 itself.
+
+### The gate did not clear — five findings, verified against the pulled tree
+
+**(1) ★ BLOCKING — the scope claim was unachievable.** `PlayerGenPass3.cs:440-441` drives `pref["PerimDefense"]` and `pref["InteriorDefense"]` from **one** pair of constants, mirrored about the defensive plane; the oracle's comment at `:356` says so outright. The prompt's §4 claimed to change the interior mapping and "nothing else in generation." Measured cost of the shared dial: a big's `PerimeterDefense` median falls 20 → 16 and his share at or under 20 goes 50.9% → 72.9%. Emmett ruled the mirror is the design (C-28), which dissolved the contradiction rather than requiring a constant split.
+
+**(2) ★ Every symmetric candidate breaks a Phase 70 band.** `line-17` is 79.5% ± 1.5pp and `Band()` throws. Baseline 80.17% against 81.20 / 81.62 / 81.93 / 82.96 for the four candidates; the hardest also breaks `ceiling-pressure` at 30.92 against 26.5 ± 2.5. Mechanism: freed interior budget raises perimeter value, so more of the stream clears Rscore 17. The split variants that would have passed are exactly the ones C-28 rules out. **S80 must re-rule the band or fail the harness.**
+
+**(3) R4's endpoint anchor does not do what it promises.** It pins `bid(1.0) = 1.15`. The bigs' realized dplane median is **0.737**, p90 **0.905** — almost nobody occupies the anchored point, so a convex curve at the same endpoints depresses the bid across the whole realized band. Measured: max RimProtection 98 → 79, p99 80 → 66. The r3 changelog's "the low tail opens without the elite endpoint moving" is true of the function and false of the population.
+
+**(4) R3 is wrong about `OffBallDefense`.** `INTANGIBLES` is exactly three (`:242`). `OffBallDefense` is a spend skill in the `PerimDefense` family (`:159`), not locked by `INT_LO`, and squarely in the blast radius of the change R3 declares it protected from.
+
+**(5) Two artefacts did not exist as described.** `tools/real_d1_block_reference.csv` is absent from the tree. §5b's census bands by **height** and prints **means only**, so "labelled by role" was a rewrite, not a labelling pass — that half is what shipped.
+
+### The finding that reshapes the candidate design
+
+**Guards do not reach the bid floor.** Guard dplane: median **0.207**, p90 0.324, only **10.8%** below 0.05. `DefPlaneFromNoise` is a logistic in height with `DEF_NOISE = 0.10`, too small to reach the bottom. So the typical guard bids 0.674, not 0.55, the "pure-perimeter guard" of §1 barely exists, and a lower **floor** is nearly cosmetic — **convexity does the work**, because it bites across the whole [0, 0.35] guard band.
+
+Two structural facts that make S80 cheaper than the prompt assumed: the mapping consumes **no RNG**, so bodies, roles, budgets, gamma and arrival are bit-identical across candidates and **fixed draws are free** — the fixture's `draws` block and 61-slot `draw_order` stay byte-identical, only the constants echo and the checkpoints move. And the drafted set is **not** a re-allocation of the same men: 139 different players under the linear candidate, 281 under the hardest convex, so comparisons are distributional, never paired.
+
+### What shipped
+
+`PrintS80PositionCensus` — rostered players split G/W/B, sixteen skills grouped by which compete for the same family budget, each with median / p10 / p90 / share <=10 / share <=20. **Claude's call, flagged at delivery:** the S78 body-band census is kept rather than replaced, so S78's recorded numbers stay comparable; and interior defence prints directly above perimeter defence, so C-28's mirror is inspectable side by side.
+
+Validated by reproducing the recorded S79.1 census exactly: **G RimProtection 27, 34.6% at or under 20** (recorded 27 / 35%) and **G PostMoves 14, 72.0%** (recorded 14 / 72%). Page-only — no engine math, no config, no fixture, no assertion. One CS1503 caught by the in-sandbox build (concatenated interpolated strings collapse to `string`, so `Inv()` needs one literal); fixed before delivery.
+
+### The block board, read at Emmett's request
+
+S79 fixed the headline — bigs at 3.1 and 2.9 a game, wings 1.3, guards 0.3–0.5, roughly 10:1 and positionally sane against S78's flat 1.2-to-1.0 with nine guards in the top ten. What remains is O-39's dead heat, and S79.2 measured both the lever and the reason it is the wrong first move.
+
+**The lever works.** Elite rim protector vs chase-down wing, share of the lineup's rim-block credit: 43.2% / 33.4% at the current 0.40 skill weight, 46.5% / 25.9% at 0.55, 49.3% / 16.7% at 0.70.
+
+**★ But the weight is not why length wins — the two arms sit on different scales.** Both are compared to `AttributeMidpoint = 50`. **LengthRating median 59.7** (86.5% of the league above the bar) against **rim-defence median 33.2** (17.1% above it). Length pays out to nearly everyone, skill to one man in six, and below the bar a negative threat floors to zero — so **83% of the league contributes nothing but the luck floor to block credit.** Raising the skill weight works by making more of the league a non-threat (positive-threat share 53.8% → 37.1%), not by making rim protection matter. Opened as O-44.
+
+**★ And the obvious fix alone makes it worse — measured, recorded so it is not re-derived.** Claude recommended raising the length bar toward the population median and was **wrong**. It does cut the help arm hard (mean help sum 3.15 → 0.78, which would help O-40's overshoot) but it **flattens the board**: the top man's credit share falls 39.8% → 34.8%, because with a high bar almost everyone floors at zero and the weights collapse onto the flat luck floor. Any fix must move the bar and re-price what sits above it together.
+
+**Sequencing, reversed on evidence.** Claude recommended O-39 before S80; the measurement reversed it. Rim-defence median moves 33.2 → 25.9 → 17.6 across S80's candidates, so a neutral point set today is wrong the moment S80 lands. LengthRating's median holds at 59.7 / 59.7 / 59.3 — S80 does not touch a body — so the length half is population-independent and can go first. **S80, then the skill half.**
+
+### Pool_85 — the 5'8" rim protector, and why he is not a bug
+
+Emmett saw a 5'8" guard ninth on the block board and asked. A throwaway sandbox probe (never delivered, tree reverted and drift-audited clean) found him.
+
+**Pool_85, Robert Morris: Height 40 (5'8"), Wingspan 43, Vertical 73 — RimProtection 96, PostDefense 88.** His rim defensive rating is **93.2** against **37.0** for the 6'9" big beside him. He takes **35.5%** of his team's rim-block credit; the big takes 32.6%. Not luck, not minutes — by the engine's own reckoning he is his team's best rim defender.
+
+**He is not rare.** Of the 49 rostered men with RimProtection >= 80: **12 under 6'0", 30 at 6'0"–6'5", only 7 at 6'6"+.** More sub-six-foot elite rim protectors than legitimate big ones.
+
+**★ Why the engine does not disbelieve him, and the answer is precise: the two doors read his body differently, and the MAKE door reads it correctly.** `Reach = (Height + Wingspan)/2` = **41.5**, deliberately excluding Vertical per its own source comment, so a tall shooter collects nearly the full `HeightOverDefenderShift`. `LengthRating = (Height + Wingspan + Vertical)/3` = **52.0**, above the 50 bar — **his 73 vertical launders his arms**, and that is how he clears the block door.
+
+**He is a half-finished ruling, not a regression.** Before S78 he was impossible: the cap was `34 + 65·clamp((h−46)/28)`, which pins a 5'8" man at **34**. S78 removed it deliberately on the recorded reasoning *the generator says what a man can do; the engine says whether it is felt* — and named "elite rim protector, 5'9\"" as the accepted counterweight. **The generator half shipped; the engine half never did.** Opened as O-45 at Emmett's request, with the standing note that the answer is not to restore the cap.
+
+The remaining gap O-45 names: the make door damps him through the shooter's height bonus, but still consumes his 93.2 in the skill channel with no body gate at all — and `DefenseRating(Rim)` is 65% RimProtection with `PerimeterDefense` contributing **zero**, so rim make percentage and `DefensiveResistance`'s shot-location push both believe him fully. Neither S80 nor O-44 reaches that.
+
+### Verification
+
+Suite `ALL CHECKS PASSED` on Emmett's machine, including Phase 74 golden parity at 2.8E-017 and Phase 71's 249/249 Matchup key parity — nothing this session touched an assertion. Sandbox build clean, season run clean, drift audit clean: exactly one file differs from the pull.
+
+**Session shape, honestly.** The gate consumed most of the session and shipped one page-only file. That is the gate working — the blocking finding would have cost a failed build and a wasted fixture regeneration — but the session ran long before Emmett called it, and the recovery was to pick the smallest instrument that no later ruling can invalidate rather than to start S80 with an hour left.
+
 ## Session 79 — THE RIM PROTECTOR BECOMES REAL. The block door stops consulting one man: a weakside shot blocker now ends possessions he was never assigned to, and credit follows the threat that produced the block. `BlockerWeight` and its 30 config keys deleted. Suite `ALL CHECKS PASSED` on Emmett's machine; Phase 74 golden parity 210 rows at 2.8E-017. The block board went from flat to roughly 10:1. (2026-07-27)
 
 **Register:** build session under `PROMPT-block-help-s79` (r2). Oracle-first. Scope wall: `Matchup` block functions, `BlockerPicker`, the Roll H block-door call site, Phase 7/36, one page-only readout, docs. Out: C6's aggregate, the drive gate, the putback RATE, off-ball defense, the generator.

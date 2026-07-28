@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 79 + the post-S79 design conversation** (2026-07-27; S79 shipped the block help arm and contribution credit. The conversation after it traced the long-running "minutes are skewed" complaint to its actual cause — lineup shape, not the recruiting board — and produced two new design rulings, O-42 and O-43.)
+Last updated: **Session 79.2** (2026-07-27; the S80 check-in gate ran and did NOT clear — five defects in the prompt, one of them blocking. Emmett ruled the perimeter mirror (C-28). S79.2 shipped the position census instead, the instrument S80 will be ruled on. Three findings opened O-44, O-45 and re-scoped O-39.)
 
 ## Current baseline
 
@@ -52,6 +52,14 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **S79.2 — the position census (page-only instrument).** `PrintS80PositionCensus` in
+  `Program.Season.Calibration.cs`: rostered players split G/W/B, sixteen skills grouped by which
+  ones compete for the same family budget, each with median / p10 / p90 / share <=10 / share <=20.
+  Sits beside the S78 body-band census, which is UNCHANGED so S78's recorded numbers stay
+  comparable. Validated by reproducing the S79.1 census exactly — G RimProtection 27 / 34.6% <=20,
+  G PostMoves 14 / 72.0% <=20. No engine math, no config, no fixture, no assertion.
+  This is the readout S80 is ruled and validated on.
 
 - **S79 — the block help arm + contribution credit.** `Matchup.BlockWeightWithHelp` composes the matched
   duel with a zone-weighted help arm in pre-tanh shift space; `BlockCreditWeights` /
@@ -207,14 +215,22 @@ chart is PROVISIONAL pending O-6.
   RollA/RollE into the common shape is its own session with its own drift audit. Not urgent: RollE's
   binding is now behaviourally proven.
 
-- **★ O-39 — THE BLOCK CONTEST UNDER-WEIGHTS RIM-PROTECTION SKILL AT THE RIM (S79 finding, PARKED BY
-  EMMETT).** `BlockContestWeights` prices skill at Rim **0.40** — identical to Three — against a configured
-  schedule of Rim 0.40 / Short 0.45 / Mid 0.50 / Long 0.42 / Three 0.40, an inverted U peaking at Mid. The
-  source comment beside those weights says skill should count for MORE near the rim; the numbers do not.
-  Measured consequence: on real generated players the elite rim protector (46.5% of his lineup's rim
-  blocks) and a chase-down wing with 80 vertical and *average* rim defense (45.9%) finish in a dead heat.
-  A Phase 7 anchor Emmett set; flagged at S79 and explicitly parked, not touched. One-line change when he
-  rules.
+- **★ O-39 — THE BLOCK CONTEST UNDER-WEIGHTS RIM-PROTECTION SKILL AT THE RIM (S79 finding; RE-SCOPED
+  AND RE-SEQUENCED at S79.2).** `BlockContestWeights` prices skill at Rim **0.40** — identical to Three —
+  against a schedule of Rim 0.40 / Short 0.45 / Mid 0.50 / Long 0.42 / Three 0.40, an inverted U peaking at
+  Mid. The source comment beside those weights says skill should count for MORE near the rim; the numbers
+  do not.
+  **S79.2 measured the lever and it works:** on real generated players, an elite rim protector's share of
+  his lineup's rim-block credit against a chase-down wing's runs 43.2% vs 33.4% at the current 0.40, 46.5%
+  vs 25.9% at 0.55, and 49.3% vs 16.7% at 0.70.
+  **But the weight is not why length wins, so this item is now the SECOND half of a two-part fix.** See
+  O-44: the two arms are measured against the same neutral point of 50 while sitting on entirely different
+  distributions (length median 59.7, rim-defence median 33.2), so the length arm pays out to 86.5% of the
+  league and the skill arm to 17.1%. Raising the skill weight works by making more of the league a
+  non-threat (positive-threat share falls 53.8% → 37.1%) rather than by making rim protection matter.
+  **Sequencing ruled at S79.2: this waits for S80.** Rim-defence median moves 33.2 → 25.9 (linear) or 17.6
+  (convex) under S80's candidates, so any neutral point set today is wrong the moment S80 lands. The length
+  half (O-44) does NOT move under S80 and can go first. Emmett's Phase 7 anchor; still his call.
 
 - **O-40 — BLOCK RATE CALIBRATION (S79, expected).** Blocks read 4.2 against the 3.5 target, up from S78's
   4.1. The help arm only ever adds, so this was predicted in the prompt and recorded rather than chased.
@@ -273,6 +289,49 @@ chart is PROVISIONAL pending O-6.
   longer glued to one man — **without** modelling time inside a possession, which was by far the largest
   build discussed.
 
+- **★ O-44 — THE BLOCK DOOR'S TWO ARMS SHARE ONE NEUTRAL POINT AND SIT ON DIFFERENT SCALES (S79.2
+  measurement).** `BlockDefenderThreat` compares BOTH `DefenseRating(zone)` and `LengthRating` to the single
+  `AttributeMidpoint = 50`. Measured on the 4,511-man drafted population: **LengthRating median 59.7**
+  (86.5% of the league above the bar) against **rim-defence median 33.2** (17.1% above it). So length pays
+  out to nearly everyone and skill to one man in six — and below the bar a negative threat is floored to
+  zero, meaning **83% of the league contributes nothing but the luck floor to block credit.** That, not the
+  40/60 weight, is why an athletic wing keeps pace with a real rim protector (O-39).
+  **★ The obvious fix alone makes it WORSE — measured, do not skip this.** Raising the length bar toward the
+  population median cuts the help arm hard (mean help sum 3.15 → 0.78, which would help O-40's block-rate
+  overshoot) but **flattens the board**: the top man's credit share falls 39.8% → 34.8%, because with a high
+  bar almost everyone floors at zero and the weights collapse onto the flat luck floor. Any fix has to move
+  the bar and re-price what sits above it together.
+  Blast radius is three call sites, all in `Matchup`: block credit/help (`:389`), putback block (`:595`),
+  putback conversion (`:633`). The shooting-foul contest (`:682`) reads `FoulDrawing`/`Discipline`, NOT
+  length, and is unaffected. **Population-independent** — S80 does not touch a body, and LengthRating's
+  median holds at 59.7 / 59.3 across every S80 candidate — so this can be built before or after S80.
+
+- **★ O-45 — THE MAKE DOOR HAS NO BODY GATE ON INTERIOR-DEFENCE SKILL (S79.2, Emmett asked for this
+  item).** Blocking is the smaller half of what `RimProtection` does. It is also 65% of
+  `DefenseRating(Rim)` (`PostDefense` the other 35%; `PerimeterDefense` contributes **zero** at the rim),
+  which feeds `EffectiveRating`'s skill shift and therefore rim make percentage directly — plus
+  `DefensiveResistance`'s top-3 blend, which moves shots away from the rim before anyone shoots.
+  **The defect, worked example:** Pool_85 (Robert Morris, seed 20260720) is **5'8" with a 43 wingspan and
+  RimProtection 96 / PostDefense 88**. His rim defensive rating is **93.2** against **37.0** for the 6'9"
+  big beside him; he takes **35.5%** of his team's rim-block credit to the big's 32.6%, and leads the
+  nation's ninth-most blocks per game. **He is not rare** — of the 49 rostered men with RimProtection >= 80,
+  **12 are under 6'0" and only 7 are 6'6"+**.
+  **★ Why the engine does not disbelieve him, precisely:** the two doors read his body differently and the
+  make door reads it CORRECTLY. `Reach = (Height + Wingspan)/2` = **41.5** for him and deliberately excludes
+  Vertical, so a tall shooter collects nearly the full `HeightOverDefenderShift` bonus. `LengthRating =
+  (Height + Wingspan + Vertical)/3` = **52.0**, above the 50 bar — his 73 vertical launders his arms. The
+  exclusion is deliberate per the `Reach` source comment, so whether shot-blocking should credit vertical at
+  one-third weight is a live basketball question, not an oversight.
+  **The open question, Emmett's to rule:** the make door damps him through the shooter's height bonus but
+  still consumes his 93.2 in the skill channel with no body gate at all. Should a small man's elite interior
+  rating stop suppressing rim FG%, and if so by what mechanism? **Neither S80 nor O-44 covers this** — S80
+  makes him rarer, O-44 stops the block board believing him, and this is the third piece.
+  Context that matters: S78 removed the old hard height cap (`34 + 65·clamp((h−46)/28)`, which pinned a
+  5'8" man at 34) **deliberately**, on the recorded ruling *the generator says what a man can do; the engine
+  says whether it is felt*, and named "elite rim protector, 5'9"" as the accepted counterweight. The
+  generator half shipped; the engine half never did. **This item is that missing half — it is not a
+  regression and the answer is not to restore the cap.**
+
 ## Parked — waiting on a named prerequisite
 
 - **P-1 — Shooting-foul positional lean (~50.7/49.3) → the help-defense/rotation model (S62).**
@@ -303,6 +362,17 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-28 — A big who cannot guard the perimeter is as legitimate as a guard who cannot protect the
+  rim; the shared defensive bid pair is INTENDED (Emmett's ruling, 2026-07-27).** `PlayerGenPass3`
+  drives `pref["PerimDefense"]` and `pref["InteriorDefense"]` from ONE pair of constants
+  (`DEF_BID_LO` / `DEF_BID_SPAN`, `:440-441`), mirrored about the defensive plane. S79.2's check-in
+  flagged this as a scope contradiction in the S80 prompt, which claimed to change interior defence
+  and "nothing else in generation". Emmett ruled the mirror is the design: **perimeter-defending
+  bigs should become rare in the same fashion that rim-protecting guards do.** So S80 changes both
+  sides together and does NOT split the constants. Consequence, recorded so it is not read as
+  collateral damage: a big's `PerimeterDefense`, `Steals` and `OffBallDefense` low tail widens by
+  exactly as much as a guard's interior tail. The census (S79.2) prints the two families adjacent
+  so the mirror is inspectable.
 - **C-1 — Defensive ratings are the MAN-TO-MAN wire; a future scheme layer TOGGLES distinct
   wiring sets (S61 architecture ruling).**
 - **C-2 — Team-aggression fouls belong to the coach/pressure layer, not Hustle (S61; the
@@ -354,15 +424,42 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-*Not yet chosen — Emmett's call.* **The S79 pick below was falsified by the design conversation that
-followed it**, which is exactly what this section exists to catch.
+**S80 — the interior-defence bid.** Emmett ruled the basketball at S79.2 (C-28, the symmetric mirror), so
+the design question is settled and only the build remains. **The S80 prompt as written must be redrafted
+first** — S79.2's check-in found five defects (below), and the §6a/§6b passes are already done, so the
+redraft is cheap. The candidate table, measured on fixed draws, is in journal S79.2 and the readout it will
+be ruled on shipped this session.
 
-**Claude's pick: O-42, lineup shape.** I recommended O-6 (scout ranks) immediately after S79 on the
-evidence that bigs play 24 minutes to guards' 32. That reasoning was wrong: the shape caps the big group at
-40 minutes before any rank is consulted, so re-ordering the board moves nobody onto the floor. O-42 is the
-cause, O-33 closes with it, and O-6 drops back to what it always was — a recruiting-realism item, not a
-minutes item. It is also the front edge of the coaching layer and the first step toward the standing
-acceptance test recorded in O-42.
+**What the redraft must fix, all verified against source at S79.2:**
+1. **§4's scope claim was unachievable** — one constant pair drives both defensive bids. Resolved by C-28:
+   the mirror is intended, both sides move, no constant split.
+2. **★ Every symmetric candidate breaks Phase 70's `line-17` band** (79.5% ±1.5pp): baseline 80.17 →
+   81.20 / 81.62 / 81.93 / 82.96 across the four candidates, and the hardest also breaks
+   `ceiling-pressure`. `Band()` throws. **The band needs re-ruling as part of S80, or the build fails the
+   harness.** Mechanism: freed interior budget raises perimeter value, so more of the stream clears Rscore 17.
+3. **R4's endpoint anchor does not protect the elite ceiling.** It pins the bid at dplane 1.0; the bigs'
+   realized median is 0.737 and p90 0.905. Measured: max RimProtection falls 98 → 79, p99 80 → 66.
+4. **R3 is wrong** — `INTANGIBLES` is three (BasketballIQ, Discipline, HelpDefense). `OffBallDefense` is a
+   spend skill in `PerimDefense` (`:159`), NOT locked by `INT_LO`, and is directly in the blast radius.
+5. **§3's `tools/real_d1_block_reference.csv` is not in the repo**, and §5b's census did not exist in the
+   shape described (height bands, means only) — that half is now shipped.
+
+**Also settled at S79.2 and load-bearing for the prompt:** guards do NOT reach the bid floor — guard dplane
+median is **0.207**, p90 0.324, only 10.8% below 0.05 — so a lower floor is nearly cosmetic and **convexity
+does the work**. Draw order does NOT change (the mapping consumes no RNG), so fixed draws are free and the
+fixture's `draws` block stays byte-identical; only the constants echo and the checkpoints move. And the
+candidate populations are not re-allocations of the same men: 139–281 of the 4,511 drafted are different
+people, so comparisons are distributional, never paired.
+
+**Direction of travel, worth knowing before the build:** rim FG% reads **51.8 against a 61.0 target**, the
+largest miss on the calibration page. S80 cuts guards' interior defence, which moves that miss the right
+way. It also lowers the individual block ceiling, which moves O-39's ceiling gap the WRONG way — those two
+are in tension and O-39/O-44 are where it gets resolved, not S80.
+
+**The strongest counter-candidate: O-44, the block door's neutral point.** Population-independent, three
+call sites, and it is the half of the block-board fix that S80 cannot invalidate. Take it first if the
+appetite is for a contained engine win rather than a generation session. Do NOT take O-39 before S80 —
+sequencing ruled at S79.2.
 
 **The strongest counter-candidate: O-43, the on-ball blend.** Smaller, self-contained, one wiring site, and
 it makes an elite perimeter defender matter on possessions he is not assigned to — the first real team

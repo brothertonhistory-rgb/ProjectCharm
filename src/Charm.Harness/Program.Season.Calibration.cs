@@ -838,6 +838,83 @@ internal static partial class Program
         }
     }
 
+    // ── S80 instrument: the POSITION census. The readout the interior-defence bid
+    //    change is ruled on and validated against. Page-only, never asserted.
+    //
+    //    Why this exists ALONGSIDE the band census above rather than replacing it: the
+    //    height bands are S78's recorded baseline and stay untouched so S78's numbers
+    //    remain comparable. What they cannot show is a change that lands on GUARDS as a
+    //    class — banding by height splits guards across three rows, and a band MEAN
+    //    hides both the tail and the direction. S80 moves the LOW END of a distribution,
+    //    so the instrument has to print the low end: median, p10, p90, and the share
+    //    sitting at or under 10 and 20.
+    //
+    //    CLAUDE'S CALL, flagged for Emmett: rows are grouped by WHAT SHARES A BUDGET,
+    //    not alphabetically, and interior defence is printed directly above perimeter
+    //    defence. That ordering encodes Emmett's S80 ruling — the two bids are ONE dial
+    //    and move together, so a big losing perimeter defence is INTENDED behaviour, not
+    //    collateral damage. The page has to make the mirror visible side by side or the
+    //    ruling cannot be checked. Reversible: reorder the groups array.
+    //
+    //    The offence and rebounding groups are here because the family budget is
+    //    COMPETITIVE (PlayerGenPass3 normalizes pulls into shares of a fixed total), so
+    //    budget a guard stops spending on interior defence necessarily lands somewhere
+    //    else. Those rows are the "somewhere else".
+    private static void PrintS80PositionCensus(DivvyResult res)
+    {
+        static string Inv(FormattableString f) => FormattableString.Invariant(f);
+
+        // Nearest-rank percentile over an ASCENDING list; p=50 is the median. Kept local
+        // rather than promoted to a shared utility — the harness has no percentile helper
+        // today and one page is not enough reason to add one.
+        static int Pctile(List<int> ascending, double p)
+        {
+            if (ascending.Count == 0) return 0;
+            var idx = (int)Math.Ceiling(p / 100.0 * ascending.Count) - 1;
+            return ascending[Math.Clamp(idx, 0, ascending.Count - 1)];
+        }
+
+        var groups = new (string Label, string[] Skills)[]
+        {
+            ("interior defence  (S80 primary)",
+                new[] { "RimProtection", "PostDefense" }),
+            ("perimeter defence (the ruled mirror — same dial, opposite plane)",
+                new[] { "PerimeterDefense", "Steals", "OffBallDefense" }),
+            ("interior offence  (competes for the same budget)",
+                new[] { "PostMoves", "Close", "Finishing", "Screening" }),
+            ("perimeter offence (competes for the same budget)",
+                new[] { "Outside", "Mid", "BallHandling", "Passing", "Playmaking" }),
+            ("rebounding        (competes for the same budget)",
+                new[] { "OffensiveRebounding", "DefensiveRebounding" }),
+        };
+
+        var pool = res.Pool;
+        var drafted = new HashSet<int>(res.Rosters.Values.SelectMany(r => r));
+
+        Console.WriteLine("--- S80 POSITION CENSUS, ROSTERED (stage 2; CURRENT ratings; page-only, never asserted) ---");
+        foreach (var pos in new[]
+                 { PositionalEligibility.Guard, PositionalEligibility.Wing, PositionalEligibility.Big })
+        {
+            var sub = pool.Where(p => drafted.Contains(p.PoolId) && p.Pos == pos).ToList();
+            if (sub.Count == 0) continue;
+
+            Console.WriteLine(Inv($"  {pos}  (n={sub.Count})"));
+            Console.WriteLine($"      {"skill",-22}{"med",5}{"p10",6}{"p90",6}{"<=10",8}{"<=20",8}");
+            foreach (var (label, skills) in groups)
+            {
+                Console.WriteLine($"    {label}");
+                foreach (var w in skills)
+                {
+                    var v = sub.Select(p => p.Ratings[w]).OrderBy(x => x).ToList();
+                    var le10 = v.Count(x => x <= 10);
+                    var le20 = v.Count(x => x <= 20);
+                    Console.WriteLine(Inv(
+                        $"      {w,-22}{Pctile(v, 50),5}{Pctile(v, 10),6}{Pctile(v, 90),6}{100.0 * le10 / v.Count,7:F1}%{100.0 * le20 / v.Count,7:F1}%"));
+                }
+            }
+        }
+    }
+
     // ── Session 63: the roster census — proves roster SUPPLY was not silently
     //    distorted while standings conservation stayed green. Page-only. ─────────────
     private static void PrintRosterCensus(DivvyResult res, WorldFile world)
@@ -881,6 +958,7 @@ internal static partial class Program
             Console.WriteLine(Inv($"    {kv.Key}  {kv.Value,4} schools"));
 
         PrintS78BodyBandCensus(res);
+        PrintS80PositionCensus(res);
 
         Console.WriteLine("  drafted height by position (pool means survive the divvy?):");
         foreach (var q in new[] { PositionalEligibility.Guard, PositionalEligibility.Wing, PositionalEligibility.Big })
