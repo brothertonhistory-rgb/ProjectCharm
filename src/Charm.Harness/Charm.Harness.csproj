@@ -97,6 +97,19 @@
     <None Include="..\..\tools\block_help_golden.json" Link="tools\block_help_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- S81.3 — the two fixtures that keep block CREDIT a regression test rather than a
+         snapshot. block_credit_neutral_frozen.json holds the neutral credit vectors copied
+         byte-for-byte from the pre-S81.3 golden and is NEVER regenerated; the oracle reads
+         it, proves it still reproduces, and embeds it. block_credit_preedit_golden.json is
+         the independent C# emission taken from production BEFORE the edit, stored as raw
+         bits — a hand transcription can repeat the same misreading as the new code, so the
+         pre-edit emission is what binds the actual old behaviour. -->
+    <None Include="..\..\tools\block_credit_neutral_frozen.json" Link="tools\block_credit_neutral_frozen.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\tools\block_credit_preedit_golden.json" Link="tools\block_credit_preedit_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="..\..\tools\nonshooting_foul_golden.json" Link="tools\nonshooting_foul_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

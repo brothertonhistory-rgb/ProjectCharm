@@ -5964,7 +5964,7 @@ All three are calibration placeholders. Direction and shape are what Phase 35 va
 
 ---
 
-## Phase 36 / Phase 74 — Block credit and the help arm (Session 71, REBUILT Session 79, GATED BY ASSIGNMENT Session 81, S81.1 RULING PENDING BUILD, 2026-07-28)
+## Phase 36 / Phase 74 — Block credit and the help arm (Session 71, REBUILT Session 79, GATED BY ASSIGNMENT Session 81, SHOOTER-RELATIVE Session 81.3, 2026-07-29)
 
 ### Problem, as it stood after S78
 
@@ -6259,7 +6259,7 @@ evidence of record is the per-situation proof in Phase 74, which is exact and wh
 leaderboard can show, because it is a per-possession effect that averages away.
 
 
-#### ★ The help arm is measured against a FIXED MIDPOINT, and that is a scalar wall breach (S81.1 finding; RULED, NOT YET BUILT)
+#### ★ The help arm compares to the SHOOTER (S81.1 finding, S81.1 ruling, BUILT S81.3)
 
 The block door asks two different questions and only one of them is a matchup.
 
@@ -6270,15 +6270,19 @@ shooter's **Finishing**. So a tall, skilled finisher already suppresses the bloc
 man guarding him, and a 6'0" guard already gets contested harder than a 6'4" guard by the man
 in front of him. That half is correct and stays.
 
-**Off the ball, it is absolute.** `BlockDefenderThreat` — the term every *helper* contributes
-through — reads:
+**Off the ball, it WAS absolute — until S81.3.** `BlockDefenderThreat` was the term every
+*helper* contributed through, and it read:
 
     skill  = GapFn(DefenseRating(zone, d) − AttributeMidpoint)
     length = GapFn(LengthRating(d)        − AttributeMidpoint)
     threat = sw * skill + lw * length
 
-`AttributeMidpoint` is a constant. The helper is compared to a permanent imaginary
-50-rated player, **not to the man he is contesting and not to anyone on the floor.**
+`AttributeMidpoint` is a constant. The helper was compared to a permanent imaginary
+50-rated player, **not to the man he was contesting and not to anyone on the floor.**
+
+**That function still exists and is unchanged — it is now the CREDIT yardstick and nothing else.**
+The rate forked onto `BlockHelpThreat` at S81.3; see *What shipped* below for why credit
+deliberately kept the neutral bar.
 
 **★ Why this is the no-scalar wall breached in the hardest place to see it.** Team strength in
 this engine is supposed to emerge from individual matchups; nothing is allowed to be a fixed
@@ -6340,6 +6344,95 @@ basketball and must survive the change. And **hops currently count as reach at f
 same 6'0" guard with a 99 rating nearly doubles his help on vertical alone (2.50 → 4.86), because
 `LengthRating` is Height, Wingspan and Vertical at **exactly one third each**. A 40-inch vertical
 is presently worth more to this engine than four inches of wingspan.
+
+#### What shipped at S81.3 — and why the measured result inverted the expectation
+
+**The rate forked; credit did not.** Two new functions sit beside the two neutral ones so the
+wall is visible in the names:
+
+    RATE   (S81.3, shooter-relative)   BlockHelpThreat        -> BlockHelpShiftVsShooter -> BlockHelpSum
+    CREDIT (unchanged, neutral)        BlockDefenderThreat    -> BlockHelpShift          -> BlockCreditWeights
+
+`BlockHelpThreat` reads the same two gaps `BlockDuelShift` already used — skill against
+`OffenseRating(zone, shooter)`, length against `LengthRating(shooter)` — so the door carries one
+rule instead of two. Readiness still MULTIPLIES threat and the no-drag floor still fires; neither
+was touched. The shooter goes exactly one level deeper and no call site above Roll H changed,
+because the shooter was already arriving at the door.
+
+**There is deliberately no nullable shooter and no no-shooter overload.** Either would preserve
+two rate semantics indefinitely — the defect in a compatibility costume. Every caller has a
+shooter: the located-shot door is only reachable with one, and the putback door is a separate
+function that needs none.
+
+**★ R2 — block CREDIT stays defender-only, on the neutral yardstick (Emmett, 2026-07-29).**
+Whether the shot gets blocked follows the shooter; whose name goes on it stays about the
+defenders. The reasoning is measured, not aesthetic: S79 scored the matched man against this
+shooter and it came out **exactly zero 44% of the time** — every possession the shooter wins —
+which pinned the helpers at 100% of credit at any dial. In basketball terms, a rim protector
+should not collect fewer blocks in the box score because the man shooting happened to be good.
+
+#### ★ The measured result — rim help RISES, and the reason is a real finding
+
+Measured over 598,368 actual attempts at the production call site across a full canonical season
+(never a roster-side reconstruction — three different roster-side draws had given three different
+answers):
+
+    zone    attempts    mean help before -> after      floored helpers    arms (absolute mean)
+    Rim      247,386    2.764 -> 2.958   +7.0%         48.6% -> 55.0%     skill -1.67->-0.55  length +1.87->-0.20
+    Short     34,279    2.244 -> 2.779  +23.8%         52.8% -> 55.2%     skill -1.87->-1.00  length +1.74->+0.01
+    Mid       56,457    1.834 -> 0.870  -52.5%         55.2% -> 80.5%     skill -1.99->-5.01  length +1.58->+0.62
+    Long      37,889    2.183 -> 2.510  +15.0%         54.0% -> 56.4%     skill -1.97->-1.53  length +1.81->+0.35
+    Three    222,357    2.357 -> 1.677  -28.9%         54.5% -> 70.9%     skill -2.07->-3.60  length +1.88->+0.71
+
+**The help arm does NOT move one way league-wide, and no check may be written as if it does.**
+It falls at Rim and Mid in the prompt's expectation and rises at Rim in reality; any assertion
+of the form "the help arm falls" or "is unchanged" ships green against a wrong build at some
+zone. The acceptance test is per-possession matchup-dependence, nothing league-wide.
+
+**★ Why the rim rises — the mechanism worth remembering.** The men who actually shoot at the rim
+are **tall but poor finishers** (on-floor median Finishing 23.0 against median rim defence 32.9).
+Replacing the imaginary average man with the real one therefore cuts both ways at once: the
+length comparison gets much harder for the helper (his reach edge collapses +1.87 → −0.20), while
+the skill comparison gets much **easier**, because a real rim shooter's Finishing sits far below
+50. At the rim the skill gain outweighs the length loss. Out at the arc it reverses — three-point
+shooters are close to a 50 as shooters but still real-sized, so both arms harden together and help
+falls off a cliff.
+
+**So the old fixed bar was never uniformly subsidizing rim helpers. It was overpaying them on size
+and underpaying them on skill, and the two nearly cancelled at the rim.** League blocks
+consequently go slightly UP, not down: 45,320 → 45,734 credited, still 4.4/team against a 3.5
+target. Reported and NOT tuned (O-40 owns the total).
+
+**O-44's predicted concentration collapse does not occur.** The best defender's
+probability-weighted conditional credit share moves 49.3% → 49.0% league-wide and the
+matched/helper route split 46.0/54.0 → 45.8/54.2. Credit vectors are byte-identical, so those
+boards can move only through *which* possessions produce blocks.
+
+**Level-relativity, the thing the change was for, is now enormous and directly asserted:** the
+same lineup helps **21.170 against a D3-calibre shooter and 0.575 against a high-major one**, with
+defender, lineup, assignment and zone held identical.
+
+#### How the credit half stays a REGRESSION fixture rather than a snapshot
+
+A regenerated golden would have agreed with a wrong engine — the specific quiet failure being
+guarded is one of `BlockCreditWeights`' two internal calls left pointing at the shooter-relative
+function, which passes every conservation check. Three devices, all required:
+
+1. **`tools/block_credit_neutral_frozen.json`** — neutral credit vectors copied byte-for-byte from
+   the pre-S81.3 golden, **never re-derived**. The oracle proves it still reproduces them exactly
+   before emitting anything.
+2. **`tools/block_credit_preedit_golden.json`** — an independent C# emission from the actual
+   production functions on a pristine re-pull of `main`. A hand transcription into the oracle can
+   repeat the same misreading the new code makes; only this binds the behaviour that really existed.
+3. **A negative control that runs every time** — it builds the mis-wired weights deliberately and
+   asserts the comparison rejects them (it rejects 59%), reporting itself dead if it ever stops.
+
+**The pre-edit comparison is ULP-bounded, not bit-equal, and that is deliberate.** `Math.Pow` is
+not bit-portable across Windows and Linux libm; a raw-bits fixture emitted on one and replayed on
+the other differs by 1–3 ULPs on ~1% of weights. The bound is 4 ULPs, set against measurement: a
+real mis-wire moves 59.2% of weights, worst case 76.3% relative, against platform noise of
+1.1E-016 — fifteen orders of magnitude apart. Both fixtures carry a shared config fingerprint so
+neither can be replayed against a config it was not emitted for.
 
 **Both open questions were RULED and SHIPPED in S81.2, ahead of the shooter-relative change rather
 than after it** — the sequence was inverted on the reasoning that the help arm should be measured

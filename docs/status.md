@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 81.2** (2026-07-29; the LEAP stops being counted as permanent standing reach. Reach is now 0.45 wingspan / 0.40 height / 0.15 vertical, and the leap gets its own convex, defender-relative term at the rim (0.40), on the second jump (0.80), and on the glass in two layers (individual swing 0.20, team weight 0.05). A 6'11" with a 7'2" span takes the rim back from a 6'6" with 42-inch hops, 12.4 to 7.5; within any fixed body more hops still helps, the SLOPE halves. Closed O-51. O-44 partially re-measured against corrected reach. Opened O-52 (the generator makes almost no long flat-footed bigs). Two findings recorded and NOT tuned toward: rim FG% does not move at all (51.9 → 51.9 — a relative term cancels league-wide), and blocks rise 4.3 → 4.4 because de-weighting the leap raises everyone's reach against a fixed bar. Suite `ALL CHECKS PASSED` on Emmett's machine.)
+Last updated: **Session 81.3** (2026-07-29; off-ball help stops being measured against a permanent imaginary 50-rated player and is measured against the man actually shooting. Both arms move together onto the same two reads the on-ball duel already used, so the block door carries one rule instead of two. The same lineup now helps 21.17 against a D3-calibre shooter and 0.58 against a high-major one, where before it was one number forever. Block CREDIT deliberately did NOT move and is proved byte-identical against two independent witnesses. ★ THE BUILD PROMPT'S HEADLINE TABLE WAS TRANSPOSED — rim and three swapped, short and long swapped — so the session's expected direction was backwards: rim help RISES 7.0% and it is THREE-point help that falls 28.9%. League blocks therefore go slightly UP (45,320 -> 45,734 credited, 4.4/team unchanged against a 3.5 target) and NOTHING was tuned. Closed O-44. Opened O-53. Suite `ALL CHECKS PASSED` and the season page verified on Emmett's machine.)
 
 ## Current baseline
 
@@ -52,6 +52,17 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **S81.3 — the help arm compares to the shooter (engine + oracle + fixtures).** `Matchup.BlockHelpThreat`
+  and `Matchup.BlockHelpShiftVsShooter` are new beside the untouched neutral pair, so the rate/credit wall is
+  visible in the function names: the RATE reads the shooter, CREDIT keeps the neutral bar (R2). No nullable
+  shooter and no no-shooter overload — either would preserve two rate semantics indefinitely. No new config
+  keys; the bar is no longer a number, it is the man shooting. Golden schema splits `rate_vs_shooter` from a
+  frozen `credit_neutral` section, two new fixtures keep the credit half a regression test rather than a
+  snapshot, and a negative control proves every run that the credit comparison still rejects a mis-wire.
+  Three findings recorded and NOT tuned toward: league blocks rise slightly (the opposite of the prompt's
+  prediction), rim help rises 7.0% because real rim shooters are tall but poor finishers, and the per-game
+  blocks leaderboard is still led by a 6'4" guard on minutes (O-49's artifact, not a block-door defect).
 
 - **S81.2 — what a vertical leap is worth (engine + config).** `Matchup.VerticalShift` (the convex
   defender-relative primitive, weight OUTSIDE `GapFn`) applied at exactly two sites — ordinary Rim at
@@ -332,30 +343,18 @@ chart is PROVISIONAL pending O-6.
   longer glued to one man — **without** modelling time inside a possession, which was by far the largest
   build discussed.
 
-- **O-44 — ABSORBED INTO THE SHOOTER-RELATIVE CHANGE (S81.1). Do not take separately.**
-  **★ PARTIALLY RE-MEASURED at S81.2 (2026-07-29): the spread below is now STALE and the gap it describes is WIDER, not narrower.** Against corrected reach the length median moves 59.7 → 60.9 and the share above the fixed bar of 50 goes 86.2% → 87.6%, because hops sit ~20 rating points below height and wingspan so de-weighting them RAISES everyone's reach number. Mean length-arm threat is up 19.9%. The fixed-midpoint half is still the S81.3 job; only its magnitude has been re-taken.
-  A neutral point that 83% of the league sits below is what a FIXED YARDSTICK produces. `BlockDefenderThreat`
-  measures every helper against `AttributeMidpoint`, a constant — so re-siting the bar treats the symptom and
-  leaves the cause. Once help compares to the shooter, the bar moves with the matchup and the question this
-  item asked stops existing. **The original analysis is retained below because the measured spread still
-  governs how the new comparison should be scaled:**
-
-  *(original) O-44 — THE BLOCK DOOR'S TWO ARMS SHARE ONE NEUTRAL POINT AND SIT ON DIFFERENT SCALES (S79.2
-  measurement).** `BlockDefenderThreat` compares BOTH `DefenseRating(zone)` and `LengthRating` to the single
-  `AttributeMidpoint = 50`. Measured on the 4,511-man drafted population: **LengthRating median 59.7**
-  (86.5% of the league above the bar) against **rim-defence median 33.2** (17.1% above it). So length pays
-  out to nearly everyone and skill to one man in six — and below the bar a negative threat is floored to
-  zero, meaning **83% of the league contributes nothing but the luck floor to block credit.** That, not the
-  40/60 weight, is why an athletic wing keeps pace with a real rim protector (O-39).
-  **★ The obvious fix alone makes it WORSE — measured, do not skip this.** Raising the length bar toward the
-  population median cuts the help arm hard (mean help sum 3.15 → 0.78, which would help O-40's block-rate
-  overshoot) but **flattens the board**: the top man's credit share falls 39.8% → 34.8%, because with a high
-  bar almost everyone floors at zero and the weights collapse onto the flat luck floor. Any fix has to move
-  the bar and re-price what sits above it together.
-  Blast radius is three call sites, all in `Matchup`: block credit/help (`:389`), putback block (`:595`),
-  putback conversion (`:633`). The shooting-foul contest (`:682`) reads `FoulDrawing`/`Discipline`, NOT
-  length, and is unaffected. **Population-independent** — S80 does not touch a body, and LengthRating's
-  median holds at 59.7 / 59.3 across every S80 candidate — so this can be built before or after S80.
+- **O-44 — CLOSED, SHIPPED IN S81.3 (2026-07-29).** The fixed yardstick is gone: help is measured against
+  the man shooting, so the bar now moves with the matchup and the question this item asked stops existing.
+  Closure was made conditional on the realized post-build report, and that condition was met on Emmett's
+  machine — the concentration collapse this item warned about does **not** occur (best defender's
+  probability-weighted conditional credit share 49.3% -> 49.0%; matched/helper route split 46.0/54.0 ->
+  45.8/54.2). **Its stale "blast radius is three call sites" line was wrong and is corrected here:**
+  `PutbackDefenderShift` is a separate function, not a caller of `BlockDefenderThreat`, and the putback door
+  was already approximately shooter-relative by another route — see O-53. Two measurements from this item
+  survive it and are carried forward: the length arm paid out to nearly everyone while skill paid one man in
+  six, and **the obvious fix alone would have made it worse** (raising the bar flattens the board onto the
+  luck floor). Both are why the fix had to move the bar and re-price what sits above it together, which
+  comparing to the shooter does automatically.
 
 - **★ O-45 — THE MAKE DOOR HAS NO BODY GATE ON INTERIOR-DEFENCE SKILL (S79.2, Emmett asked for this
   item).** Blocking is the smaller half of what `RimProtection` does. It is also 65% of
@@ -474,6 +473,15 @@ chart is PROVISIONAL pending O-6.
   40-inch vertical. **The archetype S81.2 most rewards barely exists yet**, which caps how much of the
   change the league can express. Belongs with the generation arc, not the block door. Emmett's call.
 
+
+- **★ O-53 — THE TWO BLOCK DOORS REACH SHOOTER-RELATIVITY BY DIFFERENT ROUTES (S81.3 finding; Emmett's call).**
+  The located-shot door now compares the helper to the man shooting, on both arms, at every zone. The PUTBACK
+  door does something adjacent but not the same: `PutbackBlockRate` subtracts a finisher-resistance term
+  measured against the midpoint, so it is *approximately* shooter-relative by a different shape, and
+  `PutbackDefenderShift` still reads the neutral bar. Whether the two should be unified is a real basketball
+  question and not tidiness: a go-back-up is contested by the whole interior in a scramble, which may
+  legitimately justify a different shape from a located jumper contested by one man with help. Not scoped, not
+  urgent, and NOT a bug — recorded so the divergence is a decision rather than an accident.
 
 ## Parked — waiting on a named prerequisite
 

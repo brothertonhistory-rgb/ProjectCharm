@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Charm.Engine;
@@ -23,6 +25,23 @@ namespace Charm.Harness;
 
 internal static partial class Program
 {
+    /// <summary>The config fingerprint both S81.3 fixtures carry: the settings file's
+    /// Matchup section, keys sorted ordinal, one "name=&lt;raw json token&gt;" line each,
+    /// SHA-256. Raw token text is hashed rather than parsed numbers so the C# emission and
+    /// the Python oracle cannot diverge on number formatting. A fixture emitted against
+    /// different constants would make every row agree with a WRONG engine — that is the
+    /// failure this exists to prevent.</summary>
+    private static string ConfigSectionFingerprint(string configPath)
+    {
+        using var doc = JsonDocument.Parse(File.ReadAllText(configPath));
+        var sb = new StringBuilder();
+        foreach (var p in doc.RootElement.GetProperty("Matchup").EnumerateObject()
+                            .OrderBy(p => p.Name, StringComparer.Ordinal))
+            sb.Append(p.Name).Append('=').Append(p.Value.GetRawText()).Append('\n');
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString())))
+                      .ToLowerInvariant();
+    }
+
     private static bool Phase74BlockHelpCheck(string configPath)
     {
         Console.WriteLine("\n--- Phase 74: block help arm + contribution credit (golden parity + invariants + config guards) ---");
@@ -100,13 +119,16 @@ internal static partial class Program
                     "golden fixture rejected: S79/S81 constants do not match the loaded MatchupConfig. " +
                     "Re-run tools/block_help_oracle.py after any config change.");
 
-            // Schema guard: an S79 fixture has no `offense` key, so every row would silently
-            // compare the UNGATED engine path and the gate would go untested.
+            // Schema guard. An S79 fixture has no `offense` key, so every row would silently
+            // compare the UNGATED engine path. An s81-1 fixture measures the help arm against
+            // the OLD fixed midpoint, so every rate row would agree with a build that never
+            // reached the shooter — green with S81.3 unwired. Reject both, loudly.
             var schema = root.GetProperty("schema").GetString();
-            if (schema != "s81-1")
+            if (schema != "s81-3")
                 throw new InvalidOperationException(
-                    $"golden fixture rejected: schema '{schema}', expected 's81-1'. An S79 fixture " +
-                    "would test the ungated path only and report green with the gate unwired.");
+                    $"golden fixture rejected: schema '{schema}', expected 's81-3'. An S79 fixture " +
+                    "would test the ungated path only; an s81-1 fixture would test the help arm " +
+                    "against the retired fixed midpoint and report green with S81.3 unwired.");
 
             // Rebuild the fixture's players and lineups from its own declarations.
             var players = new Dictionary<string, Player>();
@@ -141,33 +163,35 @@ internal static partial class Program
                 offenses[o.Name] = arr;
             }
 
-            var rows = root.GetProperty("rows");
-            var worst = 0.0; var allOk = true; var n = 0; var putbackRows = 0; var gatedRows = 0;
-            foreach (var r in rows.EnumerateArray())
+            // The fixture's shooter names map onto the four fixture shooters. The last two
+            // isolate one arm each; a fixture carrying only the first two could pass with
+            // one arm unwired because the other masks it.
+            static string ShooterKey(string s) => s switch
+            {
+                "average"     => "shooter",
+                "elite"       => "elite_shooter",
+                "skill_only"  => "shooter_skill_only",
+                "length_only" => "shooter_length_only",
+                _ => throw new InvalidOperationException($"unknown fixture shooter '{s}'"),
+            };
+
+            // ── (1a) the RATE contract — shooter-relative, new at S81.3 ──────
+            var rateRows = root.GetProperty("rate_vs_shooter");
+            var worst = 0.0; var allOk = true; var n = 0; var gatedRows = 0;
+            var shootersSeen = new HashSet<string>();
+            foreach (var r in rateRows.EnumerateArray())
             {
                 n++;
                 var defs    = lineups[r.GetProperty("lineup").GetString()!];
                 var offense = offenses[r.GetProperty("offense").GetString()!];
                 var zone    = Enum.Parse<ShotLocation>(r.GetProperty("zone").GetString()!);
                 var mi      = r.GetProperty("matched_index").GetInt32();
-                var isPb    = r.TryGetProperty("putback", out var pbEl) && pbEl.GetBoolean();
+                var sName   = r.GetProperty("shooter").GetString()!;
+                var shooter = players[ShooterKey(sName)];
+                shootersSeen.Add(sName);
                 if (offense is not null) gatedRows++;
 
-                var wGold = r.GetProperty("credit_weights").EnumerateArray()
-                             .Select(x => x.GetDouble()).ToArray();
-                var w = isPb
-                    ? Matchup.PutbackBlockCreditWeights(defs, cfgM)
-                    : Matchup.BlockCreditWeights(zone, defs, mi, cfgM, offense);
-                for (var i = 0; i < 5; i++)
-                {
-                    var d = Math.Abs(w[i] - wGold[i]);
-                    worst = Math.Max(worst, d);
-                    if (d > tol) allOk = false;
-                }
-
-                if (isPb) { putbackRows++; continue; }
-
-                var dGold = Math.Abs(Matchup.BlockHelpSum(zone, defs, mi, cfgM, offense)
+                var dGold = Math.Abs(Matchup.BlockHelpSum(zone, shooter, defs, mi, cfgM, offense)
                                    - r.GetProperty("help_sum").GetDouble());
                 worst = Math.Max(worst, dGold);
                 if (dGold > tol) allOk = false;
@@ -179,8 +203,6 @@ internal static partial class Program
 
                 if (mi >= 0 && defs[mi] is not null)
                 {
-                    var shooter = players[r.GetProperty("shooter").GetString() == "elite"
-                                          ? "elite_shooter" : "shooter"];
                     var rate = Matchup.BlockWeightWithHelp(zone, shooter, defs[mi]!, defs, mi,
                                                            cfgH.BlockWeight(zone), cfgM, offense);
                     var dr = Math.Abs(rate - r.GetProperty("rate").GetDouble());
@@ -193,13 +215,232 @@ internal static partial class Program
                     if (du > tol) allOk = false;
                 }
             }
-            // A fixture with no gated rows would pass while the gate sat unwired.
+            // A fixture with no gated rows would pass while the gate sat unwired; a fixture
+            // missing the arm-isolating shooters would pass with one arm unwired.
             if (gatedRows == 0) allOk = false;
-            Check($"golden parity ({n} rows, {gatedRows} gated, {putbackRows} putback, tol {tol:E0})",
+            if (!shootersSeen.SetEquals(new[] { "average", "elite", "skill_only", "length_only" }))
+                allOk = false;
+            Check($"golden parity — RATE vs shooter ({n} rows, {gatedRows} gated, "
+                  + $"{shootersSeen.Count} shooters, tol {tol:E0})",
                   allOk, gatedRows == 0 ? "NO GATED ROWS — fixture does not exercise S81"
                                         : $"worst |Δ| = {worst:E1}");
+
+            // ── (1b) the CREDIT contract — FROZEN, and compared at EXACT zero ──
+            // These vectors were copied byte-for-byte from the pre-S81.3 fixture and are
+            // never re-derived. R2: credit does not move. A tolerance here would let a
+            // small real drift through, so the bar is equality.
+            //
+            // This stays EXACT deliberately, unlike (1c). These 3,050 values are reproduced
+            // bit-for-bit by CPython, by Windows .NET and by Linux .NET — proven on all
+            // three — so equality is a bar that actually holds and there is no reason to
+            // weaken it. If it ever fails by ONE ULP on a new platform, that is the
+            // Math.Pow libm gap described at (1c) and not a regression; anything larger is.
+            var creditSection = root.GetProperty("credit_neutral");
+            var cRows = creditSection.GetProperty("rows");
+            var cWorst = 0.0; var cOk = true; var cN = 0; var cPutback = 0; var cGated = 0;
+            foreach (var r in cRows.EnumerateArray())
+            {
+                cN++;
+                var defs    = lineups[r.GetProperty("lineup").GetString()!];
+                var offense = offenses[r.GetProperty("offense").GetString()!];
+                var zone    = Enum.Parse<ShotLocation>(r.GetProperty("zone").GetString()!);
+                var mi      = r.GetProperty("matched_index").GetInt32();
+                var isPb    = r.GetProperty("putback").GetBoolean();
+                if (isPb) cPutback++;
+                if (offense is not null) cGated++;
+
+                var wGold = r.GetProperty("credit_weights").EnumerateArray()
+                             .Select(x => x.GetDouble()).ToArray();
+                var w = isPb
+                    ? Matchup.PutbackBlockCreditWeights(defs, cfgM)
+                    : Matchup.BlockCreditWeights(zone, defs, mi, cfgM, offense);
+                for (var i = 0; i < 5; i++)
+                {
+                    cWorst = Math.Max(cWorst, Math.Abs(w[i] - wGold[i]));
+                    if (w[i] != wGold[i]) cOk = false;      // EXACT, not tol
+                }
+            }
+            Check($"★ golden parity — CREDIT frozen at EXACT zero ({cN} rows, {cGated} gated, "
+                  + $"{cPutback} putback)", cOk,
+                  cOk ? "byte-identical to the pre-S81.3 vectors — R2 holds"
+                      : $"CREDIT MOVED. worst |Δ| = {cWorst:E1}. One of BlockCreditWeights' two "
+                        + "internal calls is pointing at a shooter-relative function.");
+
+            // The fixture must bind to the same config the pre-edit C# emission bound to.
+            var fxFp = root.GetProperty("config_section_sha256").GetString();
+            Check("golden fixture and pre-edit emission share one config fingerprint",
+                  fxFp == ConfigSectionFingerprint(configPath),
+                  $"{fxFp?[..12]}…");
         }
         catch (Exception ex) { Check("golden parity", false, ex.Message); }
+
+        // ── (1c) ★ CREDIT vs the PRE-EDIT C# EMISSION ────────────────────────
+        // The oracle's frozen vectors and this emission are INDEPENDENT witnesses to the
+        // same contract. A hand transcription into the oracle can repeat the same
+        // misreading the new code makes; only an emission taken from the actual production
+        // functions before the edit binds the behaviour that really existed.
+        //
+        // ★ WHY THIS IS ULP-BOUNDED AND NOT BIT-EQUAL — read before "tightening" it back.
+        // The first draft demanded raw bit equality. That is not portable: GapFn runs
+        // Math.Pow, and Math.Pow is NOT bit-identical between Windows and Linux libm. A
+        // fixture emitted on one and replayed on the other differs by ONE ULP on roughly
+        // 1% of weights (measured: 53 of 5,100, always the last digit) — a property of the
+        // platform, not of this session's change.
+        //
+        // The bound below is not a loosening, and the numbers say so. A real mis-wire —
+        // one of BlockCreditWeights' two internal calls left pointing at the
+        // shooter-relative function, which is EXACTLY the failure this check exists for —
+        // moves 59.2% of all weights, worst case 76.3% relative. Platform noise is 1.1E-016
+        // relative. Those are fifteen orders of magnitude apart. Four ULPs sits in the
+        // canyon between them and catches the real thing with room to spare.
+        //
+        // And it is not taken on trust: the NEGATIVE CONTROL below deliberately builds the
+        // mis-wired weights every run and asserts this comparison rejects them. A check
+        // that cannot fail is not a check (S81's lesson — build the check that discriminates
+        // on the axis the change is about).
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "tools",
+                                    "block_credit_preedit_golden.json");
+            if (!File.Exists(path))
+                throw new InvalidOperationException($"pre-edit credit golden not found: {path}");
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var root = doc.RootElement;
+            if (root.GetProperty("schema").GetString() != "s81-3-credit-preedit")
+                throw new InvalidOperationException("pre-edit credit golden: wrong schema.");
+
+            var fp = root.GetProperty("config_section_sha256").GetString();
+            if (fp != ConfigSectionFingerprint(configPath))
+                throw new InvalidOperationException(
+                    "pre-edit credit golden rejected: it was emitted against a different config. " +
+                    "Every row would compare the new engine to weights from another world.");
+
+            // Distance in representable doubles. 0 means bit-identical; 1 means adjacent.
+            static long Ulps(double a, double b)
+            {
+                if (a == b) return 0;
+                if (double.IsNaN(a) || double.IsNaN(b)) return long.MaxValue;
+                var ai = BitConverter.DoubleToInt64Bits(a);
+                var bi = BitConverter.DoubleToInt64Bits(b);
+                if ((ai < 0) != (bi < 0)) return long.MaxValue;   // straddles zero
+                return Math.Abs(ai - bi);
+            }
+            const long MaxUlps = 4;
+
+            var pool = new Dictionary<string, Player>();
+            foreach (var p in root.GetProperty("players").EnumerateObject())
+            {
+                if (p.Name.StartsWith("__")) continue;
+                var v = p.Value;
+                int G(string k) => v.GetProperty(k).GetInt32();
+                pool[p.Name] = Mk(p.Name, G("Height"), G("Wingspan"), G("Vertical"), G("Strength"),
+                                  G("PerimeterDefense"), G("PostDefense"), G("RimProtection"),
+                                  G("HelpDefense"), G("Finishing"), G("Close"), G("Mid"), G("Outside"));
+            }
+
+            // The negative control's shooter. Credit never reads a shooter — that is the
+            // whole point — so this exists only to build the weights a mis-wire WOULD produce.
+            var probeShooter = Mk("probe", height: 62, wingspan: 64, vertical: 60,
+                                  fin: 60, close: 58, mid: 55, outside: 54);
+
+            var rows = root.GetProperty("rows");
+            var ok = true; var n = 0; var over = 0; var worstUlps = 0L; var bitExact = 0;
+            var firstBad = "";
+            var miSeen = new HashSet<int>(); var zSeen = new HashSet<string>();
+            var nullDefRows = 0; var nullOffRows = 0; var fastBreakRows = 0; var pbRows = 0;
+            var controlCaught = 0; var controlTotal = 0;   // the negative control
+            foreach (var r in rows.EnumerateArray())
+            {
+                n++;
+                var kind = r.GetProperty("kind").GetString()!;
+                var zone = Enum.Parse<ShotLocation>(r.GetProperty("zone").GetString()!);
+                var mi   = r.GetProperty("matched_index").GetInt32();
+                zSeen.Add(r.GetProperty("zone").GetString()!);
+                miSeen.Add(mi);
+
+                var defs = new Player?[5];
+                var di = 0;
+                foreach (var e in r.GetProperty("defenders").EnumerateArray())
+                    defs[di++] = e.ValueKind == JsonValueKind.Null ? null : pool[e.GetString()!];
+                if (defs.Any(d => d is null)) nullDefRows++;
+
+                Player?[]? offense = null;
+                var offEl = r.GetProperty("offense_outside");
+                if (offEl.ValueKind != JsonValueKind.Null)
+                {
+                    offense = new Player?[5];
+                    var oi = 0;
+                    foreach (var e in offEl.EnumerateArray())
+                        offense[oi++] = e.ValueKind == JsonValueKind.Null
+                                      ? null
+                                      : Mk("o", 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, 50, e.GetInt32());
+                    if (offense.Any(o => o is null)) nullOffRows++;
+                }
+                else fastBreakRows++;
+
+                double[] w;
+                if (kind == "putback") { w = Matchup.PutbackBlockCreditWeights(defs, cfgM); pbRows++; }
+                else                     w = Matchup.BlockCreditWeights(zone, defs, mi, cfgM, offense);
+
+                var bits = r.GetProperty("weight_bits").EnumerateArray().Select(x => x.GetInt64()).ToArray();
+                for (var i = 0; i < 5; i++)
+                {
+                    var was = BitConverter.Int64BitsToDouble(bits[i]);
+                    var u = Ulps(w[i], was);
+                    if (u == 0) bitExact++;
+                    if (u > worstUlps) worstUlps = u;
+                    if (u > MaxUlps)
+                    {
+                        ok = false; over++;
+                        if (firstBad.Length == 0)
+                            firstBad = $"row {n} ({kind} {zone} mi={mi} slot {i}): "
+                                     + $"now {w[i]:R} was {was:R} ({u} ULPs)";
+                    }
+                }
+
+                // ── the negative control, on the same row ───────────────────
+                // Build the weights a shooter-relative helper arm WOULD produce and confirm
+                // this comparison rejects them. If the engine were mis-wired, the real
+                // weights above would look like these.
+                if (kind == "located")
+                {
+                    var md = Matchup.BlockHelpMeanDepth(defs, cfgM);
+                    var share = cfgM.BlockHelpShare(zone);
+                    for (var i = 0; i < 5; i++)
+                    {
+                        var d = defs[i];
+                        if (d is null) continue;
+                        var bad = i == mi
+                            ? cfgM.BlockCreditLuckFloor + Math.Max(0.0, Matchup.BlockDefenderThreat(zone, d, cfgM))
+                            : share
+                              * Matchup.BlockEffectiveGate(zone, Matchup.BlockAssignedMan(offense, i), cfgM)
+                              * (cfgM.BlockCreditLuckFloor
+                                 + Matchup.BlockHelpShiftVsShooter(zone, d, probeShooter, md, cfgM));
+                        controlTotal++;
+                        if (Ulps(bad, BitConverter.Int64BitsToDouble(bits[i])) > MaxUlps) controlCaught++;
+                    }
+                }
+            }
+
+            var coverage = miSeen.SetEquals(new[] { -1, 0, 1, 2, 3, 4 }) && zSeen.Count == 5
+                        && nullDefRows > 0 && nullOffRows > 0 && fastBreakRows > 0 && pbRows > 0;
+            // A control that catches nothing means the comparison has no teeth.
+            var controlOk = controlTotal > 0 && (double)controlCaught / controlTotal > 0.25;
+
+            Check($"★ CREDIT matches the PRE-EDIT emission ({n} rows: {zSeen.Count} zones, "
+                  + $"matchedIndex {string.Join("/", miSeen.OrderBy(x => x))}, {nullDefRows} null-slot, "
+                  + $"{nullOffRows} null-assignment, {fastBreakRows} fast-break, {pbRows} putback)",
+                  ok && coverage && controlOk,
+                  !coverage ? "FIXTURE COVERAGE INCOMPLETE — the public surface is not fully exercised"
+                  : !controlOk ? $"NEGATIVE CONTROL DEAD — a mis-wire would slip through "
+                               + $"({controlCaught}/{controlTotal} caught)"
+                  : ok ? $"worst {worstUlps} ULP over {n * 5:N0} weights ({bitExact:N0} bit-exact); "
+                       + $"negative control rejects {(double)controlCaught / controlTotal:P0} of "
+                       + "mis-wired weights — R2 holds"
+                       : $"{over} weights beyond {MaxUlps} ULPs (worst {worstUlps}). {firstBad}");
+        }
+        catch (Exception ex) { Check("★ CREDIT vs pre-edit emission", false, ex.Message); }
 
         // ── (2) BlockWeight is byte-identical after the S79 extraction ───────
         // BlockDuelShift + BlockBend were pulled OUT of BlockWeight. Same ops, same order.
@@ -258,7 +499,7 @@ internal static partial class Program
                         Math.Max(cfgM.BlockFloor(zone) - rate, rate - cfgM.BlockCeiling(zone)));
                 }
 
-                if (Matchup.BlockHelpSum(zone, defs, mi, cfgM, offense) < 0.0) helpNonNeg = false;
+                if (Matchup.BlockHelpSum(zone, shooter, defs, mi, cfgM, offense) < 0.0) helpNonNeg = false;
 
                 // A BETTER defender never lowers the rate. Skill only, body untouched — the
                 // exact case that failed 8,237/40,000 before help-depth became body-only.
@@ -588,6 +829,300 @@ internal static partial class Program
             }
             Check("S81: every populated defender stays drawable at the harshest gate", allPositive,
                   $"weakest effective gate over all Outside x zone = {weakest:F4}");
+        }
+
+        // ════════════════════════════════════════════════════════════════════
+        // S81.3 — THE HELP ARM COMPARES TO THE SHOOTER
+        // ════════════════════════════════════════════════════════════════════
+        //
+        // ★ Read (10) first. Every conservation identity, every monotonicity check, the
+        // credit-sums check and the golden all still pass at ANY bar, because a bar is
+        // self-consistent. Only a comparison of the SAME defender against two DIFFERENT
+        // shooters can see this change at all.
+        //
+        // A note on what is deliberately NOT asserted: the help arm does not move one way
+        // league-wide. Measured over real attempts it falls at Rim and Mid and GROWS at
+        // Short, Long and Three. Any check written as "the help arm falls" or "the help arm
+        // is unchanged" would ship green against a wrong build at some zone. The acceptance
+        // test is per-possession matchup-dependence, nothing league-wide.
+
+        // ── (10) ★ THE DISCRIMINATING SIGNAL, in THREE ISOLATED FORMS ────────
+        // The combined archetype alone can pass with one arm unwired, because the other
+        // masks it. All three are required.
+        {
+            var helper = Mk("helper", height: 83, wingspan: 88, vertical: 68, strength: 80,
+                            postD: 85, rimP: 92, helpD: 80);
+            var line   = new Player?[] { Mk("g", height: 44), Mk("w", height: 64),
+                                         Mk("w2", height: 64), Mk("f", height: 74), helper };
+            var md     = Matchup.BlockHelpMeanDepth(line, cfgM);
+
+            // The zone's OWN offensive attribute — Rim reads Finishing, Short Close, Mid Mid,
+            // Long and Three Outside. Sweeping Finishing at Three tests nothing; that was a
+            // real error earlier in this session's design and is now a named check.
+            static Player ShooterAt(ShotLocation z, int v, int h, int w, int vert)
+                => z switch
+                {
+                    ShotLocation.Rim   => Mk("s", height: h, wingspan: w, vertical: vert, fin: v),
+                    ShotLocation.Short => Mk("s", height: h, wingspan: w, vertical: vert, close: v),
+                    ShotLocation.Mid   => Mk("s", height: h, wingspan: w, vertical: vert, mid: v),
+                    _                  => Mk("s", height: h, wingspan: w, vertical: vert, outside: v),
+                };
+
+            var skillOk = true; var skillDetail = new List<string>();
+            foreach (var z in zones)
+            {
+                // Body and reach IDENTICAL; only the zone's own skill moves.
+                var weak   = ShooterAt(z, 25, 55, 57, 62);
+                var strong = ShooterAt(z, 85, 55, 57, 62);
+                var hWeak   = Matchup.BlockHelpShiftVsShooter(z, helper, weak,   md, cfgM);
+                var hStrong = Matchup.BlockHelpShiftVsShooter(z, helper, strong, md, cfgM);
+                if (!(hStrong < hWeak)) skillOk = false;
+                skillDetail.Add($"{z} {hWeak:F2}->{hStrong:F2}");
+            }
+            Check("★ S81.3 SKILL arm: the same helper helps LESS against the better shooter, "
+                  + "at every zone", skillOk,
+                  string.Join("  ", skillDetail) + "  (the ZONE's own attribute, 25 -> 85)");
+
+            // Skills IDENTICAL; only reach moves.
+            var lengthOk = true; var lengthDetail = new List<string>();
+            foreach (var z in zones)
+            {
+                var shortReach = Mk("s", height: 40, wingspan: 42, vertical: 45,
+                                    fin: 55, close: 55, mid: 55, outside: 55);
+                var longReach  = Mk("s", height: 88, wingspan: 92, vertical: 85,
+                                    fin: 55, close: 55, mid: 55, outside: 55);
+                var hShort = Matchup.BlockHelpShiftVsShooter(z, helper, shortReach, md, cfgM);
+                var hLong  = Matchup.BlockHelpShiftVsShooter(z, helper, longReach,  md, cfgM);
+                if (!(hLong < hShort)) lengthOk = false;
+                lengthDetail.Add($"{z} {hShort:F2}->{hLong:F2}");
+            }
+            Check("★ S81.3 LENGTH arm: the same helper helps LESS against the longer shooter, "
+                  + "at every zone", lengthOk, string.Join("  ", lengthDetail));
+
+            var small = Mk("small_weak", height: 42, wingspan: 44, vertical: 55,
+                           fin: 28, close: 30, mid: 30, outside: 30);
+            var stud  = Mk("big_elite",  height: 76, wingspan: 80, vertical: 82,
+                           fin: 92, close: 88, mid: 86, outside: 88);
+            var combinedOk2 = zones.All(z =>
+                Matchup.BlockHelpShiftVsShooter(z, helper, small, md, cfgM)
+              > Matchup.BlockHelpShiftVsShooter(z, helper, stud, md, cfgM));
+            Check("★ S81.3 COMBINED: helps MORE against a 6'0\" weak finisher than a 6'8\" "
+                  + "elite one", combinedOk2,
+                  $"Rim {Matchup.BlockHelpShiftVsShooter(ShotLocation.Rim, helper, small, md, cfgM):F2}"
+                  + $" vs {Matchup.BlockHelpShiftVsShooter(ShotLocation.Rim, helper, stud, md, cfgM):F2}");
+
+            // ── (11) LEVEL RELATIVITY, asserted directly ─────────────────────
+            // The no-scalar wall in one line: a D3 seven-footer must not help identically in
+            // D3 and in the Big Ten. Defender, lineup, assignment and zone held identical.
+            var d3Man   = Mk("d3_shooter", height: 48, wingspan: 50, vertical: 52,
+                             fin: 30, close: 30, mid: 30, outside: 30);
+            var highMaj = Mk("high_major", height: 72, wingspan: 78, vertical: 80,
+                             fin: 88, close: 85, mid: 82, outside: 84);
+            var offFixed = new Player?[] { Mk("o1", outside: 40), Mk("o2", outside: 40),
+                                           Mk("o3", outside: 40), Mk("o4", outside: 40),
+                                           Mk("o5", outside: 40) };
+            // The shooter is NOT placed in the offensive five, so nothing about him can leak
+            // into the assignment gate. (It could not anyway — the matched slot is skipped on
+            // both boards — but holding the assignment literally fixed makes that unarguable.)
+            var hD3 = Matchup.BlockHelpSum(ShotLocation.Rim, d3Man,   line, 0, cfgM, offFixed);
+            var hHM = Matchup.BlockHelpSum(ShotLocation.Rim, highMaj, line, 0, cfgM, offFixed);
+            Check("★ S81.3 LEVEL RELATIVITY: the same lineup helps materially more against a "
+                  + "D3-calibre shooter than a high-major one", hD3 > 1.5 * hHM,
+                  $"D3 {hD3:F3} vs high-major {hHM:F3} — identical defenders, lineup, "
+                  + "assignment and zone");
+        }
+
+        // ── (12) THE TWO RULED FALL-OUT BEHAVIOURS, SEPARATELY (R1) ──────────
+        // Sweeping both at once passes for the wrong reason. These overlap (10)'s isolated
+        // arms by design: (10) proves the wiring, this proves the two behaviours Emmett
+        // named, by name, at the rim.
+        {
+            var helper = Mk("rim_protector", height: 83, wingspan: 88, vertical: 68,
+                            strength: 80, postD: 85, rimP: 92, helpD: 80);
+            var line   = new Player?[] { Mk("a"), Mk("b"), Mk("c"), Mk("d"), helper };
+            var md     = Matchup.BlockHelpMeanDepth(line, cfgM);
+
+            // (a) the shooter's HEIGHT reduces help block odds, finishing held fixed
+            var shortMan = Mk("short_man", height: 42, wingspan: 44, vertical: 60, fin: 60);
+            var tallMan  = Mk("tall_man",  height: 82, wingspan: 84, vertical: 60, fin: 60);
+            var hShort = Matchup.BlockHelpShiftVsShooter(ShotLocation.Rim, helper, shortMan, md, cfgM);
+            var hTall  = Matchup.BlockHelpShiftVsShooter(ShotLocation.Rim, helper, tallMan,  md, cfgM);
+            Check("★ R1(a): the SHOOTER's height reduces help block odds (finishing fixed)",
+                  hTall < hShort, $"5'6\" {hShort:F3}  ->  6'10\" {hTall:F3}");
+
+            // (b) the shooter's FINISHING reduces help block odds, body held fixed —
+            // independently of make%, which this door never touches.
+            var poorFin = Mk("poor_finisher", height: 62, wingspan: 64, vertical: 60, fin: 25);
+            var eliteFin = Mk("elite_finisher", height: 62, wingspan: 64, vertical: 60, fin: 95);
+            var hPoor  = Matchup.BlockHelpShiftVsShooter(ShotLocation.Rim, helper, poorFin,  md, cfgM);
+            var hElite = Matchup.BlockHelpShiftVsShooter(ShotLocation.Rim, helper, eliteFin, md, cfgM);
+            Check("★ R1(b): the SHOOTER's finishing reduces help block odds (body fixed)",
+                  hElite < hPoor, $"finishing 25 {hPoor:F3}  ->  95 {hElite:F3}");
+        }
+
+        // ── (13) THE NEUTRAL POINT, in FOUR CASES ────────────────────────────
+        // The first three are EXACT — a zero gap through GapFn is exactly zero, because
+        // GapFn's sign factor is literally 0 at 0. The fourth deliberately does NOT demand
+        // a literal 0.0 out of a solved cancellation: the two arms run different weights,
+        // steepnesses and exponents through Math.Pow, so a mathematically exact
+        // cancellation lands ULPs off in floating point. Weighted-ADDITIVE composition is
+        // proved instead by DECOMPOSITION, which is exact and says the same thing — the
+        // total is the two weighted arms and nothing else, so nothing else can be hiding
+        // in there.
+        {
+            var d = Mk("d", height: 78, wingspan: 82, vertical: 66, strength: 75,
+                       perimD: 55, postD: 80, rimP: 88, helpD: 70);
+            var md = Matchup.BlockHelpMeanDepth(new Player?[] { d, d, d, d, d }, cfgM);
+
+            // (a) skill gap exactly zero -> skill arm exactly zero
+            var defRating = Matchup.DefenseRating(ShotLocation.Rim, d, cfgM);
+            var skillArmAtZero = Matchup.GapFn(defRating - defRating,
+                                               cfgM.SkillSteepness, cfgM.SkillExponent,
+                                               cfgM.ReferenceScale);
+            Check("S81.3 neutral (a): a zero SKILL gap is exactly zero shift",
+                  skillArmAtZero == 0.0, $"{skillArmAtZero:R}");
+
+            // (b) length gap exactly zero -> length arm exactly zero
+            var lengthArmAtZero = Matchup.GapFn(Matchup.LengthRating(d, cfgM)
+                                              - Matchup.LengthRating(d, cfgM),
+                                                cfgM.PhysicalSteepness, cfgM.PhysicalExponent,
+                                                cfgM.ReferenceScale);
+            Check("S81.3 neutral (b): a zero LENGTH gap is exactly zero shift",
+                  lengthArmAtZero == 0.0, $"{lengthArmAtZero:R}");
+
+            // (c) both gaps zero -> threat exactly 0 and help exactly 0. Built by handing
+            //     the shooter the defender's own body and the defender's own zone rating as
+            //     his finishing, so both gaps vanish by construction.
+            var mirror = Mk("mirror", height: d.Height, wingspan: d.Wingspan,
+                            vertical: d.Vertical, strength: d.Strength,
+                            fin: (int)Math.Round(defRating));
+            var mirrorExact = Mk("mirror_exact", height: d.Height, wingspan: d.Wingspan,
+                                 vertical: d.Vertical, strength: d.Strength);
+            // Length gap is exactly zero for mirrorExact (same body). Skill gap is exactly
+            // zero only when DefenseRating happens to be integral, so assert the length arm
+            // by itself here and the joint zero through the decomposition below.
+            var threatMirror = Matchup.BlockHelpThreat(ShotLocation.Rim, d, mirrorExact, cfgM);
+            var (swR, lwR) = cfgM.BlockContestWeights(ShotLocation.Rim);
+            var skillOnlyPart = swR * Matchup.GapFn(defRating - mirrorExact.Finishing,
+                                                   cfgM.SkillSteepness, cfgM.SkillExponent,
+                                                   cfgM.ReferenceScale);
+            Check("S81.3 neutral (c): with the shooter's body mirrored, the LENGTH arm "
+                  + "vanishes and the threat is the skill arm ALONE",
+                  threatMirror == skillOnlyPart, $"{threatMirror:R} == {skillOnlyPart:R}");
+            _ = mirror;
+
+            // (d) the composition itself, exactly — over every zone and a spread of shooters.
+            var decompOk = true; var worstDecomp = 0.0;
+            var probeShooters = new[]
+            {
+                Mk("s1", height: 42, wingspan: 44, vertical: 55, fin: 28, close: 30, mid: 30, outside: 30),
+                Mk("s2", height: 62, wingspan: 64, vertical: 60, fin: 60, close: 58, mid: 55, outside: 54),
+                Mk("s3", height: 76, wingspan: 80, vertical: 82, fin: 92, close: 88, mid: 86, outside: 88),
+                Mk("s4", height: 88, wingspan: 92, vertical: 30, fin: 10, close: 12, mid: 14, outside: 16),
+            };
+            foreach (var z in zones)
+            {
+                var (sw, lw) = cfgM.BlockContestWeights(z);
+                foreach (var sh in probeShooters)
+                {
+                    var armS = sw * Matchup.GapFn(Matchup.DefenseRating(z, d, cfgM)
+                                                - Matchup.OffenseRating(z, sh),
+                                                  cfgM.SkillSteepness, cfgM.SkillExponent,
+                                                  cfgM.ReferenceScale);
+                    var armL = lw * Matchup.GapFn(Matchup.LengthRating(d, cfgM)
+                                                - Matchup.LengthRating(sh, cfgM),
+                                                  cfgM.PhysicalSteepness, cfgM.PhysicalExponent,
+                                                  cfgM.ReferenceScale);
+                    var whole = Matchup.BlockHelpThreat(z, d, sh, cfgM);
+                    worstDecomp = Math.Max(worstDecomp, Math.Abs(whole - (armS + armL)));
+                    if (whole != armS + armL) decompOk = false;
+                }
+            }
+            Check("★ S81.3 neutral (d): the threat is EXACTLY the weighted skill arm plus the "
+                  + "weighted length arm", decompOk,
+                  decompOk ? "weighted-additive composition, proved by decomposition rather "
+                           + "than by a solved cancellation that cannot be bitwise exact"
+                           : $"worst |Δ| = {worstDecomp:E2}");
+
+            // And the two arms are separately signed and neither is inert.
+            var baseShooter = probeShooters[1];
+            var skillMoved  = Matchup.BlockHelpThreat(ShotLocation.Rim, d,
+                                  Mk("sm", height: baseShooter.Height, wingspan: baseShooter.Wingspan,
+                                     vertical: baseShooter.Vertical, fin: 95), cfgM)
+                            != Matchup.BlockHelpThreat(ShotLocation.Rim, d, baseShooter, cfgM);
+            var lengthMoved = Matchup.BlockHelpThreat(ShotLocation.Rim, d,
+                                  Mk("lm", height: 88, wingspan: 92, vertical: 85,
+                                     fin: baseShooter.Finishing), cfgM)
+                            != Matchup.BlockHelpThreat(ShotLocation.Rim, d, baseShooter, cfgM);
+            Check("S81.3: each arm alone moves the threat (neither is silently unwired)",
+                  skillMoved && lengthMoved, $"skill {skillMoved}  length {lengthMoved}");
+
+            _ = md;
+        }
+
+        // ── (14) THE GATE STILL BINDS, AND IS SEPARABLE FROM THE BAR ─────────
+        // Three probes. The third is the one that matters: a fast break has no matchups,
+        // but it very much has a shooter. "No assignment" must not quietly become "no
+        // shooter relativity".
+        {
+            var big  = Mk("big", height: 84, wingspan: 88, vertical: 68, strength: 80,
+                          postD: 85, rimP: 92, helpD: 80);
+            var line = new Player?[] { Mk("g", height: 44), Mk("w", height: 64),
+                                       Mk("w2", height: 64), Mk("f", height: 74), big };
+            var weakSh  = Mk("weak_sh",  height: 44, wingspan: 46, vertical: 55, fin: 28);
+            var eliteSh = Mk("elite_sh", height: 76, wingspan: 80, vertical: 82, fin: 92);
+
+            var offPost   = new Player?[] { Mk("o", outside: 12), Mk("o", outside: 12),
+                                            Mk("o", outside: 12), Mk("o", outside: 12),
+                                            Mk("o", outside: 12) };
+            var offSniper = new Player?[] { Mk("o", outside: 85), Mk("o", outside: 85),
+                                            Mk("o", outside: 85), Mk("o", outside: 85),
+                                            Mk("o", outside: 85) };
+
+            // (a) vary the ASSIGNMENT with the shooter fixed
+            var aPost   = Matchup.BlockHelpSum(ShotLocation.Rim, weakSh, line, 0, cfgM, offPost);
+            var aSniper = Matchup.BlockHelpSum(ShotLocation.Rim, weakSh, line, 0, cfgM, offSniper);
+            Check("S81.3 gate (a): with the shooter fixed, dragging the helpers out to the arc "
+                  + "still suppresses help", aSniper < aPost, $"{aSniper:F3} < {aPost:F3}");
+
+            // (b) vary the SHOOTER with the assignment fixed
+            var bWeak  = Matchup.BlockHelpSum(ShotLocation.Rim, weakSh,  line, 0, cfgM, offPost);
+            var bElite = Matchup.BlockHelpSum(ShotLocation.Rim, eliteSh, line, 0, cfgM, offPost);
+            Check("S81.3 gate (b): with the assignment fixed, a better shooter still suppresses "
+                  + "help", bElite < bWeak, $"{bElite:F3} < {bWeak:F3}");
+
+            // (c) THE FAST BREAK — every gate is exactly 1.0, and the bar must still bind
+            var fbWeak  = Matchup.BlockHelpSum(ShotLocation.Rim, weakSh,  line, 0, cfgM, null);
+            var fbElite = Matchup.BlockHelpSum(ShotLocation.Rim, eliteSh, line, 0, cfgM, null);
+            var gateOne = Matchup.BlockEffectiveGate(ShotLocation.Rim, null, cfgM) == 1.0;
+            Check("★ S81.3 gate (c): on a fast break the gate is exactly 1.0 AND the shooter "
+                  + "still binds", gateOne && fbElite < fbWeak,
+                  $"gate {(gateOne ? "1.0" : "NOT 1.0")}; weak shooter {fbWeak:F3} vs elite {fbElite:F3} "
+                  + "— a break has no matchups but it does have a shooter");
+        }
+
+        // ── (15) S81.2's ACCEPTANCE TEST, RE-ANCHORED ON THE RATE ────────────
+        // S81.2 ruled that a 6'11" with a 7'2" span out-protects a 6'6" with 42-inch hops,
+        // and proved it through BlockDefenderThreat. After S81.3 that function only decides
+        // WHOSE NAME goes on a block — it no longer decides whether the shot is blocked. The
+        // ruling is unchanged, but nothing was left watching it on the rate. This is that
+        // watcher, on the new path, with the shooter held identical.
+        {
+            var smallLeaper = Mk("leaper", height: 66, wingspan: 74, vertical: 95,
+                                 rimP: 70, postD: 60, helpD: 60);
+            var bigLong     = Mk("big",    height: 88, wingspan: 95, vertical: 35,
+                                 rimP: 70, postD: 60, helpD: 60);
+            var shooter     = Mk("sh", height: 62, wingspan: 64, vertical: 60,
+                                 fin: 60, close: 60, mid: 60, outside: 60);
+            var md = Matchup.BlockHelpMeanDepth(new Player?[]
+                     { Mk("x"), Mk("x"), Mk("x"), smallLeaper, bigLong }, cfgM);
+
+            var hLeaper = Matchup.BlockHelpShiftVsShooter(ShotLocation.Rim, smallLeaper, shooter, md, cfgM);
+            var hBig    = Matchup.BlockHelpShiftVsShooter(ShotLocation.Rim, bigLong,     shooter, md, cfgM);
+            Check("S81.2's ruling still holds ON THE RATE: the tall long man out-helps the "
+                  + "short explosive one", hBig > hLeaper,
+                  $"6'11\"/7'2\" flat-footed {hBig:F3} vs 6'6\"/6'9\" 42-inch hops {hLeaper:F3} "
+                  + "— identical skill, readiness, assignment and shooter");
         }
 
         // ── (6) Config guards — every Load assertion throws ──────────────────

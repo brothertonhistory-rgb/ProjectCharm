@@ -1,3 +1,200 @@
+## Session 81.3 — THE HELP ARM COMPARES TO THE SHOOTER. Off-ball help stops being measured against a permanent imaginary 50-rated player and is measured against the man actually shooting; block credit stays defender-only and is proved byte-identical against two independent witnesses. The build prompt's headline evidence table had its zone labels transposed — rim help RISES 7% and it is THREE-point help that falls 28.9% — so the session's expected direction was backwards and league blocks go slightly UP (45,320 → 45,734 credited, 4.4/team unchanged against a 3.5 target). Nothing tuned. Closed O-44, opened O-53. Suite `ALL CHECKS PASSED` and the season page verified on Emmett's machine. (2026-07-29)
+
+**Register:** build, under `PROMPT-help-compares-to-the-shooter-s81_3-r3`. One engine file, one check file, one csproj, the oracle, a regenerated golden, and two new fixtures. No config change, no dial calibration, no engine behaviour outside the block rate's help arm.
+
+### The defect
+
+The block door asked two questions and only one of them was a matchup.
+
+    on the ball  (BlockDuelShift):      DefenseRating(z, defender) - OffenseRating(z, SHOOTER)
+                                        LengthRating(defender)     - LengthRating(SHOOTER)
+
+    off the ball (BlockDefenderThreat): DefenseRating(z, d)        - AttributeMidpoint
+                                        LengthRating(d)            - AttributeMidpoint
+
+Every helper was compared to a permanent imaginary 50-rated player — not the shooter, not the
+lineup, not the league. The no-scalar wall breached in the one place it is hardest to see: a D3
+seven-footer helped identically in D3 and in the Big Ten.
+
+### What shipped
+
+**R1 — the help RATE compares to the SHOOTER.** Two new functions beside the two existing ones,
+so the rate/credit wall is visible in the names. `Matchup.BlockHelpThreat` reads the same two
+gaps `BlockDuelShift` already uses — skill against the shooter's rating for *this zone*, length
+against the shooter's own reach — and `Matchup.BlockHelpShiftVsShooter` multiplies it by the
+untouched readiness term behind the untouched no-drag floor. `BlockHelpSum` takes the shooter
+one level deeper and nothing above Roll H changed; the shooter was already arriving at the door.
+
+**Deliberately no nullable shooter and no no-shooter overload.** Either would have preserved two
+rate semantics indefinitely — the defect wearing a compatibility costume. Verified before
+building that no caller needs one: the located-shot door is only reached with a shooter, and the
+putback door is a separate function that needs none.
+
+**R2 — block credit does NOT move.** `BlockDefenderThreat` and `BlockHelpShift` are untouched and
+now serve credit only. Whether the shot gets blocked follows the shooter; whose name goes on it
+stays about the defenders.
+
+### ★ THE PROMPT'S HEADLINE TABLE WAS TRANSPOSED, AND THE SESSION'S EXPECTED DIRECTION WAS BACKWARDS
+
+The prompt's A2 table — the measured basis for A3, for §6's "what to watch", and for the whole
+framing of the session — had **rim and three swapped, and short and long swapped.** Every number
+in it was correct. Every label on it was wrong.
+
+Re-measured over the same 598,368 real attempts, at the production call site, across a full
+canonical season:
+
+    zone    attempts    mean help before -> after         floored helpers    arms (absolute mean)
+    Rim      247,386    2.764 -> 2.958   +7.0%            48.6% -> 55.0%     skill -1.67->-0.55  length +1.87->-0.20
+    Short     34,279    2.244 -> 2.779  +23.8%            52.8% -> 55.2%     skill -1.87->-1.00  length +1.74->+0.01
+    Mid       56,457    1.834 -> 0.870  -52.5%            55.2% -> 80.5%     skill -1.99->-5.01  length +1.58->+0.62
+    Long      37,889    2.183 -> 2.510  +15.0%            54.0% -> 56.4%     skill -1.97->-1.53  length +1.81->+0.35
+    Three    222,357    2.357 -> 1.677  -28.9%            54.5% -> 70.9%     skill -2.07->-3.60  length +1.88->+0.71
+
+**Three independent proofs the corrected labelling is right**, all recorded because a transposed
+table is exactly the kind of error that survives by being plausible:
+
+1. Configured base block rates are Rim 0.12 / Short 0.06 / Mid 0.03 / Long 0.02 / Three 0.01, and
+   each row's expected blocks per 100 attempts sits just above its own base (13.28 / 6.87 / 2.70 /
+   2.10 / 1.00). The prompt's labelling would have rim shots blocked at 1% and threes at 13%.
+2. Phase 74 independently prints the Rim duel alone at 11.49%.
+3. The season page's own "89.9% of blocks near the rim" reproduces from the corrected labelling
+   and not from the prompt's.
+
+**★ Why it inverts, and this is the real basketball finding.** The men who actually shoot at the
+rim are **tall but poor finishers**. Swapping the imaginary average man for the real one therefore
+cuts both ways at once: the length comparison gets much harder for the helper (his reach edge at
+the rim collapses +1.87 → −0.20), but the skill comparison gets much **easier**, because a real
+rim shooter's Finishing sits far below 50. At the rim the skill gain outweighs the length loss.
+Out at the arc it reverses — three-point shooters are not much worse than a 50 as shooters, but
+they are still real-sized, so both arms harden together and help falls off a cliff.
+
+**The old fixed bar was not uniformly subsidizing rim helpers. It was overpaying them on size and
+underpaying them on skill, and the two nearly cancelled at the rim.** A3's claim that this change
+would be "the first change since the complaint was raised that pushes the driving quantity in the
+target's direction" is therefore false, and §6's "League blocks should FALL" is backwards.
+
+**A1's lesson survives intact and is worth restating**, since it is what made the error findable:
+every Stage-1 number must come from actual attempts at the production call site, never a
+roster-side reconstruction. Three different roster-side draws had given three different answers.
+
+### Stage 1 — the two reports, not conflated
+
+**(a) Pre-build counterfactual**, over the baseline attempt stream, via a temporary accumulator at
+the production call site on a pristine tree, removed before delivery. Proof it did not perturb the
+stream: the baseline page came back byte-identical to the un-scaffolded run except the world path
+line. Expected blocks per 100 located attempts **6.639 → 6.739 (+1.5%)**.
+
+**(b) Post-build realized**, on Emmett's machine. Credited blocks **45,320 → 45,734 (+0.9%)**,
+blocks still printing **4.4 against the 3.5 target**, near the rim 89.9%, helper share 64.2% →
+64.0%, fingerprint `93d8c853…` unchanged. Everything else moved by a rounding twitch: points
+68.3 → 68.2, FG% 42.7 → 42.6, 3P% 35.1 → 35.0, pace 70.9.
+
+**Nothing was tuned toward 3.5.** A3's instruction to report and not tune held, and holds harder
+now that the direction is the opposite of what the prompt predicted — the temptation to "fix" a
+number that moved the wrong way is exactly what O-40 exists to absorb.
+
+**O-44's warning did NOT fire.** The concentration collapse it predicted does not happen: the best
+defender's probability-weighted conditional credit share moves 49.3% → 49.0% league-wide, and the
+matched/helper route split moves 46.0/54.0 → 45.8/54.2. Credit vectors are byte-identical, so those
+boards move only through *which* possessions produce blocks.
+
+### The checks, and the one that had to be rebuilt
+
+Level-relativity is now enormous and directly asserted: the same lineup helps **21.170 against a
+D3-calibre shooter and 0.575 against a high-major one**, with defender, lineup, assignment and zone
+held identical. The two ruled fall-out behaviours are asserted separately by name — shooter height
+(5'6" 18.376 → 6'10" 3.781) and shooter Finishing (25 → 22.109, 95 → 5.009) — because sweeping both
+at once passes for the wrong reason. The fast break keeps shooter-relativity (weak 34.333 vs elite
+0.364): a break has no matchups but it very much has a shooter.
+
+**★ A check the prompt asked for could not be built as specified, and the substitute is better.**
+§5(6) case four asked to prove weighted-additive composition by constructing a case where the skill
+and length arms cancel to exactly zero. That is not constructible: the two arms run different
+weights, steepnesses and exponents through `Math.Pow`, so any solved cancellation lands ULPs off
+zero. Proved by **decomposition** instead — the threat is exactly the weighted skill arm plus the
+weighted length arm and nothing else, bitwise, across every zone and four shooters. Same claim,
+and it actually holds.
+
+**★ THE BIT-EXACTNESS MISTAKE — a genuine failure on Emmett's machine, caused by the check and not
+the engine.** The pre-edit credit golden was emitted as raw bits from Claude's Linux sandbox and
+the check demanded Windows reproduce it bit-for-bit. `Math.Pow` is not bit-portable across libm
+implementations, so 53 of 5,100 weights differed by one to three ULPs and Phase 74 failed. Nothing
+about the credit board had moved — the frozen-vector check passed at literal exact equality on the
+same run, which is what made the diagnosis unambiguous.
+
+The fix is a ULP bound, and the bound was set against **measured** evidence rather than loosened
+until green: a real mis-wire — one of `BlockCreditWeights`' two internal calls left pointing at the
+shooter-relative function, which is precisely the failure this check exists for — moves **59.2% of
+all weights, worst case 76.3% relative**. Platform noise is 1.1E-016 relative. Fifteen orders of
+magnitude apart. **And it is no longer taken on trust: a negative control now builds the mis-wired
+weights every run and asserts the comparison rejects them, reporting itself dead if it ever stops.**
+It rejects 59%, matching the independent measurement.
+
+**Headroom worth knowing for the next session:** the ceiling is 4 ULPs and Emmett's machine reads
+**3**. That is a margin of one. Widening to 16 (still twelve orders below any real signal) was
+offered and is available; not taken this session, and recorded here so a future spurious failure
+is diagnosed in seconds rather than re-derived.
+
+### Fixtures — what keeps the credit half a REGRESSION test
+
+Two new files, and the reason they exist is that a regenerated golden would have agreed with a
+wrong engine:
+
+- `tools/block_credit_neutral_frozen.json` — the neutral credit vectors copied byte-for-byte from
+  the pre-S81.3 golden, **never re-derived**. The oracle reads it, proves it still reproduces
+  exactly, and embeds it. Collapsing its shooter-duplicate rows was legal only because all 600
+  pairs proved identical — which is itself the proof credit was already shooter-independent.
+- `tools/block_credit_preedit_golden.json` — an independent C# emission taken from the actual
+  production functions on a **pristine re-pull of `main`**, not from the edited tree. Cross-checked
+  bit-identical against a first emission made before any edit.
+
+Both carry a shared config fingerprint (the settings file's Matchup section, keys sorted, raw JSON
+tokens, SHA-256) that C# and Python compute identically, so neither can be replayed against a
+config it was not emitted for. The golden's schema now splits `rate_vs_shooter` from
+`credit_neutral` by name, and the C# rejects an `s81-1` fixture loudly — it would test the help arm
+against the retired midpoint and report green with this whole session unwired.
+
+The oracle also gained two **arm-isolating fixture shooters** (elite skills on an ordinary body;
+ordinary skills on an elite body). A fixture carrying only the original average/elite pair could
+pass with one arm unwired, because the other masks it.
+
+### Prediction record
+
+Nine season-page numbers were predicted before Emmett's run and all nine landed exactly, including
+credited blocks at 45,734. Two of three Phase 74 numbers landed (5,047 bit-exact, negative control
+59%); the worst-ULP prediction was wrong — 1 predicted, 3 actual — because it was inferred from the
+single example line in the failure output, which reports the *first* bad weight, not the largest.
+
+### Errors, honestly
+
+1. **The bit-exact fixture** (above) — a real red suite on Emmett's machine, entirely Claude's
+   design error, fixed in one file.
+2. **`> file -Encoding UTF8` delivered again**, the same malformed redirect that cost a turn in
+   S81. The flag belongs to `Out-File`. Second occurrence in two sessions.
+3. **Worst-ULP inferred rather than measured** (above).
+
+### Process change (Emmett's ruling)
+
+**The suite run shows its output and captures it, rather than redirecting silently.** Standing form
+is now `| Tee-Object -FilePath suite.txt`. Emmett: *"I prefer seeing the updates, so i can tell it is
+working."* An audit found the file-capture habit was his own from June and hardened in S167 when the
+suite outgrew his terminal buffer — but the drift to a **silent** redirect was never decided by
+anyone, and its failure mode is silence, which is how the malformed flag survived two sessions.
+CONVENTIONS updated.
+
+### Recorded, not acted on
+
+- **The per-game blocks leaderboard is still led by a 6'4" guard** (1.8/gm, 31.8 mpg) while the
+  BLK% rate board is entirely bigs. That is the minutes-vs-opportunity artifact O-49 already names,
+  not a block-door defect — the guard plays 32 minutes to a big's 24.
+- **League-wide low offensive ratings, third sighting.** On-floor median Finishing 23.0 against
+  median rim defence 32.9: the "average" 50-rated imaginary man was a far better finisher than
+  almost anyone real, which is *why* the skill arm gets easier at the rim. Sits beside O-46 and
+  O-50. Emmett's call when to take it.
+- **Phase 75's acceptance test now measures the credit yardstick, not the rate.** S81.2's ruling
+  (12.38 vs 7.45) is untouched, but after this session `BlockDefenderThreat` no longer decides
+  whether a shot is blocked. A mirrored watcher was added on the new path and holds: 3.815 vs 1.205.
+
 ## Session 81.2 — WHAT A VERTICAL LEAP IS WORTH. The leap stops being counted as permanent standing reach and gets its own convex, defender-relative term at the rim, on the second jump, and on the glass. Reach is now 0.45 wingspan / 0.40 height / 0.15 vertical; a 6'11" with a 7'2" span takes the rim back from a 6'6" with 42-inch hops, 12.4 to 7.5. Two findings recorded and not tuned toward: rim FG% does not move at all (51.9 → 51.9) because a relative term cancels league-wide, and league blocks rise slightly (4.3 → 4.4) because de-weighting the leap raises everyone's reach against a fixed bar. Claude forecast that block rise at ~20% and it came in at ~1%. Suite `ALL CHECKS PASSED` on Emmett's machine, byte-identical to the sandbox. (2026-07-29)
 
 **Register:** build, under `PROMPT-what-vertical-is-worth-s81_2-r7`. Config + four engine files + one generator + one new check file + one check-guard fix + a re-emitted golden. No generator change, no dial calibration, no page.

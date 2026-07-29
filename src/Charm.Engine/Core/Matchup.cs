@@ -408,13 +408,20 @@ public static class Matchup
     /// <summary>
     /// One defender's blocking threat against a NEUTRAL attacker
     /// (<see cref="MatchupConfig.AttributeMidpoint"/>) — the defender-only read
-    /// <see cref="PutbackBlockRate"/> has always used, now shared with the located-shot help
-    /// arm and with block CREDIT.
+    /// <see cref="PutbackBlockRate"/> has always used, and since Session 81.3 the yardstick of
+    /// block CREDIT and nothing else.
     ///
-    /// <para>Finisher-independent on purpose: a defender's blocking tools are the same
-    /// whatever he is blocking. The shooter enters the RATE once, through
-    /// <see cref="BlockDuelShift"/>; he does not enter credit at all (who was in position to
-    /// swat is a defender property).</para>
+    /// <para><b>★ It no longer feeds the RATE.</b> Session 81.3 forked the located-shot help
+    /// arm onto <see cref="BlockHelpThreat"/>, which measures a helper against the man actually
+    /// shooting. This function kept the neutral bar deliberately (R2): whether the shot gets
+    /// blocked follows the shooter, but whose name goes on it stays about the defenders — a rim
+    /// protector should not collect fewer blocks in the box score because the man shooting
+    /// happened to be good. Editing this function moves the credit board, not the rate.</para>
+    ///
+    /// <para>Finisher-independent on purpose: for the credit question, a defender's blocking
+    /// tools are the same whatever he is blocking. The shooter enters the RATE twice — through
+    /// <see cref="BlockDuelShift"/> for the matched man and <see cref="BlockHelpThreat"/> for
+    /// the other four — and does not enter credit at all.</para>
     /// </summary>
     public static double BlockDefenderThreat(ShotLocation zone, Player d, MatchupConfig cfg)
     {
@@ -442,10 +449,14 @@ public static class Matchup
          * (1.0 + cfg.BlockHelpPositionalSwing
                 * Math.Tanh((BlockHelpDepth(d, cfg) - lineupMeanDepth) / cfg.BlockHelpPositionalScale));
 
-    /// <summary>One off-ball defender's contribution to the block rate:
+    /// <summary>One off-ball defender's helper weight on the block CREDIT board:
     /// <c>max(0, threat) · readiness</c>. The per-defender no-drag floor is
     /// <see cref="PutbackBlockRate"/>'s rule — a below-average helper contributes nothing rather
     /// than dragging the team total down.
+    ///
+    /// <para><b>★ Session 81.3.</b> This served the RATE as well until S81.3 forked that arm
+    /// onto <see cref="BlockHelpShiftVsShooter"/>. It is now read by
+    /// <see cref="BlockCreditWeights"/> only, and must stay on the neutral bar (R2).</para>
     ///
     /// <para><b>Session 81 note.</b> The assignment gate is deliberately NOT folded in here.
     /// It is a separate named multiplier (<see cref="BlockEffectiveGate"/>) applied by the two
@@ -454,6 +465,80 @@ public static class Matchup
     public static double BlockHelpShift(ShotLocation zone, Player d, double lineupMeanDepth,
                                         MatchupConfig cfg)
         => Math.Max(0.0, BlockDefenderThreat(zone, d, cfg))
+         * BlockHelpReadiness(d, lineupMeanDepth, cfg);
+
+    // =========================================================================
+    // Session 81.3 — THE HELP ARM COMPARES TO THE SHOOTER
+    // =========================================================================
+    //
+    // Emmett's ruling (S81.1): "It needs to be compared to whoever is shooting the ball."
+    //
+    // The on-ball contest was always a matchup (BlockDuelShift: defender minus THIS
+    // shooter, on both arms). The help arm was a rating against a constant — every helper
+    // measured against a permanent imaginary 50-rated player. That is the no-scalar wall
+    // breached in the one place it is hardest to see: a D3 seven-footer helped identically
+    // in D3 and in the Big Ten. And the imaginary man was no neutral — the league's actual
+    // rim shooters are far better finishers than a 50, so the fixed bar was quietly
+    // SUBSIDIZING every rim helper.
+    //
+    // ★ THE RATE/CREDIT WALL IS THE POINT OF THE FORK. These two functions serve the RATE.
+    // BlockDefenderThreat and BlockHelpShift above are UNTOUCHED and now serve CREDIT only.
+    // Whether the shot gets blocked follows the shooter; whose name goes on it stays about
+    // the defenders (R2). The reason is measured, not aesthetic: S79 scored the matched man
+    // against this shooter and it came out exactly zero 44% of the time — every possession
+    // the shooter wins — which pinned the helpers at 100% of credit at any dial. In
+    // basketball terms, a rim protector should not collect fewer blocks in the box score
+    // because the man shooting happened to be good. The names make the wall visible; a
+    // naive edit to either neutral function would move the credit board.
+
+    /// <summary>
+    /// One off-ball defender's blocking threat against THE MAN ACTUALLY SHOOTING
+    /// (Session 81.3) — the RATE's help arm.
+    ///
+    /// <para>The same two reads <see cref="BlockDuelShift"/> already uses, so the block door
+    /// carries ONE rule instead of two: skill against the shooter's rating for THIS zone
+    /// (<see cref="OffenseRating"/> — Rim reads Finishing, Short Close, Mid Mid, Long and
+    /// Three Outside), length against the shooter's own reach. Positive means the defender
+    /// wins that arm.</para>
+    ///
+    /// <para><b>Two ruled behaviours fall out of this and are asserted separately.</b> The
+    /// shooter's HEIGHT reduces help block odds (through the length arm), and the shooter's
+    /// FINISHING reduces them independently of make% (through the skill arm at Rim). Sweeping
+    /// both at once would pass for the wrong reason.</para>
+    ///
+    /// <para><b>Deliberately NOT the credit yardstick.</b> <see cref="BlockDefenderThreat"/>
+    /// keeps the neutral bar and keeps feeding <see cref="BlockCreditWeights"/> — see the
+    /// section comment above for why that is a measured ruling and not an oversight.</para>
+    /// </summary>
+    public static double BlockHelpThreat(ShotLocation zone, Player d, Player shooter,
+                                         MatchupConfig cfg)
+    {
+        var (sw, lw) = cfg.BlockContestWeights(zone);
+        var skill  = GapFn(DefenseRating(zone, d, cfg) - OffenseRating(zone, shooter),
+                           cfg.SkillSteepness, cfg.SkillExponent, cfg.ReferenceScale);
+        var length = GapFn(LengthRating(d, cfg) - LengthRating(shooter, cfg),
+                           cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+        return sw * skill + lw * length;
+    }
+
+    /// <summary>One off-ball defender's contribution to the block RATE (Session 81.3):
+    /// <c>max(0, threatVsShooter) · readiness</c>.
+    ///
+    /// <para><b>Readiness is untouched and still MULTIPLIES threat</b> — help instincts cannot
+    /// manufacture a shot blocker out of a man with no tools, and readiness is
+    /// lineup-relative, a different question from the bar.</para>
+    ///
+    /// <para><b>The no-drag floor stays.</b> A man outclassed by the shooter contributes
+    /// nothing rather than dragging his team down. Under the neutral bar this fired on about
+    /// half the league; against real rim shooters it fires on roughly seven in ten rim
+    /// helpers, which is the ruling working, not a defect.</para>
+    ///
+    /// <para>The assignment gate is deliberately NOT folded in here — it stays a separate
+    /// named multiplier (<see cref="BlockEffectiveGate"/>) applied by the consumer, exactly as
+    /// in the neutral <see cref="BlockHelpShift"/>.</para></summary>
+    public static double BlockHelpShiftVsShooter(ShotLocation zone, Player d, Player shooter,
+                                                 double lineupMeanDepth, MatchupConfig cfg)
+        => Math.Max(0.0, BlockHelpThreat(zone, d, shooter, cfg))
          * BlockHelpReadiness(d, lineupMeanDepth, cfg);
 
     // ── Session 81 — rim help is gated by WHO YOU ARE GUARDING ─────────────────
@@ -554,7 +639,14 @@ public static class Matchup
     /// <c>offense[i]</c> (slot parity). Null on a fast break (no assignments exist) or when no
     /// lineup is available, which makes every gate exactly 1.0 and reproduces the S79 tree
     /// bit-for-bit.</param>
-    public static double BlockHelpSum(ShotLocation zone, IReadOnlyList<Player?> defenders,
+    /// <param name="shooter">The man actually taking the shot (Session 81.3). Every helper is
+    /// measured against HIM, not against a fixed midpoint. There is deliberately no nullable
+    /// shooter and no no-shooter overload — either would preserve two rate semantics
+    /// indefinitely, which is the old defect wearing a compatibility costume. Every caller has
+    /// a shooter: the located-shot door is reached only with one, and the putback door is a
+    /// separate function that needs none.</param>
+    public static double BlockHelpSum(ShotLocation zone, Player shooter,
+                                      IReadOnlyList<Player?> defenders,
                                       int matchedIndex, MatchupConfig cfg,
                                       IReadOnlyList<Player?>? offense = null)
     {
@@ -566,7 +658,7 @@ public static class Matchup
             var d = defenders[i];
             if (d is null) continue;
             var gate = BlockEffectiveGate(zone, BlockAssignedMan(offense, i), cfg);
-            sum += gate * BlockHelpShift(zone, d, meanDepth, cfg);
+            sum += gate * BlockHelpShiftVsShooter(zone, d, shooter, meanDepth, cfg);
         }
         return sum;
     }
@@ -593,7 +685,7 @@ public static class Matchup
     {
         var duel = BlockDuelShift(zone, shooter, defender, cfg);
         var help = cfg.BlockHelpShare(zone)
-                 * BlockHelpSum(zone, defenders, matchedIndex, cfg, offense);
+                 * BlockHelpSum(zone, shooter, defenders, matchedIndex, cfg, offense);
         return BlockBend(zone, duel + help, baseBlockWeight, cfg);
     }
 

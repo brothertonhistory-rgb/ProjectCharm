@@ -1,5 +1,5 @@
-"""S79 + S81 — the rim protector becomes real, and his help is gated by WHO HE GUARDS.
-LOCKED ORACLE.
+"""S79 + S81 + S81.3 — the rim protector becomes real, his help is gated by WHO HE
+GUARDS, and it is measured against WHOEVER IS SHOOTING. LOCKED ORACLE.
 
 Emits tools/block_help_golden.json, which Phase 74 replays against the compiled
 engine at 1e-12. This file is the sign-off medium and the source of truth for the
@@ -12,12 +12,32 @@ composed in PRE-TANH SHIFT SPACE so the existing per-zone floor/ceiling still bi
 
     duelShift  = sw*GapFn(DefenseRating(z,matched) - OffenseRating(z,shooter))
                + lw*GapFn(LengthRating(matched)    - LengthRating(shooter))
-    threat(d)  = sw*GapFn(DefenseRating(z,d) - 50) + lw*GapFn(LengthRating(d) - 50)
+    helpThreat = sw*GapFn(DefenseRating(z,d) - OffenseRating(z,shooter))    # S81.3
+               + lw*GapFn(LengthRating(d)    - LengthRating(shooter))
     depth(d)   = wH*Height + wS*Strength                      # BODY ONLY, not Postness
     ready(d)   = (HelpDefense/100) * (1 + swing*tanh((depth(d) - meanDepth)/scale))
-    helpShift  = max(0, threat(d)) * ready(d)                 # no-drag floor
+    helpShift  = max(0, helpThreat(d,shooter)) * ready(d)     # no-drag floor
     total      = duelShift + helpShare(z) * SUM_{d != matched} eGate(z,man(d))*helpShift(d)
     rate       = base + span*tanh(total / BlockReferenceShift)
+
+S81.3 — THE HELP ARM COMPARES TO THE SHOOTER
+--------------------------------------------
+Until S81.3 the help arm read `threat(d) = ... - AttributeMidpoint`: every helper
+measured against a permanent imaginary 50-rated player. The on-ball contest was
+already a matchup; the help arm was a rating against a constant. Emmett's ruling
+(S81.1): "It needs to be compared to whoever is shooting the ball." Both arms move
+together, onto the SAME two reads duelShift already uses, so the door carries one
+rule instead of two. The imaginary man was no neutral either — the league's real rim
+shooters are far better finishers than a 50, so the fixed bar had been quietly
+subsidizing every rim helper.
+
+★ CREDIT DOES NOT MOVE (R2, Emmett 2026-07-29). `threat(d)` above is RETAINED,
+unchanged, and now feeds credit_weights() and nothing else. Whether the shot gets
+blocked follows the shooter; whose name goes on it stays about the defenders. The
+reason is measured: S79 scored the matched man against this shooter and it came out
+exactly zero 44% of the time (every possession the shooter wins), pinning the helpers
+at 100% of credit at any dial. A rim protector should not collect fewer blocks in the
+box score because the man shooting happened to be good.
 
 RATE (putback).  Unchanged by S79 AND S81 — the five-defender stack of
 PutbackBlockRate. A go-back-up is a scramble with everyone already inside;
@@ -142,16 +162,32 @@ def duel_shift(z, shooter, matched):
           + l * ph(length_rating(matched) - length_rating(shooter)))
 
 def threat(z, d):
+    """NEUTRAL bar. S81.3: this is the CREDIT yardstick and nothing else. Retained
+    deliberately under R2 — see the module docstring. Do not point the rate at it."""
     s, l = contest(z)
     return (s * sk(def_rating(z, d) - M["AttributeMidpoint"])
           + l * ph(length_rating(d) - M["AttributeMidpoint"]))
+
+def help_threat(z, d, shooter):
+    """S81.3 — the RATE's help arm: a helper measured against the man actually shooting,
+    on the same two reads duel_shift already uses."""
+    s, l = contest(z)
+    return (s * sk(def_rating(z, d) - shooter[OFFENSE_ATTR[z]])
+          + l * ph(length_rating(d) - length_rating(shooter)))
 
 def readiness(d, md):
     return (d["HelpDefense"] / 100.0) * (
         1.0 + M["BlockHelpPositionalSwing"] * math.tanh((depth(d) - md) / M["BlockHelpPositionalScale"]))
 
 def help_shift(z, d, md):
+    """NEUTRAL. Credit's helper arm only (S81.3)."""
     return max(0.0, threat(z, d)) * readiness(d, md)
+
+def help_shift_vs_shooter(z, d, shooter, md):
+    """S81.3 — the RATE's helper arm. Readiness still MULTIPLIES threat; the no-drag
+    floor still fires, and now fires far more often, because real shooters outclass more
+    helpers than an imaginary 50 did."""
+    return max(0.0, help_threat(z, d, shooter)) * readiness(d, md)
 
 # ── S81: the assignment gate ──────────────────────────────────────────────
 # One named lookup, consumed in exactly two places (rate and credit), so a future
@@ -174,8 +210,12 @@ def effective_gate(z, o):
         return 1.0
     return 1.0 - influence(z) * (1.0 - assignment_gate(o))
 
-def help_sum(z, defs, matched_index, offense=None):
-    """offense is the OFFENSIVE five in slot order; defender i guards offense[i]
+def help_sum(z, shooter, defs, matched_index, offense=None):
+    """S81.3: shooter-first, mirroring BlockWeightWithHelp(zone, shooter, ...). There is
+    no no-shooter form — every caller has one, and keeping a fallback would preserve two
+    rate semantics indefinitely.
+
+    offense is the OFFENSIVE five in slot order; defender i guards offense[i]
     (slot parity). None = ungated (transition, or no lineup available)."""
     md = mean_depth(defs)
     total = 0.0
@@ -183,7 +223,7 @@ def help_sum(z, defs, matched_index, offense=None):
         if d is None or i == matched_index:
             continue
         g = 1.0 if offense is None else effective_gate(z, offense[i])
-        total += g * help_shift(z, d, md)
+        total += g * help_shift_vs_shooter(z, d, shooter, md)
     return total
 
 def bend(z, total, base):
@@ -192,7 +232,8 @@ def bend(z, total, base):
 
 def block_rate_with_help(z, shooter, defs, matched_index, offense=None):
     return bend(z, duel_shift(z, shooter, defs[matched_index])
-                 + help_share(z) * help_sum(z, defs, matched_index, offense), base_block(z))
+                 + help_share(z) * help_sum(z, shooter, defs, matched_index, offense),
+                base_block(z))
 
 def putback_shift(d):
     s, l = contest("Rim")
@@ -242,6 +283,18 @@ SHOOTER  = P("shooter",  Finishing=62, Close=58, Mid=55, Outside=54, Height=55, 
 ELITE_SH = P("elite_shooter", Finishing=95, Close=90, Mid=88, Outside=92,
                          Height=70, Wingspan=76, Vertical=85)
 
+# ── S81.3 — the two ARM-ISOLATING shooters ────────────────────────────────
+# elite_shooter differs from shooter in BOTH skill and body, so a golden built on that
+# pair alone would pass with one arm unwired — the other masks it. These two move
+# exactly one arm each. This is the fixture half of A4: only the SAME defender against
+# two DIFFERENT shooters can see the change at all.
+SH_SKILL = P("shooter_skill_only",            # elite skills, ordinary shooter's body
+             Finishing=95, Close=90, Mid=88, Outside=92,
+             Height=55, Wingspan=57, Vertical=62)
+SH_BODY  = P("shooter_length_only",           # ordinary shooter's skills, elite body
+             Finishing=62, Close=58, Mid=55, Outside=54,
+             Height=70, Wingspan=76, Vertical=85)
+
 # ── S81 offensive fixture players — the MEN BEING GUARDED ─────────────────
 # Only Outside is read by spacing(), but these carry full cards so the fixture
 # stays a legal Player everywhere and a future spacing layer can widen the read
@@ -272,42 +325,65 @@ LINEUPS = {
     "short_lineup":   [ORDINARY, ORDINARY, MENACE, None, None],
 }
 
-def emit():
+# The four fixture shooters. The last two isolate one arm each (see above).
+SHOOTERS = ((SHOOTER,  "average"), (ELITE_SH, "elite"),
+            (SH_SKILL, "skill_only"), (SH_BODY, "length_only"))
+
+def emit_rate():
+    """S81.3 — the RATE contract only. Credit is NOT emitted here; it is copied from the
+    frozen file (see load_frozen_credit). Splitting the schema by name is what stops a
+    regenerated fixture from quietly becoming a snapshot of whatever the engine does."""
     rows = []
     # offense=None reproduces S79 EXACTLY (every gate 1.0) and is also the live
     # transition path; the named offenses exercise S81's gate.
     off_cases = [(None, "none")] + [(v, k) for k, v in OFFENSES.items()]
     for lname, defs in LINEUPS.items():
         for z in ZONES:
-            for shooter, sname in ((SHOOTER, "average"), (ELITE_SH, "elite")):
+            for shooter, sname in SHOOTERS:
                 for mi in (0, -1):
                     if mi == 0 and defs[0] is None:
                         continue
                     for offense, oname in off_cases:
+                        hs = help_sum(z, shooter, defs, mi, offense)
                         rate = (block_rate_with_help(z, shooter, defs, mi, offense)
                                 if mi >= 0
-                                else bend(z, help_share(z) * help_sum(z, defs, -1, offense),
-                                          base_block(z)))
-                        w = credit_weights(z, defs, mi, offense)
-                        tot = sum(w)
+                                else bend(z, help_share(z) * hs, base_block(z)))
                         rows.append(dict(
                             lineup=lname, offense=oname, zone=z, shooter=sname,
                             matched_index=mi,
                             duel_shift=(duel_shift(z, shooter, defs[mi]) if mi >= 0 else 0.0),
-                            help_sum=help_sum(z, defs, mi, offense),
+                            help_sum=hs,
                             mean_depth=mean_depth(defs),
-                            rate=rate,
-                            credit_weights=w,
-                            credit_shares=[x / tot for x in w] if tot > 0 else [0.0] * 5))
-    for lname, defs in LINEUPS.items():
-        w = putback_credit_weights(defs); tot = sum(w)
-        rows.append(dict(lineup=lname, offense="none", zone="Rim", shooter="putback",
-                         matched_index=-1,
-                         duel_shift=0.0, help_sum=0.0, mean_depth=mean_depth(defs),
-                         rate=None, credit_weights=w,
-                         credit_shares=[x / tot for x in w] if tot > 0 else [0.0] * 5,
-                         putback=True))
+                            rate=rate))
     return rows
+
+
+def load_frozen_credit():
+    """Read the FROZEN neutral credit vectors and prove the oracle still reproduces them
+    EXACTLY before emitting. R2 says credit does not move; if this assertion ever fails,
+    the oracle itself has forked wrong and the fixture must not be written."""
+    path = os.path.join(ROOT, "tools", "block_credit_neutral_frozen.json")
+    frozen = json.load(open(path))
+    assert frozen["schema"] == "s81-3-credit-neutral-frozen", frozen["schema"]
+
+    pl = {k: v for k, v in frozen["players"].items()}
+    def lineup(name):  return [pl[n] if n else None for n in frozen["lineups"][name]]
+    def offense(name): return None if name == "none" else \
+                              [pl[n] if n else None for n in frozen["offenses"][name]]
+
+    worst = 0.0
+    for r in frozen["rows"]:
+        defs = lineup(r["lineup"])
+        w = (putback_credit_weights(defs) if r["putback"]
+             else credit_weights(r["zone"], defs, r["matched_index"], offense(r["offense"])))
+        for a, b in zip(w, r["credit_weights"]):
+            worst = max(worst, abs(a - b))
+            if a != b:
+                raise SystemExit(
+                    f"FROZEN CREDIT DRIFT at {r['lineup']}/{r['offense']}/{r['zone']}"
+                    f"/mi={r['matched_index']}: oracle {a!r} vs frozen {b!r}. "
+                    "R2 says block credit does not move in S81.3. Golden NOT written.")
+    return frozen, worst
 
 
 # ── the oracle's own checks — these run before the golden is written ───────
@@ -360,14 +436,95 @@ def checks():
             for mi in (0, -1):
                 if mi == 0 and defs[0] is None: continue
                 md = mean_depth(defs)
-                ungated = sum(help_shift(z, d, md) for i, d in enumerate(defs)
-                              if d is not None and i != mi)
-                if help_sum(z, defs, mi, None) != ungated: same = False
+                for shooter, _ in SHOOTERS:
+                    ungated = sum(help_shift_vs_shooter(z, d, shooter, md)
+                                  for i, d in enumerate(defs)
+                                  if d is not None and i != mi)
+                    if help_sum(z, shooter, defs, mi, None) != ungated: same = False
     ck("offense=None reproduces the ungated help sum exactly", same)
 
     # 6. Putback credit is untouched by anything in S81.
     ck("putback credit takes no offense argument",
        "offense" not in putback_credit_weights.__code__.co_varnames)
+
+    # ── S81.3 ─────────────────────────────────────────────────────────────
+    # 7. THE DISCRIMINATING SIGNAL, one arm at a time. The combined pair can pass with
+    #    one arm unwired because the other masks it (A4). All three forms required.
+    big = P("big", Height=84, Wingspan=88, Vertical=68, Strength=80,
+            PostDefense=85, RimProtection=92, HelpDefense=80)
+    md0 = mean_depth([big] * 5)
+
+    skill_ok = True
+    for z in ZONES:
+        lo = P("lo", Height=55, Wingspan=57, Vertical=62, **{OFFENSE_ATTR[z]: 25})
+        hi = P("hi", Height=55, Wingspan=57, Vertical=62, **{OFFENSE_ATTR[z]: 85})
+        if not help_shift_vs_shooter(z, big, hi, md0) < help_shift_vs_shooter(z, big, lo, md0):
+            skill_ok = False
+    ck("SKILL arm: the same helper helps LESS against the better shooter, at every zone",
+       skill_ok, "the zone's own attribute is swept — Finishing at Three would test nothing")
+
+    short_reach = P("short", Height=40, Wingspan=42, Vertical=45, Finishing=55, Close=55, Mid=55, Outside=55)
+    long_reach  = P("long",  Height=88, Wingspan=92, Vertical=85, Finishing=55, Close=55, Mid=55, Outside=55)
+    ck("LENGTH arm: the same helper helps LESS against the longer shooter, at every zone",
+       all(help_shift_vs_shooter(z, big, long_reach, md0)
+           < help_shift_vs_shooter(z, big, short_reach, md0) for z in ZONES))
+
+    ck("COMBINED: helps more against a small weak-skilled shooter than a big skilled one",
+       all(help_shift_vs_shooter(z, big, SHOOTER, md0)
+           > help_shift_vs_shooter(z, big, ELITE_SH, md0) for z in ZONES))
+
+    # 8. LEVEL RELATIVITY, stated directly — the whole point of the no-scalar wall.
+    d3  = P("d3_shooter",   Height=48, Wingspan=50, Vertical=52,
+            Finishing=30, Close=30, Mid=30, Outside=30)
+    hm  = P("high_major",   Height=72, Wingspan=78, Vertical=80,
+            Finishing=88, Close=85, Mid=82, Outside=84)
+    ck("the SAME seven-footer helps materially more against a D3 shooter than a high-major one",
+       help_shift_vs_shooter("Rim", big, d3, md0) > 1.5 * help_shift_vs_shooter("Rim", big, hm, md0),
+       f"D3 {help_shift_vs_shooter('Rim', big, d3, md0):.3f} vs "
+       f"high-major {help_shift_vs_shooter('Rim', big, hm, md0):.3f}")
+
+    # 9. THE NEUTRAL POINT, four cases. The first three are EXACT (a zero gap through
+    #    GapFn is exactly zero, sign(0) = 0). The fourth is NOT asserted as a literal
+    #    0.0 from player-derived inputs: the two arms run different weights, steepnesses
+    #    and exponents through **, and a solved cancellation lands ULPs off. Composition
+    #    is proved by DECOMPOSITION instead, which is exact and says the same thing.
+    z = "Rim"
+    s, l = contest(z)
+    mirror_skill = P("ms", Finishing=def_rating(z, big))                 # skill gap exactly 0
+    ck("skill gap zero -> skill arm exactly 0",
+       s * sk(def_rating(z, big) - mirror_skill[OFFENSE_ATTR[z]]) == 0.0)
+
+    ck("length gap zero -> length arm exactly 0",
+       l * ph(length_rating(big) - length_rating(big)) == 0.0)
+
+    both = P("both", Finishing=def_rating(z, big), Height=big["Height"],
+             Wingspan=big["Wingspan"], Vertical=big["Vertical"])
+    ck("both gaps zero -> threat exactly 0, help exactly 0",
+       help_threat(z, big, both) == 0.0 and help_shift_vs_shooter(z, big, both, md0) == 0.0)
+
+    decomp_ok = True
+    for zz in ZONES:
+        for sh, _ in SHOOTERS:
+            ss, ll = contest(zz)
+            arm_s = ss * sk(def_rating(zz, big) - sh[OFFENSE_ATTR[zz]])
+            arm_l = ll * ph(length_rating(big) - length_rating(sh))
+            if help_threat(zz, big, sh) != arm_s + arm_l:
+                decomp_ok = False
+    ck("threat is EXACTLY the weighted skill arm plus the weighted length arm", decomp_ok,
+       "weighted-additive composition proved by decomposition, not by a solved cancellation")
+
+    # 10. Arms are SEPARATELY signed and neither is inert.
+    ck("the skill arm alone moves the threat", help_threat("Rim", big, SH_SKILL) != help_threat("Rim", big, SHOOTER))
+    ck("the length arm alone moves the threat", help_threat("Rim", big, SH_BODY)  != help_threat("Rim", big, SHOOTER))
+
+    # 11. The no-drag floor still binds, and the gate still multiplies the NEW threat.
+    weak = P("weak", Height=38, Wingspan=40, Vertical=60, Strength=32,
+             PerimeterDefense=30, PostDefense=30, RimProtection=25, HelpDefense=75)
+    ck("a helper outclassed by the shooter contributes exactly zero, not a negative",
+       help_shift_vs_shooter("Rim", weak, ELITE_SH, mean_depth([weak] * 5)) == 0.0)
+
+    ck("the fast break keeps shooter-relativity (offense=None gates at 1.0 but the bar stays)",
+       help_sum("Rim", SHOOTER, [big] * 5, 0, None) > help_sum("Rim", ELITE_SH, [big] * 5, 0, None))
 
     return fails
 
@@ -376,11 +533,15 @@ if __name__ == "__main__":
     if fails:
         raise SystemExit(f"\nORACLE CHECKS FAILED: {fails}\nGolden NOT written.")
 
+    frozen, worst = load_frozen_credit()
+    print(f"\n[OK] frozen credit vectors reproduced EXACTLY "
+          f"({len(frozen['rows'])} rows, worst |delta| = {worst!r})")
+
     players = {p["name"]: p for p in
                (MENACE, TOOLS, LEAPER, POST, GUARD, ORDINARY, SHOOTER, ELITE_SH,
-                O_POST, O_CONNECT, O_STRETCH, O_SNIPER)}
+                SH_SKILL, SH_BODY, O_POST, O_CONNECT, O_STRETCH, O_SNIPER)}
     fixture = dict(
-        schema="s81-1",
+        schema="s81-3",
         float_tolerance=1e-12,
         constants={k: M[k] for k in (
             "SkillSteepness", "SkillExponent", "PhysicalSteepness", "PhysicalExponent",
@@ -395,12 +556,23 @@ if __name__ == "__main__":
             "BlockAssignmentInfluenceRim", "BlockAssignmentInfluenceShort",
             "BlockAssignmentInfluenceMid", "BlockAssignmentInfluenceLong",
             "BlockAssignmentInfluenceThree")},
+        config_section_sha256=frozen["config_section_sha256"],
         players=players,
         lineups={k: [p["name"] if p else None for p in v] for k, v in LINEUPS.items()},
         offenses={k: [p["name"] if p else None for p in v] for k, v in OFFENSES.items()},
-        rows=emit())
+
+        # ── the two contracts, separated BY NAME ──────────────────────────
+        # rate_vs_shooter: new rows, intentionally different from the s81-1 fixture.
+        # credit_neutral:  copied byte-for-byte from the frozen file, never re-derived.
+        rate_vs_shooter=emit_rate(),
+        credit_neutral=dict(
+            note=frozen["provenance"],
+            shooter_pairs_proved_identical=frozen["shooter_pairs_proved_identical"],
+            rows=frozen["rows"]))
+
     out = os.path.join(ROOT, "tools", "block_help_golden.json")
     with open(out, "w") as f:
         json.dump(fixture, f, indent=1)
         f.write("\n")
-    print(f"\nwrote {out}: {len(fixture['rows'])} rows")
+    print(f"\nwrote {out}: {len(fixture['rate_vs_shooter'])} rate rows, "
+          f"{len(fixture['credit_neutral']['rows'])} frozen credit rows")
