@@ -91,6 +91,7 @@ public static class OffensiveRebounderPicker
         var postnesses  = new double[5];
         var wingspans   = new double[5];
         var physicals   = new double[5];   // S46: ReboundPhysical per player (body pull)
+        var verticals   = new double[5];   // S81.2: the leap, for the within-team attribution tilt
         var populated   = new bool[5];
         var playerCount = 0;
 
@@ -102,6 +103,7 @@ public static class OffensiveRebounderPicker
             postnesses[i] = Matchup.Postness(p, matchupCfg);
             wingspans[i]  = p.Wingspan;
             physicals[i]  = Matchup.ReboundPhysical(p, matchupCfg);
+            verticals[i]  = p.Vertical;
             populated[i]  = true;
             playerCount++;
         }
@@ -128,6 +130,16 @@ public static class OffensiveRebounderPicker
         for (var i = 0; i < 5; i++)
             if (populated[i]) meanPhysical += physicals[i];
         meanPhysical /= playerCount;
+
+        // S81.2: lineup-mean hops — the leap tilt is TEAMMATE-relative, so this is its
+        // neutral point. Over POPULATED players only (playerCount, never a fixed five),
+        // matching every other mean in this method and the live rebound convention.
+        // Computed ONCE here, BEFORE any candidate weight — a mean recomputed inside the
+        // weight loop would make each weight depend on itself.
+        var meanVertical = 0.0;
+        for (var i = 0; i < 5; i++)
+            if (populated[i]) meanVertical += verticals[i];
+        meanVertical /= playerCount;
 
         // ── Stage 2: compute per-player pick weights ──────────────────────────────
         // weight = (Luck + OffensiveRebounding × PositionalWeight(postness)
@@ -177,8 +189,15 @@ public static class OffensiveRebounderPicker
                            * Math.Tanh(Math.Max(0.0, physicals[i] - matchupCfg.ReboundBodyFloorReference)
                                        / matchupCfg.ReboundBodyFloorScale);
 
+            // S81.2: the leap joins the SKILL PRODUCT only. Luck, bodyPull and absFloor are
+            // deliberately independent of the rebounding rating — luck is every populated
+            // player's equal claim on a loose ball and the body terms stand on their own — so
+            // the leap tilt must not touch any of the three. A player with a zero rebounding
+            // rating is therefore untouched by his hops here, which is the intended neutral.
+            var vm         = Matchup.ReboundVerticalMultiplier(verticals[i], meanVertical, matchupCfg);
+
             weights[i]   = (matchupCfg.ReboundLuckWeight
-                           + p.OffensiveRebounding * pw * wm * hm
+                           + p.OffensiveRebounding * pw * wm * hm * vm
                            + bodyPull
                            + absFloor) * shooterNerf;
             totalWeight += weights[i];

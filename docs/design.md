@@ -3166,12 +3166,21 @@ weights, a new physical composite, and one new method.
 ### What the block contest is, conceptually
 
 A block is not the negation of a make. It depends on **different physical attributes** than the make
-door. Height, wingspan, and vertical leap are what put a hand on the ball; quickness and strength matter
-for a contest but don't matter for *whether the shot is blocked at all*. So Phase 7 introduces a
-block-specific **length** composite (Height + Wingspan + Vertical, equal weights by default) that is
-separate from the make door's full Athleticism composite (Strength + Speed + Quickness + FirstStep +
-Vertical). The asymmetry is intentional and *not* to be unified — the two doors read different physical
-signals.
+door. Reach is what puts a hand on the ball; quickness and strength matter for a contest but don't
+matter for *whether the shot is blocked at all*. So Phase 7 introduces a block-specific **length**
+composite that is separate from the make door's full Athleticism composite (Strength + Speed +
+Quickness + FirstStep + Vertical). The asymmetry is intentional and *not* to be unified — the two
+doors read different physical signals.
+
+**S81.2 — reach is REACH. Weights are 0.45 wingspan / 0.40 height / 0.15 vertical.** The Phase 1
+placeholder was equal thirds, which counted a leap as permanent standing reach at full weight and
+made a 6'6" man with 42-inch hops out-protect the rim better than a 6'11" with a 7'2" span. Emmett's
+ruling: what matters is **where the hand ends up**, so wingspan outranks height — height matters
+mostly because it is where the arms are attached. The leap keeps a small, strictly positive share,
+so within any fixed body more hops still helps a defender block; what falls is the slope, not the
+sign. The leap's real value is task-specific and now lives in its own terms (see *Phase 75*), not in
+a standing-reach composite. Two invariants are enforced at load: the three weights must still sum to
+1.0 (Phase 7, kept), and `LengthWingspan > LengthHeight > LengthVertical > 0` (S81.2, added).
 
 The skill side of the block contest, however, reuses the make door's reads exactly: the same per-zone
 offense attribute (Three/Long → Outside, Mid → Mid, Short → Close, Rim → Finishing) against the same
@@ -6332,14 +6341,185 @@ same 6'0" guard with a 99 rating nearly doubles his help on vertical alone (2.50
 `LengthRating` is Height, Wingspan and Vertical at **exactly one third each**. A 40-inch vertical
 is presently worth more to this engine than four inches of wingspan.
 
-**Open inside the same session, not settled here:**
-- **Wingspan should outweigh height** (Emmett's read: what matters is where the hand ends up;
-  height matters mostly because it is where the arms are attached). Not yet weighted.
-- **Whether vertical belongs in reach at all**, or whether its real value is separate — the second
-  jump, the recovery, the chase-down from behind.
+**Both open questions were RULED and SHIPPED in S81.2, ahead of the shooter-relative change rather
+than after it** — the sequence was inverted on the reasoning that the help arm should be measured
+against a corrected reach composite, not the other way round. Wingspan now outweighs height
+(0.45 / 0.40), and the leap keeps only 0.15 here because its real value is task-specific: the second
+jump, the elevation over a man at the rim, the extra inch on the glass. See *Phase 75* for the terms
+that carry it and for the population evidence.
 
-Both become answerable only once there is something moving to measure against, which is why they
-belong with this change rather than before it.
+## Phase 75 — What a vertical leap is worth (Session 81.2, 2026-07-29)
+
+The leap was smeared across two composites with **no separation between standing reach, general
+athleticism, and task-specific jumping**. It was a full third of the block door's reach, one fifth of
+`Athleticism`, nothing at all on the glass, and counted twice in transition (once through athleticism,
+once through reach). S81.2 gives it its own convex, defender-relative term at the doors where
+elevating over a man *is* the act, and cuts its share of standing reach to a sliver.
+
+### The defect, in one line
+
+Vertical was never a dead attribute — it already paid through `Player.Athleticism` at ordinary
+finishing, putbacks and transition. The reason it *felt* absent is **dilution killing convexity**:
+`GapFn` accelerates at large gaps (exponent 1.75), but the leap is averaged with four other physicals
+*before* the curve sees it, so a 65-point hops advantage arrives as a 13-point athletic edge and buys
+about 0.8 points of make%. Undiluted, the same curve at the same gap yields far more.
+
+### The primitive
+
+    VerticalShift(attacker, defender, weight, cfg)
+        = weight · GapFn(attacker.Vertical − defender.Vertical,
+                         PhysicalSteepness, PhysicalExponent, ReferenceScale)
+
+**The weight sits OUTSIDE `GapFn`, not inside its scale.** At exponent 1.75 those are materially
+different curves and the ruled numbers are the outside form.
+
+**It is deliberately NOT inside `EffectiveRating`.** That function runs for every zone; an unfenced
+leap term there would make leapers shoot better from three. The caller applies it at exactly two
+sites, and the fence is the caller's ternary:
+
+- **ordinary Rim** (`RollHGenerator`, make path) at `RimVerticalWeight = 0.40`
+- **putbacks** (`RollHGenerator`, putback path) at `PutbackVerticalWeight = 0.80` — the second jump
+  is worth double the ordinary drive, because going straight back up is the most vertical act in
+  basketball.
+
+Keeping it out of the shared signature also stops that signature growing a limb per athletic
+attribute as the remaining four are wired.
+
+**The null-defender contract.** `VerticalShift` takes a NON-NULL defender, matching `EffectiveRating`
+and `BlockWeight`. Both make paths already short-circuit an empty defensive slot *before* reaching
+the matchup term, and that ternary is untouched: **empty defender → raw offense rating, unchanged;
+non-Rim → no new term; defended Rim → existing matchup plus the leap.** A defender-relative term
+cannot exist without a defender.
+
+**Putback ordering, ruled and not to be reopened.** The leap enters the effective rating and is
+consumed by `MakeProbability`; the flat `PutbackMakePenalty` is subtracted **afterward**. The leap is
+part of the physical shot contest; the penalty is the separate difficulty of going straight back up.
+
+### The leap stacks on athleticism rather than replacing it
+
+Vertical keeps its one-fifth share of `Athleticism`. Removing it there would move transition, fatigue
+and every athletic read for what is a rim-specific idea — a large blast radius for a narrow fix. The
+consequence is stated rather than hidden: total leaper advantage at a 65-point gap is about 6.4 points
+of make%, not 5.6.
+
+### The glass — TWO layers, each matching how that layer already works
+
+This resolves "relative to whom": **you win boards against the other team, and you get boards relative
+to your teammates.**
+
+*Individual — who among my five goes and gets it.* A within-team multiplier on the rebounding-skill
+product in both pickers, the exact shape `ReboundWingspanMultiplier` and the Hustle tilt already use:
+
+    verticalMultiplier = 1 + ReboundVerticalSwing · tanh((p.Vertical − lineupMeanVertical) / ReboundVerticalScale)
+
+`ReboundVerticalSwing = 0.20` — the same weight Hustle carries on this wire, so the multiplier stays
+inside (0.80, 1.20). **TEAMMATE-relative:** the neutral point is his own lineup mean, not an opponent.
+An attacker-versus-defender cancellation assertion is wrong here and is deliberately not written.
+
+**It joins the SKILL PRODUCT only, never the independent channels:**
+
+    Offensive:  (Luck + OffensiveRebounding · positional · wingspan · hustle · VERTICAL
+                      + bodyPull + absFloor) · shooterNerf
+    Defensive:   Luck + DefensiveRebounding · positional · wingspan · hustle · VERTICAL
+                      + bodyPull + absFloor
+
+Luck is every populated player's equal claim on a loose ball and the body terms stand on their own, so
+the leap tilt must not touch any of the three. This also makes the rating-zero neutral case
+mechanically obvious: a man with no rebounding rating is untouched by his hops.
+
+*Team — whether we win the board at all.* A team-vs-team gap in the shape `sizeShift` already uses,
+added to `totalShift` in `OffensiveReboundShare` at `ReboundVerticalTeamWeight = 0.05`. All-elite
+versus all-average moves the offensive glass 30.0% → 31.6%. Deliberately small: at 0.20 it reaches
+35%, which stops being a sliver on the glass and starts being a strategy.
+
+**Mean conventions match the live rebound path exactly.** Both new means are over **populated players
+only**, falling back to 50 solely for an empty side — a missing slot is EXCLUDED, never treated as 0
+or 50. The individual layer's lineup mean is computed **once before any candidate weight**, otherwise
+the weight would be recursive.
+
+### Every offensive term is RELATIVE, never flat (C-26)
+
+`GapFn` is odd, so two equal leapers cancel exactly and 90-vs-50 is the exact sign-reverse of 50-vs-90.
+**Three different neutral points, and they are not one rule:**
+
+| layer | neutral point |
+|---|---|
+| rim and putback | `attacker.Vertical == defender.Vertical` → shift exactly 0 |
+| team rebounding | equal team MEANS → shift exactly 0 |
+| individual rebounding | `player.Vertical == lineupMeanVertical` → multiplier exactly 1.0 |
+
+### The five keys are NOT all zero-safe
+
+    RimVerticalWeight          finite, >= 0        0 = kill switch
+    PutbackVerticalWeight      finite, >= 0        0 = kill switch
+    ReboundVerticalTeamWeight  finite, >= 0        0 = kill switch for the team layer
+    ReboundVerticalSwing       finite, [0, 1)      0 = kill switch for the individual layer
+    ReboundVerticalScale       finite, > 0         ** MUST NOT BE ZERO **
+
+The swing needs an **upper** bound, not just `>= 0`: the multiplier is `1 + Swing·tanh(gap/Scale)` and
+`tanh` approaches −1, so the lower asymptote is `1 − Swing`. At `Swing > 1` a sufficiently below-average
+jumper gets a **negative** multiplier, which reverses the sign of his whole rebounding contribution and
+can drive a picker weight negative. Both sibling swings in this file are fenced the same way.
+`ReboundVerticalScale` is the tanh denominator: at zero a positive gap gives infinity and an exact-zero
+gap gives **NaN**, which propagates and poisons every candidate weight in the picker.
+
+**Finiteness is guarded explicitly, before the range comparisons.** `if (v < 0.0)` does not fire on NaN,
+so a NaN would slip through every range check in this file's usual idiom. All five new values, and the
+three reach weights before their ordering comparison, are tested with `!double.IsFinite(...)` first.
+
+### What the population actually says (S81.2 Stage 1, 4,511 drafted players)
+
+The scales were ruled on hand-picked archetypes; the gate was whether their population-wide
+consequences contradict what was signed off. They do not.
+
+    |hops gap| at matched rim pairs   p10 3    median 15    p90 35    max 66
+
+    |make% change|          median   mean    p90    max     >2pts   >4pts
+    ordinary rim (0.40)      0.35    0.65   1.64   5.61      6.5%    0.5%
+    putback     (0.80)       0.71    1.29   3.27  11.32     23.5%    6.1%
+
+The archetypes Emmett ruled on (gaps of 30 and 65) sit at the p90 and the extreme edge. The rim term
+is genuinely a tail effect; the putback is the broader of the two but its typical move is under a
+point, and putbacks are a small share of all shots.
+
+**★ The rebound gain is decomposed, not inferred** — a four-way grid rather than a subtraction, so any
+interaction is visible. Same man, hops 90 against hops 20, four average teammates:
+
+    team layer | indiv layer | team off-glass  | his share of his team's boards
+       off     |     off     |  30.00 / 30.00  |      20.00 / 20.00
+       ON      |     off     |  30.10 / 29.95  |      20.00 / 20.00
+       off     |     ON      |  30.00 / 30.00  |      24.30 / 16.38
+       ON      |     ON      |  30.10 / 29.95  |      24.30 / 16.38
+
+**No interaction, and essentially all of the gain is the individual layer** — a leaper takes nearly a
+quarter of his team's boards where an identical floor-bound man takes a sixth. The team weight of 0.05
+moves the glass by a tenth of a point. It is doing exactly what "a sliver" meant.
+
+### Two findings recorded, neither tuned toward
+
+**Rim FG% does not move, and that is structural.** 51.9 → 51.9 across a full stock season. The leap
+term is odd and relative: every point a leaper gains over a shorter-jumping defender, a floor-bound man
+loses to a springier one, and across a league it cancels. It changes **who** finishes at the rim, not
+how many go in. Nothing here addresses the rim-shooting shortfall against the 61.0 anchor.
+
+**League blocks rise slightly, 4.3 → 4.4.** Hops sit about twenty rating points below height and
+wingspan across the population, so de-weighting the leap *raises* everyone's reach number against the
+fixed bar of 50 — the length arm's mean threat climbs 19.9% and the share above the bar goes 86.2% →
+87.6%. That threat rise is then squeezed by the block door's saturating bend, so the actual block total
+moves about 1%. **Reported, not tuned** — see O-40. Worth carrying: the natural expectation from
+"stop small men blocking so much" is that blocks fall, and they do not.
+
+### Transition moved, and nothing was watching
+
+No golden fixture binds Roll A's length aggregates. Cutting the leap's share of reach removes one of
+the two channels vertical had there (athleticism keeps the one that belongs). Measured: the
+slot-weighted size aggregate falls 58.61 → 57.96 and the team-vs-team gap narrows (sd 6.22 → 5.25), so
+size decides marginally less of the four-way disruption split on the break.
+
+**A generation finding fell out of the archetype scan:** the engine generated **61** springy small men
+(hops 85+, small frame) and **7** long flat-footed bigs (hops ≤35, big frame) in 4,511 players. The
+leap is nearly height-independent in generation, so the archetype this change most rewards barely
+exists yet. That is a generation item, not a block-door one.
 
 ## Phase 37 — Roll C Real Generator: Flat Context-Driven Type-Mix (2026-06-19)
 

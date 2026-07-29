@@ -239,15 +239,59 @@ public sealed class MatchupConfig
     /// Must be &gt; 0 (enforced in Load).</summary>
     public double PutbackBlockReferenceShift { get; set; } = 35.0;
 
-    // --- Phase 7: length composite blend for the block contest.
+    // --- Phase 7 / S81.2: length composite blend for the block contest.
     //     Length = (Height * LengthHeight + Wingspan * LengthWingspan + Vertical * LengthVertical).
-    //     Equal thirds by default — all three contribute equally to blocking ability.
+    //
+    //     S81.2 (R1) — REACH BECOMES REACH. The equal-thirds Phase 7 placeholder counted a
+    //     leap as permanent standing reach at full weight, which made a 6'6" 42-inch leaper
+    //     out-protect the rim better than a 6'11" with a 7'2" span. Emmett's ruling: what
+    //     matters is where the HAND ENDS UP, so wingspan outweighs height (height matters
+    //     mostly because it is where the arms are attached), and the leap keeps only a small
+    //     share here — its real value is task-specific and lives in Matchup.VerticalShift and
+    //     the rebound multiplier, not in a standing-reach composite.
+    //
+    //     Within any FIXED body more hops still helps a defender block — the share is small,
+    //     not zero, by design. What falls is the SLOPE, not the sign.
+    //
     //     Stored as config so the "tune the length composite" pass is trivial:
     //     change weights here without touching Matchup.LengthRating.
-    //     Must sum to 1.0 (enforced in Load). ---
-    public double LengthHeight   { get; set; } = 1.0 / 3.0;
-    public double LengthWingspan { get; set; } = 1.0 / 3.0;
-    public double LengthVertical { get; set; } = 1.0 / 3.0;
+    //     Two invariants, both enforced in Load:
+    //       LengthWingspan > LengthHeight > LengthVertical > 0   (S81.2 ordering)
+    //       LengthWingspan + LengthHeight + LengthVertical == 1.0 (Phase 7, kept) ---
+    public double LengthHeight   { get; set; } = 0.40;
+    public double LengthWingspan { get; set; } = 0.45;
+    public double LengthVertical { get; set; } = 0.15;
+
+    // --- S81.2: the leap's OWN term at the rim and on the second jump.
+    //     verticalShift = weight * GapFn(attacker.Vertical − defender.Vertical,
+    //                                    PhysicalSteepness, PhysicalExponent, ReferenceScale)
+    //
+    //     The weight sits OUTSIDE GapFn, not inside its scale — at exponent 1.75 those are
+    //     very different curves. Defender-RELATIVE and odd: two equal leapers cancel exactly
+    //     (C-26 — every offensive term is relative, never flat).
+    //
+    //     Deliberately NOT folded into EffectiveRating: that function runs for every zone, and
+    //     an unfenced leap term would make leapers shoot better from three. The term is applied
+    //     by the caller at ordinary Rim and on putbacks only (Matchup.VerticalShift).
+    //
+    //     This STACKS ON vertical's existing one-fifth share of Player.Athleticism rather than
+    //     replacing it (S81.2 ruling): removing it from the athletic composite would move
+    //     transition, fatigue and every athletic read for a rim-specific idea.
+    //     Both are finite and >= 0; 0 is the kill switch (enforced in Load). ---
+
+    /// <summary>Scale of the leap's own make-door term at ordinary Rim attempts.
+    /// Default 0.40 → a 65-point hops advantage is worth ~5.6 points of make% (on top of the
+    /// ~0.8 vertical already pays through <see cref="Player.Athleticism"/>).
+    /// Must be finite and &gt;= 0; 0 disables the rim term (enforced in Load).</summary>
+    public double RimVerticalWeight { get; set; } = 0.40;
+
+    /// <summary>Scale of the leap's own make-door term on putbacks — double the ordinary drive,
+    /// because going straight back up is the most vertical act in basketball. Default 0.80 →
+    /// a 65-point hops advantage is worth ~11 points of make%. Applied INSIDE the effective
+    /// rating, so <see cref="RollHConfig.PutbackMakePenalty"/> is still subtracted afterward:
+    /// the leap is part of the physical shot contest, the penalty is the separate difficulty of
+    /// going straight back up. Must be finite and &gt;= 0; 0 disables (enforced in Load).</summary>
+    public double PutbackVerticalWeight { get; set; } = 0.80;
 
     // =========================================================================
     // Phase 8 — foul-door parameters
@@ -893,11 +937,63 @@ public sealed class MatchupConfig
                     $"floor={cfg.BlockFloor(zone)}, ceiling={cfg.BlockCeiling(zone)}.");
         }
 
-        // Length weights must sum to 1.0.
+        // --- Reach composite (Phase 7 sum guard KEPT; S81.2 ordering guard ADDED) ---
+        // Finiteness FIRST: `if (v < 0.0)` does not fire on NaN, so a NaN would slip through
+        // every range comparison below and only surface as a silently poisoned block door.
+        if (!double.IsFinite(cfg.LengthHeight) || !double.IsFinite(cfg.LengthWingspan)
+            || !double.IsFinite(cfg.LengthVertical))
+            throw new InvalidOperationException(
+                $"LengthHeight / LengthWingspan / LengthVertical must all be finite: got " +
+                $"height={cfg.LengthHeight}, wingspan={cfg.LengthWingspan}, vertical={cfg.LengthVertical}.");
+
+        // Length weights must sum to 1.0 (Phase 7 — unchanged).
         var lenSum = cfg.LengthHeight + cfg.LengthWingspan + cfg.LengthVertical;
         if (Math.Abs(lenSum - 1.0) > Eps)
             throw new InvalidOperationException(
                 $"LengthHeight + LengthWingspan + LengthVertical must sum to 1.0: got {lenSum}.");
+
+        // S81.2 (R1) — reach is REACH: the hand's endpoint outranks the frame it hangs off,
+        // and the frame outranks the leap. Vertical keeps a strictly positive share (within a
+        // fixed body, more hops still helps a defender block — the slope falls, not the sign).
+        // ADDITIVE to the sum guard above, not a replacement; 0.45 + 0.40 + 0.15 satisfies both.
+        if (!(cfg.LengthWingspan > cfg.LengthHeight
+              && cfg.LengthHeight > cfg.LengthVertical
+              && cfg.LengthVertical > 0.0))
+            throw new InvalidOperationException(
+                $"LengthWingspan > LengthHeight > LengthVertical > 0 is required (S81.2 R1 — a leap " +
+                $"is not standing reach, but it is not nothing either): got wingspan={cfg.LengthWingspan}, " +
+                $"height={cfg.LengthHeight}, vertical={cfg.LengthVertical}.");
+
+        // --- S81.2: the five leap keys. Finiteness first, for the same NaN reason. ---
+        if (!double.IsFinite(cfg.RimVerticalWeight) || cfg.RimVerticalWeight < 0.0)
+            throw new InvalidOperationException(
+                $"RimVerticalWeight must be finite and >= 0 (0 = kill switch): got {cfg.RimVerticalWeight}.");
+
+        if (!double.IsFinite(cfg.PutbackVerticalWeight) || cfg.PutbackVerticalWeight < 0.0)
+            throw new InvalidOperationException(
+                $"PutbackVerticalWeight must be finite and >= 0 (0 = kill switch): got {cfg.PutbackVerticalWeight}.");
+
+        if (!double.IsFinite(cfg.ReboundVerticalTeamWeight) || cfg.ReboundVerticalTeamWeight < 0.0)
+            throw new InvalidOperationException(
+                $"ReboundVerticalTeamWeight must be finite and >= 0 (0 = kill switch for the team " +
+                $"layer): got {cfg.ReboundVerticalTeamWeight}.");
+
+        // Bounded swing, NOT merely nonnegative: the multiplier is 1 + Swing·tanh(gap/Scale) and
+        // tanh approaches -1, so Swing >= 1 lets a below-average jumper carry a negative
+        // multiplier and flip the sign of his whole rebounding contribution. Same fence as
+        // ReboundPositionalSwing and ReboundWingspanSwing.
+        if (!double.IsFinite(cfg.ReboundVerticalSwing)
+            || cfg.ReboundVerticalSwing < 0.0 || cfg.ReboundVerticalSwing >= 1.0)
+            throw new InvalidOperationException(
+                $"ReboundVerticalSwing must be finite and in [0, 1) (at >= 1 a poor leaper's " +
+                $"multiplier can go negative): got {cfg.ReboundVerticalSwing}.");
+
+        // Strictly positive: this is the tanh DENOMINATOR. Zero yields ±infinity off a nonzero
+        // gap and NaN off an exact-zero gap, which poisons every candidate weight in the picker.
+        if (!double.IsFinite(cfg.ReboundVerticalScale) || cfg.ReboundVerticalScale <= 0.0)
+            throw new InvalidOperationException(
+                $"ReboundVerticalScale must be finite and > 0 (it is the tanh denominator; zero " +
+                $"yields NaN at an exact-zero gap): got {cfg.ReboundVerticalScale}.");
 
         // Phase 8 invariants.
         if (cfg.FoulReferenceShift <= 0.0)
@@ -1630,6 +1726,49 @@ public sealed class MatchupConfig
     /// saturation knob). Default 15.0 — mirrors <see cref="ReboundPositionalScale"/>.
     /// Must be &gt; 0 (enforced in Load). Calibration placeholder.</summary>
     public double ReboundWingspanScale { get; set; } = 15.0;
+
+    // --- S81.2: the leap on the glass, in TWO LAYERS, each matching how that layer works.
+    //     You win boards AGAINST THE OTHER TEAM, and you get boards RELATIVE TO YOUR TEAMMATES.
+    //
+    //     Individual (who among my five goes and gets it) — a within-team multiplier on the
+    //     rebounding-skill product in BOTH pickers, the exact shape ReboundWingspanMultiplier
+    //     and the Hustle tilt already use. TEAMMATE-relative: the neutral point is his own
+    //     lineup mean, NOT an opponent.
+    //
+    //     Team (whether we win the board at all) — a team-vs-team gap through GapFn, added to
+    //     totalShift in OffensiveReboundShare beside sizeShift/skillShift/hustleShift. Equal
+    //     team means cancel exactly.
+    //
+    //     Both means are taken over POPULATED players only, matching the live rebound
+    //     convention — a missing slot is EXCLUDED, never treated as 0 or 50. ---
+
+    /// <summary>Half-amplitude of the within-team leap attribution multiplier,
+    /// <c>1 + Swing · tanh((Vertical − lineupMeanVertical) / Scale)</c>. Default 0.20 — the
+    /// same weight Hustle already carries on this wire; range (0.80, 1.20).
+    /// <para><b>The upper bound is load-bearing, not decoration.</b> tanh approaches −1, so the
+    /// lower asymptote is <c>1 − Swing</c>. At Swing &gt; 1 a sufficiently below-average jumper
+    /// gets a NEGATIVE multiplier, which reverses the sign of his whole rebounding-skill
+    /// contribution and can drive a picker weight negative. Fenced to [0, 1) exactly like
+    /// <see cref="ReboundPositionalSwing"/> and <see cref="ReboundWingspanSwing"/>.</para>
+    /// Must be finite and in [0, 1); 0 disables the individual layer (enforced in Load).</summary>
+    public double ReboundVerticalSwing { get; set; } = 0.20;
+
+    /// <summary>Rating-point hops spread at which one Swing unit is reached (tanh denominator).
+    /// Default 15.0 — mirrors <see cref="ReboundWingspanScale"/>.
+    /// <para><b>MUST NOT BE ZERO.</b> At zero a positive gap gives infinity, a negative gap
+    /// negative infinity, and an exact-zero gap gives NaN — which propagates through tanh and
+    /// poisons every candidate weight in the picker. The individual layer already has a kill
+    /// switch (<see cref="ReboundVerticalSwing"/> = 0); this denominator does not need one.</para>
+    /// Must be finite and &gt; 0 (enforced in Load).</summary>
+    public double ReboundVerticalScale { get; set; } = 15.0;
+
+    /// <summary>Weight of the team-vs-team hops gap in <c>totalShift</c>, through GapFn with the
+    /// physical gap parameters. Default 0.05 — deliberately small: all-elite versus all-average
+    /// moves the offensive glass 30.0% → 31.3%, where 0.20 would reach 35.1% and stop being a
+    /// sliver on the glass and start being a strategy. Equal team means → GapFn(0) = 0, so equal
+    /// lineups are byte-unaffected. Must be finite and &gt;= 0; 0 disables the team layer
+    /// (enforced in Load).</summary>
+    public double ReboundVerticalTeamWeight { get; set; } = 0.05;
 
     // --- S46: rebounder-picker luck weight + standalone body pull (both pickers).
     //     weight_i = Luck + Rating_i * posWeight_i * wingspanMult_i * hustleMult_i

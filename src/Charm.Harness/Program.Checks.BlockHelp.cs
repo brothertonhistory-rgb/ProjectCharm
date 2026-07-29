@@ -87,7 +87,14 @@ internal static partial class Program
                 Math.Abs(consts.GetProperty("BlockAssignmentInfluenceShort").GetDouble() - cfgM.BlockAssignmentInfluenceShort) < 1e-15 &&
                 Math.Abs(consts.GetProperty("BlockAssignmentInfluenceMid").GetDouble()   - cfgM.BlockAssignmentInfluenceMid)   < 1e-15 &&
                 Math.Abs(consts.GetProperty("BlockAssignmentInfluenceLong").GetDouble()  - cfgM.BlockAssignmentInfluenceLong)  < 1e-15 &&
-                Math.Abs(consts.GetProperty("BlockAssignmentInfluenceThree").GetDouble() - cfgM.BlockAssignmentInfluenceThree) < 1e-15;
+                Math.Abs(consts.GetProperty("BlockAssignmentInfluenceThree").GetDouble() - cfgM.BlockAssignmentInfluenceThree) < 1e-15 &&
+                // S81.2 — the reach weights were DECLARED by the fixture but never checked, so a
+                // reach-composite change would have sailed past this guard and every row would
+                // have agreed with a wrong engine. That is exactly the failure the guard exists
+                // to prevent. Every value the fixture stores and the engine reads is checked here.
+                Math.Abs(consts.GetProperty("LengthHeight").GetDouble()             - cfgM.LengthHeight)             < 1e-15 &&
+                Math.Abs(consts.GetProperty("LengthWingspan").GetDouble()           - cfgM.LengthWingspan)           < 1e-15 &&
+                Math.Abs(consts.GetProperty("LengthVertical").GetDouble()           - cfgM.LengthVertical)           < 1e-15;
             if (!constOk)
                 throw new InvalidOperationException(
                     "golden fixture rejected: S79/S81 constants do not match the loaded MatchupConfig. " +

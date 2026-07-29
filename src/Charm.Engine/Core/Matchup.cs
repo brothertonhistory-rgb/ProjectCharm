@@ -208,6 +208,41 @@ public static class Matchup
     public static double Reach(Player p) => (p.Height + p.Wingspan) / 2.0;
 
     /// <summary>
+    /// S81.2 — the leap's OWN make-door term: convex, defender-relative, applied at ordinary Rim
+    /// attempts and on putbacks and NOWHERE else.
+    ///
+    /// <para><c>shift = weight · GapFn(attacker.Vertical − defender.Vertical, PhysicalSteepness,
+    /// PhysicalExponent, ReferenceScale)</c>. The weight sits OUTSIDE GapFn rather than inside its
+    /// scale — at exponent 1.75 those are materially different curves, and the ruled numbers are
+    /// the outside form.</para>
+    ///
+    /// <para><b>Why this is not folded into <see cref="EffectiveRating"/>.</b> That function runs
+    /// for every zone; an unfenced leap term there would make leapers shoot better from three. The
+    /// caller applies this only where elevating over a man is what the shot IS. Keeping it out
+    /// also stops the shared signature growing a limb per athletic attribute.</para>
+    ///
+    /// <para><b>Why the leap needs its own term at all.</b> Vertical already pays through
+    /// <see cref="Player.Athleticism"/>, but averaged with four other physicals BEFORE the convex
+    /// curve sees it — so a 65-point leap advantage arrives as a 13-point athletic edge and buys
+    /// under a point of make%. Dilution kills the convexity. This term restores it at the two
+    /// doors where elevation is the whole act; the athletic share is deliberately left in place
+    /// (removing it would move transition, fatigue and every other athletic read).</para>
+    ///
+    /// <para><b>RELATIVE, never flat (C-26).</b> GapFn is odd, so two equal leapers cancel
+    /// exactly and 90-vs-50 is the exact sign-reverse of 50-vs-90. A floor-bound finisher against
+    /// a springy defender is penalised by the same curve that rewards the reverse.</para>
+    ///
+    /// <para><b>The defender is NON-NULL by contract.</b> A defender-relative term cannot exist
+    /// without a defender. Like <see cref="EffectiveRating"/> and <see cref="BlockWeight"/>, this
+    /// assumes real players; the caller short-circuits an empty defensive slot BEFORE reaching
+    /// here (see RollHGenerator's make and putback paths, which keep their raw-rating
+    /// fallback).</para>
+    /// </summary>
+    public static double VerticalShift(Player attacker, Player defender, double weight, MatchupConfig cfg)
+        => weight * GapFn(attacker.Vertical - defender.Vertical,
+                          cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+
+    /// <summary>
     /// The block-specific length composite (Phase 7) — the single place the
     /// Height / Wingspan / Vertical → length mapping lives.
     ///
@@ -1180,6 +1215,31 @@ public static class Matchup
                * Math.Tanh((playerWingspan - lineupMeanWingspan) / cfg.ReboundWingspanScale);
 
     /// <summary>
+    /// S81.2 — the within-team LEAP attribution multiplier: who among my five goes and gets it.
+    /// Identical in shape to <see cref="ReboundWingspanMultiplier"/> and the Hustle tilt, and it
+    /// joins them in the same skill product in both rebounder pickers.
+    ///
+    /// <para><b>TEAMMATE-relative, not opponent-relative.</b> The neutral point is the player's
+    /// own lineup mean: a player who jumps exactly like his teammates gets exactly 1.0, however
+    /// the other team jumps. Winning the board against the other team is the separate team layer
+    /// in <see cref="OffensiveReboundShare"/>; this layer only decides the split of the boards
+    /// your side was going to get. An attacker-versus-defender cancellation does not apply
+    /// here.</para>
+    ///
+    /// <para>At the ruled Swing of 0.20 the multiplier stays inside (0.80, 1.20) — a gentle tilt
+    /// worth roughly two and a half boards a game to an elite leaper over an otherwise identical
+    /// floor-bound teammate, not a re-ranking of the frontcourt. The Load-time [0, 1) fence keeps
+    /// the multiplier strictly positive: at Swing >= 1 a poor leaper's multiplier could go
+    /// negative and flip the sign of his whole rebounding contribution.</para>
+    /// </summary>
+    public static double ReboundVerticalMultiplier(
+        double playerVertical,
+        double lineupMeanVertical,
+        MatchupConfig cfg)
+        => 1.0 + cfg.ReboundVerticalSwing
+               * Math.Tanh((playerVertical - lineupMeanVertical) / cfg.ReboundVerticalScale);
+
+    /// <summary>
     /// The positional composite for rebounding (Phase 10, stage 2). A weighted
     /// read of how "post-like" a player is — used to sort who within a lineup
     /// is positioned to snag a board. Combines height, post defense, and strength
@@ -1411,8 +1471,28 @@ public static class Matchup
                                          cfg.HustleReboundSteepness,
                                          cfg.HustleReboundExponent,
                                          cfg.HustleReboundScale);
+
+        // S81.2 — the TEAM layer of the leap on the glass: whether we win the board at all.
+        // Same team-vs-team shape sizeShift already uses, with the weight OUTSIDE GapFn (the
+        // ruled form). Means are over POPULATED players only, falling back to 50 solely for an
+        // empty side — the exact convention offPhys/defPhys use above, so a partial lineup on a
+        // harness path reads the same way here as it does there. Equal team means → GapFn(0) = 0,
+        // so every equal-lineup check upstream is byte-unaffected.
+        var offVert = new List<double>();
+        foreach (var p in offense) if (p is not null) offVert.Add(p.Vertical);
+        var defVert = new List<double>();
+        foreach (var p in defense) if (p is not null) defVert.Add(p.Vertical);
+
+        var offMeanVertical = offVert.Count > 0 ? offVert.Average() : 50.0;
+        var defMeanVertical = defVert.Count > 0 ? defVert.Average() : 50.0;
+
+        var verticalShift = cfg.ReboundVerticalTeamWeight
+                          * GapFn(offMeanVertical - defMeanVertical,
+                                  cfg.PhysicalSteepness, cfg.PhysicalExponent, cfg.ReferenceScale);
+
         var totalShift = cfg.ReboundSizeWeight * sizeShift + cfg.ReboundSkillWeight * skillShift
-                       + hustleShift;
+                       + hustleShift
+                       + verticalShift;
         var ceiling    = cfg.ReboundOffShareCeiling;
         var floor      = cfg.ReboundOffShareFloor;
         var span       = totalShift >= 0.0 ? (ceiling - baseOffShare) : (baseOffShare - floor);

@@ -1,3 +1,105 @@
+## Session 81.2 — WHAT A VERTICAL LEAP IS WORTH. The leap stops being counted as permanent standing reach and gets its own convex, defender-relative term at the rim, on the second jump, and on the glass. Reach is now 0.45 wingspan / 0.40 height / 0.15 vertical; a 6'11" with a 7'2" span takes the rim back from a 6'6" with 42-inch hops, 12.4 to 7.5. Two findings recorded and not tuned toward: rim FG% does not move at all (51.9 → 51.9) because a relative term cancels league-wide, and league blocks rise slightly (4.3 → 4.4) because de-weighting the leap raises everyone's reach against a fixed bar. Claude forecast that block rise at ~20% and it came in at ~1%. Suite `ALL CHECKS PASSED` on Emmett's machine, byte-identical to the sandbox. (2026-07-29)
+
+**Register:** build, under `PROMPT-what-vertical-is-worth-s81_2-r7`. Config + four engine files + one generator + one new check file + one check-guard fix + a re-emitted golden. No generator change, no dial calibration, no page.
+
+### The defect
+
+The leap was smeared across two composites with **no separation between standing reach, general athleticism, and task-specific jumping**:
+
+    blocking      a full third of reach          a leap is not standing reach
+    rim finishing 1.6 points of make%            diluted 5x before a convex curve
+    putbacks      the same 1.6                   going back up is the most vertical act in basketball
+    rebounding    nothing                        genuinely absent
+    transition    counted twice                  athleticism AND reach
+
+Measured before the change: **a 6'6" leaper with 42-inch hops out-protected the rim better than a 6'11" with a 7'2" wingspan** — 210 against 169, ordinary 6'8" = 100.
+
+**★ Vertical was never a dead attribute, and the prompt's own preamble said so.** It already paid through `Player.Athleticism` at ordinary finishing, putbacks, transition *and* reach. The reason it felt absent is **dilution killing convexity**: `GapFn` accelerates at large gaps, but the leap is averaged with four other physicals before the curve sees it, so a 65-point hops advantage arrives as a 13-point athletic edge. A design describing itself as "wiring an absent attribute" would have overpaid it.
+
+### What shipped
+
+**R1 — reach becomes reach.** `LengthWingspan 0.45, LengthHeight 0.40, LengthVertical 0.15`. Emmett's read: what matters is where the hand ends up; height matters mostly because it is where the arms are attached. The existing sum-to-one guard stays and an ordering guard is **added** on top — `LengthWingspan > LengthHeight > LengthVertical > 0`. The ruled values satisfy both exactly.
+
+**R2/R3 — the leap gets its own term**, applied at exactly two sites and nowhere else:
+
+    verticalShift = weight * GapFn(attacker.Vertical - defender.Vertical, Physical*, ReferenceScale)
+
+Rim at 0.40, putbacks at 0.80. **The weight sits OUTSIDE `GapFn`, not inside its scale** — at exponent 1.75 those are materially different curves. **Not folded into `EffectiveRating`**, which runs for every zone and would have made leapers shoot better from three; the fence is the caller's ternary.
+
+**R4 — the glass, in two layers**, each matching how that layer already works: a teammate-relative multiplier in both pickers (swing 0.20, the same weight Hustle carries on that wire), and a team-vs-team gap in `totalShift` (weight 0.05).
+
+**★ A call Claude made and flagged rather than slipped:** the new rim term **stacks on** the leap's existing one-fifth share of `Athleticism` rather than replacing it. Pulling it out of the athletic composite would move transition, fatigue and every athletic read for a rim-specific idea. Consequence stated plainly: total leaper advantage at a 65-point gap is ~6.4 points of make%, not 5.6.
+
+### The acceptance test, and the assertion that was deliberately NOT written
+
+    the tall long man out-protects the rim over the short explosive one    12.38 vs 7.45
+
+Skill, readiness, assignment and shooter held identical, so a failure could not come from an unrelated attribute.
+
+**★ "Blocking falls" is the wrong sentence and a check written to it would have shipped green on a wrong build.** The leap keeps a strictly positive 0.15 share of reach, so **within any one fixed body more hops still helps a defender block**. What falls is the SLOPE:
+
+    6'8"/6'10" defender, rim protection 70, hops 20 -> 99
+      old block 11.84% -> 16.38%   (span 4.54 pts)
+      new block 12.16% -> 13.97%   (span 1.82 pts)
+
+Two separate facts, neither implying the other: *within one body* more hops still helps, a little; *across bodies* the tall long man now beats the short explosive one. **Only the second is the acceptance test.** Writing the first as "blocking falls" would have licensed an implementation making hops HARMFUL to shot blocking, which is nonsense basketball.
+
+### Stage 1 — the population gate, run before any scale was trusted
+
+Every number Emmett ruled on came from hand-picked matchups. The gate was whether the population-wide consequences contradict the archetypes he signed off on.
+
+    |hops gap| at matched rim pairs   p10 3    median 15    p90 35    max 66
+
+    |make% change|          median   mean    p90    max     >2pts   >4pts   >6pts
+    ordinary rim (0.40)      0.35    0.65   1.64   5.61      6.5%    0.5%    0.0%
+    putback     (0.80)       0.71    1.29   3.27  11.32     23.5%    6.1%    1.6%
+
+The archetypes ruled on (gaps of 30 and 65) sit at the p90 and the extreme edge. **The rim term is genuinely local; the putback is the broader of the two but its typical move is under a point.** Reported to Emmett with the judgement that it does not contradict the archetypes, and with the pen left where it belongs.
+
+**★ The rebound gain was decomposed rather than inferred** — a four-way grid, not a subtraction, so any interaction would be visible:
+
+    team layer | indiv layer | team off-glass  | his share of his team's boards
+       off     |     off     |  30.00 / 30.00  |      20.00 / 20.00
+       ON      |     off     |  30.10 / 29.95  |      20.00 / 20.00
+       off     |     ON      |  30.00 / 30.00  |      24.30 / 16.38
+       ON      |     ON      |  30.10 / 29.95  |      24.30 / 16.38
+
+No interaction, and **essentially all of the gain is the individual layer**. The team weight of 0.05 moves the glass by a tenth of a point — it is doing exactly what "a sliver" meant, which is the answer to the question the prompt raised about whether 0.05 was quietly doing more.
+
+### Two findings, recorded and NOT tuned toward
+
+**Rim FG% does not move at all — 51.9 → 51.9 across a full stock season, and that is structural.** The leap term is odd and relative: every point a leaper gains over a shorter-jumping defender, a floor-bound man loses to a springier one, and across a league it cancels exactly. It changes **who** finishes at the rim, not how many go in. The prompt's "what to watch" expected rim FG% to rise; it does not, and nothing here touches the shortfall against the 61.0 anchor.
+
+**League blocks rise slightly — 4.3 → 4.4, credited blocks 44,821 → 45,320.** Hops sit about twenty rating points below height and wingspan across the population, so de-weighting the leap *raises* everyone's reach against the fixed bar of 50. The length arm's mean threat climbs 19.9% and the share above the bar goes 86.2% → 87.6%. Per scope wall 6 (O-40): reported, not tuned.
+
+**★ Claude's check-in forecast on this was badly overstated and is recorded as an error.** The forecast was a ~20% rise in blocks. The threat number was right (+19.9%) but it was reported as if it were the block number; the block rate is squeezed through a saturating tanh bend afterward, so a large move in threat becomes a ~1% move in blocks. Direction right, magnitude wrong by an order. **The lesson is the S59.2 one in a new costume: a measured intermediate is not the outcome.** Trace the quantity to the surface Emmett actually reads before quoting a number to him.
+
+### Transition moved and nothing was watching
+
+Of the fourteen fixtures in `tools/`, **only `block_help_golden.json` binds the reach composite**; nothing binds Roll A's length aggregates. (The prompt cited a `fastbreak_oracle.py` that does not exist — the file is `fastbreak_diet_oracle.py` plus a golden, and neither models length. The conclusion held; the citation did not.) Measured: the slot-weighted size aggregate falls 58.61 → 57.96 and the team-vs-team gap narrows, sd 6.22 → 5.25, so size decides marginally less of the four-way disruption split on the break.
+
+### ★ The golden's constants guard had a hole, and it was exactly the one we were about to walk through
+
+`block_help_golden.json` **declares** `LengthHeight` / `LengthWingspan` / `LengthVertical` in its constants block, and the fixture-validity guard checked sixteen other values but **not those three**. A reach-composite change would therefore have sailed past the guard and every one of 1,210 rows would have agreed with a wrong engine — precisely the failure the guard exists to prevent. Closed in the same session: all three are now compared. Re-emitting the golden moved **1,020 of 1,200 rate rows**, which is independent proof the change reaches the block door.
+
+**Worth generalizing:** a guard that checks *some* of what a fixture declares is weaker than it looks, because the unchecked keys are invisible until the day one of them changes. The rule going forward is that every value a fixture stores AND the engine reads belongs in its validity guard.
+
+### A generation finding, flagged not acted on
+
+The archetype scan over the 4,511-man drafted population found **61 springy small men** (hops 85+, small frame) and **7 long flat-footed bigs** (hops ≤35, big frame). The generator's size coefficient on Vertical is −0.02 — hops are essentially height-independent — so **the archetype this change most rewards barely exists yet**. Opened as O-52. Not a block-door problem.
+
+### Process
+
+**The check-in gate held and paid.** Required reads produced a call-graph inventory (five live reach consumers, all intended), a fixture audit, a Phase 74/36 classification, and a Python pre-check that reproduced every ruled number against the live config before a line was edited. Three things went to Emmett before any file changed: the likely block rise, the putback's population breadth, and the golden's guard hole.
+
+**A sequencing reversal, surfaced rather than transcribed.** The status board recorded S81.1's reasoning that the reach questions were "only answerable once the comparison moves" and belonged *inside* the shooter-relative session. This prompt inverted that — reach first, shooter-relative after, so the help arm is measured against corrected reach. Defensible and now ruled, but it was a reversal of a written plan line and was named as one rather than quietly executed. The board is corrected here.
+
+### What is next
+
+**S81.3 — the shooter-relative help arm**, deliberately sequenced after this so it is measured against corrected reach. It absorbs O-44 outright.
+
+---
+
 ## Session 81.1 — THE HELP ARM IS MEASURED AGAINST A FIXED YARDSTICK. A design conversation, no code. Chasing "why do small men block shots" into the block door found that off-ball help compares every defender to a permanent imaginary 50-rated player rather than to the man he is contesting — the no-scalar wall breached in the one place it is hardest to see. Ruled: help compares to the SHOOTER. One change delivers level-relativity with no level flag, shooter height mattering against help, and shooter Finishing mattering against help. Absorbs O-44 entirely and displaces S80 as the next session. Claude proposed a body-set "band" and Emmett rejected it as a scalar under another name. (2026-07-28)
 
 **Register:** design conversation, immediately following the S81 build. **Nothing was built. No engine, config, generator, fixture, page or dial changed.** The artefacts of this session are three rulings and a reframed next-session slot.

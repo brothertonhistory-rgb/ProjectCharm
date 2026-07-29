@@ -70,6 +70,7 @@ public static class DefensiveRebounderPicker
         var postnesses  = new double[5];
         var wingspans   = new double[5];
         var physicals   = new double[5];   // S46: ReboundPhysical per player (body pull)
+        var verticals   = new double[5];   // S81.2: the leap, for the within-team attribution tilt
         var populated   = new bool[5];
         var playerCount = 0;
 
@@ -81,6 +82,7 @@ public static class DefensiveRebounderPicker
             postnesses[i] = Matchup.Postness(p, matchupCfg);
             wingspans[i]  = p.Wingspan;
             physicals[i]  = Matchup.ReboundPhysical(p, matchupCfg);
+            verticals[i]  = p.Vertical;
             populated[i]  = true;
             playerCount++;
         }
@@ -107,6 +109,16 @@ public static class DefensiveRebounderPicker
         for (var i = 0; i < 5; i++)
             if (populated[i]) meanPhysical += physicals[i];
         meanPhysical /= playerCount;
+
+        // S81.2: lineup-mean hops — the leap tilt is TEAMMATE-relative, so this is its
+        // neutral point. Over POPULATED players only (playerCount, never a fixed five),
+        // matching every other mean in this method and the live rebound convention.
+        // Computed ONCE here, BEFORE any candidate weight — a mean recomputed inside the
+        // weight loop would make each weight depend on itself.
+        var meanVertical = 0.0;
+        for (var i = 0; i < 5; i++)
+            if (populated[i]) meanVertical += verticals[i];
+        meanVertical /= playerCount;
 
         // ── Stage 2: compute per-player pick weights ──────────────────────────────
         // weight = Luck + DefensiveRebounding × PositionalWeight(postness)
@@ -148,8 +160,12 @@ public static class DefensiveRebounderPicker
                           * Math.Tanh(Math.Max(0.0, physicals[i] - matchupCfg.ReboundBodyFloorReference)
                                       / matchupCfg.ReboundBodyFloorScale);
 
+            // S81.2: the leap joins the SKILL PRODUCT only — same rule as the offensive
+            // picker. Luck, bodyPull and absFloor stay independent of the rebounding rating.
+            var vm = Matchup.ReboundVerticalMultiplier(verticals[i], meanVertical, matchupCfg);
+
             weights[i]   = matchupCfg.ReboundLuckWeight
-                         + p.DefensiveRebounding * pw * wm * hm
+                         + p.DefensiveRebounding * pw * wm * hm * vm
                          + bodyPull
                          + absFloor;
             totalWeight += weights[i];

@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 81** (2026-07-28; rim help is now gated by WHO A DEFENDER IS GUARDING — his help contribution and block credit scale with how far his own man pulls him from the rim, and the mirror binds equally, so a 6'11" centre chasing a stretch five stops being a rim protector on those possessions. Helper share of rim blocks 68.4% → 63.8%. Blocks 4.4 → 4.3 against a 3.5 target — recorded as a finding, NOT a correction. Opened O-48 (transition assignment), O-49 (rare-event boards want an opportunity floor), O-50 (the shot diet is 52.7% rim). Carries forward the uncommitted S80 §6a gate pass, which opened O-47 and corrected O-45's block-board sentence.. **S81.1 (design conversation, no code):** the off-ball help arm compares every defender to a FIXED MIDPOINT rather than to the man he is contesting — the no-scalar wall breached where it is hardest to see. Ruled: help compares to the SHOOTER. Absorbs O-44 outright and displaces S80 as the next session.)
+Last updated: **Session 81.2** (2026-07-29; the LEAP stops being counted as permanent standing reach. Reach is now 0.45 wingspan / 0.40 height / 0.15 vertical, and the leap gets its own convex, defender-relative term at the rim (0.40), on the second jump (0.80), and on the glass in two layers (individual swing 0.20, team weight 0.05). A 6'11" with a 7'2" span takes the rim back from a 6'6" with 42-inch hops, 12.4 to 7.5; within any fixed body more hops still helps, the SLOPE halves. Closed O-51. O-44 partially re-measured against corrected reach. Opened O-52 (the generator makes almost no long flat-footed bigs). Two findings recorded and NOT tuned toward: rim FG% does not move at all (51.9 → 51.9 — a relative term cancels league-wide), and blocks rise 4.3 → 4.4 because de-weighting the leap raises everyone's reach against a fixed bar. Suite `ALL CHECKS PASSED` on Emmett's machine.)
 
 ## Current baseline
 
@@ -52,6 +52,24 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **S81.2 — what a vertical leap is worth (engine + config).** `Matchup.VerticalShift` (the convex
+  defender-relative primitive, weight OUTSIDE `GapFn`) applied at exactly two sites — ordinary Rim at
+  `RimVerticalWeight 0.40` and putbacks at `PutbackVerticalWeight 0.80` — deliberately NOT inside
+  `EffectiveRating`, which runs for every zone. `Matchup.ReboundVerticalMultiplier` joins the skill
+  product in both rebounder pickers (`ReboundVerticalSwing 0.20`, teammate-relative), and a team-vs-team
+  gap joins `totalShift` in `OffensiveReboundShare` (`ReboundVerticalTeamWeight 0.05`). Reach weights
+  retuned to 0.45 / 0.40 / 0.15 with an ordering guard ADDED on top of the kept sum-to-one guard.
+  Null-defender fallbacks preserved byte-identical on both make paths. New Phase 75 (isolation sweep
+  first, three neutral points kept separate, strict picker monotonicity with full preconditions, all
+  five config guards). **Acceptance test:** the tall long man out-protects the rim over the short
+  explosive one, 12.38 vs 7.45, skill/readiness/assignment/shooter held identical. **Within one fixed
+  body more hops STILL helps** — 12.16% → 13.97% — the slope halves (4.54 → 1.82 pts), the sign does not
+  move. Stage-1 population gate run before any scale was trusted: rim term is a tail effect (6.5% of
+  shots move >2 pts), putback broader (23.5%). Rebound gain decomposed on a four-way grid — no
+  interaction, essentially all of it the individual layer. **Also closed a hole in Phase 74's fixture
+  guard**: the golden declared the three reach weights and never checked them, so a reach change would
+  have sailed past it with all 1,210 rows agreeing with a wrong engine.
 
 - **S81 — rim help is gated by assignment (engine).** `Matchup.BlockSpacing` /
   `BlockAssignmentGate` / `BlockEffectiveGate` / `BlockAssignedMan`, consumed in exactly two places
@@ -314,7 +332,8 @@ chart is PROVISIONAL pending O-6.
   longer glued to one man — **without** modelling time inside a possession, which was by far the largest
   build discussed.
 
-- **O-44 — ABSORBED INTO THE S81.1 SHOOTER-RELATIVE CHANGE (2026-07-28). Do not take separately.**
+- **O-44 — ABSORBED INTO THE SHOOTER-RELATIVE CHANGE (S81.1). Do not take separately.**
+  **★ PARTIALLY RE-MEASURED at S81.2 (2026-07-29): the spread below is now STALE and the gap it describes is WIDER, not narrower.** Against corrected reach the length median moves 59.7 → 60.9 and the share above the fixed bar of 50 goes 86.2% → 87.6%, because hops sit ~20 rating points below height and wingspan so de-weighting them RAISES everyone's reach number. Mean length-arm threat is up 19.9%. The fixed-midpoint half is still the S81.3 job; only its magnitude has been re-taken.
   A neutral point that 83% of the league sits below is what a FIXED YARDSTICK produces. `BlockDefenderThreat`
   measures every helper against `AttributeMidpoint`, a constant — so re-siting the bar treats the symptom and
   leaves the cause. Once help compares to the shooter, the bar moves with the matchup and the question this
@@ -440,20 +459,21 @@ chart is PROVISIONAL pending O-6.
   **When this settles, revisit S81's spacing score** — the arc-share read becomes correct and drops in
   behind the same lookup with no call-shape change.
 
-- **★ O-51 — "LENGTH" COUNTS HOPS AS REACH AT FULL WEIGHT (S81.1 measurement; belongs INSIDE the
-  shooter-relative session, not separately).**
-  `LengthRating` is Height, Wingspan and Vertical at **exactly one third each**. Measured: the same
-  6'0" guard with a 6'1" wingspan and a 99 rim-protection rating helps at **2.50 with average hops and
-  4.86 with 40-inch hops** — vertical alone nearly doubles him, and is presently worth more than four
-  inches of wingspan. **This is plausibly most of the original small-man block complaint**, and it was
-  found by asking what "length" means rather than by looking where the complaint pointed.
-  **Two questions, both ruled OPEN on purpose:** (a) wingspan should outweigh height — Emmett's read is
-  that what matters is where the hand ends up, and height matters mostly because it is where the arms
-  are attached; (b) whether vertical belongs in reach at all, or whether its real value is separate —
-  the second jump, the recovery, the chase-down from behind.
-  **Why not settled now:** both only become answerable once the comparison is against something that
-  moves. Take them after the shooter-relative change lands, in the same session, measured against the
-  new behaviour.
+- **O-51 — CLOSED, SHIPPED IN S81.2 (2026-07-29).** Both questions ruled and built. Wingspan now
+  outweighs height (0.45 / 0.40) and the leap keeps 0.15 of reach — a small strictly positive share, so
+  within any fixed body more hops still helps a defender block; what falls is the slope. The leap's real
+  value moved to its own terms: the rim (0.40), the second jump (0.80), and the glass in two layers.
+  Sequenced BEFORE the shooter-relative change rather than inside it, reversing S81.1's plan line, so
+  the help arm is measured against corrected reach.
+
+- **★ O-52 — THE GENERATOR MAKES ALMOST NO LONG FLAT-FOOTED BIGS (S81.2 measurement; documentation
+  only, NOT acted on).** Scanning the 4,511-man drafted population for the two archetypes S81.2's change
+  most affects found **61 springy small men** (hops 85+, small frame) and **7 long flat-footed bigs**
+  (hops ≤35, big frame). `PlayerGenPass3.SIZE_COEF["Vertical"] = -0.02` — hops are essentially
+  height-independent in generation, so a 7'0" with a 20-inch vertical is nearly as rare as one with a
+  40-inch vertical. **The archetype S81.2 most rewards barely exists yet**, which caps how much of the
+  change the league can express. Belongs with the generation arc, not the block door. Emmett's call.
+
 
 ## Parked — waiting on a named prerequisite
 
@@ -551,8 +571,9 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**S81.2 — the help arm compares to the SHOOTER.** Ruled in full at S81.1 (see journal and design);
-the basketball is settled and only the build remains.
+**S81.3 — the help arm compares to the SHOOTER.** Ruled in full at S81.1 (see journal and design);
+the basketball is settled and only the build remains. **Renumbered from S81.2**, which took the reach
+composite first so this is measured against corrected reach.
 
 **The defect:** `BlockDuelShift` (on the ball) reads both terms as differences against *this shooter*.
 `BlockDefenderThreat` (every helper) reads both terms against `AttributeMidpoint`, a **constant**. The
@@ -565,8 +586,13 @@ level flag; the shooter's HEIGHT reducing help block odds; the shooter's FINISHI
 odds independently of make%. Rulings 2 and 3 need no extra work — `OffenseRating(Rim)` is already
 Finishing and `LengthRating(shooter)` is already computed on the on-ball side.
 
-**Take O-51 inside this session** (wingspan-over-height, and whether vertical belongs in reach at all).
-Both only become answerable once the comparison moves, and both point at the same door.
+**O-51 is CLOSED — it shipped in S81.2, ahead of this rather than inside it.** S81.1 reasoned that the
+reach questions were only answerable once the comparison moved; the reversal was ruled explicitly, on
+the argument that the help arm should be measured against a corrected reach composite rather than the
+other way round. **Consequence for this session: its baseline is the S81.2 tree, not the S81 one.**
+Reach now reads 0.45 wingspan / 0.40 height / 0.15 vertical, the league's length median sits at 60.9
+rather than 59.7, and 87.6% of the league is above the fixed bar — so the fixed-midpoint defect this
+session fixes is slightly WIDER than O-44's original numbers describe.
 
 **Absorbs O-44 outright** — do not schedule it separately.
 

@@ -169,11 +169,20 @@ public sealed class RollHGenerator : IRollHPieGenerator
             var pbDefenderSlot = DefenderPicker.PickForOffensiveSlot(state, reboundSlot.Value);
             var pbDefender     = _game.RosterFor(state.Defense).PlayerAt(pbDefenderSlot);
 
+            // S81.2 — the second jump is the most vertical act in basketball, so the leap's own
+            // term is applied here at DOUBLE the ordinary rim weight. It rides INSIDE the
+            // effective rating and is therefore consumed by MakeProbability below; the flat
+            // PutbackMakePenalty is subtracted AFTERWARD, unchanged. The leap is part of the
+            // physical shot contest; the penalty is the separate difficulty of going straight
+            // back up. The empty-slot ternary is untouched — a defender-relative term cannot
+            // exist without a defender, so the raw-rating fallback keeps its exact old value.
             var pbEffectiveRating = pbDefender is null
                 ? Matchup.OffenseRating(ShotLocation.Rim, rebounder)
                 : Matchup.EffectiveRating(ShotLocation.Rim, rebounder, pbDefender, _matchup,
                       _game.Fatigue.EffectiveAthleticism(rebounder,  isDefense: false),
-                      _game.Fatigue.EffectiveAthleticism(pbDefender, isDefense: true));
+                      _game.Fatigue.EffectiveAthleticism(pbDefender, isDefense: true))
+                  + Matchup.VerticalShift(rebounder, pbDefender,
+                                          _matchup.PutbackVerticalWeight, _matchup);
 
             var pbRimMakePct   = _cfg.MakeProbability(ShotLocation.Rim, pbEffectiveRating);
             var putbackMakePct = Math.Clamp(pbRimMakePct - _cfg.PutbackMakePenalty, 0.0, 1.0);
@@ -232,11 +241,22 @@ public sealed class RollHGenerator : IRollHPieGenerator
         var defenderSlot = DefenderPicker.Pick(state);
         var defender     = _game.RosterFor(state.Defense).PlayerAt(defenderSlot);
 
+        // S81.2 — the leap's own term, RIM ONLY. Vertical already pays a fifth-share through
+        // Athleticism inside EffectiveRating, but averaged with four other physicals before the
+        // convex curve sees it, so a huge hops advantage arrives as a small athletic edge. This
+        // restores the convexity where elevating over a man is what the shot IS, and is fenced
+        // to the Rim by the ternary below rather than added inside EffectiveRating — that
+        // function runs for every zone and an unfenced term would make leapers shoot better
+        // from three. The empty-slot fallback is untouched: no defender, no defender-relative
+        // term, same raw rating as before.
         var effectiveRating = defender is null
             ? Matchup.OffenseRating(zone, player)
             : Matchup.EffectiveRating(zone, player, defender, _matchup,
                   _game.Fatigue.EffectiveAthleticism(player,   isDefense: false),
-                  _game.Fatigue.EffectiveAthleticism(defender, isDefense: true));
+                  _game.Fatigue.EffectiveAthleticism(defender, isDefense: true))
+              + (zone == ShotLocation.Rim
+                  ? Matchup.VerticalShift(player, defender, _matchup.RimVerticalWeight, _matchup)
+                  : 0.0);
 
         var makePct = _cfg.MakeProbability(zone, effectiveRating);
 
