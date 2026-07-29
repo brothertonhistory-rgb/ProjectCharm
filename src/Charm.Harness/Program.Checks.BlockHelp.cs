@@ -25,12 +25,24 @@ namespace Charm.Harness;
 
 internal static partial class Program
 {
-    /// <summary>The config fingerprint both S81.3 fixtures carry: the settings file's
+    /// <summary>The config fingerprint the S81.3 fixtures carry: the settings file's
     /// Matchup section, keys sorted ordinal, one "name=&lt;raw json token&gt;" line each,
     /// SHA-256. Raw token text is hashed rather than parsed numbers so the C# emission and
     /// the Python oracle cannot diverge on number formatting. A fixture emitted against
     /// different constants would make every row agree with a WRONG engine — that is the
-    /// failure this exists to prevent.</summary>
+    /// failure this exists to prevent.
+    ///
+    /// <para><b>The fingerprint is WHOLE-SECTION on purpose, and that is coarse.</b> It
+    /// covers every Matchup key, including keys the block door never reads — so a change
+    /// anywhere in the section invalidates fixtures that did not actually depend on it.
+    /// S83 was the first time this bit: it moved five Height dials that feed the MAKE door
+    /// only. The fixtures' saved values were re-verified as unchanged and only the
+    /// fingerprint label was re-stamped; not one saved number was regenerated, so
+    /// block_credit_preedit_golden.json remains the pre-edit emission it was built to be.
+    /// The alternative — narrowing the hash to the keys the block path actually reads —
+    /// was rejected as the riskier fix: it needs an exhaustive read-site audit, and a list
+    /// that silently misses one key turns a loud guard into a quiet lie. Coarse and
+    /// occasionally annoying beats narrow and wrong. Revisit if the re-stamp ritual recurs.</para></summary>
     private static string ConfigSectionFingerprint(string configPath)
     {
         using var doc = JsonDocument.Parse(File.ReadAllText(configPath));

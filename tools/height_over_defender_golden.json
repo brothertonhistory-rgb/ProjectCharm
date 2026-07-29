@@ -1,12 +1,12 @@
 {
   "constants": {
-    "HeightMaxBonus": 15.0,
+    "HeightMaxBonus": 110.0,
     "HeightReferenceScale": 18.0,
     "HeightZoneWeight": {
       "Rim": 1.0,
-      "Short": 0.8,
-      "Mid": 0.3,
-      "Long": 0.05,
+      "Short": 0.109090909090909,
+      "Mid": 0.040909090909091,
+      "Long": 0.006818181818182,
       "Three": 0.0
     }
   },
@@ -26,9 +26,9 @@
       "defender_ath": 70,
       "shooter_reach": 92.0,
       "defender_reach": 40.0,
-      "effective_rating": 53.40741898699568,
-      "make_probability": 0.6177240532079283,
-      "make_delta_vs_no_term": 0.03327548857212914
+      "effective_rating": 147.8210725713016,
+      "make_probability": 0.8165244385933559,
+      "make_delta_vs_no_term": 0.2320758739575567
     },
     {
       "archetype": "BIG_ON_GUARD",
@@ -41,9 +41,9 @@
       "defender_ath": 70,
       "shooter_reach": 92.0,
       "defender_reach": 40.0,
-      "effective_rating": 50.425935189596544,
-      "make_probability": 0.43072694288839924,
-      "make_delta_vs_no_term": 0.020381520921538
+      "effective_rating": 50.42593518959653,
+      "make_probability": 0.4307269428883992,
+      "make_delta_vs_no_term": 0.020381520921537943
     },
     {
       "archetype": "BIG_ON_GUARD",
@@ -56,7 +56,7 @@
       "defender_ath": 70,
       "shooter_reach": 92.0,
       "defender_reach": 40.0,
-      "effective_rating": 42.972225696098704,
+      "effective_rating": 42.97222569609871,
       "make_probability": 0.38130760871759967,
       "make_delta_vs_no_term": 0.0055400720628849265
     },
@@ -71,9 +71,9 @@
       "defender_ath": 70,
       "shooter_reach": 92.0,
       "defender_reach": 40.0,
-      "effective_rating": 39.245370949349784,
-      "make_probability": 0.34846806590635626,
-      "make_delta_vs_no_term": 0.0007878940757978237
+      "effective_rating": 39.245370949349805,
+      "make_probability": 0.3484680659063563,
+      "make_delta_vs_no_term": 0.0007878940757978792
     },
     {
       "archetype": "BIG_ON_GUARD",
@@ -101,9 +101,9 @@
       "defender_ath": 50,
       "shooter_reach": 86.5,
       "defender_reach": 75.0,
-      "effective_rating": 58.46213802846455,
-      "make_probability": 0.6292751818947379,
-      "make_delta_vs_no_term": 0.01927518189473787
+      "effective_rating": 112.05567887540667,
+      "make_probability": 0.7497577778235758,
+      "make_delta_vs_no_term": 0.1397577778235758
     },
     {
       "archetype": "TALLER_CENTER",
@@ -116,7 +116,7 @@
       "defender_ath": 50,
       "shooter_reach": 86.5,
       "defender_reach": 75.0,
-      "effective_rating": 56.76971042277164,
+      "effective_rating": 56.76971042277163,
       "make_probability": 0.44152939319552076,
       "make_delta_vs_no_term": 0.011529393195520765
     },
@@ -131,7 +131,7 @@
       "defender_ath": 50,
       "shooter_reach": 86.5,
       "defender_reach": 75.0,
-      "effective_rating": 52.53864140853936,
+      "effective_rating": 52.53864140853937,
       "make_probability": 0.3931329758746458,
       "make_delta_vs_no_term": 0.003132975874645727
     },
@@ -146,7 +146,7 @@
       "defender_ath": 50,
       "shooter_reach": 86.5,
       "defender_reach": 75.0,
-      "effective_rating": 50.423106901423225,
+      "effective_rating": 50.42310690142324,
       "make_probability": 0.3604594279391683,
       "make_delta_vs_no_term": 0.00045942793916831093
     },
@@ -176,9 +176,9 @@
       "defender_ath": 60,
       "shooter_reach": 64.0,
       "defender_reach": 47.0,
-      "effective_rating": 61.0588637140758,
-      "make_probability": 0.6352426691613342,
-      "make_delta_vs_no_term": 0.02524266916133422
+      "effective_rating": 131.0983339032225,
+      "make_probability": 0.7873173008203496,
+      "make_delta_vs_no_term": 0.17731730082034958
     },
     {
       "archetype": "TALL_WING",
@@ -191,7 +191,7 @@
       "defender_ath": 60,
       "shooter_reach": 64.0,
       "defender_reach": 47.0,
-      "effective_rating": 58.84709097126064,
+      "effective_rating": 58.84709097126063,
       "make_probability": 0.4450537932979137,
       "make_delta_vs_no_term": 0.015053793297913731
     },
@@ -206,7 +206,7 @@
       "defender_ath": 60,
       "shooter_reach": 64.0,
       "defender_reach": 47.0,
-      "effective_rating": 53.31765911422274,
+      "effective_rating": 53.31765911422275,
       "make_probability": 0.3940934020054226,
       "make_delta_vs_no_term": 0.0040934020054225195
     },
@@ -221,9 +221,9 @@
       "defender_ath": 60,
       "shooter_reach": 64.0,
       "defender_reach": 47.0,
-      "effective_rating": 50.55294318570379,
-      "make_probability": 0.3606004892476243,
-      "make_delta_vs_no_term": 0.0006004892476242918
+      "effective_rating": 50.5529431857038,
+      "make_probability": 0.36060048924762433,
+      "make_delta_vs_no_term": 0.0006004892476243473
     },
     {
       "archetype": "TALL_WING",
@@ -326,9 +326,9 @@
       "defender_ath": 45,
       "shooter_reach": 41.0,
       "defender_reach": 92.0,
-      "effective_rating": 61.5,
-      "make_probability": 0.6362581991572147,
-      "make_delta_vs_no_term": 0.0
+      "effective_rating": -47.741560713656014,
+      "make_probability": 0.4404651264494138,
+      "make_delta_vs_no_term": -0.19579307270780089
     },
     {
       "archetype": "SMALL_ON_BIG",
@@ -341,9 +341,9 @@
       "defender_ath": 45,
       "shooter_reach": 41.0,
       "defender_reach": 92.0,
-      "effective_rating": 61.5,
-      "make_probability": 0.44954250511196964,
-      "make_delta_vs_no_term": 0.0
+      "effective_rating": 49.582738831237535,
+      "make_probability": 0.4292877114431163,
+      "make_delta_vs_no_term": -0.020254793668853355
     },
     {
       "archetype": "SMALL_ON_BIG",
@@ -356,9 +356,9 @@
       "defender_ath": 45,
       "shooter_reach": 41.0,
       "defender_reach": 92.0,
-      "effective_rating": 61.5,
-      "make_probability": 0.404146443912273,
-      "make_delta_vs_no_term": 0.0
+      "effective_rating": 57.03102706171406,
+      "make_probability": 0.3986642278038487,
+      "make_delta_vs_no_term": -0.005482216108424309
     },
     {
       "archetype": "SMALL_ON_BIG",
@@ -371,9 +371,9 @@
       "defender_ath": 45,
       "shooter_reach": 41.0,
       "defender_reach": 92.0,
-      "effective_rating": 61.5,
-      "make_probability": 0.3726141540348147,
-      "make_delta_vs_no_term": 0.0
+      "effective_rating": 60.755171176952324,
+      "make_probability": 0.3717900236393672,
+      "make_delta_vs_no_term": -0.0008241303954474866
     },
     {
       "archetype": "SMALL_ON_BIG",

@@ -3029,15 +3029,22 @@ Roll E so every door in a possession shares one coherent pick.
   baseline and the result is fed to the **unchanged** make-curve. A contest is a shooter sliding up or
   down the shared scale — never a reshaping of the curve.
 - `HeightOverDefenderShift(zone, attacker, defender, cfg)` + `Reach(player)` — **the fourth shift
-  (Session 55): a one-sided, zone-weighted, saturating reach advantage.**
-  `heightShift = HeightZoneWeight(zone) × HeightMaxBonus × tanh(max(0, shooterReach − defenderReach) /
+  (Session 55; SIGNED since S83): a two-sided, zone-weighted, saturating reach term.**
+  `heightShift = HeightZoneWeight(zone) × HeightMaxBonus × tanh((shooterReach − defenderReach) /
   HeightReferenceScale)`, with standing reach `(Height + Wingspan) / 2.0` (float divide on purpose —
   both are int ratings, so an odd sum like 85+88 is 86.5; `Reach` is the single source of the read).
-  Design shape, signed on the S54 archetype table: **one-sided** — it rewards the taller shooter and is
-  exactly zero for the equal or shorter one (defensive length already erases shots through the block
-  channel; the symmetric negative side is a parked v2 call); **zone-weighted** — Rim 1.0 / Short 0.8 /
-  Mid 0.3 / Long 0.05 / Three 0.0, so size scores most at the rim and not at all on a set three;
-  **tanh-saturating** — an extreme mismatch approaches but never exceeds `HeightMaxBonus × zoneWeight`
+  Design shape, signed on the S54 archetype table and revised by Emmett's S83 ruling: **two-sided and
+  symmetric** — it rewards the shooter with the greater reach and docks the shooter with the lesser one
+  **by the same curve**. v1 clamped the gap at zero on the theory that the block channel already handled
+  the undersized shooter; S82's measurement showed it did not, and a 5'10" finisher was outshooting a
+  6'8" one at the rim. Emmett: *"I think an inverse relationship makes sense to start. We don't want the
+  guards who can finish to be worthless."* The symmetry is the **oddness of tanh**, not a branch —
+  removing the `max(0, …)` is the entire implementation, and `shift(+g) == −shift(−g)` falls out of the
+  function. There is deliberately **no second constant, no asymmetric exponent and no separate
+  negative-side scale**; **zone-weighted** — the *absolute* magnitudes are Rim 110 / Short 12 / Mid 4.5 /
+  Long 0.75 / Three 0, so size scores most at the rim and neither helps nor hurts on a set three;
+  **tanh-saturating in both directions** — an extreme mismatch approaches but never reaches
+  `±(HeightMaxBonus × zoneWeight)`
   (unlike `GapFn`, which is deliberately uncapped — this term carries its own ceiling because reach gaps,
   unlike skill gaps, have a hard physical meaning). Deliberately **not** `LengthRating` (which folds in
   Vertical for the block door); Vertical-in-reach is parked. Because the 4-arg overload delegates to the
@@ -3048,12 +3055,38 @@ Roll E so every door in a possession shares one coherent pick.
   `Matchup` section** — `HeightMaxBonus`, `HeightReferenceScale`, and the five zone weights
   `HeightWeightRim` / `Short` / `Mid` / `Long` / `Three`, written explicitly since **S74**. Before that
   the settings file carried no key for any of them: the compiled defaults were the live values, and the
-  `HeightMaxBonus = 0` kill switch was reachable only by hand-adding the key. `Load` validation is **range-only**
+  `HeightMaxBonus = 0` kill switch was reachable only by hand-adding the key.
+
+  **S83 live values, and why the magnitude routes through `HeightMaxBonus`.** Setting F from the sized
+  archetype table put the rim magnitude at **110 rating points**. `Load` forbids a zone weight above 1.0,
+  so the rim's rise cannot be spent on `HeightWeightRim` (already 1.0) — it is spent on `HeightMaxBonus`
+  (15.0 → 110.0) with the three non-rim weights divided by the same 110/15 (Short 0.8 → 0.109090909090909,
+  Mid 0.3 → 0.040909090909091, Long 0.05 → 0.006818181818182). Each non-rim zone's **absolute magnitude
+  is therefore unchanged**, which is what makes the non-rim season movement readable as the new penalty
+  arm rather than a rescaling artifact. An engineering call, reversible, and asserted rather than merely
+  commented: Phase 61 §(4) proves `zoneWeight × HeightMaxBonus` is within 1e-12 of its v1 product at
+  Short/Mid/Long, with a negative control that perturbs a weight and confirms the check rejects it. The
+  **compiled defaults stay at the Session 55 numbers** — config.json is where a ruling lives, and a
+  default chasing every tuning pass would erase the difference between "never touched" and "deliberately
+  moved." Phase 71 Arm 6 therefore checks the eight untuned dials against the class defaults and the four
+  S83-tuned dials against their **ruled** values.
+
+  `Load` validation is **range-only**
   (MaxBonus ≥ 0 with **0 a legal kill switch**, ReferenceScale > 0, each weight in [0,1]) — deliberately
   no monotonic-zone enforcement, so era experiments can reshape the profile. Proven by the Phase 61
   golden parity (25 cases vs `tools/height_over_defender_oracle.py`, dual tolerance 1e-6 rating /
-  1e-9 make%, the exact-zero set on the height *contribution*, Long small-positive as the
-  `HeightWeightLong` wire-proof) plus helper and config-guard tests.
+  1e-9 make%, the exact-zero set on the height *contribution* now being **equal reach and Three only**,
+  SMALL_ON_BIG re-signed as the penalty arm, Long following the **sign of the gap** as the
+  `HeightWeightLong` wire-proof), the S83 signed probes (symmetry to 1e-12 at every zone, monotone in
+  |gap| on both arms, open asymptote on both arms, Three exactly zero for either sign, kill switch zero
+  on both arms), the positive-side preservation block, and the config-guard tests.
+
+  **No ceiling is imposed on the extreme.** Emmett's S83 ruling, on seeing the stress bench read 87.4%
+  for a max-Finishing big in a frozen best-case matchup against the real world's 77–79% season mark:
+  *"The engine should allow for the absurd extremes. If I put an all american team against the worst team
+  possible, it should 'break' the engine so to speak."* The real-world mark is a **season** figure earned
+  against a schedule of varied opponents; a single fixed favourable matchup is allowed to run past it.
+  The bench prints the number and asserts only the ordering — see `Program.Checks.ReachBench.cs`.
 
 ### DEC-5 — the gap function is a signed power law
 

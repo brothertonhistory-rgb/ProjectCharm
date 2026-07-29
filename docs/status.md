@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 81.3** (2026-07-29; off-ball help stops being measured against a permanent imaginary 50-rated player and is measured against the man actually shooting. Both arms move together onto the same two reads the on-ball duel already used, so the block door carries one rule instead of two. The same lineup now helps 21.17 against a D3-calibre shooter and 0.58 against a high-major one, where before it was one number forever. Block CREDIT deliberately did NOT move and is proved byte-identical against two independent witnesses. ★ THE BUILD PROMPT'S HEADLINE TABLE WAS TRANSPOSED — rim and three swapped, short and long swapped — so the session's expected direction was backwards: rim help RISES 7.0% and it is THREE-point help that falls 28.9%. League blocks therefore go slightly UP (45,320 -> 45,734 credited, 4.4/team unchanged against a 3.5 target) and NOTHING was tuned. Closed O-44. Opened O-53. Suite `ALL CHECKS PASSED` and the season page verified on Emmett's machine.)
+Last updated: **Session 83** (2026-07-29; the make door's reach term becomes TWO-SIDED. The undersized shooter now pays exactly the curve the oversized shooter is paid — the symmetry is the oddness of tanh, not a branch, so removing v1's `max(0, …)` clamp is the entire implementation. Rim magnitude 15 -> 110 rating points (Setting F), routed through `HeightMaxBonus` because `Load` forbids a zone weight above 1.0, with the three non-rim weights divided by the same 110/15 so their absolute magnitudes are UNCHANGED. The ordering defect is fixed: a 5'10" Finishing-98 guard was converting 81.2% at the rim against a median protector where a 6'8" Finishing-57 big managed 66.6%; now 71.7% vs 76.4%. League rim FG% 51.9 -> 53.1 and overall FG% crosses into its calibration band for the first time (42.6 -> 43.1, target 44.0 +/-1.0). Top-ten field-goal shooters go from six bigs to eight, led by a 7'1" centre at 75.9% against a real-world 77-79% mark. ★ THREE EXISTING SUITE CHECKS ENCODED THE OLD LAW and the build prompt named NONE of them — found by applying the change in a scratch tree and running the whole suite at the check-in gate, not by reasoning about which checks looked related. Mid FG% moved the WRONG WAY (+0.2 against an expected -0.1) and was named, not chased. Opened C-30, O-54, O-55. Suite `ALL CHECKS PASSED`, bench and season verified on Emmett's machine.)
 
 ## Current baseline
 
@@ -52,6 +52,20 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **S83 — the reach term becomes two-sided (engine + config + three rewritten checks + a new bench).**
+  `Matchup.HeightOverDefenderShift` drops v1's `max(0, …)` clamp, so the make door's reach term is SIGNED:
+  the shorter shooter is docked by the same curve the taller one is paid. No second constant, no asymmetric
+  exponent, no separate negative arm — `tanh` is odd and supplies the mirror. Four config values: rim
+  magnitude 15.0 -> 110.0 via `HeightMaxBonus`, with Short/Mid/Long weights divided by 110/15 so every
+  non-rim zone's ABSOLUTE magnitude is unchanged (asserted at 1e-12 with a negative control, not claimed in
+  a comment). Compiled class defaults deliberately left at the S55 numbers. Phase 61 rewritten (exact-zero
+  set now equal-reach and Three only; SMALL_ON_BIG re-signed as the penalty arm; Long follows the sign of
+  the gap; new signed probes for symmetry, both-arm monotonicity, both-arm asymptote and both-arm kill
+  switch; a positive-side preservation block). Phase 71 Arm 6 split into eight-against-defaults and
+  four-against-the-ruling. Phase 74's whole-section config fingerprint re-stamped on three fixtures —
+  label only, not one saved number regenerated. New `reachbench` CLI instrument, NOT in the suite.
+  Block and foul proved bit-identical pre-to-post at every bench row (sandbox rung — see O-55).
 
 - **S81.3 — the help arm compares to the shooter (engine + oracle + fixtures).** `Matchup.BlockHelpThreat`
   and `Matchup.BlockHelpShiftVsShooter` are new beside the untouched neutral pair, so the rate/credit wall is
@@ -483,6 +497,29 @@ chart is PROVISIONAL pending O-6.
   legitimately justify a different shape from a located jumper contested by one man with help. Not scoped, not
   urgent, and NOT a bug — recorded so the divergence is a decision rather than an accident.
 
+- **O-54 — MID FG% MOVED THE WRONG WAY AT S83, AND IT IS UNEXPLAINED.** The signed term docks
+  undersized shooters at Mid, so mid FG% was expected to fall about a tenth. It ROSE 40.0 -> 40.2
+  while mid attempts rose 54,125 -> 54,420 and rim attempts fell. Mid is the thinnest slice of the
+  term (4.5 rating points at full saturation, on the shallowest make curve in the engine), so an
+  ecology shift plausibly outweighs it — but "plausibly" is not measured. The per-attempt maths is
+  proven (Phase 61 §4: the positive side is preserved to 1e-12 and the negative side is new by
+  design), so this is a WHO-SHOOTS-WHAT question, not a wiring one. Worth a counterfactual read at
+  the next calibration session; NOT worth a dial today. Nothing was tuned toward it.
+
+- **O-55 — THE BLOCK/FOUL NO-LEAK PROOF IS ONE RUNG SHORT ON EMMETT'S MACHINE.** The bench asserts
+  block and foul are bit-identical pre-to-post at every row — the proof that a make-door change did
+  not leak into the block door through the shared body attributes. It needs the pre-change bench's
+  `reach_bench.tsv` passed as a third argument, and the delivered command omitted it, so the check
+  ran green in the sandbox only. The property is at the MIDDLE rung (compiled + ran in-sandbox), not
+  the top one. Cheap to close: keep a pre-change tree, or commit the pre-change tsv as a fixture.
+
+- **O-56 — THE 6'8"+ RIM-FINISHER LEADERBOARD CANNOT BE READ.** S83's prompt predicted 6'8"+ men in
+  the top 50 RIM finishers going 6 -> ~41, and the season page prints no rim-only leaderboard, so the
+  prediction could not be checked either way. The overall FG% board is a different cut (it went from
+  six bigs in the top ten to eight, led by a 7'1" centre at 75.9%). Recorded as UNMEASURED rather
+  than substituted for. A per-zone shooting board is a small season-page addition whenever the next
+  page session opens.
+
 ## Parked — waiting on a named prerequisite
 
 
@@ -516,6 +553,19 @@ chart is PROVISIONAL pending O-6.
   Player data layer at 21k+ actives; moddability. (working-with-emmett §7)
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
+
+- **C-30 — THE ENGINE MAY BREAK AT THE ABSURD EXTREME; no artificial ceiling is imposed on a
+  mismatch (Emmett's ruling, 2026-07-29).** S83's stress bench read 87.4% for a max-Finishing 6'8"
+  finisher in a frozen best-case matchup, against a real-world two-season D1 mark of 77-79%. The
+  bench's hard ceiling was therefore red — and had been red at 82.6% BEFORE the change too, which is
+  the tell that the bar could never have held on that instrument. Emmett: *"The engine should allow
+  for the absurd extremes. If I put an all american team against the worst team possible, it should
+  'break' the engine so to speak."* The real-world figure is a SEASON number earned against a
+  schedule of varied opponents; one fixed favourable matchup is allowed to run past it. The
+  assertion was **removed, not loosened** — the number is printed with the ruling recorded beside it
+  and only the ORDERING is asserted. Consequence recorded so it is not read as a defect: extreme
+  size mismatches will produce extreme shooting numbers, at both ends, by design. Do not "fix" this
+  by capping the term. The place to read a real-world shooting mark is the season page.
 
 - **C-28 — A big who cannot guard the perimeter is as legitimate as a guard who cannot protect the
   rim; the shared defensive bid pair is INTENDED (Emmett's ruling, 2026-07-27).** `PlayerGenPass3`
@@ -579,121 +629,12 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**S81.3 — the help arm compares to the SHOOTER.** Ruled in full at S81.1 (see journal and design);
-the basketball is settled and only the build remains. **Renumbered from S81.2**, which took the reach
-composite first so this is measured against corrected reach.
+**NONE SELECTED.** S83 shipped and the board has three fresh open items (O-54, O-55, O-56), none of
+which is a session on its own. The standing candidates are unchanged: **O-40** (block-rate calibration,
+blocks 4.4 against a 3.5 target), **O-42** (lineup shape), **O-43** (the on-ball blend), **O-45** (the
+half-finished S78 engine half), **O-50** (shot diet), and the **player generator's finishing budget** —
+which S83 named as the reason the leaderboard stops where it does (the tallest bands still median
+Finishing 37, best 57). That last one opens with a design question, not a number: the generator spends a
+fixed budget, so "more finishing" is "less of something else," and Emmett has not ruled which.
 
-**The defect:** `BlockDuelShift` (on the ball) reads both terms as differences against *this shooter*.
-`BlockDefenderThreat` (every helper) reads both terms against `AttributeMidpoint`, a **constant**. The
-on-ball contest is a matchup; the help arm is a rating against a fixed yardstick. That is the no-scalar
-wall breached in the one place it is hardest to see, and it means a D3 seven-footer helps identically in
-D3 and in the Big Ten.
-
-**The change delivers three separately-requested behaviours from one edit:** level-relativity with no
-level flag; the shooter's HEIGHT reducing help block odds; the shooter's FINISHING reducing help block
-odds independently of make%. Rulings 2 and 3 need no extra work — `OffenseRating(Rim)` is already
-Finishing and `LengthRating(shooter)` is already computed on the on-ball side.
-
-**O-51 is CLOSED — it shipped in S81.2, ahead of this rather than inside it.** S81.1 reasoned that the
-reach questions were only answerable once the comparison moved; the reversal was ruled explicitly, on
-the argument that the help arm should be measured against a corrected reach composite rather than the
-other way round. **Consequence for this session: its baseline is the S81.2 tree, not the S81 one.**
-Reach now reads 0.45 wingspan / 0.40 height / 0.15 vertical, the league's length median sits at 60.9
-rather than 59.7, and 87.6% of the league is above the fixed bar — so the fixed-midpoint defect this
-session fixes is slightly WIDER than O-44's original numbers describe.
-
-**Absorbs O-44 outright** — do not schedule it separately.
-
-**Why it displaces S80:** S80 changes what ratings players are BORN with; this changes what a rating is
-ALLOWED TO DO once he has it. This one is contained to the block door, touches no generation, waits on no
-moving population, and closes an open item. S80 stays approved and moves to second.
-
-**Expected side effect, name it in the prompt before measuring:** league blocks read **4.3 against a 3.5
-target** and S81 explicitly could not move that (the entire help arm is worth ~1.3 points of a ~2-point
-matchup effect on a 12% base). This change reaches the quantity that actually drives block totals and
-should move it. **If it does not, that is a finding about the block door's base rate**, not about this
-change — and it points at O-50 (52.7% of shots are at the rim) as the remaining suspect.
-
-**Guard the build against a size nerf.** Measured today, a 7'0"/7'5"-span defender with a ZERO
-rim-protection rating helps at 1.6x an ordinary 6'8" and outhelps a 6'0" guard with a 99. **That is
-correct basketball and must survive** — Emmett's D3 big is dominant because he is the tallest man out
-there, and the change must only make that advantage shrink when the floor gets bigger, never invert.
-
----
-
-**Second: S80 — the interior-defence bid.** Emmett ruled the basketball at S79.2 (C-28, the symmetric
-mirror), so the design question is settled and only the build remains. **The S80 prompt as written must be
-redrafted first** — S79.2's check-in found five defects (below), and the §6a/§6b passes are already done,
-so the redraft is cheap.
-
-**What the redraft must fix, all verified against source at S79.2:**
-1. **§4's scope claim was unachievable** — one constant pair drives both defensive bids. Resolved by C-28:
-   the mirror is intended, both sides move, no constant split.
-2. **★ Every symmetric candidate breaks Phase 70's `line-17` band** (79.5% ±1.5pp): baseline 80.17 →
-   81.20 / 81.62 / 81.93 / 82.96 across the four candidates, and the hardest also breaks
-   `ceiling-pressure`. `Band()` throws. **The band needs re-ruling as part of S80, or the build fails the
-   harness.** Mechanism: freed interior budget raises perimeter value, so more of the stream clears Rscore 17.
-3. **R4's endpoint anchor does not protect the elite ceiling.** It pins the bid at dplane 1.0; the bigs'
-   realized median is 0.737 and p90 0.905. Measured: max RimProtection falls 98 → 79, p99 80 → 66.
-4. **R3 is wrong** — `INTANGIBLES` is three (BasketballIQ, Discipline, HelpDefense). `OffBallDefense` is a
-   spend skill in `PerimDefense` (`:159`), NOT locked by `INT_LO`, and is directly in the blast radius.
-5. **§3's `tools/real_d1_block_reference.csv` is not in the repo**, and §5b's census did not exist in the
-   shape described (height bands, means only) — that half is now shipped.
-
-**Also settled at S79.2 and load-bearing for the prompt:** guards do NOT reach the bid floor — guard dplane
-median is **0.207**, p90 0.324, only 10.8% below 0.05 — so a lower floor is nearly cosmetic and **convexity
-does the work**. Draw order does NOT change (the mapping consumes no RNG), so fixed draws are free and the
-fixture's `draws` block stays byte-identical; only the constants echo and the checkpoints move. And the
-candidate populations are not re-allocations of the same men: 139–281 of the 4,511 drafted are different
-people, so comparisons are distributional, never paired.
-
-**Direction of travel, worth knowing before the build:** rim FG% reads **51.8 against a 61.0 target**, the
-largest miss on the calibration page. S80 cuts guards' interior defence, which moves that miss the right
-way. It also lowers the individual block ceiling, which moves O-39's ceiling gap the WRONG way — those two
-are in tension and O-39/O-44 are where it gets resolved, not S80.
-
-**The counter-candidate, if the appetite is for a contained engine win instead: O-44, the block door's
-neutral point.** Population-independent on its length half, three call sites, and it is the part of the
-block-board fix S80 cannot invalidate. Do NOT take O-39 before S80 — sequencing ruled at S79.2.
-
-*Also live, not competing for this slot: O-43 (on-ball blend — one wiring site, pairs with O-41);
-O-6 (scout-rank modernization, RAISED PRIORITY, feeding O-33's minutes skew — it is what makes bigs
-play 24 minutes against guards' 32); O-47 (the drive gate's absolute anchor — explicitly sequenced
-AFTER S80). Detail on each is under Open.*
-
-**Not yet: O-40, block-rate calibration.** Blocks read high, but calibrating against a population that is
-still moving is calibrating against a fiction. **S81 sharpened this rather than closing it:** the assignment
-gate moved blocks 4.4 → 4.3 against a 3.5 target, and measurement showed why it could not do more — deleting
-the ENTIRE help arm moves the rim block rate only 14.32% → 13.02%, so the whole help arm is worth ~1.3 points
-of a ~2-point total matchup effect on a 12% base. **The block total is not primarily a help-arm quantity.**
-Two other suspects now carry more of it: O-50 (52.7% of shots are at the rim, against roughly a third in real
-college basketball) and O-44 (the neutral point, where 83% of the league sits below the bar). Take O-50's
-measurement before touching a block dial.
-
-**Recommended NOT next:** any calibration session. Seventeen verdicts are red and the page is explicitly
-provisional, which makes chasing them now the exact wrong move — several will move on their own when O-29
-and O-6 land. **Also NOT next:** O-30 (foul-outs), unchanged reasoning — an RNG restructuring is a poor
-thing to run immediately after a rebaselined page.
-
-*(S78 shipped — the body wall down (`BodyCap` ≡ 99), the interior/rebounding bid re-based, the small-body
-handle/shoot lean softened, and Glue out of the budget with the three intangibles on an isolated per-player
-stream. Suite `ALL CHECKS PASSED`; Phase 69 bit-identical (0.000E+000 across 35,092 checks); one Phase 70
-band re-ruled (ceiling-pressure 23%±3 → 26.5%±2.5, from a fixed five-seed panel); the old body-cap gate
-replaced by a ceiling-provenance gate; the anti-target gate demoted to page-only (O-34). Historical detail
-in journal S78. Six items opened: O-33 through O-38; O-29 narrowed and O-6 relocated.)*
-
-*(S77 shipped — per-player season records keyed by the person, the three readouts, Phase 73's twenty-two
-gates. No engine file touched; the 493 pre-existing page lines byte-identical. Historical detail in
-journal S77. Five items opened: O-29 through O-32 plus the O-28 re-dating.)*
-
-*(S76.1 shipped — the sixth silent-drop site; the last literal-20 player-id ceiling in the tree, which had
-been dropping 56,714 shot attempts a season. Season rebaselined on exactly one line. Historical detail in
-journal S76.1.)*
-
-*(S76 shipped — the minutes allocator, per-position depth charts, residual control, bounded cascades, the
-fatigue fence retired; R-1 closed. Historical detail in journal S76. Two flags raised and not resolved:
-cross-position occupancy 24.49% against arithmetic floors of 5/5/14% (O-26), and substitutions 34–39 per
-team-game against a real-basketball 20–25 (O-27) — both coaching-layer gaps, neither an allocator defect.)*
-
-*(S75 shipped — roster 13, the player-id widening, the eligibility ladder, and the measured league;
-historical detail in journal S75.)*
+Pick one at the top of the next session, against this board and a fresh pull (CONVENTIONS §6a).

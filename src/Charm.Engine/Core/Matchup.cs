@@ -182,20 +182,30 @@ public static class Matchup
     }
 
     /// <summary>
-    /// Session 55 — the height-over-defender make term (v1). A one-sided, zone-weighted,
-    /// saturating reach advantage added to <see cref="EffectiveRating"/>. Standing reach is
-    /// (Height + Wingspan) / 2 — the float divide is deliberate (both are int ratings; an
-    /// odd sum like 85+88 is 86.5, not 86). The gap is ONE-SIDED: it rewards the taller
-    /// shooter and is exactly zero when the shooter is equal or shorter (the shorter
-    /// shooter is already handled by the block channel; the negative side is a parked v2
-    /// call). tanh saturates the advantage so an extreme mismatch approaches, but never
-    /// exceeds, the per-zone cap (HeightMaxBonus × zone weight). Zero at Three by weight.
-    /// This is deliberately NOT <see cref="LengthRating"/>: reach here excludes Vertical.
+    /// Session 55, revised S83 — the height-over-defender make term (v2). A SIGNED,
+    /// zone-weighted, saturating reach term added to <see cref="EffectiveRating"/>. Standing
+    /// reach is (Height + Wingspan) / 2 — the float divide is deliberate (both are int
+    /// ratings; an odd sum like 85+88 is 86.5, not 86).
+    ///
+    /// <para><b>S83: the gap is TWO-SIDED and SYMMETRIC.</b> v1 clamped the gap at zero, so a
+    /// taller shooter was rewarded and an undersized shooter paid nothing on the make door.
+    /// Emmett's ruling: "I think an inverse relationship makes sense to start. We don't want
+    /// the guards who can finish to be worthless." The undersized shooter now pays exactly the
+    /// curve the oversized shooter is paid — no steeper, no second constant, no separate
+    /// negative arm. The symmetry is the ODDNESS of tanh, not a branch: removing the clamp is
+    /// the whole implementation, and shift(+g) == −shift(−g) falls out of the function.</para>
+    ///
+    /// <para>tanh saturates in BOTH directions, so an extreme mismatch approaches, but never
+    /// reaches, ±(HeightMaxBonus × zone weight). The legacy name HeightMaxBonus is kept for
+    /// config compatibility; it is now the full-saturation MAGNITUDE for either sign, not a
+    /// bonus. Zero at Three by zone weight, for either sign. HeightMaxBonus = 0 remains the
+    /// clean kill switch. This is deliberately NOT <see cref="LengthRating"/>: reach here
+    /// excludes Vertical, and the block door is a separate channel this term never touches.</para>
     /// </summary>
     public static double HeightOverDefenderShift(
         ShotLocation zone, Player attacker, Player defender, MatchupConfig cfg)
     {
-        var gap = Math.Max(0.0, Reach(attacker) - Reach(defender));   // ONE-SIDED (v1)
+        var gap = Reach(attacker) - Reach(defender);   // SIGNED (S83) — tanh supplies the mirror
         return cfg.HeightZoneWeight(zone) * cfg.HeightMaxBonus
              * Math.Tanh(gap / cfg.HeightReferenceScale);
     }

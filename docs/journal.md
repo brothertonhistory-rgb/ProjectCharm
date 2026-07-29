@@ -1,3 +1,76 @@
+## Session 83 — THE REACH TERM BECOMES TWO-SIDED. The undersized shooter now pays the same curve the oversized shooter is paid, and the rim magnitude goes 15 → 110 rating points. A 5'10" finisher who was outshooting a 6'8" one at the rim (81.2% vs 66.6% in the bench matchup) now sits below him (71.7% vs 76.4%). League rim FG% 51.9 → 53.1, and overall FG% crosses into its calibration band for the first time (42.6 → 43.1, target 44.0 ±1.0). The best full-season shooter in the league is now a 7'1" center at 75.9% against a real-world mark of 77–79%; eight of the top ten are bigs, where six were before. Three existing suite checks encoded the OLD law and had to be rewritten — none of them were named in the build prompt. Emmett ruled the extreme uncapped. Suite `ALL CHECKS PASSED`, bench and season verified on Emmett's machine. (2026-07-29)
+
+**Register:** build, under `PROMPT-reach-term-s83-r4`. One engine behaviour line, one engine comment file, four config values, three existing check files, one new bench, the oracle, a regenerated golden, and a fingerprint re-stamp on three block fixtures.
+
+### The defect
+
+The make door's reach term was one-sided. `gap = Math.Max(0.0, Reach(attacker) − Reach(defender))` rewarded the taller shooter and charged the shorter one exactly nothing — on the theory, recorded in the S55 source comment as a deliberate parked v2 call, that the block channel already handled the undersized shooter. S82 measured it and it did not. Pool_973, a 5'10" guard with Finishing 98, was converting at the rim over a median rim protector at **81.2%**; Pool_4244, a 6'8" big with the same defender and Finishing 57, at **66.6%**.
+
+Emmett's ruling: *"I think an inverse relationship makes sense to start. We don't want the guards who can finish to be worthless."* And: *"The shifty 5'10" combo guard SHOULD be able to finish, and have a decent rim diet because he can get there, but it's nothing compared to the 6'10" guy with high finishing."*
+
+### What shipped
+
+**One line of behaviour.** The `Math.Max` is gone. `tanh` is odd, so the penalty arm IS the reward arm reflected — no second constant, no asymmetric exponent, no separate negative-side scale, no new branch. `shift(+g) == −shift(−g)` falls out of the function rather than being enforced by it.
+
+**Four config values.** Setting F from the sized archetype table put the rim magnitude at 110 rating points. `Load` forbids a zone weight above 1.0 and `HeightWeightRim` is already there, so the rise routes through `HeightMaxBonus` (15.0 → 110.0) with the three non-rim weights divided by the same 110/15. Every non-rim zone's absolute magnitude is unchanged — which is what makes the non-rim season movement readable as the new penalty arm rather than a rescaling artifact, and is asserted at 1e-12 with a negative control rather than claimed in a comment.
+
+### ★ THREE EXISTING SUITE CHECKS ENCODED THE OLD LAW, AND THE BUILD PROMPT NAMED NONE OF THEM
+
+The prompt's scope wall listed the engine line, the config values, a comment rewrite, the new checks, docs and commit. It did not mention that three checks already in the suite would go red the moment the law changed. This was caught at the check-in gate by **applying the change in a scratch copy and running the whole suite**, rather than by reasoning about which checks looked related — a measurement, not an inference, and it found one more than reasoning had.
+
+1. **Phase 61, the reach-term check.** Its 25-case golden fixture was emitted under the old constants, and its contract compares them against the live config with `!=` before trusting a single case — so it threw immediately. Worse, one of its own rules read *"negative gap -> exactly 0 (one-sided)"*, and the `SMALL_ON_BIG` archetype was in the must-be-exactly-zero set. Those are not bugs; they are the previous ruling, correctly written down. Rewritten: the exact-zero set is now equal reach and Three only, `SMALL_ON_BIG` is re-signed as the penalty arm, and the Long wire-proof follows the **sign of the gap** instead of assuming positive.
+
+2. **Phase 71 Arm 6, the settings-parity check.** It demanded each of twelve newly-explicit Matchup dials equal a freshly constructed `MatchupConfig`'s compiled default — a programmatic typo-catcher added at S74 because the season page is not a sufficient one (a mistyped weight on a rare event might not move a seeded season at all). Four of those twelve were being deliberately moved, and the prompt forbade touching the class defaults. Two wrong answers were available: update the defaults (which would erase the difference between "never touched" and "deliberately moved"), or drop the four from the arm (which would remove the guard from precisely the numbers being changed). Shipped instead: the arm now checks eight against the compiled default and four against their **ruled** values, so the guard survives and the ruling is recorded in the same line.
+
+3. **Phase 74, the block-help check.** Its fixtures carry a SHA-256 fingerprint of the **entire** `Matchup` section, so a change anywhere in it invalidates fixtures that never depended on the changed keys. S83 moved five Height dials that feed the make door only. The saved values were re-verified unchanged and **only the fingerprint label was re-stamped** — not one saved number regenerated, so `block_credit_preedit_golden.json` remains the pre-edit emission it was built to be. It turned out to be **three** files carrying that stamp, not the two the S81.3 comment named. The alternative — narrowing the hash to the keys the block path actually reads — was rejected as the riskier fix: it needs an exhaustive read-site audit, and a list that silently misses one key turns a loud guard into a quiet lie. Recorded in place, with "revisit if the re-stamp ritual recurs."
+
+### The stress bench, and Emmett's ruling on the extreme
+
+A new exploratory bench (`Program.Checks.ReachBench.cs`, CLI `reachbench`, **not in the suite** — it asserts basketball target values, which the page-only calibration principle keeps out of the suite forever). Three real pool cards regenerated from the canonical world and seed and asserted key-for-key before a pie is read; the ten lineup slots stamped and then the engine's own picker asked to confirm it resolves the intended matched defender.
+
+| row | pre | post |
+|---|---|---|
+| Pool_4244, Finishing 37 | 60.6% | 71.5% |
+| Pool_4244, Finishing 57 | 66.6% | 76.4% |
+| Pool_4244, Finishing 99 | 82.6% | 87.4% |
+| Pool_973 (5'10", Finishing 98) | 81.2% | 71.7% |
+
+The ordering defect is fixed: the guard was 14.6 points **above** the big's Finishing-57 row and is now 4.7 points below it. He is not worthless — 71.7% clears the ≥50% floor Emmett's ruling was made checkable at. **Block and foul are bit-identical pre-to-post at all seven rows**, which is the proof that a change to the make door did not leak into the block door through the shared body attributes.
+
+The bench's original hard ceiling — top row ≤ 78%, the real-world two-season D1 mark — **failed at 87.4%**. It had also failed pre-change, at 82.6%, which is the tell: the bar could never have held on that instrument. Emmett's ruling: *"The engine should allow for the absurd extremes. If I put an all american team against the worst team possible, it should 'break' the engine so to speak."* The 77–79% mark is a **season** figure earned against a schedule of varied opponents; the bench is one frozen best case — the league's best finisher, a four-inch reach edge, a 40-inch vertical, against a middling rim protector, every rep. The assertion was **removed**, not loosened: the number is printed with the ruling recorded beside it, and only the ordering is asserted.
+
+### Season
+
+| zone | before | after | expected |
+|---|---|---|---|
+| rim | 51.9 | **53.1** | +0.9 to +1.0 |
+| short | 37.7 | **37.1** | ≈ −0.4 |
+| mid | 40.0 | **40.2** | ≈ −0.1 |
+| long | 34.6 | **34.3** | ≈ 0 |
+| three | 35.0 | **35.0** | ≈ 0.00 |
+
+Three landed exactly, as it must — the zone weight is 0.0 for either sign, so the term cannot reach it. Rim overshot by 0.2, short overshot by 0.2, long moved 0.3 where nothing was expected, **and mid moved the wrong way** — +0.2 against an expected −0.1. Mid is the thinnest slice of the term (4.5 rating points at full saturation, on the shallowest curve in the engine), and the shot diet moved underneath it: mid attempts rose 54,125 → 54,420 while rim attempts fell. The counterfactual sweep these expectations came from replayed a candidate over frozen baseline attempts; a realized rerun shears the RNG stream from the first changed make onward. **Named, not chased.** No dial was touched to close any of these gaps.
+
+**An unbid gift.** League FG% went 42.6 → 43.1 and crossed into its calibration band (target 44.0 ±1.0) for the first time on this arc; points 68.2 → 68.8, also toward target. Neither was the goal.
+
+**The leaderboard took the shape the real world has.** Before: the top ten field-goal shooters were six bigs and four guards/wings, topping out at 63.6%. After: eight bigs, led by a 7'1" center at 75.9%, against a real-world top mark of 77–79%. The prompt's specific prediction — 6'8"+ men in the top 50 **rim** finishers going 6 → ~41 — could not be checked: the season page prints no rim-only leaderboard, and the overall board is a different cut. Recorded as unmeasured rather than substituted for.
+
+**Baseline reproduction (5.1).** The pre-change tree reproduced the committed season page exactly on the per-zone block, including the zone FGA mix counts to the unit (245445 / 31811 / 54125 / 37303 / 219702, sum 588386). The measurement route is stable; the movement above is the change.
+
+### Errors made this session, honestly
+
+**A bench comparison that was a Finishing gap wearing a length gap's clothes.** The channel-separation check first compared the guard's block rate against the big's **Finishing-57** row. Block rate falls as Finishing rises (visible straight down the ladder: 10.31% → 5.36%), so the comparison was reading a 41-point Finishing difference and calling it length. It read 6.12% vs 9.18% and "failed" a true property. Fixed to compare at like-for-like Finishing — 6.12% (Fin 98) vs 5.36% (Fin 99) — where the guard is correctly blocked more.
+
+**A delivered command that skipped a check on Emmett's machine.** The pre/post block-and-foul equality test needs the pre-change bench file as a third argument; the command shipped for the delivery omitted it, so that assertion ran only in the sandbox. Named at the time rather than quietly counted as verified. The property is proven at the middle rung, not the top one.
+
+**An internal method assumed callable from the harness.** The bench was written to call `BlockerPicker.ResolveOffensiveLineup` to prove the helper gates read the intended teammates. It is `internal` to `Charm.Engine` and invisible across the assembly boundary. Rather than widen the engine's API for a bench, the check re-derives the same mapping through the public surface — and says so in the comment, because a re-derivation would not catch a change inside the helper. A weaker check, honestly labelled.
+
+### Scope held
+
+The player generator (tallest bands still median Finishing 37, best 57 — the reason the leaderboard stops where it does), the low-usage bonus, the make curve, the page's 61.0 rim target label, shot diet (O-50), block-rate calibration (O-40) and the on-ball blend (O-43) all stayed out.
+
+---
+
 ## Session 81.3 — THE HELP ARM COMPARES TO THE SHOOTER. Off-ball help stops being measured against a permanent imaginary 50-rated player and is measured against the man actually shooting; block credit stays defender-only and is proved byte-identical against two independent witnesses. The build prompt's headline evidence table had its zone labels transposed — rim help RISES 7% and it is THREE-point help that falls 28.9% — so the session's expected direction was backwards and league blocks go slightly UP (45,320 → 45,734 credited, 4.4/team unchanged against a 3.5 target). Nothing tuned. Closed O-44, opened O-53. Suite `ALL CHECKS PASSED` and the season page verified on Emmett's machine. (2026-07-29)
 
 **Register:** build, under `PROMPT-help-compares-to-the-shooter-s81_3-r3`. One engine file, one check file, one csproj, the oracle, a regenerated golden, and two new fixtures. No config change, no dial calibration, no engine behaviour outside the block rate's help arm.

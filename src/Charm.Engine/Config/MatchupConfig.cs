@@ -84,42 +84,57 @@ public sealed class MatchupConfig
     };
 
     // =========================================================================
-    // Session 55 — height-over-defender make term (v1)
-    //     A one-sided, zone-weighted, saturating reach advantage added to the make
-    //     door's EffectiveRating. Rewards the taller shooter (greater standing reach)
-    //     for scoring over a smaller defender; never docks the shorter shooter (the
-    //     negative side already lives in the block channel). Standing reach is
-    //     (Height + Wingspan) / 2 — deliberately NOT LengthRating (which folds in
-    //     Vertical); Vertical-in-reach is a parked follow-up.
+    // Session 55, revised S83 — height-over-defender make term (v2, SIGNED)
+    //     A signed, zone-weighted, saturating reach term added to the make door's
+    //     EffectiveRating. It rewards the shooter with the greater standing reach and
+    //     DOCKS the shooter with the lesser one, by the same curve in either direction.
+    //     Standing reach is (Height + Wingspan) / 2 — deliberately NOT LengthRating
+    //     (which folds in Vertical); Vertical-in-reach is a parked follow-up.
     //
     //     heightShift = HeightZoneWeight(zone) * HeightMaxBonus * tanh(gap / HeightReferenceScale),
-    //     gap = max(0, shooterReach - defenderReach).
+    //     gap = shooterReach - defenderReach   (SIGNED — no clamp).
+    //
+    //     S83 removed v1's max(0, ...) clamp. The symmetry is the oddness of tanh, not a
+    //     branch: there is no second constant and no separate negative-side curve, and
+    //     shift(+g) == -shift(-g) by construction. The block channel is a SEPARATE door
+    //     that reads none of these values.
     //
     //     All tunable. HeightMaxBonus = 0 is a legal clean kill switch. Validation is
     //     range-only (each weight in [0,1]) — NOT monotonic across zones, so era
-    //     experiments can reshape the zone profile without fighting the loader. ---
+    //     experiments can reshape the zone profile without fighting the loader.
+    //
+    //     NOTE ON THE LIVE VALUES. These compiled defaults are the Session 55 numbers and
+    //     are NOT what the engine runs on: config.json carries the S83 ruling (magnitude
+    //     110.0 at the rim, with the non-rim weights scaled by 15/110 so their absolute
+    //     magnitudes are unchanged). The magnitude routes through HeightMaxBonus rather
+    //     than HeightWeightRim because Load forbids a zone weight above 1.0. ---
 
-    /// <summary>Rating points the reach advantage is worth at full saturation and zone
-    /// weight 1.0 (the Rim cap). Must be &gt;= 0 (enforced in Load); 0 is a clean kill
-    /// switch. Default 15.0 (Session 55, signed on the archetype table).</summary>
+    /// <summary>Rating points the reach term is worth at full saturation and zone weight 1.0
+    /// (the Rim magnitude), for EITHER sign — the taller shooter's gain and the shorter
+    /// shooter's loss share this one number. The name is legacy (S55, when the term was
+    /// positive-only) and is kept for config compatibility; it is a magnitude, not a bonus.
+    /// Must be &gt;= 0 (enforced in Load); 0 is a clean kill switch. Compiled default 15.0
+    /// (Session 55); the live config.json value is 110.0 (S83, Setting F).</summary>
     public double HeightMaxBonus { get; set; } = 15.0;
 
-    /// <summary>Length-points that set the tanh saturation speed — the reach gap at which
-    /// the bonus has climbed to tanh(1) ≈ 76% of its zone cap. Must be &gt; 0 (enforced in
-    /// Load). Default 18.0 (Session 55).</summary>
+    /// <summary>Length-points that set the tanh saturation speed — the reach gap at which the
+    /// term has reached tanh(1) ≈ 76% of its zone magnitude, in either direction. Must be
+    /// &gt; 0 (enforced in Load). Default 18.0 (Session 55, unchanged by S83).</summary>
     public double HeightReferenceScale { get; set; } = 18.0;
 
-    /// <summary>Per-zone weight on the reach advantage — highest at the rim (finishing over
-    /// a smaller defender), fading outward, exactly 0 at Three (length does not help a set
-    /// three-point shot). Each must be in [0,1] (enforced in Load). Session 55 defaults:
-    /// Rim 1.0 / Short 0.8 / Mid 0.3 / Long 0.05 / Three 0.0.</summary>
+    /// <summary>Per-zone weight on the reach term — highest at the rim (finishing over, or
+    /// under, a differently sized defender), fading outward, exactly 0 at Three for either
+    /// sign (length neither helps nor hurts a set three-point shot). Each must be in [0,1]
+    /// (enforced in Load). Session 55 compiled defaults: Rim 1.0 / Short 0.8 / Mid 0.3 /
+    /// Long 0.05 / Three 0.0; the live S83 config.json values differ at Short/Mid/Long.</summary>
     public double HeightWeightRim   { get; set; } = 1.00;
     public double HeightWeightShort { get; set; } = 0.80;
     public double HeightWeightMid   { get; set; } = 0.30;
     public double HeightWeightLong  { get; set; } = 0.05;
     public double HeightWeightThree { get; set; } = 0.00;
 
-    /// <summary>The per-zone reach-advantage weight (Session 55). Mirrors
+    /// <summary>The per-zone reach-term weight (Session 55; signed since S83 — the weight
+    /// scales the term's magnitude, whichever way it points). Mirrors
     /// <see cref="BlendWeights"/>: one switch, config data behind it.</summary>
     public double HeightZoneWeight(ShotLocation zone) => zone switch
     {

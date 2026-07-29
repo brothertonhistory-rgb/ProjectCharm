@@ -2,15 +2,24 @@
 Height-over-defender make term — reference oracle (LOCKED / signed constants).
 
 Signed off on the archetype table (Session 54 design conversation; make%% column regenerated
-against the LIVE recentered curve at Session 55 — rating shifts unchanged, deltas within ~0.4pp): one-sided, zone-weighted,
-saturating reach advantage added to Matchup.EffectiveRating. This file is the authoritative
-reference the C# port proves golden-parity against — it is NOT provisional.
+against the LIVE recentered curve at Session 55): a zone-weighted, saturating reach term added
+to Matchup.EffectiveRating. This file is the authoritative reference the C# port proves
+golden-parity against — it is NOT provisional.
+
+S83 REVISION (Emmett's ruling, 2026-07-29 design conversation): the term is now TWO-SIDED and
+SYMMETRIC. v1 clamped the gap at zero, so an undersized shooter paid nothing on the make door.
+"I think an inverse relationship makes sense to start. We don't want the guards who can finish
+to be worthless." The clamp is gone; tanh is odd, so the penalty arm IS the reward arm
+reflected — no second constant, no separate negative-side curve. The rim magnitude is Setting F
+from the sized archetype table (110 rating points); the non-rim weights are scaled by 15/110 so
+their absolute magnitudes are unchanged from v1 on the positive side.
 
 Emits:
   * a human-readable archetype table (5 archetypes x 5 zones, incl. Long);
   * full-precision golden JSON (tools/oracle/height_over_defender_golden.json) for the C# fixture,
     so the fixture is generated, never hand-transcribed from rounded display output;
-  * helper-level assertions (reach incl. an odd-sum case, one-sided clamp, zone ordering, saturation).
+  * helper-level assertions (reach incl. an odd-sum case, signed arms, symmetry, zone
+    ordering, saturation in both directions).
 """
 import math, json
 from pathlib import Path
@@ -42,16 +51,19 @@ def make_prob(zone, rating):
     f,c,k,m = CURVE[zone]
     return f + (c-f)/(1.0 + math.exp(-k*(rating-m)))
 
-# ---- The height-over-defender term (LOCKED constants) ----
-HEIGHT_MAX_BONUS   = 15.0     # rating points at full saturation & zone weight 1.0
-HEIGHT_REF_SCALE   = 18.0     # length-points; tanh saturation speed
-HEIGHT_ZONE_WEIGHT = {'Rim':1.0, 'Short':0.8, 'Mid':0.3, 'Long':0.05, 'Three':0.0}
+# ---- The height-over-defender term (LOCKED constants; S83 values) ----
+# These MUST equal the live config.json "Matchup" values exactly — the C# fixture contract
+# compares them with == before trusting a single case, so a drift fails loudly.
+HEIGHT_MAX_BONUS   = 110.0    # rating points at full saturation & zone weight 1.0, EITHER sign
+HEIGHT_REF_SCALE   = 18.0     # length-points; tanh saturation speed (unchanged)
+HEIGHT_ZONE_WEIGHT = {'Rim':1.0, 'Short':0.109090909090909,
+                      'Mid':0.040909090909091, 'Long':0.006818181818182, 'Three':0.0}
 
 def reach(H, W):
     return (H + W) / 2.0                 # float divide — 85+88 -> 86.5, never 86
 
 def height_shift(zone, shooter_reach, defender_reach):
-    gap = max(0.0, shooter_reach - defender_reach)   # ONE-SIDED (v1)
+    gap = shooter_reach - defender_reach             # SIGNED (S83) — tanh supplies the mirror
     return HEIGHT_ZONE_WEIGHT[zone] * HEIGHT_MAX_BONUS * math.tanh(gap / HEIGHT_REF_SCALE)
 
 def eff_rating(zone, zone_skill, defense_rating, sh_ath, df_ath, sh_reach, df_reach, height_on):
@@ -69,7 +81,7 @@ ARCH = [
     ("TALLER_CENTER",  (85,88,50), (74,76,50)),   # odd-sum reach 86.5
     ("TALL_WING",      (62,66,60), (46,48,60)),
     ("POST_VS_POST",   (88,90,50), (88,90,50)),   # equal reach -> exact zero
-    ("SMALL_ON_BIG",   (40,42,70), (90,94,45)),   # negative gap -> exact zero (one-sided)
+    ("SMALL_ON_BIG",   (40,42,70), (90,94,45)),   # negative gap -> the S83 penalty arm
 ]
 
 def golden_rows():
@@ -92,7 +104,8 @@ def golden_rows():
 
 def print_table():
     print(f"{'='*84}\n  Height-over-defender oracle — LOCKED (MaxBonus={HEIGHT_MAX_BONUS}, RefScale={HEIGHT_REF_SCALE},")
-    print(f"  reach=(H+W)/2, zoneW rim/short/mid/long/three = 1.0/0.8/0.3/0.05/0.0, one-sided)\n{'='*84}")
+    zw = "/".join(f"{HEIGHT_ZONE_WEIGHT[z]:g}" for z in ZONES)
+    print(f"  reach=(H+W)/2, zoneW rim/short/mid/long/three = {zw}, SIGNED)\n{'='*84}")
     for name,(sH,sW,sA),(dH,dW,dA) in ARCH:
         sr, dr = reach(sH,sW), reach(dH,dW)
         print(f"\n  {name}: shooter reach {sr}  vs defender reach {dr}  (gap {sr-dr:+})")
@@ -108,10 +121,22 @@ def helper_asserts():
     assert reach(90,94) == 92.0
     assert reach(38,42) == 40.0
     assert reach(85,88) == 86.5, "odd-sum reach must be 86.5, not 86 (integer-divide bug)"
-    # one-sided clamp
+    # SIGNED (S83): positive gap rewards, negative gap docks, equal reach is exactly zero
     assert height_shift('Rim', 60, 40) > 0          # positive gap -> positive
     assert height_shift('Rim', 50, 50) == 0.0       # zero gap -> exactly zero
-    assert height_shift('Rim', 40, 60) == 0.0       # negative gap -> exactly zero
+    assert height_shift('Rim', 40, 60) < 0          # negative gap -> NEGATIVE (was 0 in v1)
+    # symmetry: the penalty arm is the reward arm reflected (oddness of tanh)
+    for g in (2, 6, 12, 20, 35, 51):
+        for z in ZONES:
+            assert abs(height_shift(z, 50+g, 50) + height_shift(z, 50-g, 50)) <= 1e-12
+    # monotone in |gap| on BOTH arms
+    for z in ('Rim','Short','Mid','Long'):
+        pos = [height_shift(z, 50+g, 50) for g in (2,6,12,20,35)]
+        neg = [height_shift(z, 50-g, 50) for g in (2,6,12,20,35)]
+        assert all(a < b for a,b in zip(pos, pos[1:]))
+        assert all(a > b for a,b in zip(neg, neg[1:]))
+    # Three is exactly zero for EITHER sign
+    assert height_shift('Three', 90, 40) == 0.0 and height_shift('Three', 40, 90) == 0.0
     # zone ordering for the same positive gap: Rim > Short > Mid > Long > Three(==0)
     sh = {z: height_shift(z, 90, 40) for z in ZONES}
     assert sh['Rim'] > sh['Short'] > sh['Mid'] > sh['Long'] > 0
@@ -121,7 +146,11 @@ def helper_asserts():
     s1, s2, s3 = height_shift('Rim',60,40), height_shift('Rim',90,40), height_shift('Rim',199,0)
     assert 0 < s1 < s2 < s3 < cap
     assert s3 > cap * 0.99
-    print("\n  helper asserts: PASS (reach incl. odd-sum, one-sided clamp, zone order, saturation)")
+    # the same asymptote on the penalty arm
+    n1, n2, n3 = height_shift('Rim',40,60), height_shift('Rim',40,90), height_shift('Rim',0,199)
+    assert 0 > n1 > n2 > n3 > -cap
+    assert n3 < -cap * 0.99
+    print("\n  helper asserts: PASS (reach incl. odd-sum, signed arms, symmetry, zone order, saturation both signs)")
 
 if __name__ == "__main__":
     print_table()

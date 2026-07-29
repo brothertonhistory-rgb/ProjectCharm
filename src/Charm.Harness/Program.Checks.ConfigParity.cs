@@ -106,14 +106,40 @@ internal static partial class Program
     };
 
     /// <summary>The twelve Matchup dials made explicit in S74 (seven Height terms from
-    /// S55, five ReachIn terms from S62). Arm 6 proves each equals a freshly constructed
-    /// MatchupConfig's compiled default.</summary>
+    /// S55, five ReachIn terms from S62). Arm 6 proves all twelve are present in
+    /// config.json, and proves the value of each against the right yardstick — the
+    /// compiled default for the eight still sitting on it, the RULED value for the four
+    /// S83 moved deliberately.</summary>
     private static readonly string[] S74NewlyExplicitMatchupKeys =
     {
         "HeightMaxBonus", "HeightReferenceScale", "HeightWeightRim", "HeightWeightShort",
         "HeightWeightMid", "HeightWeightLong", "HeightWeightThree",
         "ReachInDiscSpan", "ReachInAthSpan", "ReachInPerimSpan", "ReachInLuckFloor",
         "ReachInPostnessScale",
+    };
+
+    /// <summary>The four dials S83 tuned away from their compiled defaults, with the value
+    /// Emmett ruled. Arm 6 pins these to the RULING instead of to the class default.
+    ///
+    /// <para><b>Why not simply update the class defaults to match.</b> The compiled defaults
+    /// are the Session 55 signed-off numbers and stay that way: config.json is where a
+    /// ruling lives, and a default quietly chasing every tuning pass would erase the
+    /// distinction between "never touched" and "deliberately moved."</para>
+    ///
+    /// <para><b>Why not simply drop these four from the arm.</b> The arm exists as a
+    /// programmatic typo-catcher, because the season page is not a sufficient one — a
+    /// mistyped weight on a rare event might not move a seeded season at all. Dropping the
+    /// four would remove that guard from precisely the numbers being changed. Pinning them
+    /// keeps the guard and records the ruling in the same line.</para>
+    ///
+    /// <para>HeightWeightRim (1.00) and HeightWeightThree (0.00) were REVIEWED by S83 and
+    /// deliberately left alone, so they stay on the compiled-default side.</para></summary>
+    private static readonly (string Key, double Ruled)[] S83RuledMatchupValues =
+    {
+        ("HeightMaxBonus",    110.0),
+        ("HeightWeightShort", 0.109090909090909),
+        ("HeightWeightMid",   0.040909090909091),
+        ("HeightWeightLong",  0.006818181818182),
     };
 
     // ── The configuration-property contract ──────────────────────────────────
@@ -438,7 +464,10 @@ internal static partial class Program
             finally { try { File.Delete(tmp); } catch { /* best-effort */ } }
         }
 
-        // ── Arm 6: the twelve newly-explicit values equal the compiled defaults ──
+        // ── Arm 6: the twelve newly-explicit values, each against its own yardstick ──
+        //  Eight are still on the compiled default; the four S83 tuned are pinned to the
+        //  ruled value instead (see S83RuledMatchupValues for why neither dropping them
+        //  nor moving the class defaults was the right answer).
         //  The season page is NOT a sufficient typo-catcher — a mistyped weight on a
         //  rare event might not move a seeded season at all — so the proof is
         //  programmatic, never a manual delivery-note claim.
@@ -452,23 +481,42 @@ internal static partial class Program
             var fresh = new MatchupConfig();
             var mismatches = new List<string>();
             var missingProp = new List<string>();
+            var ruledMismatches = new List<string>();
+
+            var ruled = S83RuledMatchupValues.ToDictionary(r => r.Key, r => r.Ruled, StringComparer.Ordinal);
 
             foreach (var key in S74NewlyExplicitMatchupKeys)
             {
                 var prop = typeof(MatchupConfig).GetProperty(key, BindingFlags.Public | BindingFlags.Instance);
                 if (prop is null) { missingProp.Add(key); continue; }
                 var a = (double)prop.GetValue(live)!;
-                var b = (double)prop.GetValue(fresh)!;
-                if (a != b) mismatches.Add($"{key}: config {a} vs compiled default {b}");
+                if (ruled.TryGetValue(key, out var r))
+                {
+                    // S83-tuned: the yardstick is the RULING, not the compiled default.
+                    if (a != r) ruledMismatches.Add($"{key}: config {a} vs ruled {r}");
+                }
+                else
+                {
+                    var b = (double)prop.GetValue(fresh)!;
+                    if (a != b) mismatches.Add($"{key}: config {a} vs compiled default {b}");
+                }
             }
             mismatches.Sort(StringComparer.Ordinal);
+            ruledMismatches.Sort(StringComparer.Ordinal);
             missingProp.Sort(StringComparer.Ordinal);
 
-            Check("the twelve newly-explicit Matchup values equal a fresh MatchupConfig, field by field",
+            var untunedCount = S74NewlyExplicitMatchupKeys.Length - S83RuledMatchupValues.Length;
+            Check($"the {untunedCount} untuned newly-explicit Matchup values equal a fresh MatchupConfig",
                   mismatches.Count == 0 && missingProp.Count == 0,
                   mismatches.Count == 0 && missingProp.Count == 0
-                      ? $"{S74NewlyExplicitMatchupKeys.Length} fields, exact equality"
+                      ? $"{untunedCount} fields, exact equality"
                       : $"mismatched: [{string.Join("; ", mismatches)}] unknown property: [{string.Join(", ", missingProp)}]");
+
+            Check($"the {S83RuledMatchupValues.Length} S83-tuned Matchup values equal the RULED values",
+                  ruledMismatches.Count == 0,
+                  ruledMismatches.Count == 0
+                      ? $"{S83RuledMatchupValues.Length} fields, exact equality"
+                      : $"mismatched: [{string.Join("; ", ruledMismatches)}]");
 
             var present = S74NewlyExplicitMatchupKeys
                 .Where(k => root.GetProperty("Matchup").TryGetProperty(k, out _)).Count();

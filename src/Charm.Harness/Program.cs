@@ -52,6 +52,12 @@ internal static partial class Program
         // the suite (the suite's Phase 53 block proves the same machinery in-memory).
         if (args.Length > 0 && args[0] == "world") { return RunWorld(args); }
 
+        // dotnet run -- reachbench [world.json] [seed] [baseline.tsv]  S83's reach-term
+        // stress bench: real pool cards through the live Roll H path, ceiling + guard floor.
+        // Exploratory instrument, NOT in the validation suite — it asserts basketball target
+        // values, which the page-only calibration principle keeps out of the suite.
+        if (args.Length > 0 && args[0] == "reachbench") { RunReachBench(configPath, args); return 0; }
+
         // dotnet run -- divvy <world.json> <seed> [idA idB]  Roster Genesis Pass 1.5: builds
         // the national talent pool (10 x school count) and runs the prestige-weighted divvy
         // for every school in the world file — pool sheet, draft story, sample roster sheets,
