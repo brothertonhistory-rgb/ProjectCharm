@@ -582,9 +582,9 @@ Regenerating divvied rosters (world + seed; nothing persisted) and playing 5205 
 --- SEASON STAT PAGE (Session 77; page-only, never asserted) ---
   4511 player-seasons; 1025 never played a minute.
   qualifiers: >=100 3470 | >=250 2818 | >=500 2083 | >=900 444
-  minutes floor in force: >=100 (reporting only ΓÇö the roll-up is complete before any filter)
+  minutes floor in force: >=500 (reporting only ΓÇö the roll-up is complete before any filter)
 
-  LEADERS ΓÇö per-game averages, 3470 men clearing the >=100 minute floor
+  LEADERS ΓÇö per-game averages, 2083 men clearing the >=500 minute floor
     points
        1. Pool_1038    STJN   G 56   29.7   (30 gp, 31.8 mpg)
        2. Pool_1034    WCST   G 56   28.0   (30 gp, 30.1 mpg)
@@ -653,29 +653,29 @@ Regenerating divvied rosters (world + seed; nothing persisted) and playing 5205 
       10. Pool_1399    MS     G 62   32.3   (30 gp)    1716 off poss |   1722 def poss
 
   SHOOTING ΓÇö minutes floor first, then attempts per game (attempts, NOT makes)
-    FG% (>= 4.0 att/gm ΓÇö 2005 qualify)
-       1. Pool_2954    WY     W 59   66.2%   106-160   5.3 att/gm  (30 gp, 15.9 mpg)
-       2. Pool_3389    OLDDM  B 66   65.8%   129-196   6.5 att/gm  (30 gp, 24.3 mpg)
-       3. Pool_425     SDST   G 45   62.9%   107-170   5.7 att/gm  (30 gp, 27.5 mpg)
-       4. Pool_3710    NEB    B 79   62.5%   105-168   5.6 att/gm  (30 gp, 24.4 mpg)
-       5. Pool_3671    CAL    B 69   61.8%   128-207   6.9 att/gm  (30 gp, 23.5 mpg)
-       6. Pool_1263    GASO   G 63   61.8%   157-254   8.5 att/gm  (30 gp, 31.9 mpg)
-       7. Pool_4319    LA TC  B 91   61.4%    78-127   4.2 att/gm  (30 gp, 23.8 mpg)
-       8. Pool_3530    TXPA   B 69   59.3%   143-241   8.0 att/gm  (30 gp, 24.1 mpg)
-       9. Pool_2681    WKY    W 65   59.3%    96-162   5.4 att/gm  (30 gp, 16.1 mpg)
-      10. Pool_1800    NRFST  W 61   59.1%    78-132   4.4 att/gm  (30 gp, 26.0 mpg)
-    3P% (>= 1.5 att/gm ΓÇö 1422 qualify)
+    FG% (>= 4.0 att/gm ΓÇö 1807 qualify)
+       1. Pool_3389    OLDDM  B 66   65.8%   129-196   6.5 att/gm  (30 gp, 24.3 mpg)
+       2. Pool_425     SDST   G 45   62.9%   107-170   5.7 att/gm  (30 gp, 27.5 mpg)
+       3. Pool_3710    NEB    B 79   62.5%   105-168   5.6 att/gm  (30 gp, 24.4 mpg)
+       4. Pool_3671    CAL    B 69   61.8%   128-207   6.9 att/gm  (30 gp, 23.5 mpg)
+       5. Pool_1263    GASO   G 63   61.8%   157-254   8.5 att/gm  (30 gp, 31.9 mpg)
+       6. Pool_4319    LA TC  B 91   61.4%    78-127   4.2 att/gm  (30 gp, 23.8 mpg)
+       7. Pool_3530    TXPA   B 69   59.3%   143-241   8.0 att/gm  (30 gp, 24.1 mpg)
+       8. Pool_1800    NRFST  W 61   59.1%    78-132   4.4 att/gm  (30 gp, 26.0 mpg)
+       9. Pool_3609    MILW   B 71   59.1%   130-220   7.3 att/gm  (30 gp, 24.1 mpg)
+      10. Pool_3856    ORLRB  B 72   59.1%   153-259   8.6 att/gm  (30 gp, 24.2 mpg)
+    3P% (>= 1.5 att/gm ΓÇö 1199 qualify)
        1. Pool_1800    NRFST  W 61   59.1%    68-115   3.8 att/gm  (30 gp, 26.0 mpg)
-       2. Pool_5       VA     G 43   56.9%    29-51    1.7 att/gm  (30 gp,  8.3 mpg)
-       3. Pool_2553    SUTH   W 67   56.2%    27-48    1.6 att/gm  (30 gp,  8.0 mpg)
-       4. Pool_2409    VACM   W 62   56.1%    55-98    3.3 att/gm  (30 gp, 16.3 mpg)
-       5. Pool_1615    DAVDS  G 57   54.9%    62-113   3.8 att/gm  (30 gp, 27.7 mpg)
-       6. Pool_2961    BYU    W 62   54.2%    26-48    1.6 att/gm  (30 gp, 15.8 mpg)
-       7. Pool_3912    MGNST  B 62   54.1%    59-109   3.6 att/gm  (30 gp, 24.2 mpg)
-       8. Pool_714     IOWA   G 49   53.5%    54-101   3.4 att/gm  (30 gp, 20.3 mpg)
-       9. Pool_721     DAVDS  G 53   53.3%    81-152   5.1 att/gm  (30 gp, 31.7 mpg)
-      10. Pool_2517    STBN   W 59   52.7%    49-93    3.1 att/gm  (30 gp, 16.3 mpg)
-    FT% (>= 1.5 att/gm ΓÇö 1713 qualify)
+       2. Pool_1615    DAVDS  G 57   54.9%    62-113   3.8 att/gm  (30 gp, 27.7 mpg)
+       3. Pool_3912    MGNST  B 62   54.1%    59-109   3.6 att/gm  (30 gp, 24.2 mpg)
+       4. Pool_714     IOWA   G 49   53.5%    54-101   3.4 att/gm  (30 gp, 20.3 mpg)
+       5. Pool_721     DAVDS  G 53   53.3%    81-152   5.1 att/gm  (30 gp, 31.7 mpg)
+       6. Pool_624     WASH   G 55   52.4%    65-124   4.1 att/gm  (30 gp, 20.0 mpg)
+       7. Pool_418     RICHM  G 49   52.3%    67-128   4.3 att/gm  (30 gp, 20.1 mpg)
+       8. Pool_1091    WRST   G 54   52.3%    90-172   5.7 att/gm  (30 gp, 31.9 mpg)
+       9. Pool_682     SMU    G 50   52.2%   119-228   7.6 att/gm  (30 gp, 29.6 mpg)
+      10. Pool_833     TXCC   G 40   52.1%    61-117   3.9 att/gm  (30 gp, 20.2 mpg)
+    FT% (>= 1.5 att/gm ΓÇö 1536 qualify)
        1. Pool_1104    FLATL  G 41   98.3%    59-60    2.0 att/gm  (30 gp, 31.4 mpg)
        2. Pool_1241    WCST   G 57   95.6%    87-91    3.0 att/gm  (30 gp, 31.8 mpg)
        3. Pool_2493    STBR   W 63   95.0%    57-60    2.0 att/gm  (30 gp, 25.7 mpg)
@@ -687,23 +687,23 @@ Regenerating divvied rosters (world + seed; nothing persisted) and playing 5205 
        9. Pool_642     WMCH   G 42   93.8%   106-113   3.8 att/gm  (30 gp, 29.5 mpg)
       10. Pool_1538    HOU    G 52   93.2%    55-59    2.0 att/gm  (30 gp, 29.6 mpg)
 
-  RATES ΓÇö per-opportunity, 3470 men clearing the >=100 minute floor
+  RATES ΓÇö per-opportunity, 2083 men clearing the >=500 minute floor
     (direct on-floor counters, not minutes-share estimates ΓÇö may differ from external providers'
      box-score estimators though expressed in the same familiar units. BLK% is total blocks over
      opponent TWO-point attempts faced, the usual convention: threes are blockable in this engine,
      so it is NOT a strict share of blockable opportunities.)
-    BLK%     blk / opp 2PA faced   (3470 eligible)
-       1. Pool_4156    OLDDM  B 76   10.99%  (   10 of 91    )  (30 gp,  4.2 mpg)
-       2. Pool_3305    WTHP   B 69   10.87%  (   10 of 92    )  (30 gp,  4.4 mpg)
-       3. Pool_4437    NM ST  B 80   10.26%  (   12 of 117   )  (30 gp,  4.1 mpg)
-       4. Pool_4422    OR ST  B 78   10.08%  (   13 of 129   )  (30 gp,  4.0 mpg)
-       5. Pool_3150    OK     B 65    9.97%  (   30 of 301   )  (30 gp, 12.1 mpg)
-       6. Pool_4472    UTST   B 91    9.35%  (   33 of 353   )  (30 gp, 12.1 mpg)
-       7. Pool_4447    GONZG  B 82    9.26%  (   10 of 108   )  (30 gp,  4.0 mpg)
-       8. Pool_4503    UTAH   B 86    9.19%  (   59 of 642   )  (30 gp, 24.1 mpg)
-       9. Pool_4231    NCWM   B 72    9.06%  (   27 of 298   )  (30 gp, 12.4 mpg)
-      10. Pool_4181    NM     B 81    9.01%  (   10 of 111   )  (30 gp,  4.1 mpg)
-    REB%     reb / secured boards   (3470 eligible)
+    BLK%     blk / opp 2PA faced   (2083 eligible)
+       1. Pool_4503    UTAH   B 86    9.19%  (   59 of 642   )  (30 gp, 24.1 mpg)
+       2. Pool_4027    UTST   B 75    8.50%  (   55 of 647   )  (30 gp, 23.6 mpg)
+       3. Pool_4101    WBST   B 78    8.41%  (   54 of 642   )  (30 gp, 23.7 mpg)
+       4. Pool_4121    TNMN   B 73    8.35%  (   53 of 635   )  (30 gp, 24.4 mpg)
+       5. Pool_3132    STJN   B 75    8.27%  (   52 of 629   )  (30 gp, 23.8 mpg)
+       6. Pool_3999    STMRY  B 73    8.24%  (   52 of 631   )  (30 gp, 23.6 mpg)
+       7. Pool_1517    WMCH   G 64    8.14%  (   67 of 823   )  (30 gp, 31.2 mpg)
+       8. Pool_3220    UNLV   B 68    7.89%  (   49 of 621   )  (30 gp, 24.2 mpg)
+       9. Pool_3654    HBU    B 70    7.89%  (   47 of 596   )  (30 gp, 24.0 mpg)
+      10. Pool_4508    UAB    B 83    7.75%  (   51 of 658   )  (30 gp, 23.8 mpg)
+    REB%     reb / secured boards   (2083 eligible)
        1. Pool_3924    NDK    B 73   27.36%  (  322 of 1177  )  (30 gp, 23.6 mpg)
        2. Pool_3219    NJIT   B 73   25.05%  (  273 of 1090  )  (30 gp, 23.7 mpg)
        3. Pool_3654    HBU    B 70   24.67%  (  277 of 1123  )  (30 gp, 24.0 mpg)
@@ -712,41 +712,41 @@ Regenerating divvied rosters (world + seed; nothing persisted) and playing 5205 
        6. Pool_4101    WBST   B 78   22.92%  (  264 of 1152  )  (30 gp, 23.7 mpg)
        7. Pool_4058    VRMT   B 71   22.47%  (  257 of 1144  )  (30 gp, 23.6 mpg)
        8. Pool_3623    PRS    B 65   22.33%  (  249 of 1115  )  (30 gp, 24.1 mpg)
-       9. Pool_3221    CFL    B 65   22.27%  (   47 of 211   )  (30 gp,  4.0 mpg)
-      10. Pool_3100    SELA   W 65   21.94%  (  260 of 1185  )  (30 gp, 26.0 mpg)
-    AST%     ast / teammate FGM   (3470 eligible)
-       1. Pool_2776    DRXL   W 67   28.41%  (   25 of 88    )  (30 gp,  8.2 mpg)
-       2. Pool_2459    FRMN   W 53   25.60%  (   53 of 207   )  (30 gp, 25.7 mpg)
-       3. Pool_1079    MGNST  G 49   25.19%  (   66 of 262   )  (30 gp, 19.9 mpg)
-       4. Pool_263     NEWOR  G 40   24.79%  (   59 of 238   )  (30 gp, 19.9 mpg)
-       5. Pool_677     GBAY   G 43   23.56%  (   78 of 331   )  (30 gp, 29.8 mpg)
-       6. Pool_682     SMU    G 50   23.53%  (  100 of 425   )  (30 gp, 29.6 mpg)
-       7. Pool_549     DNVR   G 46   23.50%  (   86 of 366   )  (30 gp, 29.6 mpg)
-       8. Pool_479     JKNST  G 48   23.08%  (   87 of 377   )  (30 gp, 31.7 mpg)
-       9. Pool_361     NM ST  G 40   22.97%  (   65 of 283   )  (30 gp, 27.6 mpg)
-      10. Pool_3842    NCGN   B 65   22.83%  (   58 of 254   )  (30 gp, 24.0 mpg)
-    STL%     stl / def poss   (3470 eligible)
+       9. Pool_3100    SELA   W 65   21.94%  (  260 of 1185  )  (30 gp, 26.0 mpg)
+      10. Pool_2623    ULLAF  W 64   21.85%  (  279 of 1277  )  (30 gp, 26.0 mpg)
+    AST%     ast / teammate FGM   (2083 eligible)
+       1. Pool_2459    FRMN   W 53   25.60%  (   53 of 207   )  (30 gp, 25.7 mpg)
+       2. Pool_1079    MGNST  G 49   25.19%  (   66 of 262   )  (30 gp, 19.9 mpg)
+       3. Pool_263     NEWOR  G 40   24.79%  (   59 of 238   )  (30 gp, 19.9 mpg)
+       4. Pool_677     GBAY   G 43   23.56%  (   78 of 331   )  (30 gp, 29.8 mpg)
+       5. Pool_682     SMU    G 50   23.53%  (  100 of 425   )  (30 gp, 29.6 mpg)
+       6. Pool_549     DNVR   G 46   23.50%  (   86 of 366   )  (30 gp, 29.6 mpg)
+       7. Pool_479     JKNST  G 48   23.08%  (   87 of 377   )  (30 gp, 31.7 mpg)
+       8. Pool_361     NM ST  G 40   22.97%  (   65 of 283   )  (30 gp, 27.6 mpg)
+       9. Pool_3842    NCGN   B 65   22.83%  (   58 of 254   )  (30 gp, 24.0 mpg)
+      10. Pool_140     NCAS   G 48   22.19%  (   85 of 383   )  (30 gp, 31.8 mpg)
+    STL%     stl / def poss   (2083 eligible)
        1. Pool_313     NCOL   G 46    7.21%  (  123 of 1705  )  (30 gp, 32.0 mpg)
        2. Pool_1309    STACL  G 56    6.62%  (  106 of 1600  )  (30 gp, 30.1 mpg)
        3. Pool_2089    MICH   W 59    6.41%  (   88 of 1373  )  (30 gp, 26.0 mpg)
-       4. Pool_201     BUFF   G 44    6.15%  (   26 of 423   )  (30 gp,  8.0 mpg)
-       5. Pool_945     SMHOU  G 50    6.10%  (  105 of 1721  )  (30 gp, 32.2 mpg)
-       6. Pool_3043    SC     W 62    6.09%  (   27 of 443   )  (30 gp,  8.3 mpg)
-       7. Pool_268     IL     G 51    6.07%  (   96 of 1582  )  (30 gp, 29.8 mpg)
-       8. Pool_137     IAST   G 49    6.04%  (   64 of 1059  )  (30 gp, 19.9 mpg)
-       9. Pool_314     OAK    G 40    5.87%  (   63 of 1073  )  (30 gp, 20.1 mpg)
-      10. Pool_2351    GGWA   W 64    5.77%  (   25 of 433   )  (30 gp,  8.2 mpg)
-    PTS/100  pts / off poss   (3470 eligible)
+       4. Pool_945     SMHOU  G 50    6.10%  (  105 of 1721  )  (30 gp, 32.2 mpg)
+       5. Pool_268     IL     G 51    6.07%  (   96 of 1582  )  (30 gp, 29.8 mpg)
+       6. Pool_137     IAST   G 49    6.04%  (   64 of 1059  )  (30 gp, 19.9 mpg)
+       7. Pool_314     OAK    G 40    5.87%  (   63 of 1073  )  (30 gp, 20.1 mpg)
+       8. Pool_619     IUPUI  G 49    5.75%  (   85 of 1478  )  (30 gp, 27.8 mpg)
+       9. Pool_599     UCONN  G 49    5.68%  (   84 of 1480  )  (30 gp, 27.7 mpg)
+      10. Pool_127     WTHP   G 49    5.66%  (   95 of 1679  )  (30 gp, 31.5 mpg)
+    PTS/100  pts / off poss   (2083 eligible)
        1. Pool_546     UMBC   G 40   53.34   (  830 of 1556  )  (30 gp, 29.3 mpg)
        2. Pool_1038    STJN   G 56   52.66   (  891 of 1692  )  (30 gp, 31.8 mpg)
        3. Pool_1034    WCST   G 56   52.50   (  839 of 1598  )  (30 gp, 30.1 mpg)
-       4. Pool_1876    SDGST  W 56   48.63   (  409 of 841   )  (30 gp, 15.9 mpg)
-       5. Pool_1045    LEHGH  G 40   47.90   (  809 of 1689  )  (30 gp, 31.8 mpg)
-       6. Pool_2763    UCSB   W 59   47.65   (  668 of 1402  )  (30 gp, 26.4 mpg)
-       7. Pool_341     BLST   G 42   47.47   (  798 of 1681  )  (30 gp, 31.6 mpg)
-       8. Pool_973     HLYCR  G 48   46.97   (  797 of 1697  )  (30 gp, 32.0 mpg)
-       9. Pool_1581    VATC   G 51   46.65   (  745 of 1597  )  (30 gp, 29.9 mpg)
-      10. Pool_1280    STBR   G 50   46.15   (  732 of 1586  )  (30 gp, 29.5 mpg)
+       4. Pool_1045    LEHGH  G 40   47.90   (  809 of 1689  )  (30 gp, 31.8 mpg)
+       5. Pool_2763    UCSB   W 59   47.65   (  668 of 1402  )  (30 gp, 26.4 mpg)
+       6. Pool_341     BLST   G 42   47.47   (  798 of 1681  )  (30 gp, 31.6 mpg)
+       7. Pool_973     HLYCR  G 48   46.97   (  797 of 1697  )  (30 gp, 32.0 mpg)
+       8. Pool_1581    VATC   G 51   46.65   (  745 of 1597  )  (30 gp, 29.9 mpg)
+       9. Pool_1280    STBR   G 50   46.15   (  732 of 1586  )  (30 gp, 29.5 mpg)
+      10. Pool_1116    ASTNP  G 53   45.95   (  731 of 1591  )  (30 gp, 29.9 mpg)
 
   ONE TEAM IN FULL ΓÇö Oklahoma State (id 200), in rotation order
     player       pos  ht  gp   mpg   pts   reb   ast  stl  blk   to     fg%    3p%    ft%   sfl*  nsf*
@@ -772,10 +772,10 @@ Regenerating divvied rosters (world + seed; nothing persisted) and playing 5205 
     rebounds     11.2    8.8    7.7    7.1    5.2     4.1     2.2
     assists       3.3    3.0    2.5    2.3    1.6     1.3     0.7
     minutes      32.8   32.3   32.1   31.9   29.9    27.6    16.0
-    ΓÇö rates below: 3470 of 4511 clearing the >=100 minute floor
-    BLK%         11.0    9.0    6.8    6.1    4.0     3.0     2.2   n=3470
-    REB%         27.4   21.9   18.6   17.4   13.8    11.9     9.8   n=3470
-    AST%         28.4   22.8   19.9   18.6   14.3    11.8     9.6   n=3470
-    STL%          7.2    5.8    4.8    4.5    3.2     2.5     1.8   n=3470
-    PTS/100      53.3   46.2   40.3   37.2   27.3    21.6    16.4   n=3470
+    ΓÇö rates below: 2083 of 4511 clearing the >=500 minute floor
+    BLK%          9.2    7.8    5.9    5.1    2.8     2.1     2.0   n=2083
+    REB%         27.4   21.8   18.3   16.9   12.4     9.4     9.3   n=2083
+    AST%         25.6   22.2   19.2   17.6   13.0    10.1     9.9   n=2083
+    STL%          7.2    5.7    4.7    4.3    2.9     2.0     2.0   n=2083
+    PTS/100      53.3   45.9   39.7   36.5   24.8    18.3    17.8   n=2083
 

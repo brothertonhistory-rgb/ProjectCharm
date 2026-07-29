@@ -2930,11 +2930,12 @@ internal static partial class Program
         static Player MkP36(int id, int b,
                             int? rimProt  = null, int? perimDef = null,
                             int? postDef  = null, int? height   = null,
-                            int? wingspan = null, int? vertical = null)
+                            int? wingspan = null, int? vertical = null,
+                            int? outside  = null)
             => new Player($"p{id}")
             {
                 PlayerId             = id,
-                Outside              = b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
+                Outside              = outside ?? b, Mid = b, Close = b, Finishing = b, FreeThrow = b,
                 FoulDrawing          = b, BallHandling = b, Passing = b, Playmaking = b,
                 SelfCreation         = b, PostMoves    = b, OffBallMovement = b, Screening = b,
                 OffensiveRebounding  = b,
@@ -2969,7 +2970,31 @@ internal static partial class Program
                 Entry: EntryType.DeadBallInbound,
                 ShotType: shotType);
 
-        var offDummy = Enumerable.Range(6, 5).Select(i => MkP36(i, 50)).ToArray();
+        // Session 81 — TWO offenses, because these sub-checks test two different things.
+        //
+        // Emmett's ruling (2026-07-28): "we need a realistic opponent to validate against."
+        // The original fixture used five all-50 dummies, so the S81 assignment gate pushed on
+        // all five defenders EQUALLY and cancelled out of the normalized shares — every check
+        // below would have passed just as happily with the gate wired BACKWARDS.
+        //
+        // But a varied offense CONFOUNDS the attribute checks: sub-check 1 asks "does
+        // RimProtection lead at the rim", and if the rim protector happens to be guarding the
+        // sniper his help is legitimately suppressed and he legitimately does not lead. That
+        // is correct basketball and a broken experiment.
+        //
+        // So: offUniform isolates the DEFENDER attribute under test (the gate is constant, so
+        // it divides out); offVaried is used by sub-check 11, which exists to prove the gate
+        // flows through the PICKER and is correctly signed. Each check tests one thing.
+        var offUniform = Enumerable.Range(6, 5).Select(i => MkP36(i, 50)).ToArray();
+        var offVaried = new[]
+        {
+            MkP36(6,  50, outside: 88),   // sniper — his defender should barely help
+            MkP36(7,  50, outside: 70),   // secondary shooter
+            MkP36(8,  50, outside: 45),   // neutral — sits at the spacing midpoint
+            MkP36(9,  50, outside: 28),   // reluctant
+            MkP36(10, 50, outside: 12),   // non-shooting big — his defender helps freely
+        };
+        var offDummy = offUniform;
 
         // ── Sub-check 1 — Zone-aware direction (Rim): rim protector dominant ─────
         {
@@ -3243,6 +3268,56 @@ internal static partial class Program
             Console.WriteLine(sub10Ok
                 ? "    [OK] matched-man share rises monotonically Rim -> Three"
                 : "    [FAIL] matched-man share does not rise away from the rim");
+        }
+
+        // ── Sub-check 11 (S81) — the assignment gate reaches the PICKER ────────
+        // Sub-checks 1-10 deliberately face a uniform offense so they isolate the defender
+        // attribute under test. That leaves one thing unproven: that the gate survives the
+        // trip through BlockCreditWeights -> normalization -> the RNG walk. Phase 74 proves
+        // the math; this proves the WIRING, and it is the check that fails loudly if the
+        // gate is ever inverted.
+        //
+        // Five IDENTICAL defenders, no SelectedSlot (so every man is a helper and no matched
+        // arm confuses the read), against the graded offense. Under slot parity, defender i
+        // guards offVaried[i] — so the only thing separating five identical men is who they
+        // are guarding.
+        {
+            Console.WriteLine("  Sub-check 11 (S81): the assignment gate reaches the picker");
+            var def = new[] { MkP36(1, 50), MkP36(2, 50), MkP36(3, 50), MkP36(4, 50), MkP36(5, 50) };
+            var gameU = BuildGame36(offUniform, def);
+            var gameV = BuildGame36(offVaried, def);
+            var state = MkState36(ShotLocation.Rim);
+
+            var cU = new int[5]; var cV = new int[5];
+            var rU = new SystemRng(36_1101); var rV = new SystemRng(36_1101);
+            for (var i = 0; i < N; i++)
+            {
+                cU[BlockerPicker.Pick(state, gameU, matchupCfg, rU).Number - 1]++;
+                cV[BlockerPicker.Pick(state, gameV, matchupCfg, rV).Number - 1]++;
+            }
+            Console.WriteLine("    uniform offense: " + string.Join("  ",
+                cU.Select((c, i) => $"s{i + 1}={(double)c / N:P1}")));
+            Console.WriteLine("    graded offense:  " + string.Join("  ",
+                cV.Select((c, i) => $"s{i + 1}={(double)c / N:P1}")));
+            Console.WriteLine("    (s1 guards Outside 88, s5 guards Outside 12)");
+
+            // Uniform offense: five identical defenders on five identical men split evenly —
+            // the gate is constant and divides out of the normalization.
+            var evenSplit = cU.All(c => Math.Abs((double)c / N - 0.20) < 0.01);
+            // Graded offense: the man on the sniper must be credited materially less than the
+            // man on the non-shooting big. THIS IS THE SIGN CHECK — an inverted gate compiles
+            // clean, passes every conservation check, and flips exactly this line.
+            var signOk = (double)cV[0] / N < (double)cV[4] / N - 0.05;
+            // Monotone: suppression must fall as the assigned man's Outside falls.
+            var monoOk = Enumerable.Range(1, 4).All(i => cV[i] > cV[i - 1]);
+            // And nobody is ever un-drawable, even glued to the best shooter alive.
+            var drawable = cV.All(c => c > 0);
+
+            var sub11Ok = evenSplit && signOk && monoOk && drawable;
+            ok &= sub11Ok;
+            Console.WriteLine(sub11Ok
+                ? "    [OK] gate is live through the picker, correctly signed, monotone, nobody zeroed"
+                : $"    [FAIL] evenSplit={evenSplit} sign={signOk} monotone={monoOk} drawable={drawable}");
         }
 
         // ── Governor run invariants A and B ───────────────────────────────────────

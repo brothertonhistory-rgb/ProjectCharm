@@ -657,11 +657,18 @@ public sealed class RollHGenerator : IRollHPieGenerator
             blkDefRoster.PlayerAt(blkDefLineup.SlotAt(5)),
         };
 
+        // Session 81 — each off-ball defender's help is scaled by how far the man HE is
+        // guarding pulls him from the rim (slot parity). Null on a fast break, where nobody
+        // is matched up; a null offense makes every gate 1.0 and reproduces S79 exactly.
+        // Same resolver the credit path uses, so rate and credit can never disagree about
+        // who is guarding whom.
+        var blockOffense = BlockerPicker.ResolveOffensiveLineup(state, _game);
+
         var blockWeight = defender is null
             ? _cfg.BlockWeight(zone)
             : Matchup.BlockWeightWithHelp(zone, player, defender,
                                           blockDefenders, defenderSlot.Number - 1,
-                                          _cfg.BlockWeight(zone), _matchup);
+                                          _cfg.BlockWeight(zone), _matchup, blockOffense);
 
         // Phase 8 — matchup-aware foul door. Compute the bent foul rate from the
         // matchup, or fall back to the configured per-zone baseline (DEC-6, same

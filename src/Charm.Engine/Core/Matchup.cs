@@ -410,18 +410,118 @@ public static class Matchup
     /// <summary>One off-ball defender's contribution to the block rate:
     /// <c>max(0, threat) · readiness</c>. The per-defender no-drag floor is
     /// <see cref="PutbackBlockRate"/>'s rule — a below-average helper contributes nothing rather
-    /// than dragging the team total down.</summary>
+    /// than dragging the team total down.
+    ///
+    /// <para><b>Session 81 note.</b> The assignment gate is deliberately NOT folded in here.
+    /// It is a separate named multiplier (<see cref="BlockEffectiveGate"/>) applied by the two
+    /// consumers, so the "who is this man guarding" lookup stays one replaceable piece for the
+    /// eventual coaching layer instead of being welded into the help formula.</para></summary>
     public static double BlockHelpShift(ShotLocation zone, Player d, double lineupMeanDepth,
                                         MatchupConfig cfg)
         => Math.Max(0.0, BlockDefenderThreat(zone, d, cfg))
          * BlockHelpReadiness(d, lineupMeanDepth, cfg);
 
+    // ── Session 81 — rim help is gated by WHO YOU ARE GUARDING ─────────────────
+    //
+    // Emmett's ruling: a guard is not incapable of blocking shots, he is simply never
+    // in position — "if they are guarding the opposing perimeter players, they aren't
+    // rotating much." The mirror binds equally: a 6'11" centre chasing a stretch five
+    // around the arc stops being a rim helper on those possessions too. Nothing here
+    // caps what a small player CAN be; it prices the situations he is in.
+    //
+    // Assignment today IS slot parity (DefenderPicker's man-to-man wiring): the defender
+    // in slot i guards the offensive player in slot i. The gate consumes assignment
+    // through ONE named lookup so a future coaching layer can replace slot parity —
+    // cross-matching, switching, zone — without touching the gate formula.
+
+    /// <summary>
+    /// How far an OFFENSIVE player pulls his defender away from the rim, in [0, 1].
+    /// A logistic on Outside (Emmett's ruling, 2026-07-28 — "C2b").
+    ///
+    /// <para><b>Why a logistic and not a raw rating.</b> A raw <c>Outside/100</c> pays 0.29
+    /// spacing to the MEDIAN college player, which would suppress rim help league-wide for men
+    /// no defender would ever leave the paint to guard. The logistic's wide scale keeps the
+    /// score a DIAL: 45% of the league lands between 0.2 and 0.8, with nothing pinned at
+    /// either end.</para>
+    ///
+    /// <para><b>Why not the shot diet.</b> An arc-share read off the derived per-zone
+    /// tendencies separated shooters from rim runners better (AUC 0.970 vs 0.944), but it is
+    /// BIMODAL on the current population — 67% of the league pins at 0 or 1 and only 5% lands
+    /// in the middle. A two-valued score reintroduces as a hard switch exactly the
+    /// discontinuity <see cref="BlockEffectiveGate"/>'s zone fade exists to avoid. Revisit
+    /// when shot diets spread out.</para>
+    ///
+    /// <para><b>This is a PROXY for possession location, not location itself.</b> A stretch
+    /// five who posts up, cuts, or crashes the glass is still scored as a spacer all
+    /// possession. Accepted deliberately: the engine has no possession-location layer, and a
+    /// future one replaces this read behind the same lookup.</para>
+    /// </summary>
+    public static double BlockSpacing(Player offensivePlayer, MatchupConfig cfg)
+        => 1.0 / (1.0 + Math.Exp(-(offensivePlayer.Outside - cfg.BlockSpacingMidpoint)
+                                 / cfg.BlockSpacingScale));
+
+    /// <summary>
+    /// How much of his help a defender keeps, given the man he is guarding:
+    /// <c>Floor + (1 − Floor) · (1 − spacing)</c>. Zone-independent — this is the raw
+    /// assignment read, before <see cref="BlockAssignmentInfluence"/> fades it by distance.
+    ///
+    /// <para><c>Floor</c> is Emmett's "not zero": a guard on a point guard still rotates
+    /// sometimes. Config enforces <c>0 &lt; Floor &lt; 1</c>, so this is never zero and no
+    /// defender can become un-drawable for block credit.</para>
+    /// </summary>
+    public static double BlockAssignmentGate(Player assignedMan, MatchupConfig cfg)
+        => cfg.BlockAssignmentFloor
+         + (1.0 - cfg.BlockAssignmentFloor) * (1.0 - BlockSpacing(assignedMan, cfg));
+
+    /// <summary>
+    /// The assignment gate faded by shot distance:
+    /// <c>1 − Influence(zone) · (1 − assignmentGate)</c>. Returns exactly <c>1.0</c> (no
+    /// suppression) when <paramref name="assignedMan"/> is null.
+    ///
+    /// <para><b>A null assigned man is a real, ruled state, not a defensive guard.</b> It
+    /// means either (a) the possession is a fast break, where nobody is matched up and slot
+    /// parity would wrongly suppress a guard chasing down a layup for "his man" being a
+    /// shooter, or (b) the offensive slot is unpopulated (a harness roster). Both mean the
+    /// gate cannot apply, and both must leave the S79 tree bit-identical.</para>
+    ///
+    /// <para><b>The fade is flat through the paint and that is load-bearing.</b>
+    /// <see cref="MatchupConfig.BlockHelpShare"/> falls only 0.50 → 0.42 from Rim to Short, so
+    /// any influence fade steeper than that makes the COMBINED helper multiplier
+    /// (<c>helpShare · effectiveGate</c>) RISE from Rim to Short — a defender glued to a
+    /// sniper would help MORE on a five-footer than on a layup. Config enforces
+    /// non-increasing influence; the ORACLE enforces the combined curve, which is the
+    /// constraint that actually bites.</para>
+    /// </summary>
+    public static double BlockEffectiveGate(ShotLocation zone, Player? assignedMan,
+                                            MatchupConfig cfg)
+        => assignedMan is null
+         ? 1.0
+         : 1.0 - cfg.BlockAssignmentInfluence(zone) * (1.0 - BlockAssignmentGate(assignedMan, cfg));
+
+    /// <summary>The man defender <paramref name="defenderIndex"/> is guarding — slot parity,
+    /// the single named assignment lookup. Null when <paramref name="offense"/> is null (a
+    /// fast break: no assignments exist) or that offensive slot is unpopulated.
+    ///
+    /// <para>This is a SEPARATE question from "who is the matched defender", which
+    /// <see cref="BlockerPicker"/> resolves from <c>SelectedSlot</c>. A null shooter slot
+    /// means the SHOOTER is unknown; every defender's assigned man is still resolvable.</para>
+    /// </summary>
+    public static Player? BlockAssignedMan(IReadOnlyList<Player?>? offense, int defenderIndex)
+        => offense is null || defenderIndex < 0 || defenderIndex >= offense.Count
+         ? null
+         : offense[defenderIndex];
+
     /// <summary>The summed help contribution of the four NON-matched defenders. Null slots
     /// contribute zero and are NOT renormalized away — the sum IS the design (same rule as
     /// <see cref="PutbackBlockRate"/>; contrast the AVERAGING aggregates in RollHGenerator's
     /// C5.5/C6/C7, which divide by capacity).</summary>
+    /// <param name="offense">The OFFENSIVE five in slot order — defender <c>i</c> guards
+    /// <c>offense[i]</c> (slot parity). Null on a fast break (no assignments exist) or when no
+    /// lineup is available, which makes every gate exactly 1.0 and reproduces the S79 tree
+    /// bit-for-bit.</param>
     public static double BlockHelpSum(ShotLocation zone, IReadOnlyList<Player?> defenders,
-                                      int matchedIndex, MatchupConfig cfg)
+                                      int matchedIndex, MatchupConfig cfg,
+                                      IReadOnlyList<Player?>? offense = null)
     {
         var meanDepth = BlockHelpMeanDepth(defenders, cfg);
         var sum = 0.0;
@@ -430,7 +530,8 @@ public static class Matchup
             if (i == matchedIndex) continue;      // his contest is the duel arm, not the help arm
             var d = defenders[i];
             if (d is null) continue;
-            sum += BlockHelpShift(zone, d, meanDepth, cfg);
+            var gate = BlockEffectiveGate(zone, BlockAssignedMan(offense, i), cfg);
+            sum += gate * BlockHelpShift(zone, d, meanDepth, cfg);
         }
         return sum;
     }
@@ -452,10 +553,12 @@ public static class Matchup
     /// </summary>
     public static double BlockWeightWithHelp(ShotLocation zone, Player shooter, Player defender,
                                              IReadOnlyList<Player?> defenders, int matchedIndex,
-                                             double baseBlockWeight, MatchupConfig cfg)
+                                             double baseBlockWeight, MatchupConfig cfg,
+                                             IReadOnlyList<Player?>? offense = null)
     {
         var duel = BlockDuelShift(zone, shooter, defender, cfg);
-        var help = cfg.BlockHelpShare(zone) * BlockHelpSum(zone, defenders, matchedIndex, cfg);
+        var help = cfg.BlockHelpShare(zone)
+                 * BlockHelpSum(zone, defenders, matchedIndex, cfg, offense);
         return BlockBend(zone, duel + help, baseBlockWeight, cfg);
     }
 
@@ -488,8 +591,12 @@ public static class Matchup
     /// <para><paramref name="matchedIndex"/> is −1 when no matched defender is resolvable; every
     /// populated slot is then a helper. Null slots weigh exactly 0.</para>
     /// </summary>
+    /// <param name="offense">The OFFENSIVE five in slot order (slot parity). Null on a fast
+    /// break or when no lineup is available — every gate is then 1.0 and this reproduces the
+    /// S79 weights exactly.</param>
     public static double[] BlockCreditWeights(ShotLocation zone, IReadOnlyList<Player?> defenders,
-                                              int matchedIndex, MatchupConfig cfg)
+                                              int matchedIndex, MatchupConfig cfg,
+                                              IReadOnlyList<Player?>? offense = null)
     {
         var meanDepth = BlockHelpMeanDepth(defenders, cfg);
         var share     = cfg.BlockHelpShare(zone);
@@ -499,9 +606,22 @@ public static class Matchup
             var d = i < defenders.Count ? defenders[i] : null;
             if (d is null) { w[i] = 0.0; continue; }
 
+            // Session 81: the helper term is scaled by the gate IN FULL, luck floor included
+            // — the same idiom the zone share already uses on this line. Gating only the help
+            // ABOVE the floor compresses everyone toward an untouched floor, and the men with
+            // the most help to lose are the big men: measured league-wide, that version moved
+            // rim-block credit TOWARD defenders under 6'3" (over-representation 0.80x -> 0.82x),
+            // the exact opposite of this change's purpose. Scaling the whole term moves it the
+            // intended way (0.80x -> 0.78x). Because the RATE has no luck floor, this choice
+            // cannot move block TOTALS — only whose name goes on them.
+            //
+            // The matched man is never gated: he is on the ball, and the gate prices rotation
+            // distance, which is not a question that applies to the man already there.
             w[i] = i == matchedIndex
                  ? cfg.BlockCreditLuckFloor + Math.Max(0.0, BlockDefenderThreat(zone, d, cfg))
-                 : share * (cfg.BlockCreditLuckFloor + BlockHelpShift(zone, d, meanDepth, cfg));
+                 : share
+                   * BlockEffectiveGate(zone, BlockAssignedMan(offense, i), cfg)
+                   * (cfg.BlockCreditLuckFloor + BlockHelpShift(zone, d, meanDepth, cfg));
         }
         return w;
     }

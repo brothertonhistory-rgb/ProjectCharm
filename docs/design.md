@@ -5955,7 +5955,7 @@ All three are calibration placeholders. Direction and shape are what Phase 35 va
 
 ---
 
-## Phase 36 / Phase 74 — Block credit and the help arm (Session 71, REBUILT Session 79, 2026-07-27)
+## Phase 36 / Phase 74 — Block credit and the help arm (Session 71, REBUILT Session 79, GATED BY ASSIGNMENT Session 81, S81.1 RULING PENDING BUILD, 2026-07-28)
 
 ### Problem, as it stood after S78
 
@@ -6111,6 +6111,235 @@ All six on-walk pickers are now wired. Every post-hoc harness `WeightedDraw` has
 - **Team rebounds** (ball out of bounds off a miss). No individual credited; deferred.
 
 ---
+
+### Session 81 — help is gated by WHO YOU ARE GUARDING
+
+The S79 help arm above pays a defender for his tools and his instincts, and it pays him
+identically whether his own man is standing in the dunker spot or 25 feet away at the arc.
+That is why the rim-protection ability ordering could be positionally sound (S79.2: top 25 =
+24 bigs, 1 wing, 0 guards) while small men with high RimProtection still produced blocks
+freely — they had ability *and* unlimited opportunity.
+
+**Emmett's ruling: the problem is opportunity, not ability.** A 5'10" defender is not
+incapable of blocking shots; he is never in position, because he is guarding a perimeter
+player. And the mirror binds with equal force — a 6'11" centre chasing a stretch five around
+the arc also stops being a rim protector on those possessions.
+
+**★ Nothing here caps what a small player can be.** He keeps whatever RimProtection he was
+generated with. The gate prices the situation, not the man. This is the distinction that
+decides which layer owns the fix: a rating problem belongs to generation, an opportunity
+problem belongs to the engine, and this is the second kind.
+
+    spacing(o)   = 1 / (1 + exp(-(o.Outside - BlockSpacingMidpoint) / BlockSpacingScale))
+    aGate(o)     = BlockAssignmentFloor + (1 - BlockAssignmentFloor) * (1 - spacing(o))
+    eGate(z, o)  = 1 - BlockAssignmentInfluence(z) * (1 - aGate(o))
+
+    rate:    total = duelShift + helpShare(z) * SUM_{d != matched} eGate(z, man(d)) * helpShift(d)
+    credit:  helper = helpShare(z) * eGate(z, man(d)) * (luckFloor + helpShift(d))
+             matched = luckFloor + max(0, threat(d))          -- never gated
+
+`Matchup.BlockSpacing` / `BlockAssignmentGate` / `BlockEffectiveGate` / `BlockAssignedMan`.
+Shipped values: midpoint 45, scale 14, floor 0.30, influence Rim 1.00 / Short 1.00 / Mid 0.50
+/ Long 0.20 / Three 0.00.
+
+**The matched man is never gated.** He is on the ball; the gate prices rotation distance,
+which is not a question that applies to the man already there.
+
+**Assignment is slot parity, behind one named lookup.** `DefenderPicker.PickForOffensiveSlot`
+is `new Slot(state.Defense, offensiveSlot.Number)` — the defender in slot *i* guards the
+offensive player in slot *i*, and that is the whole assignment model the engine has. The gate
+consumes it through `BlockAssignedMan` alone, so a coaching layer (cross-matching, switching,
+zone) replaces slot parity without touching the gate formula. **A null `SelectedSlot` never
+blinds the gate** — a null shooter slot means the SHOOTER is unknown; every defender's
+assigned man remains resolvable.
+
+**Transition is exempt.** On a break nobody is matched up, and slot parity would suppress a
+guard chasing down a layup because the man in his slot number is a shooter. Roll H and the
+picker pass `offense = null` on a fast break, which makes every gate exactly 1.0 and
+reproduces the S79 tree bit-for-bit. Transition assignment is its own open item.
+
+**Putbacks are untouched.** A go-back-up is a scramble with everyone already inside;
+assignment has broken down by definition. `PutbackBlockCreditWeights` takes no offense
+argument and Phase 74 proves it byte-exact against a hand-recomputed ungated expression.
+
+#### ★ Why spacing is a logistic on Outside and not the shot diet
+
+The engine already derives, for every player, what fraction of his shots come from the arc
+(`DeriveTendencies`). That is the more direct question — where does this man actually stand —
+and as a classifier it is better: AUC 0.970 against the logistic's 0.944 at separating
+generated Shooters from Slashers.
+
+**It was rejected because the quantity is bimodal on the current population.** Arc share
+reads p25 = 6.5 and p75 = 70.5 with essentially nothing between; across five candidate ramp
+knees, every one pinned 25–32% of the league at 1.00 and 35–63% at 0.00, leaving ~5% in the
+middle. The knees are not the problem — the input has no middle.
+
+That matters because `Influence(zone)` exists to *fade a graded quantity*. A two-valued score
+reintroduces, at the score axis, exactly the hard discontinuity the zone fade was built to
+avoid. The logistic's wide scale (14 rating points) keeps 45% of the league between 0.2 and
+0.8 with nothing pinned at either end.
+
+**When shot diets spread out, the arc-share read becomes correct and drops in behind the same
+lookup.** The bimodality is a population property, not a design flaw in the idea.
+
+A raw `Outside/100` was rejected separately and for a different reason: it pays 0.29 spacing
+to the *median* college player, suppressing rim help league-wide for men no defender would
+leave the paint to guard.
+
+#### ★ Why the gate scales the WHOLE helper credit term, luck floor included
+
+`BlockCreditLuckFloor` is every populated defender's baseline weight — the reason nobody is
+un-drawable. Gating only the help *above* that floor compresses everyone toward an untouched
+floor, and the men with the most help to lose are the big men. Measured over 12,000 real
+lineup pairs, over-representation in rim-block credit relative to floor share:
+
+    today                            under 6'3" 0.80x   6'10"+ 1.74x
+    gate the help only               under 6'3" 0.82x   6'10"+ 1.69x    <- BACKWARDS
+    gate the whole term (shipped)    under 6'3" 0.78x   6'10"+ 1.78x
+
+Gating only the help hands *more* rim blocks to small players — the opposite of the change's
+purpose. Scaling the whole term is also the idiom `BlockHelpShare` already uses in the same
+expression.
+
+**Because the RATE has no luck floor, this choice cannot move block totals — only whose name
+goes on them.**
+
+The floor guarantee survives: at `BlockAssignmentFloor` 0.30 the weakest possible effective
+gate is 0.3145, so every populated defender stays strictly drawable and the picker's
+no-zero-mass contract holds. Config enforces `0 < floor < 1` for exactly this reason.
+
+#### ★ Why Influence is FLAT through the paint
+
+`BlockHelpShare` falls only 0.50 → 0.42 from Rim to Short. **Any** influence fade steeper than
+that makes the combined helper multiplier (`helpShare × eGate`) *rise* from Rim to Short — a
+defender glued to a sniper would help MORE on a five-footer than on a layup. Three candidate
+vectors, each perfectly monotone read down its own column, all failed exactly this way.
+
+Rim and Short are the same basketball question — can this man rotate into the lane — so they
+carry the same influence.
+
+    combined multiplier by zone (helpShare x eGate), shipped:
+      Outside 12:  0.4697  0.3946  0.1455  0.0593  0.0400
+      Outside 85:  0.1690  0.1420  0.1004  0.0521  0.0400
+
+**Config's guard cannot express this constraint** — it can only check that influence itself is
+non-increasing, which is necessary and not sufficient. The **oracle** enforces the combined
+curve, and the C# guard names the gap in a comment rather than pretending to cover it.
+
+#### What this does and does not move
+
+**Per situation, it is large and exact.** The same 6'11" rim protector, same body, same
+lineup: guarding a post big he takes 39.4% of his team's rim blocks; guarding a sniper, 18.9%.
+Blocks per 100 fall 8.821 → 3.618 — a smaller pie *and* a smaller slice. The mirror: a 5'10"
+guard on a shooter drops 7.3% → 2.8%.
+
+**League-wide, it is small.** Helper share of rim blocks fell 68.4% → **63.8%** on the stock
+season. Height composition moved about two points.
+
+**★ It is NOT a correction to league block totals, and this is recorded rather than tuned.**
+Deleting the *entire* help arm moves the rim block rate only from 14.32% to 13.02%; the gate
+cuts about a quarter of that arm. League blocks went 4.4 → 4.3 against a 3.5 target and remain
+flagged HIGH. Page-only calibration principle applies: blocks reading high is a finding for a
+calibration session with a settled population, not a dial for this one. **The value of S81 is
+who gets the blocks, not how many.**
+
+**★ The BLK% leaderboard cannot validate this change.** No pre-S81 BLK% board was ever
+committed. The A/B was declined deliberately: the measured composition shift is ~2 points, and
+a top-ten list drawn from 2,083 players reshuffles by more than that from noise alone. The
+evidence of record is the per-situation proof in Phase 74, which is exact and which no
+leaderboard can show, because it is a per-possession effect that averages away.
+
+
+#### ★ The help arm is measured against a FIXED MIDPOINT, and that is a scalar wall breach (S81.1 finding; RULED, NOT YET BUILT)
+
+The block door asks two different questions and only one of them is a matchup.
+
+**On the ball, it is relative.** `BlockDuelShift` reads both terms as differences against
+*this shooter*: `DefenseRating(zone, defender) − OffenseRating(zone, shooter)` for skill, and
+`LengthRating(defender) − LengthRating(shooter)` for length. At the rim `OffenseRating` is the
+shooter's **Finishing**. So a tall, skilled finisher already suppresses the block odds of the
+man guarding him, and a 6'0" guard already gets contested harder than a 6'4" guard by the man
+in front of him. That half is correct and stays.
+
+**Off the ball, it is absolute.** `BlockDefenderThreat` — the term every *helper* contributes
+through — reads:
+
+    skill  = GapFn(DefenseRating(zone, d) − AttributeMidpoint)
+    length = GapFn(LengthRating(d)        − AttributeMidpoint)
+    threat = sw * skill + lw * length
+
+`AttributeMidpoint` is a constant. The helper is compared to a permanent imaginary
+50-rated player, **not to the man he is contesting and not to anyone on the floor.**
+
+**★ Why this is the no-scalar wall breached in the hardest place to see it.** Team strength in
+this engine is supposed to emerge from individual matchups; nothing is allowed to be a fixed
+scalar. The help arm is a fixed scalar. Its consequences:
+
+- **A D3 seven-footer helps identically in D3 and in the Big Ten.** His size advantage never
+  shrinks when the floor gets bigger, because the thing he is measured against never changes.
+  Emmett: *"if he's going against 6'4" guys he's going to block their shots. But if he's going
+  against guys who are 6'7" and athletic and can score inside and finish he's going to be eaten
+  up."* The engine cannot currently tell those two situations apart.
+- **The shooter's height does not protect him from help.** A 6'0" guard and a 6'4" guard at the
+  rim draw exactly the same help contribution.
+- **The shooter's Finishing does not protect him from help either.** A big with 30 Finishing and
+  a big with 90 Finishing draw the same help, though Finishing already protects both of them
+  from the man guarding them. Emmett: *"rim finishing should matter against getting blocked, it
+  implies they have creativity or flexibility or what have you. A big man with low finishing
+  should get blocked more than one with high finishing, even outside of the actual make%."*
+- **O-44 is this defect wearing different clothes.** A neutral point that 83% of the league sits
+  below is exactly what a fixed yardstick produces. Re-siting the bar treats the symptom.
+
+**THE RULING (Emmett, 2026-07-28): the help arm compares to the SHOOTER.** Not to the helper's
+own teammates, not to the opposing five — to the man putting the ball up. This makes the help
+arm ask the same question the on-ball contest already asks, so the door carries one rule instead
+of two, and it delivers three separately-requested behaviours from a single change:
+
+1. **Level-relativity with no level flag.** The D3 big dominates his league and is ordinary in
+   D1, automatically, because the comparison moves with the floor.
+2. **Shooter height matters against help** — *"a 6'0" guard getting to the rim should have higher
+   odds of getting blocked than a 6'4" guard getting to the rim regardless of who the opponents
+   are, just by sheer math."*
+3. **Shooter Finishing matters against help**, independently of whether the ball goes in.
+
+**★ Two framings offered and REJECTED, recorded so they are not re-proposed.**
+
+*A body-set band (absolute floor and ceiling per frame).* Claude proposed that the body should
+set a range and the rating should position the player inside it — a low narrow band for a 6'0"
+frame, a high wide band for a 7'0" frame. Emmett rejected the shape: **the floor is not a
+number, it is the size gap against the man actually being faced.** A seven-footer with no
+instincts is not "worth a fixed 1.6x" — he is dominant against 6'4" and eaten up by a finishing
+6'7". The band framing smuggled a scalar back in under a different name.
+
+*Comparing the helper to his own teammates.* A real idea, but a different one — it describes a
+man's ROLE on his own defense (who is positioned deepest), not whether he is big for this
+matchup. `BlockHelpReadiness` already carries the teammate-relative question through its
+lineup-mean depth term; it should not be asked twice.
+
+**Measured today, before the change** — one-on-one and help contributions at the rim, with an
+ordinary 6'8" as the yardstick:
+
+    7'0", 7'5" span, ZERO rim protection        helps at 6.73   1.6x ordinary
+    6'0", 6'1" span, 40" hops, rim 99           helps at 4.86   1.2x
+    6'8" ordinary                               helps at 4.20   1.0x
+    6'0", 6'1" span, average hops, rim 99       helps at 2.50   0.6x
+    7'0", 7'5" span, rim 99                     helps at 14.14  3.4x
+
+Two readings worth carrying into the build. **Size alone already works** — the seven-footer with
+a zero rating outhelps an ordinary big and outhelps the 6'0" guard with a 99, which is correct
+basketball and must survive the change. And **hops currently count as reach at full weight**: the
+same 6'0" guard with a 99 rating nearly doubles his help on vertical alone (2.50 → 4.86), because
+`LengthRating` is Height, Wingspan and Vertical at **exactly one third each**. A 40-inch vertical
+is presently worth more to this engine than four inches of wingspan.
+
+**Open inside the same session, not settled here:**
+- **Wingspan should outweigh height** (Emmett's read: what matters is where the hand ends up;
+  height matters mostly because it is where the arms are attached). Not yet weighted.
+- **Whether vertical belongs in reach at all**, or whether its real value is separate — the second
+  jump, the recovery, the chase-down from behind.
+
+Both become answerable only once there is something moving to measure against, which is why they
+belong with this change rather than before it.
 
 ## Phase 37 — Roll C Real Generator: Flat Context-Driven Type-Mix (2026-06-19)
 

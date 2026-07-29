@@ -1,3 +1,221 @@
+## Session 81.1 — THE HELP ARM IS MEASURED AGAINST A FIXED YARDSTICK. A design conversation, no code. Chasing "why do small men block shots" into the block door found that off-ball help compares every defender to a permanent imaginary 50-rated player rather than to the man he is contesting — the no-scalar wall breached in the one place it is hardest to see. Ruled: help compares to the SHOOTER. One change delivers level-relativity with no level flag, shooter height mattering against help, and shooter Finishing mattering against help. Absorbs O-44 entirely and displaces S80 as the next session. Claude proposed a body-set "band" and Emmett rejected it as a scalar under another name. (2026-07-28)
+
+**Register:** design conversation, immediately following the S81 build. **Nothing was built. No engine, config, generator, fixture, page or dial changed.** The artefacts of this session are three rulings and a reframed next-session slot.
+
+### How it started, and why the first framing was wrong
+
+The conversation opened on S80 — the interior-defence bid, which was the approved next candidate. Emmett's first move was not about generation at all:
+
+> "For the guards it's a combo of: they aren't near the post most of the time (unless they are playing the 4 or 5 in the defensive hierarchy), also the game needs to limit the odds of shot blocking by their wing span probably more than their height."
+
+> "Shouldn't the game build in that a player's height and wingspan limits their odds of shot blocking? To me how the game works is if even if a 6'0" guard had a 99 rim protection rating if he is 6 foot with a 6'1" wing span the engine ultimately saps a ton of that."
+
+**★ The first clause was already shipped.** "Unless they are playing the 4 or 5 in the defensive hierarchy" is exactly what S81 built the day before: assignment is read, not position, so a guard assigned to the opposing 5 helps freely and keeps his rim credit. Confirming that against the source rather than treating it as a new request saved the conversation from re-opening a settled item.
+
+**The second clause was a real defect and Claude's first answer to it was wrong in shape.** Claude checked the arithmetic, found skill and length are **additively composed** (60% length / 40% skill at the rim), and correctly reported that length can offset a rating but never caps it. Then proposed a fix — a **band**: the body sets a floor and a ceiling, the rating positions the player between them.
+
+### ★ Emmett rejected the band, and the reason is the whole session
+
+> "It's simply like always the context. He's a dominant shot blocker in D3 because he's the tallest guy on the court by far 95% of the time... But you put him against guys close to his size in D1, that lack of shot attribute is going to result in very few blocks when he's going against even say a 6'8" or 6'9" guy."
+
+The band set the floor as **a number**. Emmett's floor is **a gap**. A seven-footer with no instincts is not worth a fixed 1.6× an ordinary big in every league — he is dominant against 6'4" and eaten up by a finishing 6'7". The band smuggled a scalar back in wearing different clothes, which is precisely the thing the architecture forbids, and Claude proposed it while holding the no-scalar principle in the same context window.
+
+**The pattern is the S59.2 one, recurring:** Claude reaches for a tidy constraint, Emmett tests it against real basketball, the tidy version breaks, the truer version emerges. Recorded again because the tidy version was *plausible* — a body-set band is a defensible design in some engine, just not in a purely relative one.
+
+### The finding
+
+Chasing "relative to what?" into the source produced the thing worth the session:
+
+    on the ball  (BlockDuelShift):     LengthRating(defender) - LengthRating(SHOOTER)
+                                       DefenseRating(z, defender) - OffenseRating(z, SHOOTER)
+    off the ball (BlockDefenderThreat): DefenseRating(z, d) - AttributeMidpoint
+                                        LengthRating(d)     - AttributeMidpoint
+
+**The on-ball contest is a matchup. The help arm is a rating against a constant.** Every helper in the engine is compared to a permanent imaginary 50-rated player — not the shooter, not the lineup, not the league.
+
+Consequences, all three of which Emmett had independently described as wrong basketball:
+
+- A D3 seven-footer helps identically in D3 and in the Big Ten.
+- The shooter's height does not protect him from help (6'0" and 6'4" draw the same).
+- The shooter's Finishing does not protect him from help, though it already protects him from the man guarding him.
+
+**★ And O-44 is the same defect, not a neighbour.** That item exists because the neutral point sits where 83% of the league is below it. A fixed bar is what a fixed yardstick produces. Re-siting the bar would have treated the symptom and left the cause; O-44 is now absorbed rather than sequenced.
+
+### The rulings
+
+1. **The help arm compares to the SHOOTER.** Not to teammates, not to the opposing five. Emmett: *"it needs to be compared to whoever is shooting the ball."* This makes the door carry one rule instead of two.
+2. **Shooter height must reduce help block odds** — *"a 6'0" guard getting to the rim should have higher odds of getting blocked than a 6'4" guard getting to the rim regardless of who the opponents are, just by sheer math."*
+3. **Shooter Finishing must reduce help block odds**, independently of make% — *"it implies they have creativity or flexibility or what have you. A big man with low finishing should get blocked more than one with high finishing, even outside of the actual make%."*
+
+Rulings 2 and 3 are not separate work: both fall out of ruling 1, because `OffenseRating(Rim)` is already Finishing and `LengthRating(shooter)` is already computed on the on-ball side.
+
+**Rejected and recorded:** comparing the helper to his own teammates. A real idea about a man's ROLE on his defense, but `BlockHelpReadiness` already asks the teammate-relative question through its lineup-mean depth term, and it should not be asked twice.
+
+### Measured during the conversation
+
+Help contribution at the rim, ordinary 6'8" as the yardstick:
+
+    7'0", 7'5" span, ZERO rim protection     6.73   1.6x ordinary
+    6'0", 6'1" span, 40" hops, rim 99        4.86   1.2x
+    6'8" ordinary                            4.20   1.0x
+    6'0", 6'1" span, average hops, rim 99    2.50   0.6x
+    7'0", 7'5" span, rim 99                 14.14   3.4x
+
+**Size alone already works** — the seven-footer with a zero rating outhelps both an ordinary big and the 6'0" guard with a 99. That is correct basketball and must survive the change; the fix must not turn into a size nerf.
+
+**★ Hops currently count as reach at full weight.** `LengthRating` is Height, Wingspan and Vertical at **exactly one third each**, so the same 6'0" guard nearly doubles his help on vertical alone (2.50 → 4.86). A 40-inch vertical is presently worth more to this engine than four inches of wingspan. That single number is plausibly most of the original small-man block complaint, and it was found by asking what "length" actually means rather than by looking where the complaint pointed.
+
+### Still open, deliberately
+
+- **Wingspan should outweigh height** (Emmett's read: what matters is where the hand ends up; height matters mostly because it is where the arms are attached). Weights are one-third each today.
+- **Whether vertical belongs in reach at all**, or whether its value is separate — the second jump, the recovery, the chase-down.
+
+Both were left unsettled on purpose: they only become answerable once the comparison is against something that moves. They belong inside the same session, after the shooter-relative change lands.
+
+### Process
+
+**Emmett issued a standing mandate mid-conversation:** talk in basketball terms, not code terms — *"time and credits wasted on coding talk does none of us any good."* Written into `working-with-emmett.md` as a rule rather than acknowledged in passing. It sharpens §3a, which said "explain more simply" and was being read as *simpler technical talk*; the actual requirement is basketball first, machinery only when a call genuinely depends on it.
+
+**He also asked Claude to simplify a question mid-conversation** — *"Simplify what you're asking me, I don't quite get it"* — on a question that had three options and two paragraphs of framing. The question was one sentence long underneath. Recorded as the concrete instance of the mandate.
+
+### What this does to the plan
+
+**S80 is displaced.** It changes what ratings players are born with; this changes what a rating is allowed to do once he has it. This is contained to the block door, touches no generation, waits on no moving population, and absorbs an open item outright. S80 remains approved and moves to second.
+
+**Expected side effect worth naming in advance:** league blocks read 4.3 against a 3.5 target and S81 explicitly could not move that. This change should — it is the first thing since the complaint was raised that reaches the quantity actually driving block totals. If it does not, that is a finding about the block door's base rate rather than about this change.
+
+---
+
+## Session 81 — RIM HELP IS GATED BY WHO YOU ARE GUARDING. A defender's help contribution and block credit are now scaled by how far his own man pulls him from the rim; the mirror binds equally, so a 6'11" centre chasing a stretch five stops being a rim protector on those possessions. Helper share of rim blocks fell 68.4% → 63.8% on the stock season. The gate is NOT a correction to league block totals — 4.4 → 4.3 against a 3.5 target, recorded as a finding. Two design defects caught by measurement during the ruling conversation, both of which would have shipped green. Suite `ALL CHECKS PASSED` and the full stock season verified on Emmett's machine. (2026-07-28)
+
+**Register:** build, under `PROMPT-rim-help-by-assignment-s81-r4`. Oracle + config + three engine files + two check files. No generator, no dial, no page.
+
+### Emmett's ruling
+
+> "It's not so much that they can't do it, it's more that they wouldn't have the opportunity to do so... if they are guarding the opposing perimeter players, they aren't rotating much. If they are guarding the opposing 4 or 5, a bit more."
+
+And the mirror, confirmed in the same conversation:
+
+> "The stretch 5 has an added bonus of drawing the opposing post player out more often thus decreasing his chances of being near the rim."
+
+**★ Nothing in this session caps what a small player can be.** A 5'10" defender keeps whatever RimProtection he was generated with. The change prices the *situations* he is in. That distinction was Emmett's, made explicitly, and it is why the fix lives on the help arm rather than on generation.
+
+### What shipped
+
+    spacing(o)   = 1 / (1 + exp(-(o.Outside - 45) / 14))
+    aGate(o)     = 0.30 + 0.70 * (1 - spacing(o))
+    eGate(z, o)  = 1 - influence(z) * (1 - aGate(o))
+
+    influence:  Rim 1.00  Short 1.00  Mid 0.50  Long 0.20  Three 0.00
+
+Consumed in exactly two places — the rate (`BlockHelpSum`) and the credit (`BlockCreditWeights`) — through one named assignment lookup (`Matchup.BlockAssignedMan`), so a future coaching layer can replace slot parity without touching the gate formula.
+
+### The four rulings, and the two defects measurement caught
+
+**Ruling 1 — the score. C2b, a logistic on Outside.** Emmett's first pick was an arc-share read off the derived shot diet (C4), which is the more direct question: where does this man actually shoot from. It classified better — AUC 0.970 against C2b's 0.944.
+
+**★ Defect A: C4 is a switch, not a dial.** Setting its ramp knees exposed it. The arc-share quantity is bimodal on the current population: p25 = 6.5, p75 = 70.5, and essentially nothing between. Measured across five knee pairs, every one pinned 25–32% of the league at 1.00 and 35–63% at 0.00, with only ~5% landing between 0.2 and 0.8. **Re-cutting the ramp cannot fix an input that has no middle.**
+
+Why that breaks the design rather than merely being untidy: r4 withdrew the earlier hard Rim/Short switch precisely because a discontinuity is incoherent, and `Influence(zone)` exists to fade a *graded* quantity. A two-valued score reintroduces the hard boundary at the score axis, where it is less visible. Emmett reversed to C2b on the evidence. **C4 becomes the right score once shot diets spread out; it drops in behind the same lookup.**
+
+Raw `Outside/100` was rejected outright and separately: it pays 0.29 spacing to the *median* college player, suppressing rim help league-wide for men no defender would ever leave the paint to guard.
+
+**Ruling 2 — the floor. 0.30.** Emmett's "not zero". A 6'11" rim protector dragged onto a sniper falls from 39.4% of his team's rim blocks to 18.9%; on a post big he holds 39.4%. At 0.15 he is wiped out, at 0.45 his night barely changes.
+
+**★ Defect B: gating only the help ABOVE the luck floor moves league credit BACKWARDS.** The r4 formula scaled `helpShift` and left `BlockCreditLuckFloor` untouched. Suppressing help then compresses everyone toward an ungated floor, and the men with the most help to lose are the big men. Measured over 12,000 real lineup pairs, over-representation in rim-block credit:
+
+| | under 6'3" | 6'3–6'6" | 6'7–6'9" | 6'10"+ |
+|---|---|---|---|---|
+| today | 0.80x | 1.07x | 1.43x | 1.74x |
+| gate the help only (r4 as written) | **0.82x** | 1.07x | 1.40x | **1.69x** |
+| gate the whole term (shipped) | **0.78x** | 1.09x | 1.47x | **1.78x** |
+
+The as-written version hands *more* rim blocks to small players — the exact opposite of the session's purpose. Shipped version scales the whole helper term, floor included, which is also the idiom `BlockHelpShare` already uses in the same expression. **Because the RATE has no luck floor, this choice cannot move block totals — only whose name goes on them.**
+
+**★ Neither defect would have been caught by a green harness.** Both are monotone, both preserve every conservation identity, and the per-situation archetype table looks correct under both. Defect A was found by measuring the *shape* of the score's distribution; defect B by measuring the *league-wide composition* rather than the per-defender effect. This is the S73.1 lesson in a new dress: a discriminating signal has to discriminate on the axis the change is about.
+
+**Ruling 3 — the fade. J1: Rim 1.00, Short 1.00, Mid 0.50, Long 0.20, Three 0.00.**
+
+**★ Why influence must stay flat through the paint, and this is load-bearing rather than tidy.** `BlockHelpShare` falls only 0.50 → 0.42 from Rim to Short. **Any** influence fade steeper than that makes the COMBINED helper multiplier (`helpShare × eGate`) *rise* from Rim to Short — a defender glued to a sniper would help MORE on a five-footer than on a layup. Three candidate vectors, each perfectly monotone read down its own column, all failed exactly this way. Rim and Short are the same basketball question — can this man rotate into the lane — so they carry the same influence.
+
+Config enforces non-increasing influence; the **oracle** enforces the combined curve, because that is the constraint that actually bites. The C# guard names this limitation in a comment rather than pretending to cover it.
+
+**Ruling 4 — transition is exempt.** On a live break nobody is matched up; slot parity would suppress a guard chasing down a layup because the man in his slot number is a shooter. Emmett's ruling preserves transition as a way guards get blocks. Roll H and the picker pass `offense = null` on a break, which makes every gate exactly 1.0 and reproduces the S79 tree bit-for-bit. **Transition assignment gets its own session — O-48.**
+
+### The A6 assignment audit, and a path that turned out not to exist
+
+The prompt's blocking finding was a table: for each route to a block, is the shooter slot known, is the matched defender known, is each defender's assigned man known?
+
+**The headline: every defender's assigned man is resolvable ALWAYS, independent of `SelectedSlot`,** because assignment is slot parity (`DefenderPicker.PickForOffensiveSlot` is literally `new Slot(state.Defense, offensiveSlot.Number)`). A null shooter slot means the SHOOTER is unknown; it never blinds the gate.
+
+**★ The "null selected slot, non-putback" row required no ruling because the path does not exist.** `RollHGenerator.Generate` throws at `:218-220` if `SelectedSlot` is null on the non-putback path. An ordinary located shot with no shooter slot cannot occur in the engine — it exists only as harness fixture state. This was resolved by reading the source at check-in rather than by designing a behaviour for it.
+
+Putbacks are untouched, as ruled: a go-back-up is a scramble with everyone already inside, so assignment has broken down by definition. Phase 74 now proves this **byte-exactly** against a hand-recomputed ungated expression, not merely "intentionally".
+
+### What the measurement says, honestly scored
+
+| claim | evidence | rung |
+|---|---|---|
+| the gate suppresses a defender dragged out | 39.4% → 18.9% of his team's rim blocks, exact | **proven** |
+| the mirror binds on guards too | 7.3% → 2.8% | **proven** |
+| credit moves off the help arm league-wide | helper share of rim blocks 68.4% → **63.8%** | **measured** |
+| block totals fall toward target | 4.4 → **4.3**, still flagged HIGH against 3.5 | **measured — recorded, NOT a dial to turn** |
+| the BLK% board is all bigs | 6'5"–7'0", nine bigs and one 6'5" wing at 31 mpg | **observed, NO pre-S81 baseline exists** |
+
+**★ S81 is not a correction to league block totals, and the prompt's A2 expected otherwise.** Deleting the *entire* help arm moves the rim block rate only from 14.32% to 13.02%; the gate cuts about a quarter of that arm. The projection was ~4.31 and the season read 4.3. Page-only calibration principle: this is a finding, not a dial. **The value of S81 is who gets the blocks, not how many.**
+
+**★ The BLK% board cannot validate this session and the reason is worth recording.** No pre-S81 BLK% board was ever committed — the `season.txt` on `main` is 627 lines and predates the percentage boards entirely. The A/B was deliberately declined: the measured league-wide composition shift is ~2 points, and a top-ten list drawn from 2,083 players reshuffles by more than that from noise alone, so the test would mislead in whichever direction it landed. The strong evidence is the per-situation proof in Phase 74, which is exact and which no leaderboard can show because it is a per-possession effect that averages away.
+
+### The rare-event board defect, found in passing
+
+At the 100-minute floor the BLK% board reads: **10 of 91**, **10 of 92**, **12 of 117**, **13 of 129** in the top four, all at ~4 mpg. At a true 4% rate over 91 attempts, posting 10% is ordinary luck. The actual best shot blocker in the country (Pool_4503, 59 of 642, 24 mpg) sat **eighth**.
+
+At the 500-minute floor he is **first**, and every man on the board has 596–823 opportunities behind his number.
+
+**A minutes floor is the wrong instrument for a rare event.** REB% at the same floor is fine — its leaders carry ~1,100 opportunities — because rebounds are common. BLK% and STL% want an *opportunity* floor. Not S81's defect and not S81's to fix: **O-49**, belonging with the S79.3 percentage-board work.
+
+Byte-identical simulation across both runs (blocks 4.3, location 89.7%/10.3%, 44,821 credited blocks) confirms the minutes floor is reporting-only, exactly as S79.3 designed it.
+
+### Validation
+
+- **Oracle locked before any C# was written.** 18 self-checks, all green; it refuses to emit the golden if any fails. Golden: **1,210 rows, 1,000 gated, 10 putback**.
+- **Phase 74: golden parity worst |Δ| = 0.0E+000.** Exactly zero, not merely inside 1e-12. Fixture rejects a schema that is not `s81-1`, and fails deliberately if it contains zero gated rows — an S79 fixture would otherwise test only the ungated path and report green with the gate unwired.
+- **Every pre-existing Phase 74 invariant was classified before being touched** (invariant / expected-to-move / replaced), then **re-armed against the gated tree**. Running them ungated would have left the new factor untested while reporting green.
+- **New: the discriminating signal** in four columns — gate, absolute help, team rate, credit share, blocks per 100 — plus the mirror, the sign check, the combined-curve check, the ungated-identity check, and a paired check that a real offense DOES move the weights (which together prove the gate is wired rather than inert).
+- **Phase 36 gained a realistic opponent**, per Emmett's ruling.
+- Suite `ALL CHECKS PASSED`, 38 phases, on Emmett's machine. Full stock season green.
+
+### ★ The Phase 36 finding: a realistic opponent broke two checks, correctly
+
+Emmett ruled that Phase 36's five all-50 offensive dummies had to go — identical men means identical spacing, so the gate cancelled out of the normalized shares and every sub-check would have passed with the gate wired **backwards**.
+
+Replacing them with a graded offense (Outside 88 down to 12) failed sub-checks 1 and 8. **Both failures were correct behaviour.** Sub-check 1 asks "does the rim protector lead at the rim", and when the rim protector is guarding the sniper he legitimately does not. Correct basketball, broken experiment.
+
+Resolution: sub-checks 1–10 face a **uniform** offense so each isolates the defender attribute under test, and a new **sub-check 11** carries the graded offense with the sole job of proving the gate reaches the picker and is correctly signed:
+
+    uniform offense: s1=20.1%  s2=19.8%  s3=20.1%  s4=19.9%  s5=20.2%
+    graded offense:  s1=10.4%  s2=12.8%  s3=20.4%  s4=26.6%  s5=29.8%
+    (s1 guards Outside 88, s5 guards Outside 12)
+
+Five identical defenders. **If that ordering ever reverses, the gate is inverted** — and an inverted gate compiles clean and passes every conservation check. That line is the tripwire.
+
+### Mistakes
+
+**A find-and-replace hit the wrong sibling function.** Adding an `outside` override to `MkP36` also patched an unrelated helper 900 lines away that shared the same initializer line. The compiler caught it immediately; reverted and re-applied against the correct anchor. Exactly the failure mode CONVENTIONS §1's surgical-edit rule exists to prevent — the anchor was not unique enough and was not verified as unique before the write.
+
+**Two PowerShell commands delivered wrong.** `> file -Encoding UTF8` (the flag belongs to `Out-File`, not the redirect operator) and `Tee-Object -Encoding` (PowerShell 7 only; Emmett is on 5.1). Both cost a turn. Standing correction: **verify PowerShell syntax against 5.1, and never attach `-Encoding` to `>`.**
+
+**A design.md/status.md provenance question was raised and correctly resolved by reading rather than assuming.** `docs/status.md` showed modified in the working tree with no S81 involvement. It turned out to be the uncommitted **S80 §6a reflection gate** pass — legitimate prior work that opened O-47 and corrected O-45's block-board sentence. S81's status board was rebuilt on that version, not on committed `main`, so neither is silently reverted.
+
+### Deferred, logged, not acted on
+
+- **O-48** — transition assignment (Emmett: its own session).
+- **O-49** — rare-event leaderboards want an opportunity floor, not a minutes floor.
+- **O-50** — the shot diet. League mean is **Rim 52.7 / Short 5.9 / Mid 7.4 / Long 4.0 / Three 30.1**. More than half of every shot in the engine is at the rim, against roughly a third in real college basketball. This sits directly under the block target and may be why blocks read HIGH at all.
+- **The C4 revisit** — folded into O-50, since it is the same population problem seen from the other side.
+
+---
+
 ## Session 79.3 — THE LEADERBOARDS BECAME PERCENTAGES. Five rate boards against exactly-counted on-floor denominators; the per-game block board's ~1.33× playing-time handicap is now visible and priced around. Phase 73 gained twelve gates that prove totals and honestly do not prove attribution. Every existing page block byte-identical, proven by line diff. Suite `ALL CHECKS PASSED` and the full stock season green on Emmett's machine. Claude misread a sandbox artifact as a provenance incident and had to walk it back. (2026-07-28)
 
 **Register:** micro-session, build, under `PROMPT-percentage-boards-s79_3-r6`. Two code files, page-only. No engine, config, generator, fixture or dial.

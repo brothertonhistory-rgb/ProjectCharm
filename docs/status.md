@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 79.3** (2026-07-28; the season leaderboards became percentages — BLK%, REB%, AST%, STL% and PTS/100 against exactly-counted on-floor denominators. Phase 73 gained twelve gates. The per-game block board's playing-time handicap is now visible and priced around. Opened O-46.)
+Last updated: **Session 81** (2026-07-28; rim help is now gated by WHO A DEFENDER IS GUARDING — his help contribution and block credit scale with how far his own man pulls him from the rim, and the mirror binds equally, so a 6'11" centre chasing a stretch five stops being a rim protector on those possessions. Helper share of rim blocks 68.4% → 63.8%. Blocks 4.4 → 4.3 against a 3.5 target — recorded as a finding, NOT a correction. Opened O-48 (transition assignment), O-49 (rare-event boards want an opportunity floor), O-50 (the shot diet is 52.7% rim). Carries forward the uncommitted S80 §6a gate pass, which opened O-47 and corrected O-45's block-board sentence.. **S81.1 (design conversation, no code):** the off-ball help arm compares every defender to a FIXED MIDPOINT rather than to the man he is contesting — the no-scalar wall breached where it is hardest to see. Ruled: help compares to the SHOOTER. Absorbs O-44 outright and displaces S80 as the next session.)
 
 ## Current baseline
 
@@ -52,6 +52,20 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **S81 — rim help is gated by assignment (engine).** `Matchup.BlockSpacing` /
+  `BlockAssignmentGate` / `BlockEffectiveGate` / `BlockAssignedMan`, consumed in exactly two places
+  (`BlockHelpSum` for the rate, `BlockCreditWeights` for the credit) through one named assignment
+  lookup, so a coaching layer replaces slot parity without touching the gate formula. Score is a
+  logistic on Outside (midpoint 45, scale 14); floor 0.30; influence Rim 1.00 / Short 1.00 / Mid 0.50
+  / Long 0.20 / Three 0.00. Transition exempt (`offense = null` on a fast break reproduces the S79 tree
+  bit-for-bit). Putbacks untouched and now proven byte-exact. Oracle locked with 18 self-checks before
+  any C# was written; golden 1,210 rows / 1,000 gated / worst |Δ| **0.0E+000**. Phase 74's existing
+  assertions classified, then re-armed against the gated tree; Phase 36 gained a realistic opponent and
+  a new sub-check 11 that fails loudly if the gate is ever inverted.
+  **Per situation it is large and exact** (a 6'11" rim protector dragged onto a sniper: 39.4% → 18.9%
+  of his team's rim blocks, 8.821 → 3.618 blocks per 100). **League-wide it is small** (helper share
+  68.4% → 63.8%; height composition ~2 points). **It is not a block-total correction** — see O-40.
 
 - **S79.3 — the leaderboards became percentages (page-only).** Four exact on-floor counters on
   `SeasonPlayerRecord` (`OffensiveCredits`, `OpponentTwoPaOnFloor`, `SecuredBoardsOnFloor`,
@@ -300,7 +314,14 @@ chart is PROVISIONAL pending O-6.
   longer glued to one man — **without** modelling time inside a possession, which was by far the largest
   build discussed.
 
-- **★ O-44 — THE BLOCK DOOR'S TWO ARMS SHARE ONE NEUTRAL POINT AND SIT ON DIFFERENT SCALES (S79.2
+- **O-44 — ABSORBED INTO THE S81.1 SHOOTER-RELATIVE CHANGE (2026-07-28). Do not take separately.**
+  A neutral point that 83% of the league sits below is what a FIXED YARDSTICK produces. `BlockDefenderThreat`
+  measures every helper against `AttributeMidpoint`, a constant — so re-siting the bar treats the symptom and
+  leaves the cause. Once help compares to the shooter, the bar moves with the matchup and the question this
+  item asked stops existing. **The original analysis is retained below because the measured spread still
+  governs how the new comparison should be scaled:**
+
+  *(original) O-44 — THE BLOCK DOOR'S TWO ARMS SHARE ONE NEUTRAL POINT AND SIT ON DIFFERENT SCALES (S79.2
   measurement).** `BlockDefenderThreat` compares BOTH `DefenseRating(zone)` and `LengthRating` to the single
   `AttributeMidpoint = 50`. Measured on the 4,511-man drafted population: **LengthRating median 59.7**
   (86.5% of the league above the bar) against **rim-defence median 33.2** (17.1% above it). So length pays
@@ -324,8 +345,10 @@ chart is PROVISIONAL pending O-6.
   `DefensiveResistance`'s top-3 blend, which moves shots away from the rim before anyone shoots.
   **The defect, worked example:** Pool_85 (Robert Morris, seed 20260720) is **5'8" with a 43 wingspan and
   RimProtection 96 / PostDefense 88**. His rim defensive rating is **93.2** against **37.0** for the 6'9"
-  big beside him; he takes **35.5%** of his team's rim-block credit to the big's 32.6%, and leads the
-  nation's ninth-most blocks per game. **He is not rare** — of the 49 rostered men with RimProtection >= 80,
+  big beside him, and he takes **35.5%** of his team's rim-block credit to the big's 32.6%.
+  *(S79.3 note: he led the nation's ninth-most blocks PER GAME on the old board; on the S79.3 BLK% board
+  he is nowhere near the top ten. The rate boards fixed the presentation half. This item is the OTHER
+  half and is untouched by that — his rating still suppresses rim FG% through the make door.)* **He is not rare** — of the 49 rostered men with RimProtection >= 80,
   **12 are under 6'0" and only 7 are 6'6"+**.
   **★ Why the engine does not disbelieve him, precisely:** the two doors read his body differently and the
   make door reads it CORRECTLY. `Reach = (Height + Wingspan)/2` = **41.5** for him and deliberately excludes
@@ -354,7 +377,87 @@ chart is PROVISIONAL pending O-6.
   concentrate credit on one man however good he is) is **unresolved and is the first thing to determine**.
   Belongs to neither S80 nor O-44/O-45. Emmett's call when to take it.
 
+- **★ O-47 — THE DRIVE GATE IS ANCHORED IN ABSOLUTE RATING POINTS, AND THE POPULATION SITS UNDER IT
+  (S79.3 conversation; Emmett's read that the league is undertalented, given a mechanism).**
+  `Matchup.DriveTools` (`Matchup.cs:1427-1436`) is `(FirstStep, Quickness composite) × unlock`, where
+  `unlock = clamp((BallHandling − 28) / (48 − 28), 0, 1)`. **Below BallHandling 28 the unlock is exactly
+  zero, so drive tools are zero however fast the player is**, and `ApplyDriveGate` compares
+  `gap = DriveTools − matched.PerimeterDefense` with only the wall side firing — so that player eats
+  full rim suppression. **Measured on the S79.3 census: median BallHandling is G 25 / W 20 / B 16.**
+  More than half the guards in the league — the players whose job is beating a man off the dribble —
+  generate nothing at this gate. Bigs are largely shielded by the orientation term (a post-up is not a
+  drive), so it bites guards and wings hardest, which is backwards.
+  **Where it lands:** rim FG% **51.8 against a 61.0 target**, the largest single miss on the calibration
+  page. **Not new, and that is the point:** design.md records this as a known SPEC property from S59
+  (*"the gate is NOT level-neutral below rating ~48"*), ruled **ship-as-is** at the time because no real
+  population existed to measure against, and names it **"the first item for the Pass A tuning pass."**
+  There is now a real population and it sits below the anchor.
+  **★ The distinction that decides which session fixes it:** whether the RATINGS are too low is a
+  generation question; whether the ENGINE'S ANCHORS are calibrated for the ratings it actually receives
+  is a tuning question. This item is the second kind. Related evidence pointing the same way, none of it
+  yet connected: guard Outside median 42 against the oracle's own recorded **arc target ~50**; AST% has
+  no elite tail (O-46); rim-defence median 33.2 with 83% of the league below the block bar (O-44).
+  **Sequencing:** S80 moves this the RIGHT way on its own — freed interior budget flows to perimeter
+  skills, BallHandling among them, pushing more guards over 28 — so take this AFTER S80, measured
+  against the moved population, not before.
+
+- **★ O-48 — TRANSITION HAS NO ASSIGNMENT MODEL (S81 ruling; Emmett: its own session).**
+  On a fast break nobody is matched up — defenders sprint back and pick up whoever is closest — but slot
+  parity is the engine's only assignment model. S81 therefore **exempts** transition entirely
+  (`BlockerPicker.ResolveOffensiveLineup` returns null when `state.FastBreak`), which makes every gate
+  1.0 and preserves Emmett's ruling that transition is one of the two ways guards legitimately get
+  blocks. That is the correct conservative call and it is not the answer: a break has *some* structure
+  (who is ahead of the ball, who is trailing), and nothing in the engine models it.
+  **Scope note:** this is not block-specific. Any future rule that reads "who is this defender
+  guarding" inherits the same hole.
+
+- **★ O-49 — THE RARE-EVENT LEADERBOARDS USE A MINUTES FLOOR WHERE THEY NEED AN OPPORTUNITY FLOOR
+  (S81 measurement; belongs with the S79.3 percentage-board work).**
+  At the 100-minute floor the BLK% board's top four read **10 of 91**, **10 of 92**, **12 of 117**,
+  **13 of 129**, all at ~4 mpg. At a true 4% rate over 91 attempts, posting 10% is ordinary luck. The
+  actual best shot blocker in the league (Pool_4503, **59 of 642**, 24 mpg) sat **eighth**. At the
+  500-minute floor he is **first** and every man on the board carries 596–823 opportunities.
+  **REB% at the same floor is fine** — its leaders carry ~1,100 opportunities — because rebounds are
+  common and blocks are not. So the defect is not the floor's value, it is the floor's *unit*: BLK% and
+  STL% want a denominator threshold (opportunities faced), not a minutes threshold.
+  **Not S81's defect and not S81's fix.** Purely a reporting question; the simulation is byte-identical
+  across both floors (blocks 4.3, location 89.7%/10.3%, 44,821 credited blocks), which confirms S79.3's
+  reporting-only design held.
+
+- **★ O-50 — MORE THAN HALF OF EVERY SHOT IN THE ENGINE IS AT THE RIM (S81 measurement; documentation
+  only, NOT acted on).**
+  League mean shot diet, measured on the generated population through the locked tendency derivation:
+  **Rim 52.7 / Short 5.9 / Mid 7.4 / Long 4.0 / Three 30.1.** Real college basketball is roughly a third
+  at the rim. The engine's own credited-block location agrees the shots are there (89.7% of blocks at
+  Rim+Short).
+  **Why it matters here:** blocks read HIGH (4.3 against 3.5) and the rim is where blocks happen, so a
+  rim-heavy diet may be a substantial part of that miss — which would make O-40 partly a *diet* problem
+  rather than a *block-door* problem. Do not calibrate the block door against a diet this skewed.
+  **Second consequence, and the reason the S81 score is what it is:** the same derivation is bimodal per
+  player — arc share reads p25 6.5 / p75 70.5 with nothing between, ~67% of the league pinned at one end
+  or the other. That is why S81's spacing score is a logistic on Outside rather than the more direct
+  shot-diet read, which classified better (AUC 0.970 vs 0.944) but has no middle to grade.
+  **When this settles, revisit S81's spacing score** — the arc-share read becomes correct and drops in
+  behind the same lookup with no call-shape change.
+
+- **★ O-51 — "LENGTH" COUNTS HOPS AS REACH AT FULL WEIGHT (S81.1 measurement; belongs INSIDE the
+  shooter-relative session, not separately).**
+  `LengthRating` is Height, Wingspan and Vertical at **exactly one third each**. Measured: the same
+  6'0" guard with a 6'1" wingspan and a 99 rim-protection rating helps at **2.50 with average hops and
+  4.86 with 40-inch hops** — vertical alone nearly doubles him, and is presently worth more than four
+  inches of wingspan. **This is plausibly most of the original small-man block complaint**, and it was
+  found by asking what "length" means rather than by looking where the complaint pointed.
+  **Two questions, both ruled OPEN on purpose:** (a) wingspan should outweigh height — Emmett's read is
+  that what matters is where the hand ends up, and height matters mostly because it is where the arms
+  are attached; (b) whether vertical belongs in reach at all, or whether its real value is separate —
+  the second jump, the recovery, the chase-down from behind.
+  **Why not settled now:** both only become answerable once the comparison is against something that
+  moves. Take them after the shooter-relative change lands, in the same session, measured against the
+  new behaviour.
+
 ## Parked — waiting on a named prerequisite
+
+
 
 
 
@@ -448,11 +551,46 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**S80 — the interior-defence bid.** Emmett ruled the basketball at S79.2 (C-28, the symmetric mirror), so
-the design question is settled and only the build remains. **The S80 prompt as written must be redrafted
-first** — S79.2's check-in found five defects (below), and the §6a/§6b passes are already done, so the
-redraft is cheap. The candidate table, measured on fixed draws, is in journal S79.2 and the readout it will
-be ruled on shipped this session.
+**S81.2 — the help arm compares to the SHOOTER.** Ruled in full at S81.1 (see journal and design);
+the basketball is settled and only the build remains.
+
+**The defect:** `BlockDuelShift` (on the ball) reads both terms as differences against *this shooter*.
+`BlockDefenderThreat` (every helper) reads both terms against `AttributeMidpoint`, a **constant**. The
+on-ball contest is a matchup; the help arm is a rating against a fixed yardstick. That is the no-scalar
+wall breached in the one place it is hardest to see, and it means a D3 seven-footer helps identically in
+D3 and in the Big Ten.
+
+**The change delivers three separately-requested behaviours from one edit:** level-relativity with no
+level flag; the shooter's HEIGHT reducing help block odds; the shooter's FINISHING reducing help block
+odds independently of make%. Rulings 2 and 3 need no extra work — `OffenseRating(Rim)` is already
+Finishing and `LengthRating(shooter)` is already computed on the on-ball side.
+
+**Take O-51 inside this session** (wingspan-over-height, and whether vertical belongs in reach at all).
+Both only become answerable once the comparison moves, and both point at the same door.
+
+**Absorbs O-44 outright** — do not schedule it separately.
+
+**Why it displaces S80:** S80 changes what ratings players are BORN with; this changes what a rating is
+ALLOWED TO DO once he has it. This one is contained to the block door, touches no generation, waits on no
+moving population, and closes an open item. S80 stays approved and moves to second.
+
+**Expected side effect, name it in the prompt before measuring:** league blocks read **4.3 against a 3.5
+target** and S81 explicitly could not move that (the entire help arm is worth ~1.3 points of a ~2-point
+matchup effect on a 12% base). This change reaches the quantity that actually drives block totals and
+should move it. **If it does not, that is a finding about the block door's base rate**, not about this
+change — and it points at O-50 (52.7% of shots are at the rim) as the remaining suspect.
+
+**Guard the build against a size nerf.** Measured today, a 7'0"/7'5"-span defender with a ZERO
+rim-protection rating helps at 1.6x an ordinary 6'8" and outhelps a 6'0" guard with a 99. **That is
+correct basketball and must survive** — Emmett's D3 big is dominant because he is the tallest man out
+there, and the change must only make that advantage shrink when the floor gets bigger, never invert.
+
+---
+
+**Second: S80 — the interior-defence bid.** Emmett ruled the basketball at S79.2 (C-28, the symmetric
+mirror), so the design question is settled and only the build remains. **The S80 prompt as written must be
+redrafted first** — S79.2's check-in found five defects (below), and the §6a/§6b passes are already done,
+so the redraft is cheap.
 
 **What the redraft must fix, all verified against source at S79.2:**
 1. **§4's scope claim was unachievable** — one constant pair drives both defensive bids. Resolved by C-28:
@@ -480,24 +618,23 @@ largest miss on the calibration page. S80 cuts guards' interior defence, which m
 way. It also lowers the individual block ceiling, which moves O-39's ceiling gap the WRONG way — those two
 are in tension and O-39/O-44 are where it gets resolved, not S80.
 
-**The strongest counter-candidate: O-44, the block door's neutral point.** Population-independent, three
-call sites, and it is the half of the block-board fix that S80 cannot invalidate. Take it first if the
-appetite is for a contained engine win rather than a generation session. Do NOT take O-39 before S80 —
-sequencing ruled at S79.2.
+**The counter-candidate, if the appetite is for a contained engine win instead: O-44, the block door's
+neutral point.** Population-independent on its length half, three call sites, and it is the part of the
+block-board fix S80 cannot invalidate. Do NOT take O-39 before S80 — sequencing ruled at S79.2.
 
-**The strongest counter-candidate: O-43, the on-ball blend.** Smaller, self-contained, one wiring site, and
-it makes an elite perimeter defender matter on possessions he is not assigned to — the first real team
-defense in the game. Take it first if the appetite is for a contained win rather than opening the coaching
-layer. It pairs naturally with O-41 (the help door) if the two are ever done together.
+*Also live, not competing for this slot: O-43 (on-ball blend — one wiring site, pairs with O-41);
+O-6 (scout-rank modernization, RAISED PRIORITY, feeding O-33's minutes skew — it is what makes bigs
+play 24 minutes against guards' 32); O-47 (the drive gate's absolute anchor — explicitly sequenced
+AFTER S80). Detail on each is under Open.*
 
-**Not yet: O-40, block-rate calibration.** Blocks read high, but calibration against a population that is
-itself provisional is the exact wrong sequencing — attribute measurement before generation redesign,
-generation before calibration.
-
-**The strongest counter-candidate: O-6, scout-rank modernization** (feeding O-33, the minutes skew). Still
-RAISED PRIORITY, and it is what makes bigs play 24 minutes against guards' 32. Take it first if the
-leaderboards bother you more than the mechanism does. Note the S78 narrowing: the rank cannot stop anyone
-making a roster, so this is now purely a minutes question.
+**Not yet: O-40, block-rate calibration.** Blocks read high, but calibrating against a population that is
+still moving is calibrating against a fiction. **S81 sharpened this rather than closing it:** the assignment
+gate moved blocks 4.4 → 4.3 against a 3.5 target, and measurement showed why it could not do more — deleting
+the ENTIRE help arm moves the rim block rate only 14.32% → 13.02%, so the whole help arm is worth ~1.3 points
+of a ~2-point total matchup effect on a 12% base. **The block total is not primarily a help-arm quantity.**
+Two other suspects now carry more of it: O-50 (52.7% of shots are at the rim, against roughly a third in real
+college basketball) and O-44 (the neutral point, where 83% of the league sits below the bar). Take O-50's
+measurement before touching a block dial.
 
 **Recommended NOT next:** any calibration session. Seventeen verdicts are red and the page is explicitly
 provisional, which makes chasing them now the exact wrong move — several will move on their own when O-29

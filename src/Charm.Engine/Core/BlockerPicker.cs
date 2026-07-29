@@ -101,9 +101,19 @@ public static class BlockerPicker
             ? -1
             : state.SelectedSlot.Value.Number - 1;
 
+        // Session 81: each HELPER's own assigned man gates his credit. This is a SEPARATE
+        // lookup from the matched-defender resolution above and survives a null SelectedSlot
+        // — a null shooter slot means the SHOOTER is unknown, not that assignments are.
+        //
+        // Null on a fast break: nobody is matched up on a break, and slot parity would wrongly
+        // suppress a guard chasing down a layup because "his man" is a shooter. Transition
+        // assignment is its own session (Emmett, 2026-07-28). A null offense makes every gate
+        // exactly 1.0, which is the S79 tree bit-for-bit.
+        var offense = ResolveOffensiveLineup(state, game);
+
         var weights = putback
             ? Matchup.PutbackBlockCreditWeights(players, matchupCfg)
-            : Matchup.BlockCreditWeights(zone, players, matchedIndex, matchupCfg);
+            : Matchup.BlockCreditWeights(zone, players, matchedIndex, matchupCfg, offense);
 
         var totalWeight = 0.0;
         for (var i = 0; i < 5; i++) totalWeight += weights[i];
@@ -133,5 +143,31 @@ public static class BlockerPicker
 
         // Fallback: floating-point edge — return the last populated slot.
         return lineup.SlotAt(lastPopulated + 1);
+    }
+
+    /// <summary>
+    /// The five OFFENSIVE players in slot order — the men the five defenders are guarding
+    /// under slot parity. Returns null on a fast break, which turns the Session 81 assignment
+    /// gate off entirely.
+    ///
+    /// <para><b>Why the break is exempt.</b> On a live break nobody is matched up; defenders
+    /// sprint back and pick up whoever is closest. Slot parity is still the engine's only
+    /// assignment model, so applying it here would suppress a guard's rim help because the man
+    /// in his slot number is a shooter, when in fact he is chasing down a layup with no man at
+    /// all. Emmett's ruling explicitly preserves transition as a way guards get blocks.</para>
+    ///
+    /// <para>Unpopulated offensive slots stay null inside the array and are handled by
+    /// <see cref="Matchup.BlockAssignedMan"/>, which gates them at 1.0.</para>
+    /// </summary>
+    internal static Player?[]? ResolveOffensiveLineup(PossessionState state, GameState game)
+    {
+        if (state.FastBreak) return null;
+
+        var offRoster = game.RosterFor(state.Offense);
+        var offLineup = game.LineupFor(state.Offense);
+        var offense   = new Player?[5];
+        for (var i = 0; i < 5; i++)
+            offense[i] = offRoster.PlayerAt(offLineup.SlotAt(i + 1));
+        return offense;
     }
 }

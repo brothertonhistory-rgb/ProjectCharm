@@ -1328,6 +1328,41 @@ public sealed class MatchupConfig
                     $"{cfg.BlockHelpShare(helpShareZones[i - 1])}.");
         }
 
+        // Session 81 — the assignment gate.
+        if (!double.IsFinite(cfg.BlockSpacingMidpoint))
+            throw new InvalidOperationException(
+                $"BlockSpacingMidpoint must be finite: got {cfg.BlockSpacingMidpoint}.");
+        if (!(cfg.BlockSpacingScale > 0.0) || !double.IsFinite(cfg.BlockSpacingScale))
+            throw new InvalidOperationException(
+                $"BlockSpacingScale must be finite and > 0: got {cfg.BlockSpacingScale}. " +
+                "A zero scale turns the spacing score into a step function.");
+        if (!(cfg.BlockAssignmentFloor > 0.0) || !(cfg.BlockAssignmentFloor < 1.0))
+            throw new InvalidOperationException(
+                $"BlockAssignmentFloor must lie in (0, 1): got {cfg.BlockAssignmentFloor}. " +
+                "At 0 a defender guarding a spacer becomes un-drawable for block credit; " +
+                "at 1 the gate is inert.");
+
+        // Influence: in [0, 1] and non-increasing away from the rim. NOTE the tighter
+        // constraint that this guard CANNOT express — the combined helper multiplier
+        // (BlockHelpShare * effectiveGate) must also fall Rim -> Three, and because
+        // BlockHelpShare drops only 0.50 -> 0.42 across Rim -> Short, an influence
+        // vector that passes this loop can still bend the combined curve upward there.
+        // The oracle's checks() enforces the combined curve; this guard is the cheap
+        // structural half.
+        for (var i = 0; i < helpShareZones.Length; i++)
+        {
+            var infl = cfg.BlockAssignmentInfluence(helpShareZones[i]);
+            if (!double.IsFinite(infl) || infl < 0.0 || infl > 1.0)
+                throw new InvalidOperationException(
+                    $"BlockAssignmentInfluence for zone {helpShareZones[i]} must lie in [0, 1]: " +
+                    $"got {infl}.");
+            if (i > 0 && infl > cfg.BlockAssignmentInfluence(helpShareZones[i - 1]))
+                throw new InvalidOperationException(
+                    $"BlockAssignmentInfluence must be non-increasing from Rim to Three: " +
+                    $"{helpShareZones[i]} {infl} exceeds {helpShareZones[i - 1]} " +
+                    $"{cfg.BlockAssignmentInfluence(helpShareZones[i - 1])}.");
+        }
+
         // Phase 39 — Assist attribution invariants.
         if (cfg.AssistPassingWeight < 0.0)
             throw new InvalidOperationException(
@@ -1918,6 +1953,99 @@ public sealed class MatchupConfig
         ShotLocation.Long  => BlockHelpShareLong,
         ShotLocation.Three => BlockHelpShareThree,
         _                  => BlockHelpShareRim,
+    };
+
+    // =========================================================================
+    // Session 81 — rim help is gated by WHO YOU ARE GUARDING
+    // =========================================================================
+    //
+    // Emmett's ruling: "It's not so much that they can't do it, it's more that they
+    // wouldn't have the opportunity to do so... if they are guarding the opposing
+    // perimeter players, they aren't rotating much. If they are guarding the opposing
+    // 4 or 5, a bit more." And the mirror, confirmed: "The stretch 5 has an added bonus
+    // of drawing the opposing post player out more often thus decreasing his chances of
+    // being near the rim."
+    //
+    // This does NOT cap what a small player can be. A 5'10" defender keeps whatever
+    // rim-protection rating he was generated with; it simply stops paying out on
+    // possessions where he is 25 feet from the basket. The same rule costs a 6'11"
+    // centre his rim help when a stretch five drags him to the arc.
+    //
+    //   spacing(o)   = 1 / (1 + exp(-(o.Outside - mid) / scale))
+    //   aGate(o)     = floor + (1 - floor) * (1 - spacing(o))
+    //   eGate(z, o)  = 1 - influence(z) * (1 - aGate(o))
+    //
+    // See Matchup.BlockSpacing / BlockAssignmentGate / BlockEffectiveGate.
+
+    // --- The spacing score. RULED C2b (Emmett, 2026-07-28): a logistic on Outside.
+    //     An arc-share read off the derived shot diet classified better (AUC 0.970 vs
+    //     0.944) but is BIMODAL on the current population — 67% of the league pins at
+    //     0 or 1 and only 5% lands in the middle, which would reintroduce as a hard
+    //     switch the discontinuity the zone fade exists to avoid. Revisit when shot
+    //     diets spread out. A raw Outside/100 was rejected outright: it pays 0.29
+    //     spacing to the MEDIAN college player, suppressing rim help league-wide for
+    //     men no defender would leave the paint to guard. ---
+
+    /// <summary>Outside rating at which a man is half a spacer. Default 45.0.
+    /// Must be finite (enforced in Load).</summary>
+    public double BlockSpacingMidpoint { get; set; } = 45.0;
+
+    /// <summary>Outside points spanning the spacing curve's rise. Default 14.0 —
+    /// wide on purpose, so the score stays a DIAL (45% of the league lands between
+    /// 0.2 and 0.8, nothing pinned at either end) rather than a switch.
+    /// Must be &gt; 0 (enforced in Load).</summary>
+    public double BlockSpacingScale { get; set; } = 14.0;
+
+    // --- The floor. Emmett's "not zero" — a guard on a point guard still rotates
+    //     sometimes. RULED 0.30: a 6'11" rim protector dragged onto a sniper falls from
+    //     40% of his team's rim blocks to 21%, while on a post big he holds 39%. At
+    //     0.15 he is wiped out; at 0.45 his night barely changes. ---
+
+    /// <summary>Floor of the assignment gate — the share of his help a defender keeps
+    /// even when glued to the best shooter alive. Default 0.30. Must lie in (0, 1)
+    /// (enforced in Load): at 0 a defender on a spacer becomes un-drawable for block
+    /// credit, breaking the engine-wide "no defender is un-drawable" contract.</summary>
+    public double BlockAssignmentFloor { get; set; } = 0.30;
+
+    // --- The per-zone fade. How much the gate applies as the shot moves out.
+    //
+    //     RULED J1 (Emmett, 2026-07-28): full effect through the paint, half at
+    //     midrange, mostly gone by the long two, off at the arc.
+    //
+    //     WHY RIM AND SHORT ARE EQUAL, and this is load-bearing rather than tidy:
+    //     BlockHelpShare only falls 0.50 -> 0.42 from Rim to Short, so ANY influence
+    //     fade steeper than that makes the COMBINED helper multiplier
+    //     (BlockHelpShare * eGate) RISE from Rim to Short — a defender glued to a
+    //     sniper would help MORE on a five-footer than on a layup. Three candidate
+    //     vectors that each read as sensibly monotone down the column failed exactly
+    //     this way. Rim and Short are the same basketball question (can this man
+    //     rotate into the lane), so they carry the same influence. Load enforces
+    //     non-increasing; the ORACLE enforces the combined curve, because that is the
+    //     constraint that actually bites. ---
+
+    /// <summary>Gate influence at Rim. Default 1.00 — full effect.</summary>
+    public double BlockAssignmentInfluenceRim   { get; set; } = 1.00;
+    /// <summary>Gate influence at Short. Default 1.00 — see the combined-curve note
+    /// above; a fade here bends the helper schedule the wrong way.</summary>
+    public double BlockAssignmentInfluenceShort { get; set; } = 1.00;
+    /// <summary>Gate influence at Mid. Default 0.50.</summary>
+    public double BlockAssignmentInfluenceMid   { get; set; } = 0.50;
+    /// <summary>Gate influence at Long. Default 0.20.</summary>
+    public double BlockAssignmentInfluenceLong  { get; set; } = 0.20;
+    /// <summary>Gate influence at Three. Default 0.00 — nobody is rotating off a
+    /// shooter to contest a three; the gate is inert here by construction.</summary>
+    public double BlockAssignmentInfluenceThree { get; set; } = 0.00;
+
+    /// <summary>The per-zone gate influence. Read by
+    /// <see cref="Matchup.BlockEffectiveGate"/>.</summary>
+    public double BlockAssignmentInfluence(ShotLocation zone) => zone switch
+    {
+        ShotLocation.Rim   => BlockAssignmentInfluenceRim,
+        ShotLocation.Short => BlockAssignmentInfluenceShort,
+        ShotLocation.Mid   => BlockAssignmentInfluenceMid,
+        ShotLocation.Long  => BlockAssignmentInfluenceLong,
+        ShotLocation.Three => BlockAssignmentInfluenceThree,
+        _                  => BlockAssignmentInfluenceRim,
     };
 
     // --- The credit luck floor. Every populated defender carries this before his own
