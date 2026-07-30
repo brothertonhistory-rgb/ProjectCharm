@@ -1459,8 +1459,17 @@ internal static partial class Program
             var genSlow = new RollJGenerator(cfgJ, cfgMatchup, gSlow);
             var genFast = new RollJGenerator(cfgJ, cfgMatchup, gFast);
 
-            // Use Rebound source with stamped OffenseSide
-            var ctx = new TransitionContext(TransitionSource.Rebound) { OffenseSide = TeamSide.Home };
+            // Use Rebound source with stamped OffenseSide.
+            // S86: the ticket must also NAME the rebounder. Pace is now the BAR the players'
+            // opportunity must clear, so with nobody holding the ball there is no break to
+            // gate and both coaches would read identically — the assertion below would fail
+            // with nothing wrong in the engine. Slot 1 is seated by SeedMinimalRoster. The
+            // assertion itself is UNCHANGED: a fast coach still runs more than a slow one.
+            var ctx = new TransitionContext(TransitionSource.Rebound)
+            {
+                OffenseSide     = TeamSide.Home,
+                BallHandlerSlot = 1
+            };
             var pieSlow = genSlow.Generate(ctx);
             var pieFast = genFast.Generate(ctx);
 
@@ -1490,7 +1499,9 @@ internal static partial class Program
             {
                 var pieNull = genAny.Generate(TransitionContext.Rebound);  // OffenseSide is null
                 var nullPush = Push(pieNull);
-                // At TeamPaceBias=0.0 fallback → rawBias=5.0 → mappedPace=0 → lift=0 → base Push
+                // S86: a null OffenseSide now takes the neutral rule directly — margin 0, so the
+                // configured base Push comes back. (Pre-S86 this read the TeamPaceBias fallback
+                // knob to reach the same answer; that knob is no longer reached by anything.)
                 s3cOk = true;
                 Console.WriteLine($"    [3c] Null OffenseSide: no crash, Push={nullPush:F6}  [OK]");
             }

@@ -526,8 +526,14 @@
     "FrontcourtVictimDefensiveFoul": 0.035,
     "FrontcourtVictimJumpBall": 0.005,
     "TeamPaceBias": 0.0,
-    "PaceScale": 0.15,
-    "AthleticismGapScale": 0.008,
+    "OverlapCredit": 0.35,
+    "EscapeWeight": 0.55,
+    "RaceWeight": 0.45,
+    "RaceCenter": 0.50,
+    "BarBase": 0.475,
+    "BarPaceSwing": 0.10,
+    "PushSwing": 0.22,
+    "MarginScale": 0.16,
     "Epsilon": 1e-09
   },
   "RollK": {

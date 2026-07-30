@@ -83,7 +83,9 @@ internal static partial class Program
         Console.WriteLine();
         Console.WriteLine("=== PROJECT CHARM :: Transition Ladder (run-or-not) ===");
         Console.WriteLine("  Direct Roll J read | pace neutral | team athleticism gap varied | fresh");
-        Console.WriteLine($"  AthleticismGapScale = {cfgJ.AthleticismGapScale:F4} (linear; gap × scale) | conditional Push% per source");
+        Console.WriteLine(
+            $"  S86 wire: escape {cfgJ.EscapeWeight:F2} / race {cfgJ.RaceWeight:F2} | swing {cfgJ.PushSwing:F2}" +
+            $" | margin scale {cfgJ.MarginScale:F2} | bar {cfgJ.BarBase:F3} | conditional Push% per source");
         Console.WriteLine();
 
         // ── 1. Main calibration sweep: conditional Push% per source ───────────
@@ -194,7 +196,18 @@ internal static partial class Program
     private static (double Push, double Settle, double Sum) ReadJPie(
         RollJGenerator gen, TransitionSource source, StealOrigin? origin)
     {
-        var ctx = new TransitionContext(source) { Origin = origin, OffenseSide = TeamSide.Home };
+        // S86: the ladder must NAME who won the ball, or the new wire takes its neutral
+        // early-out and every rung reads the flat configured base — a manufactured "the
+        // change does nothing" finding rather than a measurement. Slot 1 is seated by
+        // BuildTransitionGame like the other four, and MakeAthlete sets all five athletic
+        // components to the rung's level, so each swept gap IS a speed gap: this ladder now
+        // measures the escape+race half of the opportunity score with pace held neutral.
+        var ctx = new TransitionContext(source)
+        {
+            Origin          = origin,
+            OffenseSide     = TeamSide.Home,
+            BallHandlerSlot = 1
+        };
         var pie = gen.Generate(ctx);
 
         double push = 0.0, settle = 0.0, sum = 0.0;

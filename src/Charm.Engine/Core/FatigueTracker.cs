@@ -81,13 +81,41 @@ public sealed class FatigueTracker
     /// <c>(1 − drop)</c> of authored — never below, never zero (drops are guarded to [0,1)).
     /// Authored ratings are never mutated; this is a derived discount on a derived composite.</para>
     /// </summary>
-    public double EffectiveAthleticism(Player player, bool isDefense)
+    public double EffectiveAthleticism(Player player, bool isDefense) =>
+        player.Athleticism * AthleticismDiscount(player, isDefense);
+
+    /// <summary>
+    /// The fatigue DISCOUNT FACTOR itself — the multiplier
+    /// <c>1 − drop × level/Ceiling</c> that <see cref="EffectiveAthleticism"/> applies to
+    /// the composite. Exposed in S86 so a caller that needs ONE physical attribute rather
+    /// than the whole composite reads the same tired-legs factor instead of restating the
+    /// formula. Exactly one discount formula exists in the engine; this is it.
+    ///
+    /// <para>Fresh (level 0) returns exactly 1.0; fully gassed bottoms at
+    /// <c>(1 − drop)</c>. <paramref name="isDefense"/> selects the steeper defensive drop,
+    /// as everywhere else.</para>
+    /// </summary>
+    public double AthleticismDiscount(Player player, bool isDefense)
     {
-        var level    = LevelFor(player.PlayerId);
-        var drop     = isDefense ? _cfg.DefenseAthleticismDrop : _cfg.OffenseAthleticismDrop;
-        var discount = 1.0 - drop * (level / _cfg.Ceiling);   // level ∈ [0,Ceiling] ⇒ discount ∈ [1−drop, 1]
-        return player.Athleticism * discount;
+        var level = LevelFor(player.PlayerId);
+        var drop  = isDefense ? _cfg.DefenseAthleticismDrop : _cfg.OffenseAthleticismDrop;
+        return 1.0 - drop * (level / _cfg.Ceiling);   // level ∈ [0,Ceiling] ⇒ discount ∈ [1−drop, 1]
     }
+
+    /// <summary>
+    /// A player's EFFECTIVE <see cref="Player.Speed"/> — his authored speed discounted by
+    /// the SAME fatigue factor his athleticism composite already takes (S86). Tired legs
+    /// run less, and they lose more on defense than on offense, exactly as at every other
+    /// fatigue site. Speed is one of the five components of
+    /// <see cref="Player.Athleticism"/>, so this is the composite's own discount applied to
+    /// one of its parts — not a second, independent fatigue curve.
+    ///
+    /// <para>Read by <see cref="RollJGenerator"/> for the transition race term. A player's
+    /// PASSING is deliberately NOT discounted anywhere — passing is not legs (Emmett's
+    /// ruling, S86); no skill attribute in the engine reads fatigue today.</para>
+    /// </summary>
+    public double EffectiveSpeed(Player player, bool isDefense) =>
+        player.Speed * AthleticismDiscount(player, isDefense);
 
     /// <summary>
     /// Accrue exactly ONE possession of on-floor fatigue for each player in

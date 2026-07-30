@@ -91,20 +91,58 @@ public sealed class RollJConfig
     //     real coaching source reads CoachProfile.PaceBias via GameState.CoachFor.
     //     Invariant: no enforced sign restriction (both directions are valid).
     //
-    //     PaceScale — converts the mapped [−0.8,+1.0] pace value into a Push delta.
-    //     PaceLift = mappedPace × PaceScale.
-    //
-    //     AthleticismGapScale — converts the signed athleticism gap
-    //     (offenseFiveAthl − defenseFiveAthl, derived Athleticism mean of active five)
-    //     into a Push delta. Gap is positive when offense is more athletic (more Push),
-    //     negative when less athletic (less Push). LINEAR wire (gap × scale, no GapFn).
-    //     Calibrated Session 20: 1 unit of gap = 0.008 Push. Off a rebound (base 0.30):
-    //     a clear within-division edge (+10) → ~38% run; a cross-division mismatch
-    //     (+30) → ~54%. Applied as a bounded Push↔Settle transfer (see RollJGenerator),
-    //     so mass is conserved at every gap. ---
+    //     S86 RETIRED both of the old additive lifts. PaceScale is gone because pace is
+    //     no longer a nudge — it is the BAR the players' opportunity must clear (ruling
+    //     C-32/R1), and keeping both would let pace pay twice. AthleticismGapScale is
+    //     gone because the five-way athleticism composite has been replaced by the SPEED
+    //     race specifically (ruling R4), and Speed sits inside that composite
+    //     (Player.Athleticism), so keeping both would double-count fast teams. ---
     public double TeamPaceBias { get; set; } = 0.0;
-    public double PaceScale { get; set; } = 0.15;
-    public double AthleticismGapScale { get; set; } = 0.008;
+
+    // --- S86: the transition OPPORTUNITY score and the coach BAR. Values are ported
+    //     verbatim from the locked oracle header (tools/transition_opportunity_oracle.py,
+    //     Emmett-approved 2026-07-30); this build does NOT retune them.
+    //
+    //     The shape, in one line:
+    //       opportunity = EscapeWeight × escape(handlerSpeed, handlerPassing)
+    //                   + RaceWeight   × ((matesSpeed − defSpeed)/100 + RaceCenter)
+    //       margin      = opportunity − bar(paceBias)
+    //       bar(pace)   = BarBase − ((pace − 5)/5) × BarPaceSwing
+    //       transfer    = PushSwing × tanh(margin / MarginScale)   (then bounded)
+    //
+    //     OverlapCredit — R2: the rebounder's two escape routes OVERLAP. His better route
+    //     counts fully; his second counts a third as much, and the pair is renormalised by
+    //     (1 + OverlapCredit) so elite-at-both beats elite-at-one by a couple of points of
+    //     push rather than double. Must be in [0,1).
+    //
+    //     EscapeWeight / RaceWeight — the rebounder-dominant blend (ruled: ball-handler
+    //     first, teammates second). MUST sum to exactly 1: they are shares of one score,
+    //     not independent scales, so a pair that does not sum to 1 silently rescales the
+    //     whole opportunity axis against the bar.
+    //
+    //     RaceCenter — an even race contributes its half, which keeps opportunity inside
+    //     roughly [0,1] so BarBase reads as a comparable number.
+    //
+    //     BarBase / BarPaceSwing — R1/R5: the coach is the GATE. BarBase is tuned so a
+    //     league-average team at neutral pace lands on S85's realised 33.5% push. The swing
+    //     gives grind 0.535 / neutral 0.475 / run 0.395. This pair is the SINGLE lever a
+    //     future coaching brain moves (O-57 era); player math and coach bar are never
+    //     pre-fused.
+    //
+    //     PushSwing — the maximum settle↔push transfer before the bounded clamp. ZERO IS
+    //     VALID and is the kill switch: at 0 every margin produces no transfer and all five
+    //     sources reproduce their configured base weights (the Phase 75 pattern).
+    //
+    //     MarginScale — tanh softness. A comfortable clear runs; a bad miss almost never
+    //     does. Must be strictly positive (it is a denominator). ---
+    public double OverlapCredit { get; set; } = 0.35;
+    public double EscapeWeight { get; set; } = 0.55;
+    public double RaceWeight { get; set; } = 0.45;
+    public double RaceCenter { get; set; } = 0.50;
+    public double BarBase { get; set; } = 0.475;
+    public double BarPaceSwing { get; set; } = 0.10;
+    public double PushSwing { get; set; } = 0.22;
+    public double MarginScale { get; set; } = 0.16;
 
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
@@ -129,13 +167,29 @@ public sealed class RollJConfig
             throw new InvalidOperationException(
                 $"RollJ FrontcourtVictimPush ({cfg.FrontcourtVictimPush}) must be >= Rebound Push ({cfg.Push}).");
 
-        // Phase 28: modifier scales must be >= 0 (negative is a basketball non-sequitur).
-        if (cfg.PaceScale < 0)
+        // S86 guards (B6). Each one catches a settings-file edit that would silently
+        // change the SHAPE of the opportunity score rather than merely mistune it.
+        if (cfg.OverlapCredit < 0.0 || cfg.OverlapCredit >= 1.0)
             throw new InvalidOperationException(
-                $"RollJ PaceScale must be >= 0 (got {cfg.PaceScale}).");
-        if (cfg.AthleticismGapScale < 0)
+                $"RollJ OverlapCredit must be in [0,1) (got {cfg.OverlapCredit}). At 1 the two " +
+                "escape routes would count equally, which is the pre-fused form R2 rejects.");
+        if (Math.Abs(cfg.EscapeWeight + cfg.RaceWeight - 1.0) > 1e-12)
             throw new InvalidOperationException(
-                $"RollJ AthleticismGapScale must be >= 0 (got {cfg.AthleticismGapScale}).");
+                $"RollJ EscapeWeight ({cfg.EscapeWeight}) + RaceWeight ({cfg.RaceWeight}) must " +
+                "equal 1 — they are shares of ONE opportunity score, not independent scales. A " +
+                "pair that does not sum to 1 rescales the whole score against a fixed bar.");
+        // PushSwing == 0 is VALID and is the kill switch (base weights everywhere).
+        if (cfg.PushSwing < 0.0)
+            throw new InvalidOperationException(
+                $"RollJ PushSwing must be >= 0 (got {cfg.PushSwing}). Zero is valid and is the " +
+                "kill switch; negative would invert every ruling in C-32.");
+        if (cfg.MarginScale <= 0.0)
+            throw new InvalidOperationException(
+                $"RollJ MarginScale must be > 0 (got {cfg.MarginScale}) — it is the tanh denominator.");
+        if (cfg.BarPaceSwing < 0.0)
+            throw new InvalidOperationException(
+                $"RollJ BarPaceSwing must be >= 0 (got {cfg.BarPaceSwing}). Negative would make a " +
+                "run-and-gun coach RAISE the bar.");
 
         return cfg;
     }

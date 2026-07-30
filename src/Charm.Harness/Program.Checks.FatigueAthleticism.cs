@@ -258,7 +258,17 @@ internal static partial class Program
             Seat(g, TeamSide.Home, off);
             Seat(g, TeamSide.Away, new[] { Mk(6, 50), Mk(7, 50), Mk(8, 50), Mk(9, 50), Mk(10, 50) });
             var genJ = new RollJGenerator(cfgJ, cfgM, g);
-            var ctx  = new TransitionContext(TransitionSource.Rebound) { OffenseSide = TeamSide.Home };
+            // S86: name the rebounder. Fatigue now reaches Roll J through SPEED (the
+            // ball-handler's own legs in the escape term, plus his teammates' in the race),
+            // and with nobody named the wire takes its neutral early-out — fresh and tired
+            // would read identically and this site would fail with nothing wrong. Slot 1 is
+            // seated by Seat() above. The assertion is UNCHANGED, and the inert mode (zero
+            // drops) still reads exactly zero movement.
+            var ctx  = new TransitionContext(TransitionSource.Rebound)
+            {
+                OffenseSide     = TeamSide.Home,
+                BallHandlerSlot = 1
+            };
             var pushFresh = W(genJ.Generate(ctx), TransitionOutcome.Push);
             foreach (var o in off) Tire(g.Fatigue, o, 300);
             var pushTired = W(genJ.Generate(ctx), TransitionOutcome.Push);

@@ -249,6 +249,7 @@ internal static partial class Program
         ok &= Phase74BlockHelpCheck(configPath);                 // Phase 74 (S79: block help arm + contribution-based credit — golden parity, rate invariants, config guards)
         ok &= Phase75VerticalCheck(configPath);                  // Phase 75 (S81.2: the leap — isolation sweep, reach composite, three neutral points, picker strictness, config guards)
         ok &= Phase76TransitionReadoutCheck(configPath);         // Phase 76 (S85: the fast-break readout — entry/arm partition, three-way shot partition, nesting chains, event-scoping, press-born source)
+        ok &= Phase77TransitionOpportunityCheck(configPath);      // Phase 77 (S86: the transition opportunity score + coach bar — golden parity, neutral rule, conservation, monotonicity, overlap ruling, config guards)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

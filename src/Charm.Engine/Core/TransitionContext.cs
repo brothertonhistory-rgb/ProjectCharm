@@ -137,6 +137,39 @@ public sealed record TransitionContext(TransitionSource Source)
     /// anchor.</para></summary>
     public TeamSide? OffenseSide { get; init; }
 
+    /// <summary>
+    /// WHO HAS THE BALL — the lineup slot of the man who won it (S86). The rebounder who
+    /// took the board, or the thief who made the steal. Roll J reads his Speed (does he
+    /// lead the break himself?) and his Passing (can he move it ahead?) to build the
+    /// escape half of the opportunity score.
+    ///
+    /// <para><b>Filled by the RESOLVER, not by the emitting roll.</b> The four ticket
+    /// emitters (<c>RollI</c>, <c>RollM</c>, <c>RollC</c> ×2, <c>RollK</c>) run BEFORE the
+    /// pickers and do not yet know who will be chosen. The Resolver enriches the ticket at
+    /// its Terminal case, immediately after <c>DefensiveRebounderPicker</c> /
+    /// <c>StealerPicker</c> have produced a slot, and never overwrites a non-null value.</para>
+    ///
+    /// <para><b>The slot survives the possession boundary</b> because substitutions are
+    /// legal only from a dead ball: the Governor passes
+    /// <c>state.Entry != EntryType.Transition</c> as its allow-substitutions flag on the
+    /// within-period boundary (<c>Governor.cs:678-680</c>), so on a transition entry the
+    /// seat→man mapping cannot change between the pick and the read. ONE EXCEPTION, known
+    /// and accepted (S86): a half that ENDS on a defensive rebound spawns its transition
+    /// possession across the halftime break, where the substitution policy does run — so
+    /// that break is read off whoever holds the seat in the second half. Roughly a
+    /// thousand entries a season out of ~300,000; nothing mis-conserves, the pie simply
+    /// reads a different real player's legs. Not worth a structural fix; recorded so a
+    /// future session does not mistake it for a bug. (A TIED half is different again — the
+    /// overtime tip replaces the state outright, so the ticket is discarded, which is
+    /// pre-existing behaviour.)</para>
+    ///
+    /// <para>Null on every hand-constructed test ticket, and on Roll K's
+    /// <c>LiveBallTurnover</c> arm — that reason does not match the stealer-pick gate at
+    /// <c>Resolver.cs</c>, and adding a pick there is a behaviour change outside S86's wall
+    /// (journalled). Null takes the neutral rule: margin = 0, base weights unchanged.</para>
+    /// </summary>
+    public int? BallHandlerSlot { get; init; }
+
     /// <summary>The defensive-rebound transition ticket (off a field-goal miss). A
     /// read-clear shorthand for terminal/consequence sites; equivalent to
     /// <c>new TransitionContext(TransitionSource.Rebound)</c>.

@@ -119,6 +119,14 @@
          plus a separate 4-slot isolated intangibles block — so the s69 name would have
          been a lie about the shape. The s69 file is retired; journal S69/S71 and git
          history hold the old population. -->
+    <!-- Transition opportunity/bar golden fixture (S86). This is the LOCKED oracle's own
+         golden-emit output, byte for byte. Regenerate by running
+         tools/transition_opportunity_oracle.py with its golden-emit flag and redirecting
+         stdout to tools/transition_opportunity_golden.txt (the flag is named in the
+         Phase 77 check's B1 comment). -->
+    <None Include="..\..\tools\transition_opportunity_golden.txt" Link="tools\transition_opportunity_golden.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="..\..\tools\gen_pass3_replay_fixture_s78.json" Link="tools\gen_pass3_replay_fixture_s78.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

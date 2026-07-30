@@ -98,6 +98,16 @@ internal static partial class Program
         //  team runs.
         public readonly Dictionary<int, long> TeamDefTransitionEntries = new();
         public readonly Dictionary<int, long> TeamDefPossessions = new();
+        //  S86: the per-team push band — the instrument that grades the opportunity/bar wire.
+        //  OFFENSIVE-side, because this asks how often THIS team gets out and runs, the mirror
+        //  of the defensive pair above. Denominator is every Roll J entry the resolver actually
+        //  RESOLVED for this team (all five arms), matching the oracle's absolute push
+        //  probability — NOT Push+Settle, which would be a conditional rate the oracle never
+        //  computes. The S85 block prints the split league-wide only, and a league mean cannot
+        //  show whether teams spread apart: both halves are needed and neither detects the
+        //  other's failure.
+        public readonly Dictionary<int, long> TeamOffTransitionResolved = new();
+        public readonly Dictionary<int, long> TeamOffTransitionPush = new();
         public long PossessionRecords;       // every record — the pace numerator
         //  S79.3: league secured boards — the sum of PossessionRecord.OrbChances, and the
         //  league-side leg of the SecuredBoardsOnFloor identity. It exists for no other reason.
@@ -559,6 +569,18 @@ internal static partial class Program
                     case TransitionOutcome.JumpBall:      TransitionJumpBall++; break;
                     case null:                                                  break;
                 }
+                // S86: the same arm, split by the team that had the ball. A non-null arm IS the
+                // "resolver walked this Roll J entry" test — that is precisely what the S85
+                // nullable label was built to represent, so the denominator needs no new field.
+                if (r.TransitionArm is { } s86Arm)
+                {
+                    var offSchool = r.Offense == TeamSide.Home ? homeSchoolId : awaySchoolId;
+                    TeamOffTransitionResolved[offSchool] =
+                        (TeamOffTransitionResolved.TryGetValue(offSchool, out var tr0) ? tr0 : 0L) + 1L;
+                    if (s86Arm == TransitionOutcome.Push)
+                        TeamOffTransitionPush[offSchool] =
+                            (TeamOffTransitionPush.TryGetValue(offSchool, out var tp0) ? tp0 : 0L) + 1L;
+                }
                 if (r.FastBreakFga > 0) PossWithFastBreakFga++;
                 FastBreakFgm    += r.FastBreakFgm;    FastBreakBlk    += r.FastBreakBlk;
                 BreakPutbackFga += r.BreakPutbackFga; BreakPutbackFgm += r.BreakPutbackFgm;
@@ -921,6 +943,41 @@ internal static partial class Program
             Console.WriteLine(
                 Inv($"      five sibling arms sum {armSum} vs resolved transition entries {armDen} (residual {armSum - armDen})") +
                 Inv($"   |  {s.TransitionEntriesNoShot} entries never resolved (end-of-half, no shot)"));
+
+            // 2b. S86 — the SAME push share, per offensive team. The league mean above cannot
+            //     show whether teams spread apart, and the spread is the whole point of the
+            //     opportunity/bar wire: a fast roster should run and a plodding one should not.
+            //     A flat band here means the wire has gone inert even if the league mean moved.
+            //     Denominator is every RESOLVED Roll J entry for that team (all five arms), so
+            //     this is directly comparable to the oracle's absolute push probability.
+            //     Page-only, never asserted.
+            {
+                var pushRates = s.TeamOffTransitionResolved.Keys
+                                 .Where(k => s.TeamOffTransitionResolved[k] > 0)
+                                 .Select(k => 100.0 * s.TeamOffTransitionPush.GetValueOrDefault(k)
+                                                    / s.TeamOffTransitionResolved[k])
+                                 .OrderBy(x => x)
+                                 .ToList();
+                var pushZeroTeams = s.TeamOffTransitionResolved.Count(kv => kv.Value == 0);
+                if (pushRates.Count > 0)
+                {
+                    double AtPush(double p) =>
+                        pushRates[Math.Min(pushRates.Count - 1, (int)(p * pushRates.Count))];
+                    var pushMean = pushRates.Sum() / pushRates.Count;
+                    Console.WriteLine(
+                        Inv($"      push% by OFFENSIVE team (n={pushRates.Count}): mean {pushMean:F2}%") +
+                        Inv($"  min {pushRates[0]:F2}%  p10 {AtPush(0.10):F2}%  median {AtPush(0.50):F2}%") +
+                        Inv($"  p90 {AtPush(0.90):F2}%  max {pushRates[^1]:F2}%") +
+                        Inv($"  |  spread {pushRates[^1] - pushRates[0]:F2}pp") +
+                        Inv($"  |  {pushZeroTeams} teams excluded (zero resolved entries)"));
+                }
+                else
+                {
+                    Console.WriteLine(
+                        Inv($"      push% by OFFENSIVE team: no team had a resolved transition entry") +
+                        Inv($"  ({pushZeroTeams} teams excluded)"));
+                }
+            }
 
             // 3. Push selected vs break shot produced. A push that dies before a shot goes up
             //    is a real thing and the gap is itself a finding. The break-shot total is

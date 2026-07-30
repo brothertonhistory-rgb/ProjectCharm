@@ -10,7 +10,7 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 85** (2026-07-30; THE FAST-BREAK READOUT. Every transition number on the season page was offensive, so the transition-defence effects Emmett ruled in the S84 design conversation could not be designed — nothing measured the axis any of them would move. Page-only instrument, no dial moved, inertness proved by hash rather than asserted (new block stripped by exact line match, remainder SHA-256 `e05260ac…` identical to a fresh-pull baseline). Vocabulary fixed and load-bearing: a transition entry is NOT a fast break (41.61% of possessions arrive off a rebound / FT rebound / steal; only 12.74% carry a break shot, because Roll J's Settle arm leaves the state untouched), and "transition FG%" / "halfcourt FGA" are banned labels because each spans two of the three shot buckets. Roll J now REPORTS the arm it rolled — Settle and Push share a destination and DefensiveFoul forks on the bonus, so the page cannot infer it — as ONE nullable label, making the five-arm reconciliation true by representation. The non-break bucket is COUNTED, not derived, so the partition identity can actually fail. Break blocks travel the same seat-to-man path ordinary blocks take, because a seat is not a person once the S76 rotation shares it. ★ Phase 76 caught what the build had not anticipated: an end-of-half possession that kills the clock without shooting is RECORDED but never RESOLVED, so Roll J never runs on it — correct behaviour, named explicitly in check and page (503 on the canonical season) rather than loosened away. Two of sixteen checks are EXISTENCE checks (a possession with both a break and a non-break shot proves event-scoping; a break-stamped non-transition entry proves the press source) and absence FAILS. Provenance needed no new engine field and the source split cost zero extra counters — a possession cannot be both push-born and press-born. ★ THE FINDING: the median team's best break-blocker takes 25.0% of its break blocks against the 20% five interchangeable defenders would give — O-48 measured. Nine of nine suite and thirteen of thirteen season predictions landed exactly; sandbox byte-identical to Emmett's machine. Opened O-59, O-60. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
+Last updated: **Session 86** (2026-07-30; THE COACH BECAME A GATE. Roll J's run-or-not balance stopped being a flat number nudged by two additive lifts and became a score the players build against a bar the coach sets: the ball-winner's legs and his outlet pass as two OVERLAPPING escape routes, his four teammates' speed against all five defenders' speed getting back, and the offensive coach's pace setting the height that opportunity must clear. Both old lifts RETIRED rather than supplemented — pace was a nudge and is now the gate, so keeping both would let pace pay twice, and `Speed` lives inside `Player.Athleticism`, so keeping the five-way composite gap beside the new speed race would pay fast teams twice. League push 33.55% -> 35.70%, but the mean is not the finding: **per-offensive-team push now runs min 18.89% / median 36.16% / max 48.15%, a 29.26pp band, on rosters alone**, because every bar in the country is still the neutral 0.475 (O-57). Read against the entries-conceded band (12pp): who GETS transition chances is far more uniform than who RUNS on them. ★ THE RULING THAT CHANGED THE BUILD: the free-throw board was measured BEFORE it was wired and pulled out of scope — base Push 0.08 against a swing of 0.22 pinned a plodding rebounder to exactly 0.0% at grind AND neutral pace while everyone with legs jumped to ~28%, a source with no middle, and one of the two zero rows was an *average* rebounder against a fast defense. The locked oracle independently confirmed the call: its tables and its 45-case golden fixture carry only the live board and the two steals, so it never modelled the free-throw board at all and needed no edit. ★ THE CHECK-IN CAUGHT TWO SUITE CHECKS THAT WOULD HAVE GONE RED WITH NOTHING WRONG (a tempo-direction check and a tired-legs check, both stamping which team had the ball but never WHO); the same defect would have silently left the exploratory transition ladder reading dead flat — the S59.2 flat-baseline trap. Golden parity worst |delta| 4.92E-013 against a deliberately non-bitwise 1e-6 bar (S81.3 lesson). Nine of nine suite and eighteen of eighteen season predictions landed exactly; sandbox byte-identical to Emmett's machine. Three honest misses recorded, including one wrong claim in the build prompt that survived the §6b audit: entry rate DID move (41.61% -> 41.56%) because changing a pie shifts the RNG stream. Opened O-61, O-62, O-63. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
 
 ## Current baseline
 
@@ -58,6 +58,23 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S86 — THE TRANSITION OPPORTUNITY SCORE AND THE COACH BAR. The first dial the S85 readout was built to grade.**
+  `escape` (the ball-winner's better route counting fully, his second a third as much, renormalised) + `race`
+  (four teammates' speed vs five defenders') builds an opportunity; `bar` = `BarBase - mappedPace x BarPaceSwing`
+  is the height it must clear; `PushSwing x tanh(margin / MarginScale)` becomes ONE bounded Settle<->Push transfer.
+  The bounded transfer is the pre-S86 arithmetic **verbatim** — only where `rawDelta` comes from changed, plus the
+  clamp being lifted into `RollJGenerator.BoundPushSettleTransfer` (because under the configured dials NEITHER
+  clamp is reachable end-to-end on any wired source, so only a direct call can prove it binds).
+  `PaceScale` and `AthleticismGapScale` are **retired** from the config. `TransitionContext` gained
+  `BallHandlerSlot`, filled by the **Resolver** at its Terminal case (the four emitters run before the pickers and
+  cannot know who was chosen). `FatigueTracker` gained `AthleticismDiscount` + `EffectiveSpeed`; passing is NOT
+  discounted — passing is not legs. **Phase 77** adds 26 assertions, no basketball target among them: golden
+  parity vs the oracle's own committed output, FOUR separate neutral-rule early-outs, the clamp called directly,
+  five one-dial monotonicity sweeps, the overlap ruling as four strict inequalities on a saturation-free quad,
+  six config guards plus the `PushSwing = 0` kill switch, and the free-throw exemption across twelve cells.
+  Season page gained ONE line and two per-offensive-team counters: the push% band that makes the spread readable.
+  **Read the per-team band, not the league mean** — a moved mean with a collapsed band means the wire went inert.
 
 - **★ S85 — THE FAST-BREAK READOUT. The transition-defence axis is now measurable; nothing else changed.**
   Thirteen new page lines under the S38 diet line, credited to the DEFENDING team throughout: entry rate league
@@ -479,6 +496,41 @@ chart is PROVISIONAL pending O-6.
   skills, BallHandling among them, pushing more guards over 28 — so take this AFTER S80, measured
   against the moved population, not before.
 
+- **O-61 — FATIGUE REACHES LEGS ONLY, AND EMMETT ASKED WHETHER IT SHOULD REACH EVERYTHING (S86).**
+  His words at the S86 ruling: *"fatigue should cause virtually everything to drop tiny bit by tiny bit, right?"*
+  The honest answer given: yes for the physical side, and it is already tiny-by-tiny because the meter is a
+  trickle that steepens into a cliff — **but it is not everything.** `EffectiveAthleticism` / `EffectiveSpeed` are
+  the only fatigue-discounted reads in the engine. Passing, handle and shooting are untouched by tiredness
+  everywhere. That matches S86's own ruling ("passing is not legs"), so it is not a defect — but the broader
+  question is real and was NOT smuggled into S86. Opens as a design conversation: which attributes should sag, by
+  how much, and does a tired shooter's jumper fall or only his legs under it? Note the interaction with O-57:
+  fatigue is currently the only thing that makes a late-game possession differ from an early one.
+
+- **O-62 — THE FREE-THROW BOARD IS EXEMPT FROM THE OPPORTUNITY WIRE AND NEEDS ITS OWN ARCHETYPE TABLE (S86 ruling).**
+  Not a defect and not sediment — a deliberate scope wall with the measurement attached. Base Push 0.08 against a
+  swing of 0.22 means the score can subtract more than the whole pie: a plodding rebounder reads **exactly 0.0%**
+  at grind and neutral pace, an *average* rebounder against a fast defense also reads 0.0%, and everyone with legs
+  jumps to ~28%. Bimodal, which is the S81 lesson in a new place. The locked oracle never modelled this source
+  (three base-weight pairs in its golden fixture, no 0.08/0.82 row), so exempting it matched the signed artifact.
+  **The plumbing is already done:** Roll M's arm shares the `DefensiveRebound` reason, so the ticket already
+  carries a `BallHandlerSlot`. What it needs is Emmett's table for a source whose base is small — most likely a
+  per-source swing, which is a new dial and therefore a new ruling. Phase 77's B8 will go red the moment the
+  exemption lapses.
+
+- **O-63 — THREE SMALL S86 CARRY-FORWARDS, GROUPED BECAUSE NONE IS WORTH ITS OWN SESSION.**
+  (a) **`TeamPaceBias` is dead.** It was the signed fallback for a null `OffenseSide`; the neutral rule now
+  short-circuits before any bar is computed, so nothing reads it. Kept at S86's scope wall, and Phase 71
+  name-parity faithfully keeps a dead key aligned in `config.json` — exactly the sediment CONVENTIONS §6c warns
+  about. Either give it a job or remove it from both sides.
+  (b) **Roll K's `LiveBallTurnover` arm never gets a ball-handler.** Its reason misses the stealer-pick gate and
+  the engine picks a stealer in exactly one place, so that ticket rides null and takes the neutral rule: a live-ball
+  turnover off an offensive rebound runs at its flat 35% regardless of who scooped it. Adding a pick there is a
+  behaviour change, hence deferred.
+  (c) **The halftime seat exception.** A half that ENDS on a defensive rebound spawns its transition possession
+  across the halftime break, where substitutions do run — so that break reads off whoever now holds the seat.
+  ~1,000 entries a season out of ~307,000; nothing mis-conserves, the pie reads a different real player's legs.
+  Named in the code comment. Only worth revisiting if a live-ball substitution feature ever lands.
+
 - **★ O-48 — TRANSITION HAS NO ASSIGNMENT MODEL (S81 ruling; Emmett: its own session).**
   On a fast break nobody is matched up — defenders sprint back and pick up whoever is closest — but slot
   parity is the engine's only assignment model. S81 therefore **exempts** transition entirely
@@ -490,6 +542,8 @@ chart is PROVISIONAL pending O-6.
   guarding" inherits the same hole.
 
 - **O-59 — THE OBSERVATION RUN'S BREAK SENTINEL HAS BEEN WAITING FOR EXACTLY THESE COUNTERS (S85 finding).**
+  *(S86 note: still open and still untouched — S86 changed the season page, not the observation run. It is now
+  the smallest transition item on the board and belongs with the next transition session.)*
   `ObservationRunV1` still prints `DEFERRED SENTINELS (counter-plumbing needed — future session): Press frequency
   / break rate at game level`. S85 built the per-possession counters that sentinel was waiting on, but the
   observation run is a DIFFERENT surface from the season page and was deliberately left untouched (scope wall).
@@ -506,6 +560,9 @@ chart is PROVISIONAL pending O-6.
   at S81 and is not the answer. **Emmett's S84 ruling that a fast lineup should widen this spread therefore
   cannot be built at the block door — it needs O-48 first.** Blocked on O-48. The page line now exists, so the
   effect of any future assignment model on this distribution is visible rather than argued.
+  *(S86 re-measured it after the push rewire: median held at **25.0%** (min 11.5% / p90 36.4% / max 48.0%).
+  Confirms the diagnosis — moving WHO pushes does not move who gets the block, because on a break the engine
+  still assigns nobody. Blocked on O-48, unchanged.)*
 
 - **★ O-49 — THE RARE-EVENT LEADERBOARDS USE A MINUTES FLOOR WHERE THEY NEED AN OPPORTUNITY FLOOR
   (S81 measurement; belongs with the S79.3 percentage-board work).**
@@ -737,26 +794,30 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**NONE SELECTED.** S85 shipped a page-only instrument, recorded **C-32** (Emmett's S84 transition-defence
-ruling, which had never reached this board), and opened **O-59** and **O-60**.
+**NONE SELECTED.** S86 shipped the first three of C-32's four effects at the push/settle door and opened
+O-61, O-62, O-63.
 
-**The transition-defence wiring is the natural next session, and it is now genuinely informed rather than
-guessed.** Three of the four effects in C-32 live at the push/settle door and can be designed straight off the
-new lines: the arm split (push 33.55% / settle 56.46%) is the distribution a speed weighting would move, and the
-push-vs-break-shot gap (102,886 pushes producing 94,017 break shots) is where "forcing the offence to settle"
-would show up. What it needs from Emmett first is the archetype table — four fast guards against four slow ones,
-push share before and after — because that is where this kind of design is signed off and where a wrong shape
-dies cheaply.
+**★ O-57 is now the clear front-runner, and S86 is the reason.** The bar exists, it works, and **not one team in
+the country moves it** — all 347 schools play on the compiled default 5/5/5, so every bar is the neutral 0.475 and
+the entire 29.26pp push spread comes from rosters alone. S86 built the single lever a coaching brain would pull and
+left it bolted down. The archetype tables' pace columns are proven only by Phase 77, which sets `PaceBias`
+directly; the season cannot exercise half the design. This is no longer one un-set input among several — it now
+gates pace, shot diet, scoring concentration, assists **and** the run-or-not decision at once. It opens as a design
+conversation, not a build: where a school's profile comes from (prestige? conference? a coach object with its own
+generation and career arc?) is Emmett's call.
 
-**The fourth effect is not available and should not be attempted.** Widening the break-block spread needs an
-assignment model on the break (**O-48**); O-60 records why, with the measurement attached.
+**What S86 did NOT do, and should not be attempted piecemeal.** C-32's fourth effect — widening the spread of who
+gets a break block with a fast lineup — needs an assignment model on the break (**O-48**). S86 re-measured the
+distribution after the push rewire and the median did not budge from 25.0%, which is the diagnosis confirmed rather
+than a disappointment: changing who pushes cannot change who gets the block while the engine assigns nobody on a
+break. O-48 is its own session by Emmett's earlier ruling.
 
-The standing candidates are otherwise unchanged: **O-57** (nobody is coaching anybody — still the highest-leverage
-un-set input, and it opens as a design conversation), **O-40** (block-rate calibration, blocks 4.4 against a 3.5
+The standing candidates are otherwise unchanged: **O-40** (block-rate calibration, blocks 4.4 against a 3.5
 target), **O-42** (lineup shape), **O-43** (the on-ball blend), **O-45** (the half-finished S78 engine half),
-**O-50** (shot diet), **O-54/O-55/O-56** (S83's three), **O-58** (the re-stamp ritual's recurring cost),
-**O-59** (the stale break sentinel — small, and it belongs with any transition work), and the **player
-generator's finishing budget**, which opens with a design question rather than a number: the generator spends a
-fixed budget, so "more finishing" is "less of something else," and Emmett has not ruled which.
+**O-49/O-50** (the opportunity floor on rare-event boards; shot diet), **O-54/O-55/O-56** (S83's three), **O-58**
+(the re-stamp ritual's recurring cost), **O-59** (the stale break sentinel — smallest item on the board, and it
+belongs with any transition work), **O-61/O-62/O-63** (S86's three), and the **player generator's finishing
+budget**, which opens with a design question rather than a number: the generator spends a fixed budget, so "more
+finishing" is "less of something else," and Emmett has not ruled which.
 
 Pick one at the top of the next session, against this board and a fresh pull (CONVENTIONS §6a).

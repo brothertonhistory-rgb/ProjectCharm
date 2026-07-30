@@ -5416,41 +5416,49 @@ requestedShift  *= attnAmplifier
 | Steal | `FrontcourtVictim` | `FrontcourtVictimPush`, `FrontcourtVictimSettle`, … |
 | Steal | null | `StealPush`, `StealSettle`, … (fallback) |
 
-**Two independent modifiers — never pre-fused:**
+**Two independent modifiers — RETIRED at S86; the base-weight table above is still current.**
+Phase 28 shipped two additive lifts on Push/Settle: a coach-pace nudge
+(`mappedPace × PaceScale`) and a five-way team athleticism gap
+(`(offenseFiveAthl − defenseFiveAthl) × AthleticismGapScale`). **Both are gone.** S86 replaced
+them with an opportunity score gated by a coach bar — see *The transition opportunity score and
+the coach bar (Session 86)*. `PaceScale` and `AthleticismGapScale` no longer exist in
+`RollJConfig` or `config.json`.
 
-1. **Coach pace (config-only seam):** `PaceLift = TeamPaceBias × PaceScale`. Neutral at `TeamPaceBias = 0.0`. Positive = up-tempo (more Push); negative = slow. A future coaching session replaces this config-only knob with a real team/coach source; harness scenarios vary pace by constructing `RollJConfig` variants.
+Why *replaced* rather than *supplemented*, since either would have compiled: pace was a nudge and
+is now the gate, so keeping the nudge would let pace pay twice; and `Speed` is one of the five
+components of `Player.Athleticism`, so keeping the composite gap beside the new speed race would
+pay fast teams twice. Both are the pre-fusing the standing rule forbids.
 
-2. **Team athleticism-gap (relative, directional):** `AthlLift = (offenseFiveAthl − defenseFiveAthl) × AthleticismGapScale`. `offenseFiveAthl` = mean derived `Player.Athleticism` of the active five for `ctx.OffenseSide`. Null `OffenseSide` → gap = 0, regression anchor (isolated harness tests that do not seat full rosters).
+**What survived verbatim:** the bounded Settle↔Push transfer (now the extracted
+`RollJGenerator.BoundPushSettleTransfer`), the five base-weight sets, and the fact that Turnover,
+DefensiveFoul and JumpBall are fixed to their base values. Only the *source* of the raw delta
+changed.
 
-**Modifier application (bounded transfer — Session 20).** The two deltas are summed and
-applied as a single transfer between Settle and Push, clamped to the room available:
-```
-transfer       = clamp(PaceLift + AthlLift, −basePush, baseSettle)
-modifiedPush   = basePush   + transfer
-modifiedSettle = baseSettle − transfer
-```
-Pie mass is conserved exactly at every gap (`modifiedPush + modifiedSettle == basePush +
-baseSettle`), so a strong gap can floor one weight without the pie ever leaving a valid
-simplex. (Superseded the original two-independent-clamps form — see the Phase 30
-clamp-asymmetry note for the bug history.) Turnover, DefensiveFoul, JumpBall are fixed to
-their base values.
-
-**Regression anchor:** At neutral pace (`TeamPaceBias = 0.0`) and neutral athleticism gap (0 — empty lineups in harness checks), Rebound and FreeThrowRebound pies reproduce configured weights exactly. Confirmed by `RollMContextSelectionCheck`.
-
-**Harness observation:** Athleticism-gap modifier visible in stress test. AthleticVsSkill bucket: Athletic Tr%=39.9% vs Skill Tr%=33.4%. SkillVsAthletic (mirrored): Athletic Tr%=39.7% vs Skill Tr%=33.9%. Mirror gap = 0.2% — directional and side-neutral. Pace knob at neutral (0.0); all signal is from athleticism gap.
+**Regression anchor (current form):** the margin is exactly 0 — so the configured base weights come
+back untouched — on the FreeThrowRebound source, on a null `OffenseSide`, on a null
+`BallHandlerSlot`, and when the named seat resolves to no player. The isolated Roll J batches
+(`RollJBatchCheck`, `RollJBonusForkCheck`, `RollJStealBatchCheck`) construct bare tickets and
+therefore still assert the configured rates unmodified.
 
 ### Calibration placeholders
 
 Magnitudes provisional at Phase 28 (wire-the-form mandate), except where later calibrated:
 - `AttentionShiftAmplifier = 1.0`
 - `BackcourtVictimPush = 0.55`, `FrontcourtVictimPush = 0.35`
-- `TeamPaceBias = 0.0`, `PaceScale = 0.15`
-- `AthleticismGapScale` — **calibrated 0.008 in Session 20** (linear; was the 0.001 placeholder)
+- `TeamPaceBias = 0.0` — survives as a config key but **is no longer read by anything** (S86:
+  a null `OffenseSide` now takes the neutral rule directly, so the fallback it existed to serve is
+  unreachable). Kept rather than removed at S86's scope wall; recorded as an open item.
+- `PaceScale` / `AthleticismGapScale` — **retired at S86** (see the opportunity/bar section).
+  Superseded dials, not tuning debt.
 
 ### What is not this session
 
-- Coaching/offensive-hierarchy layer: `TeamPaceBias` is the seam; wiring it to a real `CoachProfile` field is a future coaching session
-- Defender picker architecture: athleticism gap uses team-level means (active five), not individual matchup gaps — the per-slot defender attribution layer is a deferred chapter
+- Coaching/offensive-hierarchy layer: `TeamPaceBias` was the seam. Phase 30 wired the real
+  `CoachProfile.PaceBias`, and S86 promoted it from a nudge to the bar — the single lever a future
+  coaching brain moves.
+- Defender picker architecture: the retired athleticism gap used team-level means (active five), not
+  individual matchup gaps. S86's race term still does (four teammates' speed vs five defenders'), and
+  transition still has no assignment model at all — O-48.
 - Calibration passes: correctness before calibration is the standing sequencing principle
 - Deferred roll faces (C, D, J putback-loop, K): unbuilt chapters, not cleanup debt
 
@@ -5548,9 +5556,16 @@ One surgical change: `CoachingPull.Apply(shooter, coach: null, ...)` replaced by
 
 ### PaceBias in Roll J
 
-`rawPaceBias` reads `_game.CoachFor(ctx.OffenseSide.Value).PaceBias` when the offense side is stamped on the ticket; falls back to `_cfg.TeamPaceBias + 5.0` (→ neutral) when null. Mapped pace `= (rawPaceBias − 5.0) / 5.0`. `paceLift = mappedPace × PaceScale`. The two modifiers (pace, athleticism gap) remain independent inputs to the same Push/Settle adjustment — never pre-fused, per the standing rule.
+Phase 30's contribution here is the **mapping**, and it is the part that survives: the coach's
+`PaceBias` on `[1,10]` becomes a signed value `(PaceBias − 5.0) / 5.0`, neutral at 5.0. What the
+mapped value *does* changed at S86. Phase 30 multiplied it by `PaceScale` into an additive Push
+lift; S86 multiplies it by `BarPaceSwing` and subtracts it from `BarBase` to set the **bar** the
+players' opportunity must clear. Up-tempo lowers the bar, a grinder raises it. Same mapping, same
+neutral point, opposite role: pace stopped being one voice among several and became the gate.
 
-**`_cfg.TeamPaceBias` role change.** Now a signed fallback knob used only when `OffenseSide` is null. Not removed — still the regression anchor for isolated harness checks. `PaceScale` is unchanged.
+**`_cfg.TeamPaceBias` is now dead.** Phase 30 left it as the signed fallback for a null
+`OffenseSide`. S86's neutral rule short-circuits before any bar is computed, so nothing reads it.
+The key survives (Phase 71 name-parity keeps `config.json` aligned) but it has no job.
 
 ### Roll J clamp-asymmetry bug fix (Phase 30) — generalized to a bounded transfer (Session 20)
 
@@ -5569,6 +5584,15 @@ var modifiedPush   = basePush   + transfer;
 var modifiedSettle = baseSettle - transfer;
 ```
 The transfer is clamped to the room available in *both* directions, so mass is conserved exactly at every gap and `Pie` never throws — at the FreeThrow source's slow-pace negative floor *or* at a strong positive gap (the positive-side crash that became reachable once `AthleticismGapScale` was calibrated up from 0.001 to 0.008).
+
+**S86 kept this arithmetic verbatim and only moved it.** `rawDelta` is now
+`PushSwing × tanh(margin / MarginScale)` instead of `paceLift + athlLift`, and the clamp itself was
+lifted into `RollJGenerator.BoundPushSettleTransfer` so Phase 77 can call it directly — because under
+S86's configured dials **neither clamp is reachable end-to-end on any wired source** (swing 0.22
+against a smallest wired base Push of 0.35 and a smallest base Settle of 0.35), so an end-to-end test
+could not prove the clamp binds. It *would* have bound on the FreeThrowRebound source (base Push
+0.08), which is one of the reasons that source is exempt from the S86 wire. Do not "simplify" this
+back into two independent clamps.
 
 ### PaceBias in Governor
 
@@ -8803,6 +8827,125 @@ Absence FAILS rather than passing quietly. Deliberately ABSENT: any break-subset
 assertion. Phase 36 already asserts `BlkBySlot.Total == BlkCount` on every possession, which holds on
 the break subset by construction; a second copy would be decoration. What IS asserted is the new
 containment relationship (`FastBreakBlkBySlot <= BlkBySlot`, seat by seat), which nothing else checks.
+
+## The transition opportunity score and the coach bar (Session 86, 2026-07-30)
+
+The first dial the S85 readout was built to grade. Roll J's Push/Settle balance stopped being a flat
+configured number nudged by two additive lifts and became **a score the players build against a bar
+the coach sets**.
+
+### The shape
+
+```
+escape      = (better + OverlapCredit × second) / (1 + OverlapCredit)
+                where better = max(handlerSpeed, handlerPassing) / 100
+                      second = min(handlerSpeed, handlerPassing) / 100
+race        = (matesSpeed − defSpeed) / 100
+opportunity = EscapeWeight × escape + RaceWeight × (race + RaceCenter)
+bar         = BarBase − ((PaceBias − 5) / 5) × BarPaceSwing
+margin      = opportunity − bar
+rawDelta    = PushSwing × tanh(margin / MarginScale)
+transfer    = BoundPushSettleTransfer(basePush, baseSettle, rawDelta)
+```
+
+Locked dials (from the oracle header, not retuned by the build): `OverlapCredit 0.35`,
+`EscapeWeight 0.55`, `RaceWeight 0.45`, `RaceCenter 0.50`, `BarBase 0.475`, `BarPaceSwing 0.10`,
+`PushSwing 0.22`, `MarginScale 0.16`. Bars: grind 0.535 / neutral 0.475 / run 0.395.
+
+### The five rulings this encodes (C-32 plus the S85 design conversation)
+
+1. **The coach is the GATE, not a tiebreaker.** Player inputs build the opportunity; pace sets the
+   height it must clear. A grinding team runs only when the break is nearly free. This is why the
+   old additive pace nudge was *replaced* — a gate and a nudge are two different mechanisms and
+   having both lets pace pay twice.
+2. **The rebounder's two escape routes OVERLAP.** His legs to lead it himself, his outlet to move it
+   ahead. The better route counts fully, the second counts a third as much, and the pair is
+   renormalised. Elite-at-both beats elite-at-one by ~3 points of push, not double — "LeBron gets the
+   best of both worlds," but not twice over.
+3. **A great outlet on a slow big creates breaks that weren't there before** — modest, and it needs
+   receivers. The two Unseld rows differ by ~7 points at neutral pace purely on who is running with
+   him.
+4. **Teammates' SPEED specifically** is the race term, not the five-way athleticism blend, opposed by
+   the defense's speed getting back. The composite gap was retired for this reason: `Speed` lives
+   inside `Player.Athleticism`, so both together would double-count fast teams.
+5. **The bar is fixed per team now and is the single lever a future coaching brain moves** (O-57
+   era). Player math and coach bar are never pre-fused.
+
+### Who has the ball — the one structural add
+
+`TransitionContext` gained `int? BallHandlerSlot`. The escape term needs the ball-winner's Speed and
+Passing, and nothing on the ticket named him.
+
+The four ticket emitters (`RollI`, `RollM`, `RollC` ×2, `RollK`) run **before** the pickers and cannot
+know who will be chosen. So the **Resolver** enriches the ticket at its Terminal case, right after
+`DefensiveRebounderPicker` / `StealerPicker` produce a slot, and never overwrites a non-null value.
+The two pickers are mutually exclusive at a single terminal, so a coalesce cannot pick the wrong one.
+Roll M's free-throw rebound shares the `DefensiveRebound` reason, so that ticket gets a ball-handler
+for free — unused today, but the plumbing is already there for when the free-throw board joins.
+
+**The slot survives the possession boundary** because substitutions are legal only from a dead ball:
+the Governor passes `state.Entry != EntryType.Transition` as its allow-substitutions flag at the
+within-period boundary. **One exception, known and accepted:** a half that *ends* on a defensive
+rebound spawns its transition possession across the halftime break, where the substitution policy does
+run — so that break reads off whoever holds the seat in the second half. Roughly a thousand entries a
+season out of ~307,000; nothing mis-conserves, the pie simply reads a different real player's legs.
+Named rather than fixed. (A *tied* half is different: the overtime tip replaces the state outright and
+the ticket is discarded — pre-existing behaviour.)
+
+### Fatigue reaches the legs, and only the legs
+
+`FatigueTracker` gained `AthleticismDiscount` (the factor `1 − drop × level/Ceiling`, extracted so
+exactly one discount formula exists) and `EffectiveSpeed`. The ball-handler's Speed and both team
+means are discounted per player *before* averaging, so one gassed man is not diluted by four fresh
+ones, and the defensive drop is the steeper one as everywhere else. **Passing is not discounted** —
+passing is not legs (Emmett's ruling). No skill attribute in the engine reads fatigue at all, which is
+a broader gap than this session's scope and is recorded as an open item.
+
+### The free-throw board is EXEMPT, and that is a ruling
+
+Its base Push is 0.08 against a swing of 0.22, so the new score would pin a slow rebounder to
+**exactly zero** and send everyone with legs to ~28% — a source with no middle. Measured before
+building rather than after:
+
+| archetype (free-throw board) | grind-2 | neutral-5 | run-9 |
+|---|---|---|---|
+| Fast guard rips the board | 24.7% | 27.3% | 29.0% |
+| Plodding big, no outlet | **0.0%** | **0.0%** | 7.3% |
+| Avg board vs FAST defense | **0.0%** | **0.0%** | 9.8% |
+| League-average everything | 3.4% | 11.5% | 20.8% |
+
+Two of eight archetypes read zero at neutral pace, and one is not even an extreme case. **Emmett ruled
+the source out of the wire**, and the locked oracle independently confirms the call: its approved
+tables and its golden fixture cover only the live board and the two steals — it never modelled the
+free-throw board at all. The board keeps its configured weights and joins later with its own archetype
+table. Phase 77's B8 asserts the exemption across twelve cells, because an exemption that silently
+lapses would surface first as a moved season number nobody could explain.
+
+### What the season says
+
+League push **33.55% → 35.70%**. The finding is not the mean, it is the spread: per-offensive-team
+push runs **min 18.89% / p10 24.97% / median 36.16% / p90 44.08% / max 48.15%, a 29.26pp band**, on
+rosters alone — every bar in the country is still the neutral 0.475 because `RunSeasonCore` assigns no
+coach profile to anybody (O-57). So the archetype tables' pace columns are proven by Phase 77, which
+sets `PaceBias` directly, and **not** by the season. Do not read a flat-bar season as the bar being
+inert.
+
+Read against the entries-conceded band (min 35.30% / max 47.59%, a 12pp spread), the shape is worth
+noting on its own: **who gets transition chances is far more uniform across the league than who runs
+on them.** Generating a break is mostly a function of forcing misses and turnovers; deciding to run is
+now a roster property.
+
+Downstream consequences, all sanctioned: break shots 94,017 → 99,219; possessions carrying a break
+shot 12.74% → 13.44%; break FG% 46.5% against non-break 42.4%. Break FG% **is expected to move** —
+changing who pushes changes which shooters take break shots. Break-block concentration held at a 25.0%
+median, exactly as it must with O-48 untouched.
+
+**One structural correction recorded.** The build prompt asserted the transition entry rate could not
+move, on the reasoning that Roll J changes which arm wins rather than whether Roll J runs. That
+reasoning is right about the mechanism and wrong about the numbers: changing the pie shifts the RNG
+stream, so every downstream draw moves. Entry rate read 41.61% → 41.56% and the possession count
+738,126 → 738,386. Conservation held at residual 0 throughout. Future sessions should expect
+whole-page wobble from any pie change and read the *identities*, not the third decimal.
 
 ## Roll G — fast-break shot diet: the shooter-bent, PaceBias-tilted break (Session 38, 2026-07-06)
 

@@ -360,6 +360,26 @@ public sealed class Resolver
                     // Phase 35: defensive-rebound attribution — stamp which defender got it.
                     if (t.Reason == "DefensiveRebound")
                         defensiveRebounderSlot = DefensiveRebounderPicker.Pick(t.State, _game, _matchup, _rng).Number;
+                    // S86: name WHO WON THE BALL on the outgoing transition ticket, so Roll J
+                    // can read his legs and his outlet pass one possession later. This is the
+                    // only place both facts are in hand: the emitting rolls stamped the ticket
+                    // before either picker ran, and the pickers above have just produced a slot.
+                    // The two are mutually exclusive at a single terminal (one Reason, and both
+                    // are set only here, in the case that returns immediately), so the coalesce
+                    // cannot pick the wrong one. Enrich only when a picker actually fired, and
+                    // never overwrite a slot already on the ticket — no emitter sets one today,
+                    // but the field's meaning must not depend on that staying true.
+                    if ((defensiveRebounderSlot ?? stealerSlot) is { } ballHandlerSlot &&
+                        t.Consequence.TransitionContext is { BallHandlerSlot: null } transitionTicket)
+                    {
+                        t = t with
+                        {
+                            Consequence = t.Consequence with
+                            {
+                                TransitionContext = transitionTicket with { BallHandlerSlot = ballHandlerSlot }
+                            }
+                        };
+                    }
                     return new RoutingOutcome(PossessionEnded: true, Destination: $"END:{t.Reason}")
                         { EndedOn = t, PutbackAttempts = putbackAttempts, FreeThrowSpins = freeThrowSpins, Points = points, ShotClockPeriods = shotClockPeriods,
                           Fga = fga, Fgm = fgm, ThreePa = threePa, ThreePm = threePm,
