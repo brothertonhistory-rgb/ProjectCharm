@@ -6762,9 +6762,33 @@ LineupPassingFactor = 1.0 + AssistPassSwing
                           × tanh( (meanAssistWeight − AssistPassMidpoint) / AssistPassScale )
 ```
 
-Defaults: `AssistPassMidpoint = 71.31` (S41; was 50.0), `AssistPassScale = 20.0`, `AssistPassSwing = 0.25`. Factor range: (0.75, 1.25). A league-average lineup produces factor ≈ 1.0. A broad high-passing lineup lifts all zone rates proportionally; a scorer-heavy lineup suppresses them.
+Defaults: `AssistPassMidpoint = 30.73` (S84; was 71.31 at S41, 50.0 before that), `AssistPassScale = 20.0`, `AssistPassSwing = 0.25`. Factor range: (0.75, 1.25). A league-average lineup produces factor ≈ 1.0. A broad high-passing lineup lifts all zone rates proportionally; a scorer-heavy lineup suppresses them.
 
-**S41 recenter — the midpoint tracks the generated population, not the scale midpoint.** The placeholder `AssistPassMidpoint = 50` assumed lineup AssistWeight centers at 50 (the middle of the 0–100 scale). It does not: generated starters average **~71** on the passing/playmaking/IQ blend, so every eligible make drew a pre-clamp factor centered at ~1.19, not 1.0 — inflating league assists to 17.4. Recentering the midpoint to the **eligible-make-weighted mean lineup AssistWeight (71.31, solved by tanh zero-balance bisection so the weighted-mean pre-clamp factor equals exactly 1.0)** is the surgical fix: a league-average lineup now earns factor 1.0 as intended. The recenter alone dropped assists 17.4 → ~15.2; the uniform zone-base trim (above) closed the rest to 13.5. This is a *relative-engine* correctness fix — the midpoint follows the population it measures, so it stays correct as the generated population shifts.
+**The midpoint tracks the generated population, not the scale midpoint — and it is a MEASURED value that goes stale.** `AssistPassMidpoint` is the only place in the assist door that has to agree with a fact about the player pool. A league-average lineup earns factor 1.0 if and only if this constant equals the population's actual mean lineup `AssistWeight`. It is therefore not a tuning dial: it is a measurement, and it rots every time the generator moves.
+
+The placeholder `AssistPassMidpoint = 50` assumed lineup AssistWeight centres at 50 (the middle of the 0–100 scale). It does not, and S41 correctly identified that as a defect — but set the replacement to **71.31**, which was also wrong, and by more. S84 measured the population directly over a full canonical season: the eligible-make-weighted mean lineup AssistWeight is **30.73** (roster-wide 29.28; designated starters 31.25 — all three agree inside two points, so the fit does not depend on which population is chosen). The correct value is 30.73 and has been since the generator arc settled.
+
+**What the 40-point error did, measured.** The factor is a `tanh`, so the cost of a wrong midpoint is not linear — it is a collapse of the derivative. At 71.31 every lineup in the league sat roughly two scale widths below the midpoint, out on the flat tail where `tanh'` is about **one fifteenth** of its value at the origin. Two consequences, both measured on the canonical season, and the second is the one that matters:
+
+| | midpoint 71.31 | midpoint 30.73 |
+|---|---|---|
+| league mean factor applied | 0.760 | 0.9994 |
+| league assists / team / game | 9.9 (target 13.5, LOW) | 13.1 (OK) |
+| team factor spread, min–max | 0.752 – 0.791 | 0.858 – 1.149 |
+| best-to-worst team separation | 5% | 34% |
+
+The **level** error was visible on the season page as a LOW assist verdict and could in principle have been chased with the zone bases. The **separation** error was invisible: a league in which every team's passing multiplier lands inside a 5% band is a league where the multiplier is inert, and no line on the page said so. Recentering restored the separation **6.7-fold** without touching a zone base.
+
+**Why the fix is the midpoint and not the swing.** Nothing saturates. The most extreme team in the league sits **0.74 scale widths** from the corrected midpoint, so no team was ever pinned against the `tanh` asymptote and no team is now. The league was flat because it was parked far from the origin, not because the swing was too small. `AssistPassSwing` remains a calibration placeholder and is the next lever if more team separation is wanted; it is not a substitute for a correctly measured midpoint.
+
+**The realized factor is now on the season page (S84, page-only, never asserted).** Two numbers, which fail independently and are therefore both needed:
+
+- **league mean** — should read ~1.000. This is the drift alarm. It reads 1.000 only while the midpoint matches the population, so generator movement shows up here first.
+- **team p10–p90 band** — currently ~0.926 to 1.068. This is the liveness alarm. A correctly centred midpoint with a dead swing would still print 1.000 at the league line, so the level alone cannot distinguish a working dial from an inert one.
+
+They are carried out of the engine as a per-possession sum-and-count pair appended last to `PossessionRecord` (the S62 positional convention), read off the same local the probability uses so the page can never report a factor the engine did not apply. A sum and a count rather than a mean because a possession can contain more than one eligible make and the roll-up is event-weighted — the same weighting the fit used.
+
+**The clamp bounds, measured (S84).** The ceiling effectively does not bind: at the corrected midpoint a three-point make clamps at 0.95 on **0.016%** of the league's assist-eligible makes (37 of 237,989) and no other zone ever reaches it, because reaching it needs a lineup mean of 55.6 against a league-best team mean of 45.5. The floor is **structurally unreachable** for any lineup whatsoever — the weakest zone base (Short, 0.3831) times the weakest possible factor (0.75) is 0.287, above the 0.25 floor. Both are printed by the Phase 39 bounds check rather than asserted, since either constant may be moved by design.
 
 **Why the multiplier is necessary.** Without it, passing attributes only decide *who* gets credited, never the team rate. Every team would post the same zone-averaged assist rate (varying only by shot mix), which cannot reproduce the real 37%→71% spread. The multiplier at the lineup grain is the mechanism that makes a ball-movement roster post a high team rate and a scorer-heavy roster a low one.
 
@@ -6790,15 +6814,36 @@ AssistWeight(p) = AssistPassingWeight    × p.Passing       (default 0.50)
                 + AssistIqWeight         × p.BasketballIQ   (default 0.15)
 ```
 
-**Coefficient sum-to-one is correct and intentional.** This deviates from `BlockerWeight` and the rebound positional weights, which do NOT sum to one (the picker normalizes among players, so absolute scale is irrelevant there). The sum-to-one constraint keeps `AssistWeight` on the 0–100 attribute scale, against which `AssistPassMidpoint` is calibrated — recentered at S41 to the generated population's mean (~71.31), the reference point `LineupPassingFactor` measures against. Conflating these conventions would be wrong; the documented rationale survives in both the class XML doc and `MatchupConfig`.
+**Coefficient sum-to-one is correct and intentional.** This deviates from `BlockerWeight` and the rebound positional weights, which do NOT sum to one (the picker normalizes among players, so absolute scale is irrelevant there). The sum-to-one constraint keeps `AssistWeight` on the 0–100 attribute scale, against which `AssistPassMidpoint` is calibrated — recentered at S84 to the measured population mean (30.73), the reference point `LineupPassingFactor` measures against. Conflating these conventions would be wrong; the documented rationale survives in both the class XML doc and `MatchupConfig`.
 
 Pick mechanics: the shooter's slot gets weight 0 (excluded); every other populated offensive player gets `max(1, AssistWeight(p, cfg))`; one RNG draw, cumulative walk, last eligible slot as floating-point fallback. Throws `InvalidOperationException` on empty non-shooter lineup — loud, unreachable in valid play.
 
 `AssistWeight` is private to `AssistPicker` because nothing else consumes it. This differs from `Matchup.BlockerWeight` (shared with the team shot-block math) and the rebound helpers (shared with team rebound share). No `Matchup` static is needed or added.
 
-### The W Illinois problem — deferred
+### The W Illinois problem — deferred, and now MEASURED (S84)
 
 W Illinois posted a 37% team assist rate despite having passing guards — because those guards didn't carry the offensive load. Good passers who *don't take the shots* can't generate assists on shots they never take. Phase 39 captures the lineup-collective grain: a roster of good passers produces a higher rate than a roster of poor passers. It does not yet capture load concentration: a good passer who takes 5% of shots contributes less than a good passer who takes 30%. That is the iso/motion concentration slider's job — a deferred feature that Phase 39 must stand alone without.
+
+**S84 put numbers on the gap, and they are large.** With the midpoint corrected the league *total* is right (13.1 against 13.5) while the *top of the board* is roughly half of real life:
+
+| | real D1, 2024–25 | engine |
+|---|---|---|
+| best in the nation, apg | 9.4 | 4.8 |
+| 10th | 6.7 | 4.1 |
+| 50th | 5.2 | 3.4 |
+| top-to-fiftieth ratio | 1.81× | 1.40× |
+
+The mechanism is arithmetic, not a bug. `Pick` weights the four eligible teammates by `max(1, AssistWeight)` — **linear, no exponent**. A team's best passer carries a mean `AssistWeight` of 47.7 against playing teammates at 27.6, a 1.72× edge; three teammates at 27.6 sum to 82.8 against his 47.7, so even if he never shot and never sat he could win only **36.5%** of the four-man draws. Net of shooter-exclusion and bench time he takes **21.4%** of his team's assists (median 20.9%, league-best 36.1%). Real lead guards take something near half.
+
+**The fix is NOT to steepen the picker, and this is a ruling (S84).** A concentration exponent would bake one league-wide funnel level into the math permanently, which is precisely the thing the strategy layer is supposed to decide per team. Emmett's ruling: a motion team *should* read low and an iso team *should* read high; the conference assist leader is not necessarily the best passing rating, but ability plus a system conducive to it — exactly as the nation's leading scorer is not automatically its highest-rated scorer. One number for every team is the wrong answer even if it hits the real board's average. **The top of the assist board is therefore not calibratable until the strategy layer exists**, and chasing 9.4 with picker or attribute math today would be tuning against an input the engine has not been given (the flat-baseline trap, S59.2).
+
+**Two findings that came out of the same look, both bigger than the assist board.**
+
+1. **The funnel dial exists on the shooting side and has no passing counterpart.** `CoachProfile.HeliocentricBias` (1–10, default 5) is wired to Roll E's hierarchy exponent and decides who gets the *shots*. Nothing decides who gets the *passes*. `LineupPassingFactor` sets the assist **level** at the team grain; a motion/iso dial would sit beside it and set the **distribution**. Same place, opposite job.
+
+2. **★ THE SEASON NEVER ASSIGNS A COACH TO ANYBODY.** All 347 schools play all 5,205 games on the default `CoachProfile` — middle funnel, middle shot selection, middle pace. The dials are built and wired; the season leaves every one of them neutral for every school. So today the nation's leading scorer *is* essentially its highest-rated scorer, because every team runs the identical system, and the same is true of the assist and pace boards. This is not an assist defect — it gates scoring concentration, shot diet and pace variety alike, and it is the reason none of the three boards can currently show system variety.
+
+3. **The outlier question survives both.** Even a heavy iso dial needs someone worth funnelling to. Whether the generator produces true outlier passers — a 1.72× edge over teammates may simply not be enough — is independent of what any coach runs, and belongs with the generation arc rather than the coaching one.
 
 ### Structural location
 

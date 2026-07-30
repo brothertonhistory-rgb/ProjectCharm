@@ -245,6 +245,12 @@ public sealed class Resolver
         var blkBySlot     = new SlotGroup();
         // Phase 39: per-slot assist accumulator. Total <= FGM on every possession.
         var astBySlot     = new SlotGroup();
+        // Session 84, PAGE-ONLY: the lineup passing factor the assist door applied, summed
+        // over this possession's assist-eligible makes, with the matching event count. Read
+        // off the SAME local the probability uses, so the page can never report a factor the
+        // engine did not apply.
+        var assistPassFactorSum    = 0.0;
+        var assistPassFactorEvents = 0;
         int? turnoverOffSlot   = null;
         var turnoverWasLiveBall = false;
         int? stealerSlot        = null;
@@ -353,7 +359,9 @@ public sealed class Resolver
                           OrbBySlot      = orbBySlot,
                           StealerSlot    = stealerSlot,
                           DefensiveRebounderSlot = defensiveRebounderSlot,
-                          AstBySlot      = astBySlot };
+                          AstBySlot      = astBySlot,
+                          AssistPassFactorSum    = assistPassFactorSum,
+                          AssistPassFactorEvents = assistPassFactorEvents };
 
                 case Continue c:
                     // Session 62: harvest any non-shooting foul this continuation carries,
@@ -750,6 +758,16 @@ public sealed class Resolver
                                     {
                                         var zoneBase   = _matchup.AssistedRate(shotSt.ShotType!.Value);
                                         var passFactor = AssistPicker.LineupPassingFactor(shotSt, _game, _matchup);
+                                        // Session 84, PAGE-ONLY: bank the factor the door is
+                                        // about to use. Placed here, not after the draw, so it
+                                        // counts EVERY eligible make rather than only the
+                                        // assisted ones — the page's denominator is chances,
+                                        // not conversions, which is what makes the realized
+                                        // mean comparable to the calibration fit. Pure
+                                        // arithmetic on an already-computed local: no RNG, no
+                                        // branch, nothing downstream reads it.
+                                        assistPassFactorSum += passFactor;
+                                        assistPassFactorEvents++;
                                         // Session 57 — PostMoves interior assist discount. Read the shooter's
                                         // PostMoves off SelectedSlot (non-null per the guard above). PostAssistFactor
                                         // returns exactly 1.0 on every identity case (span 0, PostMoves <= 50, or a

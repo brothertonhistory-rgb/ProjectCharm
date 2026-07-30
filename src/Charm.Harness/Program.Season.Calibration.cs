@@ -72,6 +72,23 @@ internal static partial class Program
         // a leaderboard alone cannot do.
         public long BlkMatchedNear, BlkHelperNear, BlkMatchedOut, BlkHelperOut;
 
+        // Session 84, PAGE-ONLY. The lineup passing factor the assist door actually applied,
+        // event-weighted (one observation per assist-eligible made field goal, assisted or
+        // not — the denominator is chances, not conversions). Never asserted.
+        //
+        // Why the page carries this at all: S84 found AssistPassMidpoint sitting at 71.31
+        // against a real population mean of 30.73, a 40-point drift that had been in the tree
+        // since S41 and was invisible on the page. It jammed every team onto the flat tail of
+        // the tanh — best and worst passing teams within 5% of each other — and no line on the
+        // season page would have shown it. A dial nobody can see is a dial that drifts.
+        //
+        // The league pair reports the LEVEL (a healthy midpoint puts the mean at ~1.000); the
+        // per-team dictionary reports the SEPARATION, which is the half the league mean cannot
+        // show — a correctly centred midpoint with a dead swing would still read 1.000.
+        public double AssistPassFactorSum;
+        public long   AssistPassFactorEvents;
+        public readonly Dictionary<int, (double Sum, long Events)> TeamAssistPassFactor = new();
+
         // Session 63: the baseline-read lines (page-only, never asserted). Full-game
         // foul totals from the attribution arrays (SFL = shooting fouls, NSF =
         // non-shooting — the S62 split), and a per-(school, depth-slot) usage
@@ -444,6 +461,22 @@ internal static partial class Program
                 PossessionRecords++;
                 BlkMatchedNear += r.BlkMatchedNear; BlkHelperNear += r.BlkHelperNear;
                 BlkMatchedOut  += r.BlkMatchedOut;  BlkHelperOut  += r.BlkHelperOut;
+                // Session 84, PAGE-ONLY. Credited to the OFFENSIVE team — the passing lineup
+                // is the one with the ball. Possessions with no eligible make contribute
+                // nothing to either side of the ratio, which is why the guard is on the count
+                // and not on the sum (a genuine factor of exactly 0.0 cannot occur: the tanh
+                // range is (0.75, 1.25), so a zero sum with a positive count would be a bug,
+                // not an empty possession).
+                AssistPassFactorSum    += r.AssistPassFactorSum;
+                AssistPassFactorEvents += r.AssistPassFactorEvents;
+                if (r.AssistPassFactorEvents > 0)
+                {
+                    var offSchool = r.Offense == TeamSide.Home ? homeSchoolId : awaySchoolId;
+                    var av = TeamAssistPassFactor.TryGetValue(offSchool, out var a0)
+                           ? a0 : (Sum: 0.0, Events: 0L);
+                    TeamAssistPassFactor[offSchool] =
+                        (av.Sum + r.AssistPassFactorSum, av.Events + r.AssistPassFactorEvents);
+                }
                 elapsedSum        += r.Elapsed;
                 PointsFromRecords += r.Points;
                 Fga += r.Fga; Fgm += r.Fgm;
@@ -660,6 +693,41 @@ internal static partial class Program
                               Inv($"LooseBallFoulOnOffense {lbf / g2:F2} | MissOutOfBoundsLost {s.MissOobN / g2:F2} | sum {candSum / g2:F2}"));
         }
         RowRel("assists",                   s.Ast / g2,              13.5);
+        {
+            // Session 84, PAGE-ONLY, never asserted. The assist door multiplies a per-zone base
+            // rate by this factor, so the factor is the whole of what team passing quality does
+            // to a team's assist total. Two things to read, and they fail independently:
+            //
+            //   LEVEL      — the league mean should sit at ~1.000. It is 1.000 by construction
+            //                only while AssistPassMidpoint matches the population mean lineup
+            //                passing quality. Drift in the generator moves the population and
+            //                this line follows it; at S84 the midpoint was 40 points stale and
+            //                this mean would have read 0.760.
+            //   SEPARATION — the p10..p90 band across teams. A centred midpoint with a dead
+            //                swing still reads 1.000 at the league line, so the level alone
+            //                cannot tell a working dial from an inert one. At S84's settings
+            //                the band is roughly 0.93..1.07.
+            //
+            // Both are page-only reads. Nothing here is a target and nothing is chased.
+            if (s.AssistPassFactorEvents > 0)
+            {
+                var lg = s.AssistPassFactorSum / s.AssistPassFactorEvents;
+                var teamFactors = s.TeamAssistPassFactor.Values
+                                   .Where(v => v.Events > 0)
+                                   .Select(v => v.Sum / v.Events)
+                                   .OrderBy(x => x).ToList();
+                Console.WriteLine(
+                    Inv($"    lineup passing factor applied (page-only): league mean {lg:F4}") +
+                    Inv($" over {s.AssistPassFactorEvents} assist-eligible makes"));
+                if (teamFactors.Count > 0)
+                {
+                    double At(double p) => teamFactors[Math.Min(teamFactors.Count - 1, (int)(p * teamFactors.Count))];
+                    Console.WriteLine(
+                        Inv($"      by team (n={teamFactors.Count}): min {teamFactors[0]:F4}  p10 {At(0.10):F4}") +
+                        Inv($"  median {At(0.50):F4}  p90 {At(0.90):F4}  max {teamFactors[^1]:F4}"));
+                }
+            }
+        }
         RowRel("turnovers",                 s.TurnoverPossessions / g2, 12.5);
         RowAbs("TO% of possessions",        Pct(s.TurnoverPossessions, s.PossessionRecords), 18.5, 1.5);
         RowRel("steals",                    s.Stl / g2,               6.2);

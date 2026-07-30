@@ -1,3 +1,102 @@
+## Session 84 — THE ASSIST DIAL WAS 40 POINTS OFF ITS OWN POPULATION FOR 43 SESSIONS. `AssistPassMidpoint` sat at 71.31 against a measured population mean of 30.73, parking every lineup in the league two scale widths out on the flat tail of the tanh. League assists 9.9 → 13.1 (target 13.5, LOW → OK), and — the part no page was showing — best-to-worst team separation 5% → 34%, a 6.7-fold restoration. The realized factor now prints on the season page as a league mean plus a team p10–p90 band, so the next drift of this kind is visible instead of measured. Phase 39's bounds check was a tautology that rebuilt the engine's own formula and compared it to itself; it now calls the production functions and exercises the clamp. Emmett's real-world top-50 list then showed the top of the assist board is still half of life, which was traced to linear weighting in the picker and **ruled not-to-be-fixed-there** — concentration is the strategy layer's job. Two findings fell out that are bigger than assists: the shooting funnel dial has no passing counterpart, and **the season assigns no coach profile to any school at all**. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine. (2026-07-29)
+
+**Register:** build, under `PROMPT-assist-midpoint-s84-r3`. One config value, five stale explanations, one engine page-only carry across four files, one suite check rewritten, one season-page line, and a fingerprint re-stamp on three block fixtures.
+
+### The defect
+
+`AssistPassMidpoint` is the one constant in the assist door that has to agree with a fact about the player pool: a league-average lineup earns factor 1.0 if and only if it equals the population's actual mean lineup `AssistWeight`. It is a measurement, not a tuning dial, and it rots whenever the generator moves.
+
+S41 found the original placeholder (50.0, which assumed attributes centre at the middle of the scale) and correctly called it a defect — then set the replacement to **71.31**, which was wrong by more. The real figure, measured over a full canonical season, is **30.73**.
+
+Three independent ways of counting agree inside two points, which is what makes the fit safe: eligible-make-weighted **30.73**, roster-wide **29.28**, designated starters **31.25**. The build prompt's own estimate was ~26 — a 4.7-point miss, and the reason the measurement was run rather than the estimate adopted.
+
+### ★ THE SEPARATION ERROR WAS THE REAL ONE, AND IT WAS INVISIBLE
+
+The factor is a `tanh`, so a wrong midpoint does not cost linearly — it collapses the derivative. At 71.31 every lineup sat about two scale widths below the midpoint, where `tanh'` is roughly **one fifteenth** of its value at the origin.
+
+| | 71.31 | 30.73 |
+|---|---|---|
+| league mean factor | 0.760 | 0.9994 |
+| assists / team / game | 9.9 (LOW) | 13.1 (OK) |
+| team factor min–max | 0.752 – 0.791 | 0.858 – 1.149 |
+| best-to-worst separation | 5% | 34% |
+
+The level error was at least *visible* — a LOW verdict on the page, chaseable (wrongly) through the zone bases. The separation error was not visible anywhere: a league where every team's passing multiplier lands inside a 5% band is a league where the multiplier is inert, and no line said so. That is the lesson, and it is why the instrument shipped alongside the fix rather than after it.
+
+**The fix is the midpoint, not the swing.** Nothing saturates: the most extreme team sits **0.74 scale widths** from the corrected midpoint. The league was flat because it was parked far from the origin, not because the swing was small. The build prompt's §5.1 gate said that if no team reached ±1 scale width then "the swing, not the midpoint, is the live constraint, and the session's premise needs revisiting." The condition fired literally and was reported as required — **and the inference was backwards**, which was said before building rather than after. Recentring is exactly what restores the slope.
+
+### The instrument — two numbers that fail independently
+
+Page-only, never asserted, printed under the assists row:
+
+```
+lineup passing factor applied (page-only): league mean 0.9994 over 237989 assist-eligible makes
+  by team (n=347): min 0.8583  p10 0.9257  median 0.9991  p90 1.0678  max 1.1474
+```
+
+- **league mean** — the drift alarm. Reads 1.000 only while the midpoint matches the population.
+- **team p10–p90 band** — the liveness alarm. A correctly centred midpoint with a dead swing would still print 1.000 at the league line, so the level alone cannot tell a working dial from an inert one.
+
+Carried as a per-possession sum-and-count pair appended **last** to `PossessionRecord` (S62 positional convention), read off the same local the probability uses so the page can never report a factor the engine did not apply. Sum-and-count rather than a mean because a possession can hold more than one eligible make and the roll-up is event-weighted — the same weighting the fit used. Proof the carry is inert: the season page is **byte-identical, same SHA-256**, to a run with only the config value moved, apart from the two new lines. Proof it is honest: the page's numbers independently reproduce an out-of-band scratch measurement taken before any tracked file was touched, to four decimals.
+
+### Phase 39's bounds check was a tautology
+
+The old sub-check rebuilt the lineup passing factor **inline** — literally `1 + Swing * tanh((mean - Midpoint) / Scale)` — and then compared the result to a clamp of that same expression. It could not fail. Worse, it re-derived a formula the engine owns, so `AssistPicker.LineupPassingFactor` could have drifted arbitrarily and this check would still have gone green. It also hardcoded a flat-50 lineup: 50 was never the league's mean lineup passing quality, so the single point it tested was a point no game reaches — the S59.2 flat-baseline blind spot, in a check written long before that lesson was named.
+
+Rewritten to call the production functions (`LineupPassingFactor`, `AssistedRate`, `PostAssistFactor`) and compose them in Resolver's order, at the **measured** team percentiles (p10 25, median 31, p90 36) rather than round numbers. It asserts the identity premise it rests on (a shooter at PostMoves 50 makes the interior discount exactly 1.0, checked at five zones × five factors), that better passing raises the factor monotonically, and that at least one grid point is strictly interior — or the clamp is doing all the work and the composition is untested.
+
+**The clamp arm needed a deliberately unreachable lineup, and that is recorded as a mechanism test.** All fifteen grid points came back interior, because at real settings the ceiling essentially never binds — a three clamps on **0.016%** of the league's makes (37 of 237,989) and no other zone reaches it, needing a lineup mean of 55.6 against a league-best team mean of 45.5. A check whose clamp arm never runs is not testing the clamp, so an `AssistWeight`-70 lineup was added and labelled in the source as a mechanism test, explicitly not a population claim. The **floor** turned out to be *structurally* unreachable for any lineup at all — weakest zone base 0.3831 × weakest factor 0.75 = 0.287 against a 0.25 floor — so it is printed and **not** asserted, since either constant may be moved by design.
+
+### Five stale explanations, two of them older than this session
+
+The prompt named one. There were five, and the audit for them was worth more than the one it was asked to do:
+
+1. The property's own doc comment asserted 71.31 **was** the measured population mean. Load-bearing and false.
+2. A block comment repeated the same claim.
+3. The `Load` exception message repeated it a third time.
+4. `AssistPicker`'s class doc still called **50** the league-average reference point — stale since S41, wrong for 43 sessions, and the exact sentence that would have told an earlier session where to look.
+5. The same block comment still described the assist probability as `zoneBase × LineupPassingFactor` — two factors, when `PostAssistFactor` made it three at **S57**.
+
+### Blast radius: the fingerprint ritual again, and reasoning would have missed it
+
+The prompt's audit checked `ConfigParity` (S74's typo-catcher) and correctly reported `AssistPassMidpoint` is not in its list — true, and the wrong guard. The actual tripwire is Phase 74's fixtures, which carry a SHA-256 of the **entire** `Matchup` section, so any change in it invalidates goldens that never read the changed key. Found by **applying the change in a scratch copy and running the whole suite**, not by reasoning about which checks looked related — the same method that found three checks in S83 where reasoning had found two.
+
+Two assertions rejected, both pure label rejections: the saved values were re-verified identical and the CREDIT golden parity check passed at **EXACT zero** on both sides of the change, which is the proof the block door is unmoved. Only the fingerprint label was re-stamped across the three files that carry it — not one saved number regenerated. This is now the **third** consecutive session to perform this ritual (S81.3, S83, S84); the S83 note said "revisit if the re-stamp ritual recurs," and it has.
+
+### ★ Emmett's real-world board, and a recommendation withdrawn
+
+Handed the actual 2024–25 D1 top 50 in assists, the fix stops looking finished:
+
+| | real | engine | |
+|---|---|---|---|
+| best in the nation | 9.4 | 4.8 | 51% of life |
+| 10th | 6.7 | 4.1 | 62% |
+| 50th | 5.2 | 3.4 | 65% |
+| top-to-fiftieth | 1.81× | 1.40× | |
+
+The league total is right and the *shape* is not. Measured mechanism: `Pick` weights the four eligible teammates **linearly** on `max(1, AssistWeight)`. A team's best passer carries 47.7 against playing teammates at 27.6 — a 1.72× edge — and three teammates at 27.6 sum to 82.8 against his 47.7, so even never shooting and never sitting he could win only **36.5%** of the four-man draws. Net of shooter-exclusion and bench time he takes **21.4%** of his team's assists (median 20.9%, league-best 36.1%). The ball does not go through one man in this engine; it goes to whoever the dice say, tilted slightly toward the better passer.
+
+A concentration exponent was offered as the cheap fix and **Emmett ruled it out, correctly**: concentration is a coaching output, not an attribute output. A motion team *should* read low; an iso team *should* read high. *"A guy leading the conference in assists does not necessarily mean he has the best passing rating — it means he has the ability to pass plus his coach's strategy was conducive to it,"* with the scoring analogy attached: the nation's leading scorer is not automatically its highest-rated scorer. One league-wide exponent is the wrong answer even if it lands the real board's average. **Consequence: the top of the assist board is not calibratable until the strategy layer exists.** Chasing 9.4 with picker or attribute math today would be tuning against an input the engine has not been given — the flat-baseline trap wearing different clothes.
+
+### ★ TWO FINDINGS BIGGER THAN THE ASSIST BOARD
+
+1. **The funnel dial has no passing counterpart.** `CoachProfile.HeliocentricBias` (1–10, default 5) is wired to Roll E's hierarchy exponent and decides who takes the *shots*. Nothing decides who makes the *passes*. The factor shipped today sets the assist **level** at the team grain; a motion/iso dial belongs beside it setting the **distribution** — same place, opposite job.
+
+2. **The season assigns no coach profile to any school.** All 347 schools play all 5,205 games on the default profile: middle funnel, middle shot selection, middle pace. The dials are built and wired; the season simply never sets them. So the nation's leading scorer today *is* essentially its highest-rated scorer, because every team in the country runs the identical system — and the same holds for the assist and pace boards. This gates scoring concentration, shot diet and pace variety alike, and it was found only because Emmett's design point sent the search to the coaching surface. Opened as **O-47**.
+
+The third possibility is independent of both and belongs to the generation arc: a 1.72× edge over teammates may simply not be an outlier passer. Even a heavy iso dial needs someone worth funnelling to.
+
+### Verification
+
+- Full suite: **`ALL CHECKS PASSED`**, 645 OK lines, zero FAIL, on Emmett's machine and matching the sandbox at seventeen checked values.
+- Canonical season: verified at **28 checked values**, exact, down to which player leads the league in assists (Pool_768, Texas Tech) and the assist-rate leader's raw fraction (142 of 391).
+- Nine predicted numbers before Emmett's run, all nine landed.
+- **508 suite lines differ from the pre-change run, and every one is RNG shear** — assists convert more often, each conversion spends an extra draw, so every downstream roll shifts. Nineteen changed non-numeric text and all nineteen were accounted for before delivery, including one worth naming: a turnover check that printed `[NOTE] no team-violation possessions fired` now prints `[OK] all 3 team-violation possessions have null TurnoverOffSlot`. The shear handed a vacuous check real cases.
+
+### Honest note on the sandbox
+
+Four suite lines differed textually between the sandbox and Emmett's machine — `100.0 %` versus `100.0%`. The pristine pull does the same thing in the sandbox, so it is a pre-existing Linux/Windows locale difference on percent-formatted lines that are not wrapped in the invariant-culture helper. No number differs. Recorded because it is the same class of hazard as the S81.3 `Math.Pow` fixture bug: sandbox output is not byte-comparable to Windows output on every line, and any future check that assumes it is will go red with nothing wrong.
+
 ## Session 83 — THE REACH TERM BECOMES TWO-SIDED. The undersized shooter now pays the same curve the oversized shooter is paid, and the rim magnitude goes 15 → 110 rating points. A 5'10" finisher who was outshooting a 6'8" one at the rim (81.2% vs 66.6% in the bench matchup) now sits below him (71.7% vs 76.4%). League rim FG% 51.9 → 53.1, and overall FG% crosses into its calibration band for the first time (42.6 → 43.1, target 44.0 ±1.0). The best full-season shooter in the league is now a 7'1" center at 75.9% against a real-world mark of 77–79%; eight of the top ten are bigs, where six were before. Three existing suite checks encoded the OLD law and had to be rewritten — none of them were named in the build prompt. Emmett ruled the extreme uncapped. Suite `ALL CHECKS PASSED`, bench and season verified on Emmett's machine. (2026-07-29)
 
 **Register:** build, under `PROMPT-reach-term-s83-r4`. One engine behaviour line, one engine comment file, four config values, three existing check files, one new bench, the oracle, a regenerated golden, and a fingerprint re-stamp on three block fixtures.

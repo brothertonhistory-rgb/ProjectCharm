@@ -37,9 +37,11 @@ namespace Charm.Engine;
 /// <see cref="Matchup.BlockerWeight"/> and the rebound positional weights — which
 /// intentionally do <em>not</em> sum to one because the picker normalizes among
 /// players, making absolute scale irrelevant — the assist coefficients must sum to 1.0.
-/// That keeps <c>AssistWeight</c> on the 0–100 attribute scale, which is what makes
-/// <see cref="MatchupConfig.AssistPassMidpoint"/> = 50 the league-average reference
-/// for <see cref="LineupPassingFactor"/>. The sum-to-one invariant is correct here and
+/// That keeps <c>AssistWeight</c> on the 0–100 attribute scale, which is what lets
+/// <see cref="MatchupConfig.AssistPassMidpoint"/> be read as a league-average reference
+/// on that same scale (30.73 since S84; this line said 50 from S41 through S83 — the
+/// placeholder the midpoint stopped carrying at S41, never updated when it moved).
+/// The sum-to-one invariant is correct here and
 /// is <em>not</em> an inconsistency to "fix" against the block/rebound convention.</para>
 ///
 /// <para><b>RNG stream.</b> <see cref="LineupPassingFactor"/> is deterministic (no RNG).

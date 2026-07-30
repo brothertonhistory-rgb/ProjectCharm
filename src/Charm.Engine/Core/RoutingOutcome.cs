@@ -347,6 +347,26 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     public int BlkMatchedOut { get; init; }
     /// <inheritdoc cref="BlkMatchedNear"/>
     public int BlkHelperOut { get; init; }
+
+    /// <summary>Session 84, PAGE-ONLY. The lineup passing factor the assist door actually
+    /// applied, summed over every assist-eligible made field goal on this possession, with
+    /// <see cref="AssistPassFactorEvents"/> the matching count. Never asserted.
+    ///
+    /// <para><b>Why a sum and a count rather than a mean.</b> A possession can contain more
+    /// than one eligible make (an and-1 basket, or a make after an offensive rebound that was
+    /// not a putback), and the roll-up wants an EVENT-weighted league mean — the same weighting
+    /// the calibration fit used. Carrying a per-possession mean would silently weight a
+    /// one-make possession equally with a three-make one.</para>
+    ///
+    /// <para><b>Why it exists.</b> S84 recentred <c>AssistPassMidpoint</c> from 71.31 to 30.73
+    /// after finding the old value was 40 attribute points above the population it claimed to
+    /// describe, which parked the whole league on the flat tail of the tanh and left the best
+    /// and worst passing teams within 5% of each other. A dial that drifts that far unnoticed
+    /// is a dial nobody was watching; these two counters put the realized factor on the season
+    /// page so the next drift is visible on the page rather than found by measuring.</para></summary>
+    public double AssistPassFactorSum { get; init; }
+    /// <inheritdoc cref="AssistPassFactorSum"/>
+    public int AssistPassFactorEvents { get; init; }
     /// <summary>The offensive slot that committed the turnover. Null for team
     /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
     /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for

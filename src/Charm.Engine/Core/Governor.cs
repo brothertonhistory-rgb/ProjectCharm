@@ -191,7 +191,15 @@ public sealed record PossessionRecord(
     // Session 62: non-shooting-foul events for this possession (reach-in A/B/F + situational
     // I/J/K/M), the parallel of ShootingFouls. Appended last so every existing positional
     // construction is unaffected; empty/null on possessions with no non-shooting foul.
-    IReadOnlyList<NonShootingFoulEvent>? NonShootingFouls = null);
+    IReadOnlyList<NonShootingFoulEvent>? NonShootingFouls = null,
+    // Session 84, PAGE-ONLY: the lineup passing factor the assist door applied, summed over
+    // this possession's assist-eligible made field goals, and the matching event count. The
+    // page divides one by the other at league and team scale to report the REALIZED factor.
+    // Appended last so every existing positional construction is unaffected (the S62
+    // convention). Never asserted; a sum-and-count pair rather than a mean because a
+    // possession can carry more than one eligible make and the roll-up is event-weighted.
+    double AssistPassFactorSum = 0.0,
+    int AssistPassFactorEvents = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -401,6 +409,8 @@ public sealed class Governor
             var possessionBlkMatchedNear = 0; var possessionBlkHelperNear = 0;
             var possessionBlkMatchedOut  = 0; var possessionBlkHelperOut  = 0;
             var possessionAstBySlot = new SlotGroup();
+            var possessionAssistPassFactorSum    = 0.0;
+            var possessionAssistPassFactorEvents = 0;
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -531,6 +541,8 @@ public sealed class Governor
                 possessionBlkMatchedOut  = outcome.BlkMatchedOut;
                 possessionBlkHelperOut   = outcome.BlkHelperOut;
                 possessionAstBySlot = outcome.AstBySlot;
+                possessionAssistPassFactorSum    = outcome.AssistPassFactorSum;
+                possessionAssistPassFactorEvents = outcome.AssistPassFactorEvents;
             }
 
             periodRemaining -= applied;
@@ -587,7 +599,9 @@ public sealed class Governor
                 possessionFtaShootingNoSlot,
                 recordTimeProfile, recordTurnoverRaw, recordShotClockPeriods,
                 possessionFastBreakFga, possessionFastBreakThreePa, possessionFastBreakThreePm,
-                possessionNonShootingFouls));
+                possessionNonShootingFouls,
+                possessionAssistPassFactorSum,
+                possessionAssistPassFactorEvents));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(

@@ -1610,31 +1610,143 @@ internal static partial class Program
                 : $"    [FAIL] Shooter self-assisted {selfAssists} times — exclusion broken");
         }
 
-        // ── Sub-check B: AstBySlot.Total <= FGM invariant (per-possession) ────
-        // Tested via direct AssistPicker rate math: clamp(base * factor, floor, ceil) <= 1.0
-        // which means at most one assist per picker call, and the picker is called at most
-        // once per eligible made FG. So AstBySlot.Total <= eligible FGM by construction.
-        // Confirm here that the rate math stays in [0,1] across all five zones.
+        // ── Sub-check B: the assist probability, composed the way the engine composes it ──
+        // ★ WHAT THIS USED TO BE, AND WHY IT WAS REPLACED (S84).
+        // The old version rebuilt the lineup passing factor inline — literally
+        // `1 + Swing * tanh((mean - Midpoint) / Scale)` — and then compared the result to a
+        // clamp of that same expression. It could not fail. Worse, it re-derived a formula the
+        // engine owns, so the engine's own function could have drifted arbitrarily and this
+        // check would still have gone green. It also hardcoded a flat-50 lineup, which the
+        // S59.2 lesson names as an assumption dressed as a control: 50 was never the league's
+        // mean lineup passing quality, so the one point it tested was a point no game reaches.
+        //
+        // The version below calls the PRODUCTION functions — AssistPicker.LineupPassingFactor,
+        // MatchupConfig.AssistedRate and MatchupConfig.PostAssistFactor — and composes them in
+        // the same order Resolver does, then clamps. Lineups are the MEASURED team percentiles
+        // from S84's canonical-season fit (p10 25, median 31, p90 36 on the 0-100 AssistWeight
+        // scale), not round numbers chosen for tidiness.
         {
-            Console.WriteLine("  Sub-check B: assistProb in [floor, ceiling] for all zones, avg-passing lineup");
+            Console.WriteLine("  Sub-check B: assist probability composed from the production functions");
 
-            var meanAw50 = 0.50 * 50 + 0.35 * 50 + 0.15 * 50;  // = 50.0 (avg lineup)
-            var factor50 = 1.0 + matchupCfg.AssistPassSwing
-                         * Math.Tanh((meanAw50 - matchupCfg.AssistPassMidpoint) / matchupCfg.AssistPassScale);
-            var allInBounds = true;
-            foreach (var zone in new[] { ShotLocation.Three, ShotLocation.Long, ShotLocation.Mid,
-                                         ShotLocation.Short, ShotLocation.Rim })
+            var zones39 = new[] { ShotLocation.Three, ShotLocation.Long, ShotLocation.Mid,
+                                  ShotLocation.Short, ShotLocation.Rim };
+
+            // A lineup whose five men each carry passing = playmaking = iq = level. Because the
+            // AssistWeight coefficients sum to 1.0 (the invariant AssistPicker documents), each
+            // man's weight is exactly `level` and so is the lineup mean — which is what lets a
+            // named percentile be dialled in directly. b stays 50 so the shooter's PostMoves is
+            // 50 and the interior discount is the identity (asserted below).
+            GameState LineupAt(int level)
+                => BuildGame39(new[]
+                {
+                    MkP39(1, 50, passing: level, playmaking: level, iq: level),
+                    MkP39(2, 50, passing: level, playmaking: level, iq: level),
+                    MkP39(3, 50, passing: level, playmaking: level, iq: level),
+                    MkP39(4, 50, passing: level, playmaking: level, iq: level),
+                    MkP39(5, 50, passing: level, playmaking: level, iq: level),
+                });
+
+            var shooter39 = new Slot(TeamSide.Home, 3);
+            PossessionState St39()
+                => new PossessionState(
+                       PossessionNumber: 1, Offense: TeamSide.Home, Defense: TeamSide.Away,
+                       Entry: EntryType.DeadBallInbound)
+                   with { SelectedSlot = shooter39 };
+
+            // (B1) The identity premise this whole sub-check rests on: with the shooter's
+            // PostMoves at 50 the interior discount returns EXACTLY 1.0, at every zone and
+            // every pass factor. If that ever stops holding, the composition below is
+            // measuring two changes at once and the clamp classification means nothing.
+            var identityOk = true;
+            foreach (var z in zones39)
+                foreach (var pf in new[] { 0.75, 0.90, 1.00, 1.10, 1.25 })
+                    if (matchupCfg.PostAssistFactor(z, 50, pf) != 1.0) identityOk = false;
+            ok &= identityOk;
+            Console.WriteLine(identityOk
+                ? "    [OK] premise: shooter PostMoves 50 makes the interior discount exactly 1.0 (5 zones x 5 factors)"
+                : "    [FAIL] premise broken: PostMoves 50 no longer yields an exact 1.0 discount — the grid below is confounded");
+
+            // (B2) The grid. Three measured team levels x five zones, composed and classified.
+            var levels = new[] { ("p10", 25), ("median", 31), ("p90", 36) };
+            var interior = 0; var atCeiling = 0; var atFloor = 0; var gridOk = true;
+            var factorByLevel = new Dictionary<string, double>();
+
+            foreach (var (label, level) in levels)
             {
-                var prob = Math.Clamp(matchupCfg.AssistedRate(zone) * factor50,
-                                      matchupCfg.AssistRateFloor, matchupCfg.AssistRateCeiling);
-                if (prob < matchupCfg.AssistRateFloor || prob > matchupCfg.AssistRateCeiling)
-                    allInBounds = false;
-                Console.WriteLine($"    {zone,-6}: base={matchupCfg.AssistedRate(zone):F3} × factor={factor50:F4} → prob={prob:F4}");
+                var g = LineupAt(level);
+                var pf = AssistPicker.LineupPassingFactor(St39(), g, matchupCfg);
+                factorByLevel[label] = pf;
+                var line = $"    {label,-7} lineup AssistWeight {level,3}  factor {pf:F4} :";
+                foreach (var z in zones39)
+                {
+                    var basePct = matchupCfg.AssistedRate(z);
+                    var post    = matchupCfg.PostAssistFactor(z, 50, pf);
+                    var raw     = basePct * pf * post;
+                    var prob    = Math.Clamp(raw, matchupCfg.AssistRateFloor, matchupCfg.AssistRateCeiling);
+                    string tag;
+                    if (raw >= matchupCfg.AssistRateCeiling)   { tag = "CEIL"; atCeiling++; }
+                    else if (raw <= matchupCfg.AssistRateFloor) { tag = "FLOOR"; atFloor++; }
+                    else                                        { tag = "in";   interior++; }
+                    if (prob < matchupCfg.AssistRateFloor || prob > matchupCfg.AssistRateCeiling) gridOk = false;
+                    line += $"  {z}={prob:F3}({tag})";
+                }
+                Console.WriteLine(line);
             }
-            ok &= allInBounds;
-            Console.WriteLine(allInBounds
-                ? "    [OK] All zone probs within [floor, ceiling]"
-                : "    [FAIL] At least one zone prob outside [floor, ceiling]");
+            ok &= gridOk;
+            Console.WriteLine(gridOk
+                ? $"    [OK] every clamped probability lies in [{matchupCfg.AssistRateFloor:F2}, {matchupCfg.AssistRateCeiling:F2}] — {interior} interior, {atCeiling} at ceiling, {atFloor} at floor"
+                : "    [FAIL] a clamped probability escaped [floor, ceiling]");
+
+            // At least one point must be interior, or the clamp is doing all the work and the
+            // composition below is untested (the S81 lesson: build the check that discriminates).
+            var anyInterior = interior > 0;
+            ok &= anyInterior;
+            Console.WriteLine(anyInterior
+                ? $"    [OK] the dial is live: {interior} of {interior + atCeiling + atFloor} grid points sit strictly inside the clamp"
+                : "    [FAIL] no grid point is interior — every probability is pinned, so the factor changes nothing");
+
+            // (B3) Ordering: a better passing lineup never lowers the assist chance, at any zone.
+            var monotone = factorByLevel["p10"] < factorByLevel["median"]
+                        && factorByLevel["median"] < factorByLevel["p90"];
+            ok &= monotone;
+            Console.WriteLine(monotone
+                ? $"    [OK] better passing raises the factor: {factorByLevel["p10"]:F4} < {factorByLevel["median"]:F4} < {factorByLevel["p90"]:F4}"
+                : "    [FAIL] the factor is not monotone in lineup passing quality");
+
+            // (B4) THE CEILING ARM. No realistic lineup reaches the ceiling — measured at S84,
+            // three-point makes clamp on 0.016% of the league's assist-eligible makes and no
+            // other zone ever does. So the grid above cannot exercise the clamp, and a check
+            // whose clamp arm never runs is not testing the clamp. This lineup is deliberately
+            // beyond anything the generator produces (AssistWeight 70 against a league mean of
+            // ~31) for exactly that reason: it is a mechanism test, not a population claim.
+            {
+                var gx  = LineupAt(70);
+                var pfx = AssistPicker.LineupPassingFactor(St39(), gx, matchupCfg);
+                var rawThree = matchupCfg.AssistedRateThree * pfx
+                             * matchupCfg.PostAssistFactor(ShotLocation.Three, 50, pfx);
+                var clamped  = Math.Clamp(rawThree, matchupCfg.AssistRateFloor, matchupCfg.AssistRateCeiling);
+                var ceilOk   = rawThree > matchupCfg.AssistRateCeiling
+                            && clamped == matchupCfg.AssistRateCeiling;
+                ok &= ceilOk;
+                Console.WriteLine(ceilOk
+                    ? $"    [OK] ceiling arm fires: an unreachable AssistWeight-70 lineup wants {rawThree:F4} on threes and is held at {clamped:F4}"
+                    : $"    [FAIL] ceiling arm never engaged — raw {rawThree:F4} vs ceiling {matchupCfg.AssistRateCeiling:F2}");
+            }
+
+            // (B5) The floor, reported and NOT asserted. At today's settings the floor cannot
+            // bind for any lineup whatsoever: the weakest zone base times the weakest possible
+            // factor still clears it. That is a fact about the constants, not a property worth
+            // gating — Emmett may raise the floor or lower a base by design — so it is printed
+            // so the next session can see it rather than rediscover it.
+            {
+                var weakestBase   = zones39.Min(z => matchupCfg.AssistedRate(z));
+                var weakestFactor = 1.0 - matchupCfg.AssistPassSwing;
+                var worstCase     = weakestBase * weakestFactor;
+                Console.WriteLine(
+                    $"    floor reachability (page-only, not a gate): weakest zone {weakestBase:F4}"
+                  + $" x weakest factor {weakestFactor:F4} = {worstCase:F4} vs floor {matchupCfg.AssistRateFloor:F2}"
+                  + $" — floor is {(worstCase > matchupCfg.AssistRateFloor ? "UNREACHABLE" : "reachable")}");
+            }
         }
 
         // ── Sub-check C: per-zone ordering (Three > Long > Rim > Mid > Short) ──

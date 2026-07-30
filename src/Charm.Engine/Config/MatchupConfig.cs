@@ -1491,7 +1491,7 @@ public sealed class MatchupConfig
                     $"AssistPassingWeight + AssistPlaymakingWeight + AssistIqWeight must equal 1.0 " +
                     $"(got {coeffSum:F10}). The sum-to-one constraint keeps AssistWeight on the " +
                     $"0–100 attribute scale, against which AssistPassMidpoint is calibrated " +
-                    $"(S41: recentered to the generated population's mean, ~71).");
+                    $"(S84: recentered to the measured population mean, 30.73).");
         }
         foreach (var (name, val) in new (string, double)[]
         {
@@ -2227,14 +2227,17 @@ public sealed class MatchupConfig
     // coefficients (which intentionally do NOT sum to one because the picker
     // normalizes among players). The sum-to-one constraint keeps AssistWeight on
     // the 0–100 attribute scale, against which AssistPassMidpoint is calibrated
-    // (S41: recentered to ~71, the generated population's mean). This is correct and is
-    // NOT an inconsistency to "fix" against the block/rebound convention.
+    // (S84: recentered to 30.73, the measured population mean — see that property's own
+    // note for why S41's ~71 was wrong). This is correct and is NOT an inconsistency to
+    // "fix" against the block/rebound convention.
     //
     // LineupPassingFactor = 1.0 + AssistPassSwing
     //     × tanh((meanAssistWeight - AssistPassMidpoint) / AssistPassScale)
     //
-    // Final probability = clamp(zoneBase × LineupPassingFactor,
+    // Final probability = clamp(zoneBase × LineupPassingFactor × PostAssistFactor,
     //                           AssistRateFloor, AssistRateCeiling)
+    // (the third factor is S57's interior discount; it is exactly 1.0 on every
+    //  non-interior zone and for any shooter with PostMoves <= 50)
     //
     // All defaults are calibration placeholders (calibration deferred until all
     // engine organs are wired).
@@ -2255,11 +2258,32 @@ public sealed class MatchupConfig
     public double AssistIqWeight         { get; set; } = 0.15;
 
     /// <summary>League-average reference point for the lineup passing factor (tanh midpoint).
-    /// S41: recentered from the placeholder 50.0 to 71.31 — the eligible-make-weighted mean
-    /// lineup AssistWeight of the generated starter population (measured, not assumed), so a
-    /// league-average lineup earns factor 1.0. The old 50 assumed attributes center at 50;
-    /// generated starters average ~71, which inflated every assist by ~×1.19.</summary>
-    public double AssistPassMidpoint { get; set; } = 71.31;
+    /// A league-average lineup earns factor 1.0 only while this equals the population's actual
+    /// mean lineup AssistWeight, so it is a MEASURED value and it goes stale whenever the
+    /// player generator moves.
+    ///
+    /// <para><b>S84: recentered 71.31 → 30.73.</b> S41 set 71.31 believing it was the
+    /// eligible-make-weighted mean of the generated starter population. It was not — the
+    /// population mean measured 30.73 over the canonical season's 237,950 assist-eligible
+    /// makes (roster-wide 29.28, designated starters 31.25; all three agree within two points,
+    /// so the fit does not depend on which population is chosen). The 40-point error pushed
+    /// the entire league two scale widths onto the flat tail of the tanh, where the derivative
+    /// is about a fifteenth of its value at the origin. Two consequences, both measured:
+    /// every team took the same ~24% haircut (league mean factor 0.760 instead of ~1.000, so
+    /// league assists read 9.9 against a 13.5 target), and team-to-team SEPARATION collapsed —
+    /// best and worst passing teams sat inside 0.752..0.791, a 5% spread. Recentering restored
+    /// both: league mean 0.9994, teams 0.858..1.149, and league assists 13.1.</para>
+    ///
+    /// <para><b>Why the fix is the midpoint and not the swing.</b> Nothing saturates here — the
+    /// most extreme team in the league sits 0.74 scale widths out, so no team was ever pinned
+    /// against the tanh's asymptote. The league was flat because it was parked far from the
+    /// origin, not because the swing was too small. The swing remains a calibration placeholder
+    /// and is the next lever if more separation is wanted.</para>
+    ///
+    /// <para>The season page prints the realized factor (league mean plus the team p10..p90
+    /// band) precisely so the next drift of this kind is visible on the page instead of found
+    /// by measuring — see SeasonLeagueStats.AssistPassFactorSum.</para></summary>
+    public double AssistPassMidpoint { get; set; } = 30.73;
 
     /// <summary>Scale of the passing tanh (attribute-unit width of the transition band).
     /// Default 20.0. Calibration placeholder.</summary>

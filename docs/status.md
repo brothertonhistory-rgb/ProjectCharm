@@ -10,17 +10,23 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 83** (2026-07-29; the make door's reach term becomes TWO-SIDED. The undersized shooter now pays exactly the curve the oversized shooter is paid — the symmetry is the oddness of tanh, not a branch, so removing v1's `max(0, …)` clamp is the entire implementation. Rim magnitude 15 -> 110 rating points (Setting F), routed through `HeightMaxBonus` because `Load` forbids a zone weight above 1.0, with the three non-rim weights divided by the same 110/15 so their absolute magnitudes are UNCHANGED. The ordering defect is fixed: a 5'10" Finishing-98 guard was converting 81.2% at the rim against a median protector where a 6'8" Finishing-57 big managed 66.6%; now 71.7% vs 76.4%. League rim FG% 51.9 -> 53.1 and overall FG% crosses into its calibration band for the first time (42.6 -> 43.1, target 44.0 +/-1.0). Top-ten field-goal shooters go from six bigs to eight, led by a 7'1" centre at 75.9% against a real-world 77-79% mark. ★ THREE EXISTING SUITE CHECKS ENCODED THE OLD LAW and the build prompt named NONE of them — found by applying the change in a scratch tree and running the whole suite at the check-in gate, not by reasoning about which checks looked related. Mid FG% moved the WRONG WAY (+0.2 against an expected -0.1) and was named, not chased. Opened C-30, O-54, O-55. Suite `ALL CHECKS PASSED`, bench and season verified on Emmett's machine.)
+Last updated: **Session 84** (2026-07-29; `AssistPassMidpoint` recentred 71.31 -> **30.73**, the MEASURED population mean. S41 correctly called the original 50.0 a defect and then replaced it with a figure wrong by more; the true eligible-make-weighted mean lineup AssistWeight is 30.73, confirmed by three independent counts agreeing inside two points (makes 30.73 / rosters 29.28 / starters 31.25). Because the factor is a tanh, the 40-point error collapsed the DERIVATIVE, not just the level: every lineup sat ~2 scale widths out on the flat tail where tanh' is ~1/15 of origin. League assists 9.9 -> 13.1 (target 13.5, LOW -> OK) and — the error no page was showing — best-to-worst team separation 5% -> 34%, a 6.7-fold restoration. ★ The realized factor now PRINTS on the season page (league mean + team p10-p90 band), two numbers that fail independently, so the next drift is visible instead of measured. Phase 39's bounds check was a TAUTOLOGY (rebuilt the engine's formula inline and compared it to itself, on a flat-50 lineup no game reaches); rewritten to call the production functions at measured percentiles, with a deliberately unreachable lineup added because the ceiling binds on only 0.016% of real makes and the floor is STRUCTURALLY unreachable. Five stale explanations corrected, two older than this session (one called 50 the reference point — stale since S41; one described the assist chance as two factors when S57 made it three). Third consecutive session to perform the Phase 74 fingerprint re-stamp ritual. ★ Emmett's real-world top-50 list then showed the assist board's TOP is still ~51% of life; traced to linear picker weighting and RULED not-to-be-fixed-there — concentration is the strategy layer's job. Opened C-31, O-57, O-58; O-46 answered and split. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
 
 ## Current baseline
 
 **The S78 page is the arc's recorded reference — and it is PROVISIONAL pending a calibration session**
 (seed 20260720, world `stock-d1`, schedule fingerprint `93d8c853…` unchanged): points 68.5, FG% 42.9,
 3P% 34.9, FT% 69.9, PPP 0.9651, TO% 22.2, pace 71.0, rebounds credited 31.4, fouls **17.95/team/game
-(6.31 shooting / 11.64 non-shooting)**, blocks 4.1, steals 7.5, assists 9.9, usage max/p90/median
+(6.31 shooting / 11.64 non-shooting)**, blocks 4.1, steals 7.5, assists **13.1 (S84; was 9.9 — the only line S84 moved)**, usage max/p90/median
 36.9% / 18.0% / 6.2%, top-five share of floor time 69.7%, cross-position occupancy 24.44%, census
 clean (4,511/4,511 drafted; 347/347 exact rosters; 347/347 protected coverage). Every calibration
-session diffs against that page, never against memory. *(Previous reference: the S77 page — points
+session diffs against that page, never against memory.
+
+**S84 added a second reference line to the page, and it is the drift alarm for the assist door:**
+`lineup passing factor applied: league mean 0.9994 over 237989 assist-eligible makes` /
+`by team (n=347): min 0.8583 p10 0.9257 median 0.9991 p90 1.0678 max 1.1474`. Read BOTH — the league
+mean going off 1.000 means the generator moved under the midpoint; the team band collapsing means the
+swing has gone inert. Neither can detect the other's failure. *(Previous reference: the S77 page — points
 72.4, FG% 45.8, 3P% 35.9, FT% 70.5, PPP 1.0176, TO% 21.6, pace 71.1, fouls 20.23 = 6.47/13.76.)*
 
 **Why it moved at S78, and why NOTHING was chased.** Seventeen calibration verdicts read HIGH or LOW.
@@ -52,6 +58,19 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **S84 — `AssistPassMidpoint` 71.31 -> 30.73, plus the instrument that makes the next drift visible.**
+  One config value is the whole behaviour change. The midpoint is not a tuning dial — it is a MEASUREMENT
+  of the player pool, and it rots whenever the generator moves; S41's 71.31 was 40 points above the real
+  figure. Level: league assists 9.9 -> 13.1 (LOW -> OK). Separation, which no page was showing: team
+  factors 0.752-0.791 -> 0.858-1.149. The swing was NOT the problem — nothing saturates, the most extreme
+  team sits 0.74 scale widths out. Page-only instrument shipped alongside: the realized factor carried out
+  of the engine as a per-possession sum-and-count pair appended LAST to `PossessionRecord` (S62 convention),
+  read off the same local the probability uses; proved inert by a byte-identical season page (same SHA-256)
+  against a config-only run. Phase 39's bounds sub-check rewritten from a tautology into a real composition
+  test at measured percentiles, with an explicit unreachable-lineup case for the ceiling arm and the floor's
+  structural unreachability printed rather than asserted. Five stale doc sites corrected. Three block
+  fixtures re-stamped (label only; CREDIT golden parity passed at EXACT zero on both sides).
 
 - **S83 — the reach term becomes two-sided (engine + config + three rewritten checks + a new bench).**
   `Matchup.HeightOverDefenderShift` drops v1's `max(0, …)` clamp, so the make door's reach term is SIGNED:
@@ -398,16 +417,30 @@ chart is PROVISIONAL pending O-6.
   generator half shipped; the engine half never did. **This item is that missing half — it is not a
   regression and the answer is not to restore the cap.**
 
-- **★ O-46 — NO PLAYER IN THE ENGINE RUNS AN OFFENCE (S79.3 measurement; documentation only, NOT acted on).**
-  The AST% board S79.3 shipped makes it readable for the first time. League median AST% is **9.52**; the
-  league's **best passer sits at 26.3%** (Pool_1079, 71 of 270). Elite real-world college point guards
-  reach **35–40%**. So the middle looks ordinary and **the elite tail is simply absent** — the engine has
-  no player who is the reason his team scores. Note the shape of the miss: it is not that assists are
-  globally too low (the calibration page reads assists 9.8 against 13.5, LOW but not absurd) — it is that
-  the DISTRIBUTION has no top. Whether this is a generation question (nobody is generated with the
-  passing/playmaking package a primary creator needs) or a Roll C question (the assist door cannot
-  concentrate credit on one man however good he is) is **unresolved and is the first thing to determine**.
-  Belongs to neither S80 nor O-44/O-45. Emmett's call when to take it.
+- **★ O-46 — NO PLAYER IN THE ENGINE RUNS AN OFFENCE (S79.3 finding; ★ S84 ANSWERED ITS OPEN QUESTION
+  AND SPLIT IT IN TWO).** The AST% board S79.3 shipped made it readable: the middle looked ordinary and the
+  elite tail was simply absent — no player who is the reason his team scores. O-46 asked whether that was a
+  generation question or a Roll C question. **S84 measured it: it is both, and a third thing that is neither.**
+
+  The level half of the complaint is now GONE. S84's midpoint recentre took league assists 9.9 -> 13.1
+  (target 13.5, OK) and the best passer's AST% 26.3% -> **36.3%**, which is inside the 35-40% band this item
+  originally cited as the elite real-world mark. What survives is the SHAPE, and against the real 2024-25 D1
+  leaderboard it is worse than AST% suggested: engine rk1 **4.8 apg against 9.4** (51% of life), rk10 4.1 vs
+  6.7, rk50 3.4 vs 5.2, and the real board is 1.81x from first to fiftieth where the engine is 1.40x.
+
+  **Strand 1 — the Roll C half, MEASURED and RULED CLOSED at C-31.** `AssistPicker.Pick` weights the four
+  eligible teammates LINEARLY on `max(1, AssistWeight)`. A team's best passer carries 47.7 against playing
+  teammates at 27.6 (1.72x); three teammates at 27.6 sum to 82.8 against his 47.7, so even never shooting and
+  never sitting he wins at most **36.5%** of the four-man draws — net of shooter-exclusion and bench time,
+  **21.4%** of his team's assists (median 20.9%, league-best 36.1%). Real lead guards take near half. The door
+  CAN'T concentrate, exactly as this item suspected — **but it must not be made to** (C-31): concentration is
+  a coaching output, so the fix is O-57's dial, not a picker exponent. Blocked on O-57; until it exists the
+  top of this board is **not a calibration target**.
+
+  **Strand 2 — the generation half, still open and independent.** A 1.72x edge over teammates may simply not
+  be an outlier passer. Even a heavy iso dial needs someone worth funnelling to, so if the generator does not
+  produce true creators, no coaching change fixes the top of the board. Sits with the parked Pass 2 notes and
+  the divisional-sorting ruling; unmeasured, named.
 
 - **★ O-47 — THE DRIVE GATE IS ANCHORED IN ABSOLUTE RATING POINTS, AND THE POPULATION SITS UNDER IT
   (S79.3 conversation; Emmett's read that the league is undertalented, given a mechanism).**
@@ -520,6 +553,29 @@ chart is PROVISIONAL pending O-6.
   than substituted for. A per-zone shooting board is a small season-page addition whenever the next
   page session opens.
 
+- **★ O-57 — THE SEASON ASSIGNS NO COACH PROFILE TO ANY SCHOOL. This gates three boards, not one.**
+  `CoachProfile` exists, carries three dials on a 1-10 scale (`HeliocentricBias`, `ShotSelectionBias`,
+  `PaceBias`), and `HeliocentricBias` is properly wired to Roll E's hierarchy exponent — it decides who
+  gets the SHOTS. But `RunSeasonCore` never calls `SetCoach`: all 347 schools play all 5,205 games on the
+  compiled default (5/5/5). Consequence, and it is large: the nation's leading scorer today IS essentially
+  its highest-rated scorer, because every team in the country runs the identical system. The same holds for
+  the assist board, the shot-diet board and pace. Emmett's framing (S84): *"a guy leading the conference in
+  assists does not necessarily mean he has the best passing rating — it means he has the ability to pass
+  plus his coach's strategy was conducive to it."* Found only because his design point sent the search to
+  the coaching surface rather than to the assist picker. **Blocks the second strand of O-46.** Opens as a
+  design conversation, not a build: where a school's profile comes from (prestige? conference? a coach
+  object with its own generation and career arc?) is Emmett's call, and it reshapes scoring concentration,
+  shot diet and pace at the same time as assists.
+
+- **O-58 — THE PHASE 74 FINGERPRINT RE-STAMP RITUAL HAS NOW RUN THREE SESSIONS RUNNING (S81.3, S83, S84).**
+  The block fixtures hash the ENTIRE `Matchup` section, so any change in it invalidates goldens that never
+  read the changed key. S83's note said "revisit if the re-stamp ritual recurs." It has recurred twice. The
+  obvious narrowing — hash only the keys the block path reads — was rejected at S83 as the riskier fix,
+  because a list that silently misses a key turns a loud guard into a quiet lie. That reasoning still holds,
+  so this is a recurring COST to be ruled on, not a defect with an obvious fix. Cheap alternative worth
+  considering: a one-line tool that re-stamps all three files and prints a diff proving no saved number
+  moved, which is currently done by hand every time.
+
 ## Parked — waiting on a named prerequisite
 
 
@@ -566,6 +622,18 @@ chart is PROVISIONAL pending O-6.
   and only the ORDERING is asserted. Consequence recorded so it is not read as a defect: extreme
   size mismatches will produce extreme shooting numbers, at both ends, by design. Do not "fix" this
   by capping the term. The place to read a real-world shooting mark is the season page.
+
+- **★ C-31 — ASSIST CONCENTRATION IS A COACHING OUTPUT, NOT AN ATTRIBUTE OUTPUT. Do not add a
+  concentration exponent to `AssistPicker`.** Offered at S84 as the cheap fix for the flat assist board and
+  ruled out by Emmett. A league-wide exponent bakes ONE funnel level into the math permanently, which is
+  exactly the decision the strategy layer is supposed to make per team: a motion team should read low, an
+  iso team should read high, and one number for everybody is wrong even if it lands the real board's average.
+  The scoring analogy is the test — the nation's leading scorer is not automatically its highest-rated
+  scorer, and the assist leader is ability PLUS a system conducive to it. Consequence for future sessions:
+  the top of the assist board is **not a calibration target** until O-57 lands, and a session that "fixes"
+  the concentration with picker or attribute math is tuning against a missing input. This also settles the
+  earlier AST% finding (best passer 26.3% -> 36.3% at S84 against elite real marks near 45-50%): the
+  remaining gap is system, not the door.
 
 - **C-28 — A big who cannot guard the perimeter is as legitimate as a guard who cannot protect the
   rim; the shared defensive bid pair is INTENDED (Emmett's ruling, 2026-07-27).** `PlayerGenPass3`
@@ -629,12 +697,21 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**NONE SELECTED.** S83 shipped and the board has three fresh open items (O-54, O-55, O-56), none of
-which is a session on its own. The standing candidates are unchanged: **O-40** (block-rate calibration,
-blocks 4.4 against a 3.5 target), **O-42** (lineup shape), **O-43** (the on-ball blend), **O-45** (the
-half-finished S78 engine half), **O-50** (shot diet), and the **player generator's finishing budget** —
-which S83 named as the reason the leaderboard stops where it does (the tallest bands still median
-Finishing 37, best 57). That last one opens with a design question, not a number: the generator spends a
-fixed budget, so "more finishing" is "less of something else," and Emmett has not ruled which.
+**NONE SELECTED.** S84 shipped, opened **O-57** and **O-58**, ruled **C-31**, and answered the question
+**O-46** had been carrying since S79.3 — splitting it into a coaching strand (blocked on O-57) and a
+generation strand (independent).
+
+**O-57 is the one worth taking next, and it opens as a design conversation, not a build.** Nobody is
+coaching anybody: three dials are built and wired and the season never sets them, which makes it the single
+highest-leverage un-set input on the board. It also unblocks O-46's first strand. What it needs from Emmett
+first is where a school's profile comes from — prestige? conference? a coach object with its own generation
+and career arc? — because that answer reshapes scoring concentration, shot diet and pace simultaneously.
+
+The standing candidates are otherwise unchanged: **O-40** (block-rate calibration, blocks 4.4 against a 3.5
+target), **O-42** (lineup shape), **O-43** (the on-ball blend), **O-45** (the half-finished S78 engine half),
+**O-50** (shot diet), **O-54/O-55/O-56** (S83's three), **O-58** (the re-stamp ritual's recurring cost), and
+the **player generator's finishing budget**. That last one opens with a design question, not a number: the
+generator spends a fixed budget, so "more finishing" is "less of something else," and Emmett has not ruled
+which.
 
 Pick one at the top of the next session, against this board and a fresh pull (CONVENTIONS §6a).

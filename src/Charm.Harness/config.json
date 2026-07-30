@@ -392,7 +392,7 @@
     "AssistPassingWeight": 0.5,
     "AssistPlaymakingWeight": 0.35,
     "AssistIqWeight": 0.15,
-    "AssistPassMidpoint": 71.31,
+    "AssistPassMidpoint": 30.73,
     "AssistPassScale": 20.0,
     "AssistPassSwing": 0.25,
     "AssistedRateThree": 0.784,
