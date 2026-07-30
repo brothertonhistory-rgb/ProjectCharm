@@ -248,6 +248,7 @@ internal static partial class Program
         ok &= Phase73SeasonStatsCheck(configPath);                // Phase 73 (S77: per-player season roll-up — conservation, two-path identity, minutes reconciliation, games played)
         ok &= Phase74BlockHelpCheck(configPath);                 // Phase 74 (S79: block help arm + contribution-based credit — golden parity, rate invariants, config guards)
         ok &= Phase75VerticalCheck(configPath);                  // Phase 75 (S81.2: the leap — isolation sweep, reach composite, three neutral points, picker strictness, config guards)
+        ok &= Phase76TransitionReadoutCheck(configPath);         // Phase 76 (S85: the fast-break readout — entry/arm partition, three-way shot partition, nesting chains, event-scoping, press-born source)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

@@ -53,6 +53,51 @@ internal static partial class Program
         public long RimFga, RimFgm, ShortFga, ShortFgm, MidFga, MidFgm, LongFga, LongFgm;
         // Session 38: fast-break shot-diet totals (page-only, never asserted on the page).
         public long FastBreakFga, FastBreakThreePa, FastBreakThreePm;
+        //  Session 85, PAGE-ONLY — the fast-break readout.
+        //
+        //  TransitionEntries: possessions that arrived off a rebound, a free-throw rebound or a
+        //  steal. NOT the same thing as a fast break: Roll J's Settle arm leaves the state
+        //  untouched, so a settled transition entry is indistinguishable from an ordinary
+        //  halfcourt possession downstream. Both numbers are printed and they must differ.
+        //
+        //  TransitionPush/Settle/Turnover/DefFoul/JumpBall: the five sibling arms of the
+        //  run-or-not pie, on transition entries only. They are SIBLINGS — a turnover, a foul
+        //  or a tie-up happens INSTEAD of a push, not after a failed one.
+        //
+        //  PossWithFastBreakFga: possessions carrying at least one break shot. Distinct from
+        //  the attempt total, and distinct again from the push count — a push can die before a
+        //  shot ever goes up, and the gap between the two is itself a finding.
+        //  TransitionEntriesNoShot: transition entries the resolver NEVER WALKED. An
+        //  end-of-half possession that runs the clock out without a shot is recorded but never
+        //  resolved at all — the Governor short-circuits before calling the resolver, so Roll J
+        //  does not run and there is no arm to report. These are a handful per thousand
+        //  possessions and they are the reason the five arms sum to slightly FEWER than the
+        //  transition entries. Counted and printed rather than swept up, because an unexplained
+        //  residual on a conservation line is indistinguishable from a wiring bug.
+        public long TransitionEntries, TransitionEntriesNoShot, PossWithFastBreakFga;
+        public long TransitionPush, TransitionSettle, TransitionTurnover,
+                    TransitionDefFoul, TransitionJumpBall;
+        //  The three-way shot partition and its blocks. Break-side counts are ALL-SOURCE (push-
+        //  born plus press-born); the *PressBorn fields hold the press half so the page can
+        //  print the split beside every total. A single possession cannot be both: the press is
+        //  rolled only on a dead-ball start, which a rebound/steal start never takes, so a
+        //  possession's own entry decides which side it belongs to with no extra counter.
+        public long FastBreakFgm, FastBreakBlk;
+        public long BreakPutbackFga, BreakPutbackFgm, BreakPutbackBlk;
+        public long NonBreakFga, NonBreakFgm, NonBreakBlk;
+        public long PressBornFga, PressBornFgm, PressBornThreePm, PressBornBlk, PressBornPossessions;
+        //  Break blocks credited to the DEFENSIVE team, per team — the denominator of the
+        //  concentration board. The per-MAN numerator lives on SeasonPlayerRecord.FbBlk,
+        //  because a lineup seat is not a person: with a real rotation several men share seat 3
+        //  across a season, so a seat-level share would understate how concentrated the credit
+        //  actually is.
+        public readonly Dictionary<int, long> TeamFastBreakBlk = new();
+        //  Transition entries CONCEDED, per team, with the possessions each team defended as
+        //  the denominator. Defensive-side because this is a defence instrument: the question
+        //  is how often an opponent gets out and runs against this team, not how often this
+        //  team runs.
+        public readonly Dictionary<int, long> TeamDefTransitionEntries = new();
+        public readonly Dictionary<int, long> TeamDefPossessions = new();
         public long PossessionRecords;       // every record — the pace numerator
         //  S79.3: league secured boards — the sum of PossessionRecord.OrbChances, and the
         //  league-side leg of the SecuredBoardsOnFloor identity. It exists for no other reason.
@@ -453,6 +498,7 @@ internal static partial class Program
                 rec.Ast    += box.Ast[i];    rec.Stl    += box.Stl[i];
                 rec.Blk    += box.Blk[i];    rec.To     += box.To[i];
                 rec.ShFoul += box.ShFoul[i]; rec.NsFoul += box.NsFoul[i];
+                rec.FbBlk  += box.FbBlk[i];   // Session 85: the break subset of the line above
             }
 
             var elapsedSum = 0.0;
@@ -487,6 +533,58 @@ internal static partial class Program
                 MidFga   += r.MidFga;   MidFgm   += r.MidFgm;
                 LongFga  += r.LongFga;  LongFgm  += r.LongFgm;
                 FastBreakFga += r.FastBreakFga; FastBreakThreePa += r.FastBreakThreePa; FastBreakThreePm += r.FastBreakThreePm;
+                // ── Session 85, PAGE-ONLY: the fast-break readout ────────────────────────
+                // Entry rate, and the run-or-not split on transition entries only. The split
+                // fires off the carried LABEL, which the engine stamps only inside Roll J, so
+                // it cannot fire on a possession Roll J never touched.
+                if (r.Entry == EntryType.Transition)
+                {
+                    TransitionEntries++;
+                    if (r.EndOfHalfIntent == Charm.Engine.EndOfHalfIntent.NoShot) TransitionEntriesNoShot++;
+                }
+                {
+                    var defSchool0 = r.Defense == TeamSide.Home ? homeSchoolId : awaySchoolId;
+                    TeamDefPossessions[defSchool0] =
+                        (TeamDefPossessions.TryGetValue(defSchool0, out var p0) ? p0 : 0L) + 1L;
+                    if (r.Entry == EntryType.Transition)
+                        TeamDefTransitionEntries[defSchool0] =
+                            (TeamDefTransitionEntries.TryGetValue(defSchool0, out var e0) ? e0 : 0L) + 1L;
+                }
+                switch (r.TransitionArm)
+                {
+                    case TransitionOutcome.Push:          TransitionPush++;     break;
+                    case TransitionOutcome.Settle:        TransitionSettle++;   break;
+                    case TransitionOutcome.Turnover:      TransitionTurnover++; break;
+                    case TransitionOutcome.DefensiveFoul: TransitionDefFoul++;  break;
+                    case TransitionOutcome.JumpBall:      TransitionJumpBall++; break;
+                    case null:                                                  break;
+                }
+                if (r.FastBreakFga > 0) PossWithFastBreakFga++;
+                FastBreakFgm    += r.FastBreakFgm;    FastBreakBlk    += r.FastBreakBlk;
+                BreakPutbackFga += r.BreakPutbackFga; BreakPutbackFgm += r.BreakPutbackFgm;
+                BreakPutbackBlk += r.BreakPutbackBlk;
+                NonBreakFga     += r.NonBreakFga;     NonBreakFgm     += r.NonBreakFgm;
+                NonBreakBlk     += r.NonBreakBlk;
+                // The press half of the break totals. A break on a possession whose entry is
+                // NOT Transition can only have come from a beaten press (Roll J is the only
+                // other stamper of the flag and it runs only on transition entries), so the
+                // entry field alone is the provenance test — no engine-side field needed.
+                if (r.Entry != EntryType.Transition &&
+                    (r.FastBreakFga > 0 || r.BreakPutbackFga > 0))
+                {
+                    PressBornPossessions++;
+                    PressBornFga     += r.FastBreakFga + r.BreakPutbackFga;
+                    PressBornFgm     += r.FastBreakFgm + r.BreakPutbackFgm;
+                    PressBornThreePm += r.FastBreakThreePm;
+                    PressBornBlk     += r.FastBreakBlk + r.BreakPutbackBlk;
+                }
+                // Break blocks by DEFENSIVE team — the concentration board's denominator.
+                if (r.FastBreakBlk > 0)
+                {
+                    var defSchool = r.Defense == TeamSide.Home ? homeSchoolId : awaySchoolId;
+                    TeamFastBreakBlk[defSchool] =
+                        (TeamFastBreakBlk.TryGetValue(defSchool, out var d0) ? d0 : 0L) + r.FastBreakBlk;
+                }
                 SecuredBoards += r.OrbChances;   // S79.3 — the league leg of the REB% identity
 
                 UnattributedFga += r.SlotUnattributedFga;
@@ -765,6 +863,156 @@ internal static partial class Program
             $"    fast-break shot diet: FGA {s.FastBreakFga} ({Pct(s.FastBreakFga, s.Fga):F1}% of all FGA)") +
             Inv($"  3PA-rate {(s.FastBreakFga > 0 ? 100.0 * s.FastBreakThreePa / s.FastBreakFga : 0.0):F1}%") +
             Inv($"  3P% {Pct(s.FastBreakThreePm, s.FastBreakThreePa):F1}%"));
+
+        // ── Session 85: THE FAST-BREAK READOUT (page-only, nothing asserted, no targets) ──
+        //
+        // A defence instrument, credited to the DEFENDING team throughout. It exists because
+        // Emmett ruled a set of transition-defence effects and none of them could be designed:
+        // every transition number on this page before today was offensive (break FGA, its
+        // three-rate, its three-point percentage), so there was no line that a change to
+        // transition defence would move. S84's lesson is the reason this is its own session —
+        // the assist dial was 40 points wrong for 43 sessions because no line printed it.
+        //
+        // Vocabulary is fixed and load-bearing. A TRANSITION ENTRY (arrived off a rebound, a
+        // free-throw rebound or a steal) is NOT a fast break: Roll J's Settle arm leaves the
+        // state untouched, so a settled entry is indistinguishable downstream from an ordinary
+        // halfcourt possession. "Transition FG%" and "halfcourt FGA" are therefore not labels
+        // used here — each of them spans two of the three shot buckets below.
+        {
+            Console.WriteLine("  --- transition / fast-break readout (Session 85; page-only, never asserted) ---");
+
+            // 1. Entry rate. Printed beside the break-shot rate on purpose: they measure
+            //    different things and must differ, which is the one thing a completeness check
+            //    cannot tell you.
+            Console.WriteLine(
+                Inv($"    transition entries {s.TransitionEntries} of {s.PossessionRecords} possessions = {Pct(s.TransitionEntries, s.PossessionRecords):F2}%") +
+                Inv($"   |  possessions carrying a break shot {s.PossWithFastBreakFga} = {Pct(s.PossWithFastBreakFga, s.PossessionRecords):F2}%"));
+            {
+                var teamRates = s.TeamDefTransitionEntries.Keys
+                                 .Where(k => s.TeamDefPossessions.TryGetValue(k, out var d) && d > 0)
+                                 .Select(k => 100.0 * s.TeamDefTransitionEntries[k] / s.TeamDefPossessions[k])
+                                 .OrderBy(x => x).ToList();
+                if (teamRates.Count > 0)
+                {
+                    double At(double p) => teamRates[Math.Min(teamRates.Count - 1, (int)(p * teamRates.Count))];
+                    Console.WriteLine(
+                        Inv($"      entries CONCEDED by team (n={teamRates.Count}): min {teamRates[0]:F2}%") +
+                        Inv($"  p10 {At(0.10):F2}%  median {At(0.50):F2}%  p90 {At(0.90):F2}%  max {teamRates[^1]:F2}%"));
+                }
+            }
+
+            // 2. The run-or-not split, on transition entries only. FIVE SIBLING outcomes: a
+            //    turnover, a foul or a tie-up happens INSTEAD of a push, not after a failed
+            //    one. Do not read the non-push arms as failed pushes.
+            var armSum = s.TransitionPush + s.TransitionSettle + s.TransitionTurnover +
+                         s.TransitionDefFoul + s.TransitionJumpBall;
+            Console.WriteLine(
+                Inv($"    on transition entries — push {Pct(s.TransitionPush, armSum):F2}% ({s.TransitionPush})") +
+                Inv($"  settle {Pct(s.TransitionSettle, armSum):F2}% ({s.TransitionSettle})") +
+                Inv($"  turnover {Pct(s.TransitionTurnover, armSum):F2}%") +
+                Inv($"  def foul {Pct(s.TransitionDefFoul, armSum):F2}%") +
+                Inv($"  jump ball {Pct(s.TransitionJumpBall, armSum):F2}%"));
+            // The denominator is the transition entries the resolver actually WALKED. An
+            // end-of-half possession that kills the clock without shooting is recorded but never
+            // resolved — Roll J does not run on it, so it has no arm. Printed rather than
+            // absorbed: an unexplained residual on a conservation line cannot be told apart
+            // from a wiring bug.
+            var armDen = s.TransitionEntries - s.TransitionEntriesNoShot;
+            Console.WriteLine(
+                Inv($"      five sibling arms sum {armSum} vs resolved transition entries {armDen} (residual {armSum - armDen})") +
+                Inv($"   |  {s.TransitionEntriesNoShot} entries never resolved (end-of-half, no shot)"));
+
+            // 3. Push selected vs break shot produced. A push that dies before a shot goes up
+            //    is a real thing and the gap is itself a finding. The break-shot total is
+            //    ALL-SOURCE, so it is not bounded by the push count — whether it exceeds it
+            //    depends on whether press-born attempts outnumber dead pushes. Measured, not
+            //    predicted.
+            Console.WriteLine(
+                Inv($"    pushes selected {s.TransitionPush}  ->  break shots produced (all sources) {s.FastBreakFga}") +
+                Inv($"   [push-born break+putback shots {s.FastBreakFga + s.BreakPutbackFga - s.PressBornFga}") +
+                Inv($" | press-born {s.PressBornFga} over {s.PressBornPossessions} possessions]"));
+
+            // 4. The three-way shot partition with FG% for each. Three buckets, not two: a
+            //    putback taken while the break was still live is break-stamped but excluded
+            //    from the break-shot count, so it is neither of the other two. The break-vs-
+            //    non-break gap is the number a later session moves.
+            var partSum = s.FastBreakFga + s.BreakPutbackFga + s.NonBreakFga;
+            var fbPct   = Pct(s.FastBreakFgm, s.FastBreakFga);
+            var nbPct   = Pct(s.NonBreakFgm,  s.NonBreakFga);
+            Console.WriteLine(
+                Inv($"    shot partition — fast break {s.FastBreakFga} FG% {fbPct:F1}%") +
+                Inv($"  |  break putback {s.BreakPutbackFga} FG% {Pct(s.BreakPutbackFgm, s.BreakPutbackFga):F1}%") +
+                Inv($"  |  non-break {s.NonBreakFga} FG% {nbPct:F1}%"));
+            Console.WriteLine(
+                Inv($"      three buckets sum {partSum} vs FGA {s.Fga} (residual {partSum - s.Fga})") +
+                Inv($"   |  break-vs-non-break FG% gap {fbPct - nbPct:+0.0;-0.0} pts"));
+
+            // 5. Fast-break FIELD-GOAL points allowed, per team per game. Field-goal points
+            //    only: free throws and putbacks sit outside the break-shot bucket, so folding
+            //    them in would mean the label no longer matched what was counted. Total points
+            //    generated by a break opportunity is a wider instrument and is not this session.
+            var fbPoints = 2.0 * (s.FastBreakFgm - s.FastBreakThreePm) + 3.0 * s.FastBreakThreePm;
+            var pressPts = 2.0 * (s.PressBornFgm - s.PressBornThreePm) + 3.0 * s.PressBornThreePm;
+            Console.WriteLine(
+                Inv($"    fast-break FIELD-GOAL points allowed: {Avg(fbPoints, s.Games * 2):F2} per team per game") +
+                Inv($"   (FT and putbacks excluded by definition; press-born share {(fbPoints > 0.0 ? 100.0 * pressPts / fbPoints : 0.0):F1}%)"));
+
+            // 6. Block rate per bucket, all three. A blocked shot IS an attempt, so these are
+            //    shares of each bucket's attempts and the three counts sum to league blocks.
+            //    All three are printed because a two-way line beside a three-way partition
+            //    invites the false reading that two rates exhaust every blocked attempt.
+            var blkSum = s.FastBreakBlk + s.BreakPutbackBlk + s.NonBreakBlk;
+            Console.WriteLine(
+                Inv($"    block rate by bucket — fast break {Pct(s.FastBreakBlk, s.FastBreakFga):F2}% ({s.FastBreakBlk})") +
+                Inv($"  |  break putback {Pct(s.BreakPutbackBlk, s.BreakPutbackFga):F2}% ({s.BreakPutbackBlk})") +
+                Inv($"  |  non-break {Pct(s.NonBreakBlk, s.NonBreakFga):F2}% ({s.NonBreakBlk})"));
+            Console.WriteLine(
+                Inv($"      three bucket blocks sum {blkSum} vs league blocks {s.Blk} (residual {blkSum - s.Blk})") +
+                Inv($"   |  press-born break blocks {s.PressBornBlk}"));
+
+            // 7. WHO gets fast-break blocks — the baseline for "the spread should widen with a
+            //    fast lineup". The top-credited defender's share of his own team's break
+            //    blocks, as a league distribution.
+            //
+            //    ★ Read this next to O-48. On a break the engine deliberately assigns NOBODY:
+            //    BlockerPicker exempts transition entirely, so every gate is 1.0 and all five
+            //    defenders are equally eligible. The concentration below is therefore "whoever
+            //    the shot-blocking numbers favour, with the matchup filter switched off" — it
+            //    is the honest baseline, and any change that widens it runs into O-48 first.
+            //
+            //    Teams with zero break blocks are EXCLUDED and counted, because their share is
+            //    undefined, not zero — including them as 0% would drag every percentile down
+            //    with a number that means "no sample".
+            //
+            //    All-source only, by design. Press-born break blocks are a sliver of a sliver;
+            //    per-team percentiles on that sample would be noise wearing a table's clothes.
+            {
+                var topByTeam = s.PlayerSeasons.Values
+                                 .Where(p => p.FbBlk > 0)
+                                 .GroupBy(p => p.SchoolId)
+                                 .ToDictionary(gp => gp.Key, gp => gp.Max(p => p.FbBlk));
+                var shares = s.TeamFastBreakBlk
+                              .Where(kv => kv.Value > 0 && topByTeam.ContainsKey(kv.Key))
+                              .Select(kv => 100.0 * topByTeam[kv.Key] / kv.Value)
+                              .OrderBy(x => x).ToList();
+                var zeroTeams = s.TeamDefPossessions.Keys
+                                 .Count(k => !s.TeamFastBreakBlk.TryGetValue(k, out var v) || v == 0);
+                if (shares.Count > 0)
+                {
+                    double At(double p) => shares[Math.Min(shares.Count - 1, (int)(p * shares.Count))];
+                    Console.WriteLine(
+                        Inv($"    top defender's share of his team's break blocks (n={shares.Count} teams; {zeroTeams} excluded with zero break blocks):"));
+                    Console.WriteLine(
+                        Inv($"      min {shares[0]:F1}%  p10 {At(0.10):F1}%  median {At(0.50):F1}%") +
+                        Inv($"  p90 {At(0.90):F1}%  max {shares[^1]:F1}%"));
+                }
+                else
+                {
+                    Console.WriteLine(
+                        Inv($"    top defender's share of his team's break blocks: no team recorded one ({zeroTeams} teams with zero)"));
+                }
+            }
+        }
 
         Console.WriteLine("  seconds per possession by ending (NoShot/HoldShootLast excluded):");
         Console.WriteLine(

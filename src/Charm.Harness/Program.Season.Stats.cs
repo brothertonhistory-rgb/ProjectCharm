@@ -59,6 +59,12 @@ internal static partial class Program
         public long Fga, Fgm, Tpa, Tpm, Fta, Ftm;
         public long OReb, DReb, Ast, Stl, Blk, To;
         public long ShFoul, NsFoul;
+        //  Session 85, PAGE-ONLY: the fast-break SUBSET of Blk. Fed from the same box column,
+        //  through the same seat-to-man translation, so FbBlk <= Blk for every man. Exists so
+        //  the page can report how concentrated a team's break blocks are on one defender —
+        //  the baseline for any later change that widens that spread. Never asserted as a
+        //  basketball target.
+        public long FbBlk;
 
         //  Session 79.3 — THE ON-FLOOR DENOMINATORS. Four exact counts, fed by NoteOccupancy
         //  from the same walk that credits floor time, so every rate below is measured against

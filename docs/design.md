@@ -8634,6 +8634,176 @@ After the S34/35 tendency retune and the S38 fast-break diet, the season page (s
 
 The paragraph that stood here described the S32-era shape (midpoints above the authored range, no diminishing returns within 0–99). **The 2026-07-21 recenter inverted it**: the fitted midpoints sit inside or below the authored range (Three 20.3, Mid 37.4, Short 43.0), so most of the authored scale is now on the FLATTENING side — diminishing returns at the top are back, deliberately, because Emmett's ruled elite anchors compress the top intervals (95→99 gains shrink to ~0.4–0.6pp everywhere; the p99-vs-elite raw separation at Three is ~5pp, exactly the ruled 42-vs-45 neighborhood). The Phase 6 curve-relative rewrite (see the Session 50 shooting-curve section) is what let the suite stay green through this flip without touching a check — the direction and magnitude of its expectations derive from the loaded config by construction, and it just proved that promise at full scale.
 
+## The fast-break readout — the defensive instrument for transition (Session 85, 2026-07-30)
+
+**Why it exists.** Before S85 every transition number the engine printed was OFFENSIVE: break FGA,
+its three-point rate, its three-point percentage (the Session 38 diet line). Emmett ruled a set of
+transition-DEFENCE effects in the S84 design conversation — speed weighted more heavily in
+push/settle than the athleticism aggregate alone, four fast guards raising the odds of a stop, a
+block, a miss or forcing the offence to settle, and a wider spread of who gets a break block — and
+none of them could be designed, because no line measured the axis any of them would move. S84 is the
+cautionary precedent: the assist dial sat 40 points off its own population for 43 sessions purely
+because nothing printed it. This readout is page-only and changed no behaviour; inertness was proved
+by hash, not asserted (see "Inertness" below).
+
+### The vocabulary, which is load-bearing
+
+| term | means |
+|---|---|
+| **transition entry** | arrived off a rebound, a free-throw rebound or a steal |
+| **push selected** | Roll J chose its Push arm |
+| **break-stamped** | `FastBreak == true`, from Roll J's Push arm **or** a beaten press |
+| **fast-break FGA** | break-stamped, Roll-G-selected, putbacks EXCLUDED (the S38 gate, unchanged) |
+| **break putback FGA** | break-stamped **and** a putback — a second-chance shot on a still-live break |
+| **non-break FGA** | neither of the above |
+
+**A transition entry is NOT a fast break, and the two numbers must be printed together.** Roll J's
+`Settle` arm continues to the same node as `Push` with the state UNCHANGED, so a settled transition
+entry is indistinguishable downstream from an ordinary halfcourt possession. Measured on the
+canonical season: 41.61% of possessions are transition entries; only 12.74% carry a break shot. A
+completeness check cannot tell these apart — only printing both can.
+
+**"Transition FG%" and "halfcourt FGA" are banned labels.** Each spans two of the three shot
+buckets. The partition is three-way because Roll K's `PutBack` arm does **not** clear the break flag
+(only `ResetOffense` does), so a putback off a break miss is break-stamped while being excluded from
+the S38 break-shot count by the explicit putback gate. A shot taken after `ResetOffense` lands
+correctly in non-break because the flag was cleared.
+
+### Roll J reports its own arm
+
+Roll J now stamps the arm it rolled onto its returned result (`RollResult.TransitionArm`, carried out
+on `RoutingOutcome` and `PossessionRecord`). **The page does not infer it, because it cannot:**
+`Settle` and `Push` hand back the SAME `ContinuationKind`, and `DefensiveFoul` forks between two kinds
+depending on the bonus. Inference would have been wrong on at least one branch.
+
+It is **one nullable categorical label, not five booleans.** Roll J runs exactly once per transition
+entry and never otherwise — one engine call site, and a transition entry carrying no recognized
+source throws loud — so the five outcomes are mutually exclusive by construction and "the five arms
+sum to the transition-entry count" is true by REPRESENTATION rather than by wiring that must be
+re-proved. The mark lives on the `RollResult` base rather than on `Continue` because the
+`DefensiveFoul` arm delegates to `DefensiveFoulCharge`; stamping the base lets Roll J apply it once
+after the switch with all five arms left byte-for-byte unchanged. Nothing in the engine reads it.
+
+### The five arms are SIBLINGS
+
+Push / settle / turnover / defensive foul / jump ball. A turnover, a foul or a tie-up happens
+*instead of* a push, never after a failed one. Reading the non-push arms as failed pushes is a
+misreading the page's wording actively guards against.
+
+### Push selected is not the same as a break shot produced
+
+A push can die before a shot ever goes up. The break-shot total is also ALL-SOURCE (push-born plus
+press-born), so it is not bounded by the push count in either direction; which way the gap falls
+depends on whether press-born attempts outnumber dead pushes, and that is measured rather than
+predicted. On the canonical season: 102,886 pushes selected against 94,017 break shots produced,
+86,180 of them push-born and 12,836 press-born over 12,248 possessions.
+
+### Provenance needs no new engine field
+
+Proved at draft time and re-verified against the live tree:
+
+> a break-stamped event on a possession with `Entry == Transition` is **push-born**;
+> a break-stamped event on any other entry is **press-born**.
+
+Three links carry it. (1) How a possession started is written once, at the record's single
+construction site, with zero mutation sites. (2) The press is rolled only in the legacy dead-ball
+branch, which a transition entry never takes — it dispatches to Roll J first. (3) The press-beaten
+stamp fires only on `IntoHalfcourtSet`, whose only emitter is Roll A's clean entry, unreachable from
+a transition entry. **And because a single possession cannot be both, the source split costs ZERO
+extra counters** — the possession's own entry field decides which side it belongs to.
+
+### The non-break bucket is counted, not derived
+
+Deriving it by subtracting the other two from FGA would make the partition identity arithmetic
+asserting itself, and would pass over a mis-scoped gate. All three buckets are counted through one
+`if / else-if / else` chain, so the partition is exhaustive and exclusive by wiring and Phase 76's
+per-possession sum-to-FGA check can actually fail for the right reason. Blocks are banked into the
+same three buckets at the single block site, using conditions written identically to the attempt
+partition so the two can never disagree about which bucket a shot was in. A blocked shot IS an
+attempt, so the three block counts sum to league blocks.
+
+### Break blocks reach the MAN, not the seat
+
+`FastBreakBlkBySlot` is the per-seat subset of `BlkBySlot` (its `Total` equals the fast-break block
+count). But **a lineup seat is not a person**: with the S76 rotation in place several men share seat 3
+across a season, so a seat-level concentration figure would understate how concentrated break-block
+credit actually is. Break blocks therefore travel the SAME seat-to-man translation ordinary blocks
+already take, inside the same guard in `AttributeGame`, which makes "a man's break blocks never exceed
+his blocks" true by construction rather than by agreement between two independent passes. The new
+per-player column joined `PlayerBoxTotals.AllEqual` — the run-to-run reproducibility contract —
+because a per-player array two identical runs never compare is an array nothing is checking.
+
+### The end-of-half carve-out
+
+An end-of-half possession that runs the clock out without shooting is RECORDED but never RESOLVED:
+the Governor short-circuits before calling the resolver, so Roll J does not run and there is no arm
+to report. Correct engine behaviour, not a defect. It is named explicitly in both the check and the
+readout (503 such entries on the canonical season) rather than absorbed, because an unexplained
+residual on a conservation line cannot be told apart from a wiring bug.
+
+### What the readout prints
+
+Credited to the DEFENDING team throughout. Page-only, never asserted, no target values.
+
+1. Transition entry rate, league and conceded per team.
+2. The five sibling arms, on resolved transition entries only, reconciling with the unresolved count
+   printed beside them.
+3. Pushes selected vs break shots produced, with the push-born / press-born split.
+4. The three-way partition with FG% for each, and the break-vs-non-break gap.
+5. Fast-break FIELD-GOAL points allowed per team per game, defined exactly as
+   `2 x (fbFgm - fbThreePm) + 3 x fbThreePm`. Free throws and putbacks are excluded because they sit
+   outside the break-shot bucket — the label says field-goal points for that reason. Total points
+   generated by a break opportunity is a wider instrument and is not this.
+6. Block rate in all three buckets. All three, because a two-way line beside a three-way partition
+   invites the false reading that two rates exhaust every blocked attempt.
+7. The top-credited defender's share of his team's break blocks, as a league distribution. Teams with
+   zero break blocks are EXCLUDED and counted — their share is undefined, not zero, and including
+   them as 0% would drag every percentile down with a number meaning "no sample". All-source only:
+   press-born break blocks are a sliver of a sliver and per-team percentiles on that sample would be
+   noise wearing a table's clothes.
+
+### The first reading, and what it says
+
+Canonical season, seed 20260720. Entry rate 41.61%; break-shot possessions 12.74%. Arms: push 33.55%
+/ settle 56.46% / turnover 5.96% / defensive foul 3.48% / jump ball 0.55%. Partition: fast break
+94,017 at 46.7%, break putback 4,999 at 52.9%, non-break 489,465 at 42.3% — a +4.4 point break
+advantage, which is the direction expected and the number a later session moves. Break field-goal
+points allowed 9.64 per team per game. Block rate 9.40% on break shots, 18.40% on break putbacks,
+7.35% non-break.
+
+**★ The concentration board is the finding.** Top defender's share of his team's break blocks: min
+13.8% / p10 19.0% / median 25.0% / p90 35.7% / max 57.1%, across all 347 teams with none excluded. A
+median of 25.0% sits close to the 20% five interchangeable defenders would produce — and that is
+**O-48 measured**. On a break the engine deliberately assigns nobody (`BlockerPicker` exempts
+transition entirely, so every gate is 1.0), so break-block credit is handed out nearly flat. Any later
+change that widens this spread runs into the assignment hole before it runs into anything about speed.
+
+### Inertness, proved rather than claimed
+
+Procedure, not judgement: the newly registered block was stripped from the post-change season page by
+exact line match and the remainder hashed against a pre-change baseline built from a fresh pull.
+SHA-256 `e05260ac…` on both sides — identical. Nothing else on the page moved, no shared dictionary
+or enumeration order changed, and no engine behaviour changed.
+
+### Phase 76 — the wiring checks
+
+Conservation and wiring only; no basketball target is asserted anywhere. Sixteen checks over 40 whole
+games on fresh state per game (foul counts, the possession arrow and the lineup all live on
+`GameState`, so sharing one across the batch would route arms differently late in the run than early).
+Two are EXISTENCE checks and they are the point — the S73.1 lesson that "nothing moved" needs a
+discriminating signal only the new tree can produce:
+
+- A possession carrying BOTH a break shot and a non-break shot. Only reachable by pushing, missing,
+  rebounding and kicking it back out, which clears the break — so it proves the counters are
+  EVENT-scoped and not history-scoped.
+- A break-stamped possession whose entry is not a transition. Only a beaten press produces one — so
+  it proves the second break source is in the break totals and absent from the Roll J denominator.
+
+Absence FAILS rather than passing quietly. Deliberately ABSENT: any break-subset block conservation
+assertion. Phase 36 already asserts `BlkBySlot.Total == BlkCount` on every possession, which holds on
+the break subset by construction; a second copy would be decoration. What IS asserted is the new
+containment relationship (`FastBreakBlkBySlot <= BlkBySlot`, seat by seat), which nothing else checks.
+
 ## Roll G — fast-break shot diet: the shooter-bent, PaceBias-tilted break (Session 38, 2026-07-06)
 
 **Current state.** A fast break no longer produces one flat shot menu for everyone. The break

@@ -63,7 +63,12 @@ public static class RollJ
         // Roll the five-way pie to a run-or-not outcome.
         var outcome = pie.Roll(rng.NextUnitInterval());
 
-        return outcome switch
+        // Session 85: stamp the arm on the way out (PAGE-ONLY). The five arms below are
+        // unchanged; the mark is applied once to whatever they return, so the season page
+        // reads the arm the pie actually rolled rather than inferring it from the
+        // destination — which cannot be done, since Settle and Push share a destination
+        // and DefensiveFoul forks between two. Nothing in the engine reads it.
+        var result = outcome switch
         {
             // Pull it out -> run a halfcourt set. CONTINUE to player selection.
             // The "proceed" analog; reads nothing off GameState.
@@ -99,5 +104,7 @@ public static class RollJ
 
             _ => throw new InvalidOperationException($"Unhandled transition outcome '{outcome}'.")
         };
+
+        return result with { TransitionArm = outcome };
     }
 }

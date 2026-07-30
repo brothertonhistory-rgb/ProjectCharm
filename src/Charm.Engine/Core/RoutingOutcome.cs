@@ -367,6 +367,65 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     public double AssistPassFactorSum { get; init; }
     /// <inheritdoc cref="AssistPassFactorSum"/>
     public int AssistPassFactorEvents { get; init; }
+
+    /// <summary>Session 85, PAGE-ONLY. Which arm of Roll J's run-or-not pie opened this
+    /// possession: <c>null</c> on every possession that did not start off a rebound, a
+    /// free-throw rebound or a steal.
+    ///
+    /// <para><b>Why one label rather than five flags.</b> Roll J runs exactly once per
+    /// transition entry and never otherwise (one call site, and a transition entry carrying
+    /// no recognized source throws loud), so its five outcomes are mutually exclusive by
+    /// construction. Carrying one nullable label makes "the five buckets sum to the
+    /// transition-entry count" true by representation; five booleans would make it a wiring
+    /// property that has to be re-proved.</para>
+    ///
+    /// <para><b>Why the engine reports it instead of the page inferring it.</b> Settle and
+    /// Push hand back the SAME continuation kind, and DefensiveFoul forks between two kinds
+    /// on the bonus — so the arm cannot be recovered from where the ball went next.</para></summary>
+    public TransitionOutcome? TransitionArm { get; init; }
+
+    /// <summary>Session 85, PAGE-ONLY. Made field goals on the fast-break bucket
+    /// (<c>FastBreak &amp;&amp; !Putback</c> — the same gate as <see cref="FastBreakFga"/>).
+    /// New because S38 carried a break THREE-point make but never a bucket-wide make, so
+    /// neither break FG% nor break points allowed could be read off the page.</summary>
+    public int FastBreakFgm { get; init; }
+
+    /// <summary>Session 85, PAGE-ONLY. Second-chance attempts and makes taken while a break
+    /// was still live (<c>FastBreak &amp;&amp; Putback</c>). Roll K's PutBack arm does not
+    /// clear the break flag, so these are break-stamped shots that the S38 diet count
+    /// deliberately excludes — which is why the shot partition is three-way and why
+    /// "halfcourt FGA" is not a label this readout uses. Forced to the rim by Roll K, so no
+    /// three-point sibling exists.</summary>
+    public int BreakPutbackFga { get; init; }
+    /// <inheritdoc cref="BreakPutbackFga"/>
+    public int BreakPutbackFgm { get; init; }
+
+    /// <summary>Session 85, PAGE-ONLY. Attempts and makes with no break flag at all — the
+    /// third bucket. Counted explicitly rather than derived by subtracting the other two,
+    /// because a derived bucket makes the partition identity arithmetic asserting itself and
+    /// would pass over a mis-scoped gate.</summary>
+    public int NonBreakFga { get; init; }
+    /// <inheritdoc cref="NonBreakFga"/>
+    public int NonBreakFgm { get; init; }
+
+    /// <summary>Session 85, PAGE-ONLY. Blocked attempts in each of the three shot buckets,
+    /// banked at the same single block site and gated by the same conditions as the attempt
+    /// partition. A blocked shot IS a field-goal attempt, so these three sum to
+    /// <see cref="BlkCount"/>.</summary>
+    public int FastBreakBlk { get; init; }
+    /// <inheritdoc cref="FastBreakBlk"/>
+    public int BreakPutbackBlk { get; init; }
+    /// <inheritdoc cref="FastBreakBlk"/>
+    public int NonBreakBlk { get; init; }
+
+    /// <summary>Session 85, PAGE-ONLY. The per-slot subset of <see cref="BlkBySlot"/> for
+    /// fast-break blocks only; <c>Total == </c><see cref="FastBreakBlk"/> on every
+    /// possession. Feeds the concentration board ("what share of a team's break blocks goes
+    /// to its top-credited defender"), which is the baseline for any later change that widens
+    /// that spread. Slot is a lineup SEAT, not a man — the harness translates it through the
+    /// same seat-to-man path ordinary blocks already take, so a man's break blocks can never
+    /// exceed his blocks.</summary>
+    public SlotGroup FastBreakBlkBySlot { get; init; }
     /// <summary>The offensive slot that committed the turnover. Null for team
     /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
     /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for

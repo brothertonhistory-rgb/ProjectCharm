@@ -176,6 +176,11 @@ internal static partial class Program
         public long[] NsFoul = new long[RosterShape.PlayerArrayWidth];
         // Phase 39: assist counts — engine-stamped on-walk from AstBySlot.
         public long[] Ast  = new long[RosterShape.PlayerArrayWidth];
+        // Session 85, PAGE-ONLY: the fast-break SUBSET of Blk, engine-stamped on-walk from
+        // FastBreakBlkBySlot. Filled by the same seat-to-man translation as Blk immediately
+        // below it, so FbBlk[i] <= Blk[i] holds for every man by construction rather than by
+        // agreement between two independent passes.
+        public long[] FbBlk = new long[RosterShape.PlayerArrayWidth];
         public static bool AllEqual(PlayerBoxTotals a, PlayerBoxTotals b) =>
             a.Fga.SequenceEqual(b.Fga)   && a.Fgm.SequenceEqual(b.Fgm) &&
             a.Tpa.SequenceEqual(b.Tpa)   && a.Tpm.SequenceEqual(b.Tpm) &&
@@ -184,7 +189,10 @@ internal static partial class Program
             a.Blk.SequenceEqual(b.Blk)   && a.Stl.SequenceEqual(b.Stl) &&
             a.To.SequenceEqual(b.To)     && a.ShFoul.SequenceEqual(b.ShFoul) &&
             a.NsFoul.SequenceEqual(b.NsFoul) &&
-            a.Ast.SequenceEqual(b.Ast);
+            a.Ast.SequenceEqual(b.Ast) &&
+            // Session 85: the new column joins the reproducibility contract. Omitting it would
+            // leave a per-player array that two identical runs are never checked to agree on.
+            a.FbBlk.SequenceEqual(b.FbBlk);
     }
 
     /// <summary>Run the full per-game attribution pass. Calling twice with the same
@@ -272,10 +280,19 @@ internal static partial class Program
             for (var s = 1; s <= 5; s++)
             {
                 var blkCount36 = r.BlkBySlot[s];
+                var fbBlk85    = r.FastBreakBlkBySlot[s];   // Session 85: the break subset
                 if (blkCount36 <= 0) continue;
                 var bp = defRoster.PlayerAt(new Slot(r.Defense, s), r.Number);
                 if (bp != null && RosterShape.IsLegalPlayerId(bp.PlayerId))
+                {
                     t.Blk[bp.PlayerId - 1] += blkCount36;
+                    // Session 85: same seat, same man, same guard — so a man's break blocks
+                    // can never exceed his blocks, and can never be credited to a different
+                    // man than the one the block itself went to. The `continue` above is
+                    // safe for this line because FastBreakBlkBySlot is a subset of BlkBySlot:
+                    // a seat with no block cannot hold a break block.
+                    t.FbBlk[bp.PlayerId - 1] += fbBlk85;
+                }
             }
             // AST — Phase 39: read engine-stamped slots from AstBySlot (AssistPicker).
             for (var s = 1; s <= 5; s++)

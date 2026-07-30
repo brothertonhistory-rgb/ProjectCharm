@@ -15,6 +15,25 @@ public abstract record RollResult
     /// full clock, never more or less, so it needs no time roll).</para>
     /// </summary>
     public double? ElapsedSeconds { get; init; }
+
+    /// <summary>
+    /// Session 85, PAGE-ONLY provenance: which arm of Roll J's run-or-not pie produced
+    /// this result. <c>null</c> on every result from every other roll.
+    /// <para>Roll J's five arms are not distinguishable from the outside: two of them
+    /// (Settle and Push) hand back the SAME <see cref="ContinuationKind"/>, and a third
+    /// (DefensiveFoul) forks between two kinds depending on the bonus. Reconstructing the
+    /// arm from the destination would therefore be a guess, and a wrong one on at least
+    /// one branch. Roll J stamps the arm it actually rolled instead, so the season page
+    /// cannot report an outcome split the engine did not produce.</para>
+    /// <para>It lives on the BASE record rather than on <see cref="Continue"/> because
+    /// Roll J's DefensiveFoul arm delegates to <see cref="DefensiveFoulCharge"/>, which
+    /// returns a <see cref="RollResult"/>; stamping the base lets Roll J apply the mark
+    /// once, after the switch, with all five arms left byte-for-byte unchanged.</para>
+    /// <para>Nothing in the engine READS this — it is carried out on
+    /// <see cref="RoutingOutcome.TransitionArm"/> for the harness and changes no
+    /// routing, no pie, and no RNG draw.</para>
+    /// </summary>
+    public TransitionOutcome? TransitionArm { get; init; }
 }
 
 /// <summary>

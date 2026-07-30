@@ -170,6 +170,13 @@ public sealed class Resolver
         // far above any real walk; reaching it means a possession is NOT converging,
         // which is a real bug — it throws rather than silently breaking, and the
         // harness asserts it is never hit.
+        // Session 85, PAGE-ONLY: which arm of Roll J's run-or-not pie opened this walk.
+        // Captured HERE, before the loop reassigns `result` — the incoming result is the one
+        // Roll J returned, and Roll J is the only roll that stamps the mark. It is therefore
+        // non-null exactly on a transition-entry possession and null on every other, which is
+        // what makes the outcome-split counters fire only where they should by representation
+        // rather than by an entry test the page has to remember to write.
+        var transitionArm = result.TransitionArm;
         var putbackAttempts = 0;
         var freeThrowSpins = 0;
         var points = 0;
@@ -184,6 +191,37 @@ public sealed class Resolver
         var fastBreakFga = 0;
         var fastBreakThreePa = 0;
         var fastBreakThreePm = 0;
+        // Session 85, PAGE-ONLY: the THREE-WAY shot partition. Every FGA on this walk lands
+        // in exactly one of three buckets, decided by the two flags in scope at the Roll H
+        // chokepoint below — `FastBreak` on the stamped state and `Putback` on the
+        // continuation:
+        //   fast-break      FastBreak && !Putback   (== the S38 counter above, same gate)
+        //   break putback   FastBreak &&  Putback   a second-chance shot on a LIVE break:
+        //                                           Roll K's PutBack arm does NOT clear
+        //                                           FastBreak (only ResetOffense does), so
+        //                                           these attempts are break-stamped while
+        //                                           being excluded from the S38 diet count
+        //   non-break       !FastBreak              everything else, INCLUDING a shot taken
+        //                                           after Roll K kicked it back out — the
+        //                                           break is over and the flag is cleared
+        // The buckets are wired as one if / else-if / else so the partition is exhaustive and
+        // exclusive by construction; Phase 76 asserts the three sum to Fga, which is what
+        // catches a mis-scoped gate. `fastBreakFgm` is new because the S38 counters carry a
+        // three-point make but never a bucket-wide make, so neither break FG% nor break
+        // points could be read.
+        var fastBreakFgm = 0;
+        var breakPutbackFga = 0; var breakPutbackFgm = 0;
+        var nonBreakFga     = 0; var nonBreakFgm     = 0;
+        // Blocks in the SAME three buckets, banked at the one block site further down (both
+        // flags are already in scope there). A two-way break/non-break block line beside a
+        // three-way shot partition would invite the false reading that two rates exhaust every
+        // blocked attempt, so all three are counted.
+        var fastBreakBlk = 0; var breakPutbackBlk = 0; var nonBreakBlk = 0;
+        // Per-slot fast-break blocks — the subset of BlkBySlot taken on a live break that is
+        // not a putback. Feeds the "who gets break blocks" concentration board; the harness
+        // maps slot -> man through the SAME path ordinary blocks already take, so a man's
+        // break blocks can never exceed his blocks.
+        var fastBreakBlkBySlot = new SlotGroup();
         // Session 36: displacement-context bucket counters — read-only observation
         // instrumentation. Every FGA whose state carries a populated
         // ShotDisplacementLevel lands in exactly one of three buckets
@@ -361,7 +399,17 @@ public sealed class Resolver
                           DefensiveRebounderSlot = defensiveRebounderSlot,
                           AstBySlot      = astBySlot,
                           AssistPassFactorSum    = assistPassFactorSum,
-                          AssistPassFactorEvents = assistPassFactorEvents };
+                          AssistPassFactorEvents = assistPassFactorEvents,
+                          TransitionArm          = transitionArm,
+                          FastBreakFgm           = fastBreakFgm,
+                          BreakPutbackFga        = breakPutbackFga,
+                          BreakPutbackFgm        = breakPutbackFgm,
+                          NonBreakFga            = nonBreakFga,
+                          NonBreakFgm            = nonBreakFgm,
+                          FastBreakBlk           = fastBreakBlk,
+                          BreakPutbackBlk        = breakPutbackBlk,
+                          NonBreakBlk            = nonBreakBlk,
+                          FastBreakBlkBySlot     = fastBreakBlkBySlot };
 
                 case Continue c:
                     // Session 62: harvest any non-shooting foul this continuation carries,
@@ -663,15 +711,37 @@ public sealed class Resolver
                                     // rim-forced shots and drag the reported three-rate below
                                     // its true value. The nesting keeps the reconciliation
                                     // 0 ≤ fbThreePm ≤ fbThreePa ≤ fbFga ≤ fga.
+                                    // Session 85 extends this from a single gate to the
+                                    // exhaustive three-way partition: the same fast-break
+                                    // condition is now the first arm of an if/else-if/else,
+                                    // so every FGA lands in exactly one bucket by wiring
+                                    // rather than by three independent conditions that could
+                                    // drift apart. The S38 counters keep their exact prior
+                                    // gate and values.
+                                    var s85Make = shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled;
                                     if (shotSt.FastBreak && !c.Putback)
                                     {
                                         fastBreakFga++;
+                                        if (s85Make) fastBreakFgm++;
                                         if (shotSt.ShotType == ShotLocation.Three)
                                         {
                                             fastBreakThreePa++;
-                                            if (shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled)
+                                            if (s85Make)
                                                 fastBreakThreePm++;
                                         }
+                                    }
+                                    else if (shotSt.FastBreak)
+                                    {
+                                        // Break putback: Roll K forced the zone to Rim, so a
+                                        // break putback three is structurally impossible and
+                                        // no three-point sibling is carried here.
+                                        breakPutbackFga++;
+                                        if (s85Make) breakPutbackFgm++;
+                                    }
+                                    else
+                                    {
+                                        nonBreakFga++;
+                                        if (s85Make) nonBreakFgm++;
                                     }
                                     if (shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled)
                                     {
@@ -735,6 +805,22 @@ public sealed class Resolver
                                         var blkSlot = BlockerPicker.Pick(shotSt, _game, _matchup,
                                                                          _rng, c.Putback).Number;
                                         blkBySlot = blkBySlot.WithSlot(blkSlot, 1);
+
+                                        // Session 85, PAGE-ONLY: the same three-way partition
+                                        // the attempt landed in, applied to the block. The
+                                        // condition is written identically to the attempt
+                                        // partition above so the two can never disagree about
+                                        // which bucket a shot was in. Only the fast-break arm
+                                        // carries a per-slot accumulator — press-born and
+                                        // putback break blocks are a sliver of a sliver, and
+                                        // per-team percentiles on that sample would be noise.
+                                        if (shotSt.FastBreak && !c.Putback)
+                                        {
+                                            fastBreakBlk++;
+                                            fastBreakBlkBySlot = fastBreakBlkBySlot.WithSlot(blkSlot, 1);
+                                        }
+                                        else if (shotSt.FastBreak) breakPutbackBlk++;
+                                        else                       nonBreakBlk++;
 
                                         // PAGE-ONLY tally. A putback has no matched man by
                                         // construction, so it always counts as help.

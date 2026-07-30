@@ -199,7 +199,31 @@ public sealed record PossessionRecord(
     // convention). Never asserted; a sum-and-count pair rather than a mean because a
     // possession can carry more than one eligible make and the roll-up is event-weighted.
     double AssistPassFactorSum = 0.0,
-    int AssistPassFactorEvents = 0);
+    int AssistPassFactorEvents = 0,
+    // Session 85, PAGE-ONLY — the fast-break readout. Appended last with defaults so every
+    // existing positional construction is unaffected (the S62/S84 convention).
+    //
+    // TransitionArm: which arm of Roll J's run-or-not pie opened this possession, or null if
+    // it did not start off a rebound / free-throw rebound / steal. ONE label rather than five
+    // flags, because Roll J runs exactly once per transition entry and never otherwise — so
+    // "the five buckets sum to the transition-entry count" is true by representation.
+    //
+    // The rest is the three-way shot partition — fast break, break putback (a second-chance
+    // shot taken while the break was still live; Roll K's PutBack arm does not clear the flag),
+    // and non-break — with makes and blocked attempts for each. All three are counted
+    // explicitly rather than one being derived by subtraction, so the partition identity is a
+    // real check rather than arithmetic asserting itself. FastBreakBlkBySlot is the per-seat
+    // subset of BlkBySlot for break blocks; its Total equals FastBreakBlk.
+    TransitionOutcome? TransitionArm = null,
+    int FastBreakFgm = 0,
+    int BreakPutbackFga = 0,
+    int BreakPutbackFgm = 0,
+    int NonBreakFga = 0,
+    int NonBreakFgm = 0,
+    int FastBreakBlk = 0,
+    int BreakPutbackBlk = 0,
+    int NonBreakBlk = 0,
+    SlotGroup FastBreakBlkBySlot = default);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -411,6 +435,14 @@ public sealed class Governor
             var possessionAstBySlot = new SlotGroup();
             var possessionAssistPassFactorSum    = 0.0;
             var possessionAssistPassFactorEvents = 0;
+            // Session 85, PAGE-ONLY — the fast-break readout's carriers.
+            TransitionOutcome? possessionTransitionArm = null;
+            var possessionFastBreakFgm    = 0;
+            var possessionBreakPutbackFga = 0; var possessionBreakPutbackFgm = 0;
+            var possessionNonBreakFga     = 0; var possessionNonBreakFgm     = 0;
+            var possessionFastBreakBlk    = 0;
+            var possessionBreakPutbackBlk = 0; var possessionNonBreakBlk     = 0;
+            var possessionFastBreakBlkBySlot = new SlotGroup();
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -543,6 +575,16 @@ public sealed class Governor
                 possessionAstBySlot = outcome.AstBySlot;
                 possessionAssistPassFactorSum    = outcome.AssistPassFactorSum;
                 possessionAssistPassFactorEvents = outcome.AssistPassFactorEvents;
+                possessionTransitionArm       = outcome.TransitionArm;
+                possessionFastBreakFgm        = outcome.FastBreakFgm;
+                possessionBreakPutbackFga     = outcome.BreakPutbackFga;
+                possessionBreakPutbackFgm     = outcome.BreakPutbackFgm;
+                possessionNonBreakFga         = outcome.NonBreakFga;
+                possessionNonBreakFgm         = outcome.NonBreakFgm;
+                possessionFastBreakBlk        = outcome.FastBreakBlk;
+                possessionBreakPutbackBlk     = outcome.BreakPutbackBlk;
+                possessionNonBreakBlk         = outcome.NonBreakBlk;
+                possessionFastBreakBlkBySlot  = outcome.FastBreakBlkBySlot;
             }
 
             periodRemaining -= applied;
@@ -601,7 +643,17 @@ public sealed class Governor
                 possessionFastBreakFga, possessionFastBreakThreePa, possessionFastBreakThreePm,
                 possessionNonShootingFouls,
                 possessionAssistPassFactorSum,
-                possessionAssistPassFactorEvents));
+                possessionAssistPassFactorEvents,
+                possessionTransitionArm,
+                possessionFastBreakFgm,
+                possessionBreakPutbackFga,
+                possessionBreakPutbackFgm,
+                possessionNonBreakFga,
+                possessionNonBreakFgm,
+                possessionFastBreakBlk,
+                possessionBreakPutbackBlk,
+                possessionNonBreakBlk,
+                possessionFastBreakBlkBySlot));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(
