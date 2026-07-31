@@ -54,14 +54,24 @@ public sealed class GameState
     /// foul tracker is required-and-injected because its thresholds vary by config at the
     /// call site; the fatigue meter is defaulted-internally because no site that ignores
     /// fatigue should have to mention it.)</param>
-    public GameState(FoulTracker fouls, ArrowState initialArrow = ArrowState.Off, FatigueTracker? fatigue = null)
+    /// <param name="personalFouls">S87: the per-player personal-foul count and the
+    /// disqualification rule. OPTIONAL and defaulted to a fresh tracker at the standard
+    /// five-and-out threshold, exactly like <paramref name="fatigue"/>, so every existing
+    /// construction site compiles and runs unchanged. Passed on to both rosters, which
+    /// consult it before seating anyone — see <see cref="Roster"/>.</param>
+    public GameState(FoulTracker fouls, ArrowState initialArrow = ArrowState.Off, FatigueTracker? fatigue = null,
+                     PersonalFoulTracker? personalFouls = null)
     {
         Fouls = fouls ?? throw new ArgumentNullException(nameof(fouls));
         PossessionArrow = initialArrow;
+        // S87: the personal-foul tracker is built BEFORE the rosters, because each roster
+        // holds it for the seating guard. GameState is the only place a Roster is
+        // constructed, so this is the one wiring point for that rule.
+        PersonalFouls = personalFouls ?? new PersonalFoulTracker();
         HomeLineup  = new Lineup(TeamSide.Home);
         AwayLineup  = new Lineup(TeamSide.Away);
-        HomeRoster  = new Roster(TeamSide.Home);
-        AwayRoster  = new Roster(TeamSide.Away);
+        HomeRoster  = new Roster(TeamSide.Home, PersonalFouls);
+        AwayRoster  = new Roster(TeamSide.Away, PersonalFouls);
         Fatigue     = fatigue ?? new FatigueTracker(new FatigueConfig());
     }
 
@@ -97,6 +107,12 @@ public sealed class GameState
     /// Constructed empty (no entries until a player first takes the floor). NOTHING reads the
     /// level this session; the athleticism-effect session is its first consumer.</summary>
     public FatigueTracker Fatigue { get; }
+
+    /// <summary>S87: per-player PERSONAL fouls and the five-and-out rule. Game-scoped
+    /// persistent state, like <see cref="Fouls"/> and <see cref="Fatigue"/> — but note it
+    /// is game-scoped where <see cref="Fouls"/> is HALF-scoped: personal fouls survive the
+    /// halftime reset that clears the team counts.</summary>
+    public PersonalFoulTracker PersonalFouls { get; }
 
     /// <summary>Each team's on-court five. Persistent game-scoped state (will
     /// mutate via future subs), one per team. The attachment point the

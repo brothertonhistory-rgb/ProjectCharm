@@ -37,6 +37,10 @@ public sealed class Resolver
     private readonly GameState _game;
     private readonly IRng _rng;
 
+    // S87: the dedicated committer-selection stream. Separate from _rng so foul
+    // attribution can never perturb the gameplay sequence — see the constructor note.
+    private readonly IRng _foulRng;
+
     public Resolver(
         IRollAPieGenerator rollAGenerator,
         RollAConfig rollAConfig,
@@ -57,7 +61,8 @@ public sealed class Resolver
         RollOffensiveFoulGenerator offensiveFoulGenerator,
         MatchupConfig matchup,
         GameState game,
-        IRng rng)
+        IRng rng,
+        IRng? foulRng = null)
     {
         _rollAGenerator = rollAGenerator;
         _rollAConfig = rollAConfig;
@@ -79,7 +84,18 @@ public sealed class Resolver
         _matchup = matchup;
         _game = game;
         _rng = rng;
+        // S87: committer selection draws from its OWN stream, never from _rng. This is
+        // what makes the whole session inert-by-construction: no foul draw can shift the
+        // gameplay sequence by a single number, so with the disqualification threshold
+        // raised out of reach the game replays exactly as it did before S87. A caller
+        // that does not care about foul attribution passes nothing and gets a fixed
+        // stream — deterministic, and equally unable to touch _rng.
+        _foulRng = foulRng ?? new SystemRng(DefaultFoulStreamSeed);
     }
+
+    /// <summary>The foul stream a caller that supplies none falls back to. Fixed rather
+    /// than derived, so an un-seeded harness check is still reproducible run to run.</summary>
+    private const int DefaultFoulStreamSeed = 8787;
 
     /// <summary>
     /// Run ONE whole possession from its start <paramref name="start"/>: route the
@@ -300,6 +316,7 @@ public sealed class Resolver
         // A possession with no shooting foul stays empty; a putback possession can carry two.
         var shootingFouls = new List<ShootingFoulEvent>();
         var nonShootingFouls = new List<NonShootingFoulEvent>();   // Session 62
+        var offensiveFouls   = new List<OffensiveFoulEvent>();     // S87
         while (true)
         {
             if (++iterations > IterationCeiling)
@@ -356,6 +373,36 @@ public sealed class Resolver
                             t.Reason is "BadPassIntercepted" or "LostBallLiveBall";
                         if (turnoverWasLiveBall)
                             stealerSlot = StealerPicker.Pick(t.State, _game, _matchup, _rng).Number;
+                    }
+                    // ── S87: the third foul ledger — offensive fouls ────────────────
+                    // Both kinds count toward the committer's five and NEITHER touches
+                    // the team-foul stream (Emmett's ruling: an offensive foul is charged
+                    // to the man, never the team). No Fouls.Increment appears anywhere in
+                    // this block, and the harness asserts that rather than assuming it.
+                    if (t.Reason == "OffensiveFoul")
+                    {
+                        // The CHARGE family (push-off, illegal screen, player-control),
+                        // reaching here from the entry, the turnover pie, or the rebound
+                        // scrum. The engine has ALREADY named this man immediately above —
+                        // turnoverOffSlot is the selected shooter or the interior picker's
+                        // choice. S87 reuses him rather than inventing a second answer to
+                        // "who charged?", so no new draw is taken and no stream moves.
+                        var chargeSlot = turnoverOffSlot ?? 0;
+                        var chargeMan  = chargeSlot >= 1
+                            ? _game.RosterFor(t.State.Offense).PlayerAt(_game.LineupFor(t.State.Offense).SlotAt(chargeSlot))
+                            : null;
+                        var chargeId = chargeMan?.PlayerId ?? 0;
+                        _game.PersonalFouls.Increment(chargeId);
+                        offensiveFouls.Add(new OffensiveFoulEvent(chargeSlot, chargeId, IsLooseBall: false));
+                    }
+                    else if (t.Reason == "LooseBallFoulOnOffense")
+                    {
+                        // The SCRUM foul — the one foul in the game that landed on nobody
+                        // before S87. Drawn on the same interior weighting the charge uses,
+                        // from the dedicated foul stream.
+                        var lbf = PickLooseBallOffensiveFouler(t.State);
+                        _game.PersonalFouls.Increment(lbf.PlayerId);
+                        offensiveFouls.Add(new OffensiveFoulEvent(lbf.Slot, lbf.PlayerId, IsLooseBall: true));
                     }
                     // Phase 35: defensive-rebound attribution — stamp which defender got it.
                     if (t.Reason == "DefensiveRebound")
@@ -414,6 +461,7 @@ public sealed class Resolver
                           TurnoverWasLiveBall = turnoverWasLiveBall,
                           ShootingFouls  = shootingFouls.ToArray(),
                           NonShootingFouls = nonShootingFouls.ToArray(),
+                          OffensiveFouls   = offensiveFouls.ToArray(),
                           OrbBySlot      = orbBySlot,
                           StealerSlot    = stealerSlot,
                           DefensiveRebounderSlot = defensiveRebounderSlot,
@@ -436,7 +484,20 @@ public sealed class Resolver
                     // before routing on Next. Every foul charge (reach-in A/B/F or situational
                     // I/J/K/M) rides out on a Continue from DefensiveFoulCharge, so this single
                     // point captures them all regardless of the bonus branch taken.
-                    if (c.NonShootingFoul is { } nsf) nonShootingFouls.Add(nsf);
+                    // S87: the charge helper emits the event bare (it is static and draws
+                    // no randomness, and stays that way). The committer is named HERE —
+                    // the one point where the foul, the live game and the defense are all
+                    // in hand — and the man is charged his fifth.
+                    if (c.NonShootingFoul is { } nsf)
+                    {
+                        var nsCommitter = PickNonShootingFouler(c.State.Defense, nsf.IsReachIn);
+                        _game.PersonalFouls.Increment(nsCommitter.PlayerId);
+                        nonShootingFouls.Add(nsf with
+                        {
+                            CommitterSlot     = nsCommitter.Slot,
+                            CommitterPlayerId = nsCommitter.PlayerId
+                        });
+                    }
                     switch (c.Next)
                     {
                         // Roll A's clean entry -> execute Roll B, loop.
@@ -992,9 +1053,23 @@ public sealed class Resolver
                             // ran) — 0 is the "no matched man" sentinel, NOT a throw, because
                             // a bonus-FT-putback shot is a legitimate game path. The ?? 0
                             // here matches the existing Phase 23 FTA/FTM slot reads below.
-                            shootingFouls.Add(new ShootingFoulEvent(
-                                c.State.ShotType!.Value,
-                                c.State.SelectedSlot?.Number ?? 0));
+                            // S87: name the man AT THE WHISTLE and charge his fifth. The
+                            // draw is the Session 62 weighting moved here unchanged; it
+                            // runs on the dedicated foul stream, so the gameplay sequence
+                            // below this line is untouched.
+                            {
+                                var shooterSlotForFoul = c.State.SelectedSlot?.Number ?? 0;
+                                var sfCommitter = PickShootingFouler(
+                                    c.State.Defense, c.State.ShotType!.Value, shooterSlotForFoul);
+                                _game.PersonalFouls.Increment(sfCommitter.PlayerId);
+                                shootingFouls.Add(new ShootingFoulEvent(
+                                    c.State.ShotType!.Value,
+                                    shooterSlotForFoul)
+                                {
+                                    CommitterSlot     = sfCommitter.Slot,
+                                    CommitterPlayerId = sfCommitter.PlayerId
+                                });
+                            }
                             // Session 40: a shooting foul is a defensive team foul like any
                             // other — it counts toward the opponent's bonus. Non-shooting
                             // fouls already do this via DefensiveFoulCharge (the sole other
@@ -1227,4 +1302,98 @@ public sealed class Resolver
             $"ResolveShootingFreeThrows reached with a non-shooting-foul result " +
             $"'{state.Result}' (zone '{state.ShotType}').")
     };
+
+    // ═════════════════════════════════════════════════════════════════════════════
+    // S87 — COMMITTER SELECTION. Every whistle names a man, at the whistle.
+    //
+    // The three helpers below decide WHO committed each kind of foul. Two of them are
+    // the Session 62 attribution draws moved house VERBATIM — same weight tables, same
+    // interior proxy, same reach-in propensity, same cumulative walk. The foul
+    // DISTRIBUTION keeps its exact character; what changes is that the answer is now
+    // decided while the game is running (and can therefore have consequences) instead
+    // of being re-drawn afterwards over a reconstructed lineup.
+    //
+    // All three draw from _foulRng, never _rng. The third kind — the offensive foul —
+    // is handled at its terminal and mostly needs no draw at all, because the engine
+    // already names the man who commits a charge.
+    // ═════════════════════════════════════════════════════════════════════════════
+
+    /// <summary>The occupied seats of <paramref name="side"/> right now — the men and the
+    /// slot numbers they sit in, as two parallel lists. Empty only on the degenerate
+    /// harness path where a foul node is driven against a game with no roster seated.</summary>
+    private (List<Player> Men, List<int> Slots) OccupiedSeats(TeamSide side)
+    {
+        var lineup = _game.LineupFor(side);
+        var roster = _game.RosterFor(side);
+        var men    = new List<Player>(5);
+        var slots  = new List<int>(5);
+        for (var s = 1; s <= 5; s++)
+        {
+            var p = roster.PlayerAt(lineup.SlotAt(s));
+            if (p != null) { men.Add(p); slots.Add(s); }
+        }
+        return (men, slots);
+    }
+
+    /// <summary>WHO FOULED THE SHOOTER — <see cref="FoulCommitter"/>'s shooting draw over
+    /// the defense's occupied seats, on the dedicated foul stream.</summary>
+    private (int Slot, int PlayerId) PickShootingFouler(TeamSide defense, ShotLocation zone, int shooterSlot)
+    {
+        var (men, slots) = OccupiedSeats(defense);
+        if (men.Count == 0) return DegenerateNoOneOnFloor();
+
+        var idx = FoulCommitter.CumulativeDraw(
+            FoulCommitter.ShootingWeights(men, slots, zone, shooterSlot), _foulRng);
+        return (slots[idx], men[idx].PlayerId);
+    }
+
+    /// <summary>WHO REACHED IN — <see cref="FoulCommitter"/>'s non-shooting draw over the
+    /// defense's occupied seats, on the dedicated foul stream.</summary>
+    private (int Slot, int PlayerId) PickNonShootingFouler(TeamSide defense, bool isReachIn)
+    {
+        var (men, slots) = OccupiedSeats(defense);
+        if (men.Count == 0) return DegenerateNoOneOnFloor();
+
+        var idx = FoulCommitter.CumulativeDraw(
+            FoulCommitter.NonShootingWeights(men, isReachIn, _matchup), _foulRng);
+        return (slots[idx], men[idx].PlayerId);
+    }
+
+    /// <summary>
+    /// WHO WAS IN THE SCRUM. The committer of a loose-ball foul on the OFFENSE — the shove
+    /// or hook fighting for a rebound, which before S87 was the one foul in the game that
+    /// landed on nobody at all.
+    ///
+    /// <para>Emmett's ruling: the men in the scrum, not the guard standing at the top of
+    /// the key. So it reuses the interior weighting the engine already applies to a charge
+    /// (<see cref="TurnoverInteriorPicker"/>) rather than inventing a second, disagreeing
+    /// answer to "who commits an offensive foul". The draw runs on the foul stream, so the
+    /// picker's usual draw from the gameplay stream is NOT taken here.</para>
+    /// </summary>
+    private (int Slot, int PlayerId) PickLooseBallOffensiveFouler(PossessionState state)
+    {
+        var (men, _) = OccupiedSeats(state.Offense);
+        if (men.Count == 0) return DegenerateNoOneOnFloor();
+
+        var slot = TurnoverInteriorPicker.Pick(state, _game, _matchup, _foulRng);
+        var p    = _game.RosterFor(state.Offense).PlayerAt(slot);
+        return (slot.Number, p?.PlayerId ?? 0);
+    }
+
+    /// <summary>
+    /// The degenerate case: a foul resolved with ZERO seats occupied. Harness-only — it
+    /// arises when a check drives a foul node directly against a game whose rosters were
+    /// never seated. No real game path reaches it (every season and full-game path seats
+    /// all ten men before the tip), which the harness asserts rather than assumes.
+    ///
+    /// <para>Records a slot so the ledger still has a shape, a PlayerId of 0 meaning "no
+    /// man", and charges nobody — there is no one on the floor to charge. Consumes one
+    /// draw from the foul stream so the stream's position does not depend on whether a
+    /// roster happened to be seated.</para>
+    /// </summary>
+    private (int Slot, int PlayerId) DegenerateNoOneOnFloor()
+    {
+        var slot = 1 + (int)(_foulRng.NextUnitInterval() * 5.0);
+        return (Math.Clamp(slot, 1, 5), 0);
+    }
 }

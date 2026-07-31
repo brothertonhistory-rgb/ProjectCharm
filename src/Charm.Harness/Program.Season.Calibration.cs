@@ -152,6 +152,27 @@ internal static partial class Program
         // standard box-score possession-share proxy.
         public long SflTotal, NsfTotal;
 
+        // ── S87, PAGE-ONLY: the foul-out layer ───────────────────────────────────
+        //  FoulOuts            — men who reached the disqualification threshold, per game.
+        //  OffFoulTotal        — offensive fouls charged to a man. NEW: before S87 these
+        //                        reached no foul count at all. Reported SEPARATELY from
+        //                        the shooting/non-shooting line, because they never touch
+        //                        the team-foul stream and so are not part of the
+        //                        fouls/team/game figure that line reports.
+        //  PfBucket[0..5]      — the personal-foul spread, 0/1/2/3/4/5+, over player-GAMES
+        //                        in which the man occupied a floor seat for at least one
+        //                        possession. Same floor-time convention the stat page
+        //                        already uses, so the 1,025 men who never played a minute
+        //                        cannot flood the zero bucket.
+        //  R4Occurrences       — men the escape hatch stranded: disqualified, no eligible
+        //                        reserve, left on the floor. Counted once per man.
+        //  PossPlayedWhileDq   — trips played by a man already disqualified. Non-zero from
+        //                        the escape hatch and from the one trip a man finishes
+        //                        after his fifth foul.
+        //  FoulOutReplacements — forced replacements the rotation actually made.
+        public long FoulOuts, OffFoulTotal, R4Occurrences, PossPlayedWhileDq, FoulOutReplacements;
+        public readonly long[] PfBucket = new long[6];
+
         //  S77: the engine's OWN unattributed buckets, carried so Gate 1 can be an EXACT
         //  identity rather than a tolerance. A possession can produce a field-goal attempt that
         //  belongs to no slot (`SlotUnattributedFga/Fgm`, stamped by the Resolver) and a bonus
@@ -454,6 +475,41 @@ internal static partial class Program
             XPossessionRecords += records.Count;
         }
 
+        /// <summary>
+        /// S87, PAGE-ONLY: the foul-out layer for one game. Reads the tracker that actually
+        /// ran and the policy that actually enforced the rule — nothing here re-derives a
+        /// decision from the records, because a second implementation of the rule is a
+        /// second chance to disagree with it.
+        ///
+        /// <para>The personal-foul spread is over men who OCCUPIED A FLOOR SEAT for at
+        /// least one possession, which the roster's substitution log answers exactly: every
+        /// man who ever held a seat has an entry, and no one else does. A man who dressed
+        /// and never played is not a zero — he is not in the distribution at all.</para>
+        /// </summary>
+        public void AccumulateFouling(GameState game, GovernorRunResult result, MinutesAllocatorPolicy policy)
+        {
+            var pf = game.PersonalFouls;
+
+            foreach (var side in new[] { TeamSide.Home, TeamSide.Away })
+            {
+                var seen = new HashSet<int>();
+                foreach (var entry in game.RosterFor(side).Log)
+                {
+                    var id = entry.Player.PlayerId;
+                    if (!seen.Add(id)) continue;                 // one player-game per man
+
+                    var n = pf.CountFor(id);
+                    PfBucket[Math.Min(n, 5)]++;
+                    if (pf.IsDisqualified(id)) FoulOuts++;
+                }
+
+                var st = policy.StateFor(side);
+                R4Occurrences       += st.R4Occurrences;
+                PossPlayedWhileDq   += st.PossessionsPlayedWhileDisqualified;
+                FoulOutReplacements += st.FoulOutReplacements;
+            }
+        }
+
         public void Accumulate(GameState game, GovernorRunResult result, PlayerBoxTotals box,
                                SeasonGameIdentity identity)
         {
@@ -488,6 +544,7 @@ internal static partial class Program
                 // totals still balanced. The tell was `n=3470` player-seasons on a 4,511-player
                 // league: (i % 10) can only ever produce ten distinct slots.
                 SflTotal += box.ShFoul[i]; NsfTotal += box.NsFoul[i];
+                OffFoulTotal += box.OffFoul[i];
                 var school = i < RosterShape.Size ? homeSchoolId : awaySchoolId;
                 var slot = (i % RosterShape.Size) + 1;
                 var pk = (school, slot);
@@ -1199,6 +1256,31 @@ internal static partial class Program
         Console.WriteLine(Inv($"  PPP (points / possession records)      {ppp:F4}"));
         Console.WriteLine(Inv($"  fouls/team/game (full game)            {(s.SflTotal + s.NsfTotal) / g2:F2}") +
                           Inv($"   [shooting {s.SflTotal / g2:F2} | non-shooting {s.NsfTotal / g2:F2}]"));
+
+        // ── S87 (page-only, never asserted) — the foul-out layer ────────────────────
+        // The line above is TEAM fouls: shooting + non-shooting, the two that feed the
+        // bonus. Offensive fouls are reported separately and deliberately are NOT added
+        // into it — they are charged to the man and never to the team, so folding them in
+        // would misstate the bonus-relevant number.
+        Console.WriteLine(Inv($"  offensive fouls/team/game              {s.OffFoulTotal / g2:F2}") +
+                          "   (charged to the MAN only — no team foul, no bonus)");
+        Console.WriteLine(Inv($"  foul-outs per team-game                {s.FoulOuts / g2:F3}"));
+        {
+            var seated = 0L;
+            foreach (var b in s.PfBucket) seated += b;
+            if (seated > 0)
+            {
+                Console.WriteLine(Inv($"  personal fouls per player-game (n={seated:N0} men who played a possession):"));
+                var labels = new[] { "0", "1", "2", "3", "4", "5+" };
+                var row = "    ";
+                for (var i = 0; i < 6; i++)
+                    row += Inv($"{labels[i]} {100.0 * s.PfBucket[i] / seated,5:F1}%  ");
+                Console.WriteLine(row);
+            }
+        }
+        Console.WriteLine(Inv($"  escape hatch — men left on floor        {s.R4Occurrences}") +
+                          Inv($"  | trips played while disqualified {s.PossPlayedWhileDq}") +
+                          Inv($"  | forced replacements {s.FoulOutReplacements}"));
 
         // Usage spread: (FGA + 0.44·FTA + TO) / same team total, per player-season.
         var usages = new List<double>();

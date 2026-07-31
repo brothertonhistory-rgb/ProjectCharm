@@ -515,7 +515,7 @@ internal static partial class Program
             var identity = new SeasonGameIdentity(
                 sg.HomeId, sg.AwayId,
                 rowsBySchool[sg.HomeId], rowsBySchool[sg.AwayId], sideHome, sideAway);
-            var (game, result, attributed) = RunSingleGenGame(
+            var (game, result, attributed, policy) = RunSingleGenGame(
                 cfgs, sideHome, sideAway, TeamSide.Home, TeamSide.Away,
                 resolverSeed: unchecked(baseSeed + 2 * g),
                 governorSeed: unchecked(baseSeed + 2 * g + 1));
@@ -523,6 +523,9 @@ internal static partial class Program
             // Session 31: keep the attribution the loop used to discard and feed the
             // calibration accumulator. Nothing else about the loop changes.
             league.Accumulate(game, result, attributed, identity);
+            // S87: the foul-out layer — read from the tracker that ran and the policy that
+            // enforced it, never re-derived.
+            league.AccumulateFouling(game, result, policy);
 
             // S75: cross-position occupancy. Seat position is the seat's STARTER's
             // position and is fixed for the game (SlotPos), so it is read straight off

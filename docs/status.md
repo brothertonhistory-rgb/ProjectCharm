@@ -22,6 +22,17 @@ Last updated: **Session 86** (2026-07-30; THE COACH BECAME A GATE. Roll J's run-
 clean (4,511/4,511 drafted; 347/347 exact rosters; 347/347 protected coverage). Every calibration
 session diffs against that page, never against memory.
 
+**★ S87 moved PPP 0.9719 → 0.9710 and NOTHING else outside the foul columns.** Team fouls, turnovers,
+rebounds and assists are unchanged to the digit; the whole delta is tellable as *someone fouled out and a
+different man played*. Credit identity `7382110 / 738211 = 10.0`, dropped 0; every reconciliation at
+residual 0. **The per-player SFL/NSF columns will not match any pre-S87 run and cannot be expected to** —
+those were drawn post-hoc, in a different order, over a rebuilt lineup. Three new page lines, all
+page-only: `offensive fouls/team/game 1.54` (charged to the MAN only — deliberately NOT folded into the
+17.95, which is the bonus-relevant number), `foul-outs per team-game 0.840`, and the personal-foul spread
+over the 105,823 men who played a possession — **0 21.2% · 1 24.6% · 2 21.3% · 3 15.5% · 4 9.1% · 5+ 8.3%**.
+The escape hatch fired zero times; forced replacements 8,507 against 8,507 trips played while
+disqualified (exactly one each — the known finish-the-trip gap, measured rather than estimated).
+
 **S84 added a second reference line to the page, and it is the drift alarm for the assist door:**
 `lineup passing factor applied: league mean 0.9994 over 237989 assist-eligible makes` /
 `by team (n=347): min 0.8583 p10 0.9257 median 0.9991 p90 1.0678 max 1.1474`. Read BOTH — the league
@@ -58,6 +69,28 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S87 — REAL FOULS: THE COMMITTER MOVED TO THE WHISTLE, AND FIVE OF THEM SIT A MAN DOWN.**
+  Foul attribution left the post-hoc harness pass and entered the engine at the moment of the whistle —
+  the point being that a foul decided after the final buzzer cannot change who is on the floor.
+  `PersonalFoulTracker` hangs off `GameState` (game-scoped, **not** the half-scoped `FoulTracker`, which
+  would forgive first-half fouls at the break), counts are **uncapped** (the escape hatch makes 6 and 7
+  reachable), and `FoulOutThreshold` lives in `RollDConfig` beside the bonus thresholds. `FoulCommitter`
+  is a new engine unit holding the **Session 62 weightings verbatim** — moved, not tuned, including S62's
+  own flagged `InteriorTiltScale = 40.0` debt. A third ledger, `OffensiveFoulEvent`, closes the gap where
+  an offensive foul reached no foul count at all. The disqualification guard sits on the **SEAT**
+  (`Roster`, injected by `GameState`, the only place a roster is constructed) rather than in the
+  substitution policy, so no present or future policy can re-insert a fouled-out man.
+  `MinutesAllocatorPolicy.ForceFoulOutReplacements` runs ahead of the ordinary move, keeps positional and
+  legal-lineup rules, drops the minutes plan / minimum stint / one-move limit, and **ignores the dead-ball
+  gate** (Emmett's S87 ruling). **Phase 78** adds twenty checks, no basketball target among them: S62
+  parity at 400,000 draws with zero mismatches *plus* a guard that the zone tilt still flips; totality;
+  seat-and-team conservation on all three ledgers with a hand-built wrong-team **negative control**;
+  reset-proof positive-delta reconciliation with the offensive-foul residual asserted at exactly zero;
+  stateful accumulation across the threshold (§2a); and **inert-mode isolation with its discriminating
+  half** (vary only the foul seed → everything pre-S87 bit-identical AND the committer columns *do* move).
+  Three rulings taken mid-session that the cleared prompt did not contain — see C-33, C-34, C-35.
+  Opened O-64, O-65, O-66.
 
 - **★ S86 — THE TRANSITION OPPORTUNITY SCORE AND THE COACH BAR. The first dial the S85 readout was built to grade.**
   `escape` (the ball-winner's better route counting fully, his second a third as much, renormalised) + `race`
@@ -194,6 +227,33 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
+- **O-64 — ★ FOUL CONCENTRATION: the rate is right, the spread is not (S87 finding).** Foul-outs run
+  **0.840 per team-game** against roughly 0.4 in real college basketball, and **8.3% of player-games end
+  at five or more** where an even spread of 17.95 fouls over the ten men who play would predict ~3%. The
+  foul RATE did not move a hundredth at S87 — what the session revealed is that the committer weighting
+  concentrates blame considerably more sharply than chance, on bad-discipline guards and on whichever big
+  is guarding the rim. This is a calibration question about the *sharpness* of `FoulCommitter`'s
+  weightings (matched share by zone, the interior tilt, the reach-in propensity spread), NOT about the
+  team foul rate, which is correct. Also folds in S62's carried-over `InteriorTiltScale = 40.0` debt (the
+  Anchor takes ~58% of the rim residual against ~37% estimated at draft time). **The natural S88.**
+- **O-65 — The whistle-level substitution door (S87, sized and deferred).** Every foul stops play and a
+  disqualified man should leave at that whistle; the engine's only substitution seam is BETWEEN trips, so
+  he finishes the trip he fouled out on. Measured cost: **8,507 replacements, 8,507 trips played while
+  disqualified — exactly one each.** Two sizes, both real. *Cheap (~one session):* the swap is nearly free
+  because generators read the current seat occupant, but the resolver has no idea a coach exists and is
+  built at 43 sites; it would leave that one trip's box score on the man who left. *Honest
+  (multi-session, foundational):* splitting a trip changes the unit every board is counted in —
+  `Roster.PlayerAt(slot, possessionNumber)` is the spine of the per-player layer. Do not attempt the
+  honest version as a corner of another session.
+- **O-66 — The per-game seed map wants a real derivation (S87).** Small offsets off `resolverSeed` have
+  reached +5. A grep proves each literal offset is unused; the **arithmetic does not** — season games are
+  seeded two apart, so game *g*'s +5 stream starts on the same number as game *g+2*'s governor stream, and
+  the same overlap already exists for the +3/+4 attribution streams. No new bug class and nothing is
+  mis-conserved, but a hash-based derivation should land before the map grows again.
+- **O-67 — The offensive-foul column is populated but printed in only one place (S87).**
+  `PlayerBoxTotals.OffFoul` is accumulated, reproducibility-checked, and reported on the season page. The
+  **observation and stress per-player box scores still print SFL/NSF only**, so a charge is invisible in
+  the two printers most used for eyeballing a player. Small; belongs with any foul work.
 - **O-1 — Intent-vs-touches ruling (S60).** The usage curve pays on the offense's intended
   share, pre-tilt/pre-denial; the denied big earns nothing. Rule this before touching the
   relief scale, or the scale absorbs the error.
@@ -698,6 +758,26 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-33 — AN OFFENSIVE FOUL COUNTS TOWARD THE MAN'S FIVE, AND NEVER TOUCHES THE TEAM (Emmett's ruling,
+  S87 check-in).** The cleared prompt accounted for only ONE offensive foul — the loose-ball shove in the
+  rebound scrum, 0.38/game — and planned a new Discipline-alone draw for it. The check-in found three more
+  sources (Roll A's entry, Roll C's turnover pie at 6.8% of the halfcourt shares, Roll K's scrum) all
+  landing on the `OffensiveFoul` terminal at ~1.5 per team per game, **and** found that `Resolver.cs` has
+  named the man who commits a charge since **Phase 34** via `TurnoverInteriorPicker` — recorded as a
+  turnover, reaching no foul count. Emmett ruled charges count toward five and that S87 reuses the
+  already-named man, so the charge bucket consumes no new randomness. Do NOT add a second rule for who
+  commits an offensive foul; there is one answer and it is the turnover picker's.
+- **C-34 — THE SCRUM FOUL IS ON THE MEN IN THE SCRUM (Emmett's ruling, S87).** The loose-ball foul on the
+  offense draws on the same interior weighting a charge uses — post-weighted, guard-floored — not on
+  discipline spread across all five, which would put real weight on the guard standing at the top of the
+  key. This is deliberately the same rule as C-33 rather than a sibling of the reach-in draw.
+- **C-35 — A FOUL-OUT REPLACEMENT DOES NOT WAIT FOR A DEAD BALL, AND THE MAN FINISHES HIS TRIP (Emmett's
+  ruling, S87).** Forced replacement runs ahead of the ordinary rotation move and ignores the `isDeadBall`
+  gate, so a foul-out no longer waits when the next trip starts on the run. Selection is *best available
+  man at that position* — positional and legal-lineup rules kept, minutes plan and minimum stint dropped.
+  The remaining gap (he finishes the trip his fifth foul landed in) is **accepted and bounded at exactly
+  one trip**, not a defect to fix in passing; closing it properly is O-65. Two men reaching five at the
+  same whistle is **not a design case** — one whistle, one man (Emmett corrected this framing directly).
 - **C-32 — TRANSITION DEFENCE IS A REAL EFFECT SET, AND IT GETS AN INSTRUMENT BEFORE A DIAL (Emmett's ruling,
   S84 design conversation 2026-07-29; recorded at S85 because it had never reached this board or the journal).**
   Four effects ruled: speed should take a larger role in push/settle than the athleticism aggregate alone; four
@@ -794,10 +874,19 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**NONE SELECTED.** S86 shipped the first three of C-32's four effects at the push/settle door and opened
-O-61, O-62, O-63.
+**NONE SELECTED.** S87 made fouls real — every whistle names a man, five sit him down — and opened
+O-64, O-65, O-66, O-67.
 
-**★ O-57 is now the clear front-runner, and S86 is the reason.** The bar exists, it works, and **not one team in
+**★ O-64 is the natural S88, and S87 is the reason.** Fouls only just acquired consequences, and the first
+thing the consequence exposed is that the RATE is right and the CONCENTRATION is not: 17.95 fouls a team a
+game did not move a hundredth, yet 8.3% of player-games end at five or more against a ~3% even-spread
+expectation, and foul-outs run 0.840 per team-game against roughly 0.4 in the real game. This is exactly the
+kind of finding that could not be seen before — a post-hoc column has no consequences to look wrong — and it
+is a *sharpness* question about `FoulCommitter`'s weightings, not a question about the team foul rate. It
+also finally settles S62's carried-over `InteriorTiltScale` debt, which has been flagged in design.md since
+Session 62 and deliberately not touched by S87.
+
+**★ O-57 remains the standing front-runner for the wider arc.** The bar exists, it works, and **not one team in
 the country moves it** — all 347 schools play on the compiled default 5/5/5, so every bar is the neutral 0.475 and
 the entire 29.26pp push spread comes from rosters alone. S86 built the single lever a coaching brain would pull and
 left it bolted down. The archetype tables' pace columns are proven only by Phase 77, which sets `PaceBias`
@@ -814,6 +903,9 @@ break. O-48 is its own session by Emmett's earlier ruling.
 
 The standing candidates are otherwise unchanged: **O-40** (block-rate calibration, blocks 4.4 against a 3.5
 target), **O-42** (lineup shape), **O-43** (the on-ball blend), **O-45** (the half-finished S78 engine half),
+**O-65** (the whistle-level substitution door — read its two sizings before scheduling it; the honest version
+is a foundation change and must not be attempted as a corner of another session), **O-67** (the offensive-foul
+column missing from two printers — smallest item on the board and it belongs with any foul work),
 **O-49/O-50** (the opportunity floor on rare-event boards; shot diet), **O-54/O-55/O-56** (S83's three), **O-58**
 (the re-stamp ritual's recurring cost), **O-59** (the stale break sentinel — smallest item on the board, and it
 belongs with any transition work), **O-61/O-62/O-63** (S86's three), and the **player generator's finishing

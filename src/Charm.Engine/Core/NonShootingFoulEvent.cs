@@ -19,9 +19,34 @@ namespace Charm.Engine;
 /// Discipline factor alone (<see cref="Matchup.ReachInDisciplineFactor"/>), since
 /// the perimeter lean is meaningless in a rebound scrum or a transition bump.</para>
 ///
-/// <para>The committer is NOT chosen here — like the shooting-foul path, the draw
-/// happens post-hoc in the harness attribution pass over the five defenders who
-/// were on the floor at this possession. This event only records that a
-/// non-shooting foul occurred and which weighting applies.</para>
+/// <para><b>The committer is not chosen at the charge site.</b>
+/// <see cref="DefensiveFoulCharge.Resolve"/> is static and RNG-free and stays that way
+/// — it emits this event bare, carrying only <see cref="IsReachIn"/>. The resolver
+/// ENRICHES it with the committer at the single point where every such event is
+/// harvested off its continuation, which is the one place the foul stream, the live
+/// game and the defense are all in hand at once. So the charge helper keeps its exact
+/// signature and its "consumes no randomness" contract, and every existing check that
+/// drives it directly is untouched.</para>
 /// </summary>
-public readonly record struct NonShootingFoulEvent(bool IsReachIn);
+public readonly record struct NonShootingFoulEvent(bool IsReachIn)
+{
+    /// <summary>
+    /// S87: the DEFENDING seat that committed this foul, drawn at the whistle by the
+    /// resolver on its dedicated foul stream, using the weighting <see cref="IsReachIn"/>
+    /// selects. 1–5 and occupied on every real game path.
+    ///
+    /// <para>Init-only with a 0 default, so the charge helper's existing construction
+    /// (<c>new NonShootingFoulEvent(IsReachIn: …)</c>) stays valid and the enrichment is
+    /// a <c>with</c>-expression at the harvest point — a pure append, the same seam
+    /// pattern <see cref="RoutingOutcome"/> uses.</para>
+    /// </summary>
+    public int CommitterSlot { get; init; }
+
+    /// <summary>
+    /// S87: the PlayerId of the man in <see cref="CommitterSlot"/> at the moment of the
+    /// whistle. Carried alongside the seat because the personal-foul count is keyed by
+    /// player, and the seat can change hands later in the game. 0 is the degenerate
+    /// harness-only "no one on the floor" sentinel.
+    /// </summary>
+    public int CommitterPlayerId { get; init; }
+}

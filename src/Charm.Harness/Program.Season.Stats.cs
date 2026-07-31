@@ -324,8 +324,9 @@ internal static partial class Program
                     Inv($"{r.PerGame(r.To),4:F1}  {fg,5:F1}% {tp,5:F1}% {ft,5:F1}%  ") +
                     Inv($"{r.PerGame(r.ShFoul),5:F1} {r.PerGame(r.NsFoul),5:F1}"));
             }
-            Console.WriteLine("    (* sfl/nsf are POST-HOC HARNESS DRAWS, not a record of who committed a foul —");
-            Console.WriteLine("       the committer is allocated by weight in AttributeGame, not chosen by the engine.)");
+            Console.WriteLine("    (* S87: sfl/nsf are now a RECORD of who committed the foul — the engine names");
+            Console.WriteLine("       the man at the whistle. They no longer agree with any pre-S87 run's columns,");
+            Console.WriteLine("       which were drawn afterwards, in a different order, over a rebuilt lineup.)");
         }
         else
         {

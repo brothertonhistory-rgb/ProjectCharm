@@ -25,6 +25,18 @@ public sealed class RollDConfig
     /// <summary>Team-foul count at which the opponent enters the double bonus.</summary>
     public int DoubleBonusThreshold { get; set; } = 10;
 
+    // --- S87: the PERSONAL-foul disqualification threshold. Lives beside the bonus
+    //     thresholds because they are the same kind of number — a foul count that
+    //     changes what the game does — even though they run on different clocks
+    //     (team fouls reset at the half; personal fouls are game-scoped). ---
+
+    /// <summary>Personal-foul count at which a player is disqualified. NCAA classic: 5.
+    /// Validated at <see cref="PersonalFoulTracker"/> construction (must be at least 1).
+    /// Setting this very large is the INERT MODE used by the regression check — no
+    /// separate flag: nobody reaches the threshold, so nothing is ever replaced and the
+    /// game replays exactly as it did before S87.</summary>
+    public int FoulOutThreshold { get; set; } = PersonalFoulTracker.DefaultFoulOutThreshold;
+
     /// <summary>Tolerance for the flavor-pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 

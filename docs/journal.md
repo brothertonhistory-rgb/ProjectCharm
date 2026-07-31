@@ -1,3 +1,114 @@
+## Session 87 — EVERY WHISTLE NAMES A MAN, AND FIVE OF THEM PUT HIM ON THE BENCH. Foul attribution moved out of a post-hoc harness pass and into the engine at the moment of the whistle, which is the whole point: a foul that is decided after the game is over cannot have consequences, and a foul that is decided while the game is running can. Personal fouls are now game-scoped per-player state on `GameState` (`PersonalFoulTracker`, alongside `Fatigue` — deliberately NOT on the half-scoped `FoulTracker`, which would forgive everyone's first-half fouls at the break), a fifth foul disqualifies, and the rotation pulls the man at the next trip. **The Session 62 weightings were MOVED, not tuned — same zone tables, same interior proxy, same reach-in propensity, same one-draw-per-foul cost — and Phase 78 proves it by driving the new engine unit and the surviving S62 reference from identically-seeded streams and comparing the chosen seat draw for draw: 400,000 draws, zero mismatches.** ★ THE RULING THAT RESHAPED THE BUILD: the prompt found only ONE offensive foul — the loose-ball shove in the rebound scrum, 0.38 a game — and planned a brand-new Discipline-alone draw for it. The check-in found three more sources (the entry, the turnover pie, the offensive-rebound scrum) all landing on the same `OffensiveFoul` terminal at roughly **1.5 per team per game, four times the population**, and, more importantly, found that **the engine has already named the man who commits a charge since Phase 34** via `TurnoverInteriorPicker` — it was recorded as a turnover, never as a foul. Emmett ruled charges count toward five, and ruled the scrum foul uses the SAME interior weighting rather than the prompt's discipline spread ("men in the scrum"), so the engine now has ONE answer to "who committed an offensive foul" instead of two that disagree, and the charge bucket needed no new draw at all. ★ THE SECOND RULING came from Emmett correcting a bad framing: asked whether two men fouling out at one whistle should both leave, he answered *"How can two men foul at the same time?"* — correct, one whistle one man — and *"every foul results in play stoppage, and a fouled out player would leave immediately."* Also correct, and the engine cannot honour it: **the only substitution seam is BETWEEN trips**, so a below-bonus reach-in stops play, resumes the inbound, and continues the same possession with no door open. The gap was measured and bounded rather than papered over (8,507 forced replacements, 8,507 trips played by a disqualified man — **exactly one each**), the whistle-level door was sized honestly at one session for the cheap version and a multi-session foundation change for the honest one, and Emmett took the free half: a foul-out replacement now happens at the next trip **regardless of whether the ball is live**, which kills the extra-trip case entirely. ★ THE FINDING: foul-outs run **0.84 per team-game** — the rate is untouched (17.95 fouls/team/game, unchanged to the hundredth) but the CONCENTRATION is high. 8.3% of player-games end at five or more where an even spread over the ten men who play would predict ~3%. Named for S88, not chased. **One honest miss recorded below** (an off-by-one in my own check, caught before delivery). Opened O-64, O-65, O-66. Suite `ALL CHECKS PASSED` and season green on Emmett's machine, byte-identical to the sandbox on every Phase 78 figure. (2026-07-30)
+
+**Register:** build, under `PROMPT-real-fouls-s87-r3`, with two rulings taken mid-session that the ChatGPT-cleared prompt did not contain. Three new engine files, one new suite phase, one config dial, twenty-one files changed. Nine of nine predicted season figures landed; twenty of twenty Phase 78 lines green first time on Emmett's machine.
+
+### The shape that shipped
+
+Three foul ledgers on the possession record, where there were two:
+
+```
+ShootingFoulEvent    + CommitterSlot, CommitterPlayerId    drawn at the whistle, FoulCommitter.ShootingWeights
+NonShootingFoulEvent + CommitterSlot, CommitterPlayerId    drawn at the whistle, FoulCommitter.NonShootingWeights
+OffensiveFoulEvent   (NEW)  CommitterSlot, CommitterPlayerId, IsLooseBall
+```
+
+`FoulCommitter` is a new public static engine unit holding the S62 weight math and its draw. It exists as a named unit rather than as private resolver methods for one reason: **the parity check has to be able to drive THIS code.** A check that re-implemented the weights would only ever prove a formula equals itself.
+
+`PersonalFoulTracker` hangs off `GameState` as an optional constructor parameter defaulting to a fresh instance — the `FatigueTracker` pattern exactly — so no existing construction site changed. Counts are **never capped**: the escape hatch means six and seven are reachable and the record has to say so, which is why the season page's bucket is `5+` rather than `5`.
+
+### ★ THE CHARGE: four sources, and the man was already named
+
+The prompt's §3.2 accounted for `LooseBallFoulOnOffense` from Rolls I and M and nothing else. The source audit found:
+
+| source | reaches the walk as | frequency |
+|---|---|---|
+| Roll A entry | `ContinuationKind.ResolveOffensiveFoul` → `OffensiveFoul` terminal | small |
+| Roll C turnover pie | `OffensiveFoul` terminal, 6.8% of the halfcourt pie | the bulk |
+| Roll K offensive-rebound scrum | `OffensiveFoul` terminal | small |
+| Rolls I / M | `LooseBallFoulOnOffense` terminal | 0.38/game |
+
+`Resolver.cs:340` has read `t.Reason is "ThreeSecondViolation" or "OffensiveGoaltending" or "OffensiveFoul"` since Phase 34 and stamped `TurnoverOffSlot` from `SelectedSlot ?? TurnoverInteriorPicker.Pick(...)`. **The man who commits a charge has been named, engine-side, for fifty sessions — as a turnover, reaching no foul count.**
+
+So the ruling made the work smaller, not larger: the charge bucket reuses `turnoverOffSlot` and consumes **no new randomness at all**. Only the scrum foul needed a draw, and Emmett ruled it onto the same `TurnoverInteriorPicker` weighting. Season result: **1.54 offensive fouls per team per game**, reported on its own page line and deliberately NOT folded into the `fouls/team/game` figure, because they never touch the team counter and folding them in would misstate the bonus-relevant number.
+
+### ★ WHY THE MAN FINISHES THE TRIP HE FOULED OUT ON
+
+Emmett is right that every foul stops play and a disqualified man leaves immediately. The engine cannot do it, and the reason is structural:
+
+`Governor.cs:678` calls `_substitutionPolicy?.OnPossessionBoundary(...)` **after `RunOnePossession` returns**. A below-bonus defensive foul routes to `ResumeInbound` / `ResolveSidelineInbound`, which the resolver handles *inside* the same walk. So a whistle mid-possession is a dead ball in basketball and invisible to the substitution seam. Non-shooting fouls are about two-thirds of all fouls and most are below the bonus early in each half.
+
+Two options were sized honestly rather than assumed:
+
+- **Cheap version — about one session.** The swap itself is nearly free (generators read the *current* occupant, so a man seated at the whistle is live immediately). What costs is that the resolver has no idea a coach exists and is constructed at 43 sites. What you'd buy: the right man on the floor. What you'd pay: **minutes and stats are counted one whole trip at a time**, so the box score for that trip would still land on the man who left.
+- **Honest version — a multi-session foundation change.** Splitting a trip means changing the unit every board in the game is counted in (`Roster.PlayerAt(slot, possessionNumber)` is the spine of the whole per-player layer).
+
+Recommendation was neither, and Emmett agreed. He took the free tightening instead: **`ForceFoulOutReplacements` runs ahead of the ordinary move and ignores the `isDeadBall` gate**, so a foul-out no longer waits when the next trip starts on the run (missed last free throw, rebounded and pushed). Measured cost of what remains: 8,507 replacements against 8,507 trips played while disqualified — **exactly one trip each, bounded and confirmed, not estimated**.
+
+### The forced replacement is a rule, not a rotation decision
+
+Filters KEPT: positional eligibility, `IsLegalLineup`. Filters DROPPED: the minutes plan (`Residual` / `EnterThreshold` / `ExitThreshold`), the minimum stint, and the one-move-per-boundary limit. A coach filling a hole is not managing minutes.
+
+Selection is "best available man at that position" (Emmett's ruling), tiered because **rank is comparable only within a stored group** (SideDepth's own header rule): exact positional match first ordered by rank, cross-position eligible men only if no exact match exists, PlayerId breaking ties. Deterministic; draws no randomness.
+
+**The guard lives on the SEAT, not in the policy.** `Roster` is constructed in exactly one place (`GameState`'s constructor) and its occupancy mutates through exactly two doors, with the mid-game door called from a single site. Putting the rule on the door means no present or future policy can re-insert a disqualified man; putting it in the policy would mean re-proving it for every policy ever written. It throws rather than declining quietly, because reaching it is a wiring bug — the policy is required to filter first — and a silent refusal would leave a seat holding someone the caller believes it replaced.
+
+### ★ THE FINDING: the rate is right, the concentration is not
+
+| | value |
+|---|---|
+| fouls/team/game | **17.95** (6.31 shooting / 11.64 non-shooting) — *unchanged* |
+| offensive fouls/team/game | 1.54 (new line) |
+| foul-outs per team-game | **0.840** |
+| personal fouls per player-game (n=105,823 who played a trip) | 0 21.2% · 1 24.6% · 2 21.3% · 3 15.5% · 4 9.1% · **5+ 8.3%** |
+| escape hatch — men stranded | **0** |
+| trips played while disqualified / forced replacements | 8,507 / 8,507 |
+
+The foul RATE did not move a hundredth. What the session revealed is how those fouls are *distributed*: 8.3% of player-games reaching five, where 17.95 fouls spread across the ten men who play would predict roughly 3%. The committer weighting concentrates blame considerably more sharply than chance — bad-discipline guards and whichever big is guarding the rim. Real college basketball runs nearer 0.4 foul-outs per team-game.
+
+**Page-only, nothing chased, no dial touched** (the page-only calibration principle). It is named as O-64 and is the natural S88.
+
+The escape hatch firing **zero** times across 5,205 games is its own finding: a 13-man roster always had a legal body. The path is built, tested (A4 exercises it directly at a threshold of 3) and inert in production.
+
+### ★ THE HONEST MISS: my own check was one foul short
+
+A3's first run read `deltas 35 vs events 36` and failed. The engine was right; the instrument was wrong.
+
+The reconciliation deliberately accumulates **positive deltas** of the team-foul counter across boundaries rather than reading final-minus-initial, because `FoulTracker` resets at the half and a naive read would silently lose the entire first half. That design is sound. What it missed is that **the Governor reports a boundary only when a successor possession will actually run**, so the last possession of the game has no boundary behind it and its fouls were never sampled. One closing sample after `Run` fixed it exactly.
+
+Worth recording because the failure mode is the one the design was *meant* to prevent — an observable that quietly under-reports — and it appeared in the observable itself rather than in the thing being observed. It cost one turn and was caught in the sandbox, before delivery.
+
+### Phase 71 earned its keep again
+
+`FoulOutThreshold` was added to `RollDConfig` (beside the bonus thresholds — same kind of number, different clock) with a default of 5, so the code ran fine with the key absent. Phase 71's key-name parity check went red immediately: `ABSENT key(s) silently defaulting today: [FoulOutThreshold]`. Added to `config.json`. A silently-defaulting dial is exactly the thing that is invisible until someone tries to tune it.
+
+### Why A7 is not a stored baseline
+
+The claim S87 rests on is that committer selection draws from its **own stream** and therefore perturbs nothing. A stored pre-S87 fixture would test that, but it rots the moment anything else legitimately changes and it cannot say *why* a mismatch happened. So the property is tested directly: with the threshold raised to 1,000,000 (the inert mode — no flag, just a threshold nobody reaches), run the same game twice changing **only the foul seed**.
+
+Both halves are load-bearing. Everything pre-S87 must be bit-identical — 143 possessions, 53-57, team fouls 11/12, matched. **And the committer columns must DIFFER** — 35 of 51 changed — or the first half would pass just as happily against a wire that never draws at all. That is the S73.1 lesson applied: an acceptance test of "nothing moved" paired with a discriminating signal only the new tree can produce.
+
+`_foulRng` defaults to a fixed `SystemRng(8787)` when no caller supplies one, rather than falling back to `_rng`. That is what kept every pre-existing check byte-identical: a foul draw cannot reach the gameplay stream even in a harness fixture that never heard of S87.
+
+### What did NOT change, and was asserted rather than assumed
+
+- **Team fouls.** R3: an offensive foul is charged to the man, never the team. No `Fouls.Increment` appears anywhere in the new code, and A3 states it as its own line (`team-foul residual 0` against 4 offensive fouls charged) so a future change that starts charging them fails *there*, with the right message, rather than as an unexplained arithmetic slip.
+- **`DefensiveFoulCharge.Resolve`** keeps its exact signature and its "consumes no randomness" contract. It emits the event bare; the resolver enriches it with a `with`-expression at the single harvest point (`Resolver.cs:439`), which is the only place the foul, the live game and the defense are all in hand at once. Every existing check that drives it directly is untouched.
+- **The foul math.** Moved constant-for-constant, including S62's own flagged calibration debt (`InteriorTiltScale = 40.0` gives the Anchor ~58% of the rim residual against the ~37% estimated at draft time). Deliberately not settled here — this session moved the code, it did not tune it.
+
+### The degenerate case is real, and harness-only
+
+A foul can resolve with **zero seats occupied**: `Program.Checks.NonShootingFouls.cs` drives `DefensiveFoulCharge.Resolve` against a bare `Fresh()` game with no roster at all, and several checks construct a resolver without seating. The rule records a slot, a `CommitterPlayerId` of 0 meaning "no man", charges nobody, and consumes one draw so the stream's position does not depend on whether a roster happened to be seated. **No real game path reaches it** — every season and full-game path seats all ten before the tip, and `Program.Checks.Fouls` seats both sides fully, which was confirmed at check-in rather than assumed.
+
+### Seed map — a note for whoever touches it next
+
+The committer stream is `resolverSeed + 5`, continuing the existing per-game map (resolver, governor +1, attribution +2/+3/+4). **A grep proves the literal offset is free; the arithmetic does not.** Season games are seeded two apart (`baseSeed + 2g`), so game *g*'s +5 stream starts on the same number as game *g+2*'s governor stream — and the same kind of overlap already exists today for +3 and +4. This adds no new bug class and was taken as ruled, but the per-game seed map wants a proper derivation (a hash rather than small offsets) before it grows again. O-66.
+
+### Deltas on the page, and what explains them
+
+`PPP 0.9719 → 0.9710`. Turnovers, rebounds, assists, team fouls: unchanged. Credit identity `7382110 / 738211 = 10.0`, dropped 0; every reconciliation at residual 0.
+
+Every delta outside the foul columns is tellable as **someone fouled out and a different man played** — which is the acceptance condition the prompt set, and it holds. The per-player SFL/NSF columns will not match any pre-S87 run and cannot be expected to: those were drawn afterwards, in a different order, over a rebuilt lineup. The stale page note claiming they were "POST-HOC HARNESS DRAWS, not a record of who committed a foul" was corrected in the same pass (subtract before adding).
+
 ## Session 86 — THE COACH BECAME A GATE, AND THE LEAGUE SPREAD OPEN BY 29 POINTS OF PUSH. Roll J's run-or-not balance stopped being a flat number nudged by two additive lifts and became a score the players build against a bar the coach sets: the ball-winner's legs and his outlet pass (two OVERLAPPING escape routes, the better counting fully and the second a third as much), his four teammates' speed against all five defenders' speed getting back, and the offensive coach's pace setting the height that opportunity must clear. **Both old lifts were RETIRED, not supplemented, and the reason is the standing no-pre-fusing rule: pace was a nudge and is now the gate, so keeping both would let pace pay twice; and `Speed` lives inside `Player.Athleticism`, so keeping the five-way composite gap beside the new speed race would pay fast teams twice.** League push moved 33.55% → 35.70%, but the mean is not the finding — **per-offensive-team push now runs min 18.89% / p10 24.97% / median 36.16% / p90 44.08% / max 48.15%, a 29.26pp band, on rosters alone**, because every bar in the country is still the neutral 0.475 (O-57: nobody is coaching anybody). Read against the entries-conceded band (12pp), the shape is its own observation: **who gets transition chances is far more uniform across the league than who runs on them.** ★ THE RULING THAT CHANGED THE BUILD: the free-throw board was measured BEFORE it was wired and pulled out of scope. Its base Push is 0.08 against a swing of 0.22, so the new score pinned a plodding rebounder to **exactly zero** at both grind and neutral pace and sent everyone with legs to ~28% — a source with no middle, and one of the two zero rows was an *average* rebounder against a fast defense, not an extreme. Emmett ruled it exempt, and the locked oracle independently confirmed the call: its approved tables and its 45-case golden fixture cover only the live board and the two steals — **it never modelled the free-throw board at all**, so leaving it out matched the signed artifact exactly and the oracle needed no change. ★ THE CHECK-IN CAUGHT TWO SUITE CHECKS THAT WOULD HAVE GONE RED WITH NOTHING WRONG: one asserts a fast coach runs more than a slow one, one asserts a tired offense runs less, and both stamped which team had the ball but never *who* — so under the new rule there was no break to gate and every dial read flat. Both fixes were one line (name the rebounder, which the real game now always does off a defensive board) and neither assertion changed. The same defect would have silently killed the exploratory transition ladder, which sweeps team athleticism gaps against push: fixing only its retired-dial print would have left it reading dead flat, a manufactured "the change does nothing" finding — the S59.2 flat-baseline trap, avoided by naming a ball-handler there too. Golden parity landed at worst |Δ| **4.92E-013** against a 1e-6 bar, deliberately not bitwise (the S81.3 lesson). Every one of nine suite and eighteen season-page predictions landed exactly; the sandbox run was byte-identical to Emmett's machine. **Three honest misses recorded below**, including one wrong claim in the build prompt that survived the §6b audit. Opened O-61, O-62, O-63. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine. (2026-07-30)
 
 **Register:** build, under `PROMPT-transition-opportunity-s86-r3`. One locked oracle committed, eight config dials in / two out, one ticket field, one resolver enrichment site, one generator rewritten, two fatigue accessors, one season-page line with two counters, one new suite phase, three pre-existing surfaces repaired.

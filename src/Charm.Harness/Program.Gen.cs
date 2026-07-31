@@ -1186,7 +1186,7 @@ internal static partial class Program
             TeamSide teamASide = teamAIsHome ? TeamSide.Home : TeamSide.Away;
             TeamSide teamBSide = teamAIsHome ? TeamSide.Away : TeamSide.Home;
 
-            var (game, result, attributed) = RunSingleGenGame(
+            var (game, result, attributed, _) = RunSingleGenGame(
                 c, sideA, sideB, teamASide, teamBSide,
                 resolverSeed: gameSeed, governorSeed: gameSeed + 1);
 
@@ -1250,14 +1250,18 @@ internal static partial class Program
     // sim must stay byte-for-byte, so every construction below is in the original
     // order). Attribution uses the resolver seed, exactly as the committed
     // AttributeGame(result, game, gameSeed) call did.
-    private static (GameState Game, GovernorRunResult Result, PlayerBoxTotals Attributed) RunSingleGenGame(
+    private static (GameState Game, GovernorRunResult Result, PlayerBoxTotals Attributed,
+                    MinutesAllocatorPolicy Policy) RunSingleGenGame(
         GenEngineConfigs c, GenSideData sideA, GenSideData sideB,
         TeamSide teamASide, TeamSide teamBSide, int resolverSeed, int governorSeed)
     {
         var game = new GameState(
             new FoulTracker(c.D.BonusThreshold, c.D.DoubleBonusThreshold),
             ArrowState.Off,
-            new FatigueTracker(c.Fat));
+            new FatigueTracker(c.Fat),
+            // S87: personal fouls and the five-and-out rule. Game-scoped, so it survives
+            // the halftime reset that clears the team counts.
+            new PersonalFoulTracker(c.D.FoulOutThreshold));
 
         SeatRoster(game, teamASide, sideA.Starters);
         SeatRoster(game, teamBSide, sideB.Starters);
@@ -1304,7 +1308,13 @@ internal static partial class Program
             new RollOffensiveFoulGenerator(c.OffFoul),
             c.Matchup,
             game,
-            resolverRng);
+            resolverRng,
+            // S87: the committer-selection stream. Its own object, so no foul draw can
+            // move the gameplay sequence by a single number — with the disqualification
+            // threshold raised out of reach, the game replays exactly as it did before
+            // this session. Offset +5 continues the existing per-game seed map
+            // (resolver, governor+1, attribution+2/+3/+4).
+            new SystemRng(unchecked(resolverSeed + 5)));
 
         // The one line that differs from the bench runner: the Governor is given the
         // substitution policy (7th argument). Everything else is identical.
@@ -1314,7 +1324,12 @@ internal static partial class Program
         var result = governor.Run(firstState);
         var attributed = AttributeGame(result, game, resolverSeed, c.Matchup);
 
-        return (game, result, attributed);
+        // S87: the policy comes back too. It is the only holder of the foul-out
+        // bookkeeping — how many forced replacements it made, how many men the escape
+        // hatch stranded, how many trips were played by a disqualified man. Deriving those
+        // from the records afterwards would be a second implementation of the rule that
+        // could quietly disagree with the one that actually ran.
+        return (game, result, attributed, policy);
     }
 
     // ── Gen accumulator: team-level channels + 20-player box + possessions played ──

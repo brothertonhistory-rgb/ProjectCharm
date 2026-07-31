@@ -74,6 +74,7 @@
     "FlavorOffBall": 0.1,
     "BonusThreshold": 7,
     "DoubleBonusThreshold": 10,
+    "FoulOutThreshold": 5,
     "Epsilon": 1e-09
   },
   "RollE": {

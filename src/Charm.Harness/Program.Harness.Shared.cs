@@ -171,9 +171,12 @@ internal static partial class Program
         public long[] To   = new long[RosterShape.PlayerArrayWidth];
         // Phase 25: shooting fouls committed (SFL) — weighted draw, separate seed+3 RNG.
         public long[] ShFoul = new long[RosterShape.PlayerArrayWidth];
-        // Session 62: non-shooting fouls committed (NSF) — reach-in/situational propensity
-        // draw, separate seed+4 RNG.
+        // Session 62: non-shooting fouls committed (NSF). S87: no longer a draw — read
+        // from the engine-recorded committer.
         public long[] NsFoul = new long[RosterShape.PlayerArrayWidth];
+        // S87: OFFENSIVE fouls committed (OFF) — charges and scrum fouls. New column;
+        // these reached no foul count at all before this session.
+        public long[] OffFoul = new long[RosterShape.PlayerArrayWidth];
         // Phase 39: assist counts — engine-stamped on-walk from AstBySlot.
         public long[] Ast  = new long[RosterShape.PlayerArrayWidth];
         // Session 85, PAGE-ONLY: the fast-break SUBSET of Blk, engine-stamped on-walk from
@@ -189,6 +192,10 @@ internal static partial class Program
             a.Blk.SequenceEqual(b.Blk)   && a.Stl.SequenceEqual(b.Stl) &&
             a.To.SequenceEqual(b.To)     && a.ShFoul.SequenceEqual(b.ShFoul) &&
             a.NsFoul.SequenceEqual(b.NsFoul) &&
+            // S87: the new column joins the reproducibility contract, for the same reason
+            // S85's did — a per-player array two identical runs never check would drift
+            // silently.
+            a.OffFoul.SequenceEqual(b.OffFoul) &&
             a.Ast.SequenceEqual(b.Ast) &&
             // Session 85: the new column joins the reproducibility contract. Omitting it would
             // leave a per-player array that two identical runs are never checked to agree on.
@@ -204,8 +211,10 @@ internal static partial class Program
         // Phase 36: seed+2 RNG (BLK WeightedDraw) retired — BlockerPicker now runs engine-side.
         // seed+3 (shooting fouls), and Session 62 seed+4 (non-shooting fouls), are the
         // harness-side attribution draws. Distinct streams keep each byte-for-byte stable.
-        var foulRng   = new Random(seed + 3);
-        var nsFoulRng = new Random(seed + 4);
+        // S87: the seed+3 / seed+4 post-hoc foul draws are retired — the engine records
+        // the committer at the whistle now. Kept unconsumed here would be misleading, so
+        // they are gone from this pass entirely; DrawFoulingDefender /
+        // DrawNonShootingFouler survive as the Phase 78 same-platform parity reference.
         var homeRoster = game.RosterFor(TeamSide.Home);
         var awayRoster = game.RosterFor(TeamSide.Away);
         Roster RosterFor(TeamSide s) => s == TeamSide.Home ? homeRoster : awayRoster;
@@ -303,28 +312,28 @@ internal static partial class Program
                 if (ap != null && RosterShape.IsLegalPlayerId(ap.PlayerId))
                     t.Ast[ap.PlayerId - 1] += astCount;
             }
-            // Phase 25: shooting-foul attribution. seed+3 RNG (foulRng). seed+2 stream
-            // (BLK WeightedDraw) retired in Phase 36 — BlockerPicker now runs engine-side.
-            // OReb moved to engine-stamped in Phase 31; TO committer moved in Phase 33;
-            // STL moved in Phase 34; DReb moved in Phase 35; BLK moved in Phase 36.
+            // ── S87: foul attribution is now a READ, not a draw ──────────────────
+            // Phase 25 / Session 62 drew the committer here, post-hoc, over a
+            // reconstructed lineup. The engine now names him at the whistle — which is
+            // what lets a foul have consequences — so this pass reads the recorded man
+            // instead. The PlayerId is taken from the event rather than re-resolved
+            // through the seat, so the credit survives a later substitution into that
+            // same seat. The seed+3 / seed+4 streams are retired from this path; the
+            // Draw* helpers below are kept as Phase 78's parity reference.
             if (r.ShootingFouls is { } sfs)
                 foreach (var sf in sfs)
-                {
-                    var fSlot = DrawFoulingDefender(foulRng, r.Defense, defRoster, sf.Zone, sf.ShooterSlot, r.Number);
-                    var fp = defRoster.PlayerAt(new Slot(r.Defense, fSlot), r.Number);
-                    if (fp != null && RosterShape.IsLegalPlayerId(fp.PlayerId)) t.ShFoul[fp.PlayerId - 1]++;
-                }
-            // Session 62: non-shooting-foul attribution. seed+4 RNG (nsFoulRng), a separate
-            // stream so it never perturbs the shooting-foul draw. Reach-in fouls draw in
-            // proportion to each defender's full reach-in propensity; situational fouls draw
-            // on the Discipline factor alone. One credited committer per event.
+                    if (RosterShape.IsLegalPlayerId(sf.CommitterPlayerId)) t.ShFoul[sf.CommitterPlayerId - 1]++;
+
             if (r.NonShootingFouls is { } nsfs)
                 foreach (var nsf in nsfs)
-                {
-                    var nSlot = DrawNonShootingFouler(nsFoulRng, r.Defense, defRoster, nsf.IsReachIn, r.Number, matchupCfg);
-                    var np = defRoster.PlayerAt(new Slot(r.Defense, nSlot), r.Number);
-                    if (np != null && RosterShape.IsLegalPlayerId(np.PlayerId)) t.NsFoul[np.PlayerId - 1]++;
-                }
+                    if (RosterShape.IsLegalPlayerId(nsf.CommitterPlayerId)) t.NsFoul[nsf.CommitterPlayerId - 1]++;
+
+            // S87: the third ledger. Offensive fouls reached NO foul count before this
+            // session — a charge was recorded as a turnover only, and the scrum foul was
+            // recorded nowhere at all. They count for the man; they never touch the team.
+            if (r.OffensiveFouls is { } offs)
+                foreach (var off in offs)
+                    if (RosterShape.IsLegalPlayerId(off.CommitterPlayerId)) t.OffFoul[off.CommitterPlayerId - 1]++;
         }
         return t;
     }

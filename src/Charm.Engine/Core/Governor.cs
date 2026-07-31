@@ -223,7 +223,13 @@ public sealed record PossessionRecord(
     int FastBreakBlk = 0,
     int BreakPutbackBlk = 0,
     int NonBreakBlk = 0,
-    SlotGroup FastBreakBlkBySlot = default);
+    SlotGroup FastBreakBlkBySlot = default,
+    // S87: offensive fouls charged on this possession — charges (from the entry, the
+    // turnover pie, or the rebound scrum) and scrum fouls, each carrying the man who
+    // committed it. The third foul ledger; before S87 an offensive foul reached no foul
+    // count at all. Appended last with a null default so every existing positional
+    // construction is unaffected (the S62/S84/S85 convention).
+    IReadOnlyList<OffensiveFoulEvent>? OffensiveFouls = null);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -426,6 +432,7 @@ public sealed class Governor
             var   possessionTurnoverWasLiveBall = false;
             IReadOnlyList<ShootingFoulEvent>? possessionShootingFouls = null;
             IReadOnlyList<NonShootingFoulEvent>? possessionNonShootingFouls = null;   // Session 62
+            IReadOnlyList<OffensiveFoulEvent>? possessionOffensiveFouls = null;       // S87
             var possessionOrbBySlot = new SlotGroup();
             int? possessionStealerSlot = null;
             int? possessionDefensiveRebounderSlot = null;
@@ -564,6 +571,7 @@ public sealed class Governor
                 possessionTurnoverWasLiveBall = outcome.TurnoverWasLiveBall;
                 possessionShootingFouls       = outcome.ShootingFouls;
                 possessionNonShootingFouls    = outcome.NonShootingFouls;
+                possessionOffensiveFouls      = outcome.OffensiveFouls;
                 possessionOrbBySlot           = outcome.OrbBySlot;
                 possessionStealerSlot         = outcome.StealerSlot;
                 possessionDefensiveRebounderSlot = outcome.DefensiveRebounderSlot;
@@ -653,7 +661,8 @@ public sealed class Governor
                 possessionFastBreakBlk,
                 possessionBreakPutbackBlk,
                 possessionNonBreakBlk,
-                possessionFastBreakBlkBySlot));
+                possessionFastBreakBlkBySlot,
+                possessionOffensiveFouls));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(

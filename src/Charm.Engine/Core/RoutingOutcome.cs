@@ -31,6 +31,14 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     public int PutbackAttempts { get; init; }
 
     /// <summary>
+    /// S87: the offensive fouls charged on this possession's walk — charges and scrum
+    /// fouls, each already carrying the man who committed it. The third foul ledger,
+    /// alongside <c>ShootingFouls</c> and <c>NonShootingFouls</c>. Init-only with a null
+    /// default, so every existing construction is untouched — a pure append.
+    /// </summary>
+    public IReadOnlyList<OffensiveFoulEvent>? OffensiveFouls { get; init; }
+
+    /// <summary>
     /// How many times Roll L was spun resolving this possession's trip to the line —
     /// the FT-loop spin count, an observability counter exactly parallel to
     /// <see cref="PutbackAttempts"/>. Zero on the overwhelming majority of possessions

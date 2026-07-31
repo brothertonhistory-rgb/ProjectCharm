@@ -152,7 +152,15 @@ internal sealed class MinutesAllocatorPolicy : ISubstitutionPolicy
             // note — this is the only production driver of bench recovery).
             RecoverBenched(game, st, elapsedSeconds);
 
-            // Substitutions are legal only from a dead ball.
+            // ★ S87: a foul-out is not a rotation decision, and it does not wait for a
+            // dead ball. Every foul IS a whistle, so a man who has just fouled out is
+            // leaving the floor at the next trip whatever the ball is doing — this runs
+            // ahead of the ordinary move and ignores the isDeadBall gate (Emmett's
+            // ruling). The one gap that remains is that he finishes the trip his fifth
+            // foul landed in: the engine's only substitution seam is between trips.
+            ForceFoulOutReplacements(game, st, nextPossessionNumber);
+
+            // Ordinary rotation substitutions are legal only from a dead ball.
             if (isDeadBall)
                 EvaluateOneMove(game, st, nextPossessionNumber);
         }
@@ -176,6 +184,11 @@ internal sealed class MinutesAllocatorPolicy : ISubstitutionPolicy
             if (kind == PeriodBreakKind.Halftime)
                 RecoverBenched(game, st, _halftimeRestEquivalentSeconds);
 
+            // S87: foul-outs clear first here too — a period break is a boundary like
+            // any other, and it is also the recovery point for a man the escape hatch
+            // left on the floor because no reserve was available earlier.
+            ForceFoulOutReplacements(game, st, nextPossessionNumber);
+
             // A period break is a dead ball and a perfectly ordinary substitution
             // opportunity — unlike the retired fence, which allowed reclaim only.
             EvaluateOneMove(game, st, nextPossessionNumber);
@@ -194,6 +207,12 @@ internal sealed class MinutesAllocatorPolicy : ISubstitutionPolicy
 
             st.ActualCredits[p.PlayerId] = st.ActualCredits.GetValueOrDefault(p.PlayerId) + 1;
             st.StintRecords[p.PlayerId]  = st.StintRecords.GetValueOrDefault(p.PlayerId) + 1;
+
+            // S87: a trip played by a man who has already fouled out. Non-zero only via
+            // the escape hatch (no eligible reserve) or the one trip he finishes after
+            // his fifth foul. The season page reports it; nothing asserts a target.
+            if (game.PersonalFouls.IsDisqualified(p.PlayerId))
+                st.PossessionsPlayedWhileDisqualified++;
 
             // Seat-split accounting: which SEAT TYPE the credit was earned in, so a man
             // who reaches his target through strange role usage is visible rather than
@@ -216,6 +235,133 @@ internal sealed class MinutesAllocatorPolicy : ISubstitutionPolicy
             if (!onFloor.Contains(kv.Key)) benched.Add(kv.Value);
         if (benched.Count > 0)
             game.Fatigue.Recover(benched, elapsedSeconds);
+    }
+
+    // ── S87: foul-out replacement ────────────────────────────────────────────────
+    //
+    //  A man who has fouled out comes off. This is NOT the rotation deciding something
+    //  — it is a rule, and it runs ahead of the rotation with a different set of
+    //  filters:
+    //
+    //    KEPT   — positional eligibility, and the legal-lineup check. You never get four
+    //             bigs because somebody fouled out.
+    //    DROPPED— the minutes plan (Residual / EnterThreshold / ExitThreshold), the
+    //             minimum stint, and the one-move-per-boundary limit. A coach filling a
+    //             hole is not managing minutes, and if two men are somehow both
+    //             disqualified they both come off in the same pass.
+    //
+    //  SELECTION — "best available man at that position" (Emmett's ruling). Rank is
+    //  comparable only WITHIN a stored group (see SideDepth's header), so the choice is
+    //  tiered: exact positional match first, ordered by rank; cross-position eligible
+    //  men only if no exact match exists. PlayerId breaks any tie, so the choice is
+    //  deterministic and draws no randomness.
+    //
+    //  THE ESCAPE HATCH — if no eligible reserve exists (bench exhausted, or every
+    //  candidate would break the lineup), the disqualified man STAYS ON THE FLOOR and
+    //  nothing throws. That is counted once per man, and it is not permanent: every
+    //  later boundary retries, so the moment a body frees up he is removed.
+
+    private void ForceFoulOutReplacements(GameState game, SideState st, int atPossession)
+    {
+        // A substitution is legal only from possession 2 onward (possession 1 is the
+        // opening seat, which is SetStarter's job) — the same rule EvaluateOneMove uses.
+        if (atPossession < 2) return;
+
+        var roster = game.RosterFor(st.Depth.Side);
+        var pf     = game.PersonalFouls;
+
+        var seatOcc = new int[Lineup.Size + 1];
+        for (var slot = 1; slot <= Lineup.Size; slot++)
+        {
+            var p = roster.PlayerAt(new Slot(st.Depth.Side, slot));
+            if (p is null) return;                 // defensive; a seated slot is never null
+            seatOcc[slot] = p.PlayerId;
+        }
+
+        for (var seat = 1; seat <= Lineup.Size; seat++)
+        {
+            var occupantId = seatOcc[seat];
+            if (!pf.IsDisqualified(occupantId)) continue;
+
+            var seatType = st.Depth.SlotPos[seat];
+            var onFloor  = new HashSet<int>(seatOcc.Skip(1));
+
+            var replacementId = PickForcedReplacement(st, pf, onFloor, seatOcc, seat, seatType);
+
+            if (replacementId < 0)
+            {
+                // The escape hatch. Count the man once, never again — a second boundary
+                // that still cannot replace him is the SAME unresolved situation, not a
+                // second one.
+                if (st.UnreplaceableDisqualified.Add(occupantId))
+                {
+                    st.R4Occurrences++;
+                    st.Log.Add($"P{atPossession} FOUL-OUT UNREPLACED seat{seat} id{occupantId} " +
+                               $"({pf.CountFor(occupantId)} PF) — no eligible reserve, stays on floor");
+                }
+                continue;
+            }
+
+            roster.Substitute(new Slot(st.Depth.Side, seat), st.Depth.PlayerById[replacementId], atPossession);
+
+            // Bookkeeping mirrors ApplyMove's: the entrant starts a fresh stint, the
+            // exiting man's stint is closed and recorded.
+            if (st.StintRecords.TryGetValue(occupantId, out var stint) && stint > 0)
+                st.StintLengths.Add(stint);
+            st.StintRecords[occupantId]    = 0;
+            st.StintRecords[replacementId] = 0;
+
+            seatOcc[seat] = replacementId;
+            st.Substitutions++;
+            st.FoulOutReplacements++;
+            // If he was previously stranded by the escape hatch, he is no longer — the
+            // recovery rule fired. Clearing the flag keeps the R4 count a count of MEN
+            // stranded, not of boundaries.
+            st.UnreplaceableDisqualified.Remove(occupantId);
+            st.Log.Add($"P{atPossession} FOUL-OUT seat{seat} out id{occupantId} " +
+                       $"({pf.CountFor(occupantId)} PF) in id{replacementId}");
+        }
+    }
+
+    /// <summary>
+    /// Best available man for a seat whose occupant has fouled out, or -1 if there is
+    /// none. Never returns a disqualified man, a man already on the floor, or a man whose
+    /// entry would make the lineup illegal.
+    /// </summary>
+    private static int PickForcedReplacement(
+        SideState st, PersonalFoulTracker pf, HashSet<int> onFloor,
+        int[] seatOcc, int seat, string seatType)
+    {
+        var exact = -1; var exactRank = double.NegativeInfinity;
+        var cross = -1; var crossRank = double.NegativeInfinity;
+
+        foreach (var id in st.Depth.PlayerById.Keys)
+        {
+            if (onFloor.Contains(id)) continue;
+            if (pf.IsDisqualified(id)) continue;                       // never seat a fouled-out man
+            var pos = st.Depth.PosById[id];
+            if (!PositionalEligibility.IsEligibleForSeat(pos, seatType)) continue;
+
+            var after = (int[])seatOcc.Clone();
+            after[seat] = id;
+            if (!IsLegalLineup(st, after)) continue;
+
+            var rank = st.Depth.RankById.GetValueOrDefault(id, double.NegativeInfinity);
+
+            if (pos == seatType)
+            {
+                // Same stored group as the seat — ranks are comparable here.
+                if (rank > exactRank || (rank == exactRank && (exact < 0 || id < exact)))
+                { exact = id; exactRank = rank; }
+            }
+            else
+            {
+                if (rank > crossRank || (rank == crossRank && (cross < 0 || id < cross)))
+                { cross = id; crossRank = rank; }
+            }
+        }
+
+        return exact >= 0 ? exact : cross;
     }
 
     // ── The move set ─────────────────────────────────────────────────────────────
@@ -280,6 +426,11 @@ internal sealed class MinutesAllocatorPolicy : ISubstitutionPolicy
             foreach (var entrantId in st.Depth.PlayerById.Keys)
             {
                 if (onFloor.Contains(entrantId)) continue;
+                // S87: a fouled-out man is never a candidate. The seat itself refuses him
+                // too, so this filter is about not WANTING him rather than not being able
+                // to seat him — but the rotation must not spend its one move on a man the
+                // seat would reject.
+                if (game.PersonalFouls.IsDisqualified(entrantId)) continue;
                 if (!PositionalEligibility.IsEligibleForSeat(st.Depth.PosById[entrantId], seatType)) continue;
                 if (st.Residual(entrantId) < EnterThreshold) { blockedByHysteresis = true; continue; }
 
@@ -323,6 +474,7 @@ internal sealed class MinutesAllocatorPolicy : ISubstitutionPolicy
                 foreach (var entrantId in st.Depth.PlayerById.Keys)
                 {
                     if (onFloor.Contains(entrantId)) continue;
+                    if (game.PersonalFouls.IsDisqualified(entrantId)) continue;   // S87
                     if (!PositionalEligibility.IsEligibleForSeat(st.Depth.PosById[entrantId], sourceType)) continue;
                     if (st.Residual(entrantId) < EnterThreshold) { blockedByHysteresis = true; continue; }
 
@@ -479,6 +631,14 @@ internal sealed class MinutesAllocatorPolicy : ISubstitutionPolicy
 
         public int Records;
         public int Substitutions, Straights, Cascades;
+        // S87: foul-out bookkeeping. FoulOutReplacements is a SUBSET of Substitutions
+        // (a forced replacement is still a substitution). R4Occurrences counts MEN the
+        // escape hatch stranded, never boundaries — UnreplaceableDisqualified is the
+        // set that makes that true, and a man leaves it when the recovery rule fires.
+        public int FoulOutReplacements;
+        public int R4Occurrences;
+        public int PossessionsPlayedWhileDisqualified;
+        public readonly HashSet<int> UnreplaceableDisqualified = new();
         public int DeadBallsEvaluated, ImprovingMoveAvailable, BlockedByStint, BlockedByHysteresis, NoImprovingMove;
         public int CrossPositionCredits, TotalSeatCredits;
         public readonly List<int> StintLengths = new();

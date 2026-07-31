@@ -247,7 +247,7 @@ internal static partial class Program
             var replayRows = BuildSeasonRows(replayDivvy, tiny, verbose: false);
             var g0 = outcome.Schedule[0];
             var cfgs = LoadGenEngineConfigs(configPath);
-            var (replayGame, _, _) = RunSingleGenGame(
+            var (replayGame, _, _, _) = RunSingleGenGame(
                 cfgs,
                 BuildSeasonSide(replayRows[g0.HomeId], 0),
                 BuildSeasonSide(replayRows[g0.AwayId], RosterShape.AwayIdOffset),

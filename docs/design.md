@@ -4783,13 +4783,114 @@ The five named statics live on `Matchup` (`ReachInDisciplineFactor`, `ReachInAth
 
 **The anchor — today's rate is preserved.** The team multiplier is `perManAggregate = Σ propensity / (count · refProp)` with `refProp = ReachInLuckFloor + 1` (`Matchup.ReachInReferencePropensity`, `Matchup.ReachInPerManAggregate`). Five average defenders give **exactly 1.0** (each propensity equals refProp). The three reach-in sources — Roll A's entry defensive foul, Roll B's halfcourt foul, Roll F's player-action foul — multiply their pressure-bent foul share by this aggregate before the overflow guard, so a neutral lineup moves nothing and no config rebase is needed. The offensive entry foul (a charge, not a reach-in) is untouched. A hack-happy lineup ADDS fouls (aggregate > 1); a disciplined one sheds them. The aggregate is multiplied in the three **generators**, not in the shared `TeamDisruptionShares`/`DisruptionShares` share-math — a blast-radius choice that left the StealFloor harness callers untouched. (Engineering call, flagged.)
 
-**The committer — the foul carries a name.** Every non-shooting foul emits exactly one attributable `NonShootingFoulEvent` at the single increment site, `DefensiveFoulCharge.Resolve`, tagged `IsReachIn = flavor.HasValue`: true for the A/B/F reach-ins (they route through Roll D, which rolls a foul flavor), false for the situational fouls (loose-ball / transition / offensive-rebound — Rolls I/J/K/M — which carry none). The resolver harvests the event onto the possession record (a new `NonShootingFouls` list, parallel to `ShootingFouls`, on both `RoutingOutcome` and `PossessionRecord`), and the harness draws the culprit post-hoc on its own RNG stream (seed+4, `DrawNonShootingFouler`): reach-in fouls in proportion to each defender's full propensity, situational fouls on the Discipline factor alone (the perimeter lean is meaningless in a rebound scrum). One credited committer per event, always a defender. The `FoulFlavor` remains pure theater — it is read here only as the reach-in/situational discriminator, never for routing.
+**The committer — the foul carries a name.** Every non-shooting foul emits exactly one attributable `NonShootingFoulEvent` at the single increment site, `DefensiveFoulCharge.Resolve`, tagged `IsReachIn = flavor.HasValue`: true for the A/B/F reach-ins (they route through Roll D, which rolls a foul flavor), false for the situational fouls (loose-ball / transition / offensive-rebound — Rolls I/J/K/M — which carry none). The resolver harvests the event onto the possession record (a new `NonShootingFouls` list, parallel to `ShootingFouls`, on both `RoutingOutcome` and `PossessionRecord`). Reach-in fouls draw the culprit in proportion to each defender's full propensity; situational fouls draw on the Discipline factor alone (the perimeter lean is meaningless in a rebound scrum). One credited committer per event, always a defender. The `FoulFlavor` remains pure theater — it is read here only as the reach-in/situational discriminator, never for routing.
+
+> **S87 moved WHERE that draw happens, not WHAT it computes.** As shipped in S62 the culprit was drawn *post-hoc in the harness* on its own RNG stream (seed+4, `DrawNonShootingFouler`), over a lineup reconstructed from the roster log after the game was over. Since S87 the draw runs **inside the resolver at the moment of the whistle**, on the engine's dedicated foul stream, using `FoulCommitter.NonShootingWeights` — the same weights, constant for constant, proven draw-for-draw by Phase 78. The reason for the move is that a committer decided after the final buzzer cannot have consequences, and S87 needed one: a fifth personal foul now disqualifies. `DrawNonShootingFouler` survives in the harness *solely* as Phase 78's parity reference and no longer attributes anything. See "Session 87" below.
 
 **The numbers.** propensity: hacker (D0) 1.48 / average (D50) 1.13 / lockdown (D99) 0.78 — a ±31% swing, hacker ≈ 1.9× lockdown. One hacker among four average → team aggregate 1.062 (fouls ADDED, not shuffled); two hackers → exactly 2× that delta (stackable-linear — five disciplined defenders drop the team total ~5× one, each owning his own fifth, never five terms on one event). In a real season this reads as ~10.7 non-shooting + ~6.6 shooting ≈ **17.3 fouls per team per game** (full game), a ~1.6:1 non-shooting-to-shooting ratio matching real basketball. (Note: the observation "FOULS PER TEAM PER GAME" line is a *second-half snapshot* — `FoulTracker.ResetForNewHalf()` zeroes it at the half — so it reads ~8.7; the box score, which accumulates both halves, is the full-game figure.)
 
 **Retirement.** The S45 Hustle `defensiveFoulNudge` was retired here (see "Defense-only foul cost — RETIRED"). Box scores now carry an **NSF** column (non-shooting fouls per player) beside SFL, in the bench, observation, and stress printers; the per-man spread shows only when Discipline varies across a lineup.
 
 **Proven by Phase 68** (golden parity 46 rows at 1e-12, worst |Δ| = 2.22e-16, bound to the engine statics and replayed under the fixture's own config; formula invariants — discipline factor symmetric about 50, average defender neutral, propensity monotone decreasing in Discipline, strictly positive; ANCHOR five-average → 1.0 bit-exact; the SUM property — one hacker → 1.062, adds not redistributes; stackable-linear Δ2 = 2·Δ1 exactly; draw ∝ propensity via the real `DrawNonShootingFouler` at 200k draws; completeness — every `Resolve` emits one event with the correct `IsReachIn`, below and across the bonus; config guards). Phase 45's (d) sub-check was rewritten to guard the retirement (foul arm now Hustle-independent, turnover arm still responds).
+
+## Session 87: Real fouls — the committer moved to the whistle, and five put a man on the bench
+
+Before S87 a foul was an anonymous event that got a name **after the game was over**. The harness re-drew the culprit post-hoc over a lineup rebuilt from the roster log (seed+3 for shooting fouls, seed+4 for non-shooting), and offensive fouls got no name at all in the foul ledger. That is sufficient for a box-score column and insufficient for anything else: **a foul decided after the final buzzer cannot change who is on the floor.** S87 moved the decision to the moment of the whistle, which is what makes disqualification possible.
+
+### The three ledgers
+
+`PossessionRecord` carries three parallel foul lists where it carried two:
+
+| ledger | committer chosen by | team foul? | personal foul? |
+|---|---|---|---|
+| `ShootingFoulEvent` | `FoulCommitter.ShootingWeights`, foul stream | yes | yes |
+| `NonShootingFoulEvent` | `FoulCommitter.NonShootingWeights`, foul stream | yes | yes |
+| `OffensiveFoulEvent` **(new)** | charge: the already-named man; scrum: `TurnoverInteriorPicker`, foul stream | **NO** | yes |
+
+The two pre-existing event types gained `CommitterSlot` / `CommitterPlayerId` as **init-only properties with a 0 default**, so every existing positional construction stays valid — the pure-append seam pattern `RoutingOutcome` uses. The PlayerId is carried alongside the seat because the personal count is keyed by player and a seat changes hands.
+
+`DefensiveFoulCharge.Resolve` was NOT touched. It is static and draws no randomness and stays that way; it emits the event bare, and the resolver **enriches** it with a `with`-expression at `Resolver.cs`'s single harvest point — the one place the foul, the live game and the defense are all in hand at once.
+
+### `FoulCommitter` — why the math is a named unit
+
+The Session 62 weightings live in `Core/FoulCommitter.cs` as public statics: `MatchedShare`, `SignedK`, `InteriorScore`, `InteriorTiltScale`, `ShootingWeights`, `NonShootingWeights`, `CumulativeDraw`. Two reasons it is not private resolver methods.
+
+The weights are a **pure function of the five men and the situation**, separable from the draw and therefore checkable cell by cell. And the draw is exposed beside them so Phase 78 can drive *this* code rather than a transcription of it — a check that re-implements the weights only ever proves a formula equals itself. Parity is asserted as a **sequence** comparison: engine unit and surviving S62 reference, identically-seeded streams, chosen seat compared draw for draw. `SystemRng` is `System.Random`, both consume exactly one uniform per call, so identical weights force an identical sequence and any divergence anywhere in the table surfaces as a mismatched seat. Same-platform, in-process, so exact equality is a bar that holds (unlike the cross-platform fixture that went red in S81.3).
+
+S62's flagged calibration debt was carried over **verbatim and deliberately unsettled**: `InteriorTiltScale = 40.0` gives the Anchor ~58% of the rim residual against the ~37% estimated when the form was drafted. S87 moved this code; it did not tune it.
+
+### Offensive fouls: four sources, one rule, no team foul
+
+**Emmett's ruling (S87): an offensive foul counts toward the man's five and never touches the team.** So it moves no bonus and no half counter — asserted by Phase 78 as its own line rather than inferred from the arithmetic.
+
+Four sources reach the walk, and they do NOT all need a draw:
+
+- **The charge family** — Roll A's entry offensive foul, Roll C's turnover-pie `BaseOffensiveFoul` (6.8% of the halfcourt pie, the bulk of the population), Roll K's offensive-rebound scrum — all land on the `OffensiveFoul` terminal, where **the engine has already named the man since Phase 34**: `TurnoverOffSlot = SelectedSlot ?? TurnoverInteriorPicker.Pick(...)`. It was recorded as a *turnover*, reaching no foul count. S87 reuses that man rather than inventing a second, disagreeing answer to "who charged?", and therefore **consumes no new randomness for this bucket**.
+- **The scrum foul** — `LooseBallFoulOnOffense` from Rolls I and M, ~0.38/game. This was the one foul in the game that landed on nobody at all. **Emmett's ruling: the men in the scrum, not the guard at the top of the key**, so it draws on the same `TurnoverInteriorPicker` weighting the charge uses — post-weighted, guard-floored, over the offense's five — on the foul stream rather than the gameplay stream.
+
+`IsLooseBall` separates the two on the event. Season result: **1.54 offensive fouls per team per game**, on its own page line, deliberately NOT folded into `fouls/team/game` — folding them in would misstate the bonus-relevant number.
+
+### `PersonalFoulTracker` — game-scoped, uncapped, on the seat
+
+Hangs off `GameState` as an optional constructor parameter defaulting to a fresh instance at the configured threshold — the `FatigueTracker` pattern exactly, so no existing construction site changed.
+
+**It is deliberately NOT `FoulTracker`.** That one is TEAM fouls and HALF-scoped and resets at the break — that is the bonus's clock. Personal fouls are per-player and GAME-scoped: three in the first half carry into the second. Storing them on the half-scoped tracker would forgive everyone's first-half fouls at the break and no existing bonus check would notice.
+
+**Counts are never capped.** The escape hatch means a man who cannot be replaced stays on the floor and keeps fouling; six and seven are reachable and the record says so. That is why the season page's bucket is `5+` rather than `5`.
+
+`FoulOutThreshold` lives in `RollDConfig` beside the bonus thresholds — the same kind of number, a foul count that changes what the game does, even though they run on different clocks. Guarded at construction (must be ≥ 1). Setting it very large is the **inert mode** used by Phase 78's regression check: no flag, just a threshold nobody reaches.
+
+### The disqualification guard lives on the SEAT
+
+`Roster` gained a `PersonalFoulTracker?`, injected by `GameState` — which is the **only** place a `Roster` is constructed. Both seating doors (`SetStarter`, `Substitute`) refuse a disqualified man.
+
+Occupancy mutates through exactly two doors and the mid-game one has a single caller. Putting the rule on the door means **no present or future substitution policy can re-insert a disqualified man**, by bug or by design; putting it in the policy would mean re-proving it for every policy ever written. It **throws** rather than declining quietly: reaching it is a wiring bug (the policy must filter first), and a silent refusal would leave a seat holding someone the caller believes it replaced. It is NOT the escape hatch — a man who cannot be replaced simply stays on the floor and nothing is called here at all.
+
+### The forced replacement is a rule, not a rotation decision
+
+`MinutesAllocatorPolicy.ForceFoulOutReplacements` runs **ahead of** `EvaluateOneMove` at every boundary.
+
+- **KEPT:** positional eligibility, `IsLegalLineup`. You never get four bigs because somebody fouled out.
+- **DROPPED:** the minutes plan (`Residual` / `EnterThreshold` / `ExitThreshold`), the minimum stint, the one-move-per-boundary limit. A coach filling a hole is not managing minutes.
+- **AND the `isDeadBall` gate** *(Emmett's ruling, S87)*. A foul-out replacement happens at the next trip whether the ball is live or not, so it no longer waits when the next trip starts on the run — a missed last free throw, rebounded and pushed.
+
+**Selection: best available man at that position** *(Emmett's ruling)*, tiered because rank is comparable only WITHIN a stored group (`SideDepth`'s own rule): exact positional match first ordered by rank, cross-position eligible men only if no exact match exists, PlayerId breaking ties. Deterministic, draws no randomness. The ordinary rotation also filters disqualified men from its candidate lists (straight subs and cascades both) — the seat would reject them anyway, but the rotation must not spend its one move on a man the seat will refuse.
+
+**The escape hatch (R4):** if no eligible reserve exists, the disqualified man stays on the floor and nothing throws. Counted once per MAN, not per boundary, and cleared when the recovery fires — every later boundary retries. Across the canonical season it fired **zero** times: a 13-man roster always had a legal body. The path is built, exercised directly by Phase 78, and inert in production.
+
+### ★ THE KNOWN GAP: he finishes the trip he fouled out on
+
+Every foul stops play and a disqualified man should leave at that whistle. **The engine cannot honour this, and the reason is structural:** the Governor calls `OnPossessionBoundary` *after* `RunOnePossession` returns, so the only substitution seam is BETWEEN trips. A below-bonus defensive foul stops play, resumes the inbound, and continues the same possession with no door open — and non-shooting fouls are about two-thirds of all fouls, most of them below the bonus early in each half.
+
+Measured and bounded rather than estimated: **8,507 forced replacements against 8,507 trips played by a disqualified man — exactly one each.**
+
+Closing the gap properly means a whistle-level substitution door, which was sized honestly and deferred (O-65). The cheap version is roughly one session — the swap itself is nearly free, since generators read the *current* seat occupant, but the resolver has no idea a coach exists and is constructed at 43 sites — and it would leave the box score for that one trip still landing on the man who left. The honest version changes the unit every board in the game is counted in: `Roster.PlayerAt(slot, possessionNumber)` is the spine of the whole per-player layer, and making a trip divisible touches all of it.
+
+### Isolation: why the foul stream is its own object
+
+`Resolver` takes `IRng? foulRng = null` and assigns `_foulRng = foulRng ?? new SystemRng(8787)` — a **fixed default, never a fallback to `_rng`**. That is what keeps every pre-existing harness check byte-identical: a foul draw cannot reach the gameplay stream even in a fixture that never heard of S87. Production passes `resolverSeed + 5`, continuing the per-game map (resolver, governor +1, attribution +2/+3/+4).
+
+*A caveat for whoever touches the seed map next:* a grep proves the literal offset is free; the arithmetic does not. Season games are seeded two apart, so game *g*'s +5 stream starts on the same number as game *g+2*'s governor stream, and the same overlap already exists for +3/+4. No new bug class, but the map wants a real derivation before it grows again (O-66).
+
+### The degenerate case
+
+A foul can resolve with **zero seats occupied** — harness-only, where a check drives a foul node against a game with no roster seated. The rule records a slot, a `CommitterPlayerId` of 0 meaning "no man", charges nobody (`PersonalFoulTracker.Increment` no-ops on id ≤ 0), and consumes one draw so the stream position does not depend on whether a roster happened to be seated. **No real game path reaches it** — every season and full-game path seats all ten before the tip.
+
+### What the page says now (S87, page-only, never asserted)
+
+| line | value |
+|---|---|
+| fouls/team/game | 17.95 (6.31 / 11.64) — **unchanged from S78** |
+| offensive fouls/team/game | 1.54 |
+| foul-outs per team-game | 0.840 |
+| personal fouls per player-game (n=105,823) | 0 21.2% · 1 24.6% · 2 21.3% · 3 15.5% · 4 9.1% · 5+ 8.3% |
+| escape hatch / trips while DQ / forced replacements | 0 / 8,507 / 8,507 |
+
+The distribution denominator is **men who occupied a floor seat for at least one possession**, read from the roster's substitution log — the same floor-time convention the stat page uses, so the ~1,000 men who never played cannot flood the zero bucket. A man who dressed and never played is not a zero; he is not in the distribution at all.
+
+**The foul-out rate is a finding, not a target.** 8.3% of player-games reaching five, where an even spread of 17.95 fouls over the ten men who play would predict ~3%, says the committer weighting concentrates blame considerably more sharply than chance. Real college basketball runs nearer 0.4 foul-outs per team-game against our 0.84. Nothing was chased and no dial was touched (O-64).
+
+**Proven by Phase 78** (twenty checks): S62 parity at 400,000 draws across five zones × four shooter slots including the 0 sentinel, zero mismatches, plus non-shooting parity on both buckets and a guard that the zone tilt still FLIPS direction (a parity check alone would pass against a reference that had lost the flip on both sides); totality across four occupancy shapes; seat-and-team conservation on all three ledgers with a hand-built wrong-team negative control proving the test can see a mis-wire; reset-proof positive-delta reconciliation with the offensive-foul residual asserted at exactly zero; stateful accumulation crossing the threshold mid-run (CONVENTIONS §2a); inert-mode isolation with its discriminating half; and config guards at 0 and at the legal boundary of 1.
 
 ## Phase 18: Roll L Real Generator — FreeThrow Attribute Wired (Session 53)
 

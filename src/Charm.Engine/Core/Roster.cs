@@ -53,6 +53,11 @@ public sealed class Roster
     private readonly TeamSide _side;
     private readonly List<SubstitutionEntry> _log = new();
 
+    // S87: the game's personal-foul tracker, injected by GameState. Consulted on every
+    // seating so a disqualified man cannot be put back on the floor. Null only for a
+    // roster built outside a game (no game, no disqualifications).
+    private readonly PersonalFoulTracker? _personalFouls;
+
     // Fast lookup: current occupant per slot number (1–5). Null = not yet filled.
     private readonly Player?[] _current = new Player?[Lineup.Size];  // index 0 = slot 1
 
@@ -63,7 +68,16 @@ public sealed class Roster
     /// <param name="side">Which team this roster belongs to. Must match the
     /// <see cref="Slot.Side"/> of every slot passed to <see cref="SetStarter"/>
     /// and <see cref="Substitute"/>.</param>
-    public Roster(TeamSide side) => _side = side;
+    /// <param name="personalFouls">S87: the game's personal-foul tracker. Supplied by
+    /// <see cref="GameState"/>, which is the ONLY place a roster is constructed — so
+    /// every roster in a live game carries it. Optional (null) so a roster built in
+    /// isolation still works; a null tracker means no man can be disqualified and the
+    /// guard is inert.</param>
+    public Roster(TeamSide side, PersonalFoulTracker? personalFouls = null)
+    {
+        _side          = side;
+        _personalFouls = personalFouls;
+    }
 
     // -------------------------------------------------------------------------
     // Population
@@ -85,6 +99,11 @@ public sealed class Roster
             throw new InvalidOperationException(
                 $"Slot {slot} already has a starter ({_current[idx]!.Name}). " +
                 "Call Substitute to replace a player mid-game.");
+        // S87: both seating doors carry the guard, so the rule is a property of the seat
+        // rather than of one method. Inert at the tip in practice (personal fouls are
+        // game-scoped, so nobody is disqualified before the game starts), but the rule
+        // must not depend on that staying true.
+        RefuseIfDisqualified(player);
 
         _current[idx] = player;
         _log.Add(new SubstitutionEntry(slot, player, AtPossession: 1));
@@ -103,6 +122,7 @@ public sealed class Roster
         if (atPossession < 2)
             throw new ArgumentOutOfRangeException(nameof(atPossession), atPossession,
                 "Substitutions happen at possession 2 or later; use SetStarter for the opening lineup.");
+        RefuseIfDisqualified(incoming);
 
         _current[slot.Number - 1] = incoming;
         _log.Add(new SubstitutionEntry(slot, incoming, atPossession));
@@ -149,6 +169,38 @@ public sealed class Roster
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /// <summary>
+    /// S87: the disqualification guard. A man who has fouled out may never occupy a seat
+    /// again in this game.
+    ///
+    /// <para><b>Why it lives here and not in the substitution policy.</b> A roster is
+    /// constructed in exactly one place (<see cref="GameState"/>'s constructor) and its
+    /// occupancy is mutated through exactly two doors — <see cref="SetStarter"/> at the
+    /// tip and <see cref="Substitute"/> mid-game — with the mid-game door called from a
+    /// single site. Putting the rule on the door means no present or future substitution
+    /// policy can re-insert a disqualified man, whether by bug or by design; putting it
+    /// in the policy would mean re-proving it for every policy ever written.</para>
+    ///
+    /// <para><b>Why it throws rather than declining quietly.</b> Reaching here is a
+    /// wiring bug, not a game situation: the policy is required to filter disqualified
+    /// men out of its candidate list before it ever selects one, and a silent refusal
+    /// would leave a seat holding someone the caller believes it replaced. This is the
+    /// same shape as <see cref="SetStarter"/>'s existing double-seat throw. It is NOT
+    /// the escape hatch — a disqualified man who cannot be REPLACED simply stays on the
+    /// floor and nothing is called here at all.</para>
+    /// </summary>
+    private void RefuseIfDisqualified(Player incoming)
+    {
+        if (_personalFouls is null) return;
+        if (!_personalFouls.IsDisqualified(incoming.PlayerId)) return;
+
+        throw new InvalidOperationException(
+            $"Cannot seat {incoming.Name} (PlayerId {incoming.PlayerId}) on {_side}: he has " +
+            $"{_personalFouls.CountFor(incoming.PlayerId)} personal fouls and the disqualification " +
+            $"threshold is {_personalFouls.FoulOutThreshold}. A disqualified player may not return " +
+            "to the floor; a substitution policy must exclude him from its candidates.");
+    }
 
     private void ValidateSlot(Slot slot)
     {
