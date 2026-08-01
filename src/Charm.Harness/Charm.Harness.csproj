@@ -142,6 +142,15 @@
     <None Include="..\..\tools\history_v1_golden.json" Link="tools\history_v1_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- S88's two fixtures. S88 wrote them, and wrote the checks that read them, but never
+         added them here — so Phase 79 could not have passed even if it had been registered.
+         Added at S89.1 alongside registering the phase itself. -->
+    <None Include="..\..\tools\transition_defense_golden.json" Link="tools\transition_defense_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\tools\transition_scope_frozen_s88.json" Link="tools\transition_scope_frozen_s88.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

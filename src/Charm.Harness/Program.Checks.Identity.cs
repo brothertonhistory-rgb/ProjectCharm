@@ -9,7 +9,7 @@ namespace Charm.Harness;
 internal static partial class Program
 {
     /// <summary>
-    /// Phase 79 (Session 89) — PERMANENT IDENTITY AND THE HISTORY FILE.
+    /// Phase 80 (Session 89) — PERMANENT IDENTITY AND THE HISTORY FILE.
     ///
     /// <para>Page-only principle holds: not one basketball target is asserted here. Every
     /// check below is about numbering, wiring and file behaviour.</para>
@@ -28,10 +28,10 @@ internal static partial class Program
     /// non-reuse is read off the persisted counters instead, which is also the surface that
     /// actually carries the guarantee across a restart.</para>
     /// </summary>
-    private static bool Phase79IdentityCheck(string configPath)
+    private static bool Phase80IdentityCheck(string configPath)
     {
         Console.WriteLine();
-        Console.WriteLine("== Phase 79 — permanent identity and the history file ==");
+        Console.WriteLine("== Phase 80 — permanent identity and the history file ==");
 
         var ok = true;
         void Check(string label, bool pass, string? why = null)

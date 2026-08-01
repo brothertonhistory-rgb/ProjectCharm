@@ -10,7 +10,9 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 89** (2026-08-01; PERMANENT IDENTITY AND THE HISTORY FILE. Every person, season and game now carries a number issued once and never issued again — high-water counters in a named save file, `--history <path>`, with no default path. Identities live in a NEW PROJECT, `src/Charm.History`, and the project boundary IS the seam: the raw `long` is `internal` with no `InternalsVisibleTo`, so no calibration or domain file can write "person 4001 is older than person 4000". No ordering, no conversion, no arithmetic — only equality and hashing. **No basketball moved**: the full season page with and without a history differs by exactly THREE banner lines on Emmett's machine. Phase 79 adds 71 assertions, all green first time, two of which discriminate (the reflected type surface; isolation with a real negative control that moves one live per-player field). The check-in found the world already HAD a canonical writer — the fingerprint's projection was split out of `WriteWorld` rather than written twice — and found a landmine in Phase 55's determinism replay, which used generated record equality and would have gone red the first time it saw history mode. ★ THE SESSION ALSO FOUND S88: `config.json` carried a STAGED, uncommitted edit — twenty `Transition*` dials with no code behind any of them, four `HustleTransitionDefense*` keys removed whose engine defaults match the deleted values character for character. Behaviourally inert, saved out, reverted, opened as O-68 — and **Phase 71 went green through all of it**, which is O-69. Four honest misses recorded, all the same mistake: sandbox numbers asserted against Emmett's Windows machine, including the Gate 1 fixture itself (O-70). Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
+Last updated: **Session 89.1** (2026-08-01; CORRECTION SESSION. `git add -A` at the end of S89 swept in five UNTRACKED files and revealed that **S88 is a complete, working session**: a per-man transition-defence model wired into the live engine (`RollHGenerator`'s break make and block doors, `Resolver`'s defender draw — ~98,000 shots a season), oracle-locked, retiring the four `HustleTransitionDefense*` dials for twenty `Transition*` ones. Emmett's `config.json` was CORRECT and S89 reverted it, breaking a working session; restored. S89's account of S88 is wrong in four places and is corrected in the S89.1 journal entry — the S89 entry itself is left untouched, because the journal is immutable history. ★ A REAL DEFECT S89 INTRODUCED: a phase-number collision. S88 declared `Phase79TransitionDefenseCheck`, S89 registered `Phase79IdentityCheck` as 79, and **S88's phase had no caller anywhere — it had never run once**. Registered here at 79 by date; identity moves to 80. First-ever run: 40 of 43, all three failures one cause — S88's two golden fixtures were never added to the harness project. Both added; suite now green with 43 + 71 assertions that had never both run. ★ O-69 STRUCK: Phase 71 is not broken. Handed a real mismatch it named all four orphan keys and all twenty absent ones in exactly C-25's language. S89 never opened the red suite to see which phase failed.)
+
+*(Previous board entry, S89: PERMANENT IDENTITY AND THE HISTORY FILE. Every person, season and game now carries a number issued once and never issued again — high-water counters in a named save file, `--history <path>`, with no default path. Identities live in a NEW PROJECT, `src/Charm.History`, and the project boundary IS the seam: the raw `long` is `internal` with no `InternalsVisibleTo`, so no calibration or domain file can write "person 4001 is older than person 4000". No ordering, no conversion, no arithmetic — only equality and hashing. **No basketball moved**: the full season page with and without a history differs by exactly THREE banner lines on Emmett's machine. Phase 79 adds 71 assertions, all green first time, two of which discriminate (the reflected type surface; isolation with a real negative control that moves one live per-player field). The check-in found the world already HAD a canonical writer — the fingerprint's projection was split out of `WriteWorld` rather than written twice — and found a landmine in Phase 55's determinism replay, which used generated record equality and would have gone red the first time it saw history mode. ★ THE SESSION ALSO FOUND S88: `config.json` carried a STAGED, uncommitted edit — twenty `Transition*` dials with no code behind any of them, four `HustleTransitionDefense*` keys removed whose engine defaults match the deleted values character for character. Behaviourally inert, saved out, reverted, opened as O-68 — and **Phase 71 went green through all of it**, which is O-69. Four honest misses recorded, all the same mistake: sandbox numbers asserted against Emmett's Windows machine, including the Gate 1 fixture itself (O-70). Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
 
 *(Previous board entry, S86: THE COACH BECAME A GATE. Roll J's run-or-not balance stopped being a flat number nudged by two additive lifts and became a score the players build against a bar the coach sets: the ball-winner's legs and his outlet pass as two OVERLAPPING escape routes, his four teammates' speed against all five defenders' speed getting back, and the offensive coach's pace setting the height that opportunity must clear. Both old lifts RETIRED rather than supplemented — pace was a nudge and is now the gate, so keeping both would let pace pay twice, and `Speed` lives inside `Player.Athleticism`, so keeping the five-way composite gap beside the new speed race would pay fast teams twice. League push 33.55% -> 35.70%, but the mean is not the finding: **per-offensive-team push now runs min 18.89% / median 36.16% / max 48.15%, a 29.26pp band, on rosters alone**, because every bar in the country is still the neutral 0.475 (O-57). Read against the entries-conceded band (12pp): who GETS transition chances is far more uniform than who RUNS on them. ★ THE RULING THAT CHANGED THE BUILD: the free-throw board was measured BEFORE it was wired and pulled out of scope — base Push 0.08 against a swing of 0.22 pinned a plodding rebounder to exactly 0.0% at grind AND neutral pace while everyone with legs jumped to ~28%, a source with no middle, and one of the two zero rows was an *average* rebounder against a fast defense. The locked oracle independently confirmed the call: its tables and its 45-case golden fixture carry only the live board and the two steals, so it never modelled the free-throw board at all and needed no edit. ★ THE CHECK-IN CAUGHT TWO SUITE CHECKS THAT WOULD HAVE GONE RED WITH NOTHING WRONG (a tempo-direction check and a tired-legs check, both stamping which team had the ball but never WHO); the same defect would have silently left the exploratory transition ladder reading dead flat — the S59.2 flat-baseline trap. Golden parity worst |delta| 4.92E-013 against a deliberately non-bitwise 1e-6 bar (S81.3 lesson). Nine of nine suite and eighteen of eighteen season predictions landed exactly; sandbox byte-identical to Emmett's machine. Three honest misses recorded, including one wrong claim in the build prompt that survived the §6b audit: entry rate DID move (41.61% -> 41.56%) because changing a pie shifts the RNG stream. Opened O-61, O-62, O-63. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
 
@@ -73,6 +75,23 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S88 — WHO GOT BACK: THE LAST TEAM-SCALAR IN THE ENGINE IS GONE.** *(Shipped at S88, committed
+  accidentally at S89, verified at S89.1 — its suite phase had never run until then.)* A fast break
+  was one team average against another: the defence's mean Hustle shaved a couple of points off the
+  make, nobody guarded anybody, and the engine could not tell a break against an elite rim protector
+  from one against a shooting guard. Now each of the five carries a GOT-BACK number — his legs, and
+  how deep the man he is guarding starts — doing three jobs: WHO defends this break, HOW SET he is
+  when he arrives, and HOW MANY got back (the dominant channel on conversion). Oracle-locked, ported
+  constant for constant. **R2: depth is set by the man you are guarding, never by your own body** —
+  read off the OPPOSING lineup, so a defence is not stranded under the rim against a team that goes
+  small; A9 builds the own-body mis-wire and proves the check rejects it (five identical defenders
+  collapse to one number where the real wire gives 1.5495 / 1.4575 / 1.2803 / 1.0383 / 0.9186).
+  **R6: Hustle rides inside the legs term**, no channel of its own — keeping both would pay a fast,
+  high-effort team twice (the S86 double-count). Anchor exact: five average men on an average
+  offence give 1.000000000000000, and break make/block reproduce their configured bases to the
+  digit. Phase 79, 43 assertions, no basketball target among them. See O-71 — it still has no
+  journal or design entry.
 
 - **★ S89 — PERMANENT IDENTITY AND THE HISTORY FILE. The first persistent layer that outlives a run.**
   `PersonId` / `SeasonId` / `GameId` are readonly record structs hiding a `long` in a **new project**,
@@ -259,7 +278,22 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **★ O-68 — S88 EXISTS AS A DIAL SET AND NOTHING ELSE (found S89).** `config.json` was carrying a
+- **★ O-71 — S88 IS COMMITTED BUT WAS NEVER GIVEN A JOURNAL OR DESIGN ENTRY (opened S89.1).** Its
+  code, oracle, fixtures and 43-assertion phase are now in the tree and green, and the S89.1 entry
+  describes what it does — but S88 has no session entry of its own, no design-doc section for the
+  transition-defence subsystem, and no record of the design conversation that produced its eight
+  rulings (R1–R8 survive only in the source header and the oracle). The engine's last team-scalar
+  was retired without the reasoning being written down anywhere a future session will look. Worth a
+  short backfill session reading the oracle and source and writing both entries properly.
+- **~~O-68~~ — RESOLVED WRONG AND REPLACED (S89.1).** S89 recorded S88 as "a dial set with no code".
+  That was false: the code existed as UNTRACKED files, invisible to the GitHub pull Claude greps.
+  The dial set is not orphaned, the config was correct, and the whole item rested on an error. See
+  O-71 for what actually remains.
+- **~~O-69~~ — STRUCK (S89.1). Phase 71 works.** S89 claimed it went green through a twenty-key
+  config/code mismatch. It did not — it went red and named every orphan and absent key. The mismatch
+  Claude "caught it missing" was one Claude had created by reverting the config, and Claude never
+  opened the failing suite to see which phase reported it. Recorded rather than deleted so the
+  mistake is findable. `config.json` was carrying a
   **staged, uncommitted** edit that would have ridden into the next commit unannounced: twenty new
   `Transition*` keys — `GotBackLuckFloor`, `LegsSpan`, `DepthSpan`, `EffortSpeedShare`, `PostnessScale`,
   `ArrivalSpan`, `ContestDiscount`, `BaseBreakMake`, `BaseBreakBlock`, `RimProtectionSwing`,
@@ -940,9 +974,10 @@ chart is PROVISIONAL pending O-6.
 **NONE SELECTED.** S89 gave every person, season and game a permanent number and a save file to keep them
 in, and opened O-68, O-69, O-70.
 
-**★ O-69 is the cheapest and most protective thing on the board, and it should probably go first or ride the
-next session.** A config guard that reports green while twenty unknown keys sit in the file and four required
-ones are missing is not a guard. It cost nothing this time only by luck. Small enough to be a micro-session.
+**★ O-71 (backfill S88's journal and design entries) is the cheapest thing on the board and should probably
+go first.** A whole subsystem is live in the engine with its design reasoning recorded nowhere but a source
+header. Reading the oracle and writing the two entries is a micro-session, and it closes the last gap this
+correction opened.
 
 **★ O-31 (per-game retention) is now unblocked and is the natural continuation.** S89 built the numbering it
 was waiting on: a game carries its identity from schedule construction through the accumulators, so a per-game

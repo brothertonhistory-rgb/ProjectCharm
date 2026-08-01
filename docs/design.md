@@ -9398,6 +9398,16 @@ Eleven groups, 71 assertions, **no basketball target among them**. Two of the el
 
 B10's check-only helpers build history files **by hand** rather than through the store, because a check that could only build a file with the writer could never test what the reader does with a file the writer would not have produced.
 
+### Phase numbering — a correction (S89.1)
+
+This subsystem's suite phase is **Phase 80**, not 79. S88 had already declared
+`Phase79TransitionDefenseCheck` for the transition-defence model; S89 wrote
+`Phase79IdentityCheck` and registered that as 79, colliding with it and leaving S88's phase
+with no caller at all — it had never executed once. Corrected at S89.1: S88 holds 79 (by
+date), identity holds 80. **A new suite phase is not registered until it appears in
+`Program.cs`'s registration block AND any fixture it reads is added to
+`Charm.Harness.csproj`.** S88 did neither; S89 did the second but collided on the first.
+
 ### One check that had to change first
 
 Phase 55's determinism replay asserted `outcome2.Results.SequenceEqual(outcome.Results)` — the record's generated equality, which silently absorbs any field ever added to `SeasonGameResult`. Two runs against one career MUST issue different numbers, so that form would have gone red with nothing wrong the first time it saw history mode. It is now field-explicit, and asserts something sharper than before: **the basketball is a pure function of (world, seed, config); the numbering deliberately is not.**

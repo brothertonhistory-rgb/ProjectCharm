@@ -500,3 +500,9 @@ size_ladder_v2.txt
 size_ladder_v3.txt
 gen_pass2_skillfirst_oracle_output.txt
 gen_pass3_budget_oracle_output.txt
+
+# S89.1 - career save files are per-run artifacts, never tracked.
+careers/
+*.history.json
+*.history.json.lock
+season-history.txt
