@@ -10,7 +10,9 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 89.1** (2026-08-01; CORRECTION SESSION. `git add -A` at the end of S89 swept in five UNTRACKED files and revealed that **S88 is a complete, working session**: a per-man transition-defence model wired into the live engine (`RollHGenerator`'s break make and block doors, `Resolver`'s defender draw — ~98,000 shots a season), oracle-locked, retiring the four `HustleTransitionDefense*` dials for twenty `Transition*` ones. Emmett's `config.json` was CORRECT and S89 reverted it, breaking a working session; restored. S89's account of S88 is wrong in four places and is corrected in the S89.1 journal entry — the S89 entry itself is left untouched, because the journal is immutable history. ★ A REAL DEFECT S89 INTRODUCED: a phase-number collision. S88 declared `Phase79TransitionDefenseCheck`, S89 registered `Phase79IdentityCheck` as 79, and **S88's phase had no caller anywhere — it had never run once**. Registered here at 79 by date; identity moves to 80. First-ever run: 40 of 43, all three failures one cause — S88's two golden fixtures were never added to the harness project. Both added; suite now green with 43 + 71 assertions that had never both run. ★ O-69 STRUCK: Phase 71 is not broken. Handed a real mismatch it named all four orphan keys and all twenty absent ones in exactly C-25's language. S89 never opened the red suite to see which phase failed.)
+Last updated: **S90 chores commit** (2026-08-02; DOCUMENTATION ONLY, no source changed. Closes **O-71**: S88's transition-defence subsystem finally has a journal entry and a design section, backfilled from the locked oracle, the source headers and Phase 79. The eight rulings survive verbatim because S88 wrote them into the oracle header; the design conversation does not survive and was not reconstructed. Opens **O-72** (class year is generated and dropped before the season) and **O-73** (the development ceiling — latent card, runway, arrival — is computed for all 4,511 men every world build and discarded one line before the season sees it; Emmett ruled it out of the S90 archive as not-history, which settles retention but not the engine gap). ★ ONE CHORE ON THE S90 PROMPT WAS PHANTOM: an "O-number renumber" rode through four prompt revisions unverified and does not exist — there are no duplicate O-numbers and O-25 is simply a number never assigned. The real collision in the record was S88's PHASE number, fixed at S89.1. A chore claim inherited across revisions got none of the source audit every code claim around it received.)
+
+*(Previous board entry, Session 89.1 — 2026-08-01; CORRECTION SESSION. `git add -A` at the end of S89 swept in five UNTRACKED files and revealed that **S88 is a complete, working session**: a per-man transition-defence model wired into the live engine (`RollHGenerator`'s break make and block doors, `Resolver`'s defender draw — ~98,000 shots a season), oracle-locked, retiring the four `HustleTransitionDefense*` dials for twenty `Transition*` ones. Emmett's `config.json` was CORRECT and S89 reverted it, breaking a working session; restored. S89's account of S88 is wrong in four places and is corrected in the S89.1 journal entry — the S89 entry itself is left untouched, because the journal is immutable history. ★ A REAL DEFECT S89 INTRODUCED: a phase-number collision. S88 declared `Phase79TransitionDefenseCheck`, S89 registered `Phase79IdentityCheck` as 79, and **S88's phase had no caller anywhere — it had never run once**. Registered here at 79 by date; identity moves to 80. First-ever run: 40 of 43, all three failures one cause — S88's two golden fixtures were never added to the harness project. Both added; suite now green with 43 + 71 assertions that had never both run. ★ O-69 STRUCK: Phase 71 is not broken. Handed a real mismatch it named all four orphan keys and all twenty absent ones in exactly C-25's language. S89 never opened the red suite to see which phase failed.)
 
 *(Previous board entry, S89: PERMANENT IDENTITY AND THE HISTORY FILE. Every person, season and game now carries a number issued once and never issued again — high-water counters in a named save file, `--history <path>`, with no default path. Identities live in a NEW PROJECT, `src/Charm.History`, and the project boundary IS the seam: the raw `long` is `internal` with no `InternalsVisibleTo`, so no calibration or domain file can write "person 4001 is older than person 4000". No ordering, no conversion, no arithmetic — only equality and hashing. **No basketball moved**: the full season page with and without a history differs by exactly THREE banner lines on Emmett's machine. Phase 79 adds 71 assertions, all green first time, two of which discriminate (the reflected type surface; isolation with a real negative control that moves one live per-player field). The check-in found the world already HAD a canonical writer — the fingerprint's projection was split out of `WriteWorld` rather than written twice — and found a landmine in Phase 55's determinism replay, which used generated record equality and would have gone red the first time it saw history mode. ★ THE SESSION ALSO FOUND S88: `config.json` carried a STAGED, uncommitted edit — twenty `Transition*` dials with no code behind any of them, four `HustleTransitionDefense*` keys removed whose engine defaults match the deleted values character for character. Behaviourally inert, saved out, reverted, opened as O-68 — and **Phase 71 went green through all of it**, which is O-69. Four honest misses recorded, all the same mistake: sandbox numbers asserted against Emmett's Windows machine, including the Gate 1 fixture itself (O-70). Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
 
@@ -75,6 +77,13 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ O-71 CLOSED — S88's JOURNAL AND DESIGN ENTRIES ARE WRITTEN (S90 chores commit).** The
+  transition-defence subsystem now has a session entry at its chronological slot in `journal.md`
+  (between S89 and S87) and a `design.md` section beside its S85/S86 transition siblings. The eight
+  rulings survive verbatim because S88 wrote them into the oracle header; **the design conversation
+  that produced them does not survive and was not reconstructed** — that limit is stated in the entry
+  rather than papered over, and it is the honest cost of shipping without docs. No source changed.
 
 - **★ S88 — WHO GOT BACK: THE LAST TEAM-SCALAR IN THE ENGINE IS GONE.** *(Shipped at S88, committed
   accidentally at S89, verified at S89.1 — its suite phase had never run until then.)* A fast break
@@ -278,13 +287,25 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **★ O-71 — S88 IS COMMITTED BUT WAS NEVER GIVEN A JOURNAL OR DESIGN ENTRY (opened S89.1).** Its
-  code, oracle, fixtures and 43-assertion phase are now in the tree and green, and the S89.1 entry
-  describes what it does — but S88 has no session entry of its own, no design-doc section for the
-  transition-defence subsystem, and no record of the design conversation that produced its eight
-  rulings (R1–R8 survive only in the source header and the oracle). The engine's last team-scalar
-  was retired without the reasoning being written down anywhere a future session will look. Worth a
-  short backfill session reading the oracle and source and writing both entries properly.
+- **O-72 — CLASS YEAR IS COMPUTED AND DISCARDED, AND THE ARCHIVE DOES NOT KEEP IT (opened S90 chores).**
+  `Player.PlayerClass` (Fr/So/Jr/Sr) exists and the generator produces it, but `GenMapToPlayer`
+  (`Program.Gen.cs:821`) never assigns it, so every season player carries an empty string and S90's
+  roster section has nothing to store. Emmett ruled the archive is a historical record and class year
+  is plainly historical — but he did not name it, so S90 did NOT fold it and it is opened here rather
+  than assumed. One field through one mapping plus one byte on the roster entry; folding it later is a
+  roster schema version bump, and seasons written before it will not have it (S90 R2). Note it is a
+  PLACEHOLDER label decorating `Arrival` per the S42.1 ruling — the real population-structure question
+  is still unowned.
+- **O-73 — THE DEVELOPMENT CEILING IS COMPUTED FOR EVERY PLAYER AND THROWN AWAY (opened S90 chores).**
+  `PlayerGenPass3.BuildFromDraws` computes `Latent`, `Current`, `Runway` and `Arrival` for all 4,511
+  men every time a world is built; `GenMapToPlayer` copies the 33-key current card into the 38 ratings
+  and drops the rest on the floor. So the season cannot tell a raw project from a finished senior of
+  the same rating. **Emmett ruled the ceiling OUT of the S90 archive** — *"No, 10 years down the line,
+  it doesn't matter. It should maintain a historical record"* — which settles retention, not the
+  engine gap: a development layer will need this data live, and it is currently discarded one line
+  before the season sees it. Two facts worth not re-deriving: `CurrentSkills` is fully redundant with
+  the stored 38 (`BuildCard` sources all 23 skill keys from `Current`), and `Runway` is exactly
+  `Latent − Current`. The only irreducible value is the latent card.
 - **~~O-68~~ — RESOLVED WRONG AND REPLACED (S89.1).** S89 recorded S88 as "a dial set with no code".
   That was false: the code existed as UNTRACKED files, invisible to the GitHub pull Claude greps.
   The dial set is not orphaned, the config was correct, and the whole item rested on an error. See

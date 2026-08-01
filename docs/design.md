@@ -9050,6 +9050,110 @@ stream, so every downstream draw moves. Entry rate read 41.61% → 41.56% and th
 738,126 → 738,386. Conservation held at residual 0 throughout. Future sessions should expect
 whole-page wobble from any pie change and read the *identities*, not the third decimal.
 
+## Transition defence — the per-man got-back model (Session 88, 2026-07-31)
+
+*(Backfilled at S90 from the locked oracle, the source headers and Phase 79. S88 shipped
+undocumented; see journal S88 for what that cost and for the eight rulings in full.)*
+
+**What it replaced.** Transition defence used to be one team average against another: the
+defence's mean Hustle read against the offence's, shaving a couple of points off the break
+make. Nobody guarded anybody, no individual rating was read, and a break against an elite rim
+protector resolved identically to a break against a shooting guard. It was **the last place in
+the engine where a team was a scalar rather than five men**, and retiring it is what the
+no-scalar wall required.
+
+### The one number that does three jobs
+
+Every defender on a break carries a **got-back number**. It is built from two factors over a
+luck floor:
+
+- **his legs** — speed-primary, with Hustle riding *inside* the term rather than beside it
+  (R6). Symmetric about the league-average rating, so an average man contributes exactly the
+  reference value.
+- **his depth** — a tanh read of **the man he is guarding**, measured against *that man's own
+  lineup's* mean post-ness (R2). Above the neutral value when he is on a perimeter player,
+  below it when he is stuck on their centre.
+
+The shooter's own defender is additionally scaled by **the zone the shot came from** (R7): a
+man who just shot at the rim is standing under it, a man who just shot a three is already at
+the arc and halfway back.
+
+That single number is then read three ways:
+
+| job | how the number is used | where |
+|---|---|---|
+| **WHO** defends this break | relative weights within the lineup, drawn (never thresholded — R1) | `TransitionDefenderPicker.Pick`, from `Resolver` |
+| **HOW SET** he is on arrival | absolute — arrival quality scales how much his defence counts | `TransitionDefense.ArrivalQuality` |
+| **HOW MANY** got back | the team aggregate, normalised by occupied count × the league-average reference | `TransitionDefense.TeamAggregate`, from `Resolver` |
+
+**Job 3 is the dominant channel on conversion** and is what the old Hustle wire was reaching
+for. Jobs 1 and 2 are what it could never express, because a mean has no assignment in it.
+
+### Why depth is read off the OPPOSING lineup
+
+This is the load-bearing structural decision and the one most likely to be "tidied" wrongly by
+a later session. Depth is set by the man you are guarding, **never by your own body**. Five
+identical rangy athletes still have one man playing the five, and he is under the basket — but
+which man that is depends entirely on who the *offence* put on the floor. Read against a team
+that goes small, nobody is stranded under the rim, because there is no post to be stuck
+guarding.
+
+Reading depth off the defender's own size would be **a scalar wearing a costume**: it would
+make a big man permanently bad in transition regardless of context, which is exactly the
+absolute-rather-than-relative error the engine exists to avoid. Phase 79's A9 constructs that
+mis-wire deliberately and proves the real check rejects it — the mis-wire collapses five
+identical defenders to one identical number, where the correct wire gives
+**1.5495 / 1.4575 / 1.2803 / 1.0383 / 0.9186**.
+
+### The anchor
+
+Five average men against an average offence produce a team aggregate of exactly
+`1.000000000000000`, and the break make and break block reproduce their configured bases to
+the digit. **A neutral lineup therefore moves nothing**, which is why the subsystem landed
+without a config rebase. Same anchoring discipline as S62's per-man reach-in aggregate and
+S86's opportunity score: the neutral case is pinned first, and every effect is a departure
+from it.
+
+### Two layers, and why
+
+The raw numeric primitives take plain doubles and are what golden parity binds to, so the
+fixture drives **this code** rather than a transcription of it — the same shape as
+`FoulCommitter`, for the same reason. The `Player`-facing overloads sit on top and own the one
+mapping question the oracle does not answer: the oracle's `post` is `Matchup.Postness` and its
+`length` is `Matchup.LengthRating`, both of which blend to weights summing to 1.0 and therefore
+share the raw 0–99 rating scale the oracle's constants assume.
+
+### Live wiring
+
+| site | call |
+|---|---|
+| `RollHGenerator:590` | `BreakMakePct` — every fast-break shot |
+| `RollHGenerator:689` | `BreakBlockPct` — the break block, chase-down weighted (R3) |
+| `Resolver:1329` | `LineupGotBack` — the five weights |
+| `Resolver:1337` | `TeamAggregate` — how many got back |
+| `Resolver:1339` | `TransitionDefenderPicker.Pick` — who defends it |
+
+Roughly **98,000 shots a season** pass through this.
+
+### Calibration status
+
+All twenty `Transition*` dials on `MatchupConfig` are **calibration placeholders**. None is
+ever suite-asserted (page-only calibration principle); Phase 79 asserts oracle parity and the
+wiring invariants, and the magnitudes are read on the season page. The four
+`HustleTransitionDefense*` dials this subsystem replaced are retired — keeping both would pay
+a fast, high-effort team twice for turning and running (R6), the same double-count that retired
+two dials at S86.
+
+### Known gap
+
+**Transition still has no assignment model on the offensive side (O-48).** The got-back number
+answers who *defends* the break; it does not answer who the break is run *at*. S85 measured the
+consequence — the median team's best break-blocker takes ~25% of its break blocks against the
+20% five interchangeable defenders would produce — and S86 re-measured after the push rewire
+and found the median unmoved, which is the diagnosis confirmed rather than a disappointment:
+changing who pushes cannot change who gets the block while the engine assigns nobody on a
+break.
+
 ## Roll G — fast-break shot diet: the shooter-bent, PaceBias-tilted break (Session 38, 2026-07-06)
 
 **Current state.** A fast break no longer produces one flat shot menu for everyone. The break
