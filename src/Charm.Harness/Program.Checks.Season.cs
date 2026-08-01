@@ -271,9 +271,22 @@ internal static partial class Program
             // ── §3.6 Fixture determinism: the full season is a pure function of ────────
             //        (world, seed, config). Run #1 is §3.5's outcome, reused.
             var outcome2 = RunSeasonCore(tiny, seed, configPath, verbose: false);
+            // ★ S89 — the comparison is now FIELD-EXPLICIT, and this is load-bearing rather
+            // than tidiness. `SequenceEqual` used the record's generated equality, which
+            // silently absorbs any field ever added to `SeasonGameResult`. The two identity
+            // fields added this session are exactly the kind that MUST differ between two
+            // runs against one career — that is what "a number is never reused" means — so
+            // the old form would have gone red with nothing wrong the first time this check
+            // ever saw history mode. What is being asserted here is that the BASKETBALL is a
+            // pure function of (world, seed, config); the numbering deliberately is not.
+            static bool SameGame(SeasonGameResult a, SeasonGameResult b)
+                => a.HomeId == b.HomeId && a.AwayId == b.AwayId
+                && a.HomeScore == b.HomeScore && a.AwayScore == b.AwayScore
+                && a.OvertimePeriods == b.OvertimePeriods;
             Check("fixture: a second full season run is identical (schedule, every score, standings)",
                   outcome2.Fingerprint == outcome.Fingerprint
-                    && outcome2.Results.SequenceEqual(outcome.Results)
+                    && outcome2.Results.Count == outcome.Results.Count
+                    && outcome2.Results.Zip(outcome.Results).All(p => SameGame(p.First, p.Second))
                     && tiny.Schools.All(s => outcome2.Wins[s.Id] == outcome.Wins[s.Id]
                                           && outcome2.Losses[s.Id] == outcome.Losses[s.Id]));
 

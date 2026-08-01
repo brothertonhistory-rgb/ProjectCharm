@@ -128,7 +128,8 @@ public sealed class RollHGenerator : IRollHPieGenerator
     }
 
     /// <inheritdoc cref="IRollHPieGenerator.Generate"/>
-    public Pie<ShotResult> Generate(PossessionState state, bool putback = false)
+    public Pie<ShotResult> Generate(PossessionState state, bool putback = false,
+                                    TransitionContest? contest = null)
     {
         // Putback path (Sessions 21 + this) — the go-back-up's MAKE RATE rides the same
         // calibrated finisher-vs-matched-defender rim matchup every rim attempt uses (then a
@@ -560,49 +561,34 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // Settle all three signed C-terms (C5.5 +, C6 −, C7 −) under a single clamp.
         makePct = Math.Clamp(makePct, 0.0, 1.0);
 
-        // ── C8: Hustle transition defense (Phase 45) ─────────────────────────
-        // FastBreak ONLY. C5.5/C6/C7 above are all halfcourt-gated (never fire on a
-        // break), so the settle clamp above leaves the raw matchup make% untouched on
-        // a FastBreak — C8's own clamp below is the only one that fires on a break.
+        // ── C8 RETIRED (S88). The transition contest replaces it entirely. ────
+        // What C8 was: the defending team's MEAN HUSTLE against the offense's, shaving a
+        // couple of points off the break make. One team average against another — nobody
+        // guarded anybody, no individual rating was read, and the engine could not tell a
+        // break against an elite rim protector from a break against a shooting guard.
         //
-        // The defending team's mean Hustle vs the offense's drives the suppression:
-        // a high-hustle defense gets back in transition and contests the run-out.
-        // Gap is (defense − offense) so a positive gap = defense out-hustles = suppress.
-        // GapFn (NOT raw tanh) gives the zero-slope/convex shape: a tiny gap barely
-        // matters; a big gap compounds. Subtracted from make%, then clamped to [0,1].
-        if (state.FastBreak)
+        // S88 replaces it rather than supplementing it (R6): Hustle now rides INSIDE each
+        // man's legs term, and keeping both would pay a fast, high-effort team twice for
+        // turning and running — the same double-count that retired two dials at S86. The
+        // make and block rates below come from the contest the Resolver drew.
+        //
+        // Note this fires on a break with nobody on the floor to defend it too: no contest is
+        // built there, so that shot keeps its own-rating make with no defensive term at all.
+        // The old Hustle shave used to fire on that path, scoring every empty seat as an
+        // average man; it retires with the rest of the wire rather than surviving in the one
+        // place nobody is watching.
+        //
+        // The contest OWNS the break, it does not nudge it. Both rates are absolute reads off
+        // the transition model, not deltas on the halfcourt matchup, because that is what the
+        // anchor means: five average defenders against five average men must reproduce the
+        // configured base break make and block rates EXACTLY, and they cannot if a halfcourt
+        // term is still riding underneath. Everything the halfcourt chain computed above is
+        // therefore discarded on an in-scope break — which is correct, because a run-out is
+        // not a halfcourt possession with a modifier.
+        if (contest is not null)
         {
-            var defRoster = _game.RosterFor(state.Defense);
-            var defLineup = _game.LineupFor(state.Defense);
-            var offRoster = _game.RosterFor(state.Offense);
-            var offLineup = _game.LineupFor(state.Offense);
-
-            var defPlayers = new Player?[]
-            {
-                defRoster.PlayerAt(defLineup.SlotAt(1)),
-                defRoster.PlayerAt(defLineup.SlotAt(2)),
-                defRoster.PlayerAt(defLineup.SlotAt(3)),
-                defRoster.PlayerAt(defLineup.SlotAt(4)),
-                defRoster.PlayerAt(defLineup.SlotAt(5)),
-            };
-            var offPlayers = new Player?[]
-            {
-                offRoster.PlayerAt(offLineup.SlotAt(1)),
-                offRoster.PlayerAt(offLineup.SlotAt(2)),
-                offRoster.PlayerAt(offLineup.SlotAt(3)),
-                offRoster.PlayerAt(offLineup.SlotAt(4)),
-                offRoster.PlayerAt(offLineup.SlotAt(5)),
-            };
-
-            // defense first → positive gap = defense out-hustles = suppression
-            var gap = Matchup.HustleGap(defPlayers, offPlayers);
-            var suppression = _matchup.HustleTransitionDefenseWeight
-                            * Matchup.HustleGapShift(gap,
-                                                     _matchup.HustleTransitionDefenseSteepness,
-                                                     _matchup.HustleTransitionDefenseExponent,
-                                                     _matchup.HustleTransitionDefenseScale);
-            makePct -= suppression;
-            makePct  = Math.Clamp(makePct, 0.0, 1.0);
+            makePct = TransitionDefense.BreakMakePct(
+                contest.Defender, contest.DefenderGotBack, contest.TeamAggregate, _matchup);
         }
 
         // ── IQ: proportional make-door conversion bonus (Phase 50) ────────────
@@ -632,20 +618,30 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // IqMakeSensitivity = 0 the bump is 0 and makePct is already in [0,1] from the
         // clamps above, so this whole block is inert — the zero-knob byte-identical
         // anchor.
-        var iqZoneWeight = zone switch
+        //
+        // S88 — SKIPPED on an in-scope break. The comment above described this as sitting on
+        // top of a chain whose last break-relevant term was C8; C8 is gone and the break's
+        // make rate is now an absolute read off the transition model. A proportional sprinkle
+        // on top of it would break the anchor — five average defenders against five average
+        // men would no longer reproduce the configured base break make rate, they would
+        // reproduce it times the shooter's IQ factor. Halfcourt jumpers are untouched.
+        if (contest is null)
         {
-            ShotLocation.Three => 1.0,
-            ShotLocation.Long  => 1.0,
-            ShotLocation.Mid   => 0.7,
-            ShotLocation.Short => 0.3,
-            ShotLocation.Rim   => 0.0,
-            _                  => 0.0
-        };
-        var iqProgress   = Math.Clamp((player.BasketballIQ - 50.0) / 49.0, 0.0, 1.0);
-        var iqZoneFactor = _cfg.IqMakeSensitivity * iqZoneWeight * iqProgress;
-        var iqBump       = makePct * iqZoneFactor;   // proportional sprinkle on the settled make%
-        makePct         += iqBump;
-        if (makePct > 1.0) makePct = 1.0;            // own clamp; no-op when knob = 0
+            var iqZoneWeight = zone switch
+            {
+                ShotLocation.Three => 1.0,
+                ShotLocation.Long  => 1.0,
+                ShotLocation.Mid   => 0.7,
+                ShotLocation.Short => 0.3,
+                ShotLocation.Rim   => 0.0,
+                _                  => 0.0
+            };
+            var iqProgress   = Math.Clamp((player.BasketballIQ - 50.0) / 49.0, 0.0, 1.0);
+            var iqZoneFactor = _cfg.IqMakeSensitivity * iqZoneWeight * iqProgress;
+            var iqBump       = makePct * iqZoneFactor;   // proportional sprinkle on the settled make%
+            makePct         += iqBump;
+            if (makePct > 1.0) makePct = 1.0;            // own clamp; no-op when knob = 0
+        }
 
         // Phase 7 + Session 79 — matchup-aware block door, now a duel PLUS a help arm.
         //
@@ -684,11 +680,18 @@ public sealed class RollHGenerator : IRollHPieGenerator
         // who is guarding whom.
         var blockOffense = BlockerPicker.ResolveOffensiveLineup(state, _game);
 
-        var blockWeight = defender is null
-            ? _cfg.BlockWeight(zone)
-            : Matchup.BlockWeightWithHelp(zone, player, defender,
-                                          blockDefenders, defenderSlot.Number - 1,
-                                          _cfg.BlockWeight(zone), _matchup, blockOffense);
+        // S88 — on an in-scope break the CHASE-DOWN replaces this door outright (R3). The
+        // halfcourt block is a duel plus a help arm among five men who are set; a break block
+        // is one man running somebody down from behind, so it reads his length, his speed
+        // through how well he got back, and his rim protection as the junior partner. Same
+        // reason as the make rate: an absolute read, not a modifier, or the anchor cannot hold.
+        var blockWeight = contest is not null
+            ? TransitionDefense.BreakBlockPct(contest.Defender, contest.DefenderGotBack, _matchup)
+            : defender is null
+                ? _cfg.BlockWeight(zone)
+                : Matchup.BlockWeightWithHelp(zone, player, defender,
+                                              blockDefenders, defenderSlot.Number - 1,
+                                              _cfg.BlockWeight(zone), _matchup, blockOffense);
 
         // Phase 8 — matchup-aware foul door. Compute the bent foul rate from the
         // matchup, or fall back to the configured per-zone baseline (DEC-6, same

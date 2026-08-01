@@ -929,6 +929,76 @@ public sealed class MatchupConfig
             throw new InvalidOperationException(
                 $"ReachInPostnessScale must be > 0: got {cfg.ReachInPostnessScale}.");
 
+        // ── S88 — the got-back transition-defence model. ─────────────────────
+        // The two SPANS are guarded strictly below 1 and every zone multiplier strictly above
+        // 0 for a load-bearing reason, not for tidiness: together they are what make every
+        // got-back number strictly positive, which is why the defender draw needs no
+        // all-zero-weight branch. Loosening either to admit 1.0 would make a zero total weight
+        // reachable and turn that missing branch into a crash.
+        if (cfg.TransitionGotBackLuckFloor < 0.0)
+            throw new InvalidOperationException(
+                $"TransitionGotBackLuckFloor must be >= 0: got {cfg.TransitionGotBackLuckFloor}.");
+        if (cfg.TransitionLegsSpan < 0.0 || cfg.TransitionLegsSpan >= 1.0)
+            throw new InvalidOperationException(
+                $"TransitionLegsSpan must be in [0,1): got {cfg.TransitionLegsSpan}.");
+        if (cfg.TransitionDepthSpan < 0.0 || cfg.TransitionDepthSpan >= 1.0)
+            throw new InvalidOperationException(
+                $"TransitionDepthSpan must be in [0,1): got {cfg.TransitionDepthSpan}.");
+        if (cfg.TransitionEffortSpeedShare < 0.0 || cfg.TransitionEffortSpeedShare > 1.0)
+            throw new InvalidOperationException(
+                $"TransitionEffortSpeedShare must be in [0,1]: got {cfg.TransitionEffortSpeedShare}.");
+        if (cfg.TransitionPostnessScale <= 0.0)
+            throw new InvalidOperationException(
+                $"TransitionPostnessScale must be > 0 (tanh denominator): got {cfg.TransitionPostnessScale}.");
+        if (cfg.TransitionArrivalSpan < 0.0 || cfg.TransitionArrivalSpan >= 1.0)
+            throw new InvalidOperationException(
+                $"TransitionArrivalSpan must be in [0,1): got {cfg.TransitionArrivalSpan}.");
+        if (cfg.TransitionContestDiscount <= 0.0 || cfg.TransitionContestDiscount > 1.0)
+            throw new InvalidOperationException(
+                $"TransitionContestDiscount must be in (0,1]: got {cfg.TransitionContestDiscount}.");
+        if (cfg.TransitionBaseBreakMake <= 0.0 || cfg.TransitionBaseBreakMake >= 1.0)
+            throw new InvalidOperationException(
+                $"TransitionBaseBreakMake must be in (0,1): got {cfg.TransitionBaseBreakMake}.");
+        if (cfg.TransitionBaseBreakBlock <= 0.0 || cfg.TransitionBaseBreakBlock >= 1.0)
+            throw new InvalidOperationException(
+                $"TransitionBaseBreakBlock must be in (0,1): got {cfg.TransitionBaseBreakBlock}.");
+        if (cfg.TransitionRimProtectionSwing < 0.0)
+            throw new InvalidOperationException(
+                $"TransitionRimProtectionSwing must be >= 0: got {cfg.TransitionRimProtectionSwing}.");
+        if (cfg.TransitionTeamPresenceSwing < 0.0)
+            throw new InvalidOperationException(
+                $"TransitionTeamPresenceSwing must be >= 0: got {cfg.TransitionTeamPresenceSwing}.");
+        if (cfg.TransitionChaseSwing < 0.0)
+            throw new InvalidOperationException(
+                $"TransitionChaseSwing must be >= 0: got {cfg.TransitionChaseSwing}.");
+        if (cfg.TransitionChaseLengthWeight < 0.0 || cfg.TransitionChaseLengthWeight > 1.0)
+            throw new InvalidOperationException(
+                $"TransitionChaseLengthWeight must be in [0,1]: got {cfg.TransitionChaseLengthWeight}.");
+        if (cfg.TransitionChaseRimProtWeight < 0.0 || cfg.TransitionChaseRimProtWeight > 1.0)
+            throw new InvalidOperationException(
+                $"TransitionChaseRimProtWeight must be in [0,1]: got {cfg.TransitionChaseRimProtWeight}.");
+        if (Math.Abs(cfg.TransitionChaseLengthWeight + cfg.TransitionChaseRimProtWeight - 1.0) > 1e-9)
+            throw new InvalidOperationException(
+                "TransitionChaseLengthWeight + TransitionChaseRimProtWeight must sum to 1.0: " +
+                $"length={cfg.TransitionChaseLengthWeight}, rimprot={cfg.TransitionChaseRimProtWeight}, " +
+                $"sum={cfg.TransitionChaseLengthWeight + cfg.TransitionChaseRimProtWeight}.");
+        if (cfg.TransitionChaseSpeedSwing < 0.0)
+            throw new InvalidOperationException(
+                $"TransitionChaseSpeedSwing must be >= 0: got {cfg.TransitionChaseSpeedSwing}.");
+        foreach (var (zoneName, zoneMult) in new (string, double)[]
+        {
+            ("TransitionShooterZoneRim",   cfg.TransitionShooterZoneRim),
+            ("TransitionShooterZoneShort", cfg.TransitionShooterZoneShort),
+            ("TransitionShooterZoneMid",   cfg.TransitionShooterZoneMid),
+            ("TransitionShooterZoneLong",  cfg.TransitionShooterZoneLong),
+            ("TransitionShooterZoneThree", cfg.TransitionShooterZoneThree),
+        })
+        {
+            if (zoneMult <= 0.0)
+                throw new InvalidOperationException(
+                    $"{zoneName} must be > 0: got {zoneMult}.");
+        }
+
         const double Eps = 1e-9;
 
         // Skill + length weights must sum to 1.0 per zone.
@@ -1557,9 +1627,10 @@ public sealed class MatchupConfig
         // scale > 0, weight in (0, 1). Per-player tanh families: steepness > 0, scale > 0.
         foreach (var (name, steep, exp, scale, weight) in new (string, double, double, double, double)[]
         {
+            // HustleTransitionDefense RETIRED at S88 — the team-mean Hustle break wire is gone
+            // and Hustle now rides inside each man's legs term (TransitionDefense.LegsFactor).
             ("HustleRebound",           cfg.HustleReboundSteepness,           cfg.HustleReboundExponent,           cfg.HustleReboundScale,           cfg.HustleReboundWeight),
             ("HustlePressure",          cfg.HustlePressureSteepness,          cfg.HustlePressureExponent,          cfg.HustlePressureScale,          cfg.HustlePressureWeight),
-            ("HustleTransitionDefense", cfg.HustleTransitionDefenseSteepness, cfg.HustleTransitionDefenseExponent, cfg.HustleTransitionDefenseScale, cfg.HustleTransitionDefenseWeight),
         })
         {
             if (steep <= 0.0)
@@ -2541,24 +2612,107 @@ public sealed class MatchupConfig
     /// Load). [CALIBRATION PLACEHOLDER]</summary>
     public double ReachInPostnessScale { get; set; } = 25.0;
 
-    // --- Transition defense (RollHGenerator C8, FastBreak only). ---
+    // --- Transition defense (S88 — the got-back model; see TransitionDefense). ---
+    //
+    // RETIRED at S88: the four HustleTransitionDefense* dials that drove RollHGenerator's C8,
+    // the team-mean Hustle wire. Hustle now rides inside each man's legs term below (R6);
+    // keeping both would pay a fast, high-effort team twice. Matchup.HustleGap /
+    // HustleGapShift SURVIVE — they still serve the rebound and pressure doors.
 
-    /// <summary>Steepness of the Hustle gap → FastBreak make% suppression (GapFn). Default 0.043.
-    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
-    public double HustleTransitionDefenseSteepness { get; set; } = 0.043;
+    /// <summary>R1 — nobody is ever impossible. The additive floor under every man's got-back
+    /// number, so the slowest man on the floor still sometimes gets back. Default 0.15.
+    /// Must be &gt;= 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionGotBackLuckFloor { get; set; } = 0.15;
 
-    /// <summary>Exponent of the Hustle gap → FastBreak make% suppression (GapFn). Default 2.0.
-    /// Must be &gt; 1 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
-    public double HustleTransitionDefenseExponent { get; set; } = 2.0;
+    /// <summary>How much his LEGS move his odds of being the one there. Half-amplitude about
+    /// 1.0: at 0.45 a maximum-effort man is 1.45× and a minimum-effort man 0.55×. Default 0.45.
+    /// Must be in [0, 1) (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionLegsSpan { get; set; } = 0.45;
 
-    /// <summary>Reference scale of the Hustle gap → FastBreak make% suppression (GapFn). Default 25.0.
-    /// Must be &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
-    public double HustleTransitionDefenseScale { get; set; } = 25.0;
+    /// <summary>R2 — how much being stuck on THEIR BIG holds a defender back, measured against
+    /// that big's own lineup. Half-amplitude about 1.0. Default 0.34. Must be in [0, 1)
+    /// (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionDepthSpan { get; set; } = 0.34;
 
-    /// <summary>Weight applied to the Hustle transition-defense GapFn output before it is
-    /// subtracted from FastBreak make%. Default 0.05. Must be in (0, 1) (enforced in Load).
+    /// <summary>R6 — Speed's share of the legs term, Hustle taking the remainder. At 0.75,
+    /// turning and running is three parts wheels to one part want-to. Default 0.75. Must be in
+    /// [0, 1] (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionEffortSpeedShare { get; set; } = 0.75;
+
+    /// <summary>Tanh scale mapping an opponent's post-ness gap from HIS lineup mean into the
+    /// [0,1] depth orientation (larger → gentler lean). Same idiom as
+    /// <see cref="ReachInPostnessScale"/>. Default 25.0. Must be &gt; 0 (tanh denominator,
+    /// enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionPostnessScale { get; set; } = 25.0;
+
+    /// <summary>Job 2 — how much arriving well rather than late scales a defender's own
+    /// contest. Half-amplitude about 1.0. Default 0.60. Must be in [0, 1) (enforced in Load).
     /// [CALIBRATION PLACEHOLDER]</summary>
-    public double HustleTransitionDefenseWeight { get; set; } = 0.05;
+    public double TransitionArrivalSpan { get; set; } = 0.60;
+
+    /// <summary>R4 — a backpedalling man is not a set defender, so his read is discounted. A
+    /// break stays a better look than a halfcourt set; it is simply no longer free. Default
+    /// 0.55. Must be in (0, 1] (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionContestDiscount { get; set; } = 0.55;
+
+    /// <summary>The anchor — break make rate for five average defenders against five average
+    /// men on an average offence. Today's page. Default 0.466. Must be in (0, 1) (enforced in
+    /// Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionBaseBreakMake { get; set; } = 0.466;
+
+    /// <summary>The anchor — break block rate for five average defenders against five average
+    /// men. Today's page. Default 0.0962. Must be in (0, 1) (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionBaseBreakBlock { get; set; } = 0.0962;
+
+    /// <summary>How much the rim protection of THE MAN WHO GOT BACK moves the break make rate,
+    /// before the discount. Default 0.14. Must be &gt;= 0 (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionRimProtectionSwing { get; set; } = 0.14;
+
+    /// <summary>R5 + job 3 — HOW MANY GOT BACK, the dominant channel on conversion. Being
+    /// there is worth something on its own: a guard standing in the lane makes you change the
+    /// shot even though he will never block it. Default 0.22. Must be &gt;= 0 (enforced in
+    /// Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionTeamPresenceSwing { get; set; } = 0.22;
+
+    /// <summary>R3 — the size of the chase-down block swing. Default 0.11. Must be &gt;= 0
+    /// (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionChaseSwing { get; set; } = 0.11;
+
+    /// <summary>R3 — length's share of the chase-down. Length leads. Default 0.70. Must be in
+    /// [0, 1] and sum to 1.0 with <see cref="TransitionChaseRimProtWeight"/> (enforced in
+    /// Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionChaseLengthWeight { get; set; } = 0.70;
+
+    /// <summary>R3 — rim protection's share of the chase-down. The junior partner: a rangy
+    /// fast wing whose block rating gives him nothing in the halfcourt still runs people down
+    /// in transition. Default 0.30. [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionChaseRimProtWeight { get; set; } = 0.30;
+
+    /// <summary>R3 — speed paying DIRECTLY into the block rate through how well he got back,
+    /// on top of the length-led swing. Default 0.055. Must be &gt;= 0 (enforced in Load).
+    /// [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionChaseSpeedSwing { get; set; } = 0.055;
+
+    /// <summary>R7 — where the shooter shot from, applied to the one defender whose slot
+    /// number matches his. A man who just shot at the rim is standing under it. Must be
+    /// &gt; 0 (enforced in Load). [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionShooterZoneRim { get; set; } = 0.70;
+
+    /// <inheritdoc cref="TransitionShooterZoneRim"/>
+    public double TransitionShooterZoneShort { get; set; } = 0.80;
+
+    /// <inheritdoc cref="TransitionShooterZoneRim"/>
+    public double TransitionShooterZoneMid { get; set; } = 1.00;
+
+    /// <inheritdoc cref="TransitionShooterZoneRim"/>
+    public double TransitionShooterZoneLong { get; set; } = 1.10;
+
+    /// <summary>R7 — a man who just shot a three is already at the arc, halfway back. This is
+    /// why a stretch big is genuinely better transition defence than a back-to-the-basket big
+    /// of identical speed. [CALIBRATION PLACEHOLDER]</summary>
+    public double TransitionShooterZoneThree { get; set; } = 1.20;
 
     // --- Attribution pickers (per-player tanh — correct here, not GapFn). ---
 

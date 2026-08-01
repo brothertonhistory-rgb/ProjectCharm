@@ -238,6 +238,10 @@ public sealed class Resolver
         // maps slot -> man through the SAME path ordinary blocks already take, so a man's
         // break blocks can never exceed his blocks.
         var fastBreakBlkBySlot = new SlotGroup();
+        // S88, PAGE-ONLY: one observation per in-scope break shot — the transition contest it
+        // faced and how it finished. Lazily allocated, so a possession that takes no break
+        // shot carries nothing.
+        List<BreakContestObservation>? breakContests = null;
         // Session 36: displacement-context bucket counters — read-only observation
         // instrumentation. Every FGA whose state carries a populated
         // ShotDisplacementLevel lands in exactly one of three buckets
@@ -477,7 +481,8 @@ public sealed class Resolver
                           FastBreakBlk           = fastBreakBlk,
                           BreakPutbackBlk        = breakPutbackBlk,
                           NonBreakBlk            = nonBreakBlk,
-                          FastBreakBlkBySlot     = fastBreakBlkBySlot };
+                          FastBreakBlkBySlot     = fastBreakBlkBySlot,
+                          BreakContests          = breakContests };
 
                 case Continue c:
                     // Session 62: harvest any non-shooting foul this continuation carries,
@@ -731,7 +736,13 @@ public sealed class Resolver
                             // distinct putback pie and counts toward this possession's
                             // putback depth — the re-entrant loop's accumulation.
                             if (c.Putback) putbackAttempts++;
-                            var pieH = _rollHGenerator.Generate(c.State, c.Putback);
+                            // S88 — WHO GOT BACK. One draw per in-scope break shot, taken
+                            // before resolution and independent of the outcome. Null on every
+                            // other shot. The SAME object feeds the pie below and the block
+                            // credit further down, which is what keeps the man who contested
+                            // it and the man credited for the block the same person.
+                            var contest = BuildTransitionContest(c.State, c.Putback);
+                            var pieH = _rollHGenerator.Generate(c.State, c.Putback, contest);
                             result = RollH.Execute(c.State, pieH, _rng);
                             // FGA/FGM/3PA/3PM counters — the single Roll H chokepoint every
                             // field-goal attempt passes through, including putbacks. Read the
@@ -740,6 +751,20 @@ public sealed class Resolver
                             {
                                 var shotSt = result is Terminal tH ? tH.State : ((Continue)result).State;
                                 shotResolutions++;
+                                // S88, PAGE-ONLY: one observation per in-scope break shot,
+                                // recorded on EVERY such shot regardless of how it finished, so
+                                // the page's denominator is attempts rather than a subset. A
+                                // shot the contest never touched records nothing.
+                                if (contest is not null)
+                                {
+                                    (breakContests ??= new List<BreakContestObservation>()).Add(
+                                        new BreakContestObservation(
+                                            contest.TeamAggregate,
+                                            contest.DefenderGotBack,
+                                            contest.Defender.RimProtection,
+                                            shotSt.Result is ShotResult.Made or ShotResult.MadeAndFouled,
+                                            shotSt.Result == ShotResult.Blocked));
+                                }
                                 if (shotSt.Result == ShotResult.MissFouled)
                                 {
                                     // MissFouled is NOT an FGA (box-score definition): shooting
@@ -883,8 +908,17 @@ public sealed class Resolver
                                         // not on PossessionState, and the two block doors have
                                         // different credit rules — the putback rate is a
                                         // five-defender stack with no matched man. Pass it through.
-                                        var blkSlot = BlockerPicker.Pick(shotSt, _game, _matchup,
-                                                                         _rng, c.Putback).Number;
+                                        // S88: on an in-scope break the blocker is ALREADY
+                                        // known — he is the man drawn before the shot, whose
+                                        // length and speed set the block rate in the first
+                                        // place. Crediting him consumes no draw, and
+                                        // BlockerPicker is not consulted: rate and credit
+                                        // cannot disagree about who was there if they are the
+                                        // same read. Every other blocked shot is unchanged.
+                                        var blkSlot = contest is not null
+                                            ? contest.DefenderSlot.Number
+                                            : BlockerPicker.Pick(shotSt, _game, _matchup,
+                                                                 _rng, c.Putback).Number;
                                         blkBySlot = blkBySlot.WithSlot(blkSlot, 1);
 
                                         // Session 85, PAGE-ONLY: the same three-way partition
@@ -1227,6 +1261,90 @@ public sealed class Resolver
             if (roster.PlayerAt(lineup.SlotAt(i)) is not null)
                 return true;
         return false;
+    }
+
+    /// <summary>
+    /// S88 — WHO GOT BACK. Builds the transition contest for one shot: snapshot the defensive
+    /// lineup ONCE, compute every man's got-back number from that snapshot, draw exactly one
+    /// defender, and hand back the man himself.
+    ///
+    /// <para><b>Why the Resolver owns this.</b> It is the only place where both the shot pie
+    /// and the block credit are in scope, which is what lets the contested man and the credited
+    /// man be the same person. Roll H receives the result; it never recomputes the weights and
+    /// never re-resolves the player from a fresh lineup read. (<c>c.Putback</c> is threaded from
+    /// here for the same structural reason.)</para>
+    ///
+    /// <para><b>Exactly one draw per in-scope break shot</b>, taken BEFORE resolution and
+    /// independent of the outcome — so a blocked break and a made break consume the same amount
+    /// of the RNG stream and the sequence cannot depend on what happened.</para>
+    /// </summary>
+    /// <returns>Null when this is not an in-scope break: a halfcourt shot, a putback, or a
+    /// break with nobody on the floor on one side or the other (occupancy matrix rows 1 and 2).
+    /// Null is the only signal — there is no numeric sentinel to misread.</returns>
+    private TransitionContest? BuildTransitionContest(PossessionState state, bool putback)
+    {
+        // Scope (binding): in scope iff a fast break AND not a putback. A putback already has
+        // its own model — a five-defender team stack with no matched man and its own make
+        // penalty — because by the time it goes back up everyone is back.
+        if (!state.FastBreak || putback) return null;
+
+        var defLineup = _game.LineupFor(state.Defense);
+        var defRoster = _game.RosterFor(state.Defense);
+        var offLineup = _game.LineupFor(state.Offense);
+        var offRoster = _game.RosterFor(state.Offense);
+
+        // ── THE SNAPSHOT. Everything below reads this and only this. ──────────
+        // Indexed by slot number (index i = slot i+1) on BOTH sides, never by enumeration
+        // order of a compacted list — that is identical whenever both lineups are full, which
+        // is every real game, and wrong the moment a seat is empty.
+        var defenders  = new Player?[5];
+        var defOccupied = 0;
+        for (var i = 0; i < 5; i++)
+        {
+            defenders[i] = defRoster.PlayerAt(defLineup.SlotAt(i + 1));
+            if (defenders[i] is not null) defOccupied++;
+        }
+        if (defOccupied == 0) return null;          // matrix row 1 — nobody on defence
+
+        var offence     = new Player?[5];
+        var offOccupied = 0;
+        for (var i = 0; i < 5; i++)
+        {
+            offence[i] = offRoster.PlayerAt(offLineup.SlotAt(i + 1));
+            if (offence[i] is not null) offOccupied++;
+        }
+        if (offOccupied == 0) return null;          // matrix row 2 — nobody on offence
+
+        // Diagnostic, NOT a fallback: the man who shot it has to be on the floor. Silently
+        // dropping the shooter-zone term would hide an inconsistent possession state.
+        var shooterSlot = state.SelectedSlot
+            ?? throw new InvalidOperationException(
+                "BuildTransitionContest: a non-putback break shot with no stamped SelectedSlot — " +
+                "the selection roll must run before the shot door.");
+        if (offence[shooterSlot.Number - 1] is null)
+            throw new InvalidOperationException(
+                $"BuildTransitionContest: the shooter's offensive slot {shooterSlot.Number} is " +
+                "empty in the snapshot — inconsistent possession state.");
+
+        var weights = TransitionDefense.LineupGotBack(
+            defenders, offence, shooterSlot.Number, state.ShotType, _matchup);
+
+        // The aggregate is over the men actually on the floor (matrix row 3): an empty seat is
+        // nobody, not a zero-got-back man.
+        var occupiedWeights = new List<double>(defOccupied);
+        for (var i = 0; i < 5; i++)
+            if (defenders[i] is not null) occupiedWeights.Add(weights[i]);
+        var aggregate = TransitionDefense.TeamAggregate(occupiedWeights, _matchup);
+
+        var drawnSlot = TransitionDefenderPicker.Pick(state.Defense, defLineup, weights, _rng);
+
+        // THE MAN, from the same snapshot the weights came from — not a fresh roster read.
+        var drawnMan = defenders[drawnSlot.Number - 1]
+            ?? throw new InvalidOperationException(
+                $"BuildTransitionContest: drew empty defensive slot {drawnSlot.Number} — " +
+                "the picker must only ever draw an occupied seat.");
+
+        return new TransitionContest(drawnSlot, drawnMan, weights[drawnSlot.Number - 1], aggregate);
     }
 
     private RollResult DriveFreeThrows(PossessionState state, int shots, bool oneAndOne, out int spinCount, out int ftPoints)

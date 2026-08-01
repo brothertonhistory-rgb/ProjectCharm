@@ -3532,18 +3532,38 @@ internal static partial class Program
         }
 
         // ── (f) Transition defense: FastBreak only, halfcourt unaffected ─────
+        // S88 REWROTE THIS, it was not deleted. The statement it has always made is still
+        // true and still worth guarding: a defence that gets back makes a break harder, and
+        // a halfcourt possession does not care. What changed is HOW the engine says it.
+        //
+        // Before S88 the break read one team average of Hustle against another, so this
+        // sub-check varied Hustle and read the pie straight off the generator. That wire is
+        // retired. The break contest is now built in the possession loop and handed to the
+        // shot door, so calling the generator in isolation produces no transition defence at
+        // all — the old form of this check would have gone red with nothing wrong in the
+        // engine. It is therefore driven through the same door the game uses.
         Console.WriteLine("  (f) Transition defense (FastBreak only, halfcourt unaffected):");
         {
-            // FastBreak: defense out-hustles (def=80, off=20) → make% suppressed vs even.
-            var fbEven = RollHMake(50, 50, fastBreak: true, ShotLocation.Rim);
-            var fbDef  = RollHMake(20, 80, fastBreak: true, ShotLocation.Rim);
-            var fbSuppressed = fbDef < fbEven - Eps;
-            // Halfcourt: same Hustle gap → C8 does NOT fire → make% unchanged.
+            // Five men who get back against five who do not — legs are the only difference,
+            // and the offence is flat so nobody is stranded on a post.
+            var offence = Five(50);
+            double BreakMakeFor(Player?[] defence)
+            {
+                var w   = TransitionDefense.LineupGotBack(defence, offence, null, null, cfgM);
+                var agg = TransitionDefense.TeamAggregate(w, cfgM);
+                return TransitionDefense.BreakMakePct(defence[0]!, w[0], agg, cfgM);
+            }
+
+            var fbQuick = BreakMakeFor(Five(90));
+            var fbSlow  = BreakMakeFor(Five(10));
+            var fbSuppressed = fbQuick < fbSlow - Eps;
+
+            // Halfcourt: the shot door must not read a thing from the got-back model.
             var hcEven = RollHMake(50, 50, fastBreak: false, ShotLocation.Rim);
             var hcDef  = RollHMake(20, 80, fastBreak: false, ShotLocation.Rim);
             var hcUnaffected = Math.Abs(hcDef - hcEven) < TightEps;
 
-            Console.WriteLine($"    FastBreak: even mk%={fbEven:F6}  def-adv mk%={fbDef:F6}  suppressed → {(fbSuppressed ? "ok" : "FAIL")}");
+            Console.WriteLine($"    FastBreak: got back mk%={fbQuick:F6}  did not mk%={fbSlow:F6}  suppressed → {(fbSuppressed ? "ok" : "FAIL")}");
             Console.WriteLine($"    Halfcourt: even mk%={hcEven:F6}  def-adv mk%={hcDef:F6}  unaffected → {(hcUnaffected ? "ok" : "FAIL")}");
             var fOk = fbSuppressed && hcUnaffected;
             pass &= fOk;

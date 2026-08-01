@@ -434,6 +434,11 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// same seat-to-man path ordinary blocks already take, so a man's break blocks can never
     /// exceed his blocks.</summary>
     public SlotGroup FastBreakBlkBySlot { get; init; }
+
+    /// <summary>S88, PAGE-ONLY — the in-scope break shots resolved on this possession and the
+    /// transition contest each faced. Empty on every possession that took no break shot.
+    /// Never asserted; feeds the season page's got-back band and bins.</summary>
+    public IReadOnlyList<BreakContestObservation>? BreakContests { get; init; }
     /// <summary>The offensive slot that committed the turnover. Null for team
     /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
     /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for

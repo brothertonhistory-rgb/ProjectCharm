@@ -1,5 +1,6 @@
 using System.Globalization;
 using Charm.Engine;
+using Charm.History;
 
 namespace Charm.Harness;
 
@@ -43,6 +44,11 @@ internal static partial class Program
     {
         // Identity — stamped once, then only re-verified (see IdentityDriftObservations).
         public int PoolId;
+        /// <summary>★ S89 — the man's permanent number, or absent in legacy mode. `PoolId`
+        /// keeps every consumer it had: it is this season's roster slot, it encodes position,
+        /// and the roll-up is still keyed by it. This is the number that will still mean the
+        /// same person in four seasons' time, when the pool slot means somebody else.</summary>
+        public PersonId? PersonId;
         public int SchoolId;
         public int AcquisitionIndex;
         public string Name = "";

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Charm.Engine;
+using Charm.History;
 
 namespace Charm.Harness;
 
@@ -84,10 +85,17 @@ internal static partial class Program
     private const long SeasonScheduleXor = 0x5EA5C4ED;
     private const int SeasonNonConfAttempts = 20;
 
-    private sealed record SeasonGame(string Kind, int HomeId, int AwayId);
+    // ★ S89 — the two identity fields are NULLABLE, and they are nullable for exactly one
+    // reason: legacy mode. Run without a history and there is no career to belong to, so
+    // the honest value is "absent" — never a zero, never a made-up number. Run WITH a
+    // history and both are always present; that is validated once, at the top, rather than
+    // by every reader downstream checking again.
+    private sealed record SeasonGame(string Kind, int HomeId, int AwayId,
+                                     SeasonId? SeasonId = null, GameId? GameId = null);
 
     private sealed record SeasonGameResult(
-        int HomeId, int AwayId, int HomeScore, int AwayScore, int OvertimePeriods);
+        int HomeId, int AwayId, int HomeScore, int AwayScore, int OvertimePeriods,
+        SeasonId? SeasonId = null, GameId? GameId = null);
 
     private sealed class SeasonRunOutcome
     {
@@ -394,7 +402,13 @@ internal static partial class Program
 
     // ── The schedule builder (preflight -> conf -> nonconf -> orient) ────────────
 
-    private static List<SeasonGame> BuildSeasonSchedule(WorldFile world, long seasonSeed)
+    /// <summary>★ S89 — the schedule is built identity-free FIRST, validated, and only then
+    /// numbered. The order matters: a schedule that fails to build must not have already
+    /// spent a season number on itself, and no half-validated fixture may ever become
+    /// visible carrying an identity. Once the numbers ARE reserved they are durable, so a
+    /// season that then fails burns them permanently — a gap, never a retry.</summary>
+    private static List<SeasonGame> BuildSeasonSchedule(
+        WorldFile world, long seasonSeed, HistoryStore? history = null)
     {
         SeasonPreflight(world);
         var schools = world.Schools.OrderBy(s => s.Id).ToList();
@@ -416,9 +430,24 @@ internal static partial class Program
         for (var g = 0; g < all.Count; g++)
             games.Add(new SeasonGame(
                 g < confGames.Count ? "conf" : "nonconf", oriented[g].Item1, oriented[g].Item2));
+
+        if (history is null) return games;   // legacy mode: the fixtures stay unnumbered
+
+        // The count is known and the slate is legal, so one season number and one block of
+        // game numbers are reserved together and written once.
+        var seasonId = history.ReserveSeason();
+        var gameIds = history.ReserveGames(games.Count);
+        for (var g = 0; g < games.Count; g++)
+            games[g] = games[g] with { SeasonId = seasonId, GameId = gameIds[g] };
         return games;
     }
 
+    /// <summary>★ S89 note — this hashes the four pre-S89 fields BY NAME (index, kind, home,
+    /// away) and has always done so. That is what keeps the fingerprint at
+    /// `93d8c853…` after the identity fields were added: had it used the record's own
+    /// hashing it would have absorbed them and the A8 isolation check would have gone red
+    /// with nothing wrong in the engine. Nothing here changed; the property is recorded so
+    /// a later session does not "tidy" it into default record hashing.</summary>
     private static string ScheduleFingerprint(List<SeasonGame> games)
     {
         var sb = new StringBuilder();
@@ -484,11 +513,31 @@ internal static partial class Program
     // ── The season runner (shared by the CLI page and Phase 55) ───────────────────
 
     private static SeasonRunOutcome RunSeasonCore(
-        WorldFile world, long seasonSeed, string engineConfigPath, bool verbose)
+        WorldFile world, long seasonSeed, string engineConfigPath, bool verbose,
+        HistoryStore? history = null)
     {
-        var schedule = BuildSeasonSchedule(world, seasonSeed);
+        var schedule = BuildSeasonSchedule(world, seasonSeed, history);
         var fingerprint = ScheduleFingerprint(schedule);
-        var divvy = RunDivvyDraft(world, seasonSeed);
+        var divvy = RunDivvyDraft(world, seasonSeed, history);
+
+        // ★ S89 — history mode's contract, validated ONCE, here. Past this line every
+        // history-backed path may assume identities are present; none of them re-check.
+        if (history is not null)
+        {
+            if (divvy.PersonIds is null || divvy.PersonIds.Count != divvy.Pool.Count)
+                throw new HistoryException(HistoryError.MissingIdentity,
+                    $"history mode: {divvy.PersonIds?.Count ?? 0} identities for " +
+                    $"{divvy.Pool.Count} admitted people.");
+            foreach (var sg in schedule)
+            {
+                IdentityGuard.Require(sg.SeasonId, "a scheduled fixture");
+                IdentityGuard.Require(sg.GameId, "a scheduled fixture");
+            }
+            // Nothing after schedule construction issues an identity, so the lock is
+            // released before the long simulation rather than held across it.
+            history.CloseReservations();
+        }
+
         var rowsBySchool = BuildSeasonRows(divvy, world, verbose);
         AssertSeasonIdentitiesDistinct(rowsBySchool);
         var cfgs = LoadGenEngineConfigs(engineConfigPath);
@@ -498,6 +547,10 @@ internal static partial class Program
         var results = new List<SeasonGameResult>(schedule.Count);
         var ties = 0;
         var league = new SeasonLeagueStats();
+        // ★ S89 — the map goes to the accumulator ONCE, before the loop, rather than being
+        // threaded through both accumulator signatures every game. `RecordFor` is its only
+        // consumer and it already holds the pool slot.
+        league.PersonIds = divvy.PersonIds;
         var baseSeed = unchecked((int)seasonSeed);
 
         for (var g = 0; g < schedule.Count; g++)
@@ -549,8 +602,10 @@ internal static partial class Program
             // GameState.HomeScore is credited to HomeSchool, AwayScore to AwaySchool,
             // full stop (a flipped attribution passes conservation and determinism —
             // Phase 55's replay check exists to catch exactly that).
+            // S89: the result carries the FIXTURE's numbers — the same game, not a new one.
             results.Add(new SeasonGameResult(
-                sg.HomeId, sg.AwayId, game.HomeScore, game.AwayScore, result.OvertimePeriods));
+                sg.HomeId, sg.AwayId, game.HomeScore, game.AwayScore, result.OvertimePeriods,
+                sg.SeasonId, sg.GameId));
             if (game.HomeScore > game.AwayScore) { wins[sg.HomeId]++; losses[sg.AwayId]++; }
             else if (game.AwayScore > game.HomeScore) { wins[sg.AwayId]++; losses[sg.HomeId]++; }
             else ties++;   // assumption-1 says impossible; counted so it can never hide
@@ -575,19 +630,27 @@ internal static partial class Program
     {
         if (args.Length < 3)
         {
-            Console.WriteLine("usage: season <world.json> <seed> [minutes-floor: 100|250|500|900]");
+            Console.WriteLine("usage: season <world.json> <seed> [minutes-floor: 100|250|500|900] " +
+                              "[--history <path>]");
+            Console.WriteLine("  --history binds this season to a named career file. There is NO " +
+                              "default: leave it off and the run behaves exactly as it always has.");
             return;
         }
+        // S89: named, so it does not collide with the positional minutes floor at args[3].
+        string? historyPath;
+        try { historyPath = ParseHistoryArg(args, 3); }
+        catch (HistoryException hx) { Console.WriteLine($"SEASON ERROR: {hx.Message}"); return; }
         // S77: reporting-only leaderboard filter. Applied after the roll-up is complete; it
         // touches neither simulation nor accumulation, and deliberately does NOT live in
         // config.json (Phase 71 parity-locks that file's key names).
         var minuteFloor = SeasonDefaultMinuteFloor;
-        if (args.Length > 3)
+        for (var i = 3; i < args.Length; i++)
         {
-            if (!int.TryParse(args[3], NumberStyles.Integer, CultureInfo.InvariantCulture, out minuteFloor)
+            if (IsHistoryArgAt(args, i)) continue;   // S89: the flag and its path are not the floor
+            if (!int.TryParse(args[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out minuteFloor)
                 || !SeasonMinuteTiers.Contains(minuteFloor))
             {
-                Console.WriteLine($"SEASON ERROR: minutes floor '{args[3]}' must be one of " +
+                Console.WriteLine($"SEASON ERROR: minutes floor '{args[i]}' must be one of " +
                                   string.Join(", ", SeasonMinuteTiers) + ".");
                 return;
             }
@@ -608,10 +671,23 @@ internal static partial class Program
             return;
         }
 
+        // ★ S89 — the history opens BEFORE anything is printed, so a wrong world, a locked
+        // career or a corrupt file stops the run instead of stopping it half a page in.
+        // Legacy mode (no --history) leaves this null and nothing below touches a file.
+        HistoryStore? history = null;
+        try { history = OpenHistoryFor(world, historyPath); }
+        catch (HistoryException hx)
+        {
+            Console.WriteLine($"SEASON ERROR [{hx.Error}]: {hx.Message}");
+            return;
+        }
+
         List<SeasonGame> schedule;
         SeasonRunOutcome run;
         try
         {
+            // Preflight only — deliberately UNNUMBERED. RunSeasonCore builds the real
+            // schedule; numbering here as well would burn a season number every run.
             schedule = BuildSeasonSchedule(world, seed);   // preflight + build (fails loudly)
             Console.WriteLine("=== Project Charm :: Season (Pass 2: minimal season loop) ===");
             Console.WriteLine($"World: {args[1]} ({world.Schools.Count} schools, {world.Conferences.Count} conferences)");
@@ -622,14 +698,31 @@ internal static partial class Program
             Console.WriteLine();
             Console.WriteLine($"Regenerating divvied rosters (world + seed; nothing persisted) and playing " +
                               $"{schedule.Count} real engine games ...");
-            run = RunSeasonCore(world, seed, engineConfigPath, verbose: true);
+            run = RunSeasonCore(world, seed, engineConfigPath, verbose: true, history);
+        }
+        catch (HistoryException hx)
+        {
+            Console.WriteLine($"SEASON ERROR [{hx.Error}]: {hx.Message}");
+            history?.Dispose();
+            return;
         }
         catch (InvalidOperationException ex)
         {
             Console.WriteLine($"SEASON ERROR: {ex.Message}");
+            history?.Dispose();
             return;
         }
+        finally { history?.Dispose(); }
         Console.WriteLine();
+
+        // ★ S89 — printed only in history mode, so the legacy page is byte-identical to
+        // every page before this session (A8/A11).
+        if (history is not null)
+        {
+            Console.WriteLine($"History: {history.Path}");
+            Console.WriteLine($"World fingerprint: {history.WorldFingerprint}");
+            Console.WriteLine();
+        }
 
         var prestige = world.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);
         var names = world.Schools.ToDictionary(s => s.Id, s => s.Name);

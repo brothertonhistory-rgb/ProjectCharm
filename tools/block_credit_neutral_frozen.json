@@ -1,7 +1,7 @@
 {
  "schema": "s81-3-credit-neutral-frozen",
  "provenance": "Block CREDIT vectors copied byte-for-byte from tools/block_help_golden.json at schema s81-1 (the pre-S81.3 tree). NEVER re-derived. S81.3 forked the block RATE onto a shooter-relative bar and left CREDIT on the neutral one (R2); this file is what keeps the credit half a REGRESSION fixture instead of a snapshot that would agree with whatever the engine happens to do. Regenerating it would destroy the only thing it is for. Shooter-duplicate rows were collapsed only after proving every pair identical, which is itself the proof that credit was already shooter-independent.",
- "config_section_sha256": "e83197d9d87b69da85b00e1c2377192494ae2563075e5f7f4e1f7dd1dac7816f",
+ "config_section_sha256": "d479e2dd6ee3bbf60afdddfdfc37f1780b9be7980457b7cf49a3acaf0c9f03a5",
  "shooter_pairs_proved_identical": 600,
  "players": {
   "menace": {

@@ -36,7 +36,10 @@ public sealed class RollHStubPieGenerator : IRollHPieGenerator
     /// <param name="putback">When true, the shot is an offensive-rebound PUTBACK:
     /// return the DISTINCT putback pie (always Rim, Phase 8 carve applied with Rim
     /// foul baseline). Defaults to false.</param>
-    public Pie<ShotResult> Generate(PossessionState state, bool putback = false)
+    /// <param name="contest">S88 — ignored here. The stub is the flat pre-attribute pie: it
+    /// reads no ratings at all, so a transition contest has nothing to act on.</param>
+    public Pie<ShotResult> Generate(PossessionState state, bool putback = false,
+                                    TransitionContest? contest = null)
     {
         if (putback)
             return BuildPutbackPie();

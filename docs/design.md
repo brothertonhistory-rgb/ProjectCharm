@@ -8266,6 +8266,8 @@ A single JSON world file:
 
 The **reader** is the bench-reader standard: a strict tree-walk refusing unknown keys, duplicates, wrong types, and out-of-range values at every level, naming the exact school/conference/field. The **writer** is deterministic by construction: canonical tier order, conferences and schools by id, fixed property order, `\n` newlines, invariant numeric formatting — same inputs, byte-identical file.
 
+**★ S89 — the writer is now also the FINGERPRINT's projection.** `WriteWorld` was split: `CanonicalWorldBytes(WorldFile)` returns the canonical bytes and `WriteWorld` is a thin wrapper that writes them. The body is unchanged. This exists because a history file binds itself to a world by hashing exactly this form (`sha256-v1:<hex>`), and writing a *second* canonical serializer for the fingerprint would give the project two definitions of "the same world" that can drift apart silently — a world would then hash as changed while converting byte-identically, or the reverse, with no way to tell which one lied. One projection, two consumers. It is portable by construction: `Utf8JsonWriter`'s numeric formatting is culture-invariant and shortest-round-trip, managed code, identical on Windows and Linux, and nowhere near `Math.Pow` — so the S81.3 bit-portability trap does not apply and a fingerprint computed in a sandbox matches one computed on Emmett's machine. **The fingerprint hashes the PARSED model, never the file bytes**, so reformatting a world file by hand must not move it. (`stock-d1.world.json` happens to hash to the same value as its own projection today, `fa823da9…`, because the committed file was writer-produced. That is a coincidence, not a rule.)
+
 **Standing boundary rule (recorded, not yet exercised):** the world's prestige scale is 0–99; the roster generator's floor is 1. Any future pass feeding a school's prestige to generation treats 0 as 1 at that seam.
 
 **Historical prestige = current prestige everywhere in Pass 1** — the stock authored file and every generated world. A real-era file with authored national memory (historical above current for faded blue bloods) is a later authoring exercise over the same schema.
@@ -9286,3 +9288,118 @@ surviving `ApplyDietShift` at real usage; the post scorer untouched end-to-end; 
 (d2) moved as predicted (rim 53.196% → 45.398%, still inside its 6pp band — an average creator vs a
 perimD-65 man is exactly who this gate should wall); observation/stress/season moved as sanctioned
 real-population runs; Phase 56 and every flat-50 anchor unmoved; no unexplained mover.
+
+---
+
+## Permanent identity and the history file (Session 89, 2026-08-01)
+
+The first persistent layer that outlives a run. Every person, season and game gets a number that is issued once and **never issued again** — not after the player is thrown away, not after a restart, not after a season fails to build. This is the foundation the career layer stands on: `working-with-emmett` §7 named save-file schema versioning as the thing to design *before* the career layer rather than after, and this is that design.
+
+**It changes no basketball.** Run the season with and without a history and the full 5,205-game page differs by three banner lines. That is verified on Emmett's machine by direct comparison, and asserted at fixture scale by Phase 79's B8 with a negative control.
+
+### The assembly boundary IS the design
+
+Identities live in their own project, `src/Charm.History`, which the harness references and which references nothing. That direction is the whole mechanism.
+
+```csharp
+public readonly record struct PersonId
+{
+    private readonly long _value;
+    internal static PersonId FromRaw(long value);   // the only door in
+    internal long Raw { get; }                      // the only door out
+    public bool IsValid { get; }
+    public override string ToString();              // "person:123"
+}
+```
+
+`SeasonId` and `GameId` are the same shape. What they refuse, and why:
+
+- **No ordering.** No `<`, no `IComparable`, no sort. A lower number does not mean older, better, taller or drafted earlier — it means "a different person". The moment ordering exists, something will sort by it and produce a leaderboard that looks right and is meaningless.
+- **No conversion.** No cast to `long`, no cast between id types. A person number and a game number are not the same kind of thing and the compiler is what says so.
+- **Equality and hashing, yes, required.** "Is this the same man?" is the one question identity exists to answer, and dictionary lookup is how the stat layer finds him. Record structs generate `==`/`Equals`/`GetHashCode` over all fields including the private one.
+
+Everything in the harness — every calibration file, every check — is one assembly, so `internal` inside *the harness* would seal nothing. Putting the ids in a separate project with **no `InternalsVisibleTo`** makes the seam a compiler guarantee rather than a convention. Phase 79's B2 asserts the absence of that attribute for exactly this reason: a friend grant would silently unseal every other check without changing any of them.
+
+**Zero is not a person.** Issuance starts at 1, so `default(PersonId)` is invalid rather than being person zero. A struct cannot forbid `default`, so enforcement lives at construction boundaries (`IdentityGuard`), not in the type. Absence is `PersonId?` being null, never a zero identity.
+
+### The file — three counters and a world binding
+
+```json
+{
+  "format": "charm-history",
+  "schemaVersion": 1,
+  "worldFingerprint": "sha256-v1:fa823da9…",
+  "nextPersonId": 4512,
+  "nextSeasonId": 2,
+  "nextGameId": 5206
+}
+```
+
+Canonical form is specified once, in `HistorySchemaV1.Serialize`, and pinned by `tools/history_v1_golden.json`: that key order, 2-space indent, `\n` newlines, UTF-8 with **no BOM**, one final newline. The golden is compared against what the store actually writes, never against a second hand-rolled copy of the format.
+
+`Next*` means **next unissued**: every value below it is permanently unavailable, and the stored value itself has not been handed out yet.
+
+**The loader is as strict as the world loader**, and a save file deserves it more: a misread world produces a wrong league, a misread history produces two men with one number. Every refusal is classified by a `HistoryError` code (tests assert the code, never the message text): `MalformedJson`, `MissingKey`, `DuplicateKey`, `UnknownKey`, `WrongFormat`, `WrongType`, `UnsupportedVersion`, `CounterOutOfDomain`, `FingerprintMismatch`, `PathIsDirectory`, `LockUnavailable`, `PersistFailed`, `NegativeCount`, `ExhaustedRange`, `InvalidIdentity`, `MissingIdentity`. **A parse failure is NEVER treated as "no file"** — starting fresh at 1 on top of a corrupt-but-real history reissues every number in it.
+
+### The allocator — high-water, never a free list
+
+There is no record of which numbers were issued and no way to hand one back. The three counters ARE the proof: every value below a counter is spent, full stop, whether it ended up on a person or was burned by a season that failed to build. A scheme that filled holes would have to KNOW which numbers were free, which means a list, which means the list can be wrong — and a wrong list means two men sharing a career. Holes are permanent and cost nothing.
+
+**Order per batch: reserve → make durable → only then hand out.** Backwards would mean a crash between issuing and persisting leaves the file believing those numbers are available while people already wear them. Losing a range to a crash is free; reissuing one is fatal.
+
+Arithmetic is checked and half-open: `start = next`, `end = next + n`, persist `end`, issue `[start, end)`. An oversized batch rejects the **whole** reservation with the file byte-identical — never a partial advance. A zero reservation writes nothing.
+
+**The lock is a sidecar** (`<path>.lock`), not the data file. Holding the data file open exclusively and then atomically replacing that same file does not work on Windows — the replace needs the file not held. The lock is taken FIRST, before existence is even checked (checking first is the creation race), and held across load, validation and every reservation. It is released before the long simulation, which issues nothing.
+
+**Never a fallback.** If the file cannot be made durable — read-only folder, full disk, another process holding the lock — no identities are issued at all and the run stops. An in-memory fallback would produce a season whose numbers exist nowhere. Durability is claimed against ordinary process failure and normal atomic filesystem behaviour; not against a machine losing power mid-write.
+
+### Where numbers are issued, and in what order
+
+| kind | site | batch |
+|---|---|---|
+| person | `BuildDivvyPool` — the one place a person comes into existence | one reservation for all 4,511 |
+| season | `BuildSeasonSchedule`, **after** the slate validates | one |
+| game | same place, same write | one block of 5,205 |
+
+The schedule is built identity-free first and validated, and only then numbered — a schedule that fails to build must not already have spent a season number. Once reserved the numbers are durable, so a season that then fails burns them: a gap, never a retry.
+
+One reservation for the whole cohort, not one per player: 4,511 file replacements would be slow AND would leave 4,510 windows in which a crash strands a partly-numbered pool.
+
+### The transport — a frozen bijection, not a field on the pool row
+
+People are numbered where they come into existence; their statistics are counted somewhere else. Between the two sits `PersonIdentityMap`: built once at the construction site, validated as a bijection (no pool slot twice, no person number twice, full coverage), frozen, then read-only. It rides on `DivvyResult`, is handed to `SeasonLeagueStats` once before the game loop, and `RecordFor` — its only consumer, which already holds the pool slot — stamps `SeasonPlayerRecord.PersonId` beside the existing identity metadata.
+
+**A miss throws, never skips.** A silently skipped man would leave a whole season of statistics filed nowhere while every conservation total stayed green, because the totals would only ever have counted the men who were found.
+
+**The identity is deliberately NOT on `PoolPlayer`.** Phase 54 `with`-clones pool rows in its rigged-pool checks, and an identity riding through a test clone is an identity a helper can duplicate.
+
+**`PoolId` is untouched and must stay so.** It is position-encoded — guards 0–1734, wings 1735–3122, bigs 3123–4510, via `RosterShape.PositionForPoolIndex` — so renumbering it reclassifies the league. `PersonId` sits beside it, never in place of it: `PoolId` is this season's roster slot, `PersonId` is the man who will still be the same person in four seasons when that slot means somebody else.
+
+### Legacy mode, and why the flag has no default
+
+`--history <path>` is a **named** argument (the `season` command's fourth positional slot is already the minutes floor). Omit it and there is no allocator, no file, no folder touched, and every identity field is absent — never a zero, never a synthetic id. That is exactly how every session before S89 behaved.
+
+There is deliberately **no default path**. A career is a thing Emmett names and knows the location of; a hidden file appearing next to the binary the first time a season runs is how somebody ends up with three careers they cannot tell apart, and how a throwaway test run permanently burns four thousand person numbers out of a real one.
+
+### The world fingerprint
+
+`sha256-v1:` + SHA-256 of `CanonicalWorldBytes(world)` — the complete parsed, validated world model, hashed through the same canonical writer `world convert` uses (see the World Structure section). A history opened against a different world is **refused**, never silently rebound.
+
+The whole world is hashed, not a chosen subset: guessing which fields "can affect generation" is precisely the omission that bites three seasons later when somebody edits a prestige value and careers quietly continue against a different league. The world is small and does not change, so hashing all of it costs nothing and cannot be wrong. A future format change defines `sha256-v2` rather than redefining v1.
+
+### Phase 79 — what the checks are for
+
+Eleven groups, 71 assertions, **no basketball target among them**. Two of the eleven are the ones that actually discriminate:
+
+- **B2, the type surface.** Reflection proves the banned operations are *unwritable* rather than merely unwritten. `GetHashCode` is exempt **by name**, not by return type, so a future `public long Value` cannot hide behind the exemption.
+- **B8, isolation with a real negative control.** The whole fixture season compared with and without a history across ~17,600 characters of surface, then one live per-player field moved by a single shot and the comparison required to go red. Without that control, a green isolation line proves only that the comparator was never shown able to fail (the S81 lesson).
+
+**B1 reads the FILE, not the identities**, deliberately: "the next number is above every prior one" cannot be asserted by comparing identities, because identities cannot be compared — that is the point of B2. Non-reuse is read off the persisted counters, which is also the surface that carries the guarantee across a restart.
+
+B10's check-only helpers build history files **by hand** rather than through the store, because a check that could only build a file with the writer could never test what the reader does with a file the writer would not have produced.
+
+### One check that had to change first
+
+Phase 55's determinism replay asserted `outcome2.Results.SequenceEqual(outcome.Results)` — the record's generated equality, which silently absorbs any field ever added to `SeasonGameResult`. Two runs against one career MUST issue different numbers, so that form would have gone red with nothing wrong the first time it saw history mode. It is now field-explicit, and asserts something sharper than before: **the basketball is a pure function of (world, seed, config); the numbering deliberately is not.**
+
+`ScheduleFingerprint` needed no change — it has always hashed index/kind/home/away by name rather than letting the record hash itself, which is the only reason `93d8c853…` survives the new fixture fields. Recorded in place so a later session does not "tidy" it into default record hashing.

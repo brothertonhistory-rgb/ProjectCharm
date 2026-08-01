@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Charm.Engine", "src\Charm.E
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Charm.Harness", "src\Charm.Harness\Charm.Harness.csproj", "{CA76F77F-A8CA-4F93-A6DF-7BCFFAA8549D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Charm.History", "src\Charm.History\Charm.History.csproj", "{7F3A9C21-4B6E-4D18-9C42-6A1D5E8B7C90}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -26,8 +28,13 @@ Global
 		{CA76F77F-A8CA-4F93-A6DF-7BCFFAA8549D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CA76F77F-A8CA-4F93-A6DF-7BCFFAA8549D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CA76F77F-A8CA-4F93-A6DF-7BCFFAA8549D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F3A9C21-4B6E-4D18-9C42-6A1D5E8B7C90}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F3A9C21-4B6E-4D18-9C42-6A1D5E8B7C90}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F3A9C21-4B6E-4D18-9C42-6A1D5E8B7C90}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F3A9C21-4B6E-4D18-9C42-6A1D5E8B7C90}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
+		{7F3A9C21-4B6E-4D18-9C42-6A1D5E8B7C90} = {B1E60A67-C2C9-4A8E-A9A5-9FE81099DF7C}
 		{52C42D85-5408-4E02-A649-574DF01457B5} = {B1E60A67-C2C9-4A8E-A9A5-9FE81099DF7C}
 		{CA76F77F-A8CA-4F93-A6DF-7BCFFAA8549D} = {B1E60A67-C2C9-4A8E-A9A5-9FE81099DF7C}
 	EndGlobalSection

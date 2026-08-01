@@ -84,7 +84,7 @@ internal static partial class Program
         catch (Exception ex) when (ex is InvalidOperationException or IOException)
         { Console.WriteLine($"REACHBENCH ERROR: {ex.Message}"); return; }
 
-        var pool = BuildDivvyPool(world.Schools.Count, seed);
+        var (pool, _) = BuildDivvyPool(world.Schools.Count, seed);   // S89: legacy mode, no identities
         Console.WriteLine($"  pool rebuilt: {pool.Count} players from {world.Schools.Count} schools");
 
         // ── The actual-card contract ─────────────────────────────────────────

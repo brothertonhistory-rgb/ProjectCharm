@@ -1,4 +1,5 @@
 using Charm.Engine;
+using Charm.History;
 
 namespace Charm.Harness;
 
@@ -144,7 +145,12 @@ internal static partial class Program
     private static readonly HashSet<string> DivvyNoPlusLegs = new(StringComparer.Ordinal);
 
     // ── Pool generation (S63 bridge, S70 swap): the real Pass-3 cohort ───────────
-    private static List<PoolPlayer> BuildDivvyPool(int schoolCount, long divvySeed)
+    /// <summary>★ S89 — this is the ONE place a person comes into existence, and therefore
+    /// the one place a person is numbered. `history` null is legacy mode: no allocator, no
+    /// file, and the returned map is null. Every existing caller keeps its two-argument
+    /// shape (the S87 `PersonalFoulTracker` pattern).</summary>
+    private static (List<PoolPlayer> Pool, PersonIdentityMap? Ids) BuildDivvyPool(
+        int schoolCount, long divvySeed, HistoryStore? history = null)
     {
         var n = schoolCount;
         var P = RosterShape.PoolSize(n);
@@ -229,7 +235,28 @@ internal static partial class Program
                 v, players[pid], DivvyScoutRank(v, pos[pid])));
         }
 
-        return pool;
+        // ★ S89 — ONE reservation for the whole cohort, made durable before a single
+        // number is handed out. Not one write per player: 4,511 file replacements to
+        // number one class would be slow AND would leave 4,510 windows in which a crash
+        // strands a partly-numbered pool. One range, one write, all or nothing.
+        //
+        // The number does NOT go on PoolPlayer. The pool row is compared field-by-field
+        // and `with`-cloned by Phase 54's rigged-pool checks, and an identity riding along
+        // through a clone is an identity that can be duplicated by a test helper. The map
+        // beside the pool is the only carrier.
+        PersonIdentityMap? ids = null;
+        if (history is not null)
+        {
+            var issued = history.ReservePersons(P);
+            var pairs = new KeyValuePair<int, PersonId>[P];
+            for (var pid = 0; pid < P; pid++) pairs[pid] = new(pid, issued[pid]);
+            ids = PersonIdentityMap.Freeze(pairs);
+            if (ids.Count != P)
+                throw new InvalidOperationException(
+                    $"S89: the identity map covers {ids.Count} of {P} admitted people.");
+        }
+
+        return (pool, ids);
     }
 
     // ── The recruiting line at the bridge (Session 66 ruling, standing; Session 70:
@@ -340,15 +367,18 @@ internal static partial class Program
         public required Dictionary<int, List<int>> Rosters { get; init; }   // schoolId -> pool ids, ACQUISITION ORDER (immutable)
         public required List<DivvyPick> Picks { get; init; }
         public required double NoiseScale { get; init; }
+        /// <summary>★ S89 — the frozen pool-slot -> person bijection, or null in legacy mode.
+        /// Built at the construction site, never rebuilt, never added to.</summary>
+        public PersonIdentityMap? PersonIds { get; init; }
         public int MinSlackLead { get; set; }
         public int MinSlackTdw { get; set; }
     }
 
-    private static DivvyResult RunDivvyDraft(WorldFile world, long divvySeed)
+    private static DivvyResult RunDivvyDraft(WorldFile world, long divvySeed, HistoryStore? history = null)
     {
         var n = world.Schools.Count;
         var rng = new WorldRng(divvySeed);   // consumed ONLY by Phase D (winner draws)
-        var pool = BuildDivvyPool(n, divvySeed);
+        var (pool, personIds) = BuildDivvyPool(n, divvySeed, history);
         ValidateDivvyPool(pool, n);
 
         var P = pool.Count;
@@ -398,6 +428,7 @@ internal static partial class Program
         {
             Pool = pool, Rosters = rosters, Picks = new List<DivvyPick>(P), NoiseScale = scale,
             MinSlackLead = supplyLead - obligLead, MinSlackTdw = supplyTdw - obligTdw,
+            PersonIds = personIds,
         };
 
         // Legality, two layers (brief §3d — coverage is a hard constraint, never a

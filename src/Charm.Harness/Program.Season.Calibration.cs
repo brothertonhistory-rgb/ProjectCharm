@@ -1,5 +1,6 @@
 using System.Globalization;
 using Charm.Engine;
+using Charm.History;
 
 namespace Charm.Harness;
 
@@ -279,6 +280,12 @@ internal static partial class Program
         //  games played, because minutes are not in the box at all (A3).
         public readonly Dictionary<int, SeasonPlayerRecord> PlayerSeasons = new();
 
+        /// <summary>★ S89 — the frozen pool-slot -> person map, set once before the game loop,
+        /// null in legacy mode. The roll-up's LOGIC is untouched by it (A-5): the record is
+        /// still keyed by pool slot, still fetched the same way, still filed under the same
+        /// man. The identity is stamped beside the key, not in place of it.</summary>
+        public PersonIdentityMap? PersonIds { get; set; }
+
         /// <summary>Fetch-or-create the record for a person, stamping the identity fields on
         /// first sight. Metadata is written ONCE and thereafter only re-verified — see the
         /// drift counter, which is how a scrambled mapping shows up as something other than a
@@ -295,6 +302,12 @@ internal static partial class Program
             rec = new SeasonPlayerRecord
             {
                 PoolId           = row.PoolId,
+                // ★ S89 — the permanent number, stamped at the same moment as the rest of the
+                // identity metadata. A lookup miss THROWS (PersonIdentityMap's indexer): a
+                // silently skipped man would leave a whole season of statistics filed nowhere
+                // while every conservation total stayed green, because the totals would only
+                // ever have counted the men who were found.
+                PersonId         = PersonIds?[row.PoolId],
                 SchoolId         = schoolId,
                 AcquisitionIndex = row.Slot,
                 Name             = row.Player.Name,

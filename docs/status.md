@@ -10,7 +10,9 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 86** (2026-07-30; THE COACH BECAME A GATE. Roll J's run-or-not balance stopped being a flat number nudged by two additive lifts and became a score the players build against a bar the coach sets: the ball-winner's legs and his outlet pass as two OVERLAPPING escape routes, his four teammates' speed against all five defenders' speed getting back, and the offensive coach's pace setting the height that opportunity must clear. Both old lifts RETIRED rather than supplemented — pace was a nudge and is now the gate, so keeping both would let pace pay twice, and `Speed` lives inside `Player.Athleticism`, so keeping the five-way composite gap beside the new speed race would pay fast teams twice. League push 33.55% -> 35.70%, but the mean is not the finding: **per-offensive-team push now runs min 18.89% / median 36.16% / max 48.15%, a 29.26pp band, on rosters alone**, because every bar in the country is still the neutral 0.475 (O-57). Read against the entries-conceded band (12pp): who GETS transition chances is far more uniform than who RUNS on them. ★ THE RULING THAT CHANGED THE BUILD: the free-throw board was measured BEFORE it was wired and pulled out of scope — base Push 0.08 against a swing of 0.22 pinned a plodding rebounder to exactly 0.0% at grind AND neutral pace while everyone with legs jumped to ~28%, a source with no middle, and one of the two zero rows was an *average* rebounder against a fast defense. The locked oracle independently confirmed the call: its tables and its 45-case golden fixture carry only the live board and the two steals, so it never modelled the free-throw board at all and needed no edit. ★ THE CHECK-IN CAUGHT TWO SUITE CHECKS THAT WOULD HAVE GONE RED WITH NOTHING WRONG (a tempo-direction check and a tired-legs check, both stamping which team had the ball but never WHO); the same defect would have silently left the exploratory transition ladder reading dead flat — the S59.2 flat-baseline trap. Golden parity worst |delta| 4.92E-013 against a deliberately non-bitwise 1e-6 bar (S81.3 lesson). Nine of nine suite and eighteen of eighteen season predictions landed exactly; sandbox byte-identical to Emmett's machine. Three honest misses recorded, including one wrong claim in the build prompt that survived the §6b audit: entry rate DID move (41.61% -> 41.56%) because changing a pie shifts the RNG stream. Opened O-61, O-62, O-63. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
+Last updated: **Session 89** (2026-08-01; PERMANENT IDENTITY AND THE HISTORY FILE. Every person, season and game now carries a number issued once and never issued again — high-water counters in a named save file, `--history <path>`, with no default path. Identities live in a NEW PROJECT, `src/Charm.History`, and the project boundary IS the seam: the raw `long` is `internal` with no `InternalsVisibleTo`, so no calibration or domain file can write "person 4001 is older than person 4000". No ordering, no conversion, no arithmetic — only equality and hashing. **No basketball moved**: the full season page with and without a history differs by exactly THREE banner lines on Emmett's machine. Phase 79 adds 71 assertions, all green first time, two of which discriminate (the reflected type surface; isolation with a real negative control that moves one live per-player field). The check-in found the world already HAD a canonical writer — the fingerprint's projection was split out of `WriteWorld` rather than written twice — and found a landmine in Phase 55's determinism replay, which used generated record equality and would have gone red the first time it saw history mode. ★ THE SESSION ALSO FOUND S88: `config.json` carried a STAGED, uncommitted edit — twenty `Transition*` dials with no code behind any of them, four `HustleTransitionDefense*` keys removed whose engine defaults match the deleted values character for character. Behaviourally inert, saved out, reverted, opened as O-68 — and **Phase 71 went green through all of it**, which is O-69. Four honest misses recorded, all the same mistake: sandbox numbers asserted against Emmett's Windows machine, including the Gate 1 fixture itself (O-70). Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
+
+*(Previous board entry, S86: THE COACH BECAME A GATE. Roll J's run-or-not balance stopped being a flat number nudged by two additive lifts and became a score the players build against a bar the coach sets: the ball-winner's legs and his outlet pass as two OVERLAPPING escape routes, his four teammates' speed against all five defenders' speed getting back, and the offensive coach's pace setting the height that opportunity must clear. Both old lifts RETIRED rather than supplemented — pace was a nudge and is now the gate, so keeping both would let pace pay twice, and `Speed` lives inside `Player.Athleticism`, so keeping the five-way composite gap beside the new speed race would pay fast teams twice. League push 33.55% -> 35.70%, but the mean is not the finding: **per-offensive-team push now runs min 18.89% / median 36.16% / max 48.15%, a 29.26pp band, on rosters alone**, because every bar in the country is still the neutral 0.475 (O-57). Read against the entries-conceded band (12pp): who GETS transition chances is far more uniform than who RUNS on them. ★ THE RULING THAT CHANGED THE BUILD: the free-throw board was measured BEFORE it was wired and pulled out of scope — base Push 0.08 against a swing of 0.22 pinned a plodding rebounder to exactly 0.0% at grind AND neutral pace while everyone with legs jumped to ~28%, a source with no middle, and one of the two zero rows was an *average* rebounder against a fast defense. The locked oracle independently confirmed the call: its tables and its 45-case golden fixture carry only the live board and the two steals, so it never modelled the free-throw board at all and needed no edit. ★ THE CHECK-IN CAUGHT TWO SUITE CHECKS THAT WOULD HAVE GONE RED WITH NOTHING WRONG (a tempo-direction check and a tired-legs check, both stamping which team had the ball but never WHO); the same defect would have silently left the exploratory transition ladder reading dead flat — the S59.2 flat-baseline trap. Golden parity worst |delta| 4.92E-013 against a deliberately non-bitwise 1e-6 bar (S81.3 lesson). Nine of nine suite and eighteen of eighteen season predictions landed exactly; sandbox byte-identical to Emmett's machine. Three honest misses recorded, including one wrong claim in the build prompt that survived the §6b audit: entry rate DID move (41.61% -> 41.56%) because changing a pie shifts the RNG stream. Opened O-61, O-62, O-63. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
 
 ## Current baseline
 
@@ -22,7 +24,9 @@ Last updated: **Session 86** (2026-07-30; THE COACH BECAME A GATE. Roll J's run-
 clean (4,511/4,511 drafted; 347/347 exact rosters; 347/347 protected coverage). Every calibration
 session diffs against that page, never against memory.
 
-**★ S87 moved PPP 0.9719 → 0.9710 and NOTHING else outside the foul columns.** Team fouls, turnovers,
+**★★ S89 CORRECTION — THE RECORDED BASELINE NUMBERS BELOW WERE TAKEN FROM A SANDBOX RUN, NOT FROM EMMETT'S MACHINE.** S89 ran the identical committed tree on Emmett's machine and got **PPP 0.9692** (not 0.9710), **foul-outs 0.844** (not 0.840), **737,952 possessions** (not 738,211), **105,830 men who played** (not 105,823), **8,512 forced replacements** (not 8,507). `Math.Pow` is not bit-portable, and over three-quarters of a million possessions the last-bit differences cascade into a handful of different shot outcomes. **Emmett's machine is the verification of record (CONVENTIONS §2), so HIS figures are the baseline** and the sandbox figures below are wrong. The numbers that ARE machine-independent and unchanged: schedule fingerprint `93d8c853…`, fouls/team/game **17.95**, offensive fouls **1.54**, census 4,511/4,511, qualifiers `>=100 3470`. **Standing rule for every future session: a recorded reference figure must come from Emmett's run, and the session that records it should say which machine produced it.** See O-70.
+
+**★ S87 moved PPP 0.9719 → 0.9710 and NOTHING else outside the foul columns.** *(sandbox figures — see the correction above)* Team fouls, turnovers,
 rebounds and assists are unchanged to the digit; the whole delta is tellable as *someone fouled out and a
 different man played*. Credit identity `7382110 / 738211 = 10.0`, dropped 0; every reconciliation at
 residual 0. **The per-player SFL/NSF columns will not match any pre-S87 run and cannot be expected to** —
@@ -69,6 +73,34 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S89 — PERMANENT IDENTITY AND THE HISTORY FILE. The first persistent layer that outlives a run.**
+  `PersonId` / `SeasonId` / `GameId` are readonly record structs hiding a `long` in a **new project**,
+  `src/Charm.History`, referenced by the harness and referencing nothing. The raw accessor is `internal`
+  and the assembly grants **no `InternalsVisibleTo`** — that is the seam, and it is a compiler guarantee
+  rather than a convention, because the whole harness (every calibration file, every check) is one
+  assembly where `internal` would seal nothing. No ordering, no conversion, no arithmetic; equality and
+  hashing only. Zero is not a person — issuance starts at 1, so `default` is invalid, enforced at
+  boundaries by `IdentityGuard`. The file holds **three counters and a world binding and nothing else**,
+  schema v1, pinned byte-for-byte by `tools/history_v1_golden.json`; the loader is as strict as the world
+  loader with sixteen classified refusal reasons, and **a parse failure is never treated as "no file"**.
+  Allocation is **high-water, never a free list** (the counters ARE the proof; a list that knows which
+  numbers are free can be wrong, and a wrong list means two men share a career), **reserve → persist →
+  issue** in that order, one batch per kind, checked half-open arithmetic that rejects a whole oversized
+  reservation with the file untouched. The lock is a **sidecar** `.lock` file taken before existence is
+  even checked, released before the long simulation. `--history <path>` is **named with no default** — a
+  hidden file appearing beside the binary is how a throwaway run burns 4,511 numbers out of a real career.
+  Transport is a frozen, validated `PoolId -> PersonId` bijection built at the one construction site and
+  handed to the accumulator once; a lookup **throws**, never skips. `PoolId` untouched (it is
+  position-encoded; renumbering it reclassifies the league). `WriteWorld` split into `CanonicalWorldBytes`
+  + a thin writer so the fingerprint hashes the SAME canonical form the converter emits. **Phase 79**
+  adds 71 assertions, no basketball target among them; the two that discriminate are the reflected type
+  surface (banned operations proven *unwritable*, `GetHashCode` exempt by name) and isolation with a real
+  negative control (one live per-player field moved by a single shot, comparison required to go red).
+  **Phase 55's determinism replay was fixed first** — it used generated record equality and would have
+  gone red with nothing wrong the moment it saw history mode. Verified on Emmett's machine: full 5,205-game
+  season, legacy vs history, **three banner lines differ and nothing else**; counters read 4512 / 2 / 5206.
+  Opened O-68, O-69, O-70.
 
 - **★ S87 — REAL FOULS: THE COMMITTER MOVED TO THE WHISTLE, AND FIVE OF THEM SIT A MAN DOWN.**
   Foul attribution left the post-hoc harness pass and entered the engine at the moment of the whistle —
@@ -227,6 +259,37 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
+- **★ O-68 — S88 EXISTS AS A DIAL SET AND NOTHING ELSE (found S89).** `config.json` was carrying a
+  **staged, uncommitted** edit that would have ridden into the next commit unannounced: twenty new
+  `Transition*` keys — `GotBackLuckFloor`, `LegsSpan`, `DepthSpan`, `EffortSpeedShare`, `PostnessScale`,
+  `ArrivalSpan`, `ContestDiscount`, `BaseBreakMake`, `BaseBreakBlock`, `RimProtectionSwing`,
+  `TeamPresenceSwing`, `ChaseSwing`, `ChaseLengthWeight`, `ChaseRimProtWeight`, `ChaseSpeedSwing` and five
+  `ShooterZone*` multipliers — with **zero code reading any of them**, and four `HustleTransitionDefense*`
+  keys deleted whose compiled defaults (`0.043 / 2.0 / 25.0 / 0.05`) are character-for-character the
+  deleted values. **Behaviourally inert**, which is why it survived undetected. It is the skeleton of a
+  transition-defence design that named its dials and stopped — plausibly C-32's second and third effects.
+  Saved to `s88-transition-dials.json` (Emmett's Downloads) and reverted; the dial set is NOT in the repo.
+  If this arc resumes, it needs O-48 for the assignment half (see O-60) and its own design conversation
+  first. Recorded so the numbers are findable by name rather than by archaeology.
+- **★ O-69 — PHASE 71 DOES NOT ACTUALLY CATCH A CONFIG/CODE MISMATCH (found S89, and it is the real find).**
+  Phase 71 exists to lock config key names against a registry. O-68's file had **twenty keys the code has
+  never heard of present and four keys the code needs absent**, and the suite went green. Whatever it is
+  checking, it is not "the file and the code agree about which dials exist." Here that was survivable only
+  because the missing keys' compiled defaults happened to equal the removed values — had they differed, a
+  real dial would have silently reverted to a default with nothing saying so. Note this does NOT contradict
+  C-25 (a missing key is quiet at runtime **by ruling**, and loud at test time via Phase 71) — it says the
+  loud half is not working. Small, cheap, and it protects every dial in the project.
+- **★ O-70 — RECORDED REFERENCE FIGURES MUST NAME THEIR MACHINE (found S89).** S89 established that the
+  board's recorded S87 baseline was taken from a **sandbox** run: Emmett's machine reads PPP 0.9692 against
+  the recorded 0.9710, foul-outs 0.844 against 0.840, 737,952 possessions against 738,211. Neither is
+  wrong-as-arithmetic — `Math.Pow` is not bit-portable and the difference cascades over 738k possessions —
+  but only one is the verification of record. Two consequences. (1) **The baseline block at the top of this
+  board is corrected in place** for the figures S89 measured; the older S78/S84 reference numbers are
+  unaudited and may carry the same defect. (2) **Standing rule:** a session recording a reference figure
+  states which machine produced it, and a session predicting a figure for Emmett's run must not compute it
+  in the sandbox and assert it as exact. CONVENTIONS §2 already says this about fixtures; it needs to say it
+  about page numbers. **O-32 is the structural fix** and is now worth more than it looked — a page that
+  prints its own fingerprint makes a cross-machine mismatch visible in one line instead of by eye.
 - **O-64 — ★ FOUL CONCENTRATION: the rate is right, the spread is not (S87 finding).** Foul-outs run
   **0.840 per team-game** against roughly 0.4 in real college basketball, and **8.3% of player-games end
   at five or more** where an even spread of 17.95 fouls over the ten men who play would predict ~3%. The
@@ -874,7 +937,20 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**NONE SELECTED.** S87 made fouls real — every whistle names a man, five sit him down — and opened
+**NONE SELECTED.** S89 gave every person, season and game a permanent number and a save file to keep them
+in, and opened O-68, O-69, O-70.
+
+**★ O-69 is the cheapest and most protective thing on the board, and it should probably go first or ride the
+next session.** A config guard that reports green while twenty unknown keys sit in the file and four required
+ones are missing is not a guard. It cost nothing this time only by luck. Small enough to be a micro-session.
+
+**★ O-31 (per-game retention) is now unblocked and is the natural continuation.** S89 built the numbering it
+was waiting on: a game carries its identity from schedule construction through the accumulators, so a per-game
+row can be filed under a person who is still the same person next season. The two questions the item names —
+what a finished game should show a player, and the save-size arithmetic at career scale — are design
+conversations, and the schema is now versioned so they can be answered without a migration.
+
+*(Previous entry, S87.)* S87 made fouls real — every whistle names a man, five sit him down — and opened
 O-64, O-65, O-66, O-67.
 
 **★ O-64 is the natural S88, and S87 is the reason.** Fouls only just acquired consequences, and the first

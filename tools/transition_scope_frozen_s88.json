@@ -1,0 +1,680 @@
+{
+  "schema": "s88-scope-1",
+  "rows": [
+    {
+      "zone": "Rim",
+      "shooter": 1,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.416243089286936",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.2174969254119329",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.009255188315401402",
+        "MissOutOfBoundsRetained": "0.004627594157700701",
+        "Blocked": "0.15237720282802908"
+      }
+    },
+    {
+      "zone": "Rim",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Rim",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Rim",
+      "shooter": 3,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.364295112964192",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.25403424038394856",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.010809967675912706",
+        "MissOutOfBoundsRetained": "0.005404983837956353",
+        "Blocked": "0.1654556951379904"
+      }
+    },
+    {
+      "zone": "Rim",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Rim",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Rim",
+      "shooter": 5,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.4088770502619399",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.2409709653696016",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.010254083632749005",
+        "MissOutOfBoundsRetained": "0.0051270418163745024",
+        "Blocked": "0.13477085891933502"
+      }
+    },
+    {
+      "zone": "Rim",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Rim",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 1,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.34857307645629254",
+        "MadeAndFouled": "0.028000000000000004",
+        "Miss": "0.4183717930063527",
+        "MissFouled": "0.072",
+        "MissOutOfBoundsLost": "0.017803055021546922",
+        "MissOutOfBoundsRetained": "0.008901527510773461",
+        "Blocked": "0.10635054800503439"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 3,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3457602020962713",
+        "MadeAndFouled": "0.028000000000000004",
+        "Miss": "0.43665352930393336",
+        "MissFouled": "0.072",
+        "MissOutOfBoundsLost": "0.018581001246975887",
+        "MissOutOfBoundsRetained": "0.009290500623487944",
+        "Blocked": "0.08971476672933154"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 5,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3288590903640526",
+        "MadeAndFouled": "0.028000000000000004",
+        "Miss": "0.44792471323904337",
+        "MissFouled": "0.072",
+        "MissOutOfBoundsLost": "0.019060626095278442",
+        "MissOutOfBoundsRetained": "0.009530313047639221",
+        "Blocked": "0.09462525725398642"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Short",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 1,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3798441399040974",
+        "MadeAndFouled": "0.009",
+        "Miss": "0.5007859368118925",
+        "MissFouled": "0.04100000000000001",
+        "MissOutOfBoundsLost": "0.021310039864335852",
+        "MissOutOfBoundsRetained": "0.010655019932167926",
+        "Blocked": "0.03740486348750629"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 3,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.37178169854386217",
+        "MadeAndFouled": "0.009",
+        "Miss": "0.5110974155491778",
+        "MissFouled": "0.04100000000000001",
+        "MissOutOfBoundsLost": "0.02174882619358203",
+        "MissOutOfBoundsRetained": "0.010874413096791016",
+        "Blocked": "0.03449764661658694"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 5,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.36486147212381964",
+        "MadeAndFouled": "0.009",
+        "Miss": "0.5153630630384662",
+        "MissFouled": "0.04100000000000001",
+        "MissOutOfBoundsLost": "0.02193034310801984",
+        "MissOutOfBoundsRetained": "0.01096517155400992",
+        "Blocked": "0.03687995017568424"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Mid",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 1,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.39637120435241385",
+        "MadeAndFouled": "0.0036",
+        "Miss": "0.5225091569280558",
+        "MissFouled": "0.0264",
+        "MissOutOfBoundsLost": "0.022234432209704506",
+        "MissOutOfBoundsRetained": "0.011117216104852253",
+        "Blocked": "0.017767990404973552"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 3,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3462356282777311",
+        "MadeAndFouled": "0.0036",
+        "Miss": "0.566390330242868",
+        "MissFouled": "0.0264",
+        "MissOutOfBoundsLost": "0.024101716180547576",
+        "MissOutOfBoundsRetained": "0.012050858090273788",
+        "Blocked": "0.021221467208579436"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 5,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.29405676132093694",
+        "MadeAndFouled": "0.0036",
+        "Miss": "0.6056505874984998",
+        "MissFouled": "0.0264",
+        "MissOutOfBoundsLost": "0.025772365425468076",
+        "MissOutOfBoundsRetained": "0.012886182712734038",
+        "Blocked": "0.03163410304236111"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Long",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 1,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.40339488788763167",
+        "MadeAndFouled": "0.0015",
+        "Miss": "0.5380409393284945",
+        "MissFouled": "0.0135",
+        "MissOutOfBoundsLost": "0.02289535912036147",
+        "MissOutOfBoundsRetained": "0.011447679560180736",
+        "Blocked": "0.009221134103331561"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 1,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2728700445331841",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.14140979968251113",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.005050349988661111",
+        "MissOutOfBoundsRetained": "0.005050349988661111",
+        "Blocked": "0.3756194558069826"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 3,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3373827022863987",
+        "MadeAndFouled": "0.0015",
+        "Miss": "0.5986751433085475",
+        "MissFouled": "0.0135",
+        "MissOutOfBoundsLost": "0.025475538013129687",
+        "MissOutOfBoundsRetained": "0.012737769006564844",
+        "Blocked": "0.01072884738535908"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 3,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.2514625337721388",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.17428041792164853",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.006224300640058875",
+        "MissOutOfBoundsRetained": "0.006224300640058875",
+        "Blocked": "0.3618084470260949"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 5,
+      "putback": false,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.2561386604821243",
+        "MadeAndFouled": "0.0015",
+        "Miss": "0.6701091683116449",
+        "MissFouled": "0.0135",
+        "MissOutOfBoundsLost": "0.02851528375794234",
+        "MissOutOfBoundsRetained": "0.01425764187897117",
+        "Blocked": "0.015979245569317138"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": false,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    },
+    {
+      "zone": "Three",
+      "shooter": 5,
+      "putback": true,
+      "fastBreak": true,
+      "weights": {
+        "Made": "0.3437416909925424",
+        "MadeAndFouled": "0.06999999999999999",
+        "Miss": "0.20093002800894008",
+        "MissFouled": "0.13",
+        "MissOutOfBoundsLost": "0.007176072428890717",
+        "MissOutOfBoundsRetained": "0.007176072428890717",
+        "Blocked": "0.2409761361407361"
+      }
+    }
+  ]
+}

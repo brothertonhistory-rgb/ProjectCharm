@@ -152,9 +152,20 @@ public static class BlockerPicker
     ///
     /// <para><b>Why the break is exempt.</b> On a live break nobody is matched up; defenders
     /// sprint back and pick up whoever is closest. Slot parity is still the engine's only
-    /// assignment model, so applying it here would suppress a guard's rim help because the man
-    /// in his slot number is a shooter, when in fact he is chasing down a layup with no man at
-    /// all. Emmett's ruling explicitly preserves transition as a way guards get blocks.</para>
+    /// halfcourt assignment model, so applying it here would suppress a guard's rim help
+    /// because the man in his slot number is a shooter, when in fact he is chasing down a
+    /// layup with no man at all. Emmett's ruling explicitly preserves transition as a way
+    /// guards get blocks.</para>
+    ///
+    /// <para><b>S88 — the exemption is REPLACED behaviourally, not deleted.</b> An ordinary
+    /// break shot no longer arrives here at all: the Resolver draws the man who got back
+    /// before the shot goes up and credits him directly, so the man whose length set the block
+    /// rate is the man credited for the block. What still reaches this early-out is the
+    /// remainder — break PUTBACKS, which are out of the got-back model's scope because by the
+    /// time the ball goes back up everyone is back, and the harness-only case of a break with
+    /// nobody on the floor to defend it. Deleting the line would re-apply the halfcourt
+    /// assignment gate to putbacks and move their block attribution at unchanged incidence,
+    /// which is a bucket S88 promised not to touch. So it stays.</para>
     ///
     /// <para>Unpopulated offensive slots stay null inside the array and are handled by
     /// <see cref="Matchup.BlockAssignedMan"/>, which gates them at 1.0.</para>

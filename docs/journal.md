@@ -1,3 +1,113 @@
+## Session 89 — EVERY PERSON, SEASON AND GAME NOW HAS A NUMBER THAT IS NEVER GIVEN OUT TWICE. The engine gained a save file: `--history <path>` binds a run to a named career, and the three counters inside it are the whole guarantee — every value below a counter is spent forever, whether it ended up on a person or was burned by a season that failed to build. Identities are a **new project**, `src/Charm.History`, and the project boundary is the point: `PersonId`, `SeasonId` and `GameId` hide a `long` behind an `internal` accessor with **no `InternalsVisibleTo`**, so no calibration or domain file in the harness can write "person 4001 is older than person 4000" or "person 12 is on school 12". Both inferences are false; the type system is what makes them unwritable. There is no ordering, no conversion, no arithmetic — only equality and hashing, because "is this the same man?" is the one question identity exists to answer. **Nothing in the basketball moved.** The full 5,205-game season page, run with and without a history on Emmett's machine, differs by exactly **three lines**, all of them banner text. ★ THE CHECK-IN'S BEST FIND: the world file already had a canonical writer. A-4 claimed "no serialize call on the world path; this is the first write path" — false. `WriteWorld` has emitted fixed property order, canonical tier order, `\n` newlines and invariant numerics since the world layer shipped, so the fingerprint's projection was split out of it (`CanonicalWorldBytes`) rather than written a second time. One definition of "the same world," two consumers; a second serializer could have drifted from the first with no way to tell which one lied. ★ THE CHECK-IN'S SECOND FIND, and it was a landmine: Phase 55's determinism replay asserted `outcome2.Results.SequenceEqual(outcome.Results)` — the record's GENERATED equality, which silently absorbs any field ever added to `SeasonGameResult`. The two identity fields added this session are exactly the kind that MUST differ between two runs against one career. It is now field-explicit, and what it asserts is sharper than what it asserted before: the BASKETBALL is a pure function of (world, seed, config); the numbering deliberately is not. ★ THE THIRD: `SeasonGameResult` is not the only carrier of a game — it is built AFTER all three accumulators have run, so stamping it alone would have left the per-player layer unable to say which game a line came from. ★ THE SESSION ALSO FOUND S88. `config.json` carried a staged, uncommitted edit: twenty `Transition*` dials with **no code behind any of them** and four `HustleTransitionDefense*` keys deleted whose engine defaults are character-for-character the deleted values. Behaviourally inert; a design conversation that named its dials and stopped. Saved out, reverted, opened as O-68. **Four honest misses recorded below, all the same mistake** — sandbox numbers asserted against Emmett's Windows machine, including the Gate 1 fixture itself, which is why this session's isolation proof came from a same-machine comparison rather than from the banked fixture. Opened O-68, O-69, O-70. Suite `ALL CHECKS PASSED` with Phase 79 at 71 of 71; season verified on Emmett's machine. (2026-08-01)
+
+**Register:** build, under `PROMPT-permanent-identity-s89-r5`. Committed base was **S87** — there is no S88 in the tree (see O-68). Eleven new files (one new project of eight, two harness files, one golden fixture), ten changed, one new suite phase, no new config dial, no engine math touched.
+
+### The shape that shipped
+
+```
+src/Charm.History/                       NEW PROJECT — the seam is the assembly boundary
+  PersonId.cs  SeasonId.cs  GameId.cs    readonly record structs, private long, internal FromRaw/Raw
+  HistoryException.cs                    16 named reasons; tests assert the CODE, never the message
+  HistorySchemaV1.cs                     canonical writer + strict loader
+  HistoryStore.cs                        sidecar lock, high-water allocator, atomic publish
+  PersonIdentityMap.cs                   the frozen bijection + IdentityGuard
+```
+
+Three counters and a world binding, and deliberately nothing else:
+
+```json
+{ "format": "charm-history", "schemaVersion": 1,
+  "worldFingerprint": "sha256-v1:…", "nextPersonId": 1, "nextSeasonId": 1, "nextGameId": 1 }
+```
+
+The retention session (O-31) adds the entity tables. What it inherits from here is that every number those tables will store is trustworthy, because nothing was ever reused underneath them.
+
+### ★ WHY HIGH-WATER AND NEVER A FREE LIST
+
+There is no record of which numbers were issued and no way to hand one back. The counters ARE the proof. A scheme that filled holes would have to KNOW which numbers were free, which means a list, which means the list can be wrong — and the failure mode of a wrong list is two men sharing one career. Holes are permanent and cost nothing.
+
+Order per batch is **reserve → make durable → only then hand out**. Backwards would mean a crash between issuing and persisting leaves the file believing those numbers are still available while people are already wearing them. Losing a range to a crash is free; reissuing one is fatal.
+
+The lock is a **sidecar** (`<path>.lock`), not the data file. Holding the data file open exclusively and then atomically replacing that same file does not work on Windows — the replace needs the file not to be held. The lock is taken FIRST, before existence is even checked (checking first is the creation race), and released before the long simulation, which issues nothing.
+
+### ★ WHERE THE THREE KINDS OF NUMBER ARE ISSUED
+
+| kind | where | batch |
+|---|---|---|
+| person | `BuildDivvyPool`, the ONE construction site | one reservation for all 4,511 |
+| season | `BuildSeasonSchedule`, after the slate validates | one |
+| game | same place, same write | one block of 5,205 |
+
+The schedule is built identity-free FIRST and validated, and only then numbered. A schedule that fails to build must not already have spent a season number on itself. Once reserved the numbers are durable, so a season that then fails burns them permanently — a gap, never a retry.
+
+**4,511 people in ONE reservation, not 4,511 writes.** Per-player writes would be slow AND would leave 4,510 windows in which a crash strands a partly-numbered pool.
+
+### ★ THE CALL THAT WENT AGAINST THE PROMPT: the number is not on the pool row
+
+A-3 suggested `PersonId` as a new field beside `PoolId` on `PoolPlayer`. It is not there. Phase 54 `with`-clones pool rows in its rigged-pool checks, and an identity riding through a test clone is an identity a helper can duplicate. The frozen `PersonIdentityMap` beside the pool is the only carrier, it is validated as a bijection at construction (no pool slot twice, no person number twice, full coverage), and a lookup miss **throws** — a silently skipped man would leave a whole season of statistics filed nowhere while every conservation total stayed green, because the totals would only ever have counted the men who were found.
+
+`PoolId` is untouched and must stay so: it is **position-encoded** (guards 0–1734, wings 1735–3122, bigs 3123–4510 via `RosterShape.PositionForPoolIndex`). Renumbering it reclassifies the league.
+
+### ★ SCHEDULEFINGERPRINT NEEDED NO CHANGE, AND THAT IS WORTH RECORDING
+
+The prompt's §5.5 warned the fingerprint might absorb the new fixture fields. It never could — it has always hashed index/kind/home/away **by name** rather than letting the record hash itself. That is the only reason `93d8c853…` survives. A property that was already right, recorded in place so a later session does not "tidy" it into default record hashing.
+
+### ★ S88 EXISTS, AND IT NEVER REACHED CODE
+
+`git status` showed `config.json` **staged** — first column `M`, sitting in the index waiting to ride into the next commit. The diff:
+
+- **Added, twenty keys:** `TransitionGotBackLuckFloor`, `TransitionLegsSpan`, `TransitionDepthSpan`, `TransitionEffortSpeedShare`, `TransitionPostnessScale`, `TransitionArrivalSpan`, `TransitionContestDiscount`, `TransitionBaseBreakMake`, `TransitionBaseBreakBlock`, `TransitionRimProtectionSwing`, `TransitionTeamPresenceSwing`, `TransitionChaseSwing`, `TransitionChaseLengthWeight`, `TransitionChaseRimProtWeight`, `TransitionChaseSpeedSwing`, and five `TransitionShooterZone*` multipliers. **Zero hits for any of them anywhere in `src/`.**
+- **Removed, four keys:** `HustleTransitionDefense{Steepness,Exponent,Scale,Weight}`. These ARE read, by `MatchupConfig` and `RollHGenerator` — and their compiled defaults are `0.043 / 2.0 / 25.0 / 0.05`, character for character the deleted values. **Deleting them changed nothing.**
+
+Saved to `s88-transition-dials.json` and reverted. See O-68.
+
+**★ And it exposed a real gap: Phase 71 went green through all of it.** Phase 71 exists to lock config key names against a registry. Twenty unknown keys present and four required keys absent, and it passed. Here that was survivable only because the defaults coincided. See O-69.
+
+### THE HONEST MISSES — four of them, and they are all one mistake
+
+**Every one is the same error: a number computed in Claude's Linux sandbox, asserted against Emmett's Windows machine.** CONVENTIONS §2 has said since S81.3 that a sandbox artifact may not be compared bit-for-bit on Emmett's machine. It was applied carefully to the engine's fixtures and walked past four times on ordinary numbers.
+
+1. **The Gate 1 fixture — the root error.** The prompt required banking the pre-S89 season page before any edit. Claude banked **its own sandbox run** instead of having Emmett bank his. A baseline from the wrong machine cannot prove isolation on the right one. Every prediction downstream inherited it.
+2. **The B8 character count.** Predicted `17573 chars compared`, Emmett's read `17581`. Claude called this evidence that "something further down moved a real value." It was not evidence of anything — the surface is a concatenation of a few thousand integers, so two *completely different* seasons land within a few characters of each other. A weak signal treated as a fingerprint.
+3. **The config hash.** Predicted `5D3B832C` after the revert; Emmett's machine read `F6B15704`. Both are the committed file — Claude's hash was of the LF copy, Emmett's of the CRLF checkout. Confirmed by converting and re-hashing: exact match. Which also means the *original* signal (Emmett's observation config hash differing from the sandbox's) proved nothing on its own; any Windows machine would differ. What actually proved the S88 edit was `git status`, which was solid.
+4. **The season page.** Predicted PPP 0.9710 and foul-outs 0.840 from the sandbox; Emmett's machine reads **0.9692** and **0.844**, on 737,952 possessions against the sandbox's 738,211. `Math.Pow` is not bit-portable, and across three-quarters of a million possessions the last-bit differences cascade into a handful of different shot outcomes. **This further implies the recorded S87 reference figures were themselves taken from a sandbox run** — they matched the sandbox exactly and do not match Emmett's machine. See O-70.
+
+**What rescued the session:** the isolation proof does not need the fixture at all. Running the season twice on Emmett's machine — legacy and history, same build, same dials — and diffing the two pages is a *stronger* test than any cross-machine prediction, and it is the one that ran. Three lines, all banner. That is also what Phase 79's B8 does at fixture scale, with a negative control.
+
+### Verification of record — Emmett's machine
+
+```
+Compare-Object (Get-Content season.txt) (Get-Content season-history.txt)
+  History: C:\Project Charm\careers\test.history.json                =>
+  World fingerprint: sha256-v1:fa823da9…                             =>
+  (blank)                                                            =>
+```
+
+Three lines, all on the history side, all banner. Every score, standing, calibration line, census row and per-player line identical across the full 5,205-game season.
+
+After one season: `nextPersonId 4512, nextSeasonId 2, nextGameId 5206` — one past 4,511 people, one season, 5,205 fixtures. Predicted exactly; these are counts, not arithmetic, so they are machine-independent.
+
+Suite: `ALL CHECKS PASSED`, Phase 79 **71 of 71 green first time**.
+
+### Phase 79 — what actually discriminates
+
+Most of the eleven groups would pass on a broken implementation, because "it did not crash" is cheap. Two cannot:
+
+- **B2, the type surface.** Reflection over all three id types: no ordering/conversion/arithmetic operator exists, no public member returns a numeric primitive (`GetHashCode` exempt **by name**, so a future `public long Value` cannot hide behind the exemption), no `IComparable`, equality operators present and required, `Raw` non-public, and **no `InternalsVisibleTo` on the assembly** — because a friend grant would silently unseal every check above it without changing any of them. This proves the banned operations are *unwritable*, which beats demonstrating one misuse.
+- **B8, isolation with a real negative control.** Legacy and history seasons compared across a 17,581-character surface (fingerprint, every result, every standing, five conservation counters, eighteen columns per player-season). Then **one live per-player field is moved by a single shot** and the comparison is required to go red. A string mutation would only have proved two different strings differ; mutating the outcome proves the surface is actually reading the season.
+
+**B1's non-reuse check reads the FILE, not the identities** — deliberately. "The next number is above every prior one" cannot be asserted by comparing identities, because identities cannot be compared; that is the entire point of B2. Non-reuse is read off the persisted counters, which is also the surface that carries the guarantee across a restart.
+
+B10 covers every rejection path with its own classification: malformed JSON, unknown key, missing key, wrong format, unsupported version, wrong type, out-of-domain counter, wrong world, path-is-a-directory, lock held. Each also asserts **the file was not modified**. The check-only helpers build history files BY HAND rather than through the store — a check that could only build a file with the writer could never test what the reader does with a file the writer would not have produced.
+
+### Two design notes for the next session at this seam
+
+**The history is named, never defaulted.** There is deliberately no fallback path. A hidden file appearing next to the binary the first time a season runs is how somebody ends up with three careers they cannot tell apart, and how a throwaway test run permanently burns four thousand person numbers out of a real one. No argument means no history, no file, no allocator — exactly how every session before this one behaved.
+
+**The fingerprint is the WHOLE world, not a chosen subset.** Guessing which fields "can affect generation" is precisely the omission that bites three seasons later when somebody edits a prestige value and the careers quietly continue against a different league. The world is small and does not change; hashing all of it costs nothing and cannot be wrong. A future format change defines `sha256-v2` rather than redefining what v1 meant. Note for the curious: `stock-d1.world.json` currently hashes to the same value as its own canonical projection (`fa823da9…`), because the committed file was writer-produced — a coincidence, not a rule, which is why the fingerprint hashes the parsed model and not the file bytes.
+
+---
+
 ## Session 87 — EVERY WHISTLE NAMES A MAN, AND FIVE OF THEM PUT HIM ON THE BENCH. Foul attribution moved out of a post-hoc harness pass and into the engine at the moment of the whistle, which is the whole point: a foul that is decided after the game is over cannot have consequences, and a foul that is decided while the game is running can. Personal fouls are now game-scoped per-player state on `GameState` (`PersonalFoulTracker`, alongside `Fatigue` — deliberately NOT on the half-scoped `FoulTracker`, which would forgive everyone's first-half fouls at the break), a fifth foul disqualifies, and the rotation pulls the man at the next trip. **The Session 62 weightings were MOVED, not tuned — same zone tables, same interior proxy, same reach-in propensity, same one-draw-per-foul cost — and Phase 78 proves it by driving the new engine unit and the surviving S62 reference from identically-seeded streams and comparing the chosen seat draw for draw: 400,000 draws, zero mismatches.** ★ THE RULING THAT RESHAPED THE BUILD: the prompt found only ONE offensive foul — the loose-ball shove in the rebound scrum, 0.38 a game — and planned a brand-new Discipline-alone draw for it. The check-in found three more sources (the entry, the turnover pie, the offensive-rebound scrum) all landing on the same `OffensiveFoul` terminal at roughly **1.5 per team per game, four times the population**, and, more importantly, found that **the engine has already named the man who commits a charge since Phase 34** via `TurnoverInteriorPicker` — it was recorded as a turnover, never as a foul. Emmett ruled charges count toward five, and ruled the scrum foul uses the SAME interior weighting rather than the prompt's discipline spread ("men in the scrum"), so the engine now has ONE answer to "who committed an offensive foul" instead of two that disagree, and the charge bucket needed no new draw at all. ★ THE SECOND RULING came from Emmett correcting a bad framing: asked whether two men fouling out at one whistle should both leave, he answered *"How can two men foul at the same time?"* — correct, one whistle one man — and *"every foul results in play stoppage, and a fouled out player would leave immediately."* Also correct, and the engine cannot honour it: **the only substitution seam is BETWEEN trips**, so a below-bonus reach-in stops play, resumes the inbound, and continues the same possession with no door open. The gap was measured and bounded rather than papered over (8,507 forced replacements, 8,507 trips played by a disqualified man — **exactly one each**), the whistle-level door was sized honestly at one session for the cheap version and a multi-session foundation change for the honest one, and Emmett took the free half: a foul-out replacement now happens at the next trip **regardless of whether the ball is live**, which kills the extra-trip case entirely. ★ THE FINDING: foul-outs run **0.84 per team-game** — the rate is untouched (17.95 fouls/team/game, unchanged to the hundredth) but the CONCENTRATION is high. 8.3% of player-games end at five or more where an even spread over the ten men who play would predict ~3%. Named for S88, not chased. **One honest miss recorded below** (an off-by-one in my own check, caught before delivery). Opened O-64, O-65, O-66. Suite `ALL CHECKS PASSED` and season green on Emmett's machine, byte-identical to the sandbox on every Phase 78 figure. (2026-07-30)
 
 **Register:** build, under `PROMPT-real-fouls-s87-r3`, with two rulings taken mid-session that the ChatGPT-cleared prompt did not contain. Three new engine files, one new suite phase, one config dial, twenty-one files changed. Nine of nine predicted season figures landed; twenty of twenty Phase 78 lines green first time on Emmett's machine.

@@ -14,7 +14,8 @@ internal static partial class Program
     /// </summary>
     private sealed class ForcedMadeRollH : IRollHPieGenerator
     {
-        public Pie<ShotResult> Generate(PossessionState state, bool putback = false)
+        public Pie<ShotResult> Generate(PossessionState state, bool putback = false,
+                                        TransitionContest? contest = null)
         {
             var w = new Dictionary<ShotResult, double>();
             foreach (var v in Enum.GetValues<ShotResult>()) w[v] = 0.0;

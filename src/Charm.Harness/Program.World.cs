@@ -661,7 +661,28 @@ internal static partial class Program
     {
         var dir = Path.GetDirectoryName(Path.GetFullPath(path));
         if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        File.WriteAllBytes(path, CanonicalWorldBytes(w));
+    }
 
+    /// <summary>★ S89 — the canonical form of a world, as BYTES rather than as a file.
+    ///
+    /// <para>This body is the committed writer, unchanged; only its last line moved out to
+    /// <see cref="WriteWorld"/>. It exists separately because the history file's world
+    /// fingerprint hashes exactly this. Writing a SECOND canonical serializer for the
+    /// fingerprint would give the project two definitions of "the same world" that can
+    /// drift apart silently — a world would then hash as changed while converting
+    /// byte-identically, or the reverse, and there would be no way to tell which one lied.
+    /// One projection, two consumers.</para>
+    ///
+    /// <para>The formatting is deterministic on purpose and portable by construction:
+    /// canonical tier order, conferences and schools by id, fixed property order, "\n"
+    /// newlines, 2-space indent, UTF-8. Numbers go through Utf8JsonWriter, which is
+    /// culture-invariant and shortest-round-trip — managed code, identical on Windows and
+    /// Linux, and nowhere near <c>Math.Pow</c>. The S81.3 bit-portability trap does not
+    /// apply here, and a fingerprint computed in one sandbox matches the one computed on
+    /// Emmett's machine.</para></summary>
+    private static byte[] CanonicalWorldBytes(WorldFile w)
+    {
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, NewLine = "\n" }))
         {
@@ -722,7 +743,7 @@ internal static partial class Program
 
             writer.WriteEndObject();
         }
-        File.WriteAllBytes(path, stream.ToArray());
+        return stream.ToArray();
     }
 
     // =====================================================================================

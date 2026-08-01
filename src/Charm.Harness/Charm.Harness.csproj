@@ -10,6 +10,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Charm.Engine\Charm.Engine.csproj" />
+    <!-- S89: identity types, the allocator and the history file. The harness
+         references it; it references nothing. That direction is what makes the
+         raw-value seam real — see Charm.History.csproj's header. -->
+    <ProjectReference Include="..\Charm.History\Charm.History.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -128,6 +132,14 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="..\..\tools\gen_pass3_replay_fixture_s78.json" Link="tools\gen_pass3_replay_fixture_s78.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- S89 — the history file's canonical v1 form, pinned. This is a FORMAT fixture, not
+         a behaviour one: it is what a brand-new history looks like on disk, byte for byte,
+         with a placeholder world fingerprint. It exists so that a later session cannot
+         change the key order, the indent, the encoding or the trailing newline of a save
+         file without the suite saying so out loud. -->
+    <None Include="..\..\tools\history_v1_golden.json" Link="tools\history_v1_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Charm.History</RootNamespace>
+  </PropertyGroup>
+
+  <!-- ★ S89 — THE SEAM IS THIS PROJECT.
+
+       `PersonId`, `SeasonId` and `GameId` hide a `long`. Nothing outside this
+       assembly may see that long: no accessor, no cast, no comparison operator.
+       The whole point is that domain code CANNOT write "person 4001 is older than
+       person 4000" or "person id 12 is on school 12" — those inferences are false
+       and the type system is what makes them unwritable.
+
+       The mechanism is the assembly boundary: the raw accessors below are
+       `internal`, and there is DELIBERATELY NO `InternalsVisibleTo` here. Adding
+       one would silently unseal every guarantee A2 asserts. If a future session
+       needs the raw value outside, it adds a method HERE and defends it, rather
+       than opening the wall. -->
+
+</Project>

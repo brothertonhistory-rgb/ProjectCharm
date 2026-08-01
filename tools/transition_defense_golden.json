@@ -1,0 +1,1779 @@
+{
+ "schema": "s88-1",
+ "source": "tools/transition_defense_oracle.py (LOCKED)",
+ "float_tolerance": 1e-09,
+ "note": "Absolute 1e-9, deliberately NOT bitwise: a bit-exact cross-platform fixture is not portable (Math.Pow / tanh differ by 1-3 ULPs between Windows and Linux libm) and shipping one produced a red suite at S81.3 with nothing wrong in the engine.",
+ "constants": {
+  "TransitionGotBackLuckFloor": 0.15,
+  "TransitionLegsSpan": 0.45,
+  "TransitionDepthSpan": 0.34,
+  "TransitionEffortSpeedShare": 0.75,
+  "TransitionPostnessScale": 25.0,
+  "TransitionArrivalSpan": 0.6,
+  "TransitionContestDiscount": 0.55,
+  "TransitionBaseBreakMake": 0.466,
+  "TransitionBaseBreakBlock": 0.0962,
+  "TransitionRimProtectionSwing": 0.14,
+  "TransitionTeamPresenceSwing": 0.22,
+  "TransitionChaseSwing": 0.11,
+  "TransitionChaseLengthWeight": 0.7,
+  "TransitionChaseRimProtWeight": 0.3,
+  "TransitionChaseSpeedSwing": 0.055,
+  "TransitionShooterZoneRim": 0.7,
+  "TransitionShooterZoneShort": 0.8,
+  "TransitionShooterZoneMid": 1.0,
+  "TransitionShooterZoneLong": 1.1,
+  "TransitionShooterZoneThree": 1.2
+ },
+ "denominator_fixture": {
+  "description": "offensive slots 3/4/5 of AVG_OFFENCE on both sides; oppMean over the three occupied seats",
+  "slots": [
+   3,
+   4,
+   5
+  ],
+  "players": [
+   {
+    "speed": 56,
+    "hustle": 60,
+    "post": 50
+   },
+   {
+    "speed": 50,
+    "hustle": 60,
+    "post": 70
+   },
+   {
+    "speed": 44,
+    "hustle": 60,
+    "post": 88
+   }
+  ],
+  "oppMean": 69.33333333333333,
+  "weights": [
+   1.449081623441886,
+   1.1636865515945378,
+   0.9203135672028194
+  ],
+  "aggregate_occupied_count": 1.024081664417172,
+  "aggregate_fixed_five": 0.6144489986503031
+ },
+ "cases": [
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 25.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.1956353351364433
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 45.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.0660308133677485
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 65.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 0.8552242845269509
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 85.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 0.732953266371738
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 25.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.3279735572396494
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 45.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.1819659631846042
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 65.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 0.944479233037393
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 85.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 0.806733289146911
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 25.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.4603117793428557
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 45.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.29790111300146
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 65.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.0337341815478354
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 85.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 0.8805133119220842
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 25.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.5926500014460616
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 45.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.4138362628183154
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 65.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.1229891300582773
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 85.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 0.9542933346972571
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 25.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.7249882235492677
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 45.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.5297714126351711
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 65.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.2122440785687196
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 85.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.0280733574724301
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 25.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.8573264456524738
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 45.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.6457065624520268
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 65.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.3014990270791618
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 85.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.1018533802476032
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.014677300317286
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Rim",
+   "expected": 0.7552741102221001
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Short",
+   "expected": 0.8417418402538288
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Mid",
+   "expected": 1.014677300317286
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Long",
+   "expected": 1.1011450303490147
+  },
+  {
+   "kind": "gotback",
+   "speed": 20,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Three",
+   "expected": 1.187612760380743
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.1241130211386923
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Rim",
+   "expected": 0.8318791147970847
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Short",
+   "expected": 0.9292904169109539
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Mid",
+   "expected": 1.1241130211386923
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Long",
+   "expected": 1.2215243232525617
+  },
+  {
+   "kind": "gotback",
+   "speed": 35,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Three",
+   "expected": 1.3189356253664306
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.233548741960099
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Rim",
+   "expected": 0.9084841193720693
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Short",
+   "expected": 1.0168389935680793
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Mid",
+   "expected": 1.233548741960099
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Long",
+   "expected": 1.341903616156109
+  },
+  {
+   "kind": "gotback",
+   "speed": 50,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Three",
+   "expected": 1.4502584903521187
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.3429844627815053
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Rim",
+   "expected": 0.9850891239470537
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Short",
+   "expected": 1.1043875702252044
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Mid",
+   "expected": 1.3429844627815053
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Long",
+   "expected": 1.4622829090596559
+  },
+  {
+   "kind": "gotback",
+   "speed": 65,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Three",
+   "expected": 1.5815813553378064
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.4524201836029118
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Rim",
+   "expected": 1.0616941285220383
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Short",
+   "expected": 1.1919361468823295
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Mid",
+   "expected": 1.4524201836029118
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Long",
+   "expected": 1.582662201963203
+  },
+  {
+   "kind": "gotback",
+   "speed": 80,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Three",
+   "expected": 1.712904220323494
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": null,
+   "expected": 1.5618559044243183
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Rim",
+   "expected": 1.1382991330970227
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Short",
+   "expected": 1.2794847235394546
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Mid",
+   "expected": 1.5618559044243183
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Long",
+   "expected": 1.7030414948667503
+  },
+  {
+   "kind": "gotback",
+   "speed": 95,
+   "hustle": 60,
+   "oppPostness": 50.0,
+   "oppMean": 54.4,
+   "zone": "Three",
+   "expected": 1.844227085309182
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 0.85,
+   "expected": 0.53551201919905
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 1.0,
+   "expected": 0.50251201919905
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 1.25,
+   "expected": 0.44751201919905
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 0.85,
+   "expected": 0.49900000000000005
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 1.0,
+   "expected": 0.466
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 1.25,
+   "expected": 0.41100000000000003
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 0.85,
+   "expected": 0.4624879808009501
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 1.0,
+   "expected": 0.4294879808009501
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 1.25,
+   "expected": 0.3744879808009501
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 0.85,
+   "expected": 0.4332783654417101
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 1.0,
+   "expected": 0.4002783654417101
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.014677300317286,
+   "aggregate": 1.25,
+   "expected": 0.3452783654417101
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 0.85,
+   "expected": 0.5377551116134018
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 1.0,
+   "expected": 0.5047551116134018
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 1.25,
+   "expected": 0.4497551116134018
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 0.85,
+   "expected": 0.49900000000000005
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 1.0,
+   "expected": 0.466
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 1.25,
+   "expected": 0.41100000000000003
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 0.85,
+   "expected": 0.46024488838659827
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 1.0,
+   "expected": 0.42724488838659824
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 1.25,
+   "expected": 0.37224488838659825
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 0.85,
+   "expected": 0.42924079909587687
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 1.0,
+   "expected": 0.39624079909587684
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.1241130211386923,
+   "aggregate": 1.25,
+   "expected": 0.34124079909587685
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 0.85,
+   "expected": 0.5399982040277537
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 1.0,
+   "expected": 0.5069982040277536
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 1.25,
+   "expected": 0.45199820402775365
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 0.85,
+   "expected": 0.49900000000000005
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 1.0,
+   "expected": 0.466
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 1.25,
+   "expected": 0.41100000000000003
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 0.85,
+   "expected": 0.45800179597224644
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 1.0,
+   "expected": 0.4250017959722464
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 1.25,
+   "expected": 0.3700017959722464
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 0.85,
+   "expected": 0.42520323275004357
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 1.0,
+   "expected": 0.39220323275004354
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.233548741960099,
+   "aggregate": 1.25,
+   "expected": 0.33720323275004355
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 0.85,
+   "expected": 0.5422412964421055
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 1.0,
+   "expected": 0.5092412964421055
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 1.25,
+   "expected": 0.4542412964421055
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 0.85,
+   "expected": 0.49900000000000005
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 1.0,
+   "expected": 0.466
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 1.25,
+   "expected": 0.41100000000000003
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 0.85,
+   "expected": 0.45575870355789466
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 1.0,
+   "expected": 0.42275870355789463
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 1.25,
+   "expected": 0.36775870355789464
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 0.85,
+   "expected": 0.4211656664042103
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 1.0,
+   "expected": 0.3881656664042103
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.3429844627815053,
+   "aggregate": 1.25,
+   "expected": 0.3331656664042103
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 0.85,
+   "expected": 0.5444843888564572
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 1.0,
+   "expected": 0.5114843888564572
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 1.25,
+   "expected": 0.4564843888564572
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 0.85,
+   "expected": 0.49900000000000005
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 1.0,
+   "expected": 0.466
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 1.25,
+   "expected": 0.41100000000000003
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 0.85,
+   "expected": 0.45351561114354283
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 1.0,
+   "expected": 0.4205156111435428
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 1.25,
+   "expected": 0.3655156111435428
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 0.85,
+   "expected": 0.4171281000583771
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 1.0,
+   "expected": 0.38412810005837705
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.4524201836029118,
+   "aggregate": 1.25,
+   "expected": 0.32912810005837706
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 0.85,
+   "expected": 0.5467274812708091
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 1.0,
+   "expected": 0.513727481270809
+  },
+  {
+   "kind": "make",
+   "rimprot": 25.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 1.25,
+   "expected": 0.45872748127080903
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 0.85,
+   "expected": 0.49900000000000005
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 1.0,
+   "expected": 0.466
+  },
+  {
+   "kind": "make",
+   "rimprot": 50.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 1.25,
+   "expected": 0.41100000000000003
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 0.85,
+   "expected": 0.45127251872919105
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 1.0,
+   "expected": 0.418272518729191
+  },
+  {
+   "kind": "make",
+   "rimprot": 75.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 1.25,
+   "expected": 0.36327251872919103
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 0.85,
+   "expected": 0.4130905337125438
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 1.0,
+   "expected": 0.38009053371254375
+  },
+  {
+   "kind": "make",
+   "rimprot": 95.0,
+   "gotBack": 1.5618559044243183,
+   "aggregate": 1.25,
+   "expected": 0.32509053371254376
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 30.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.047459203291265704
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 30.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.06310721151942998
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 30.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.07875521974759425
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 30.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.09127362633012566
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 50.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.07666881865050568
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 50.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.09231682687866995
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 50.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.10796483510683422
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 50.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.12048324168936562
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 70.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.10587843400974564
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 70.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.12152644223790993
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 70.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.13717445046607418
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 70.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.1496928570486056
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 90.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.1350880493689856
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 90.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.1507360575971499
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 90.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.16638406582531415
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 90.0,
+   "gotBack": 1.014677300317286,
+   "expected": 0.17890247240784557
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 30.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.0478437334194403
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 30.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.06445306696804105
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 30.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.08106240051664182
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 30.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.09434986735552242
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 50.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.0788478227101617
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 50.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.09545715625876247
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 50.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.11206648980736324
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 50.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.12535395664624382
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 70.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.10985191200088312
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 70.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.12646124554948387
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 70.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.14307057909808463
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 70.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.15635804593696523
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 90.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.14085600129160453
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 90.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.15746533484020528
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 90.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.17407466838880606
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 90.0,
+   "gotBack": 1.1241130211386923,
+   "expected": 0.18736213522768666
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 30.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.0482282635476149
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 30.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.06579892241665215
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 30.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.0833695812856894
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 30.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.0974261083809192
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 50.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.08102682676981776
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 50.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.09859748563885501
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 50.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.11616814450789226
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 50.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.13022467160312207
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 70.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.11382538999202062
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 70.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.13139604886105788
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 70.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.14896670773009513
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 70.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.16302323482532494
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 90.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.1466239532142235
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 90.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.16419461208326075
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 90.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.18176527095229802
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 90.0,
+   "gotBack": 1.233548741960099,
+   "expected": 0.19582179804752778
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 30.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.04861279367578949
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 30.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.06714477786526322
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 30.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.08567676205473697
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 30.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.10050234940631596
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 50.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.0832058308294738
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 50.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.10173781501894755
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 50.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.12026979920842129
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 50.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.13509538656000028
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 70.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.11779886798315813
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 70.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.13633085217263186
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 70.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.1548628363621056
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 70.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.16968842371368456
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 90.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.15239190513684242
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 90.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.17092388932631616
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 90.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.1894558735157899
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 90.0,
+   "gotBack": 1.3429844627815053,
+   "expected": 0.2042814608673689
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 30.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.048997323803964085
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 30.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.06849063331387432
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 30.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.08798394282378455
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 30.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.10357859043171273
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 50.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.08538483488912986
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 50.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.10487814439904009
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 50.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.12437145390895031
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 50.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.1399661015168785
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 70.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.12177234597429562
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 70.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.14126565548420583
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 70.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.16075896499411607
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 70.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.17635361260204424
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 90.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.15815985705946137
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 90.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.17765316656937158
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 90.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.19714647607928182
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 90.0,
+   "gotBack": 1.4524201836029118,
+   "expected": 0.21274112368721
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 30.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.04938185393213868
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 30.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.0698364887624854
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 30.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.09029112359283212
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 30.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.1066548314571095
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 50.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.08756383894878589
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 50.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.10801847377913261
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 50.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.12847310860947933
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 50.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.1448368164737567
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 70.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.1257458239654331
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 70.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.14620045879577984
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 70.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.16665509362612654
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 70.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.18301880149040392
+  },
+  {
+   "kind": "block",
+   "rimprot": 25.0,
+   "length": 90.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.16392780898208031
+  },
+  {
+   "kind": "block",
+   "rimprot": 50.0,
+   "length": 90.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.18438244381242705
+  },
+  {
+   "kind": "block",
+   "rimprot": 75.0,
+   "length": 90.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.20483707864277376
+  },
+  {
+   "kind": "block",
+   "rimprot": 95.0,
+   "length": 90.0,
+   "gotBack": 1.5618559044243183,
+   "expected": 0.22120078650705113
+  }
+ ]
+}

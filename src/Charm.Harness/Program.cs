@@ -251,6 +251,7 @@ internal static partial class Program
         ok &= Phase76TransitionReadoutCheck(configPath);         // Phase 76 (S85: the fast-break readout — entry/arm partition, three-way shot partition, nesting chains, event-scoping, press-born source)
         ok &= Phase77TransitionOpportunityCheck(configPath);      // Phase 77 (S86: the transition opportunity score + coach bar — golden parity, neutral rule, conservation, monotonicity, overlap ruling, config guards)
         ok &= Phase78RealFoulsCheck(configPath);                 // Phase 78 (S87: real fouls — committer parity vs S62, totality, seat conservation, reset-proof reconciliation, five-and-out, escape hatch, negative control, config guards)
+        ok &= Phase79IdentityCheck(configPath);                  // Phase 79 (S89: permanent identity + the history file — non-reuse across reload, type-surface enforcement, deterministic issuance, transport bijection, two-episode fixtures, domain guards, behavioural isolation with negative control, PoolId untouched, file lifecycle, legacy mode)
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);
