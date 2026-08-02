@@ -376,7 +376,7 @@ internal static partial class Program
                   GeoSiteConstructs(new GameSite(farAway.PlaceId, new GameHost.Nobody()), stock));
 
             // =========================================================================
-            //  A7 — SCHEMA v2, BYTE-EXACT
+            //  A7 — SCHEMA v3, BYTE-EXACT
             // =========================================================================
             var v1Refused = false; var v1Msg = "";
             try { LoadWorld(v1Path); }
@@ -384,10 +384,32 @@ internal static partial class Program
             Check("A7 the retained schemaVersion 1 fixture is REFUSED with a named message",
                   v1Refused && v1Msg.Contains("schemaVersion 1", StringComparison.Ordinal), v1Msg);
 
+            // ★ S93 — the v2 refusal gets a NEGATIVE CONTROL rather than a second committed
+            //   retired fixture. The v1 file is CONSTRUCTED into a v2 one and required to be
+            //   refused for the v2 reason (no conference game count) rather than the v1 one
+            //   (no places table) — which is the discriminating part: a guard that fell
+            //   through to the generic "unsupported version" message would still refuse the
+            //   file and would still look green here without this check on the WORDS.
+            var v2Path = Path.Combine(Path.GetTempPath(), $"charm_v2_retired_{Guid.NewGuid():N}.json");
+            var v2Refused = false; var v2Msg = "";
+            try
+            {
+                File.WriteAllText(v2Path,
+                    File.ReadAllText(v1Path).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 2",
+                                                     StringComparison.Ordinal));
+                try { LoadWorld(v2Path); }
+                catch (InvalidOperationException ex) { v2Refused = true; v2Msg = ex.Message; }
+            }
+            finally { if (File.Exists(v2Path)) File.Delete(v2Path); }
+            Check("A7 a schemaVersion 2 world is REFUSED by name, for the v2 reason "
+                  + "(no conference game count) and not the v1 one",
+                  v2Refused && v2Msg.Contains("schemaVersion 2", StringComparison.Ordinal)
+                    && v2Msg.Contains("games", StringComparison.Ordinal), v2Msg);
+
             var tiny = LoadWorld(tinyPath);
             var format = LoadWorld(formatPath);
-            Check("A7 both migrated world files are schemaVersion 2 and validate",
-                  stock.SchemaVersion == 2 && tiny.SchemaVersion == 2 && format.SchemaVersion == 2);
+            Check("A7 all three migrated world files are schemaVersion 3 and validate",
+                  stock.SchemaVersion == 3 && tiny.SchemaVersion == 3 && format.SchemaVersion == 3);
 
             // ★ CANONICAL BYTES COMPARED, NEVER DECODED OBJECT EQUALITY. Object equality
             //   would pass while the key order, the indent or a number's spelling drifted,

@@ -3,23 +3,48 @@ using Charm.Engine;
 namespace Charm.Harness;
 
 // ============================================================================
-// Phase 55 — Season Pass 2 checks (Session 30).
+// Phase 55 — Season checks (Session 30; rewritten at Session 93).
 //
 // What a green Phase 55 PROVES: the stock schedule is legal and matches the
-// Python oracle's fingerprint bit-for-bit at the fixed seed; the builder is
-// deterministic; the preflight rejects an impossible world by NAME (and does
-// not over-reject a merely small one); the season prep path serves all 347
-// stock schools without mutating the world; a full fixture season conserves
-// results (every team 30, wins == losses == games, zero ties), credits scores
+// Python oracle's fingerprint; the builder is deterministic; the preflight
+// rejects an impossible world by NAME (and does not over-reject a merely small
+// one, nor an idle one); the season prep path serves all 347 stock schools
+// without mutating the world; a full fixture season conserves results (every
+// team its league's number, wins == losses == games, zero ties), credits scores
 // to the right schools (the attribution replay), and reproduces exactly.
 // Session 31 adds §3.8: the calibration accumulator conserves — points
 // reconcile three independent ways, the ending buckets partition the records,
 // per-game elapsed matches TotalSeconds — while asserting ZERO basketball
 // target values (those are page-only by design; see Program.Season.Calibration.cs).
 //
+// ★ S93 — REWRITTEN, NOT EXTENDED. The flat 16-conference / 14-non-conference /
+// 5,205-game / every-team-30 / exactly-15-home assertions were against a
+// schedule that no longer exists. What survives is re-pointed at the authored
+// numbers, and the generic checks DERIVE their totals from the loaded world so
+// a fixture can never inherit a stock constant; the exact 2,818 is asserted
+// once, as a stock-world golden.
+//
+// ★ AND ONE WARNING THAT MATTERS MORE THAN ANY CHECK HERE: the exactly-even
+// home/away assertion PASSED BEFORE S93 TOO. The old Eulerian walk landed all
+// 347 schools at 8 home and 8 away by accident of even degrees, at every seed
+// tried. So a green R3 line here is a promise being kept, NOT evidence that the
+// new orientation works. Phase 84's A9 — pre-fixed venues, which a Eulerian
+// cannot honour — is the assertion that discriminates.
+//
 // What it does NOT prove: outcome realism, calibration direction, or that the
 // prestige-vs-wins relationship on the page is basketball truth — those are
 // page-level observations for Emmett, never suite assertions.
+//
+// Divergence from the build prompt, named loudly: §3.4's draft assumed the
+// season path constructs GenPrograms (the smoke sim does, because
+// RunGenMatchup's signature demands a GenConfig). The Session 30 extraction
+// showed the game body never reads one — so the season path carries NO
+// GenProgram at all. Prestige's only door into a season game is the roster the
+// divvy drafted; there is no side door to clamp. §3.4 therefore asserts the
+// stronger structural fact (world unmutated, prestige-0 schools still read 0,
+// full legal prep for all 347) instead of a clamp on plumbing that does not
+// exist on this path.
+// ============================================================================
 //
 // Divergence from the build prompt, named loudly: §3.4's draft assumed the
 // season path constructs GenPrograms (the smoke sim does, because
@@ -56,16 +81,30 @@ internal static partial class Program
                 Path.Combine(AppContext.BaseDirectory, "data", "places.csv"));
             const long seed = 20260703;   // Session 30's fixed seed (Phase 54 used 20260702)
 
-            // Oracle exports (tools/schedule_oracle.py, fixed seed 20260703):
-            const string stockOracleFp   = "29fd9e2584aaa714bb1dbebd8d5d00e9585b82f0057d209c21b326bee7fb3c3f";
-            const string fixtureOracleFp = "50167eae4a08754a323afcd2104b1924b411e1fc7391838de6419f612996b304";
+            // ★ S93 — the oracle exports. The schedule consumes no randomness, so these are
+            //   a function of the WORLD alone and the seed no longer enters them.
+            const string stockOracleFp   = "6f79d6636e291866d51387f93979d817011f7903ddc64e67d4ebcebf087cb5c3";
+            const string fixtureOracleFp = "51c8e88c202e9eb663f69dd2d317ca5d213a3faf98623496598a8e7e06684f54";
+
+            // What the world itself says the season is. ★ Generic checks DERIVE their totals
+            // from the loaded world so a fixture can never inherit a stock constant; the exact
+            // stock number is asserted ONCE below, as a golden.
+            static int ConfSize(WorldFile w, int cid) => w.Schools.Count(s => s.ConferenceId == cid);
+            static int ExpectedGames(WorldFile w) => w.Conferences.Sum(c => ConfSize(w, c.Id) * c.Games / 2);
 
             // ── §3.1 Stock schedule legality (schedule only — no games played). ──────
             var schedule = BuildSeasonSchedule(stock, seed);
-            Check("stock: 5205 games total (347 × 30 / 2)", schedule.Count == 5205,
-                  $"got {schedule.Count}");
+            var expectedStock = ExpectedGames(stock);
+            Check("stock: the season is exactly the conference slate, derived from the world",
+                  schedule.Count == expectedStock, $"got {schedule.Count}, world says {expectedStock}");
+            // ★ THE ONE STOCK GOLDEN. 2,818 is what the 32 authored game counts add up to; if
+            //   this moves while the derived check above still passes, somebody edited conf.csv.
+            Check("stock: 2818 conference games (the authored counts, as a stock-world golden)",
+                  schedule.Count == 2818, $"got {schedule.Count}");
 
             var confOf = stock.Schools.ToDictionary(s => s.Id, s => s.ConferenceId);
+            var gamesOf = stock.Conferences.ToDictionary(c => c.Id, c => c.Games);
+            var skipOf = stock.Conferences.ToDictionary(c => c.Id, c => c.Skip);
             var byConf = new Dictionary<int, List<int>>();
             foreach (var s in stock.Schools.OrderBy(x => x.Id))
             {
@@ -75,68 +114,70 @@ internal static partial class Program
             }
 
             var total = stock.Schools.ToDictionary(s => s.Id, _ => 0);
-            var confN = stock.Schools.ToDictionary(s => s.Id, _ => 0);
-            var nonconfN = stock.Schools.ToDictionary(s => s.Id, _ => 0);
             var homeN = stock.Schools.ToDictionary(s => s.Id, _ => 0);
             var pairConf = new Dictionary<(int, int), int>();
-            var pairNonconf = new Dictionary<(int, int), int>();
-            var selfGames = 0; var confCross = 0; var nonconfMates = 0;
+            var selfGames = 0; var confCross = 0; var nonConfKind = 0;
             foreach (var g in schedule)
             {
                 if (g.HomeId == g.AwayId) { selfGames++; continue; }
+                if (g.Kind != "conf") { nonConfKind++; continue; }
                 total[g.HomeId]++; total[g.AwayId]++; homeN[g.HomeId]++;
+                if (confOf[g.HomeId] != confOf[g.AwayId]) confCross++;
                 var key = (Math.Min(g.HomeId, g.AwayId), Math.Max(g.HomeId, g.AwayId));
-                if (g.Kind == "conf")
-                {
-                    confN[g.HomeId]++; confN[g.AwayId]++;
-                    if (confOf[g.HomeId] != confOf[g.AwayId]) confCross++;
-                    pairConf[key] = pairConf.GetValueOrDefault(key) + 1;
-                }
-                else
-                {
-                    nonconfN[g.HomeId]++; nonconfN[g.AwayId]++;
-                    if (confOf[g.HomeId] == confOf[g.AwayId]) nonconfMates++;
-                    pairNonconf[key] = pairNonconf.GetValueOrDefault(key) + 1;
-                }
+                pairConf[key] = pairConf.GetValueOrDefault(key) + 1;
             }
             Check("stock: no self-games", selfGames == 0, $"{selfGames} found");
-            Check("stock: every team plays exactly 30 (16 conf + 14 nonconf)",
-                  total.Values.All(v => v == 30) && confN.Values.All(v => v == 16)
-                    && nonconfN.Values.All(v => v == 14),
-                  $"totals {total.Values.Min()}-{total.Values.Max()}, conf {confN.Values.Min()}-{confN.Values.Max()}, " +
-                  $"nonconf {nonconfN.Values.Min()}-{nonconfN.Values.Max()}");
-            Check("stock: exactly 15 home / 15 away for every team",
-                  homeN.Values.All(v => v == 15),
-                  $"home range {homeN.Values.Min()}-{homeN.Values.Max()}");
+            Check("stock: every game is a conference game — no non-conference game exists",
+                  nonConfKind == 0, $"{nonConfKind} found");
+            Check("stock: every team plays exactly its own league's authored number of games",
+                  stock.Schools.All(s => total[s.Id] == gamesOf[s.ConferenceId]),
+                  string.Join(", ", stock.Schools.Where(s => total[s.Id] != gamesOf[s.ConferenceId])
+                                                 .Take(3).Select(s => $"{s.Name} {total[s.Id]} vs {gamesOf[s.ConferenceId]}")));
+            // ★ R3, THE HARD LINE. Note this PASSED before S93 too (the old Eulerian landed
+            //   8/8 by accident of even degrees) — it is a promise now, not evidence. Phase 84
+            //   A9 is the assertion that discriminates.
+            Check("stock: exactly even home/away for every team (Games/2 each) — R3",
+                  stock.Schools.All(s => homeN[s.Id] == gamesOf[s.ConferenceId] / 2),
+                  string.Join(", ", stock.Schools.Where(s => homeN[s.Id] != gamesOf[s.ConferenceId] / 2)
+                                                 .Take(3).Select(s => $"{s.Name} {homeN[s.Id]}")));
             Check("stock: conference games never cross conferences", confCross == 0, $"{confCross} crossed");
-            Check("stock: no non-conference game pairs conference-mates", nonconfMates == 0, $"{nonconfMates} found");
-            Check("stock: no non-conference pair meets twice",
-                  pairNonconf.Values.All(v => v == 1),
-                  $"max meetings {(pairNonconf.Count > 0 ? pairNonconf.Values.Max() : 0)}");
+
+            // The fourteen Independent schools: authored at zero games, so they play none.
+            var idle = stock.Schools.Where(s => gamesOf[s.ConferenceId] == 0).ToList();
+            Check("stock: a conference authored at zero games plays no games at all (R14) — " +
+                  "the 14 Independent schools appear in no game",
+                  idle.Count == 14 && idle.All(s => total[s.Id] == 0),
+                  $"{idle.Count} zero-game schools, max games {(idle.Count > 0 ? idle.Max(s => total[s.Id]) : 0)}");
 
             var meetingRuleOk = true; var meetingDetail = "";
-            foreach (var (cid, members) in byConf)
+            foreach (var (cid, members) in byConf.OrderBy(kv => kv.Key))
             {
-                var s = members.Count;
-                var baseMeet = 16 / (s - 1);
-                for (var i = 0; i < members.Count - 1 && meetingRuleOk; i++)
-                    for (var j = i + 1; j < members.Count; j++)
+                var g = gamesOf[cid]; var k = skipOf[cid];
+                if (g == 0) continue;
+                var p = members.Count - 1 - k; var q = g / p; var r = g - q * p;
+                foreach (var x in members)
+                {
+                    var counts = members.Where(y => y != x)
+                        .Select(y => pairConf.GetValueOrDefault((Math.Min(x, y), Math.Max(x, y))))
+                        .ToList();
+                    if (counts.Count(c => c == 0) != k || counts.Count(c => c == q + 1) != r
+                        || counts.Count(c => c == q) != p - r)
                     {
-                        var c = pairConf.GetValueOrDefault((members[i], members[j]));
-                        if (c != baseMeet && c != baseMeet + 1)
-                        {
-                            meetingRuleOk = false;
-                            meetingDetail = $"conf {cid} pair ({members[i]},{members[j]}) meets {c}, " +
-                                            $"expected {baseMeet} or {baseMeet + 1}";
-                            break;
-                        }
+                        meetingRuleOk = false;
+                        meetingDetail = $"conf {cid} school {x}: {counts.Count(c => c == 0)} skipped " +
+                                        $"(want {k}), {counts.Count(c => c == q + 1)} at {q + 1} (want {r}), " +
+                                        $"{counts.Count(c => c == q)} at {q} (want {p - r})";
+                        break;
                     }
+                }
+                if (!meetingRuleOk) break;
             }
-            Check("stock: every conference pair meets floor or ceil of 16/(s-1) times",
+            Check("stock: every school meets k opponents never, r opponents q+1 times and the " +
+                  "rest q times — asserted per school, not per league average",
                   meetingRuleOk, meetingDetail);
 
             var fp = ScheduleFingerprint(schedule);
-            Check("stock: schedule fingerprint matches the Python oracle at seed 20260703",
+            Check("stock: schedule fingerprint matches the Python oracle",
                   fp == stockOracleFp, fp == stockOracleFp ? fp : $"got {fp}");
             Check("stock: game 0 matches the oracle export (conf, 6 at home vs 23)",
                   schedule[0].Kind == "conf" && schedule[0].HomeId == 6 && schedule[0].AwayId == 23,
@@ -152,33 +193,41 @@ internal static partial class Program
                 resolverSeeds.Add(unchecked(seasonBase + 2 * g));
                 governorSeeds.Add(unchecked(seasonBase + 2 * g + 1));
             }
-            Check("stock: 5205 distinct resolver seeds, 5205 distinct governor seeds, sets disjoint",
-                  resolverSeeds.Count == 5205 && governorSeeds.Count == 5205
+            Check($"stock: {schedule.Count} distinct resolver seeds, {schedule.Count} distinct " +
+                  "governor seeds, sets disjoint",
+                  resolverSeeds.Count == schedule.Count && governorSeeds.Count == schedule.Count
                     && !resolverSeeds.Overlaps(governorSeeds));
 
-            // ── §3.2 Build determinism: the schedule is a pure function of (world, seed). ──
+            // ── §3.2 Build determinism: the schedule is a pure function of the world. ──
             var schedule2 = BuildSeasonSchedule(stock, seed);
             Check("stock: building twice yields the identical schedule (fingerprint + sequence)",
                   ScheduleFingerprint(schedule2) == fp && schedule.SequenceEqual(schedule2));
+            // ★ S93 — and a DIFFERENT seed yields the same schedule too, because no randomness
+            //   enters the slate any more. Asserted rather than left implicit, so that the day
+            //   a session wires a scheduler RNG this check goes red and says so.
+            var scheduleOtherSeed = BuildSeasonSchedule(stock, seed + 1);
+            Check("stock: a different seed yields the SAME schedule — the slate consumes no " +
+                  "randomness (the seed still drives every outcome)",
+                  ScheduleFingerprint(scheduleOtherSeed) == fp);
 
-            // ── §3.3 Preflight: impossible world rejected BY NAME; small world is not. ──
+            // ── §3.3 Preflight: impossible world rejected BY NAME; legal ones are not. ──
             var lowTier = tiny.Tiers.OrderBy(t => t.Floor).First().Id;
-            WorldFile Rig(params int[] movedIdx)
+            WorldFile Rig(int games, int skip, params int[] movedIdx)
             {
                 var moved = movedIdx.ToHashSet();
                 return new WorldFile
                 {
-                    SchemaVersion = 2, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
+                    SchemaVersion = 3, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
                     Division = tiny.Division, WorldSeed = tiny.WorldSeed, Tiers = tiny.Tiers,
                     Places = tiny.Places,
                     Conferences = tiny.Conferences
-                        .Append(new WorldConference(999, "Lonely", "LON", lowTier)).ToList(),
+                        .Append(new WorldConference(999, "Lonely", "LON", lowTier, games, skip)).ToList(),
                     Schools = tiny.Schools
                         .Select((s, i) => moved.Contains(i) ? s with { ConferenceId = 999 } : s).ToList(),
                 };
             }
 
-            var lonely = Rig(0);   // one school alone in conference 999
+            var lonely = Rig(16, 0, 0);   // one school alone in a conference that wants 16 games
             var lonelyValid = true; var lonelyValidMsg = "";
             try { ValidateWorld(lonely); }
             catch (InvalidOperationException ex) { lonelyValid = false; lonelyValidMsg = ex.Message; }
@@ -189,15 +238,25 @@ internal static partial class Program
             try { SeasonPreflight(lonely); }
             catch (InvalidOperationException ex) { rejected = true; rejectMsg = ex.Message; }
             Check("preflight rejects the one-school conference, naming it",
-                  rejected && rejectMsg.Contains("Lonely") && rejectMsg.Contains("s-1 = 0"),
+                  rejected && rejectMsg.Contains("Lonely") && rejectMsg.Contains("needs an opponent"),
                   rejectMsg);
 
-            var pair = Rig(0, 5);   // a TWO-school conference: legal (16 meetings of one opponent)
+            var pair = Rig(16, 0, 0, 5);   // a TWO-school conference: legal (16 meetings of one opponent)
             var pairOk = true; var pairMsg = "";
             try { SeasonPreflight(pair); }
             catch (InvalidOperationException ex) { pairOk = false; pairMsg = ex.Message; }
-            Check("preflight does NOT reject a two-school conference (s=2 is legal: base=16, r=0)",
+            Check("preflight does NOT reject a two-school conference (n=2 is legal: q=16, r=0)",
                   pairOk, pairMsg);
+
+            // ★ A one-school conference at ZERO games is legal — it is a conference of
+            //   independents, and its size never matters because nobody plays.
+            var lonelyIdle = Rig(0, 0, 0);
+            var idleOk = true; var idleMsg = "";
+            try { SeasonPreflight(lonelyIdle); }
+            catch (InvalidOperationException ex) { idleOk = false; idleMsg = ex.Message; }
+            Check("preflight does NOT reject a one-school conference authored at ZERO games " +
+                  "(R14: it is a conference of independents, and size never binds)",
+                  idleOk, idleMsg);
 
             // ── §3.4 Stock season prep (adapted — see the header note). ──────────────
             var prestigeBefore = stock.Schools.OrderBy(s => s.Id)
@@ -227,14 +286,23 @@ internal static partial class Program
                   string.Join(", ", zeroes.Select(s => s.Name)));
 
             // ── §3.5 Fixture season: conservation + the attribution replay. ──────────
+            //     ★ S93 — the counts are DERIVED from the fixture, not written down. The tiny
+            //     world's four five-team leagues each play 16, so it is 160 games of 16 apiece
+            //     rather than the old 300 of 30 — and a fixture whose composition changes must
+            //     not need this file edited to stay honest.
+            var tinyGames = ExpectedGames(tiny);
+            var tinyPerTeam = tiny.Schools.ToDictionary(
+                s => s.Id, s => tiny.Conferences.Single(c => c.Id == s.ConferenceId).Games);
             var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false);
-            Check("fixture: schedule fingerprint matches the oracle (20 schools, 300 games)",
-                  outcome.Fingerprint == fixtureOracleFp && outcome.Results.Count == 300,
-                  outcome.Fingerprint == fixtureOracleFp ? "" : $"got {outcome.Fingerprint}");
-            Check("fixture: every team has exactly 30 results (W+L == 30)",
-                  tiny.Schools.All(s => outcome.Wins[s.Id] + outcome.Losses[s.Id] == 30));
-            Check("fixture: results conserve — total wins == total losses == 300, zero ties",
-                  outcome.Wins.Values.Sum() == 300 && outcome.Losses.Values.Sum() == 300
+            Check($"fixture: schedule fingerprint matches the oracle ({tiny.Schools.Count} schools, " +
+                  $"{tinyGames} games)",
+                  outcome.Fingerprint == fixtureOracleFp && outcome.Results.Count == tinyGames,
+                  outcome.Fingerprint == fixtureOracleFp
+                    ? $"{outcome.Results.Count} games" : $"got {outcome.Fingerprint}");
+            Check("fixture: every team has exactly its league's authored number of results (W+L)",
+                  tiny.Schools.All(s => outcome.Wins[s.Id] + outcome.Losses[s.Id] == tinyPerTeam[s.Id]));
+            Check($"fixture: results conserve — total wins == total losses == {tinyGames}, zero ties",
+                  outcome.Wins.Values.Sum() == tinyGames && outcome.Losses.Values.Sum() == tinyGames
                     && outcome.Ties == 0,
                   $"W {outcome.Wins.Values.Sum()}, L {outcome.Losses.Values.Sum()}, ties {outcome.Ties}");
             Check("fixture: every game has a strict winner (assumption 1: the OT loop never " +

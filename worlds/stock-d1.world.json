@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "metadata": {
     "kind": "authored",
     "eraLabel": "stock-d1",
@@ -36,193 +36,257 @@
       "id": 1,
       "name": "America East Conference",
       "shortName": "America East",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 2,
       "name": "Atlantic 10 Conference",
       "shortName": "Atlantic 10",
-      "tierId": "highMid"
+      "tierId": "highMid",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 3,
       "name": "Atlantic Coast Conference",
       "shortName": "ACC",
-      "tierId": "power"
+      "tierId": "power",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 4,
       "name": "Atlantic Sun Conference",
       "shortName": "Atlantic Sun",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 20,
+      "skip": 0
     },
     {
       "id": 5,
       "name": "Big 12 Conference",
       "shortName": "Big 12",
-      "tierId": "power"
+      "tierId": "power",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 6,
       "name": "Big East Conference",
       "shortName": "Big East",
-      "tierId": "power"
+      "tierId": "power",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 7,
       "name": "Big Sky Conference",
       "shortName": "Big Sky",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 8,
       "name": "Big South Conference",
       "shortName": "Big South",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 9,
       "name": "Big Ten Conference",
       "shortName": "Big Ten",
-      "tierId": "power"
+      "tierId": "power",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 10,
       "name": "Big West Conference",
       "shortName": "Big West",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 11,
       "name": "Colonial Athletic Association",
       "shortName": "CAA",
-      "tierId": "lowMid"
+      "tierId": "lowMid",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 12,
       "name": "Conference USA",
       "shortName": "Conference USA",
-      "tierId": "highMid"
+      "tierId": "highMid",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 13,
       "name": "Independent",
       "shortName": "Independent",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 0,
+      "skip": 0
     },
     {
       "id": 14,
       "name": "Horizon League",
       "shortName": "Horizon League",
-      "tierId": "highMid"
+      "tierId": "highMid",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 15,
       "name": "Ivy League",
       "shortName": "Ivy League",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 14,
+      "skip": 0
     },
     {
       "id": 16,
       "name": "Metro Atlantic Athletic Conference",
       "shortName": "MAAC",
-      "tierId": "lowMid"
+      "tierId": "lowMid",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 17,
       "name": "Summit League",
       "shortName": "Summit",
-      "tierId": "lowMid"
+      "tierId": "lowMid",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 18,
       "name": "Mid-American Conference",
       "shortName": "MAC",
-      "tierId": "lowMid"
+      "tierId": "lowMid",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 19,
       "name": "Mid-Eastern Athletic Conference",
       "shortName": "MEAC",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 20,
       "name": "Missouri Valley Conference",
       "shortName": "MVC",
-      "tierId": "highMid"
+      "tierId": "highMid",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 21,
       "name": "Mountain West Conference",
       "shortName": "Mountain West",
-      "tierId": "highMid"
+      "tierId": "highMid",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 22,
       "name": "Northeast Conference",
       "shortName": "Northeast",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 23,
       "name": "Ohio Valley Conference",
       "shortName": "Ohio Valley",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 24,
       "name": "Pacific-10 Conference",
       "shortName": "Pacific-10",
-      "tierId": "power"
+      "tierId": "power",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 25,
       "name": "Patriot League",
       "shortName": "Patriot League",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 14,
+      "skip": 0
     },
     {
       "id": 26,
       "name": "Southeastern Conference",
       "shortName": "SEC",
-      "tierId": "power"
+      "tierId": "power",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 27,
       "name": "Southern Conference",
       "shortName": "Southern",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 28,
       "name": "Southland Conference",
       "shortName": "Southland",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 16,
+      "skip": 0
     },
     {
       "id": 29,
       "name": "Southwestern Athletic Conference",
       "shortName": "SWAC",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 30,
       "name": "Sun Belt Conference",
       "shortName": "Sun Belt",
-      "tierId": "lowMid"
+      "tierId": "lowMid",
+      "games": 18,
+      "skip": 0
     },
     {
       "id": 31,
       "name": "West Coast Conference",
       "shortName": "WCC",
-      "tierId": "lowMid"
+      "tierId": "lowMid",
+      "games": 14,
+      "skip": 0
     },
     {
       "id": 32,
       "name": "Western Athletic Conference",
       "shortName": "WAC",
-      "tierId": "highMid"
+      "tierId": "highMid",
+      "games": 16,
+      "skip": 0
     }
   ],
   "places": [
@@ -3061,7 +3125,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 45,
-      "historicalPrestige": 45
+      "historicalPrestige": 45,
+      "rivalId": null
     },
     {
       "id": 2,
@@ -3072,7 +3137,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 60,
-      "historicalPrestige": 60
+      "historicalPrestige": 60,
+      "rivalId": null
     },
     {
       "id": 3,
@@ -3083,7 +3149,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 77,
-      "historicalPrestige": 77
+      "historicalPrestige": 77,
+      "rivalId": null
     },
     {
       "id": 4,
@@ -3094,7 +3161,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 12,
-      "historicalPrestige": 12
+      "historicalPrestige": 12,
+      "rivalId": null
     },
     {
       "id": 5,
@@ -3105,7 +3173,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 26,
-      "historicalPrestige": 26
+      "historicalPrestige": 26,
+      "rivalId": null
     },
     {
       "id": 6,
@@ -3116,7 +3185,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 25,
-      "historicalPrestige": 25
+      "historicalPrestige": 25,
+      "rivalId": null
     },
     {
       "id": 7,
@@ -3127,7 +3197,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 9,
-      "historicalPrestige": 9
+      "historicalPrestige": 9,
+      "rivalId": null
     },
     {
       "id": 8,
@@ -3138,7 +3209,8 @@
       "conferenceId": 25,
       "division": "D1",
       "currentPrestige": 42,
-      "historicalPrestige": 42
+      "historicalPrestige": 42,
+      "rivalId": null
     },
     {
       "id": 9,
@@ -3149,7 +3221,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 40,
-      "historicalPrestige": 40
+      "historicalPrestige": 40,
+      "rivalId": null
     },
     {
       "id": 10,
@@ -3160,7 +3233,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 88,
-      "historicalPrestige": 88
+      "historicalPrestige": 88,
+      "rivalId": null
     },
     {
       "id": 11,
@@ -3171,7 +3245,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 70,
-      "historicalPrestige": 70
+      "historicalPrestige": 70,
+      "rivalId": null
     },
     {
       "id": 12,
@@ -3182,7 +3257,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 72,
-      "historicalPrestige": 72
+      "historicalPrestige": 72,
+      "rivalId": null
     },
     {
       "id": 13,
@@ -3193,7 +3269,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 31,
-      "historicalPrestige": 31
+      "historicalPrestige": 31,
+      "rivalId": null
     },
     {
       "id": 14,
@@ -3204,7 +3281,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 39,
-      "historicalPrestige": 39
+      "historicalPrestige": 39,
+      "rivalId": null
     },
     {
       "id": 15,
@@ -3215,7 +3293,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 11,
-      "historicalPrestige": 11
+      "historicalPrestige": 11,
+      "rivalId": null
     },
     {
       "id": 16,
@@ -3226,7 +3305,8 @@
       "conferenceId": 25,
       "division": "D1",
       "currentPrestige": 13,
-      "historicalPrestige": 13
+      "historicalPrestige": 13,
+      "rivalId": null
     },
     {
       "id": 17,
@@ -3237,7 +3317,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 68,
-      "historicalPrestige": 68
+      "historicalPrestige": 68,
+      "rivalId": null
     },
     {
       "id": 18,
@@ -3248,7 +3329,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 54,
-      "historicalPrestige": 54
+      "historicalPrestige": 54,
+      "rivalId": null
     },
     {
       "id": 19,
@@ -3259,7 +3341,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 38,
-      "historicalPrestige": 38
+      "historicalPrestige": 38,
+      "rivalId": null
     },
     {
       "id": 20,
@@ -3270,7 +3353,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 64,
-      "historicalPrestige": 64
+      "historicalPrestige": 64,
+      "rivalId": null
     },
     {
       "id": 21,
@@ -3281,7 +3365,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 50,
-      "historicalPrestige": 50
+      "historicalPrestige": 50,
+      "rivalId": null
     },
     {
       "id": 22,
@@ -3292,7 +3377,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 12,
-      "historicalPrestige": 12
+      "historicalPrestige": 12,
+      "rivalId": null
     },
     {
       "id": 23,
@@ -3303,7 +3389,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 34,
-      "historicalPrestige": 34
+      "historicalPrestige": 34,
+      "rivalId": null
     },
     {
       "id": 24,
@@ -3314,7 +3401,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 21,
-      "historicalPrestige": 21
+      "historicalPrestige": 21,
+      "rivalId": null
     },
     {
       "id": 25,
@@ -3325,7 +3413,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 53,
-      "historicalPrestige": 53
+      "historicalPrestige": 53,
+      "rivalId": null
     },
     {
       "id": 26,
@@ -3336,7 +3425,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 77,
-      "historicalPrestige": 77
+      "historicalPrestige": 77,
+      "rivalId": null
     },
     {
       "id": 27,
@@ -3347,7 +3437,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 43,
-      "historicalPrestige": 43
+      "historicalPrestige": 43,
+      "rivalId": null
     },
     {
       "id": 28,
@@ -3358,7 +3449,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 45,
-      "historicalPrestige": 45
+      "historicalPrestige": 45,
+      "rivalId": null
     },
     {
       "id": 29,
@@ -3369,7 +3461,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 63,
-      "historicalPrestige": 63
+      "historicalPrestige": 63,
+      "rivalId": null
     },
     {
       "id": 30,
@@ -3380,7 +3473,8 @@
       "conferenceId": 15,
       "division": "D1",
       "currentPrestige": 30,
-      "historicalPrestige": 30
+      "historicalPrestige": 30,
+      "rivalId": null
     },
     {
       "id": 31,
@@ -3391,7 +3485,8 @@
       "conferenceId": 25,
       "division": "D1",
       "currentPrestige": 35,
-      "historicalPrestige": 35
+      "historicalPrestige": 35,
+      "rivalId": null
     },
     {
       "id": 32,
@@ -3402,7 +3497,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 40,
-      "historicalPrestige": 40
+      "historicalPrestige": 40,
+      "rivalId": null
     },
     {
       "id": 33,
@@ -3413,7 +3509,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 82,
-      "historicalPrestige": 82
+      "historicalPrestige": 82,
+      "rivalId": null
     },
     {
       "id": 34,
@@ -3424,7 +3521,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 84,
-      "historicalPrestige": 84
+      "historicalPrestige": 84,
+      "rivalId": null
     },
     {
       "id": 35,
@@ -3435,7 +3533,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 21,
-      "historicalPrestige": 21
+      "historicalPrestige": 21,
+      "rivalId": null
     },
     {
       "id": 36,
@@ -3446,7 +3545,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 34,
-      "historicalPrestige": 34
+      "historicalPrestige": 34,
+      "rivalId": null
     },
     {
       "id": 37,
@@ -3457,7 +3557,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 44,
-      "historicalPrestige": 44
+      "historicalPrestige": 44,
+      "rivalId": null
     },
     {
       "id": 38,
@@ -3468,7 +3569,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 80,
-      "historicalPrestige": 80
+      "historicalPrestige": 80,
+      "rivalId": null
     },
     {
       "id": 39,
@@ -3479,7 +3581,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 14,
-      "historicalPrestige": 14
+      "historicalPrestige": 14,
+      "rivalId": null
     },
     {
       "id": 40,
@@ -3490,7 +3593,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 24,
-      "historicalPrestige": 24
+      "historicalPrestige": 24,
+      "rivalId": null
     },
     {
       "id": 41,
@@ -3501,7 +3605,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 11,
-      "historicalPrestige": 11
+      "historicalPrestige": 11,
+      "rivalId": null
     },
     {
       "id": 42,
@@ -3512,7 +3617,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 43,
@@ -3523,7 +3629,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 49,
-      "historicalPrestige": 49
+      "historicalPrestige": 49,
+      "rivalId": null
     },
     {
       "id": 44,
@@ -3534,7 +3641,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 30,
-      "historicalPrestige": 30
+      "historicalPrestige": 30,
+      "rivalId": null
     },
     {
       "id": 45,
@@ -3545,7 +3653,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 9,
-      "historicalPrestige": 9
+      "historicalPrestige": 9,
+      "rivalId": null
     },
     {
       "id": 46,
@@ -3556,7 +3665,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 71,
-      "historicalPrestige": 71
+      "historicalPrestige": 71,
+      "rivalId": null
     },
     {
       "id": 47,
@@ -3567,7 +3677,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 44,
-      "historicalPrestige": 44
+      "historicalPrestige": 44,
+      "rivalId": null
     },
     {
       "id": 48,
@@ -3578,7 +3689,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 17,
-      "historicalPrestige": 17
+      "historicalPrestige": 17,
+      "rivalId": null
     },
     {
       "id": 49,
@@ -3589,7 +3701,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 80,
-      "historicalPrestige": 80
+      "historicalPrestige": 80,
+      "rivalId": null
     },
     {
       "id": 50,
@@ -3600,7 +3713,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 75,
-      "historicalPrestige": 75
+      "historicalPrestige": 75,
+      "rivalId": null
     },
     {
       "id": 51,
@@ -3611,7 +3725,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 46,
-      "historicalPrestige": 46
+      "historicalPrestige": 46,
+      "rivalId": null
     },
     {
       "id": 52,
@@ -3622,7 +3737,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 21,
-      "historicalPrestige": 21
+      "historicalPrestige": 21,
+      "rivalId": null
     },
     {
       "id": 53,
@@ -3633,7 +3749,8 @@
       "conferenceId": 25,
       "division": "D1",
       "currentPrestige": 22,
-      "historicalPrestige": 22
+      "historicalPrestige": 22,
+      "rivalId": null
     },
     {
       "id": 54,
@@ -3644,7 +3761,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 58,
-      "historicalPrestige": 58
+      "historicalPrestige": 58,
+      "rivalId": null
     },
     {
       "id": 55,
@@ -3655,7 +3773,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 58,
-      "historicalPrestige": 58
+      "historicalPrestige": 58,
+      "rivalId": null
     },
     {
       "id": 56,
@@ -3666,7 +3785,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 47,
-      "historicalPrestige": 47
+      "historicalPrestige": 47,
+      "rivalId": null
     },
     {
       "id": 57,
@@ -3677,7 +3797,8 @@
       "conferenceId": 15,
       "division": "D1",
       "currentPrestige": 18,
-      "historicalPrestige": 18
+      "historicalPrestige": 18,
+      "rivalId": null
     },
     {
       "id": 58,
@@ -3688,7 +3809,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 90,
-      "historicalPrestige": 90
+      "historicalPrestige": 90,
+      "rivalId": null
     },
     {
       "id": 59,
@@ -3699,7 +3821,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 24,
-      "historicalPrestige": 24
+      "historicalPrestige": 24,
+      "rivalId": null
     },
     {
       "id": 60,
@@ -3710,7 +3833,8 @@
       "conferenceId": 15,
       "division": "D1",
       "currentPrestige": 40,
-      "historicalPrestige": 40
+      "historicalPrestige": 40,
+      "rivalId": null
     },
     {
       "id": 61,
@@ -3721,7 +3845,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 82,
-      "historicalPrestige": 82
+      "historicalPrestige": 82,
+      "rivalId": null
     },
     {
       "id": 62,
@@ -3732,7 +3857,8 @@
       "conferenceId": 15,
       "division": "D1",
       "currentPrestige": 6,
-      "historicalPrestige": 6
+      "historicalPrestige": 6,
+      "rivalId": null
     },
     {
       "id": 63,
@@ -3743,7 +3869,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 62,
-      "historicalPrestige": 62
+      "historicalPrestige": 62,
+      "rivalId": null
     },
     {
       "id": 64,
@@ -3754,7 +3881,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 81,
-      "historicalPrestige": 81
+      "historicalPrestige": 81,
+      "rivalId": null
     },
     {
       "id": 65,
@@ -3765,7 +3893,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 40,
-      "historicalPrestige": 40
+      "historicalPrestige": 40,
+      "rivalId": null
     },
     {
       "id": 66,
@@ -3776,7 +3905,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 30,
-      "historicalPrestige": 30
+      "historicalPrestige": 30,
+      "rivalId": null
     },
     {
       "id": 67,
@@ -3787,7 +3917,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 28,
-      "historicalPrestige": 28
+      "historicalPrestige": 28,
+      "rivalId": null
     },
     {
       "id": 68,
@@ -3798,7 +3929,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 58,
-      "historicalPrestige": 58
+      "historicalPrestige": 58,
+      "rivalId": null
     },
     {
       "id": 69,
@@ -3809,7 +3941,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 44,
-      "historicalPrestige": 44
+      "historicalPrestige": 44,
+      "rivalId": null
     },
     {
       "id": 70,
@@ -3820,7 +3953,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 50,
-      "historicalPrestige": 50
+      "historicalPrestige": 50,
+      "rivalId": null
     },
     {
       "id": 71,
@@ -3831,7 +3965,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 53,
-      "historicalPrestige": 53
+      "historicalPrestige": 53,
+      "rivalId": null
     },
     {
       "id": 72,
@@ -3842,7 +3977,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 98,
-      "historicalPrestige": 98
+      "historicalPrestige": 98,
+      "rivalId": null
     },
     {
       "id": 73,
@@ -3853,7 +3989,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 45,
-      "historicalPrestige": 45
+      "historicalPrestige": 45,
+      "rivalId": null
     },
     {
       "id": 74,
@@ -3864,7 +4001,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 30,
-      "historicalPrestige": 30
+      "historicalPrestige": 30,
+      "rivalId": null
     },
     {
       "id": 75,
@@ -3875,7 +4013,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 51,
-      "historicalPrestige": 51
+      "historicalPrestige": 51,
+      "rivalId": null
     },
     {
       "id": 76,
@@ -3886,7 +4025,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 22,
-      "historicalPrestige": 22
+      "historicalPrestige": 22,
+      "rivalId": null
     },
     {
       "id": 77,
@@ -3897,7 +4037,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 31,
-      "historicalPrestige": 31
+      "historicalPrestige": 31,
+      "rivalId": null
     },
     {
       "id": 78,
@@ -3908,7 +4049,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 21,
-      "historicalPrestige": 21
+      "historicalPrestige": 21,
+      "rivalId": null
     },
     {
       "id": 79,
@@ -3919,7 +4061,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 34,
-      "historicalPrestige": 34
+      "historicalPrestige": 34,
+      "rivalId": null
     },
     {
       "id": 80,
@@ -3930,7 +4073,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 20,
-      "historicalPrestige": 20
+      "historicalPrestige": 20,
+      "rivalId": null
     },
     {
       "id": 81,
@@ -3941,7 +4085,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 39,
-      "historicalPrestige": 39
+      "historicalPrestige": 39,
+      "rivalId": null
     },
     {
       "id": 82,
@@ -3952,7 +4097,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 50,
-      "historicalPrestige": 50
+      "historicalPrestige": 50,
+      "rivalId": null
     },
     {
       "id": 83,
@@ -3963,7 +4109,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 23,
-      "historicalPrestige": 23
+      "historicalPrestige": 23,
+      "rivalId": null
     },
     {
       "id": 84,
@@ -3974,7 +4121,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 89,
-      "historicalPrestige": 89
+      "historicalPrestige": 89,
+      "rivalId": null
     },
     {
       "id": 85,
@@ -3985,7 +4133,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 16,
-      "historicalPrestige": 16
+      "historicalPrestige": 16,
+      "rivalId": null
     },
     {
       "id": 86,
@@ -3996,7 +4145,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 23,
-      "historicalPrestige": 23
+      "historicalPrestige": 23,
+      "rivalId": null
     },
     {
       "id": 87,
@@ -4007,7 +4157,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 20,
-      "historicalPrestige": 20
+      "historicalPrestige": 20,
+      "rivalId": null
     },
     {
       "id": 88,
@@ -4018,7 +4169,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 75,
-      "historicalPrestige": 75
+      "historicalPrestige": 75,
+      "rivalId": null
     },
     {
       "id": 89,
@@ -4029,7 +4181,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 34,
-      "historicalPrestige": 34
+      "historicalPrestige": 34,
+      "rivalId": null
     },
     {
       "id": 90,
@@ -4040,7 +4193,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 55,
-      "historicalPrestige": 55
+      "historicalPrestige": 55,
+      "rivalId": null
     },
     {
       "id": 91,
@@ -4051,7 +4205,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 20,
-      "historicalPrestige": 20
+      "historicalPrestige": 20,
+      "rivalId": null
     },
     {
       "id": 92,
@@ -4062,7 +4217,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 24,
-      "historicalPrestige": 24
+      "historicalPrestige": 24,
+      "rivalId": null
     },
     {
       "id": 93,
@@ -4073,7 +4229,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 68,
-      "historicalPrestige": 68
+      "historicalPrestige": 68,
+      "rivalId": null
     },
     {
       "id": 94,
@@ -4084,7 +4241,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 58,
-      "historicalPrestige": 58
+      "historicalPrestige": 58,
+      "rivalId": null
     },
     {
       "id": 95,
@@ -4095,7 +4253,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 85,
-      "historicalPrestige": 85
+      "historicalPrestige": 85,
+      "rivalId": null
     },
     {
       "id": 96,
@@ -4106,7 +4265,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 67,
-      "historicalPrestige": 67
+      "historicalPrestige": 67,
+      "rivalId": null
     },
     {
       "id": 97,
@@ -4117,7 +4277,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 98,
@@ -4128,7 +4289,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 37,
-      "historicalPrestige": 37
+      "historicalPrestige": 37,
+      "rivalId": null
     },
     {
       "id": 99,
@@ -4139,7 +4301,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 74,
-      "historicalPrestige": 74
+      "historicalPrestige": 74,
+      "rivalId": null
     },
     {
       "id": 100,
@@ -4150,7 +4313,8 @@
       "conferenceId": 31,
       "division": "D1",
       "currentPrestige": 85,
-      "historicalPrestige": 85
+      "historicalPrestige": 85,
+      "rivalId": null
     },
     {
       "id": 101,
@@ -4161,7 +4325,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 5,
-      "historicalPrestige": 5
+      "historicalPrestige": 5,
+      "rivalId": null
     },
     {
       "id": 102,
@@ -4172,7 +4337,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 103,
@@ -4183,7 +4349,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 20,
-      "historicalPrestige": 20
+      "historicalPrestige": 20,
+      "rivalId": null
     },
     {
       "id": 104,
@@ -4194,7 +4361,8 @@
       "conferenceId": 15,
       "division": "D1",
       "currentPrestige": 29,
-      "historicalPrestige": 29
+      "historicalPrestige": 29,
+      "rivalId": null
     },
     {
       "id": 105,
@@ -4205,7 +4373,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 50,
-      "historicalPrestige": 50
+      "historicalPrestige": 50,
+      "rivalId": null
     },
     {
       "id": 106,
@@ -4216,7 +4385,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 17,
-      "historicalPrestige": 17
+      "historicalPrestige": 17,
+      "rivalId": null
     },
     {
       "id": 107,
@@ -4227,7 +4397,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 56,
-      "historicalPrestige": 56
+      "historicalPrestige": 56,
+      "rivalId": null
     },
     {
       "id": 108,
@@ -4238,7 +4409,8 @@
       "conferenceId": 25,
       "division": "D1",
       "currentPrestige": 46,
-      "historicalPrestige": 46
+      "historicalPrestige": 46,
+      "rivalId": null
     },
     {
       "id": 109,
@@ -4249,7 +4421,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 63,
-      "historicalPrestige": 63
+      "historicalPrestige": 63,
+      "rivalId": null
     },
     {
       "id": 110,
@@ -4260,7 +4433,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 4,
-      "historicalPrestige": 4
+      "historicalPrestige": 4,
+      "rivalId": null
     },
     {
       "id": 111,
@@ -4271,7 +4445,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 26,
-      "historicalPrestige": 26
+      "historicalPrestige": 26,
+      "rivalId": null
     },
     {
       "id": 112,
@@ -4282,7 +4457,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 23,
-      "historicalPrestige": 23
+      "historicalPrestige": 23,
+      "rivalId": null
     },
     {
       "id": 113,
@@ -4293,7 +4469,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 87,
-      "historicalPrestige": 87
+      "historicalPrestige": 87,
+      "rivalId": null
     },
     {
       "id": 114,
@@ -4304,7 +4481,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 62,
-      "historicalPrestige": 62
+      "historicalPrestige": 62,
+      "rivalId": null
     },
     {
       "id": 115,
@@ -4315,7 +4493,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 48,
-      "historicalPrestige": 48
+      "historicalPrestige": 48,
+      "rivalId": null
     },
     {
       "id": 116,
@@ -4326,7 +4505,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 73,
-      "historicalPrestige": 73
+      "historicalPrestige": 73,
+      "rivalId": null
     },
     {
       "id": 117,
@@ -4337,7 +4517,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 50,
-      "historicalPrestige": 50
+      "historicalPrestige": 50,
+      "rivalId": null
     },
     {
       "id": 118,
@@ -4348,7 +4529,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 44,
-      "historicalPrestige": 44
+      "historicalPrestige": 44,
+      "rivalId": null
     },
     {
       "id": 119,
@@ -4359,7 +4541,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 65,
-      "historicalPrestige": 65
+      "historicalPrestige": 65,
+      "rivalId": null
     },
     {
       "id": 120,
@@ -4370,7 +4553,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 65,
-      "historicalPrestige": 65
+      "historicalPrestige": 65,
+      "rivalId": null
     },
     {
       "id": 121,
@@ -4381,7 +4565,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 22,
-      "historicalPrestige": 22
+      "historicalPrestige": 22,
+      "rivalId": null
     },
     {
       "id": 122,
@@ -4392,7 +4577,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 45,
-      "historicalPrestige": 45
+      "historicalPrestige": 45,
+      "rivalId": null
     },
     {
       "id": 123,
@@ -4403,7 +4589,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 24,
-      "historicalPrestige": 24
+      "historicalPrestige": 24,
+      "rivalId": null
     },
     {
       "id": 124,
@@ -4414,7 +4601,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 36,
-      "historicalPrestige": 36
+      "historicalPrestige": 36,
+      "rivalId": null
     },
     {
       "id": 125,
@@ -4425,7 +4613,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 16,
-      "historicalPrestige": 16
+      "historicalPrestige": 16,
+      "rivalId": null
     },
     {
       "id": 126,
@@ -4436,7 +4625,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 30,
-      "historicalPrestige": 30
+      "historicalPrestige": 30,
+      "rivalId": null
     },
     {
       "id": 127,
@@ -4447,7 +4637,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 97,
-      "historicalPrestige": 97
+      "historicalPrestige": 97,
+      "rivalId": null
     },
     {
       "id": 128,
@@ -4458,7 +4649,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 72,
-      "historicalPrestige": 72
+      "historicalPrestige": 72,
+      "rivalId": null
     },
     {
       "id": 129,
@@ -4469,7 +4661,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 76,
-      "historicalPrestige": 76
+      "historicalPrestige": 76,
+      "rivalId": null
     },
     {
       "id": 130,
@@ -4480,7 +4673,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 91,
-      "historicalPrestige": 91
+      "historicalPrestige": 91,
+      "rivalId": null
     },
     {
       "id": 131,
@@ -4491,7 +4685,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 48,
-      "historicalPrestige": 48
+      "historicalPrestige": 48,
+      "rivalId": null
     },
     {
       "id": 132,
@@ -4502,7 +4697,8 @@
       "conferenceId": 25,
       "division": "D1",
       "currentPrestige": 27,
-      "historicalPrestige": 27
+      "historicalPrestige": 27,
+      "rivalId": null
     },
     {
       "id": 133,
@@ -4513,7 +4709,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 29,
-      "historicalPrestige": 29
+      "historicalPrestige": 29,
+      "rivalId": null
     },
     {
       "id": 134,
@@ -4524,7 +4721,8 @@
       "conferenceId": 25,
       "division": "D1",
       "currentPrestige": 26,
-      "historicalPrestige": 26
+      "historicalPrestige": 26,
+      "rivalId": null
     },
     {
       "id": 135,
@@ -4535,7 +4733,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 23,
-      "historicalPrestige": 23
+      "historicalPrestige": 23,
+      "rivalId": null
     },
     {
       "id": 136,
@@ -4546,7 +4745,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 26,
-      "historicalPrestige": 26
+      "historicalPrestige": 26,
+      "rivalId": null
     },
     {
       "id": 137,
@@ -4557,7 +4757,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 36,
-      "historicalPrestige": 36
+      "historicalPrestige": 36,
+      "rivalId": null
     },
     {
       "id": 138,
@@ -4568,7 +4769,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 19,
-      "historicalPrestige": 19
+      "historicalPrestige": 19,
+      "rivalId": null
     },
     {
       "id": 139,
@@ -4579,7 +4781,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 71,
-      "historicalPrestige": 71
+      "historicalPrestige": 71,
+      "rivalId": null
     },
     {
       "id": 140,
@@ -4590,7 +4793,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 49,
-      "historicalPrestige": 49
+      "historicalPrestige": 49,
+      "rivalId": null
     },
     {
       "id": 141,
@@ -4601,7 +4805,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 23,
-      "historicalPrestige": 23
+      "historicalPrestige": 23,
+      "rivalId": null
     },
     {
       "id": 142,
@@ -4612,7 +4817,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 88,
-      "historicalPrestige": 88
+      "historicalPrestige": 88,
+      "rivalId": null
     },
     {
       "id": 143,
@@ -4623,7 +4829,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 39,
-      "historicalPrestige": 39
+      "historicalPrestige": 39,
+      "rivalId": null
     },
     {
       "id": 144,
@@ -4634,7 +4841,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 26,
-      "historicalPrestige": 26
+      "historicalPrestige": 26,
+      "rivalId": null
     },
     {
       "id": 145,
@@ -4645,7 +4853,8 @@
       "conferenceId": 31,
       "division": "D1",
       "currentPrestige": 24,
-      "historicalPrestige": 24
+      "historicalPrestige": 24,
+      "rivalId": null
     },
     {
       "id": 146,
@@ -4656,7 +4865,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 29,
-      "historicalPrestige": 29
+      "historicalPrestige": 29,
+      "rivalId": null
     },
     {
       "id": 147,
@@ -4667,7 +4877,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 44,
-      "historicalPrestige": 44
+      "historicalPrestige": 44,
+      "rivalId": null
     },
     {
       "id": 148,
@@ -4678,7 +4889,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 37,
-      "historicalPrestige": 37
+      "historicalPrestige": 37,
+      "rivalId": null
     },
     {
       "id": 149,
@@ -4689,7 +4901,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 84,
-      "historicalPrestige": 84
+      "historicalPrestige": 84,
+      "rivalId": null
     },
     {
       "id": 150,
@@ -4700,7 +4913,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 52,
-      "historicalPrestige": 52
+      "historicalPrestige": 52,
+      "rivalId": null
     },
     {
       "id": 151,
@@ -4711,7 +4925,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 88,
-      "historicalPrestige": 88
+      "historicalPrestige": 88,
+      "rivalId": null
     },
     {
       "id": 152,
@@ -4722,7 +4937,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 2,
-      "historicalPrestige": 2
+      "historicalPrestige": 2,
+      "rivalId": null
     },
     {
       "id": 153,
@@ -4733,7 +4949,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 61,
-      "historicalPrestige": 61
+      "historicalPrestige": 61,
+      "rivalId": null
     },
     {
       "id": 154,
@@ -4744,7 +4961,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 25,
-      "historicalPrestige": 25
+      "historicalPrestige": 25,
+      "rivalId": null
     },
     {
       "id": 155,
@@ -4755,7 +4973,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 87,
-      "historicalPrestige": 87
+      "historicalPrestige": 87,
+      "rivalId": null
     },
     {
       "id": 156,
@@ -4766,7 +4985,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 25,
-      "historicalPrestige": 25
+      "historicalPrestige": 25,
+      "rivalId": null
     },
     {
       "id": 157,
@@ -4777,7 +4997,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 74,
-      "historicalPrestige": 74
+      "historicalPrestige": 74,
+      "rivalId": null
     },
     {
       "id": 158,
@@ -4788,7 +5009,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 66,
-      "historicalPrestige": 66
+      "historicalPrestige": 66,
+      "rivalId": null
     },
     {
       "id": 159,
@@ -4799,7 +5021,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 68,
-      "historicalPrestige": 68
+      "historicalPrestige": 68,
+      "rivalId": null
     },
     {
       "id": 160,
@@ -4810,7 +5033,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 94,
-      "historicalPrestige": 94
+      "historicalPrestige": 94,
+      "rivalId": null
     },
     {
       "id": 161,
@@ -4821,7 +5045,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 47,
-      "historicalPrestige": 47
+      "historicalPrestige": 47,
+      "rivalId": null
     },
     {
       "id": 162,
@@ -4832,7 +5057,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 71,
-      "historicalPrestige": 71
+      "historicalPrestige": 71,
+      "rivalId": null
     },
     {
       "id": 163,
@@ -4843,7 +5069,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 76,
-      "historicalPrestige": 76
+      "historicalPrestige": 76,
+      "rivalId": null
     },
     {
       "id": 164,
@@ -4854,7 +5081,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 83,
-      "historicalPrestige": 83
+      "historicalPrestige": 83,
+      "rivalId": null
     },
     {
       "id": 165,
@@ -4865,7 +5093,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 18,
-      "historicalPrestige": 18
+      "historicalPrestige": 18,
+      "rivalId": null
     },
     {
       "id": 166,
@@ -4876,7 +5105,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 79,
-      "historicalPrestige": 79
+      "historicalPrestige": 79,
+      "rivalId": null
     },
     {
       "id": 167,
@@ -4887,7 +5117,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 27,
-      "historicalPrestige": 27
+      "historicalPrestige": 27,
+      "rivalId": null
     },
     {
       "id": 168,
@@ -4898,7 +5129,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 42,
-      "historicalPrestige": 42
+      "historicalPrestige": 42,
+      "rivalId": null
     },
     {
       "id": 169,
@@ -4909,7 +5141,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 28,
-      "historicalPrestige": 28
+      "historicalPrestige": 28,
+      "rivalId": null
     },
     {
       "id": 170,
@@ -4920,7 +5153,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 35,
-      "historicalPrestige": 35
+      "historicalPrestige": 35,
+      "rivalId": null
     },
     {
       "id": 171,
@@ -4931,7 +5165,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 27,
-      "historicalPrestige": 27
+      "historicalPrestige": 27,
+      "rivalId": null
     },
     {
       "id": 172,
@@ -4942,7 +5177,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 9,
-      "historicalPrestige": 9
+      "historicalPrestige": 9,
+      "rivalId": null
     },
     {
       "id": 173,
@@ -4953,7 +5189,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 28,
-      "historicalPrestige": 28
+      "historicalPrestige": 28,
+      "rivalId": null
     },
     {
       "id": 174,
@@ -4964,7 +5201,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 57,
-      "historicalPrestige": 57
+      "historicalPrestige": 57,
+      "rivalId": null
     },
     {
       "id": 175,
@@ -4975,7 +5213,8 @@
       "conferenceId": 25,
       "division": "D1",
       "currentPrestige": 25,
-      "historicalPrestige": 25
+      "historicalPrestige": 25,
+      "rivalId": null
     },
     {
       "id": 176,
@@ -4986,7 +5225,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 65,
-      "historicalPrestige": 65
+      "historicalPrestige": 65,
+      "rivalId": null
     },
     {
       "id": 177,
@@ -4997,7 +5237,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 70,
-      "historicalPrestige": 70
+      "historicalPrestige": 70,
+      "rivalId": null
     },
     {
       "id": 178,
@@ -5008,7 +5249,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 16,
-      "historicalPrestige": 16
+      "historicalPrestige": 16,
+      "rivalId": null
     },
     {
       "id": 179,
@@ -5019,7 +5261,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 71,
-      "historicalPrestige": 71
+      "historicalPrestige": 71,
+      "rivalId": null
     },
     {
       "id": 180,
@@ -5030,7 +5273,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 60,
-      "historicalPrestige": 60
+      "historicalPrestige": 60,
+      "rivalId": null
     },
     {
       "id": 181,
@@ -5041,7 +5285,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 29,
-      "historicalPrestige": 29
+      "historicalPrestige": 29,
+      "rivalId": null
     },
     {
       "id": 182,
@@ -5052,7 +5297,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 59,
-      "historicalPrestige": 59
+      "historicalPrestige": 59,
+      "rivalId": null
     },
     {
       "id": 183,
@@ -5063,7 +5309,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 16,
-      "historicalPrestige": 16
+      "historicalPrestige": 16,
+      "rivalId": null
     },
     {
       "id": 184,
@@ -5074,7 +5321,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 15,
-      "historicalPrestige": 15
+      "historicalPrestige": 15,
+      "rivalId": null
     },
     {
       "id": 185,
@@ -5085,7 +5333,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 90,
-      "historicalPrestige": 90
+      "historicalPrestige": 90,
+      "rivalId": null
     },
     {
       "id": 186,
@@ -5096,7 +5345,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 13,
-      "historicalPrestige": 13
+      "historicalPrestige": 13,
+      "rivalId": null
     },
     {
       "id": 187,
@@ -5107,7 +5357,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 75,
-      "historicalPrestige": 75
+      "historicalPrestige": 75,
+      "rivalId": null
     },
     {
       "id": 188,
@@ -5118,7 +5369,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 41,
-      "historicalPrestige": 41
+      "historicalPrestige": 41,
+      "rivalId": null
     },
     {
       "id": 189,
@@ -5129,7 +5381,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 48,
-      "historicalPrestige": 48
+      "historicalPrestige": 48,
+      "rivalId": null
     },
     {
       "id": 190,
@@ -5140,7 +5393,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 35,
-      "historicalPrestige": 35
+      "historicalPrestige": 35,
+      "rivalId": null
     },
     {
       "id": 191,
@@ -5151,7 +5405,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 23,
-      "historicalPrestige": 23
+      "historicalPrestige": 23,
+      "rivalId": null
     },
     {
       "id": 192,
@@ -5162,7 +5417,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 66,
-      "historicalPrestige": 66
+      "historicalPrestige": 66,
+      "rivalId": null
     },
     {
       "id": 193,
@@ -5173,7 +5429,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 53,
-      "historicalPrestige": 53
+      "historicalPrestige": 53,
+      "rivalId": null
     },
     {
       "id": 194,
@@ -5184,7 +5441,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 28,
-      "historicalPrestige": 28
+      "historicalPrestige": 28,
+      "rivalId": null
     },
     {
       "id": 195,
@@ -5195,7 +5453,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 84,
-      "historicalPrestige": 84
+      "historicalPrestige": 84,
+      "rivalId": null
     },
     {
       "id": 196,
@@ -5206,7 +5465,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 48,
-      "historicalPrestige": 48
+      "historicalPrestige": 48,
+      "rivalId": null
     },
     {
       "id": 197,
@@ -5217,7 +5477,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 60,
-      "historicalPrestige": 60
+      "historicalPrestige": 60,
+      "rivalId": null
     },
     {
       "id": 198,
@@ -5228,7 +5489,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 88,
-      "historicalPrestige": 88
+      "historicalPrestige": 88,
+      "rivalId": null
     },
     {
       "id": 199,
@@ -5239,7 +5501,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 87,
-      "historicalPrestige": 87
+      "historicalPrestige": 87,
+      "rivalId": null
     },
     {
       "id": 200,
@@ -5250,7 +5513,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 87,
-      "historicalPrestige": 87
+      "historicalPrestige": 87,
+      "rivalId": null
     },
     {
       "id": 201,
@@ -5261,7 +5525,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 64,
-      "historicalPrestige": 64
+      "historicalPrestige": 64,
+      "rivalId": null
     },
     {
       "id": 202,
@@ -5272,7 +5537,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 54,
-      "historicalPrestige": 54
+      "historicalPrestige": 54,
+      "rivalId": null
     },
     {
       "id": 203,
@@ -5283,7 +5549,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 71,
-      "historicalPrestige": 71
+      "historicalPrestige": 71,
+      "rivalId": null
     },
     {
       "id": 204,
@@ -5294,7 +5561,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 45,
-      "historicalPrestige": 45
+      "historicalPrestige": 45,
+      "rivalId": null
     },
     {
       "id": 205,
@@ -5305,7 +5573,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 53,
-      "historicalPrestige": 53
+      "historicalPrestige": 53,
+      "rivalId": null
     },
     {
       "id": 206,
@@ -5316,7 +5585,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 54,
-      "historicalPrestige": 54
+      "historicalPrestige": 54,
+      "rivalId": null
     },
     {
       "id": 207,
@@ -5327,7 +5597,8 @@
       "conferenceId": 15,
       "division": "D1",
       "currentPrestige": 44,
-      "historicalPrestige": 44
+      "historicalPrestige": 44,
+      "rivalId": null
     },
     {
       "id": 208,
@@ -5338,7 +5609,8 @@
       "conferenceId": 31,
       "division": "D1",
       "currentPrestige": 39,
-      "historicalPrestige": 39
+      "historicalPrestige": 39,
+      "rivalId": null
     },
     {
       "id": 209,
@@ -5349,7 +5621,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 92,
-      "historicalPrestige": 92
+      "historicalPrestige": 92,
+      "rivalId": null
     },
     {
       "id": 210,
@@ -5360,7 +5633,8 @@
       "conferenceId": 31,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 211,
@@ -5371,7 +5645,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 38,
-      "historicalPrestige": 38
+      "historicalPrestige": 38,
+      "rivalId": null
     },
     {
       "id": 212,
@@ -5382,7 +5657,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 8,
-      "historicalPrestige": 8
+      "historicalPrestige": 8,
+      "rivalId": null
     },
     {
       "id": 213,
@@ -5393,7 +5669,8 @@
       "conferenceId": 15,
       "division": "D1",
       "currentPrestige": 38,
-      "historicalPrestige": 38
+      "historicalPrestige": 38,
+      "rivalId": null
     },
     {
       "id": 214,
@@ -5404,7 +5681,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 69,
-      "historicalPrestige": 69
+      "historicalPrestige": 69,
+      "rivalId": null
     },
     {
       "id": 215,
@@ -5415,7 +5693,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 80,
-      "historicalPrestige": 80
+      "historicalPrestige": 80,
+      "rivalId": null
     },
     {
       "id": 216,
@@ -5426,7 +5705,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 28,
-      "historicalPrestige": 28
+      "historicalPrestige": 28,
+      "rivalId": null
     },
     {
       "id": 217,
@@ -5437,7 +5717,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 28,
-      "historicalPrestige": 28
+      "historicalPrestige": 28,
+      "rivalId": null
     },
     {
       "id": 218,
@@ -5448,7 +5729,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 59,
-      "historicalPrestige": 59
+      "historicalPrestige": 59,
+      "rivalId": null
     },
     {
       "id": 219,
@@ -5459,7 +5741,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 220,
@@ -5470,7 +5753,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 65,
-      "historicalPrestige": 65
+      "historicalPrestige": 65,
+      "rivalId": null
     },
     {
       "id": 221,
@@ -5481,7 +5765,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 49,
-      "historicalPrestige": 49
+      "historicalPrestige": 49,
+      "rivalId": null
     },
     {
       "id": 222,
@@ -5492,7 +5777,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 39,
-      "historicalPrestige": 39
+      "historicalPrestige": 39,
+      "rivalId": null
     },
     {
       "id": 223,
@@ -5503,7 +5789,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 54,
-      "historicalPrestige": 54
+      "historicalPrestige": 54,
+      "rivalId": null
     },
     {
       "id": 224,
@@ -5514,7 +5801,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 8,
-      "historicalPrestige": 8
+      "historicalPrestige": 8,
+      "rivalId": null
     },
     {
       "id": 225,
@@ -5525,7 +5813,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 22,
-      "historicalPrestige": 22
+      "historicalPrestige": 22,
+      "rivalId": null
     },
     {
       "id": 226,
@@ -5536,7 +5825,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 67,
-      "historicalPrestige": 67
+      "historicalPrestige": 67,
+      "rivalId": null
     },
     {
       "id": 227,
@@ -5547,7 +5837,8 @@
       "conferenceId": 31,
       "division": "D1",
       "currentPrestige": 59,
-      "historicalPrestige": 59
+      "historicalPrestige": 59,
+      "rivalId": null
     },
     {
       "id": 228,
@@ -5558,7 +5849,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 53,
-      "historicalPrestige": 53
+      "historicalPrestige": 53,
+      "rivalId": null
     },
     {
       "id": 229,
@@ -5569,7 +5861,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 230,
@@ -5580,7 +5873,8 @@
       "conferenceId": 31,
       "division": "D1",
       "currentPrestige": 47,
-      "historicalPrestige": 47
+      "historicalPrestige": 47,
+      "rivalId": null
     },
     {
       "id": 231,
@@ -5591,7 +5885,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 70,
-      "historicalPrestige": 70
+      "historicalPrestige": 70,
+      "rivalId": null
     },
     {
       "id": 232,
@@ -5602,7 +5897,8 @@
       "conferenceId": 31,
       "division": "D1",
       "currentPrestige": 38,
-      "historicalPrestige": 38
+      "historicalPrestige": 38,
+      "rivalId": null
     },
     {
       "id": 233,
@@ -5613,7 +5909,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 29,
-      "historicalPrestige": 29
+      "historicalPrestige": 29,
+      "rivalId": null
     },
     {
       "id": 234,
@@ -5624,7 +5921,8 @@
       "conferenceId": 31,
       "division": "D1",
       "currentPrestige": 44,
-      "historicalPrestige": 44
+      "historicalPrestige": 44,
+      "rivalId": null
     },
     {
       "id": 235,
@@ -5635,7 +5933,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 72,
-      "historicalPrestige": 72
+      "historicalPrestige": 72,
+      "rivalId": null
     },
     {
       "id": 236,
@@ -5646,7 +5945,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 64,
-      "historicalPrestige": 64
+      "historicalPrestige": 64,
+      "rivalId": null
     },
     {
       "id": 237,
@@ -5657,7 +5957,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 51,
-      "historicalPrestige": 51
+      "historicalPrestige": 51,
+      "rivalId": null
     },
     {
       "id": 238,
@@ -5668,7 +5969,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 73,
-      "historicalPrestige": 73
+      "historicalPrestige": 73,
+      "rivalId": null
     },
     {
       "id": 239,
@@ -5679,7 +5981,8 @@
       "conferenceId": 19,
       "division": "D1",
       "currentPrestige": 28,
-      "historicalPrestige": 28
+      "historicalPrestige": 28,
+      "rivalId": null
     },
     {
       "id": 240,
@@ -5690,7 +5993,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 52,
-      "historicalPrestige": 52
+      "historicalPrestige": 52,
+      "rivalId": null
     },
     {
       "id": 241,
@@ -5701,7 +6005,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 29,
-      "historicalPrestige": 29
+      "historicalPrestige": 29,
+      "rivalId": null
     },
     {
       "id": 242,
@@ -5712,7 +6017,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 16,
-      "historicalPrestige": 16
+      "historicalPrestige": 16,
+      "rivalId": null
     },
     {
       "id": 243,
@@ -5723,7 +6029,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 77,
-      "historicalPrestige": 77
+      "historicalPrestige": 77,
+      "rivalId": null
     },
     {
       "id": 244,
@@ -5734,7 +6041,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 75,
-      "historicalPrestige": 75
+      "historicalPrestige": 75,
+      "rivalId": null
     },
     {
       "id": 245,
@@ -5745,7 +6053,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 40,
-      "historicalPrestige": 40
+      "historicalPrestige": 40,
+      "rivalId": null
     },
     {
       "id": 246,
@@ -5756,7 +6065,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 55,
-      "historicalPrestige": 55
+      "historicalPrestige": 55,
+      "rivalId": null
     },
     {
       "id": 247,
@@ -5767,7 +6077,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 10,
-      "historicalPrestige": 10
+      "historicalPrestige": 10,
+      "rivalId": null
     },
     {
       "id": 248,
@@ -5778,7 +6089,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 21,
-      "historicalPrestige": 21
+      "historicalPrestige": 21,
+      "rivalId": null
     },
     {
       "id": 249,
@@ -5789,7 +6101,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 65,
-      "historicalPrestige": 65
+      "historicalPrestige": 65,
+      "rivalId": null
     },
     {
       "id": 250,
@@ -5800,7 +6113,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 17,
-      "historicalPrestige": 17
+      "historicalPrestige": 17,
+      "rivalId": null
     },
     {
       "id": 251,
@@ -5811,7 +6125,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 41,
-      "historicalPrestige": 41
+      "historicalPrestige": 41,
+      "rivalId": null
     },
     {
       "id": 252,
@@ -5822,7 +6137,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 20,
-      "historicalPrestige": 20
+      "historicalPrestige": 20,
+      "rivalId": null
     },
     {
       "id": 253,
@@ -5833,7 +6149,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 11,
-      "historicalPrestige": 11
+      "historicalPrestige": 11,
+      "rivalId": null
     },
     {
       "id": 254,
@@ -5844,7 +6161,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 65,
-      "historicalPrestige": 65
+      "historicalPrestige": 65,
+      "rivalId": null
     },
     {
       "id": 255,
@@ -5855,7 +6173,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 75,
-      "historicalPrestige": 75
+      "historicalPrestige": 75,
+      "rivalId": null
     },
     {
       "id": 256,
@@ -5866,7 +6185,8 @@
       "conferenceId": 16,
       "division": "D1",
       "currentPrestige": 25,
-      "historicalPrestige": 25
+      "historicalPrestige": 25,
+      "rivalId": null
     },
     {
       "id": 257,
@@ -5877,7 +6197,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 81,
-      "historicalPrestige": 81
+      "historicalPrestige": 81,
+      "rivalId": null
     },
     {
       "id": 258,
@@ -5888,7 +6209,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 41,
-      "historicalPrestige": 41
+      "historicalPrestige": 41,
+      "rivalId": null
     },
     {
       "id": 259,
@@ -5899,7 +6221,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 18,
-      "historicalPrestige": 18
+      "historicalPrestige": 18,
+      "rivalId": null
     },
     {
       "id": 260,
@@ -5910,7 +6233,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 21,
-      "historicalPrestige": 21
+      "historicalPrestige": 21,
+      "rivalId": null
     },
     {
       "id": 261,
@@ -5921,7 +6245,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 92,
-      "historicalPrestige": 92
+      "historicalPrestige": 92,
+      "rivalId": null
     },
     {
       "id": 262,
@@ -5932,7 +6257,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 49,
-      "historicalPrestige": 49
+      "historicalPrestige": 49,
+      "rivalId": null
     },
     {
       "id": 263,
@@ -5943,7 +6269,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 81,
-      "historicalPrestige": 81
+      "historicalPrestige": 81,
+      "rivalId": null
     },
     {
       "id": 264,
@@ -5954,7 +6281,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 89,
-      "historicalPrestige": 89
+      "historicalPrestige": 89,
+      "rivalId": null
     },
     {
       "id": 265,
@@ -5965,7 +6293,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 20,
-      "historicalPrestige": 20
+      "historicalPrestige": 20,
+      "rivalId": null
     },
     {
       "id": 266,
@@ -5976,7 +6305,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 39,
-      "historicalPrestige": 39
+      "historicalPrestige": 39,
+      "rivalId": null
     },
     {
       "id": 267,
@@ -5987,7 +6317,8 @@
       "conferenceId": 23,
       "division": "D1",
       "currentPrestige": 23,
-      "historicalPrestige": 23
+      "historicalPrestige": 23,
+      "rivalId": null
     },
     {
       "id": 268,
@@ -5998,7 +6329,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 94,
-      "historicalPrestige": 94
+      "historicalPrestige": 94,
+      "rivalId": null
     },
     {
       "id": 269,
@@ -6009,7 +6341,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 72,
-      "historicalPrestige": 72
+      "historicalPrestige": 72,
+      "rivalId": null
     },
     {
       "id": 270,
@@ -6020,7 +6353,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 34,
-      "historicalPrestige": 34
+      "historicalPrestige": 34,
+      "rivalId": null
     },
     {
       "id": 271,
@@ -6031,7 +6365,8 @@
       "conferenceId": 29,
       "division": "D1",
       "currentPrestige": 11,
-      "historicalPrestige": 11
+      "historicalPrestige": 11,
+      "rivalId": null
     },
     {
       "id": 272,
@@ -6042,7 +6377,8 @@
       "conferenceId": 5,
       "division": "D1",
       "currentPrestige": 72,
-      "historicalPrestige": 72
+      "historicalPrestige": 72,
+      "rivalId": null
     },
     {
       "id": 273,
@@ -6053,7 +6389,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 274,
@@ -6064,7 +6401,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 10,
-      "historicalPrestige": 10
+      "historicalPrestige": 10,
+      "rivalId": null
     },
     {
       "id": 275,
@@ -6075,7 +6413,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 32,
-      "historicalPrestige": 32
+      "historicalPrestige": 32,
+      "rivalId": null
     },
     {
       "id": 276,
@@ -6086,7 +6425,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 18,
-      "historicalPrestige": 18
+      "historicalPrestige": 18,
+      "rivalId": null
     },
     {
       "id": 277,
@@ -6097,7 +6437,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 42,
-      "historicalPrestige": 42
+      "historicalPrestige": 42,
+      "rivalId": null
     },
     {
       "id": 278,
@@ -6108,7 +6449,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 24,
-      "historicalPrestige": 24
+      "historicalPrestige": 24,
+      "rivalId": null
     },
     {
       "id": 279,
@@ -6119,7 +6461,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 47,
-      "historicalPrestige": 47
+      "historicalPrestige": 47,
+      "rivalId": null
     },
     {
       "id": 280,
@@ -6130,7 +6473,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 40,
-      "historicalPrestige": 40
+      "historicalPrestige": 40,
+      "rivalId": null
     },
     {
       "id": 281,
@@ -6141,7 +6485,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 70,
-      "historicalPrestige": 70
+      "historicalPrestige": 70,
+      "rivalId": null
     },
     {
       "id": 282,
@@ -6152,7 +6497,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 77,
-      "historicalPrestige": 77
+      "historicalPrestige": 77,
+      "rivalId": null
     },
     {
       "id": 283,
@@ -6163,7 +6509,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 40,
-      "historicalPrestige": 40
+      "historicalPrestige": 40,
+      "rivalId": null
     },
     {
       "id": 284,
@@ -6174,7 +6521,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 15,
-      "historicalPrestige": 15
+      "historicalPrestige": 15,
+      "rivalId": null
     },
     {
       "id": 285,
@@ -6185,7 +6533,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 49,
-      "historicalPrestige": 49
+      "historicalPrestige": 49,
+      "rivalId": null
     },
     {
       "id": 286,
@@ -6196,7 +6545,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 84,
-      "historicalPrestige": 84
+      "historicalPrestige": 84,
+      "rivalId": null
     },
     {
       "id": 287,
@@ -6207,7 +6557,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 47,
-      "historicalPrestige": 47
+      "historicalPrestige": 47,
+      "rivalId": null
     },
     {
       "id": 288,
@@ -6218,7 +6569,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 29,
-      "historicalPrestige": 29
+      "historicalPrestige": 29,
+      "rivalId": null
     },
     {
       "id": 289,
@@ -6229,7 +6581,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 22,
-      "historicalPrestige": 22
+      "historicalPrestige": 22,
+      "rivalId": null
     },
     {
       "id": 290,
@@ -6240,7 +6593,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 29,
-      "historicalPrestige": 29
+      "historicalPrestige": 29,
+      "rivalId": null
     },
     {
       "id": 291,
@@ -6251,7 +6605,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 31,
-      "historicalPrestige": 31
+      "historicalPrestige": 31,
+      "rivalId": null
     },
     {
       "id": 292,
@@ -6262,7 +6617,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 52,
-      "historicalPrestige": 52
+      "historicalPrestige": 52,
+      "rivalId": null
     },
     {
       "id": 293,
@@ -6273,7 +6629,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 80,
-      "historicalPrestige": 80
+      "historicalPrestige": 80,
+      "rivalId": null
     },
     {
       "id": 294,
@@ -6284,7 +6641,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 76,
-      "historicalPrestige": 76
+      "historicalPrestige": 76,
+      "rivalId": null
     },
     {
       "id": 295,
@@ -6295,7 +6653,8 @@
       "conferenceId": 32,
       "division": "D1",
       "currentPrestige": 83,
-      "historicalPrestige": 83
+      "historicalPrestige": 83,
+      "rivalId": null
     },
     {
       "id": 296,
@@ -6306,7 +6665,8 @@
       "conferenceId": 12,
       "division": "D1",
       "currentPrestige": 64,
-      "historicalPrestige": 64
+      "historicalPrestige": 64,
+      "rivalId": null
     },
     {
       "id": 297,
@@ -6317,7 +6677,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 51,
-      "historicalPrestige": 51
+      "historicalPrestige": 51,
+      "rivalId": null
     },
     {
       "id": 298,
@@ -6328,7 +6689,8 @@
       "conferenceId": 26,
       "division": "D1",
       "currentPrestige": 83,
-      "historicalPrestige": 83
+      "historicalPrestige": 83,
+      "rivalId": null
     },
     {
       "id": 299,
@@ -6339,7 +6701,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 52,
-      "historicalPrestige": 52
+      "historicalPrestige": 52,
+      "rivalId": null
     },
     {
       "id": 300,
@@ -6350,7 +6713,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 90,
-      "historicalPrestige": 90
+      "historicalPrestige": 90,
+      "rivalId": null
     },
     {
       "id": 301,
@@ -6361,7 +6725,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 71,
-      "historicalPrestige": 71
+      "historicalPrestige": 71,
+      "rivalId": null
     },
     {
       "id": 302,
@@ -6372,7 +6737,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 70,
-      "historicalPrestige": 70
+      "historicalPrestige": 70,
+      "rivalId": null
     },
     {
       "id": 303,
@@ -6383,7 +6749,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 66,
-      "historicalPrestige": 66
+      "historicalPrestige": 66,
+      "rivalId": null
     },
     {
       "id": 304,
@@ -6394,7 +6761,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 14,
-      "historicalPrestige": 14
+      "historicalPrestige": 14,
+      "rivalId": null
     },
     {
       "id": 305,
@@ -6405,7 +6773,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 30,
-      "historicalPrestige": 30
+      "historicalPrestige": 30,
+      "rivalId": null
     },
     {
       "id": 306,
@@ -6416,7 +6785,8 @@
       "conferenceId": 3,
       "division": "D1",
       "currentPrestige": 84,
-      "historicalPrestige": 84
+      "historicalPrestige": 84,
+      "rivalId": null
     },
     {
       "id": 307,
@@ -6427,7 +6797,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 73,
-      "historicalPrestige": 73
+      "historicalPrestige": 73,
+      "rivalId": null
     },
     {
       "id": 308,
@@ -6438,7 +6809,8 @@
       "conferenceId": 24,
       "division": "D1",
       "currentPrestige": 57,
-      "historicalPrestige": 57
+      "historicalPrestige": 57,
+      "rivalId": null
     },
     {
       "id": 309,
@@ -6449,7 +6821,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 50,
-      "historicalPrestige": 50
+      "historicalPrestige": 50,
+      "rivalId": null
     },
     {
       "id": 310,
@@ -6460,7 +6833,8 @@
       "conferenceId": 6,
       "division": "D1",
       "currentPrestige": 82,
-      "historicalPrestige": 82
+      "historicalPrestige": 82,
+      "rivalId": null
     },
     {
       "id": 311,
@@ -6471,7 +6845,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 23,
-      "historicalPrestige": 23
+      "historicalPrestige": 23,
+      "rivalId": null
     },
     {
       "id": 312,
@@ -6482,7 +6857,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 8,
-      "historicalPrestige": 8
+      "historicalPrestige": 8,
+      "rivalId": null
     },
     {
       "id": 313,
@@ -6493,7 +6869,8 @@
       "conferenceId": 30,
       "division": "D1",
       "currentPrestige": 71,
-      "historicalPrestige": 71
+      "historicalPrestige": 71,
+      "rivalId": null
     },
     {
       "id": 314,
@@ -6504,7 +6881,8 @@
       "conferenceId": 18,
       "division": "D1",
       "currentPrestige": 47,
-      "historicalPrestige": 47
+      "historicalPrestige": 47,
+      "rivalId": null
     },
     {
       "id": 315,
@@ -6515,7 +6893,8 @@
       "conferenceId": 20,
       "division": "D1",
       "currentPrestige": 60,
-      "historicalPrestige": 60
+      "historicalPrestige": 60,
+      "rivalId": null
     },
     {
       "id": 316,
@@ -6526,7 +6905,8 @@
       "conferenceId": 11,
       "division": "D1",
       "currentPrestige": 35,
-      "historicalPrestige": 35
+      "historicalPrestige": 35,
+      "rivalId": null
     },
     {
       "id": 317,
@@ -6537,7 +6917,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 47,
-      "historicalPrestige": 47
+      "historicalPrestige": 47,
+      "rivalId": null
     },
     {
       "id": 318,
@@ -6548,7 +6929,8 @@
       "conferenceId": 9,
       "division": "D1",
       "currentPrestige": 92,
-      "historicalPrestige": 92
+      "historicalPrestige": 92,
+      "rivalId": null
     },
     {
       "id": 319,
@@ -6559,7 +6941,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 52,
-      "historicalPrestige": 52
+      "historicalPrestige": 52,
+      "rivalId": null
     },
     {
       "id": 320,
@@ -6570,7 +6953,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 61,
-      "historicalPrestige": 61
+      "historicalPrestige": 61,
+      "rivalId": null
     },
     {
       "id": 321,
@@ -6581,7 +6965,8 @@
       "conferenceId": 27,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 322,
@@ -6592,7 +6977,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 58,
-      "historicalPrestige": 58
+      "historicalPrestige": 58,
+      "rivalId": null
     },
     {
       "id": 323,
@@ -6603,7 +6989,8 @@
       "conferenceId": 21,
       "division": "D1",
       "currentPrestige": 55,
-      "historicalPrestige": 55
+      "historicalPrestige": 55,
+      "rivalId": null
     },
     {
       "id": 324,
@@ -6614,7 +7001,8 @@
       "conferenceId": 2,
       "division": "D1",
       "currentPrestige": 88,
-      "historicalPrestige": 88
+      "historicalPrestige": 88,
+      "rivalId": null
     },
     {
       "id": 325,
@@ -6625,7 +7013,8 @@
       "conferenceId": 15,
       "division": "D1",
       "currentPrestige": 33,
-      "historicalPrestige": 33
+      "historicalPrestige": 33,
+      "rivalId": null
     },
     {
       "id": 326,
@@ -6636,7 +7025,8 @@
       "conferenceId": 14,
       "division": "D1",
       "currentPrestige": 21,
-      "historicalPrestige": 21
+      "historicalPrestige": 21,
+      "rivalId": null
     },
     {
       "id": 327,
@@ -6647,7 +7037,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 7,
-      "historicalPrestige": 7
+      "historicalPrestige": 7,
+      "rivalId": null
     },
     {
       "id": 328,
@@ -6658,7 +7049,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 8,
-      "historicalPrestige": 8
+      "historicalPrestige": 8,
+      "rivalId": null
     },
     {
       "id": 329,
@@ -6669,7 +7061,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 4,
-      "historicalPrestige": 4
+      "historicalPrestige": 4,
+      "rivalId": null
     },
     {
       "id": 330,
@@ -6680,7 +7073,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 32,
-      "historicalPrestige": 32
+      "historicalPrestige": 32,
+      "rivalId": null
     },
     {
       "id": 331,
@@ -6691,7 +7085,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 6,
-      "historicalPrestige": 6
+      "historicalPrestige": 6,
+      "rivalId": null
     },
     {
       "id": 332,
@@ -6702,7 +7097,8 @@
       "conferenceId": 10,
       "division": "D1",
       "currentPrestige": 14,
-      "historicalPrestige": 14
+      "historicalPrestige": 14,
+      "rivalId": null
     },
     {
       "id": 333,
@@ -6713,7 +7109,8 @@
       "conferenceId": 8,
       "division": "D1",
       "currentPrestige": 11,
-      "historicalPrestige": 11
+      "historicalPrestige": 11,
+      "rivalId": null
     },
     {
       "id": 334,
@@ -6724,7 +7121,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 6,
-      "historicalPrestige": 6
+      "historicalPrestige": 6,
+      "rivalId": null
     },
     {
       "id": 335,
@@ -6735,7 +7133,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 38,
-      "historicalPrestige": 38
+      "historicalPrestige": 38,
+      "rivalId": null
     },
     {
       "id": 336,
@@ -6746,7 +7145,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 0,
-      "historicalPrestige": 0
+      "historicalPrestige": 0,
+      "rivalId": null
     },
     {
       "id": 337,
@@ -6757,7 +7157,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 42,
-      "historicalPrestige": 42
+      "historicalPrestige": 42,
+      "rivalId": null
     },
     {
       "id": 338,
@@ -6768,7 +7169,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 3,
-      "historicalPrestige": 3
+      "historicalPrestige": 3,
+      "rivalId": null
     },
     {
       "id": 339,
@@ -6779,7 +7181,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 6,
-      "historicalPrestige": 6
+      "historicalPrestige": 6,
+      "rivalId": null
     },
     {
       "id": 340,
@@ -6790,7 +7193,8 @@
       "conferenceId": 22,
       "division": "D1",
       "currentPrestige": 2,
-      "historicalPrestige": 2
+      "historicalPrestige": 2,
+      "rivalId": null
     },
     {
       "id": 341,
@@ -6801,7 +7205,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 0,
-      "historicalPrestige": 0
+      "historicalPrestige": 0,
+      "rivalId": null
     },
     {
       "id": 342,
@@ -6812,7 +7217,8 @@
       "conferenceId": 28,
       "division": "D1",
       "currentPrestige": 7,
-      "historicalPrestige": 7
+      "historicalPrestige": 7,
+      "rivalId": null
     },
     {
       "id": 343,
@@ -6823,7 +7229,8 @@
       "conferenceId": 7,
       "division": "D1",
       "currentPrestige": 20,
-      "historicalPrestige": 20
+      "historicalPrestige": 20,
+      "rivalId": null
     },
     {
       "id": 344,
@@ -6834,7 +7241,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 5,
-      "historicalPrestige": 5
+      "historicalPrestige": 5,
+      "rivalId": null
     },
     {
       "id": 345,
@@ -6845,7 +7253,8 @@
       "conferenceId": 4,
       "division": "D1",
       "currentPrestige": 9,
-      "historicalPrestige": 9
+      "historicalPrestige": 9,
+      "rivalId": null
     },
     {
       "id": 346,
@@ -6856,7 +7265,8 @@
       "conferenceId": 13,
       "division": "D1",
       "currentPrestige": 4,
-      "historicalPrestige": 4
+      "historicalPrestige": 4,
+      "rivalId": null
     },
     {
       "id": 347,
@@ -6867,7 +7277,8 @@
       "conferenceId": 17,
       "division": "D1",
       "currentPrestige": 12,
-      "historicalPrestige": 12
+      "historicalPrestige": 12,
+      "rivalId": null
     }
   ]
 }

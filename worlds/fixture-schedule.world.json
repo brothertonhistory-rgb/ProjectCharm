@@ -1,0 +1,473 @@
+{
+  "schemaVersion": 3,
+  "metadata": {
+    "kind": "authored",
+    "eraLabel": "fixture-schedule",
+    "division": "D1"
+  },
+  "tiers": [
+    {
+      "id": "power",
+      "floor": 40,
+      "equilibrium": 75,
+      "pullbackIntensity": 0.25
+    },
+    {
+      "id": "highMid",
+      "floor": 20,
+      "equilibrium": 55,
+      "pullbackIntensity": 0.45
+    },
+    {
+      "id": "lowMid",
+      "floor": 8,
+      "equilibrium": 35,
+      "pullbackIntensity": 0.65
+    },
+    {
+      "id": "low",
+      "floor": 0,
+      "equilibrium": 18,
+      "pullbackIntensity": 0.85
+    }
+  ],
+  "conferences": [
+    {
+      "id": 1,
+      "name": "Odd Valley Conference",
+      "shortName": "Odd Valley",
+      "tierId": "low",
+      "games": 16,
+      "skip": 2
+    },
+    {
+      "id": 2,
+      "name": "Skipline Conference",
+      "shortName": "Skipline",
+      "tierId": "low",
+      "games": 10,
+      "skip": 2
+    },
+    {
+      "id": 3,
+      "name": "Duo Conference",
+      "shortName": "Duo",
+      "tierId": "low",
+      "games": 16,
+      "skip": 0
+    },
+    {
+      "id": 4,
+      "name": "Idle Conference",
+      "shortName": "Idle",
+      "tierId": "low",
+      "games": 0,
+      "skip": 0
+    },
+    {
+      "id": 5,
+      "name": "Plain Conference",
+      "shortName": "Plain",
+      "tierId": "low",
+      "games": 10,
+      "skip": 0
+    }
+  ],
+  "places": [
+    {
+      "placeId": 1,
+      "name": "Fixture City",
+      "subdivision": "FX",
+      "country": "US",
+      "lat": 40,
+      "long": -75,
+      "tags": []
+    }
+  ],
+  "schools": [
+    {
+      "id": 1,
+      "name": "Ashford University",
+      "abbr": "F001",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 12
+    },
+    {
+      "id": 2,
+      "name": "Bellhaven University",
+      "abbr": "F002",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 3,
+      "name": "Cranmoor University",
+      "abbr": "F003",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 4,
+      "name": "Dunwich University",
+      "abbr": "F004",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 5,
+      "name": "Eastmere University",
+      "abbr": "F005",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 6,
+      "name": "Fairholt University",
+      "abbr": "F006",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 7,
+      "name": "Gladstone University",
+      "abbr": "F007",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 8,
+      "name": "Harrowgate University",
+      "abbr": "F008",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 9,
+      "name": "Ivybrook University",
+      "abbr": "F009",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 10,
+      "name": "Jessup University",
+      "abbr": "F010",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 11,
+      "name": "Kingsford University",
+      "abbr": "F011",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 12,
+      "name": "Larkspur University",
+      "abbr": "F012",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 1
+    },
+    {
+      "id": 13,
+      "name": "Marlowe University",
+      "abbr": "F013",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 14,
+      "name": "Netherby University",
+      "abbr": "F014",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 15
+    },
+    {
+      "id": 15,
+      "name": "Oakhurst University",
+      "abbr": "F015",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 14
+    },
+    {
+      "id": 16,
+      "name": "Pellham University",
+      "abbr": "F016",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 17,
+      "name": "Quarry Hill University",
+      "abbr": "F017",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 18,
+      "name": "Redwater University",
+      "abbr": "F018",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 19,
+      "name": "Stonebridge University",
+      "abbr": "F019",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 20,
+      "name": "Thornfield University",
+      "abbr": "F020",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 21,
+      "name": "Underhill University",
+      "abbr": "F021",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 22,
+      "name": "Vasser University",
+      "abbr": "F022",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 3,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 23,
+      "name": "Westmarch University",
+      "abbr": "F023",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 3,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 24,
+      "name": "Yarrow University",
+      "abbr": "F024",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 4,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 25
+    },
+    {
+      "id": 25,
+      "name": "Zeller University",
+      "abbr": "F025",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 4,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 24
+    },
+    {
+      "id": 26,
+      "name": "Abbotsleigh University",
+      "abbr": "F026",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 4,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 27
+    },
+    {
+      "id": 27,
+      "name": "Braddock University",
+      "abbr": "F027",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 26
+    },
+    {
+      "id": 28,
+      "name": "Calloway University",
+      "abbr": "F028",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 29
+    },
+    {
+      "id": 29,
+      "name": "Dunmore University",
+      "abbr": "F029",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": 28
+    },
+    {
+      "id": 30,
+      "name": "Elmridge University",
+      "abbr": "F030",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 31,
+      "name": "Fenwick University",
+      "abbr": "F031",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 32,
+      "name": "Gorse University",
+      "abbr": "F032",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 40,
+      "historicalPrestige": 40,
+      "rivalId": null
+    }
+  ]
+}

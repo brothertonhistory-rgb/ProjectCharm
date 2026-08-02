@@ -1,82 +1,128 @@
 #!/usr/bin/env python3
 """
-Project Charm — Session 30 schedule-builder oracle.
+Project Charm — Session 93 schedule-builder oracle (THE CONFERENCE SLATE).
 
-Mirrors the C# season schedule builder bit-for-bit. The contract (locked here,
-the C# is written against THIS file):
+Mirrors the C# season schedule builder. The contract is LOCKED here, and the C# is
+written against THIS file.
 
-RNG: WorldRng = SplitMix64 (identical to Program.World.cs). The schedule stream
-is WorldRng(seasonSeed ^ 0x5EA5C4ED) — its own stream, decoupled from the divvy
-(the committed sample-sheet XOR pattern). NextInt(n) = int(NextDouble() * n).
-Consumption order: (1) one Fisher-Yates shuffle of ring positions, n-1 draws,
-i = n-1 down to 1, j = NextInt(i+1); (2) one draw per ACTUAL conflict repair
-(the scan start offset) — stale queue entries consume nothing. Conference
-slates and orientation consume NO randomness.
+★ WHAT SESSION 93 CHANGED, AND WHY THE OLD CONTRACT IS GONE (Emmett, 2026-08-02):
+"we don't care about a 'season' right now, we care about games being scheduled."
+The season is now the CONFERENCE SLATE AND NOTHING ELSE. Every non-conference
+construction in the previous oracle — the 14-regular ring circulant, the conflict
+queue, the double-edge repair, the 20-attempt retry, and the entire RNG stream that
+existed to feed it — is DELETED, not disabled. Non-conference scheduling is its own
+future session and starts from nothing.
 
-CONFERENCE SLATES (no RNG): conferences by id ascending, members by school id
-ascending indexed 0..s-1. base = 16 // (s-1); r = 16 - base*(s-1). The extra-
-meeting graph is the canonical circulant on member indices: r even -> offsets
-1..r/2; r odd (s even, guaranteed by parity) -> offsets 1..(r-1)/2 plus the
-diameter matching (i, i+s/2). Emission order: for i in 0..s-2, for j in
-i+1..s-1, emit (base + extra(i,j)) consecutive games (id_i, id_j).
+Consequences that follow from that ruling, recorded so no future session meets them
+as a surprise:
 
-NON-CONFERENCE (RNG): a 14-regular SIMPLE graph, no conference-mates.
-Construction: shuffle school indices into a ring; edges ring[i]—ring[(i+k)%n]
-for i in 0..n-1, k in 1..7 (insertion order = the canonical edge-list order);
-collect conference-mate conflicts in scan order (FIFO); repair each live
-conflict (a,b) by a double-edge swap: start = NextInt(edgeCount), scan forward,
-skip candidates sharing an endpoint, try rewiring R1 (a,c)+(b,d) then R2
-(a,d)+(b,c); a rewiring is legal iff both new pairs are non-mates and absent
-from the graph. Apply the first legal one: slot of (a,b) <- first new edge,
-slot of (c,d) <- second; adjacency updated. If some conflict finds no legal
-swap across a full scan, the ATTEMPT fails: construction restarts with a fresh
-shuffle drawn from the same continuing RNG stream (nothing is reseeded), up to
-20 attempts total; 20 failed attempts -> fail loudly naming the last stuck
-pairing. Edges stored (loId, hiId).
+  * A team plays its own conference's authored number of games, not 30. Fourteen for
+    the Ivy, sixteen for the ACC, twenty for the Atlantic Sun.
+  * The fourteen Independent schools play ZERO games. Their conference is authored at
+    Games = 0, which is R14, and it is now a live case in the stock world rather than
+    a fixture curiosity.
+  * ★ THE SCHEDULE CONSUMES NO RANDOMNESS AT ALL. The old builder's only RNG lived in
+    the non-conference filler. The conference slate is fully determined by the world
+    file, so the schedule is now IDENTICAL AT EVERY SEED. That is honest — the seed
+    still drives every game's outcome — but it means the same pairs are doubled and
+    the same pairs skipped every season forever, which is a real basketball gap that
+    Session 94's host memory and its soft objectives are the answer to. Recorded here,
+    not solved here.
 
-ORIENTATION (no RNG): the full multigraph (conf block then nonconf block,
-game index ascending) has every degree 30 (even). Per component (components by
-lowest school id, schools scanned id-ascending), run iterative Hierholzer with
-per-vertex adjacency in game-index order and a per-vertex pointer; each edge is
-oriented in its consumption direction (from = HOME). A closed Eulerian circuit
-gives out = in = 15 at every vertex: exactly 15 home / 15 away.
+THE SLATE (no RNG). For a conference of n schools with Games = G and Skip = k:
+
+  p = n - 1 - k          opponents actually played
+  q, r = divmod(G, p)    r opponents at q+1 meetings, p - r at q, k at zero
+
+  Conferences by id ascending; members by school id ascending, indexed 0..n-1.
+  Construction order inside a conference, and the ORDER IS LOAD-BEARING:
+    1. resolve the active rivalries (mutual, both in THIS conference, G > 0, a matching)
+    2. build the r-regular EXTRA-meeting graph so that it CONTAINS the rivalry matching
+       (rivalries are placed by construction, never searched for); when r = 0, instead
+       require the SKIPPED graph to avoid every rivalry edge
+    3. build the k-regular SKIPPED graph on the complement of the extra graph
+    4. every remaining pair meets q times
+    5. orient
+
+  ★ THE CANONICAL CIRCULANT IS TRIED FIRST AND PINNED. When k = 0 and no rivalry
+  constrains it, the extra-meeting graph is exactly the circulant the pre-S93 builder
+  used — offsets 1..r/2, plus the diameter matching (i, i+n/2) when r is odd. That is
+  deliberate: it makes the stock slate's pair multiset reproducible against the old
+  builder wherever G is unchanged, so a DIFFERENCE MEANS SOMETHING. The shortcut only
+  ever ACCEPTS a candidate it has verified against the same constraints the search
+  enforces; it never rejects, so it cannot mask the search's infeasibility proof.
+
+  Otherwise the shape is found by EXHAUSTIVE backtracking over the finite class
+  assignment (each unordered pair is EXTRA, SKIP or BASE), pairs in lexicographic
+  order, classes tried EXTRA -> SKIP -> BASE, with degree-feasibility pruning. For
+  n <= SIZE_CAP the search is exhaustive, so returning without a slate IS a proof of
+  infeasibility. Above SIZE_CAP the solver refuses to search at all.
+
+  Emission order: for i in 0..n-2, for j in i+1..n-1, emit m consecutive games
+  (member_i, member_j) where m is that pair's meeting count. A conference authored at
+  G = 0 emits nothing.
+
+ORIENTATION (no RNG), and R3 is a HARD LINE: every team plays an exactly even home /
+away conference season, G/2 each.
+
+  A pair meeting m times contributes floor(m/2) home and floor(m/2) away BY
+  CONSTRUCTION, alternating from the lower school id, and those games never enter the
+  flow. Only an ODD m leaves one game undecided — the RESIDUAL, always the last of
+  that pair's m games.
+
+  Residuals are decided by an integral flow with EXACT quotas:
+      source     -> one node per FREE residual        capacity 1
+      residual   -> each of its two schools           capacity 1
+      school     -> sink            capacity = EXACTLY its remaining home quota
+  Fixed residuals (the Session 94 seam: FixedResidualHost) consume home quota BEFORE
+  any flow structure is built; a school driven negative there is refused with
+  rejected_before_flow = True and the school named. A saturating flow is a legal
+  orientation; anything less proves the slate infeasible under the fixed set.
+
+  In production the fixed set is ALWAYS EMPTY — there is no host memory yet. The
+  parameter exists so Session 94 does not have to reopen this code.
+
+FOUR VERDICTS, kept strictly separate and never collapsed:
+  InvalidConfiguration(reason)        the authored world is wrong — cheap, static
+  InfeasibleUnderConstraints(reason)  valid configuration, PROVEN no slate exists
+  SearchBudgetExhausted               did not find one; does NOT mean none exists
+  UnsupportedConferenceSize(n)        above the solver's hard size cap
+Precedence, fixed: static configuration validation -> supported-size check -> search
+-> feasible/infeasible.
 
 FINGERPRINT: one record per game in schedule order (never re-sorted):
-"{gameIndex}|{kind}|{homeSchoolId}|{awaySchoolId}\n", kind in {conf, nonconf},
+"{gameIndex}|{kind}|{homeSchoolId}|{awaySchoolId}\n", kind is always "conf" today,
 UTF-8, SHA-256, lowercase hex.
 
-ENGINE SEEDS (no RNG; asserted unique in Phase 55): base =
-int32(seasonSeed) two's-complement truncation (the smoke sim's
-unchecked((int)seed) pattern); resolver = base + 2*gameIndex, governor =
-base + 2*gameIndex + 1, int32 wraparound.
+ENGINE SEEDS (no RNG; asserted unique in Phase 55): base = int32(seasonSeed) two's-
+complement truncation; resolver = base + 2*gameIndex, governor = base + 2*gameIndex + 1,
+int32 wraparound.
 """
 
 import hashlib
 import json
 import sys
 
-MASK64 = (1 << 64) - 1
-SCHED_XOR = 0x5EA5C4ED
+SIZE_CAP = 20
+MAX_GAMES = 30
 
 
-class WorldRng:
-    """SplitMix64, mirroring Program.World.cs bit-for-bit."""
+# ─── Verdicts ────────────────────────────────────────────────────────────────
 
-    def __init__(self, seed):
-        self.state = seed & MASK64
+class ScheduleError(Exception):
+    """InvalidConfiguration — the authored world is wrong."""
 
-    def next_u64(self):
-        self.state = (self.state + 0x9E3779B97F4A7C15) & MASK64
-        z = self.state
-        z = ((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9) & MASK64
-        z = ((z ^ (z >> 27)) * 0x94D049BB133111EB) & MASK64
-        return z ^ (z >> 31)
 
-    def next_double(self):
-        return (self.next_u64() >> 11) * (1.0 / (1 << 53))
+class InfeasibleUnderConstraints(Exception):
+    """Valid configuration, PROVEN no slate exists."""
 
-    def next_int(self, n):
-        return int(self.next_double() * n)
+
+class SearchBudgetExhausted(Exception):
+    """Did not find a slate. Does NOT mean none exists."""
+
+
+class UnsupportedConferenceSize(Exception):
+    """Above the solver's hard size cap."""
 
 
 def int32(x):
@@ -84,306 +130,443 @@ def int32(x):
     return x - (1 << 32) if x >= (1 << 31) else x
 
 
-class ScheduleError(Exception):
-    pass
+# ─── Legality — a NECESSARY filter, not a promise ────────────────────────────
+
+def legality_reason(n, g, k):
+    """None when the configuration may go to the solver, else the reason string.
+    These conditions are necessary, never sufficient."""
+    if g < 0:
+        return f"Games {g} is negative"
+    if g > MAX_GAMES:
+        return f"Games {g} exceeds the {MAX_GAMES}-game maximum for a regular season"
+    if g % 2 == 1:
+        return f"Games {g} is odd — a conference season must be even"
+    if k < 0:
+        return f"Skip {k} is negative"
+    if g == 0:
+        # A conference of independents (R14). It carries a canonical k of zero.
+        return None if k == 0 else f"Games 0 requires Skip 0 (got Skip {k})"
+    if n < 2:
+        return f"size {n} — a conference season needs an opponent"
+    if k > n - 2:
+        return f"Skip {k} leaves no opponent (size {n}; Skip may not exceed {n - 2})"
+    p = n - 1 - k
+    q, r = divmod(g, p)
+    if q < 1:
+        return (f"Games {g} over {p} played opponent(s) gives {q} meetings — "
+                f"every played opponent must get a game")
+    if (n * k) % 2 == 1:
+        return f"size {n} with Skip {k} is odd on both — no {k}-regular skipped graph exists"
+    if (n * r) % 2 == 1:
+        return (f"size {n} with {r} extra meeting(s) is odd on both — "
+                f"no {r}-regular extra graph exists")
+    return None
 
 
-class AttemptFailed(Exception):
-    pass
+def shape(n, g, k):
+    """(p, q, r) for a conference that plays. Undefined at g == 0."""
+    p = n - 1 - k
+    q, r = divmod(g, p)
+    return p, q, r
 
 
-def preflight(schools, conf_names):
-    """schools: list of (id, confId) sorted by id. Raises ScheduleError naming
-    the school/conference and the unmet requirement."""
-    n = len(schools)
+# ─── The extra-meeting / skipped shape ───────────────────────────────────────
+
+def circulant(n, r):
+    """The canonical r-regular circulant on indices 0..n-1: offsets 1..r/2, plus the
+    diameter matching (i, i+n/2) when r is odd (which forces n even)."""
+    extra = set()
+    if r <= 0:
+        return extra
+    if r % 2 == 0:
+        offsets, diameter = range(1, r // 2 + 1), False
+    else:
+        offsets, diameter = range(1, (r - 1) // 2 + 1), True
+    for i in range(n):
+        for off in offsets:
+            j = (i + off) % n
+            extra.add((min(i, j), max(i, j)))
+        if diameter and i < n // 2:
+            extra.add((i, i + n // 2))
+    return extra
+
+
+EXTRA, SKIP, BASE = 0, 1, 2
+
+
+def search_shape(n, r, k, forced_extra, forbidden_skip, budget=None):
+    """Exhaustive backtracking over the class of every unordered pair.
+
+    Each vertex takes exactly r EXTRA pairs and exactly k SKIP pairs; everything else
+    is BASE. forced_extra pairs must be EXTRA; forbidden_skip pairs may not be SKIP.
+    Pairs are visited in lexicographic order and classes tried EXTRA -> SKIP -> BASE,
+    so the first solution found is a canonical one.
+
+    Returns (extra_set, skip_set, nodes). Raises InfeasibleUnderConstraints when the
+    space is exhausted with no solution — which for n <= SIZE_CAP is a PROOF — or
+    SearchBudgetExhausted, which proves nothing at all."""
+    pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
+    extra_left = [r] * n
+    skip_left = [k] * n
+    open_pairs = [n - 1] * n          # undecided pairs still incident to each vertex
+    assigned = {}
+    nodes = [0]
+
+    def feasible():
+        for v in range(n):
+            if extra_left[v] + skip_left[v] > open_pairs[v]:
+                return False
+        return True
+
+    def walk(idx):
+        nodes[0] += 1
+        if budget is not None and nodes[0] > budget:
+            raise SearchBudgetExhausted(
+                f"search budget of {budget} nodes exhausted at size {n}")
+        if idx == len(pairs):
+            return all(extra_left[v] == 0 and skip_left[v] == 0 for v in range(n))
+        i, j = pairs[idx]
+        # Row i-1 is fully decided by now, so it must be exactly satisfied.
+        if idx > 0:
+            prev_i = pairs[idx - 1][0]
+            if prev_i != i and (extra_left[prev_i] != 0 or skip_left[prev_i] != 0):
+                return False
+        forced = (i, j) in forced_extra
+        for cls in (EXTRA, SKIP, BASE):
+            if forced and cls != EXTRA:
+                continue
+            if cls == EXTRA and (extra_left[i] == 0 or extra_left[j] == 0):
+                continue
+            if cls == SKIP and ((i, j) in forbidden_skip
+                                or skip_left[i] == 0 or skip_left[j] == 0):
+                continue
+            if cls == EXTRA:
+                extra_left[i] -= 1; extra_left[j] -= 1
+            elif cls == SKIP:
+                skip_left[i] -= 1; skip_left[j] -= 1
+            open_pairs[i] -= 1; open_pairs[j] -= 1
+            assigned[(i, j)] = cls
+            ok = feasible() and walk(idx + 1)
+            if ok:
+                return True
+            del assigned[(i, j)]
+            open_pairs[i] += 1; open_pairs[j] += 1
+            if cls == EXTRA:
+                extra_left[i] += 1; extra_left[j] += 1
+            elif cls == SKIP:
+                skip_left[i] += 1; skip_left[j] += 1
+        return False
+
+    if not walk(0):
+        raise InfeasibleUnderConstraints(
+            f"no legal slate exists for size {n} with {r} extra meeting(s), {k} skip(s) "
+            f"and {len(forced_extra) + len(forbidden_skip)} placed rivalry pair(s)")
+    ex = {p for p, c in assigned.items() if c == EXTRA}
+    sk = {p for p, c in assigned.items() if c == SKIP}
+    return ex, sk, nodes[0]
+
+
+def conference_meetings(members, g, k, rival_pairs=(), conf_label="", budget=None,
+                        size_cap=SIZE_CAP, stats=None):
+    """members: school ids ascending. rival_pairs: frozenset({idA, idB}) entries active
+    in THIS conference. Returns {(loId, hiId): meetings} for every unordered pair."""
+    n = len(members)
+    reason = legality_reason(n, g, k)
+    if reason is not None:
+        raise ScheduleError(f"INVALID CONFIGURATION: {conf_label}{reason}.")
+    if g == 0:
+        return {}
+    if n > size_cap:
+        raise UnsupportedConferenceSize(
+            f"UNSUPPORTED CONFERENCE SIZE: {conf_label}size {n} is above the solver's "
+            f"hard cap of {size_cap}; no search was attempted.")
+    p, q, r = shape(n, g, k)
+    idx = {sid: i for i, sid in enumerate(members)}
+    forced = set()
+    for pr in rival_pairs:
+        a, b = sorted(idx[s] for s in pr)
+        forced.add((a, b))
+
+    extra = skipped = None
+    if k == 0:
+        cand = circulant(n, r)
+        if r == 0 or forced <= cand:
+            extra, skipped = cand, set()
+    if extra is None:
+        # r > 0: rivalries must sit at q+1. r == 0: rivalries must not be skipped.
+        forced_extra = forced if r > 0 else set()
+        forbidden_skip = set() if r > 0 else forced
+        extra, skipped, nodes = search_shape(n, r, k, forced_extra, forbidden_skip, budget)
+        if stats is not None:
+            stats.setdefault("nodes", {})[conf_label.strip() or n] = nodes
+
+    meetings = {}
+    for i in range(n - 1):
+        for j in range(i + 1, n):
+            m = 0 if (i, j) in skipped else q + (1 if (i, j) in extra else 0)
+            meetings[(members[i], members[j])] = m
+    return meetings
+
+
+# ─── Orientation ─────────────────────────────────────────────────────────────
+
+class OrientationResult:
+    def __init__(self, homes, rejected_before_flow=False, reason=""):
+        self.homes = homes
+        self.rejected_before_flow = rejected_before_flow
+        self.reason = reason
+
+
+def orient_conference(members, g, meetings, fixed_hosts=None):
+    """Returns an OrientationResult whose .homes is a list of home school ids, one per
+    emitted game, in emission order.
+
+    fixed_hosts: {(loId, hiId): hostId} — the Session 94 seam. Legal only for a pair
+    whose meeting count is odd; the host must be one of the two schools."""
+    fixed_hosts = dict(fixed_hosts or {})
+    quota = {s: g // 2 for s in members}
+    residual_index = {}
+    homes = []
+    order = []
+    for i in range(len(members) - 1):
+        for j in range(i + 1, len(members)):
+            lo, hi = members[i], members[j]
+            m = meetings[(lo, hi)]
+            for t in range(m):
+                order.append((lo, hi))
+                if m % 2 == 1 and t == m - 1:
+                    residual_index[(lo, hi)] = len(homes)
+                    homes.append(None)
+                else:
+                    h = lo if t % 2 == 0 else hi
+                    homes.append(h)
+                    quota[h] -= 1
+
+    for pair, host in sorted(fixed_hosts.items()):
+        if pair not in meetings:
+            raise ScheduleError(
+                f"INVALID CONFIGURATION: fixed host names pair {pair}, "
+                f"which is not a pair in this conference.")
+        if meetings[pair] % 2 == 0:
+            raise ScheduleError(
+                f"INVALID CONFIGURATION: fixed host named for pair {pair}, which meets "
+                f"{meetings[pair]} time(s) — only an odd meeting count leaves a residual.")
+        if host not in pair:
+            raise ScheduleError(
+                f"INVALID CONFIGURATION: fixed host {host} is not one of the two "
+                f"schools in {pair}.")
+
+    for pair in sorted(fixed_hosts):
+        host = fixed_hosts[pair]
+        quota[host] -= 1
+        if quota[host] < 0:
+            return OrientationResult(
+                None, rejected_before_flow=True,
+                reason=(f"the fixed hosts over-commit school {host}'s home quota of "
+                        f"{g // 2} — refused before any flow structure was built"))
+        homes[residual_index[pair]] = host
+
+    free = [pair for pair in sorted(residual_index) if pair not in fixed_hosts]
+    if sum(quota.values()) != len(free):
+        return OrientationResult(
+            None, reason=(f"the remaining home quota {sum(quota.values())} does not equal "
+                          f"the {len(free)} free residual game(s)"))
+
+    # Integral flow by deterministic augmenting paths. Each free residual has exactly
+    # two candidate hosts; a school may host at most its remaining quota. Candidate
+    # order is fixed (lower school id first, then residual index ascending), so this
+    # returns one specific orientation and never a choice between two.
+    assigned = {}
+    holds = {s: [] for s in members}
+    for start in range(len(free)):
+        parent = {start: None}
+        queue = [start]
+        found = None
+        while queue and found is None:
+            ridx = queue.pop(0)
+            for school in free[ridx]:
+                if quota[school] > 0:
+                    found = (ridx, school)
+                    break
+                for other in holds[school]:
+                    if other not in parent:
+                        parent[other] = (ridx, school)
+                        queue.append(other)
+        if found is None:
+            return OrientationResult(
+                None, reason=(f"no legal orientation exists under the fixed set: the "
+                              f"residual {free[start]} has nowhere left to host"))
+        ridx, school = found
+        quota[school] -= 1
+        while True:
+            was = assigned.get(ridx)
+            if was is not None:
+                holds[was].remove(ridx)
+            assigned[ridx] = school
+            holds[school].append(ridx)
+            step = parent[ridx]
+            if step is None:
+                break
+            ridx, school = step
+
+    for ridx, school in assigned.items():
+        homes[residual_index[free[ridx]]] = school
+
+    if any(h is None for h in homes):
+        return OrientationResult(None, reason="the orientation left a game undecided")
+    return OrientationResult(homes)
+
+
+# ─── The schedule ────────────────────────────────────────────────────────────
+
+def active_rivalries(members, rivals, g):
+    """A rivalry is ACTIVE for slate construction only when both schools share a
+    conference whose Games > 0. A cross-conference rivalry and a rivalry inside a
+    zero-game conference are both DORMANT — never an error."""
+    if g == 0:
+        return set()
+    inside = set(members)
+    return {frozenset((s, rivals[s])) for s in members
+            if rivals.get(s) is not None and rivals[s] in inside}
+
+
+def build_schedule(schools, conferences, rivals=None, fixed_hosts=None, stats=None):
+    """schools: list of (id, confId) sorted by id.
+       conferences: {id: (name, games, skip)}.
+       rivals: {schoolId: rivalSchoolId} — mutual, a matching, validated at load.
+       Returns (games, fingerprint); games is a list of (kind, home, away)."""
+    rivals = rivals or {}
+    fixed_hosts = fixed_hosts or {}
     by_conf = {}
     for sid, cid in schools:
         by_conf.setdefault(cid, []).append(sid)
-    for cid in sorted(by_conf):
-        s = len(by_conf[cid])
-        name = conf_names.get(cid, f"conference {cid}")
-        if s < 2:
-            raise ScheduleError(
-                f"SEASON PREFLIGHT INFEASIBLE: conference '{name}' (id {cid}) has "
-                f"{s} school(s) — a 16-game conference slate needs an opponent (s-1 = 0).")
-        base = 16 // (s - 1)
-        r = 16 - base * (s - 1)
-        if (r * s) % 2 == 1:
-            raise ScheduleError(
-                f"SEASON PREFLIGHT INFEASIBLE: conference '{name}' (id {cid}, size {s}) — "
-                f"extra-meeting condition violated (r={r}, r*s odd; no r-regular graph exists).")
-    for sid, cid in schools:
-        eligible = n - len(by_conf[cid])
-        if eligible < 14:
-            raise ScheduleError(
-                f"SEASON PREFLIGHT INFEASIBLE: school id {sid} (conference id {cid}) has only "
-                f"{eligible} eligible non-conference opponents — 14 required.")
-    if (n * 14) % 2 == 1:
-        raise ScheduleError(
-            f"SEASON PREFLIGHT INFEASIBLE: total non-conference degree {n}*14 is odd.")
-    return by_conf
 
-
-def conference_games(by_conf):
-    """Deterministic, no RNG. Returns list of (loId, hiId) in schedule order."""
     games = []
     for cid in sorted(by_conf):
         members = sorted(by_conf[cid])
-        s = len(members)
-        base = 16 // (s - 1)
-        r = 16 - base * (s - 1)
-        extra = set()
-        if r > 0:
-            if r % 2 == 0:
-                offsets, diameter = range(1, r // 2 + 1), False
-            else:
-                offsets, diameter = range(1, (r - 1) // 2 + 1), True
-            for i in range(s):
-                for k in offsets:
-                    j = (i + k) % s
-                    extra.add((min(i, j), max(i, j)))
-                if diameter and i < s // 2:
-                    extra.add((i, i + s // 2))
-        for i in range(s - 1):
-            for j in range(i + 1, s):
-                m = base + (1 if (i, j) in extra else 0)
-                for _ in range(m):
-                    games.append((members[i], members[j]))
-    return games
-
-
-def nonconference_edges(schools, rng, seed_label=""):
-    """schools: list of (id, confId) sorted by id. Returns edge list of
-    (loId, hiId) in canonical (construction + in-place swap) order."""
-    n = len(schools)
-    ids = [s[0] for s in schools]
-    conf = {sid: cid for sid, cid in schools}
-
-    ring = list(range(n))
-    for i in range(n - 1, 0, -1):
-        j = rng.next_int(i + 1)
-        ring[i], ring[j] = ring[j], ring[i]
-
-    def norm(a, b):
-        return (a, b) if a < b else (b, a)
-
-    edges = []
-    for i in range(n):
-        for k in range(1, 8):
-            u = ids[ring[i]]
-            v = ids[ring[(i + k) % n]]
-            edges.append(norm(u, v))
-    adj = set(edges)
-    if len(adj) != len(edges):
-        raise ScheduleError("SEASON SCHEDULE BUG: circulant produced a duplicate edge.")
-    index_of = {e: i for i, e in enumerate(edges)}
-
-    queue = [e for e in edges if conf[e[0]] == conf[e[1]]]
-
-    for ab in queue:
-        if ab not in adj:
-            continue  # rewired away by an earlier repair; no RNG consumed
-        a, b = ab
-        off = rng.next_int(len(edges))
-        repaired = False
-        for m in range(len(edges)):
-            cd = edges[(off + m) % len(edges)]
-            c, d = cd
-            if c == a or c == b or d == a or d == b:
-                continue
-            for (n1, n2) in (((a, c), (b, d)), ((a, d), (b, c))):
-                p1, p2 = norm(*n1), norm(*n2)
-                if conf[n1[0]] == conf[n1[1]] or conf[n2[0]] == conf[n2[1]]:
-                    continue
-                if p1 in adj or p2 in adj:
-                    continue
-                i_ab, i_cd = index_of[ab], index_of[cd]
-                adj.discard(ab); adj.discard(cd)
-                adj.add(p1); adj.add(p2)
-                edges[i_ab], edges[i_cd] = p1, p2
-                del index_of[ab]; del index_of[cd]
-                index_of[p1], index_of[p2] = i_ab, i_cd
-                repaired = True
-                break
-            if repaired:
-                break
-        if not repaired:
-            raise AttemptFailed(
-                f"non-conference repair found no legal swap for the "
-                f"conference-mate pairing school {a} vs school {b}")
-    return edges
-
-
-MAX_ATTEMPTS = 20
-
-
-def nonconference_slate(schools, rng, seed_label=""):
-    """Up to MAX_ATTEMPTS construction attempts on the one continuing RNG
-    stream; the first attempt that completes wins."""
-    last = None
-    for _ in range(MAX_ATTEMPTS):
-        try:
-            return nonconference_edges(schools, rng, seed_label)
-        except AttemptFailed as e:
-            last = e
-    raise ScheduleError(
-        f"SEASON SCHEDULE BUILD FAILED{seed_label}: {MAX_ATTEMPTS} construction "
-        f"attempts exhausted; last failure: {last}.")
-
-
-def orient(all_games, school_ids):
-    """all_games: list of (x, y) in schedule order. Returns list of
-    (home, away) in the same order. Hierholzer per component; each edge is
-    oriented in its consumption direction (from = home)."""
-    adj = {sid: [] for sid in school_ids}
-    for g, (x, y) in enumerate(all_games):
-        adj[x].append((y, g))
-        adj[y].append((x, g))
-    used = [False] * len(all_games)
-    home = [None] * len(all_games)
-    ptr = {sid: 0 for sid in school_ids}
-    visited = set()
-    for start in school_ids:  # id ascending
-        if start in visited or not adj[start]:
+        name, g, k = conferences[cid]
+        label = f"conference '{name}' (id {cid}) "
+        meetings = conference_meetings(
+            members, g, k, active_rivalries(members, rivals, g), label, stats=stats)
+        if not meetings:
             continue
-        stack = [start]
-        while stack:
-            v = stack[-1]
-            visited.add(v)
-            a = adj[v]
-            while ptr[v] < len(a) and used[a[ptr[v]][1]]:
-                ptr[v] += 1
-            if ptr[v] == len(a):
-                stack.pop()
-            else:
-                w, g = a[ptr[v]]
-                used[g] = True
-                home[g] = v
-                stack.append(w)
-    return [(h, x if h == y else y) for (x, y), h in zip(all_games, home)]
+        res = orient_conference(members, g, meetings, fixed_hosts.get(cid))
+        if res.homes is None:
+            raise InfeasibleUnderConstraints(
+                f"INFEASIBLE UNDER CONSTRAINTS: {label}{res.reason}.")
+        pos = 0
+        for i in range(len(members) - 1):
+            for j in range(i + 1, len(members)):
+                lo, hi = members[i], members[j]
+                for _ in range(meetings[(lo, hi)]):
+                    h = res.homes[pos]
+                    games.append(("conf", h, hi if h == lo else lo))
+                    pos += 1
 
-
-def build_schedule(schools, conf_names, season_seed):
-    """schools: list of (id, confId) sorted by id. Returns
-    (games, fingerprint_hex) where games is a list of (kind, home, away)."""
-    by_conf = preflight(schools, conf_names)
-    rng = WorldRng((season_seed ^ SCHED_XOR) & MASK64)
-    conf_g = conference_games(by_conf)
-    nonconf_g = nonconference_slate(schools, rng, f" at seed {season_seed}")
-    all_undirected = conf_g + nonconf_g
-    oriented = orient(all_undirected, [s[0] for s in schools])
-    kinds = ["conf"] * len(conf_g) + ["nonconf"] * len(nonconf_g)
-    games = [(k, h, a) for k, (h, a) in zip(kinds, oriented)]
     payload = "".join(f"{i}|{k}|{h}|{a}\n" for i, (k, h, a) in enumerate(games))
-    fp = hashlib.sha256(payload.encode("utf-8")).hexdigest()
-    return games, fp
+    return games, hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-# ─── Legality proof (the invariants Phase 55 asserts at stock) ───────────────
+# ─── Legality proof (the invariants Phase 55 and Phase 84 assert) ────────────
 
-def prove(schools, games, tag):
-    n = len(schools)
-    conf = {sid: cid for sid, cid in schools}
+def prove(schools, conferences, games, tag, rivals=None):
+    rivals = rivals or {}
+    conf_of = dict(schools)
     by_conf = {}
     for sid, cid in schools:
         by_conf.setdefault(cid, []).append(sid)
 
-    total = {sid: 0 for sid, _ in schools}
-    confN = {sid: 0 for sid, _ in schools}
-    nonconfN = {sid: 0 for sid, _ in schools}
-    homeN = {sid: 0 for sid, _ in schools}
-    pair_conf = {}
-    pair_nonconf = {}
-    for k, h, a in games:
+    played = {sid: 0 for sid, _ in schools}
+    home_n = {sid: 0 for sid, _ in schools}
+    pair = {}
+    for kind, h, a in games:
         assert h != a, f"{tag}: self-game {h}"
-        total[h] += 1; total[a] += 1; homeN[h] += 1
+        assert kind == "conf", f"{tag}: a non-conference game exists"
+        assert conf_of[h] == conf_of[a], f"{tag}: a conference game crossed conferences"
+        played[h] += 1; played[a] += 1; home_n[h] += 1
         key = (min(h, a), max(h, a))
-        if k == "conf":
-            confN[h] += 1; confN[a] += 1
-            assert conf[h] == conf[a], f"{tag}: conf game across conferences {key}"
-            pair_conf[key] = pair_conf.get(key, 0) + 1
-        else:
-            nonconfN[h] += 1; nonconfN[a] += 1
-            assert conf[h] != conf[a], f"{tag}: nonconf game between mates {key}"
-            pair_nonconf[key] = pair_nonconf.get(key, 0) + 1
+        pair[key] = pair.get(key, 0) + 1
 
-    assert all(total[s] == 30 for s in total), f"{tag}: not every team 30 games"
-    assert all(confN[s] == 16 for s in confN), f"{tag}: not every team 16 conf"
-    assert all(nonconfN[s] == 14 for s in nonconfN), f"{tag}: not every team 14 nonconf"
-    assert all(homeN[s] == 15 for s in homeN), f"{tag}: home not exactly 15"
-    assert all(c == 1 for c in pair_nonconf.values()), f"{tag}: nonconf pair met twice"
-    assert len(games) == n * 30 // 2, f"{tag}: total games {len(games)}"
-
+    expected_total = 0
     for cid, members in by_conf.items():
-        s = len(members)
-        base = 16 // (s - 1)
-        for i, x in enumerate(members):
-            for y in members[i + 1:]:
-                c = pair_conf.get((min(x, y), max(x, y)), 0)
-                assert c in (base, base + 1), \
-                    f"{tag}: conf pair ({x},{y}) meets {c}, expected {base} or {base + 1}"
+        n = len(members)
+        _, g, k = conferences[cid]
+        expected_total += n * g // 2
+        for s in members:
+            assert played[s] == g, f"{tag}: school {s} plays {played[s]}, authored {g}"
+            assert home_n[s] == g // 2, \
+                f"{tag}: school {s} hosts {home_n[s]} of {g}, not the exact half {g // 2}"
+        if g == 0:
+            continue
+        p, q, r = shape(n, g, k)
+        for s in members:
+            counts = [pair.get((min(s, o), max(s, o)), 0) for o in members if o != s]
+            assert counts.count(0) == k, \
+                f"{tag}: school {s} skips {counts.count(0)}, authored {k}"
+            assert counts.count(q + 1) == r, \
+                f"{tag}: school {s} has {counts.count(q + 1)} opponents at q+1, expected {r}"
+            assert counts.count(q) == p - r, \
+                f"{tag}: school {s} has {counts.count(q)} opponents at q, expected {p - r}"
+            rv = rivals.get(s)
+            if rv is not None and rv in members:
+                met = pair.get((min(s, rv), max(s, rv)), 0)
+                if r > 0:
+                    assert met == q + 1, f"{tag}: rivalry {s}-{rv} sits at {met}, not q+1"
+                else:
+                    assert met > 0, f"{tag}: rivalry {s}-{rv} was skipped"
+    assert len(games) == expected_total, \
+        f"{tag}: {len(games)} games, expected {expected_total}"
 
+
+# ─── World loading ───────────────────────────────────────────────────────────
 
 def load_world(path):
     w = json.load(open(path))
     schools = sorted((s["id"], s["conferenceId"]) for s in w["schools"])
-    conf_names = {c["id"]: c["name"] for c in w["conferences"]}
-    return schools, conf_names
+    conferences = {c["id"]: (c["name"], c["games"], c["skip"]) for c in w["conferences"]}
+    rivals = {s["id"]: s["rivalId"] for s in w["schools"] if s.get("rivalId") is not None}
+    return schools, conferences, rivals
 
 
 if __name__ == "__main__":
-    # Run from the repo root: python tools/schedule_oracle.py [stock-seed-count]
-    root = sys.argv[2] if len(sys.argv) > 2 else "."
-    stock, stock_names = load_world(f"{root}/worlds/stock-d1.world.json")
-    tiny, tiny_names = load_world(f"{root}/worlds/fixture-tiny.world.json")
+    import time
+    root = sys.argv[1] if len(sys.argv) > 1 else "."
+    worlds = [("stock-d1", load_world(f"{root}/worlds/stock-d1.world.json")),
+              ("fixture-tiny", load_world(f"{root}/worlds/fixture-tiny.world.json")),
+              ("fixture-schedule", load_world(f"{root}/worlds/fixture-schedule.world.json"))]
 
-    FIXED = 20260703
+    print("LOCKED EXPORTS (the schedule consumes no randomness; the seed does not enter):")
+    for label, (schools, confs, rivals) in worlds:
+        t0 = time.time()
+        games, fp = build_schedule(schools, confs, rivals)
+        prove(schools, confs, games, label, rivals)
+        print(f"  {label:18s} games {len(games):5d}  game0 {games[0] if games else '(none)'}")
+        print(f"  {label:18s} fingerprint {fp}   ({time.time() - t0:.2f}s)")
 
-    # Acceptance sweep: many seeds, both scales, every invariant.
-    n_stock, n_tiny = int(sys.argv[1]) if len(sys.argv) > 1 else 40, 200
-    for s in range(FIXED, FIXED + n_stock):
-        g, _ = build_schedule(stock, stock_names, s)
-        prove(stock, g, f"stock seed {s}")
-    print(f"stock: {n_stock} seeds green ({len(g)} games each)")
-    for s in range(FIXED, FIXED + n_tiny):
-        g, _ = build_schedule(tiny, tiny_names, s)
-        prove(tiny, g, f"tiny seed {s}")
-    print(f"fixture: {n_tiny} seeds green ({len(g)} games each)")
+    schools, confs, rivals = worlds[0][1]
+    g1, fp1 = build_schedule(schools, confs, rivals)
+    g2, fp2 = build_schedule(schools, confs, rivals)
+    assert fp1 == fp2 and g1 == g2
+    print("determinism: rebuilding the same world reproduces the schedule exactly")
 
-    # Determinism at the fixed seed.
-    g1, fp1 = build_schedule(stock, stock_names, FIXED)
-    g2, fp2 = build_schedule(stock, stock_names, FIXED)
-    assert g1 == g2 and fp1 == fp2
-    t1, tfp1 = build_schedule(tiny, tiny_names, FIXED)
-    t2, tfp2 = build_schedule(tiny, tiny_names, FIXED)
-    assert t1 == t2 and tfp1 == tfp2
-    _, fp_diff = build_schedule(stock, stock_names, FIXED + 1)
-    assert fp_diff != fp1
-    print("determinism: same seed identical, different seed different")
+    # Per-league conference game counts, for the Phase 84 prediction.
+    by_conf = {}
+    for sid, cid in schools:
+        by_conf.setdefault(cid, []).append(sid)
+    print("per-league conference game counts:",
+          {cid: len(by_conf[cid]) * confs[cid][1] // 2 for cid in sorted(by_conf)})
 
-    # Preflight rejection: a rigged one-school conference.
-    rigged = list(tiny)
-    rigged[0] = (rigged[0][0], 999)  # school 1 alone in conference 999
+    # Size-cap benchmark (A12): a deliberately hard LEGAL configuration at n = SIZE_CAP.
+    st = {}
+    t0 = time.time()
+    conference_meetings(list(range(1, SIZE_CAP + 1)), 22, 3, (), f"n={SIZE_CAP} ", stats=st)
+    print(f"size-cap benchmark: the hardest legal configuration found at the cap, "
+          f"n={SIZE_CAP} G=22 k=3, solved in {time.time() - t0:.3f}s, nodes {st.get('nodes')}")
+    # ★ The refusal case must be LEGAL, or InvalidConfiguration fires first and the size
+    #   check is never reached — which is the precedence order working, not the cap.
+    assert legality_reason(SIZE_CAP + 1, 20, 0) is None
     try:
-        build_schedule(rigged, {**tiny_names, 999: "Lonely"}, FIXED)
-        raise SystemExit("rigged world was NOT rejected")
-    except ScheduleError as e:
-        assert "Lonely" in str(e) and "s-1 = 0" in str(e)
-        print(f"preflight rejection: {e}")
-
-    # Exports for Phase 55.
-    print()
-    print(f"FIXED SEED {FIXED} EXPORTS:")
-    print(f"  stock fingerprint:   {fp1}")
-    print(f"  stock games total:   {len(g1)}")
-    conf_counts = {}
-    conf_of = dict(stock)
-    for k, h, a in g1:
-        if k == "conf":
-            conf_counts[conf_of[h]] = conf_counts.get(conf_of[h], 0) + 1
-    print(f"  stock conf-game counts by conference id: {dict(sorted(conf_counts.items()))}")
-    print(f"  fixture fingerprint: {tfp1}")
-    print(f"  fixture games total: {len(t1)}")
-    print(f"  fixture game 0:      {t1[0]}")
-    print(f"  stock game 0:        {g1[0]}")
-    # RNG-consumption pulse: conflicts repaired at the fixed seeds.
+        conference_meetings(list(range(1, SIZE_CAP + 2)), 20, 0, (), "oversized ")
+        raise SystemExit("an oversized conference was NOT refused")
+    except UnsupportedConferenceSize as e:
+        print(f"size-cap refusal: {e}")

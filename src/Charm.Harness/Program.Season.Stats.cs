@@ -518,8 +518,10 @@ internal static partial class Program
             // ── Gate 4: games played ────────────────────────────────────────────
             //  A player receives ONE game played for POSITIVE floor-time credit in a team-game,
             //  at most one per team-game, none for zero credit. NOT roster membership — that
-            //  yields 30 for everybody and CONCEALS the DNPs this page exists to expose.
-            var teamGames = tiny.Schools.Count * 30 / 2 * 2 / tiny.Schools.Count;   // == 30
+            //  yields a full slate for everybody and CONCEALS the DNPs this page exists to expose.
+            //  ★ S93 — the bound is the league's AUTHORED game count, not a flat 30: the tiny
+            //  fixture's four leagues play 16 apiece and a team can never exceed its own slate.
+            var teamGames = tiny.Conferences.Max(c => c.Games);
             var maxGp     = all.Count == 0 ? 0 : all.Max(r => r.GamesPlayed);
             Check("games played: no player exceeds his school's team-game count",
                   maxGp <= teamGames, $"max {maxGp} of {teamGames}");

@@ -7,83 +7,74 @@ using Charm.History;
 namespace Charm.Harness;
 
 // ============================================================================
-// Season — Pass 2 of the world-structure arc: the minimal season loop.
+// Season — the season loop, and as of S93 the CONFERENCE SLATE.
 //
 // A HARNESS-ONLY layer (no engine file changes). `season <world.json> <seed>`
 // regenerates every school's divvied roster (world + seed — nothing persisted),
-// builds a deterministic 30-game schedule (16 conference + 14 non-conference,
-// neutral floors, exactly 15 home / 15 away), plays every game through the real
-// engine via the extracted single-game body, and prints the standings page:
-// all schools ranked by W-L, the prestige-band proof table, the overachievers
-// with their leaked top-decile talent named, and the OT sanity pulse.
+// builds the conference schedule, plays every game through the real engine via
+// the extracted single-game body, and prints the standings page.
 //
-// THE SCHEDULE CONTRACT (mirrored bit-for-bit by the Python oracle,
+// ★ S93 — WHAT A SEASON IS NOW (Emmett, 2026-08-02): "we don't care about a
+// 'season' right now, we care about games being scheduled." A team plays its
+// own conference's authored number of games and NOTHING ELSE. The pre-S93
+// non-conference filler — a flat 14-regular ring circulant with conflict repair
+// — is DELETED, not disabled, and non-conference scheduling starts from nothing
+// in its own future session.
+//
+// Three consequences, all honest, none of them bugs:
+//   * A team plays 14, 16, 18 or 20 games, not 30. Its league says which.
+//   * The fourteen Independent schools play ZERO games. Their conference is
+//     authored at Games = 0 (R14), so they carry rosters and no record.
+//   * ★ THE SCHEDULE CONSUMES NO RANDOMNESS. All of the old builder's RNG lived
+//     in the filler, so the slate is now a pure function of the world file and
+//     is IDENTICAL AT EVERY SEED. The seed still drives every outcome. What it
+//     no longer does is decide who plays whom — which means the same pairs are
+//     doubled and the same pairs skipped every season forever. Session 94's
+//     host memory is the answer to that; it is recorded here, not solved here.
+//
+// THE SCHEDULE CONTRACT (mirrored by the Python oracle,
 // tools/schedule_oracle.py — the oracle's docstring is the authoritative spec;
 // this header restates it):
 //
-//   RNG: WorldRng (SplitMix64) seeded with (seasonSeed ^ 0x5EA5C4ED) — the
-//   schedule's own stream, decoupled from the divvy (the committed sample-sheet
-//   XOR pattern). NextInt(n) = (int)(NextDouble() * n). Consumption order:
-//   per construction attempt, one Fisher-Yates shuffle of ring positions
-//   (n-1 draws, i = n-1 down to 1, j = NextInt(i+1)), then one draw per ACTUAL
-//   conflict repair (the scan start offset) — stale queue entries consume
-//   nothing. Conference slates and orientation consume NO randomness.
-//
 //   CONFERENCE SLATES (no RNG): conferences by id ascending, members by school
-//   id ascending indexed 0..s-1. base = 16/(s-1); r = 16 - base*(s-1). The
-//   extra-meeting graph is the canonical circulant on member indices: r even ->
-//   offsets 1..r/2; r odd (s even, guaranteed by parity) -> offsets 1..(r-1)/2
-//   plus the diameter matching (i, i+s/2). Emission order: for i in 0..s-2,
-//   for j in i+1..s-1, emit (base + extra(i,j)) consecutive games (id_i, id_j).
+//   id ascending indexed 0..n-1. For Games = G and Skip = k: p = n-1-k played
+//   opponents, q = G/p meetings each, r = G mod p opponents bumped to q+1, and
+//   k opponents skipped entirely. Construction order inside a league is
+//   load-bearing: resolve the active rivalries, build the r-regular EXTRA graph
+//   so it CONTAINS the rivalry matching, build the k-regular SKIPPED graph on
+//   the complement, everything else meets q times, orient. When k = 0 and no
+//   rivalry constrains it the extra graph is the canonical circulant the
+//   pre-S93 builder used — pinned deliberately, so an unchanged league's pair
+//   multiset is reproducible against the old schedule. Otherwise an exhaustive
+//   backtracking search finds it.
 //
-//   NON-CONFERENCE (RNG): a 14-regular SIMPLE graph, no conference-mates.
-//   Shuffle school indices into a ring; edges ring[i]—ring[(i+k)%n] for
-//   i in 0..n-1, k in 1..7 (insertion order = the canonical edge-list order);
-//   collect conference-mate conflicts in scan order (FIFO); repair each live
-//   conflict (a,b) by a double-edge swap: start = NextInt(edgeCount), scan
-//   forward, skip candidates sharing an endpoint, try rewiring R1 (a,c)+(b,d)
-//   then R2 (a,d)+(b,c); legal iff both new pairs are non-mates and absent.
-//   Apply the first legal one: slot of (a,b) <- first new edge, slot of (c,d)
-//   <- second. If some conflict finds no legal swap across a full scan, the
-//   ATTEMPT fails: construction restarts with a fresh shuffle drawn from the
-//   same continuing RNG stream (nothing reseeded), up to 20 attempts; 20
-//   failures -> fail loudly naming the last stuck pairing. (Oracle-measured:
-//   stock always completes on attempt 1; the razor-tight fixture — 15 eligible,
-//   14 needed — occasionally needs 2-3.) Edges stored (loId, hiId).
-//
-//   ORIENTATION (no RNG): the full multigraph (conf block then nonconf block,
-//   game index ascending) has every degree 30 (even). Per component (components
-//   by lowest school id, schools scanned id-ascending), iterative Hierholzer
-//   with per-vertex adjacency in game-index order; each edge is oriented in its
-//   consumption direction (from = HOME). A closed Eulerian circuit gives
-//   out = in = 15 at every vertex: exactly 15 home / 15 away, always possible
-//   because every degree is even. The road seam is 0 today (neutral floors),
-//   but no school banks lopsided side assignments against the day it isn't.
+//   ORIENTATION (no RNG): R3 is a HARD LINE — every team plays an exactly even
+//   home/away conference season, G/2 each. A pair meeting m times splits
+//   floor(m/2) each way by construction, alternating from the lower school id;
+//   only an ODD m leaves one game to decide, the RESIDUAL. Residuals go to an
+//   integral flow with exact home quotas, which exists because it can honour
+//   PRE-FIXED VENUES — a Eulerian walk cannot, and would land the same even
+//   split while proving nothing.
 //
 //   FINGERPRINT: one record per game in schedule order (never re-sorted):
-//   "{gameIndex}|{kind}|{homeSchoolId}|{awaySchoolId}\n", kind conf|nonconf,
-//   UTF-8, SHA-256, lowercase hex. Printed on the page; asserted by Phase 55
-//   against the oracle export at the fixed seed.
+//   "{gameIndex}|{kind}|{homeSchoolId}|{awaySchoolId}\n", kind always conf
+//   today, UTF-8, SHA-256, lowercase hex. Printed on the page; asserted by
+//   Phase 55 against the oracle export.
 //
 //   ENGINE SEEDS (no RNG; uniqueness asserted in Phase 55): base =
 //   unchecked((int)seasonSeed) (the smoke sim's pattern); resolver =
 //   base + 2*gameIndex, governor = base + 2*gameIndex + 1. Distinct within a
 //   season by construction; the stride-2 scheme also keeps resolver and
-//   governor seed sets disjoint (the committed gen runner's stride-1 shape lets
-//   game i's governor seed equal game i+1's resolver seed — the season does not
-//   inherit that wrinkle; `gen` itself is untouched behind the byte-for-byte
-//   wall).
+//   governor seed sets disjoint.
 //
 // THE HONEST WALL: the schedule is oracle-proven; game OUTCOMES are not
-// oracle-mirrorable (SystemRng, no .NET in the sandbox) — they are proven by
-// harness invariants (conservation, determinism, completeness) in Phase 55.
-// The prestige-vs-wins climb is a page-level finding, never a suite assertion.
+// oracle-mirrorable (SystemRng) — they are proven by harness invariants
+// (conservation, determinism, completeness) in Phase 55. The prestige-vs-wins
+// climb is a page-level finding, never a suite assertion.
 // ============================================================================
 
 internal static partial class Program
 {
-    private const long SeasonScheduleXor = 0x5EA5C4ED;
-    private const int SeasonNonConfAttempts = 20;
 
     // ★ S89 — the two identity fields are NULLABLE, and they are nullable for exactly one
     // reason: legacy mode. Run without a history and there is no career to belong to, so
@@ -185,233 +176,528 @@ internal static partial class Program
         }
     }
 
-    private static int SeasonNextInt(WorldRng rng, int n) => (int)(rng.NextDouble() * n);
+    // =========================================================================================
+    //  THE CONFERENCE SLATE (Session 93)
+    //
+    //  Locked contract: tools/schedule_oracle.py. That file is the spec; this is the port.
+    //  ★ NO RANDOMNESS ENTERS THE SCHEDULE. The pre-S93 builder's only RNG lived in the
+    //  non-conference filler, which is deleted. The slate is a pure function of the world
+    //  file, so the same world produces the same schedule at every seed. The seed still
+    //  drives every game's outcome; it no longer decides who plays whom. Recorded because it
+    //  is a real basketball gap — the same pairs double and the same pairs skip every season
+    //  forever — and Session 94's host memory is the answer to it.
+    // =========================================================================================
 
-    // ── Preflight (necessary conditions; the construction is the final ATTEMPT) ──
+    /// <summary>The four verdicts, kept strictly separate and never collapsed into each other.
+    /// Confusing the third for the second is the exact dishonesty this type exists to prevent:
+    /// "I did not find one" is not "there is none".</summary>
+    private enum SlateVerdict
+    {
+        Feasible,
+        InvalidConfiguration,
+        InfeasibleUnderConstraints,
+        SearchBudgetExhausted,
+        UnsupportedConferenceSize,
+    }
 
+    /// <summary>★ THE SESSION 94 SEAM, BUILT NOW AND LEFT EMPTY. A decided residual: for the
+    /// pair (Low, High), this school hosts. Legal only where the pair meets an ODD number of
+    /// times — an even meeting count splits itself and never reaches the flow. In production
+    /// the set is ALWAYS empty today because there is no memory of who hosted last time; it is
+    /// non-empty only inside Phase 84's A9. Session 94 fills it and must not have to reopen
+    /// this code to do so.</summary>
+    private sealed record FixedResidualHost(int LowSchoolId, int HighSchoolId, int HostSchoolId);
+
+    private sealed class ConferenceSlate
+    {
+        public SlateVerdict Verdict { get; init; } = SlateVerdict.Feasible;
+        public string Reason { get; init; } = "";
+        /// <summary>★ True only when the fixed hosts were refused by the cheap quota guard,
+        /// BEFORE any flow structure existed. A9's negative control asserts this directly, so
+        /// "without running the flow" is a provable fact rather than an intention.</summary>
+        public bool RejectedBeforeFlow { get; init; }
+        public Dictionary<(int Lo, int Hi), int> Meetings { get; init; } = new();
+        /// <summary>Oriented games in emission order: (home, away).</summary>
+        public List<(int Home, int Away)> Games { get; init; } = new();
+        public long SearchNodes { get; init; }
+        public bool UsedCanonicalCirculant { get; init; }
+    }
+
+    private const int SeasonConferenceSizeCap = 20;
+    private const int SeasonMaxConferenceGames = 30;
+    private const long SeasonSlateNodeBudget = 20_000_000;
+
+    // ── Legality — a NECESSARY filter, not a promise ─────────────────────────────
+
+    /// <summary>The half of legality that needs no school count, so the world validator can
+    /// run it at load. Returns null when the numbers are acceptable, else the reason.</summary>
+    private static string? ConferenceStaticLegality(int games, int skip)
+    {
+        if (games < 0) return $"Games {games} is negative";
+        if (games > SeasonMaxConferenceGames)
+            return $"Games {games} exceeds the {SeasonMaxConferenceGames}-game maximum for a regular season";
+        if (games % 2 == 1) return $"Games {games} is odd — a conference season must be even";
+        if (skip < 0) return $"Skip {skip} is negative";
+        // A suspended conference carries a canonical k of zero: there is no shape for a skip
+        // to live in when nobody plays.
+        if (games == 0 && skip != 0) return $"Games 0 requires Skip 0 (got Skip {skip})";
+        return null;
+    }
+
+    /// <summary>The full predicate, including everything that depends on how many schools are
+    /// in the league. NECESSARY, never sufficient: passing means the configuration may go to
+    /// the solver, not that a slate exists.</summary>
+    private static string? ConferenceSlateLegality(int n, int games, int skip)
+    {
+        var stat = ConferenceStaticLegality(games, skip);
+        if (stat is not null) return stat;
+        if (games == 0) return null;                      // a conference of independents (R14)
+        if (n < 2) return $"size {n} — a conference season needs an opponent";
+        if (skip > n - 2)
+            return $"Skip {skip} leaves no opponent (size {n}; Skip may not exceed {n - 2})";
+        var p = n - 1 - skip;
+        var q = games / p;
+        var r = games - q * p;
+        if (q < 1)
+            return $"Games {games} over {p} played opponent(s) gives {q} meetings — " +
+                   "every played opponent must get a game";
+        if ((n * skip) % 2 == 1)
+            return $"size {n} with Skip {skip} is odd on both — no {skip}-regular skipped graph exists";
+        if ((n * r) % 2 == 1)
+            return $"size {n} with {r} extra meeting(s) is odd on both — " +
+                   $"no {r}-regular extra graph exists";
+        return null;
+    }
+
+    private static (int P, int Q, int R) ConferenceShape(int n, int games, int skip)
+    {
+        var p = n - 1 - skip;
+        var q = games / p;
+        return (p, q, games - q * p);
+    }
+
+    // ── The extra-meeting shape ─────────────────────────────────────────────────
+
+    /// <summary>The canonical r-regular circulant on member indices — offsets 1..r/2, plus the
+    /// diameter matching (i, i+n/2) when r is odd (which forces n even). ★ PINNED DELIBERATELY:
+    /// this is what the pre-S93 builder produced, so wherever a league's game count is
+    /// unchanged the pair multiset is reproducible against the old schedule and a DIFFERENCE
+    /// MEANS SOMETHING.</summary>
+    private static HashSet<(int, int)> CanonicalCirculant(int n, int r)
+    {
+        var extra = new HashSet<(int, int)>();
+        if (r <= 0) return extra;
+        var half = r % 2 == 0 ? r / 2 : (r - 1) / 2;
+        var diameter = r % 2 == 1;
+        for (var i = 0; i < n; i++)
+        {
+            for (var off = 1; off <= half; off++)
+            {
+                var j = (i + off) % n;
+                extra.Add((Math.Min(i, j), Math.Max(i, j)));
+            }
+            if (diameter && i < n / 2) extra.Add((i, i + n / 2));
+        }
+        return extra;
+    }
+
+    private const int SlateExtra = 0, SlateSkip = 1, SlateBase = 2;
+
+    /// <summary>Exhaustive backtracking over the class of every unordered pair: EXTRA (meets
+    /// q+1), SKIP (meets zero) or BASE (meets q). Every vertex takes exactly r EXTRA and
+    /// exactly k SKIP. Pairs are visited in lexicographic order and classes tried
+    /// EXTRA → SKIP → BASE, so the first solution found is a canonical one and two equal
+    /// solutions can never both be returned.
+    ///
+    /// <para>★ THE SEARCH IS EXHAUSTIVE, which is what licenses the word "infeasible". Running
+    /// the space out with no solution IS a proof. Running the node BUDGET out is not, and
+    /// returns <c>SearchBudgetExhausted</c> instead — the two are never merged.</para></summary>
+    private static SlateVerdict SearchConferenceShape(
+        int n, int r, int k, HashSet<(int, int)> forcedExtra, HashSet<(int, int)> forbiddenSkip,
+        out HashSet<(int, int)> extra, out HashSet<(int, int)> skipped, out long nodes, out string reason)
+    {
+        var pairs = new List<(int I, int J)>();
+        for (var i = 0; i < n; i++)
+            for (var j = i + 1; j < n; j++)
+                pairs.Add((i, j));
+        var extraLeft = new int[n];
+        var skipLeft = new int[n];
+        var openPairs = new int[n];
+        for (var v = 0; v < n; v++) { extraLeft[v] = r; skipLeft[v] = k; openPairs[v] = n - 1; }
+        var cls = new int[pairs.Count];
+        long visited = 0;
+        var exhausted = false;
+
+        bool Feasible()
+        {
+            for (var v = 0; v < n; v++)
+                if (extraLeft[v] + skipLeft[v] > openPairs[v]) return false;
+            return true;
+        }
+
+        bool Walk(int idx)
+        {
+            if (++visited > SeasonSlateNodeBudget) { exhausted = true; return false; }
+            if (idx == pairs.Count)
+            {
+                for (var v = 0; v < n; v++)
+                    if (extraLeft[v] != 0 || skipLeft[v] != 0) return false;
+                return true;
+            }
+            var (i, j) = pairs[idx];
+            // Row i-1 is fully decided by now, so it must be exactly satisfied.
+            if (idx > 0)
+            {
+                var prevI = pairs[idx - 1].I;
+                if (prevI != i && (extraLeft[prevI] != 0 || skipLeft[prevI] != 0)) return false;
+            }
+            var forced = forcedExtra.Contains((i, j));
+            for (var c = SlateExtra; c <= SlateBase; c++)
+            {
+                if (forced && c != SlateExtra) continue;
+                if (c == SlateExtra && (extraLeft[i] == 0 || extraLeft[j] == 0)) continue;
+                if (c == SlateSkip && (forbiddenSkip.Contains((i, j))
+                                       || skipLeft[i] == 0 || skipLeft[j] == 0)) continue;
+                if (c == SlateExtra) { extraLeft[i]--; extraLeft[j]--; }
+                else if (c == SlateSkip) { skipLeft[i]--; skipLeft[j]--; }
+                openPairs[i]--; openPairs[j]--;
+                cls[idx] = c;
+                if (Feasible() && Walk(idx + 1)) return true;
+                if (exhausted) return false;
+                openPairs[i]++; openPairs[j]++;
+                if (c == SlateExtra) { extraLeft[i]++; extraLeft[j]++; }
+                else if (c == SlateSkip) { skipLeft[i]++; skipLeft[j]++; }
+            }
+            return false;
+        }
+
+        var solved = Walk(0);
+        nodes = visited;
+        extra = new HashSet<(int, int)>();
+        skipped = new HashSet<(int, int)>();
+        if (exhausted)
+        {
+            reason = $"the search budget of {SeasonSlateNodeBudget:N0} nodes ran out at size {n} — " +
+                     "this proves nothing about whether a slate exists";
+            return SlateVerdict.SearchBudgetExhausted;
+        }
+        if (!solved)
+        {
+            reason = $"no legal slate exists for size {n} with {r} extra meeting(s), {k} skip(s) " +
+                     $"and {forcedExtra.Count + forbiddenSkip.Count} placed rivalry pair(s)";
+            return SlateVerdict.InfeasibleUnderConstraints;
+        }
+        for (var idx = 0; idx < pairs.Count; idx++)
+        {
+            if (cls[idx] == SlateExtra) extra.Add(pairs[idx]);
+            else if (cls[idx] == SlateSkip) skipped.Add(pairs[idx]);
+        }
+        reason = "";
+        return SlateVerdict.Feasible;
+    }
+
+    // ── One conference: shape, then whose gym ───────────────────────────────────
+
+    /// <summary>Which rivalries are ACTIVE for slate construction: mutual, both schools in THIS
+    /// conference, and the conference actually plays. A cross-conference rivalry and a rivalry
+    /// inside a zero-game conference are both DORMANT — never an error (R13 extended). The
+    /// second cannot be placed in a shape that does not exist.</summary>
+    private static List<(int Lo, int Hi)> ActiveRivalries(
+        List<int> members, Dictionary<int, int?> rivals, int games)
+    {
+        var active = new List<(int, int)>();
+        if (games == 0) return active;
+        var inside = new HashSet<int>(members);
+        foreach (var s in members)
+            if (rivals.TryGetValue(s, out var rv) && rv is { } r && inside.Contains(r) && s < r)
+                active.Add((s, r));
+        return active;
+    }
+
+    /// <summary>Build one conference's slate: the meeting multiset, then the orientation.
+    ///
+    /// <para>Construction order, and the ORDER IS LOAD-BEARING: resolve the rivalries; build
+    /// the r-regular extra graph so that it CONTAINS the rivalry matching (rivalries are placed
+    /// by construction, never searched for); build the k-regular skipped graph on the
+    /// complement; everything else meets q times; orient.</para></summary>
+    private static ConferenceSlate BuildConferenceSlate(
+        List<int> members, int games, int skip, List<(int Lo, int Hi)> rivalries,
+        string label, List<FixedResidualHost>? fixedHosts = null)
+    {
+        var n = members.Count;
+        var reason = ConferenceSlateLegality(n, games, skip);
+        if (reason is not null)
+            return new ConferenceSlate { Verdict = SlateVerdict.InvalidConfiguration, Reason = $"{label}{reason}" };
+        if (games == 0)
+            return new ConferenceSlate();   // a conference of independents: nothing to build
+        // ★ PRECEDENCE, FIXED: static configuration validation → supported-size check →
+        //   search. A configuration that is both illegal and oversized reports the illegality.
+        if (n > SeasonConferenceSizeCap)
+            return new ConferenceSlate
+            {
+                Verdict = SlateVerdict.UnsupportedConferenceSize,
+                Reason = $"{label}size {n} is above the solver's hard cap of " +
+                         $"{SeasonConferenceSizeCap}; no search was attempted",
+            };
+
+        var (p, q, r) = ConferenceShape(n, games, skip);
+        var index = new Dictionary<int, int>();
+        for (var i = 0; i < n; i++) index[members[i]] = i;
+        var forced = new HashSet<(int, int)>();
+        foreach (var (lo, hi) in rivalries)
+        {
+            var a = index[lo]; var b = index[hi];
+            forced.Add((Math.Min(a, b), Math.Max(a, b)));
+        }
+
+        HashSet<(int, int)>? extra = null;
+        HashSet<(int, int)> skipped = new();
+        long nodes = 0;
+        var usedCirculant = false;
+        if (skip == 0)
+        {
+            var candidate = CanonicalCirculant(n, r);
+            // ★ THE SHORTCUT ONLY EVER ACCEPTS. It takes the pinned circulant when the
+            //   circulant already satisfies every constraint the search would enforce, and
+            //   otherwise falls through — so it can never mask the search's infeasibility proof.
+            if (r == 0 || forced.All(candidate.Contains))
+            {
+                extra = candidate;
+                usedCirculant = true;
+            }
+        }
+        if (extra is null)
+        {
+            // r > 0: a rivalry must sit at q+1. r == 0: a rivalry must simply not be skipped.
+            var forcedExtra = r > 0 ? forced : new HashSet<(int, int)>();
+            var forbiddenSkip = r > 0 ? new HashSet<(int, int)>() : forced;
+            var verdict = SearchConferenceShape(
+                n, r, skip, forcedExtra, forbiddenSkip, out extra, out skipped, out nodes, out var why);
+            if (verdict != SlateVerdict.Feasible)
+                return new ConferenceSlate { Verdict = verdict, Reason = $"{label}{why}", SearchNodes = nodes };
+        }
+
+        var meetings = new Dictionary<(int Lo, int Hi), int>();
+        for (var i = 0; i < n - 1; i++)
+            for (var j = i + 1; j < n; j++)
+                meetings[(members[i], members[j])] =
+                    skipped.Contains((i, j)) ? 0 : q + (extra.Contains((i, j)) ? 1 : 0);
+
+        return OrientConferenceSlate(members, games, meetings, label, fixedHosts, nodes, usedCirculant);
+    }
+
+    /// <summary>★ R3 IS A HARD LINE: every team plays an exactly even home/away conference
+    /// season, <c>Games/2</c> each.
+    ///
+    /// <para>A pair meeting m times contributes floor(m/2) home and floor(m/2) away BY
+    /// CONSTRUCTION, alternating from the lower school id, and those games never enter the
+    /// flow. Only an ODD m leaves one game undecided — the RESIDUAL, always the last of that
+    /// pair's m games. Residuals are settled by an integral flow with exact quotas: one node
+    /// per free residual at capacity one, each residual feeding its two schools at capacity
+    /// one, each school feeding the sink at exactly its remaining home quota.</para>
+    ///
+    /// <para>★ A Eulerian walk would also produce an even split here and would tell you
+    /// nothing — the pre-S93 orientation already landed all 347 schools at 8 home and 8 away
+    /// by accident of even degrees. The flow exists because it can honour PRE-FIXED VENUES,
+    /// which a Eulerian cannot, and that is the only thing that distinguishes it.</para></summary>
+    private static ConferenceSlate OrientConferenceSlate(
+        List<int> members, int games, Dictionary<(int Lo, int Hi), int> meetings,
+        string label, List<FixedResidualHost>? fixedHosts, long nodes, bool usedCirculant)
+    {
+        var n = members.Count;
+        var quota = members.ToDictionary(s => s, _ => games / 2);
+        var homes = new List<int?>();
+        var pairOf = new List<(int Lo, int Hi)>();
+        var residualIndex = new Dictionary<(int Lo, int Hi), int>();
+        for (var i = 0; i < n - 1; i++)
+            for (var j = i + 1; j < n; j++)
+            {
+                var lo = members[i]; var hi = members[j];
+                var m = meetings[(lo, hi)];
+                for (var t = 0; t < m; t++)
+                {
+                    pairOf.Add((lo, hi));
+                    if (m % 2 == 1 && t == m - 1)
+                    {
+                        residualIndex[(lo, hi)] = homes.Count;
+                        homes.Add(null);
+                    }
+                    else
+                    {
+                        var h = t % 2 == 0 ? lo : hi;
+                        homes.Add(h);
+                        quota[h]--;
+                    }
+                }
+            }
+
+        var fixedByPair = new Dictionary<(int Lo, int Hi), int>();
+        foreach (var f in fixedHosts ?? new List<FixedResidualHost>())
+        {
+            var key = (Math.Min(f.LowSchoolId, f.HighSchoolId), Math.Max(f.LowSchoolId, f.HighSchoolId));
+            if (!meetings.ContainsKey(key))
+                return new ConferenceSlate
+                {
+                    Verdict = SlateVerdict.InvalidConfiguration,
+                    Reason = $"{label}a fixed host names the pair ({key.Item1},{key.Item2}), " +
+                             "which is not a pair in this conference",
+                };
+            if (meetings[key] % 2 == 0)
+                return new ConferenceSlate
+                {
+                    Verdict = SlateVerdict.InvalidConfiguration,
+                    Reason = $"{label}a fixed host is named for the pair ({key.Item1},{key.Item2}), " +
+                             $"which meets {meetings[key]} time(s) — only an odd meeting count " +
+                             "leaves a residual to decide",
+                };
+            if (f.HostSchoolId != key.Item1 && f.HostSchoolId != key.Item2)
+                return new ConferenceSlate
+                {
+                    Verdict = SlateVerdict.InvalidConfiguration,
+                    Reason = $"{label}fixed host {f.HostSchoolId} is not one of the two schools in " +
+                             $"({key.Item1},{key.Item2})",
+                };
+            if (fixedByPair.TryGetValue(key, out var already) && already != f.HostSchoolId)
+                return new ConferenceSlate
+                {
+                    Verdict = SlateVerdict.InvalidConfiguration,
+                    Reason = $"{label}two contradictory fixed hosts for the pair " +
+                             $"({key.Item1},{key.Item2}): {already} and {f.HostSchoolId}",
+                };
+            fixedByPair[key] = f.HostSchoolId;
+        }
+
+        // ★ FIXED RESIDUALS CONSUME QUOTA BEFORE ANY FLOW STRUCTURE EXISTS, so an
+        //   over-commitment is refused by the doorman rather than discovered by the solver.
+        foreach (var key in fixedByPair.Keys.OrderBy(k => k.Lo).ThenBy(k => k.Hi))
+        {
+            var host = fixedByPair[key];
+            quota[host]--;
+            if (quota[host] < 0)
+                return new ConferenceSlate
+                {
+                    Verdict = SlateVerdict.InfeasibleUnderConstraints,
+                    RejectedBeforeFlow = true,
+                    Reason = $"{label}the fixed hosts over-commit school {host}'s home quota of " +
+                             $"{games / 2} — refused before any flow structure was built",
+                };
+            homes[residualIndex[key]] = host;
+        }
+
+        var free = residualIndex.Keys.Where(k => !fixedByPair.ContainsKey(k))
+                                     .OrderBy(k => k.Lo).ThenBy(k => k.Hi).ToList();
+        var quotaLeft = quota.Values.Sum();
+        if (quotaLeft != free.Count)
+            return new ConferenceSlate
+            {
+                Verdict = SlateVerdict.InfeasibleUnderConstraints,
+                Reason = $"{label}the remaining home quota {quotaLeft} does not equal the " +
+                         $"{free.Count} free residual game(s)",
+            };
+
+        // Integral flow by deterministic augmenting paths. Each free residual has exactly two
+        // candidate hosts; a school may host at most its remaining quota. Candidate order is
+        // fixed (lower school id first, then residual index ascending), so this returns one
+        // specific orientation and never a choice between two.
+        var assigned = new int?[free.Count];
+        var holds = members.ToDictionary(s => s, _ => new List<int>());
+        for (var start = 0; start < free.Count; start++)
+        {
+            var parent = new Dictionary<int, (int Ridx, int School)?> { [start] = null };
+            var queue = new Queue<int>();
+            queue.Enqueue(start);
+            var foundR = -1; var foundS = -1;
+            while (queue.Count > 0 && foundR < 0)
+            {
+                var ridx = queue.Dequeue();
+                foreach (var school in new[] { free[ridx].Lo, free[ridx].Hi })
+                {
+                    if (quota[school] > 0) { foundR = ridx; foundS = school; break; }
+                    foreach (var other in holds[school])
+                        if (!parent.ContainsKey(other))
+                        {
+                            parent[other] = (ridx, school);
+                            queue.Enqueue(other);
+                        }
+                }
+            }
+            if (foundR < 0)
+                return new ConferenceSlate
+                {
+                    Verdict = SlateVerdict.InfeasibleUnderConstraints,
+                    Reason = $"{label}no legal orientation exists under the fixed set: the residual " +
+                             $"({free[start].Lo},{free[start].Hi}) has nowhere left to host",
+                };
+            var curR = foundR; var curS = foundS;
+            quota[curS]--;
+            while (true)
+            {
+                if (assigned[curR] is { } was) holds[was].Remove(curR);
+                assigned[curR] = curS;
+                holds[curS].Add(curR);
+                var step = parent[curR];
+                if (step is null) break;
+                curR = step.Value.Ridx; curS = step.Value.School;
+            }
+        }
+        for (var i = 0; i < free.Count; i++) homes[residualIndex[free[i]]] = assigned[i];
+
+        var oriented = new List<(int Home, int Away)>(homes.Count);
+        for (var g = 0; g < homes.Count; g++)
+        {
+            if (homes[g] is not { } h)
+                return new ConferenceSlate
+                {
+                    Verdict = SlateVerdict.InfeasibleUnderConstraints,
+                    Reason = $"{label}the orientation left a game undecided",
+                };
+            var (lo, hi) = pairOf[g];
+            oriented.Add((h, h == lo ? hi : lo));
+        }
+        return new ConferenceSlate
+        {
+            Meetings = meetings, Games = oriented,
+            SearchNodes = nodes, UsedCanonicalCirculant = usedCirculant,
+        };
+    }
+
+    // ── Preflight: the legality predicate over every conference in the world ────
+
+    /// <summary>★ S93 — this REPLACES the hardcoded-sixteen preflight rather than layering on
+    /// top of it. Every league is checked against the same predicate the solver uses, and an
+    /// impossible one dies here, by name, before a single game is built.</summary>
     private static void SeasonPreflight(WorldFile world)
     {
-        var schools = world.Schools.OrderBy(s => s.Id).ToList();
-        var n = schools.Count;
-        var confNames = world.Conferences.ToDictionary(c => c.Id, c => c.Name);
-        var byConf = new Dictionary<int, List<int>>();
-        foreach (var s in schools)
+        var byConf = new Dictionary<int, int>();
+        foreach (var s in world.Schools)
+            byConf[s.ConferenceId] = byConf.GetValueOrDefault(s.ConferenceId) + 1;
+        foreach (var c in world.Conferences.OrderBy(c => c.Id))
         {
-            if (!byConf.TryGetValue(s.ConferenceId, out var list))
-                byConf[s.ConferenceId] = list = new List<int>();
-            list.Add(s.Id);
-        }
-        foreach (var cid in byConf.Keys.OrderBy(x => x))
-        {
-            var size = byConf[cid].Count;
-            var name = confNames.TryGetValue(cid, out var nm) ? nm : $"conference {cid}";
-            if (size < 2)
+            var size = byConf.GetValueOrDefault(c.Id);
+            var reason = ConferenceSlateLegality(size, c.Games, c.Skip);
+            if (reason is not null)
                 throw new InvalidOperationException(
-                    $"SEASON PREFLIGHT INFEASIBLE: conference '{name}' (id {cid}) has {size} school(s) — " +
-                    $"a 16-game conference slate needs an opponent (s-1 = 0).");
-            var baseMeet = 16 / (size - 1);
-            var r = 16 - baseMeet * (size - 1);
-            if ((r * size) % 2 == 1)
-                throw new InvalidOperationException(
-                    $"SEASON PREFLIGHT INFEASIBLE: conference '{name}' (id {cid}, size {size}) — " +
-                    $"extra-meeting condition violated (r={r}, r*s odd; no r-regular graph exists).");
+                    $"SEASON PREFLIGHT INFEASIBLE: conference '{c.Name}' (id {c.Id}, size {size}) — {reason}.");
         }
-        foreach (var s in schools)
-        {
-            var eligible = n - byConf[s.ConferenceId].Count;
-            if (eligible < 14)
-                throw new InvalidOperationException(
-                    $"SEASON PREFLIGHT INFEASIBLE: school id {s.Id} (conference id {s.ConferenceId}) has only " +
-                    $"{eligible} eligible non-conference opponents — 14 required.");
-        }
-        if ((n * 14) % 2 == 1)
-            throw new InvalidOperationException(
-                $"SEASON PREFLIGHT INFEASIBLE: total non-conference degree {n}*14 is odd.");
     }
 
-    // ── Conference slates (deterministic, no RNG) ─────────────────────────────────
-
-    private static List<(int Lo, int Hi)> BuildConferenceGames(Dictionary<int, List<int>> byConf)
-    {
-        var games = new List<(int, int)>();
-        foreach (var cid in byConf.Keys.OrderBy(x => x))
-        {
-            var members = byConf[cid];   // sorted by school id (built from id-sorted scan)
-            var s = members.Count;
-            var baseMeet = 16 / (s - 1);
-            var r = 16 - baseMeet * (s - 1);
-            var extra = new HashSet<(int, int)>();
-            if (r > 0)
-            {
-                int half; bool diameter;
-                if (r % 2 == 0) { half = r / 2; diameter = false; }
-                else { half = (r - 1) / 2; diameter = true; }   // r odd => s even (parity)
-                for (var i = 0; i < s; i++)
-                {
-                    for (var k = 1; k <= half; k++)
-                    {
-                        var j = (i + k) % s;
-                        extra.Add((Math.Min(i, j), Math.Max(i, j)));
-                    }
-                    if (diameter && i < s / 2) extra.Add((i, i + s / 2));
-                }
-            }
-            for (var i = 0; i < s - 1; i++)
-                for (var j = i + 1; j < s; j++)
-                {
-                    var m = baseMeet + (extra.Contains((i, j)) ? 1 : 0);
-                    for (var t = 0; t < m; t++) games.Add((members[i], members[j]));
-                }
-        }
-        return games;
-    }
-
-    // ── Non-conference slate (one attempt; the wrapper retries) ──────────────────
-
-    private static bool TryBuildNonConferenceAttempt(
-        List<WorldSchool> schools, WorldRng rng,
-        out List<(int Lo, int Hi)> edgesOut, out string failure)
-    {
-        edgesOut = new List<(int, int)>();
-        failure = "";
-        var n = schools.Count;
-        var ids = schools.Select(s => s.Id).ToArray();
-        var conf = schools.ToDictionary(s => s.Id, s => s.ConferenceId);
-
-        var ring = Enumerable.Range(0, n).ToArray();
-        for (var i = n - 1; i >= 1; i--)
-        {
-            var j = SeasonNextInt(rng, i + 1);
-            (ring[i], ring[j]) = (ring[j], ring[i]);
-        }
-
-        static (int, int) Norm(int a, int b) => a < b ? (a, b) : (b, a);
-
-        var edges = new List<(int, int)>(7 * n);
-        for (var i = 0; i < n; i++)
-            for (var k = 1; k <= 7; k++)
-                edges.Add(Norm(ids[ring[i]], ids[ring[(i + k) % n]]));
-
-        var adj = new HashSet<(int, int)>(edges);
-        if (adj.Count != edges.Count)
-            throw new InvalidOperationException(
-                "SEASON SCHEDULE BUG: circulant produced a duplicate edge.");
-        var indexOf = new Dictionary<(int, int), int>(edges.Count);
-        for (var i = 0; i < edges.Count; i++) indexOf[edges[i]] = i;
-
-        var queue = edges.Where(e => conf[e.Item1] == conf[e.Item2]).ToList();
-
-        foreach (var ab in queue)
-        {
-            if (!adj.Contains(ab)) continue;   // rewired away earlier; no RNG consumed
-            var (a, b) = ab;
-            var off = SeasonNextInt(rng, edges.Count);
-            var repaired = false;
-            for (var m = 0; m < edges.Count && !repaired; m++)
-            {
-                var cd = edges[(off + m) % edges.Count];
-                var (cc, dd) = cd;
-                if (cc == a || cc == b || dd == a || dd == b) continue;
-                // R1: (a,c)+(b,d) then R2: (a,d)+(b,c) — first legal rewiring wins.
-                foreach (var (n1, n2) in new[]
-                         { ((a, cc), (b, dd)), ((a, dd), (b, cc)) })
-                {
-                    if (conf[n1.Item1] == conf[n1.Item2] || conf[n2.Item1] == conf[n2.Item2]) continue;
-                    var p1 = Norm(n1.Item1, n1.Item2);
-                    var p2 = Norm(n2.Item1, n2.Item2);
-                    if (adj.Contains(p1) || adj.Contains(p2)) continue;
-                    var iAb = indexOf[ab];
-                    var iCd = indexOf[cd];
-                    adj.Remove(ab); adj.Remove(cd);
-                    adj.Add(p1); adj.Add(p2);
-                    edges[iAb] = p1; edges[iCd] = p2;
-                    indexOf.Remove(ab); indexOf.Remove(cd);
-                    indexOf[p1] = iAb; indexOf[p2] = iCd;
-                    repaired = true;
-                    break;
-                }
-            }
-            if (!repaired)
-            {
-                failure = $"non-conference repair found no legal swap for the " +
-                          $"conference-mate pairing school {a} vs school {b}";
-                return false;
-            }
-        }
-        edgesOut = edges;
-        return true;
-    }
-
-    private static List<(int Lo, int Hi)> BuildNonConferenceSlate(
-        List<WorldSchool> schools, WorldRng rng, long seasonSeed)
-    {
-        var last = "";
-        for (var attempt = 0; attempt < SeasonNonConfAttempts; attempt++)
-            if (TryBuildNonConferenceAttempt(schools, rng, out var edges, out last))
-                return edges;
-        throw new InvalidOperationException(
-            $"SEASON SCHEDULE BUILD FAILED at seed {seasonSeed}: {SeasonNonConfAttempts} construction " +
-            $"attempts exhausted; last failure: {last}.");
-    }
-
-    // ── Orientation (Hierholzer; no RNG; out = in = 15 at every vertex) ──────────
-
-    private static List<(int Home, int Away)> OrientSchedule(
-        List<(int Lo, int Hi)> allGames, List<int> schoolIds)
-    {
-        var adj = schoolIds.ToDictionary(id => id, _ => new List<(int Nbr, int G)>());
-        for (var g = 0; g < allGames.Count; g++)
-        {
-            var (x, y) = allGames[g];
-            adj[x].Add((y, g));
-            adj[y].Add((x, g));
-        }
-        var used = new bool[allGames.Count];
-        var home = new int[allGames.Count];
-        var ptr = schoolIds.ToDictionary(id => id, _ => 0);
-        var visited = new HashSet<int>();
-        foreach (var start in schoolIds)   // id ascending
-        {
-            if (visited.Contains(start) || adj[start].Count == 0) continue;
-            var stack = new Stack<int>();
-            stack.Push(start);
-            while (stack.Count > 0)
-            {
-                var v = stack.Peek();
-                visited.Add(v);
-                var a = adj[v];
-                while (ptr[v] < a.Count && used[a[ptr[v]].G]) ptr[v]++;
-                if (ptr[v] == a.Count) { stack.Pop(); }
-                else
-                {
-                    var (w, g) = a[ptr[v]];
-                    used[g] = true;
-                    home[g] = v;   // oriented in the consumption direction: from = HOME
-                    stack.Push(w);
-                }
-            }
-        }
-        var oriented = new List<(int, int)>(allGames.Count);
-        for (var g = 0; g < allGames.Count; g++)
-        {
-            var (x, y) = allGames[g];
-            oriented.Add(home[g] == x ? (x, y) : (y, x));
-        }
-        return oriented;
-    }
-
-    // ── The schedule builder (preflight -> conf -> nonconf -> orient) ────────────
+    // ── The schedule builder (preflight -> conference slates -> orient) ─────────
 
     /// <summary>★ S89 — the schedule is built identity-free FIRST, validated, and only then
     /// numbered. The order matters: a schedule that fails to build must not have already
     /// spent a season number on itself, and no half-validated fixture may ever become
     /// visible carrying an identity. Once the numbers ARE reserved they are durable, so a
-    /// season that then fails burns them permanently — a gap, never a retry.</summary>
+    /// season that then fails burns them permanently — a gap, never a retry.
+    ///
+    /// <para>★ S93 — <paramref name="seasonSeed"/> no longer reaches the schedule at all. It
+    /// stays in the signature because it names the season everywhere else and because the
+    /// per-game engine seeds are derived from it.</para></summary>
     private static List<SeasonGame> BuildSeasonSchedule(
         WorldFile world, long seasonSeed, HistoryStore? history = null)
     {
         SeasonPreflight(world);
         var schools = world.Schools.OrderBy(s => s.Id).ToList();
+        var rivals = schools.ToDictionary(s => s.Id, s => s.RivalId);
         var byConf = new Dictionary<int, List<int>>();
         foreach (var s in schools)
         {
@@ -419,17 +705,20 @@ internal static partial class Program
                 byConf[s.ConferenceId] = list = new List<int>();
             list.Add(s.Id);
         }
-        var rng = new WorldRng(unchecked(seasonSeed ^ SeasonScheduleXor));
-        var confGames = BuildConferenceGames(byConf);
-        var nonconfGames = BuildNonConferenceSlate(schools, rng, seasonSeed);
-        var all = new List<(int, int)>(confGames.Count + nonconfGames.Count);
-        all.AddRange(confGames);
-        all.AddRange(nonconfGames);
-        var oriented = OrientSchedule(all, schools.Select(s => s.Id).ToList());
-        var games = new List<SeasonGame>(all.Count);
-        for (var g = 0; g < all.Count; g++)
-            games.Add(new SeasonGame(
-                g < confGames.Count ? "conf" : "nonconf", oriented[g].Item1, oriented[g].Item2));
+
+        var games = new List<SeasonGame>();
+        foreach (var c in world.Conferences.OrderBy(c => c.Id))
+        {
+            if (!byConf.TryGetValue(c.Id, out var members)) continue;
+            var label = $"conference '{c.Name}' (id {c.Id}) ";
+            var slate = BuildConferenceSlate(
+                members, c.Games, c.Skip, ActiveRivalries(members, rivals, c.Games), label);
+            if (slate.Verdict != SlateVerdict.Feasible)
+                throw new InvalidOperationException(
+                    $"SEASON SCHEDULE {slate.Verdict.ToString().ToUpperInvariant()}: {slate.Reason}.");
+            foreach (var (home, away) in slate.Games)
+                games.Add(new SeasonGame("conf", home, away));
+        }
 
         if (history is null) return games;   // legacy mode: the fixtures stay unnumbered
 
@@ -739,8 +1028,24 @@ internal static partial class Program
             Console.WriteLine($"World: {args[1]} ({world.Schools.Count} schools, {world.Conferences.Count} conferences)");
             Console.WriteLine($"Season seed: {seed}");
             Console.WriteLine($"Schedule fingerprint: {ScheduleFingerprint(schedule)}");
-            Console.WriteLine($"Schedule: {schedule.Count} games — 16 conference + 14 non-conference per team, " +
-                              $"15 home / 15 away, neutral floors (the road seam is 0).");
+            // ★ S93 — the banner reads the WORLD rather than restating a constant. The old
+            //   line said "16 conference + 14 non-conference per team, 15 home / 15 away" and
+            //   would have kept saying it while every one of those numbers was false.
+            var slateCounts = world.Conferences
+                .Select(c => (c.Games, N: world.Schools.Count(s => s.ConferenceId == c.Id)))
+                .Where(x => x.N > 0).ToList();
+            var idleSchools = slateCounts.Where(x => x.Games == 0).Sum(x => x.N);
+            var playedRange = slateCounts.Where(x => x.Games > 0).Select(x => x.Games).ToList();
+            Console.WriteLine(
+                $"Schedule: {schedule.Count} games — conference play only. Each team plays its own " +
+                $"league's number ({(playedRange.Count == 0 ? "none" : $"{playedRange.Min()}–{playedRange.Max()}")}), " +
+                $"exactly half of them at home." +
+                (idleSchools > 0
+                    ? $" {idleSchools} school(s) sit in a league authored at zero games and play none."
+                    : ""));
+            Console.WriteLine(
+                "  Non-conference scheduling does not exist yet — it is its own session. " +
+                "Neutral floors throughout (the road seam is 0).");
             Console.WriteLine();
             Console.WriteLine($"Regenerating divvied rosters (world + seed; nothing persisted) and playing " +
                               $"{schedule.Count} real engine games ...");

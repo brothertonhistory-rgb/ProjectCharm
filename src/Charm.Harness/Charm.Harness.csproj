@@ -62,6 +62,15 @@
     <None Include="..\..\worlds\fixture-format.world.json" Link="worlds\fixture-format.world.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- S93 — the conference-slate fixture. The tiny fixture CANNOT test this session: its
+         four five-team leagues at 16 games meet every pair exactly four times, so it has
+         zero unbalanced games and cannot exercise the orientation at all. This world is
+         built to have the awkward shapes — an odd-sized league that skips, a league with
+         no doubles but real skips, a two-school league, an idle league, and five rivalries
+         including two dormant ones. -->
+    <None Include="..\..\worlds\fixture-schedule.world.json" Link="worlds\fixture-schedule.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- S92 — the distance golden. Expected miles are computed OUTSIDE .NET from the exact
          serialized coordinates using the spherical haversine form and the exact radius
          3958.7613: an independent IMPLEMENTATION OF THE SAME MODEL, which is the only kind

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "metadata": {
     "kind": "authored",
     "eraLabel": "fixture-format",
@@ -36,7 +36,9 @@
       "id": 1,
       "name": "Format Conference",
       "shortName": "Format",
-      "tierId": "low"
+      "tierId": "low",
+      "games": 0,
+      "skip": 0
     }
   ],
   "places": [
@@ -108,7 +110,8 @@
       "conferenceId": 1,
       "division": "D1",
       "currentPrestige": 5,
-      "historicalPrestige": 5
+      "historicalPrestige": 5,
+      "rivalId": null
     }
   ]
 }

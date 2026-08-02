@@ -63,7 +63,18 @@ internal static partial class Program
 
     // ── Schema types ────────────────────────────────────────────────────────────────────
     private sealed record WorldTier(string Id, int Floor, int Equilibrium, double PullbackIntensity);
-    private sealed record WorldConference(int Id, string Name, string ShortName, string TierId);
+    /// <summary>★ S93 — A CONFERENCE NOW SAYS HOW MANY GAMES IT PLAYS. <c>Games</c> and
+    /// <c>Skip</c> were authored in <c>data/conf.csv</c> from the day that file landed and
+    /// the converter read neither; the season hardcoded sixteen for everybody. They are the
+    /// league's own answer to "how long is our season" and "how many league-mates do we not
+    /// get to this year", and they are the only numbers the slate is built from.
+    ///
+    /// <para>★ <c>Games = 0</c> IS LEGAL AND MEANS A CONFERENCE OF INDEPENDENTS (R14). The
+    /// stock world authors it for the fourteen Independent schools, who therefore play no
+    /// games at all this season — the honest consequence of a conference-only schedule, not
+    /// an error to route around.</para></summary>
+    private sealed record WorldConference(
+        int Id, string Name, string ShortName, string TierId, int Games, int Skip);
 
     /// <summary>★ S92 — A PLACE IS A CITY (R1). Not an arena: no name, no capacity, no
     /// attendance. Not a market either — R4 rules city size out by name, so there is
@@ -108,10 +119,26 @@ internal static partial class Program
     /// two tags is two tags.</summary>
     private static readonly string[] WorldPlaceTagVocabulary = { "domestic", "exotic" };
 
+    /// <summary>★ S93 — <c>RivalId</c> is the school this school is guaranteed to see, and
+    /// it buys a PLACE IN THE SHAPE, never a number of games (R5): the rival sits at the
+    /// highest meeting count the league's shape offers and is never the opponent skipped.
+    /// Where every pair already meets the same number of times, a rivalry does nothing, and
+    /// that is correct rather than a bug.
+    ///
+    /// <para>★ It is MUTUAL BY VALIDATION and forms a MATCHING — if A names B then B names
+    /// A, and no school appears in two rivalries. ★ A rivalry across two conferences, or
+    /// inside a conference authored at zero games, is DORMANT, NEVER AN ERROR (R13): the
+    /// second cannot be placed in a shape that does not exist.</para>
+    ///
+    /// <para>★ NOTHING IS AUTHORED IN THE STOCK WORLD. Who rivals whom is basketball and
+    /// Emmett's alone; the column ships empty for him to fill. <c>teams.csv</c>'s separate
+    /// <c>TravelPart</c> column is NOT this: those 38 mutual pairs are travel partners —
+    /// who a school buses with — which is a scheduling convenience the calendar session
+    /// owns, not a guarantee of meeting twice.</para></summary>
     private sealed record WorldSchool(
         int Id, string Name, string Abbr, string Color,
         int PlaceId, int ConferenceId, string Division,
-        int CurrentPrestige, int HistoricalPrestige);
+        int CurrentPrestige, int HistoricalPrestige, int? RivalId = null);
 
     private sealed class WorldFile
     {
@@ -126,11 +153,15 @@ internal static partial class Program
         public List<WorldSchool> Schools { get; init; } = new();
     }
 
-    /// <summary>★ S92 — schema 2. A v1 file has coordinates on the school and no place
-    /// table; there is deliberately NO migration code, because a silent upgrade path is how
-    /// a stale world quietly keeps working for a year and then disagrees with its own
-    /// fingerprint. v1 is refused by name and the committed files were converted once.</summary>
-    private const int WorldSchemaVersion = 2;
+    /// <summary>★ S93 — schema 3. A v1 file has coordinates on the school and no place
+    /// table; a v2 file has no conference game count and no rivalry, so it cannot say how
+    /// long its own season is. Both are refused BY NAME and there is deliberately NO
+    /// migration code, because a silent upgrade path is how a stale world quietly keeps
+    /// working for a year and then disagrees with its own fingerprint. The committed files
+    /// were converted once. ★ THE WORLD FINGERPRINT MOVES AGAIN — invoked deliberately for
+    /// the second time, free today because no career exists outside this repo and
+    /// permanently expensive the day one does.</summary>
+    private const int WorldSchemaVersion = 3;
 
     // ── Deterministic PRNG (SplitMix64) — explicit so a world file is reproducible on
     //    any runtime, never dependent on System.Random's version-specific algorithm.
@@ -271,12 +302,15 @@ internal static partial class Program
             var conferences = new List<WorldConference>();
             foreach (var el in WorldRequireArray(root, "conferences"))
             {
-                RejectUnknownOrDuplicateKeys(el, "conferences[]", "id", "name", "shortName", "tierId");
+                RejectUnknownOrDuplicateKeys(el, "conferences[]",
+                    "id", "name", "shortName", "tierId", "games", "skip");
                 conferences.Add(new WorldConference(
                     RequireIntProperty(el, "id", "conferences[]"),
                     WorldRequireString(el, "name", "conferences[]"),
                     WorldRequireString(el, "shortName", "conferences[]"),
-                    WorldRequireString(el, "tierId", "conferences[]")));
+                    WorldRequireString(el, "tierId", "conferences[]"),
+                    RequireIntProperty(el, "games", "conferences[]"),
+                    RequireIntProperty(el, "skip", "conferences[]")));
             }
 
             // ── Places (S92). Coordinates go through GeoCoordinate.TryCreate rather than
@@ -319,7 +353,7 @@ internal static partial class Program
             {
                 RejectUnknownOrDuplicateKeys(el, "schools[]",
                     "id", "name", "abbr", "color", "placeId",
-                    "conferenceId", "division", "currentPrestige", "historicalPrestige");
+                    "conferenceId", "division", "currentPrestige", "historicalPrestige", "rivalId");
                 var name = WorldRequireString(el, "name", "schools[]");
                 var ctx = $"school '{name}'";
                 schools.Add(new WorldSchool(
@@ -331,7 +365,8 @@ internal static partial class Program
                     RequireIntProperty(el, "conferenceId", ctx),
                     WorldRequireString(el, "division", ctx),
                     RequireIntProperty(el, "currentPrestige", ctx),
-                    RequireIntProperty(el, "historicalPrestige", ctx)));
+                    RequireIntProperty(el, "historicalPrestige", ctx),
+                    WorldRequireNullableInt(el, "rivalId", ctx)));
             }
 
             return new WorldFile
@@ -362,6 +397,21 @@ internal static partial class Program
         if (el.ValueKind != JsonValueKind.String)
             throw new InvalidOperationException($"'{name}' in {ctx} must be a string (got {el.GetRawText()}).");
         return el.GetString() ?? "";
+    }
+
+    /// <summary>★ S93 — the key is REQUIRED and its value may be null. "Absent" and "no
+    /// rival" are deliberately the same shape on the page but not the same shape in the
+    /// file: a school that simply forgot the field would otherwise read as having no rival,
+    /// and the canonical bytes would have two spellings for one world.</summary>
+    private static int? WorldRequireNullableInt(JsonElement obj, string name, string ctx)
+    {
+        if (!obj.TryGetProperty(name, out var el))
+            throw new InvalidOperationException($"missing required '{name}' in {ctx}.");
+        if (el.ValueKind == JsonValueKind.Null) return null;
+        if (el.ValueKind != JsonValueKind.Number || !el.TryGetInt32(out var v))
+            throw new InvalidOperationException(
+                $"'{name}' in {ctx} must be an integer or null (got {el.GetRawText()}).");
+        return v;
     }
 
     private static double WorldRequireDouble(JsonElement obj, string name, string ctx)
@@ -419,6 +469,15 @@ internal static partial class Program
                 throw new InvalidOperationException($"conference '{c.Name}' points at unknown tier '{c.TierId}'.");
             if (c.Name.Length == 0 || c.ShortName.Length == 0)
                 throw new InvalidOperationException($"conference id {c.Id} has an empty name or shortName.");
+            // ★ S93 — only the SIZE-FREE half of legality lives here. Everything that needs
+            //   to know how many schools are in the league (an opponent exists, the skip
+            //   leaves somebody to play, the shape's two parity conditions) belongs to the
+            //   season preflight, so a rigged world still LOADS and the preflight is what
+            //   names the impossible slate. One definition, called from both places.
+            var confReason = ConferenceStaticLegality(c.Games, c.Skip);
+            if (confReason is not null)
+                throw new InvalidOperationException(
+                    $"conference '{c.Name}' (id {c.Id}): {confReason}.");
         }
 
         // ── Places (S92). Validated BEFORE schools, because a school's location is a
@@ -487,6 +546,30 @@ internal static partial class Program
                     $"({conf.TierId}) floor {floor}.");
         }
 
+        // ── Rivalries (S93). Mutual, a matching, and DORMANT rather than illegal when the
+        //    two schools cannot actually meet. A cross-conference rivalry and a rivalry
+        //    inside a zero-game conference both load, validate and schedule without error;
+        //    they simply constrain nothing. That is R13 as extended, and it is asserted
+        //    rather than merely tolerated (Phase 84 A6). ────────────────────────────────
+        var schoolById = w.Schools.ToDictionary(s => s.Id);
+        foreach (var s in w.Schools.OrderBy(s => s.Id))
+        {
+            if (s.RivalId is not { } rid) continue;
+            if (rid == s.Id)
+                throw new InvalidOperationException(
+                    $"school '{s.Name}' names itself as its rival.");
+            if (!schoolById.TryGetValue(rid, out var rival))
+                throw new InvalidOperationException(
+                    $"school '{s.Name}' names rival id {rid}, which is not a school in this world.");
+            if (rival.RivalId != s.Id)
+                throw new InvalidOperationException(
+                    $"rivalry is not mutual: '{s.Name}' names '{rival.Name}', but '{rival.Name}' names " +
+                    (rival.RivalId is { } back && schoolById.TryGetValue(back, out var other)
+                        ? $"'{other.Name}'" : "nobody") +
+                    ". A rivalry is a matching: if A names B then B must name A, and no school may " +
+                    "appear in more than one.");
+        }
+
         WorldFeasibilityCheck(w, tierById, confById);
     }
 
@@ -501,6 +584,11 @@ internal static partial class Program
                 "world schemaVersion 1 is retired (S92): a v1 file puts 'lat'/'long' on each school and has " +
                 "no 'places' table, so it has no way to say WHERE a game is played. There is no automatic " +
                 "migration — re-run 'world convert <teams.csv> <conf.csv> <places.csv> <out.json>'.");
+        if (schemaVersion == 2)
+            throw new InvalidOperationException(
+                "world schemaVersion 2 is retired (S93): a v2 file carries no 'games' or 'skip' on a conference " +
+                "and no 'rivalId' on a school, so it has no way to say HOW LONG ITS OWN SEASON IS. There is no " +
+                "automatic migration — re-run 'world convert <teams.csv> <conf.csv> <places.csv> <out.json>'.");
         if (schemaVersion != WorldSchemaVersion)
             throw new InvalidOperationException(
                 $"unsupported schemaVersion {schemaVersion} (this build reads {WorldSchemaVersion}).");
@@ -707,17 +795,25 @@ internal static partial class Program
         string teamsCsvPath, string confCsvPath,
         List<WorldPlace> places, Dictionary<int, WorldPlace> placeById)
     {
+        // ★ S93 — `Games` stops being a dead column after carrying the right answer for
+        //   every league since the file landed, and `Skip` joins it. They sit together,
+        //   where a person authoring a league's season expects to find them.
         var confRows = ReadWorldCsv(confCsvPath,
-            new[] { "ID", "Name", "ShortName", "Games", "Prestige", "Divisions", "DivisionOne", "DivisionTwo",
-                    "TourneyTeams", "TDay1", "TDay2", "TDay3", "TDay4", "TDay5", "SeedDiv", "D1", "D2", "D3",
-                    "TourneyBirth", "TourneyType" });
+            new[] { "ID", "Name", "ShortName", "Games", "Skip", "Prestige", "Divisions", "DivisionOne",
+                    "DivisionTwo", "TourneyTeams", "TDay1", "TDay2", "TDay3", "TDay4", "TDay5", "SeedDiv",
+                    "D1", "D2", "D3", "TourneyBirth", "TourneyType" });
         // ★ S92 — `Lat`/`Long` are RETIRED from teams.csv and replaced by `PlaceId`. `City`
         //   and `State` STAY, as human-readable authoring columns, and are cross-checked
         //   below rather than trusted: they are how a person reads the file, not how the
         //   game finds a school.
+        // ★ S93 — `Rival` sits deliberately NEXT TO `TravelPart`, because they are the two
+        //   columns most likely to be confused for each other and the neighbouring is the
+        //   cheapest way to keep them straight. TravelPart is who a school buses with (38
+        //   mutual pairs, authored, still read by nothing); Rival is who it is guaranteed
+        //   to meet at the top of the shape. It ships EMPTY for all 347.
         var teamRows = ReadWorldCsv(teamsCsvPath,
             new[] { "ID", "Name", "Mascot", "Prestige", "Abbr", "Logo", "City", "State", "Conference",
-                    "Division", "TeamColor", "TravelPart", "PlaceId", "Academics" });
+                    "Division", "TeamColor", "TravelPart", "Rival", "PlaceId", "Academics" });
 
         var conferences = new List<WorldConference>();
         var confIds = new HashSet<int>();
@@ -726,14 +822,16 @@ internal static partial class Program
             var id = WorldCsvInt(r[0], confCsvPath, "conference ID");
             if (!confIds.Add(id))
                 throw new InvalidOperationException($"{confCsvPath}: duplicate conference id {id}.");
-            var rating = WorldCsvInt(r[4], confCsvPath, $"conference '{r[1]}' Prestige");
+            var games = WorldCsvInt(r[3], confCsvPath, $"conference '{r[1]}' Games");
+            var skip = WorldCsvInt(r[4], confCsvPath, $"conference '{r[1]}' Skip");
+            var rating = WorldCsvInt(r[5], confCsvPath, $"conference '{r[1]}' Prestige");
             var tierId = rating switch
             {
                 5 => "power", 4 => "highMid", 3 => "lowMid", 1 or 2 => "low",
                 _ => throw new InvalidOperationException(
                     $"{confCsvPath}: conference '{r[1]}' rating {rating} outside the known 1-5 scale."),
             };
-            conferences.Add(new WorldConference(id, r[1], r[2], tierId));
+            conferences.Add(new WorldConference(id, r[1], r[2], tierId, games, skip));
         }
 
         var schools = new List<WorldSchool>();
@@ -750,7 +848,10 @@ internal static partial class Program
             var prestige = WorldCsvInt(r[3], teamsCsvPath, $"school '{r[1]}' Prestige");
             if (prestige is < 0 or > 99)
                 throw new InvalidOperationException($"{teamsCsvPath}: school '{r[1]}' prestige {prestige} out of 0-99.");
-            var placeId = WorldCsvInt(r[12], teamsCsvPath, $"school '{r[1]}' PlaceId");
+            var rivalId = r[12].Trim().Length == 0
+                ? (int?)null
+                : WorldCsvInt(r[12], teamsCsvPath, $"school '{r[1]}' Rival");
+            var placeId = WorldCsvInt(r[13], teamsCsvPath, $"school '{r[1]}' PlaceId");
             if (!placeById.TryGetValue(placeId, out var place))
                 throw new InvalidOperationException(
                     $"{teamsCsvPath}: school '{r[1]}' references PlaceId {placeId}, which is not in the places csv.");
@@ -769,7 +870,7 @@ internal static partial class Program
             schools.Add(new WorldSchool(
                 Id: id, Name: r[1], Abbr: r[4], Color: r[10],
                 PlaceId: placeId, ConferenceId: confId, Division: "D1",
-                CurrentPrestige: prestige, HistoricalPrestige: prestige));
+                CurrentPrestige: prestige, HistoricalPrestige: prestige, RivalId: rivalId));
         }
 
         return new WorldFile
@@ -962,6 +1063,8 @@ internal static partial class Program
                 writer.WriteString("name", c.Name);
                 writer.WriteString("shortName", c.ShortName);
                 writer.WriteString("tierId", c.TierId);
+                writer.WriteNumber("games", c.Games);
+                writer.WriteNumber("skip", c.Skip);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();
@@ -1003,6 +1106,10 @@ internal static partial class Program
                 writer.WriteString("division", s.Division);
                 writer.WriteNumber("currentPrestige", s.CurrentPrestige);
                 writer.WriteNumber("historicalPrestige", s.HistoricalPrestige);
+                // ★ ALWAYS WRITTEN, null when there is no rival. Omitting it would give one
+                //   world two spellings — and the fingerprint hashes bytes.
+                if (s.RivalId is { } rid) writer.WriteNumber("rivalId", rid);
+                else writer.WriteNull("rivalId");
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();

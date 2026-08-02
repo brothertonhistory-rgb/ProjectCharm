@@ -10,7 +10,28 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 92** (2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 83 PASS at
+Last updated: **Session 93** (2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 84 PASS at 26
+assertions, schedule fingerprint `6f79d663…`, 2,818 games, credit identity 3,996,770/399,677 = 10.0 dropped 0, census
+4,511/4,511. **THE SEASON IS NOW THE CONFERENCE SLATE AND NOTHING ELSE.** Every league plays the number of games its own
+`conf.csv` row has carried since the file landed — 14 for the Ivy, 16 for thirteen leagues, 18 for fourteen, 20 for the
+Atlantic Sun — against the opponents the shape demands, in gyms chosen on purpose. ★ THE RULING THAT DEFINED THE BUILD
+(Emmett, mid-session): *"we don't care about a 'season' right now, we care about games being scheduled."* Non-conference
+play is **DELETED, not amended**: the 14-regular ring circulant, the conflict queue, the double-edge repair, the
+20-attempt retry and the whole RNG stream that fed them are gone, and non-conference scheduling starts from nothing in
+its own session. ★ THE FOURTEEN INDEPENDENT SCHOOLS PLAY ZERO GAMES — `Games = 0` is R14 and it is now live in the stock
+world. ★ THE SCHEDULE CONSUMES NO RANDOMNESS AT ALL, so the same world builds the identical slate at every seed; asserted
+deliberately, so the day someone wires a scheduler RNG the check goes red. ★ THE INVARIANT THAT WOULD HAVE PASSED WHILE
+THE SEMANTICS WERE WRONG: all 347 schools ALREADY sat at exactly 8 home / 8 away in conference play, at eight seeds, in
+all 32 leagues — the old Eulerian walk got it right by accident of even degrees, so "every team is exactly even" passes
+on the PRE-S93 code and proves nothing. Phase 84's A9 is what discriminates: pre-fixed venues, which a Eulerian cannot
+honour — sampled hosts all honoured with everyone still even, an over-commit refused BEFORE the flow, and a
+quota-consistent-but-impossible set refused BY the flow. Schema v3; v2 refused by name and the WORLD FINGERPRINT MOVED a
+second time, invoked deliberately. Two gate findings reshaped the session: the board's "next approved candidate" said
+HOME COURT and the recorded reason inverted; and the rivalries turned out to be already authored under another name —
+`TravelPart`'s 38 mutual in-conference pairs — which Emmett ruled stay put as travel partners. Opens **O-78**, **O-79**,
+**O-80**.)
+
+*(Previous board entry, S92 — 2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 83 PASS at
 66 assertions, and the full 5,205-game season page unmoved: PPP 0.9692, possessions 737,952, men who played
 105,830, forced replacements 8,512, foul-outs 0.844, fouls 17.95, census 4,511/4,511, fingerprint `93d8c853…`
 — every machine-of-record figure S89 recorded reproduced to the digit. **THE ENGINE NOW KNOWS WHERE THINGS
@@ -33,7 +54,7 @@ constructs the US-shaped validator and requires it to reject all eight; and a v1
 version. ★ ONE PREDICTION OF THIRTEEN MISSED, and in the harmless direction: the triangle-inequality
 violation came back 0.000E+000 on Windows against a predicted 1.8E-012 — the arcsine lands exactly there and
 one bit short on Linux. It should have been flagged as platform-dependent alongside the two deviation figures
-that were.)
+that were..))
 
 *(Previous board entry, S91 — 2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 82 PASS at
 53 assertions, and the full 5,205-game season page byte-identical to its pre-S91 self, fingerprint `93d8c853…`.
@@ -74,6 +95,20 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 *(Previous board entry, S86: THE COACH BECAME A GATE. Roll J's run-or-not balance stopped being a flat number nudged by two additive lifts and became a score the players build against a bar the coach sets: the ball-winner's legs and his outlet pass as two OVERLAPPING escape routes, his four teammates' speed against all five defenders' speed getting back, and the offensive coach's pace setting the height that opportunity must clear. Both old lifts RETIRED rather than supplemented — pace was a nudge and is now the gate, so keeping both would let pace pay twice, and `Speed` lives inside `Player.Athleticism`, so keeping the five-way composite gap beside the new speed race would pay fast teams twice. League push 33.55% -> 35.70%, but the mean is not the finding: **per-offensive-team push now runs min 18.89% / median 36.16% / max 48.15%, a 29.26pp band, on rosters alone**, because every bar in the country is still the neutral 0.475 (O-57). Read against the entries-conceded band (12pp): who GETS transition chances is far more uniform than who RUNS on them. ★ THE RULING THAT CHANGED THE BUILD: the free-throw board was measured BEFORE it was wired and pulled out of scope — base Push 0.08 against a swing of 0.22 pinned a plodding rebounder to exactly 0.0% at grind AND neutral pace while everyone with legs jumped to ~28%, a source with no middle, and one of the two zero rows was an *average* rebounder against a fast defense. The locked oracle independently confirmed the call: its tables and its 45-case golden fixture carry only the live board and the two steals, so it never modelled the free-throw board at all and needed no edit. ★ THE CHECK-IN CAUGHT TWO SUITE CHECKS THAT WOULD HAVE GONE RED WITH NOTHING WRONG (a tempo-direction check and a tired-legs check, both stamping which team had the ball but never WHO); the same defect would have silently left the exploratory transition ladder reading dead flat — the S59.2 flat-baseline trap. Golden parity worst |delta| 4.92E-013 against a deliberately non-bitwise 1e-6 bar (S81.3 lesson). Nine of nine suite and eighteen of eighteen season predictions landed exactly; sandbox byte-identical to Emmett's machine. Three honest misses recorded, including one wrong claim in the build prompt that survived the §6b audit: entry rate DID move (41.61% -> 41.56%) because changing a pie shifts the RNG stream. Opened O-61, O-62, O-63. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
 
 ## Current baseline
+
+**★ S93 REPLACED THE SCHEDULE, SO THE PAGE BELOW IS NOT COMPARABLE LINE FOR LINE.** The season is now **2,818
+conference games** instead of 5,205, every school plays its own league's number instead of 30, and fourteen schools play
+none — so any TOTAL (possessions, games played, minutes leaders, qualifier counts) has moved for a structural reason and
+not a basketball one. **Verified on Emmett's machine at S93** (seed 20260720, schedule fingerprint `6f79d663…`): PPP
+**0.9675**, fouls/team/game **18.00** (6.36 shooting / 11.64 non-shooting), offensive fouls 1.55, foul-outs 0.831,
+possessions **399,677**, credit identity 3,996,770/399,677 = 10.0 dropped 0, men who played a possession 57,213, census
+4,511/4,511, qualifiers `>=100 3002 | >=250 2309 | >=500 432 | >=900 0`. **Per-possession rates are the comparable
+lines and they held**: PPP 0.9692 → 0.9675, pace unchanged, turnovers and rebounds unmoved. **Blocks moved 4.1 → 4.6 and
+steals rose with them, with nothing in the shot-blocking machinery touched** — power-conference bigs now face only
+power-conference offenses and the low-majors only each other, so the size mismatches are distributed differently than
+when the leagues were mixed. It is the opponent pool, not the engine. **Short seasons also make every rate leaderboard
+noisier**: the best passer reads 35.0% AST%, finally in the elite range, on 55 assists over 14 games; five men shot 100%
+from the line. Read the top of a rate board as luck until the season is long again.
 
 **The S78 page is the arc's recorded reference — and it is PROVISIONAL pending a calibration session**
 (seed 20260720, world `stock-d1`, schedule fingerprint `93d8c853…` unchanged): points 68.5, FG% 42.9,
@@ -132,6 +167,23 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S93 — THE CONFERENCE SLATE: EVERY LEAGUE PLAYS ITS OWN SEASON.** `data/conf.csv` has carried a
+  `Games` column for all 32 leagues since the day the file landed and the converter read the column and
+  threw it away; the season hardcoded sixteen for everybody and dealt fourteen random non-conference
+  opponents on top. Now the authored number is the only number. A league's `Games` and `Skip` define the
+  shape — `p = n−1−k` opponents played, `r` of them at `q+1` meetings, the rest at `q`, `k` skipped — and
+  **rivalries are placed by construction, never searched for**: a rivalry buys a place in the shape (top
+  meeting count, never the one skipped), never a number of games, and where every pair already meets the
+  same number of times it provably changes nothing. **R3 is a hard line** — every team hosts exactly half
+  its league season, by construction for even meeting counts and by an integral flow for the odd residual.
+  Four verdicts kept strictly apart (`InvalidConfiguration` / `InfeasibleUnderConstraints` /
+  `SearchBudgetExhausted` / `UnsupportedConferenceSize`); the search is **exhaustive to n = 20**, which is
+  what licenses the word *infeasible*, and above 20 it refuses without searching. Stock: **2,818 games**,
+  derived from the world and asserted once as a golden. New fixture world `fixture-schedule` (32 schools,
+  five leagues) because the tiny fixture has zero unbalanced games and could not exercise any of this.
+  The Session 94 venue seam (`FixedResidualHost`) is **built and empty**. Phase 84, 26 assertions.
+  Opens **O-78**, **O-79**, **O-80**.
 
 - **★ S92 — GEOGRAPHY: THE ENGINE HAS A MAP.** Every school had carried a real latitude and longitude since
   the world layer shipped and **nothing computed anything with them** — there was no distance function
@@ -403,6 +455,29 @@ be run against a league with a real rotation, though the minute VALUES remain pl
 chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
+
+- **O-78 — THE PAGE STILL RANKS 347 SCHOOLS IN ONE NATIONAL W-L TABLE, AND THEY NO LONGER PLAY THE SAME
+  NUMBER OF GAMES (opened S93).** Jacksonville leads at 17-3 over Stanford at 17-1 because the Atlantic Sun
+  plays twenty and the Pacific-10 eighteen; Hampton went 15-1 and sits fourteenth. The prestige proof table
+  is compressed for the same reason — an Ivy team cannot average more than seven wins and is pooled with
+  leagues that get twenty chances — so it reads as though prestige stopped mattering when it did not. Both
+  are artifacts of a page built for a uniform schedule, not findings. **Emmett ruled the fix out of S93 and
+  named its real home:** *"there is no such thing as ranking the 360 teams into one big official w-l
+  standing... we will work on conference standings, top 25 rankings, etc... down the line."* The deeper
+  point survives the ordering question: with no non-conference play, no two leagues share an opponent even
+  indirectly, so there is no honest basis for a national ranking this season at all.
+
+- **O-79 — THE SAME PAIRS DOUBLE AND THE SAME PAIRS SKIP EVERY SEASON, FOREVER (opened S93).** The slate
+  takes no randomness and there is no memory, so a career's year two would carry a conference schedule
+  identical to year one's. Not a defect of this session — it is what a fully-determined slate with no
+  history means — but it is a real basketball gap and it must not survive the career layer. **Session 94's
+  stored memory of who hosted last time is the natural home**, together with the soft objectives
+  (`SkipUrgency` and friends) that were held out of S93 precisely because they need that memory to apply.
+
+- **O-80 — `conf.csv`'s `Divisions` COLUMN READS 2 FOR SIX LEAGUES AND NOTHING READS IT (opened S93).**
+  R11 says every team in a conference plays the same shape; divisions are a different design with a
+  different shape rule and a different tournament. Dead data, deliberately left dead, recorded so the next
+  session that opens that file knows the column is not an oversight.
 
 - **O-77 — `data/teams.csv` MAY HOLD MORE MIS-LOCATED SCHOOLS (opened S92).**
   St. Peter's was listed in New Brunswick NJ on Rutgers' exact coordinates, about 25 miles from where the
@@ -1132,11 +1207,14 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**HOME COURT.** Ruled by Emmett at S92's design conversation and the reason geography came first: the season
-already plays a balanced 15 home / 15 away, which is **the exact condition under which the real ~60% home win
-rate is measured**, so home court dropped onto the *existing* schedule reads clean. Land the scheduler first
-and home court arrives on top of a brand-new schedule, and nobody can say which change moved the page. Order
-is **geography → home court → scheduler**.
+**HOME COURT.** Unchanged by S93 and worth stating plainly, because the ordering's original REASON no longer holds and
+the choice should be made on purpose rather than inherited. S92 put home court before the scheduler on the grounds that
+the season already played a balanced 15 and 15 — the exact condition under which the real ~60% home win rate is measured
+— so the effect dropped onto the *existing* schedule would read clean. **S93 replaced that schedule.** Every team now
+plays its own league's number and hosts exactly half, so the balanced condition SURVIVES and is promised harder than
+before; what is gone is the clean before-and-after, because the opponents changed. Home court will now land on top of a
+schedule that is one session old. Emmett was told this at the S93 gate and chose the scheduler anyway, on the grounds
+that the non-conference graph being protected was a placeholder due for deletion regardless. That reasoning holds.
 
 What it inherits and must not re-derive:
 
@@ -1149,17 +1227,21 @@ What it inherits and must not re-derive:
   freshman, it brings it down more."* One number on all five, its SIZE built from the five on the floor —
   that is what keeps the crowd number off the no-scalar wall, and it is the load-bearing design constraint of
   the whole session.
-- **R3 — the host fact already exists and is unused.** `GameSite` carries a place and a host; a neutral site
-  is a game nobody hosts, not a category. No game record carries a site yet — the scheduler owns that — so
-  home court's first question is where the site attaches without waiting for the scheduler.
-- **A9's isolation check will need rewriting**, not extending: the moment home court lands, files on the
-  season path legitimately name geography types, and the check as written forbids exactly that.
+- **R3 — the host fact already exists.** `GameSite` carries a place and a host; a neutral site is a game nobody hosts,
+  not a category. ★ **S93 CHANGED WHAT IS AVAILABLE HERE**: every conference game now has a decided host, and the
+  orientation can be handed pre-fixed venues. No game record carries a `GameSite` yet — that binding is still unbuilt —
+  but the home/away fact is no longer a placeholder graph's accident.
+- **Phase 83's A9 isolation check will need rewriting**, not extending: it forbids the four season-path files from so
+  much as naming a geography type, and the moment home court lands they legitimately will. ★ **It is also a live
+  landmine for S94**: the venue seam deliberately carries plain school ids, and the day it reaches for `GameSite` or
+  `GameHost` that check goes red with nothing wrong.
 
-**The scheduler follows, and S91 was built to be found wanting by it.** It inherits: the window is **157–164
-days** from Nov 1 to the championship and **135–142** to Selection Sunday (reported by Phase 82, asserted
-nowhere — whether 30 games and a bracket FIT is its question, and the current 30-game season is loose inside
-it); **conference tournaments are staggered** (R7) and the only shared constraint is that all finish before
-Selection Sunday; **conference weekday habits (R8) are scheduler data** and the calendar stores none; **the
-stock world has 14 independent schools** with no conference tournament, idle through the March window; and now
-**the map**, which says the WAC's worst internal trip is Hawaii ↔ Louisiana Tech at 4,030 miles against the
-Ivy League's 295. Leagues run 8 to 16 teams, with no six-team league.
+**The scheduler's remaining thirds follow.** **Session 94** — the stored memory of who hosted last time, which fills the
+`FixedResidualHost` seam S93 built and left empty, and which is the answer to **O-79**. **Session 95** — dates: the
+window is **157–164 days** from Nov 1 to the championship and **135–142** to Selection Sunday (reported by Phase 82,
+asserted nowhere); conference tournaments are staggered and the only shared constraint is that all finish before
+Selection Sunday; **conference weekday habits (R8) are scheduler data** and the calendar stores none; `conf.csv`'s
+ordered `D1,D2,D3` day preference is still dead data waiting for it; and `TravelPart`'s 38 pairs are Friday-Saturday
+road pairings that belong to this session, not to rivalries. **Non-conference scheduling is its own session after
+those** and starts from nothing — it inherits the map (the WAC's worst internal trip is Hawaii ↔ Louisiana Tech at
+4,030 miles against the Ivy League's 295) and the fact that fourteen schools currently play no basketball at all.
