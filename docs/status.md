@@ -10,7 +10,32 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 91** (2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 82 PASS at
+Last updated: **Session 92** (2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 83 PASS at
+66 assertions, and the full 5,205-game season page unmoved: PPP 0.9692, possessions 737,952, men who played
+105,830, forced replacements 8,512, foul-outs 0.844, fouls 17.95, census 4,511/4,511, fingerprint `93d8c853…`
+— every machine-of-record figure S89 recorded reproduced to the digit. **THE ENGINE NOW KNOWS WHERE THINGS
+ARE.** 310 places, great-circle miles between any two, and the fact of who is hosting; world schema v2, with
+v1 refused by name and no migration path. ★ THE RULING THAT SHAPED THE BUILD: **hosting is a SEPARATE FACT
+from location** — where the game is, and whose gym it is. That one separation makes a neutral site stop being
+a category (it is a game nobody hosts) and makes the five Philadelphia schools sharing one point cost
+nothing. **NOTHING CONSUMES THE MAP** — no game is placed, no crowd is modelled, no home-court advantage
+exists. ★ THE WORLD FINGERPRINT MOVED (`fa823da9…` → `9351889c…`), breaking the binding of any pre-S92
+history file: ruled acceptable, asserted deliberately rather than discovered, free today because no career
+exists outside this repo. Two rulings at the check-in gate: **Brooklyn stays** (its stated no-campus
+criterion is false — St. Francis-NY is a mile away — but Barclays really hosts, and hosting is the criterion
+that matters) and **St. Peter's moves to Jersey City** (the source data had it in New Brunswick on Rutgers'
+exact coordinates, 25 miles off; nothing read a coordinate, so it had never mattered). Opens **O-77**
+(`teams.csv` may hold more mis-located schools; St. Peter's was found by accident, and nothing has ever
+audited the column). ★ TWO CHECKS FAILED IN THE SANDBOX AND WERE RIGHT TO: a contiguous-US bounding box
+turned out to contain the Bahamas, so the exotic-list check was rebuilt as a two-armed negative control that
+constructs the US-shaped validator and requires it to reject all eight; and a v1 file was dying with
+"'places' array is required at root" because the parser demanded the place table before anything checked the
+version. ★ ONE PREDICTION OF THIRTEEN MISSED, and in the harmless direction: the triangle-inequality
+violation came back 0.000E+000 on Windows against a predicted 1.8E-012 — the arcsine lands exactly there and
+one bit short on Linux. It should have been flagged as platform-dependent alongside the two deviation figures
+that were.)
+
+*(Previous board entry, S91 — 2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 82 PASS at
 53 assertions, and the full 5,205-game season page byte-identical to its pre-S91 self, fingerprint `93d8c853…`.
 **THE ENGINE NOW KNOWS WHAT DAY IT IS.** Any year 0001–9999 with correct weekdays and leap years from one code
 path, nothing authored and nothing shipped as data, plus the season spine: November 1 as a FLOOR, Selection
@@ -26,7 +51,7 @@ CORRECTING THE PROMPT: Claude reported "the stock world has ZERO independents; t
 There are **14**, modelled as a conference named `Independent` — Claude tested for an empty conference field
 instead of reading conference names, and the word was in plain text on the season page it had already read. The
 prompt's reasoning was still a non-sequitur, so the claim was true for a reason its author had not given and
-the correction was false for a reason Claude had not checked.)
+the correction was false for a reason Claude had not checked.))
 
 *(Previous board entry, S90 — 2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 81 PASS at
 41 assertions, season page byte-identical with zero new lines. **Closes O-31**: per-game retention, forever,
@@ -107,6 +132,44 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S92 — GEOGRAPHY: THE ENGINE HAS A MAP.** Every school had carried a real latitude and longitude since
+  the world layer shipped and **nothing computed anything with them** — there was no distance function
+  anywhere. Now there are **310 places** (293 campus cities plus R2's two authored lists: nine domestic host
+  cities, eight exotic), great-circle miles between any two (spherical haversine, mean radius 3958.7613), and
+  `GameSite` = a place plus a host that is **`Nobody` or `School(id)`, an explicit tagged value and never a
+  nullable int**. A school no longer carries `city`, `state`, `lat` or `long` — it carries one `placeId`, so
+  it has exactly one answer for where it is. World schema **v2**; v1 refused by name from one guard shared by
+  the parser and the validator, with the re-conversion command in the message, and **no migration code** on
+  purpose. `dotnet run -- geography <world.json>` prints the map. **Nothing consumes it**: no game is placed,
+  no crowd is modelled, no home-court advantage exists at the end of this session. Phase 83, 66 assertions,
+  green first time on Emmett's machine; season page unmoved.
+  - ★ **The tolerance is EVIDENCED at run time, not asserted** — platform variance 1.09E-011 mi ≪ tolerance
+    1.00E-006 mi ≪ wrong-formula error 10.1 mi, with the left number *measured* by perturbing every library
+    trig call by 4 ULP in every combination. ★ **Near-antipodal is the one place that ordering breaks** (a
+    last-bit wobble moves the answer 1.7E-004 mi), so that probe asserts properties — finite, clamped, never
+    more than half the way round — and never a mileage. A golden number there would have been S81.3 again.
+  - ★ **Three invariants that would have passed while the semantics were wrong**, each answered: a distance
+    function tested only on nearby American cities passes with flat-earth arithmetic (so the golden is
+    dominated by long pairs and a planar negative control must FAIL them, scoped to the long rows by name); a
+    place table passes every structural test while the authored entries are silently dropped (so all seventeen
+    are asserted individually, by name); and a golden mileage table from an online calculator fails a CORRECT
+    implementation for the right-looking reason (so the golden pins the **model** — spherical haversine, that
+    exact radius, computed outside .NET from the exact serialized coordinates).
+  - **The data trap:** 13 city names appear in two states (Durham NC vs Durham NH would have put Duke in New
+    Hampshire) and five cities disagreed with themselves on coordinates. The collapse rule — lowest school id
+    in the city wins — ran **once, by hand, into `data/places.csv`** and is never executed at load. No school
+    moved more than 1.38 miles. The converter **refuses by name** any school whose csv city/state disagrees
+    with its resolved place: a resolving id is not sufficient.
+  - **Permanent contract decisions** (three prompt revisions, all twenty required changes on this): `PlaceId`
+    IS the identity and `(name, subdivision, country)` is only a uniqueness constraint; ids are **authored,
+    never generated**, never reused, never compacted; `country` is ISO 3166-1 alpha-2 **strictly**, so PR and
+    VI take their own codes rather than being filed under US; `tags` is authored data nothing reads, canonical
+    sorted array; coordinate serialisation pins the **mechanism** (the existing `Utf8JsonWriter` path), because
+    `1`, `1.0` and `1E+00` all round-trip and all hash differently.
+  - Honest misses: the purity scan tripped on its own documentation (searched for "config", found it in the
+    header line promising no config — the same fix Phase 82 had already recorded and this session did not
+    carry across); and the stock world was never copied beside the binary, costing one suite run.
 
 - **★ S91 — THE CALENDAR: THE ENGINE HAS A CLOCK.** Before this, a season was 5,205 games in an arbitrary
   order and no game had a date. Now any year from 0001 to 9999 comes out with correct weekdays and correct
@@ -340,6 +403,15 @@ be run against a league with a real rotation, though the minute VALUES remain pl
 chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
+
+- **O-77 — `data/teams.csv` MAY HOLD MORE MIS-LOCATED SCHOOLS (opened S92).**
+  St. Peter's was listed in New Brunswick NJ on Rutgers' exact coordinates, about 25 miles from where the
+  school actually is. It was found **by accident**, while enumerating shared places for the migration table,
+  and it had never mattered because nothing read a coordinate. Geography makes every such error visible the
+  moment the map prints — a wrongly-placed school reads zero miles from a neighbour it does not share a city
+  with. **Nothing has ever audited that column**, and it now feeds travel, and shortly crowd reach. The cheap
+  version is a one-pass eyeball of the 36 shared-place groups on the geography page; the thorough version is
+  an external cross-check of all 347. Emmett owns the data call either way.
 
 - **O-75 — ★ THE OBSERVATION RUN AND THE STRESS TEST CANNOT FAIL THE SUITE (defect, opened S91).**
   Both are `void`, both print their own PASSED/FAILED line, and both are called **after** `ok` has already
@@ -1060,102 +1132,34 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**NONE SELECTED.** S91 built the clock and opened O-75, O-76.
+**HOME COURT.** Ruled by Emmett at S92's design conversation and the reason geography came first: the season
+already plays a balanced 15 home / 15 away, which is **the exact condition under which the real ~60% home win
+rate is measured**, so home court dropped onto the *existing* schedule reads clean. Land the scheduler first
+and home court arrives on top of a brand-new schedule, and nobody can say which change moved the page. Order
+is **geography → home court → scheduler**.
 
-**★ THE SCHEDULER IS THE NATURAL S92, and S91 was built to be found wanting by it.** The calendar answers
-"what day is it" and deliberately answers nothing else: no game is placed on it, no team is active or idle,
-no date is "conference". S92 is the first session that discovers whether the calendar is *usable*, which is
-the only real test of it, and findings are expected rather than feared. Four things it inherits and should
-not re-derive: the window is **157–164 days** from Nov 1 to the championship and **135–142** to Selection
-Sunday (reported by Phase 82, asserted nowhere — whether 30 games and a bracket FIT is S92's question, and
-the current 30-game season is loose inside it); **conference tournaments are staggered** (R7) and the only
-shared constraint is that all finish before Selection Sunday; **conference weekday habits (R8) are scheduler
-data** and the calendar stores none; and **the stock world has 14 independent schools**, modelled as a
-conference named `Independent`, which have no conference tournament and sit idle through the March window.
-The r1 conference-size measurement (leagues run 8 to 16, no six-team league) belongs to this prompt, not to
-S91's — it is regular-season structure, and tournament width depends on bracket format, byes, venues and
-rest.
+What it inherits and must not re-derive:
 
-**★ O-75/O-76 (the suite's tail) is the cheap alternative and would take under an hour.** A red line that
-cannot go red is worse than a missing check, because it is trusted. It pairs naturally with the checks-only
-switch, and Emmett named the whole thing by asking a question about run time.
+- **R4 — the crowd is PRESTIGE and DISTANCE, and there is no city size.** Population, market size and arena
+  capacity are ruled out by name; a place has no population field and must never grow one. *"A small town
+  college can have an incredible homecourt advantage."* Both surviving inputs already exist on every school.
+- **R6 — the effect ships FLAT**, inheriting the experience/cohesion axis later rather than waiting for it.
+- **R7 — it lands on the TEAM, uniformly, with an EMERGENT magnitude.** *"It shouldn't the individual players
+  do poorly, it's the odds of everyone goes down the same on the road, but if you have a team full of
+  freshman, it brings it down more."* One number on all five, its SIZE built from the five on the floor —
+  that is what keeps the crowd number off the no-scalar wall, and it is the load-bearing design constraint of
+  the whole session.
+- **R3 — the host fact already exists and is unused.** `GameSite` carries a place and a host; a neutral site
+  is a game nobody hosts, not a category. No game record carries a site yet — the scheduler owns that — so
+  home court's first question is where the site attaches without waiting for the scheduler.
+- **A9's isolation check will need rewriting**, not extending: the moment home court lands, files on the
+  season path legitimately name geography types, and the check as written forbids exactly that.
 
-**★ THE ARCHIVE STILL HAS NO READER.** S90 shipped no indexing, no querying, no career stitching and no
-presentation — its job was to guarantee the data exists and cannot be lost. Every number a player card needs
-is on disk and nothing can read it back across seasons. That session owns the person index (finding one man's
-career today means scanning every row of every season file) and what a finished card actually shows.
-
-**★ O-73 (the discarded ceiling) is an ENGINE question, not a storage one.** Emmett ruled the ceiling out of
-the archive, which settles retention and settles nothing else: the generator computes latent, runway and
-arrival for all 4,511 men every world build and the season never receives any of it, so no development layer
-can be built until that wire exists. Cheap now, and more expensive every session that assumes the season's
-ratings are all a player has.
-
-*(Previous entry, S90.)* S90 gave a career a permanent archive and opened O-74.
-
-**★ THE ARCHIVE HAS NO READER, and that is the natural S91.** S90 deliberately shipped no indexing, no
-querying, no career stitching and no presentation — its job was to guarantee the data exists and cannot be
-lost. Every number a player card needs is now on disk and nothing can read it back across seasons. That
-session owns the questions S90 left standing: the person index (finding one man's career today means
-scanning every row of every season file), and what a finished card actually shows. It is also the first
-session that will discover whether the format is pleasant to read, which is the only real test of it.
-
-**★ O-73 (the discarded ceiling) is the other candidate, and it is an ENGINE question, not a storage one.**
-Emmett ruled the ceiling out of the archive, which settles retention and settles nothing else: the generator
-computes latent, runway and arrival for all 4,511 men every world build and the season never receives any of
-it, so no development layer can be built until that wire exists. Cheap now, and it gets more expensive every
-session that assumes the season's ratings are all a player has.
-
-*(Previous entry, S89.)* S89 gave every person, season and game a permanent number and a save file to keep them
-in, and opened O-68, O-69, O-70.
-
-**★ O-71 (backfill S88's journal and design entries) is the cheapest thing on the board and should probably
-go first.** A whole subsystem is live in the engine with its design reasoning recorded nowhere but a source
-header. Reading the oracle and writing the two entries is a micro-session, and it closes the last gap this
-correction opened.
-
-**★ O-31 (per-game retention) is now unblocked and is the natural continuation.** S89 built the numbering it
-was waiting on: a game carries its identity from schedule construction through the accumulators, so a per-game
-row can be filed under a person who is still the same person next season. The two questions the item names —
-what a finished game should show a player, and the save-size arithmetic at career scale — are design
-conversations, and the schema is now versioned so they can be answered without a migration.
-
-*(Previous entry, S87.)* S87 made fouls real — every whistle names a man, five sit him down — and opened
-O-64, O-65, O-66, O-67.
-
-**★ O-64 is the natural S88, and S87 is the reason.** Fouls only just acquired consequences, and the first
-thing the consequence exposed is that the RATE is right and the CONCENTRATION is not: 17.95 fouls a team a
-game did not move a hundredth, yet 8.3% of player-games end at five or more against a ~3% even-spread
-expectation, and foul-outs run 0.840 per team-game against roughly 0.4 in the real game. This is exactly the
-kind of finding that could not be seen before — a post-hoc column has no consequences to look wrong — and it
-is a *sharpness* question about `FoulCommitter`'s weightings, not a question about the team foul rate. It
-also finally settles S62's carried-over `InteriorTiltScale` debt, which has been flagged in design.md since
-Session 62 and deliberately not touched by S87.
-
-**★ O-57 remains the standing front-runner for the wider arc.** The bar exists, it works, and **not one team in
-the country moves it** — all 347 schools play on the compiled default 5/5/5, so every bar is the neutral 0.475 and
-the entire 29.26pp push spread comes from rosters alone. S86 built the single lever a coaching brain would pull and
-left it bolted down. The archetype tables' pace columns are proven only by Phase 77, which sets `PaceBias`
-directly; the season cannot exercise half the design. This is no longer one un-set input among several — it now
-gates pace, shot diet, scoring concentration, assists **and** the run-or-not decision at once. It opens as a design
-conversation, not a build: where a school's profile comes from (prestige? conference? a coach object with its own
-generation and career arc?) is Emmett's call.
-
-**What S86 did NOT do, and should not be attempted piecemeal.** C-32's fourth effect — widening the spread of who
-gets a break block with a fast lineup — needs an assignment model on the break (**O-48**). S86 re-measured the
-distribution after the push rewire and the median did not budge from 25.0%, which is the diagnosis confirmed rather
-than a disappointment: changing who pushes cannot change who gets the block while the engine assigns nobody on a
-break. O-48 is its own session by Emmett's earlier ruling.
-
-The standing candidates are otherwise unchanged: **O-40** (block-rate calibration, blocks 4.4 against a 3.5
-target), **O-42** (lineup shape), **O-43** (the on-ball blend), **O-45** (the half-finished S78 engine half),
-**O-65** (the whistle-level substitution door — read its two sizings before scheduling it; the honest version
-is a foundation change and must not be attempted as a corner of another session), **O-67** (the offensive-foul
-column missing from two printers — smallest item on the board and it belongs with any foul work),
-**O-49/O-50** (the opportunity floor on rare-event boards; shot diet), **O-54/O-55/O-56** (S83's three), **O-58**
-(the re-stamp ritual's recurring cost), **O-59** (the stale break sentinel — smallest item on the board, and it
-belongs with any transition work), **O-61/O-62/O-63** (S86's three), and the **player generator's finishing
-budget**, which opens with a design question rather than a number: the generator spends a fixed budget, so "more
-finishing" is "less of something else," and Emmett has not ruled which.
-
-Pick one at the top of the next session, against this board and a fresh pull (CONVENTIONS §6a).
+**The scheduler follows, and S91 was built to be found wanting by it.** It inherits: the window is **157–164
+days** from Nov 1 to the championship and **135–142** to Selection Sunday (reported by Phase 82, asserted
+nowhere — whether 30 games and a bracket FIT is its question, and the current 30-game season is loose inside
+it); **conference tournaments are staggered** (R7) and the only shared constraint is that all finish before
+Selection Sunday; **conference weekday habits (R8) are scheduler data** and the calendar stores none; **the
+stock world has 14 independent schools** with no conference tournament, idle through the March window; and now
+**the map**, which says the WAC's worst internal trip is Hawaii ↔ Louisiana Tech at 4,030 miles against the
+Ivy League's 295. Leagues run 8 to 16 teams, with no six-team league.

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Charm.Engine;
 
 namespace Charm.Harness;
 
@@ -16,7 +17,7 @@ internal static partial class Program
     //
     //   dotnet run -- world <file>                          validate + report
     //   dotnet run -- world report <file>                   same
-    //   dotnet run -- world convert <teams.csv> <conf.csv> <out.json>
+    //   dotnet run -- world convert <teams.csv> <conf.csv> <places.csv> <out.json>
     //   dotnet run -- world seed <in.json> <seed> <out.json>
     //
     // Standing rules honored here (docs/world-structure-brief.md):
@@ -63,22 +64,73 @@ internal static partial class Program
     // ── Schema types ────────────────────────────────────────────────────────────────────
     private sealed record WorldTier(string Id, int Floor, int Equilibrium, double PullbackIntensity);
     private sealed record WorldConference(int Id, string Name, string ShortName, string TierId);
+
+    /// <summary>★ S92 — A PLACE IS A CITY (R1). Not an arena: no name, no capacity, no
+    /// attendance. Not a market either — R4 rules city size out by name, so there is
+    /// deliberately no population field and there must never be one.
+    ///
+    /// <para>★ <c>PlaceId</c> IS THE IDENTITY. <c>(Name, Subdivision, Country)</c> is a
+    /// UNIQUENESS CONSTRAINT inside one world file, not a second identity. Correcting a
+    /// spelling or adding a diacritic must not create a new place, because every school —
+    /// and every future schedule and retained game — joins through the id.</para>
+    ///
+    /// <para>★ THE ID IS AUTHORED, NEVER GENERATED. It is stored on every school and hashed
+    /// into the world fingerprint, so a generation rule would mean that inserting an
+    /// alphabetically earlier row renumbers the world. Lifecycle: a new place takes a new
+    /// unused id; a deleted place's id is never reused; ids are never compacted; sorting the
+    /// csv never changes one. Holes are permanent and cost nothing.</para>
+    ///
+    /// <para>★ <c>Country</c> is ISO 3166-1 alpha-2, strictly, so territories get their own
+    /// codes (PR, VI) rather than being filed under US — claiming ISO while using a
+    /// different hierarchy would give two serialisations of the same place and therefore two
+    /// fingerprints. <c>Subdivision</c> is an optional LOCAL code under the same string
+    /// rules, and is deliberately NOT called "region": which part of the country a school
+    /// recruits from is a different concept and a different build.</para>
+    ///
+    /// <para>★ <c>Tags</c> is authored data that NOTHING reads — no distance, no predicate,
+    /// no branch. It exists only so that R2's two hand-maintained lists stay separately
+    /// maintainable. Campus-ness is NOT stored: a place has a campus iff some school points
+    /// at it.</para></summary>
+    private sealed record WorldPlace(
+        int PlaceId, string Name, string Subdivision, string Country,
+        GeoCoordinate Coordinate, string[] Tags)
+    {
+        /// <summary>How the place reads on a page and in an error message. Country is always
+        /// shown because the Cayman Islands' ISO code is `KY`, which sits next to Kentucky in
+        /// this very league and would otherwise be misread every single time.</summary>
+        public string Descriptor => Subdivision.Length > 0
+            ? $"{Name}, {Subdivision} ({Country})"
+            : $"{Name} ({Country})";
+    }
+
+    /// <summary>The fixed tag vocabulary. Unknown values are refused at load. There is
+    /// deliberately no `both` word — Indianapolis has campuses AND hosts Final Fours, and
+    /// two tags is two tags.</summary>
+    private static readonly string[] WorldPlaceTagVocabulary = { "domestic", "exotic" };
+
     private sealed record WorldSchool(
-        int Id, string Name, string Abbr, string City, string State, string Color,
-        double Lat, double Long, int ConferenceId, string Division,
+        int Id, string Name, string Abbr, string Color,
+        int PlaceId, int ConferenceId, string Division,
         int CurrentPrestige, int HistoricalPrestige);
 
     private sealed class WorldFile
     {
-        public int SchemaVersion { get; init; } = 1;
+        public int SchemaVersion { get; init; } = WorldSchemaVersion;
         public string Kind { get; init; } = "authored";      // "authored" | "generated"
         public string EraLabel { get; init; } = "";
         public string Division { get; init; } = "D1";
         public long? WorldSeed { get; init; }                 // present iff generated
         public List<WorldTier> Tiers { get; init; } = new();
         public List<WorldConference> Conferences { get; init; } = new();
+        public List<WorldPlace> Places { get; init; } = new();
         public List<WorldSchool> Schools { get; init; } = new();
     }
+
+    /// <summary>★ S92 — schema 2. A v1 file has coordinates on the school and no place
+    /// table; there is deliberately NO migration code, because a silent upgrade path is how
+    /// a stale world quietly keeps working for a year and then disagrees with its own
+    /// fingerprint. v1 is refused by name and the committed files were converted once.</summary>
+    private const int WorldSchemaVersion = 2;
 
     // ── Deterministic PRNG (SplitMix64) — explicit so a world file is reproducible on
     //    any runtime, never dependent on System.Random's version-specific algorithm.
@@ -118,13 +170,14 @@ internal static partial class Program
                 case "report" when args.Length == 3:
                     ReportWorld(LoadWorld(args[2]), args[2]);
                     return 0;
-                case "convert" when args.Length == 5:
+                case "convert" when args.Length == 6:
                 {
-                    var world = ConvertWorld(args[2], args[3]);
+                    var world = ConvertWorld(args[2], args[3], args[4]);
                     ValidateWorld(world);
-                    WriteWorld(world, args[4]);
-                    Console.WriteLine($"converted {world.Schools.Count} schools / {world.Conferences.Count} conferences -> {args[4]}");
-                    ReportWorld(world, args[4]);
+                    WriteWorld(world, args[5]);
+                    Console.WriteLine($"converted {world.Schools.Count} schools / {world.Conferences.Count} conferences / " +
+                                      $"{world.Places.Count} places -> {args[5]}");
+                    ReportWorld(world, args[5]);
                     return 0;
                 }
                 case "seed" when args.Length == 5:
@@ -140,7 +193,7 @@ internal static partial class Program
                 }
                 default:
                     Console.WriteLine("usage: world <file> | world report <file> | " +
-                                      "world convert <teams.csv> <conf.csv> <out.json> | " +
+                                      "world convert <teams.csv> <conf.csv> <places.csv> <out.json> | " +
                                       "world seed <in.json> <seed> <out.json>");
                     return 1;
             }
@@ -180,9 +233,15 @@ internal static partial class Program
             if (root.ValueKind != JsonValueKind.Object)
                 throw new InvalidOperationException("world file root must be a JSON object.");
             RejectUnknownOrDuplicateKeys(root, "root",
-                "schemaVersion", "metadata", "tiers", "conferences", "schools");
+                "schemaVersion", "metadata", "tiers", "conferences", "places", "schools");
 
             var schemaVersion = RequireIntProperty(root, "schemaVersion", "root");
+
+            // ★ THE VERSION IS CHECKED HERE, NOT ONLY IN ValidateWorld. A v1 file has no
+            //   'places' array, so without this the parser dies three checks later with
+            //   "'places' array is required at root" — technically true and completely
+            //   unhelpful to whoever is holding an old world file.
+            WorldRequireSupportedSchemaVersion(schemaVersion);
 
             if (!root.TryGetProperty("metadata", out var meta) || meta.ValueKind != JsonValueKind.Object)
                 throw new InvalidOperationException("'metadata' object is required at root.");
@@ -220,11 +279,46 @@ internal static partial class Program
                     WorldRequireString(el, "tierId", "conferences[]")));
             }
 
+            // ── Places (S92). Coordinates go through GeoCoordinate.TryCreate rather than
+            //    a local range check, so there is exactly ONE definition of "a real point"
+            //    and a bad row is named instead of throwing an argument exception. ────────
+            var places = new List<WorldPlace>();
+            foreach (var el in WorldRequireArray(root, "places"))
+            {
+                RejectUnknownOrDuplicateKeys(el, "places[]",
+                    "placeId", "name", "subdivision", "country", "lat", "long", "tags");
+                var placeName = WorldRequireString(el, "name", "places[]");
+                var pctx = $"place '{placeName}'";
+                var placeId = RequireIntProperty(el, "placeId", pctx);
+                var lat = WorldRequireDouble(el, "lat", pctx);
+                var lng = WorldRequireDouble(el, "long", pctx);
+                if (!GeoCoordinate.TryCreate(lat, lng, out var coordinate))
+                    throw new InvalidOperationException(
+                        $"{pctx} (placeId {placeId}) has an impossible coordinate " +
+                        FormattableString.Invariant($"({lat}, {lng}): latitude must be in [-90,90], ") +
+                        "longitude in [-180,180], both finite.");
+
+                if (!el.TryGetProperty("tags", out var tagsEl) || tagsEl.ValueKind != JsonValueKind.Array)
+                    throw new InvalidOperationException($"missing required 'tags' array in {pctx}.");
+                var tags = new List<string>();
+                foreach (var t in tagsEl.EnumerateArray())
+                {
+                    if (t.ValueKind != JsonValueKind.String)
+                        throw new InvalidOperationException($"every tag in {pctx} must be a string.");
+                    tags.Add(t.GetString() ?? "");
+                }
+                places.Add(new WorldPlace(
+                    placeId, placeName,
+                    WorldRequireString(el, "subdivision", pctx),
+                    WorldRequireString(el, "country", pctx),
+                    coordinate, tags.ToArray()));
+            }
+
             var schools = new List<WorldSchool>();
             foreach (var el in WorldRequireArray(root, "schools"))
             {
                 RejectUnknownOrDuplicateKeys(el, "schools[]",
-                    "id", "name", "abbr", "city", "state", "color", "lat", "long",
+                    "id", "name", "abbr", "color", "placeId",
                     "conferenceId", "division", "currentPrestige", "historicalPrestige");
                 var name = WorldRequireString(el, "name", "schools[]");
                 var ctx = $"school '{name}'";
@@ -232,11 +326,8 @@ internal static partial class Program
                     RequireIntProperty(el, "id", ctx),
                     name,
                     WorldRequireString(el, "abbr", ctx),
-                    WorldRequireString(el, "city", ctx),
-                    WorldRequireString(el, "state", ctx),
                     WorldRequireString(el, "color", ctx),
-                    WorldRequireDouble(el, "lat", ctx),
-                    WorldRequireDouble(el, "long", ctx),
+                    RequireIntProperty(el, "placeId", ctx),
                     RequireIntProperty(el, "conferenceId", ctx),
                     WorldRequireString(el, "division", ctx),
                     RequireIntProperty(el, "currentPrestige", ctx),
@@ -247,7 +338,7 @@ internal static partial class Program
             {
                 SchemaVersion = schemaVersion, Kind = kind, EraLabel = eraLabel,
                 Division = division, WorldSeed = worldSeed,
-                Tiers = tiers, Conferences = conferences, Schools = schools,
+                Tiers = tiers, Conferences = conferences, Places = places, Schools = schools,
             };
         }
     }
@@ -287,8 +378,7 @@ internal static partial class Program
     // =====================================================================================
     private static void ValidateWorld(WorldFile w)
     {
-        if (w.SchemaVersion != 1)
-            throw new InvalidOperationException($"unsupported schemaVersion {w.SchemaVersion} (this build reads 1).");
+        WorldRequireSupportedSchemaVersion(w.SchemaVersion);
         if (w.Kind != "authored" && w.Kind != "generated")
             throw new InvalidOperationException($"metadata.kind must be 'authored' or 'generated' (got '{w.Kind}').");
         if (w.Kind == "generated" && w.WorldSeed is null)
@@ -331,9 +421,46 @@ internal static partial class Program
                 throw new InvalidOperationException($"conference id {c.Id} has an empty name or shortName.");
         }
 
-        // Schools: unique ids, real conferences, division matches, values in bounds,
-        // and the tier-membership floor check (holds for authored AND generated files:
-        // membership guarantees a minimum — a file that starts below it is incoherent).
+        // ── Places (S92). Validated BEFORE schools, because a school's location is a
+        //    reference into this table and a dangling reference should be reported as the
+        //    school's problem only once the table itself is known good. ──────────────────
+        if (w.Places.Count == 0)
+            throw new InvalidOperationException("world has no places (schemaVersion 2 requires a 'places' table).");
+        var placeById = new Dictionary<int, WorldPlace>();
+        var placeByDescriptor = new Dictionary<(string, string, string), WorldPlace>();
+        foreach (var p in w.Places)
+        {
+            if (p.PlaceId <= 0)
+                throw new InvalidOperationException($"place '{p.Name}' has placeId {p.PlaceId}; ids must be positive.");
+            if (!placeById.TryAdd(p.PlaceId, p))
+                throw new InvalidOperationException(
+                    $"duplicate placeId {p.PlaceId} ('{p.Name}' and '{placeById[p.PlaceId].Name}').");
+            if (p.Name.Length == 0)
+                throw new InvalidOperationException($"placeId {p.PlaceId} has an empty name.");
+            if (p.Name.Trim() != p.Name)
+                throw new InvalidOperationException($"place '{p.Name}' (placeId {p.PlaceId}) has surrounding whitespace.");
+            if (!WorldIsAlpha2CountryCode(p.Country))
+                throw new InvalidOperationException(
+                    $"place '{p.Name}' (placeId {p.PlaceId}) country '{p.Country}' is not an ISO 3166-1 alpha-2 code " +
+                    "(exactly two uppercase ASCII letters). Territories take their OWN code — Puerto Rico is PR, " +
+                    "the U.S. Virgin Islands are VI; neither is filed under US.");
+            if (!WorldIsSubdivisionCode(p.Subdivision))
+                throw new InvalidOperationException(
+                    $"place '{p.Name}' (placeId {p.PlaceId}) subdivision '{p.Subdivision}' must be empty or " +
+                    "1-3 uppercase ASCII letters or digits, with no surrounding whitespace.");
+            WorldValidatePlaceTags(p);
+
+            var key = (p.Name, p.Subdivision, p.Country);
+            if (!placeByDescriptor.TryAdd(key, p))
+                throw new InvalidOperationException(
+                    $"two places share the descriptor '{p.Descriptor}' (placeId {placeByDescriptor[key].PlaceId} " +
+                    $"and {p.PlaceId}). The descriptor is a uniqueness constraint inside one world file; the id " +
+                    "is the identity.");
+        }
+
+        // Schools: unique ids, real conferences, real places, division matches, values in
+        // bounds, and the tier-membership floor check (holds for authored AND generated
+        // files: membership guarantees a minimum — a file that starts below it is incoherent).
         if (w.Schools.Count == 0)
             throw new InvalidOperationException("world has no schools.");
         var schoolIds = new HashSet<int>();
@@ -341,6 +468,9 @@ internal static partial class Program
         {
             if (!schoolIds.Add(s.Id))
                 throw new InvalidOperationException($"duplicate school id {s.Id} ('{s.Name}').");
+            if (!placeById.ContainsKey(s.PlaceId))
+                throw new InvalidOperationException(
+                    $"school '{s.Name}' points at unknown placeId {s.PlaceId}.");
             if (!confById.TryGetValue(s.ConferenceId, out var conf))
                 throw new InvalidOperationException($"school '{s.Name}' points at unknown conference id {s.ConferenceId}.");
             if (!string.Equals(s.Division, w.Division, StringComparison.Ordinal))
@@ -358,6 +488,57 @@ internal static partial class Program
         }
 
         WorldFeasibilityCheck(w, tierById, confById);
+    }
+
+    /// <summary>★ ONE version guard, called by the parser AND the validator, so a file read
+    /// from disk and a world built in memory refuse the same way with the same words. There
+    /// is deliberately NO migration code: a silent upgrade path is how a stale world quietly
+    /// keeps working for a year and then disagrees with its own fingerprint.</summary>
+    private static void WorldRequireSupportedSchemaVersion(int schemaVersion)
+    {
+        if (schemaVersion == 1)
+            throw new InvalidOperationException(
+                "world schemaVersion 1 is retired (S92): a v1 file puts 'lat'/'long' on each school and has " +
+                "no 'places' table, so it has no way to say WHERE a game is played. There is no automatic " +
+                "migration — re-run 'world convert <teams.csv> <conf.csv> <places.csv> <out.json>'.");
+        if (schemaVersion != WorldSchemaVersion)
+            throw new InvalidOperationException(
+                $"unsupported schemaVersion {schemaVersion} (this build reads {WorldSchemaVersion}).");
+    }
+
+    // ── Place string rules. Ordinal, case-SENSITIVE, no trimming anywhere: these strings
+    //    reach the canonical bytes and therefore the world fingerprint, so "us" and "US"
+    //    must not be quietly the same thing. ──────────────────────────────────────────────
+    private static bool WorldIsAlpha2CountryCode(string s)
+        => s.Length == 2 && s[0] is >= 'A' and <= 'Z' && s[1] is >= 'A' and <= 'Z';
+
+    private static bool WorldIsSubdivisionCode(string s)
+    {
+        if (s.Length == 0) return true;                  // optional — most non-US places have none
+        if (s.Length > 3) return false;
+        foreach (var c in s)
+            if (c is not (>= 'A' and <= 'Z') and not (>= '0' and <= '9')) return false;
+        return true;
+    }
+
+    /// <summary>Tags are a CANONICAL string array: fixed vocabulary, no duplicates, sorted
+    /// ordinal ascending. All three rules exist for the same reason — the array's bytes are
+    /// hashed into the world fingerprint, so `["exotic","domestic"]` and
+    /// `["domestic","exotic"]` would be the same place with two fingerprints.</summary>
+    private static void WorldValidatePlaceTags(WorldPlace p)
+    {
+        for (var i = 0; i < p.Tags.Length; i++)
+        {
+            var t = p.Tags[i];
+            if (!WorldPlaceTagVocabulary.Contains(t, StringComparer.Ordinal))
+                throw new InvalidOperationException(
+                    $"place '{p.Name}' (placeId {p.PlaceId}) carries unknown tag '{t}'; the vocabulary is " +
+                    $"[{string.Join(", ", WorldPlaceTagVocabulary)}].");
+            if (i > 0 && string.CompareOrdinal(p.Tags[i - 1], t) >= 0)
+                throw new InvalidOperationException(
+                    $"place '{p.Name}' (placeId {p.PlaceId}) tags must be sorted ordinal ascending with no " +
+                    $"duplicates (got [{string.Join(", ", p.Tags)}]).");
+        }
     }
 
     // The special check (brief rule 6): given member counts and floors, the target
@@ -465,6 +646,10 @@ internal static partial class Program
             WorldSeed = worldSeed,
             Tiers = input.Tiers.ToList(),
             Conferences = input.Conferences.ToList(),
+            // ★ S92 — the seeder reseeds PRESTIGE and nothing else. Places are carried
+            //   through untouched and no coordinate moves: a generated world is the same
+            //   map with different programs on it.
+            Places = input.Places.ToList(),
             Schools = input.Schools
                 .Select(s => s with { CurrentPrestige = assigned[s.Id], HistoricalPrestige = assigned[s.Id] })
                 .ToList(),
@@ -479,15 +664,60 @@ internal static partial class Program
     // split, NOT the NCAA division — dropped; every school is stamped division "D1".
     // Historical prestige = current (the Pass 1 rule).
     // =====================================================================================
-    private static WorldFile ConvertWorld(string teamsCsvPath, string confCsvPath)
+    private static WorldFile ConvertWorld(string teamsCsvPath, string confCsvPath, string placesCsvPath)
+    {
+        // ── Places first: the school rows reference them. ★ THE COLLAPSE RULE IS AN
+        //    AUTHORING RULE AND ALREADY RAN, BY HAND, INTO data/places.csv. The converter
+        //    never decides that two schools share a place because their city and state
+        //    strings happen to match — otherwise "St. Louis" versus "Saint Louis", or one
+        //    diacritic, silently splits or merges a place and MOVES PERMANENT IDS. ────────
+        var placeRows = ReadWorldCsv(placesCsvPath,
+            new[] { "PlaceId", "Name", "Subdivision", "Country", "Lat", "Long", "Tags" });
+        var places = new List<WorldPlace>();
+        var placeIds = new HashSet<int>();
+        var placeByDescriptor = new Dictionary<(string, string, string), int>();
+        foreach (var r in placeRows)
+        {
+            var pid = WorldCsvInt(r[0], placesCsvPath, "PlaceId");
+            if (!placeIds.Add(pid))
+                throw new InvalidOperationException($"{placesCsvPath}: duplicate PlaceId {pid}.");
+            var lat = WorldCsvDouble(r[4], placesCsvPath, $"place '{r[1]}' Lat");
+            var lng = WorldCsvDouble(r[5], placesCsvPath, $"place '{r[1]}' Long");
+            if (!GeoCoordinate.TryCreate(lat, lng, out var coord))
+                throw new InvalidOperationException(
+                    FormattableString.Invariant(
+                        $"{placesCsvPath}: place '{r[1]}' (PlaceId {pid}) coordinate ({lat}, {lng}) is not a real point."));
+            var tags = r[6].Length == 0
+                ? Array.Empty<string>()
+                : r[6].Split(';', StringSplitOptions.RemoveEmptyEntries)
+                      .Select(t => t.Trim()).OrderBy(t => t, StringComparer.Ordinal).ToArray();
+            var place = new WorldPlace(pid, r[1], r[2], r[3], coord, tags);
+            if (!placeByDescriptor.TryAdd((place.Name, place.Subdivision, place.Country), pid))
+                throw new InvalidOperationException(
+                    $"{placesCsvPath}: PlaceId {pid} and {placeByDescriptor[(place.Name, place.Subdivision, place.Country)]} " +
+                    $"share the descriptor '{place.Descriptor}'.");
+            places.Add(place);
+        }
+        var placeById = places.ToDictionary(p => p.PlaceId);
+
+        return ConvertWorldCore(teamsCsvPath, confCsvPath, places, placeById);
+    }
+
+    private static WorldFile ConvertWorldCore(
+        string teamsCsvPath, string confCsvPath,
+        List<WorldPlace> places, Dictionary<int, WorldPlace> placeById)
     {
         var confRows = ReadWorldCsv(confCsvPath,
             new[] { "ID", "Name", "ShortName", "Games", "Prestige", "Divisions", "DivisionOne", "DivisionTwo",
                     "TourneyTeams", "TDay1", "TDay2", "TDay3", "TDay4", "TDay5", "SeedDiv", "D1", "D2", "D3",
                     "TourneyBirth", "TourneyType" });
+        // ★ S92 — `Lat`/`Long` are RETIRED from teams.csv and replaced by `PlaceId`. `City`
+        //   and `State` STAY, as human-readable authoring columns, and are cross-checked
+        //   below rather than trusted: they are how a person reads the file, not how the
+        //   game finds a school.
         var teamRows = ReadWorldCsv(teamsCsvPath,
             new[] { "ID", "Name", "Mascot", "Prestige", "Abbr", "Logo", "City", "State", "Conference",
-                    "Division", "TeamColor", "TravelPart", "Lat", "Long", "Academics" });
+                    "Division", "TeamColor", "TravelPart", "PlaceId", "Academics" });
 
         var conferences = new List<WorldConference>();
         var confIds = new HashSet<int>();
@@ -520,23 +750,38 @@ internal static partial class Program
             var prestige = WorldCsvInt(r[3], teamsCsvPath, $"school '{r[1]}' Prestige");
             if (prestige is < 0 or > 99)
                 throw new InvalidOperationException($"{teamsCsvPath}: school '{r[1]}' prestige {prestige} out of 0-99.");
+            var placeId = WorldCsvInt(r[12], teamsCsvPath, $"school '{r[1]}' PlaceId");
+            if (!placeById.TryGetValue(placeId, out var place))
+                throw new InvalidOperationException(
+                    $"{teamsCsvPath}: school '{r[1]}' references PlaceId {placeId}, which is not in the places csv.");
+
+            // ★ A RESOLVING ID IS NOT SUFFICIENT. Without this check a school could read
+            //   "Durham, NC" in the column a person edits while its placeId pointed at
+            //   Durham, NH — every reference would resolve, nothing would throw, and Duke
+            //   would quietly be in New Hampshire forever.
+            if (!string.Equals(r[6], place.Name, StringComparison.Ordinal)
+                || !string.Equals(r[7], place.Subdivision, StringComparison.Ordinal))
+                throw new InvalidOperationException(
+                    $"{teamsCsvPath}: school '{r[1]}' says it is in '{r[6]}, {r[7]}' but its PlaceId {placeId} " +
+                    $"is '{place.Descriptor}'. The csv's City/State and the place must agree exactly; fix one " +
+                    "of the two rather than letting a school have two answers for where it is.");
+
             schools.Add(new WorldSchool(
-                Id: id, Name: r[1], Abbr: r[4], City: r[6], State: r[7], Color: r[10],
-                Lat: WorldCsvDouble(r[12], teamsCsvPath, $"school '{r[1]}' Lat"),
-                Long: WorldCsvDouble(r[13], teamsCsvPath, $"school '{r[1]}' Long"),
-                ConferenceId: confId, Division: "D1",
+                Id: id, Name: r[1], Abbr: r[4], Color: r[10],
+                PlaceId: placeId, ConferenceId: confId, Division: "D1",
                 CurrentPrestige: prestige, HistoricalPrestige: prestige));
         }
 
         return new WorldFile
         {
-            SchemaVersion = 1,
+            SchemaVersion = WorldSchemaVersion,
             Kind = "authored",
             EraLabel = "stock-d1",
             Division = "D1",
             WorldSeed = null,
             Tiers = WorldTierDefaults.Select(t => new WorldTier(t.Id, t.Floor, t.Equilibrium, t.Pullback)).ToList(),
             Conferences = conferences.OrderBy(c => c.Id).ToList(),
+            Places = places.OrderBy(p => p.PlaceId).ToList(),
             Schools = schools.OrderBy(s => s.Id).ToList(),
         };
     }
@@ -721,6 +966,30 @@ internal static partial class Program
             }
             writer.WriteEndArray();
 
+            // ★ S92 — places, sorted by placeId ascending. Coordinates go through the SAME
+            //   Utf8JsonWriter.WriteNumber(string, double) call the schools' lat/long used
+            //   since the world layer shipped: managed, culture-invariant,
+            //   shortest-round-trip, identical on Windows and Linux. No format string and no
+            //   custom decimal rendering — "round-trip-safe" does NOT pin bytes (1, 1.0 and
+            //   1E+00 all round-trip and all hash differently), and the fingerprint hashes
+            //   bytes. Negative zero is normalised upstream, at GeoCoordinate's factory.
+            writer.WriteStartArray("places");
+            foreach (var p in w.Places.OrderBy(p => p.PlaceId))
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("placeId", p.PlaceId);
+                writer.WriteString("name", p.Name);
+                writer.WriteString("subdivision", p.Subdivision);
+                writer.WriteString("country", p.Country);
+                writer.WriteNumber("lat", p.Coordinate.LatitudeDegrees);
+                writer.WriteNumber("long", p.Coordinate.LongitudeDegrees);
+                writer.WriteStartArray("tags");
+                foreach (var t in p.Tags) writer.WriteStringValue(t);
+                writer.WriteEndArray();
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+
             writer.WriteStartArray("schools");
             foreach (var s in w.Schools.OrderBy(s => s.Id))
             {
@@ -728,11 +997,8 @@ internal static partial class Program
                 writer.WriteNumber("id", s.Id);
                 writer.WriteString("name", s.Name);
                 writer.WriteString("abbr", s.Abbr);
-                writer.WriteString("city", s.City);
-                writer.WriteString("state", s.State);
                 writer.WriteString("color", s.Color);
-                writer.WriteNumber("lat", s.Lat);
-                writer.WriteNumber("long", s.Long);
+                writer.WriteNumber("placeId", s.PlaceId);
                 writer.WriteNumber("conferenceId", s.ConferenceId);
                 writer.WriteString("division", s.Division);
                 writer.WriteNumber("currentPrestige", s.CurrentPrestige);
@@ -761,7 +1027,7 @@ internal static partial class Program
         Console.WriteLine($"=== WORLD REPORT: {sourceLabel} ===");
         Console.WriteLine(
             $"kind {w.Kind} | era {w.EraLabel} | division {w.Division} | schools {n} | " +
-            $"conferences {w.Conferences.Count}" +
+            $"conferences {w.Conferences.Count} | places {w.Places.Count}" +
             (w.WorldSeed is not null ? $" | worldSeed {w.WorldSeed.Value}" : ""));
 
         Console.WriteLine();

@@ -1,3 +1,5 @@
+using Charm.Engine;
+
 namespace Charm.Harness;
 
 internal static partial class Program
@@ -36,10 +38,12 @@ internal static partial class Program
             // ── 1. Converter: the committed reference csvs -> a valid stock world. ──────
             var teamsCsv = Path.Combine(AppContext.BaseDirectory, "data", "teams.csv");
             var confCsv  = Path.Combine(AppContext.BaseDirectory, "data", "conf.csv");
-            var stock = ConvertWorld(teamsCsv, confCsv);
+            var placesCsv = Path.Combine(AppContext.BaseDirectory, "data", "places.csv");
+            var stock = ConvertWorld(teamsCsv, confCsv, placesCsv);
             ValidateWorld(stock);
             Check("stock world converts and validates", true);
             Check("stock school count 347", stock.Schools.Count == 347, $"got {stock.Schools.Count}");
+            Check("stock place count 310", stock.Places.Count == 310, $"got {stock.Places.Count}");
             Check("stock conference count 32", stock.Conferences.Count == 32, $"got {stock.Conferences.Count}");
             Check("every school division matches metadata (D1)",
                 stock.Division == "D1" && stock.Schools.All(s => s.Division == "D1"));
@@ -114,16 +118,25 @@ internal static partial class Program
     // conference, powerCount + lowCount schools. Callers then break it on purpose.
     private static WorldFile BuildSyntheticWorld(int powerCount, int lowCount, int powerPrestige, int lowPrestige)
     {
+        // ★ S92 — every school points at a place. The synthetic world used to put all of its
+        //   schools at lat 0, long 0; now they all share ONE place, which is legal (five
+        //   schools share Philadelphia in the real world) and keeps this fixture about
+        //   prestige, which is all it was ever testing.
+        var places = new List<WorldPlace>
+        {
+            new(1, "Synthetic City", "ST", "US", GeoCoordinate.Create(0.0, 0.0), Array.Empty<string>()),
+        };
         var schools = new List<WorldSchool>();
         for (var i = 0; i < powerCount; i++)
-            schools.Add(new WorldSchool(i + 1, $"Power {i + 1}", $"P{i + 1}", "City", "ST", "#000000",
-                0.0, 0.0, 1, "D1", powerPrestige, powerPrestige));
+            schools.Add(new WorldSchool(i + 1, $"Power {i + 1}", $"P{i + 1}", "#000000",
+                1, 1, "D1", powerPrestige, powerPrestige));
         for (var i = 0; i < lowCount; i++)
-            schools.Add(new WorldSchool(powerCount + i + 1, $"Low {i + 1}", $"L{i + 1}", "City", "ST", "#000000",
-                0.0, 0.0, 2, "D1", lowPrestige, lowPrestige));
+            schools.Add(new WorldSchool(powerCount + i + 1, $"Low {i + 1}", $"L{i + 1}", "#000000",
+                1, 2, "D1", lowPrestige, lowPrestige));
         return new WorldFile
         {
-            SchemaVersion = 1, Kind = "authored", EraLabel = "synthetic", Division = "D1", WorldSeed = null,
+            SchemaVersion = 2, Kind = "authored", EraLabel = "synthetic", Division = "D1", WorldSeed = null,
+            Places = places,
             Tiers = WorldTierDefaults.Select(t => new WorldTier(t.Id, t.Floor, t.Equilibrium, t.Pullback)).ToList(),
             Conferences = new List<WorldConference>
             {

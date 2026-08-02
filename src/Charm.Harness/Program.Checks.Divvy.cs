@@ -47,7 +47,8 @@ internal static partial class Program
             var tiny = LoadWorld(fixturePath);
             var stock = ConvertWorld(
                 Path.Combine(AppContext.BaseDirectory, "data", "teams.csv"),
-                Path.Combine(AppContext.BaseDirectory, "data", "conf.csv"));
+                Path.Combine(AppContext.BaseDirectory, "data", "conf.csv"),
+                Path.Combine(AppContext.BaseDirectory, "data", "places.csv"));
             const long seed = 20260702;
 
             // ── 1. Determinism: the divvy is a pure function of (world, seed). ─────────

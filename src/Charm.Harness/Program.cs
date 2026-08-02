@@ -84,6 +84,15 @@ internal static partial class Program
         // calendar must not be able to reach the season page (Phase 82 A10).
         if (args.Length > 0 && args[0] == "calendar") { RunCalendar(args); return 0; }
 
+        // dotnet run -- geography <world.json>  S92's printed map: every place with its
+        // jurisdiction, coordinate and tags; each school's nearest and furthest opponent;
+        // the longest trip inside each conference; the league's longest and shortest pairs;
+        // and the nearest campus to each authored event place. Returns before the validation
+        // suite and loads NO config: the map must not be able to reach the season page
+        // (Phase 83 A9). NOTHING CONSUMES THE MAP YET — no game is placed anywhere and there
+        // is no home-court advantage at the end of S92.
+        if (args.Length > 0 && args[0] == "geography") { return RunGeography(args); }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
@@ -263,6 +272,7 @@ internal static partial class Program
         ok &= Phase80IdentityCheck(configPath);                  // Phase 80 (S89: permanent identity + the history file — non-reuse across reload, type-surface enforcement, deterministic issuance, transport bijection, two-episode fixtures, domain guards, behavioural isolation with negative control, PoolId untouched, file lifecycle, legacy mode)
         ok &= Phase81GameLogCheck(configPath);                  // Phase 81 (S90: per-game retention — conservation from disk, the 26-man mutation bound with a real negative control, strict reader, writer state machine, roster round-trip including men who never played, v1->v2 migration through the production writer)
         ok &= Phase82CalendarCheck();                           // Phase 82 (S91: the calendar — proleptic Gregorian civil dates across 0001-9999 against independently-sourced weekdays, the exact leap rule, Selection Sunday and the ten D1 tournament dates as REFERENCE DATA, one continuous legal span from Nov 1 to championship Monday with a no-gaps walk and a negative control that rebuilds r3's gated version, overlapping periods, the three-way season lookup at both year edges, wall-clock and culture purity, renderer invariance). STANDALONE — no config, no world, no basketball.
+        ok &= Phase83GeographyCheck();                          // Phase 83 (S92: the map — places, great-circle miles against a golden table whose MODEL is pinned, the metric properties, schema v2 with canonical BYTES, hosting as an explicit tagged value, worldwide coordinate bounds, and a planar negative control that must FAIL the long trips). STANDALONE — no config and no basketball.
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

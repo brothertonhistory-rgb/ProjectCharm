@@ -8255,26 +8255,31 @@ exist yet, so nothing breaks by waiting.
 
 The first layer of the world-structure arc (`docs/world-structure-brief.md` is the arc's governing design record; this section is the as-built state). Pass 1 is **data + tooling + proof**: the era-file schema, the stock D1 world, the pyramid seeder, the integrity validator, and the distribution readout. No seasons, no dynamics, no engine change — everything lives in `src/Charm.Harness/Program.World.cs` with the Phase 53 suite block beside it.
 
-### The era-file schema (schemaVersion 1 — the first persistent schema)
+### The era-file schema (schemaVersion 2 — S92; **v1 is retired and refused by name**)
 
 A single JSON world file:
 
 - `metadata`: `kind` (`"authored"` | `"generated"`), `eraLabel`, `division`, and `worldSeed` — present **iff** generated (the reproducibility contract, brief rule 7).
 - `tiers`: exactly the four canonical objects (`power` / `highMid` / `lowMid` / `low`), each carrying `floor`, `equilibrium`, `pullbackIntensity`. **The floor is the only load-bearing number this pass** (the validator and seeder consume it); equilibrium and pullbackIntensity are carried as schema now so the Pass 3 dynamics need no migration. Placeholders: floors 40 / 20 / 8 / 0, equilibria 75 / 55 / 35 / 18, pullback 0.25 / 0.45 / 0.65 / 0.85 (intensity rising as tier falls, per the brief) — all burn-in-tunable.
 - `conferences`: `id`, `name`, `shortName`, `tierId`.
-- `schools`: `id` (internal, opaque — dynamics never read a name), `name`, `abbr`, `city`, `state`, `color`, `lat`, `long`, `conferenceId`, **`division` per school** (carried from day one; must match `metadata.division` in this single-division format), `currentPrestige`, `historicalPrestige` — both 0–99.
+- `places` (**S92**): `placeId`, `name`, `subdivision`, `country`, `lat`, `long`, `tags` — see the geography section for the identity, lifecycle and tag rules. Root key order is `schemaVersion, metadata, tiers, conferences, places, schools`, places sorted by `placeId` ascending.
+- `schools`: `id` (internal, opaque — dynamics never read a name), `name`, `abbr`, `color`, **`placeId`**, `conferenceId`, **`division` per school** (carried from day one; must match `metadata.division` in this single-division format), `currentPrestige`, `historicalPrestige` — both 0–99.
+
+★ **S92 — A SCHOOL HAS EXACTLY ONE ANSWER FOR WHERE IT IS.** v1 put `city`, `state`, `lat` and `long` on the school itself. All four are **gone**: a school now carries a `placeId` and nothing else locational. The reason is not tidiness — with both present, a school could read Durham NC while its place read Durham NH, every reference would still resolve, nothing would throw, and the map would be silently wrong forever. The v1 fields were free to remove because they had exactly two consumers in the whole tree, the converter that filled them and the writer that emitted them; **no check, no page and no season code ever read one**.
+
+There is **no migration code**, deliberately. `schemaVersion 1` is refused by name, from one guard called by both the parser and the validator, with the re-conversion command in the message. A silent upgrade path is how a stale world quietly keeps working for a year and then disagrees with its own fingerprint.
 
 The **reader** is the bench-reader standard: a strict tree-walk refusing unknown keys, duplicates, wrong types, and out-of-range values at every level, naming the exact school/conference/field. The **writer** is deterministic by construction: canonical tier order, conferences and schools by id, fixed property order, `\n` newlines, invariant numeric formatting — same inputs, byte-identical file.
 
-**★ S89 — the writer is now also the FINGERPRINT's projection.** `WriteWorld` was split: `CanonicalWorldBytes(WorldFile)` returns the canonical bytes and `WriteWorld` is a thin wrapper that writes them. The body is unchanged. This exists because a history file binds itself to a world by hashing exactly this form (`sha256-v1:<hex>`), and writing a *second* canonical serializer for the fingerprint would give the project two definitions of "the same world" that can drift apart silently — a world would then hash as changed while converting byte-identically, or the reverse, with no way to tell which one lied. One projection, two consumers. It is portable by construction: `Utf8JsonWriter`'s numeric formatting is culture-invariant and shortest-round-trip, managed code, identical on Windows and Linux, and nowhere near `Math.Pow` — so the S81.3 bit-portability trap does not apply and a fingerprint computed in a sandbox matches one computed on Emmett's machine. **The fingerprint hashes the PARSED model, never the file bytes**, so reformatting a world file by hand must not move it. (`stock-d1.world.json` happens to hash to the same value as its own projection today, `fa823da9…`, because the committed file was writer-produced. That is a coincidence, not a rule.)
+**★ S89 — the writer is now also the FINGERPRINT's projection.** `WriteWorld` was split: `CanonicalWorldBytes(WorldFile)` returns the canonical bytes and `WriteWorld` is a thin wrapper that writes them. The body is unchanged. This exists because a history file binds itself to a world by hashing exactly this form (`sha256-v1:<hex>`), and writing a *second* canonical serializer for the fingerprint would give the project two definitions of "the same world" that can drift apart silently — a world would then hash as changed while converting byte-identically, or the reverse, with no way to tell which one lied. One projection, two consumers. It is portable by construction: `Utf8JsonWriter`'s numeric formatting is culture-invariant and shortest-round-trip, managed code, identical on Windows and Linux, and nowhere near `Math.Pow` — so the S81.3 bit-portability trap does not apply and a fingerprint computed in a sandbox matches one computed on Emmett's machine. **The fingerprint hashes the PARSED model, never the file bytes**, so reformatting a world file by hand must not move it. (`stock-d1.world.json` happens to hash to the same value as its own projection, because the committed file is writer-produced. That is a coincidence, not a rule.) **★ S92 moved the world fingerprint** — `fa823da9…` → `9351889c…` — because the canonical bytes changed. This breaks the binding of any history file written before S92. It was ruled acceptable and is free today because no career exists outside this repo; it is permanently expensive the day one does.
 
 **Standing boundary rule (recorded, not yet exercised):** the world's prestige scale is 0–99; the roster generator's floor is 1. Any future pass feeding a school's prestige to generation treats 0 as 1 at that seam.
 
 **Historical prestige = current prestige everywhere in Pass 1** — the stock authored file and every generated world. A real-era file with authored national memory (historical above current for faded blue bloods) is a later authoring exercise over the same schema.
 
-### The reference data and the converter (`world convert`)
+### The reference data and the converter (`world convert <teams.csv> <conf.csv> <places.csv> <out.json>`)
 
-`data/teams.csv` (347 D1 schools) and `data/conf.csv` (32 conferences) are the committed reference inputs from Emmett's source game. Two traps, resolved at check-in and encoded in the converter: **`teams.csv`'s `Division` column is the intra-conference East/West split, not the NCAA division** — dropped, every school stamped `D1`; and **`conf.csv`'s 1–5 conference rating maps to the tiers** — 5 → power, 4 → highMid, 3 → lowMid, 1–2 → low ("Independent" rides as an ordinary low-tier conference, no special casing). The authored data proves the placeholder floors: per-tier prestige minimums are 45 / 21 / 8 / 0 against floors 40 / 20 / 8 / 0.
+`data/teams.csv` (347 D1 schools), `data/conf.csv` (32 conferences) and — **since S92** — `data/places.csv` (310 places) are the committed reference inputs. Two traps, resolved at check-in and encoded in the converter: **`teams.csv`'s `Division` column is the intra-conference East/West split, not the NCAA division** — dropped, every school stamped `D1`; and **`conf.csv`'s 1–5 conference rating maps to the tiers** — 5 → power, 4 → highMid, 3 → lowMid, 1–2 → low ("Independent" rides as an ordinary low-tier conference, no special casing). The authored data proves the placeholder floors: per-tier prestige minimums are 45 / 21 / 8 / 0 against floors 40 / 20 / 8 / 0.
 
 The converter parses with a **quote-aware csv reader** (never `string.Split(',')`), handles the files' leading count line and CRLF, trims every decoded field, verifies the exact expected header, and checks its row count against the csv's **own count line** — the 347 assert lives in Phase 53, not the tooling, so the converter stays count-agnostic. The stock output (`worlds/stock-d1.world.json`) carries the game's authored prestige **loaded as written**; its report shows a deviation from the target pyramid concentrated exactly where the target was deliberately thinned relative to this reference (20–39 band +9.3 points, <20 base −10.4) — reported, never corrected.
 
@@ -8291,6 +8296,8 @@ Mechanics, in the fixed RNG-consumption order that *is* the reproducibility cont
 3. **Assignment:** band values sorted ascending; each value goes to the unassigned school with the **lowest station whose conference floor permits it**. Floors are honored **by this construction, never a post-hoc clamp** (a clamp would silently distort the exact band counts). A value no school can take throws loudly — it means the validator missed an infeasibility.
 
 ### The validator (runs on every load, every command)
+
+★ **S92 — places are validated BEFORE schools**, because a school's location is a reference into that table and a dangling reference should only be reported as the school's problem once the table itself is known good. Place rules: `placeId` positive and unique; non-empty untrimmed name; `country` exactly two uppercase ASCII letters; `subdivision` empty or 1–3 uppercase alphanumerics; the coordinate constructed through `GeoCoordinate` so there is one definition of "a real point" in the codebase; `tags` from the fixed vocabulary, no duplicates, sorted ordinal; and `(name, subdivision, country)` unique across the file. Every school's `placeId` must resolve.
 
 Ordinary checks: unique school/conference ids, real conference/tier references, exactly the four canonical tiers, both prestige values 0–99, floor ≤ equilibrium, pullbackIntensity in (0, 1], worldSeed present iff generated, every school's division matching the metadata. **Member-below-floor:** any file — authored or generated — with a school under its conference's floor fails, naming school, value, conference, and floor (membership guarantees a minimum; a file starting below it is incoherent). **The special check (brief rule 6):** the target pyramid and the floors must be **simultaneously satisfiable** — cumulative per distinct floor descending, schools whose floor forces them to F+ must not exceed the pyramid slots in bands reaching F+; an infeasible file fails naming the binding conflict. Never a silent floor weakening, never a distorted pyramid.
 
@@ -9972,3 +9979,237 @@ the March window.
 
 And **1850 gets a correct 1850 calendar and a full March Madness bracket.** The calendar does
 not know the sport did not exist then, and should not.
+
+## Geography — the map (Session 92, 2026-08-02)
+
+Before this session every school carried a real latitude and longitude — they had since the world
+layer shipped — and **nothing in the tree computed anything with them**. There was no distance
+function anywhere. S92 builds the map: places, the distance between any two of them, and the fact
+of who is hosting. **Nothing consumes it yet.** No game is placed anywhere, no crowd is modelled,
+and there is **no home-court advantage** at the end of this session.
+
+### Why it came before home court and before the scheduler
+
+Emmett's ordering, and the reason is measurement rather than dependency: the season already plays
+a balanced 15 home / 15 away, which is the exact condition under which the real ~60% home win rate
+is measured, so home court dropped onto the *existing* schedule reads clean. Land the scheduler
+first and home court arrives on top of a brand-new schedule, and nobody can say which change moved
+the page. Order is **geography → home court → scheduler**.
+
+### The rulings
+
+- **R1 — A PLACE IS A CITY, NOT AN ARENA.** *"Not really concerned with arena names and things,
+  simply the location the game is in. If Duke plays Villanova in New York City, that's enough for
+  me, I don't need to know at what arena."* No venue records, no capacities, no names.
+- **R2 — TWO AUTHORED LISTS, maintained separately**: major contiguous-US cities with no campus that
+  might host tournament games, and a separate exotic preseason-tournament list. ★ **Two lists is a
+  DATA distinction only.** There is one kind of place and the distance math never reads the label —
+  otherwise there are two loaders to drift apart and the first Final Four in a dome gets
+  special-cased.
+- **★ R3 — HOSTING IS A SEPARATE FACT FROM LOCATION.** *"There should just be a flag of an actual
+  home court… If Villanova plays Drexel @ Drexel, that's different than a neutral site at a big
+  Philly arena."* Two independent facts: **where** the game is, which is what travel and crowd reach
+  read off, and **whose gym** it is — a school, or nobody.
+- **R4 — THE CROWD IS PRESTIGE AND DISTANCE. THERE IS NO CITY SIZE.** *"It is purely about who is
+  playing, what their prestige is, how far away the venue is from home campus… A small town college
+  can have an incredible homecourt advantage."* Population, market size and arena capacity are ruled
+  out **by name**, so a place has no population field and must never grow one. Both surviving inputs
+  already exist on every school.
+- **R5 — MILES.**
+- **R6 / R7 — recorded here, built next.** The home-court effect ships FLAT, inheriting the
+  experience/cohesion axis later rather than waiting for it; and it lands on the TEAM, uniformly,
+  with an emergent magnitude — *"it's the odds of everyone goes down the same on the road, but if
+  you have a team full of freshman, it brings it down more."* One number on all five, its SIZE built
+  from the five on the floor. That is what keeps the eventual crowd number off the no-scalar wall.
+
+### ★ R3's consequence: a neutral site stops being a category
+
+Schools sharing a place no longer implies shared home advantage, so the five Philadelphia schools on
+one point cost nothing. A neutral site is simply **a game nobody hosts** — identical machinery in
+Kansas City, in Lahaina, and in a city where four schools live. Drexel hosting in Philadelphia,
+Saint Joseph's hosting in Philadelphia, and a neutral game in Philadelphia are three values of the
+same shape.
+
+`GameHost` is an explicit tagged value — `Nobody` or `School(id)` — and **`Nobody` is a named case,
+never a null standing in for absence**: "nobody hosts this" and "we have not worked out who hosts
+this" are different facts, and one silently standing in for the other is what surfaces as a wrong
+home-court call years into a career. `GameSite` pairs a `PlaceId` with a host.
+
+**World-level rule:** if a school hosts, the game is at that school's own place. It lives in the
+harness rather than on the value, because a pure value cannot resolve a school. ★ **Stated
+limitation, not a bug:** this makes a *displaced* home game unrepresentable — a team hosting in a
+downtown arena one city over, or Hawaii hosting the Diamond Head Classic. At city-level precision
+most of those collapse harmlessly. If displaced home games are ever wanted, that is a ruling.
+
+**S92 defines all of this and nothing uses it.** No game record gains a field; the scheduler owns
+that.
+
+### The distance function (`GeoDistance`, engine)
+
+Great-circle on a **spherical** earth, **haversine** form, **mean radius 3958.7613 miles**. The
+constant and the form together are half the definition of every mileage the game will ever print;
+both are pinned.
+
+- **Haversine, not the law of cosines**, because the law of cosines loses most of its precision on
+  short distances and short distances are nearly the whole league — two schools in Philadelphia is
+  the normal case, not the exotic one.
+- **The intermediate is clamped to [0,1] before the root.** Floating arithmetic can push it a hair
+  above one near antipodal points, and the arcsine of 1.0000000000001 is NaN — a distance that
+  silently poisons every average it lands in.
+- **Equal coordinates return exactly 0.0**, by construction rather than a special case.
+- ★ **The reverse is NOT promised.** Two *different* coordinates may also return 0.0 if the
+  difference underflows. That is a property of doubles, and pretending otherwise would mean storing
+  integer microdegrees for no benefit anyone can see on a basketball page. Two distinct places at the
+  same coordinate being zero miles apart is the *intended* behaviour — it is how shared places work.
+
+**The dependency direction is the point.** The engine owns coordinate mathematics and never learns
+about csvs, place ids or schools; the world layer owns authored places and calls in. Nothing in the
+engine file reads a wall clock, a culture default or a config.
+
+`GeoCoordinate` is **validated at construction** — no NaN, no infinity, latitude in [-90,90],
+longitude in [-180,180], no implicit longitude wrapping — so the distance function re-validates
+nothing and loaders do not each grow their own half-checks. `default(GeoCoordinate)` is (0,0), a real
+point in the Gulf of Guinea, so the guarantee survives the implicit parameterless constructor C#
+gives every struct. **Negative zero is normalised at that one door**, because the fingerprint hashes
+bytes and `-0.0` serialises as `-0` while `+0.0` serialises as `0`: the same world must not hash two
+ways because someone typed a minus sign in front of a zero.
+
+### Place identity and lifecycle — the part that becomes unfixable later
+
+★ **`PlaceId` IS the identity.** `(name, subdivision, country)` is a **uniqueness constraint inside
+one world file**, not a second identity. Correcting a spelling or adding a diacritic must not create
+a new place, because every school — and every future schedule and retained game — joins through the
+id.
+
+★ **The id is AUTHORED, never generated.** It is stored on every school and hashed into the world
+fingerprint, so a generation rule would mean that inserting an alphabetically earlier row renumbers
+the world. **Lifecycle:** a new place takes a new unused id; a deleted place's id is never reused;
+ids are never compacted; sorting the csv never changes one. Holes are permanent and cost nothing.
+
+★ **`country` is ISO 3166-1 alpha-2, strictly**, so territories take their own codes rather than
+being filed under `US` — Puerto Rico is `PR`, the U.S. Virgin Islands are `VI`, the Cayman Islands
+are `KY`. Claiming ISO semantics while using a different hierarchy would give two serialisations of
+the same place and therefore two fingerprints. `subdivision` is an optional **local** code under the
+same string rules, and is deliberately **not** called "region": which part of the country a school
+recruits from is a different concept and a different build. Because the Cayman code sits next to
+Kentucky in this very league, the printed map always shows country and subdivision distinctly.
+
+★ **`tags` is authored data that NOTHING reads** — no distance, no predicate, no branch. It exists
+only so R2's two hand-maintained lists stay separately maintainable and a future scheduler can ask
+for the exotic places. Wire form is a canonical string array: fixed vocabulary (`domestic`,
+`exotic`), no duplicates, sorted ordinal — all three rules exist because the array's bytes are hashed,
+so `["exotic","domestic"]` would be the same place with a different fingerprint. There is deliberately
+no `both` word; two tags is two tags. **Campus-ness is NOT stored**: a place has a campus iff some
+school points at it.
+
+### `data/places.csv` — one authoritative table, and the collapse rule that is an AUTHORING rule
+
+310 places: 293 campus cities plus R2's two lists (nine domestic host cities, eight exotic). It is
+the **full** table, not a supplement, so conversion never recomputes city grouping, ids never shift,
+and school coordinates cannot drift from place coordinates.
+
+★ **The collapse rule ran ONCE, by hand, into this file, and is never executed at load.** The
+converter must not decide that two schools share a place because their city and state strings happen
+to match — otherwise `St. Louis` versus `Saint Louis`, or one diacritic, silently splits or merges a
+place and moves permanent ids. The rule as applied: where schools in one `(city, state)` disagreed on
+coordinates, the place took **the coordinate of the lowest school id in that city**. Five cities
+disagreed (Durham NC, Houston, Jacksonville FL, Winston-Salem, Seattle) and **no school moved more
+than 1.38 miles** from where it sat before.
+
+★ **A resolving id is not sufficient.** `teams.csv` keeps `City` and `State` as human-readable
+authoring columns, and the converter **verifies they agree exactly with the resolved place and
+refuses a disagreement by name**. Without that check a school could read the right city in the column
+a person edits while its id pointed somewhere else, and nothing would ever complain.
+
+### Coordinate serialisation — the MECHANISM is pinned, not a format description
+
+"Round-trip-safe" does not determine bytes: `1`, `1.0` and `1E+00` all round-trip and all hash
+differently, and the fingerprint hashes bytes. So coordinates are written through the **existing**
+`Utf8JsonWriter.WriteNumber(string, double)` path the schools' `lat`/`long` used since the world layer
+shipped — the same call that produces today's stable fingerprint. No custom decimal formatting, no
+format string. NaN and infinity are refused at load; negative zero is normalised upstream.
+
+`worlds/fixture-format.world.json` exists to pin the **rule** rather than the values: its places carry
+an integer-valued coordinate (`45`), a short decimal (`-33.86`), a value needing seventeen significant
+digits, one that emits in exponent notation (`1E-07`), and a normalised zero. "A second write is
+byte-identical" only proves self-consistency; the golden is what pins the rule, and Phase 83 compares
+**bytes**, never decoded object equality.
+
+### `dotnet run -- geography <world.json>` — the printed map
+
+Its own command, returning before the validation suite and loading no config, the S91 pattern: the
+season page must stay byte-identical and the cheapest way to guarantee that is for the map to have no
+way to reach it. It prints every place in `placeId` order with jurisdiction, coordinate, campus count
+and tags; each school's nearest and furthest opponent; the longest trip inside each conference; the
+league's longest and shortest pairs with mean and median; and the nearest campus to each authored
+event place.
+
+★ **"Opponent" means every other school in the world file** — the scheduler is out of scope, so no
+other meaning is available. ★ **Zero-mile shared-place pairs are INCLUDED in the shortest**: that a
+Philadelphia pair reads zero is useful confirmation that shared places work, not a degenerate result
+to filter out. Ordering is deterministic throughout (pairs normalised lower id first, conferences by
+id, invariant formatting, literal `\n` newlines) so the page is byte-identical on Windows and Linux.
+
+### What the map says about this league (page-only, never asserted)
+
+Longest pair Hawaii ↔ Maine, 5,151.9 miles. Longest trip inside a conference: the WAC's Hawaii ↔
+Louisiana Tech at 4,030.3, against the Ivy League's worst at 294.9. Mean school-to-school 981.8,
+median 794.0 over 60,031 pairs, with **82 pairs at exactly zero** because those schools share a city.
+
+### The three invariants that would have passed while the semantics were wrong
+
+This is the part worth carrying forward, because each one is a check that looks thorough and proves
+nothing.
+
+1. **A distance function tested only on nearby American cities passes with flat-earth arithmetic** —
+   two points 200 miles apart differ by under 1% between planar and great-circle. So the golden table
+   is dominated by long and exotic pairs, and the negative control **builds the planar formula and
+   requires it to fail**, reporting by how much. ★ Scoped to the long rows by name: on Duke ↔ North
+   Carolina Central the two formulas agree to ten decimal places and always will.
+2. **A place table passes every structural test while the authored entries are silently dropped**,
+   because 293 of the 310 places come from schools and every school still resolves. So all seventeen
+   authored places are asserted individually, **by name**.
+3. **A golden mileage table sourced from an online calculator fails for the right-looking reason** —
+   the implementation is correct and the table is ellipsoidal, which differs by up to ~0.5%, twenty-plus
+   miles on a Hawaii–Maine pair. So the golden pins the **model**: spherical haversine, radius
+   3958.7613, computed outside .NET from the exact serialized coordinates. Every row records its
+   method and its tolerance.
+
+### ★ The tolerance is evidenced, not asserted — and one place where the ordering does not hold
+
+`Math.Sin`/`Cos`/`Asin` are not bit-portable between Windows and Linux, so Phase 83 measures three
+numbers at run time and requires them to order:
+
+```
+platform variance 1.09E-011 mi  <<  tolerance 1.00E-006 mi  <<  wrong-formula error 10.1 mi
+```
+
+The left number is **measured, not remembered**: the check perturbs every library trig call the
+formula makes by 4 ULP in every combination across the golden table and takes the worst movement.
+Four is generous — both runtimes document under one. The right number is the *smallest* error the
+planar control produces on a discriminating row. Six orders of headroom below, seven above. A
+tolerance that cannot be shown to sit between the two is tuning until green.
+
+★ **Near-antipodal is the exception, and it is why that probe asserts PROPERTIES and never a
+mileage.** As two points approach opposite sides of the earth the haversine intermediate approaches
+1, where the arcsine's slope goes to infinity: a single last-bit wobble moves the answer 1.7E-004
+miles, a hundred and seventy times the tolerance. A golden number there would go red on a different
+machine with nothing wrong in the engine. The probe proves the clamp holds and the answer stays
+finite and never exceeds half the way round, which is all it was ever there to prove.
+
+### The tiny fixture is authored to DISCRIMINATE, and its school count is load-bearing
+
+`fixture-tiny.world.json` now carries two schools sharing one place, two places sharing a name kept
+apart by jurisdiction, a place with no school, and a long-distance pair. ★ **All of it was authored by
+re-pointing existing schools' places, never by adding or removing a school**: school count drives the
+talent pool, so a twenty-first school would move every season number in three downstream phases.
+Coordinates are inert to basketball, so moving one costs nothing.
+
+`fixture-v1-retired.world.json` is a retained schemaVersion 1 world kept for exactly one purpose — to
+prove the refusal fires and names itself. **Migrating it is the same as deleting the check.**
+
+### What this session does not prove
+
+Nothing consumes the map, so nothing proves it is *usable*. Home court is next and the scheduler after;
+both are expected to produce findings. A place has no size, and the crowd model that eventually reads
+this map will not have one (R4). Displaced home games are unrepresentable by design, pending a ruling.

@@ -1,0 +1,137 @@
+{
+  "note": "S92 golden distance table. THE MODEL IS PINNED, not just the numbers: an ellipsoidal geodesic differs from spherical haversine by up to ~0.5% — twenty-plus miles on a Hawaii-Maine pair — so a table taken from an online calculator would fail a CORRECT implementation for the right-looking reason. Rows flagged discriminatesModel are the long and exotic ones; a planar approximation must fail every one of them, and cannot be told apart from great-circle on the short American pairs.",
+  "rows": [
+    {
+      "label": "Honolulu HI <-> Orono ME",
+      "lat1": 21.31,
+      "long1": -157.83,
+      "lat2": 44.89,
+      "long2": -68.67,
+      "expectedMiles": 5151.911068777722,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": true
+    },
+    {
+      "label": "George Town KY <-> Spokane WA",
+      "lat1": 19.2869,
+      "long1": -81.3674,
+      "lat2": 47.67,
+      "long2": -117.41,
+      "expectedMiles": 2812.183498822162,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": true
+    },
+    {
+      "label": "Lahaina HI <-> Nassau BS",
+      "lat1": 20.8783,
+      "long1": -156.6825,
+      "lat2": 25.0782,
+      "long2": -77.3383,
+      "expectedMiles": 4980.890280354221,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": true
+    },
+    {
+      "label": "Anchorage AK <-> San Juan PR",
+      "lat1": 61.2181,
+      "long1": -149.9003,
+      "lat2": 18.4655,
+      "long2": -66.1057,
+      "expectedMiles": 4899.7672972063665,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": true
+    },
+    {
+      "label": "Anchorage AK <-> Charlotte Amalie VI",
+      "lat1": 61.2181,
+      "long1": -149.9003,
+      "lat2": 18.3419,
+      "long2": -64.9307,
+      "expectedMiles": 4946.112594667062,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": true
+    },
+    {
+      "label": "Montego Bay JM <-> Spokane WA",
+      "lat1": 18.4762,
+      "long1": -77.8939,
+      "lat2": 47.67,
+      "long2": -117.41,
+      "expectedMiles": 2996.2047526883903,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": true
+    },
+    {
+      "label": "Cancun MX <-> Orono ME",
+      "lat1": 21.1619,
+      "long1": -86.8515,
+      "lat2": 44.89,
+      "long2": -68.67,
+      "expectedMiles": 1938.5623177104137,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": true
+    },
+    {
+      "label": "Lahaina HI <-> Honolulu HI",
+      "lat1": 20.8783,
+      "long1": -156.6825,
+      "lat2": 21.31,
+      "long2": -157.83,
+      "expectedMiles": 79.75877007718259,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": false
+    },
+    {
+      "label": "Phoenix AZ <-> Oklahoma City OK",
+      "lat1": 33.4484,
+      "long1": -112.074,
+      "lat2": 35.4676,
+      "long2": -97.5164,
+      "expectedMiles": 840.1949835967041,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": false
+    },
+    {
+      "label": "Uncasville CT <-> Hartford CT",
+      "lat1": 41.439,
+      "long1": -72.0904,
+      "lat2": 41.7637,
+      "long2": -72.6851,
+      "expectedMiles": 38.04476828945003,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": false
+    },
+    {
+      "label": "Durham NC <-> Chapel Hill NC",
+      "lat1": 35.99,
+      "long1": -78.91,
+      "lat2": 35.93,
+      "long2": -79.04,
+      "expectedMiles": 8.369266127194779,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": false
+    },
+    {
+      "label": "Philadelphia PA <-> Philadelphia PA",
+      "lat1": 40,
+      "long1": -75.14,
+      "lat2": 40,
+      "long2": -75.14,
+      "expectedMiles": 0.0,
+      "method": "spherical haversine, mean radius 3958.7613 mi, computed in Python 3 (math.sin/cos/asin) from the exact serialized world-file coordinates — an independent IMPLEMENTATION of the same model, not an online calculator",
+      "toleranceMiles": 1e-06,
+      "discriminatesModel": false
+    }
+  ]
+}

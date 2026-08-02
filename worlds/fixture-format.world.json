@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 2,
+  "metadata": {
+    "kind": "authored",
+    "eraLabel": "fixture-format",
+    "division": "D1"
+  },
+  "tiers": [
+    {
+      "id": "power",
+      "floor": 40,
+      "equilibrium": 75,
+      "pullbackIntensity": 0.25
+    },
+    {
+      "id": "highMid",
+      "floor": 20,
+      "equilibrium": 55,
+      "pullbackIntensity": 0.45
+    },
+    {
+      "id": "lowMid",
+      "floor": 8,
+      "equilibrium": 35,
+      "pullbackIntensity": 0.65
+    },
+    {
+      "id": "low",
+      "floor": 0,
+      "equilibrium": 18,
+      "pullbackIntensity": 0.85
+    }
+  ],
+  "conferences": [
+    {
+      "id": 1,
+      "name": "Format Conference",
+      "shortName": "Format",
+      "tierId": "low"
+    }
+  ],
+  "places": [
+    {
+      "placeId": 1,
+      "name": "Integer Coordinate",
+      "subdivision": "",
+      "country": "XX",
+      "lat": 45,
+      "long": -120,
+      "tags": []
+    },
+    {
+      "placeId": 2,
+      "name": "Short Decimal",
+      "subdivision": "",
+      "country": "XX",
+      "lat": -33.86,
+      "long": 151.21,
+      "tags": []
+    },
+    {
+      "placeId": 3,
+      "name": "Many Significant Digits",
+      "subdivision": "",
+      "country": "XX",
+      "lat": 12.345678901234567,
+      "long": -98.76543210987654,
+      "tags": []
+    },
+    {
+      "placeId": 4,
+      "name": "Exponent Notation",
+      "subdivision": "",
+      "country": "XX",
+      "lat": 1E-07,
+      "long": -1.5E-07,
+      "tags": []
+    },
+    {
+      "placeId": 5,
+      "name": "Normalised Zero",
+      "subdivision": "",
+      "country": "XX",
+      "lat": 0,
+      "long": 0,
+      "tags": []
+    },
+    {
+      "placeId": 6,
+      "name": "Two Tags",
+      "subdivision": "",
+      "country": "XX",
+      "lat": 90,
+      "long": 180,
+      "tags": [
+        "domestic",
+        "exotic"
+      ]
+    }
+  ],
+  "schools": [
+    {
+      "id": 1,
+      "name": "Format U",
+      "abbr": "FMT",
+      "color": "#000000",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 5,
+      "historicalPrestige": 5
+    }
+  ]
+}

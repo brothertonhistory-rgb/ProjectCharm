@@ -35,6 +35,42 @@
     <None Include="..\..\worlds\fixture-tiny.world.json" Link="worlds\fixture-tiny.world.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- S92 — the stock world itself, so Phase 83 can compare the COMMITTED BYTES against
+         what the converter and the canonical writer produce. Phase 53 has always rebuilt
+         this world from the csvs in memory; that proves the converter agrees with itself
+         and says nothing about whether the file on disk is still the same world. -->
+    <None Include="..\..\worlds\stock-d1.world.json" Link="worlds\stock-d1.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- S92 — the authored place table. ONE authoritative file: every campus city plus
+         both of R2's hand-maintained lists, each with its permanent PlaceId. The collapse
+         rule ran ONCE, by hand, into this file and is never executed at load. -->
+    <None Include="..\..\data\places.csv" Link="data\places.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- S92 — a retained schemaVersion 1 world, kept for exactly one purpose: to prove that
+         the v1 refusal fires and names itself. Do NOT migrate this file; migrating it is
+         the same as deleting the check. -->
+    <None Include="..\..\worlds\fixture-v1-retired.world.json" Link="worlds\fixture-v1-retired.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- S92 — the canonical-BYTES golden. Its places carry the values that expose a
+         formatting rule: an integer-valued coordinate, a short decimal, a value needing many
+         significant digits, one that emits in exponent notation, and a normalised zero.
+         "A second write is byte-identical" only proves self-consistency; THIS file is what
+         pins the rule. -->
+    <None Include="..\..\worlds\fixture-format.world.json" Link="worlds\fixture-format.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <!-- S92 — the distance golden. Expected miles are computed OUTSIDE .NET from the exact
+         serialized coordinates using the spherical haversine form and the exact radius
+         3958.7613: an independent IMPLEMENTATION OF THE SAME MODEL, which is the only kind
+         of independence that means anything here. An online calculator is NOT an acceptable
+         source — ellipsoidal geodesics differ by up to ~0.5%, twenty-plus miles on the long
+         pairs, and would fail a correct implementation for the right-looking reason. -->
+    <None Include="..\..\tools\geo_distance_golden.json" Link="tools\geo_distance_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

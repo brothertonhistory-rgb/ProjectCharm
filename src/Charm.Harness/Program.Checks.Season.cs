@@ -52,7 +52,8 @@ internal static partial class Program
             var tiny = LoadWorld(fixturePath);
             var stock = ConvertWorld(
                 Path.Combine(AppContext.BaseDirectory, "data", "teams.csv"),
-                Path.Combine(AppContext.BaseDirectory, "data", "conf.csv"));
+                Path.Combine(AppContext.BaseDirectory, "data", "conf.csv"),
+                Path.Combine(AppContext.BaseDirectory, "data", "places.csv"));
             const long seed = 20260703;   // Session 30's fixed seed (Phase 54 used 20260702)
 
             // Oracle exports (tools/schedule_oracle.py, fixed seed 20260703):
@@ -167,8 +168,9 @@ internal static partial class Program
                 var moved = movedIdx.ToHashSet();
                 return new WorldFile
                 {
-                    SchemaVersion = 1, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
+                    SchemaVersion = 2, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
                     Division = tiny.Division, WorldSeed = tiny.WorldSeed, Tiers = tiny.Tiers,
+                    Places = tiny.Places,
                     Conferences = tiny.Conferences
                         .Append(new WorldConference(999, "Lonely", "LON", lowTier)).ToList(),
                     Schools = tiny.Schools
