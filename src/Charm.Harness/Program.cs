@@ -76,6 +76,14 @@ internal static partial class Program
         // in-memory). configPath is the engine config.json (for the games).
         if (args.Length > 0 && args[0] == "season") { RunSeason(configPath, args); return 0; }
 
+        // dotnet run -- calendar [year ...]  S91's printed year: a complete civil year with
+        // correct weekdays and leap years, the season boundaries marked, Selection Sunday and
+        // championship day named. With no arguments it prints the five years the design asks
+        // for — a recent year, a leap year, 1900 (century, not leap), 2000 (century, leap) and
+        // 1850. Returns before the validation suite and loads NO config and NO world: the
+        // calendar must not be able to reach the season page (Phase 82 A10).
+        if (args.Length > 0 && args[0] == "calendar") { RunCalendar(args); return 0; }
+
         var cfg = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
         var cfgC = RollCConfig.Load(configPath);
@@ -254,6 +262,7 @@ internal static partial class Program
         ok &= Phase79TransitionDefenseCheck(configPath);         // Phase 79 (S88: who got back — the per-man transition-defence model; oracle parity, block credit/rate pairing, slot-number pairing, negative control, config guards). REGISTERED AT S89.1: S88 shipped this file but never wired it into the runner, so it had never executed once.
         ok &= Phase80IdentityCheck(configPath);                  // Phase 80 (S89: permanent identity + the history file — non-reuse across reload, type-surface enforcement, deterministic issuance, transport bijection, two-episode fixtures, domain guards, behavioural isolation with negative control, PoolId untouched, file lifecycle, legacy mode)
         ok &= Phase81GameLogCheck(configPath);                  // Phase 81 (S90: per-game retention — conservation from disk, the 26-man mutation bound with a real negative control, strict reader, writer state machine, roster round-trip including men who never played, v1->v2 migration through the production writer)
+        ok &= Phase82CalendarCheck();                           // Phase 82 (S91: the calendar — proleptic Gregorian civil dates across 0001-9999 against independently-sourced weekdays, the exact leap rule, Selection Sunday and the ten D1 tournament dates as REFERENCE DATA, one continuous legal span from Nov 1 to championship Monday with a no-gaps walk and a negative control that rebuilds r3's gated version, overlapping periods, the three-way season lookup at both year edges, wall-clock and culture purity, renderer invariance). STANDALONE — no config, no world, no basketball.
 
         ObservationRunV1(configPath);
         StressTestArchetypeRosters(configPath);

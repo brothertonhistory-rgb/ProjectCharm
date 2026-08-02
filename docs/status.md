@@ -10,7 +10,25 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 90** (2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 81 PASS at
+Last updated: **Session 91** (2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 82 PASS at
+53 assertions, and the full 5,205-game season page byte-identical to its pre-S91 self, fingerprint `93d8c853…`.
+**THE ENGINE NOW KNOWS WHAT DAY IT IS.** Any year 0001–9999 with correct weekdays and leap years from one code
+path, nothing authored and nothing shipped as data, plus the season spine: November 1 as a FLOOR, Selection
+Sunday as the third Sunday in March, and the ten D1 tournament dates derived from that single anchor. ★ THE
+RULING THAT SURVIVED THREE PROMPT REVISIONS: legality is ONE CONTINUOUS SPAN, Nov 1 through championship
+Monday, every day inside it legal — the ten D1 dates are REFERENCE DATA that permit and forbid nothing, and
+Selection Sunday is a legal playing day. r1 made a date intrinsically "conference tournament"; r2/r3 made D1's
+bracket the definition of when basketball is legal; both are one competition's schedule mistaken for a property
+of the date. NO GAMES ARE PLACED ON IT — the scheduler is its own session. Opens **O-75** (the observation run
+and stress test cannot fail the suite: both are `void` and wired in after the verdict is computed) and **O-76**
+(no way to run the checks without simming 5,000 games). ★ ONE CHECK-IN FINDING WAS WRONG IN THE DIRECTION OF
+CORRECTING THE PROMPT: Claude reported "the stock world has ZERO independents; the prompt's claim is false."
+There are **14**, modelled as a conference named `Independent` — Claude tested for an empty conference field
+instead of reading conference names, and the word was in plain text on the season page it had already read. The
+prompt's reasoning was still a non-sequitur, so the claim was true for a reason its author had not given and
+the correction was false for a reason Claude had not checked.)
+
+*(Previous board entry, S90 — 2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 81 PASS at
 41 assertions, season page byte-identical with zero new lines. **Closes O-31**: per-game retention, forever,
 at full detail. Ships history schema v2 and folds the offensive foul into the season record (the printed
 column stays O-67). Opens **O-74** (hierarchy rank is a constant 5 league-wide). ★ THREE CLAIMS THAT FOUR
@@ -20,7 +38,7 @@ check can only live at the writer, never the reader; and the "compact JSON is 5�
 justified a custom binary format is wrong by most of an order of magnitude — measured, it is a wash, and the
 format now stands on exact size arithmetic and index-target predictability instead. A fourth, "the measured
 105,830 rows", was a seat-occupancy count presented as a row count; the true count was measured at the end
-and happens to be exactly 105,830, so the bound was tight and the claim was still wrong when it was made.)
+and happens to be exactly 105,830, so the bound was tight and the claim was still wrong when it was made.))
 
 *(Previous board entry, S90 chores commit — 2026-08-02; DOCUMENTATION ONLY, no source changed. Closes **O-71**: S88's transition-defence subsystem finally has a journal entry and a design section, backfilled from the locked oracle, the source headers and Phase 79. The eight rulings survive verbatim because S88 wrote them into the oracle header; the design conversation does not survive and was not reconstructed. Opens **O-72** (class year is generated and dropped before the season) and **O-73** (the development ceiling — latent card, runway, arrival — is computed for all 4,511 men every world build and discarded one line before the season sees it; Emmett ruled it out of the S90 archive as not-history, which settles retention but not the engine gap). ★ ONE CHORE ON THE S90 PROMPT WAS PHANTOM: an "O-number renumber" rode through four prompt revisions unverified and does not exist — there are no duplicate O-numbers and O-25 is simply a number never assigned. The real collision in the record was S88's PHASE number, fixed at S89.1. A chore claim inherited across revisions got none of the source audit every code claim around it received.)
 
@@ -89,6 +107,20 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S91 — THE CALENDAR: THE ENGINE HAS A CLOCK.** Before this, a season was 5,205 games in an arbitrary
+  order and no game had a date. Now any year from 0001 to 9999 comes out with correct weekdays and correct
+  leap years from one code path — **nothing authored, nothing shipped as data**, so a custom world starting
+  in 1850 gets the real 1850 calendar (R1). Proleptic Gregorian, named as a convention rather than assumed.
+  On top of it sits the season spine, all of it derived from two anchors: **November 1 is a FLOOR, not a
+  start line**, and Selection Sunday is the third Sunday in March, from which the two Thu–Sun weekends, the
+  Final Four Saturday and the championship Monday at +22 all follow — verified across all 9,998 supported
+  seasons with zero weekday violations. **Legality is ONE CONTINUOUS SPAN** and season membership is the
+  same span under one name; the ten D1 dates are reference data that gate nothing, because the NIT, D2, D3
+  and JUCO play the days D1 rests. Periods overlap by construction (R9) and none is registered. Phase 82,
+  53 assertions, three negative controls including a rebuild of the rejected gated-legality design. **No
+  games are placed on it** — the scheduler is its own session, deliberately, because a calendar built
+  alongside a scheduler bends around whatever the scheduler needed that day.
 
 - **★ O-31 CLOSED — EVERY GAME EVERY MAN PLAYS IS RETAINED, FOREVER (S90).** A career bound to a history
   file now writes one permanent log per season: a roster section (name, school, seat, position, archetype,
@@ -308,6 +340,20 @@ be run against a league with a real rotation, though the minute VALUES remain pl
 chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
+
+- **O-75 — ★ THE OBSERVATION RUN AND THE STRESS TEST CANNOT FAIL THE SUITE (defect, opened S91).**
+  Both are `void`, both print their own PASSED/FAILED line, and both are called **after** `ok` has already
+  been computed in `Program.cs`. So the suite can print `STRESS TEST FAILED` and then, eighty lines later,
+  `ALL CHECKS PASSED.` and mean it. The observation run also prints its own `ALL CHECKS PASSED` mid-file,
+  where it reads like the verdict. This is not a preference — it is a red line that does not mean anything,
+  in a project where Emmett cannot audit the C# and is relying on it. Wiring the two verdicts into the real
+  one is small; whether either SHOULD be able to fail the suite is the question to rule first.
+- **O-76 — THERE IS NO WAY TO RUN THE CHECKS WITHOUT SIMMING 5,000 GAMES (opened S91).**
+  Every suite run pays for the 1,000-game observation corpus and the 4,000-game stress test whether or not
+  the session touches basketball. Measured at S91: 225s with them, 189s without — 36 seconds, but **770 of
+  3,639 output lines**, and the noise is the larger cost when the thing being read is a 53-line phase block.
+  A checks-only switch. Belongs with O-75; found because Emmett asked why a calendar test was simming
+  4,000 games.
 
 - **O-74 — NOTHING SETS HIERARCHY RANK; EVERY PLAYER IN THE LEAGUE IS A 5 (opened S90).**
   `GenMapToPlayer` leaves it at its default and no other path assigns it, so the offensive pecking order the
@@ -1014,7 +1060,38 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**NONE SELECTED.** S90 gave a career a permanent archive and opened O-74.
+**NONE SELECTED.** S91 built the clock and opened O-75, O-76.
+
+**★ THE SCHEDULER IS THE NATURAL S92, and S91 was built to be found wanting by it.** The calendar answers
+"what day is it" and deliberately answers nothing else: no game is placed on it, no team is active or idle,
+no date is "conference". S92 is the first session that discovers whether the calendar is *usable*, which is
+the only real test of it, and findings are expected rather than feared. Four things it inherits and should
+not re-derive: the window is **157–164 days** from Nov 1 to the championship and **135–142** to Selection
+Sunday (reported by Phase 82, asserted nowhere — whether 30 games and a bracket FIT is S92's question, and
+the current 30-game season is loose inside it); **conference tournaments are staggered** (R7) and the only
+shared constraint is that all finish before Selection Sunday; **conference weekday habits (R8) are scheduler
+data** and the calendar stores none; and **the stock world has 14 independent schools**, modelled as a
+conference named `Independent`, which have no conference tournament and sit idle through the March window.
+The r1 conference-size measurement (leagues run 8 to 16, no six-team league) belongs to this prompt, not to
+S91's — it is regular-season structure, and tournament width depends on bracket format, byes, venues and
+rest.
+
+**★ O-75/O-76 (the suite's tail) is the cheap alternative and would take under an hour.** A red line that
+cannot go red is worse than a missing check, because it is trusted. It pairs naturally with the checks-only
+switch, and Emmett named the whole thing by asking a question about run time.
+
+**★ THE ARCHIVE STILL HAS NO READER.** S90 shipped no indexing, no querying, no career stitching and no
+presentation — its job was to guarantee the data exists and cannot be lost. Every number a player card needs
+is on disk and nothing can read it back across seasons. That session owns the person index (finding one man's
+career today means scanning every row of every season file) and what a finished card actually shows.
+
+**★ O-73 (the discarded ceiling) is an ENGINE question, not a storage one.** Emmett ruled the ceiling out of
+the archive, which settles retention and settles nothing else: the generator computes latent, runway and
+arrival for all 4,511 men every world build and the season never receives any of it, so no development layer
+can be built until that wire exists. Cheap now, and more expensive every session that assumes the season's
+ratings are all a player has.
+
+*(Previous entry, S90.)* S90 gave a career a permanent archive and opened O-74.
 
 **★ THE ARCHIVE HAS NO READER, and that is the natural S91.** S90 deliberately shipped no indexing, no
 querying, no career stitching and no presentation — its job was to guarantee the data exists and cannot be

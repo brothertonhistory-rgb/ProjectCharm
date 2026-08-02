@@ -9699,3 +9699,276 @@ date), identity holds 80. **A new suite phase is not registered until it appears
 Phase 55's determinism replay asserted `outcome2.Results.SequenceEqual(outcome.Results)` — the record's generated equality, which silently absorbs any field ever added to `SeasonGameResult`. Two runs against one career MUST issue different numbers, so that form would have gone red with nothing wrong the first time it saw history mode. It is now field-explicit, and asserts something sharper than before: **the basketball is a pure function of (world, seed, config); the numbering deliberately is not.**
 
 `ScheduleFingerprint` needed no change — it has always hashed index/kind/home/away by name rather than letting the record hash itself, which is the only reason `93d8c853…` survives the new fixture fields. Recorded in place so a later session does not "tidy" it into default record hashing.
+
+---
+
+## The calendar — the game's clock (Session 91, 2026-08-02)
+
+Before S91 the engine had no concept of time. A season was 5,205 games in an arbitrary
+order; nothing carried from one to the next, so the schedule was a list rather than a
+sequence. This section describes the clock. It answers *"what day is it"*. It does not
+answer *"who plays whom"* — that is the scheduler, and it is deliberately a separate
+subsystem, because a calendar built alongside a scheduler quietly bends around whatever
+the scheduler needed that day.
+
+### The governing rule
+
+**The calendar says what day it is; a competition says when it plays.**
+
+This one sentence is the section's spine, and it was arrived at by getting it wrong three
+times in three prompt revisions. r1 made a date intrinsically "conference tournament".
+r2 and r3 made D1's bracket the definition of when basketball is legal. Both errors are
+the same shape: **one competition's schedule mistaken for a property of the date.** D1 is
+one layer of the sport. The NIT plays the midweek nights between D1 weekends; D2, D3 and
+JUCO run their own brackets in the same window. Emmett's overturning ruling:
+
+> *"If I'm playing a JUCO team, none of that applies for me. Every single day from Nov. 1st
+> to the D1 championship needs to be a legal gameday, regardless of how many games end up
+> on it, be it 0 or 1,000."*
+
+### Nothing authored, nothing shipped as data
+
+R1: *"I'd like to just make the real life calendars. A player should be able to start in
+1850 with a completely custom file and the game should have the real life 1850 calendar
+ready to go."* The rules are the same in every century, so 1850 and 2400 both come out
+right from one code path. **Every boundary is DERIVED from two anchors — November 1 and
+the third Sunday in March — and never stored.**
+
+Corollary that matters for a career simulation at scale: this is **not a materialised day
+graph**. "Build the calendar" does not mean 365 persistent day objects per year. It is a
+small rule object plus enumeration helpers computing everything from a `DateOnly`.
+
+### Calendar convention, named
+
+**All dates are proleptic Gregorian** — modern Gregorian rules applied backward and forward
+uniformly. **The game does not model regional Julian-to-Gregorian adoption.** This makes
+deterministic custom worlds possible and avoids pretending there was one universal civil
+calendar everywhere before 1582.
+
+The leap rule is exact: divisible by 4 **except** centuries, **except** centuries divisible
+by 400. 1900 no, 2000 yes, 1850 no, 2400 yes. A naive divisible-by-4 rule is right for
+every year anyone tests casually and wrong three times in four centuries, and a career that
+drifts one day has every weekday in it wrong thereafter.
+
+**The civil arithmetic is the platform's, on purpose** (`DateOnly`, `DateTime.IsLeapYear`,
+`DayOfWeek`). This subsystem's value is basketball calendar *policy*; a hand-written
+Zeller-style formula would be a second implementation of a solved problem with its own bugs.
+The suite therefore checks the platform against weekdays sourced **independently of it**.
+
+### Two ranges, separated
+
+| domain | supported |
+|---|---|
+| the civil calendar (weekday, month length, leap status, printed year) | `0001-01-01` .. `9999-12-31` |
+| a constructible basketball season, by START year | `0001` .. `9998` |
+
+A season is narrower at both ends for one reason: it crosses New Year's, so it needs the
+following year to exist.
+
+**A season is anchored by its START year.** `BasketballSeasonCalendar(2026)` derives
+November 1 2026, Selection Sunday in March 2027, the championship at +22, and the label
+`2026-2027`. This removes the ambiguity in "the 2027 calendar", which could mean the civil
+year, the season ending in 2027, or the season beginning in it — three different answers.
+
+### The rulings, and the spine they generate
+
+- **R2 — a complete civil year**, 365 days normally and 366 in a leap year. The season is
+  one stretch inside a year that runs all the way round; the empty months are where
+  recruiting, development and the rest eventually live.
+- **R3 — seasons are named `XXXX-XXXX`**, never a single year.
+- **R4 — November 1 is the FIRST LEGAL DAY.** ★ A **floor**, not a start line. Nothing is
+  forced onto November 1; the scheduler simply cannot place a game earlier. Chosen over
+  "the first Monday in November" because a weekday anchor would pin opening night to a
+  fixed weekday for no benefit and produce a differently-shaped calendar every year.
+- **R5 — Selection Sunday is the THIRD SUNDAY IN MARCH.** The one date the whole sport
+  agrees on.
+- **R6 — the postseason, and the season's end.** Everything derives from Selection Sunday,
+  so ONE anchor generates the whole spine in any year:
+
+  | | offset from Selection Sunday | weekday | what |
+  |---|---|---|---|
+  | Weekend 1 | +4, +5, +6, +7 | Thu, Fri, Sat, Sun | first and second rounds |
+  | Weekend 2 | +11, +12, +13, +14 | Thu, Fri, Sat, Sun | regional semifinals and finals |
+  | Weekend 3 | +20 | Sat | Final Four |
+  | | +22 | Mon | **championship — the season ends here** |
+
+  Because Selection Sunday is always March 15–21, the championship is always April 6–12.
+  Verified across all 9,998 supported seasons: zero weekday violations on any of the ten.
+- **R7 — conference tournaments are STAGGERED.** *"One conference can be done with theirs
+  before another team even starts theirs."* ★ **This is a D1 CONFERENCE constraint, not a
+  calendar rule.** It binds the scheduler placing those brackets and makes no date
+  unplayable for anyone else. **The stagger is a feature** — a team idle for ten days
+  waiting to learn where it is going is a real thing once rest and form matter.
+- **R8 — conferences have WEEKDAY HABITS.** This needs nothing from the calendar beyond
+  deterministic weekdays. The calendar exposes the weekday and the legal window; a
+  conference preference is **scheduler data**. S91 stores none and builds no abstraction to
+  claim the feature is "supported."
+- **R9 — named periods come LATER, and they OVERLAP.** See below.
+
+### Legal play — ONE continuous span
+
+```
+[November 1, championship Monday]        both ends inclusive
+```
+
+**Every day in it is a legal game day.** Zero games or a thousand; the calendar does not
+care and must not.
+
+- **November 1 is legal**, and is never *required* to host a game.
+- **Selection Sunday is legal.** It is D1's announcement day and means nothing to a JUCO
+  team, which may be playing that night. This is the single fact that separates the shipped
+  design from the two rejected ones.
+- **Championship Monday is the last legal day**, inclusive.
+- **Nothing between them is illegal.** Not the rest days between D1 weekends, not the
+  Sunday before the final.
+
+**Season membership is IDENTICAL to the legal span.** r3 separated them to justify making
+legality discrete; with legality continuous there is nothing left to separate, and two
+identical spans under two names is the kind of duplication that drifts apart later.
+
+★ **The ten D1 tournament dates are REFERENCE DATA, exposed so a future scheduler can place
+that bracket. They permit and forbid nothing.** `+8` is not a D1 tournament date and IS a
+legal game day. Any API shape that lets a caller mistake one for the other is wrong, which
+is why the predicate surface is deliberately tiny:
+
+```csharp
+bool IsLegalGameDate(DateOnly date);
+bool IsInBasketballSeason(DateOnly date);   // == IsLegalGameDate; one span, one meaning
+
+DateOnly SelectionSunday      { get; }      // D1 reference data — a competition's shape,
+DateOnly ChampionshipDay      { get; }      // not a gate on anyone
+IReadOnlyList<DateOnly> D1TournamentDates { get; }
+```
+
+r3's three-predicate surface (`IsLegalRegularSeasonGameDate`,
+`IsLegalNationalPostseasonGameDate`) is **retired**: those names encoded the error.
+
+### ★ Legality answers where the season NAME cannot
+
+Legality is derived from the date, not from a constructed season:
+
+> legal ⇔ `month >= 11` **or** `date <= championship day of the March in this civil year`
+
+This is why November 9999 is a legal game day even though the season it belongs to
+(`9999-10000`) cannot be written down, and why January 0001 is legal though its season
+started in a year that does not exist. **Only the label is unrepresentable.** A design that
+routed legality through a constructed season would have had to answer "illegal" at both
+edges, which is false.
+
+### Season membership across a calendar year — the model is DATE-CENTRIC
+
+A printed year 2027 contains January–April dates from season `2026-2027` **and**
+November–December dates from `2027-2028`, with the middle months belonging to none. **So
+there is no single `SeasonName` for a calendar year.**
+
+- date on or after Nov 1 → season begins in `d.Year`
+- date on or before that season's championship day → season begins in `d.Year - 1`
+- otherwise → no season
+
+Lookup distinguishes **three** outcomes, and the third is the one an earlier revision
+missed:
+
+| date | result |
+|---|---|
+| ordinary offseason (any June) | **`Offseason`** — a valid answer |
+| Jan 1 – championship day of year **0001** | **`SeasonOutsideSupportedRange`, classified** |
+| Nov 1 – Dec 31 of year **9999** | **`SeasonOutsideSupportedRange`, classified** |
+
+★ **Never `null` for the edge cases.** "This date is in the offseason" and "the season this
+date needs cannot be represented" are different facts, and one silently standing in for the
+other is exactly the kind of thing that surfaces as a wrong answer decades into a career.
+
+### Periods — ranges laid OVER the calendar
+
+R9, Emmett: *"Eventually there will be stretches of time, some which overlap — coaching
+carousel, recruiting, transfers, awards, summer workouts. But those will come much later."*
+
+★ **The overlap is load-bearing for the structure even though nothing uses it yet.** A day
+cannot BE "recruiting" if it is also "summer workouts" and also "coaching carousel." A
+day-level "what phase is this" field would have to pick a winner and there is no winner to
+pick — the same error as making a date intrinsically "conference tournament."
+
+```
+CalendarPeriod    Name (non-empty), Start, End — both INCLUSIVE, Start <= End
+                  zero-length legal (a one-day period); may cross New Year's;
+                  duplicate names legal; exact duplicate ranges legal
+CalendarTimeline  immutable; GetPeriods(date) -> EVERY covering period, canonical order
+```
+
+**Canonical order is pinned**, because two implementations could both be deterministic and
+disagree: **Start ascending, then End ascending, then Name by ORDINAL comparison, then
+registration ordinal.** The final tiebreak exists because duplicate names AND exact
+duplicate ranges are both legal, so a registration ordinal is what makes the order total.
+Ordinal name comparison, never culture-aware: a save file must not re-sort itself because
+the machine's language changed.
+
+**Note on the one deliberate inconsistency:** calendar windows compose half-open because
+they abut; **periods are CLOSED** because a human writes "August 1 to August 31" and means
+both ends. Stated rather than discovered.
+
+**S91 registers no periods in production.** The shape is proven by fixtures; naming them
+before anything needs them is premature crystallisation.
+
+### The printed year — culture-invariant by construction
+
+`dotnet run -- calendar [year ...]` prints months laid out with weekdays, season boundaries
+marked, Selection Sunday and championship day named. With no arguments it prints a recent
+year, a leap year, **1900** (century, not leap), **2000** (century, leap) and **1850**.
+
+It **must not vary** with OS locale, first-day-of-week, translated month names, date
+formatting or newline convention, or Emmett's machine and the sandbox print two different
+valid calendars and neither of us can tell which. So: weekday and month names are hardcoded
+English abbreviations and never asked of the platform; the week always starts on Sunday;
+every number is formatted invariant; newlines are literal `\n`, **never
+`Environment.NewLine`**; the leap day is explicitly marked.
+
+★ **It is NOT the proof of correctness.** A visually plausible month can hide a wrong season
+label or an off-by-one boundary. The suite asserts the underlying values first, then asserts
+the renderer reflects them.
+
+### No wall clock, direct or indirect
+
+There is no parameterless "current calendar" entry point and there must never be one: a
+career simulation whose calendar can read the host machine's date is one timezone away from
+a non-deterministic save. Every entry point demands an explicit year or date, enforced by
+reflection AND by a source scan. The tree's **one** wall-clock read is `Program.Game.cs`'s
+ad-hoc seed for the `game` demo, which is unrelated; the check asserts S91 adds no second.
+
+### Phase 82 — what it proves, and the two invariants it exists to defeat
+
+Page-only principle holds: **no basketball target and no count of anything the simulation
+produces is asserted.** Day counts are REPORTED (Nov 1 → championship runs 157–164 days
+across the supported range; Nov 1 → Selection Sunday, 135–142). Whether ~30 games and a
+16-team bracket FIT is the scheduler's question, asked when it knows its own constraints.
+
+Two invariants would pass while the semantics were wrong, and both shaped the checks:
+
+1. **A calendar correct for 2020–2030 and wrong before 1900 passes every test written
+   casually.** The century cases are the only thing that discriminates a correct leap rule
+   from a nearly-correct one, so 1900/2000/2100/2200/2300/2400 are all in the table, and a
+   test-only divisible-by-4 calendar must FAIL it (it gets 28 of 38 wrong).
+2. **A weekday test that computes its expected answer from the same library the production
+   code uses proves the library agrees with itself.** Every expected weekday is hardcoded
+   from an independent implementation.
+
+Three negative controls construct the forbidden design and require rejection: the naive leap
+calendar; **r3's gated legality** (legal to Selection Sunday, then only the ten D1 dates —
+it punches 143 holes the no-gaps walk rejects); and a one-period-per-day structure (keeps 1
+where the timeline keeps 4).
+
+**Isolation.** The suite has no pre-S91 page to diff against, so the byte-identical claim was
+proven by running the full 5,205-game season on the untouched tree and on this one, same
+machine, and comparing hashes. A10 additionally scans the five season-path files and requires
+that none of them names a calendar type — so if a future session wires the calendar into the
+season page, the check goes red rather than the isolation claim silently rotting.
+
+### What the calendar does not prove, and what comes next
+
+Nothing is scheduled, so nothing proves the calendar is *usable*. That is the scheduler's
+discovery and is expected to produce findings. Two facts it will need on day one: conference
+tournaments are staggered (R7), and **the stock world has 14 independent schools** — modelled
+as a conference named `Independent` — which have no conference tournament and sit idle through
+the March window.
+
+And **1850 gets a correct 1850 calendar and a full March Madness bracket.** The calendar does
+not know the sport did not exist then, and should not.
