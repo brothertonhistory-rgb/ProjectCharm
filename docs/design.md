@@ -8761,6 +8761,188 @@ After the S34/35 tendency retune and the S38 fast-break diet, the season page (s
 
 The paragraph that stood here described the S32-era shape (midpoints above the authored range, no diminishing returns within 0–99). **The 2026-07-21 recenter inverted it**: the fitted midpoints sit inside or below the authored range (Three 20.3, Mid 37.4, Short 43.0), so most of the authored scale is now on the FLATTENING side — diminishing returns at the top are back, deliberately, because Emmett's ruled elite anchors compress the top intervals (95→99 gains shrink to ~0.4–0.6pp everywhere; the p99-vs-elite raw separation at Three is ~5pp, exactly the ruled 42-vs-45 neighborhood). The Phase 6 curve-relative rewrite (see the Session 50 shooting-curve section) is what let the suite stay green through this flip without touching a check — the direction and magnitude of its expectations derive from the loaded config by construction, and it just proved that promise at full scale.
 
+## Per-game retention — the season log (Session 90, 2026-08-02)
+
+**What it is.** Bound to a history file, a season writes one permanent log: `<career>.gamelog/season-N.log`.
+It holds who was on every roster that year and every game every one of them played, kept
+forever at full detail. A player card thirty years later reads out of these files.
+
+**Emmett's framing, which set the scope:** *"I just want the player card to be a historical
+record that persists long after they've graduated… his recruiting ranking, his career highs,
+his full college stats, game by game log."* **The archive records what happened, not what
+might have** — see "What is deliberately absent" below.
+
+### Two sections, and why the second one exists
+
+| section | what it holds |
+|---|---|
+| **roster** (written once, before game one) | one entry per man per season: name, school, seat, position, archetype, starter flag, hierarchy rank, recruiting rank, and all **38 authored ratings** |
+| **game blocks** (one per fixture) | the game's own facts, then one **row per man who played**: 21 counters plus his identity and season context |
+
+The roster section is not decoration. Game rows say what a man *did* and nothing about him,
+and **a man who never got off the bench has no rows at all** — 661 of 4,511 in the stock
+season. Without this section he would not exist in the archive. It is also the only retained
+copy of names and ratings, which is why it carries its own checksum rather than waiting for
+the season footer: a crashed file must not expose a "valid" prefix whose player identity is
+already corrupt.
+
+### The rulings
+
+- **Counters only, never rates.** Nothing derived is stored — no percentages, no points. A
+  stored rate is a stored rounding error and freezes a formula that will be improved. **The
+  honest consequence: a new derived statistic works retroactively exactly when its primitive
+  ingredients were present in that season's schema.** This is the whole reason the offensive
+  foul was added before the first season was archived rather than after (see below).
+- **Ratings are stamped at the START of the season.** Inert today, since nobody develops
+  mid-season; fixed now because the format is fixed now. The card should read as one coherent
+  thing — this is who he was, this is what he did. When development lands, a session may add
+  an end-of-season entry as a *new* roster schema version; it may not redefine what this one
+  meant.
+- **The durable unit is one GAME, not one row.** No partially retained game is ever readable
+  as complete.
+- **A log binds to a career LINEAGE, not a world** (history schema v2, below).
+- **An existing log is a refusal, never a resume.** The schedule is not persisted, so a second
+  process cannot verify that the prefix it found belongs to the season it is about to write.
+
+### What is deliberately absent
+
+**The ceiling.** The generator computes a latent card, a runway and an arrival stage for every
+player; `GenMapToPlayer` drops all five fields before the season sees them. Emmett ruled them
+out of the archive: *"No, 10 years down the line, it doesn't matter. It should maintain a
+historical record."* A ceiling is a scouting opinion about a future that did not occur.
+**Arrival goes with it** — it is a fraction *of* the ceiling and is uninterpretable stored
+alone. The engine gap is separate and real: see O-73. Class year is O-72.
+
+Two facts worth not re-deriving: the generator's *current* card is fully redundant with the
+stored 38 (the card that becomes those ratings is built from it), and runway is exactly
+latent minus current. **The latent card was the only irreducible value.**
+
+### Where a row is born — snapshot and diff
+
+A game row is the season record's **delta across one game**. The rejected alternative was a
+parallel accumulator building rows independently, which is precisely how a game log and a
+season line drift apart: two implementations of one rule get to disagree.
+
+Two details are load-bearing:
+
+- **The boundary is the whole loop iteration, and the order matters.** The season loop calls
+  `Accumulate` → `AccumulateFouling` → `NoteOccupancy`. Box fields land in the first; credits,
+  games played and the four on-floor denominators land in the third. A boundary drawn between
+  them silently drops every counter of one kind, **and every check would still pass**.
+- **26 men, not 4,511.** Only this game's two rosters can move, and that is provable rather
+  than assumed: both writes to a season record go through `RecordFor`, whose only two callers
+  resolve through `SeasonGameIdentity`, which indexes this game's home and away rows and throws
+  outside the stamped range. Phase 81 A11 asserts the bound with a negative control that
+  mutates a record *outside* the 26 after the snapshot — testing the gate, not the resolver
+  guard sitting in front of it.
+
+**Emission is the games-played delta**, never inferred from a credits delta afterwards. And a
+counter moving for a man the predicate says did not play is a **hard error that stops the
+run** — that check is the only proof the predicate and the accumulator agree about who was on
+the floor.
+
+### Why the codec lives in `Charm.History`
+
+Not a preference — forced. Writing a `PersonId` to disk needs its raw `long`, which is
+`internal` with no `InternalsVisibleTo`; **that absence is S89's seam**. A codec in the harness
+cannot compile without opening it. The seam holds against the tests too (Phase 81 borrows
+identities from a real allocator) and it forced two shapes that are right anyway: the public
+surface is DTOs, and the **writer sorts both sections itself**, because `PersonId` deliberately
+has no ordering and the harness physically cannot hand them over sorted.
+
+One deliberate exception: `HistoryStore.UseFixedHistoryIdForTests` is **public**, because the
+migration golden has no other honest form — production mints from `Guid.NewGuid()`, so
+migration produces a different file every run. It sets a label and hands out no identity value,
+so the real seam is untouched. Phase 81 is its only caller.
+
+### The intrinsic / contextual line
+
+**Intrinsic** validation is provable from the file plus caller-supplied bindings alone, and is
+therefore still provable in thirty years by a program that knows nothing about basketball:
+versions, digests, checksums, ordering, uniqueness, numeric domains, footer counts, EOF, and
+every row naming somebody in this file's own roster section.
+
+**Contextual** validation needs the live season: that a school id is a real school, that a pool
+id belongs to the current population, that blocks match the schedule fixture for fixture. The
+codec deliberately **cannot** do these and no stock-world constant is compiled into it — a
+permanent archive format must outlive the league it was written from.
+
+One asymmetry worth keeping straight: *row-person-in-roster* is intrinsic (both facts are in
+the file); *row-person-against-the-frozen-map* is contextual.
+
+### Why custom fixed-width binary — the size argument is STRUCK
+
+Earlier drafts justified this format by claiming compact JSON would be 5–8× the bytes.
+**Measured, that is wrong by most of an order of magnitude:**
+
+| format | one stock season |
+|---|---|
+| JSON, short keys | 21.9 MiB |
+| JSON, zeros omitted | **19.8 MiB** |
+| JSON, real field names | 35.4 MiB |
+| this format | 20.18 MiB |
+
+A per-game row is mostly zeros and single digits; a fixed-width row spends eight bytes on each
+regardless. Omit-the-zeros JSON is *smaller*. What survives:
+
+1. **Predictable index targets.** Row *n* of block *b* sits at a computable offset, so the
+   future almanac's index stores integers and resolves to bytes with no parsing.
+2. **Exact size arithmetic**, assertable to the byte (Phase 81 A9).
+3. **Zero dependencies**, which all three projects still have.
+
+**Narrowed honestly:** fixed width gives O(1) access to a *known* offset. It does **not** give
+O(1) career lookup — rows are ordered by game and there is no person index, so finding one
+man's career still means scanning until a future session builds one.
+
+### Sizes, measured on the stock season
+
+```
+fileSize == 128 + (32 + entries x 216 + 8) + SUM(48 + rows x 188 + 8) + 64
+```
+
+4,511 roster entries, 5,205 blocks, **105,830 rows → 21,162,128 bytes (20.18 MiB)**; a
+forty-year career ≈ 807 MiB. The row count is exactly the season page's seat-occupancy figure:
+the two populations coincide, so every man who held a seat played at least one possession.
+
+### History schema v2 — the career lineage label
+
+A v1 history bound to a **world**, and two careers from one world legally share the world
+fingerprint and both start at person 1, season 1, game 1 — so a log copied between them passed
+every check v1 could make. `historyId` (128 random bits, minted once at creation, 32 lowercase
+hex) closes it.
+
+- **A history created after S90 is born v2.** No v1 file is ever written at any instant.
+- **A pre-S90 file migrates once**, atomically, under the lock already held, every counter
+  carried across untouched — a migration that moved a counter would reissue numbers already
+  worn.
+- **What it does not prove:** a history *cloned* at the filesystem carries its label, so those
+  branches are indistinguishable. That is the same trust boundary S89 already draws, since a
+  clone also duplicates every counter. Branch detection is save-branch management.
+
+### Two string and numeric contracts worth knowing
+
+**No silent truncation, ever.** Fixed-width string fields are strict UTF-8, zero-padded, with
+every byte at and after the first zero required to be zero. There is no mandatory terminator —
+the width is fixed and known, so length is recoverable without one. **An overlong name refuses
+before the file exists**, during the writer's `RosterPrepared` stage, which is a pure in-memory
+stage with no filesystem contact. Truncating a name in an archive whose purpose is being the
+only record of who somebody was is not an option.
+
+**Ratings are int16 though the domain is 0–99.** One byte would fit — `Player.Validate()`
+checks all 38 against that scale and every pool player is validated at construction. The extra
+byte costs 171 KB a season; being wrong about a domain inside a permanent format costs a schema
+version.
+
+### The 38 ratings are named, not merely golden
+
+A golden pins bytes; it does not define meaning. The serialized order is written down in
+`RetentionRatingOrder` and assigned field-by-field by name, so a future reorder on `Player`
+cannot move a byte on disk. **It is the same order, slot for slot, as `Player.Validate()`'s own
+separately maintained list** — two independent lists agreeing is a stronger guarantee than a
+golden alone. Slots 26–28 are height, wingspan and weight: physical properties are ratings on
+this scale, not separate fields. Slots 6–10 are the five shot tendencies, which are derived
+from the rest of the card by the divvy bridge rather than generated with it.
+
 ## The fast-break readout — the defensive instrument for transition (Session 85, 2026-07-30)
 
 **Why it exists.** Before S85 every transition number the engine printed was OFFENSIVE: break FGA,

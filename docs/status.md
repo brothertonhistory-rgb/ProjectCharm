@@ -10,7 +10,19 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **S90 chores commit** (2026-08-02; DOCUMENTATION ONLY, no source changed. Closes **O-71**: S88's transition-defence subsystem finally has a journal entry and a design section, backfilled from the locked oracle, the source headers and Phase 79. The eight rulings survive verbatim because S88 wrote them into the oracle header; the design conversation does not survive and was not reconstructed. Opens **O-72** (class year is generated and dropped before the season) and **O-73** (the development ceiling — latent card, runway, arrival — is computed for all 4,511 men every world build and discarded one line before the season sees it; Emmett ruled it out of the S90 archive as not-history, which settles retention but not the engine gap). ★ ONE CHORE ON THE S90 PROMPT WAS PHANTOM: an "O-number renumber" rode through four prompt revisions unverified and does not exist — there are no duplicate O-numbers and O-25 is simply a number never assigned. The real collision in the record was S88's PHASE number, fixed at S89.1. A chore claim inherited across revisions got none of the source audit every code claim around it received.)
+Last updated: **Session 90** (2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 81 PASS at
+41 assertions, season page byte-identical with zero new lines. **Closes O-31**: per-game retention, forever,
+at full detail. Ships history schema v2 and folds the offensive foul into the season record (the printed
+column stays O-67). Opens **O-74** (hierarchy rank is a constant 5 league-wide). ★ THREE CLAIMS THAT FOUR
+PROMPT REVISIONS CARRIED WERE FALSE AGAINST SOURCE and were caught before the format hardened: the row was
+missing a counter the engine already attributes; the world fingerprint is a labelled string, so its label
+check can only live at the writer, never the reader; and the "compact JSON is 5–8× the bytes" argument that
+justified a custom binary format is wrong by most of an order of magnitude — measured, it is a wash, and the
+format now stands on exact size arithmetic and index-target predictability instead. A fourth, "the measured
+105,830 rows", was a seat-occupancy count presented as a row count; the true count was measured at the end
+and happens to be exactly 105,830, so the bound was tight and the claim was still wrong when it was made.)
+
+*(Previous board entry, S90 chores commit — 2026-08-02; DOCUMENTATION ONLY, no source changed. Closes **O-71**: S88's transition-defence subsystem finally has a journal entry and a design section, backfilled from the locked oracle, the source headers and Phase 79. The eight rulings survive verbatim because S88 wrote them into the oracle header; the design conversation does not survive and was not reconstructed. Opens **O-72** (class year is generated and dropped before the season) and **O-73** (the development ceiling — latent card, runway, arrival — is computed for all 4,511 men every world build and discarded one line before the season sees it; Emmett ruled it out of the S90 archive as not-history, which settles retention but not the engine gap). ★ ONE CHORE ON THE S90 PROMPT WAS PHANTOM: an "O-number renumber" rode through four prompt revisions unverified and does not exist — there are no duplicate O-numbers and O-25 is simply a number never assigned. The real collision in the record was S88's PHASE number, fixed at S89.1. A chore claim inherited across revisions got none of the source audit every code claim around it received.)
 
 *(Previous board entry, Session 89.1 — 2026-08-01; CORRECTION SESSION. `git add -A` at the end of S89 swept in five UNTRACKED files and revealed that **S88 is a complete, working session**: a per-man transition-defence model wired into the live engine (`RollHGenerator`'s break make and block doors, `Resolver`'s defender draw — ~98,000 shots a season), oracle-locked, retiring the four `HustleTransitionDefense*` dials for twenty `Transition*` ones. Emmett's `config.json` was CORRECT and S89 reverted it, breaking a working session; restored. S89's account of S88 is wrong in four places and is corrected in the S89.1 journal entry — the S89 entry itself is left untouched, because the journal is immutable history. ★ A REAL DEFECT S89 INTRODUCED: a phase-number collision. S88 declared `Phase79TransitionDefenseCheck`, S89 registered `Phase79IdentityCheck` as 79, and **S88's phase had no caller anywhere — it had never run once**. Registered here at 79 by date; identity moves to 80. First-ever run: 40 of 43, all three failures one cause — S88's two golden fixtures were never added to the harness project. Both added; suite now green with 43 + 71 assertions that had never both run. ★ O-69 STRUCK: Phase 71 is not broken. Handed a real mismatch it named all four orphan keys and all twenty absent ones in exactly C-25's language. S89 never opened the red suite to see which phase failed.)
 
@@ -77,6 +89,16 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ O-31 CLOSED — EVERY GAME EVERY MAN PLAYS IS RETAINED, FOREVER (S90).** A career bound to a history
+  file now writes one permanent log per season: a roster section (name, school, seat, position, archetype,
+  recruiting rank and all 38 ratings, **including the 661 men who never played a minute**) and one row per
+  man per game, 21 counters each. Career highs, full college stats and the game-by-game log all derive from
+  those rows; the S76 per-RANK minutes ladder is now re-derivable by identity, which season totals could not
+  do. Stock season: 4,511 entries, 5,205 blocks, **105,830 rows, 21,162,128 bytes**; ~807 MiB for a forty-year
+  career. Season page byte-identical, zero new lines. Phase 81, 41 assertions. Also ships history schema v2
+  (`historyId`, born-v2, one-way migration for pre-S90 careers) and **adds the offensive foul to the season
+  record** — the engine had named the man since S87 and the season line had been dropping him.
 
 - **★ O-71 CLOSED — S88's JOURNAL AND DESIGN ENTRIES ARE WRITTEN (S90 chores commit).** The
   transition-defence subsystem now has a session entry at its chronological slot in `journal.md`
@@ -287,6 +309,12 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
+- **O-74 — NOTHING SETS HIERARCHY RANK; EVERY PLAYER IN THE LEAGUE IS A 5 (opened S90).**
+  `GenMapToPlayer` leaves it at its default and no other path assigns it, so the offensive pecking order the
+  field exists to express is uniform across all 4,511 men. S90 stores it anyway — two bytes, authored surface
+  that will become live, and a season written without it could never get it back — but it is currently a
+  constant occupying a column. Whoever designs usage hierarchy owns this.
+
 - **O-72 — CLASS YEAR IS COMPUTED AND DISCARDED, AND THE ARCHIVE DOES NOT KEEP IT (opened S90 chores).**
   `Player.PlayerClass` (Fr/So/Jr/Sr) exists and the generator produces it, but `GenMapToPlayer`
   (`Program.Gen.cs:821`) never assigns it, so every season player carries an empty string and S90's
@@ -492,12 +520,6 @@ chart is PROVISIONAL pending O-6.
   S77 became the stat page, so nothing is scheduled to build them. The deferral itself is still correct —
   committer selection is post-hoc in the harness, so disqualification needs an RNG restructuring that must
   not share a diff with a roster change. It needs a real session number. Blocks O-28.
-
-- **O-31 — Per-GAME retention: game logs, home/away and conference splits, streaks (S77 deferral,
-  EMMETT'S CALL).** S77 keeps season totals only. Cheap to add later at the same seam (`Accumulate` already
-  sees one game at a time); the open questions are what the finished game should show a player and the
-  save-size arithmetic at career scale. Also the only way to re-derive the S76 per-RANK minutes ladder by
-  identity, which season totals cannot do.
 
 - **O-32 — The season page should print its OWN fingerprint (proposed S77, not ruled).** The recorded
   season SHA-256 comes from a recipe that exists nowhere in the repo; the sandbox cannot reproduce it under
@@ -992,7 +1014,22 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**NONE SELECTED.** S89 gave every person, season and game a permanent number and a save file to keep them
+**NONE SELECTED.** S90 gave a career a permanent archive and opened O-74.
+
+**★ THE ARCHIVE HAS NO READER, and that is the natural S91.** S90 deliberately shipped no indexing, no
+querying, no career stitching and no presentation — its job was to guarantee the data exists and cannot be
+lost. Every number a player card needs is now on disk and nothing can read it back across seasons. That
+session owns the questions S90 left standing: the person index (finding one man's career today means
+scanning every row of every season file), and what a finished card actually shows. It is also the first
+session that will discover whether the format is pleasant to read, which is the only real test of it.
+
+**★ O-73 (the discarded ceiling) is the other candidate, and it is an ENGINE question, not a storage one.**
+Emmett ruled the ceiling out of the archive, which settles retention and settles nothing else: the generator
+computes latent, runway and arrival for all 4,511 men every world build and the season never receives any of
+it, so no development layer can be built until that wire exists. Cheap now, and it gets more expensive every
+session that assumes the season's ratings are all a player has.
+
+*(Previous entry, S89.)* S89 gave every person, season and game a permanent number and a save file to keep them
 in, and opened O-68, O-69, O-70.
 
 **★ O-71 (backfill S88's journal and design entries) is the cheapest thing on the board and should probably
