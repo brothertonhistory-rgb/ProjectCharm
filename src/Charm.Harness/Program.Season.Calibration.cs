@@ -578,6 +578,7 @@ internal static partial class Program
                 rec.Ast    += box.Ast[i];    rec.Stl    += box.Stl[i];
                 rec.Blk    += box.Blk[i];    rec.To     += box.To[i];
                 rec.ShFoul += box.ShFoul[i]; rec.NsFoul += box.NsFoul[i];
+                rec.OffFoul += box.OffFoul[i];   // S90: the charge finally reaches the man's season line
                 rec.FbBlk  += box.FbBlk[i];   // Session 85: the break subset of the line above
             }
 

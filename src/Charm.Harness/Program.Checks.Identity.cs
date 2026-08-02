@@ -344,7 +344,8 @@ internal static partial class Program
                           .Append(r.Tpm).Append(',').Append(r.Fta).Append(',').Append(r.Ftm).Append(',')
                           .Append(r.OReb).Append(',').Append(r.DReb).Append(',').Append(r.Ast).Append(',')
                           .Append(r.Stl).Append(',').Append(r.Blk).Append(',').Append(r.To).Append(',')
-                          .Append(r.ShFoul).Append(',').Append(r.NsFoul).Append(';');
+                          .Append(r.ShFoul).Append(',').Append(r.NsFoul).Append(',')
+                          .Append(r.OffFoul).Append(';');
                     }
                     return sb.ToString();
                 }
@@ -408,18 +409,24 @@ internal static partial class Program
             // ── B10 — the file lifecycle. ───────────────────────────────────────────
             {
                 var p = Fresh("b10");
-                Check("B10 absent -> created as valid v1", !File.Exists(p));
+                Check("B10 absent -> created as a valid history", !File.Exists(p));
                 using (HistoryStore.Open(p, tinyFp)) { }
                 Check("B10 the created file exists and parses", File.Exists(p));
 
                 // ★ The golden is compared against what the STORE ACTUALLY WRITES, never
                 // against a second hand-rolled copy of the same format — that would be a
                 // check comparing this file's opinion of the format to its own opinion.
-                var golden = Path.Combine(AppContext.BaseDirectory, "tools", "history_v1_golden.json");
+                // ★ S90 — THE GOLDEN IS NOW v2, because a history created today is BORN v2.
+                // The v1 golden stays committed as the v1 RECORD: it is what a pre-S90 career
+                // looks like, and the migration path still has to read exactly that.
+                // The lineage label is pinned for the comparison, because production mints it
+                // from Guid.NewGuid() and a golden cannot chase a random value.
+                var golden = Path.Combine(AppContext.BaseDirectory, "tools", "history_v2_golden.json");
                 var goldenFp = "sha256-v1:" + new string('0', 64);
                 var pGolden = Fresh("b10_golden");
+                using (HistoryStore.UseFixedHistoryIdForTests("0123456789abcdef0123456789abcdef"))
                 using (HistoryStore.Open(pGolden, goldenFp)) { }
-                Check("B10 canonical output matches the committed golden v1 fixture "
+                Check("B10 canonical output matches the committed golden v2 fixture "
                       + "(key order, 2-space indent, UTF-8 no BOM, final newline)",
                       File.Exists(golden)
                       && File.ReadAllBytes(golden).SequenceEqual(File.ReadAllBytes(pGolden)),

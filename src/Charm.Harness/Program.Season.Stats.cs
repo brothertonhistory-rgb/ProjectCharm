@@ -65,6 +65,15 @@ internal static partial class Program
         public long Fga, Fgm, Tpa, Tpm, Fta, Ftm;
         public long OReb, DReb, Ast, Stl, Blk, To;
         public long ShFoul, NsFoul;
+        //  ★ S90 — OFFENSIVE FOULS COMMITTED. S87 made the engine name the man who takes a
+        //  charge (`PlayerBoxTotals.OffFoul`), but this record never picked the column up:
+        //  it was summed league-wide only, so the season line dropped a counter the engine
+        //  already attributed. S90 retains every game forever, and a primitive not tracked
+        //  at write time can never be recreated for a game already written — so it is added
+        //  here BEFORE the first season is archived rather than after.
+        //  ★ Deliberately NOT printed anywhere. The page must stay byte-identical (Phase 81
+        //  A3); the missing printed column remains O-67.
+        public long OffFoul;
         //  Session 85, PAGE-ONLY: the fast-break SUBSET of Blk. Fed from the same box column,
         //  through the same seat-to-man translation, so FbBlk <= Blk for every man. Exists so
         //  the page can report how concentrated a team's break blocks are on one defender —
@@ -627,6 +636,10 @@ internal static partial class Program
                 p.First.Ast == p.Second.Ast && p.First.Stl == p.Second.Stl &&
                 p.First.Blk == p.Second.Blk && p.First.To == p.Second.To &&
                 p.First.ShFoul == p.Second.ShFoul && p.First.NsFoul == p.Second.NsFoul &&
+                // S90: the new offensive-foul channel joins the reproducibility contract for
+                // the same reason S85's and S87's columns did — a per-player field two
+                // identical runs never compare is a field that can drift in silence.
+                p.First.OffFoul == p.Second.OffFoul &&
                 // S79.3 — the four on-floor denominators reproduce too, or a rate is not
                 // reproducible even though every counting stat is.
                 p.First.OffensiveCredits == p.Second.OffensiveCredits &&

@@ -1,0 +1,9 @@
+{
+  "format": "charm-history",
+  "schemaVersion": 2,
+  "historyId": "0123456789abcdef0123456789abcdef",
+  "worldFingerprint": "sha256-v1:0000000000000000000000000000000000000000000000000000000000000000",
+  "nextPersonId": 1,
+  "nextSeasonId": 1,
+  "nextGameId": 1
+}

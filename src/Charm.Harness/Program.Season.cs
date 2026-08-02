@@ -512,9 +512,14 @@ internal static partial class Program
 
     // ── The season runner (shared by the CLI page and Phase 55) ───────────────────
 
+    /// <param name="retainGameLog">S90. OFF by default, and that default is load-bearing:
+    /// every existing caller — Phase 55, Phase 80's identity checks, the turnover-clock
+    /// check — keeps its exact prior behaviour and touches no folder. Only the season page
+    /// and Phase 81 turn it on, so the retention layer cannot perturb a check that was
+    /// green before it existed.</param>
     private static SeasonRunOutcome RunSeasonCore(
         WorldFile world, long seasonSeed, string engineConfigPath, bool verbose,
-        HistoryStore? history = null)
+        HistoryStore? history = null, bool retainGameLog = false)
     {
         var schedule = BuildSeasonSchedule(world, seasonSeed, history);
         var fingerprint = ScheduleFingerprint(schedule);
@@ -553,6 +558,23 @@ internal static partial class Program
         league.PersonIds = divvy.PersonIds;
         var baseSeed = unchecked((int)seasonSeed);
 
+        //  ── S90: the retention log. ────────────────────────────────────────────
+        //  Built here, before the first tip, because the roster section is written
+        //  before game one and the rows it lists are these rows — the start-of-season
+        //  card, which is the only version that exists at write time (R8).
+        //
+        //  ★ The writer VALIDATES THE WHOLE ROSTER IN MEMORY before it touches the
+        //  filesystem, so an overlong name or a bad domain refuses with nothing on disk
+        //  to clean up. Publication of the roster is one deliberate transition.
+        GameLogWriter? gameLog = null;
+        if (retainGameLog && history is not null)
+        {
+            var roster = BuildRetentionRoster(rowsBySchool, divvy.PersonIds!);
+            gameLog = GameLogWriter.Create(
+                history.Path, history.HistoryId, history.WorldFingerprint, fingerprint,
+                schedule[0].SeasonId!.Value, roster);
+        }
+
         for (var g = 0; g < schedule.Count; g++)
         {
             var sg = schedule[g];
@@ -568,6 +590,11 @@ internal static partial class Program
             var identity = new SeasonGameIdentity(
                 sg.HomeId, sg.AwayId,
                 rowsBySchool[sg.HomeId], rowsBySchool[sg.AwayId], sideHome, sideAway);
+            // Snapshot BEFORE the first accumulator. The three calls below write different
+            // halves of a man's line, so the boundary has to enclose all of them.
+            var retentionBefore = gameLog is null ? null
+                                : RetentionSnapshotBefore(league, identity);
+
             var (game, result, attributed, policy) = RunSingleGenGame(
                 cfgs, sideHome, sideAway, TeamSide.Home, TeamSide.Away,
                 resolverSeed: unchecked(baseSeed + 2 * g),
@@ -599,6 +626,17 @@ internal static partial class Program
             }
             league.NoteOccupancy(result.Possessions, game, storedPos, seatPos, seatH, identity);
 
+            // ...and diff AFTER the last one. Emission is the games-played delta, never a
+            // credits delta read after the fact.
+            if (gameLog is not null && retentionBefore is not null)
+                gameLog.AppendGame(
+                    new GameBlockFactsV1(
+                        sg.GameId!.Value, g, sg.HomeId, sg.AwayId,
+                        string.Equals(sg.Kind, "conf", StringComparison.Ordinal),
+                        game.HomeScore, game.AwayScore, (short)result.OvertimePeriods,
+                        result.Possessions.Count),
+                    RetentionRowsAfter(league, retentionBefore, g));
+
             // GameState.HomeScore is credited to HomeSchool, AwayScore to AwaySchool,
             // full stop (a flipped attribution passes conservation and determinism —
             // Phase 55's replay check exists to catch exactly that).
@@ -612,6 +650,14 @@ internal static partial class Program
 
             if (verbose && (g + 1) % 500 == 0)
                 Console.WriteLine($"  ... {g + 1}/{schedule.Count} games played");
+        }
+
+        //  One block per scheduled fixture and no other — the writer refuses to publish
+        //  a partial season rather than leaving a plausible-looking short file behind.
+        if (gameLog is not null)
+        {
+            gameLog.Finalize(schedule.Count);
+            gameLog.Dispose();
         }
 
         return new SeasonRunOutcome
@@ -698,7 +744,11 @@ internal static partial class Program
             Console.WriteLine();
             Console.WriteLine($"Regenerating divvied rosters (world + seed; nothing persisted) and playing " +
                               $"{schedule.Count} real engine games ...");
-            run = RunSeasonCore(world, seed, engineConfigPath, verbose: true, history);
+            // S90: the season page retains a per-game log whenever it is bound to a career.
+            // The page itself gains NO output — the log is a file beside the history, and the
+            // printed season is byte-identical to its pre-S90 self (Phase 81 A3).
+            run = RunSeasonCore(world, seed, engineConfigPath, verbose: true, history,
+                                retainGameLog: true);
         }
         catch (HistoryException hx)
         {

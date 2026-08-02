@@ -41,10 +41,10 @@ public sealed class HistoryStore : IDisposable
     private readonly string _path;
     private readonly string _lockPath;
     private FileStream? _lockHandle;
-    private HistoryStateV1 _state;
+    private HistoryStateV2 _state;
     private bool _reservationsClosed;
 
-    private HistoryStore(string path, string lockPath, FileStream lockHandle, HistoryStateV1 state)
+    private HistoryStore(string path, string lockPath, FileStream lockHandle, HistoryStateV2 state)
     {
         _path = path;
         _lockPath = lockPath;
@@ -56,15 +56,67 @@ public sealed class HistoryStore : IDisposable
     /// world is refused, never silently rebound.</summary>
     public string WorldFingerprint => _state.WorldFingerprint;
 
+    /// <summary>This career lineage's label — 32 lowercase hex. Every retention log written
+    /// against this history carries it, which is what stops a log from one career being read
+    /// into another that happens to share a world.</summary>
+    public string HistoryId => _state.HistoryId;
+
+    // ★ The id source is a seam for ONE reason: the migration golden. Production mints from
+    // Guid.NewGuid(), which by design produces a different file every run, so the suite could
+    // never pin migration byte-for-byte against a fixture. Injecting a fixed id lets the suite
+    // drive the EXACT production migration writer and compare bytes — rather than the usual
+    // alternative, which is a hand-authored "expected" file that proves only that somebody
+    // typed what they expected.
+    private static Func<string> _idSource = HistorySchemaV2.MintHistoryId;
+
+    /// <summary>Pin the lineage label for the duration of the returned scope.
+    ///
+    /// <para>★ PUBLIC, AND THAT IS A DELIBERATE WIDENING WORTH NAMING. Everything else in
+    /// this assembly is sealed against the harness on purpose. This one door is open because
+    /// the migration golden has no other honest form: production mints from Guid.NewGuid(),
+    /// so a v1-to-v2 migration produces a different file every run and could never be pinned
+    /// byte-for-byte. The alternative is a hand-authored "expected" file, which proves only
+    /// that somebody typed what they expected — it would not be driving the production
+    /// writer at all.</para>
+    ///
+    /// <para>It carries no raw identity value out, so S89's actual seam is untouched: this
+    /// sets a label, it does not expose a number. Nothing on a production path may call it,
+    /// and Phase 81 is the only caller in the tree.</para></summary>
+    public static IDisposable UseFixedHistoryIdForTests(string id)
+    {
+        if (!HistorySchemaV2.IsCanonicalHistoryId(id))
+            throw new HistoryException(HistoryError.WrongType,
+                "a test history id must be 32 lowercase hex characters.");
+        var previous = _idSource;
+        _idSource = () => id;
+        return new Restore(() => _idSource = previous);
+    }
+
+    private sealed class Restore : IDisposable
+    {
+        private readonly Action _undo;
+        public Restore(Action undo) => _undo = undo;
+        public void Dispose() => _undo();
+    }
+
     /// <summary>The normalized path actually used. Concurrent safety assumes every writer
     /// resolves to the same normalized path; symlink aliases are out of scope.</summary>
     public string Path => _path;
 
     // ── Opening ──────────────────────────────────────────────────────────────
 
-    /// <summary>Take the lock, then load-or-create and verify. Opening an EXISTING history
-    /// writes nothing: validation is read-only, so a run that fails before its first
-    /// reservation leaves the file byte-identical.</summary>
+    /// <summary>Take the lock, then load-or-create and verify.
+    ///
+    /// <para>★ S90 corrected this comment, which used to promise that opening an existing
+    /// history writes nothing. That is true of a **v2** history — validation is read-only, so
+    /// a run that fails before its first reservation leaves the file byte-identical. It is NOT
+    /// true of a **v1** history: opening one performs exactly one atomic migration write to
+    /// give the career its lineage label, and nothing else. A career must have its identity
+    /// before any retention log can bind to it.</para>
+    ///
+    /// <para>A history CREATED here is born v2. S90 never writes a v1 file at any instant —
+    /// creating one and migrating it on first open would mean two writes and a half-created
+    /// state that no reader has a name for.</para></summary>
     public static HistoryStore Open(string path, string worldFingerprint)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -103,7 +155,7 @@ public sealed class HistoryStore : IDisposable
 
         try
         {
-            HistoryStateV1 state;
+            HistoryStateV2 state;
             if (File.Exists(full))
             {
                 byte[] bytes;
@@ -115,7 +167,38 @@ public sealed class HistoryStore : IDisposable
                 }
                 // A parse failure is NEVER treated as "no file". Starting fresh at 1 on top
                 // of a corrupt-but-real history reissues every number in it.
-                state = HistorySchemaV1.Parse(bytes);
+                //
+                // The version is peeked FIRST so the right parser runs. Handing a v2 file to
+                // the v1 parser would refuse it as "unknown key 'historyId'" — true, and
+                // completely misleading about what is wrong.
+                var version = HistorySchemaV2.PeekVersion(bytes);
+                if (version == HistoryStateV2.SchemaVersion)
+                {
+                    state = HistorySchemaV2.Parse(bytes);
+                }
+                else if (version == HistoryStateV1.SchemaVersion)
+                {
+                    // ── MIGRATION: one way, once, under the lock already held. ──
+                    // Counters cross untouched; only the lineage label is added. A
+                    // migration that moved a counter would reissue numbers already worn.
+                    var v1 = HistorySchemaV1.Parse(bytes);
+                    if (!string.Equals(v1.WorldFingerprint, worldFingerprint, StringComparison.Ordinal))
+                        throw new HistoryException(HistoryError.FingerprintMismatch,
+                            $"this history belongs to a different world. History '{full}' is bound to " +
+                            $"{v1.WorldFingerprint}, the world given is {worldFingerprint}.");
+                    // ★ If minting or the atomic rewrite fails, PublishAtomically throws with
+                    // the v1 file byte-identical and no counter advanced — so the run stops and
+                    // a retry is possible. No log folder is created here, and none can be:
+                    // the writer is constructed later, from a store this line has not returned.
+                    state = HistoryStateV2.FromV1(v1, _idSource());
+                    PublishAtomically(full, state);
+                }
+                else
+                {
+                    throw new HistoryException(HistoryError.UnsupportedVersion,
+                        $"unsupported history schemaVersion {version.ToString(CultureInfo.InvariantCulture)} " +
+                        "(this build reads 1 and 2).");
+                }
 
                 if (!string.Equals(state.WorldFingerprint, worldFingerprint, StringComparison.Ordinal))
                     throw new HistoryException(HistoryError.FingerprintMismatch,
@@ -126,7 +209,8 @@ public sealed class HistoryStore : IDisposable
             {
                 // First creation is an atomic publication too — never streamed straight
                 // to the final path, so a half-written history can never be found there.
-                state = HistoryStateV1.Fresh(worldFingerprint);
+                // Born v2: the lineage label exists before the first number is issued.
+                state = HistoryStateV2.Fresh(_idSource(), worldFingerprint);
                 PublishAtomically(full, state);
             }
 
@@ -244,9 +328,9 @@ public sealed class HistoryStore : IDisposable
     //  Temp-file uniqueness comes from `Guid.NewGuid()`, which is the idiom five
     //  suite files already use. Deliberately NOT any simulation RNG: an allocator
     //  that drew from a game stream would change the basketball by saving.
-    private static void PublishAtomically(string path, HistoryStateV1 state)
+    private static void PublishAtomically(string path, HistoryStateV2 state)
     {
-        var bytes = HistorySchemaV1.Serialize(state);
+        var bytes = HistorySchemaV2.Serialize(state);
         var dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) ?? ".";
         var temp = System.IO.Path.Combine(dir, $".charm-history-{Guid.NewGuid():N}.tmp");
         try
