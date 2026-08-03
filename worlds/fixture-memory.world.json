@@ -1,0 +1,531 @@
+{
+  "schemaVersion": 4,
+  "metadata": {
+    "kind": "authored",
+    "eraLabel": "fixture-memory",
+    "division": "D1"
+  },
+  "tiers": [
+    {
+      "id": "power",
+      "floor": 40,
+      "equilibrium": 75,
+      "pullbackIntensity": 0.25
+    },
+    {
+      "id": "highMid",
+      "floor": 20,
+      "equilibrium": 55,
+      "pullbackIntensity": 0.45
+    },
+    {
+      "id": "lowMid",
+      "floor": 8,
+      "equilibrium": 35,
+      "pullbackIntensity": 0.65
+    },
+    {
+      "id": "low",
+      "floor": 0,
+      "equilibrium": 18,
+      "pullbackIntensity": 0.85
+    }
+  ],
+  "conferences": [
+    {
+      "id": 1,
+      "name": "Granite Coast Conference",
+      "shortName": "Granite",
+      "tierId": "power",
+      "games": 6,
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 5,
+      "tourneyOffsetDays": 4
+    },
+    {
+      "id": 2,
+      "name": "River Valley League",
+      "shortName": "River Valley",
+      "tierId": "highMid",
+      "games": 6,
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 5,
+      "tourneyOffsetDays": 8
+    },
+    {
+      "id": 3,
+      "name": "Prairie Athletic Association",
+      "shortName": "Prairie",
+      "tierId": "lowMid",
+      "games": 6,
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 5,
+      "tourneyOffsetDays": 11
+    },
+    {
+      "id": 4,
+      "name": "Timberline Conference",
+      "shortName": "Timberline",
+      "tierId": "low",
+      "games": 6,
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 5,
+      "tourneyOffsetDays": 4
+    }
+  ],
+  "places": [
+    {
+      "placeId": 1,
+      "name": "Harborview",
+      "subdivision": "ME",
+      "country": "US",
+      "lat": 43.66,
+      "long": -70.26,
+      "tags": []
+    },
+    {
+      "placeId": 2,
+      "name": "Stonebridge",
+      "subdivision": "NH",
+      "country": "US",
+      "lat": 43.21,
+      "long": -71.54,
+      "tags": []
+    },
+    {
+      "placeId": 3,
+      "name": "Cape Union",
+      "subdivision": "MA",
+      "country": "US",
+      "lat": 41.7,
+      "long": -70.3,
+      "tags": []
+    },
+    {
+      "placeId": 4,
+      "name": "Beacon Point",
+      "subdivision": "RI",
+      "country": "US",
+      "lat": 41.49,
+      "long": -71.31,
+      "tags": []
+    },
+    {
+      "placeId": 5,
+      "name": "Colonyville",
+      "subdivision": "CT",
+      "country": "US",
+      "lat": 41.31,
+      "long": -72.92,
+      "tags": []
+    },
+    {
+      "placeId": 6,
+      "name": "Riverbend",
+      "subdivision": "OH",
+      "country": "US",
+      "lat": 39.1,
+      "long": -84.51,
+      "tags": []
+    },
+    {
+      "placeId": 7,
+      "name": "Riverbend",
+      "subdivision": "IN",
+      "country": "US",
+      "lat": 39.77,
+      "long": -86.16,
+      "tags": []
+    },
+    {
+      "placeId": 8,
+      "name": "Millrace",
+      "subdivision": "KY",
+      "country": "US",
+      "lat": 38.25,
+      "long": -85.76,
+      "tags": []
+    },
+    {
+      "placeId": 9,
+      "name": "Twin Locks",
+      "subdivision": "TN",
+      "country": "US",
+      "lat": 36.16,
+      "long": -86.78,
+      "tags": []
+    },
+    {
+      "placeId": 10,
+      "name": "Gapville",
+      "subdivision": "VA",
+      "country": "US",
+      "lat": 36.6,
+      "long": -83.71,
+      "tags": []
+    },
+    {
+      "placeId": 11,
+      "name": "Windom",
+      "subdivision": "KS",
+      "country": "US",
+      "lat": 38.38,
+      "long": -97.91,
+      "tags": []
+    },
+    {
+      "placeId": 12,
+      "name": "Tallgrass",
+      "subdivision": "NE",
+      "country": "US",
+      "lat": 40.81,
+      "long": -96.68,
+      "tags": []
+    },
+    {
+      "placeId": 13,
+      "name": "Flint Hills",
+      "subdivision": "OK",
+      "country": "US",
+      "lat": 36.15,
+      "long": -95.99,
+      "tags": []
+    },
+    {
+      "placeId": 14,
+      "name": "Panhandle",
+      "subdivision": "TX",
+      "country": "US",
+      "lat": 35.22,
+      "long": -101.83,
+      "tags": []
+    },
+    {
+      "placeId": 15,
+      "name": "Homestead",
+      "subdivision": "SD",
+      "country": "US",
+      "lat": 43.55,
+      "long": -96.73,
+      "tags": []
+    },
+    {
+      "placeId": 16,
+      "name": "Treeline",
+      "subdivision": "MT",
+      "country": "US",
+      "lat": 46.59,
+      "long": -112.04,
+      "tags": []
+    },
+    {
+      "placeId": 17,
+      "name": "Ridgeway",
+      "subdivision": "ID",
+      "country": "US",
+      "lat": 43.62,
+      "long": -116.2,
+      "tags": []
+    },
+    {
+      "placeId": 18,
+      "name": "Icefield",
+      "subdivision": "WY",
+      "country": "US",
+      "lat": 41.14,
+      "long": -104.82,
+      "tags": []
+    },
+    {
+      "placeId": 19,
+      "name": "Lost Creek",
+      "subdivision": "NV",
+      "country": "US",
+      "lat": 39.16,
+      "long": -119.77,
+      "tags": []
+    },
+    {
+      "placeId": 20,
+      "name": "Ore Basin",
+      "subdivision": "UT",
+      "country": "US",
+      "lat": 40.76,
+      "long": -111.89,
+      "tags": []
+    },
+    {
+      "placeId": 21,
+      "name": "Lahaina",
+      "subdivision": "HI",
+      "country": "US",
+      "lat": 20.8783,
+      "long": -156.6825,
+      "tags": [
+        "exotic"
+      ]
+    }
+  ],
+  "schools": [
+    {
+      "id": 1,
+      "name": "Harbor State",
+      "abbr": "HARB",
+      "color": "#1B2A55",
+      "placeId": 1,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 82,
+      "historicalPrestige": 82,
+      "rivalId": null
+    },
+    {
+      "id": 2,
+      "name": "Granite Tech",
+      "abbr": "GRTC",
+      "color": "#5A5A5A",
+      "placeId": 2,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 74,
+      "historicalPrestige": 74,
+      "rivalId": null
+    },
+    {
+      "id": 3,
+      "name": "Cape Union",
+      "abbr": "CPUN",
+      "color": "#7A1F2B",
+      "placeId": 3,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 68,
+      "historicalPrestige": 68,
+      "rivalId": null
+    },
+    {
+      "id": 4,
+      "name": "Lighthouse College",
+      "abbr": "LGHT",
+      "color": "#0E6B5C",
+      "placeId": 3,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 55,
+      "historicalPrestige": 55,
+      "rivalId": null
+    },
+    {
+      "id": 5,
+      "name": "Old Colony",
+      "abbr": "OLDC",
+      "color": "#243B8A",
+      "placeId": 5,
+      "conferenceId": 1,
+      "division": "D1",
+      "currentPrestige": 47,
+      "historicalPrestige": 47,
+      "rivalId": null
+    },
+    {
+      "id": 6,
+      "name": "Riverbend University",
+      "abbr": "RVBD",
+      "color": "#B3541E",
+      "placeId": 6,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 60,
+      "historicalPrestige": 60,
+      "rivalId": null
+    },
+    {
+      "id": 7,
+      "name": "Fort Calder",
+      "abbr": "FTCD",
+      "color": "#3E2C6E",
+      "placeId": 7,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 48,
+      "historicalPrestige": 48,
+      "rivalId": null
+    },
+    {
+      "id": 8,
+      "name": "Millrace State",
+      "abbr": "MLRC",
+      "color": "#0F5132",
+      "placeId": 8,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 41,
+      "historicalPrestige": 41,
+      "rivalId": null
+    },
+    {
+      "id": 9,
+      "name": "Twin Locks",
+      "abbr": "TWLK",
+      "color": "#8A6D0B",
+      "placeId": 9,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 33,
+      "historicalPrestige": 33,
+      "rivalId": null
+    },
+    {
+      "id": 10,
+      "name": "Cumberland Gap A\u0026M",
+      "abbr": "CGAM",
+      "color": "#5C0A0A",
+      "placeId": 10,
+      "conferenceId": 2,
+      "division": "D1",
+      "currentPrestige": 25,
+      "historicalPrestige": 25,
+      "rivalId": null
+    },
+    {
+      "id": 11,
+      "name": "Prairie Wind",
+      "abbr": "PRWD",
+      "color": "#2F6DAE",
+      "placeId": 11,
+      "conferenceId": 3,
+      "division": "D1",
+      "currentPrestige": 45,
+      "historicalPrestige": 45,
+      "rivalId": null
+    },
+    {
+      "id": 12,
+      "name": "Big Bluestem",
+      "abbr": "BBLU",
+      "color": "#4A7023",
+      "placeId": 12,
+      "conferenceId": 3,
+      "division": "D1",
+      "currentPrestige": 36,
+      "historicalPrestige": 36,
+      "rivalId": null
+    },
+    {
+      "id": 13,
+      "name": "Flint Hills College",
+      "abbr": "FLNT",
+      "color": "#7C7C7C",
+      "placeId": 13,
+      "conferenceId": 3,
+      "division": "D1",
+      "currentPrestige": 28,
+      "historicalPrestige": 28,
+      "rivalId": null
+    },
+    {
+      "id": 14,
+      "name": "Dust Bowl State",
+      "abbr": "DBST",
+      "color": "#A0522D",
+      "placeId": 14,
+      "conferenceId": 3,
+      "division": "D1",
+      "currentPrestige": 19,
+      "historicalPrestige": 19,
+      "rivalId": null
+    },
+    {
+      "id": 15,
+      "name": "Sod House",
+      "abbr": "SODH",
+      "color": "#6B4226",
+      "placeId": 15,
+      "conferenceId": 3,
+      "division": "D1",
+      "currentPrestige": 11,
+      "historicalPrestige": 11,
+      "rivalId": null
+    },
+    {
+      "id": 16,
+      "name": "Timberline Institute",
+      "abbr": "TMBR",
+      "color": "#14452F",
+      "placeId": 16,
+      "conferenceId": 4,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 17,
+      "name": "North Ridge",
+      "abbr": "NRDG",
+      "color": "#1F3A5F",
+      "placeId": 17,
+      "conferenceId": 4,
+      "division": "D1",
+      "currentPrestige": 22,
+      "historicalPrestige": 22,
+      "rivalId": null
+    },
+    {
+      "id": 18,
+      "name": "Glacier Poly",
+      "abbr": "GLPY",
+      "color": "#4F7CAC",
+      "placeId": 18,
+      "conferenceId": 4,
+      "division": "D1",
+      "currentPrestige": 15,
+      "historicalPrestige": 15,
+      "rivalId": null
+    },
+    {
+      "id": 19,
+      "name": "Lost Creek",
+      "abbr": "LSTC",
+      "color": "#3B3B6D",
+      "placeId": 19,
+      "conferenceId": 4,
+      "division": "D1",
+      "currentPrestige": 8,
+      "historicalPrestige": 8,
+      "rivalId": null
+    },
+    {
+      "id": 20,
+      "name": "Basin Mining School",
+      "abbr": "BSMN",
+      "color": "#5E503F",
+      "placeId": 20,
+      "conferenceId": 4,
+      "division": "D1",
+      "currentPrestige": 2,
+      "historicalPrestige": 2,
+      "rivalId": null
+    }
+  ]
+}

@@ -71,6 +71,19 @@
     <None Include="..\..\worlds\fixture-schedule.world.json" Link="worlds\fixture-schedule.world.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- S96 — the host-memory fixture, and it exists for the same reason fixture-schedule
+         did. The TINY fixture cannot test this session either: its five-team leagues at 16
+         games meet every pair exactly four times, so no pair is ever odd, no residual ever
+         exists, and there is nothing for memory to flip. And fixture-schedule cannot PLAY a
+         season at all — its two-school league is refused by the date layer — while a career
+         lifecycle check must schedule, play and finalize real seasons to produce the logs it
+         then reads back. So: four five-team leagues at SIX games. Every pair meets once or
+         twice, twenty pairs across the world meet an odd number of times, every school is
+         owed exactly one residual, and a whole season is sixty games. Derived from
+         fixture-tiny and written through `world rewrite`, so it is canonical bytes. -->
+    <None Include="..\..\worlds\fixture-memory.world.json" Link="worlds\fixture-memory.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- S92 — the distance golden. Expected miles are computed OUTSIDE .NET from the exact
          serialized coordinates using the spherical haversine form and the exact radius
          3958.7613: an independent IMPLEMENTATION OF THE SAME MODEL, which is the only kind

@@ -8615,7 +8615,7 @@ Three consequences follow, all honest, none of them defects:
 
 - **A team plays its own league's authored number of games, not 30** — 14 for the Ivy, Patriot and WCC; 16 for thirteen leagues; 18 for fourteen; 20 for the Atlantic Sun. The stock season is **2,818 games**, and that number is the sum of `n·G/2` over the 32 leagues rather than a constant anybody typed.
 - **The fourteen Independent schools play ZERO games.** Their conference is authored at `Games = 0`, which is R14, and it is now a live case in the stock world rather than a fixture curiosity. They carry rosters and finish 0-0.
-- ★ **THE SCHEDULE CONSUMES NO RANDOMNESS AT ALL.** Every draw the old builder made lived in the non-conference filler. The conference slate is fully determined by the world file, so **the same world produces an identical schedule at every seed** — asserted in Phase 55, deliberately, so that the day a session wires a scheduler RNG the check goes red and says so. The seed still drives every possession of every game. What it no longer does is decide who plays whom, which means the same pairs are doubled and the same pairs skipped every season forever. **That is a real basketball gap and Session 94's stored memory of who hosted last time is the answer to it** — recorded here, not solved here.
+- ★ **THE SCHEDULE CONSUMES NO RANDOMNESS AT ALL.** Every draw the old builder made lived in the non-conference filler. The conference slate is fully determined by the world file, so **the same world produces an identical schedule at every seed** — asserted in Phase 55, deliberately, so that the day a session wires a scheduler RNG the check goes red and says so. The seed still drives every possession of every game. What it no longer does is decide who plays whom, which means the same pairs are doubled and the same pairs skipped every season forever. **That was a real basketball gap and S96's host memory is the answer to its hosting half** — a season now reads season N−1's retained log and flips every single-meeting host, so a career alternates gyms year over year (see "Host memory" below). What is still fully determined and still repeats forever is WHICH pairs double and which skip; that half stays open as O-79.
 
 **The shape.** For a conference of `n` schools authored `Games = G` and `Skip = k`: `p = n − 1 − k` opponents are actually played, `q, r = divmod(G, p)`, so **`r` opponents are met `q+1` times, `p − r` are met `q` times, and `k` are not played at all**. "Home-and-home with everybody, twice with a few" is the stock world's case of that rule, never the rule itself.
 
@@ -8633,7 +8633,7 @@ Three consequences follow, all honest, none of them defects:
 
 **Orientation — R3 is a HARD LINE: every team plays an exactly even home/away conference season, `G/2` each.** A pair meeting `m` times contributes `floor(m/2)` home and `floor(m/2)` away **by construction**, alternating from the lower school id, and those games never enter the flow. Only an **odd `m`** leaves one game undecided — the **RESIDUAL**, always the last of that pair's `m` games. Residuals go to an integral flow with exact quotas: one node per free residual at capacity one, each residual feeding its two schools at capacity one, each school feeding the sink at exactly its remaining home quota. Solved by deterministic augmenting paths with a fixed candidate order, so one specific orientation comes back and never a choice between two.
 
-★ **WHY A FLOW AND NOT A EULERIAN WALK, AND WHY THE OBVIOUS CHECK PROVES NOTHING.** Measured before S93 changed anything: **all 347 stock schools already sat at exactly 8 home / 8 away in conference play, at eight different seeds, in all 32 leagues.** The old orientation was one Hierholzer circuit over all 30 games and every degree was even, so out equalled in at every school — the even split was an *accident of arithmetic*, unprotected and untested, and the first authored slate producing an odd meeting count would have broken it silently. So an assertion that "every team is exactly even" **passes on the pre-S93 code** and is worthless as evidence. What the flow buys is **PRE-FIXED VENUES**, which a Eulerian cannot honour: `FixedResidualHost(Low, High, Host)` is the Session 94 seam, built now and **always empty in production** because there is no host memory yet. Fixed residuals consume home quota **before any flow structure exists**, so an over-commitment is refused by the doorman with `RejectedBeforeFlow` set and the school named — and a set that passes that cheap guard and is still impossible is refused by the flow itself. Phase 84's A9 exercises all three arms; a Eulerian walk fails every one.
+★ **WHY A FLOW AND NOT A EULERIAN WALK, AND WHY THE OBVIOUS CHECK PROVES NOTHING.** Measured before S93 changed anything: **all 347 stock schools already sat at exactly 8 home / 8 away in conference play, at eight different seeds, in all 32 leagues.** The old orientation was one Hierholzer circuit over all 30 games and every degree was even, so out equalled in at every school — the even split was an *accident of arithmetic*, unprotected and untested, and the first authored slate producing an odd meeting count would have broken it silently. So an assertion that "every team is exactly even" **passes on the pre-S93 code** and is worthless as evidence. What the flow buys is **PRE-FIXED VENUES**, which a Eulerian cannot honour: `FixedResidualHost(Low, High, Host)` is the seam this built and left empty; **S96 filled it** — in production it now carries last season's residual hosts, inverted. Fixed residuals consume home quota **before any flow structure exists**, so an over-commitment is refused by the doorman with `RejectedBeforeFlow` set and the school named — and a set that passes that cheap guard and is still impossible is refused by the flow itself. Phase 84's A9 exercises all three arms; a Eulerian walk fails every one.
 
 **Legality is a necessary filter, not a promise.** `G ≥ 0`, `G ≤ 30`, `G` even; `k ≥ 0`; `G = 0` requires `k = 0` (a suspended league carries a canonical skip of zero); `n ≥ 2`; `k ≤ n−2`; `q ≥ 1` (every played opponent gets a game); `n·k` even and `n·r` even (a `k`-regular and an `r`-regular graph must be able to exist — which is why an **odd-sized league can never carry an odd skip**). The size-free half runs in the world validator at load; the rest runs in the season preflight, so a rigged world still *loads* and the preflight is what names the impossible slate. **Four verdicts, kept strictly separate and never collapsed:** `InvalidConfiguration` (the authored world is wrong — cheap, static), `InfeasibleUnderConstraints` (valid configuration, PROVEN no slate exists), `SearchBudgetExhausted` (did not find one; proves nothing), `UnsupportedConferenceSize` (above the solver's hard cap). Precedence is fixed: static validation → supported-size check → search → feasible/infeasible. For `n ≤ 20` the search is exhaustive, which is what licenses the word *infeasible*; **above 20 the solver refuses without searching**, zero nodes explored. The hardest legal configuration found at the cap — twenty schools, twenty-two games, three skipped — terminates in 126,508 nodes and 14 ms.
 
@@ -8660,7 +8660,7 @@ Identity block (world, seed, **schedule fingerprint**, and a schedule line that 
 
 ### Deferred out of this pass
 
-Home-court advantage **SHIPPED IN S95** — see "Home court — the road penalty" below; what remains deferred there is the crowd model itself (prestige and distance, R4) and the per-team emergent magnitude (R7); real scheduling texture — **non-conference play in its entirety** (S93 deleted the placeholder graph rather than carrying it; it is its own session and starts from nothing), dates and travel (S95), the stored memory of who hosted last time (S94, whose seam is built and empty), buy games, and conference tournaments; the postseason (Pass 2 ends at the regular-season table); persistence of results (a season is recomputed, never saved — the save-format discipline arrives with the career layer per the standing note); the prestige dynamics reading these standings (Pass 3, next per the arc map); and calibration tuning itself — whose measuring stick Session 31 built (the section below) and whose standing precondition, a living varied population, this pass satisfies. **Per-player season statistics were deferred out of this pass and SHIPPED IN S77** — see "The season stat layer" below; what remains deferred there is per-GAME retention (game logs, splits, streaks).
+Home-court advantage **SHIPPED IN S95** — see "Home court — the road penalty" below; what remains deferred there is the crowd model itself (prestige and distance, R4) and the per-team emergent magnitude (R7); real scheduling texture — **non-conference play in its entirety** (S93 deleted the placeholder graph rather than carrying it; it is its own session and starts from nothing), dates and travel (S95), the stored memory of who hosted last time (**SHIPPED IN S96** — see "Host memory" below), buy games, and conference tournaments; the postseason (Pass 2 ends at the regular-season table); persistence of results (a season is recomputed, never saved — the save-format discipline arrives with the career layer per the standing note); the prestige dynamics reading these standings (Pass 3, next per the arc map); and calibration tuning itself — whose measuring stick Session 31 built (the section below) and whose standing precondition, a living varied population, this pass satisfies. **Per-player season statistics were deferred out of this pass and SHIPPED IN S77** — see "The season stat layer" below; what remains deferred there is per-GAME retention (game logs, splits, streaks).
 
 # The season stat layer — per-player season records, keyed by the person (Session 77, 2026-07-26)
 
@@ -10289,7 +10289,7 @@ In each team's own chronological sequence, never league-wide slots: between two 
 
 ### Data and schema (v4; the fingerprint's third move, invoked)
 
-`conf.csv` gained `Weeks` and `TourneyOpensDaysBeforeSelectionSunday` beside `Skip`; the long-dead `D1/D2/D3` nights are finally read (normalised to lowercase at the authoring boundary); `TDay1..5` stay in place, deliberately unread. Every conference in a world file carries `nights`, `weeks`, `tourneyOffsetDays` (null = none); **v3 is refused by name — it cannot say WHEN its own season is** — with a Phase 83 negative control on the words. The date lives ON the game record (a fifth field the structural fingerprint provably cannot see — it hashes four fields by name; C1 proves before-and-after identity); a **new DATED fingerprint** over `index|date|home|away` joins it, in exact golden parity with the oracle. The season start year is **2026, stored never hardcoded** (`SeasonDefaultStartYear`); C13 builds 2031 and proves identical structure, different dates, moved fingerprint. `world rewrite <in> <out>` joined the CLI: one-shot canonicalisation through the single projection. The showcase game is a wired-and-inert seam (`SelectShowcaseGames`, selecting nothing), exactly as `FixedResidualHost` shipped at S93.
+`conf.csv` gained `Weeks` and `TourneyOpensDaysBeforeSelectionSunday` beside `Skip`; the long-dead `D1/D2/D3` nights are finally read (normalised to lowercase at the authoring boundary); `TDay1..5` stay in place, deliberately unread. Every conference in a world file carries `nights`, `weeks`, `tourneyOffsetDays` (null = none); **v3 is refused by name — it cannot say WHEN its own season is** — with a Phase 83 negative control on the words. The date lives ON the game record (a fifth field the structural fingerprint provably cannot see — it hashes four fields by name; C1 proves before-and-after identity); a **new DATED fingerprint** over `index|date|home|away` joins it, in exact golden parity with the oracle. The season start year is **2026, stored never hardcoded** (`SeasonDefaultStartYear`); C13 builds 2031 and proves identical structure, different dates, moved fingerprint. `world rewrite <in> <out>` joined the CLI: one-shot canonicalisation through the single projection. The showcase game is a wired-and-inert seam (`SelectShowcaseGames`, selecting nothing), exactly as `FixedResidualHost` shipped at S93 and was filled at S96.
 
 ### Authored values (stock, ruled)
 
@@ -10468,3 +10468,134 @@ The crowd model itself — **R4's prestige and distance**, with city size ruled 
 **R7's emergent per-team magnitude** (*"a team full of freshman, it brings it down more"*). Today the
 shave is one authored integer, identical for every road player on every road floor. Semi-home and
 neutral sites park with the tournament layer that will own the site fact.
+
+---
+
+## Host memory — a season remembers who hosted (Session 96, 2026-08-03)
+
+A conference pair that meets an **odd** number of times cannot split those meetings evenly. One of
+the two schools gets the extra home game — the **residual** — and until this session the slate
+decided it the same way every year, because the slate takes no randomness and had no past. In a
+career, the same school hosted the extra game forever. S95 is what made that expensive: hosting is
+now worth about three points of margin and nine points of win rate, so a school drawing the doubled
+home fixture against its toughest rival drew it every season, permanently.
+
+**A season now reads season N−1's retained log and fixes every one of those residuals to the other
+school.** On the stock world that is **526 pairs across 14 leagues**, derived at runtime and printed
+on the season page. Season 3 flips back, so a career alternates. `Program.Season.Memory.cs` owns the
+layer; Phase 87 owns the proofs.
+
+### ★ MEMORY MEANS SEASON N−1, AND IT IS FOUND BY ARITHMETIC
+
+The season about to be scheduled is the number the history's counter is about to hand out
+(`HistoryStore.PeekNextSeasonId`, S96's one addition to `Charm.History` — a read, no reservation, no
+schema change). The previous career season is that minus one, and the candidate file path is computed
+from it exactly. It exists or it does not.
+
+**There is deliberately no directory listing, no filename parsing and no "highest log found" search.**
+That would be the *latest retained* season, which is a different thing. A career that logged season 1,
+ran season 2 without retention and reached season 3 would flip season 1's hosts and call it
+year-over-year alternation — and every conservation check, quota check and determinism check in the
+suite would have stayed green while it did. Phase 87's C8(ii) and C8(iii) are the only assertions that
+discriminate on this, and they do it the same way both times: a valid older log sits right there, and
+the correct answer is no memory at all.
+
+The peek is sound because **reservation happens after the slate is built** (S89: a schedule that fails
+to build must not have spent a season number), so the memory layer cannot wait for it. C9c proves the
+peek is honest rather than asserting it — the file's bytes do not move, and the number the next
+reservation actually returns is the number the peek promised.
+
+### ★ NO FALLBACK, EVER
+
+Once the candidate is season N−1's log, **any** failure to find, read or validate it disables host
+memory for the run and no other log is opened. Five statuses, all of them values and none of them
+exceptions:
+
+| Status | Means | Page says |
+|---|---|---|
+| `NoHistory` | legacy run, no career attached | *nothing* |
+| `FirstSeason` | season 1 — season 0 was never a candidate | none (first season of this career) |
+| `NoPublishedLog` | N−1 spent a number and published nothing | none (no log for season N−1) |
+| `Unreadable` | the candidate is present and cannot be trusted | none (season N−1 log unreadable: *category*) |
+| `Loaded` | a complete, valid source | season N−1 — *n* residuals flipped across *m* leagues |
+
+`Loaded` means **a valid source log**, not "at least one residual was found" — a season whose league
+had no odd pairs loads and legitimately remembers nothing (C2f).
+
+The problem categories follow the reader's own typed failure surface and invent nothing. `GameLogError`
+names the three binding failures separately, so a log from another **career**, another **world** and
+another **season** stay three different things. It does not distinguish the kinds of internal damage —
+block checksum, payload digest, footer counts, trailing bytes — so those collapse honestly into
+`Corrupt`. The catch is bounded to the reader's typed exception plus real I/O failures: a bad file
+cannot stop a season, and a programming failure is never reclassified as bad memory.
+
+### ★ SCHEDULE FACTS ONLY, ENFORCED BY WHAT THE CODE CAN SEE
+
+Each log block is projected **immediately** into three fields — home school, away school,
+conference-or-not — and nothing wider travels past that line. The log also holds scores, possession
+counts, overtimes, every roster card and every man's stat line. None of it reaches the scheduler, and
+the projection is the reason rather than a promise that nobody will read them.
+
+C10 proves this **behaviourally**, not by searching the source for forbidden words: two careers on the
+same world play completely different basketball (different seeds, different scores) and produce
+**identical** memory, key for key. A grep can rot into a check that passes for the wrong reason; this
+cannot.
+
+### ★ THE THEOREM — WHY THE FLIP CANNOT BREAK R3
+
+For a school in `d` odd pairs across a `G`-game league: its even-split pairs hand it `(G − d)/2` homes,
+so it must win exactly `d/2` residuals — every season, whatever memory says. Inverting every residual
+re-awards exactly `d/2`. **Quota is preserved identically**; memory reallocates WHICH games, never how
+many.
+
+`d` has the same parity as `G`, and an odd `G` is already refused by production
+(`ConferenceStaticLegality`: *"a conference season must be even"*), so an odd `d` is unreachable through
+any world that loads. Production adds **no new assertion** — it relies on that named guard, and Phase 87
+C5e verifies the guard fires and names itself rather than inventing a second refusal for an unreachable
+state. C5a–d verify all four parts numerically over every playing league of the stock world.
+
+### ★ MEMORY FOLLOWS THE SCHOOL PAIR, NOT THE CONFERENCE
+
+Hosting fairness is a debt between two schools. If both move to a new league together and still meet,
+the alternation should survive the move. So `ResidualsToFlip` validates membership and parity against
+the **current** conference and never asks which conference the memory came from.
+
+Recorded honestly: this ruling cannot be exercised today. The world fingerprint hashes the entire world
+file, conference `games` and `skip` and every school's league included, so an edited world **refuses to
+open the same career at all**. The pair-scoped rule and the parity-change filter are correct code
+waiting for in-career realignment; they are belt-and-braces at the world level, not load-bearing.
+
+### The five conditions, and why a failure is silence rather than refusal
+
+A remembered entry is used only if the pair is normalized, both schools are in this league, the pair
+exists in this season's meetings, the current count is **odd**, and the remembered host is one of the
+two. Anything else is **silently skipped**.
+
+That matters because `OrientConferenceSlate` correctly *refuses* a fixed host named on an even pair —
+and a refusal there takes the whole season down. A league changing size between careers is ordinary; a
+season failing to schedule because of it is not. Parity-changed pairs are dropped in the memory layer,
+never left for the slate's guard to catch.
+
+### The page moved
+
+The season page used to print its schedule and dated fingerprints **before** the run, off a throwaway
+preflight schedule built with no career attached. That was safe only while a schedule was a pure
+function of the world. Memory can now move a venue, so the preflight and the schedule that actually
+plays are two different schedules. **Both lines moved below the run**, where they describe the games
+that happened, and the host-memory line joins them. Legacy mode prints no memory line at all.
+
+### The fixture this needed
+
+`worlds/fixture-memory.world.json` — four five-team leagues at **six** conference games, 60 games a
+season, 20 odd pairs, every school owed exactly one residual. It exists for the same reason
+`fixture-schedule` did at S93: the tiny fixture's leagues meet every pair exactly four times, so no
+residual ever exists and there is nothing to flip. And `fixture-schedule` cannot *play* a season at all
+— its two-school league is refused by the date layer — while a career-lifecycle check must schedule,
+play and finalize real seasons to produce the logs it reads back.
+
+### Still open here
+
+**Which pairs double and which skip is still fully determined and still repeats forever** (O-79's
+remaining half), along with the soft objectives (`SkipUrgency` and friends) held out of S93 because they
+need this memory to apply. MTE participation memory is named and not pre-shaped for — the reader
+projects hosting facts only, and widening it is a ruling, not an extension.

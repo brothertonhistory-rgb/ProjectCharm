@@ -120,6 +120,14 @@ internal static partial class Program
         /// reports the value that PLAYED rather than re-reading config.json and reporting
         /// a number that might not be the one the games were played at.</summary>
         public int RoadShave { get; init; }
+        /// <summary>★ S96 — the dated fingerprint OF THE SCHEDULE THAT PLAYED. It used to be
+        /// computed on the page from a throwaway preflight schedule; once memory can move a
+        /// venue those two are different schedules, and the page must print the one whose
+        /// games were actually played.</summary>
+        public string DatedFingerprint { get; init; } = "";
+        /// <summary>★ S96 — what host memory did this season. Page-facing; the suite reads
+        /// the parts it asserts from the schedule itself, never from these counters.</summary>
+        public SeasonMemoryOutcome Memory { get; init; } = SeasonMemoryOutcome.None;
     }
 
     /// <summary>Everything the two accumulators need to turn a stamped player id back into a
@@ -241,6 +249,11 @@ internal static partial class Program
         public List<(int Home, int Away)> Games { get; init; } = new();
         public long SearchNodes { get; init; }
         public bool UsedCanonicalCirculant { get; init; }
+        /// <summary>★ S96 — how many residual venues host memory actually supplied to THIS
+        /// slate. Zero everywhere memory is absent, and zero for a slate built from an
+        /// explicit `fixedHosts` list (Phase 84's A9), so the season's "residuals flipped"
+        /// counts what memory did and nothing else.</summary>
+        public int MemoryFixedHosts { get; init; }
     }
 
     private const int SeasonConferenceSizeCap = 20;
@@ -440,10 +453,22 @@ internal static partial class Program
     /// the r-regular extra graph so that it CONTAINS the rivalry matching (rivalries are placed
     /// by construction, never searched for); build the k-regular skipped graph on the
     /// complement; everything else meets q times; orient.</para></summary>
+    /// <param name="fixedHosts">Venues decided by the caller. Phase 84's A9 is the only user;
+    /// production supplies <paramref name="memory"/> instead.</param>
+    /// <param name="memory">★ S96 — last season's residual hosts. The flip list cannot be
+    /// computed by the caller because it needs this league's MEETING COUNTS, and those are
+    /// not known until the extra-meeting shape has been solved a few lines below. So the
+    /// memory comes in whole and the pure `ResidualsToFlip` runs at the one point where both
+    /// halves exist. Mutually exclusive with <paramref name="fixedHosts"/>: two sources of
+    /// venue truth for one slate is a contradiction, not a merge.</param>
     private static ConferenceSlate BuildConferenceSlate(
         List<int> members, int games, int skip, List<(int Lo, int Hi)> rivalries,
-        string label, List<FixedResidualHost>? fixedHosts = null)
+        string label, List<FixedResidualHost>? fixedHosts = null, HostMemory? memory = null)
     {
+        if (fixedHosts is not null && memory is not null)
+            throw new InvalidOperationException(
+                $"{label}both an explicit fixed-host list and host memory were supplied; " +
+                "a slate has exactly one source of decided venues.");
         var n = members.Count;
         var reason = ConferenceSlateLegality(n, games, skip);
         if (reason is not null)
@@ -503,7 +528,15 @@ internal static partial class Program
                 meetings[(members[i], members[j])] =
                     skipped.Contains((i, j)) ? 0 : q + (extra.Contains((i, j)) ? 1 : 0);
 
-        return OrientConferenceSlate(members, games, meetings, label, fixedHosts, nodes, usedCirculant);
+        // ★ S96 — the one point where memory meets this league's actual meeting counts.
+        var flips = memory is null ? fixedHosts : ResidualsToFlip(memory, meetings, members);
+        // ★ ZERO-PATH CALL SHAPE PRESERVED. Null and empty behave identically downstream
+        //   (line 555's `?? new List<>()`), but passing null keeps a memory-less season's
+        //   call byte-for-byte the call it made before this session existed.
+        return OrientConferenceSlate(
+            members, games, meetings, label,
+            flips is null || flips.Count == 0 ? null : flips, nodes, usedCirculant,
+            memory is null ? 0 : flips!.Count);
     }
 
     /// <summary>★ R3 IS A HARD LINE: every team plays an exactly even home/away conference
@@ -522,7 +555,8 @@ internal static partial class Program
     /// which a Eulerian cannot, and that is the only thing that distinguishes it.</para></summary>
     private static ConferenceSlate OrientConferenceSlate(
         List<int> members, int games, Dictionary<(int Lo, int Hi), int> meetings,
-        string label, List<FixedResidualHost>? fixedHosts, long nodes, bool usedCirculant)
+        string label, List<FixedResidualHost>? fixedHosts, long nodes, bool usedCirculant,
+        int memoryFixedHosts = 0)
     {
         var n = members.Count;
         var quota = members.ToDictionary(s => s, _ => games / 2);
@@ -678,6 +712,7 @@ internal static partial class Program
         {
             Meetings = meetings, Games = oriented,
             SearchNodes = nodes, UsedCanonicalCirculant = usedCirculant,
+            MemoryFixedHosts = memoryFixedHosts,
         };
     }
 
@@ -714,6 +749,14 @@ internal static partial class Program
     /// per-game engine seeds are derived from it.</para></summary>
     private static List<SeasonGame> BuildSeasonSchedule(
         WorldFile world, long seasonSeed, HistoryStore? history = null)
+        => BuildSeasonSchedule(world, seasonSeed, history, out _);
+
+    /// <summary>★ S96 — the same builder, reporting what host memory did. A separate overload
+    /// rather than a changed signature: sixteen existing call sites across the suite take the
+    /// two- and three-argument forms and none of them care about memory.</summary>
+    private static List<SeasonGame> BuildSeasonSchedule(
+        WorldFile world, long seasonSeed, HistoryStore? history,
+        out SeasonMemoryOutcome memoryOutcome)
     {
         SeasonPreflight(world);
         var schools = world.Schools.OrderBy(s => s.Id).ToList();
@@ -726,19 +769,34 @@ internal static partial class Program
             list.Add(s.Id);
         }
 
+        // ★ S96 — ONCE, before the loop, and therefore before ReserveSeason. That ordering is
+        //   what the peek exists for: the season number this schedule will wear is read here,
+        //   long before it is spent at the bottom of this method.
+        var memory = ReadHostMemory(history);
+        var residualsFlipped = 0;
+        var leaguesFlipped = 0;
+
         var games = new List<SeasonGame>();
         foreach (var c in world.Conferences.OrderBy(c => c.Id))
         {
             if (!byConf.TryGetValue(c.Id, out var members)) continue;
             var label = $"conference '{c.Name}' (id {c.Id}) ";
             var slate = BuildConferenceSlate(
-                members, c.Games, c.Skip, ActiveRivalries(members, rivals, c.Games), label);
+                members, c.Games, c.Skip, ActiveRivalries(members, rivals, c.Games), label,
+                memory: memory);
             if (slate.Verdict != SlateVerdict.Feasible)
                 throw new InvalidOperationException(
                     $"SEASON SCHEDULE {slate.Verdict.ToString().ToUpperInvariant()}: {slate.Reason}.");
+            // Counted only past the verdict check, so these are venues that APPLIED to a
+            // league that actually built — never venues that were merely offered.
+            if (slate.MemoryFixedHosts > 0) { residualsFlipped += slate.MemoryFixedHosts; leaguesFlipped++; }
             foreach (var (home, away) in slate.Games)
                 games.Add(new SeasonGame("conf", home, away));
         }
+
+        memoryOutcome = new SeasonMemoryOutcome(
+            memory.Status, memory.SourceSeasonId, memory.AttemptedSeasonId, memory.Problem,
+            residualsFlipped, leaguesFlipped);
 
         if (history is null) return games;   // legacy mode: the fixtures stay unnumbered
 
@@ -835,11 +893,11 @@ internal static partial class Program
         HistoryStore? history = null, bool retainGameLog = false,
         int? roadShaveOverride = null)
     {
-        var schedule = BuildSeasonSchedule(world, seasonSeed, history);
+        var schedule = BuildSeasonSchedule(world, seasonSeed, history, out var memoryOutcome);
         var fingerprint = ScheduleFingerprint(schedule);
         // ★ S94 — every game gains its night. Purely additive: the structural fingerprint
         //   above is computed from the four named fields and cannot see the date.
-        SeasonDateSchedule(world, schedule, SeasonDefaultStartYear);
+        var datedFingerprint = SeasonDateSchedule(world, schedule, SeasonDefaultStartYear);
         var divvy = RunDivvyDraft(world, seasonSeed, history);
 
         // ★ S89 — history mode's contract, validated ONCE, here. Past this line every
@@ -1003,6 +1061,8 @@ internal static partial class Program
             PossessionCounts = possessionCounts,
             HostedRoadSidesShaved = hostedRoadSidesShaved,
             RoadShave = roadShave,
+            DatedFingerprint = datedFingerprint,
+            Memory = memoryOutcome,
         };
     }
 
@@ -1077,14 +1137,12 @@ internal static partial class Program
             Console.WriteLine("=== Project Charm :: Season (Pass 2: minimal season loop) ===");
             Console.WriteLine($"World: {args[1]} ({world.Schools.Count} schools, {world.Conferences.Count} conferences)");
             Console.WriteLine($"Season seed: {seed}");
-            Console.WriteLine($"Schedule fingerprint: {ScheduleFingerprint(schedule)}");
-            // ★ S94 — the dated layer's own line: season year, dated fingerprint, and how
-            //   much of the country plays in December (the Atlantic Sun's real window plus
-            //   the 18-game leagues' ruled-fine New Year's-week openers).
-            var datedFp = SeasonDateSchedule(world, schedule, SeasonDefaultStartYear);
-            var decemberGames = schedule.Count(x => x.Date is { Month: 12 });
-            Console.WriteLine($"Dated: season {SeasonDefaultStartYear}-{SeasonDefaultStartYear + 1}, " +
-                              $"{decemberGames} December games, dated fingerprint {datedFp}");
+            // ★ S96 — the two fingerprint lines USED TO PRINT HERE, off this preflight
+            //   schedule. That was safe only while a schedule was a pure function of the
+            //   world: host memory can now move a venue, so the preflight (which is built
+            //   with no career attached and therefore no memory) and the schedule that
+            //   actually plays are two different schedules. Both lines moved below the run,
+            //   where they describe the games that happened. See the block after the loop.
             // ★ S93 — the banner reads the WORLD rather than restating a constant. The old
             //   line said "16 conference + 14 non-conference per team, 15 home / 15 away" and
             //   would have kept saying it while every one of those numbers was false.
@@ -1132,6 +1190,23 @@ internal static partial class Program
         }
         finally { history?.Dispose(); }
         Console.WriteLine();
+
+        // ★ S96 — the schedule that PLAYED, described after the fact. The dated line keeps
+        //   its S94 content: season year, dated fingerprint, and how much of the country
+        //   plays in December.
+        {
+            var decemberGames = run.Schedule.Count(x => x.Date is { Month: 12 });
+            Console.WriteLine($"Schedule fingerprint: {run.Fingerprint}");
+            Console.WriteLine($"Dated: season {SeasonDefaultStartYear}-{SeasonDefaultStartYear + 1}, " +
+                              $"{decemberGames} December games, dated fingerprint {run.DatedFingerprint}");
+            // ★ PAGE-ONLY AND RUNTIME-DERIVED. Every number on this line comes from the run
+            //   that produced it; no measured league constant appears here, and a category
+            //   word is printed where a raw exception message must never be. Legacy mode
+            //   prints nothing at all — there is no career for the line to be about.
+            var memoryLine = HostMemoryPageLine(run.Memory);
+            if (memoryLine is not null) Console.WriteLine(memoryLine);
+            Console.WriteLine();
+        }
 
         // ★ S95 — the home-court readout. PAGE-ONLY, NEVER ASSERTED: the ratified 59%
         //   is a calibration target, and the page-only principle keeps basketball target

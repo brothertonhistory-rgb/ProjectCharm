@@ -1,3 +1,68 @@
+## Session 96 — HOST MEMORY. A season now reads season N−1's retained log and **flips every single-meeting host**, so a career alternates gyms year over year instead of playing the same schedule forever. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 87 PASS at 33 assertions**, pre-S96 zero-path golden `51c8e88c202e9eb6…` reproduced exactly, three retained seasons reading `FirstSeason → 1 → 2`, season 2 flipping season 1 and season 3 landing back on season 1's schedule, `20 flipped across 4 leagues`, peeked 4 / reserved `season:4`. On the stock world: **526 residuals flipped across 14 leagues**, runtime-derived and printed on the page. (2026-08-03)
+
+**Register:** build, under `PROMPT-memory-layer-s96-r3` (ChatGPT-reviewed, CONDITIONAL GO on the §9 evidence packet). Three new files, four edited, none deleted. No oracle — the mechanism is an inversion, not a formula; the theorem it rests on is verified numerically over every playing league rather than Monte-Carlo'd.
+
+### What shipped
+
+`src/Charm.Harness/Program.Season.Memory.cs` — NEW (the five statuses, the problem categories, `ReadHostMemory`, `Aggregate`, the pure `ResidualsToFlip`, the page line). `src/Charm.Harness/Program.Checks.SeasonMemory.cs` — NEW (Phase 87). `worlds/fixture-memory.world.json` — NEW. `Program.Season.cs`, `Program.cs`, `Charm.Harness.csproj`, `src/Charm.History/HistoryStore.cs` — EDIT. **`Charm.Engine` untouched, verified against a clean pull. `Charm.History` gained exactly one line of code** — the peek — with no schema and no persisted-format change.
+
+### ★ THE RULING THAT RESHAPED THE DESIGN, AND IT CAME FROM THE OUTSIDE REVIEW
+
+The r1 prompt defined the source as *"enumerate `season-*.log`, take the highest N."* ChatGPT's central catch: **that is the LATEST RETAINED season, not the PREVIOUS season.** A career that logs season 1, runs season 2 without retention, and reaches season 3 would flip season 1's hosts and call it year-over-year alternation.
+
+**It would have passed every stock-world check.** Conservation holds, quota holds, determinism holds, the flip visibly happens — the only thing wrong is *which year it remembered*, and nothing in the obvious test set can see that. r2 replaced the enumeration subsystem with arithmetic against `PeekNextSeasonId − 1` and deleted the whole thing: no filename parser, no lexical-ordering hazard, no shuffled-order determinism test. The only filesystem question left is *does this exact path exist*.
+
+Phase 87's **C8(ii) and C8(iii)** are the two assertions in the file that discriminate on it, and they are built the same way on purpose: a perfectly good older log is **sitting right there**, valid and inviting, and the correct answer is to produce no memory at all. Both also assert the resulting schedule equals the no-memory schedule, so "it didn't reach back" is proven by the games rather than by a status field.
+
+### ★ TWO THINGS THE GATE FOUND THAT THE CLEARED PROMPT DID NOT HAVE
+
+The prompt arrived cleared. The check-in gate still surfaced two, and both needed Emmett's ruling before a line was written.
+
+**(1) The page would have printed last year's schedule.** `RunSeason` builds a throwaway preflight schedule **with no history attached**, prints the fingerprint lines off it, and only then calls `RunSeasonCore` to build the real one. That was safe for exactly as long as a schedule was a pure function of the world — which stopped being true this session. The page would have printed the *unflipped* fingerprint and dated fingerprint while the games played used the flipped ones. Emmett ruled the two lines move below the run. They now read off `run.Fingerprint` and a new `run.DatedFingerprint`, describing the games that actually happened.
+
+**(2) Nothing in the tree could test the flip end to end.** The tiny fixture's four five-team leagues at 16 games meet every pair exactly four times — **no pair is ever odd, so no residual exists and there is nothing to flip.** (S93 hit this exact wall and wrote it into the csproj comment; the gate found the comment after finding the problem.) And S93's answer, `fixture-schedule`, **cannot play a season at all** — its two-school Duo league is refused by S94's date layer — while a career-lifecycle check must schedule, play and finalize real seasons to produce the logs it reads back. The alternatives were the full 347-school world at roughly ten seasons of suite time, or one small fixture. Emmett approved the fixture: four five-team leagues at **six** games, 60 games a season, 20 odd pairs, every school owed exactly one residual, three seasons in seconds. Built from fixture-tiny and canonicalised through `world rewrite`.
+
+**The lesson is the S94/S95 pattern again, and it is now three for three: a cleared prompt with a passed evidence packet is not a substitute for the gate.** Both findings were about the *surroundings* of the change rather than the change — where the page reads from, and whether a fixture can exercise the thing at all — which is exactly the class of defect a prompt audit is blind to because the prompt is about the new code.
+
+### ★ WHAT THE PACKET DECIDED
+
+Four §9 items came back with an answer that changed the build:
+
+- **`GameLogError` names the three binding failures separately** (`HistoryIdMismatch` / `WorldDigestMismatch` / `SeasonIdMismatch`). Under §5's own rule — *preserve the finest STABLE category the reader exposes, invent none* — `BindingMismatch` split back out into **WrongCareer / WrongWorld / WrongSeason**. A log from another career and a log from another season are different things to see on a page.
+- **The r3 problem list had no category for corruption.** A flipped byte inside a block is a `BlockChecksumMismatch`: not truncation, not a bad format, not a binding failure, not I/O. It had nowhere to go. **`Corrupt` was added** as the honest catch-all for the damage classes the reader does *not* distinguish.
+- **`ReadFinalized` is eager, not lazy.** It returns a fully materialized `List`, so "can enumeration throw after construction?" is **no** — the wrap around block iteration is harmless and not load-bearing. The reader *does* validate block uniqueness, contiguous fixture ordering, both footer counts and the payload digest, so §5's division-of-labour paragraph is recorded fact rather than hope.
+- **The reader does NOT reject a game whose home and away are the same school** — it validates only that both ids are non-negative, deliberately, because a permanent archive format knows no league. So the ★r3 self-pair check is genuinely load-bearing, not belt-and-braces, and it fires *before* normalization could fold a self-game into a well-formed-looking pair.
+
+One correction to the prompt's own wording: the store does **not** hold its lock for its lifetime — `CloseReservations()` drops it right after the schedule is built. The peek happens before that, so the conclusion held and the stated reason did not.
+
+### ★ THE WORLD FINGERPRINT ANSWERS THE LOAD-BEARING QUESTION, AND THE ANSWER IS "NOT REACHABLE"
+
+§9 item 7 asked whether the parity-change filter and foreign-pair tolerance are load-bearing. The fingerprint hashes the **entire** world file — conference `games`, `skip`, and every school's league included — so an edited world **refuses to open the same career at all**, before a season runs.
+
+**So neither filter can fire in production today.** They are correct code waiting for in-career realignment, and Phase 87 exercises them directly (C6, C7a). Recorded as belt-and-braces rather than left implying a protection that cannot engage. The same fact is what makes the *memory-follows-the-pair* ruling (§2.5) currently untestable through a real world — it is right, and it is waiting.
+
+### The theorem, and why production adds no assertion
+
+For a school in `d` odd pairs across a `G`-game league, its even-split pairs hand it `(G − d)/2` homes, so it must win exactly `d/2` residuals — every season, whatever memory says. Inverting every residual re-awards exactly `d/2`. Quota is preserved **identically**; memory reallocates WHICH games, never how many.
+
+`d` has the same parity as `G`, and an odd `G` is already refused by `ConferenceStaticLegality` — *"a conference season must be even"*. So an odd `d` is unreachable through any world that loads, and **production adds no new guard**: it relies on the named one. C5e verifies that guard fires and names itself rather than inventing a second refusal for a state no world can reach. C5a–d verify all four parts numerically across every playing league. Independently re-measured from the world file before any code was written: **31 playing leagues, 17 at two meetings apiece with nothing to do, 14 with singles, 1,672 played pairs, 526 odd (31.46%), every school's `d` even, summing to 2 × 526.** Every figure the prompt carried reproduced exactly.
+
+### ★ ISOLATION PROVEN BEHAVIOURALLY, NOT BY GREP
+
+C10 was specified as a vocabulary grep on the new files. It shipped as something stronger: **two careers on the same world, at different seeds, playing completely different basketball, must produce identical memory key for key** — with the score divergence asserted first as its own discriminator, so the check cannot pass by both careers being the same. A grep can rot into a check that passes for the wrong reason; a behavioural proof cannot. (The grep was run anyway at the final diff: zero occurrences of `HomeScore`, `AwayScore`, `PossessionCount`, `OvertimePeriods`, `RosterEntryV1`, `PerGameStatRowV1`, `PersonId`, `Ratings` or `ScoutRank` in the memory layer.)
+
+### Predictions
+
+Nine numbers were predicted before Emmett's run — the golden hash, the three-season alternation, `20 flipped across 4 leagues`, the C8(ii)/C8(iii) statuses and categories, the peek/reserve pair, and the stock page's `526 residuals flipped across 14 leagues`. **All nine landed, and every one of the 33 assertions matched its predicted detail string exactly.**
+
+One in-sandbox miss, caught before delivery and worth recording: C2d asserted a 64-byte stub file would classify as `UnsupportedVersion`. It classifies as `Truncated` — a file shorter than a 128-byte header never reaches the magic check. The fix was not to relax the assertion but to **split it in two**: a stub too short to hold a header is *truncation*, and a full-length file that is not a Charm log is a *format refusal*. They are different failures and should not arrive wearing the same word.
+
+### What this does not claim
+
+That 526 pairs flip is a measurement of one world file, not a property of the engine, and it is **never asserted** — page-only calibration in full. C5 asserts the *relationship* instead (each school wins exactly half its odd pairs), which stays true when the world is edited.
+
+**O-79's hosting half closes here.** Which pairs double and which skip is still fully determined and still repeats forever; that half stays open, together with the soft objectives (`SkipUrgency` and friends) held out of S93 precisely because they need this memory to apply.
+
 ## Session 95 — HOME COURT. The road team is worse everywhere and a hair at a time: every man on the road side is handed to the engine **three points lower in each of his twenty-three SKILL ratings**, floored at 0, so all thirteen contested doors lean against him at once without a single one of them being told to. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 86 PASS at 32 assertions**, zero-path golden `c853b3698ae28b31…` reproduced exactly, Athleticism `44.000000 → 44.000000`, gravity `18.442→16.750`, spacing `11.839→9.806`, home passthrough True / away shaved True, 160/160 hosted road sides shaved. Calibrated on the full stock world: **58.74% home wins at +3.66 margin over three seasons and 8,454 games**, against a **50.08% / −0.05** control at zero. (2026-08-03)
 
 **Register:** build, under `PROMPT-home-court-s95-r4` (ChatGPT-reviewed and cleared with its evidence packet passed). Three new files, eight edited, none deleted. No oracle — the mechanism is a subtraction, not a formula; the Python pre-check's role was played by the calibration sweep, which is a measurement rather than a proof.

@@ -103,6 +103,25 @@ public sealed class HistoryStore : IDisposable
     /// resolves to the same normalized path; symlink aliases are out of scope.</summary>
     public string Path => _path;
 
+    /// <summary>★ S96 — the season number the NEXT <see cref="ReserveSeason"/> will return.
+    ///
+    /// <para>A read, and only a read: no reservation, no counter movement, no write, no
+    /// schema or persisted-format change. It exists because host memory must know which
+    /// season is about to be scheduled BEFORE the schedule is built — and the schedule is
+    /// deliberately built before any number is spent (a slate that fails to build must not
+    /// have burned a season id), so the memory layer cannot wait for the reservation.</para>
+    ///
+    /// <para>★ THE CONTRACT, exactly, because the name understates it: while this run holds
+    /// the lock, the value returned here IS the value the next season reservation hands
+    /// back. `Reserve` reads this same counter as its start. That equality is what makes
+    /// "the previous career season is this minus one" arithmetic rather than a guess, and
+    /// Phase 87 C9 proves it by peeking and then reserving.</para>
+    ///
+    /// <para>Deliberately NOT a `SeasonId`: this is a counter reading, not an issued
+    /// identity, and wrapping it in the identity type would let a caller carry an
+    /// unreserved number around as though it had been allocated.</para></summary>
+    public long PeekNextSeasonId => _state.NextSeasonId;
+
     // ── Opening ──────────────────────────────────────────────────────────────
 
     /// <summary>Take the lock, then load-or-create and verify.

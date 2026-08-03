@@ -10,7 +10,32 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 95** (2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 86 PASS at 32
+Last updated: **Session 96** (2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 87 PASS at 33
+assertions**, pre-S96 zero-path golden `51c8e88c202e9eb6…` reproduced EXACTLY, three retained seasons reading
+`FirstSeason → 1 → 2`, season 2 flipping season 1 and season 3 landing back on season 1's schedule, `20 flipped across
+4 leagues`, peeked 4 / reserved `season:4`. **A SEASON NOW REMEMBERS WHO HOSTED.** A conference pair that meets an odd
+number of times has its residual host fixed to the OTHER school the following year, read from season N−1's retained
+log — **526 residuals flipped across 14 leagues** on the stock world, runtime-derived and printed on the page, with
+season 3 alternating back. ★ THE RULING THAT RESHAPED THE DESIGN CAME FROM THE OUTSIDE REVIEW: r1 defined the source as
+*enumerate the log folder, take the highest season*, which is the **latest retained** season, not the **previous** one —
+a career that skipped retention for a year would have flipped a two-year-old schedule and **passed every check**.
+Replaced with arithmetic against `PeekNextSeasonId − 1`, deleting the enumeration subsystem entirely; C8(ii)/C8(iii) are
+the only assertions that discriminate, and both work by leaving a valid older log sitting right there. ★ **NO FALLBACK**:
+five statuses, all values, none throwing — any failure to find, read or validate season N−1 disables memory and **no
+other log is ever opened**. ★ **SCHEDULE FACTS ONLY**, enforced by projecting each block immediately to three fields;
+proven BEHAVIOURALLY rather than by grep — two careers playing completely different basketball remember identical hosts.
+★ **R3 SURVIVES BY THEOREM**: a school in `d` odd pairs must win exactly `d/2` residuals, so inverting them all re-awards
+`d/2` — production adds NO new assertion and relies on the existing odd-game refusal, verified by name. ★ The gate found
+two things the cleared prompt did not have: the page printed its fingerprints off a **preflight schedule built with no
+career attached** (both lines moved below the run — Emmett's ruling), and **no fixture in the tree could test the flip**
+(tiny has no odd pairs; fixture-schedule cannot play a season at all) — new `fixture-memory.world.json` approved and
+added. ★ The packet split `BindingMismatch` into WrongCareer/WrongWorld/WrongSeason (the reader names them separately)
+and added a missing **`Corrupt`** category. ★ The world fingerprint hashes the whole world file, so an edited world
+cannot open the same career — the parity-change filter and foreign-pair tolerance are **belt-and-braces, not
+load-bearing**, recorded honestly. `Charm.Engine` untouched; `Charm.History` gained exactly one line — the peek. Closes
+**O-79's hosting half**; opens **O-84**. Next: **MTE / non-conference scheduling**.)
+
+*(Previous board entry, S95 — 2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 86 PASS at 32
 assertions**, zero-path golden `c853b3698ae28b31…` reproduced EXACTLY, Athleticism `44.000000 → 44.000000`, gravity
 `18.442→16.750`, spacing `11.839→9.806`, home passthrough True / away shaved True, 160/160 hosted road sides shaved.
 **THE ROAD TEAM IS NOW WORSE.** Every man on the road side is handed to the engine three points lower in each of his
@@ -32,7 +57,7 @@ things: Phase 55's hand replay is a third and fourth seating site and would have
 catches a flipped shave too), and Phase 71's registry forced the dial into the engine's config folder on a granted
 second exception. ★ **Phase 83's A9 landmine never went off** — the host fact stayed out, so the check was not touched.
 Retires `RollLConfig.RoadMakePenalty` at all four sites and the page's stale *"neutral floors throughout"* banner. Opens
-**O-82**. Next: **host memory (O-79)**, the next scheduler third.)
+**O-82**. Next: **host memory (O-79)**, the next scheduler third.)*
 
 *(Previous board entry, S94 — 2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, Phase 85 PASS at 20
 assertions, structural fingerprint `6f79d663…` UNMOVED, dated fingerprint `7515df7d…` in EXACT golden parity with the
@@ -142,6 +167,15 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S96 MOVED NO BASKETBALL IN SEASON ONE — AND MOVES THE SCHEDULE FROM SEASON TWO ON.** With no career attached, or in
+the first season of one, the schedule is byte-identical to its pre-S96 self (Phase 87 C1b, golden
+`51c8e88c202e9eb6…`). From a career's **second** season the residual host of every single-meeting pair is inverted —
+**526 pairs across 14 leagues** on the stock world — so any figure below that depends on WHO HOSTED is a season-one
+figure. Totals, rates and the credit identity are untouched: the same games are played, some of them in the other gym.
+The page gained one line (`Host memory: season N — X residuals flipped across Y leagues`) and **moved two**: the
+schedule and dated fingerprints now print *below* the run, because they used to be computed from a preflight schedule
+built with no career attached and would otherwise have disagreed with the games that played.
+
 **★ S95 MOVED THE BASKETBALL — deliberately, for the first time since S93.** Every road side now plays three points
 lower in its twenty-three skill ratings, so every per-possession rate below was measured under a symmetric schedule with
 no home court and is no longer directly comparable. The page gained one line:
@@ -227,6 +261,24 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S96 — HOST MEMORY: A SEASON REMEMBERS WHO HOSTED.** A conference pair meeting an **odd** number of
+  times cannot split those meetings evenly; one school gets the extra home game. Until now the slate decided
+  it identically every year, so in a career the same school hosted it forever — and after S95 that was worth
+  about three points of margin and nine points of win rate, permanently. A season now reads **season N−1's**
+  retained log and fixes every one of those residuals to the **other** school: **526 flipped across 14
+  leagues** on the stock world, with season 3 alternating back to season 1's schedule. ★ **Found by
+  ARITHMETIC, never by enumeration** — the previous career season is `PeekNextSeasonId − 1` and its path
+  either exists or does not; "highest log in the folder" is the *latest retained* season and would have
+  silently flipped a stale year. ★ **No fallback**: five statuses, all values, none throwing; any failure
+  disables memory and no other log is opened. ★ **Schedule facts only** — each block is projected immediately
+  to home / away / conference-or-not, proven behaviourally (two careers, different basketball, identical
+  memory). ★ **R3 survives by theorem**, verified numerically over every playing league; production adds no
+  new assertion. `FixedResidualHost`, built and empty since S93, is now filled. `Charm.Engine` untouched;
+  `Charm.History` gained exactly one read-only getter. New fixture world `fixture-memory` (the tiny fixture
+  has no odd pairs at all; `fixture-schedule` cannot play a season). The season page's two fingerprint lines
+  **moved below the run** — they used to be printed off a preflight schedule built with no career attached.
+  Phase 87, 33 assertions. Closes **O-79's hosting half**; opens **O-84**.
+
 - **★ S95 — HOME COURT: THE ROAD PENALTY.** Every man on the road side of a game — starters and bench alike —
   is handed to the engine three points lower in each of his **twenty-three skill ratings**, floored at 0.
   One dial (`HomeCourt.RoadShave`), every real home floor worth the same, and **a floor with no host tilts
@@ -262,7 +314,7 @@ the one calibrated dial (S72); the settings file and the config classes are name
   what licenses the word *infeasible*, and above 20 it refuses without searching. Stock: **2,818 games**,
   derived from the world and asserted once as a golden. New fixture world `fixture-schedule` (32 schools,
   five leagues) because the tiny fixture has zero unbalanced games and could not exercise any of this.
-  The host-memory venue seam (`FixedResidualHost`) is **built and empty** (S94 shipped dates instead; the seam waits for the next scheduler third). Phase 84, 26 assertions.
+  The host-memory venue seam (`FixedResidualHost`) was **built and left empty** here; **S96 filled it**. Phase 84, 26 assertions.
   Opens **O-78**, **O-79**, **O-80**.
 
 - **★ S92 — GEOGRAPHY: THE ENGINE HAS A MAP.** Every school had carried a real latitude and longitude since
@@ -570,16 +622,28 @@ chart is PROVISIONAL pending O-6.
   point survives the ordering question: with no non-conference play, no two leagues share an opponent even
   indirectly, so there is no honest basis for a national ranking this season at all.
 
-- **O-79 — THE SAME PAIRS DOUBLE AND THE SAME PAIRS SKIP EVERY SEASON, FOREVER (opened S93).** The slate
-  takes no randomness and there is no memory, so a career's year two would carry a conference schedule
-  identical to year one's. Not a defect of this session — it is what a fully-determined slate with no
-  history means — but it is a real basketball gap and it must not survive the career layer. **The next scheduler third's
-  stored memory of who hosted last time is the natural home** (S94 shipped dates; Emmett reordered), together with the soft objectives
-  (`SkipUrgency` and friends) that were held out of S93 precisely because they need that memory to apply.
-  ★ **S95 raised the stakes here.** Until this session home and away were bookkeeping; now hosting is worth
-  roughly three points of margin and about nine points of win rate, so a school that draws the doubled home
-  fixture against its toughest opponent draws it **every year, forever**. What was a cosmetic repetition is
-  now a permanent, compounding competitive advantage — and it is the reason this is the next session.
+- **O-79 — THE SAME PAIRS DOUBLE AND THE SAME PAIRS SKIP EVERY SEASON, FOREVER (opened S93; ★ HOSTING HALF
+  CLOSED AT S96).** The slate takes no randomness, so a career's year two carried a conference schedule
+  identical to year one's. **S96 fixed the hosting half**: a season reads season N−1's retained log and flips
+  every single-meeting host, so gyms now alternate year over year. **What remains open is the other half** —
+  WHICH pairs double and which skip is still fully determined by the world file and still repeats forever, so
+  the same two schools meet twice every season for the life of a career and the same pair never meets at all.
+  The soft objectives (`SkipUrgency` and friends) were held out of S93 precisely because they need the memory
+  that now exists; they are the natural mechanism and they are not built. Note the stakes are **lower** than
+  the hosting half's were: a repeated double is a schedule-strength artefact, not the compounding home-court
+  advantage S95 created. Its natural home is the non-conference / MTE session or a session of its own.
+
+- **O-84 — MEMORY CANNOT YET FOLLOW A SCHOOL THROUGH REALIGNMENT, AND TWO GUARDS ARE THEREFORE DORMANT
+  (opened S96).** S96 ruled that hosting fairness is a debt between two **schools**, not a conference thing:
+  if both move to a new league together and still meet, the alternation should survive the move. The code
+  honours that — membership and parity are validated against the *current* league and the memory is never
+  asked where it came from. But the world fingerprint hashes the entire world file, conference `games`,
+  `skip` and every school's league included, so **an edited world refuses to open the same career at all**.
+  The ruling, the parity-change filter (a pair that was odd and is now even) and the foreign-pair tolerance
+  are therefore correct code that **cannot fire in production today** — belt-and-braces, exercised only by
+  Phase 87 directly. They become load-bearing the moment realignment happens *inside* a career, which is a
+  career-layer question and not scheduled. Recorded so a future session does not mistake dormant guards for
+  proven ones, or delete them as dead code.
 
 - **O-80 — `conf.csv`'s `Divisions` COLUMN READS 2 FOR SIX LEAGUES AND NOTHING READS IT (opened S93).**
   R11 says every team in a conference plays the same shape; divisions are a different design with a
@@ -1322,36 +1386,38 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**HOST MEMORY — the next scheduler third, and the answer to O-79.** Who hosted last time, stored, feeding the
-`FixedResidualHost` seam S93 built and left empty and the soft objectives (`SkipUrgency` and friends) that were held
-out of S93 precisely because they need that memory to apply.
+**MULTI-TEAM EVENTS AND NON-CONFERENCE SCHEDULING — the last scheduler third.** S93 deleted the placeholder
+non-conference graph rather than carrying it, so this starts from nothing and it is the largest hole left in the
+season: **fourteen schools currently play no basketball at all**, and every other school plays only its own league.
 
-★ **S95 is why this is next rather than merely due.** The slate takes no randomness and has no history, so a career's
-year two carries a conference schedule identical to year one's — the same pairs doubled, the same pairs skipped, the
-same gyms. Until this session that was a cosmetic repetition. **Home court has just made it a permanent competitive
-advantage**: hosting is now worth about three points of margin and roughly nine points of win rate, so a school that
-happens to draw the doubled home fixture against its toughest opponent draws it every year, forever, and a school that
-draws the road side of it never stops paying. That compounds across a career layer that does not exist yet, which is
-exactly when it is cheap to fix.
+★ **S96 is what makes this next rather than merely due.** The two hard prerequisites are now built. The map (S92)
+knows how far every trip is; the loose date windows (S94) leave real open nights to put games on; home court (S95)
+makes **where** a non-conference game is played a genuine decision rather than a coin flip; and **host memory (S96)
+is the pattern for anything that must not repeat forever** — a career layer that schedules the same eight buy games
+against the same eight opponents every year is the same defect this session just closed, one level up.
 
 What it inherits and must not re-derive:
 
-- **The orientation already accepts pre-fixed venues.** S93's A9 proved it on three arms — a sampled third of the
-  residual host decisions all honoured with every school still exactly even, an over-commit refused BEFORE the flow by
-  name, and a quota-consistent Hall deficit refused BY the flow. A Eulerian walk fails all three. **The hard part is
-  built**; what is missing is the memory that decides what to fix.
-- **Every team hosts exactly half its league season, by construction** (R3, S93). Whatever memory does, it must not
-  break that — it reallocates WHICH games, never how many.
+- **The memory layer reads schedule facts and is deliberately NOT pre-shaped for MTE participation.** The reader
+  projects each log block to home / away / conference-or-not and nothing wider. Remembering *which event a school
+  attended* is a **ruling**, not an extension — it widens the projection, and the projection is what enforces the
+  isolation wall. Rule it before building it.
+- **Fixture kind already exists on the wire.** The retention log's block header carries a conference-or-not byte and
+  the reader validates its domain; every game today is `conf`. A non-conference fixture needs no format change to be
+  written, which is a fact worth knowing before anyone proposes one.
+- **Sites are the open question, not the schedule.** O-83 parked semi-home, semi-away and neutral with the tournament
+  layer. An MTE is played on a neutral floor by definition, so this session probably cannot avoid the site fact the
+  way S96 could — and `SeasonGame` carries no site fact at all today (S95 passes `true` as a literal).
 - **`TravelPart`'s 38 mutual in-conference pairs** are Friday–Saturday road pairings, ruled to stay put as travel
-  partners and read by nothing. They belong to a scheduling session and this may be it, or may not; still logged.
-- **The date layer is downstream and indifferent** (S94). Host memory changes orientation, not the calendar shape.
-- **The world fingerprint has moved three times** (S92, S93, S94) and each move was invoked deliberately. If stored
-  host memory needs a schema field, that is a fourth move and it is ruled before it is built, not discovered.
+  partners and read by nothing. Still logged, still unbuilt.
+- **The world fingerprint has moved three times** (S92, S93, S94) and each move was deliberate. A fixture-kind or
+  event field in the world file is a fourth move, ruled before it is built.
 
-**Then: non-conference scheduling**, its own session, starting from nothing — it inherits the map (the WAC's worst
-internal trip is Hawaii ↔ Louisiana Tech at 4,030 miles against the Ivy League's 295), the open nights S94's loose
-windows leave empty, the fact that fourteen schools currently play no basketball at all, and now a home-court effect
-that makes **where** a non-conference game is played a real decision rather than a coin flip.
+**Then: O-79's remaining half** — which pairs double and which skip, still fully determined and still repeating
+forever, together with the soft objectives (`SkipUrgency` and friends) held out of S93 because they need the memory
+S96 has now built. Lower stakes than the hosting half, and it may fold naturally into whichever session owns the
+non-conference slate.
 
 **Behind that, the two home-court halves that did not ship** — the crowd model (O-82) and the site facts semi-home,
-semi-away and neutral (O-83). Neither is a defect; both are named, seamed and waiting on prerequisites.
+semi-away and neutral (O-83) — plus **O-84**, the realignment guards S96 shipped dormant. None is a defect; all are
+named, seamed and waiting on prerequisites.
