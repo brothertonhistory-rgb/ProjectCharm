@@ -73,8 +73,15 @@ internal static partial class Program
     /// stock world authors it for the fourteen Independent schools, who therefore play no
     /// games at all this season — the honest consequence of a conference-only schedule, not
     /// an error to route around.</para></summary>
+    /// <summary>★ S94 — three new authored facts joined the conference: its playing
+    /// NIGHTS (the ordered D1/D2/D3 priority, stored as authored and normalised only when
+    /// consumed), its WEEKS (how many Mon-Sun playing weeks its conference season runs),
+    /// and its TOURNAMENT OFFSET (days before Selection Sunday its tournament opens;
+    /// null = no tournament, walling at Selection Sunday itself — authored as the literal
+    /// 'none' in conf.csv, because a blank cannot mean two things).</summary>
     private sealed record WorldConference(
-        int Id, string Name, string ShortName, string TierId, int Games, int Skip);
+        int Id, string Name, string ShortName, string TierId, int Games, int Skip,
+        IReadOnlyList<string> Nights, int Weeks, int? TourneyOffsetDays);
 
     /// <summary>★ S92 — A PLACE IS A CITY (R1). Not an arena: no name, no capacity, no
     /// attendance. Not a market either — R4 rules city size out by name, so there is
@@ -161,7 +168,7 @@ internal static partial class Program
     /// were converted once. ★ THE WORLD FINGERPRINT MOVES AGAIN — invoked deliberately for
     /// the second time, free today because no career exists outside this repo and
     /// permanently expensive the day one does.</summary>
-    private const int WorldSchemaVersion = 3;
+    private const int WorldSchemaVersion = 4;
 
     // ── Deterministic PRNG (SplitMix64) — explicit so a world file is reproducible on
     //    any runtime, never dependent on System.Random's version-specific algorithm.
@@ -211,6 +218,17 @@ internal static partial class Program
                     ReportWorld(world, args[5]);
                     return 0;
                 }
+                case "rewrite" when args.Length == 4:
+                {
+                    // ★ S94 — one-shot canonicalisation: load, validate, write through the
+                    //   single canonical projection, so a hand-edited world becomes the
+                    //   byte-exact form Phase 83 A7 asserts against.
+                    var world = LoadWorld(args[2]);
+                    ValidateWorld(world);
+                    WriteWorld(world, args[3]);
+                    Console.WriteLine($"rewrote {args[2]} -> {args[3]} (canonical bytes)");
+                    return 0;
+                }
                 case "seed" when args.Length == 5:
                 {
                     var input = LoadWorld(args[2]);
@@ -225,6 +243,7 @@ internal static partial class Program
                 default:
                     Console.WriteLine("usage: world <file> | world report <file> | " +
                                       "world convert <teams.csv> <conf.csv> <places.csv> <out.json> | " +
+                                      "world rewrite <in.json> <out.json> | " +
                                       "world seed <in.json> <seed> <out.json>");
                     return 1;
             }
@@ -303,14 +322,38 @@ internal static partial class Program
             foreach (var el in WorldRequireArray(root, "conferences"))
             {
                 RejectUnknownOrDuplicateKeys(el, "conferences[]",
-                    "id", "name", "shortName", "tierId", "games", "skip");
+                    "id", "name", "shortName", "tierId", "games", "skip",
+                    "nights", "weeks", "tourneyOffsetDays");
+                if (!el.TryGetProperty("nights", out var nightsEl)
+                    || nightsEl.ValueKind != JsonValueKind.Array)
+                    throw new InvalidOperationException("conferences[] requires a 'nights' array (S94).");
+                var nights = new List<string>();
+                foreach (var nEl in nightsEl.EnumerateArray())
+                {
+                    if (nEl.ValueKind != JsonValueKind.String)
+                        throw new InvalidOperationException("every conference night must be a string.");
+                    nights.Add(nEl.GetString() ?? "");
+                }
+                int? offset = null;
+                if (!el.TryGetProperty("tourneyOffsetDays", out var offEl))
+                    throw new InvalidOperationException(
+                        "conferences[] requires 'tourneyOffsetDays' (S94; null = no tournament).");
+                if (offEl.ValueKind != JsonValueKind.Null)
+                {
+                    if (offEl.ValueKind != JsonValueKind.Number || !offEl.TryGetInt32(out var o))
+                        throw new InvalidOperationException("tourneyOffsetDays must be an integer or null.");
+                    offset = o;
+                }
                 conferences.Add(new WorldConference(
                     RequireIntProperty(el, "id", "conferences[]"),
                     WorldRequireString(el, "name", "conferences[]"),
                     WorldRequireString(el, "shortName", "conferences[]"),
                     WorldRequireString(el, "tierId", "conferences[]"),
                     RequireIntProperty(el, "games", "conferences[]"),
-                    RequireIntProperty(el, "skip", "conferences[]")));
+                    RequireIntProperty(el, "skip", "conferences[]"),
+                    nights,
+                    RequireIntProperty(el, "weeks", "conferences[]"),
+                    offset));
             }
 
             // ── Places (S92). Coordinates go through GeoCoordinate.TryCreate rather than
@@ -469,6 +512,26 @@ internal static partial class Program
                 throw new InvalidOperationException($"conference '{c.Name}' points at unknown tier '{c.TierId}'.");
             if (c.Name.Length == 0 || c.ShortName.Length == 0)
                 throw new InvalidOperationException($"conference id {c.Id} has an empty name or shortName.");
+            // ★ S94 — the size-free half of DATE legality, mirroring how Games/Skip split
+            //   between here and the season layer. The zero-game league is exempt from all
+            //   of it (R14): no weeks, no wall, and its nights are never consumed.
+            if (c.Games > 0)
+            {
+                foreach (var night in c.Nights)
+                    if (!SeasonWeekdayOf(night).HasValue)
+                        throw new InvalidOperationException(
+                            $"conference '{c.Name}' authored night '{night}' is not a weekday.");
+                if (c.Nights.Select(x => x.Trim().ToLowerInvariant()).Distinct().Count() != c.Nights.Count)
+                    throw new InvalidOperationException(
+                        $"conference '{c.Name}' has a duplicate authored night.");
+                if (c.Weeks < c.Games / 2)
+                    throw new InvalidOperationException(
+                        $"conference '{c.Name}' Weeks {c.Weeks} cannot seat Games {c.Games} at two a "
+                        + $"week (needs at least {c.Games / 2}).");
+                if (c.TourneyOffsetDays is < 0)
+                    throw new InvalidOperationException(
+                        $"conference '{c.Name}' tournament offset {c.TourneyOffsetDays} is negative.");
+            }
             // ★ S93 — only the SIZE-FREE half of legality lives here. Everything that needs
             //   to know how many schools are in the league (an opponent exists, the skip
             //   leaves somebody to play, the shape's two parity conditions) belongs to the
@@ -589,6 +652,12 @@ internal static partial class Program
                 "world schemaVersion 2 is retired (S93): a v2 file carries no 'games' or 'skip' on a conference " +
                 "and no 'rivalId' on a school, so it has no way to say HOW LONG ITS OWN SEASON IS. There is no " +
                 "automatic migration — re-run 'world convert <teams.csv> <conf.csv> <places.csv> <out.json>'.");
+        if (schemaVersion == 3)
+            throw new InvalidOperationException(
+                "world schemaVersion 3 is retired (S94): a v3 file carries no playing nights, no week "
+                + "count and no tournament wall on a conference, so it has no way to say WHEN its own "
+                + "season is. There is no automatic migration — re-run 'world convert <teams.csv> "
+                + "<conf.csv> <places.csv> <out.json>'.");
         if (schemaVersion != WorldSchemaVersion)
             throw new InvalidOperationException(
                 $"unsupported schemaVersion {schemaVersion} (this build reads {WorldSchemaVersion}).");
@@ -798,8 +867,15 @@ internal static partial class Program
         // ★ S93 — `Games` stops being a dead column after carrying the right answer for
         //   every league since the file landed, and `Skip` joins it. They sit together,
         //   where a person authoring a league's season expects to find them.
+        // ★ S94 — Weeks and the tournament offset sit right after Skip, where a person
+        //   authoring a league's season expects them; the D1/D2/D3 playing nights and
+        //   TourneyOpensDaysBeforeSelectionSunday stop being dead columns after carrying
+        //   authored data since the file landed / this session respectively. TDay1..5 stay
+        //   in place and deliberately UNREAD (their origin is unrecorded; deleting authored
+        //   data on an inference is worse than ignoring it).
         var confRows = ReadWorldCsv(confCsvPath,
-            new[] { "ID", "Name", "ShortName", "Games", "Skip", "Prestige", "Divisions", "DivisionOne",
+            new[] { "ID", "Name", "ShortName", "Games", "Skip", "Weeks",
+                    "TourneyOpensDaysBeforeSelectionSunday", "Prestige", "Divisions", "DivisionOne",
                     "DivisionTwo", "TourneyTeams", "TDay1", "TDay2", "TDay3", "TDay4", "TDay5", "SeedDiv",
                     "D1", "D2", "D3", "TourneyBirth", "TourneyType" });
         // ★ S92 — `Lat`/`Long` are RETIRED from teams.csv and replaced by `PlaceId`. `City`
@@ -824,14 +900,31 @@ internal static partial class Program
                 throw new InvalidOperationException($"{confCsvPath}: duplicate conference id {id}.");
             var games = WorldCsvInt(r[3], confCsvPath, $"conference '{r[1]}' Games");
             var skip = WorldCsvInt(r[4], confCsvPath, $"conference '{r[1]}' Skip");
-            var rating = WorldCsvInt(r[5], confCsvPath, $"conference '{r[1]}' Prestige");
+            var weeks = WorldCsvInt(r[5], confCsvPath, $"conference '{r[1]}' Weeks");
+            var offRaw = r[6].Trim();
+            int? offset;
+            if (string.Equals(offRaw, "none", StringComparison.OrdinalIgnoreCase))
+                offset = null;                     // authored 'no tournament' — a real value
+            else if (offRaw.Length == 0)
+                throw new InvalidOperationException(
+                    $"{confCsvPath}: conference '{r[1]}' TourneyOpensDaysBeforeSelectionSunday is blank — "
+                    + "a blank cannot mean two things; author a number or the literal 'none'.");
+            else
+                offset = WorldCsvInt(offRaw, confCsvPath,
+                    $"conference '{r[1]}' TourneyOpensDaysBeforeSelectionSunday");
+            // Nights normalise to lowercase at the authoring boundary; validation rejects
+            // anything unrecognised, so 'Sun' and 'sun' cannot become two spellings of one world.
+            var nights = new[] { r[18].Trim().ToLowerInvariant(), r[19].Trim().ToLowerInvariant(),
+                                 r[20].Trim().ToLowerInvariant() };
+            var rating = WorldCsvInt(r[7], confCsvPath, $"conference '{r[1]}' Prestige");
             var tierId = rating switch
             {
                 5 => "power", 4 => "highMid", 3 => "lowMid", 1 or 2 => "low",
                 _ => throw new InvalidOperationException(
                     $"{confCsvPath}: conference '{r[1]}' rating {rating} outside the known 1-5 scale."),
             };
-            conferences.Add(new WorldConference(id, r[1], r[2], tierId, games, skip));
+            conferences.Add(new WorldConference(id, r[1], r[2], tierId, games, skip,
+                                                nights, weeks, offset));
         }
 
         var schools = new List<WorldSchool>();
@@ -1065,6 +1158,12 @@ internal static partial class Program
                 writer.WriteString("tierId", c.TierId);
                 writer.WriteNumber("games", c.Games);
                 writer.WriteNumber("skip", c.Skip);
+                writer.WriteStartArray("nights");
+                foreach (var night in c.Nights) writer.WriteStringValue(night);
+                writer.WriteEndArray();
+                writer.WriteNumber("weeks", c.Weeks);
+                if (c.TourneyOffsetDays is null) writer.WriteNull("tourneyOffsetDays");
+                else writer.WriteNumber("tourneyOffsetDays", c.TourneyOffsetDays.Value);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();

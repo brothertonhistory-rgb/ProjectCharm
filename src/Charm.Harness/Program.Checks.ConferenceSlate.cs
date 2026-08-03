@@ -42,7 +42,11 @@ internal static partial class Program
 {
     // ★ Oracle exports (tools/schedule_oracle.py). The schedule consumes no randomness,
     //   so these are a function of the WORLD alone.
-    private const string SlateOracleFixtureFp = "5698eb1b2532c2003c920fb647fa57be26eeb2ad36e5335fb645a43445e0db52";
+    // ★ S94 — the fixture fingerprint MOVED DELIBERATELY: the prompt required a 20-game
+    //   December league authored into fixture-schedule, and a changed world hashes as a
+    //   changed world. r15's C1 wanted this constant unchanged AND the league added —
+    //   the contradiction was caught at build and resolved on the side of the fixture.
+    private const string SlateOracleFixtureFp = "d839a6fad46fcd939b2c23e3b1079ea6ac9750f54f6e3d80b3b09f4c1d6cd480";
 
     private static bool Phase84ConferenceSlateCheck(string configPath)
     {

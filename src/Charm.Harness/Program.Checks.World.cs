@@ -135,13 +135,13 @@ internal static partial class Program
                 1, 2, "D1", lowPrestige, lowPrestige));
         return new WorldFile
         {
-            SchemaVersion = 3, Kind = "authored", EraLabel = "synthetic", Division = "D1", WorldSeed = null,
+            SchemaVersion = 4, Kind = "authored", EraLabel = "synthetic", Division = "D1", WorldSeed = null,
             Places = places,
             Tiers = WorldTierDefaults.Select(t => new WorldTier(t.Id, t.Floor, t.Equilibrium, t.Pullback)).ToList(),
             Conferences = new List<WorldConference>
             {
-                new(1, "Synthetic Power", "SP", "power", 16, 0),
-                new(2, "Synthetic Low", "SL", "low", 16, 0),
+                new(1, "Synthetic Power", "SP", "power", 16, 0, new[] { "sat", "wed", "mon" }, 9, 4),
+                new(2, "Synthetic Low", "SL", "low", 16, 0, new[] { "sat", "wed", "mon" }, 9, 11),
             },
             Schools = schools,
         };

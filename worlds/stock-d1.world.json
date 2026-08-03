@@ -3274,7 +3274,7 @@
     },
     {
       "placeId": 305,
-      "name": "Canc\u00fan",
+      "name": "Canc\u00FAn",
       "subdivision": "",
       "country": "MX",
       "lat": 21.1619,
@@ -3378,7 +3378,7 @@
     },
     {
       "id": 4,
-      "name": "Alabama A&M",
+      "name": "Alabama A\u0026M",
       "abbr": "ALAM",
       "color": "#790000",
       "placeId": 4,
@@ -4350,7 +4350,7 @@
     },
     {
       "id": 85,
-      "name": "Florida A&M",
+      "name": "Florida A\u0026M",
       "abbr": "FLAM",
       "color": "#FF7329",
       "placeId": 82,
@@ -5406,7 +5406,7 @@
     },
     {
       "id": 173,
-      "name": "Mount St. Mary's",
+      "name": "Mount St. Mary\u0027s",
       "abbr": "MSMYS",
       "color": "#003F87",
       "placeId": 156,
@@ -5562,7 +5562,7 @@
     },
     {
       "id": 186,
-      "name": "North Carolina A&T",
+      "name": "North Carolina A\u0026T",
       "abbr": "NC AT",
       "color": "#002659",
       "placeId": 169,
@@ -5874,7 +5874,7 @@
     },
     {
       "id": 212,
-      "name": "Prairie View A&M",
+      "name": "Prairie View A\u0026M",
       "abbr": "PV AM",
       "color": "#4D0960",
       "placeId": 190,
@@ -6054,7 +6054,7 @@
     },
     {
       "id": 227,
-      "name": "Saint Mary's",
+      "name": "Saint Mary\u0027s",
       "abbr": "STMRY",
       "color": "#D80024",
       "placeId": 201,
@@ -6378,7 +6378,7 @@
     },
     {
       "id": 254,
-      "name": "St. John's",
+      "name": "St. John\u0027s",
       "abbr": "STJN",
       "color": "#E24552",
       "placeId": 55,
@@ -6390,7 +6390,7 @@
     },
     {
       "id": 255,
-      "name": "Saint Joseph's",
+      "name": "Saint Joseph\u0027s",
       "abbr": "STJOE",
       "color": "#BB003A",
       "placeId": 68,
@@ -6402,7 +6402,7 @@
     },
     {
       "id": 256,
-      "name": "St. Peter's",
+      "name": "St. Peter\u0027s",
       "abbr": "STPT",
       "color": "#2361AA",
       "placeId": 224,
@@ -6558,7 +6558,7 @@
     },
     {
       "id": 269,
-      "name": "Texas A&M",
+      "name": "Texas A\u0026M",
       "abbr": "TXAM",
       "color": "#500000",
       "placeId": 235,
@@ -6570,7 +6570,7 @@
     },
     {
       "id": 270,
-      "name": "Texas A&M-CC",
+      "name": "Texas A\u0026M-CC",
       "abbr": "TXCC",
       "color": "#00639C",
       "placeId": 236,
@@ -7122,7 +7122,7 @@
     },
     {
       "id": 316,
-      "name": "William & Mary",
+      "name": "William \u0026 Mary",
       "abbr": "WM",
       "color": "#073E2B",
       "placeId": 271,

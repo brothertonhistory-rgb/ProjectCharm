@@ -10236,3 +10236,45 @@ prove the refusal fires and names itself. **Migrating it is the same as deleting
 Nothing consumes the map, so nothing proves it is *usable*. Home court is next and the scheduler after;
 both are expected to produce findings. A place has no size, and the crowd model that eventually reads
 this map will not have one (R4). Displaced home games are unrepresentable by design, pending a ruling.
+## Conference dates — every game gets a night (Session 94, 2026-08-03)
+
+The locked contract is `tools/schedule_oracle.py`'s S94 section; this records the design and the rulings. The C# port is `src/Charm.Harness/Program.Season.Dates.cs`, proven by Phase 85 (20 assertions) with golden parity asserted EXACT on the dated fingerprints.
+
+### The model: LOOSE, ruled on real evidence
+
+Two real 2025-26 Big East schedules — an eleven-team league playing twenty conference games, the exact shape a draft prompt had proven "impossible" — overturned the tight model in one sitting, and Emmett ruled **loose over tight**. Three authored numbers per league, and its name is not one of them: **Games** (S93), **Weeks**, and **TourneyOpensDaysBeforeSelectionSunday** (the literal `none` = no tournament, walling at Selection Sunday itself; a blank is malformed and refused, because a blank cannot mean two things). Everything else derives.
+
+- `wall = SelectionSunday − offset − 1`, never a fixed calendar date.
+- ★ **The window's final week is the LATEST Mon–Sun week ALL of whose active nights fall on or before the wall.** Not the week containing the wall — with 26 Saturday-led leagues, any Tue–Fri wall would gut a partial final week, and the real league doesn't play one: the 2026 Big East walled Tue Mar 10 and finished **Sat Mar 7, the week before**, resting into its tournament. Every playing week is therefore complete and capacity uniform.
+- The window is that week plus `weeks − 1` playing weeks before it, **skipping the Mon–Sun week containing December 25** (quiet — neither counted nor played). No week may open before November 1.
+- ★ **Weekly totals are EXACT**: `base, extra = divmod(n·G/2, weeks)`; the LAST `extra` playing weeks carry `base+1`. Heavier-latest is evidenced — the real schedules' combined December appearances run 1/3/3 against a steady 3–4 after New Year. This rule is what makes "loose" enforceable: without it, earliest-first packing rebuilds the tight model inside a loose container and ends the season a fortnight before its own tournament.
+- **December is the front of the window**, not a borrowed night. Nothing in the mechanism names December; a league reaches it if its authored weeks reach back that far (today: the Atlantic Sun's real window, plus the 18-game leagues' Dec 28–31 openers, ruled fine for short-calendar years). December counts are unequal across teams and that is CORRECT — the real league's were.
+- **Off days equalise in SLOTS**: `2·weeks − games`, identical per team because the league shares one window. Counted in off-weeks the two real schedules differ (2 vs 4); counted in slots both are exactly 4.
+
+### THE HARDEST CONSTRAINT: the Mon–Sun week
+
+★ **A team never plays three conference games in a Monday-to-Sunday week. Bar none.** The week is the CALENDAR week, not a rolling seven days — UConn's Sun Jan 4 / Wed Jan 7 / Sat Jan 10 is three inside seven rolling days and perfectly legal, because Jan 4 closes the week that opened Dec 29. Phase 85's C2 carries two negative controls: a constructed one-calendar-week triple that must be rejected, and ★ the real UConn pattern that must be ACCEPTED, so the rolling reading cannot quietly return and stay green.
+
+### Assignment: a rotation, not a search
+
+Base meetings ride canonical circle-method rounds, so a pair's repeat meetings land about half a season apart **by construction**; each extra meeting (the doubled opponents) interleaves half a rotation from its pair's base position. Weeks fill from that stream under a deterministic urgency order (a team owing more than the remaining weeks can seat plays now; on-pace teams keep rotation order so the built-in spacing survives), with take/skip backtracking on top. Dates inside a week fill in the league's own authored `D1 → D2 → D3` priority — a candidate order inside the backtracking, never an irreversible greedy rule and never a prescribed date-count shape. Even leagues use `{D1, D2}`, odd `{D1, D2, D3}`; a date seats at most `⌊n/2⌋` games. S93 emission order is the deterministic tie-break everywhere; **no RNG**, and the whole country dates in under a second with **zero same-quarter rematch collisions** — the spacing falls out of the structure.
+
+★ **THE COMPLETED DATED WEEK IS THE ATOMIC UNIT OF CHRONOLOGICAL EVALUATION.** Authored priority may fill a later calendar night first (`D1 = Sat` before `D2 = Wed`), so no rematch or quarter rule ever runs on a week with holes in it: individual placements test only week-stable facts (occupancy, the team week-cap, the date cap, target reachability, and the always-illegal same-pair-twice-in-one-week); once the week hits its exact total it sorts by real date, appends tentatively to each team's sequence, and the sequence rules run on the sorted result, backtracking on failure. Judged mid-week, a Saturday placement reads adjacent to last week's opponent while the unassigned Wednesday game is the very thing separating them — a completable schedule dying as infeasible, the exact dishonesty the verdict enum exists to prevent.
+
+### Rematch spacing (R4)
+
+In each team's own chronological sequence, never league-wide slots: between two meetings of a pair, **each** team plays someone else in between (hard, asserted); and consecutive meetings of a pair land in **different game-count quarters** (quarters differ by at most one game — the first `G mod 4` quarters hold the extra; all four stock shapes occur: 14→4/4/3/3, 16→4/4/4/4, 18→5/5/4/4, 20→5/5/5/5). The bound is ZERO collisions, measured achievable on the whole stock world and matching the evidence: the two real schedules separate all twenty of their repeated pairs.
+
+★ **A two-team league cannot be dated at any calendar length** — every game is a rematch of the only opponent, so non-adjacency is unsatisfiable; refused at static validation by name, never "discovered" by the search. The fixture's Duo Conference is the standing example.
+
+### Verdicts
+
+`static validation → supported size → fit (two integer comparisons) → assignment`. The fit bound is two-sided — `G/2 ≤ weeks ≤ n·G/2` — and ★ **the weekly-capacity condition is a THEOREM, not a refusal**: with valid nights every complete week seats exactly `n` (`2·⌊n/2⌋ = n` even, `3·(n−1)/2 ≥ n` odd) and `weeks ≥ G/2` bounds every target by `n`; verified exhaustively, asserted internally, unreachable on authored data — a session that "re-adds" it as a refusal is re-adding dead code. `InfeasibleUnderConstraints` only from exhaustion (a proof); `SearchBudgetExhausted` proves nothing and the two never merge. The zero-game league is exempt from all of it, evaluated before every bound.
+
+### Data and schema (v4; the fingerprint's third move, invoked)
+
+`conf.csv` gained `Weeks` and `TourneyOpensDaysBeforeSelectionSunday` beside `Skip`; the long-dead `D1/D2/D3` nights are finally read (normalised to lowercase at the authoring boundary); `TDay1..5` stay in place, deliberately unread. Every conference in a world file carries `nights`, `weeks`, `tourneyOffsetDays` (null = none); **v3 is refused by name — it cannot say WHEN its own season is** — with a Phase 83 negative control on the words. The date lives ON the game record (a fifth field the structural fingerprint provably cannot see — it hashes four fields by name; C1 proves before-and-after identity); a **new DATED fingerprint** over `index|date|home|away` joins it, in exact golden parity with the oracle. The season start year is **2026, stored never hardcoded** (`SeasonDefaultStartYear`); C13 builds 2031 and proves identical structure, different dates, moved fingerprint. `world rewrite <in> <out>` joined the CLI: one-shot canonicalisation through the single projection. The showcase game is a wired-and-inert seam (`SelectShowcaseGames`, selecting nothing), exactly as `FixedResidualHost` shipped at S93.
+
+### Authored values (stock, ruled)
+
+Weeks by game count — 14→8, 16→9, 18→10, 20→12 (twelve is what the real 20-game league uses; eleven reaches only a Dec 28–31 stub). Tournament offsets by tier — power/highMid 4 (opens the Wednesday of championship week), lowMid 8, low 11; the Ivy holds a tournament for now; **O-81** records the down-the-line design: any league may hold no tournament or a two-team one, and bracket format should eventually DERIVE the wall — the schedule layer consumes exactly one date and will not care.

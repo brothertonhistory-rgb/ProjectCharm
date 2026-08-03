@@ -406,10 +406,29 @@ internal static partial class Program
                   v2Refused && v2Msg.Contains("schemaVersion 2", StringComparison.Ordinal)
                     && v2Msg.Contains("games", StringComparison.Ordinal), v2Msg);
 
+            // ★ S94 — the SAME negative-control pattern, one version up: a v3 document must
+            //   be refused for the v3 reason (no playing nights / week count / wall — it
+            //   cannot say WHEN its season is), never the generic message.
+            var v3Path = Path.Combine(Path.GetTempPath(), $"charm_v3_retired_{Guid.NewGuid():N}.json");
+            var v3Refused = false; var v3Msg = "";
+            try
+            {
+                File.WriteAllText(v3Path,
+                    File.ReadAllText(v1Path).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 3",
+                                                     StringComparison.Ordinal));
+                try { LoadWorld(v3Path); }
+                catch (InvalidOperationException ex) { v3Refused = true; v3Msg = ex.Message; }
+            }
+            finally { if (File.Exists(v3Path)) File.Delete(v3Path); }
+            Check("A7 ★ a schemaVersion 3 world is REFUSED by name, for the v3 reason "
+                  + "(no nights, no weeks, no wall — it cannot say WHEN its season is)",
+                  v3Refused && v3Msg.Contains("schemaVersion 3", StringComparison.Ordinal)
+                    && v3Msg.Contains("WHEN", StringComparison.Ordinal), v3Msg);
+
             var tiny = LoadWorld(tinyPath);
             var format = LoadWorld(formatPath);
-            Check("A7 all three migrated world files are schemaVersion 3 and validate",
-                  stock.SchemaVersion == 3 && tiny.SchemaVersion == 3 && format.SchemaVersion == 3);
+            Check("A7 all three migrated world files are schemaVersion 4 and validate",
+                  stock.SchemaVersion == 4 && tiny.SchemaVersion == 4 && format.SchemaVersion == 4);
 
             // ★ CANONICAL BYTES COMPARED, NEVER DECODED OBJECT EQUALITY. Object equality
             //   would pass while the key order, the indent or a number's spelling drifted,

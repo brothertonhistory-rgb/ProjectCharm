@@ -217,11 +217,12 @@ internal static partial class Program
                 var moved = movedIdx.ToHashSet();
                 return new WorldFile
                 {
-                    SchemaVersion = 3, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
+                    SchemaVersion = 4, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
                     Division = tiny.Division, WorldSeed = tiny.WorldSeed, Tiers = tiny.Tiers,
                     Places = tiny.Places,
                     Conferences = tiny.Conferences
-                        .Append(new WorldConference(999, "Lonely", "LON", lowTier, games, skip)).ToList(),
+                        .Append(new WorldConference(999, "Lonely", "LON", lowTier, games, skip,
+                            new[] { "sat", "wed", "mon" }, Math.Max(1, games / 2), 8)).ToList(),
                     Schools = tiny.Schools
                         .Select((s, i) => moved.Contains(i) ? s with { ConferenceId = 999 } : s).ToList(),
                 };

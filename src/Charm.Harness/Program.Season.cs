@@ -81,8 +81,13 @@ internal static partial class Program
     // the honest value is "absent" — never a zero, never a made-up number. Run WITH a
     // history and both are always present; that is validated once, at the top, rather than
     // by every reader downstream checking again.
+    /// <summary>★ S94 — the game gained its DATE, as a field on the record rather than a
+    /// parallel table (a side table joined by position drifts out of order silently). The
+    /// structural fingerprint hashes four fields BY NAME (see ScheduleFingerprint's S89
+    /// note), so the fifth is invisible to it — proven by Phase 85 C1.</summary>
     private sealed record SeasonGame(string Kind, int HomeId, int AwayId,
-                                     SeasonId? SeasonId = null, GameId? GameId = null);
+                                     SeasonId? SeasonId = null, GameId? GameId = null,
+                                     DateOnly? Date = null);
 
     private sealed record SeasonGameResult(
         int HomeId, int AwayId, int HomeScore, int AwayScore, int OvertimePeriods,
@@ -812,6 +817,9 @@ internal static partial class Program
     {
         var schedule = BuildSeasonSchedule(world, seasonSeed, history);
         var fingerprint = ScheduleFingerprint(schedule);
+        // ★ S94 — every game gains its night. Purely additive: the structural fingerprint
+        //   above is computed from the four named fields and cannot see the date.
+        SeasonDateSchedule(world, schedule, SeasonDefaultStartYear);
         var divvy = RunDivvyDraft(world, seasonSeed, history);
 
         // ★ S89 — history mode's contract, validated ONCE, here. Past this line every
@@ -1028,6 +1036,13 @@ internal static partial class Program
             Console.WriteLine($"World: {args[1]} ({world.Schools.Count} schools, {world.Conferences.Count} conferences)");
             Console.WriteLine($"Season seed: {seed}");
             Console.WriteLine($"Schedule fingerprint: {ScheduleFingerprint(schedule)}");
+            // ★ S94 — the dated layer's own line: season year, dated fingerprint, and how
+            //   much of the country plays in December (the Atlantic Sun's real window plus
+            //   the 18-game leagues' ruled-fine New Year's-week openers).
+            var datedFp = SeasonDateSchedule(world, schedule, SeasonDefaultStartYear);
+            var decemberGames = schedule.Count(x => x.Date is { Month: 12 });
+            Console.WriteLine($"Dated: season {SeasonDefaultStartYear}-{SeasonDefaultStartYear + 1}, " +
+                              $"{decemberGames} December games, dated fingerprint {datedFp}");
             // ★ S93 — the banner reads the WORLD rather than restating a constant. The old
             //   line said "16 conference + 14 non-conference per team, 15 home / 15 away" and
             //   would have kept saying it while every one of those numbers was false.
