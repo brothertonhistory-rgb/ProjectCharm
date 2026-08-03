@@ -94,6 +94,12 @@ internal static partial class Program
         new("Clock",              typeof(RollClockConfig),          LoaderShape.Sectioned),
         new("EndOfHalf",          typeof(EndOfHalfConfig),          LoaderShape.Sectioned),
         new("Fatigue",            typeof(FatigueConfig),            LoaderShape.Sectioned),
+        // ★ S95 — the home-court dial. Registered here for the same reason every other
+        //   surface is: arm 1 asserts that every config class with a static Load(string)
+        //   is claimed exactly once AND that every top-level section in config.json is
+        //   claimed by exactly one contract. An unregistered dial fails the phase, which
+        //   is precisely what makes hardcoding this table safe.
+        new("HomeCourt",          typeof(HomeCourtConfig),          LoaderShape.Sectioned),
         // EXCLUDED. RosterConfig itself declares only Home/Away — against it the section
         // is a clean 2 = 2. But the section's real content is ARRAYS OF PLAYER OBJECTS
         // (the forty rating properties live on the separate PlayerConfig class), and

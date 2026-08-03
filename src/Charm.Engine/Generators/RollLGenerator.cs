@@ -33,10 +33,6 @@ namespace Charm.Engine;
 /// trips) and the 72% flat fallback (only the two cases above).
 /// </para>
 ///
-/// <para><b>RoadMakePenalty is dormant.</b> The <see cref="RollLConfig.RoadMakePenalty"/>
-/// field is a documented seam (currently 0.0) and is NOT read or applied here. Home/road
-/// FT effects are outside Phase 18.</para>
-///
 /// <para><b>Clamp.</b> <see cref="Math.Clamp"/> is applied to the make probability as a
 /// safety net against misconfigured authored ratings. <see cref="Player.Validate"/> is
 /// the upstream guard for invalid values; the clamp just ensures the pie constructor
@@ -83,7 +79,6 @@ public sealed class RollLGenerator : IRollLPieGenerator
             else
             {
                 // Direct 1:1 — FreeThrow rating IS the make percentage × 100.
-                // RoadMakePenalty: dormant, not read. Do not apply even conditionally.
                 makeProbability = player.FreeThrow / 100.0;
             }
         }

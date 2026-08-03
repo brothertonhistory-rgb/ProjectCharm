@@ -1,3 +1,80 @@
+## Session 95 — HOME COURT. The road team is worse everywhere and a hair at a time: every man on the road side is handed to the engine **three points lower in each of his twenty-three SKILL ratings**, floored at 0, so all thirteen contested doors lean against him at once without a single one of them being told to. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 86 PASS at 32 assertions**, zero-path golden `c853b3698ae28b31…` reproduced exactly, Athleticism `44.000000 → 44.000000`, gravity `18.442→16.750`, spacing `11.839→9.806`, home passthrough True / away shaved True, 160/160 hosted road sides shaved. Calibrated on the full stock world: **58.74% home wins at +3.66 margin over three seasons and 8,454 games**, against a **50.08% / −0.05** control at zero. (2026-08-03)
+
+**Register:** build, under `PROMPT-home-court-s95-r4` (ChatGPT-reviewed and cleared with its evidence packet passed). Three new files, eight edited, none deleted. No oracle — the mechanism is a subtraction, not a formula; the Python pre-check's role was played by the calibration sweep, which is a measurement rather than a proof.
+
+### What shipped
+
+`src/Charm.Harness/Program.Season.HomeCourt.cs` — NEW (the shaved-name set, `RoadShavedPlayer`, `ApplyRoadShave`, `PrepareSeasonGameSides`, and the shared `SeasonFingerprint`). `src/Charm.Harness/Program.Checks.HomeCourt.cs` — NEW (Phase 86). `src/Charm.Engine/Config/HomeCourtConfig.cs` — NEW (one integer). `Program.Season.cs`, `Program.Checks.Season.cs`, `Program.Checks.ConfigParity.cs`, `Program.cs`, `config.json`, `RollLConfig.cs`, `RollLGenerator.cs`, `RollLStubPieGenerator.cs` — EDIT. **No engine math touched.**
+
+### ★ THE RULING THAT RESHAPED THE BUILD MID-SESSION: SKILLS, NOT BODIES
+
+The prompt arrived closed on a thirty-rating shave — every performance rating, body included — ratified at 2 for 59.0% home wins. It shipped as a **twenty-three-rating** shave at 3, and the change came out of one exchange at the check-in gate.
+
+The gate had to report that B4's contract could not hold as written: `Player.Athleticism`, `GravityContribution` and `SpacingContribution` are computed on read, not stored, so a clone whose ratings are 2 lower has derived values 2 lower whether anybody wants them to or not. Emmett's first answer was *"should only be attributes that are impacted"* — which under the thirty-rating classification is arithmetically impossible, and was said so plainly rather than engineered around. He then asked the better question: **"Or the attributes shouldn't be what is impacted right? It's just the small adjustment to the pies? or how do you see it?"**
+
+The answer that settled it is the architectural fact this session turns on, and it is worth carrying forward: **there is no layer in this engine between a man's ratings and the pie.** Every contested door is built by reading the two men against each other at the moment it fires — no openness stage, no shot-quality stage. So shaving the ratings is not an alternative to leaning the pies; it *is* how you lean them, with one dial instead of thirteen, each door leaning by exactly as much as it actually reads the ratings involved. Leaning thirteen pies by hand would mean thirteen magnitude rulings, engine surgery at every door, and the same arithmetic at the end with thirteen numbers to keep honest.
+
+Given that, the real fork was *which* ratings. Emmett: **"Yes, it makes sense that it is skills, not body that is impacted."** The body comes out — three body facts and six physicals — and, on a second call, **Hustle** with them: *"hold hustle out."* Effort travels. Reads and restraint do not: BasketballIQ and Discipline stay shaved, and Discipline is the strongest single case in the set, because the most real home-court effect in college basketball is the whistle and Discipline is the dial that decides who gets called for the reach-in.
+
+★ **Exempting all six physicals TOGETHER is what makes the ruling true rather than approximately true.** `Athleticism` is their mean; exempt five of six and it still moves. Phase 86 asserts it as **exact equality** — `44.000000 → 44.000000` — and Athleticism is the largest channel the shave could have reached, feeding every matchup gap, fatigue drain and displacement read in the engine.
+
+### ★ THE DIAL HAD TO BE RE-MEASURED, AND 2 WAS WRONG BY THE END
+
+Two was calibrated against thirty ratings. Under twenty-three, with the athleticism channel gone entirely, it measures **56.78%** — short of the ratified 59–61% band. The body exemption is worth about two points of home win rate on its own. Three full stock seasons per value:
+
+| shave | home win % | margin | per-season spread |
+|---|---|---|---|
+| 0 | 50.08% | −0.05 | 49.0 – 51.0 |
+| 2 | 56.78% | +2.59 | 55.3 – 58.9 |
+| **3** | **58.74%** | **+3.66** | 58.0 – 59.9 |
+| 4 | 61.86% | +4.84 | 61.3 – 62.3 |
+
+Three restores what was signed off almost exactly (58.74% against 59.0%, +3.66 against +3.8); four overshoots with every season above 61.3. Emmett ruled 3. **The lesson is now a sentence on the config class: the dial is re-measured whenever the shaved SET changes, because the set decides how much of the engine one subtraction reaches.** A number calibrated against one classification is not evidence about another — and the delivered build would have shipped a placeholder wearing a calibrated number's clothes if the sweep had not been run.
+
+★ **The zero control is what makes any of it readable.** 50.08% and a margin of −0.05 on 8,454 games: with no penalty there is no home court, so the balanced-schedule condition S92 argued the whole ordering around is verified rather than assumed.
+
+### ★ THE EVIDENCE PACKET PASSED AND THE GATE STILL FOUND TWO THINGS
+
+The r4 prompt led with nine packet items already run against a pristine pull and PASSED. The gate re-verified rather than re-derived, exactly as instructed, and two of those items were incomplete.
+
+**(1) Packet item 1 named "the two `BuildSeasonSide` lines ~885" and asked for any other seater. There are two more** — `Program.Checks.Season.cs:323-324`, inside Phase 55's independent hand replay. That check rebuilds game 0's sides from scratch, reruns the game, and asserts the score matches what the season recorded; it exists to catch a flipped home/away credit. With the shave inside the season loop and not inside the replay, the two halves would have been simulating different basketball and the check would have gone red with nothing wrong in the engine. The packet's related claim — *"no existing check encodes a season outcome"* — is true about constants and misses that this one **recomputes** one. The fix is one call, and it sharpens the check: an independently seated pair, prepared the same way, must reproduce the score, so a shave landing on the HOME side is now caught here too.
+
+**(2) The new dial could not live where the prompt put it.** §3 forbade every file under `src/Charm.Engine/` bar three named deletions. But Phase 71 has two arms that bite together: every class in the *engine assembly* with a `static Load(string)` must be registered exactly once, and every top-level section in `config.json` must be claimed by exactly one registered contract. All 21 existing config classes live in `src/Charm.Engine/Config/`. Put `HomeCourtConfig` in the harness and the new section is unclaimed (red); register it anyway and the contract is phantom (red). The dial went in the engine's config folder with a registry row, on a granted second exception — a data class with a `Load`, no road behaviour anywhere near the engine. Neither file was on the prompt's changed-file list.
+
+### ★ ZERO IS THE OLD ENGINE, PROVEN AGAINST AN ARTIFACT THAT SURVIVES THE CHANGE
+
+Step zero of the build, before any production wiring existed: the freshly-pulled pre-S95 tree was run on the tiny fixture at seed 20260703 and every game's home id, away id, both scores and **possession-record count** were hashed by the same helper the check would later use — never hand-reproduced, because a hash captured on one OS has to verify on another. `c853b3698ae28b31…`, 160 games. Phase 86 B1 runs the post-S95 tree at `RoadShave = 0` and reproduces it, with the game count asserted **before** the hash so that "160 games, wrong hash" and "23 games" cannot arrive wearing the same face.
+
+The possession count is in the line on purpose: scores alone would let a change that reshapes a game's internals while landing on the same final score slip through.
+
+### ★ SCOPE HONESTY: THE HOST FACT STILL DOES NOT EXIST
+
+A scheduled game carries a home id and an away id and nothing else. S92 defined `GameSite`, `GameHost` and `Nobody`-as-a-named-case, and **S95 consumes none of it.** The applicator takes an explicit `hasHost` flag; the season loop passes `true` as a literal, commented, because every game on today's schedule is a real home game. An `IsHosted(game)` helper was refused by the prompt and stayed refused — it would be a filter that is always true today, dressed as a filter that means something.
+
+★ **Consequence worth recording: Phase 83's A9 landmine never went off.** The board had warned that A9 forbids the season-path files from naming a geography type and that home court would legitimately need one. It did not. The check was not rewritten, not extended, not touched — defused by scope rather than by editing the thing that was supposed to catch us.
+
+### What Phase 86 discriminates on
+
+Almost every check in the phase stays green if the shave lands on the **wrong side**: conservation holds, determinism holds, the counts hold, the clone is perfectly formed either way. Two things discriminate — B6, which names home and away separately at the seam (home is the original *reference*, asserted, not a copy that happens to be equal), and Phase 55's hand replay. Everything else is scaffolding around those two.
+
+Three more that earn their place. **B3 does not echo production's list**: it reflects the live public int surface, spells the seventeen exempt names independently, derives the expected shaved set by subtraction, and asserts equality — so a rating added in a future session lands loudly on one side or the other instead of being forgotten. **B4 compares against a hand-built expected clone across all 49 readable properties**, read-only and derived included, and asserts the source player is unchanged afterwards rather than trusting that init-only properties cannot be reassigned. **B5's non-accumulation arm** requires two applications to the same source to be semantically equivalent (reference equality explicitly *not* expected) — if the applicator ever wrote back to its source a road team would decay across a season one game at a time, and every conservation check in the suite would stay green while it happened.
+
+★ **The 59% is never a test.** Page-only calibration in full; Phase 86's own probe shave is deliberately 2, not the ruled 3, so a future tuning pass cannot turn the check file red.
+
+### Retired, and a banner that had stopped being true
+
+`RollLConfig.RoadMakePenalty` — a Phase 18 seam for a road free-throw effect, shipped at 0.0, never read — is deleted at all four sites the packet's own correction had found (the r1 audit had missed the config key). The old calibration hook `CHARM_ROAD_SHAVE` was never committed; nothing to delete, and the prompt's §4 and B9 disagreed about that, with B9 correct.
+
+The season page's line *"Neutral floors throughout (the road seam is 0)"* is gone. It is the S93 banner lesson recurring: a banner that restates a constant keeps saying it long after it is false. It now says what the schedule **is** — every game a real home game, neutral floors arriving with the tournament layer — and the measured line below says what the dial **did**.
+
+### Predictions
+
+Nine figures were predicted before Emmett's run and all nine landed: the golden hash, the Athleticism pair, both gravity and spacing values, the B6 pair, the coverage count, and the two changed existing lines (Phase 55's replay at 70-65 both ways, Phase 71 at 22 discovered / 22 registered / 21 sections). The sweep was predicted to land at "3 or 4" before it ran; 3 is the closer.
+
+### Ruled this session, for the record
+
+Skills, not bodies. Hustle held out; BasketballIQ and Discipline shaved. Flat across floors, with prestige/proximity/semi-home deferred to the tournament layer on the evidence of the real Big East's own Semi-Home / Semi-Away / Neutral labels. A road penalty, never a home boost. The shave is a subtraction on ratings, not thirteen tilts on pies, because the engine has no layer in between. `RoadShave = 3`. The dial is re-measured whenever the shaved set changes. Opens **O-82** (the crowd model — R4's prestige and distance, and R7's emergent per-team magnitude — both still unbuilt).
+
 ## Session 94 — DATES FOR THE CONFERENCE SLATE. Every game in the country now has a night. Three authored numbers per league — games, weeks, and the day its tournament opens (days before Selection Sunday, `none` a first-class value) — and everything else derives: `wall = SelectionSunday − offset − 1`; the window is the authored count of Mon–Sun playing weeks counted BACKWARD from the last complete playing week before the wall, Christmas week skipped; weekly totals exact (`base`/`base+1`, heavier weeks latest); dates fill in the league's own `D1→D2→D3` priority. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 85 PASS at 20 assertions, structural fingerprint `6f79d663…` UNMOVED, dated fingerprint `7515df7d…` in golden parity with the locked oracle, 63 December games, season page's basketball identical to S93 to the digit (credit identity 3,996,770/399,677 = 10.0 dropped 0).** World schema v4 (`nights`, `weeks`, `tourneyOffsetDays` on every conference; v3 refused by name — "it cannot say WHEN its own season is"); the world fingerprint moved a third time, invoked deliberately. (2026-08-03)
 
 ★ **THE RULING THAT DEFINED THE SESSION: LOOSE OVER TIGHT** — and it arrived as EVIDENCE, not argument. The r8 prompt modelled a compact maximal-density window with a balanced December rotation, and its check-in declared an 11-team 20-game league impossible (`D·(n−1) = n·r` has no integer solution at r=2). Emmett answered with two real 2025-26 Big East schedules — an 11-team league playing 20 — and they overturned FOUR of r8's load-bearing rules at once: the week is **Monday-to-Sunday, not rolling seven days** (UConn played Sun Jan 4 / Wed Jan 7 / Sat Jan 10 — three in seven rolling days, never three in a calendar week); December is **the front of the window, not a borrowed isolated night** (five league dates visible in December, three in one week); December counts are **unequal and correct** (UConn 3, Providence 2, both finish on 20); off days equalise in **SLOTS, not weeks** (`2·weeks − games`, four each, while their off-week counts differ). *"I like loose."* The r8 blocker dissolved without residue — the impossible league is the one that actually exists.

@@ -105,6 +105,21 @@ internal static partial class Program
         // per game inside RunSeasonCore; read by the page readout and Phase 55 §3.8.
         public required SeasonLeagueStats League { get; init; }
         public int Ties { get; init; }
+        /// <summary>★ S95 — per-game possession-record counts, in schedule order. The
+        /// season fingerprint hashes these alongside the scores so a change that reshapes
+        /// a game's INTERNALS while landing on the same final score cannot slip past
+        /// Phase 86's zero-path identity check. Observation only; nothing simulates from
+        /// it.</summary>
+        public List<int> PossessionCounts { get; init; } = new();
+        /// <summary>★ S95 — how many games actually had a road side transformed. The
+        /// counter increments only when the PREPARED away side is the shaved one, so it
+        /// counts what played rather than what was intended. Phase 86 B8 reads it from
+        /// the result; there is deliberately no global.</summary>
+        public int HostedRoadSidesShaved { get; init; }
+        /// <summary>★ S95 — the shave this run actually used. Carried out so the page
+        /// reports the value that PLAYED rather than re-reading config.json and reporting
+        /// a number that might not be the one the games were played at.</summary>
+        public int RoadShave { get; init; }
     }
 
     /// <summary>Everything the two accumulators need to turn a stamped player id back into a
@@ -811,9 +826,14 @@ internal static partial class Program
     /// check — keeps its exact prior behaviour and touches no folder. Only the season page
     /// and Phase 81 turn it on, so the retention layer cannot perturb a check that was
     /// green before it existed.</param>
+    /// <param name="roadShaveOverride">★ S95. Null — every production caller — means
+    /// "read the dial from config.json". Phase 86 passes a bare int so it can run the
+    /// season at a chosen shave (0 for the zero-path identity check, on for determinism)
+    /// WITHOUT rewriting config.json, which no check may ever do.</param>
     private static SeasonRunOutcome RunSeasonCore(
         WorldFile world, long seasonSeed, string engineConfigPath, bool verbose,
-        HistoryStore? history = null, bool retainGameLog = false)
+        HistoryStore? history = null, bool retainGameLog = false,
+        int? roadShaveOverride = null)
     {
         var schedule = BuildSeasonSchedule(world, seasonSeed, history);
         var fingerprint = ScheduleFingerprint(schedule);
@@ -843,10 +863,16 @@ internal static partial class Program
         var rowsBySchool = BuildSeasonRows(divvy, world, verbose);
         AssertSeasonIdentitiesDistinct(rowsBySchool);
         var cfgs = LoadGenEngineConfigs(engineConfigPath);
+        // ★ S95 — the home-court dial, read ONCE here and carried into the loop as a
+        //   plain value. The loop never touches disk; 5,205 games do not re-read a file
+        //   to learn the same integer 5,205 times.
+        var roadShave = roadShaveOverride ?? HomeCourtConfig.Load(engineConfigPath).RoadShave;
 
         var wins = world.Schools.ToDictionary(s => s.Id, _ => 0);
         var losses = world.Schools.ToDictionary(s => s.Id, _ => 0);
         var results = new List<SeasonGameResult>(schedule.Count);
+        var possessionCounts = new List<int>(schedule.Count);
+        var hostedRoadSidesShaved = 0;
         var ties = 0;
         var league = new SeasonLeagueStats();
         // ★ S89 — the map goes to the accumulator ONCE, before the loop, rather than being
@@ -882,8 +908,20 @@ internal static partial class Program
             // and sat directly above the code that maps them). Ids need uniqueness only
             // within a game; sides are stamped per matchup, never cached across games
             // where a school flips sides.
-            var sideHome = BuildSeasonSide(rowsBySchool[sg.HomeId], 0);
-            var sideAway = BuildSeasonSide(rowsBySchool[sg.AwayId], RosterShape.AwayIdOffset);
+            var seatedHome = BuildSeasonSide(rowsBySchool[sg.HomeId], 0);
+            var seatedAway = BuildSeasonSide(rowsBySchool[sg.AwayId], RosterShape.AwayIdOffset);
+            // ★ S95 — home court. EVERY game on today's schedule is a real home game
+            //   (SeasonGame carries HomeId/AwayId and no site fact at all), so the host
+            //   flag is passed as a literal `true` rather than inferred from anything.
+            //   When the tournament layer brings a schedule-owned site fact, THAT becomes
+            //   this argument and nothing else here moves.
+            var (sideHome, sideAway, awayShaved) =
+                PrepareSeasonGameSides(seatedHome, seatedAway, roadShave, hasHost: true);
+            if (awayShaved) hostedRoadSidesShaved++;
+            // Everything below — the engine, the identity bundle, the occupancy walk —
+            // reads the PREPARED sides, so the men who are attributed are the men who
+            // played. Name and PlayerId survive the shave untouched, which is what keeps
+            // the S77 Gate 2 identity comparison two independent paths to one person.
             var identity = new SeasonGameIdentity(
                 sg.HomeId, sg.AwayId,
                 rowsBySchool[sg.HomeId], rowsBySchool[sg.AwayId], sideHome, sideAway);
@@ -941,6 +979,7 @@ internal static partial class Program
             results.Add(new SeasonGameResult(
                 sg.HomeId, sg.AwayId, game.HomeScore, game.AwayScore, result.OvertimePeriods,
                 sg.SeasonId, sg.GameId));
+            possessionCounts.Add(result.Possessions.Count);
             if (game.HomeScore > game.AwayScore) { wins[sg.HomeId]++; losses[sg.AwayId]++; }
             else if (game.AwayScore > game.HomeScore) { wins[sg.AwayId]++; losses[sg.HomeId]++; }
             else ties++;   // assumption-1 says impossible; counted so it can never hide
@@ -961,6 +1000,9 @@ internal static partial class Program
         {
             Schedule = schedule, Fingerprint = fingerprint, Results = results,
             Wins = wins, Losses = losses, Divvy = divvy, League = league, Ties = ties,
+            PossessionCounts = possessionCounts,
+            HostedRoadSidesShaved = hostedRoadSidesShaved,
+            RoadShave = roadShave,
         };
     }
 
@@ -1058,9 +1100,15 @@ internal static partial class Program
                 (idleSchools > 0
                     ? $" {idleSchools} school(s) sit in a league authored at zero games and play none."
                     : ""));
+            // ★ S95 — the second clause used to read "Neutral floors throughout (the road
+            //   seam is 0)". That stopped being true this session. The S93 lesson applies:
+            //   a banner that restates a constant keeps saying it long after it is false,
+            //   so this now says what the schedule IS and the measured line below says
+            //   what the dial DID.
             Console.WriteLine(
                 "  Non-conference scheduling does not exist yet — it is its own session. " +
-                "Neutral floors throughout (the road seam is 0).");
+                "Every game on this schedule is a real home game; neutral floors arrive " +
+                "with the tournament layer.");
             Console.WriteLine();
             Console.WriteLine($"Regenerating divvied rosters (world + seed; nothing persisted) and playing " +
                               $"{schedule.Count} real engine games ...");
@@ -1084,6 +1132,31 @@ internal static partial class Program
         }
         finally { history?.Dispose(); }
         Console.WriteLine();
+
+        // ★ S95 — the home-court readout. PAGE-ONLY, NEVER ASSERTED: the ratified 59%
+        //   is a calibration target, and the page-only principle keeps basketball target
+        //   values out of the suite entirely. Y is every completed schedule game, because
+        //   every entry today is explicitly hosted — no invented filter; when the
+        //   schedule owns a site fact this denominator narrows to it.
+        {
+            var played = run.Results;
+            if (played.Count == 0)
+            {
+                Console.WriteLine($"Home court: road shave {run.RoadShave} — " +
+                                  "home wins 0/0 = n/a, margin n/a");
+            }
+            else
+            {
+                var homeWins = played.Count(r => r.HomeScore > r.AwayScore);
+                var pct = 100.0 * homeWins / played.Count;
+                var margin = played.Average(r => (double)r.HomeScore - r.AwayScore);
+                Console.WriteLine($"Home court: road shave {run.RoadShave} — home wins " +
+                                  $"{homeWins}/{played.Count} = " +
+                                  $"{pct.ToString("0.0", CultureInfo.InvariantCulture)}%, margin " +
+                                  margin.ToString("+0.0;-0.0;+0.0", CultureInfo.InvariantCulture));
+            }
+            Console.WriteLine();
+        }
 
         // ★ S89 — printed only in history mode, so the legacy page is byte-identical to
         // every page before this session (A8/A11).

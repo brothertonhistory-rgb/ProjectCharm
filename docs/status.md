@@ -10,7 +10,31 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 94** (2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, Phase 85 PASS at 20
+Last updated: **Session 95** (2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 86 PASS at 32
+assertions**, zero-path golden `c853b3698ae28b31…` reproduced EXACTLY, Athleticism `44.000000 → 44.000000`, gravity
+`18.442→16.750`, spacing `11.839→9.806`, home passthrough True / away shaved True, 160/160 hosted road sides shaved.
+**THE ROAD TEAM IS NOW WORSE.** Every man on the road side is handed to the engine three points lower in each of his
+twenty-three SKILL ratings, floored at 0, so all thirteen contested doors lean against him at once and no single one of
+them was told to. Calibrated on the full stock world: **58.74% home wins at +3.66 margin over three seasons and 8,454
+games**, against a **50.08% / −0.05 control at zero shave** — the balanced-schedule condition S92 argued the whole
+ordering around, verified rather than assumed. ★ THE RULING THAT RESHAPED THE BUILD MID-SESSION: **SKILLS, NOT BODIES**.
+The prompt arrived closed on a thirty-rating shave; Emmett asked whether the pies rather than the attributes should be
+what moves, and the answer — *this engine has no layer between a man's ratings and the pie, so shaving ratings IS
+leaning the pies, with one dial instead of thirteen* — reframed the fork as WHICH ratings. Body out (three body facts,
+six physicals), **Hustle out** (*"effort travels"*), BasketballIQ and Discipline in (the whistle is the most real
+home-court effect in the sport and Discipline is the dial that decides the reach-in call). ★ Exempting all six physicals
+TOGETHER is what makes it true rather than approximately true: `Athleticism` is their mean and Phase 86 asserts it as
+EXACT equality. ★ **THE DIAL HAD TO BE RE-MEASURED AND 2 WAS WRONG BY THE END** — under 23 ratings it measures 56.78%,
+short of the 59–61% band; 3 restores what was signed off (58.74% vs 59.0%, +3.66 vs +3.8); 4 overshoots. The lesson is
+now a sentence on the config class. ★ **ZERO IS THE OLD ENGINE**, proven against a fingerprint captured from the
+pre-S95 tree before a line of production wiring existed. ★ The evidence packet had PASSED and the gate still found two
+things: Phase 55's hand replay is a third and fourth seating site and would have gone red (fixed, and sharpened — it now
+catches a flipped shave too), and Phase 71's registry forced the dial into the engine's config folder on a granted
+second exception. ★ **Phase 83's A9 landmine never went off** — the host fact stayed out, so the check was not touched.
+Retires `RollLConfig.RoadMakePenalty` at all four sites and the page's stale *"neutral floors throughout"* banner. Opens
+**O-82**. Next: **host memory (O-79)**, the next scheduler third.)
+
+*(Previous board entry, S94 — 2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, Phase 85 PASS at 20
 assertions, structural fingerprint `6f79d663…` UNMOVED, dated fingerprint `7515df7d…` in EXACT golden parity with the
 locked oracle, 63 December games, the season page's basketball identical to S93 to the digit. **EVERY GAME IN THE
 COUNTRY NOW HAS A NIGHT.** Three authored numbers per league — games, weeks, and days-before-Selection-Sunday its
@@ -30,7 +54,7 @@ is 63 games in TEN leagues (the Atlantic Sun's real window plus the ruled-fine D
 fingerprint moved because the prompt's own C1 contradicted its own §7. Eight prompt revisions r8→r15, each smaller —
 including one refusal DELETED BY PROOF (the weekly-capacity condition is a theorem, unreachable once nights validate).
 Opens **O-81**. The S94=host-memory / S95=dates order on this board was reordered by Emmett; host memory (O-79) is the
-next scheduler third.)
+next scheduler third.)*
 
 *(Previous board entry, S93 — 2026-08-02; verified on Emmett's machine — ALL CHECKS PASSED, Phase 84 PASS at 26
 assertions, schedule fingerprint `6f79d663…`, 2,818 games, credit identity 3,996,770/399,677 = 10.0 dropped 0, census
@@ -118,6 +142,16 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**★ S95 MOVED THE BASKETBALL — deliberately, for the first time since S93.** Every road side now plays three points
+lower in its twenty-three skill ratings, so every per-possession rate below was measured under a symmetric schedule with
+no home court and is no longer directly comparable. The page gained one line:
+`Home court: road shave 3 — home wins X/Y = Z.Z%, margin +M.M`. On the full stock world, three seasons and 8,454 games:
+**58.74% home wins, +3.66 margin**; the zero-shave control on the same seeds reads **50.08% / −0.05**. The league-wide
+totals (PPP, possessions, credit identity, census) are conserved — the shave moves who wins, not how basketball is
+counted — but the *distribution* of wins is intentionally different and any standings figure recorded before S95 is a
+pre-home-court figure. **Zero reproduces the pre-S95 engine exactly** (Phase 86 B1, golden `c853b3698ae28b31…`), so the
+old page is always one config value away.
+
 **S94 dated every game and moved NO basketball**: the page below reproduces to the digit with one added banner line
 (`Dated: season 2026-2027, 63 December games, dated fingerprint 7515df7d…`).
 
@@ -192,6 +226,27 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S95 — HOME COURT: THE ROAD PENALTY.** Every man on the road side of a game — starters and bench alike —
+  is handed to the engine three points lower in each of his **twenty-three skill ratings**, floored at 0.
+  One dial (`HomeCourt.RoadShave`), every real home floor worth the same, and **a floor with no host tilts
+  nobody**: the home side is passed through as the very same object it arrived as, asserted by reference
+  identity rather than by equality. ★ **Skills, not bodies** — the three body facts, the six physicals and
+  **Hustle** are exempt, which keeps `Player.Athleticism` (their mean, computed on read) EXACTLY unchanged on
+  the road; BasketballIQ and Discipline are shaved, Discipline being the strongest single case in the set.
+  The five shot tendencies are exempt because WHERE a man shoots from is identity. Gravity and Spacing DO
+  come down, which is the shave landing where it was sent rather than leaking into the body. ★ **The
+  mechanism is a subtraction on ratings, not thirteen tilts on pies**, because this engine has no layer
+  between a man's ratings and the pie — one dial makes all thirteen doors lean, each by exactly as much as
+  it actually reads the ratings involved, weighted by the engine's own sensitivities instead of by thirteen
+  hand-picked constants. Nothing team-level is introduced, so the no-scalar wall is held by construction.
+  ★ **Calibrated at 3** on the full stock world (58.74% / +3.66 over 8,454 games; 50.08% / −0.05 at zero) —
+  the ratified 2 was measured against a thirty-rating shave and reads 56.78% under the shipped
+  classification. **The dial is re-measured whenever the shaved SET changes.** ★ **Zero is the old engine**,
+  proven against a golden fingerprint (scores AND per-game possession counts) captured from the pre-S95 tree
+  before any production wiring existed. The host fact still does not exist on a game: the applicator takes an
+  explicit `hasHost` flag and the season loop passes `true` as a literal, so nothing pretends to filter.
+  **Phase 86**, 32 assertions. The 59% is never asserted — page-only calibration in full.
 
 - **★ S93 — THE CONFERENCE SLATE: EVERY LEAGUE PLAYS ITS OWN SEASON.** `data/conf.csv` has carried a
   `Games` column for all 32 leagues since the day the file landed and the converter read the column and
@@ -481,6 +536,29 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
+- **★ O-82 — THE CROWD MODEL IS STILL UNBUILT, AND SO IS THE PER-TEAM MAGNITUDE (opened S95).** S95 shipped the
+  home-court EFFECT and none of the model S92 ruled behind it. Two named halves, both still owed:
+  **R4 — the crowd is PRESTIGE and DISTANCE, and there is no city size** (population, market size and arena
+  capacity are ruled out by name; a place has no population field and must never grow one — *"a small town
+  college can have an incredible homecourt advantage"*); and **R7's second half — an EMERGENT per-team
+  magnitude**, *"if you have a team full of freshman, it brings it down more"* — one number on all five whose
+  SIZE is built from the five on the floor, which is the shape that keeps a crowd number off the no-scalar
+  wall. Today the shave is one authored integer, identical for every road player on every road floor, and
+  R6's FLAT ruling was re-affirmed at S95 rather than superseded — so this is deferred work, not a defect.
+  **Prerequisite for the distance half: a game must know WHERE it is played**, which needs the schedule-owned
+  site fact that parks with the tournament layer. The prestige half and the magnitude half need neither, and
+  could go first.
+
+- **O-83 — SEMI-HOME, SEMI-AWAY AND NEUTRAL SITES PARK WITH THE TOURNAMENT LAYER (opened S95).** Ruled
+  deferred on evidence: the real Big East schedules label all three, so they are **site facts a schedule
+  owns**, not properties of a team, and inventing them before a schedule can say them would be inventing the
+  ticket. The seam is already shaped for it — `ApplyRoadShave` and `PrepareSeasonGameSides` take an explicit
+  `hasHost` flag that the season loop passes as a literal `true`, so the day a game carries its own site fact
+  that fact becomes the argument and **nothing else moves**. The season page's home-court denominator narrows
+  with it (today it is every completed schedule game, because every entry today really is hosted), and Phase
+  86's B8 expectation moves from `schedule.Count` to the count of games whose host fact is true. Both are
+  named in place, in the code, so neither reads as an oversight later.
+
 - **O-78 — THE PAGE STILL RANKS 347 SCHOOLS IN ONE NATIONAL W-L TABLE, AND THEY NO LONGER PLAY THE SAME
   NUMBER OF GAMES (opened S93).** Jacksonville leads at 17-3 over Stanford at 17-1 because the Atlantic Sun
   plays twenty and the Pacific-10 eighteen; Hampton went 15-1 and sits fourteenth. The prestige proof table
@@ -498,6 +576,10 @@ chart is PROVISIONAL pending O-6.
   history means — but it is a real basketball gap and it must not survive the career layer. **The next scheduler third's
   stored memory of who hosted last time is the natural home** (S94 shipped dates; Emmett reordered), together with the soft objectives
   (`SkipUrgency` and friends) that were held out of S93 precisely because they need that memory to apply.
+  ★ **S95 raised the stakes here.** Until this session home and away were bookkeeping; now hosting is worth
+  roughly three points of margin and about nine points of win rate, so a school that draws the doubled home
+  fixture against its toughest opponent draws it **every year, forever**. What was a cosmetic repetition is
+  now a permanent, compounding competitive advantage — and it is the reason this is the next session.
 
 - **O-80 — `conf.csv`'s `Divisions` COLUMN READS 2 FOR SIX LEAGUES AND NOTHING READS IT (opened S93).**
   R11 says every team in a conference plays the same shape; divisions are a different design with a
@@ -1240,41 +1322,36 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**HOME COURT.** Unchanged by S93 and worth stating plainly, because the ordering's original REASON no longer holds and
-the choice should be made on purpose rather than inherited. S92 put home court before the scheduler on the grounds that
-the season already played a balanced 15 and 15 — the exact condition under which the real ~60% home win rate is measured
-— so the effect dropped onto the *existing* schedule would read clean. **S93 replaced that schedule.** Every team now
-plays its own league's number and hosts exactly half, so the balanced condition SURVIVES and is promised harder than
-before; what is gone is the clean before-and-after, because the opponents changed. Home court will now land on top of a
-schedule that is one session old. Emmett was told this at the S93 gate and chose the scheduler anyway, on the grounds
-that the non-conference graph being protected was a placeholder due for deletion regardless. That reasoning holds.
+**HOST MEMORY — the next scheduler third, and the answer to O-79.** Who hosted last time, stored, feeding the
+`FixedResidualHost` seam S93 built and left empty and the soft objectives (`SkipUrgency` and friends) that were held
+out of S93 precisely because they need that memory to apply.
+
+★ **S95 is why this is next rather than merely due.** The slate takes no randomness and has no history, so a career's
+year two carries a conference schedule identical to year one's — the same pairs doubled, the same pairs skipped, the
+same gyms. Until this session that was a cosmetic repetition. **Home court has just made it a permanent competitive
+advantage**: hosting is now worth about three points of margin and roughly nine points of win rate, so a school that
+happens to draw the doubled home fixture against its toughest opponent draws it every year, forever, and a school that
+draws the road side of it never stops paying. That compounds across a career layer that does not exist yet, which is
+exactly when it is cheap to fix.
 
 What it inherits and must not re-derive:
 
-- **R4 — the crowd is PRESTIGE and DISTANCE, and there is no city size.** Population, market size and arena
-  capacity are ruled out by name; a place has no population field and must never grow one. *"A small town
-  college can have an incredible homecourt advantage."* Both surviving inputs already exist on every school.
-- **R6 — the effect ships FLAT**, inheriting the experience/cohesion axis later rather than waiting for it.
-- **R7 — it lands on the TEAM, uniformly, with an EMERGENT magnitude.** *"It shouldn't the individual players
-  do poorly, it's the odds of everyone goes down the same on the road, but if you have a team full of
-  freshman, it brings it down more."* One number on all five, its SIZE built from the five on the floor —
-  that is what keeps the crowd number off the no-scalar wall, and it is the load-bearing design constraint of
-  the whole session.
-- **R3 — the host fact already exists.** `GameSite` carries a place and a host; a neutral site is a game nobody hosts,
-  not a category. ★ **S93 CHANGED WHAT IS AVAILABLE HERE**: every conference game now has a decided host, and the
-  orientation can be handed pre-fixed venues. No game record carries a `GameSite` yet — that binding is still unbuilt —
-  but the home/away fact is no longer a placeholder graph's accident.
-- **Phase 83's A9 isolation check will need rewriting**, not extending: it forbids the four season-path files from so
-  much as naming a geography type, and the moment home court lands they legitimately will. ★ **It is also a live
-  landmine for S94**: the venue seam deliberately carries plain school ids, and the day it reaches for `GameSite` or
-  `GameHost` that check goes red with nothing wrong.
+- **The orientation already accepts pre-fixed venues.** S93's A9 proved it on three arms — a sampled third of the
+  residual host decisions all honoured with every school still exactly even, an over-commit refused BEFORE the flow by
+  name, and a quota-consistent Hall deficit refused BY the flow. A Eulerian walk fails all three. **The hard part is
+  built**; what is missing is the memory that decides what to fix.
+- **Every team hosts exactly half its league season, by construction** (R3, S93). Whatever memory does, it must not
+  break that — it reallocates WHICH games, never how many.
+- **`TravelPart`'s 38 mutual in-conference pairs** are Friday–Saturday road pairings, ruled to stay put as travel
+  partners and read by nothing. They belong to a scheduling session and this may be it, or may not; still logged.
+- **The date layer is downstream and indifferent** (S94). Host memory changes orientation, not the calendar shape.
+- **The world fingerprint has moved three times** (S92, S93, S94) and each move was invoked deliberately. If stored
+  host memory needs a schema field, that is a fourth move and it is ruled before it is built, not discovered.
 
-**The scheduler's remaining thirds follow — REORDERED BY EMMETT AT S94** (dates were taken first; recorded so the
-inversion cannot read as a stale plan). **DATES SHIPPED as S94**: the `D1,D2,D3` nights are read at last, the window and
-wall derive from three authored numbers, and Phase 85 owns the proofs. **Next scheduler third — the host memory**: who
-hosted last time, filling the `FixedResidualHost` seam S93 built and left empty; the answer to **O-79**, and the thing
-that makes doubled pairs rotate year over year. `TravelPart`'s 38 pairs are Friday–Saturday road pairings that belong
-to a scheduling session, not to rivalries — still unbuilt, still logged. **Non-conference scheduling is its own session
-after that** and starts from nothing — it inherits the map (the WAC's worst internal trip is Hawaii ↔ Louisiana Tech at
-4,030 miles against the Ivy League's 295), the open nights S94's loose windows leave empty, and the fact that fourteen
-schools currently play no basketball at all.
+**Then: non-conference scheduling**, its own session, starting from nothing — it inherits the map (the WAC's worst
+internal trip is Hawaii ↔ Louisiana Tech at 4,030 miles against the Ivy League's 295), the open nights S94's loose
+windows leave empty, the fact that fourteen schools currently play no basketball at all, and now a home-court effect
+that makes **where** a non-conference game is played a real decision rather than a coin flip.
+
+**Behind that, the two home-court halves that did not ship** — the crowd model (O-82) and the site facts semi-home,
+semi-away and neutral (O-83). Neither is a defect; both are named, seamed and waiting on prerequisites.

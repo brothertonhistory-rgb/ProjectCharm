@@ -574,7 +574,6 @@
   },
   "RollL": {
     "MakeProbability": 0.72,
-    "RoadMakePenalty": 0.0,
     "Epsilon": 1e-09
   },
   "RollM": {
@@ -635,6 +634,9 @@
     "HalftimeRestEquivalentSeconds": 300.0,
     "OffenseAthleticismDrop": 0.1,
     "DefenseAthleticismDrop": 0.2
+  },
+  "HomeCourt": {
+    "RoadShave": 3
   },
   "Rosters": {
     "Home": [

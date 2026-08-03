@@ -9,9 +9,8 @@ namespace Charm.Engine;
 /// The real attribute-driven generator (<see cref="RollLGenerator"/>) is the most
 /// DIRECT in the engine: a free throw is a literal 1:1 from the shooter's FT rating
 /// (a 71-rated shooter → Make = .71), with no skill/athleticism interaction to fold.
-/// It reads the carried shooter slot and divides the rating by 100; the optional road
-/// penalty (<see cref="RollLConfig.RoadMakePenalty"/>, currently 0 and unread) subtracts
-/// from that. It replaces this stub without touching Roll L or the resolver. The
+/// It reads the carried shooter slot and divides the rating by 100. It replaces this
+/// stub without touching Roll L or the resolver. The
 /// <see cref="Pie{TOutcome}"/> validates sum-to-one on construction, so any
 /// misconfigured make% fails loudly here rather than silently warping odds.
 ///
@@ -26,8 +25,7 @@ public sealed class RollLStubPieGenerator : IRollLPieGenerator
     /// <summary>Generate the two-way free-throw pie from the flat config make%. The
     /// <paramref name="state"/> parameter is accepted (to satisfy
     /// <see cref="IRollLPieGenerator"/>) but ignored — the make% is the same for every
-    /// trip. Miss is the complement, so the two slices sum to 1 by construction. The
-    /// road penalty is a documented seam (0, unread) this session.</summary>
+    /// trip. Miss is the complement, so the two slices sum to 1 by construction.</summary>
     public Pie<FreeThrowOutcome> Generate(PossessionState state)
     {
         var make = _config.MakeProbability;

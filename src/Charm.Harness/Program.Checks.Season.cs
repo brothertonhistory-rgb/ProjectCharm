@@ -318,10 +318,21 @@ internal static partial class Program
             var replayRows = BuildSeasonRows(replayDivvy, tiny, verbose: false);
             var g0 = outcome.Schedule[0];
             var cfgs = LoadGenEngineConfigs(configPath);
-            var (replayGame, _, _, _) = RunSingleGenGame(
-                cfgs,
+            // ★ S95 — the replay must play the SAME GAME the season played, and since S95
+            //   that game is played on a home floor: the road side is two points colder.
+            //   Without this the two halves of the comparison would be simulating
+            //   different basketball and the check would go red with nothing wrong.
+            //
+            //   This does not weaken the check; it sharpens it. The check exists to catch
+            //   the home/away credit being flipped, and it now ALSO catches the shave
+            //   landing on the home side — an independently seated pair, prepared the same
+            //   way, must reproduce the recorded score exactly.
+            var (replayHome, replayAway, _) = PrepareSeasonGameSides(
                 BuildSeasonSide(replayRows[g0.HomeId], 0),
                 BuildSeasonSide(replayRows[g0.AwayId], RosterShape.AwayIdOffset),
+                outcome.RoadShave, hasHost: true);
+            var (replayGame, _, _, _) = RunSingleGenGame(
+                cfgs, replayHome, replayAway,
                 TeamSide.Home, TeamSide.Away,
                 resolverSeed: unchecked(seasonBase + 0),
                 governorSeed: unchecked(seasonBase + 1));

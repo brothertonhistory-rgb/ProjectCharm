@@ -8660,7 +8660,7 @@ Identity block (world, seed, **schedule fingerprint**, and a schedule line that 
 
 ### Deferred out of this pass
 
-Home-court advantage (the road seam exists and ships 0 — turning it on is a calibration act); real scheduling texture — **non-conference play in its entirety** (S93 deleted the placeholder graph rather than carrying it; it is its own session and starts from nothing), dates and travel (S95), the stored memory of who hosted last time (S94, whose seam is built and empty), buy games, and conference tournaments; the postseason (Pass 2 ends at the regular-season table); persistence of results (a season is recomputed, never saved — the save-format discipline arrives with the career layer per the standing note); the prestige dynamics reading these standings (Pass 3, next per the arc map); and calibration tuning itself — whose measuring stick Session 31 built (the section below) and whose standing precondition, a living varied population, this pass satisfies. **Per-player season statistics were deferred out of this pass and SHIPPED IN S77** — see "The season stat layer" below; what remains deferred there is per-GAME retention (game logs, splits, streaks).
+Home-court advantage **SHIPPED IN S95** — see "Home court — the road penalty" below; what remains deferred there is the crowd model itself (prestige and distance, R4) and the per-team emergent magnitude (R7); real scheduling texture — **non-conference play in its entirety** (S93 deleted the placeholder graph rather than carrying it; it is its own session and starts from nothing), dates and travel (S95), the stored memory of who hosted last time (S94, whose seam is built and empty), buy games, and conference tournaments; the postseason (Pass 2 ends at the regular-season table); persistence of results (a season is recomputed, never saved — the save-format discipline arrives with the career layer per the standing note); the prestige dynamics reading these standings (Pass 3, next per the arc map); and calibration tuning itself — whose measuring stick Session 31 built (the section below) and whose standing precondition, a living varied population, this pass satisfies. **Per-player season statistics were deferred out of this pass and SHIPPED IN S77** — see "The season stat layer" below; what remains deferred there is per-GAME retention (game logs, splits, streaks).
 
 # The season stat layer — per-player season records, keyed by the person (Session 77, 2026-07-26)
 
@@ -10011,13 +10011,20 @@ function anywhere. S92 builds the map: places, the distance between any two of t
 of who is hosting. **Nothing consumes it yet.** No game is placed anywhere, no crowd is modelled,
 and there is **no home-court advantage** at the end of this session.
 
-### Why it came before home court and before the scheduler
+### Why it came first — and how the ordering actually went
 
-Emmett's ordering, and the reason is measurement rather than dependency: the season already plays
-a balanced 15 home / 15 away, which is the exact condition under which the real ~60% home win rate
-is measured, so home court dropped onto the *existing* schedule reads clean. Land the scheduler
-first and home court arrives on top of a brand-new schedule, and nobody can say which change moved
-the page. Order is **geography → home court → scheduler**.
+The ordering argued for here was **geography → home court → scheduler**, and the reason was
+measurement rather than dependency: the season already played a balanced 15 home / 15 away, the
+exact condition under which the real ~60% home win rate is measured, so home court dropped onto the
+*existing* schedule would read clean.
+
+★ **Emmett reordered it, and the reason recorded here inverted.** S93 took the scheduler next, on
+the grounds that the non-conference graph this ordering was protecting was a placeholder due for
+deletion regardless — there was no baseline worth spending. The balanced condition **survived and
+is promised harder than before**: every team now hosts exactly half its league season by
+construction rather than by an accident of even degrees. Home court landed at **S95**, on a
+schedule two sessions old, and measured 50.08% at zero shave on the full stock world — the balanced
+condition holding to a tenth of a point, which is what made the calibration readable.
 
 ### The rulings
 
@@ -10039,11 +10046,18 @@ the page. Order is **geography → home court → scheduler**.
   out **by name**, so a place has no population field and must never grow one. Both surviving inputs
   already exist on every school.
 - **R5 — MILES.**
-- **R6 / R7 — recorded here, built next.** The home-court effect ships FLAT, inheriting the
-  experience/cohesion axis later rather than waiting for it; and it lands on the TEAM, uniformly,
-  with an emergent magnitude — *"it's the odds of everyone goes down the same on the road, but if
-  you have a team full of freshman, it brings it down more."* One number on all five, its SIZE built
-  from the five on the floor. That is what keeps the eventual crowd number off the no-scalar wall.
+- **R6 / R7 — recorded here; ★ PARTLY SUPERSEDED BY S95, which built the effect.** R6 held: the
+  effect ships **FLAT**, inheriting the experience/cohesion axis later rather than waiting for it,
+  and S95 ruled flat again and harder — every real home floor is worth exactly the same, with
+  prestige, proximity and semi-home arrangements deferred to the tournament layer that will own a
+  site fact. R7's first half held: it lands on the **TEAM, uniformly** — *"it's the odds of everyone
+  goes down the road the same."* ★ **R7's second half is NOT built.** The emergent magnitude *"if you
+  have a team full of freshman, it brings it down more"* — one number on all five whose SIZE is built
+  from the five on the floor — is deferred with the crowd model (R4) and logged as an open item.
+  What shipped is one authored integer, identical for every road player on every road floor. The
+  no-scalar wall is held a different way in the meantime, and it is worth being precise about how:
+  the shave never touches a team-level number at all. It moves **individual men**, and every matchup
+  in the game re-resolves from the moved men — see the S95 section below.
 
 ### ★ R3's consequence: a neutral site stops being a category
 
@@ -10233,8 +10247,10 @@ prove the refusal fires and names itself. **Migrating it is the same as deleting
 
 ### What this session does not prove
 
-Nothing consumes the map, so nothing proves it is *usable*. Home court is next and the scheduler after;
-both are expected to produce findings. A place has no size, and the crowd model that eventually reads
+Nothing consumes the map, so nothing proves it is *usable*. The scheduler came next (S93/S94) and home
+court after it (S95) — and ★ **home court consumed none of this map either**: it reads no place, no
+distance and no host record, because the host fact still does not live on a game. The map's first real
+consumer is still ahead of it. A place has no size, and the crowd model that eventually reads
 this map will not have one (R4). Displaced home games are unrepresentable by design, pending a ruling.
 ## Conference dates — every game gets a night (Session 94, 2026-08-03)
 
@@ -10278,3 +10294,177 @@ In each team's own chronological sequence, never league-wide slots: between two 
 ### Authored values (stock, ruled)
 
 Weeks by game count — 14→8, 16→9, 18→10, 20→12 (twelve is what the real 20-game league uses; eleven reaches only a Dec 28–31 stub). Tournament offsets by tier — power/highMid 4 (opens the Wednesday of championship week), lowMid 8, low 11; the Ivy holds a tournament for now; **O-81** records the down-the-line design: any league may hold no tournament or a two-team one, and bracket format should eventually DERIVE the wall — the schedule layer consumes exactly one date and will not care.
+
+## Home court — the road penalty (Session 95, 2026-08-03)
+
+The road team is worse. Not because a crowd is modelled — no crowd is modelled — but because every
+man on the road side of a game is handed to the engine three points lower in each of his
+twenty-three **skill** ratings, floored at 0. The dial is `HomeCourt.RoadShave` in `config.json`;
+the applicator is `src/Charm.Harness/Program.Season.HomeCourt.cs`; Phase 86 owns the proofs.
+
+Measured on the full stock world, three seasons, 8,454 games: **58.74% home wins at a mean margin of
++3.66**, against a **50.08% / −0.05** control at zero shave.
+
+### The four rulings
+
+1. **★ ALL OF IT, A LITTLE — "death by a thousand cuts."** Every contested pie the road team touches
+   leans a hair against them, and no single door carries it. There is no road free-throw penalty, no
+   road turnover dial, no crowd-noise event.
+2. **★ FLAT.** One dial. Every real home floor is worth exactly the same. Prestige, proximity and
+   semi-home arrangements are **deferred to the tournament layer**, on evidence — the real Big East
+   schedules label Semi-Home, Semi-Away and Neutral, so those are site facts a schedule owns, not
+   properties of a team.
+3. **★ A ROAD PENALTY, NOT A HOME BOOST.** *"The odds of everyone goes down the same on the road."*
+   A floor with no host tilts **nobody**. The home side is handed to the engine as the very same
+   object it arrived as — reference identity, asserted, not a copy that happens to be equal.
+4. **★ SKILLS, NOT BODIES.** The road costs a man his touch, his hands, his reads and his restraint.
+   It never costs him his body or his effort.
+
+### Why the ratings and not the pies
+
+The obvious reading of ruling 1 is thirteen small tilts, one per contested door. It is not what
+shipped, and the reason is architectural rather than economical: **this engine has no layer between
+a man's ratings and the pie.** There is no openness stage, no shot-quality stage — every contested
+door is built by reading the two men against each other at the moment it fires.
+
+So shaving the ratings is not an *alternative* to leaning the pies. It **is** how you lean them,
+with one dial instead of thirteen, and every door leans by exactly as much as it actually reads the
+ratings involved: a door that turns hard on quickness moves more, a door that barely reads it barely
+moves. The lean is weighted by the engine's own sensitivities rather than by thirteen hand-picked
+constants that would each need their own ruling and their own calibration.
+
+★ **It also keeps the no-scalar wall intact by construction.** Nothing team-level is introduced. The
+shave moves individual men, and every matchup in the game re-resolves from the moved men — which is
+why a road team full of shooters loses something different from a road team full of rim protectors,
+without anybody authoring that difference.
+
+### The classification: 23 shaved, 17 untouched
+
+**Shaved (23).** Close, Mid, Outside, Finishing, FreeThrow, FoulDrawing, BallHandling, Passing,
+Playmaking, SelfCreation, PostMoves, OffBallMovement, Screening, OffensiveRebounding,
+PerimeterDefense, PostDefense, RimProtection, DefensiveRebounding, Steals, HelpDefense,
+OffBallDefense, BasketballIQ, Discipline.
+
+**Untouched (17).** Height, Wingspan, Weight (body facts); Strength, Speed, Quickness, FirstStep,
+Vertical, Endurance (the six physicals); **Hustle**; the five shot tendencies; PlayerId and
+HierarchyRank.
+
+Three of those groups carry a real argument.
+
+- **The six physicals are exempt TOGETHER, and that is load-bearing.** `Player.Athleticism` is their
+  mean, computed on read. Exempt all six and it cannot move one thousandth on the road — Phase 86
+  asserts it as **exact equality**, because Athleticism feeds every matchup gap, fatigue drain and
+  displacement read in the engine, and it is the single largest channel the shave could have reached.
+  Exempt five of six and the ruling would be quietly false.
+- **Discipline is the strongest single case in the whole set.** The most real home-court effect in
+  college basketball is the whistle, and Discipline is the dial that decides who gets called for the
+  reach-in. BasketballIQ is nearly as good: you cannot hear a call in a hostile gym, and
+  communication breakdowns are what road turnovers actually look like.
+- **Hustle is exempt on a ruling, not an oversight.** *"Effort travels."* A man competes exactly as
+  hard away from home. It was the closest call of the three intangibles and it went the other way.
+
+★ **The shot diet is exempt because WHERE a man shoots from is identity.** The odds lean; the diet
+stays his. A road shooter takes the same shots and makes fewer of them.
+
+★ **Gravity and Spacing DO come down, and that is the shave landing where it was sent rather than
+leaking.** Both are computed on read from shooting and scoring ratings that are shaved by design, so
+a road shooter draws slightly less respect because he is slightly colder. Phase 86 asserts the
+direction, which is what gives the Athleticism equality its teeth — a clone that simply copied
+everything would satisfy the equality too.
+
+### The mechanism, exactly
+
+`RoadShavedPlayer` returns a new `Player` with the twenty-three shaved and everything else carried;
+`ApplyRoadShave` replaces **every** rostered man on a side, starters and bench alike, so no coach can
+substitute his way out of the penalty. Two paths return the original reference and both are
+load-bearing rather than micro-optimisation: **no host** (ruling 3) and **zero shave**.
+
+★ **ZERO IS THE OLD ENGINE, proven against an artifact that survives the change.** Before a line of
+production wiring existed, the pre-S95 tree was run at the probe seed and every game's home id, away
+id, both scores and possession-record count were hashed into a golden fingerprint. Phase 86 B1 runs
+the post-S95 tree at `RoadShave = 0` and reproduces it. Zero is not *believed* inert; it is measured
+inert against a fingerprint the change could not have influenced.
+
+`PrepareSeasonGameSides` is the observation seam — it prepares both sides and reports whether the
+away side was actually transformed. It exists as a named helper rather than two inline calls so that
+Phase 86 has a **contract** to test instead of a test-only global counter to echo. The season loop
+builds its game from exactly this tuple.
+
+### ★ Scope honesty: the host fact does not exist yet
+
+A scheduled game carries a home id and an away id and **nothing else**. There is no host field, no
+site record, no `GameSite` binding — S92 defined all of that and S95 deliberately consumes none of
+it. The applicator therefore takes an **explicit `hasHost` flag** and the season loop passes `true`
+as a literal, because every game on today's schedule is a real home game.
+
+This matters more than it looks. The alternative — an `IsHosted(game)` helper inferring hostedness
+from something — would be a filter that is always true today, dressed as a filter that means
+something. When the tournament layer brings a schedule-owned site fact, that fact becomes this
+argument and the page denominator narrows with it, and nothing else moves.
+
+★ **Phase 83's A9 isolation check did not need rewriting.** The board had flagged it as a live
+landmine: A9 forbids the season-path files from so much as naming a geography type, and home court
+was expected to legitimately need one. It did not — because the host fact stayed out. The landmine
+was defused by scope, not by editing the check.
+
+### Calibration — and why the number is 3
+
+The dial was ratified at **2** during design, measured against a shave that reached all thirty
+performance ratings including the body. The skills-not-bodies ruling cut that to twenty-three and,
+far more importantly, removed the athleticism channel entirely. Re-measured under the shipped
+classification:
+
+| road shave | home win % | margin | per-season spread |
+|---|---|---|---|
+| 0 | 50.08% | −0.05 | 49.0 – 51.0 |
+| 2 | 56.78% | +2.59 | 55.3 – 58.9 |
+| **3** | **58.74%** | **+3.66** | 58.0 – 59.9 |
+| 4 | 61.86% | +4.84 | 61.3 – 62.3 |
+
+Two ruled at 56.8%, short of the 59–61% evidence band — the body exemption is worth about two points
+of home win rate on its own. Three restores what was signed off (58.74% against 59.0%, +3.66 against
++3.8). Four overshoots with every season above 61.3. The dial is an integer and nothing sits between
+them; a fractional shave was named and declined as not worth the rounding for a point of win rate.
+
+★ **THE DIAL IS RE-MEASURED WHENEVER THE SHAVED SET CHANGES.** The set decides how much of the engine
+one subtraction reaches, so a number calibrated against one classification is not evidence about
+another. That sentence is on `HomeCourtConfig` as well as here, because it is the trap this session
+walked into and out of.
+
+★ **The 59% is NEVER a test.** It lives on the season page and nowhere else — the page-only
+calibration principle in full. A suite that asserted a home win rate would go red for a tuning
+decision and would need editing every time the dial moved, which is how a red line stops meaning
+anything. Phase 86 asserts the mechanism's contract and never its magnitude; its own probe shave is
+deliberately 2, not the ruled 3, so a future tuning pass cannot turn the check file red.
+
+### What Phase 86 discriminates on, and what it cannot see
+
+Almost every check in the phase stays green if the shave is applied to the **wrong side**.
+Conservation holds, determinism holds, the coverage count holds, the clone is perfectly formed
+either way. Two things discriminate, and neither is decoration:
+
+1. **B6** names home and away separately at the seam — home is the original reference, away is not.
+2. **Phase 55's independent hand replay** seats a fresh pair from the row tables and must reproduce
+   the recorded score. ★ This check had to be **taught the shave** to keep working, and doing so
+   sharpened it: it was built to catch a flipped home/away credit and now catches a flipped shave
+   as well.
+
+The non-accumulation assertion is worth naming separately. Applying the shave twice to the same
+source must yield semantically equivalent results — reference equality is explicitly *not* expected.
+If the applicator ever wrote back to its source, a road team would decay across a season, one game
+at a time, and every conservation check in the suite would stay green while it happened.
+
+### Retired here
+
+`RollLConfig.RoadMakePenalty` — a documented seam from Phase 18 for a road free-throw effect, shipped
+at 0.0 and never read by anything — is **deleted**, along with its config key and the dormancy
+comments in both Roll L generators. Home court arrived somewhere else, so a second unwired road seam
+is now just a thing for a future session to misread. The season page's banner sentence "Neutral
+floors throughout (the road seam is 0)" went with it; it stopped being true this session.
+
+### Still deferred
+
+The crowd model itself — **R4's prestige and distance**, with city size ruled out by name — and
+**R7's emergent per-team magnitude** (*"a team full of freshman, it brings it down more"*). Today the
+shave is one authored integer, identical for every road player on every road floor. Semi-home and
+neutral sites park with the tournament layer that will own the site fact.

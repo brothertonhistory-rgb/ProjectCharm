@@ -28,13 +28,6 @@ public sealed class RollLConfig
     //     1 by construction. ---
     public double MakeProbability { get; set; } = 0.72;
 
-    // --- Road make-penalty (DOCUMENTED SEAM ONLY). A small negative modifier to the
-    //     make% on the road, IF it ever proves a real statistical effect. Set to 0
-    //     and NOT applied this session — the stub generator ignores it entirely. It
-    //     lives here so the seam is named and a future pass can wire it without a
-    //     config migration. ---
-    public double RoadMakePenalty { get; set; } = 0.0;
-
     /// <summary>Tolerance for the pie sum-to-one validation.</summary>
     public double Epsilon { get; set; } = 1e-9;
 
