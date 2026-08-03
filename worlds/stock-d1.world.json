@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "metadata": {
     "kind": "authored",
     "eraLabel": "stock-d1",
@@ -38,7 +38,14 @@
       "shortName": "America East",
       "tierId": "low",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sun",
+        "wed",
+        "fri"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 2,
@@ -46,7 +53,14 @@
       "shortName": "Atlantic 10",
       "tierId": "highMid",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "wed",
+        "sat",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 3,
@@ -54,7 +68,14 @@
       "shortName": "ACC",
       "tierId": "power",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "wed",
+        "sat",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 4,
@@ -62,7 +83,14 @@
       "shortName": "Atlantic Sun",
       "tierId": "low",
       "games": 20,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 12,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 5,
@@ -70,7 +98,14 @@
       "shortName": "Big 12",
       "tierId": "power",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 6,
@@ -78,7 +113,14 @@
       "shortName": "Big East",
       "tierId": "power",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "wed",
+        "sat",
+        "mon"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 7,
@@ -86,7 +128,14 @@
       "shortName": "Big Sky",
       "tierId": "low",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "fri",
+        "tue"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 8,
@@ -94,7 +143,14 @@
       "shortName": "Big South",
       "tierId": "low",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "mon"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 9,
@@ -102,7 +158,14 @@
       "shortName": "Big Ten",
       "tierId": "power",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "wed",
+        "sat",
+        "mon"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 10,
@@ -110,7 +173,14 @@
       "shortName": "Big West",
       "tierId": "low",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "thu",
+        "sat",
+        "tue"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 11,
@@ -118,7 +188,14 @@
       "shortName": "CAA",
       "tierId": "lowMid",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "wed",
+        "sat",
+        "mon"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 8
     },
     {
       "id": 12,
@@ -126,7 +203,14 @@
       "shortName": "Conference USA",
       "tierId": "highMid",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 13,
@@ -134,7 +218,14 @@
       "shortName": "Independent",
       "tierId": "low",
       "games": 0,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sun",
+        "fri",
+        "wed"
+      ],
+      "weeks": 0,
+      "tourneyOffsetDays": null
     },
     {
       "id": 14,
@@ -142,7 +233,14 @@
       "shortName": "Horizon League",
       "tierId": "highMid",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "tue"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 15,
@@ -150,7 +248,14 @@
       "shortName": "Ivy League",
       "tierId": "low",
       "games": 14,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "fri",
+        "tue"
+      ],
+      "weeks": 8,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 16,
@@ -158,7 +263,14 @@
       "shortName": "MAAC",
       "tierId": "lowMid",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "thu",
+        "sat",
+        "tue"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 8
     },
     {
       "id": 17,
@@ -166,7 +278,14 @@
       "shortName": "Summit",
       "tierId": "lowMid",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "tue"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 8
     },
     {
       "id": 18,
@@ -174,7 +293,14 @@
       "shortName": "MAC",
       "tierId": "lowMid",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 8
     },
     {
       "id": 19,
@@ -182,7 +308,14 @@
       "shortName": "MEAC",
       "tierId": "low",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "mon",
+        "sat",
+        "fri"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 20,
@@ -190,7 +323,14 @@
       "shortName": "MVC",
       "tierId": "highMid",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "tue"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 21,
@@ -198,7 +338,14 @@
       "shortName": "Mountain West",
       "tierId": "highMid",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "tue"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 22,
@@ -206,7 +353,14 @@
       "shortName": "Northeast",
       "tierId": "low",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 23,
@@ -214,7 +368,14 @@
       "shortName": "Ohio Valley",
       "tierId": "low",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "tue"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 24,
@@ -222,7 +383,14 @@
       "shortName": "Pacific-10",
       "tierId": "power",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "sun"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 25,
@@ -230,7 +398,14 @@
       "shortName": "Patriot League",
       "tierId": "low",
       "games": 14,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 8,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 26,
@@ -238,7 +413,14 @@
       "shortName": "SEC",
       "tierId": "power",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "tue",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 27,
@@ -246,7 +428,14 @@
       "shortName": "Southern",
       "tierId": "low",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 28,
@@ -254,7 +443,14 @@
       "shortName": "Southland",
       "tierId": "low",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 29,
@@ -262,7 +458,14 @@
       "shortName": "SWAC",
       "tierId": "low",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "mon"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 30,
@@ -270,7 +473,14 @@
       "shortName": "Sun Belt",
       "tierId": "lowMid",
       "games": 18,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "tue"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 8
     },
     {
       "id": 31,
@@ -278,7 +488,14 @@
       "shortName": "WCC",
       "tierId": "lowMid",
       "games": 14,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "tue"
+      ],
+      "weeks": 8,
+      "tourneyOffsetDays": 8
     },
     {
       "id": 32,
@@ -286,7 +503,14 @@
       "shortName": "WAC",
       "tierId": "highMid",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "thu",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     }
   ],
   "places": [
@@ -3050,7 +3274,7 @@
     },
     {
       "placeId": 305,
-      "name": "Canc\u00FAn",
+      "name": "Canc\u00fan",
       "subdivision": "",
       "country": "MX",
       "lat": 21.1619,
@@ -3154,7 +3378,7 @@
     },
     {
       "id": 4,
-      "name": "Alabama A\u0026M",
+      "name": "Alabama A&M",
       "abbr": "ALAM",
       "color": "#790000",
       "placeId": 4,
@@ -4126,7 +4350,7 @@
     },
     {
       "id": 85,
-      "name": "Florida A\u0026M",
+      "name": "Florida A&M",
       "abbr": "FLAM",
       "color": "#FF7329",
       "placeId": 82,
@@ -5182,7 +5406,7 @@
     },
     {
       "id": 173,
-      "name": "Mount St. Mary\u0027s",
+      "name": "Mount St. Mary's",
       "abbr": "MSMYS",
       "color": "#003F87",
       "placeId": 156,
@@ -5338,7 +5562,7 @@
     },
     {
       "id": 186,
-      "name": "North Carolina A\u0026T",
+      "name": "North Carolina A&T",
       "abbr": "NC AT",
       "color": "#002659",
       "placeId": 169,
@@ -5650,7 +5874,7 @@
     },
     {
       "id": 212,
-      "name": "Prairie View A\u0026M",
+      "name": "Prairie View A&M",
       "abbr": "PV AM",
       "color": "#4D0960",
       "placeId": 190,
@@ -5830,7 +6054,7 @@
     },
     {
       "id": 227,
-      "name": "Saint Mary\u0027s",
+      "name": "Saint Mary's",
       "abbr": "STMRY",
       "color": "#D80024",
       "placeId": 201,
@@ -6154,7 +6378,7 @@
     },
     {
       "id": 254,
-      "name": "St. John\u0027s",
+      "name": "St. John's",
       "abbr": "STJN",
       "color": "#E24552",
       "placeId": 55,
@@ -6166,7 +6390,7 @@
     },
     {
       "id": 255,
-      "name": "Saint Joseph\u0027s",
+      "name": "Saint Joseph's",
       "abbr": "STJOE",
       "color": "#BB003A",
       "placeId": 68,
@@ -6178,7 +6402,7 @@
     },
     {
       "id": 256,
-      "name": "St. Peter\u0027s",
+      "name": "St. Peter's",
       "abbr": "STPT",
       "color": "#2361AA",
       "placeId": 224,
@@ -6334,7 +6558,7 @@
     },
     {
       "id": 269,
-      "name": "Texas A\u0026M",
+      "name": "Texas A&M",
       "abbr": "TXAM",
       "color": "#500000",
       "placeId": 235,
@@ -6346,7 +6570,7 @@
     },
     {
       "id": 270,
-      "name": "Texas A\u0026M-CC",
+      "name": "Texas A&M-CC",
       "abbr": "TXCC",
       "color": "#00639C",
       "placeId": 236,
@@ -6898,7 +7122,7 @@
     },
     {
       "id": 316,
-      "name": "William \u0026 Mary",
+      "name": "William & Mary",
       "abbr": "WM",
       "color": "#073E2B",
       "placeId": 271,

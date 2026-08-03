@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "metadata": {
     "kind": "authored",
     "eraLabel": "fixture-schedule",
@@ -38,7 +38,14 @@
       "shortName": "Odd Valley",
       "tierId": "low",
       "games": 16,
-      "skip": 2
+      "skip": 2,
+      "nights": [
+        "sat",
+        "thu",
+        "tue"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 8
     },
     {
       "id": 2,
@@ -46,7 +53,14 @@
       "shortName": "Skipline",
       "tierId": "low",
       "games": 10,
-      "skip": 2
+      "skip": 2,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 7,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 3,
@@ -54,7 +68,14 @@
       "shortName": "Duo",
       "tierId": "low",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "fri",
+        "tue",
+        "mon"
+      ],
+      "weeks": 10,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 4,
@@ -62,7 +83,14 @@
       "shortName": "Idle",
       "tierId": "low",
       "games": 0,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "Sun",
+        "Fri",
+        "wed"
+      ],
+      "weeks": 0,
+      "tourneyOffsetDays": null
     },
     {
       "id": 5,
@@ -70,7 +98,29 @@
       "shortName": "Plain",
       "tierId": "low",
       "games": 10,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 6,
+      "tourneyOffsetDays": 8
+    },
+    {
+      "id": 6,
+      "name": "December Conference",
+      "shortName": "December",
+      "tierId": "low",
+      "games": 20,
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 12,
+      "tourneyOffsetDays": 11
     }
   ],
   "places": [
@@ -467,6 +517,138 @@
       "division": "D1",
       "currentPrestige": 40,
       "historicalPrestige": 40,
+      "rivalId": null
+    },
+    {
+      "id": 33,
+      "name": "December School 1",
+      "abbr": "DC01",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 34,
+      "name": "December School 2",
+      "abbr": "DC02",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 35,
+      "name": "December School 3",
+      "abbr": "DC03",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 36,
+      "name": "December School 4",
+      "abbr": "DC04",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 37,
+      "name": "December School 5",
+      "abbr": "DC05",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 38,
+      "name": "December School 6",
+      "abbr": "DC06",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 39,
+      "name": "December School 7",
+      "abbr": "DC07",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 40,
+      "name": "December School 8",
+      "abbr": "DC08",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 41,
+      "name": "December School 9",
+      "abbr": "DC09",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 42,
+      "name": "December School 10",
+      "abbr": "DC10",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
+      "rivalId": null
+    },
+    {
+      "id": 43,
+      "name": "December School 11",
+      "abbr": "DC11",
+      "color": "#123456",
+      "placeId": 1,
+      "conferenceId": 6,
+      "division": "D1",
+      "currentPrestige": 30,
+      "historicalPrestige": 30,
       "rivalId": null
     }
   ]

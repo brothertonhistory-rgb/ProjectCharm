@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "metadata": {
     "kind": "authored",
     "eraLabel": "fixture-format",
@@ -38,7 +38,14 @@
       "shortName": "Format",
       "tierId": "low",
       "games": 0,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 0,
+      "tourneyOffsetDays": null
     }
   ],
   "places": [
@@ -74,8 +81,8 @@
       "name": "Exponent Notation",
       "subdivision": "",
       "country": "XX",
-      "lat": 1E-07,
-      "long": -1.5E-07,
+      "lat": 1e-07,
+      "long": -1.5e-07,
       "tags": []
     },
     {

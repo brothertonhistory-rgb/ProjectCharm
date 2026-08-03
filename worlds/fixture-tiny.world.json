@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "metadata": {
     "kind": "authored",
     "eraLabel": "fixture-tiny",
@@ -38,7 +38,14 @@
       "shortName": "Granite",
       "tierId": "power",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     },
     {
       "id": 2,
@@ -46,7 +53,14 @@
       "shortName": "River Valley",
       "tierId": "highMid",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 8
     },
     {
       "id": 3,
@@ -54,7 +68,14 @@
       "shortName": "Prairie",
       "tierId": "lowMid",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 11
     },
     {
       "id": 4,
@@ -62,7 +83,14 @@
       "shortName": "Timberline",
       "tierId": "low",
       "games": 16,
-      "skip": 0
+      "skip": 0,
+      "nights": [
+        "sat",
+        "wed",
+        "mon"
+      ],
+      "weeks": 9,
+      "tourneyOffsetDays": 4
     }
   ],
   "places": [
@@ -369,7 +397,7 @@
     },
     {
       "id": 10,
-      "name": "Cumberland Gap A\u0026M",
+      "name": "Cumberland Gap A&M",
       "abbr": "CGAM",
       "color": "#5C0A0A",
       "placeId": 10,

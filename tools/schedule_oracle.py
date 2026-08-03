@@ -528,6 +528,458 @@ def load_world(path):
     return schools, conferences, rivals
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+#  SESSION 94 — DATES FOR THE CONFERENCE SLATE (extends the locked S93 contract)
+#
+#  ★ THE S93 LAYER ABOVE IS UNTOUCHED. Dates are an attribute of a game, never a
+#  re-sort: the dated schedule is the S93 emission with a date attached to each
+#  game, and the structural fingerprint cannot move.
+#
+#  THE MODEL (Emmett, 2026-08-02, ruled LOOSE over tight on real Big East
+#  evidence — two 2025-26 schedules of an 11-team league playing 20 games):
+#    * Three authored numbers per league: games, weeks, and the day its
+#      tournament opens (days before Selection Sunday; None = no tournament,
+#      walling at Selection Sunday itself). wall = SelectionSunday - offset - 1.
+#    * The week is MONDAY TO SUNDAY. A team never plays three in one. BAR NONE.
+#    * The window's final week is the LATEST week ALL of whose active nights
+#      fall on or before the wall (the real Big East finished Sat Mar 7 against
+#      a Tue Mar 10 wall — rest days into the tournament, never a partial week).
+#    * The window is that week plus the weeks-1 playing weeks before it,
+#      skipping the Monday-Sunday week containing December 25 (quiet, R10).
+#    * Weekly totals are EXACT: base, extra = divmod(n*G/2, weeks); the LAST
+#      `extra` playing weeks carry base+1 (the real league opens light: its two
+#      schedules' combined December appearances ran 1/3/3 against 3-4 after).
+#    * Active nights: even leagues {D1,D2}; odd {D1,D2,D3}. A date holds at
+#      most floor(n/2) games. Dates fill in AUTHORED priority D1->D2->D3 as a
+#      candidate order inside exhaustive backtracking — never a greedy rule,
+#      never a final count. Capacity theorem (r13): with valid nights a
+#      complete week seats exactly n, and weeks >= G/2 keeps every target <= n
+#      — asserted internally; a failure indicts this file, not the world.
+#    * ★ THE COMPLETED DATED WEEK IS THE ATOMIC UNIT OF CHRONOLOGICAL
+#      EVALUATION (r14/r15). Within-week placements test only week-stable
+#      facts; rematch non-adjacency and quarter status run on the week sorted
+#      by real date and tentatively appended. Judged mid-week, a Saturday
+#      placement would read adjacent to last week's opponent while the
+#      unassigned Wednesday game is the very thing separating them.
+#    * Rematch: between two meetings of a pair, EACH team plays someone else in
+#      between; and the two meetings land in different game-count quarters of
+#      each team's own sequence (the first G mod 4 quarters hold one extra).
+#    * S93 emission order is the deterministic tie-break everywhere. No RNG.
+#
+#  Verdicts: ScheduleError (InvalidConfiguration) for authored-data faults and
+#  the two-sided week bound G/2 <= weeks <= n*G/2; InfeasibleUnderConstraints
+#  only from exhaustion (a PROOF); SearchBudgetExhausted proves nothing.
+# ═════════════════════════════════════════════════════════════════════════════
+
+import datetime as _dt
+
+_WD = {"mon": 0, "tue": 1, "wed": 2, "thu": 3, "fri": 4, "sat": 5, "sun": 6}
+DATE_SEARCH_BUDGET = 5_000_000
+
+
+def third_sunday_in_march(year):
+    first = _dt.date(year, 3, 1)
+    return first + _dt.timedelta(days=(6 - first.weekday()) % 7 + 14)
+
+
+def _monday(d):
+    return d - _dt.timedelta(days=d.weekday())
+
+
+def parse_nights(nights, n, conf_label):
+    """Case-normalised, validated: distinct recognised weekdays; even leagues use the
+    first two, odd leagues all three. Returns the ACTIVE ordered night list."""
+    norm = []
+    for raw in nights:
+        w = (raw or "").strip().lower()
+        if w not in _WD:
+            raise ScheduleError(f"INVALID CONFIGURATION: {conf_label}"
+                                f"unrecognised authored night '{raw}'.")
+        norm.append(w)
+    if len(set(norm)) != len(norm):
+        raise ScheduleError(f"INVALID CONFIGURATION: {conf_label}"
+                            f"duplicate authored night in {nights}.")
+    need = 2 if n % 2 == 0 else 3
+    active = norm[:need]
+    if len(set(active)) < need:
+        raise ScheduleError(f"INVALID CONFIGURATION: {conf_label}"
+                            f"needs {need} distinct nights, has {len(set(active))}.")
+    return active
+
+
+def league_window(start_year, weeks, offset_days, active, conf_label):
+    """The ordered playing-week Mondays (ascending) and the wall. The final week is
+    the latest Mon-Sun week ALL of whose active nights fall on or before the wall;
+    the Christmas week is skipped and counts for nothing (R10)."""
+    ss = third_sunday_in_march(start_year + 1)
+    if offset_days is not None and offset_days < 0:
+        raise ScheduleError(f"INVALID CONFIGURATION: {conf_label}"
+                            f"tournament offset {offset_days} is negative.")
+    wall = ss if offset_days is None else ss - _dt.timedelta(days=offset_days + 1)
+    wk = _monday(wall)
+    while not all(wk + _dt.timedelta(days=_WD[a]) <= wall for a in active):
+        wk -= _dt.timedelta(days=7)
+    xmas = _monday(_dt.date(start_year, 12, 25))
+    nov1 = _dt.date(start_year, 11, 1)
+    out = []
+    while len(out) < weeks:
+        if wk != xmas:
+            out.append(wk)
+        wk -= _dt.timedelta(days=7)
+    if out and out[-1] < nov1:
+        raise ScheduleError(f"INVALID CONFIGURATION: {conf_label}window would open "
+                            f"{out[-1]}, before the November 1 floor.")
+    return list(reversed(out)), wall
+
+
+def weekly_targets(n, g, weeks, conf_label):
+    """Exact totals: [base]*(weeks-extra) + [base+1]*extra over the ordered playing
+    weeks — heavier weeks LATEST. Two-sided bound refused here; capacity asserted
+    internally per the r13 theorem."""
+    if weeks < g // 2:
+        raise ScheduleError(f"INVALID CONFIGURATION: {conf_label}Weeks {weeks} cannot "
+                            f"seat Games {g} at two a week (needs at least {g // 2}).")
+    league_games = n * g // 2
+    if weeks > league_games:
+        raise ScheduleError(f"INVALID CONFIGURATION: {conf_label}Weeks {weeks} exceeds "
+                            f"the league's {league_games} games — an empty week is "
+                            f"forced (base = 0).")
+    base, extra = divmod(league_games, weeks)
+    targets = [base] * (weeks - extra) + [base + 1] * extra
+    assert max(targets) <= n, (
+        f"{conf_label}weekly target {max(targets)} exceeds capacity {n} — "
+        f"implementation error, not authored data (r13 theorem)")
+    return targets
+
+
+def _quarter_of(seq_index, g):
+    q, m = divmod(g, 4)
+    sizes = [q + 1] * m + [q] * (4 - m)
+    start = 0
+    for qi, sz in enumerate(sizes):
+        if seq_index < start + sz:
+            return qi
+        start += sz
+    raise AssertionError("sequence index outside its own season")
+
+
+def date_conference(members, g, weeks, offset_days, nights, oriented_games,
+                    start_year, conf_label="", budget=DATE_SEARCH_BUDGET):
+    """The heart of S94: partition the S93 oriented games (emission order) into dated
+    rounds. Returns (dates, window, wall): dates[i] dates oriented_games[i].
+
+    Week-by-week search; the COMPLETED DATED WEEK is the atomic unit of
+    chronological evaluation. Individual placements test only week-stable facts
+    (occupancy, the team week-cap, the date cap, target reachability). Candidate
+    games in emission order; candidate dates in authored priority."""
+    n = len(members)
+    if n - 1 <= 1 and g >= 2:
+        # ★ r-oracle finding: with a single played opponent every game is a rematch of
+        #   the last, so the non-adjacency rule is unsatisfiable at ANY calendar length.
+        #   Static, named, before any search — never an infeasibility "discovery".
+        raise ScheduleError(
+            f"INVALID CONFIGURATION: {conf_label}a dated conference season needs at "
+            f"least two played opponents (size {n} gives one; every game would be a "
+            f"back-to-back rematch).")
+    active = parse_nights(nights, n, conf_label)
+    window, wall = league_window(start_year, weeks, offset_days, active, conf_label)
+    targets = weekly_targets(n, g, weeks, conf_label)
+    cap = n // 2
+
+    seq = {s2: [] for s2 in members}
+    dates_out = [None] * len(oriented_games)
+
+    # ── ROTATION-GUIDED CONSTRUCTION (deterministic, no RNG) ──────────────────
+    # The meeting multiset of every k=0 league is q complete-graph cycles plus the
+    # extra matching graph; a circle-method rotation emits rounds of distinct
+    # matchings, so a pair's repeat meetings land ~half a season apart and the
+    # rematch and quarter rules hold BY CONSTRUCTION. The extra cycle is
+    # interleaved mid-season for the same reason. Weeks are filled from the round
+    # stream in order under the team week-cap, deferring overflow FIFO; the
+    # completed-week evaluation (r14/r15) remains the wall every week must pass.
+    idx = {sid: i for i, sid in enumerate(members)}
+    pair_games = {}
+    for i, (_, h, a) in enumerate(oriented_games):
+        pair_games.setdefault((min(h, a), max(h, a)), []).append(i)
+    meetings_of = {p: len(v) for p, v in pair_games.items()}
+    q_base = min(meetings_of.values()) if meetings_of else 0
+    # circle-method rounds over member indices (odd n gets a bye vertex)
+    m2 = n if n % 2 == 0 else n + 1
+    ring = list(range(m2))
+    circle_rounds = []
+    for _ in range(m2 - 1):
+        rnd = []
+        for i2 in range(m2 // 2):
+            a2, b2 = ring[i2], ring[m2 - 1 - i2]
+            if a2 < n and b2 < n:
+                rnd.append((min(a2, b2), max(a2, b2)))
+        circle_rounds.append(sorted(rnd))
+        ring = [ring[0]] + [ring[-1]] + ring[1:-1]
+    # cycles: 0..q_base-1 carry every non-skip pair; the EXTRA cycle carries pairs
+    # with meetings > q_base, interleaved after cycle floor(q_base/2).
+    def cycle_rounds(which):
+        out = []
+        for rnd in circle_rounds:
+            keep = []
+            for (i2, j2) in rnd:
+                key = (members[i2], members[j2])
+                mts = meetings_of.get((min(key), max(key)), 0)
+                if which == "extra":
+                    if mts > q_base:
+                        keep.append(key)
+                elif mts > 0:
+                    keep.append(key)
+            if keep:
+                out.append(keep)
+        return out
+    # Extras are NOT a block: each extra instance is interleaved half a rotation
+    # (R/2 rounds) away from its pair's base-round position, so a doubled
+    # opponent's two meetings sit ~half a season apart BY CONSTRUCTION — the same
+    # property the pure double-round-robin gets from cycling.
+    base_rounds = cycle_rounds("base")
+    R = max(1, len(base_rounds))
+    round_of_pair = {}
+    for ri, rnd in enumerate(base_rounds):
+        for key in rnd:
+            round_of_pair.setdefault((min(key), max(key)), ri)
+    entries = []                                  # (sortkey, tiebreak, gameIdx)
+    for p, gis in pair_games.items():
+        rp = round_of_pair.get(p, 0)
+        for e, gi in enumerate(gis):
+            if e < q_base:
+                # base meeting e sits in cycle e at its circle-round position
+                key = (e * R + rp) * 2
+            else:
+                # extra meeting: half a rotation from the base position, inside
+                # the middle cycle; deeper extras (never in stock) step by R/2 more
+                off = (rp + (R // 2) * (e - q_base + 1)) % R
+                key = ((q_base // 2) * R + off) * 2 + 1
+            entries.append((key, gi))
+    entries.sort()
+    stream = [gi for _, gi in entries]
+    assert len(stream) == len(oriented_games), \
+        f"{conf_label}rotation stream lost games — implementation error"
+
+    nodes = [0]
+
+    def run_construction():
+        left = {s2: g for s2 in members}
+        used = [False] * len(stream)
+
+        def build(w):
+            if w == len(window):
+                return all(used)
+            target = targets[w]
+            dts = [window[w] + _dt.timedelta(days=_WD[a]) for a in active]
+            weeks_left = len(window) - w
+            for s2 in members:
+                if left[s2] > 2 * weeks_left:
+                    return False
+            # ★ URGENCY-SORTED candidate order: a team owing more than the weeks
+            #   left can seat must play NOW; on-pace teams keep rotation order so
+            #   the built-in half-season spacing survives. Deterministic.
+            def urgency(gi):
+                _, h2, a2 = oriented_games[gi]
+                return max(left[h2] - 2 * (weeks_left - 1),
+                           left[a2] - 2 * (weeks_left - 1))
+            order = sorted((sp for sp in range(len(stream)) if not used[sp]),
+                           key=lambda sp: (-urgency(stream[sp]), sp))
+            played_wk = {s2: 0 for s2 in members}
+            pairs_wk = set()
+            on_date = [set() for _ in dts]
+            chosen = []
+
+            def eval_and_descend():
+                # ── COMPLETED-WEEK EVALUATION (r14/r15): sort by real date,
+                #    tentatively append, run the sequence rules, descend. ──
+                week_sorted = sorted(chosen, key=lambda t: (dts[t[2]], t[1]))
+                appended = 0
+                ok2 = True
+                for sp, gi, di in week_sorted:
+                    _, h2, a2 = oriented_games[gi]
+                    for team, opp in ((h2, a2), (a2, h2)):
+                        if seq[team] and seq[team][-1][0] == opp:
+                            ok2 = False
+                            break
+                        prev = next((i2 for o, i2 in reversed(seq[team])
+                                     if o == opp), None)
+                        if prev is not None and \
+                                _quarter_of(prev, g) == _quarter_of(len(seq[team]), g):
+                            ok2 = False
+                            break
+                        seq[team].append((opp, len(seq[team])))
+                        appended += 1
+                    if not ok2:
+                        break
+                if ok2:
+                    for sp, gi, di in week_sorted:
+                        dates_out[gi] = dts[di]
+                        used[sp] = True
+                        _, h2, a2 = oriented_games[gi]
+                        left[h2] -= 1; left[a2] -= 1
+                    if build(w + 1):
+                        return True
+                    for sp, gi, di in week_sorted:
+                        dates_out[gi] = None
+                        used[sp] = False
+                        _, h2, a2 = oriented_games[gi]
+                        left[h2] += 1; left[a2] += 1
+                # unwind the tentative appends
+                flat = []
+                for sp, gi, di in week_sorted:
+                    _, h2, a2 = oriented_games[gi]
+                    flat.extend((h2, a2))
+                for team in reversed(flat[:appended]):
+                    seq[team].pop()
+                return False
+
+            def pick(pos, count):
+                nodes[0] += 1
+                if nodes[0] > budget:
+                    raise SearchBudgetExhausted(
+                        f"{conf_label}date-search budget {budget} exhausted "
+                        f"in week {w + 1}")
+                if count == target:
+                    return eval_and_descend()
+                if pos == len(order) or count + (len(order) - pos) < target:
+                    return False
+                sp = order[pos]
+                gi = stream[sp]
+                _, h2, a2 = oriented_games[gi]
+                key = (min(h2, a2), max(h2, a2))
+                if played_wk[h2] < 2 and played_wk[a2] < 2 and key not in pairs_wk:
+                    for di in range(len(dts)):
+                        if h2 in on_date[di] or a2 in on_date[di]:
+                            continue
+                        if len(on_date[di]) >= 2 * cap:
+                            continue
+                        on_date[di].add(h2); on_date[di].add(a2)
+                        played_wk[h2] += 1; played_wk[a2] += 1
+                        pairs_wk.add(key)
+                        chosen.append((sp, gi, di))
+                        if pick(pos + 1, count + 1):
+                            return True
+                        chosen.pop()
+                        pairs_wk.discard(key)
+                        played_wk[h2] -= 1; played_wk[a2] -= 1
+                        on_date[di].discard(h2); on_date[di].discard(a2)
+                        break        # date choice is priority-forced, not branched
+                    else:
+                        pass
+                    # a must-play team's game may not be skipped
+                    if left[h2] - played_wk[h2] > 2 * (weeks_left - 1) or \
+                            left[a2] - played_wk[a2] > 2 * (weeks_left - 1):
+                        return False
+                return pick(pos + 1, count)
+
+            return pick(0, 0)
+
+        return build(0)
+
+    ok = run_construction()
+    if not ok:
+        raise SearchBudgetExhausted(
+            f"{conf_label}the rotation construction wedged — a fuller search is "
+            f"needed; this proves nothing about feasibility.")
+    if False:
+        raise InfeasibleUnderConstraints(
+            f"INFEASIBLE UNDER CONSTRAINTS: {conf_label}no legal date assignment "
+            f"exists under the week cap, exact weekly totals, rematch spacing and "
+            f"quarter separation (search exhausted).")
+    return dates_out, window, wall
+
+
+def date_schedule(schools, conferences, games, start_year, meta, stats=None):
+    """Date every game of an S93 build. meta: {confId: (nights, weeks, offsetDays)}.
+    Returns (dates aligned to games, DATED fingerprint over index|date|home|away)."""
+    conf_of = dict(schools)
+    by_conf = {}
+    for sid, cid in schools:
+        by_conf.setdefault(cid, []).append(sid)
+    dates = [None] * len(games)
+    per_conf_idx = {}
+    for i, (kind, h, a) in enumerate(games):
+        per_conf_idx.setdefault(conf_of[h], []).append(i)
+    for cid in sorted(by_conf):
+        members = sorted(by_conf[cid])
+        name, g, k = conferences[cid]
+        if g == 0:
+            continue                                   # zero-game league: exempt
+        nights, weeks, off = meta[cid]
+        label = f"conference '{name}' (id {cid}) "
+        idxs = per_conf_idx.get(cid, [])
+        ds, window, wall = date_conference(
+            members, g, weeks, off, nights, [games[i] for i in idxs],
+            start_year, label)
+        for i, d in zip(idxs, ds):
+            dates[i] = d
+        if stats is not None:
+            stats[cid] = (window, wall)
+    payload = "".join(f"{i}|{dates[i].isoformat() if dates[i] else '-'}|{h}|{a}\n"
+                      for i, (kind, h, a) in enumerate(games))
+    return dates, hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def prove_dates(schools, conferences, games, dates, start_year, meta, tag):
+    """Every S94 rule, by name, on the dated result."""
+    conf_of = dict(schools)
+    by_conf = {}
+    for sid, cid in schools:
+        by_conf.setdefault(cid, []).append(sid)
+    for cid in sorted(by_conf):
+        members = sorted(by_conf[cid])
+        name, g, k = conferences[cid]
+        idxs = [i for i, (kk, h, a) in enumerate(games) if conf_of[h] == cid]
+        if g == 0:
+            assert not idxs, f"{tag}: zero-game league {cid} emitted games"
+            continue
+        n = len(members)
+        nights, weeks, off = meta[cid]
+        active = parse_nights(nights, n, "")
+        window, wall = league_window(start_year, weeks, off, active, "")
+        targets = weekly_targets(n, g, weeks, "")
+        nov1 = _dt.date(start_year, 11, 1)
+        xmas = _monday(_dt.date(start_year, 12, 25))
+        wk_count = {}
+        team_week = {}
+        team_games = {s: [] for s in members}
+        by_date = {}
+        for i in idxs:
+            d = dates[i]
+            assert d is not None, f"{tag}: undated game {i}"
+            assert nov1 <= d <= wall, f"{tag}: {d} outside [{nov1}, wall {wall}]"
+            assert d.weekday() in {_WD[a] for a in active}, \
+                f"{tag}: {d} is not an active authored night"
+            wm = _monday(d)
+            assert wm != xmas, f"{tag}: game inside the Christmas week (R10)"
+            assert wm in window, f"{tag}: game week {wm} outside the window"
+            wk_count[wm] = wk_count.get(wm, 0) + 1
+            by_date[d] = by_date.get(d, 0) + 1
+            _, h, a = games[i]
+            for t in (h, a):
+                team_week[(t, wm)] = team_week.get((t, wm), 0) + 1
+                team_games[t].append((d, i))
+        for wi, wm in enumerate(window):
+            assert wk_count.get(wm, 0) == targets[wi], \
+                f"{tag}: week {wm} holds {wk_count.get(wm, 0)}, target {targets[wi]}"
+        for (t, wm), c in team_week.items():
+            assert c <= 2, f"{tag}: team {t} plays {c} in week {wm} — ABJECT FAILURE"
+        for d, c in by_date.items():
+            assert c <= n // 2, f"{tag}: {d} seats {c} games, cap {n // 2}"
+        for t in members:
+            ordered = [games[i][1] if games[i][2] == t else games[i][2]
+                       for d, i in sorted(team_games[t])]
+            assert len(ordered) == g, f"{tag}: team {t} dated {len(ordered)} of {g}"
+            seen = {}
+            for si, opp in enumerate(ordered):
+                assert not (si and ordered[si - 1] == opp), \
+                    f"{tag}: adjacent rematch for {t} vs {opp}"
+                if opp in seen:
+                    assert _quarter_of(seen[opp], g) != _quarter_of(si, g), \
+                        f"{tag}: same-quarter rematch for {t} vs {opp}"
+                seen[opp] = si
+
+
 if __name__ == "__main__":
     import time
     root = sys.argv[1] if len(sys.argv) > 1 else "."
@@ -570,3 +1022,97 @@ if __name__ == "__main__":
         raise SystemExit("an oversized conference was NOT refused")
     except UnsupportedConferenceSize as e:
         print(f"size-cap refusal: {e}")
+
+    # ═══ SESSION 94 — THE DATE LAYER (start year 2026 is the ruled default) ═══
+    import datetime as _d
+    START_YEAR = 2026
+
+    def _meta(path):
+        w = json.load(open(path))
+        return {c["id"]: (c["nights"], c["weeks"], c["tourneyOffsetDays"])
+                for c in w["conferences"]}
+
+    print()
+    print("S94 DATED EXPORTS (the completed dated week is the atomic unit; no RNG):")
+    # stock and fixture-tiny date whole-world; fixture-schedule goes per-conference
+    # because its Duo league is the standing single-opponent refusal.
+    for label, path in [("stock-d1", f"{root}/worlds/stock-d1.world.json"),
+                        ("fixture-tiny", f"{root}/worlds/fixture-tiny.world.json")]:
+        schools, confs, rivals = load_world(path)
+        games, _fp = build_schedule(schools, confs, rivals)
+        meta = _meta(path)
+        dates, dfp = date_schedule(schools, confs, games, START_YEAR, meta)
+        prove_dates(schools, confs, games, dates, START_YEAR, meta, label)
+        dec = sum(1 for d in dates if d and d.month == 12)
+        print(f"  {label:18s} dated {sum(1 for d in dates if d):5d}  "
+              f"December games {dec:3d}  dated fingerprint {dfp}")
+
+    schools, confs, rivals = load_world(f"{root}/worlds/fixture-schedule.world.json")
+    games, _fp = build_schedule(schools, confs, rivals)
+    meta = _meta(f"{root}/worlds/fixture-schedule.world.json")
+    conf_of = dict(schools)
+    by_conf = {}
+    for sid, cid in schools:
+        by_conf.setdefault(cid, []).append(sid)
+    duo_refused = False
+    for cid in sorted(by_conf):
+        members = sorted(by_conf[cid]); name, g, k = confs[cid]
+        if g == 0:
+            continue
+        idxs = [i for i, (kk, h, a) in enumerate(games) if conf_of[h] == cid]
+        sub = [games[i] for i in idxs]
+        nights, weeks, off = meta[cid]
+        try:
+            ds, win, wall = date_conference(members, g, weeks, off, nights, sub,
+                                            START_YEAR, f"'{name}' ")
+            print(f"  fixture '{name}': {len(ds)} games dated, "
+                  f"window {win[0]} .. wall {wall}")
+        except ScheduleError as e:
+            assert "two played opponents" in str(e), e
+            duo_refused = True
+            print(f"  fixture '{name}': REFUSED by name (single opponent) — correct")
+    assert duo_refused, "the Duo single-opponent refusal never fired"
+
+    # determinism and the year dial
+    schools, confs, rivals = load_world(f"{root}/worlds/stock-d1.world.json")
+    games, _fp = build_schedule(schools, confs, rivals)
+    meta = _meta(f"{root}/worlds/stock-d1.world.json")
+    d1, f1 = date_schedule(schools, confs, games, START_YEAR, meta)
+    d2, f2 = date_schedule(schools, confs, games, START_YEAR, meta)
+    assert (d1, f1) == (d2, f2)
+    d3, f3 = date_schedule(schools, confs, games, 2031, meta)
+    prove_dates(schools, confs, games, d3, 2031, meta, "stock-2031")
+    assert f3 != f1
+    print("  determinism: same dates twice; year dial: 2031 proves green, "
+          "fingerprint moves, structure identical")
+
+    # ★ THE BIG EAST BACK-CHECK — the one place the model touches reality.
+    # SS 2026-03-15; tournament opened Wed Mar 11 (offset 4) -> wall Tue Mar 10;
+    # 20 games / 12 weeks, Christmas skipped: window Dec 8 .. week of Mar 2.
+    # Real: Providence opened Sat Dec 13, the league finished Sat Mar 7.
+    win, wall = league_window(2025, 12, 4, ["wed", "sat"], "backcheck ")
+    assert wall == _d.date(2026, 3, 10), wall
+    assert win[0] == _d.date(2025, 12, 8) and win[-1] == _d.date(2026, 3, 2), win
+    print("  back-check: the real 2025-26 Big East window reproduced to the week "
+          "from two authored numbers")
+
+    # the refusal battery, every message discriminating
+    for name, fn, frag in [
+        ("weeks<G/2", lambda: weekly_targets(10, 18, 8, "x "), "at two a week"),
+        ("weeks>nG/2", lambda: weekly_targets(4, 2, 5, "x "), "empty week"),
+        ("negative offset", lambda: league_window(2026, 9, -1, ["sat"], "x "),
+         "negative"),
+        ("pre-Nov-1", lambda: league_window(2026, 25, 4, ["sat", "wed"], "x "),
+         "November 1 floor"),
+        ("bad night", lambda: parse_nights(["sat", "xyz", "mon"], 9, "x "),
+         "unrecognised"),
+        ("dup night", lambda: parse_nights(["sat", "sat", "mon"], 9, "x "),
+         "duplicate"),
+    ]:
+        try:
+            fn()
+            raise SystemExit(f"refusal MISSING: {name}")
+        except ScheduleError as e:
+            assert frag in str(e), (name, str(e))
+    print("  refusals: all six static cases fire by name")
+    print("S94 ORACLE: ALL ASSERTIONS PASSED")
