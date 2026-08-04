@@ -1,3 +1,67 @@
+## Session 99 — WHO YOU PLAY TWICE. The extra meeting now rotates by whose turn it is, read from up to eight seasons of retained logs. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 90 PASS at 40 assertions.** On the stock world, season ten of a career: **411 preferred pairs held across all 14 affected leagues, 45 fell to feasibility, ZERO terminal fallbacks**. On the sixteen-school rig — the Big East's shape exactly — **every school has played every opponent twice by season 7**, inside the eight-season window, against a frozen control where twelve of fifteen opponents are never doubled once in twelve years. **O-79 closes.** (2026-08-04)
+
+**Register:** build, under `PROMPT-schedule-rotation-s99-r3` (ChatGPT-reviewed). Two new files, five edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED.
+
+### What shipped
+
+`src/Charm.Harness/Program.Checks.Rotation.cs` — NEW (Phase 90). `worlds/fixture-rotation.world.json` — NEW (21 schools: a five-school league at six games for the compact rig, a sixteen-school league at eighteen games for the deep one). `Program.Season.cs`, `Program.Season.Memory.cs`, `Program.Checks.SeasonMemory.cs`, `Program.cs`, `Charm.Harness.csproj` — EDIT.
+
+### ★ THE PROMPT MISCOUNTED THE LEAGUES THE SESSION IS ABOUT
+
+The prompt said **13 affected, 18 unaffected** in three places while its own §1 table listed **14 rows**. Measured off the stock world at the gate: **14 affected, 17 unaffected**, plus the one Independent container at zero games. Independently confirmed by the live page, which has always read *"526 residuals flipped across 14 leagues"*. The table was right; the prose was wrong. Corrected everywhere, and worth recording because a plausible count in a prompt is exempted from the §6b source audit in exactly the way S81.3's plausible table was.
+
+### ★ ROTATION AND HOST MEMORY ARE NOT ORTHOGONAL, AND THE FIRST BUILD PICKED THE WRONG ONE TO YIELD
+
+The prompt declared rotation orthogonal to the host source: one answers *which pairs meet twice*, the other *who owns the residual*. That is true of the questions and **false of the flow**. The very first live run died on the Atlantic 10.
+
+Before this session every school's odd pairs were frozen for the life of a career, so reversing last year's residual hosts was always possible — you were reversing a valid assignment. Rotation unfreezes them. A school can end up forced onto the road in more of its surviving single-meeting games than its home quota can absorb, and the flow correctly refuses to orient.
+
+One of the two has to yield. **The first build made ROTATION yield**, on the reasoning that rotation is explicitly *a preference, never a ban* while host memory carries no such licence. It was defensible, it was flagged as a call, and **measuring the axis the change is about killed it**: on the sixteen-school rig — the league whose five-season turn is the entire reason the window is eight — every season relaxed to empty, the terminal fallback fired every year, and the schedule never moved at all. Coverage read `min distinct 3/15, covered never`. A session that does nothing in the deepest league is not a session.
+
+**The flips yield instead, and this is S96's OWN rule rather than a new concession.** `ResidualsToFlip` already silently skips a pair whose parity changed, on the stated grounds that a league changing shape is an ordinary consequence and not an error. Rotation changes the shape every year, so the same reasoning covers the same case one step further along — and the alternative is a hard constraint that can refuse a season outright, which host memory was explicitly built never to do. Memory-derived venues are dropped from the end of `ResidualsToFlip`'s own `(Lo, Hi)` ordering, one at a time, so the longest honourable prefix survives deterministically. **An explicit `fixedHosts` list stays hard** — that is a caller's instruction, not something this layer computed for itself.
+
+With that flipped, the deep rig covers by **season 7** with a longest gap of **7** — which is *exactly* what the Python oracle predicted before a line of C# existed. The oracle and the engine agreeing to the season on a quantity neither was tuned to is the strongest signal this session produced.
+
+### ★ THE ORACLE, AND WHY ITS CONSTANTS SURVIVED THE REVERSAL
+
+Written at the gate from the prompt's spec, not from production — production did not exist. Twelve seasons on both shapes plus a rotation-off control, cross-checked on the compact rig against a **brute-force enumerator over all twelve legal extra graphs**, an enumeration production never performs, which found that full coverage in two seasons is not merely achieved but **optimal**. The prompt asked for that enumerator on a *Sun Belt shape* (13 schools, r=6); the number of 6-regular graphs on 13 labelled vertices is astronomical and it cannot be done. The compact rig moved to the five-school shape already in the suite, same 2-to-1 ratio, twelve graphs, instant.
+
+Margins follow the stated policy — coverage observed **+1**, gap observed **+2** — and because the oracle modelled the chooser alone, the honest expectation was that the live bounds would be looser. They were not. Live matched oracle exactly on the deep rig once the flips became the soft side.
+
+### ★ THE PAIR AGES, AND THE ONE THING A FIRST DRAFT GETS WRONG
+
+The score is the **absolute season offset** of a pair's most recent second meeting; never seen in any readable year scores W+1, the maximum, because nothing is more overdue than *not in living memory*. **A hole does not compress time**: seasons 3, 6, 7 and 8 missing leaves a four-year-old pair scoring 4, not its position in the readable list. Unobserved is not evidence — a missing year cannot prove a pair did or did not double — and the accepted price is stated rather than discovered later: a hole can **overstate** how overdue a pair is and can never understate a doubling it saw.
+
+The trap the session was built around is not "rotation does nothing", which shows up loudly. It is **a later season with zero usable history rotating anyway**: every pair ties at the maximum and the school-id tie-break silently picks the graph, which is the exact bias this session exists to remove wearing the right face. C1f is the only assertion that discriminates on it.
+
+### ★ ONE READ PATH, TWO CONSUMERS THAT FAIL DIFFERENTLY
+
+Both halves open the same files through the same validation (`ReadSeasonLog`), so they can never disagree about whether a year is trustworthy. What differs is **consumption**: hosts take only season N−1 and fail closed as a whole; rotation takes N−1..N−8 independently, and a hole contributes zero facts while disabling nothing. **The divergence point is the loop in `ReadCareerMemory` and nowhere else** — inside one record the all-or-nothing rule is untouched. `ReadHostMemory` is now literally `ReadCareerMemory(history, 1).Hosts`, which is what makes drift between them impossible rather than merely unlikely.
+
+Cost, measured on nine real stock seasons at the gate: eight retained logs are **94.6 MiB**, and the full read → parse → validate → aggregate path is **median 466 ms** (min 437, max 656, twenty runs after a warm-up, single-core sandbox). One walk a season, not thirty-two.
+
+### ★ THE SESSION HAD TO NARROW THREE S96 CHECKS, AND THEY WERE NOT ON THE FILE LIST
+
+Same shape as S98's finding, one session later. Phase 87's C8i-b, C8ii and C8iii each bundled a live claim with a clause that was only ever a **consequence of the frozen graph** — "season 3 flips back to season 1's schedule", and two `== fp1` comparisons. All three go red the moment the doubled pairs move, and none of them was about that.
+
+C8ii and C8iii lost the fingerprint clause and gained a stronger one: the schedule must now **differ** from a no-career schedule, which proves the rotation half read the older log while the host half refused it — the S99 divergence landing exactly on C8's own trap.
+
+C8i-b was rewritten to assert what S96 actually promises: **where a pair owns the residual in two consecutive seasons, the host alternates.** Two honest corrections went in getting there. First, on this fixture's five-school leagues the two possible extra graphs are **disjoint**, so no odd pair recurs at all and the assertion ranged over nothing — the guard `repeated > 0` caught it, and the measurement moved to the sixteen-school rig where three of twelve pairs move a year. Second, the first form asserted the exact identity `recurring == alternated + given up` and the run refused it: **152 recurring, 87 alternated, 88 given up.** The arithmetic was never going to close, because a pair whose venue was given up is not thereby *pinned* — the flow still chooses its host freely and lands on the other school often enough to alternate anyway. The true claim is one-directional: **every reversal that was applied happened**, so at least `recurring − given up` must swap. That is what ships.
+
+### ★ WHAT THE CHECK CANNOT DO, SAID PLAINLY
+
+**C3 is the only assertion in Phase 90 that discriminates.** Every pre-S99 slate check — game count, degrees, even home and away — passes identically on the frozen schedule and the rotated one, because they describe the *shape* of a season and this session changes the *choice*. So C3 runs the same twelve seasons with the chooser off and requires C2b's coverage predicate to **reject** that world: `compact covered never, deep never`, distinct doubled opponents pinned at exactly `r` forever.
+
+### Numbers on Emmett's machine
+
+Phase 90 **PASS at 40**. Compact rig covered by season **2** (bound 3), longest gap **2** (bound 4). Deep rig covered by season **7** (bound 8), longest gap **7** (bound 9). Relaxation fired **10 times across 6 of 12 seasons**, 303 preferences held, **0 terminal fallbacks**. Zero path: fixture-mte reproduces the **pre-S97** schedule golden `eee5e256…` and results golden `95038e91…` with no career, in a career's first season, and in a career whose only prior season published no log. Nine numbers were predicted before the run and all nine landed.
+
+### Honest misses
+
+The first build shipped the wrong side yielding and only the coverage measurement caught it. The first C8i-b asserted an identity that cannot hold. Both were found by running the thing rather than reasoning about it, and both cost a turn rather than a session.
+
+---
+
 ## Session 98 — THE BRACKETS PLAY. Every seated field is now seeded by prestige and played out to a full placement on the window's own nights, on a floor nobody hosts. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 89 PASS at 56 assertions, Phase 88 PASS at 62.** On the stock world: **128 tournament games** on top of 2,818 conference ones, with the conference schedule fingerprint `6f79d663…` and dated fingerprint `7515df7d…` **UNMOVED**, 63 December games unmoved, and home court reading **1689/2818 = 59.9% at +4.2** — the same numbers S97 recorded, because the tournament games are excluded from that denominator by their own site fact. Tournament games fingerprint `26f2b8ff…`. (2026-08-04)
 
 **Register:** build, under `PROMPT-mte-brackets-s98-r5` (ChatGPT-reviewed). Two new files, four edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED.

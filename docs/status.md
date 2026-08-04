@@ -10,28 +10,28 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 98** (2026-08-04; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 89 PASS at 56
-assertions**, **Phase 88 at 62**. **THE BRACKETS PLAY.** Every seated field is now seeded 1..N by prestige (ties to the
-lower school id), played out to a FULL placement on the window's own November nights, logged as an ordinary
-non-conference game, and its finishes written into the permanent record. On the stock world: **128 tournament games**
-on top of 2,818 conference ones, conference schedule fingerprint `6f79d663…` and dated `7515df7d…` **UNMOVED**, 63
-December games unmoved, home court **1689/2818 = 59.9% at +4.2** (the 128 neutral games excluded by their own site
-fact), tournament games fingerprint `26f2b8ff…`. ★ **EXECUTED LAST, DATED FIRST** — `g` is both the engine seed input
-and the retention ordinal, so slotting brackets into calendar order would re-roll the whole season; they append and
-carry November dates. The payoff is the session's control: with the brackets ON, the conference half reproduces a
-fingerprint captured from the PRISTINE S97 TREE (Phase 89 C1c on Emmett's machine at fixture scale; the stock-scale
-`3a037971…` match is a SANDBOX measurement — O-70). ★ **C1 AS THE PROMPT WROTE IT WOULD NOT HAVE DISCRIMINATED**:
-forcing every event dormant appends nothing, so it compared two conference-only seasons; the arm that tests this
-session is the one with brackets ON, and both ship. ★ **THE ROUTE TABLES ARE THE SPEC** — prose does not uniquely
-determine an eight-team consolation topology, so both tables are literal in source and Phase 89 walks them down all
-4,096 (and 16) result paths; r2's "a winner never appears in a consolation path" was FALSE. ★ **EMMETT'S RULING: a
-school that never played is OUT of the band averages entirely** — the proof table now counts **333, not 347** — and
-the standings compare by INTEGER CROSS-MULTIPLICATION, never a float. ★ **AN S97 CHECK HAD TO BE NARROWED AND IT WAS
-NOT ON THE FILE LIST**: Phase 88 C8's whole-season identity goes red once brackets play, so it narrowed to the
-conference prefix with a new C8d so it cannot decay into comparing two identical seasons. `Charm.Engine` and
-`Charm.History` UNTOUCHED. Closes **O-83's neutral half**; opens **O-88**. Two honest misses, both caught in the
-sandbox: a check demanded byte-identical logs across two careers, which the per-career history id makes impossible;
-and the ledger probe was measuring its own footprint. Next: **O-79's remaining half, or non-conference proper**.)
+Last updated: **Session 99** (2026-08-04; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 90 PASS at 40
+assertions**. **WHO YOU PLAY TWICE.** A league that cannot play everybody twice no longer gives the same opponents the
+second meeting forever: the season reads up to **eight** years of retained logs and prefers whichever pairs have waited
+longest. Season ten of a stock career: **411 preferred pairs held across all 14 affected leagues, 45 fell to
+feasibility, 0 terminal fallbacks**. On the sixteen-school rig (the Big East's shape) **every school has played every
+opponent twice by season 7** — inside the window — against a frozen control where twelve of fifteen opponents are never
+doubled once in twelve years. **O-79 CLOSES on both halves.** ★ **THE PROMPT MISCOUNTED THE LEAGUES THE SESSION IS
+ABOUT** — 13/18 in the prose, **14 rows in its own table**; measured 14 affected / 17 unaffected / 1 zero-game, which
+the page has always said. ★ **ROTATION AND HOST MEMORY ARE NOT ORTHOGONAL IN THE FLOW, AND THE FIRST BUILD PICKED THE
+WRONG SIDE TO YIELD**: the first live run died on the Atlantic 10, rotation was made to yield, and measuring the axis
+killed it — the deepest league relaxed to empty EVERY season and the schedule never moved (`min distinct 3/15, covered
+never`). **The memory-derived flips yield instead**, which is S96's own parity-change rule one step further along; an
+explicit `fixedHosts` list stays hard. ★ **THE ORACLE AND THE ENGINE AGREE TO THE SEASON** — a Python oracle written at
+the gate, cross-checked against a brute-force enumerator over all twelve legal graphs on the compact rig (which proved
+two-season coverage OPTIMAL), predicted deep-rig coverage at 7 and gap at 7; live reads 7 and 7. ★ **THREE S96 CHECKS
+HAD TO BE NARROWED AND THEY WERE NOT ON THE FILE LIST** (the S98 finding, one session later): C8i-b/C8ii/C8iii each
+bundled a live claim with a clause that was only a consequence of the FROZEN graph. C8i-b's first rewrite asserted
+`recurring == alternated + given up` and the run refused it (**152 = 87 + 88**) — a given-up venue is not PINNED, the
+flow still picks freely and alternates by chance. The true claim is one-directional. ★ **C3 IS THE ONLY DISCRIMINATING
+ASSERTION**: every pre-S99 slate check describes a season's SHAPE and this session changes the CHOICE, so the negative
+control runs twelve seasons with the chooser off and requires the coverage predicate to REJECT that world. Opens
+**O-89**, **O-90**.)
 
 *(Previous board entry, S97 — 2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 88 PASS at 61
 assertions**, pre-S97 zero-path goldens `51c8e88c202e9eb6…`/`2c521c9f8f2ee203…` and `eee5e256b0c6fc87…`/`bbff75ce74cf9363…`
@@ -211,6 +211,8 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 *(Previous board entry, Session 89.1 — 2026-08-01; CORRECTION SESSION. `git add -A` at the end of S89 swept in five UNTRACKED files and revealed that **S88 is a complete, working session**: a per-man transition-defence model wired into the live engine (`RollHGenerator`'s break make and block doors, `Resolver`'s defender draw — ~98,000 shots a season), oracle-locked, retiring the four `HustleTransitionDefense*` dials for twenty `Transition*` ones. Emmett's `config.json` was CORRECT and S89 reverted it, breaking a working session; restored. S89's account of S88 is wrong in four places and is corrected in the S89.1 journal entry — the S89 entry itself is left untouched, because the journal is immutable history. ★ A REAL DEFECT S89 INTRODUCED: a phase-number collision. S88 declared `Phase79TransitionDefenseCheck`, S89 registered `Phase79IdentityCheck` as 79, and **S88's phase had no caller anywhere — it had never run once**. Registered here at 79 by date; identity moves to 80. First-ever run: 40 of 43, all three failures one cause — S88's two golden fixtures were never added to the harness project. Both added; suite now green with 43 + 71 assertions that had never both run. ★ O-69 STRUCK: Phase 71 is not broken. Handed a real mismatch it named all four orphan keys and all twenty absent ones in exactly C-25's language. S89 never opened the red suite to see which phase failed.)
 
+*(Previous board entry, S98: THE BRACKETS PLAY — every seated field seeded by prestige and played to a full placement on neutral floors; 128 tournament games on the stock world with the conference fingerprints UNMOVED. Phase 89, 56 assertions. See journal S98.)*
+
 *(Previous board entry, S89: PERMANENT IDENTITY AND THE HISTORY FILE. Every person, season and game now carries a number issued once and never issued again — high-water counters in a named save file, `--history <path>`, with no default path. Identities live in a NEW PROJECT, `src/Charm.History`, and the project boundary IS the seam: the raw `long` is `internal` with no `InternalsVisibleTo`, so no calibration or domain file can write "person 4001 is older than person 4000". No ordering, no conversion, no arithmetic — only equality and hashing. **No basketball moved**: the full season page with and without a history differs by exactly THREE banner lines on Emmett's machine. Phase 79 adds 71 assertions, all green first time, two of which discriminate (the reflected type surface; isolation with a real negative control that moves one live per-player field). The check-in found the world already HAD a canonical writer — the fingerprint's projection was split out of `WriteWorld` rather than written twice — and found a landmine in Phase 55's determinism replay, which used generated record equality and would have gone red the first time it saw history mode. ★ THE SESSION ALSO FOUND S88: `config.json` carried a STAGED, uncommitted edit — twenty `Transition*` dials with no code behind any of them, four `HustleTransitionDefense*` keys removed whose engine defaults match the deleted values character for character. Behaviourally inert, saved out, reverted, opened as O-68 — and **Phase 71 went green through all of it**, which is O-69. Four honest misses recorded, all the same mistake: sandbox numbers asserted against Emmett's Windows machine, including the Gate 1 fixture itself (O-70). Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
 
 *(Previous board entry, S86: THE COACH BECAME A GATE. Roll J's run-or-not balance stopped being a flat number nudged by two additive lifts and became a score the players build against a bar the coach sets: the ball-winner's legs and his outlet pass as two OVERLAPPING escape routes, his four teammates' speed against all five defenders' speed getting back, and the offensive coach's pace setting the height that opportunity must clear. Both old lifts RETIRED rather than supplemented — pace was a nudge and is now the gate, so keeping both would let pace pay twice, and `Speed` lives inside `Player.Athleticism`, so keeping the five-way composite gap beside the new speed race would pay fast teams twice. League push 33.55% -> 35.70%, but the mean is not the finding: **per-offensive-team push now runs min 18.89% / median 36.16% / max 48.15%, a 29.26pp band, on rosters alone**, because every bar in the country is still the neutral 0.475 (O-57). Read against the entries-conceded band (12pp): who GETS transition chances is far more uniform than who RUNS on them. ★ THE RULING THAT CHANGED THE BUILD: the free-throw board was measured BEFORE it was wired and pulled out of scope — base Push 0.08 against a swing of 0.22 pinned a plodding rebounder to exactly 0.0% at grind AND neutral pace while everyone with legs jumped to ~28%, a source with no middle, and one of the two zero rows was an *average* rebounder against a fast defense. The locked oracle independently confirmed the call: its tables and its 45-case golden fixture carry only the live board and the two steals, so it never modelled the free-throw board at all and needed no edit. ★ THE CHECK-IN CAUGHT TWO SUITE CHECKS THAT WOULD HAVE GONE RED WITH NOTHING WRONG (a tempo-direction check and a tired-legs check, both stamping which team had the ball but never WHO); the same defect would have silently left the exploratory transition ladder reading dead flat — the S59.2 flat-baseline trap. Golden parity worst |delta| 4.92E-013 against a deliberately non-bitwise 1e-6 bar (S81.3 lesson). Nine of nine suite and eighteen of eighteen season predictions landed exactly; sandbox byte-identical to Emmett's machine. Three honest misses recorded, including one wrong claim in the build prompt that survived the §6b audit: entry rate DID move (41.61% -> 41.56%) because changing a pie shifts the RNG stream. Opened O-61, O-62, O-63. Suite `ALL CHECKS PASSED`, season verified on Emmett's machine.)
@@ -321,6 +323,19 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S99 — WHO YOU PLAY TWICE. The extra meeting rotates by whose turn it is.** The set of opponents a
+  school plays twice is no longer fixed by the world file for the life of a career: every non-rivalry pair
+  scores the absolute season offset of its most recent second meeting (never seen = W+1, the maximum), and
+  the most overdue are preferred. Window **eight seasons**, sized off the Big East's five-season turn plus
+  margin. Two forced collections — rivalries never relaxed, preferences relaxed worst-first, longest feasible
+  prefix retained. **One walk of the career file serves both consumers**: hosts take only N−1 and fail closed
+  as a whole, rotation takes N−1..N−8 independently, and the divergence is the loop and nothing else
+  (`ReadHostMemory` is now literally `ReadCareerMemory(history, 1).Hosts`). Read cost measured: 94.6 MiB of
+  logs, median 466 ms, once a season. Zero path preserved on all three ways of having no facts, against
+  **pre-S97** goldens. R3 survives by construction (`q` odd everywhere ⇒ odd-pair count is a function of the
+  shape, not the choice). Phase 90, **40 assertions**, page-only throughout. Closes **O-79** entirely; opens
+  **O-89**, **O-90**.
 
 - **★ S98 — THE BRACKETS PLAY: EVERY SEATED FIELD IS DECIDED ON THE FLOOR.** Each active complete field is seeded
   1..N by `CurrentPrestige` descending with the lower school id breaking ties, and played to a **full placement** —
@@ -679,6 +694,32 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
+- **★ O-89 — HOST ALTERNATION LOOKS ONE YEAR BACK WHILE ROTATION LOOKS EIGHT (opened S99; the S100
+  candidate).** S96's rule is *"they hosted the single game last season, so I host it this season."* S99 now
+  inserts home-and-home years between a pair's single games, and a home-and-home year has **no residual**, so
+  the rule looks back one season, sees an even pair, and has nothing to say. The counter is not carried
+  forward. A specific matchup can therefore stay one-sided across intervening doubled years and nothing in
+  the engine notices — the hole is *"who has hosted more of our single games"*, not *"how long since we
+  played there"*. Two things make this cheap to fix: **the eight-year read is already built and paid for**
+  (rotation walks it every season), and the depth needed is *shallower* than rotation's, because single games
+  are the common case — in an 18- or 20-team league almost nobody is doubled, so the last single meeting is
+  nearly always last season. The fix is a **running count across the window** (host the next single game
+  against whoever is behind) rather than a one-year comparison, which also degrades gracefully into a hole
+  where today's rule goes silent. **Not a regression** — S96's guarantee was only ever one-hop — but it is
+  the fairness this session made incomplete, and it is small.
+
+- **O-90 — ROTATION EMPTIES HOST MEMORY ENTIRELY ON A FIVE-SCHOOL LEAGUE (opened S99).** On `n = 5, r = 2`
+  the extra graph is a five-cycle and its complement is the **other** five-cycle, so a rotated year shares
+  **no** odd pair with the year before it and there is nothing to alternate. Found because Phase 87's
+  alternation assertion ranged over zero pairs and the `repeated > 0` guard refused to pass vacuously; the
+  measurement moved to the sixteen-school rig. On the stock world the effect is partial rather than total
+  (526 → 72 residuals applied over a ten-season career, some of which is legitimate — a pair that goes to
+  home-and-home has no residual to reverse — and some of which is venues given up to keep the slate
+  orientable). Recorded because it is invisible on the page: the host line reports the venues that
+  **applied**, which is the honest number, and says nothing about the ones surrendered. Largely subsumed by
+  **O-89**'s running count; kept separate because the tiny-league case may still be degenerate afterwards and
+  should be measured, not assumed.
+
 - **★ O-88 — A PLAYER'S SEASON TOTALS NOW BLEND CONFERENCE AND TOURNAMENT GAMES WITH NO SPLIT (opened S98).**
   A tournament game is an ordinary regular-season game by ruling, so it counts in every stat line, every
   leaderboard and every rate board — correctly. What does not exist anywhere is a *cut*: nobody can ask for a
@@ -755,16 +796,15 @@ chart is PROVISIONAL pending O-6.
   conferences is not a basis for a national ranking, and Emmett's ruling that conference standings and a top
   25 are the real home stands unchanged.
 
-- **O-79 — THE SAME PAIRS DOUBLE AND THE SAME PAIRS SKIP EVERY SEASON, FOREVER (opened S93; ★ HOSTING HALF
-  CLOSED AT S96).** The slate takes no randomness, so a career's year two carried a conference schedule
-  identical to year one's. **S96 fixed the hosting half**: a season reads season N−1's retained log and flips
-  every single-meeting host, so gyms now alternate year over year. **What remains open is the other half** —
-  WHICH pairs double and which skip is still fully determined by the world file and still repeats forever, so
-  the same two schools meet twice every season for the life of a career and the same pair never meets at all.
-  The soft objectives (`SkipUrgency` and friends) were held out of S93 precisely because they need the memory
-  that now exists; they are the natural mechanism and they are not built. Note the stakes are **lower** than
-  the hosting half's were: a repeated double is a schedule-strength artefact, not the compounding home-court
-  advantage S95 created. Its natural home is the non-conference / MTE session or a session of its own.
+- **O-79 — ★ CLOSED AT S99, BOTH HALVES SHIPPED (opened S93).** The slate took no randomness, so a
+  career's year two carried a conference schedule identical to year one's. **S96 fixed the hosting half**
+  (a season reads N−1's log and flips every single-meeting host). **S99 fixed the other half**: which pairs
+  double is now chosen each season from up to eight years of retained logs by whose turn it is, and the
+  sixteen-school rig gets every school to every opponent by season 7. The soft objectives (`SkipUrgency` and
+  friends) held out of S93 were never built and are **not needed** — a pair-age score plus the existing
+  search does the work. Kept here as a closed entry rather than deleted so a future session reading the S93
+  contract does not go looking for an open item that shipped. Successors: **O-89** (the alternation still
+  only looks one year back) and **O-90** (rotation empties host memory on very small leagues).
 
 - **O-84 — MEMORY CANNOT YET FOLLOW A SCHOOL THROUGH REALIGNMENT, AND TWO GUARDS ARE THEREFORE DORMANT
   (opened S96).** S96 ruled that hosting fairness is a debt between two **schools**, not a conference thing:
@@ -1522,17 +1562,11 @@ chart is PROVISIONAL pending O-6.
 **Not yet ruled.** S98 finished the two-session bracket arc, so the next scope is Emmett's call between three
 that are all genuinely ready:
 
-- **O-79's remaining half — which pairs double and which pairs skip.** The slate still takes no randomness, so
-  a career's year two carries the same doubled and skipped pairs as year one, forever. S96 built the memory
-  layer this needs, and S93 held the soft objectives (`SkipUrgency` and friends) out precisely because they
-  needed it. Lower stakes than the hosting half was — a repeated double is a schedule-strength artefact, not a
-  compounding home-court advantage — but it is the last piece of the conference scheduler.
-- **The rest of non-conference** — the guarantee market and the bulletin board, which is where **O-87's campus
-  events** naturally land. This is the largest remaining hole in what a season IS: outside the brackets, no
-  school plays anybody from another league.
-- **The crowd model (O-82)** — its prestige half and its emergent per-team magnitude half need no new
-  prerequisite. Only the distance half is still blocked, and S98 narrowed that gap: a game now knows whether
-  anybody hosts it, but still not where it is played.
+- **★ O-89 — carry host alternation across the whole window.** The natural S100. S99 made the rotation
+  read eight years and left the alternation reading one, so a pair's single games can stay one-sided across
+  intervening home-and-home seasons. The expensive part — the windowed read — is built, paid for and
+  measured; what is needed is a running per-pair count in place of a one-year comparison. Small, self
+  contained, and it finishes the fairness S96 started rather than opening a new area.
 
 Behind those: **O-84**'s realignment guards, still shipped dormant, and the **calibration queue**, untouched
 since the population arc settled.

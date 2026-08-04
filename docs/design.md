@@ -8615,7 +8615,7 @@ Three consequences follow, all honest, none of them defects:
 
 - **A team plays its own league's authored number of games, not 30** — 14 for the Ivy, Patriot and WCC; 16 for thirteen leagues; 18 for fourteen; 20 for the Atlantic Sun. The stock season is **2,818 games**, and that number is the sum of `n·G/2` over the 32 leagues rather than a constant anybody typed.
 - **The fourteen Independent schools play ZERO games.** Their conference is authored at `Games = 0`, which is R14, and it is now a live case in the stock world rather than a fixture curiosity. They carry rosters and finish 0-0.
-- ★ **THE SCHEDULE CONSUMES NO RANDOMNESS AT ALL.** Every draw the old builder made lived in the non-conference filler. The conference slate is fully determined by the world file, so **the same world produces an identical schedule at every seed** — asserted in Phase 55, deliberately, so that the day a session wires a scheduler RNG the check goes red and says so. The seed still drives every possession of every game. What it no longer does is decide who plays whom, which means the same pairs are doubled and the same pairs skipped every season forever. **That was a real basketball gap and S96's host memory is the answer to its hosting half** — a season now reads season N−1's retained log and flips every single-meeting host, so a career alternates gyms year over year (see "Host memory" below). What is still fully determined and still repeats forever is WHICH pairs double and which skip; that half stays open as O-79.
+- ★ **THE SCHEDULE CONSUMES NO RANDOMNESS AT ALL.** Every draw the old builder made lived in the non-conference filler. The conference slate is fully determined by the world file, so **the same world produces an identical schedule at every seed** — asserted in Phase 55, deliberately, so that the day a session wires a scheduler RNG the check goes red and says so. The seed still drives every possession of every game. What it no longer does is decide who plays whom, which means the same pairs are doubled and the same pairs skipped every season forever. **That was a real basketball gap and it is now closed on both halves.** S96's host memory answered the hosting half — a season reads season N−1's retained log and flips every single-meeting host, so a career alternates gyms year over year (see "Host memory" below). **S99 answered the other half**: which pairs double is no longer fixed by the world file, but chosen each season from up to eight years of retained logs by whose turn it is (see "Schedule rotation" below). The slate still consumes no randomness — the choice is *remembered*, not *drawn* — so Phase 55's determinism assertion stands untouched, and a season with no career or no readable history still produces the pinned schedule byte for byte. **O-79 closes.**
 
 **The shape.** For a conference of `n` schools authored `Games = G` and `Skip = k`: `p = n − 1 − k` opponents are actually played, `q, r = divmod(G, p)`, so **`r` opponents are met `q+1` times, `p − r` are met `q` times, and `k` are not played at all**. "Home-and-home with everybody, twice with a few" is the stock world's case of that rule, never the rule itself.
 
@@ -10486,9 +10486,17 @@ now worth about three points of margin and nine points of win rate, so a school 
 home fixture against its toughest rival drew it every season, permanently.
 
 **A season now reads season N−1's retained log and fixes every one of those residuals to the other
-school.** On the stock world that is **526 pairs across 14 leagues**, derived at runtime and printed
-on the season page. Season 3 flips back, so a career alternates. `Program.Season.Memory.cs` owns the
-layer; Phase 87 owns the proofs.
+school.** Before S99 that was **526 pairs across 14 leagues** on the stock world, and season 3 flipped
+back to season 1's schedule exactly. `Program.Season.Memory.cs` owns the layer; Phase 87 owns the proofs.
+
+★ **S99 CHANGED BOTH OF THOSE NUMBERS, AND THE SECOND SENTENCE IS NO LONGER TRUE.** Rotation moves
+which pairs own a residual, so (a) far fewer pairs are odd in two consecutive seasons — a pair that
+goes to home-and-home has no residual to reverse — and (b) a career no longer returns to season 1's
+schedule, because the doubled pairs have moved on. A ten-season stock career reads **72 residuals
+across 8 leagues**. The promise that survives, and the one Phase 87 now asserts directly, is per-pair
+rather than per-season: **where a pair owns the residual in two consecutive seasons, the host
+alternates**. See "Schedule rotation" below for the venues that are given up to make that possible,
+and O-89 for the fairness hole this leaves.
 
 ### ★ MEMORY MEANS SEASON N−1, AND IT IS FOUND BY ARITHMETIC
 
@@ -10604,6 +10612,137 @@ play and finalize real seasons to produce the logs it reads back.
 remaining half), along with the soft objectives (`SkipUrgency` and friends) held out of S93 because they
 need this memory to apply. MTE participation memory is named and not pre-shaped for — the reader
 projects hosting facts only, and widening it is a ruling, not an extension.
+
+## Schedule rotation — whose turn is it to be played twice (Session 99, 2026-08-04)
+
+A league that cannot play everybody twice gives `r` opponents a second meeting and `p − r` only one.
+Until this session that choice was **frozen for the life of a career**: the slate takes no randomness,
+so the same two schools met twice every year forever and the same pair never got a second game at all.
+On the stock world's Big East a school doubled the same three of its fifteen opponents in year one and
+in year twelve. **A season now chooses that set from up to eight years of retained logs, by whose turn
+it is.**
+
+`Program.Season.cs` owns the chooser; `Program.Season.Memory.cs` owns the read; Phase 90 owns the proofs.
+
+### ★ THE SCORE IS HOW LONG A PAIR HAS WAITED, NOT WHETHER IT PLAYED LAST YEAR
+
+Every non-rivalry pair scores the **absolute season offset of its most recent second meeting**: doubled
+last season scores 1, doubled four years ago scores 4, doubled in several years takes the most recent.
+A pair with no recorded second meeting in any readable year scores **W+1**, the maximum — nothing is
+more overdue than *not in living memory*. Higher score first; ties by lower school id, then higher.
+
+Emmett's ruling: the rule is **whose turn it is**, not mere avoidance. A pair that has waited longest
+outranks a pair that merely did not double last season. The tie-break **is** the old bias, named
+explicitly so the result is deterministic; the eight-season window reduces reliance on it and does not
+pretend to eliminate it.
+
+### ★ THE WINDOW IS EIGHT, AND THE BIG EAST IS WHY
+
+A Big East school has fifteen opponents and three second meetings a season, so one full turn takes
+**five seasons**. Any window shorter than five collapses two different things into one tier —
+*doubled outside the window* and *never doubled* — leaving the oldest and most important tier decided
+by the tie-break. Eight is five for one full turn plus three seasons of margin for imperfect rotations,
+infeasible preference combinations and holes.
+
+Measured over twelve seasons of the stock world at design time: **every one of the fourteen affected
+leagues** gets every school to every opponent, and the slowest — the Big East — needs **seven seasons**.
+Inside the window, with a year to spare. The live engine reproduces that seven exactly.
+
+### ★ OFFSETS ARE CALENDAR DISTANCE, NEVER POSITION IN THE READABLE LIST
+
+A hole at N−2 does not slide N−4 up to three. **Unobserved is not evidence**: a missing year cannot
+prove a pair did or did not double, so a pair last *seen* doubled at N−2 scores two even when N−1 is
+unreadable. The accepted price, stated rather than discovered later: a hole can **overstate** how
+overdue a pair is, and can never understate a doubling it did see.
+
+### ★ TWO FORCED COLLECTIONS, NEVER ONE
+
+- `hardForced` — rivalry pairs. **Never relaxed, never scored**, present in every retry including the
+  terminal fallback. A permanently forced pair has no turn to take, so it is excluded from the ranking,
+  from the page's counts and from every fairness measurement, and each school's *rotating* degree is
+  `r` minus its hard-forced degree.
+- `preferredForced` — the rotation's choices. Relaxed one at a time, and the only thing relaxation may
+  touch.
+
+The existing search's signature is unchanged: it receives the **union**. The separation exists precisely
+because the search treats every member of its forced set identically, so a single merged set would let
+the relaxation loop drop a rivalry to make a preference fit.
+
+**The greedy pass is allowed to end incomplete.** It supplies preferred hard assignments, not a finished
+extra graph — the existing search completes every remaining degree. It strands degree routinely: the
+Big Ten proposes 41 of a possible 44 pairs, the Big East 23 of 24. Relaxation then removes preferences
+in **exact reverse preference order**, worst-scored first, so every retry keeps the **longest feasible
+prefix**. An exhausted search budget is returned as itself and never merged with infeasibility — relaxing
+on a budget failure would discard a legal preference and call it impossible.
+
+No global-optimality claim is made and none is needed. A highly overdue early pick can block a slightly
+lower-ranked one and survive; the promise is rotation by preference, not the maximum-total-overdue graph.
+
+### ★ THE ZERO PATH IS THE PRE-S99 SCHEDULER, BYTE FOR BYTE — AND THAT INCLUDES A CAREER
+
+Three different ways of having no facts, one schedule: no career at all, a career's **first** season
+(no log can exist), and a **later** season where zero valid rotation facts exist for this league. All
+three fall through to the pinned circulant shortcut exactly as before. The third is the one a first
+draft misses — not a season where every pair ties at the maximum and the id tie-break silently picks
+the graph, but **no rotation at all**.
+
+Usable history is **league-specific**: a year counts for a league only if it supplies a meeting count
+for at least one of *that* league's pairs. A year that speaks about the league and reports no second
+meetings is real evidence and is kept, with an empty set.
+
+### ★ ROTATION IS NOT ORTHOGONAL TO HOST MEMORY IN THE FLOW, AND THE FLIPS ARE THE SOFT SIDE
+
+The two answer different questions — *which pairs meet twice* versus *who owns the residual* — and the
+mutual-exclusion throw between `fixedHosts` and `memory` deliberately did **not** grow a third arm. But
+they are not independent where the season is oriented.
+
+Before S99 every school's odd pairs were frozen, so reversing last year's residual hosts was always
+possible: you were reversing a valid assignment. Rotation unfreezes them, and a school can end up forced
+onto the road in more of its surviving odd pairs than its home quota can absorb. The flow correctly
+refuses.
+
+**Memory-derived venues yield; rotation does not.** This is S96's own rule one step further along —
+`ResidualsToFlip` already silently skips a pair whose parity changed, on the stated grounds that a league
+changing shape is ordinary rather than an error, and rotation changes the shape every year. Flips are
+dropped from the end of `ResidualsToFlip`'s own `(Lo, Hi)` ordering, one at a time, so the longest
+honourable prefix survives deterministically. An explicit `fixedHosts` list stays **hard**: that is a
+caller's instruction, not something this layer computed for itself.
+
+The reverse choice was built first and measured: with rotation yielding, the sixteen-school rig relaxed
+to empty **every single season** and the schedule never moved. See journal S99.
+
+### ★ WHAT CANNOT MOVE, AND WHY IT IS STRUCTURAL
+
+**R3 survives by construction.** With `q` odd in every affected league — true of all fourteen in the
+stock world — a school's odd-pair count is `p − r`, a function of the **shape** alone. Changing *which*
+pairs are extra cannot change *how many* odd pairs a school has, so every school still hosts exactly half
+its league season, every season. This is arithmetic, not a check that happened to pass.
+
+**Degree assertions run before orientation on every path** — the chooser's, the shortcut's and the
+search's alike. They reject a self-pair, a wrong degree, an unnormalized pair, a school from another
+league, and a legal graph that dropped a rivalry. That last one is what makes "a rivalry is never
+relaxed" mechanical rather than a promise.
+
+### The page line
+
+`Schedule rotation: N preferred pairs held across L leagues (F fell to feasibility, T terminal fallbacks)`
+
+Page-only and entirely runtime-derived; no measured league constant appears on it. Printed for a career
+even when every number is zero — *"0 preferred pairs held"* and no line at all are different facts, and
+the first is what a career with no usable history looks like. Legacy mode prints nothing. The word
+*"rotated"* is deliberately absent: "changed since last season" is unknowable when N−1 is a hole, so the
+line reports what the chooser **did** rather than a year-over-year difference it cannot compute.
+
+Season ten of a stock career reads **411 preferred pairs held across 14 leagues (45 fell to feasibility,
+0 terminal fallbacks)**.
+
+### The feasibility floor, stated precisely
+
+**Any input feasible before S99 remains feasible after.** Rotation is a preference and never a ban: with
+the preferred set empty the extra graph is the pinned one, every odd pair is what it always was, and the
+pre-S99 path runs in full. That is *not* the same as "every input is feasible" — hand-built adversarial
+host memory can refuse the pinned schedule too, and could before this session as well. The stronger
+sentence is false and does not belong in this document.
 
 ## The MTE pool — tournaments exist and fields are seated (Session 97, 2026-08-03)
 

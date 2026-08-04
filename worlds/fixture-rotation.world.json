@@ -1,0 +1,516 @@
+{
+ "schemaVersion": 5,
+ "metadata": {
+  "kind": "authored",
+  "eraLabel": "fixture-rotation",
+  "division": "D1"
+ },
+ "tiers": [
+  {
+   "id": "power",
+   "floor": 40,
+   "equilibrium": 75,
+   "pullbackIntensity": 0.25,
+   "eventScope": "power"
+  },
+  {
+   "id": "highMid",
+   "floor": 20,
+   "equilibrium": 55,
+   "pullbackIntensity": 0.45,
+   "eventScope": "mid"
+  },
+  {
+   "id": "lowMid",
+   "floor": 8,
+   "equilibrium": 35,
+   "pullbackIntensity": 0.65,
+   "eventScope": "mid"
+  },
+  {
+   "id": "low",
+   "floor": 0,
+   "equilibrium": 18,
+   "pullbackIntensity": 0.85,
+   "eventScope": "mid"
+  }
+ ],
+ "conferences": [
+  {
+   "id": 1,
+   "name": "Turnstile Conference",
+   "shortName": "Turnstile",
+   "tierId": "power",
+   "games": 6,
+   "skip": 0,
+   "nights": [
+    "sat",
+    "wed",
+    "mon"
+   ],
+   "weeks": 5,
+   "tourneyOffsetDays": 4
+  },
+  {
+   "id": 2,
+   "name": "Long Haul Conference",
+   "shortName": "Long Haul",
+   "tierId": "low",
+   "games": 18,
+   "skip": 0,
+   "nights": [
+    "wed",
+    "sat",
+    "mon"
+   ],
+   "weeks": 10,
+   "tourneyOffsetDays": 4
+  }
+ ],
+ "places": [
+  {
+   "placeId": 1,
+   "name": "Alder",
+   "subdivision": "ME",
+   "country": "US",
+   "lat": 38.7,
+   "long": -72.8,
+   "tags": []
+  },
+  {
+   "placeId": 2,
+   "name": "Bracken",
+   "subdivision": "NH",
+   "country": "US",
+   "lat": 39.4,
+   "long": -73.6,
+   "tags": []
+  },
+  {
+   "placeId": 3,
+   "name": "Cinder",
+   "subdivision": "VT",
+   "country": "US",
+   "lat": 40.1,
+   "long": -74.4,
+   "tags": []
+  },
+  {
+   "placeId": 4,
+   "name": "Dunmore",
+   "subdivision": "MA",
+   "country": "US",
+   "lat": 40.8,
+   "long": -75.2,
+   "tags": []
+  },
+  {
+   "placeId": 5,
+   "name": "Elmridge",
+   "subdivision": "CT",
+   "country": "US",
+   "lat": 41.5,
+   "long": -76.0,
+   "tags": []
+  },
+  {
+   "placeId": 6,
+   "name": "Fallowfield",
+   "subdivision": "RI",
+   "country": "US",
+   "lat": 42.2,
+   "long": -76.8,
+   "tags": []
+  },
+  {
+   "placeId": 7,
+   "name": "Granby",
+   "subdivision": "NY",
+   "country": "US",
+   "lat": 42.9,
+   "long": -77.6,
+   "tags": []
+  },
+  {
+   "placeId": 8,
+   "name": "Hollis",
+   "subdivision": "NJ",
+   "country": "US",
+   "lat": 43.6,
+   "long": -78.4,
+   "tags": []
+  },
+  {
+   "placeId": 9,
+   "name": "Ironwood",
+   "subdivision": "PA",
+   "country": "US",
+   "lat": 44.3,
+   "long": -79.2,
+   "tags": []
+  },
+  {
+   "placeId": 10,
+   "name": "Juniper",
+   "subdivision": "DE",
+   "country": "US",
+   "lat": 45.0,
+   "long": -80.0,
+   "tags": []
+  },
+  {
+   "placeId": 11,
+   "name": "Kestrel",
+   "subdivision": "MD",
+   "country": "US",
+   "lat": 45.7,
+   "long": -80.8,
+   "tags": []
+  },
+  {
+   "placeId": 12,
+   "name": "Larkspur",
+   "subdivision": "VA",
+   "country": "US",
+   "lat": 46.4,
+   "long": -81.6,
+   "tags": []
+  },
+  {
+   "placeId": 13,
+   "name": "Millbrook",
+   "subdivision": "WV",
+   "country": "US",
+   "lat": 47.1,
+   "long": -82.4,
+   "tags": []
+  },
+  {
+   "placeId": 14,
+   "name": "Northgate",
+   "subdivision": "NC",
+   "country": "US",
+   "lat": 47.8,
+   "long": -83.2,
+   "tags": []
+  },
+  {
+   "placeId": 15,
+   "name": "Oakhaven",
+   "subdivision": "SC",
+   "country": "US",
+   "lat": 48.5,
+   "long": -84.0,
+   "tags": []
+  },
+  {
+   "placeId": 16,
+   "name": "Pinecrest",
+   "subdivision": "GA",
+   "country": "US",
+   "lat": 49.2,
+   "long": -84.8,
+   "tags": []
+  },
+  {
+   "placeId": 17,
+   "name": "Quarry Hill",
+   "subdivision": "OH",
+   "country": "US",
+   "lat": 49.9,
+   "long": -85.6,
+   "tags": []
+  },
+  {
+   "placeId": 18,
+   "name": "Ridgeway",
+   "subdivision": "IN",
+   "country": "US",
+   "lat": 50.6,
+   "long": -86.4,
+   "tags": []
+  },
+  {
+   "placeId": 19,
+   "name": "Sablecreek",
+   "subdivision": "IL",
+   "country": "US",
+   "lat": 51.3,
+   "long": -87.2,
+   "tags": []
+  },
+  {
+   "placeId": 20,
+   "name": "Thornbury",
+   "subdivision": "MI",
+   "country": "US",
+   "lat": 52.0,
+   "long": -88.0,
+   "tags": []
+  },
+  {
+   "placeId": 21,
+   "name": "Umberfield",
+   "subdivision": "WI",
+   "country": "US",
+   "lat": 52.7,
+   "long": -88.8,
+   "tags": []
+  }
+ ],
+ "schools": [
+  {
+   "id": 1,
+   "name": "Alder State",
+   "abbr": "ALDE",
+   "color": "#3A4A6B",
+   "placeId": 1,
+   "conferenceId": 1,
+   "division": "D1",
+   "currentPrestige": 82,
+   "historicalPrestige": 82,
+   "rivalId": null
+  },
+  {
+   "id": 2,
+   "name": "Bracken Tech",
+   "abbr": "BRAC",
+   "color": "#3A4A6B",
+   "placeId": 2,
+   "conferenceId": 1,
+   "division": "D1",
+   "currentPrestige": 74,
+   "historicalPrestige": 74,
+   "rivalId": null
+  },
+  {
+   "id": 3,
+   "name": "Cinder State",
+   "abbr": "CIND",
+   "color": "#3A4A6B",
+   "placeId": 3,
+   "conferenceId": 1,
+   "division": "D1",
+   "currentPrestige": 66,
+   "historicalPrestige": 66,
+   "rivalId": null
+  },
+  {
+   "id": 4,
+   "name": "Dunmore Tech",
+   "abbr": "DUNM",
+   "color": "#3A4A6B",
+   "placeId": 4,
+   "conferenceId": 1,
+   "division": "D1",
+   "currentPrestige": 58,
+   "historicalPrestige": 58,
+   "rivalId": null
+  },
+  {
+   "id": 5,
+   "name": "Elmridge State",
+   "abbr": "ELMR",
+   "color": "#3A4A6B",
+   "placeId": 5,
+   "conferenceId": 1,
+   "division": "D1",
+   "currentPrestige": 50,
+   "historicalPrestige": 50,
+   "rivalId": null
+  },
+  {
+   "id": 6,
+   "name": "Fallowfield Tech",
+   "abbr": "FALL",
+   "color": "#3A4A6B",
+   "placeId": 6,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 45,
+   "historicalPrestige": 45,
+   "rivalId": null
+  },
+  {
+   "id": 7,
+   "name": "Granby State",
+   "abbr": "GRAN",
+   "color": "#3A4A6B",
+   "placeId": 7,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 42,
+   "historicalPrestige": 42,
+   "rivalId": null
+  },
+  {
+   "id": 8,
+   "name": "Hollis Tech",
+   "abbr": "HOLL",
+   "color": "#3A4A6B",
+   "placeId": 8,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 39,
+   "historicalPrestige": 39,
+   "rivalId": null
+  },
+  {
+   "id": 9,
+   "name": "Ironwood State",
+   "abbr": "IRON",
+   "color": "#3A4A6B",
+   "placeId": 9,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 36,
+   "historicalPrestige": 36,
+   "rivalId": null
+  },
+  {
+   "id": 10,
+   "name": "Juniper Tech",
+   "abbr": "JUNI",
+   "color": "#3A4A6B",
+   "placeId": 10,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 33,
+   "historicalPrestige": 33,
+   "rivalId": null
+  },
+  {
+   "id": 11,
+   "name": "Kestrel State",
+   "abbr": "KEST",
+   "color": "#3A4A6B",
+   "placeId": 11,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 30,
+   "historicalPrestige": 30,
+   "rivalId": null
+  },
+  {
+   "id": 12,
+   "name": "Larkspur Tech",
+   "abbr": "LARK",
+   "color": "#3A4A6B",
+   "placeId": 12,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 27,
+   "historicalPrestige": 27,
+   "rivalId": null
+  },
+  {
+   "id": 13,
+   "name": "Millbrook State",
+   "abbr": "MILL",
+   "color": "#3A4A6B",
+   "placeId": 13,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 24,
+   "historicalPrestige": 24,
+   "rivalId": null
+  },
+  {
+   "id": 14,
+   "name": "Northgate Tech",
+   "abbr": "NORT",
+   "color": "#3A4A6B",
+   "placeId": 14,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 21,
+   "historicalPrestige": 21,
+   "rivalId": null
+  },
+  {
+   "id": 15,
+   "name": "Oakhaven State",
+   "abbr": "OAKH",
+   "color": "#3A4A6B",
+   "placeId": 15,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 20,
+   "historicalPrestige": 20,
+   "rivalId": null
+  },
+  {
+   "id": 16,
+   "name": "Pinecrest Tech",
+   "abbr": "PINE",
+   "color": "#3A4A6B",
+   "placeId": 16,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 18,
+   "historicalPrestige": 18,
+   "rivalId": null
+  },
+  {
+   "id": 17,
+   "name": "Quarry Hill State",
+   "abbr": "QUAR",
+   "color": "#3A4A6B",
+   "placeId": 17,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 15,
+   "historicalPrestige": 15,
+   "rivalId": null
+  },
+  {
+   "id": 18,
+   "name": "Ridgeway Tech",
+   "abbr": "RIDG",
+   "color": "#3A4A6B",
+   "placeId": 18,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 12,
+   "historicalPrestige": 12,
+   "rivalId": null
+  },
+  {
+   "id": 19,
+   "name": "Sablecreek State",
+   "abbr": "SABL",
+   "color": "#3A4A6B",
+   "placeId": 19,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 9,
+   "historicalPrestige": 9,
+   "rivalId": null
+  },
+  {
+   "id": 20,
+   "name": "Thornbury Tech",
+   "abbr": "THOR",
+   "color": "#3A4A6B",
+   "placeId": 20,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 6,
+   "historicalPrestige": 6,
+   "rivalId": null
+  },
+  {
+   "id": 21,
+   "name": "Umberfield State",
+   "abbr": "UMBE",
+   "color": "#3A4A6B",
+   "placeId": 21,
+   "conferenceId": 2,
+   "division": "D1",
+   "currentPrestige": 3,
+   "historicalPrestige": 3,
+   "rivalId": null
+  }
+ ],
+ "events": []
+}

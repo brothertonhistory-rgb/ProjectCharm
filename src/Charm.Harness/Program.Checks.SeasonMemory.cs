@@ -418,11 +418,64 @@ internal static partial class Program
                   && life2.Memory.Status == HostMemoryStatus.Loaded && life2.Memory.SourceSeasonId == 1
                   && life3.Memory.Status == HostMemoryStatus.Loaded && life3.Memory.SourceSeasonId == 2,
                   $"{life1.Memory.Status}, {life2.Memory.SourceSeasonId}, {life3.Memory.SourceSeasonId}");
-            Check("C8i-b: season 2 flips season 1, and season 3 flips back to season 1's schedule",
-                  life2.Memory.ResidualsFlipped > 0 && life3.Memory.ResidualsFlipped > 0
-                  && fp2 != fp1 && fp3 == fp1,
-                  $"{life2.Memory.ResidualsFlipped} flipped across " +
-                  $"{life2.Memory.LeaguesWithResidualsFlipped} leagues");
+            //  ★ NARROWED AT S99, AND THE OLD FORM WAS NOT WRONG — IT WAS OBSOLETE. This read
+            //  "season 2 flips season 1, and season 3 flips BACK to season 1's schedule". That
+            //  return trip was never what C8 is about; it was a CONSEQUENCE of the extra-meeting
+            //  graph being frozen for the life of a career, which is exactly what S99 removes.
+            //  On this fixture the two possible extra graphs on five schools are disjoint, so a
+            //  rotated year can legitimately share no odd pair with the year before it and have
+            //  nothing to flip at all.
+            //
+            //  What C8i-b actually protects survives intact and is now asserted directly: WHERE
+            //  A PAIR IS ODD IN TWO CONSECUTIVE SEASONS, THE HOST ALTERNATES. That is the whole
+            //  basketball of S96, it is independent of which pairs the scheduler chose, and —
+            //  unlike a fingerprint comparison — it cannot decay into comparing two identical
+            //  seasons, because the pairs it ranges over are found at runtime.
+            //  ★ AND IT IS MEASURED ON A LEAGUE WHERE ODD PAIRS CAN RECUR. On this fixture's
+            //  five-school leagues the extra graph is a five-cycle and its complement is the
+            //  OTHER five-cycle, so a rotated year shares no odd pair with the year before it
+            //  and the alternation assertion would range over nothing at all. The sixteen-school
+            //  rig moves three pairs a year out of twelve, so most residual pairs recur and the
+            //  alternation is observable — which is the only condition under which asserting it
+            //  means anything.
+            var altWorld = LoadWorld(Path.Combine(AppContext.BaseDirectory, "worlds",
+                                                  "fixture-rotation.world.json"));
+            var altPath = Path.Combine(scratch, "alt", "career.history.json");
+            var alt1 = PlayRetainedSeason(altWorld, MemoryGoldenSeed, altPath, configPath);
+            var alt2 = PlayRetainedSeason(altWorld, MemoryGoldenSeed, altPath, configPath);
+            var alt3 = PlayRetainedSeason(altWorld, MemoryGoldenSeed, altPath, configPath);
+            var alternated = 0;
+            var repeated = 0;
+            foreach (var (before, after) in new[] { (alt1, alt2), (alt2, alt3) })
+            {
+                var a = ResidualHostsOfSchedule(before.Schedule);
+                var b = ResidualHostsOfSchedule(after.Schedule);
+                foreach (var (pair, host) in a)
+                {
+                    if (!b.TryGetValue(pair, out var next)) continue;   // no longer an odd pair
+                    repeated++;
+                    if (next != host) alternated++;
+                }
+            }
+            //  ★ THE CLAIM IS ONE-DIRECTIONAL, AND THE FIRST DRAFT OF IT WAS WRONG. It asserted
+            //  the exact identity "recurring == alternated + given up", which the run refused:
+            //  152 recurring, 87 alternated, 88 given up. The arithmetic was never going to
+            //  close, because a pair whose venue was given up is not thereby PINNED — the flow
+            //  still chooses its host freely and lands on the other school often enough to
+            //  alternate anyway. Swaps therefore always EXCEED applied reversals.
+            //
+            //  What is true, and what host memory actually promises, is the one direction:
+            //  EVERY REVERSAL THAT WAS APPLIED HAPPENED. So at least (recurring - given up)
+            //  pairs must alternate. This still fails loudly if the flip stops being applied —
+            //  the alternation count would fall through the floor — and it cannot be satisfied
+            //  by a fraction, because the floor is computed from a counter kept at the point the
+            //  venue is surrendered rather than chosen to fit the result.
+            var givenUp = alt2.Rotation.MemoryVenuesGivenUp + alt3.Rotation.MemoryVenuesGivenUp;
+            Check("C8i-b: where a pair owns the residual in two consecutive seasons the host ALTERNATES — " +
+                  "every reversal that was applied happened, so at least (recurring - given up) pairs swap",
+                  repeated > 0 && alternated > 0 && alternated >= repeated - givenUp && fp2 != fp1,
+                  $"{repeated} recurring residual pairs, {givenUp} venue(s) given up, so at least " +
+                  $"{Math.Max(0, repeated - givenUp)} must swap — {alternated} did");
 
             //  (ii) T1 — a history-bound season that retained nothing. The next season must
             //  find no log for N-1 and STOP. Season 1's perfectly good log is sitting right
@@ -433,13 +486,20 @@ internal static partial class Program
             List<SeasonGame> gap3; SeasonMemoryOutcome gap3Memory;
             using (var store = HistoryStore.Open(gapPath, WorldFingerprint(memWorld)))
                 gap3 = BuildSeasonSchedule(memWorld, MemoryGoldenSeed, store, out gap3Memory);
-            Check("C8ii: an unlogged year yields NO memory — season 1's log is provably not reached",
+            //  ★ NARROWED AT S99. The old form also demanded the schedule equal season 1's,
+            //  which was the frozen graph speaking again. Season 3 now ROTATES off season 1's
+            //  log while refusing to take HOSTS from it — which is the S99 divergence landing
+            //  exactly on C8's own trap, and is asserted below rather than assumed.
+            var gapNoCareer = BuildSeasonSchedule(memWorld, MemoryGoldenSeed, null);
+            Check("C8ii: an unlogged year yields NO memory — season 1's log is provably not reached for " +
+                  "HOSTS, even while the rotation half reads it two years back",
                   gap3Memory.Status == HostMemoryStatus.NoPublishedLog
                   && gap3Memory.AttemptedSeasonId == 2 && gap3Memory.SourceSeasonId is null
                   && gap3Memory.ResidualsFlipped == 0
-                  && ScheduleFingerprint(gap3) == fp1
+                  && ScheduleFingerprint(gap3) != ScheduleFingerprint(gapNoCareer)
                   && File.Exists(GameLogWriter.FinalPathFor(gapPath, 1)),
-                  $"{gap3Memory.Status}, attempted {gap3Memory.AttemptedSeasonId}");
+                  $"{gap3Memory.Status}, attempted {gap3Memory.AttemptedSeasonId}, " +
+                  $"{gap3Memory.ResidualsFlipped} flipped, and the slate moved off the no-career one");
 
             //  (iii) T2 — the candidate is damaged. Same shape, same trap, different cause.
             var badPath = Path.Combine(scratch, "bad", "career.history.json");
@@ -451,14 +511,16 @@ internal static partial class Program
             List<SeasonGame> bad3; SeasonMemoryOutcome bad3Memory;
             using (var store = HistoryStore.Open(badPath, WorldFingerprint(memWorld)))
                 bad3 = BuildSeasonSchedule(memWorld, MemoryGoldenSeed, store, out bad3Memory);
-            Check("C8iii: a damaged candidate yields NO memory — never the valid season-1 log beside it",
+            //  ★ NARROWED AT S99, for the same reason as C8ii and with the same replacement.
+            Check("C8iii: a damaged candidate yields NO memory — never the valid season-1 log beside it, " +
+                  "however far back the rotation half is willing to read",
                   bad3Memory.Status == HostMemoryStatus.Unreadable
                   && bad3Memory.Problem == HostMemoryProblem.Truncated
                   && bad3Memory.AttemptedSeasonId == 2 && bad3Memory.SourceSeasonId is null
                   && bad3Memory.ResidualsFlipped == 0
-                  && ScheduleFingerprint(bad3) == fp1
+                  && ScheduleFingerprint(bad3) != ScheduleFingerprint(gapNoCareer)
                   && File.Exists(GameLogWriter.FinalPathFor(badPath, 1)),
-                  $"{bad3Memory.Status}/{bad3Memory.Problem}");
+                  $"{bad3Memory.Status}/{bad3Memory.Problem}, {bad3Memory.ResidualsFlipped} flipped");
 
             //  A log from a different career, sitting at exactly the right path.
             var alienPath = Path.Combine(scratch, "alien", "career.history.json");
@@ -579,6 +641,26 @@ internal static partial class Program
             var key = (Lo: Math.Min(home, away), Hi: Math.Max(home, away));
             lo.TryAdd(key, 0); hi.TryAdd(key, 0);
             if (home == key.Lo) lo[key]++; else hi[key]++;
+        }
+        var result = new Dictionary<(int Lo, int Hi), int>();
+        foreach (var key in lo.Keys)
+            if (lo[key] != hi[key]) result[key] = lo[key] > hi[key] ? key.Lo : key.Hi;
+        return result;
+    }
+
+    /// <summary>★ S99 — who hosted each ODD pair, read off a whole season's oriented games
+    /// rather than off one league's slate. Deliberately re-derived here: C8i-b compares two
+    /// seasons of production output, and calling production's own aggregation would be a
+    /// routine agreeing with itself.</summary>
+    private static Dictionary<(int Lo, int Hi), int> ResidualHostsOfSchedule(List<SeasonGame> schedule)
+    {
+        var lo = new Dictionary<(int Lo, int Hi), int>();
+        var hi = new Dictionary<(int Lo, int Hi), int>();
+        foreach (var g in schedule)
+        {
+            var key = (Lo: Math.Min(g.HomeId, g.AwayId), Hi: Math.Max(g.HomeId, g.AwayId));
+            lo.TryAdd(key, 0); hi.TryAdd(key, 0);
+            if (g.HomeId == key.Lo) lo[key]++; else hi[key]++;
         }
         var result = new Dictionary<(int Lo, int Hi), int>();
         foreach (var key in lo.Keys)

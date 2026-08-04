@@ -90,6 +90,16 @@
     <None Include="..\..\worlds\fixture-memory.world.json" Link="worlds\fixture-memory.world.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- S99 — the rotation rigs. Two leagues in one file: a five-school league at six games
+         (four opponents, two second meetings — the same 2-to-1 ratio as the Sun Belt, and
+         small enough that every legal extra graph can be enumerated by brute force), and a
+         sixteen-school league at eighteen games, which is the stock Big East's shape exactly:
+         fifteen opponents, three second meetings, one full turn through the league in five
+         seasons. The deep one is the only rig that can show the eight-season window is deep
+         enough, and it is a NEW file precisely so no existing fingerprint moves. -->
+    <None Include="..\..\worlds\fixture-rotation.world.json" Link="worlds\fixture-rotation.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- S92 — the distance golden. Expected miles are computed OUTSIDE .NET from the exact
          serialized coordinates using the spherical haversine form and the exact radius
          3958.7613: an independent IMPLEMENTATION OF THE SAME MODEL, which is the only kind

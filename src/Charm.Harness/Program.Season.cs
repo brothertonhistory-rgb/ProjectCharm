@@ -152,6 +152,10 @@ internal static partial class Program
         /// <summary>★ S96 — what host memory did this season. Page-facing; the suite reads
         /// the parts it asserts from the schedule itself, never from these counters.</summary>
         public SeasonMemoryOutcome Memory { get; init; } = SeasonMemoryOutcome.None;
+        /// <summary>★ S99 — what the schedule rotation did this season. Page-facing, on the
+        /// same terms as Memory above: the suite reads what it asserts from the slates
+        /// themselves, never from a printed line.</summary>
+        public SeasonRotationOutcome Rotation { get; init; } = SeasonRotationOutcome.None;
         /// <summary>★ S97 — which tournaments ran, who is in them, and what happened to the
         /// permanent record. Page-facing; the suite reads what it asserts from the seating
         /// result itself, never from a printed line.</summary>
@@ -302,6 +306,41 @@ internal static partial class Program
         /// explicit `fixedHosts` list (Phase 84's A9), so the season's "residuals flipped"
         /// counts what memory did and nothing else.</summary>
         public int MemoryFixedHosts { get; init; }
+
+        // ── S99: what the rotation chooser did to THIS league ────────────────────
+        //
+        //  ★ TEST-OBSERVABLE, and that is the whole requirement. Without these a legal
+        //  slate cannot be told from a bypassed chooser: every pre-S99 slate assertion
+        //  describes the SHAPE of a season, and this session changes the CHOICE. They
+        //  ride on the slate result because that is the narrowest seam that already
+        //  exists — `MemoryFixedHosts` and `UsedCanonicalCirculant` are here for the
+        //  same reason.
+        //
+        //  ★ THEIR ARITHMETIC RECONCILES, and it is asserted where they are built:
+        //  Initial == Retained + Relaxations, and the terminal flag fires at most once.
+        //  That is what keeps the page's counters from drifting away from the mechanism
+        //  they claim to describe.
+
+        /// <summary>The chooser ran on this league: it had a second meeting to give AND at
+        /// least one valid historical fact about its own pairs. False means the league took
+        /// the pre-S99 path, whatever the rest of the world did.</summary>
+        public bool RotationActive { get; init; }
+        /// <summary>Preferred pairs the greedy pass proposed, before any relaxation.</summary>
+        public int RotationPreferredInitial { get; init; }
+        /// <summary>Preferred pairs surviving in the slate that was built.</summary>
+        public int RotationPreferredRetained { get; init; }
+        /// <summary>Preferred pairs the relaxation loop removed. Counted as DISTINCT PAIRS,
+        /// never as retry events — one pass that drops three pairs is three.</summary>
+        public int RotationRelaxations { get; init; }
+        /// <summary>The preferred set emptied and the league took the pre-S99 path with its
+        /// rivalries intact. Rotation is a preference and never a ban, so this is a legal
+        /// outcome rather than a failure.</summary>
+        public bool RotationTerminalFallback { get; init; }
+        /// <summary>★ S99 — memory-derived venues this league had to give up because the
+        /// rotation moved which pairs own a residual. Zero on every pre-S99 path, and zero
+        /// whenever the extra graph did not move. The page does not print it; Phase 90 asserts
+        /// on it, so "the flips are soft" is a measured fact rather than a comment.</summary>
+        public int MemoryFlipsDropped { get; init; }
     }
 
     private const int SeasonConferenceSizeCap = 20;
@@ -477,6 +516,156 @@ internal static partial class Program
         return SlateVerdict.Feasible;
     }
 
+    // ── S99: whose turn is it to be played twice ────────────────────────────────
+
+    /// <summary>This league's history, offset by offset, as SETS OF EXTRA PAIRS on member
+    /// indices — the point where a meeting count becomes "a second meeting".
+    ///
+    /// <para>★ "EXTRA" IS RELATIVE TO THIS SEASON'S q, and that is safe because the world
+    /// fingerprint hashes every league's game count: an edited world cannot open the same
+    /// career (O-84). So a past count is compared against the current q rather than a q
+    /// re-derived from the log, which the log does not carry and must not be asked to.</para>
+    ///
+    /// <para>★ USABLE HISTORY IS LEAGUE-SPECIFIC. A year counts for this league only if it
+    /// supplies a meeting count for at least one of THIS league's pairs. A career whose logs
+    /// validate but say nothing about a given league must leave that league on the pre-S99
+    /// path — otherwise every pair would tie at the maximum and the school-id tie-break would
+    /// quietly pick the graph, which is exactly the bias this session removes.</para></summary>
+    private static List<(int Offset, HashSet<(int, int)> Extra)> RotationLeagueHistory(
+        List<int> members, int q, RotationHistory rotation)
+    {
+        var seasons = new List<(int, HashSet<(int, int)>)>();
+        var n = members.Count;
+        foreach (var offset in rotation.ByOffset.Keys.OrderBy(k => k))
+        {
+            var counts = rotation.ByOffset[offset];
+            var extra = new HashSet<(int, int)>();
+            var sawThisLeague = false;
+            for (var i = 0; i < n - 1; i++)
+                for (var j = i + 1; j < n; j++)
+                {
+                    var key = (Lo: Math.Min(members[i], members[j]), Hi: Math.Max(members[i], members[j]));
+                    if (!counts.TryGetValue(key, out var met)) continue;
+                    sawThisLeague = true;
+                    if (met > q) extra.Add((i, j));
+                }
+            // ★ A YEAR THAT SAYS NOTHING ABOUT THIS LEAGUE IS NOT A YEAR. But a year that
+            //   speaks about the league and reports NO second meetings is real evidence —
+            //   it is kept, with an empty extra set.
+            if (sawThisLeague) seasons.Add((offset, extra));
+        }
+        return seasons;
+    }
+
+    /// <summary>The preference: whose turn is it, best-first.
+    ///
+    /// <para>★ THE SCORE IS THE ABSOLUTE SEASON OFFSET OF A PAIR'S MOST RECENT SECOND MEETING.
+    /// Doubled last season scores one; doubled four years ago scores four; doubled in several
+    /// years takes the most recent. A pair with no recorded second meeting in any readable year
+    /// scores W+1 — the maximum, because it is the most overdue thing there is.</para>
+    ///
+    /// <para>★ OVERDUE, NOT MERELY AVOIDANCE (Emmett's ruling). The rule is whose turn it is: a
+    /// pair that has waited longest outranks a pair that merely did not double last season.
+    /// Higher score first; ties by lower school id, then higher. The tie-break IS the old bias,
+    /// and naming it explicitly is what makes the result deterministic — the eight-season window
+    /// reduces reliance on it and does not pretend to eliminate it.</para>
+    ///
+    /// <para>★ RIVALRIES ARE NOT SCORED AND NOT COUNTED. A permanently forced pair has no turn
+    /// to take, so it is excluded here, from the page's counts, and from every fairness
+    /// measurement. Each school's ROTATING degree is r minus its hard-forced degree; a school
+    /// whose rivalries already consume its whole r has nothing to rotate.</para>
+    ///
+    /// <para>★ THE GREEDY PASS IS ALLOWED TO END INCOMPLETE. It supplies preferred hard
+    /// assignments, not a finished extra graph — the existing search completes every remaining
+    /// degree. Measured at design time, it strands degree routinely: the Big Ten proposes 41 of
+    /// a possible 44 pairs and the Big East 23 of 24.</para>
+    ///
+    /// <para>No global-optimality claim is made and none is needed: a highly overdue early pick
+    /// can block a slightly lower-ranked one and survive. The promise is rotation by preference,
+    /// not the maximum-total-overdue graph.</para></summary>
+    private static List<(int Score, int Lo, int Hi, int I, int J)> RotationRankPairs(
+        int n, List<int> members, HashSet<(int, int)> hardForced,
+        List<(int Offset, HashSet<(int, int)> Extra)> seasons)
+    {
+        var mostRecent = new Dictionary<(int, int), int>();
+        foreach (var (offset, extra) in seasons)
+            foreach (var pair in extra)
+                if (!mostRecent.TryGetValue(pair, out var seen) || offset < seen)
+                    mostRecent[pair] = offset;
+
+        var ranked = new List<(int Score, int Lo, int Hi, int I, int J)>();
+        for (var i = 0; i < n - 1; i++)
+            for (var j = i + 1; j < n; j++)
+            {
+                if (hardForced.Contains((i, j))) continue;
+                // ★ THE MAXIMUM, for a pair no readable year ever saw doubled. Nothing scores
+                //   higher, because nothing is more overdue than "not in living memory".
+                var score = mostRecent.TryGetValue((i, j), out var offset)
+                    ? offset
+                    : RotationWindowSeasons + 1;
+                ranked.Add((score, Math.Min(members[i], members[j]),
+                            Math.Max(members[i], members[j]), i, j));
+            }
+        ranked.Sort((x, y) =>
+        {
+            var c = y.Score.CompareTo(x.Score);         // most overdue first
+            if (c != 0) return c;
+            c = x.Lo.CompareTo(y.Lo);                   // then the lower school id
+            return c != 0 ? c : x.Hi.CompareTo(y.Hi);   // then the higher
+        });
+        return ranked;
+    }
+
+    /// <summary>The greedy pass over the ranking: take a pair whenever both schools still have
+    /// rotating degree left. Split from the ranking above so Phase 90 can assert the SCORES —
+    /// a chooser can produce a legal-looking set from a wrong scale, and the pair ages are the
+    /// thing this session is actually about.</summary>
+    private static List<(int I, int J)> RotationPreferredPairs(
+        int n, int r, List<int> members, HashSet<(int, int)> hardForced,
+        List<(int Offset, HashSet<(int, int)> Extra)> seasons)
+    {
+        var ranked = RotationRankPairs(n, members, hardForced, seasons);
+
+        var hardDegree = new int[n];
+        foreach (var (a, b) in hardForced) { hardDegree[a]++; hardDegree[b]++; }
+
+        var left = new int[n];
+        for (var v = 0; v < n; v++) left[v] = r - hardDegree[v];
+        var taken = new List<(int, int)>();
+        foreach (var (_, _, _, i, j) in ranked)
+        {
+            if (left[i] <= 0 || left[j] <= 0) continue;
+            taken.Add((i, j));
+            left[i]--; left[j]--;
+        }
+        return taken;
+    }
+
+    /// <summary>The degree assertions, run on the extra graph BEFORE orientation. Cheap, and
+    /// they catch the "list of extra games" misreading of an r-regular simple graph — which is
+    /// exactly the mistake a chooser that hands back a list rather than a matching would make.
+    /// Returns null when the graph is sound, else the reason.</summary>
+    private static string? RotationDegreeProblem(
+        int n, int r, HashSet<(int, int)> extra, HashSet<(int, int)> hardForced)
+    {
+        var degree = new int[n];
+        foreach (var (i, j) in extra)
+        {
+            if (i == j) return $"the extra graph pairs member {i} with itself";
+            if (i < 0 || j < 0 || i >= n || j >= n)
+                return $"the extra graph names member ({i},{j}), which is not in this league";
+            if (i > j) return $"the extra graph holds the unnormalized pair ({i},{j})";
+            degree[i]++; degree[j]++;
+        }
+        for (var v = 0; v < n; v++)
+            if (degree[v] != r)
+                return $"member {v} has {degree[v]} extra opponent(s), not {r}";
+        foreach (var pair in hardForced)
+            if (!extra.Contains(pair))
+                return $"the rivalry pair ({pair.Item1},{pair.Item2}) is not at a second meeting";
+        return null;
+    }
+
     // ── One conference: shape, then whose gym ───────────────────────────────────
 
     /// <summary>Which rivalries are ACTIVE for slate construction: mutual, both schools in THIS
@@ -509,9 +698,18 @@ internal static partial class Program
     /// memory comes in whole and the pure `ResidualsToFlip` runs at the one point where both
     /// halves exist. Mutually exclusive with <paramref name="fixedHosts"/>: two sources of
     /// venue truth for one slate is a contradiction, not a merge.</param>
+    /// <param name="rotation">★ S99 — up to eight seasons of pair meeting counts. Absent means
+    /// the pre-S99 chooser, byte for byte.
+    ///
+    /// <para>★ ROTATION IS ORTHOGONAL TO THE HOST SOURCE. <paramref name="fixedHosts"/> and
+    /// <paramref name="memory"/> are two answers to ONE question — who hosts — and stay mutually
+    /// exclusive by the throw above. Rotation answers a different question — which pairs meet
+    /// twice — and coexists with either. The exclusion throw deliberately does NOT grow a third
+    /// arm.</para></param>
     private static ConferenceSlate BuildConferenceSlate(
         List<int> members, int games, int skip, List<(int Lo, int Hi)> rivalries,
-        string label, List<FixedResidualHost>? fixedHosts = null, HostMemory? memory = null)
+        string label, List<FixedResidualHost>? fixedHosts = null, HostMemory? memory = null,
+        RotationHistory? rotation = null)
     {
         if (fixedHosts is not null && memory is not null)
             throw new InvalidOperationException(
@@ -547,13 +745,182 @@ internal static partial class Program
         HashSet<(int, int)> skipped = new();
         long nodes = 0;
         var usedCirculant = false;
-        if (skip == 0)
+
+        // ══════════════════════════════════════════════════════════════════════════
+        //  ★ S99 — WHOSE TURN IS IT. Two forced collections, never one.
+        //
+        //      hardForced      rivalry pairs. NEVER relaxed, NEVER scored, present in
+        //                      every retry including the terminal fallback.
+        //      preferredForced the rotation's choices. Relaxed one at a time; the only
+        //                      thing relaxation may touch.
+        //
+        //  The search's signature is unchanged — it receives the UNION — but the
+        //  relaxation loop draws exclusively from the preferred half. This separation
+        //  is the whole reason two collections exist: the search treats every member of
+        //  its forced set identically, so a single merged set would let the relaxation
+        //  loop drop a rivalry to make a preference fit.
+        // ══════════════════════════════════════════════════════════════════════════
+        var hardForced = forced;
+        var preferred = new List<(int I, int J)>();
+        var rotationActive = false;
+        var preferredInitial = 0;
+        var retained = 0;
+        var relaxations = 0;
+        var terminalFallback = false;
+
+        if (rotation is not null && r > 0)
+        {
+            var seasons = RotationLeagueHistory(members, q, rotation);
+            if (seasons.Count > 0)
+            {
+                rotationActive = true;
+                preferred = RotationPreferredPairs(n, r, members, hardForced, seasons);
+                preferredInitial = preferred.Count;
+            }
+        }
+
+        // ★ THE WHOLE SLATE IS THE UNIT OF FEASIBILITY, not the extra graph alone — and this
+        //   is the one thing the design conversation did not foresee. A legal extra graph can
+        //   still fail to ORIENT: host memory reverses last season's residual hosts, and
+        //   before this session that was always possible because every school's odd pairs were
+        //   frozen forever, so reversing a valid assignment was itself valid. Rotation unfreezes
+        //   them. A school can end up forced onto the road in more of its surviving odd pairs
+        //   than its home quota can absorb, and the flow correctly refuses.
+        //
+        //   ★ SO WHICH ONE YIELDS, AND WHY IT IS THE FLIPS. The first build made ROTATION yield
+        //   — relax preferences until the flips fit — on the reasoning that rotation is
+        //   explicitly "a preference, never a ban". Measuring the axis the change is about
+        //   killed that: on the sixteen-school rig, the league whose five-season turn is the
+        //   entire reason the window is eight, every season relaxed to empty and the schedule
+        //   never moved at all. A session that does nothing in the deepest league is not a
+        //   session.
+        //
+        //   The flips yield instead, and this is S96's OWN rule rather than a new concession:
+        //   ResidualsToFlip already SILENTLY SKIPS a pair whose parity changed, on the stated
+        //   grounds that a league changing shape is "an ordinary consequence, not an error".
+        //   Rotation changes the shape every year, so the same reasoning covers the same case
+        //   one step further along — and the alternative is a hard constraint that can refuse
+        //   a season outright, which host memory was explicitly built never to do.
+        //
+        //   Flips are dropped from the END of ResidualsToFlip's own (Lo, Hi) ordering, one at
+        //   a time, so the result is deterministic and the LONGEST honourable prefix survives.
+        ConferenceSlate FinishSlate(
+            HashSet<(int, int)> chosenExtra, HashSet<(int, int)> chosenSkips,
+            long searchNodes, bool circulant, int keptPreferences, int droppedPreferences,
+            bool terminal)
+        {
+            var meetingsLocal = new Dictionary<(int Lo, int Hi), int>();
+            for (var i = 0; i < n - 1; i++)
+                for (var j = i + 1; j < n; j++)
+                    meetingsLocal[(members[i], members[j])] =
+                        chosenSkips.Contains((i, j)) ? 0 : q + (chosenExtra.Contains((i, j)) ? 1 : 0);
+
+            // ★ S96 — the one point where memory meets this league's actual meeting counts.
+            var flipsLocal = memory is null ? fixedHosts : ResidualsToFlip(memory, meetingsLocal, members);
+
+            ConferenceSlate Orient(List<FixedResidualHost>? venues, int dropped)
+                // ★ ZERO-PATH CALL SHAPE PRESERVED. Null and empty behave identically
+                //   downstream, but passing null keeps a memory-less season's call byte-for-byte
+                //   the call it made before this session existed.
+                => OrientConferenceSlate(
+                    members, games, meetingsLocal, label,
+                    venues is null || venues.Count == 0 ? null : venues,
+                    searchNodes, circulant,
+                    memory is null ? 0 : venues!.Count,
+                    new RotationSlateDiagnostics(
+                        rotationActive, preferredInitial, keptPreferences, droppedPreferences,
+                        terminal, dropped));
+
+            var attemptOrient = Orient(flipsLocal, 0);
+            // ★ ONLY MEMORY-DERIVED VENUES ARE SOFT. An explicit fixedHosts list is a caller's
+            //   instruction and keeps its refusal; only the flips this layer computed for itself
+            //   may be given up, and only for the one refusal that means "these venues do not
+            //   fit", never for a malformed configuration.
+            if (memory is null || flipsLocal is null) return attemptOrient;
+            var soft = new List<FixedResidualHost>(flipsLocal);
+            var droppedFlips = 0;
+            while (attemptOrient.Verdict == SlateVerdict.InfeasibleUnderConstraints && soft.Count > 0)
+            {
+                soft.RemoveAt(soft.Count - 1);
+                droppedFlips++;
+                attemptOrient = Orient(soft, droppedFlips);
+            }
+            return attemptOrient;
+        }
+
+        if (preferred.Count > 0)
+        {
+            // ★ RELAXATION IN EXACT REVERSE PREFERENCE ORDER. `preferred` is best-first, so
+            //   removing from the END drops the worst-scored survivor each time and every
+            //   retry keeps the LONGEST FEASIBLE PREFIX of the preference.
+            var prefix = new List<(int I, int J)>(preferred);
+            while (prefix.Count > 0)
+            {
+                var union = new HashSet<(int, int)>(hardForced);
+                foreach (var pair in prefix) union.Add(pair);
+                var attempt = SearchConferenceShape(
+                    n, r, skip, union, new HashSet<(int, int)>(),
+                    out var found, out var foundSkips, out nodes, out var attemptWhy);
+                // ★ AN EXHAUSTED BUDGET PROVES NOTHING and must never be read as "this
+                //   preference is impossible". The two verdicts are never merged, here least
+                //   of all — relaxing on a budget failure would silently discard a legal
+                //   preference and call it infeasible.
+                if (attempt == SlateVerdict.SearchBudgetExhausted)
+                    return new ConferenceSlate
+                    {
+                        Verdict = attempt, Reason = $"{label}{attemptWhy}", SearchNodes = nodes,
+                    };
+                if (attempt == SlateVerdict.Feasible)
+                {
+                    var degreeMiss = RotationDegreeProblem(n, r, found, hardForced);
+                    // A wrong graph out of the search is a BUG, not an infeasible preference.
+                    // It is never relaxed away; it stops the season by name.
+                    if (degreeMiss is not null)
+                        return new ConferenceSlate
+                        {
+                            Verdict = SlateVerdict.InvalidConfiguration,
+                            Reason = $"{label}{degreeMiss}", SearchNodes = nodes,
+                        };
+                    // ★ FinishSlate owns the venue side and always orients: memory-derived
+                    //   flips are soft, so a preference that last season's hosts cannot all
+                    //   survive costs a flip rather than the preference. Anything that still
+                    //   comes back refused is a real configuration error and is returned as
+                    //   one — it is never relaxed into legality.
+                    return FinishSlate(
+                        found, foundSkips, nodes, circulant: false,
+                        keptPreferences: prefix.Count,
+                        droppedPreferences: relaxations, terminal: false);
+                }
+                prefix.RemoveAt(prefix.Count - 1);
+                relaxations++;
+            }
+            // ★ THE TERMINAL FALLBACK: the preferred set emptied, the rivalries are intact,
+            //   and what happens below is the pre-S99 path in full — INCLUDING the pinned
+            //   shortcut. A feasibility floor, not a quality bound.
+            terminalFallback = true;
+            relaxations = preferredInitial;
+        }
+        else if (rotationActive)
+        {
+            // Rotation ran and had nothing to prefer — every pair is already a rivalry, or the
+            // league's whole r is consumed by them. Retained zero IS terminal, by definition.
+            terminalFallback = true;
+        }
+
+        // ── The pre-S99 path, unchanged, and still REACHABLE ──────────────────────
+        //  ★ THIS IS WHAT PRESERVES EVERY GOLDEN. With no career, in a career's first
+        //    season, or in a later season where zero valid rotation facts exist for this
+        //    league, nothing above fired and the shortcut is taken exactly as it always
+        //    was. A version that computed rotation data correctly and then took the
+        //    shortcut anyway would be indistinguishable here — which is why Phase 90's
+        //    controls, not this comment, are what prove the chooser ran.
+        if (extra is null && skip == 0)
         {
             var candidate = CanonicalCirculant(n, r);
             // ★ THE SHORTCUT ONLY EVER ACCEPTS. It takes the pinned circulant when the
             //   circulant already satisfies every constraint the search would enforce, and
             //   otherwise falls through — so it can never mask the search's infeasibility proof.
-            if (r == 0 || forced.All(candidate.Contains))
+            if (r == 0 || hardForced.All(candidate.Contains))
             {
                 extra = candidate;
                 usedCirculant = true;
@@ -562,30 +929,49 @@ internal static partial class Program
         if (extra is null)
         {
             // r > 0: a rivalry must sit at q+1. r == 0: a rivalry must simply not be skipped.
-            var forcedExtra = r > 0 ? forced : new HashSet<(int, int)>();
-            var forbiddenSkip = r > 0 ? new HashSet<(int, int)>() : forced;
+            var forcedExtra = r > 0 ? hardForced : new HashSet<(int, int)>();
+            var forbiddenSkip = r > 0 ? new HashSet<(int, int)>() : hardForced;
             var verdict = SearchConferenceShape(
                 n, r, skip, forcedExtra, forbiddenSkip, out extra, out skipped, out nodes, out var why);
             if (verdict != SlateVerdict.Feasible)
                 return new ConferenceSlate { Verdict = verdict, Reason = $"{label}{why}", SearchNodes = nodes };
         }
 
-        var meetings = new Dictionary<(int Lo, int Hi), int>();
-        for (var i = 0; i < n - 1; i++)
-            for (var j = i + 1; j < n; j++)
-                meetings[(members[i], members[j])] =
-                    skipped.Contains((i, j)) ? 0 : q + (extra.Contains((i, j)) ? 1 : 0);
+        // ★ THE DEGREE ASSERTIONS, before orientation and on every path — the shortcut's and
+        //   the search's alike, so a wrong graph cannot reach the flow. Cheap, and they catch
+        //   the "list of extra games" misreading of an r-regular simple graph.
+        var degreeProblem = RotationDegreeProblem(
+            n, r, extra, r > 0 ? hardForced : new HashSet<(int, int)>());
+        if (degreeProblem is not null)
+            return new ConferenceSlate
+            {
+                Verdict = SlateVerdict.InvalidConfiguration,
+                Reason = $"{label}{degreeProblem}",
+                SearchNodes = nodes,
+            };
 
-        // ★ S96 — the one point where memory meets this league's actual meeting counts.
-        var flips = memory is null ? fixedHosts : ResidualsToFlip(memory, meetings, members);
-        // ★ ZERO-PATH CALL SHAPE PRESERVED. Null and empty behave identically downstream
-        //   (line 555's `?? new List<>()`), but passing null keeps a memory-less season's
-        //   call byte-for-byte the call it made before this session existed.
-        return OrientConferenceSlate(
-            members, games, meetings, label,
-            flips is null || flips.Count == 0 ? null : flips, nodes, usedCirculant,
-            memory is null ? 0 : flips!.Count);
+        // ★ THE ARITHMETIC RECONCILES, asserted where the counters are built rather than
+        //   trusted by the page: initial preferred == retained + removed. Reaching here with
+        //   the rotation active means retained is zero and every proposal was dropped.
+        if (rotationActive && preferredInitial != retained + relaxations)
+            return new ConferenceSlate
+            {
+                Verdict = SlateVerdict.InvalidConfiguration,
+                Reason = $"{label}the rotation proposed {preferredInitial} preferred pair(s) but " +
+                         $"kept {retained} and dropped {relaxations}",
+                SearchNodes = nodes,
+            };
+
+        return FinishSlate(extra, skipped, nodes, usedCirculant,
+                           keptPreferences: retained, droppedPreferences: relaxations,
+                           terminal: terminalFallback);
     }
+
+    /// <summary>★ S99 — what the chooser did to one league, carried to the slate result so a
+    /// check can tell a legal slate from a bypassed chooser.</summary>
+    private readonly record struct RotationSlateDiagnostics(
+        bool Active, int Initial, int Retained, int Relaxations, bool TerminalFallback,
+        int MemoryFlipsDropped = 0);
 
     /// <summary>★ R3 IS A HARD LINE: every team plays an exactly even home/away conference
     /// season, <c>Games/2</c> each.
@@ -604,7 +990,7 @@ internal static partial class Program
     private static ConferenceSlate OrientConferenceSlate(
         List<int> members, int games, Dictionary<(int Lo, int Hi), int> meetings,
         string label, List<FixedResidualHost>? fixedHosts, long nodes, bool usedCirculant,
-        int memoryFixedHosts = 0)
+        int memoryFixedHosts = 0, RotationSlateDiagnostics rotationDiag = default)
     {
         var n = members.Count;
         var quota = members.ToDictionary(s => s, _ => games / 2);
@@ -761,6 +1147,12 @@ internal static partial class Program
             Meetings = meetings, Games = oriented,
             SearchNodes = nodes, UsedCanonicalCirculant = usedCirculant,
             MemoryFixedHosts = memoryFixedHosts,
+            RotationActive = rotationDiag.Active,
+            RotationPreferredInitial = rotationDiag.Initial,
+            RotationPreferredRetained = rotationDiag.Retained,
+            RotationRelaxations = rotationDiag.Relaxations,
+            RotationTerminalFallback = rotationDiag.TerminalFallback,
+            MemoryFlipsDropped = rotationDiag.MemoryFlipsDropped,
         };
     }
 
@@ -805,7 +1197,17 @@ internal static partial class Program
     private static List<SeasonGame> BuildSeasonSchedule(
         WorldFile world, long seasonSeed, HistoryStore? history,
         out SeasonMemoryOutcome memoryOutcome)
-        => BuildSeasonSchedule(world, seasonSeed, history, deferNumbering: false, out memoryOutcome);
+        => BuildSeasonSchedule(world, seasonSeed, history, deferNumbering: false,
+                               out memoryOutcome, out _);
+
+    /// <summary>★ S99 — the same builder, additionally reporting what the rotation did. A
+    /// separate overload rather than a changed signature, for the S96 reason unchanged: every
+    /// existing call site takes the shorter forms and none of them care.</summary>
+    private static List<SeasonGame> BuildSeasonSchedule(
+        WorldFile world, long seasonSeed, HistoryStore? history, bool deferNumbering,
+        out SeasonMemoryOutcome memoryOutcome)
+        => BuildSeasonSchedule(world, seasonSeed, history, deferNumbering,
+                               out memoryOutcome, out _);
 
     /// <summary>★ S97 — the numbering may now be DEFERRED, and only the production season
     /// runner defers it.
@@ -825,7 +1227,7 @@ internal static partial class Program
     /// counters are independent of the person counter, so deferring moves no identity.</para></summary>
     private static List<SeasonGame> BuildSeasonSchedule(
         WorldFile world, long seasonSeed, HistoryStore? history, bool deferNumbering,
-        out SeasonMemoryOutcome memoryOutcome)
+        out SeasonMemoryOutcome memoryOutcome, out SeasonRotationOutcome rotationOutcome)
     {
         SeasonPreflight(world);
         var schools = world.Schools.OrderBy(s => s.Id).ToList();
@@ -841,9 +1243,18 @@ internal static partial class Program
         // ★ S96 — ONCE, before the loop, and therefore before ReserveSeason. That ordering is
         //   what the peek exists for: the season number this schedule will wear is read here,
         //   long before it is spent at the bottom of this method.
-        var memory = ReadHostMemory(history);
+        // ★ S99 — and it is now ONE walk of the career file serving both halves. The window is
+        //   read here rather than per league, so ninety-odd megabytes of retained logs are
+        //   parsed once a season instead of thirty-two times.
+        var career = ReadCareerMemory(history, RotationWindowSeasons);
+        var memory = career.Hosts;
         var residualsFlipped = 0;
         var leaguesFlipped = 0;
+        var preferredHeld = 0;
+        var rotatingLeagues = 0;
+        var fellToFeasibility = 0;
+        var terminalFallbacks = 0;
+        var venuesGivenUp = 0;
 
         var games = new List<SeasonGame>();
         foreach (var c in world.Conferences.OrderBy(c => c.Id))
@@ -852,13 +1263,25 @@ internal static partial class Program
             var label = $"conference '{c.Name}' (id {c.Id}) ";
             var slate = BuildConferenceSlate(
                 members, c.Games, c.Skip, ActiveRivalries(members, rivals, c.Games), label,
-                memory: memory);
+                memory: memory, rotation: career.Rotation);
             if (slate.Verdict != SlateVerdict.Feasible)
                 throw new InvalidOperationException(
                     $"SEASON SCHEDULE {slate.Verdict.ToString().ToUpperInvariant()}: {slate.Reason}.");
             // Counted only past the verdict check, so these are venues that APPLIED to a
             // league that actually built — never venues that were merely offered.
             if (slate.MemoryFixedHosts > 0) { residualsFlipped += slate.MemoryFixedHosts; leaguesFlipped++; }
+            venuesGivenUp += slate.MemoryFlipsDropped;
+            // ★ S99 — same rule for the rotation: only a league that BUILT is counted, and
+            //   the two participating outcomes partition cleanly. A league that retained at
+            //   least one preference is a rotating league; one that retained none took the
+            //   terminal fallback, by definition.
+            if (slate.RotationActive)
+            {
+                preferredHeld += slate.RotationPreferredRetained;
+                fellToFeasibility += slate.RotationRelaxations;
+                if (slate.RotationPreferredRetained > 0) rotatingLeagues++;
+                else terminalFallbacks++;
+            }
             foreach (var (home, away) in slate.Games)
                 games.Add(new SeasonGame("conf", home, away));
         }
@@ -866,6 +1289,9 @@ internal static partial class Program
         memoryOutcome = new SeasonMemoryOutcome(
             memory.Status, memory.SourceSeasonId, memory.AttemptedSeasonId, memory.Problem,
             residualsFlipped, leaguesFlipped);
+        rotationOutcome = new SeasonRotationOutcome(
+            history is not null, preferredHeld, rotatingLeagues, fellToFeasibility, terminalFallbacks,
+            venuesGivenUp);
 
         if (history is null) return games;   // legacy mode: the fixtures stay unnumbered
         if (deferNumbering) return games;    // S97: the caller spends the number itself, later
@@ -1042,7 +1468,8 @@ internal static partial class Program
         var seating = MteSeatSeason(world, seasonSeed, eventHistory);
 
         var schedule = BuildSeasonSchedule(
-            world, seasonSeed, history, deferNumbering: true, out var memoryOutcome);
+            world, seasonSeed, history, deferNumbering: true,
+            out var memoryOutcome, out var rotationOutcome);
         var fingerprint = ScheduleFingerprint(schedule);
         // ★ S94 — every game gains its night. Purely additive: the structural fingerprint
         //   above is computed from the four named fields and cannot see the date.
@@ -1315,6 +1742,7 @@ internal static partial class Program
             RoadShave = roadShave,
             DatedFingerprint = datedFingerprint,
             Memory = memoryOutcome,
+            Rotation = rotationOutcome,
             Events = eventOutcome,
             PlayedGames = playedGames,
             ConferenceGameCount = schedule.Count,
@@ -1539,6 +1967,11 @@ internal static partial class Program
             //   prints nothing at all — there is no career for the line to be about.
             var memoryLine = HostMemoryPageLine(run.Memory);
             if (memoryLine is not null) Console.WriteLine(memoryLine);
+            // ★ S99 — beside it, on the same terms, and printed even when every number is
+            //   zero: a career with no usable history reads "0 preferred pairs held", which
+            //   is a different fact from a legacy run that prints no line at all.
+            var rotationLine = RotationPageLine(run.Rotation);
+            if (rotationLine is not null) Console.WriteLine(rotationLine);
             Console.WriteLine();
         }
 
