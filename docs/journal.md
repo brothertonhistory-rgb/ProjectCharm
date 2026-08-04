@@ -1,3 +1,71 @@
+## Session 98 — THE BRACKETS PLAY. Every seated field is now seeded by prestige and played out to a full placement on the window's own nights, on a floor nobody hosts. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 89 PASS at 56 assertions, Phase 88 PASS at 62.** On the stock world: **128 tournament games** on top of 2,818 conference ones, with the conference schedule fingerprint `6f79d663…` and dated fingerprint `7515df7d…` **UNMOVED**, 63 December games unmoved, and home court reading **1689/2818 = 59.9% at +4.2** — the same numbers S97 recorded, because the tournament games are excluded from that denominator by their own site fact. Tournament games fingerprint `26f2b8ff…`. (2026-08-04)
+
+**Register:** build, under `PROMPT-mte-brackets-s98-r5` (ChatGPT-reviewed). Two new files, four edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED.
+
+### What shipped
+
+`src/Charm.Harness/Program.Season.Brackets.cs` — NEW (the route tables, seeding, the reservation keys, the one game factory, the play driver, the event-games fingerprint). `src/Charm.Harness/Program.Checks.Brackets.cs` — NEW (Phase 89). `Program.Season.cs`, `Program.Season.Events.cs`, `Program.Checks.Mte.cs`, `Program.cs` — EDIT.
+
+### ★ EXECUTED LAST, DATED FIRST — the structural decision the whole session rests on
+
+The season loop's index `g` is **both** the engine seed input and the retention log's fixture ordinal. Slotting tournament games into calendar order — before most of the conference slate, since every window closes in November and the earliest conference night is December 7 — would shift every conference index and **re-roll the entire season's basketball**. So the brackets are **appended after the last conference game and carry November dates**. It looks wrong and it is correct, and it is only correct because season game execution is independent game to game.
+
+That independence was re-verified at the gate rather than assumed: every game builds a fresh `GameState`, foul tracker, fatigue tracker and personal-foul tracker, and both random streams come from the season seed alone. Nothing has been added since S95.
+
+**The payoff, and it is the strongest control this session has.** With the brackets ON, the conference half of the season reproduces a fingerprint captured from the **pristine S97 tree** — every score, every possession count. Phase 89 C1c asserts it on Emmett's machine at fixture scale (`95038e91…`, 60 conference games with 24 tournament games played after them). At full stock scale the same comparison was run in the sandbox: 2,818 conference games hashing to `3a037971…` on the pristine tree and `3a037971…` on this one. **That stock-scale figure is a sandbox measurement and is recorded as such** (O-70) — what Emmett's machine proves is the fixture-scale golden plus both stock fingerprints and the home-court line landing unmoved.
+
+### ★ C1 AS THE PROMPT WROTE IT WOULD NOT HAVE DISCRIMINATED
+
+The build prompt's zero-path control said: force every event dormant, and the conference half must equal S97's. But with everything dormant **no tournament game exists**, so that is a comparison of two conference-only seasons — true, and about nothing. It is last session's check wearing this session's name. Worse, the same paragraph asked for an assertion that "the first tournament game's fixture ordinal is exactly `conferenceGameCount`", which cannot hold in a run with no tournament games; the prompt was internally inconsistent about which arm it meant.
+
+The arm that tests this session is the one with the brackets ON. Both arms ship — C1c (on, prefix matches) is the control, C1e (off, whole season matches) is the cheap confirmation — and C1d exists purely so C1c can never decay into a prefix of nothing.
+
+This is the S81 lesson recurring: **build the check that discriminates on the axis the change is about.** The axis here is "appending games does not move the games that came before", and forcing the events off removes the append.
+
+### ★ THE ROUTE TABLES ARE THE SPEC, AND THE PROSE WAS NOT ENOUGH
+
+An earlier revision declared the bracket topology load-bearing and then did not contain it. "Winners' semis, losers' bracket, final, third, fifth, seventh" does not uniquely determine an eight-team consolation shape. Both tables are now written literally in the source, nothing derives them, and Phase 89 walks them down **every possible result path** — 4,096 outcomes at eight teams, 16 at four — asserting that every game is filled before it is played, that every team plays exactly three (or two), and that every place is filled exactly once.
+
+Two corrections went in with them. The claim that "a winner never appears in a consolation path" is **false** — the winners of the two consolation semis go on to play for fifth. And the placement floor/ceiling has to be stated **per field size**: an earlier draft applied an eight-team statement to both.
+
+### ★ EMMETT'S RULING: A SCHOOL THAT NEVER PLAYED IS OUT OF THE BAND AVERAGES
+
+Schedules stop being uniform this session, so all three ranking blocks moved to win percentage (ruling 1). That raised a question the prompt did not answer: the fourteen independents play nobody, and they had been counting as zero wins and dragging their prestige bands down. With percentages they have no percentage at all.
+
+Emmett ruled them **out of the band averages entirely, and out of the escapes list that reads them**. A school that never took the floor is not a school that went winless. The stock proof table now counts **333 schools, not 347**, and reads 34.7 / 48.7 / 52.8 / 53.0 / 57.7 across the five bands.
+
+The comparison itself is **integer cross-multiplication**, never a float division, so the ordering is exact and platform-independent. The standings, the proof table and the escapes list all call the same extracted rule, which is what lets the suite assert it: the mechanism (percentage not wins, the tie-break, where a school with no games sorts, who is inside a band average) is checked; no basketball value ever is.
+
+### ★ THE SESSION HAD TO NARROW AN S97 CHECK, AND IT WAS NOT ON THE FILE LIST
+
+Phase 88's C8 said *every event active vs every event dormant, same seed — the COMPLETE per-game results are identical*. That was the right claim while an active pool played no games. It stops being right the moment brackets play: an active pool legitimately has 24 more games, and C8 would have gone red with nothing wrong in the engine.
+
+Narrowed to the conference prefix, which is the claim it was always about, and paired with a new **C8d** so it cannot become a comparison of two identical conference-only seasons. Forced, not preferred — and recorded because `Program.Checks.Mte.cs` was outside the prompt's declared file boundary.
+
+### Three calls surfaced rather than slipped in
+
+1. **Legacy mode plays its tournaments.** Without a career the fixtures stay unnumbered, exactly as legacy conference fixtures always have. The alternative — tournaments only in history mode — would have kept Phase 88's C8 green untouched, which is precisely the wrong reason to choose it. Basketball does not require a save file.
+2. **The forced-failure seam is an injected rename delegate**, and the check calls the replacement routine directly rather than threading a test hook through `RunSeasonCore`. Same proof, no test-only argument in the production path. (S97's C7 used a filesystem trick — a regular file standing where the record folder must be — which proves something about the filesystem.)
+3. **`finishBySeat` is an array of seat/place pairs**, matching how the seats themselves are already written, rather than an object with numeric keys.
+
+### The gate's findings against the cleared prompt
+
+- **Only ONE `new SeasonGame(...)` exists in the whole harness.** The prompt's "all sixteen call sites are unchanged" was carried over from S96's note about the *schedule builder's* overloads. One line changed, not sixteen.
+- **The three ranking blocks are not three functions.** They are written inline inside one large page routine, and the escapes list reads its band averages straight out of the proof table — so moving one to percentage forces all three. The prompt asked for them "by function name"; there were none, and they had to be extracted before the suite could reach them.
+- **The record's play status and finish map are per event** exactly as claimed (`Program.Season.Events.cs` 588 and 601), and the reader that next season uses looks at neither — so flipping a field to `Completed` and filling its finishes breaks nothing downstream. The prompt's claim held.
+- **The non-conference filter in host memory is applied, not merely carried** — `if (!conference) continue;` in the aggregation, stronger than the prompt's "carries the flag into the projection". C7 proves it behaviourally anyway, with a leak constructed so a total filtering failure would close a live residual.
+- **Two line citations in the prompt were stale** (the seed derivation and the `hasHost` literal both point elsewhere). The claims were right; the numbers were not. Flagged rather than followed.
+
+### Honest misses
+
+- **A check of mine asserted something that cannot be true.** C10e originally required two careers' retained logs to be **byte-for-byte identical**. Every career stamps its own private history id into the file header by design (S89), so two careers playing identical basketball can never produce identical bytes. Caught in the sandbox before delivery and rewritten to compare what S98 actually put in the file — the fixture ordinals, the conference/tournament byte, the game numbers and the basketball. The wrong version would have been a red line that meant nothing.
+- **The ledger probe was measuring its own footprint.** C10b spends a game number before and after to measure the counter (the raw number is internal by design, so subtraction is the only route a caller has). Run on the same career C10e compared, it shifted every game id by one and produced a failure that was entirely the check's. Given its own career.
+- **The session ran out of turns mid-build** and delivered a status report with three compile errors outstanding rather than a working tree. Recorded because the honest thing at that moment was to say so, and because a build this size should have been split.
+
+### What it opens
+
+**O-88** — a player's season totals now blend conference and tournament games with no split anywhere on the page, though the retention log carries the byte that would allow one. **O-83's neutral half is CLOSED**; semi-home and semi-away remain. **O-82's distance half is still blocked** — a game now knows *whether* somebody hosts it, not *where* it is played. **O-78 is weakened but not closed**: the win-percentage half is fixed, and 128 cross-conference games mean the leagues are no longer entirely disconnected, but 128 threads across 32 conferences is not a basis for a national ranking.
+
 ## Session 97 — THE MTE POOL. A world can now author early-season bracketed tournaments; each season draws which ones happen, seats their fields best-tournament-first, and records the whole thing permanently. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 88 PASS at 61 assertions**, pre-S97 zero-path goldens `51c8e88c202e9eb6…` / `2c521c9f8f2ee203…` and `eee5e256b0c6fc87…` / `bbff75ce74cf9363…` reproduced EXACTLY, the pull's negative control reading `flat 42.4 vs pull-5 49.1`. On the stock world: **29 authored events, 22 active, 88 schools seated**, Maui opening Texas / Pittsburgh / Mississippi State / Purdue / Old Dominion / Miami-Ohio / Wichita State / College of Charleston, and the season's basketball byte-identical to S96 (`6f79d663…`, `7515df7d…`, 63 December games, 59.9% home wins at +4.2). **NO TOURNAMENT GAME PLAYS — that is S98.** (2026-08-03)
 
 **Register:** build, under `PROMPT-mte-pool-s97-r8` (ChatGPT-reviewed). Four new files, seven edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED — the record is harness-side and the store's existing peek sufficed.

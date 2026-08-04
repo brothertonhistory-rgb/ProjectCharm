@@ -188,9 +188,17 @@ internal static partial class Program
     /// no career, so there is nothing for a record to be about.</summary>
     private enum EventRecordStatus { NotApplicable, Written, WriteFailed }
 
+    /// <summary>★ S98 — <c>FinishStatus</c> is the SECOND write of the season and it is a
+    /// different event from the first. S97's <c>RecordStatus</c> says whether the NotPlayed
+    /// record was published at the commit; this says whether the finishes were later written
+    /// over it. A failure here leaves a season that was validly played and a year of event
+    /// history that cannot say who won — the same deliberate hole S97 already models, and
+    /// there is no retry inside the run.</summary>
     private sealed record EventSeasonOutcome(
         EventSeatingOutcome Seating, EventRecordStatus RecordStatus,
-        string? RecordDiagnostic, IReadOnlyList<string> HistoryDiagnostics)
+        string? RecordDiagnostic, IReadOnlyList<string> HistoryDiagnostics,
+        EventRecordStatus FinishStatus = EventRecordStatus.NotApplicable,
+        string? FinishDiagnostic = null)
     {
         public static readonly EventSeasonOutcome None = new(
             EventSeatingOutcome.Empty, EventRecordStatus.NotApplicable, null, Array.Empty<string>());
@@ -607,6 +615,179 @@ internal static partial class Program
         return stream.ToArray();
     }
 
+    // ── S98: the record is REPLACED, never rebuilt ───────────────────────────────
+
+    /// <summary>★ S98 — the second word <c>playStatus</c> may hold. It gains no third: a field
+    /// either played to a full placement or it did not play at all (a dormant or short event
+    /// simply has no games). See the S98 ruling — a short field is a data error, not a
+    /// modelled state.</summary>
+    private const string MtePlayStatusCompleted = "Completed";
+
+    /// <summary>★ S98 — REPLACED, NEVER REBUILT. The file on disk is the authority for who was
+    /// in the tournament; this reads it, validates it, and writes it back with the finishes
+    /// filled in. It never re-seats from the current world, because a world edited between the
+    /// commit and now would silently rewrite history.
+    ///
+    /// <para>Validated before a byte is written: the format version, the career it belongs to,
+    /// the season it names, that every event still says <c>NotPlayed</c>, that no finishes are
+    /// already present, and that the seats on disk are the seats the games were actually
+    /// played between. The first five are corruption tripwires and throw; there is no reopen
+    /// path for a completed season (a career-bound season always reserves a NEW id, and S97's
+    /// collision precheck refuses before spending anything), so a record already marked
+    /// Completed means something is wrong rather than something is finished.</para>
+    ///
+    /// <para>Atomic by the same means as the first write: a whole temp file, then one rename.
+    /// A failure before the rename leaves the NotPlayed record byte-identical and the season
+    /// still valid and played — the page says the finishes could not be persisted, and there
+    /// is no retry inside the run.</para>
+    ///
+    /// <para><paramref name="replace"/> is the INJECTED SEAM, and it exists so a check can
+    /// force a failure at the rename without reaching for file permissions, an invalid path,
+    /// OS locking or a global mutable switch — every one of which would prove something about
+    /// the filesystem rather than about this method.</para></summary>
+    private static void MteReplaceRecordWithFinishes(
+        HistoryStore history, long seasonId,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> finishBySeatByEvent,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> seatsPlayedByEvent,
+        Action<string, string>? replace = null)
+    {
+        var final = MteRecordPathFor(history.Path, seasonId);
+        var existing = File.ReadAllBytes(final);
+
+        using var doc = JsonDocument.Parse(existing);
+        var root = doc.RootElement;
+
+        void Refuse(string why) => throw new InvalidOperationException(
+            $"SEASON EVENT RECORD REFUSED: '{final}' {why}. Nothing was written and the record on " +
+            "disk is untouched.");
+
+        if (root.ValueKind != JsonValueKind.Object) Refuse("is not an object");
+        if (!root.TryGetProperty("formatVersion", out var fv) || !fv.TryGetInt32(out var version)
+            || version != MteRecordFormatVersion)
+            Refuse($"is not format version {MteRecordFormatVersion.ToString(CultureInfo.InvariantCulture)}");
+        if (!root.TryGetProperty("historyId", out var hid) || hid.ValueKind != JsonValueKind.String
+            || !string.Equals(hid.GetString(), history.HistoryId, StringComparison.Ordinal))
+            Refuse("belongs to another career");
+        if (!root.TryGetProperty("seasonId", out var sid) || !sid.TryGetInt64(out var embedded)
+            || embedded != seasonId)
+            Refuse("names a different season");
+        if (!root.TryGetProperty("events", out var events) || events.ValueKind != JsonValueKind.Array)
+            Refuse("has no events array");
+
+        var seen = new HashSet<int>();
+        foreach (var ev in events.EnumerateArray())
+        {
+            if (!ev.TryGetProperty("eventId", out var eid) || !eid.TryGetInt32(out var eventId))
+                Refuse("holds an event with no id");
+            else seen.Add(eventId);
+
+            if (!ev.TryGetProperty("playStatus", out var ps) || ps.ValueKind != JsonValueKind.String
+                || !string.Equals(ps.GetString(), MtePlayStatusNotPlayed, StringComparison.Ordinal))
+                Refuse($"event {eid.GetInt32().ToString(CultureInfo.InvariantCulture)} is not " +
+                       $"{MtePlayStatusNotPlayed} — a completed season is never reopened");
+            if (!ev.TryGetProperty("finishBySeat", out var fin) || fin.ValueKind != JsonValueKind.Null)
+                Refuse($"event {eid.GetInt32().ToString(CultureInfo.InvariantCulture)} already carries finishes");
+
+            if (!seatsPlayedByEvent.TryGetValue(eid.GetInt32(), out var played)) continue;
+
+            // ★ The seats on disk ARE the field that played. Compared as a whole map, so a
+            //   swapped pair — same schools, different seats — is caught as readily as a
+            //   missing one.
+            var onDisk = new Dictionary<int, int>();
+            if (ev.TryGetProperty("seats", out var seats) && seats.ValueKind == JsonValueKind.Array)
+                foreach (var s in seats.EnumerateArray())
+                    if (s.TryGetProperty("seat", out var sn) && sn.TryGetInt32(out var seatNo)
+                        && s.TryGetProperty("schoolId", out var sc) && sc.TryGetInt32(out var schoolId))
+                        onDisk[seatNo] = schoolId;
+            if (onDisk.Count != played.Count
+                || played.Any(kv => !onDisk.TryGetValue(kv.Key, out var got) || got != kv.Value))
+                Refuse($"event {eid.GetInt32().ToString(CultureInfo.InvariantCulture)}'s seats on disk " +
+                       "are not the field these games were played between");
+        }
+
+        foreach (var eventId in finishBySeatByEvent.Keys)
+            if (!seen.Contains(eventId))
+                Refuse($"carries no event {eventId.ToString(CultureInfo.InvariantCulture)} to finish");
+
+        var bytes = MteRecordBytesWithFinishes(root, finishBySeatByEvent);
+
+        var folder = MteRecordFolderFor(history.Path);
+        var temp = Path.Combine(folder, $".charm-events-{Guid.NewGuid():N}.tmp");
+        File.WriteAllBytes(temp, bytes);
+        try
+        {
+            (replace ?? MteDefaultReplace)(temp, final);
+        }
+        catch
+        {
+            try { File.Delete(temp); } catch (IOException) { /* best effort */ }
+            throw;
+        }
+    }
+
+    /// <summary>The real rename. Overwrite is correct here and only here: the destination is
+    /// this run's own NotPlayed record, published minutes earlier at the commit.</summary>
+    private static void MteDefaultReplace(string temp, string final)
+        => File.Move(temp, final, overwrite: true);
+
+    /// <summary>Re-emit the record with the finishes filled in. Every property that is not
+    /// <c>playStatus</c> or <c>finishBySeat</c> is copied through verbatim, so nothing this
+    /// session did not decide can change — including the world fingerprint, which stays
+    /// provenance and stays unvalidated.</summary>
+    private static byte[] MteRecordBytesWithFinishes(
+        JsonElement root, IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> finishBySeatByEvent)
+    {
+        using var stream = new MemoryStream();
+        using (var w = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, NewLine = "\n" }))
+        {
+            w.WriteStartObject();
+            foreach (var prop in root.EnumerateObject())
+            {
+                if (!string.Equals(prop.Name, "events", StringComparison.Ordinal))
+                {
+                    prop.WriteTo(w);
+                    continue;
+                }
+                w.WriteStartArray("events");
+                foreach (var ev in prop.Value.EnumerateArray())
+                {
+                    var eventId = ev.GetProperty("eventId").GetInt32();
+                    finishBySeatByEvent.TryGetValue(eventId, out var finishes);
+                    w.WriteStartObject();
+                    foreach (var f in ev.EnumerateObject())
+                    {
+                        if (string.Equals(f.Name, "playStatus", StringComparison.Ordinal))
+                        {
+                            w.WriteString("playStatus",
+                                finishes is null ? MtePlayStatusNotPlayed : MtePlayStatusCompleted);
+                        }
+                        else if (string.Equals(f.Name, "finishBySeat", StringComparison.Ordinal))
+                        {
+                            if (finishes is null) { w.WriteNull("finishBySeat"); continue; }
+                            // ★ An ARRAY of seat/place pairs ordered by seat, not an object with
+                            //   numeric keys: the seats above are an array of objects and this is
+                            //   the same fact keyed the same way, so the file stays one shape.
+                            w.WriteStartArray("finishBySeat");
+                            foreach (var kv in finishes.OrderBy(x => x.Key))
+                            {
+                                w.WriteStartObject();
+                                w.WriteNumber("seat", kv.Key);
+                                w.WriteNumber("place", kv.Value);
+                                w.WriteEndObject();
+                            }
+                            w.WriteEndArray();
+                        }
+                        else f.WriteTo(w);
+                    }
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
+            }
+            w.WriteEndObject();
+        }
+        return stream.ToArray();
+    }
+
     // ── The page ─────────────────────────────────────────────────────────────────
 
     /// <summary>★ WHEN THE AUTHORED POOL IS EMPTY THIS PRINTS NOTHING — no heading, no blank
@@ -615,7 +796,9 @@ internal static partial class Program
     /// dormant line: a different case, and a different assertion.
     ///
     /// <para>Page-only throughout. No field composition is ever suite-asserted.</para></summary>
-    private static IReadOnlyList<string> MtePageLines(EventSeasonOutcome outcome)
+    private static IReadOnlyList<string> MtePageLines(
+        EventSeasonOutcome outcome,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>>? finishes = null)
     {
         var seating = outcome.Seating;
         if (seating.PoolIsEmpty) return Array.Empty<string>();
@@ -625,15 +808,31 @@ internal static partial class Program
         {
             var sb = new StringBuilder();
             sb.Append($"  {e.Name} (tier {e.Tier}, {e.PlaceName}, {e.FirstDay}..{e.LastDay}): ");
-            sb.Append(e.Seats.Count == 0
-                ? "no field"
-                : string.Join(", ", e.Seats.Select(s =>
-                {
-                    var note = MteFallbackPageNote(s.Fallback);
-                    return note is null ? s.SchoolName : $"{s.SchoolName} [{note}]";
-                })));
+            // ★ S98 — once a field has PLAYED the page stops listing a seating order nobody
+            //   cares about and prints the result: the field in FINISH order with its places.
+            //   The seating line survives untouched for a field that did not play, which is
+            //   what keeps a dormant or short event reading exactly as it did in S97.
+            IReadOnlyDictionary<int, int>? placeBySeat = null;
+            finishes?.TryGetValue(e.EventId, out placeBySeat);
+            if (placeBySeat is { Count: > 0 })
+            {
+                sb.Append(string.Join(", ", e.Seats
+                    .Where(s => placeBySeat.ContainsKey(s.Seat))
+                    .OrderBy(s => placeBySeat[s.Seat])
+                    .Select(s => $"{placeBySeat[s.Seat]}. {s.SchoolName}")));
+            }
+            else
+            {
+                sb.Append(e.Seats.Count == 0
+                    ? "no field"
+                    : string.Join(", ", e.Seats.Select(s =>
+                    {
+                        var note = MteFallbackPageNote(s.Fallback);
+                        return note is null ? s.SchoolName : $"{s.SchoolName} [{note}]";
+                    })));
+            }
             if (e.SeatingStatus == EventSeatingStatus.SeatedShort)
-                sb.Append($" — SHORT ({e.Seats.Count}/{e.FieldSize})");
+                sb.Append($" — SHORT ({e.Seats.Count}/{e.FieldSize}) — NOT PLAYED");
             lines.Add(sb.ToString());
         }
         if (seating.Dormant.Count > 0)
@@ -643,6 +842,10 @@ internal static partial class Program
         if (outcome.RecordStatus == EventRecordStatus.WriteFailed)
             lines.Add($"  EVENT RECORD NOT WRITTEN — {outcome.RecordDiagnostic} " +
                       "(the season is valid and played; this year is a hole in event history)");
+        if (outcome.FinishStatus == EventRecordStatus.WriteFailed)
+            lines.Add($"  EVENT FINISHES NOT PERSISTED — {outcome.FinishDiagnostic} " +
+                      "(the tournaments were played and the games count; the permanent record " +
+                      "cannot say who won)");
         return lines;
     }
 }

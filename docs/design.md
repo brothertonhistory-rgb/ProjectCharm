@@ -10390,17 +10390,22 @@ away side was actually transformed. It exists as a named helper rather than two 
 Phase 86 has a **contract** to test instead of a test-only global counter to echo. The season loop
 builds its game from exactly this tuple.
 
-### ★ Scope honesty: the host fact does not exist yet
+### ★ The host fact ARRIVED AT S98, and nothing else moved
 
-A scheduled game carries a home id and an away id and **nothing else**. There is no host field, no
-site record, no `GameSite` binding — S92 defined all of that and S95 deliberately consumes none of
-it. The applicator therefore takes an **explicit `hasHost` flag** and the season loop passes `true`
-as a literal, because every game on today's schedule is a real home game.
+S95 shipped this seam deliberately open: a scheduled game carried a home id and an away id and
+**nothing else**, so the applicator took an **explicit `hasHost` flag** and the season loop passed
+`true` as a literal. The alternative — an `IsHosted(game)` helper inferring hostedness from
+something — would have been a filter that is always true, dressed as a filter that means something.
 
-This matters more than it looks. The alternative — an `IsHosted(game)` helper inferring hostedness
-from something — would be a filter that is always true today, dressed as a filter that means
-something. When the tournament layer brings a schedule-owned site fact, that fact becomes this
-argument and the page denominator narrows with it, and nothing else moves.
+**S98 closed it exactly as predicted.** `SeasonGame` gained `HasHost` (defaulting to `true`, so the
+one existing construction site and every `with` copy were untouched), the literal became
+`hasHost: sg.HasHost`, and the page's home-court denominator narrowed from *every completed game* to
+*every game whose fixture says it has a host*. That is the entire change inside the road-shave path.
+A tournament game says it has no host, both sides come back as the very objects that went in, and
+neither is shaved. Nothing else in this section moved.
+
+Note what the host fact is and is not: it is a **boolean**, not a place. A game still does not know
+WHERE it is played, which is why the distance half of the crowd model (O-82) is still blocked.
 
 ★ **Phase 83's A9 isolation check did not need rewriting.** The board had flagged it as a live
 landmine: A9 forbids the season-path files from so much as naming a geography type, and home court
@@ -10604,10 +10609,10 @@ projects hosting facts only, and widening it is a ruling, not an extension.
 
 A world may author **early-season bracketed tournaments**. Each season every event draws against its own
 persistence to decide whether it happens at all, and the ones that do seat their fields in tier order —
-the best tournament picks from the whole country, the next picks from what is left. **No tournament game
-plays here.** Bracket play, seeding, places on the calendar and the neutral-floor fact are S98. The split
-is licensed by the calendar: every window ends in November and the earliest conference night in the stock
-world is **December 7**.
+the best tournament picks from the whole country, the next picks from what is left. This section covers the **pool** — who is in what. **The
+brackets themselves play in S98** and have their own section below; seeding, the route tables, the dates
+and the neutral floor all live there. The two-session split was licensed by the calendar: every window ends
+in November and the earliest conference night in the stock world is **December 7**.
 
 ### What an event is (world schema v5)
 
@@ -10708,8 +10713,8 @@ Phase 88 asserts the slate is identical across all 64 sweep seeds.
 One independently readable JSON file per season at `<history>.events/season-N.json` — arithmetic lookup,
 no enumeration, written only when a career is attached. Every display fact is **snapshotted** (event name,
 tier, place name, dates, school names), because a permanent history page must never need the current world
-to reconstruct what it said years ago. `playStatus` is an extensible string, `NotPlayed` at S97, so S98 can
-add a word without a format break.
+to reconstruct what it said years ago. `playStatus` is an extensible string — `NotPlayed` at S97,
+and **S98 added `Completed` with no format break**, exactly as the extensibility was there for.
 
 ★ **THE RECORD BINDS TO THE CAREER, NOT THE WORLD.** A record cannot both survive world edits and be
 rejected whenever the world changes. `formatVersion`, `historyId` and the embedded `seasonId` are
@@ -10748,3 +10753,231 @@ and asserted positively by Phase 83 A7, deliberately not fixed.
 authored tournament. **The small events' persistence** (0.50–0.78) leaves the bottom of the country thin
 in a given year. **Campus events** — a school that misses the brackets hosting its own three-team event,
 the floor of the market in the design brief — are unbuilt and belong to neither S97 nor S98.
+
+## The brackets play (Session 98, 2026-08-04)
+
+S97 seated the fields. This section is what happens on the floor: each active complete field is seeded by
+prestige, played out to a full placement on the window's own nights, logged as an ordinary non-conference
+game, and its finishes written into the permanent record. The neutral floor arrives with it — a tournament
+game is hosted by nobody.
+
+Four rulings from Emmett govern everything below:
+
+1. **The standings rank by win PERCENTAGE, not raw wins.** Schedules stop being uniform this session; a raw
+   ranking would reward having played more games.
+2. **A neutral floor means nobody gets anything.** Both sides go to the engine unshaved. The crowd model
+   (O-82) is unbuilt and nothing here anticipates it.
+3. **The higher seed is the nominal home side** — a box-score ordering only, never a venue and never an edge.
+4. **A tournament game is an ordinary regular-season game.** It counts in the record. It feeds nothing else:
+   prestige does not move until the season rolls over, and a finish is recorded and read by nobody.
+
+### ★ EXECUTED LAST, DATED FIRST
+
+The single most important structural fact in this session, and the one most likely to be "tidied" later.
+
+```
+build the conference slate → date it → seat the fields   (S97, unchanged)
+  → number the season AND reserve the bracket games      (the commit)
+  → play conference games at loop index g = 0 .. N-1     (UNCHANGED, bit for bit)
+  → play tournament games at loop index g = N .. N+M-1
+  → replace the record with the finishes
+```
+
+The season loop's index `g` is **both** the engine seed input (`baseSeed + 2g`, `baseSeed + 2g + 1`) and the
+retention log's fixture ordinal. Slotting tournament games into *calendar* order — before most of the
+conference slate — would shift every conference index and re-roll the entire season's basketball. So the
+brackets are **appended** and carry **November dates**. Play order and calendar order are different things,
+and this is the first session that makes them differ.
+
+That is only safe because season game execution is independent game to game: both sides are rebuilt from the
+per-school row tables for every game, the two seeds come from the season seed alone, and no accumulator feeds
+later play. The reasoning was already written out above `SeasonFingerprint`; S98 rests on it and re-verified
+it at the gate.
+
+**The payoff, measured.** With the brackets on, the conference half of the season reproduces a fingerprint
+captured from the pristine S97 tree — every score and every possession count. Phase 89 C1c asserts it on the
+fixture world; the full stock world was checked the same way in the sandbox and its 2,818-game conference
+season hashed identically before and after (`3a037971…`).
+
+Tournament games take their seeds from the same arithmetic, continued:
+
+```
+fixtureOrdinal = conferenceGameCount + eventGameOrdinal
+resolverSeed   = baseSeed + 2 * fixtureOrdinal
+governorSeed   = baseSeed + 2 * fixtureOrdinal + 1
+```
+
+`eventGameOrdinal` runs in **one canonical order, defined once**: event by `(tier, id)`, then bracket game
+index. Assigning reservations, running games, building the fingerprint and comparing in the determinism
+check all walk that order; none leans on a dictionary's enumeration order. (The `+5` committer stream's
+overlap with a nearby game's governor stream is unchanged and still O-66.)
+
+### Seeding — prestige, and nothing else
+
+Seeds run 1..N by `CurrentPrestige` descending, ties broken by **lower school id** — the canonical tie-break
+everywhere in this codebase, and never a draw.
+
+★ **SEAT ORDER IS NOT SEED ORDER.** A seat records which authored slot a school filled; a seed records how
+good it is. The permanent record keeps SEATS, the bracket uses SEEDS, and nothing re-derives one from the
+other — both maps are carried explicitly. On the fixture world the two genuinely disagree (the two-seat is
+the five-seed), which is what makes the checks discriminate rather than pass by luck.
+
+★ **ORIGINAL SEEDS TRAVEL.** A team carries the seed it was given for the whole bracket. Nothing re-ranks
+between rounds, so a late-round game between two teams that arrived down different paths is still ordered by
+the numbers they started with.
+
+### ★ The route tables — literal and normative
+
+These ARE the spec. The prose ("winners' semis, losers' bracket, final, third, fifth, seventh") does not
+uniquely determine an eight-team consolation topology, so nothing derives these and nothing infers them.
+**Every team plays every round** — the NCAA rule the design brief recorded — which is what makes the
+consolation side compulsory rather than decorative.
+
+**Eight teams, three rounds, twelve games, places 1st–8th:**
+```
+R1  G0  seed1 v seed8      W -> G4.A     L -> G6.A
+    G1  seed4 v seed5      W -> G4.B     L -> G6.B
+    G2  seed2 v seed7      W -> G5.A     L -> G7.A
+    G3  seed3 v seed6      W -> G5.B     L -> G7.B
+R2  G4  championship semi  W -> G8.A     L -> G9.A
+    G5  championship semi  W -> G8.B     L -> G9.B
+    G6  consolation semi   W -> G10.A    L -> G11.A
+    G7  consolation semi   W -> G10.B    L -> G11.B
+R3  G8  FINAL              W = 1st       L = 2nd
+    G9  third place        W = 3rd       L = 4th
+    G10 fifth place        W = 5th       L = 6th
+    G11 seventh place      W = 7th       L = 8th
+```
+
+**Four teams, two rounds, four games, places 1st–4th:**
+```
+R1  G0  seed1 v seed4      W -> G2.A     L -> G3.A
+    G1  seed2 v seed3      W -> G2.B     L -> G3.B
+R2  G2  FINAL              W = 1st       L = 2nd
+    G3  third place        W = 3rd       L = 4th
+```
+
+Phase 89 walks both tables down **every possible result path** — 4,096 at eight teams, 16 at four — and
+asserts that every game is filled before it is played, every team plays exactly three (or two), and every
+place is filled exactly once. The invariant that matters is stated **per field size**: an eight-field's R1
+winner finishes 1st–4th and its R1 loser 5th–8th; a four-field's R1 winner finishes 1st–2nd and its loser
+3rd–4th. (An earlier draft claimed "a winner never appears in a consolation path" — that is **false**: the
+winners of G6 and G7 go on to play for fifth.)
+
+**Dates.** Rounds run on the window's own days, in order: an eight-field on `firstDay`, `firstDay+1` and
+`lastDay`; a four-field on `firstDay` and `lastDay`. The world validator already refuses any window whose
+length is not exactly the number of playing days, so these are **exact equalities and not bounds**.
+
+★ **A SHORT FIELD CANNOT HAPPEN ON A REAL WORLD, AND S98 DOES NOT MODEL ONE** (Emmett's ruling). Eight seats
+need eight distinct conference cap keys; the stock world has 32 conferences plus 14 independent keys and
+seats at most 136 of 347 schools, so the last fallback level always has candidates. S97's own check had to
+construct a single-league world to make `SeatedShort` fire at all. It stays exactly what S97 made it — a
+diagnostic saying the authored data is wrong. S98 adds **no** cancelled-field status and no validation
+branch: a short or dormant event simply has no games, holds no game numbers, keeps `NotPlayed`, and the page
+says so.
+
+### GameIds — reserved up front, because the lock shuts before a game plays
+
+**Forced, not preferred.** `CloseReservations()` runs before the first tip, so nothing can reserve an id once
+play begins. Every tournament id is therefore spent at the S97 commit alongside the conference block.
+
+The pairings are unknown then; the COUNT is not — twelve per active complete eight-field, four per active
+complete four-field, zero for a dormant or short event. So the reservation table is keyed by bracket
+**POSITION**, never by team:
+
+```
+(eventTier, eventId, bracketGameIndex) -> GameId
+```
+
+An id belongs to a slot rather than to whoever happens to win it, and the key set is validated at the point
+of creation rather than after result routing has obscured where a surplus came from. An id reserved for an
+event that never plays is wasted permanently and cannot be repaired later in the run, which is why a short
+event holds none.
+
+### The site fact and the one factory
+
+`SeasonGame` gained `HasHost`, **defaulting to `true`**, so all pre-S98 construction is untouched. That
+default is the safe value for existing code and the *dangerous* one for new code — a forgotten `false` would
+silently host a tournament game and the harness would stay green. The answer is that **every tournament
+fixture is built in exactly one factory**, and the checks exercise that factory's output rather than a
+hand-built probe. It produces `Kind = "mte"` (exact — "anything except conf" must not become the contract),
+the reservation keyed by event and bracket slot, the better original seed as the nominal home side, the
+round's authored day, and `HasHost = false`.
+
+`HasHost` is deliberately **not** in `ScheduleFingerprint`, which hashes index, kind, home and away by name
+so the conference schedule keeps `6f79d663…`.
+
+A neutral game still nominates a home side — that is what stamps PlayerIds and picks the two seeds. Cosmetic,
+deterministic, never read as a venue.
+
+**Legacy mode plays its tournaments too.** With no career attached the fixtures simply stay unnumbered,
+exactly as legacy conference fixtures always have. Basketball does not require a save file.
+
+### The record — replaced, never rebuilt
+
+S98 atomically replaces `<history>.events/season-N.json` with `playStatus: "Completed"` and a populated
+`finishBySeat`. **The file on disk is the authority for who was in the tournament** — the replacement reads
+it, validates it, and writes it back with the finishes filled in. It never re-seats from the current world,
+because a world edited between the commit and now would silently rewrite history.
+
+Validated before a byte is written: the format version, the career it belongs to, the season it names, that
+every event still says `NotPlayed`, that no finishes are already present, and that the seats on disk are the
+seats the games were actually played between (compared as a whole map, so a swapped pair is caught as readily
+as a missing one). **Rerunning a completed season is not reachable and nothing is built for it** — a
+career-bound season always reserves a NEW id and S97's collision precheck refuses before spending anything —
+so the `Completed` guard is a corruption tripwire, not a lifecycle branch.
+
+`finishBySeat` is an **array of seat/place pairs ordered by seat**, matching how the seats themselves are
+written, and it is addressed by the S97 SEAT — never by seed and never by school.
+
+★ **THE ORDER, EXPLICITLY.** The replacement cannot be the last write *and* have its failure reported on the
+page; both cannot hold. The resolution:
+
+```
+S97 publishes the NotPlayed record at the commit, before any game runs   (unchanged)
+play every game
+attempt the atomic replacement
+carry success or failure out on the run result
+print the page                                            <- the last thing that happens
+```
+
+A failed replacement leaves the `NotPlayed` record **byte-identical**, the season valid and played, the page
+saying the finishes could not be persisted, and **no retry inside the run** — the same deliberate hole S97
+already models. The replacement takes an **injected rename delegate** so a check can force that failure
+without reaching for file permissions, an invalid path or OS locking, every one of which would prove
+something about the filesystem rather than about the method.
+
+### The page
+
+- **Standings rank by win percentage**, ties broken by school id. The comparison is **integer
+  cross-multiplication** (`winsA * playedB` against `winsB * playedA`, widened to `long`), never a float
+  division, so the ordering is exact and platform-independent.
+- ★ **A school that played nothing prints an em dash and sorts last** — never `.000`, which would say it lost.
+  And per Emmett's S98 ruling it is left **out of the band averages entirely**, and out of the escapes list
+  that reads them: it never played, so it cannot make its prestige band look worse. On the stock world that
+  is the fourteen independents, so the proof table now counts **333 schools, not 347**.
+- **The proof table and the escapes list moved to win percentage too**, or they would keep the exact
+  distortion the standings ruling exists to remove.
+- **Per-event results** print the field in **finish order with places** once it has played; a dormant or short
+  event keeps its S97 seating line unchanged.
+- **Both fingerprints are relabelled**, because after this session the old name is a lie: a bracket cannot be
+  built before it is played, so tournament fixtures cannot exist when the schedule fingerprint is computed.
+  The page now says `Conference schedule fingerprint:` and prints a `Tournament games fingerprint:` beside it.
+- **The hosted-game denominator reads the site fact**, not the conference prefix. Those are the same set
+  today and will stop being the same set the moment the schedule owns more site facts.
+- Page-only throughout: no field, finish or basketball value is suite-asserted.
+
+### The engine half, untouched
+
+`Charm.Engine` and `Charm.History` are both untouched. Host memory does not see a tournament game — the
+projection has skipped non-conference blocks since S96, and Phase 89 proves it **behaviourally** with a
+constructed leak: a rigged non-conference block reverses the very pair that owns a live single-meeting
+residual, so a filtering failure would close the gap and the residual would vanish. That fixture deliberately
+does not pass through S97 seating, because the conference cap key forbids exactly that field.
+
+### Still open here
+
+**Tournament results feed nothing** — no prestige movement, no ranking, no bid — which is ruling 4 and not an
+omission. **Campus events** are still unbuilt (O-87). **A game still does not know WHERE it is played**, only
+whether somebody hosts it, so the distance half of the crowd model remains blocked. And **a player's season
+totals now blend conference and tournament games with no split anywhere** (O-88).

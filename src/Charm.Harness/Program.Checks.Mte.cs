@@ -540,18 +540,37 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             var withEvents = RunSeasonCore(Swap(forcedOn), MteCheckSeed, configPath, verbose: false);
             var without = RunSeasonCore(Swap(forcedOff), MteCheckSeed, configPath, verbose: false);
-            var fpOn = SeasonFingerprint(withEvents.Results, withEvents.PossessionCounts);
+            // ★ S98 NARROWED THIS, AND THE NARROWING IS FORCED. Until this session an active
+            //   pool played no games, so "the complete per-game results are identical" was the
+            //   right claim. The brackets now PLAY, so an active pool legitimately has more
+            //   games than a dormant one and the old comparison would go red with nothing
+            //   wrong. The surviving claim — the one this check was always about — is that
+            //   events cannot perturb one possession of CONFERENCE basketball, and that is a
+            //   prefix comparison. C8d below keeps it from becoming vacuous.
+            var confOn = SeasonFingerprint(
+                withEvents.Results.Take(withEvents.ConferenceGameCount).ToList(),
+                withEvents.PossessionCounts.Take(withEvents.ConferenceGameCount).ToList());
             var fpOff = SeasonFingerprint(without.Results, without.PossessionCounts);
             Check("C8a: ★ every event active vs every event dormant, same seed — the COMPLETE per-game " +
-                  "results and possession counts are identical. Not win totals: a seed perturbation " +
-                  "could preserve winners while moving every box score",
-                  fpOn == fpOff, fpOn == fpOff ? fpOn[..16] + "…" : $"{fpOn[..16]}… vs {fpOff[..16]}…");
+                  "CONFERENCE results and possession counts are identical. Not win totals: a seed " +
+                  "perturbation could preserve winners while moving every box score",
+                  confOn == fpOff, confOn == fpOff ? confOn[..16] + "…" : $"{confOn[..16]}… vs {fpOff[..16]}…");
             Check("C8b: and the schedule itself is untouched",
                   withEvents.Fingerprint == without.Fingerprint
                   && withEvents.DatedFingerprint == without.DatedFingerprint);
             Check("C8c: the discriminator — the two runs really did seat different pools, so C8a is not " +
                   "comparing a run against itself",
                   withEvents.Events.Seating.Active.Count > 0 && without.Events.Seating.Active.Count == 0);
+            // ★ S98 — the SECOND discriminator, and it is what stops C8a decaying into a
+            //   comparison of two identical conference-only seasons. The active run really did
+            //   play extra basketball beyond the prefix; the dormant run really did play none.
+            Check("C8d: ★ S98 — and the active run PLAYED its brackets while the dormant one played " +
+                  "nothing, so the prefix in C8a is a prefix of something longer",
+                  withEvents.TournamentGameCount > 0
+                  && withEvents.Results.Count == withEvents.ConferenceGameCount + withEvents.TournamentGameCount
+                  && without.TournamentGameCount == 0
+                  && without.Results.Count == without.ConferenceGameCount,
+                  $"{withEvents.TournamentGameCount} tournament games on, {without.TournamentGameCount} off");
 
             // ════════════════════════════════════════════════════════════════════
             //  C9 — THE COLLISION REFUSAL, before anything is spent.

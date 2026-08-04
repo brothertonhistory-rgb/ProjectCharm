@@ -85,9 +85,33 @@ internal static partial class Program
     /// parallel table (a side table joined by position drifts out of order silently). The
     /// structural fingerprint hashes four fields BY NAME (see ScheduleFingerprint's S89
     /// note), so the fifth is invisible to it — proven by Phase 85 C1.</summary>
+    /// <summary>★ S98 — <c>HasHost</c> is the SITE FACT, and it defaults to <c>true</c> so the
+    /// one existing construction site and every <c>with</c> copy are unchanged. A tournament
+    /// game sets it false and is the only thing that ever does. The default is deliberately
+    /// the safe-for-existing-code value and deliberately the DANGEROUS one for new code — a
+    /// forgotten <c>false</c> would silently host a neutral game — which is why every
+    /// tournament fixture is built in exactly one factory (MteBuildTournamentGame).</summary>
     private sealed record SeasonGame(string Kind, int HomeId, int AwayId,
                                      SeasonId? SeasonId = null, GameId? GameId = null,
-                                     DateOnly? Date = null);
+                                     DateOnly? Date = null, bool HasHost = true);
+
+    /// <summary>★ S98 — ONE ORDERED PLAYED-GAME LIST, AND ITS INDEX IS THE FIXTURE ORDINAL.
+    /// <c>PlayedGames[i]</c> is aligned one-to-one with <c>Results[i]</c> and
+    /// <c>PossessionCounts[i]</c>, and <c>i</c> IS <c>FixtureOrdinal</c> — conference games at
+    /// <c>0..N-1</c>, tournament games appended after.
+    ///
+    /// <para>A named record rather than a tuple of nullables: the conference entries simply
+    /// leave the tournament fields absent. This single structure is what lets the
+    /// conference-prefix fingerprint, the event fingerprint, the hosted-game denominator and
+    /// the finish routing all read the same facts instead of three places reconstructing them
+    /// differently.</para></summary>
+    private sealed record PlayedSeasonGame(
+        SeasonGame Game, int FixtureOrdinal,
+        int? EventTier = null, int? EventId = null, int? BracketGameIndex = null,
+        int? HomeOriginalSeed = null, int? AwayOriginalSeed = null)
+    {
+        public bool IsTournament => EventId is not null;
+    }
 
     private sealed record SeasonGameResult(
         int HomeId, int AwayId, int HomeScore, int AwayScore, int OvertimePeriods,
@@ -132,6 +156,26 @@ internal static partial class Program
         /// permanent record. Page-facing; the suite reads what it asserts from the seating
         /// result itself, never from a printed line.</summary>
         public EventSeasonOutcome Events { get; init; } = EventSeasonOutcome.None;
+        /// <summary>★ S98 — every game that PLAYED, in fixture-ordinal order. See
+        /// PlayedSeasonGame: index i is the fixture ordinal, and Results[i] /
+        /// PossessionCounts[i] describe the same game.</summary>
+        public List<PlayedSeasonGame> PlayedGames { get; init; } = new();
+        /// <summary>★ S98 — the conference prefix length. <c>Schedule</c> is conference-only
+        /// (a bracket cannot exist before it is played), so this is <c>Schedule.Count</c> —
+        /// carried explicitly because the slice that C1 takes must name its own length rather
+        /// than borrow one.</summary>
+        public int ConferenceGameCount { get; init; }
+        /// <summary>★ S98 — how many bracket games were played. Zero on every world that
+        /// authors no events, which is what keeps the zero path a zero path.</summary>
+        public int TournamentGameCount { get; init; }
+        /// <summary>★ S98 — the tournament games' own fingerprint. The schedule fingerprint
+        /// stays CONFERENCE-ONLY and after this session no longer describes the whole season;
+        /// this is the other half, and the page says so in both labels.</summary>
+        public string EventGamesFingerprint { get; init; } = "";
+        /// <summary>★ S98 — final placings, keyed by event id and then by the S97 SEAT (never
+        /// by seed, never by school). Empty when nothing played.</summary>
+        public IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> EventFinishes { get; init; }
+            = new Dictionary<int, IReadOnlyDictionary<int, int>>();
     }
 
     /// <summary>Everything the two accumulators need to turn a stamped player id back into a
@@ -838,6 +882,30 @@ internal static partial class Program
     /// <para>One season number and one contiguous block of game numbers, reserved together
     /// and stamped in schedule order.</para></summary>
     private static long NumberSeasonSchedule(List<SeasonGame> games, HistoryStore history)
+        => NumberSeasonSchedule(games, history, seating: null).SeasonNumber;
+
+    /// <summary>★ S98 — what the commit hands back. The bracket reservations ride out with the
+    /// season number because they are spent in the same breath and can be spent nowhere
+    /// else.</summary>
+    private sealed record SeasonNumbering(
+        long SeasonNumber, SeasonId SeasonId,
+        IReadOnlyDictionary<BracketSlotKey, GameId> Reservations);
+
+    /// <summary>★ S98 — THE TOURNAMENT GAME NUMBERS ARE TAKEN HERE, AND THIS IS FORCED RATHER
+    /// THAN PREFERRED. <c>CloseReservations()</c> runs before the first tip, so nothing can
+    /// reserve an id once play begins; every tournament id must therefore be spent at this
+    /// commit, alongside the conference block.
+    ///
+    /// <para>The pairings are unknown at this moment. The COUNT is not: twelve per active
+    /// complete eight-team field, four per active complete four-team field, and ZERO for a
+    /// dormant or short event — a short event cannot play, so it must not hold ids, and an id
+    /// reserved for a field that never plays is wasted permanently and cannot be repaired later
+    /// in the run.</para>
+    ///
+    /// <para>So the table is keyed by bracket POSITION and never by team: an id belongs to a
+    /// slot rather than to whoever happens to win it.</para></summary>
+    private static SeasonNumbering NumberSeasonSchedule(
+        List<SeasonGame> games, HistoryStore history, EventSeatingOutcome? seating)
     {
         // ★ The peek's contract, asserted rather than assumed: while this run holds the
         //   lock, the value the peek returns IS the value the reservation hands back, and the
@@ -849,10 +917,23 @@ internal static partial class Program
             throw new InvalidOperationException(
                 $"SEASON INVARIANT VIOLATED: peeked season {expected} but the counter did not advance "
                 + "by exactly one across the reservation.");
-        var gameIds = history.ReserveGames(games.Count);
+
+        var slots = seating is null ? new List<BracketSlotKey>() : MteExpectedBracketSlots(seating);
+        var gameIds = history.ReserveGames(games.Count + slots.Count);
         for (var g = 0; g < games.Count; g++)
             games[g] = games[g] with { SeasonId = seasonId, GameId = gameIds[g] };
-        return expected;
+
+        var reservations = new Dictionary<BracketSlotKey, GameId>(slots.Count);
+        for (var i = 0; i < slots.Count; i++)
+            reservations[slots[i]] = gameIds[games.Count + i];
+        // ★ The key set is checked AT THE POINT OF CREATION, so a surplus or a duplicated slot
+        //   names itself here rather than after result routing has obscured where it came from.
+        if (reservations.Count != slots.Count)
+            throw new InvalidOperationException(
+                $"SEASON INVARIANT VIOLATED: {slots.Count} bracket slots produced "
+                + $"{reservations.Count} distinct reservations; a bracket position is unique.");
+
+        return new SeasonNumbering(expected, seasonId, reservations);
     }
 
     /// <summary>★ S89 note — this hashes the four pre-S89 fields BY NAME (index, kind, home,
@@ -972,15 +1053,25 @@ internal static partial class Program
 
         var recordStatus = EventRecordStatus.NotApplicable;
         string? recordDiagnostic = null;
+        // ★ S98 — legacy mode plays its tournaments too. The fixtures simply stay unnumbered,
+        //   exactly as legacy conference fixtures always have: basketball does not require a
+        //   career. So the reservation table is empty here and the bracket factory asks for an
+        //   id only when there is a season to hang it on.
+        IReadOnlyDictionary<BracketSlotKey, GameId> reservations =
+            new Dictionary<BracketSlotKey, GameId>();
+        SeasonId? seasonIdOfRun = null;
         if (history is not null)
         {
-            var reserved = NumberSeasonSchedule(schedule, history);
-            if (reserved != pendingSeasonId)
+            var numbering = NumberSeasonSchedule(schedule, history, seating);
+            if (numbering.SeasonNumber != pendingSeasonId)
                 throw new InvalidOperationException(
-                    $"SEASON INVARIANT VIOLATED: peeked season {pendingSeasonId} but reserved {reserved}.");
+                    $"SEASON INVARIANT VIOLATED: peeked season {pendingSeasonId} but reserved " +
+                    $"{numbering.SeasonNumber}.");
+            reservations = numbering.Reservations;
+            seasonIdOfRun = numbering.SeasonId;
             try
             {
-                MtePublishRecord(history, reserved, seasonSeed, world, seating);
+                MtePublishRecord(history, numbering.SeasonNumber, seasonSeed, world, seating);
                 recordStatus = EventRecordStatus.Written;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -989,8 +1080,6 @@ internal static partial class Program
                 recordDiagnostic = ex.GetType().Name;
             }
         }
-        var eventOutcome = new EventSeasonOutcome(
-            seating, recordStatus, recordDiagnostic, eventHistory.Diagnostics);
 
         var divvy = RunDivvyDraft(world, seasonSeed, history);
 
@@ -1050,9 +1139,21 @@ internal static partial class Program
                 schedule[0].SeasonId!.Value, roster);
         }
 
-        for (var g = 0; g < schedule.Count; g++)
+        var playedGames = new List<PlayedSeasonGame>(schedule.Count);
+
+        //  ★ S98 — ONE GAME, RUN ONCE, WHATEVER KIND IT IS. This body is the pre-S98 loop
+        //  body lifted whole into a local function so that a tournament fixture goes through
+        //  the identical path: same side construction, same seed arithmetic, same
+        //  accumulators, same retention block. The ONLY thing that differs between a
+        //  conference game and a bracket game is what the fixture says about itself.
+        //
+        //  `pg.FixtureOrdinal` replaces the old loop variable `g` and is the same number for
+        //  every conference game it ever was, which is what keeps the conference half of the
+        //  season byte-identical.
+        (int HomeScore, int AwayScore) PlayOneGame(PlayedSeasonGame pg)
         {
-            var sg = schedule[g];
+            var sg = pg.Game;
+            var g = pg.FixtureOrdinal;
             // HomeSchool -> the engine's Home side, AwaySchool -> Away: the §1b
             // invariant. Home rows stamp PlayerIds 1..RosterShape.Size, away rows the
             // next Size — at S75's 13-man roster that is 1-13 and 14-26 (the comment
@@ -1062,13 +1163,13 @@ internal static partial class Program
             // where a school flips sides.
             var seatedHome = BuildSeasonSide(rowsBySchool[sg.HomeId], 0);
             var seatedAway = BuildSeasonSide(rowsBySchool[sg.AwayId], RosterShape.AwayIdOffset);
-            // ★ S95 — home court. EVERY game on today's schedule is a real home game
-            //   (SeasonGame carries HomeId/AwayId and no site fact at all), so the host
-            //   flag is passed as a literal `true` rather than inferred from anything.
-            //   When the tournament layer brings a schedule-owned site fact, THAT becomes
-            //   this argument and nothing else here moves.
+            // ★ S98 — home court, now read from the SCHEDULE'S OWN SITE FACT. This was a
+            //   literal `true` from S95 until this session, with a note saying the tournament
+            //   layer would replace it and nothing else here would move. That is exactly what
+            //   happened: a conference game still says it has a host, a bracket game says it
+            //   has none, and the shave path returns both sides untouched for the latter.
             var (sideHome, sideAway, awayShaved) =
-                PrepareSeasonGameSides(seatedHome, seatedAway, roadShave, hasHost: true);
+                PrepareSeasonGameSides(seatedHome, seatedAway, roadShave, hasHost: sg.HasHost);
             if (awayShaved) hostedRoadSidesShaved++;
             // Everything below — the engine, the identity bundle, the occupancy walk —
             // reads the PREPARED sides, so the men who are attributed are the men who
@@ -1132,21 +1233,78 @@ internal static partial class Program
                 sg.HomeId, sg.AwayId, game.HomeScore, game.AwayScore, result.OvertimePeriods,
                 sg.SeasonId, sg.GameId));
             possessionCounts.Add(result.Possessions.Count);
+            playedGames.Add(pg);
             if (game.HomeScore > game.AwayScore) { wins[sg.HomeId]++; losses[sg.AwayId]++; }
             else if (game.AwayScore > game.HomeScore) { wins[sg.AwayId]++; losses[sg.HomeId]++; }
             else ties++;   // assumption-1 says impossible; counted so it can never hide
 
-            if (verbose && (g + 1) % 500 == 0)
-                Console.WriteLine($"  ... {g + 1}/{schedule.Count} games played");
+            return (game.HomeScore, game.AwayScore);
         }
 
-        //  One block per scheduled fixture and no other — the writer refuses to publish
-        //  a partial season rather than leaving a plausible-looking short file behind.
+        // ══════════════════════════════════════════════════════════════════════════
+        //  ★ EXECUTED LAST, DATED FIRST — see the header of Program.Season.Brackets.cs.
+        //
+        //  The conference slate plays at loop index g = 0 .. N-1, UNCHANGED and bit for
+        //  bit, so `baseSeed + 2g` hands every conference game the exact seeds it had
+        //  before this session existed. The tournament games APPEND at N .. N+M-1 and
+        //  carry NOVEMBER DATES.
+        //
+        //  This looks wrong and is correct. `g` is both the engine seed input and the
+        //  retention log's fixture ordinal, so slotting tournament games into calendar
+        //  order would shift every conference index and re-roll the entire season's
+        //  basketball. Do not "fix" it.
+        // ══════════════════════════════════════════════════════════════════════════
+        for (var g = 0; g < schedule.Count; g++)
+        {
+            PlayOneGame(new PlayedSeasonGame(schedule[g], g));
+            if (verbose && (g + 1) % 500 == 0)
+                Console.WriteLine($"  ... {g + 1}/{schedule.Count} conference games played");
+        }
+
+        var prestigeById = world.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);
+        var brackets = MtePlayBrackets(
+            seating, prestigeById, reservations, seasonIdOfRun, schedule.Count,
+            pg => PlayOneGame(pg));
+        if (verbose && brackets.GameCount > 0)
+            Console.WriteLine($"  ... {brackets.GameCount} tournament games played");
+
+        //  One block per fixture PLAYED and no other — conference plus tournament. The
+        //  writer refuses to publish a partial season rather than leaving a
+        //  plausible-looking short file behind.
         if (gameLog is not null)
         {
-            gameLog.Finalize(schedule.Count);
+            gameLog.Finalize(schedule.Count + brackets.GameCount);
             gameLog.Dispose();
         }
+
+        //  ★ S98 — THE SECOND WRITE, and the order below is the resolution of a real
+        //  contradiction: the record replacement cannot be the last write AND have its
+        //  failure reported on the page. It is not. The replacement is attempted here,
+        //  its outcome is carried out on the run result, and the page — which prints
+        //  after this method returns and after the career file is closed — says what
+        //  happened. A failure leaves the NotPlayed record byte-identical, the season
+        //  valid and played, and no retry inside the run.
+        var finishStatus = EventRecordStatus.NotApplicable;
+        string? finishDiagnostic = null;
+        if (history is not null && recordStatus == EventRecordStatus.Written
+            && brackets.FinishBySeat.Count > 0)
+        {
+            try
+            {
+                MteReplaceRecordWithFinishes(
+                    history, pendingSeasonId, brackets.FinishBySeat, brackets.SeatsPlayed);
+                finishStatus = EventRecordStatus.Written;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                finishStatus = EventRecordStatus.WriteFailed;
+                finishDiagnostic = ex.GetType().Name;
+            }
+        }
+
+        var eventOutcome = new EventSeasonOutcome(
+            seating, recordStatus, recordDiagnostic, eventHistory.Diagnostics,
+            finishStatus, finishDiagnostic);
 
         return new SeasonRunOutcome
         {
@@ -1158,6 +1316,12 @@ internal static partial class Program
             DatedFingerprint = datedFingerprint,
             Memory = memoryOutcome,
             Events = eventOutcome,
+            PlayedGames = playedGames,
+            ConferenceGameCount = schedule.Count,
+            TournamentGameCount = brackets.GameCount,
+            EventGamesFingerprint =
+                MteEventGamesFingerprint(playedGames, results, possessionCounts),
+            EventFinishes = brackets.FinishBySeat,
         };
     }
 
@@ -1165,6 +1329,68 @@ internal static partial class Program
 
     private static readonly (int Lo, int Hi)[] SeasonBands =
         { (0, 19), (20, 39), (40, 59), (60, 79), (80, 99) };   // the divvy's exact five bands
+
+    // ══════════════════════════════════════════════════════════════════════════════
+    //  ★ S98 — THE STANDINGS ORDER, EXTRACTED SO THE SUITE CAN ASSERT IT.
+    //
+    //  These are not page decoration; they are the rule Emmett ruled on, and a rule the
+    //  suite cannot reach is a rule nothing defends. The page calls exactly these, so
+    //  what Phase 89 asserts is what prints.
+    //
+    //  Note what is and is not asserted: the MECHANISM (percentage not raw wins, the
+    //  tie-break, where a school that played nothing sorts, who is inside a band
+    //  average) is suite-asserted. No basketball VALUE ever is — page-only calibration
+    //  is untouched.
+    // ══════════════════════════════════════════════════════════════════════════════
+
+    private static int SeasonGamesPlayed(SeasonRunOutcome run, int schoolId)
+        => run.Wins[schoolId] + run.Losses[schoolId];
+
+    /// <summary>★ A SCHOOL THAT PLAYED NOTHING PRINTS AN EM DASH, never <c>.000</c> — which
+    /// would say it lost.</summary>
+    private static string SeasonWinPctText(SeasonRunOutcome run, int schoolId)
+        => SeasonGamesPlayed(run, schoolId) == 0
+            ? "—"
+            : (100.0 * run.Wins[schoolId] / SeasonGamesPlayed(run, schoolId))
+                .ToString("00.0", CultureInfo.InvariantCulture);
+
+    /// <summary>★ Win PERCENTAGE, by INTEGER CROSS-MULTIPLICATION and never a float division:
+    /// <c>winsA * playedB</c> against <c>winsB * playedA</c>, widened to <c>long</c>
+    /// deliberately. The ordering is then exact and platform-independent, which a double
+    /// comparison is not. Ties break on the LOWER SCHOOL ID — the canonical tie-break
+    /// everywhere in this codebase. A school with no games sorts below everyone who played,
+    /// and two of them break by id.</summary>
+    private static Comparison<int> SeasonStandingsOrder(SeasonRunOutcome run) => (a, b) =>
+    {
+        var pa = SeasonGamesPlayed(run, a);
+        var pb = SeasonGamesPlayed(run, b);
+        if (pa == 0 || pb == 0) return pa == pb ? a.CompareTo(b) : (pa == 0 ? 1 : -1);
+        var cmp = ((long)run.Wins[b] * pa).CompareTo((long)run.Wins[a] * pb);
+        return cmp != 0 ? cmp : a.CompareTo(b);
+    };
+
+    /// <summary>★ Average win percentage per prestige band, over schools that ACTUALLY PLAYED
+    /// (Emmett's ruling, S98). A school that never took the floor is not a school that went
+    /// winless, so it cannot be allowed to drag its band down — it is left out of the average
+    /// entirely, and out of the escapes list that reads these averages.</summary>
+    private static Dictionary<(int Lo, int Hi), double> SeasonBandWinPct(
+        WorldFile world, SeasonRunOutcome run, out Dictionary<(int Lo, int Hi), int> counts)
+    {
+        var avgs = new Dictionary<(int Lo, int Hi), double>();
+        counts = new Dictionary<(int Lo, int Hi), int>();
+        foreach (var band in SeasonBands)
+        {
+            var members = world.Schools
+                .Where(s => s.CurrentPrestige >= band.Lo && s.CurrentPrestige <= band.Hi)
+                .Select(s => s.Id)
+                .Where(id => SeasonGamesPlayed(run, id) > 0)
+                .ToList();
+            if (members.Count == 0) continue;
+            avgs[band] = members.Average(id => 100.0 * run.Wins[id] / SeasonGamesPlayed(run, id));
+            counts[band] = members.Count;
+        }
+        return avgs;
+    }
 
     private static void RunSeason(string engineConfigPath, string[] args)
     {
@@ -1258,10 +1484,15 @@ internal static partial class Program
             //   a banner that restates a constant keeps saying it long after it is false,
             //   so this now says what the schedule IS and the measured line below says
             //   what the dial DID.
+            // ★ S98 — this line said "every game on this schedule is a real home game;
+            //   neutral floors arrive with the tournament layer". They arrived. The S93
+            //   lesson applies again: a banner that restates a constant keeps saying it long
+            //   after it is false, so it now says what the CONFERENCE schedule is and leaves
+            //   the tournament count to the block below, which knows it.
             Console.WriteLine(
-                "  Non-conference scheduling does not exist yet — it is its own session. " +
-                "Every game on this schedule is a real home game; neutral floors arrive " +
-                "with the tournament layer.");
+                "  General non-conference scheduling does not exist yet — it is its own session. " +
+                "Every game on the conference slate is a real home game; the early-season " +
+                "tournaments play on neutral floors and are counted after it.");
             Console.WriteLine();
             Console.WriteLine($"Regenerating divvied rosters (world + seed; nothing persisted) and playing " +
                               $"{schedule.Count} real engine games ...");
@@ -1291,7 +1522,15 @@ internal static partial class Program
         //   plays in December.
         {
             var decemberGames = run.Schedule.Count(x => x.Date is { Month: 12 });
-            Console.WriteLine($"Schedule fingerprint: {run.Fingerprint}");
+            // ★ S98 — BOTH LINES ARE RELABELLED, because after this session the old name is
+            //   a lie. A bracket cannot be built before it is played (round two's pairings are
+            //   round one's results), so tournament fixtures cannot exist when the schedule
+            //   fingerprint is computed. It is now conference-only and says so, and the other
+            //   half of the season gets its own hash beside it.
+            Console.WriteLine($"Conference schedule fingerprint: {run.Fingerprint}");
+            if (run.TournamentGameCount > 0)
+                Console.WriteLine($"Tournament games fingerprint: {run.EventGamesFingerprint} " +
+                                  $"({run.TournamentGameCount} games)");
             Console.WriteLine($"Dated: season {SeasonDefaultStartYear}-{SeasonDefaultStartYear + 1}, " +
                               $"{decemberGames} December games, dated fingerprint {run.DatedFingerprint}");
             // ★ PAGE-ONLY AND RUNTIME-DERIVED. Every number on this line comes from the run
@@ -1307,10 +1546,11 @@ internal static partial class Program
         //   the suite. When the world authors no events this prints NOTHING — not a heading,
         //   not a blank line — which is what makes the zero-path byte-identity claim honest.
         {
-            var eventLines = MtePageLines(run.Events);
+            var eventLines = MtePageLines(run.Events, run.EventFinishes);
             if (eventLines.Count > 0)
             {
-                Console.WriteLine("--- EARLY-SEASON EVENTS (fields only; no tournament game is played yet) ---");
+                Console.WriteLine("--- EARLY-SEASON EVENTS (played out to a full placement; " +
+                                  "neutral floors, nobody hosts) ---");
                 foreach (var line in eventLines) Console.WriteLine(line);
                 Console.WriteLine();
             }
@@ -1318,25 +1558,39 @@ internal static partial class Program
 
         // ★ S95 — the home-court readout. PAGE-ONLY, NEVER ASSERTED: the ratified 59%
         //   is a calibration target, and the page-only principle keeps basketball target
-        //   values out of the suite entirely. Y is every completed schedule game, because
-        //   every entry today is explicitly hosted — no invented filter; when the
-        //   schedule owns a site fact this denominator narrows to it.
+        //   values out of the suite entirely.
+        //
+        // ★ S98 — THE DENOMINATOR NOW READS THE SITE FACT, exactly as the S95 note said it
+        //   would. It counts games whose fixture says it HAS a host, not the conference
+        //   prefix. Those are the same set today; they will stop being the same set the
+        //   moment the schedule owns more site facts, and reading the fact is free while
+        //   reading the prefix is a shortcut that would silently rot. Neutral games are
+        //   excluded outright — a tournament game has no home team to win, so counting it
+        //   would drag a measured home-court number toward 50% and look like a regression.
         {
-            var played = run.Results;
-            if (played.Count == 0)
+            var hosted = run.PlayedGames
+                .Where(p => p.Game.HasHost)
+                .Select(p => run.Results[p.FixtureOrdinal])
+                .ToList();
+            var neutral = run.PlayedGames.Count - hosted.Count;
+            var neutralNote = neutral > 0
+                ? $" ({neutral.ToString(CultureInfo.InvariantCulture)} neutral-floor games excluded)"
+                : "";
+            if (hosted.Count == 0)
             {
                 Console.WriteLine($"Home court: road shave {run.RoadShave} — " +
-                                  "home wins 0/0 = n/a, margin n/a");
+                                  "home wins 0/0 = n/a, margin n/a" + neutralNote);
             }
             else
             {
-                var homeWins = played.Count(r => r.HomeScore > r.AwayScore);
-                var pct = 100.0 * homeWins / played.Count;
-                var margin = played.Average(r => (double)r.HomeScore - r.AwayScore);
+                var homeWins = hosted.Count(r => r.HomeScore > r.AwayScore);
+                var pct = 100.0 * homeWins / hosted.Count;
+                var margin = hosted.Average(r => (double)r.HomeScore - r.AwayScore);
                 Console.WriteLine($"Home court: road shave {run.RoadShave} — home wins " +
-                                  $"{homeWins}/{played.Count} = " +
+                                  $"{homeWins}/{hosted.Count} = " +
                                   $"{pct.ToString("0.0", CultureInfo.InvariantCulture)}%, margin " +
-                                  margin.ToString("+0.0;-0.0;+0.0", CultureInfo.InvariantCulture));
+                                  margin.ToString("+0.0;-0.0;+0.0", CultureInfo.InvariantCulture) +
+                                  neutralNote);
             }
             Console.WriteLine();
         }
@@ -1356,41 +1610,63 @@ internal static partial class Program
         var confShort = world.Conferences.ToDictionary(c => c.Id, c => c.ShortName);
         var confOf = world.Schools.ToDictionary(s => s.Id, s => s.ConferenceId);
 
-        // (i) the full ranked table — every school by W-L, ties broken by school id.
-        Console.WriteLine($"--- STANDINGS (all {world.Schools.Count}, ranked by W-L; ties broken by school id) ---");
-        var ranked = world.Schools.Select(s => s.Id)
-            .OrderByDescending(id => run.Wins[id]).ThenBy(id => id).ToList();
-        Console.WriteLine($"  {"rk",-5}{"school",-26}{"conf",-10}{"pres",5}   W-L");
+        // ══════════════════════════════════════════════════════════════════════════
+        //  ★ S98 — EVERY RANKING ON THIS PAGE MOVES TO WIN PERCENTAGE (Emmett's ruling).
+        //
+        //  Schedules stop being uniform this session. A school in a tournament plays
+        //  three more games than one that is not, and under a raw-win ranking it would be
+        //  rewarded simply for having played more. Percentage is the only honest order.
+        //
+        //  The comparison is INTEGER CROSS-MULTIPLICATION — winsA * playedB against
+        //  winsB * playedA, widened to long deliberately — never a float division. The
+        //  ordering is then exact and platform-independent, which a double is not.
+        //
+        //  ★ A SCHOOL THAT PLAYED NOTHING IS NOT A SCHOOL THAT LOST. It prints an em dash
+        //  rather than .000, sorts below everyone who played, and — Emmett's ruling — is
+        //  left OUT of the band averages and out of the escapes list entirely. It never
+        //  played, so it cannot make its prestige band look worse. (The stock world has
+        //  fourteen such schools, sitting in a league authored at zero games.)
+        // ══════════════════════════════════════════════════════════════════════════
+        int Played(int id) => SeasonGamesPlayed(run, id);
+        string Pct(int id) => SeasonWinPctText(run, id);
+        var ByWinPct = SeasonStandingsOrder(run);
+
+        // (i) the full ranked table — every school by win percentage, ties broken by school id.
+        Console.WriteLine($"--- STANDINGS (all {world.Schools.Count}, ranked by WIN PCT; ties broken by " +
+                          "school id; a school that played nothing sorts last) ---");
+        var ranked = world.Schools.Select(s => s.Id).ToList();
+        ranked.Sort(ByWinPct);
+        Console.WriteLine($"  {"rk",-5}{"school",-26}{"conf",-10}{"pres",5}   {"W-L",-8}pct");
         for (var i = 0; i < ranked.Count; i++)
         {
             var id = ranked[i];
             Console.WriteLine($"  {i + 1,-5}{names[id] + " (" + abbrs[id] + ")",-26}" +
-                              $"{confShort[confOf[id]],-10}{prestige[id],5}   {run.Wins[id]}-{run.Losses[id]}");
+                              $"{confShort[confOf[id]],-10}{prestige[id],5}   " +
+                              $"{run.Wins[id] + "-" + run.Losses[id],-8}{Pct(id)}");
         }
         Console.WriteLine();
 
-        // (ii) the proof table — average wins by prestige band (the divvy's bands).
+        // (ii) the proof table — average WIN PCT by prestige band (the divvy's bands),
+        //      over schools that actually played.
         Console.WriteLine("--- PROOF TABLE (prestige buys access; does access buy wins?) ---");
-        var bandAvg = new Dictionary<(int, int), double>();
+        var bandAvg = SeasonBandWinPct(world, run, out var bandN);
         foreach (var band in SeasonBands)
         {
-            var members = world.Schools.Where(s => s.CurrentPrestige >= band.Lo && s.CurrentPrestige <= band.Hi)
-                                       .Select(s => s.Id).ToList();
-            if (members.Count == 0) continue;
-            var avg = members.Average(id => (double)run.Wins[id]);
-            bandAvg[band] = avg;
-            Console.WriteLine($"  prestige {band.Lo,2}-{band.Hi,-2}  avg wins {avg,5:F1}   (n={members.Count})");
+            if (!bandAvg.TryGetValue(band, out var avg)) continue;
+            Console.WriteLine($"  prestige {band.Lo,2}-{band.Hi,-2}  avg win pct {avg,5:F1}   (n={bandN[band]})");
         }
         Console.WriteLine();
 
-        // (iii) the escapes — top 10 by wins over band average, leaked talent named.
-        Console.WriteLine("--- ESCAPES (top 10 by wins over band average; leaked top-decile talent named) ---");
+        // (iii) the escapes — top 10 by win pct over band average, leaked talent named.
+        Console.WriteLine("--- ESCAPES (top 10 by win pct over band average; leaked top-decile talent named) ---");
         var ranks = run.Divvy.Pool.Select(p => p.ScoutRank).ToArray();
         var topDecile = new HashSet<int>(
             Enumerable.Range(0, ranks.Length).OrderByDescending(i => ranks[i]).Take(ranks.Length / 10));
         (int, int) BandOf(int p) => SeasonBands.First(b => p >= b.Lo && p <= b.Hi);
         var escapes = world.Schools
-            .Select(s => (s.Id, Dev: run.Wins[s.Id] - bandAvg[BandOf(s.CurrentPrestige)]))
+            .Where(s => Played(s.Id) > 0 && bandAvg.ContainsKey(BandOf(s.CurrentPrestige)))
+            .Select(s => (s.Id, Dev: 100.0 * run.Wins[s.Id] / Played(s.Id)
+                                     - bandAvg[BandOf(s.CurrentPrestige)]))
             .OrderByDescending(t => t.Dev).ThenBy(t => t.Id).Take(10);
         foreach (var (id, dev) in escapes)
         {
@@ -1402,7 +1678,7 @@ internal static partial class Program
             }).ToList();
             var band = BandOf(prestige[id]);
             Console.WriteLine($"  {names[id]} (prestige {prestige[id]}, band {band.Item1}-{band.Item2}): " +
-                              $"{run.Wins[id]}-{run.Losses[id]}, {dev:+0.0;-0.0} over band | " +
+                              $"{run.Wins[id]}-{run.Losses[id]}, {dev:+0.0;-0.0} pts over band | " +
                               (leaked.Count > 0 ? "leaks: " + string.Join("; ", leaked)
                                                 : "no top-decile players (overperformed without a leaked star)"));
         }
