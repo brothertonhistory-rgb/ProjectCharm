@@ -10,28 +10,25 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 99** (2026-08-04; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 90 PASS at 40
-assertions**. **WHO YOU PLAY TWICE.** A league that cannot play everybody twice no longer gives the same opponents the
-second meeting forever: the season reads up to **eight** years of retained logs and prefers whichever pairs have waited
-longest. Season ten of a stock career: **411 preferred pairs held across all 14 affected leagues, 45 fell to
-feasibility, 0 terminal fallbacks**. On the sixteen-school rig (the Big East's shape) **every school has played every
-opponent twice by season 7** — inside the window — against a frozen control where twelve of fifteen opponents are never
-doubled once in twelve years. **O-79 CLOSES on both halves.** ★ **THE PROMPT MISCOUNTED THE LEAGUES THE SESSION IS
-ABOUT** — 13/18 in the prose, **14 rows in its own table**; measured 14 affected / 17 unaffected / 1 zero-game, which
-the page has always said. ★ **ROTATION AND HOST MEMORY ARE NOT ORTHOGONAL IN THE FLOW, AND THE FIRST BUILD PICKED THE
-WRONG SIDE TO YIELD**: the first live run died on the Atlantic 10, rotation was made to yield, and measuring the axis
-killed it — the deepest league relaxed to empty EVERY season and the schedule never moved (`min distinct 3/15, covered
-never`). **The memory-derived flips yield instead**, which is S96's own parity-change rule one step further along; an
-explicit `fixedHosts` list stays hard. ★ **THE ORACLE AND THE ENGINE AGREE TO THE SEASON** — a Python oracle written at
-the gate, cross-checked against a brute-force enumerator over all twelve legal graphs on the compact rig (which proved
-two-season coverage OPTIMAL), predicted deep-rig coverage at 7 and gap at 7; live reads 7 and 7. ★ **THREE S96 CHECKS
-HAD TO BE NARROWED AND THEY WERE NOT ON THE FILE LIST** (the S98 finding, one session later): C8i-b/C8ii/C8iii each
-bundled a live claim with a clause that was only a consequence of the FROZEN graph. C8i-b's first rewrite asserted
-`recurring == alternated + given up` and the run refused it (**152 = 87 + 88**) — a given-up venue is not PINNED, the
-flow still picks freely and alternates by chance. The true claim is one-directional. ★ **C3 IS THE ONLY DISCRIMINATING
-ASSERTION**: every pre-S99 slate check describes a season's SHAPE and this session changes the CHOICE, so the negative
-control runs twelve seasons with the chooser off and requires the coverage predicate to REJECT that world. Opens
-**O-89**, **O-90**.)
+Last updated: **Session 100** (2026-08-04; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 91 PASS at 19
+assertions**, Phase 90 back to 40. **WHO IS OWED THE HOME GAME.** The alternation stops looking one year back and counts
+residual home games across the same window the rotation already reads, so a home-and-home year no longer erases the
+debt; whoever is behind hosts the next single meeting. Twelve seasons of the sixteen-school rig, measured from the games
+that PLAYED: worst pair **3 home games apart across 3 of 130 pairs** `[0:38 1:39 2:50 3:3]`, against a one-hop control on
+the same world at **6 apart across 12 pairs** `[0:31 1:27 2:30 3:8 4:15 5:7 6:12]`. Five-school rig: **all 40 pairs go
+from 6 apart to 2**. **O-89 CLOSES; O-90 CLOSES BY MEASUREMENT.** ★ **NO NEW DISK READ AND NO NEW PARSE** — every
+readable year's residual hosts were already computed by `Aggregate` and discarded above `k == 1`; the walk keeps them.
+★ **COUNTING RESIDUAL HOSTS IS COUNTING HOME GAMES EXACTLY**, an equivalence licensed by `Aggregate`'s own refusal, not
+an approximation. ★ **S96's d/2 THEOREM DOES NOT SURVIVE** — debt can over-commit a school (measured: 118 school-seasons
+of 1,903, 142 excess venues, worst 2) — which is what turned the surrender order into a ruling: the list is emitted
+**strongest claim first** and `FinishSlate` already dropped from the end, so the flow is untouched. ★ **THE PROMPT'S A4
+WAS BACKWARDS ON WHERE THIS BITES**: not small leagues but **11–13 school leagues at 18 games** — Sun Belt 78 pairs at
+the maximum, plus eleven each in the ACC, SEC and Big 12; the Big East has two. Caught by re-measuring at the gate, the
+S81.3 lesson recurring. ★ **A DAMAGED N−1 EMPTIES THE DEBT** (Claude's call, flagged): the first build let the older
+years supply 59 venues while the page said `Unreadable`, and Phase 90 C5a caught it — reverted because the page reports
+N−1's status beside the applied count and the page was outside the wall. Opens **O-91**. ★ **THE FOURTH SESSION RUNNING
+THAT A CHECK OUTSIDE THE FILE LIST HAD TO MOVE** — §0.5 named that exact pattern, catalogued six Phase 87 assertions,
+and omitted Phase 90 entirely; the first delivery shipped five files and failed to build on Windows.)
 
 *(Previous board entry, S97 — 2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 88 PASS at 61
 assertions**, pre-S97 zero-path goldens `51c8e88c202e9eb6…`/`2c521c9f8f2ee203…` and `eee5e256b0c6fc87…`/`bbff75ce74cf9363…`
@@ -336,6 +333,19 @@ the one calibrated dial (S72); the settings file and the config classes are name
   **pre-S97** goldens. R3 survives by construction (`q` odd everywhere ⇒ odd-pair count is a function of the
   shape, not the choice). Phase 90, **40 assertions**, page-only throughout. Closes **O-79** entirely; opens
   **O-89**, **O-90**.
+
+- **★ S100 — WHO IS OWED THE HOME GAME.** The alternation is a **running count across the window**, not a one-hop
+  comparison: for each normalized pair, `loResidualHosts − hiResidualHosts` summed over every readable offset, and the
+  school that is behind hosts the next single meeting. A doubled year contributes nothing and **erases nothing** — the
+  two levels of "even this season" (no emission; balance intact) are asserted separately, and that distinction is the
+  whole of O-89. **Level and unknown both emit nothing** (Emmett's Q1): debt memory resolves imbalance, it does not
+  preserve alternation for its own sake. **Window shared with the rotation** (Q3), consumption-capped by a test-only
+  `Within(window)` that makes the one-hop negative control cost no extra parse. **Page unchanged** (Q4). Emission is
+  ordered **strongest claim first, ties by ascending pair** (Q2), which leaves `FinishSlate`'s drop-from-the-end
+  untouched. The debt is read from **what happened, never what was intended** — a surrendered venue is not a lost
+  instruction, and Phase 91 C7 proves the on-disk debt equals the played schedules' debt key for key. `Charm.Engine` and
+  `Charm.History` UNTOUCHED; no new world file. Phase 91, **19 assertions**, page-only throughout. Closes **O-89** and
+  **O-90**; opens **O-91**.
 
 - **★ S98 — THE BRACKETS PLAY: EVERY SEATED FIELD IS DECIDED ON THE FLOOR.** Each active complete field is seeded
   1..N by `CurrentPrestige` descending with the lower school id breaking ties, and played to a **full placement** —
@@ -694,31 +704,14 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **★ O-89 — HOST ALTERNATION LOOKS ONE YEAR BACK WHILE ROTATION LOOKS EIGHT (opened S99; the S100
-  candidate).** S96's rule is *"they hosted the single game last season, so I host it this season."* S99 now
-  inserts home-and-home years between a pair's single games, and a home-and-home year has **no residual**, so
-  the rule looks back one season, sees an even pair, and has nothing to say. The counter is not carried
-  forward. A specific matchup can therefore stay one-sided across intervening doubled years and nothing in
-  the engine notices — the hole is *"who has hosted more of our single games"*, not *"how long since we
-  played there"*. Two things make this cheap to fix: **the eight-year read is already built and paid for**
-  (rotation walks it every season), and the depth needed is *shallower* than rotation's, because single games
-  are the common case — in an 18- or 20-team league almost nobody is doubled, so the last single meeting is
-  nearly always last season. The fix is a **running count across the window** (host the next single game
-  against whoever is behind) rather than a one-year comparison, which also degrades gracefully into a hole
-  where today's rule goes silent. **Not a regression** — S96's guarantee was only ever one-hop — but it is
-  the fairness this session made incomplete, and it is small.
-
-- **O-90 — ROTATION EMPTIES HOST MEMORY ENTIRELY ON A FIVE-SCHOOL LEAGUE (opened S99).** On `n = 5, r = 2`
-  the extra graph is a five-cycle and its complement is the **other** five-cycle, so a rotated year shares
-  **no** odd pair with the year before it and there is nothing to alternate. Found because Phase 87's
-  alternation assertion ranged over zero pairs and the `repeated > 0` guard refused to pass vacuously; the
-  measurement moved to the sixteen-school rig. On the stock world the effect is partial rather than total
-  (526 → 72 residuals applied over a ten-season career, some of which is legitimate — a pair that goes to
-  home-and-home has no residual to reverse — and some of which is venues given up to keep the slate
-  orientable). Recorded because it is invisible on the page: the host line reports the venues that
-  **applied**, which is the honest number, and says nothing about the ones surrendered. Largely subsumed by
-  **O-89**'s running count; kept separate because the tiny-league case may still be degenerate afterwards and
-  should be measured, not assumed.
+- **O-91 — A DAMAGED SEASON N−1 EMPTIES THE HOST DEBT, RATHER THAN LEAVING A HOLE IN IT (opened S100).** S96's
+  fail-closed rule was written for a one-hop question that genuinely needed N−1 specifically. The windowed rule does
+  not: offsets are absolute calendar distances, so no older year can masquerade as last year, and the count across the
+  remaining years is real information that is currently thrown away. The reason S100 kept the conservative rule is
+  **presentational** — the host line reports N−1's status beside the count of venues that applied, so letting the debt
+  work while the status reads `Unreadable` makes the page print "none" next to venues it applied. Answering this means
+  deciding what the host line should say, which is its own presentation call. Rare in practice (a damaged log is not a
+  normal event) and cheap to change; asserted today by Phase 91 C1d, so a silent drift is impossible.
 
 - **★ O-88 — A PLAYER'S SEASON TOTALS NOW BLEND CONFERENCE AND TOURNAMENT GAMES WITH NO SPLIT (opened S98).**
   A tournament game is an ordinary regular-season game by ruling, so it counts in every stat line, every
@@ -803,8 +796,8 @@ chart is PROVISIONAL pending O-6.
   sixteen-school rig gets every school to every opponent by season 7. The soft objectives (`SkipUrgency` and
   friends) held out of S93 were never built and are **not needed** — a pair-age score plus the existing
   search does the work. Kept here as a closed entry rather than deleted so a future session reading the S93
-  contract does not go looking for an open item that shipped. Successors: **O-89** (the alternation still
-  only looks one year back) and **O-90** (rotation empties host memory on very small leagues).
+  contract does not go looking for an open item that shipped. Successors **O-89** and **O-90** both shipped at
+  S100; its own successor is **O-91**.
 
 - **O-84 — MEMORY CANNOT YET FOLLOW A SCHOOL THROUGH REALIGNMENT, AND TWO GUARDS ARE THEREFORE DORMANT
   (opened S96).** S96 ruled that hosting fairness is a debt between two **schools**, not a conference thing:
@@ -1559,14 +1552,16 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**Not yet ruled.** S98 finished the two-session bracket arc, so the next scope is Emmett's call between three
-that are all genuinely ready:
+**Not yet ruled.** S100 closed the host-fairness arc that S96 opened and S99 made incomplete, so the next scope is
+Emmett's call. What is genuinely ready:
 
-- **★ O-89 — carry host alternation across the whole window.** The natural S100. S99 made the rotation
-  read eight years and left the alternation reading one, so a pair's single games can stay one-sided across
-  intervening home-and-home seasons. The expensive part — the windowed read — is built, paid for and
-  measured; what is needed is a running per-pair count in place of a one-year comparison. Small, self
-  contained, and it finishes the fairness S96 started rather than opening a new area.
+- **O-91 — should a damaged last year empty the debt or just leave a hole in it.** Small, and it is really a
+  question about what the host line on the page should say. Cheap either way and asserted today, so there is no
+  drift risk in leaving it.
+- **O-88 — a season's totals blend conference and tournament games with no way to cut them apart.** Opened S98
+  and untouched since.
+- **O-84's realignment guards**, still shipped dormant, and the **calibration queue**, untouched since the
+  population arc settled.
 
-Behind those: **O-84**'s realignment guards, still shipped dormant, and the **calibration queue**, untouched
-since the population arc settled.
+The schedule layer has now had five consecutive sessions (S96–S100). Worth Emmett's judgement whether the next
+one belongs somewhere else entirely.

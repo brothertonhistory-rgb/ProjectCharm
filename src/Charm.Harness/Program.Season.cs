@@ -692,26 +692,26 @@ internal static partial class Program
     /// complement; everything else meets q times; orient.</para></summary>
     /// <param name="fixedHosts">Venues decided by the caller. Phase 84's A9 is the only user;
     /// production supplies <paramref name="memory"/> instead.</param>
-    /// <param name="memory">★ S96 — last season's residual hosts. The flip list cannot be
-    /// computed by the caller because it needs this league's MEETING COUNTS, and those are
-    /// not known until the extra-meeting shape has been solved a few lines below. So the
-    /// memory comes in whole and the pure `ResidualsToFlip` runs at the one point where both
-    /// halves exist. Mutually exclusive with <paramref name="fixedHosts"/>: two sources of
-    /// venue truth for one slate is a contradiction, not a merge.</param>
+    /// <param name="debt">★ S96, widened at S100 — the readable window's residual hosts. The
+    /// venue list cannot be computed by the caller because it needs this league's MEETING
+    /// COUNTS, and those are not known until the extra-meeting shape has been solved a few
+    /// lines below. So the record comes in whole and the pure `ResidualsToFlip` runs at the one
+    /// point where both halves exist. Mutually exclusive with <paramref name="fixedHosts"/>:
+    /// two sources of venue truth for one slate is a contradiction, not a merge.</param>
     /// <param name="rotation">★ S99 — up to eight seasons of pair meeting counts. Absent means
     /// the pre-S99 chooser, byte for byte.
     ///
     /// <para>★ ROTATION IS ORTHOGONAL TO THE HOST SOURCE. <paramref name="fixedHosts"/> and
-    /// <paramref name="memory"/> are two answers to ONE question — who hosts — and stay mutually
+    /// <paramref name="debt"/> are two answers to ONE question — who hosts — and stay mutually
     /// exclusive by the throw above. Rotation answers a different question — which pairs meet
     /// twice — and coexists with either. The exclusion throw deliberately does NOT grow a third
     /// arm.</para></param>
     private static ConferenceSlate BuildConferenceSlate(
         List<int> members, int games, int skip, List<(int Lo, int Hi)> rivalries,
-        string label, List<FixedResidualHost>? fixedHosts = null, HostMemory? memory = null,
+        string label, List<FixedResidualHost>? fixedHosts = null, HostDebtHistory? debt = null,
         RotationHistory? rotation = null)
     {
-        if (fixedHosts is not null && memory is not null)
+        if (fixedHosts is not null && debt is not null)
             throw new InvalidOperationException(
                 $"{label}both an explicit fixed-host list and host memory were supplied; " +
                 "a slate has exactly one source of decided venues.");
@@ -802,8 +802,13 @@ internal static partial class Program
         //   one step further along — and the alternative is a hard constraint that can refuse
         //   a season outright, which host memory was explicitly built never to do.
         //
-        //   Flips are dropped from the END of ResidualsToFlip's own (Lo, Hi) ordering, one at
+        //   ★ S100 — AND WHICH VENUE IS SURRENDERED IS NOW A DECISION, not an accident of the
+        //   pair id. Venues are dropped from the END of ResidualsToFlip's own ordering, one at
         //   a time, so the result is deterministic and the LONGEST honourable prefix survives.
+        //   That list is now ordered STRONGEST CLAIM FIRST — biggest home-game debt, ties by
+        //   ascending pair — so the school owed two home games keeps its game and the pair
+        //   nearly square is the one that pays. The loop below is untouched: ordering the list
+        //   at the point it is built is the whole implementation of that ruling.
         ConferenceSlate FinishSlate(
             HashSet<(int, int)> chosenExtra, HashSet<(int, int)> chosenSkips,
             long searchNodes, bool circulant, int keptPreferences, int droppedPreferences,
@@ -815,8 +820,8 @@ internal static partial class Program
                     meetingsLocal[(members[i], members[j])] =
                         chosenSkips.Contains((i, j)) ? 0 : q + (chosenExtra.Contains((i, j)) ? 1 : 0);
 
-            // ★ S96 — the one point where memory meets this league's actual meeting counts.
-            var flipsLocal = memory is null ? fixedHosts : ResidualsToFlip(memory, meetingsLocal, members);
+            // ★ S96 — the one point where the record meets this league's actual meeting counts.
+            var flipsLocal = debt is null ? fixedHosts : ResidualsToFlip(debt, meetingsLocal, members);
 
             ConferenceSlate Orient(List<FixedResidualHost>? venues, int dropped)
                 // ★ ZERO-PATH CALL SHAPE PRESERVED. Null and empty behave identically
@@ -826,17 +831,17 @@ internal static partial class Program
                     members, games, meetingsLocal, label,
                     venues is null || venues.Count == 0 ? null : venues,
                     searchNodes, circulant,
-                    memory is null ? 0 : venues!.Count,
+                    debt is null ? 0 : venues!.Count,
                     new RotationSlateDiagnostics(
                         rotationActive, preferredInitial, keptPreferences, droppedPreferences,
                         terminal, dropped));
 
             var attemptOrient = Orient(flipsLocal, 0);
             // ★ ONLY MEMORY-DERIVED VENUES ARE SOFT. An explicit fixedHosts list is a caller's
-            //   instruction and keeps its refusal; only the flips this layer computed for itself
-            //   may be given up, and only for the one refusal that means "these venues do not
-            //   fit", never for a malformed configuration.
-            if (memory is null || flipsLocal is null) return attemptOrient;
+            //   instruction and keeps its refusal; only the venues this layer computed for
+            //   itself may be given up, and only for the one refusal that means "these venues do
+            //   not fit", never for a malformed configuration.
+            if (debt is null || flipsLocal is null) return attemptOrient;
             var soft = new List<FixedResidualHost>(flipsLocal);
             var droppedFlips = 0;
             while (attemptOrient.Verdict == SlateVerdict.InfeasibleUnderConstraints && soft.Count > 0)
@@ -1225,9 +1230,14 @@ internal static partial class Program
     /// Every other caller keeps the pre-S97 behaviour exactly, which is why this is a flag on
     /// a private overload rather than a change to the shape everyone uses. The season/game
     /// counters are independent of the person counter, so deferring moves no identity.</para></summary>
+    /// <param name="debtWindowOverride">★ S100. Null — every production caller — means the full
+    /// shared window. A check may cap it to run the pre-S100 one-hop rule as a negative control;
+    /// it caps consumption only, so the rotation half keeps its full depth and the isolating
+    /// control really does isolate the one thing that changed.</param>
     private static List<SeasonGame> BuildSeasonSchedule(
         WorldFile world, long seasonSeed, HistoryStore? history, bool deferNumbering,
-        out SeasonMemoryOutcome memoryOutcome, out SeasonRotationOutcome rotationOutcome)
+        out SeasonMemoryOutcome memoryOutcome, out SeasonRotationOutcome rotationOutcome,
+        int? debtWindowOverride = null)
     {
         SeasonPreflight(world);
         var schools = world.Schools.OrderBy(s => s.Id).ToList();
@@ -1248,6 +1258,13 @@ internal static partial class Program
         //   parsed once a season instead of thirty-two times.
         var career = ReadCareerMemory(history, RotationWindowSeasons);
         var memory = career.Hosts;
+        // ★ S100 — the window is SHARED with the rotation (one depth, one read policy, one test
+        //   matrix). The two halves need depth for different reasons — the rotation because
+        //   second meetings are rare, host debt because a pair's run of single games gets
+        //   interrupted — and they share it for coherence, not because the numbers happen to
+        //   match. `debtWindowOverride` is test-only and caps CONSUMPTION, never the read, so a
+        //   one-hop negative control costs no extra parse and cannot drift from production.
+        var debt = career.Debt.Within(debtWindowOverride ?? RotationWindowSeasons);
         var residualsFlipped = 0;
         var leaguesFlipped = 0;
         var preferredHeld = 0;
@@ -1263,7 +1280,7 @@ internal static partial class Program
             var label = $"conference '{c.Name}' (id {c.Id}) ";
             var slate = BuildConferenceSlate(
                 members, c.Games, c.Skip, ActiveRivalries(members, rivals, c.Games), label,
-                memory: memory, rotation: career.Rotation);
+                debt: debt, rotation: career.Rotation);
             if (slate.Verdict != SlateVerdict.Feasible)
                 throw new InvalidOperationException(
                     $"SEASON SCHEDULE {slate.Verdict.ToString().ToUpperInvariant()}: {slate.Reason}.");
@@ -1444,7 +1461,7 @@ internal static partial class Program
     private static SeasonRunOutcome RunSeasonCore(
         WorldFile world, long seasonSeed, string engineConfigPath, bool verbose,
         HistoryStore? history = null, bool retainGameLog = false,
-        int? roadShaveOverride = null)
+        int? roadShaveOverride = null, int? debtWindowOverride = null)
     {
         // ══════════════════════════════════════════════════════════════════════════
         //  ★ S97 — THE SEASON PIPELINE, IN THIS ORDER, AND THE ORDER IS THE CONTRACT.
@@ -1469,7 +1486,7 @@ internal static partial class Program
 
         var schedule = BuildSeasonSchedule(
             world, seasonSeed, history, deferNumbering: true,
-            out var memoryOutcome, out var rotationOutcome);
+            out var memoryOutcome, out var rotationOutcome, debtWindowOverride);
         var fingerprint = ScheduleFingerprint(schedule);
         // ★ S94 — every game gains its night. Purely additive: the structural fingerprint
         //   above is computed from the four named fields and cannot see the date.

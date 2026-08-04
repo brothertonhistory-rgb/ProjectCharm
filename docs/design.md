@@ -10476,7 +10476,7 @@ neutral sites park with the tournament layer that will own the site fact.
 
 ---
 
-## Host memory — a season remembers who hosted (Session 96, 2026-08-03)
+## Host memory — who is owed the home game (Sessions 96 and 100, current as of 2026-08-04)
 
 A conference pair that meets an **odd** number of times cannot split those meetings evenly. One of
 the two schools gets the extra home game — the **residual** — and until this session the slate
@@ -10485,18 +10485,36 @@ career, the same school hosted the extra game forever. S95 is what made that exp
 now worth about three points of margin and nine points of win rate, so a school drawing the doubled
 home fixture against its toughest rival drew it every season, permanently.
 
-**A season now reads season N−1's retained log and fixes every one of those residuals to the other
-school.** Before S99 that was **526 pairs across 14 leagues** on the stock world, and season 3 flipped
-back to season 1's schedule exactly. `Program.Season.Memory.cs` owns the layer; Phase 87 owns the proofs.
+**A season reads the retained logs of up to eight previous years, counts each school's residual home
+games against each opponent, and gives the next single meeting to whoever is behind.**
+`Program.Season.Memory.cs` owns the layer; Phase 87 owns the reading and the emission rule, Phase 91
+owns the debt.
 
-★ **S99 CHANGED BOTH OF THOSE NUMBERS, AND THE SECOND SENTENCE IS NO LONGER TRUE.** Rotation moves
-which pairs own a residual, so (a) far fewer pairs are odd in two consecutive seasons — a pair that
-goes to home-and-home has no residual to reverse — and (b) a career no longer returns to season 1's
-schedule, because the doubled pairs have moved on. A ten-season stock career reads **72 residuals
-across 8 leagues**. The promise that survives, and the one Phase 87 now asserts directly, is per-pair
-rather than per-season: **where a pair owns the residual in two consecutive seasons, the host
-alternates**. See "Schedule rotation" below for the venues that are given up to make that possible,
-and O-89 for the fairness hole this leaves.
+★ **S96 ASKED A ONE-HOP QUESTION AND S100 REPLACED IT WITH A RUNNING COUNT.** S96's rule was *"did you
+host our single game last season?"*, which was right until S99 began inserting home-and-home years
+between a pair's single games. A home-and-home year has no residual, so the rule looked back one
+season, saw an even pair, had nothing to say, and the counter was never carried forward. Measured over
+a twelve-season stock career: **3,509 single → home-and-home → single sequences, 2,581 of which handed
+the extra home game to the same school again**, and 341 pairs finishing twelve years twelve home games
+to six. The rule now asks *"who has hosted more of our single games across the window?"* A doubled year
+contributes nothing and — the whole point — **erases nothing**.
+
+★ **COUNTING RESIDUAL HOSTS IS COUNTING HOME GAMES, EXACTLY — an equivalence, not an approximation.**
+`Aggregate` refuses any source in which a pair's home counts are not an even split plus at most one
+residual, so for a pair meeting `m` times the home-game difference is `0` when `m` is even and exactly
+`±1` when `m` is odd, and the residual host names the sign. Summing residual hosts over the window is
+therefore identical to summing the full home-game difference. Counting doubled games as well would give
+the same difference, the same decisions, and would hide the error until a world with a different `q`.
+
+★ **AND IT COSTS NOTHING TO READ.** `ReadCareerMemory` already walked N−1..N−8 for the rotation, already
+validated each year through `ReadSeasonLog`, and already bound a full `HostMemory` per year whose
+residual pass runs unconditionally — then kept `k == 1` and discarded the rest. S100 keeps them. **No
+new disk read, no new parse**; if this layer ever opens a file to answer a debt question, something has
+been misread.
+
+Live, twelve seasons of the sixteen-school rig measured from the games that played: the worst pair
+finishes **three home games apart on 3 of 130 pairs**, against a one-hop control on the same world at
+**six apart on twelve pairs**. On the five-school rig every one of 40 pairs moves from six apart to two.
 
 ### ★ MEMORY MEANS SEASON N−1, AND IT IS FOUND BY ARITHMETIC
 
@@ -10518,11 +10536,71 @@ to build must not have spent a season number), so the memory layer cannot wait f
 peek is honest rather than asserting it — the file's bytes do not move, and the number the next
 reservation actually returns is the number the peek promised.
 
-### ★ NO FALLBACK, EVER
+### ★ THE BALANCE, AND WHAT THE SIGN MEANS
+
+For a normalized pair `(Lo, Hi)`, `balance = loResidualHosts − hiResidualHosts` summed over every
+readable offset. **Positive means Lo has hosted more, so Hi is owed. Negative means Lo is owed. Zero is
+level.** An entry naming a school outside its own pair contributes nothing to either side — that is
+damage in a hand-built or foreign record, and the honest reading of damage is silence.
+
+**Level and unknown are different internally and identical at emission** (Emmett's Q1). A pair that is
+square, and a pair with no single meeting anywhere in the window, both get **no venue at all**. Unknown
+is not debt and level is known-zero debt; neither justifies overriding the flow. Leaving them
+unconstrained is not a gap — it is slack the flow spends satisfying a pair that really is owed. The
+principle, stated once: **debt memory resolves imbalance; it does not preserve alternation for its own
+sake.**
+
+### ★ ONE WINDOW, SHARED WITH THE ROTATION (Emmett's Q3)
+
+Eight seasons, the same depth and the same read the rotation uses. The two halves need depth for
+*different* reasons — the rotation because second meetings are rare, host debt because a pair's run of
+single games gets interrupted — and they share it for coherence, not because the requirements are
+numerically identical. A second depth would have added a config concept, a read policy and a test
+matrix for no evidence of need.
+
+`HostDebtHistory.Within(window)` caps **consumption**, never the read. It is test-only: it lets a check
+run the pre-S100 one-hop rule as a negative control without a second read policy and without an extra
+parse, and it is what makes C6's isolating control possible with the rotation left **ON**. A
+rotation-off control would confound, because freezing which pairs are doubled changes how often a pair
+plays a single game at all.
+
+### ★ STRONGEST CLAIM FIRST, AND WHY THAT IS NOT COSMETIC (Emmett's Q2)
+
+S96's theorem guaranteed the emitted set could never over-commit a school's home quota. **Debt carries
+no such guarantee** — a school can be behind in more of its odd pairs than it can host. Measured on the
+stock world, 118 school-seasons of 1,903 go over quota, 142 venues in excess, never more than two at
+once.
+
+So the emitted list is ordered **strongest claim first** — biggest absolute balance, ties by ascending
+pair — and `FinishSlate` already surrendered venues from the **end** of that list, one at a time, so the
+longest honourable prefix survives deterministically. **Ordering the list where it is built is the
+entire implementation of the ruling; the flow is untouched.** A school owed two home games keeps its
+game and the pair nearly square is the one that pays. An explicit `fixedHosts` list stays **hard**.
+
+### ★ THE DEBT IS READ FROM WHAT HAPPENED, NOT WHAT WAS INTENDED
+
+S99 made these venues soft. A surrendered venue is **not a lost instruction**: the game is played
+somewhere, the log records the actual host, and next season's debt reads that. There is deliberately
+**no ledger of intentions**, because a second ledger would eventually disagree with the schedule and
+create two truths. Phase 91 C7 proves it rather than asserting it — the engine's debt read off disk
+equals the debt of the schedules that played, key for key, with venues genuinely surrendered so the
+comparison ranges over the pairs that could disagree.
+
+### ★ NO FALLBACK, EVER — AND THAT NOW COVERS THE DEBT TOO
 
 Once the candidate is season N−1's log, **any** failure to find, read or validate it disables host
-memory for the run and no other log is opened. Five statuses, all of them values and none of them
-exceptions:
+memory for the run and no other log is opened. **S100 keeps that for the debt as well**: a damaged N−1
+empties the whole window rather than letting the older years supply venues on their own.
+
+This is the one place S100 deliberately does *not* follow S99's divergence, and the reason is the page.
+The host line reports N−1's status beside the count of venues that applied; if the debt kept working
+while the status said `Unreadable`, the page would print *"none"* next to venues it really did apply.
+Reading a damaged year as a hole and carrying on is defensible basketball — the count across the other
+years is real, and offsets are absolute so no older year can masquerade as last year — but it needs the
+page to say so, and the page was outside S100's wall. Recorded as **O-91**, not taken silently. The
+rotation half still reads those same logs; Phase 91 C1d asserts both sides of that at once.
+
+Five statuses, all of them values and none of them exceptions:
 
 | Status | Means | Page says |
 |---|---|---|
@@ -10554,12 +10632,20 @@ same world play completely different basketball (different seeds, different scor
 **identical** memory, key for key. A grep can rot into a check that passes for the wrong reason; this
 cannot.
 
-### ★ THE THEOREM — WHY THE FLIP CANNOT BREAK R3
+### ★ THE THEOREM — WHAT IT STILL COVERS, AND WHAT IT NO LONGER DOES
 
 For a school in `d` odd pairs across a `G`-game league: its even-split pairs hand it `(G − d)/2` homes,
 so it must win exactly `d/2` residuals — every season, whatever memory says. Inverting every residual
 re-awards exactly `d/2`. **Quota is preserved identically**; memory reallocates WHICH games, never how
 many.
+
+★ **THIS DESCRIBES THE INVERT-EVERYTHING RULE, WHICH IS WHAT ONE READABLE YEAR STILL REDUCES TO — it is
+not a promise about the windowed rule.** S100 emits venues only where a balance is non-zero, so the
+emitted set *can* over-commit a school. R3 itself is never in danger — the orientation flow enforces the
+quota and surrenders the surplus — but the guarantee that nothing would ever need surrendering is gone,
+which is precisely why the surrender order became a ruling. Phase 87 C5c was checked before it was
+rewritten and kept: it is **arithmetic that follows from C5a and C5b** (`d` even, wins `d/2`, complement
+`d − d/2 = d/2`), not a property of the constructed fixture. Its claim is narrowed, not its assertion.
 
 `d` has the same parity as `G`, and an odd `G` is already refused by production
 (`ConferenceStaticLegality`: *"a conference season must be even"*), so an odd `d` is unreachable through
@@ -10580,14 +10666,21 @@ waiting for in-career realignment; they are belt-and-braces at the world level, 
 
 ### The five conditions, and why a failure is silence rather than refusal
 
-A remembered entry is used only if the pair is normalized, both schools are in this league, the pair
-exists in this season's meetings, the current count is **odd**, and the remembered host is one of the
-two. Anything else is **silently skipped**.
+A venue is emitted only if the pair is normalized, both schools are in this league, the pair exists in
+this season's meetings, the current count is **odd**, and the recorded host is one of the two. Anything
+else is **silently skipped**. To that S100 adds the sign test: a zero balance emits nothing.
 
 That matters because `OrientConferenceSlate` correctly *refuses* a fixed host named on an even pair —
 and a refusal there takes the whole season down. A league changing size between careers is ordinary; a
 season failing to schedule because of it is not. Parity-changed pairs are dropped in the memory layer,
 never left for the slate's guard to catch.
+
+★ **THE EVEN-THIS-SEASON SKIP HAS TWO LEVELS NOW, AND ONLY ONE OF THEM IS A SKIP.** *Emission* — no
+venue, because there is no residual to orient. *Memory* — the pair's balance is **not erased**, so when
+the pair turns odd again the debt is still there deciding the host. That single distinction is the whole
+of O-89, and the pre-S100 code conflated them: it had no place to keep a balance, so an even year was
+simply silence in both senses. Phase 87 C6a and C6b assert the two separately, with the one-hop rule run
+beside them emitting nothing on the same pair.
 
 ### The page moved
 
@@ -10608,10 +10701,13 @@ play and finalize real seasons to produce the logs it reads back.
 
 ### Still open here
 
-**Which pairs double and which skip is still fully determined and still repeats forever** (O-79's
-remaining half), along with the soft objectives (`SkipUrgency` and friends) held out of S93 because they
-need this memory to apply. MTE participation memory is named and not pre-shaped for — the reader
-projects hosting facts only, and widening it is a ruling, not an extension.
+**O-91** — whether a damaged season N−1 should empty the debt or merely leave a hole in it. Answering
+"a hole" means the page must stop reporting N−1's status as if it described the venues, which is a
+presentation decision of its own.
+
+MTE participation memory is named and not pre-shaped for — the reader projects hosting facts only, and
+widening it is a ruling, not an extension. The pair-scoped rule and the parity-change filter remain
+correct code waiting for in-career realignment, for the fingerprint reason recorded above.
 
 ## Schedule rotation — whose turn is it to be played twice (Session 99, 2026-08-04)
 

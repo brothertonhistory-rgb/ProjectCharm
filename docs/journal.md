@@ -1,3 +1,90 @@
+## Session 100 — WHO IS OWED THE HOME GAME. The alternation stops looking one year back and starts counting residual home games across the same window the rotation already reads, so a home-and-home year no longer wipes the debt. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 91 PASS at 19 assertions, Phase 90 back to 40.** Twelve seasons of the sixteen-school rig: the worst pair finishes **three home games apart, on 3 of 130 pairs**, against a one-hop control on the same world that finishes **six apart on twelve pairs**. On the five-school rig, where the old rule was totally degenerate, **every one of 40 pairs goes from six apart to two**. **O-89 closes; O-90 closes by measurement.** (2026-08-04)
+
+**Register:** build, under `PROMPT-host-debt-s100-r2` (ChatGPT-reviewed). One new file, five edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED. No new world file.
+
+### What shipped
+
+`src/Charm.Harness/Program.Checks.HostDebt.cs` — NEW (Phase 91). `Program.Season.Memory.cs`, `Program.Season.cs`, `Program.Checks.SeasonMemory.cs`, `Program.Checks.Rotation.cs`, `Program.cs` — EDIT.
+
+### The hole, measured before a line was written
+
+S96's rule was *"they hosted our single game last season, so I host it this season."* S99 then started inserting home-and-home years between a pair's single games, and a home-and-home year has no residual — so the rule looked back one season, saw an even pair, and had nothing to say. The counter was never carried forward.
+
+Measured at the gate over a twelve-season stock career, chaining schedules exactly as production does:
+
+| | |
+|---|---|
+| Pairs that ever owned a residual | 906 |
+| …that **never once swapped it** | **356 (39%)** |
+| Single → home-and-home → single sequences | 3,509 |
+| …that handed the extra game to the same school again | **2,581 (74%)** |
+| Pairs finishing twelve years 12 home games to 6 | **341** |
+
+The signature is unmistakable: a pair plays `2,1,2,1,2,1` across twelve years and the same school hosts the odd game all six times.
+
+### ★ THE PROMPT WAS WRONG ABOUT WHERE THIS BITES, AND THE MEASUREMENT SAID SO AT THE GATE
+
+Assumption A4 said the window *"earns its depth on **small** leagues"*, on the reasoning that in an 18- or 20-team league almost nobody is doubled so the last single meeting is nearly always last season. Measured, the worst damage is in **11-to-13 school leagues playing 18 games** — leagues where roughly half your opponents get doubled each year. Sun Belt 78 pairs at the maximum, then Southern, Northeast, CAA, MEAC, and eleven pairs each in the **ACC, SEC, Big 12** and seven in the Big Ten. The Big East — the sixteen-school shape the eight-season window was sized around — has **two**.
+
+A4's consequence (share the window, keep it deep) is unaffected; its rationale was backwards. This is the S81.3 lesson recurring one prompt later: a plausible claim about a *measurement* is exempted from the §6b source audit in exactly the way a plausible table is, and the fix is the same — re-measure rather than quote.
+
+### ★ COUNTING RESIDUAL HOSTS IS COUNTING HOME GAMES, EXACTLY
+
+Not an approximation, an equivalence, and it is what licenses the whole design. `Aggregate` refuses any source in which a pair's home counts are not an even split plus at most one residual, so for a pair meeting `m` times the home-game difference is `0` when `m` is even and exactly `±1` when `m` is odd, with the residual host naming the sign. Summing residual hosts over the window is therefore identical to summing the full home-game difference. A counter that also tallied doubled games would give the same difference and the same decisions, and would hide the error until a world with a different `q`.
+
+### ★ THIS ADDED NO DISK READ AND NO PARSE
+
+The single most useful finding of the gate. `ReadCareerMemory` already walked seasons N−1..N−8, already called `ReadSeasonLog` for each, and already bound a full `HostMemory` per year — whose residual pass runs unconditionally — and then kept only `k == 1` and dropped the rest on the floor. The session is a plumbing change: the walk keeps what it was already computing. If this layer ever opens a file to answer a debt question, something has been misread.
+
+### ★ S96'S THEOREM DOES NOT SURVIVE, AND THAT MAKES THE SURRENDER ORDER LOAD-BEARING
+
+Inverting **every** residual was guaranteed to re-award each school exactly half of them (`d` even, wins `d/2`, complement `d − d/2 = d/2`), so the emitted set could never over-commit a school's home quota. Debt carries no such guarantee: a school can be behind in more of its odd pairs than it can host. Measured at the gate on the stock world, **118 school-seasons of 1,903 go over quota, 142 venues in excess, never more than two at once** — real, small, and bounded.
+
+So Q2 stopped being a nicety. The emitted list is now ordered **strongest claim first** — biggest absolute debt, ties by ascending pair — and `FinishSlate` already surrendered from the **end** of that list. Ordering it where it is built is the entire implementation of the ruling; the flow is untouched. Phase 91 C5 constructs the over-commitment deliberately and asserts both halves: the strongest claims survive, and the weakest is provably not among the venues honoured.
+
+Phase 87 C5c was checked before it was rewritten, per §0.5's instruction. It is **not** a property of the constructed fixture — it is arithmetic that follows from C5a and C5b — so it stays, with its claim narrowed to describe the invert-everything rule that a single readable year still reduces to.
+
+### ★ THE DEBT IS READ FROM WHAT HAPPENED, NOT WHAT WAS INTENDED
+
+S99 made these venues soft: the flow surrenders them when it cannot orient the season. A surrendered venue is not a lost instruction — the game is played somewhere, the log records the actual host, and next season's debt reads that. **No ledger of intentions exists**, because a second ledger would eventually disagree with the schedule and create two truths. Phase 91 C7 proves it directly: the engine's own debt, read off disk, equals the debt of the schedules that actually played, key for key over 130 pairs, with 188 venues surrendered across the career so the assertion genuinely ranges over pairs played against what was asked for.
+
+### ★ THE ONE CALL EMMETT COULD HAVE MADE DIFFERENTLY — A DAMAGED N−1 EMPTIES THE DEBT
+
+Found by the build, not the gate: Phase 90 C5a went red. Under S96 a damaged season N−1 disabled host memory entirely. Under a windowed rule the natural reading is S99's — a hole contributes zero facts and disables nothing — and the first build did exactly that, applying 59 venues off the older years while the status half reported `Unreadable`.
+
+**Reverted, and the reason is the page.** The host line reports N−1's status beside the count of venues that applied. If the debt kept working while the status said "unreadable", the page would print *"none (season N unreadable)"* next to venues it really did apply, and a line that lies is worse than a rule that is conservative. Reading a damaged year as a hole and carrying on is defensible basketball — the count across the other years is still real, and offsets are absolute so no older year can masquerade as last year — but it needs the page to say so, and **the page is explicitly outside this session's wall**. Recorded as **O-91** rather than taken silently.
+
+The fixtures were passing this by luck, which is why it is now asserted rather than assumed: on the five-school rig a pair odd two years ago is *even* this year, so a build with no rule at all emits nothing there and looks correct. Phase 91 C1d reads the **record**, not the schedule, and additionally proves the rotation still reads those same two logs — the two consumers failing differently, one step further along.
+
+### ★ THE DISCRIMINATOR, AND WHY IT COULD NOT PASS ON LUCK
+
+Every venue assertion in Phase 87 passes on **both** rules in season two, because with one year of history they *are* the same rule: a single year's balance is exactly ±1 and "behind" is exactly "did not host last time". A two-season test proves nothing about this session.
+
+C2 is the only check that needs a doubled year in the middle. The gate flagged that on a stock pair the old rule corrects itself by chance 26% of the time, so a control there could go green for the wrong reason. On the five-school rig the old rule repeats **200 times out of 200** over twelve seasons — so that is the fixture, and both season-three schedules are built from the **same two logs** with nothing differing but how far back the debt may look. Live: **20 pairs took a home-and-home year in between, 20 swapped; 20 of 20 repeated year one's host at window 1.**
+
+The control needed a way to run the pre-S100 rule without a second read policy, a second config concept or a second walk. `HostDebtHistory.Within(window)` caps **consumption**, never the read, so the control costs no extra parse and cannot drift from production — and it lets C6 isolate correctly with the rotation left **ON**, which a rotation-off control could not do (freezing which pairs are doubled changes how often a pair plays a single game at all).
+
+### The numbers, live
+
+Phase 91, all nineteen green, every one predicted before Emmett's run and every one landing:
+
+- **C6** — twelve seasons of `fixture-rotation`, measured from the games that played: S100 **max 3 across 3 of 130 pairs**, distribution `[0:38 1:39 2:50 3:3]`; one-hop control **max 6 across 12 pairs**, `[0:31 1:27 2:30 3:8 4:15 5:7 6:12]`; 188 venues surrendered over the career. The bound is set from the S100 run, the control's number is printed in the same line, and the check additionally requires the control to be strictly worse — so the bar cannot quietly become decorative.
+- **C10 / O-90** — the five-school rig, `S100 max 2 across 40 of 40 pairs` against `ONE-HOP max 6 across 40`. Reported, never asserted.
+- **C9** — the deep rig still covers by season 7, `min distinct 15/15`. The rotation is undisturbed.
+- **C4** — R3 exact, every school, every one of twelve seasons.
+
+### ★ THE FOURTH SESSION RUNNING THAT A CHECK OUTSIDE THE FILE LIST HAD TO MOVE
+
+S98 moved Phase 88 C8; S99 moved Phase 87 C8i-b/C8ii/C8iii; this prompt's §0.5 named that pattern explicitly, listed six Phase 87 assertions with their replacements — and then **omitted Phase 90 entirely**, both its two slate call sites and C5a's semantics. The delivery inherited the omission: the first drop shipped five files against §4's list and the build failed on Windows at `Program.Checks.Rotation.cs`, because the sixth file had been edited in the sandbox and never added to the delivery. One turn lost, no ambiguity about the cause.
+
+The lesson is not "check the file list harder". It is that **a prompt section written to fix a recurring omission is not itself exempt from that omission** — §0.5 catalogued Phase 87 because Phase 87 was where the last three lived, and looked no further. The mechanical guard: before delivering, grep the whole tree for every renamed symbol and diff the touched-file set against what was actually edited, rather than against the prompt's expectation.
+
+### Errors worth recording honestly
+
+1. **The sixth file, above.** Delivered against the prompt's list instead of against the sandbox's actual diff.
+2. **The first build let a damaged N−1 keep supplying venues.** Caught by Phase 90 going red, not by reasoning — and the fixtures would have hidden it, which is why C1d now exists.
+3. **C6's bound shipped as a placeholder.** It was written at 2 before the twelve-season run existed and the run measured 3. Correct process (measure, then set) with the constant filled in a turn early; it went red in the sandbox, never on Emmett's machine.
+
 ## Session 99 — WHO YOU PLAY TWICE. The extra meeting now rotates by whose turn it is, read from up to eight seasons of retained logs. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 90 PASS at 40 assertions.** On the stock world, season ten of a career: **411 preferred pairs held across all 14 affected leagues, 45 fell to feasibility, ZERO terminal fallbacks**. On the sixteen-school rig — the Big East's shape exactly — **every school has played every opponent twice by season 7**, inside the eight-season window, against a frozen control where twelve of fifteen opponents are never doubled once in twelve years. **O-79 closes.** (2026-08-04)
 
 **Register:** build, under `PROMPT-schedule-rotation-s99-r3` (ChatGPT-reviewed). Two new files, five edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED.

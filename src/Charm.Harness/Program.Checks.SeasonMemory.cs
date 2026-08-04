@@ -190,42 +190,68 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             //  C3 — the flip, at four separated layers.
             // ════════════════════════════════════════════════════════════════════
-            //  (a) PURE. A hand-built memory against hand-built meetings, exercising every
-            //      one of the five conditions plus the inversion itself.
-            var pureMembers = new List<int> { 10, 20, 30, 40 };
+            //  (a) PURE. A hand-built record against hand-built meetings, exercising every one
+            //      of the five silent skips plus the emission rule itself.
+            //  ★ REWRITTEN AT S100. This asserted the exact INVERSION of a one-season memory.
+            //      The rule is now "a venue is emitted only when the windowed balance is
+            //      non-zero, and it names the school that is behind", so all four signs are
+            //      asserted — positive, negative, ZERO and UNKNOWN — with the five skips intact.
+            var pureMembers = new List<int> { 10, 20, 30, 40, 50 };
             var pureMeetings = new Dictionary<(int Lo, int Hi), int>
             {
-                [(10, 20)] = 1,   // odd — flips
-                [(10, 30)] = 3,   // odd — flips
-                [(10, 40)] = 2,   // even — no residual to decide
-                [(20, 30)] = 1,   // odd, but memory names a host outside the pair
-                [(20, 40)] = 1,   // odd, but no memory entry at all
-                [(30, 40)] = 1,   // odd — flips
+                [(10, 20)] = 1,   // odd, balance +2 -> 20 hosts, strongest claim
+                [(10, 30)] = 3,   // odd, balance -1 -> 10 hosts
+                [(10, 40)] = 2,   // even this season — no venue, but the balance is NOT erased
+                [(10, 50)] = 1,   // odd, balance 0 (level) -> nothing
+                [(20, 30)] = 1,   // odd, every entry names a school outside the pair -> nothing
+                [(20, 40)] = 1,   // odd, no entry in any readable year (unknown) -> nothing
+                [(30, 40)] = 1,   // odd, balance -1 -> 30 hosts
             };
-            var pureMemory = LoadedMemory(new Dictionary<(int Lo, int Hi), int>
-            {
-                [(10, 20)] = 10,   // 10 hosted -> 20 must host
-                [(10, 30)] = 30,   // 30 hosted -> 10 must host
-                [(10, 40)] = 40,   // parity changed: skipped
-                [(20, 30)] = 99,   // host not in the pair: skipped
-                [(30, 40)] = 40,   // 40 hosted -> 30 must host
-                [(50, 60)] = 50,   // both schools foreign: skipped
-                [(20, 55)] = 20,   // one school foreign: skipped
-                [(70, 70)] = 70,   // not a normalized pair: skipped
-            });
-            var pureFlips = ResidualsToFlip(pureMemory, pureMeetings, pureMembers);
+            var pureDebt = WindowedDebt(
+                (1, new Dictionary<(int Lo, int Hi), int>
+                {
+                    [(10, 20)] = 10, [(10, 30)] = 30, [(10, 40)] = 40, [(10, 50)] = 10,
+                    [(20, 30)] = 99,                 // host not in the pair: contributes nothing
+                    [(30, 40)] = 40,
+                    [(50, 60)] = 50,                 // both schools foreign: skipped
+                    [(20, 55)] = 20,                 // one school foreign: skipped
+                    [(70, 70)] = 70,                 // not a normalized pair: skipped
+                }),
+                // a HOLE at offset 2 — no entry at all, and it must not slide anything forward
+                (3, new Dictionary<(int Lo, int Hi), int>
+                {
+                    [(10, 20)] = 10,                 // 10 again -> balance +2
+                    [(10, 50)] = 50,                 // squares the pair -> balance 0
+                    [(20, 30)] = 99,
+                }));
+            var pureFlips = ResidualsToFlip(pureDebt, pureMeetings, pureMembers);
             var pureWant = new[]
             {
-                new FixedResidualHost(10, 20, 20),
-                new FixedResidualHost(10, 30, 10),
-                new FixedResidualHost(30, 40, 30),
+                new FixedResidualHost(10, 20, 20),   // |2| — strongest, first in the list
+                new FixedResidualHost(10, 30, 10),   // |1| — ties break by ascending pair
+                new FixedResidualHost(30, 40, 30),   // |1|
             };
-            Check("C3a: the pure flip inverts exactly the legal entries and silently skips the rest",
+            Check("C3a: a venue is emitted only where the windowed balance is non-zero and it names the " +
+                  "school that is behind — positive, negative, level and unknown, all five skips intact, " +
+                  "strongest claim first",
                   pureFlips.Count == pureWant.Length
                   && pureFlips.Zip(pureWant).All(p => p.First == p.Second),
                   pureFlips.Count == pureWant.Length
                     ? string.Join(" ", pureFlips.Select(f => $"({f.LowSchoolId},{f.HighSchoolId})->{f.HostSchoolId}"))
-                    : $"{pureFlips.Count} flips, want {pureWant.Length}");
+                    : $"{pureFlips.Count} venues, want {pureWant.Length}");
+
+            //  ★ AND THE BALANCE ITSELF, so a failure above diagnoses itself. Level and unknown
+            //    are DIFFERENT internally even though they behave identically at emission.
+            var pureBalance = HostDebtBalances(pureDebt);
+            Check("C3a-ii: the balance is the residual-host difference, level is present-with-zero and " +
+                  "unknown is absent, and a host outside its own pair counts for neither side",
+                  pureBalance[(10, 20)] == 2 && pureBalance[(10, 30)] == -1
+                  && pureBalance[(10, 40)] == -1 && pureBalance[(10, 50)] == 0
+                  && pureBalance[(20, 30)] == 0 && !pureBalance.ContainsKey((20, 40))
+                  && !pureBalance.ContainsKey((70, 70)),
+                  $"(10,20)={pureBalance[(10, 20)]}, (10,30)={pureBalance[(10, 30)]}, " +
+                  $"(10,40)={pureBalance[(10, 40)]} kept through an even season, " +
+                  $"(10,50)={pureBalance[(10, 50)]} level, (20,40) unknown");
 
             //  (b) SLATE. Production builds a league, memory is derived from that league's OWN
             //      oriented games, production builds it again — and every odd pair inverts.
@@ -233,9 +259,9 @@ internal static partial class Program
             var memConf = memWorld.Conferences.Single(c => c.Id == 1);
             var slate1 = BuildConferenceSlate(memLeague, memConf.Games, memConf.Skip,
                                               new List<(int, int)>(), "c3b ");
-            var derived = LoadedMemory(ResidualHostsOf(slate1));
+            var derived = OneSeasonDebt(ResidualHostsOf(slate1));
             var slate2 = BuildConferenceSlate(memLeague, memConf.Games, memConf.Skip,
-                                              new List<(int, int)>(), "c3b ", memory: derived);
+                                              new List<(int, int)>(), "c3b ", debt: derived);
             var hosts1 = ResidualHostsOf(slate1);
             var hosts2 = ResidualHostsOf(slate2);
             Check("C3b: every single-meeting pair in a real league changes host in season 2",
@@ -249,7 +275,7 @@ internal static partial class Program
             //  changed" could be the solver wandering rather than the memory acting.
             var slateControl = BuildConferenceSlate(memLeague, memConf.Games, memConf.Skip,
                                                     new List<(int, int)>(), "c3b ",
-                                                    memory: LoadedMemory(new Dictionary<(int Lo, int Hi), int>()));
+                                                    debt: OneSeasonDebt(new Dictionary<(int Lo, int Hi), int>()));
             Check("C3b control: empty memory reproduces season 1's league exactly — the flip is the memory's doing",
                   slateControl.Verdict == SlateVerdict.Feasible
                   && slateControl.MemoryFixedHosts == 0
@@ -271,7 +297,7 @@ internal static partial class Program
                 var rivalries = ActiveRivalries(members, StockRivals(stock), c.Games);
                 var a = BuildConferenceSlate(members, c.Games, c.Skip, rivalries, $"c4 {c.Id} ");
                 var b = BuildConferenceSlate(members, c.Games, c.Skip, rivalries, $"c4 {c.Id} ",
-                                             memory: LoadedMemory(ResidualHostsOf(a)));
+                                             debt: OneSeasonDebt(ResidualHostsOf(a)));
                 r3Leagues++;
                 if (b.Verdict != SlateVerdict.Feasible) { r3Bad.Add($"{c.ShortName} {b.Verdict}"); continue; }
                 var homes = members.ToDictionary(s => s, _ => 0);
@@ -309,7 +335,7 @@ internal static partial class Program
                 foreach (var (pair, h) in hostsA) winsInv[h == pair.Lo ? pair.Hi : pair.Lo]++;
 
                 var b = BuildConferenceSlate(members, c.Games, c.Skip, rivalries, $"c5 {c.Id} ",
-                                             memory: LoadedMemory(hostsA));
+                                             debt: OneSeasonDebt(hostsA));
                 var homesB = members.ToDictionary(s => s, _ => 0);
                 foreach (var (home, _) in b.Games) homesB[home]++;
 
@@ -325,7 +351,19 @@ internal static partial class Program
                   t1.Count == 0 ? "no school owes half a residual" : string.Join("; ", t1.Take(4)));
             Check("C5b: season 1 awards every school exactly half its odd pairs", t2.Count == 0,
                   t2.Count == 0 ? "exact" : string.Join("; ", t2.Take(4)));
-            Check("C5c: inverting every residual re-awards exactly half", t3.Count == 0,
+            //  ★ S100 CHECKED THIS BEFORE REWRITING IT, and it is NOT a property of the
+            //    constructed fixture — it is arithmetic that follows from C5a and C5b. A school
+            //    sits in an even number d of odd pairs (C5a) and wins d/2 of them (C5b), so the
+            //    complement it wins after a full inversion is d - d/2 = d/2 whatever the world
+            //    looks like. It is kept as the step a reader needs between C5b and C5d.
+            //  ★ WHAT IT NO LONGER CLAIMS, and this is S100's real change: it describes the
+            //    INVERT-EVERYTHING rule, which is what one readable year of debt still reduces
+            //    to. It is not a promise about the windowed rule, which emits venues only where
+            //    a balance is non-zero and therefore CAN over-commit a school's home quota. The
+            //    flow surrenders the surplus; Phase 91 C5 is where that order is asserted.
+            Check("C5c: inverting every residual re-awards exactly half — arithmetic from C5a and C5b, and " +
+                  "true of the one-hop rule that a single readable year still reduces to",
+                  t3.Count == 0,
                   t3.Count == 0 ? "exact" : string.Join("; ", t3.Take(4)));
             Check("C5d: season 2 lands every school at exactly half its league season", t4.Count == 0,
                   t4.Count == 0 ? "exact" : string.Join("; ", t4.Take(4)));
@@ -350,29 +388,61 @@ internal static partial class Program
             //  changing size between careers is ordinary; a season failing to schedule because
             //  of it is not.
             // ════════════════════════════════════════════════════════════════════
-            var evenPairMemory = LoadedMemory(new Dictionary<(int Lo, int Hi), int>
+            //  ★ REWRITTEN AT S100, NOT NARROWED — AND THIS IS THE MOST IMPORTANT ONE IN THE
+            //    FILE. "Even this season" now has two levels and they are asserted separately:
+            //
+            //      EMISSION — no venue. There is no residual to orient, and handing one to
+            //                 OrientConferenceSlate would take the whole season down.
+            //      MEMORY   — the pair's balance is NOT erased. When the pair turns odd again
+            //                 that balance is what decides the host.
+            //
+            //    The old check only ever proved the first. The second is the entire content of
+            //    O-89, and a build that computed the balance perfectly and still wiped it at an
+            //    even year would have passed the old form.
+            var evenPair = (Lo: memLeague[0], Hi: memLeague[1]);
+            var evenPairDebt = OneSeasonDebt(new Dictionary<(int Lo, int Hi), int>
             {
-                [(memLeague[0], memLeague[1])] = memLeague[0],
+                [evenPair] = evenPair.Lo,
             });
-            var evenMeetings = new Dictionary<(int Lo, int Hi), int> { [(memLeague[0], memLeague[1])] = 2 };
-            var dropped = ResidualsToFlip(evenPairMemory, evenMeetings, memLeague);
+            var evenMeetings = new Dictionary<(int Lo, int Hi), int> { [evenPair] = 2 };
+            var dropped = ResidualsToFlip(evenPairDebt, evenMeetings, memLeague);
             var tinyLeague = LeagueMembers(tiny, 1);
             var tinyConf = tiny.Conferences.Single(c => c.Id == 1);
             var tinySlate = BuildConferenceSlate(
                 tinyLeague, tinyConf.Games, tinyConf.Skip, new List<(int, int)>(), "c6 ",
-                memory: LoadedMemory(tinyLeague.SelectMany(
+                debt: OneSeasonDebt(tinyLeague.SelectMany(
                     a => tinyLeague.Where(b => b > a).Select(b => ((Lo: a, Hi: b), a)))
                     .ToDictionary(x => x.Item1, x => x.Item2)));
-            Check("C6: memory naming a now-even pair is filtered out, and the league still builds",
+            Check("C6a: EMISSION — a pair even THIS season gets no venue, and the league still builds",
                   dropped.Count == 0 && tinySlate.Verdict == SlateVerdict.Feasible
                   && tinySlate.MemoryFixedHosts == 0,
-                  $"{dropped.Count} flips, {tinySlate.Verdict}");
+                  $"{dropped.Count} venues, {tinySlate.Verdict}");
+
+            //  ★ MEMORY. The same pair, the same balance, read through a window in which the
+            //    MOST RECENT year is the even one. The balance must survive it untouched, and
+            //    the venue must appear the moment the pair is odd again.
+            var throughEven = WindowedDebt(
+                (1, new Dictionary<(int Lo, int Hi), int>()),                       // the doubled year
+                (2, new Dictionary<(int Lo, int Hi), int> { [evenPair] = evenPair.Lo }));
+            var oddAgain = new Dictionary<(int Lo, int Hi), int> { [evenPair] = 1 };
+            var revived = ResidualsToFlip(throughEven, oddAgain, memLeague);
+            var carried = HostDebtBalances(throughEven);
+            var oneHop = ResidualsToFlip(throughEven.Within(1), oddAgain, memLeague);
+            Check("C6b: ★ MEMORY — a home-and-home year in between does NOT erase the debt: the balance " +
+                  "survives it and the school that is behind hosts when the pair turns odd again",
+                  carried.TryGetValue(evenPair, out var carriedBalance) && carriedBalance == 1
+                  && revived.Count == 1 && revived[0].HostSchoolId == evenPair.Hi,
+                  $"balance {(carried.TryGetValue(evenPair, out var cb) ? cb : 0)} through the doubled year, " +
+                  $"{revived.Count} venue -> {(revived.Count == 1 ? revived[0].HostSchoolId : 0)}");
+            Check("C6b control: ★ AND THE PRE-S100 RULE IS SILENT ON EXACTLY THIS PAIR — one hop back sees " +
+                  "the doubled year, has nothing to say, and emits nothing. This is the hole O-89 named",
+                  oneHop.Count == 0, $"{oneHop.Count} venues at window 1");
 
             // ════════════════════════════════════════════════════════════════════
             //  C7 — foreign, malformed and self-referential memory.
             // ════════════════════════════════════════════════════════════════════
             var foreign = ResidualsToFlip(
-                LoadedMemory(new Dictionary<(int Lo, int Hi), int>
+                OneSeasonDebt(new Dictionary<(int Lo, int Hi), int>
                 {
                     [(90001, 90002)] = 90001,                 // schools that do not exist
                     [(memLeague[0], 90003)] = memLeague[0],    // one real school, one foreign
@@ -477,6 +547,32 @@ internal static partial class Program
                   $"{repeated} recurring residual pairs, {givenUp} venue(s) given up, so at least " +
                   $"{Math.Max(0, repeated - givenUp)} must swap — {alternated} did");
 
+            //  ★ STRENGTHENED AT S100, FROM SWAPS TO BALANCE. The check above counts host
+            //  CHANGES, which is the one-hop question. S100's promise is about the running
+            //  total, so this reads the debt off the two seasons that were actually PLAYED and
+            //  requires season three's host to be the school that balance says is behind —
+            //  everywhere the venue was not surrendered. That is the A3 rule in miniature:
+            //  nothing here consults what was requested, only what the schedules did.
+            {
+                var played = WindowedDebt(
+                    (1, ResidualHostsOfSchedule(alt2.Schedule)),
+                    (2, ResidualHostsOfSchedule(alt1.Schedule)));
+                var owedBy = HostDebtBalances(played);
+                var thirdHosts = ResidualHostsOfSchedule(alt3.Schedule);
+                var honoured = 0; var contradicted = 0;
+                foreach (var (pair, host) in thirdHosts)
+                {
+                    if (!owedBy.TryGetValue(pair, out var bal) || bal == 0) continue;
+                    if (host == (bal > 0 ? pair.Hi : pair.Lo)) honoured++; else contradicted++;
+                }
+                Check("C8i-b-ii: ★ AND THE DEBT IS READ FROM WHAT HAPPENED. Season three's hosts are checked " +
+                      "against the balance computed from the two seasons actually PLAYED, and every " +
+                      "contradiction is a venue the flow surrendered",
+                      honoured > 0 && contradicted <= alt3.Rotation.MemoryVenuesGivenUp,
+                      $"{honoured} pairs hosted by the school that was behind, {contradicted} did not, " +
+                      $"{alt3.Rotation.MemoryVenuesGivenUp} venue(s) surrendered that season");
+            }
+
             //  (ii) T1 — a history-bound season that retained nothing. The next season must
             //  find no log for N-1 and STOP. Season 1's perfectly good log is sitting right
             //  there; reaching it would be stale alternation wearing the right face.
@@ -553,8 +649,8 @@ internal static partial class Program
                              readB.PreviousResidualHost.TryGetValue(kv.Key, out var v) && v == kv.Value),
                       $"{readA.ResidualPairsRemembered} residuals, both reads");
 
-                var flipsA = ResidualsToFlip(readA, slate1.Meetings, memLeague);
-                var flipsB = ResidualsToFlip(readB, slate1.Meetings, memLeague);
+                var flipsA = ResidualsToFlip(OneSeasonDebt(readA.PreviousResidualHost), slate1.Meetings, memLeague);
+                var flipsB = ResidualsToFlip(OneSeasonDebt(readB.PreviousResidualHost), slate1.Meetings, memLeague);
                 Check("C9b: the flip list is order-stable — same entries, same order, every time",
                       flipsA.SequenceEqual(flipsB), $"{flipsA.Count} venues");
 
@@ -621,11 +717,22 @@ internal static partial class Program
 
     // ── Helpers, kept here rather than in production ──────────────────────────────
 
-    /// <summary>A Loaded memory over a hand-supplied or derived residual map. Test-side only:
-    /// production builds these by reading a log.</summary>
-    private static HostMemory LoadedMemory(Dictionary<(int Lo, int Hi), int> residuals)
-        => new(residuals, HostMemoryStatus.Loaded, 1, 1, HostMemoryProblem.None,
-               0, residuals.Count);
+    /// <summary>★ S100 — a debt record over ONE readable year. The pre-S100 sibling built a
+    /// one-season <c>HostMemory</c>; every venue-emission check wants this instead, and a
+    /// single readable year is exactly the pre-S100 rule, which is what lets the S96 checks
+    /// carry over unchanged in meaning. Test-side only: production builds these by reading
+    /// logs.</summary>
+    private static HostDebtHistory OneSeasonDebt(IReadOnlyDictionary<(int Lo, int Hi), int> residuals)
+        => new(new Dictionary<int, IReadOnlyDictionary<(int Lo, int Hi), int>> { [1] = residuals });
+
+    /// <summary>★ S100 — a debt record over several readable years, by ABSOLUTE season offset.
+    /// Offsets are supplied explicitly rather than by list position, so a check can leave a
+    /// HOLE and prove it does not compress time.</summary>
+    private static HostDebtHistory WindowedDebt(
+        params (int Offset, Dictionary<(int Lo, int Hi), int> Residuals)[] years)
+        => new(years.ToDictionary(
+                   y => y.Offset,
+                   y => (IReadOnlyDictionary<(int Lo, int Hi), int>)y.Residuals));
 
     /// <summary>Who hosted the residual of each odd pair, derived from a slate's oriented games.
     ///

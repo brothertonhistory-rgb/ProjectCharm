@@ -398,7 +398,7 @@ internal static partial class Program
                     var career = ReadCareerMemory(store, RotationWindowSeasons);
                     deepSlate = BuildConferenceSlate(
                         deep, 18, 0, new List<(int Lo, int Hi)>(), "c6 deep ",
-                        memory: career.Hosts, rotation: career.Rotation);
+                        debt: career.Debt, rotation: career.Rotation);
                 }
                 Check("C6c: the chooser's result is a legal r-regular extra graph and it is NOT the pinned " +
                       "one — the schedule really moved",
@@ -505,7 +505,7 @@ internal static partial class Program
                     var career = ReadCareerMemory(store, RotationWindowSeasons);
                     withMemory = BuildConferenceSlate(
                         deep, 18, 0, new List<(int Lo, int Hi)>(), "c8a ",
-                        memory: career.Hosts, rotation: career.Rotation);
+                        debt: career.Debt, rotation: career.Rotation);
                     withoutMemory = BuildConferenceSlate(
                         deep, 18, 0, new List<(int Lo, int Hi)>(), "c8b ",
                         rotation: career.Rotation);

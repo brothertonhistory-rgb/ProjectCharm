@@ -73,6 +73,50 @@ namespace Charm.Harness;
 //  than discovered later: a hole can OVERSTATE how overdue a pair is, and can
 //  never understate a doubling it did see.
 // ============================================================================
+//  S100 — AND IT REMEMBERS WHO IS OWED THE HOME GAME.
+//
+//  S96 asked one question: "did you host our single game LAST season?" S99 then
+//  started inserting home-and-home years between a pair's single games, and a
+//  home-and-home year has no residual — so the question came back "nothing to
+//  say", and the counter was never carried forward. Measured over a twelve-season
+//  stock career: 3,509 single -> home-and-home -> single sequences, 2,581 of which
+//  handed the extra home game to the SAME school again, and 341 pairs finishing
+//  twelve years twelve home games to six.
+//
+//  ★ THE QUESTION IS NOW A RUNNING COUNT, NOT A ONE-HOP COMPARISON. Over every
+//  readable year in the window, count each school's residual home games against
+//  this opponent. Whoever is behind hosts the next single meeting. A doubled year
+//  contributes nothing and — the whole point — ERASES NOTHING.
+//
+//  ★ THIS ADDS NO DISK READ AND NO PARSE. Every readable year's residual hosts
+//  were already computed by `Aggregate` and thrown away one line later; the walk
+//  keeps them now. If this file ever opens a file to answer a debt question,
+//  something has been misread.
+//
+//  ★ COUNTING RESIDUAL HOSTS IS COUNTING HOME GAMES, EXACTLY — an equivalence,
+//  not an approximation. `Aggregate` refuses any source in which a pair's home
+//  counts are not an even split plus at most one residual, so for a pair meeting
+//  m times the home-game difference is 0 when m is even and exactly +/-1 when m is
+//  odd, and the residual host names the sign. Summing residual hosts over seasons
+//  is therefore identical to summing the full home-game difference. Counting
+//  doubled games as well would give the same difference and hide the error.
+//
+//  ★ THE DEBT IS READ FROM WHAT HAPPENED, NEVER FROM WHAT WAS INTENDED. S99 made
+//  these venues SOFT — the flow surrenders them when it cannot orient the season.
+//  A surrendered venue is not a lost instruction: the game is played somewhere,
+//  the log records the actual host, and next season's debt reads that. There is
+//  deliberately NO ledger of intentions, because a second ledger would eventually
+//  disagree with the schedule and create two truths.
+//
+//  ★ AND S96'S THEOREM DOES NOT SURVIVE THIS, WHICH IS WHY THE ORDER MATTERS.
+//  Inverting EVERY residual was guaranteed to re-award each school exactly half of
+//  them, so the emitted set could never over-commit a school's home quota. Debt
+//  carries no such guarantee: a school can be behind in more of its odd pairs than
+//  it can host. Measured on the stock world, 118 school-seasons of 1,903 go over
+//  quota by at most two. The flow surrenders the surplus, and the emitted list is
+//  ordered STRONGEST CLAIM FIRST so that what it surrenders is the pair nearest
+//  square.
+// ============================================================================
 
 internal static partial class Program
 {
@@ -208,8 +252,33 @@ internal static partial class Program
         internal int SeasonsRead => ByOffset.Count;
     }
 
-    /// <summary>What one walk of the career file produced, for both consumers at once.</summary>
-    private sealed record CareerMemory(HostMemory Hosts, RotationHistory Rotation);
+    /// <summary>★ S100 — validated RESIDUAL HOSTS, keyed by ABSOLUTE season offset, exactly the
+    /// way <see cref="RotationHistory"/> keys meeting counts. A missing key is a year that was
+    /// never written, could not be trusted, or said nothing.
+    ///
+    /// <para>★ A YEAR THAT VALIDATED AND FOUND NO ODD PAIR IS STILL A YEAR, and it is kept with
+    /// an empty map. It contributes nothing to any balance either way, but "we read that season
+    /// and it had no single games" and "we could not read that season" are different facts and
+    /// the diagnostics say so.</para></summary>
+    private sealed record HostDebtHistory(
+        IReadOnlyDictionary<int, IReadOnlyDictionary<(int Lo, int Hi), int>> ByOffset)
+    {
+        private static readonly Dictionary<int, IReadOnlyDictionary<(int Lo, int Hi), int>> NoSeasons = new();
+        internal static readonly HostDebtHistory None = new(NoSeasons);
+        internal int SeasonsRead => ByOffset.Count;
+
+        /// <summary>The same history seen through a SHALLOWER window. Test-only in practice —
+        /// production always consumes the full window — and it exists so a check can run the
+        /// one-hop rule as a negative control without a second read policy, a second config
+        /// concept or a second walk of the career file. Capping at CONSUMPTION rather than at
+        /// read time is what keeps "S100 adds no disk read" true for the controls too.</summary>
+        internal HostDebtHistory Within(int window)
+            => new(ByOffset.Where(kv => kv.Key <= window)
+                           .ToDictionary(kv => kv.Key, kv => kv.Value));
+    }
+
+    /// <summary>What one walk of the career file produced, for all three consumers at once.</summary>
+    private sealed record CareerMemory(HostMemory Hosts, RotationHistory Rotation, HostDebtHistory Debt);
 
     /// <summary>What the rotation did this season, carried out of the schedule builder so the
     /// page reports the run that happened rather than re-deriving it.</summary>
@@ -311,7 +380,8 @@ internal static partial class Program
     {
         if (history is null)
             return new CareerMemory(
-                HostMemory.Empty(HostMemoryStatus.NoHistory, null), RotationHistory.None);
+                HostMemory.Empty(HostMemoryStatus.NoHistory, null), RotationHistory.None,
+                HostDebtHistory.None);
 
         // ★ The peek, not a reservation. The schedule is built before any season number is
         //   spent — deliberately, so a slate that fails to build burns nothing — so the
@@ -320,22 +390,45 @@ internal static partial class Program
         var previous = pending - 1;
         if (previous <= 0)
             return new CareerMemory(
-                HostMemory.Empty(HostMemoryStatus.FirstSeason, null), RotationHistory.None);
+                HostMemory.Empty(HostMemoryStatus.FirstSeason, null), RotationHistory.None,
+                HostDebtHistory.None);
 
         HostMemory? hosts = null;
         var byOffset = new Dictionary<int, IReadOnlyDictionary<(int Lo, int Hi), int>>();
+        var debtByOffset = new Dictionary<int, IReadOnlyDictionary<(int Lo, int Hi), int>>();
         for (var k = 1; k <= window; k++)
         {
             var season = pending - k;
             if (season <= 0) break;          // season 0 was never a candidate
             var (memory, meetings) = ReadSeasonLog(history, season);
-            if (k == 1) hosts = memory;      // the host half sees THIS season and no other
+            if (k == 1) hosts = memory;      // S96's status half sees THIS season and no other
             // ★ THE KEY IS k, THE CALENDAR DISTANCE — never the position of this year in the
             //   list of years that happened to be readable. A hole leaves a gap in the keys.
             if (memory.Status == HostMemoryStatus.Loaded && meetings.Count > 0)
                 byOffset[k] = meetings;
+            // ★ S100 — the residual hosts that were already computed for every one of these
+            //   years and discarded above `k == 1`. NO NEW READ, NO NEW PARSE: this is the same
+            //   `memory` object the line above already has in hand. Kept on the SAME condition
+            //   as the meeting counts so the two halves can never disagree about which years
+            //   are trustworthy, and kept even when the map is empty — a validated season with
+            //   no odd pairs is evidence, not a hole.
+            if (memory.Status == HostMemoryStatus.Loaded)
+                debtByOffset[k] = memory.PreviousResidualHost;
         }
-        return new CareerMemory(hosts!, new RotationHistory(byOffset));
+        // ★ S100 — AND THE DEBT FAILS CLOSED WITH THE HOSTS, not with the rotation. This is the
+        //   one place S100 deliberately does NOT follow S99's divergence, and the reason is the
+        //   PAGE. The host line reports the status of season N-1 and the count of venues that
+        //   applied; if a damaged N-1 disabled the status half while the window went on
+        //   supplying venues, the page would print "none (season N unreadable)" beside venues it
+        //   really did apply, and a line that lies is worse than a rule that is conservative.
+        //   Reading a damaged year as a hole and carrying on is defensible basketball — the
+        //   count across the other years is still real, and offsets are absolute so no older
+        //   year can masquerade as last year — but it needs the page to say so, and the page is
+        //   outside this session's wall. Recorded as an open item rather than taken silently.
+        var debt = hosts!.Status == HostMemoryStatus.Loaded
+            ? new HostDebtHistory(debtByOffset)
+            : HostDebtHistory.None;
+        return new CareerMemory(hosts, new RotationHistory(byOffset), debt);
     }
 
     /// <summary>Turn one season's projected schedule facts into residual hosts, or refuse the
@@ -428,47 +521,96 @@ internal static partial class Program
 
     // ── Turning memory into venues ───────────────────────────────────────────────
 
-    /// <summary>Last season's residual hosts, inverted, for the pairs where that is still a
-    /// legal thing to say. Pure — no disk, no history, no clock.
+    /// <summary>★ S100 — WHO HAS HOSTED MORE OF OUR SINGLE GAMES. For each normalized pair,
+    /// the count of residual home games the LOW school has taken over the readable window minus
+    /// the count the HIGH school has taken. Pure — no disk, no history, no clock.
     ///
-    /// <para>★ THE INVERSION LIVES HERE. The memory records who hosted; what comes out is a
-    /// fixed venue naming the OTHER school. That is the whole basketball of this session.</para>
+    /// <para>★ THE SIGN IS THE WHOLE ANSWER. Positive means Lo has hosted more, so <b>Hi is
+    /// owed</b>. Negative means Lo is owed. Zero means level.</para>
+    ///
+    /// <para>★ RESIDUAL HOSTS ONLY. Not seasons-in-which-a-school-led, not total games, not
+    /// alternation misses, not age since the last home game. On a validated record those often
+    /// coincide; only this one is the specified quantity, and only this one is exactly the
+    /// home-game difference (see the file header).</para>
+    ///
+    /// <para>★ A PAIR PRESENT WITH A ZERO IS NOT THE SAME AS A PAIR ABSENT — level versus
+    /// unknown. They behave identically at emission by ruling, and are kept apart here so a
+    /// check or a future diagnostic can tell them apart. An entry naming a school outside its
+    /// own pair contributes NOTHING rather than being treated as either side: it is damage in
+    /// a hand-built or foreign memory, and the honest reading of damage is silence.</para></summary>
+    private static Dictionary<(int Lo, int Hi), int> HostDebtBalances(HostDebtHistory debt)
+    {
+        var balance = new Dictionary<(int Lo, int Hi), int>();
+        foreach (var offset in debt.ByOffset.Keys.OrderBy(k => k))
+            foreach (var (pair, hosted) in debt.ByOffset[offset])
+            {
+                if (pair.Lo >= pair.Hi) continue;              // not a normalized pair
+                balance.TryAdd(pair, 0);
+                if (hosted == pair.Lo) balance[pair]++;
+                else if (hosted == pair.Hi) balance[pair]--;
+            }
+        return balance;
+    }
+
+    /// <summary>The venues the window's debt decides, strongest claim first. Pure — no disk,
+    /// no history, no clock.
+    ///
+    /// <para>★ WHOEVER IS BEHIND HOSTS. The window records who has taken the pair's residual
+    /// home games; what comes out is a fixed venue naming the school that has taken fewer. That
+    /// is the whole basketball of this session, and it is S96's rule generalised: over a single
+    /// readable year the two rules are identical, because one year's balance is exactly +/-1 and
+    /// "behind" is exactly "did not host last time".</para>
+    ///
+    /// <para>★ DEBT MEMORY RESOLVES IMBALANCE; IT DOES NOT PRESERVE ALTERNATION FOR ITS OWN
+    /// SAKE. A level pair and a pair with no single meeting anywhere in the window both get NO
+    /// venue. Leaving them unconstrained is not a gap — it is slack the flow spends satisfying
+    /// a pair that really is owed.</para>
     ///
     /// <para>★ MEMORY FOLLOWS THE SCHOOL PAIR, NOT THE CONFERENCE. Hosting fairness is a debt
-    /// between two schools: if both move to a new league together and still meet, the
-    /// alternation should survive the move. So membership and parity are validated against the
-    /// CURRENT conference and this never asks which conference the memory came from.</para>
+    /// between two schools: if both move to a new league together and still meet, the balance
+    /// should survive the move. So membership and parity are validated against the CURRENT
+    /// conference and this never asks which conference the record came from.</para>
     ///
-    /// <para>★ FIVE CONDITIONS, and anything failing one is SILENTLY SKIPPED rather than
-    /// refused. A pair that met an odd number of times last year and an even number this year
-    /// has no residual to decide, and that is an ordinary consequence of a league changing
-    /// size — not an error. Dropping them here is also what keeps them away from
+    /// <para>★ THE FIVE SILENT SKIPS ARE INTACT, and anything failing one is SKIPPED rather
+    /// than refused: an unnormalized pair, a school outside this league, a pair that does not
+    /// meet here, a pair EVEN this season, and a recorded host that is not one of the two
+    /// schools. Dropping them here is also what keeps them away from
     /// <c>OrientConferenceSlate</c>, which would correctly reject them as an invalid
     /// configuration and take the whole season down with it.</para>
     ///
+    /// <para>★ AND THE EVEN-THIS-SEASON SKIP HAS LOST ITS AMNESIA. It still emits nothing —
+    /// there is no residual to orient — but the pair's balance is untouched, so when the pair
+    /// turns odd again the debt is still there deciding the host. That single distinction is
+    /// what closes O-89.</para>
+    ///
+    /// <para>★ ORDERED STRONGEST FIRST, ties by ascending pair. A school owed two home games
+    /// has a stronger claim than a pair nearly square, and <c>FinishSlate</c> surrenders venues
+    /// from the END of this list — so ordering it here is what makes the weakest claim the one
+    /// that pays, with no change to the flow at all.</para>
+    ///
     /// <para><paramref name="members"/> is the membership validation, not redundancy: it is
-    /// the only thing standing between a hand-built or foreign memory entry and a lookup on a
-    /// school this league has never heard of.</para></summary>
+    /// the only thing standing between a hand-built or foreign record and a lookup on a school
+    /// this league has never heard of.</para></summary>
     private static List<FixedResidualHost> ResidualsToFlip(
-        HostMemory memory, Dictionary<(int Lo, int Hi), int> meetings, List<int> members)
+        HostDebtHistory debt, Dictionary<(int Lo, int Hi), int> meetings, List<int> members)
     {
         var flips = new List<FixedResidualHost>();
-        if (memory.Status != HostMemoryStatus.Loaded || memory.PreviousResidualHost.Count == 0)
-            return flips;
+        if (debt.ByOffset.Count == 0) return flips;
 
         var inLeague = new HashSet<int>(members);
-        foreach (var entry in memory.PreviousResidualHost
-                                    .OrderBy(kv => kv.Key.Lo).ThenBy(kv => kv.Key.Hi))
+        var scored = new List<(int Lo, int Hi, int Host, int Claim)>();
+        foreach (var (pair, balance) in HostDebtBalances(debt))
         {
-            var (lo, hi) = entry.Key;
-            var hosted = entry.Value;
-            if (lo >= hi) continue;                                 // not a normalized pair
+            var (lo, hi) = pair;
             if (!inLeague.Contains(lo) || !inLeague.Contains(hi)) continue;   // foreign school
-            if (!meetings.TryGetValue((lo, hi), out var m)) continue;         // not a pair here
-            if (m % 2 == 0) continue;                               // no residual to decide
-            if (hosted != lo && hosted != hi) continue;             // host not in the pair
-            flips.Add(new FixedResidualHost(lo, hi, hosted == lo ? hi : lo));
+            if (!meetings.TryGetValue(pair, out var m)) continue;             // not a pair here
+            if (m % 2 == 0) continue;                    // no residual to orient — balance kept
+            if (balance == 0) continue;                  // level, or every entry was unusable
+            scored.Add((lo, hi, balance > 0 ? hi : lo, Math.Abs(balance)));
         }
+
+        foreach (var s in scored.OrderByDescending(x => x.Claim).ThenBy(x => x.Lo).ThenBy(x => x.Hi))
+            flips.Add(new FixedResidualHost(s.Lo, s.Hi, s.Host));
         return flips;
     }
 
