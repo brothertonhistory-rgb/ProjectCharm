@@ -1,3 +1,75 @@
+## Session 97 — THE MTE POOL. A world can now author early-season bracketed tournaments; each season draws which ones happen, seats their fields best-tournament-first, and records the whole thing permanently. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 88 PASS at 61 assertions**, pre-S97 zero-path goldens `51c8e88c202e9eb6…` / `2c521c9f8f2ee203…` and `eee5e256b0c6fc87…` / `bbff75ce74cf9363…` reproduced EXACTLY, the pull's negative control reading `flat 42.4 vs pull-5 49.1`. On the stock world: **29 authored events, 22 active, 88 schools seated**, Maui opening Texas / Pittsburgh / Mississippi State / Purdue / Old Dominion / Miami-Ohio / Wichita State / College of Charleston, and the season's basketball byte-identical to S96 (`6f79d663…`, `7515df7d…`, 63 December games, 59.9% home wins at +4.2). **NO TOURNAMENT GAME PLAYS — that is S98.** (2026-08-03)
+
+**Register:** build, under `PROMPT-mte-pool-s97-r8` (ChatGPT-reviewed). Four new files, seven edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED — the record is harness-side and the store's existing peek sufficed.
+
+### What shipped
+
+`src/Charm.Harness/Program.Season.Events.cs` — NEW (keyed hashing, the activation draw, seating, the per-season record, the overlap refusal, the page). `src/Charm.Harness/Program.Checks.Mte.cs` — NEW (Phase 88). `worlds/fixture-mte.world.json`, `worlds/fixture-v4-retired.world.json` — NEW. `Program.World.cs`, `Program.Season.cs`, `Program.cs`, `Charm.Harness.csproj`, `Program.Checks.Season.cs`, `Program.Checks.Geography.cs`, `Program.Checks.World.cs`, all five live `worlds/*.world.json`, `data/places.csv` — EDIT.
+
+World schema **v4 → v5**, the fourth deliberate fingerprint move: a top-level `events` array and an `eventScope` on every tier. v4 is refused by name through the one shared guard, with the re-conversion command. **Every existing career on disk stops opening** — stated up front rather than discovered, and free only because no career exists outside this repo.
+
+### ★ THE GATE FOUND FOUR THINGS THE CLEARED PROMPT DID NOT HAVE
+
+The prompt arrived through eight revisions and an outside review. The check-in gate still found four, and one of them reshaped the session's central mechanism.
+
+**(1) THE SEASON TOOK ITS NUMBER BEFORE ANY GAME HAD A NIGHT.** `ReserveSeason` lived at the bottom of `BuildSeasonSchedule`, which runs before `SeasonDateSchedule`. The prompt's §4 wanted the double-booking refusal — which needs dates — to run *before* the number is spent, and two of its own checks asserted exactly that. As the code stood it was impossible. Emmett ruled **option A**: split the numbering out behind a `deferNumbering` flag used only by the production runner, so all sixteen other call sites keep their pre-S97 behaviour byte for byte. `NumberSeasonSchedule` is now the named commit, and it asserts the peek's contract through the public counter rather than through `SeasonId.Raw`, which is internal to `Charm.History`.
+
+**(2) THE TEST WORLD COULD NOT HOLD AN EIGHT-TEAM FIELD.** `fixture-memory` has four leagues; one school per league per field caps it at four seats, so every eight-team event on it is short by construction. `fixture-mte` therefore adds a zero-game Independent container of six schools — which is also what makes the independents exemption testable at all (C4d measures five independents sharing one field).
+
+**(3) THE V4 REFUSAL WOULD HAVE HAD NOTHING TO REFUSE.** `fixture-v1-retired` is kept at v1 on purpose; once every other world converted to v5 there was no v4 artifact left. `fixture-v4-retired.world.json` is the genuine pre-S97 `fixture-tiny`, frozen.
+
+**(4) THE WARM CITIES ALREADY EXISTED.** Seventeen neutral sites were authored in S92 and tagged — Lahaina, Nassau, George Town, Charlotte Amalie, Cancún, Montego Bay, San Juan, Anchorage, and nine domestic. Maui, Atlantis, the Caymans and the Paradise Jam were sitting in the file waiting. Only five towns had to be invented (Freeport, Myrtle Beach, Niceville, Estero, Naples), and the descriptor-uniqueness rule caught a sixth: **Charleston, SC already exists as a campus**, so the Palmetto Classic uses it rather than a duplicate.
+
+### ★ THE PROMPT PREDICTED A TRIPWIRE WOULD GO RED. IT WAS WRONG, AND NOT TOUCHING IT WAS THE CALL
+
+§0.3 said the *"schedule consumes no randomness"* assertion would deliberately fail and should be replaced with a sharper pair. It does not fail. There are **two** cross-seed assertions (`Program.Checks.Season.cs` §3.2 and `Program.Checks.ConferenceDates.cs` C9) and both compare the conference slate and its dates only — seating a field enters neither fingerprint. Replacing a working negative control because a prompt predicted its failure is how a good check is lost for nothing. The corollary shaped the design: **field seating is its own step in `RunSeasonCore`, never folded into the schedule builder**, which is what keeps "the league schedule is a pure function of the world" true and testable. C3d now asserts it across all 64 sweep seeds.
+
+### ★ THE RULING THAT CHANGED THE MECHANISM: A BAND IS A TARGET, NOT A FLOOR
+
+The pool shipped its first stock draw with fields that were individually plausible and nationally wrong. Maui had three schools at 90+; the seated population's median prestige was 65 against a league median of 43; twenty of the league's 173 bottom-half schools got into anything.
+
+The cause was mechanical and invisible from any per-event table: **inside a seat's prestige band every qualifying school was equally likely.** A band authored `[62,99]` does not mean "a solid programme" — it means "anyone from 62 up", drawn flat. Four variants were measured end to end on the full stock world (open-topped bands / capped windows / headline-open-body-capped / capped with raised headlines) and each one traded the two halves against each other: fields that looked right one at a time, or a country that looked right in aggregate, never both.
+
+Emmett's ruling: **add the pull.** A seat now draws `MteSeatPull` candidates and seats the strongest of them — an event reaching for the best team it is allowed to take, without ever being guaranteed it. Deliberately not "take the best available", which would hand one event the same flagship every season and defeat the memory layer this session was blocked on. Five is the value; three measured too weak. Ties break on the lower school id, so the pull adds no second source of randomness. The whole thing is integer arithmetic — no `Math.Pow`, no `GetHashCode` — and Emmett's Windows run reproduced the sandbox's fields and season fingerprints exactly.
+
+**★ AND THE PER-EVENT TABLE LOOKED PERFECT UNDER EVERY VARIANT.** This is the S81 lesson recurring verbatim: the check that discriminates is the one measured on the axis the change is about. C4l is built that way on purpose — it measures mean seated prestige over 32 seeds against a flat-draw control, because without it the pull could be wired to nothing and all sixty other assertions would still pass.
+
+### ★ THE SECOND RULING: THE NATIONAL QUEUE STAYS; THE EVENTS WERE ASKING TOO HIGH
+
+With the pull in, a four-season career showed elite participation collapsing — 17 elite programmes seated in season 1, then 6, then 1. The pool has two history rules: the **per-event** four-year exclusion (the real NCAA rule) and a **national** soft preference where fewest recent appearances wins outright. The second was behaving as a queue rather than a preference: the 108 schools seated in season 1 were locked out of every event in season 2.
+
+Claude measured the alternative (drop the national rule; per-event only) and recommended it, because it matched a recorded ruling — *teams play in a tournament virtually every year; the four-year rule is can't return to the same event*. **Emmett overruled it in one sentence: keep the queue, the tournaments are just a tad too aggressive with their asks.** He was right and the measurement proves it — with the queue kept and the headline bands capped, elite participation reads **6 / 6 / 6 / 6** across four seasons with Maui headlined by Texas, Syracuse, Kansas and Maryland. An MTE is something a programme does every few years; the national turn-taking is what expresses that, and the collapse was one year hoovering up every name in the country and starving the next.
+
+### ★ THE THIRD RULING: COMPRESSION, TOP TO BOTTOM
+
+The first authored ladder put Maui at 94 down to Centenary at 11 — a spread of 83. Emmett: *the Maui Invitational is going to have much higher lows than that; if the tournament is good enough to get a power conference school there should be at least one other one in there, or a mid-major with a high enough prestige.* And the compression applies at every tier — *the absolute worst noncon tourney only has 0-25 or something*.
+
+Re-authored as a real ladder: each field tight, the tiers spanning the country. **Mean spread inside a field fell from 78 to 22.** Maui now reads 94 / 92 / 83 / 80 / 66 / 64 / 60 / 58; the Bayou Showcase, the worst tournament in the pool, reads 24 / 20 / 14 / 11 and sits entirely inside 0-25. Slot two dropped its `power` requirement so a Gonzaga or a Memphis can headline beside a Texas. **Every seat in the country filled at fallback level None — no rule relaxed anywhere.**
+
+### The authored stock pool
+
+29 events (5 eight-team, 24 four-team) across 7 tiers, each in its own city, every window in November and exactly the playing days. Expected active = Σ persistence = **23.10**; expected seats **111**, about a third of D1, which is the density ruled in the design conversation. Persistence runs 0.98 for Maui down to 0.50 for the marginal events, so a tournament genuinely does not happen some years — seven were dormant in the verified run.
+
+### What Phase 88 proves, and what it deliberately does not
+
+**Page-only calibration holds absolutely.** Not one assertion says a field should look a certain way, that a named school belongs anywhere, or that some number of events should run. Sixty-one assertions cover mechanism: the zero path against pre-S97 goldens, thirteen named load refusals plus the retired-v4 and retired-v1 guards, the two absolutes held at **every** fallback level across 64 seeds, four-year arithmetic at both boundaries, tier order beating id order, the authored slot order proven load-bearing, `SeatedShort` as a diagnostic, a bounded 64-seed determinism sweep with both persistence endpoints, the pull's negative control, isolation on the COMPLETE per-game results, and the transaction proven **negatively** at both refusals — a season id provably unspent and no file written.
+
+**★ THE RECORD BINDS TO THE CAREER, NOT THE WORLD.** A record cannot both survive world edits and be rejected whenever the world changes. `formatVersion`, `historyId` and the embedded `seasonId` are validated; `worldFingerprint` is written as provenance and **never checked**. C6h asserts the acceptance *directly*, so it reads as the ruling it is rather than as validation somebody forgot. A vanished school id simply never matches a qualifier — the seating layer's own membership check does the work.
+
+### Three checks corrected, and why each was not tuning-until-green
+
+**Phase 55's rigged one-league world hardcoded `SchemaVersion = 4`** and went red saying the world was old when the only thing wrong was the literal. Now the constant. **Phase 83's A7 said "all three migrated world files are schemaVersion 4"** — the same class, plus a new v4 negative control mirroring the existing v1/v2/v3 pattern. **Phase 82's pinned counts** (310 places, 8 exotic) moved to 315 and 9; the numbers stay pinned deliberately, because their job is to make somebody look when the map grows, and they did.
+
+**★ A7's convert round-trip was SPLIT, and the split is the point.** It used to compare the converter's whole canonical output against the committed world. That stopped being true: the three csvs author the MAP, there is no events csv, so the pool lives in the world file and a reconversion produces none. The full-strength half is kept — everything the csvs *do* author still matches byte for byte — and the divergence is asserted **positively**, so a reconversion silently wiping the tournament pool can never be a surprise and a future session teaching the converter about events turns that check red instead of letting the property vanish.
+
+### Predictions, and the miss
+
+Nine numbers were predicted before Emmett's suite run and all nine landed, including `flat 42.4 vs pull-5 49.1` to the digit and the full season fingerprint `95038e912bc82c77…` matching between a Linux sandbox and Windows. The season page's entire 22-event block was predicted verbatim and matched. **The miss was earlier and cost a turn:** C5's overlap window was hand-picked at 01-20 on the assumption the fixture's season covered January. It runs February to March, so the refusal never fired and three assertions went red. Rewritten to *derive* the window from the dated schedule — seat the field, find a night a seated school actually plays, author the window over it — which is both correct and immune to a later fixture edit.
+
+### Still open here
+
+**There is no events csv**, so `world convert` drops the pool. Named in the converter's source and asserted by A7, not fixed — giving the pool its own data file is a ruling. **The small tournaments' persistence was left alone** at 0.50–0.78, so six of the ten tier-6/7 events drew dormant in the verified season and only ten schools under 30 prestige played in anything; raising them is one number per event and Emmett has not called it. **Campus events** — the escape hatch from the design brief, where a school that misses the brackets hosts its own three-team event — are in neither S97 nor S98 and are now on the board so they cannot fade.
+
 ## Session 96 — HOST MEMORY. A season now reads season N−1's retained log and **flips every single-meeting host**, so a career alternates gyms year over year instead of playing the same schedule forever. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 87 PASS at 33 assertions**, pre-S96 zero-path golden `51c8e88c202e9eb6…` reproduced exactly, three retained seasons reading `FirstSeason → 1 → 2`, season 2 flipping season 1 and season 3 landing back on season 1's schedule, `20 flipped across 4 leagues`, peeked 4 / reserved `season:4`. On the stock world: **526 residuals flipped across 14 leagues**, runtime-derived and printed on the page. (2026-08-03)
 
 **Register:** build, under `PROMPT-memory-layer-s96-r3` (ChatGPT-reviewed, CONDITIONAL GO on the §9 evidence packet). Three new files, four edited, none deleted. No oracle — the mechanism is an inversion, not a formula; the theorem it rests on is verified numerically over every playing league rather than Monte-Carlo'd.

@@ -10,7 +10,34 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 96** (2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 87 PASS at 33
+Last updated: **Session 97** (2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 88 PASS at 61
+assertions**, pre-S97 zero-path goldens `51c8e88c202e9eb6…`/`2c521c9f8f2ee203…` and `eee5e256b0c6fc87…`/`bbff75ce74cf9363…`
+reproduced EXACTLY, the pull's negative control reading `flat 42.4 vs pull-5 49.1`. **EARLY-SEASON TOURNAMENTS EXIST AND
+THEIR FIELDS ARE SEATED.** A world authors bracketed events — tier, city, exact window, one template per seat, and a
+yearly chance of running; each season draws which happen and seats them best-tournament-first, recorded permanently per
+season. **NO TOURNAMENT GAME PLAYS — that is S98.** On the stock world: 29 events, 22 active, 88 schools seated, Maui
+opening Texas/Pittsburgh/Mississippi State/Purdue/Old Dominion/Miami-Ohio/Wichita State/College of Charleston, and the
+season's basketball byte-identical to S96 (`6f79d663…`, `7515df7d…`, 63 December games, 59.9% at +4.2). World schema
+**v4 → v5**, the fourth deliberate fingerprint move — every existing career stops opening, stated up front. ★ THE GATE
+FOUND FOUR THINGS THE CLEARED r8 PROMPT DID NOT HAVE, one of which reshaped the build: **the season took its official
+number before any game had a night**, so the double-booking refusal the prompt wanted could not run before the commit —
+Emmett ruled the numbering split out behind a flag only the production runner sets. Also: the test world could not hold
+an eight-team field (four leagues = four cap keys; a six-school Independent container added), the v4 refusal had no
+artifact left to refuse (`fixture-v4-retired` frozen), and the warm cities were already authored in S92 — only five
+towns invented, and Charleston SC was caught as an existing campus. ★ **THE PROMPT PREDICTED A TRIPWIRE WOULD GO RED
+AND IT WAS WRONG**; both cross-seed assertions compare the slate only, so they were left untouched and seating became
+its own step, which is what keeps them meaningful. ★ **A BAND WAS A FLOOR, NOT A TARGET** — inside a band every school
+was equally likely, so fields looked right one at a time while the country did not. **THE PULL** (Emmett): a seat draws
+five candidates and seats the strongest — never "take the best", which would freeze one flagship per event forever.
+C4l is its negative control, measured league-wide, because the per-event table looked perfect under every variant
+(the S81 lesson verbatim). ★ **THE NATIONAL QUEUE STAYS** (Emmett, overruling Claude's recommendation to drop it): the
+collapse from 17 elite programmes to 1 over three seasons was **the events asking too high**, not the rule — with the
+asks capped it reads 6/6/6/6 across four seasons with Maui headlined by Texas, Syracuse, Kansas, Maryland. ★
+**COMPRESSION, TOP TO BOTTOM** (Emmett): mean spread inside a field fell 78 → 22; Maui is 94 down to 58, the worst
+tournament sits entirely inside 0–25, and every seat in the country filled at fallback level None. `Charm.Engine` and
+`Charm.History` UNTOUCHED. Opens **O-85**, **O-86**, **O-87**. Next: **S98 — the brackets actually play**.)
+
+*(Previous board entry, S96 — 2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 87 PASS at 33
 assertions**, pre-S96 zero-path golden `51c8e88c202e9eb6…` reproduced EXACTLY, three retained seasons reading
 `FirstSeason → 1 → 2`, season 2 flipping season 1 and season 3 landing back on season 1's schedule, `20 flipped across
 4 leagues`, peeked 4 / reserved `season:4`. **A SEASON NOW REMEMBERS WHO HOSTED.** A conference pair that meets an odd
@@ -33,7 +60,7 @@ added. ★ The packet split `BindingMismatch` into WrongCareer/WrongWorld/WrongS
 and added a missing **`Corrupt`** category. ★ The world fingerprint hashes the whole world file, so an edited world
 cannot open the same career — the parity-change filter and foreign-pair tolerance are **belt-and-braces, not
 load-bearing**, recorded honestly. `Charm.Engine` untouched; `Charm.History` gained exactly one line — the peek. Closes
-**O-79's hosting half**; opens **O-84**. Next: **MTE / non-conference scheduling**.)
+**O-79's hosting half**; opens **O-84**. Next: **MTE / non-conference scheduling**.)*
 
 *(Previous board entry, S95 — 2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 86 PASS at 32
 assertions**, zero-path golden `c853b3698ae28b31…` reproduced EXACTLY, Athleticism `44.000000 → 44.000000`, gravity
@@ -260,6 +287,17 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S97 — THE MTE POOL: TOURNAMENTS EXIST AND FIELDS ARE SEATED.** World schema v5 adds an authored `events`
+  array and an `eventScope` per tier. Each season draws activation against each event's persistence, then seats
+  active fields in `(tier, id)` order from the whole country. **Two absolutes never relax at any fallback level** —
+  one event per school per season, one `conferenceCapKey` per field (a zero-game container keys on the SCHOOL, so
+  independents are exempt by key rather than by a branch). Band, scope and the four-year rule relax in a fixed
+  cumulative order, recomputed from the full pool each level; a short field is a diagnostic, never a refusal.
+  History gives a hard per-event four-year exclusion and a soft national queue. **The pull** draws five candidates
+  per seat and seats the strongest. Permanent per-season records bind to the CAREER, not the world. The season
+  pipeline was reordered so the number is spent only after dating, the overlap refusal and the collision precheck
+  all pass. Phase 88, 61 assertions, page-only throughout. Opens **O-85**, **O-86**, **O-87**.
 
 - **★ S96 — HOST MEMORY: A SEASON REMEMBERS WHO HOSTED.** A conference pair meeting an **odd** number of
   times cannot split those meetings evenly; one school gets the extra home game. Until now the slate decided
@@ -587,6 +625,23 @@ be run against a league with a real rotation, though the minute VALUES remain pl
 chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
+
+- **★ O-85 — THE TOURNAMENT POOL HAS NO DATA FILE, SO A RECONVERSION WIPES IT (opened S97).** `teams.csv`,
+  `conf.csv` and `places.csv` author the MAP; the 29 authored events live only in `stock-d1.world.json` and are
+  carried by `world rewrite`. Re-running `world convert` produces a world with an empty pool. This is **named in
+  the converter's source and asserted positively by Phase 83 A7** — it is not a silent hazard — but it is also not
+  fixed. Giving the pool its own csv is a ruling, not a chore: it decides whether the spreadsheets remain the single
+  source of truth for a world.
+
+- **O-86 — THE SMALL TOURNAMENTS' PERSISTENCE LEAVES THE BOTTOM OF THE COUNTRY THIN (opened S97).** Tier 6 and 7
+  events are authored at 0.50–0.78, so six of the ten drew dormant in the verified season and only ten schools under
+  30 prestige played in any bracket. That may be exactly right — the real bottom of D1 mostly plays buy games, not
+  brackets — but it has not been ruled. One number per event either way.
+
+- **O-87 — CAMPUS EVENTS ARE UNBUILT AND BELONG TO NEITHER S97 NOR S98 (opened S97).** The design brief's floor of
+  the market: a school that misses the brackets hosts its own three- or four-team event at home, where the two
+  visitors meet each other on a neutral floor **inside** a home arena. It is what makes participation near-total in
+  reality, and it is the natural consumer of S92's `GameHost.Nobody`. Neither bracketed session touches it.
 
 - **★ O-82 — THE CROWD MODEL IS STILL UNBUILT, AND SO IS THE PER-TEAM MAGNITUDE (opened S95).** S95 shipped the
   home-court EFFECT and none of the model S92 ruled behind it. Two named halves, both still owed:
@@ -1386,37 +1441,27 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**MULTI-TEAM EVENTS AND NON-CONFERENCE SCHEDULING — the last scheduler third.** S93 deleted the placeholder
-non-conference graph rather than carrying it, so this starts from nothing and it is the largest hole left in the
-season: **fourteen schools currently play no basketball at all**, and every other school plays only its own league.
-
-★ **S96 is what makes this next rather than merely due.** The two hard prerequisites are now built. The map (S92)
-knows how far every trip is; the loose date windows (S94) leave real open nights to put games on; home court (S95)
-makes **where** a non-conference game is played a genuine decision rather than a coin flip; and **host memory (S96)
-is the pattern for anything that must not repeat forever** — a career layer that schedules the same eight buy games
-against the same eight opponents every year is the same defect this session just closed, one level up.
+**S98 — THE BRACKETS ACTUALLY PLAY.** S97 seated the fields and deliberately played nothing. S98 seeds each field
+1–8 by prestige (1v8/4v5; a four-field 1v4/2v3), runs a championship bracket plus consolation paths so every team
+plays once per round and the full 1st–8th is decided (12 games for an eight-field, 4 for a four-field), on the
+window's exact days, before the conference slate in the season loop.
 
 What it inherits and must not re-derive:
 
-- **The memory layer reads schedule facts and is deliberately NOT pre-shaped for MTE participation.** The reader
-  projects each log block to home / away / conference-or-not and nothing wider. Remembering *which event a school
-  attended* is a **ruling**, not an extension — it widens the projection, and the projection is what enforces the
-  isolation wall. Rule it before building it.
-- **Fixture kind already exists on the wire.** The retention log's block header carries a conference-or-not byte and
-  the reader validates its domain; every game today is `conf`. A non-conference fixture needs no format change to be
-  written, which is a fact worth knowing before anyone proposes one.
-- **Sites are the open question, not the schedule.** O-83 parked semi-home, semi-away and neutral with the tournament
-  layer. An MTE is played on a neutral floor by definition, so this session probably cannot avoid the site fact the
-  way S96 could — and `SeasonGame` carries no site fact at all today (S95 passes `true` as a literal).
-- **`TravelPart`'s 38 mutual in-conference pairs** are Friday–Saturday road pairings, ruled to stay put as travel
-  partners and read by nothing. Still logged, still unbuilt.
-- **The world fingerprint has moved three times** (S92, S93, S94) and each move was deliberate. A fixture-kind or
-  event field in the world file is a fourth move, ruled before it is built.
+- **The neutral site fact is unavoidable now.** `SeasonGame` carries no site fact and S95 passes `hasHost: true` as
+  a literal; the comment at `Program.Season.cs` ~975 predicted this exact session. That literal becomes the argument.
+- **The retention log needs no format change.** The block header's conference-or-not byte is already {0,1} and the
+  reader validates the domain — proven in S97's §0.5 and recorded so S98 inherits the proof rather than the chore.
+- **Records are replaced, never rebuilt.** S98 atomically replaces a season file with `playStatus: Completed` and
+  populated finishes, and validates version / historyId / seasonId / `NotPlayed` / no finishes / seats matching the
+  games it scheduled **before** writing. It never re-seats from the current world.
+- **`SeatedShort` events stay recorded, active and unplayed** — the ruling made in S97 so the schema ages right,
+  with an execution status distinguishing that from pending. Emmett may override it at S98's design conversation.
+- **GameIds are reserved from the known per-event count** despite unknown pairings.
 
 **Then: O-79's remaining half** — which pairs double and which skip, still fully determined and still repeating
-forever, together with the soft objectives (`SkipUrgency` and friends) held out of S93 because they need the memory
-S96 has now built. Lower stakes than the hosting half, and it may fold naturally into whichever session owns the
-non-conference slate.
+forever — and the rest of non-conference (the guarantee market and the bulletin board), which is where **O-87's
+campus events** naturally land.
 
 **Behind that, the two home-court halves that did not ship** — the crowd model (O-82) and the site facts semi-home,
 semi-away and neutral (O-83) — plus **O-84**, the realignment guards S96 shipped dormant. None is a defect; all are

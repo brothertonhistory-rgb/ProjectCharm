@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "metadata": {
     "kind": "authored",
     "eraLabel": "fixture-tiny",
@@ -10,25 +10,29 @@
       "id": "power",
       "floor": 40,
       "equilibrium": 75,
-      "pullbackIntensity": 0.25
+      "pullbackIntensity": 0.25,
+      "eventScope": "power"
     },
     {
       "id": "highMid",
       "floor": 20,
       "equilibrium": 55,
-      "pullbackIntensity": 0.45
+      "pullbackIntensity": 0.45,
+      "eventScope": "mid"
     },
     {
       "id": "lowMid",
       "floor": 8,
       "equilibrium": 35,
-      "pullbackIntensity": 0.65
+      "pullbackIntensity": 0.65,
+      "eventScope": "mid"
     },
     {
       "id": "low",
       "floor": 0,
       "equilibrium": 18,
-      "pullbackIntensity": 0.85
+      "pullbackIntensity": 0.85,
+      "eventScope": "mid"
     }
   ],
   "conferences": [
@@ -527,5 +531,6 @@
       "historicalPrestige": 2,
       "rivalId": null
     }
-  ]
+  ],
+  "events": []
 }

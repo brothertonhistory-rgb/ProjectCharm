@@ -51,18 +51,36 @@ internal static partial class Program
 
     // ── Canonical tier table (placeholders; floor is the load-bearing value this pass;
     //    equilibrium + pullbackIntensity are carried schema for Pass 3, consumed there). ──
-    private static readonly (string Id, int Floor, int Equilibrium, double Pullback)[] WorldTierDefaults =
+    //
+    // ★ S97 — <c>EventScope</c> is the tier's answer to "is a school from this league a
+    //   power-conference name or a mid-major?", and an MTE slot asks that question of every
+    //   candidate. It lives on the TIER rather than in C# branching on tier ids, so a world
+    //   that invents its own league structure answers it in its own file. This table is the
+    //   default for a world BUILT FROM CSV (`world convert`): the csv authors which tier a
+    //   conference belongs to, never what the tiers themselves mean, so the mapping has to
+    //   originate somewhere and this is the somewhere. Every world FILE then carries it
+    //   explicitly and is read from the file, never from here.
+    private static readonly (string Id, int Floor, int Equilibrium, double Pullback, string EventScope)[] WorldTierDefaults =
     {
-        ("power",   40, 75, 0.25),
-        ("highMid", 20, 55, 0.45),
-        ("lowMid",   8, 35, 0.65),
-        ("low",      0, 18, 0.85),
+        ("power",   40, 75, 0.25, "power"),
+        ("highMid", 20, 55, 0.45, "mid"),
+        ("lowMid",   8, 35, 0.65, "mid"),
+        ("low",      0, 18, 0.85, "mid"),
     };
+
+    /// <summary>The fixed vocabulary for a tier's event scope. `any` is deliberately NOT a
+    /// tier value — it is a SLOT value meaning "this seat does not care", so a tier that
+    /// declined to answer would be indistinguishable from a slot that declined to ask.</summary>
+    private static readonly string[] WorldTierEventScopeVocabulary = { "power", "mid" };
+
+    /// <summary>The fixed vocabulary for an event SLOT's scope. Includes `any`.</summary>
+    private static readonly string[] WorldEventSlotScopeVocabulary = { "power", "mid", "any" };
 
     private const double WorldStationJitter = 30.0;  // triangular +/-30 around tier equilibrium
 
     // ── Schema types ────────────────────────────────────────────────────────────────────
-    private sealed record WorldTier(string Id, int Floor, int Equilibrium, double PullbackIntensity);
+    private sealed record WorldTier(
+        string Id, int Floor, int Equilibrium, double PullbackIntensity, string EventScope);
     /// <summary>★ S93 — A CONFERENCE NOW SAYS HOW MANY GAMES IT PLAYS. <c>Games</c> and
     /// <c>Skip</c> were authored in <c>data/conf.csv</c> from the day that file landed and
     /// the converter read neither; the season hardcoded sixteen for everybody. They are the
@@ -147,6 +165,34 @@ internal static partial class Program
         int PlaceId, int ConferenceId, string Division,
         int CurrentPrestige, int HistoricalPrestige, int? RivalId = null);
 
+    /// <summary>★ S97 — ONE SEAT in an event's field, and the template for who may sit in it.
+    ///
+    /// <para>A slot asks two independent questions and they are deliberately NOT fused: a
+    /// prestige <c>Band</c> ("how good must this school be") and a <c>Scope</c> ("must it be
+    /// a power-conference name, a mid-major, or does this seat not care"). Maui's bottom
+    /// seats are wide-band and `any`; its headline seat is narrow-band and `power`. Fusing
+    /// them into one "quality" number would make it impossible to author the real thing a
+    /// top event does — spend everything on one flagship and fill the rest cheap.</para></summary>
+    private sealed record WorldEventSlot(int BandLo, int BandHi, string Scope);
+
+    /// <summary>★ S97 — an authored bracketed tournament. Existing in the world file is NOT
+    /// the same as running: <c>Persistence</c> is the chance this event happens in any given
+    /// season, and <c>ForcedActive</c> overrides that draw in either direction for a world
+    /// that wants a guaranteed field or a guaranteed absence.
+    ///
+    /// <para>★ <c>Tier</c> is the SEATING ORDER, 1 first. It is not the conference tier and
+    /// shares no vocabulary with it: this is "how good is this tournament", which decides who
+    /// picks from the pool first, and the whole top-down draft falls out of it.</para>
+    ///
+    /// <para>★ The window is EXACTLY the playing days — three for an eight-team field, two
+    /// for a four-team field — because S98's rounds are back-to-back. A rest day inside an
+    /// event is a different design and would be authored as a different shape, not as a
+    /// looser window here.</para></summary>
+    private sealed record WorldEvent(
+        int Id, string Name, int Tier, int PlaceId,
+        string FirstDay, string LastDay, int FieldSize,
+        IReadOnlyList<WorldEventSlot> Slots, double Persistence, bool? ForcedActive);
+
     private sealed class WorldFile
     {
         public int SchemaVersion { get; init; } = WorldSchemaVersion;
@@ -158,6 +204,10 @@ internal static partial class Program
         public List<WorldConference> Conferences { get; init; } = new();
         public List<WorldPlace> Places { get; init; } = new();
         public List<WorldSchool> Schools { get; init; } = new();
+        /// <summary>★ S97 — the MTE pool. May be EMPTY: a world with no tournaments is legal
+        /// and every downstream step is a no-op on it, which is what makes the zero path
+        /// provable byte-for-byte against the pre-S97 tree.</summary>
+        public List<WorldEvent> Events { get; init; } = new();
     }
 
     /// <summary>★ S93 — schema 3. A v1 file has coordinates on the school and no place
@@ -167,8 +217,15 @@ internal static partial class Program
     /// working for a year and then disagrees with its own fingerprint. The committed files
     /// were converted once. ★ THE WORLD FINGERPRINT MOVES AGAIN — invoked deliberately for
     /// the second time, free today because no career exists outside this repo and
-    /// permanently expensive the day one does.</summary>
-    private const int WorldSchemaVersion = 4;
+    /// permanently expensive the day one does.
+    ///
+    /// <para>★ S97 — schema 5, the FOURTH deliberate move and the same bargain: a v4 file has
+    /// no <c>events</c> array and no <c>eventScope</c> on its tiers, so it cannot say which
+    /// tournaments exist or what a league's name is worth to one. The fingerprint hashes the
+    /// whole world file, so every world moving to v5 means EVERY EXISTING CAREER STOPS
+    /// OPENING. That is stated plainly rather than discovered: it is still free today,
+    /// because no career exists outside this repo.</para></summary>
+    private const int WorldSchemaVersion = 5;
 
     // ── Deterministic PRNG (SplitMix64) — explicit so a world file is reproducible on
     //    any runtime, never dependent on System.Random's version-specific algorithm.
@@ -283,7 +340,7 @@ internal static partial class Program
             if (root.ValueKind != JsonValueKind.Object)
                 throw new InvalidOperationException("world file root must be a JSON object.");
             RejectUnknownOrDuplicateKeys(root, "root",
-                "schemaVersion", "metadata", "tiers", "conferences", "places", "schools");
+                "schemaVersion", "metadata", "tiers", "conferences", "places", "schools", "events");
 
             var schemaVersion = RequireIntProperty(root, "schemaVersion", "root");
 
@@ -310,12 +367,14 @@ internal static partial class Program
             var tiers = new List<WorldTier>();
             foreach (var el in WorldRequireArray(root, "tiers"))
             {
-                RejectUnknownOrDuplicateKeys(el, "tiers[]", "id", "floor", "equilibrium", "pullbackIntensity");
+                RejectUnknownOrDuplicateKeys(el, "tiers[]",
+                    "id", "floor", "equilibrium", "pullbackIntensity", "eventScope");
                 tiers.Add(new WorldTier(
                     WorldRequireString(el, "id", "tiers[]"),
                     RequireIntProperty(el, "floor", "tiers[]"),
                     RequireIntProperty(el, "equilibrium", "tiers[]"),
-                    WorldRequireDouble(el, "pullbackIntensity", "tiers[]")));
+                    WorldRequireDouble(el, "pullbackIntensity", "tiers[]"),
+                    WorldRequireString(el, "eventScope", "tiers[]")));
             }
 
             var conferences = new List<WorldConference>();
@@ -412,11 +471,77 @@ internal static partial class Program
                     WorldRequireNullableInt(el, "rivalId", ctx)));
             }
 
+            // ── Events (S97). REQUIRED at root even when empty: a world with no tournaments
+            //    writes `"events": []`, so there is exactly one spelling of "no events" and
+            //    the fingerprint cannot differ between a file that omitted the key and one
+            //    that wrote an empty array. Same discipline as places[].tags. ──────────────
+            var events = new List<WorldEvent>();
+            foreach (var el in WorldRequireArray(root, "events"))
+            {
+                RejectUnknownOrDuplicateKeys(el, "events[]",
+                    "id", "name", "tier", "placeId", "firstDay", "lastDay",
+                    "fieldSize", "slots", "persistence", "forcedActive");
+                var evName = WorldRequireString(el, "name", "events[]");
+                var ectx = $"event '{evName}'";
+
+                if (!el.TryGetProperty("slots", out var slotsEl) || slotsEl.ValueKind != JsonValueKind.Array)
+                    throw new InvalidOperationException($"missing required 'slots' array in {ectx}.");
+                var slots = new List<WorldEventSlot>();
+                var slotIndex = 0;
+                foreach (var sEl in slotsEl.EnumerateArray())
+                {
+                    if (sEl.ValueKind != JsonValueKind.Object)
+                        throw new InvalidOperationException($"{ectx} slot {slotIndex} must be an object.");
+                    RejectUnknownOrDuplicateKeys(sEl, $"{ectx} slot {slotIndex}", "band", "scope");
+                    if (!sEl.TryGetProperty("band", out var bandEl) || bandEl.ValueKind != JsonValueKind.Array)
+                        throw new InvalidOperationException(
+                            $"{ectx} slot {slotIndex} requires a 'band' array of exactly two numbers.");
+                    var band = new List<int>();
+                    foreach (var bEl in bandEl.EnumerateArray())
+                    {
+                        if (bEl.ValueKind != JsonValueKind.Number || !bEl.TryGetInt32(out var bv))
+                            throw new InvalidOperationException(
+                                $"{ectx} slot {slotIndex} band values must be integers.");
+                        band.Add(bv);
+                    }
+                    if (band.Count != 2)
+                        throw new InvalidOperationException(
+                            $"{ectx} slot {slotIndex} band must have exactly two values [lo, hi] (got {band.Count}).");
+                    slots.Add(new WorldEventSlot(
+                        band[0], band[1], WorldRequireString(sEl, "scope", $"{ectx} slot {slotIndex}")));
+                    slotIndex++;
+                }
+
+                bool? forced = null;
+                if (!el.TryGetProperty("forcedActive", out var forcedEl))
+                    throw new InvalidOperationException(
+                        $"{ectx} requires 'forcedActive' (null = draw against persistence).");
+                if (forcedEl.ValueKind != JsonValueKind.Null)
+                {
+                    if (forcedEl.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                        throw new InvalidOperationException($"{ectx} forcedActive must be true, false or null.");
+                    forced = forcedEl.ValueKind == JsonValueKind.True;
+                }
+
+                events.Add(new WorldEvent(
+                    RequireIntProperty(el, "id", ectx),
+                    evName,
+                    RequireIntProperty(el, "tier", ectx),
+                    RequireIntProperty(el, "placeId", ectx),
+                    WorldRequireString(el, "firstDay", ectx),
+                    WorldRequireString(el, "lastDay", ectx),
+                    RequireIntProperty(el, "fieldSize", ectx),
+                    slots,
+                    WorldRequireDouble(el, "persistence", ectx),
+                    forced));
+            }
+
             return new WorldFile
             {
                 SchemaVersion = schemaVersion, Kind = kind, EraLabel = eraLabel,
                 Division = division, WorldSeed = worldSeed,
                 Tiers = tiers, Conferences = conferences, Places = places, Schools = schools,
+                Events = events,
             };
         }
     }
@@ -497,6 +622,14 @@ internal static partial class Program
                 throw new InvalidOperationException($"tier '{t.Id}' floor {t.Floor} exceeds its equilibrium {t.Equilibrium}.");
             if (t.PullbackIntensity <= 0.0 || t.PullbackIntensity > 1.0)
                 throw new InvalidOperationException($"tier '{t.Id}' pullbackIntensity {t.PullbackIntensity} must be in (0, 1].");
+            // ★ S97 — EVERY tier answers, and `any` is not an answer a tier may give (that is
+            //   a slot's word for "I do not ask"). A missing or unknown value is refused by
+            //   name rather than defaulted, because a silent default here would decide
+            //   quietly which leagues count as power-conference names.
+            if (!WorldTierEventScopeVocabulary.Contains(t.EventScope, StringComparer.Ordinal))
+                throw new InvalidOperationException(
+                    $"tier '{t.Id}' eventScope '{t.EventScope}' is not in the vocabulary " +
+                    $"[{string.Join(", ", WorldTierEventScopeVocabulary)}].");
             tierById[t.Id] = t;
         }
 
@@ -633,8 +766,133 @@ internal static partial class Program
                     "appear in more than one.");
         }
 
+        WorldValidateEvents(w, placeById);
+
         WorldFeasibilityCheck(w, tierById, confById);
     }
+
+    /// <summary>★ S97 — the MTE pool's own legality, validated AFTER places (an event's home
+    /// is a reference into that table) and independently of any school: which schools are
+    /// eligible for which seat is a SEASON question, decided fresh every year against
+    /// history, and nothing here may pre-answer it.
+    ///
+    /// <para>Everything refused here is refused BY NAME, because these are hand-authored rows
+    /// and the whole value of a strict reader is that a typo says which tournament it is
+    /// in.</para></summary>
+    private static void WorldValidateEvents(WorldFile w, Dictionary<int, WorldPlace> placeById)
+    {
+        var eventById = new Dictionary<int, WorldEvent>();
+        var eventByPlace = new Dictionary<int, WorldEvent>();
+        foreach (var e in w.Events)
+        {
+            if (e.Id <= 0)
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' has id {e.Id}; event ids must be positive.");
+            if (!eventById.TryAdd(e.Id, e))
+                throw new InvalidOperationException(
+                    $"duplicate event id {e.Id} ('{e.Name}' and '{eventById[e.Id].Name}').");
+            if (e.Name.Length == 0)
+                throw new InvalidOperationException($"event id {e.Id} has an empty name.");
+            if (e.Name.Trim() != e.Name)
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' (id {e.Id}) has surrounding whitespace.");
+            if (e.Tier < 1)
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' tier {e.Tier} must be 1 or greater (1 seats first).");
+
+            if (!placeById.TryGetValue(e.PlaceId, out var place))
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' points at unknown placeId {e.PlaceId}.");
+            // ★ ONE EVENT PER PLACE. Two tournaments in one town in one November is a
+            //   scheduling collision nobody wants to discover at seating time, and the
+            //   place is how a field's home is named on every page and in every record.
+            if (!eventByPlace.TryAdd(e.PlaceId, e))
+                throw new InvalidOperationException(
+                    $"two events share placeId {e.PlaceId} ('{place.Descriptor}'): '{eventByPlace[e.PlaceId].Name}' " +
+                    $"and '{e.Name}'. One event per place.");
+
+            if (e.FieldSize is not (8 or 4))
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' fieldSize {e.FieldSize} must be exactly 8 or 4.");
+            if (e.Slots.Count != e.FieldSize)
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' has {e.Slots.Count} slot(s) for a field of {e.FieldSize}; " +
+                    "every seat is authored.");
+
+            for (var i = 0; i < e.Slots.Count; i++)
+            {
+                var s = e.Slots[i];
+                if (s.BandLo is < 0 or > 99 || s.BandHi is < 0 or > 99)
+                    throw new InvalidOperationException(
+                        $"event '{e.Name}' slot {i} band [{s.BandLo}, {s.BandHi}] falls outside the " +
+                        "prestige domain 0-99.");
+                if (s.BandLo > s.BandHi)
+                    throw new InvalidOperationException(
+                        $"event '{e.Name}' slot {i} band [{s.BandLo}, {s.BandHi}] is inverted; lo must not exceed hi.");
+                if (!WorldEventSlotScopeVocabulary.Contains(s.Scope, StringComparer.Ordinal))
+                    throw new InvalidOperationException(
+                        $"event '{e.Name}' slot {i} scope '{s.Scope}' is not in the vocabulary " +
+                        $"[{string.Join(", ", WorldEventSlotScopeVocabulary)}].");
+            }
+
+            if (!double.IsFinite(e.Persistence) || e.Persistence < 0.0 || e.Persistence > 1.0)
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' persistence {e.Persistence} must be a finite number in [0, 1].");
+
+            WorldValidateEventWindow(e);
+        }
+    }
+
+    /// <summary>★ S97 — the window is EXACTLY the playing days, and that is a hard equality
+    /// rather than a bound: three dates for an eight-team field, two for a four-team field.
+    ///
+    /// <para>Dates are month/day and year-independent, so they are resolved against the
+    /// season spine the engine actually dates games on — months 7-12 in the season's opening
+    /// calendar year, 1-6 in the closing one. A YEAR-WRAPPING window is refused rather than
+    /// silently supported: every real event is a few days in November, and a window that
+    /// straddles New Year would have to answer questions about which season it belongs to
+    /// that nothing in v5 asks.</para></summary>
+    private static void WorldValidateEventWindow(WorldEvent e)
+    {
+        var first = WorldParseSpineDay(e.FirstDay, e, nameof(e.FirstDay));
+        var last = WorldParseSpineDay(e.LastDay, e, nameof(e.LastDay));
+
+        if (WorldSpineHalf(first) != WorldSpineHalf(last))
+            throw new InvalidOperationException(
+                $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} crosses the turn of the year; " +
+                "year-wrapping windows are not supported in schema v5.");
+        if (last < first)
+            throw new InvalidOperationException(
+                $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} runs backwards in season order.");
+
+        var days = last.DayNumber - first.DayNumber + 1;
+        var want = e.FieldSize == 8 ? 3 : 2;
+        if (days != want)
+            throw new InvalidOperationException(
+                $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} is {days} day(s); a field of " +
+                $"{e.FieldSize} plays on EXACTLY {want} (rounds are back-to-back).");
+    }
+
+    /// <summary>Month/day to a real date on the season spine. Refuses anything that is not a
+    /// legal calendar day in that spine — February 30 has no night to play on.</summary>
+    private static DateOnly WorldParseSpineDay(string raw, WorldEvent e, string which)
+    {
+        var parts = raw.Split('-');
+        if (parts.Length != 2 || parts[0].Length != 2 || parts[1].Length != 2
+            || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var month)
+            || !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var day))
+            throw new InvalidOperationException(
+                $"event '{e.Name}' {which} '{raw}' must be MM-DD (month/day, year-independent).");
+        if (month is < 1 or > 12)
+            throw new InvalidOperationException($"event '{e.Name}' {which} '{raw}' has no such month.");
+        var year = month >= 7 ? SeasonDefaultStartYear : SeasonDefaultStartYear + 1;
+        if (day < 1 || day > DateTime.DaysInMonth(year, month))
+            throw new InvalidOperationException(
+                $"event '{e.Name}' {which} '{raw}' is not a real date on the season spine.");
+        return new DateOnly(year, month, day);
+    }
+
+    private static int WorldSpineHalf(DateOnly d) => d.Month >= 7 ? 0 : 1;
 
     /// <summary>★ ONE version guard, called by the parser AND the validator, so a file read
     /// from disk and a world built in memory refuse the same way with the same words. There
@@ -658,6 +916,12 @@ internal static partial class Program
                 + "count and no tournament wall on a conference, so it has no way to say WHEN its own "
                 + "season is. There is no automatic migration — re-run 'world convert <teams.csv> "
                 + "<conf.csv> <places.csv> <out.json>'.");
+        if (schemaVersion == 4)
+            throw new InvalidOperationException(
+                "world schemaVersion 4 is retired (S97): a v4 file carries no 'events' array and no "
+                + "'eventScope' on its tiers, so it has no way to say WHICH TOURNAMENTS EXIST or what a "
+                + "league's name is worth to one. There is no automatic migration — re-run 'world convert "
+                + "<teams.csv> <conf.csv> <places.csv> <out.json>'.");
         if (schemaVersion != WorldSchemaVersion)
             throw new InvalidOperationException(
                 $"unsupported schemaVersion {schemaVersion} (this build reads {WorldSchemaVersion}).");
@@ -810,6 +1074,9 @@ internal static partial class Program
             Schools = input.Schools
                 .Select(s => s with { CurrentPrestige = assigned[s.Id], HistoricalPrestige = assigned[s.Id] })
                 .ToList(),
+            // ★ S97 — the pool is carried through untouched for the same reason places are:
+            //   reseeding prestige changes who is good, never which tournaments exist.
+            Events = input.Events.ToList(),
         };
     }
 
@@ -973,10 +1240,19 @@ internal static partial class Program
             EraLabel = "stock-d1",
             Division = "D1",
             WorldSeed = null,
-            Tiers = WorldTierDefaults.Select(t => new WorldTier(t.Id, t.Floor, t.Equilibrium, t.Pullback)).ToList(),
+            Tiers = WorldTierDefaults
+                .Select(t => new WorldTier(t.Id, t.Floor, t.Equilibrium, t.Pullback, t.EventScope)).ToList(),
             Conferences = conferences.OrderBy(c => c.Id).ToList(),
             Places = places.OrderBy(p => p.PlaceId).ToList(),
             Schools = schools.OrderBy(s => s.Id).ToList(),
+            // ★ S97 — A CONVERTED WORLD HAS NO EVENTS, and that is stated here rather than
+            //   left to be discovered. The three csvs author schools, leagues and places;
+            //   there is no events csv, so the pool is authored into the world FILE and
+            //   `world rewrite` is what carries it. The consequence, named on purpose:
+            //   re-running `world convert` over an authored world DROPS ITS POOL. If the
+            //   stock pool ever needs to survive a reconversion it needs its own csv, which
+            //   is a deliberate decision and not something to slide in here.
+            Events = new List<WorldEvent>(),
         };
     }
 
@@ -1144,6 +1420,7 @@ internal static partial class Program
                 writer.WriteNumber("floor", t.Floor);
                 writer.WriteNumber("equilibrium", t.Equilibrium);
                 writer.WriteNumber("pullbackIntensity", t.PullbackIntensity);
+                writer.WriteString("eventScope", t.EventScope);
                 writer.WriteEndObject();
             }
             writer.WriteEndArray();
@@ -1213,6 +1490,40 @@ internal static partial class Program
             }
             writer.WriteEndArray();
 
+            // ★ S97 — events, sorted by id ascending, and ALWAYS WRITTEN even when empty.
+            //   Slots keep their AUTHORED order: a slot's position is load-bearing (seats
+            //   fill in it, and the narrow headline seat picks before the wide filler ones),
+            //   so sorting them would silently change which field an event produces.
+            writer.WriteStartArray("events");
+            foreach (var e in w.Events.OrderBy(e => e.Id))
+            {
+                writer.WriteStartObject();
+                writer.WriteNumber("id", e.Id);
+                writer.WriteString("name", e.Name);
+                writer.WriteNumber("tier", e.Tier);
+                writer.WriteNumber("placeId", e.PlaceId);
+                writer.WriteString("firstDay", e.FirstDay);
+                writer.WriteString("lastDay", e.LastDay);
+                writer.WriteNumber("fieldSize", e.FieldSize);
+                writer.WriteStartArray("slots");
+                foreach (var s in e.Slots)
+                {
+                    writer.WriteStartObject();
+                    writer.WriteStartArray("band");
+                    writer.WriteNumberValue(s.BandLo);
+                    writer.WriteNumberValue(s.BandHi);
+                    writer.WriteEndArray();
+                    writer.WriteString("scope", s.Scope);
+                    writer.WriteEndObject();
+                }
+                writer.WriteEndArray();
+                writer.WriteNumber("persistence", e.Persistence);
+                if (e.ForcedActive is { } fa) writer.WriteBoolean("forcedActive", fa);
+                else writer.WriteNull("forcedActive");
+                writer.WriteEndObject();
+            }
+            writer.WriteEndArray();
+
             writer.WriteEndObject();
         }
         return stream.ToArray();
@@ -1251,7 +1562,7 @@ internal static partial class Program
         Console.WriteLine();
         Console.WriteLine("TIER ROLLUP");
         Console.WriteLine($"  {"Tier",-8} {"Confs",5} {"Schools",7} {"Floor",5} {"Min",4} {"Med",6} {"Mean",6} {"Max",4}");
-        foreach (var (id, _, _, _) in WorldTierDefaults)
+        foreach (var (id, _, _, _, _) in WorldTierDefaults)
         {
             var confIds = w.Conferences.Where(c => c.TierId == id).Select(c => c.Id).ToHashSet();
             var vals = w.Schools.Where(s => confIds.Contains(s.ConferenceId)).Select(s => s.CurrentPrestige).ToList();

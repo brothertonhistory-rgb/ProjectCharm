@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "metadata": {
     "kind": "authored",
     "eraLabel": "stock-d1",
@@ -10,25 +10,29 @@
       "id": "power",
       "floor": 40,
       "equilibrium": 75,
-      "pullbackIntensity": 0.25
+      "pullbackIntensity": 0.25,
+      "eventScope": "power"
     },
     {
       "id": "highMid",
       "floor": 20,
       "equilibrium": 55,
-      "pullbackIntensity": 0.45
+      "pullbackIntensity": 0.45,
+      "eventScope": "mid"
     },
     {
       "id": "lowMid",
       "floor": 8,
       "equilibrium": 35,
-      "pullbackIntensity": 0.65
+      "pullbackIntensity": 0.65,
+      "eventScope": "mid"
     },
     {
       "id": "low",
       "floor": 0,
       "equilibrium": 18,
-      "pullbackIntensity": 0.85
+      "pullbackIntensity": 0.85,
+      "eventScope": "mid"
     }
   ],
   "conferences": [
@@ -3336,6 +3340,61 @@
       "long": -149.9003,
       "tags": [
         "exotic"
+      ]
+    },
+    {
+      "placeId": 311,
+      "name": "Freeport",
+      "subdivision": "",
+      "country": "BS",
+      "lat": 26.5333,
+      "long": -78.6957,
+      "tags": [
+        "exotic"
+      ]
+    },
+    {
+      "placeId": 312,
+      "name": "Myrtle Beach",
+      "subdivision": "SC",
+      "country": "US",
+      "lat": 33.6891,
+      "long": -78.8867,
+      "tags": [
+        "domestic"
+      ]
+    },
+    {
+      "placeId": 313,
+      "name": "Niceville",
+      "subdivision": "FL",
+      "country": "US",
+      "lat": 30.5163,
+      "long": -86.4822,
+      "tags": [
+        "domestic"
+      ]
+    },
+    {
+      "placeId": 314,
+      "name": "Estero",
+      "subdivision": "FL",
+      "country": "US",
+      "lat": 26.4381,
+      "long": -81.8067,
+      "tags": [
+        "domestic"
+      ]
+    },
+    {
+      "placeId": 315,
+      "name": "Naples",
+      "subdivision": "FL",
+      "country": "US",
+      "lat": 26.142,
+      "long": -81.7948,
+      "tags": [
+        "domestic"
       ]
     }
   ],
@@ -7503,6 +7562,1337 @@
       "currentPrestige": 12,
       "historicalPrestige": 12,
       "rivalId": null
+    }
+  ],
+  "events": [
+    {
+      "id": 1,
+      "name": "Maui Invitational",
+      "tier": 1,
+      "placeId": 303,
+      "firstDay": "11-24",
+      "lastDay": "11-26",
+      "fieldSize": 8,
+      "slots": [
+        {
+          "band": [
+            86,
+            99
+          ],
+          "scope": "power"
+        },
+        {
+          "band": [
+            78,
+            92
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            72,
+            86
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            66,
+            80
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            56,
+            70
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.98,
+      "forcedActive": null
+    },
+    {
+      "id": 2,
+      "name": "Battle 4 Atlantis",
+      "tier": 1,
+      "placeId": 304,
+      "firstDay": "11-25",
+      "lastDay": "11-27",
+      "fieldSize": 8,
+      "slots": [
+        {
+          "band": [
+            84,
+            98
+          ],
+          "scope": "power"
+        },
+        {
+          "band": [
+            76,
+            90
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            70,
+            84
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            64,
+            78
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            58,
+            72
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            54,
+            68
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            50,
+            64
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            46,
+            60
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.97,
+      "forcedActive": null
+    },
+    {
+      "id": 3,
+      "name": "Vegas Invitational",
+      "tier": 2,
+      "placeId": 251,
+      "firstDay": "11-27",
+      "lastDay": "11-29",
+      "fieldSize": 8,
+      "slots": [
+        {
+          "band": [
+            78,
+            92
+          ],
+          "scope": "power"
+        },
+        {
+          "band": [
+            70,
+            84
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            64,
+            78
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            58,
+            72
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            54,
+            68
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            50,
+            64
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            46,
+            60
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            56
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.92,
+      "forcedActive": null
+    },
+    {
+      "id": 4,
+      "name": "Legends Classic",
+      "tier": 2,
+      "placeId": 297,
+      "firstDay": "11-20",
+      "lastDay": "11-22",
+      "fieldSize": 8,
+      "slots": [
+        {
+          "band": [
+            74,
+            88
+          ],
+          "scope": "power"
+        },
+        {
+          "band": [
+            66,
+            80
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            56,
+            70
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            44,
+            58
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            54
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.88,
+      "forcedActive": null
+    },
+    {
+      "id": 5,
+      "name": "Cayman Islands Classic",
+      "tier": 3,
+      "placeId": 306,
+      "firstDay": "11-23",
+      "lastDay": "11-25",
+      "fieldSize": 8,
+      "slots": [
+        {
+          "band": [
+            68,
+            82
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            62,
+            76
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            56,
+            70
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            44,
+            58
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            54
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            50
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.9,
+      "forcedActive": null
+    },
+    {
+      "id": 6,
+      "name": "ESPN Events Invitational",
+      "tier": 3,
+      "placeId": 42,
+      "firstDay": "11-26",
+      "lastDay": "11-27",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            70,
+            84
+          ],
+          "scope": "power"
+        },
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            44,
+            58
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.93,
+      "forcedActive": null
+    },
+    {
+      "id": 7,
+      "name": "Paradise Jam",
+      "tier": 4,
+      "placeId": 307,
+      "firstDay": "11-20",
+      "lastDay": "11-21",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            46,
+            60
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            54
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.9,
+      "forcedActive": null
+    },
+    {
+      "id": 8,
+      "name": "Puerto Rico Tip-Off",
+      "tier": 4,
+      "placeId": 309,
+      "firstDay": "11-19",
+      "lastDay": "11-20",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            46,
+            60
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            54
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.88,
+      "forcedActive": null
+    },
+    {
+      "id": 9,
+      "name": "Hall of Fame Series",
+      "tier": 4,
+      "placeId": 301,
+      "firstDay": "11-21",
+      "lastDay": "11-22",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            46,
+            60
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            54
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.85,
+      "forcedActive": null
+    },
+    {
+      "id": 10,
+      "name": "Wooden Legacy",
+      "tier": 4,
+      "placeId": 296,
+      "firstDay": "11-27",
+      "lastDay": "11-28",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            46,
+            60
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            54
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.86,
+      "forcedActive": null
+    },
+    {
+      "id": 11,
+      "name": "Baha Mar Hoops",
+      "tier": 4,
+      "placeId": 311,
+      "firstDay": "11-23",
+      "lastDay": "11-24",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            46,
+            60
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            54
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.84,
+      "forcedActive": null
+    },
+    {
+      "id": 12,
+      "name": "Desert Classic",
+      "tier": 4,
+      "placeId": 294,
+      "firstDay": "11-26",
+      "lastDay": "11-27",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            60,
+            74
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            66
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            46,
+            60
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            54
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.82,
+      "forcedActive": null
+    },
+    {
+      "id": 13,
+      "name": "Cancun Challenge",
+      "tier": 5,
+      "placeId": 305,
+      "firstDay": "11-24",
+      "lastDay": "11-25",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            50
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            30,
+            44
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.85,
+      "forcedActive": null
+    },
+    {
+      "id": 14,
+      "name": "Jamaica Classic",
+      "tier": 5,
+      "placeId": 308,
+      "firstDay": "11-20",
+      "lastDay": "11-21",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            50
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            30,
+            44
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.8,
+      "forcedActive": null
+    },
+    {
+      "id": 15,
+      "name": "Fort Myers Tip-Off",
+      "tier": 5,
+      "placeId": 279,
+      "firstDay": "11-23",
+      "lastDay": "11-24",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            50
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            30,
+            44
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.86,
+      "forcedActive": null
+    },
+    {
+      "id": 16,
+      "name": "Myrtle Beach Invitational",
+      "tier": 5,
+      "placeId": 312,
+      "firstDay": "11-19",
+      "lastDay": "11-20",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            50
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            30,
+            44
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.84,
+      "forcedActive": null
+    },
+    {
+      "id": 17,
+      "name": "Asheville Championship",
+      "tier": 5,
+      "placeId": 249,
+      "firstDay": "11-21",
+      "lastDay": "11-22",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            50
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            30,
+            44
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.8,
+      "forcedActive": null
+    },
+    {
+      "id": 18,
+      "name": "Palmetto Classic",
+      "tier": 5,
+      "placeId": 44,
+      "firstDay": "11-26",
+      "lastDay": "11-27",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            50
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            30,
+            44
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.78,
+      "forcedActive": null
+    },
+    {
+      "id": 19,
+      "name": "Hall of Fame Tip-Off",
+      "tier": 5,
+      "placeId": 300,
+      "firstDay": "11-14",
+      "lastDay": "11-15",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            48,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            50
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            30,
+            44
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.82,
+      "forcedActive": null
+    },
+    {
+      "id": 20,
+      "name": "Emerald Coast Classic",
+      "tier": 6,
+      "placeId": 313,
+      "firstDay": "11-27",
+      "lastDay": "11-28",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            34,
+            48
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            28,
+            42
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            36
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            16,
+            30
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.78,
+      "forcedActive": null
+    },
+    {
+      "id": 21,
+      "name": "Gulf Coast Showcase",
+      "tier": 6,
+      "placeId": 314,
+      "firstDay": "11-23",
+      "lastDay": "11-24",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            34,
+            48
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            28,
+            42
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            36
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            16,
+            30
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.76,
+      "forcedActive": null
+    },
+    {
+      "id": 22,
+      "name": "Sunshine Slam",
+      "tier": 6,
+      "placeId": 22,
+      "firstDay": "11-24",
+      "lastDay": "11-25",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            34,
+            48
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            28,
+            42
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            36
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            16,
+            30
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.75,
+      "forcedActive": null
+    },
+    {
+      "id": 23,
+      "name": "Border Classic",
+      "tier": 6,
+      "placeId": 295,
+      "firstDay": "11-21",
+      "lastDay": "11-22",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            34,
+            48
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            28,
+            42
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            36
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            16,
+            30
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.7,
+      "forcedActive": null
+    },
+    {
+      "id": 24,
+      "name": "Veterans Classic",
+      "tier": 6,
+      "placeId": 299,
+      "firstDay": "11-14",
+      "lastDay": "11-15",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            34,
+            48
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            28,
+            42
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            36
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            16,
+            30
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.72,
+      "forcedActive": null
+    },
+    {
+      "id": 25,
+      "name": "Sanford Pentagon Showcase",
+      "tier": 6,
+      "placeId": 302,
+      "firstDay": "11-20",
+      "lastDay": "11-21",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            34,
+            48
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            28,
+            42
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            36
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            16,
+            30
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.68,
+      "forcedActive": null
+    },
+    {
+      "id": 26,
+      "name": "Great Alaska Shootout",
+      "tier": 6,
+      "placeId": 310,
+      "firstDay": "11-26",
+      "lastDay": "11-27",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            34,
+            48
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            28,
+            42
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            36
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            16,
+            30
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.6,
+      "forcedActive": null
+    },
+    {
+      "id": 27,
+      "name": "Grand Rapids Classic",
+      "tier": 7,
+      "placeId": 298,
+      "firstDay": "11-22",
+      "lastDay": "11-23",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            14,
+            25
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            9,
+            20
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            4,
+            15
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            11
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.58,
+      "forcedActive": null
+    },
+    {
+      "id": 28,
+      "name": "Naples Invitational",
+      "tier": 7,
+      "placeId": 315,
+      "firstDay": "11-25",
+      "lastDay": "11-26",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            14,
+            25
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            9,
+            20
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            4,
+            15
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            11
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.55,
+      "forcedActive": null
+    },
+    {
+      "id": 29,
+      "name": "Bayou Showcase",
+      "tier": 7,
+      "placeId": 138,
+      "firstDay": "11-19",
+      "lastDay": "11-20",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            14,
+            25
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            9,
+            20
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            4,
+            15
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            11
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.5,
+      "forcedActive": null
     }
   ]
 }

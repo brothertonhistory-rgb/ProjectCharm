@@ -10599,3 +10599,152 @@ play and finalize real seasons to produce the logs it reads back.
 remaining half), along with the soft objectives (`SkipUrgency` and friends) held out of S93 because they
 need this memory to apply. MTE participation memory is named and not pre-shaped for — the reader
 projects hosting facts only, and widening it is a ruling, not an extension.
+
+## The MTE pool — tournaments exist and fields are seated (Session 97, 2026-08-03)
+
+A world may author **early-season bracketed tournaments**. Each season every event draws against its own
+persistence to decide whether it happens at all, and the ones that do seat their fields in tier order —
+the best tournament picks from the whole country, the next picks from what is left. **No tournament game
+plays here.** Bracket play, seeding, places on the calendar and the neutral-floor fact are S98. The split
+is licensed by the calendar: every window ends in November and the earliest conference night in the stock
+world is **December 7**.
+
+### What an event is (world schema v5)
+
+A top-level `events` array, which may be empty — a world with no tournaments is legal and every step
+downstream is a no-op, which is what makes the zero path provable byte for byte against the pre-S97 tree.
+Per event: a permanent `id`, a `name`, a `tier` (1 seats first — this is *how good the tournament is*, not
+the conference tier and sharing no vocabulary with it), a `placeId` (**one event per place**), a
+`firstDay`/`lastDay` window, a `fieldSize` of exactly 8 or 4, one authored `slot` per seat, a
+`persistence` in [0,1], and a nullable `forcedActive` that overrides the draw either way.
+
+**The window is EXACTLY the playing days** — three for an eight-team field, two for a four-team — as a
+hard equality, not a bound, because S98's rounds are back-to-back. A rest day inside an event is a
+different design and would be authored as a different shape.
+
+A **slot** asks two questions that are deliberately never fused: a prestige `band` and a `scope` of
+`power` / `mid` / `any`. Fusing them into one quality number would make it impossible to author what a top
+event actually does — spend everything on one flagship and fill the rest cheap. The power/mid meaning
+lives on the **tier**, as an `eventScope` every tier must carry; `any` is a slot word only, so a tier that
+declined to answer could never be mistaken for a seat that declined to ask.
+
+Schema **v4 → v5** is the fourth deliberate fingerprint move, refused by name through the one shared
+guard with no migration code. Adding the pool changes every world's fingerprint, so **every existing
+career stops opening** — free only while no career exists outside this repo.
+
+### Seating: the two absolutes, the ladder, the queue, the pull
+
+Activation is evaluated for **every** event first, then the active ones sort by `(tier, id)` and seat one
+at a time. That ordering is load-bearing: a tier-1 event must take its pick of the whole country before a
+tier-2 event touches it, whatever order they were authored in.
+
+**Two absolutes never relax, at any fallback level:** a school plays in at most one event per season, and
+a field holds at most one school per `conferenceCapKey`. The cap key is a *key*, not a rule with an
+exception — a school in a league that plays games keys on its conference; a school in a zero-game
+container (the stock world's fourteen Independents) keys on **itself**. The cap exists to force league
+variety into a field, and an administrative container holding every unaffiliated school in the country is
+not a league.
+
+Everything else relaxes in a fixed cumulative order when a seat cannot otherwise be filled —
+`None → Band → BandAndScope → BandScopeAndFourYear` — recomputed from the **full pool** at each level, so
+relaxing the band can admit a school the band excluded. The record stores the level per seat as the enum
+word, never an ordinal. A field still short after the last level is `SeatedShort`: **a diagnostic, never
+a refusal.**
+
+**History supplies two facts and nothing wider.** A *hard* per-event exclusion — seated in THIS event in
+seasons N−1..N−4, inclusive at both ends — and a *soft national preference* where the fewest recent
+appearances across ALL events wins outright, applied at every level including the last.
+
+★ **THE SOFT PREFERENCE IS A QUEUE, AND THAT IS THE RULING** (Emmett, 2026-08-03). It means an MTE is
+something a programme does every few years rather than annually. When it appeared to starve later seasons
+of good teams, the cause was **the events asking too high** — one year taking every elite programme in the
+country — not the rule.
+
+★ **THE PULL** (Emmett, 2026-08-03). Inside a band every qualifying school used to be equally likely, so a
+band was a *floor* rather than a *target*: a headline seat authored `[80,94]` was as likely to land the
+school that just scrapes in as the best in the country. A seat now draws `MteSeatPull` (5) candidates and
+seats the strongest — reaching hard without ever guaranteeing, which is what the real participation
+records look like. It is deliberately **not** "take the best available", which would hand one event the
+same flagship forever and defeat the memory layer this work was blocked on. Ties break on the lower school
+id, so the pull adds no randomness of its own.
+
+**RNG contract: keyed substreams only.** Every draw is a hash of the season seed, a compile-time domain
+constant, and the ids that name the draw. Nothing consumes a stream, so adding, removing or forcing one
+event never moves another's draw and one slot's fallback never shifts a later slot's. Persistence becomes
+an **integer threshold** once at load, so 0 means never and 1 means always as facts rather than as
+very-likely. Runtime `GetHashCode`, string hashing and `Math.Pow` are all forbidden here: this number
+reaches a saved career and must be identical on every platform.
+
+### The season pipeline, and where the commit is
+
+```
+1. peek the season about to be scheduled        (a read; nothing spent)
+2. read the last four seasons' event records     (holes tolerated)
+3. draw activation; seat every active field
+4. build the conference slate                    (unchanged)
+5. date it                                       (unchanged)
+6. refuse a seated school double-booked in its window
+7. refuse a record already claiming the pending season
+8. SPEND the season and game numbers             ← the commit
+9. publish the permanent record
+```
+
+★ **THE NUMBERING MOVED, AND THE ORDER IS THE CONTRACT.** The season used to take its official number the
+instant the league slates were legal — before the calendar had been laid over them. That was safe only
+while nothing after the slate could refuse a season, which stopped being true here: a school seated in a
+tournament cannot also have a league game inside that window, and nothing knows what night a game is on
+until dating has run. `NumberSeasonSchedule` is now a named step, reached through a `deferNumbering` flag
+that **only the production runner sets**, so all sixteen other callers keep their pre-S97 behaviour. Past
+step 8 the season is committed and S89's rule is unchanged: the reservation is durable and a season that
+then fails burns it. A record write that fails *after* the commit does not invalidate the basketball — it
+leaves a deliberate hole in event history.
+
+**Field seating is its own step, never folded into the schedule builder.** That is what keeps "the league
+schedule is a pure function of the world" true — the two cross-seed tripwires still pass untouched, and
+Phase 88 asserts the slate is identical across all 64 sweep seeds.
+
+### The permanent record
+
+One independently readable JSON file per season at `<history>.events/season-N.json` — arithmetic lookup,
+no enumeration, written only when a career is attached. Every display fact is **snapshotted** (event name,
+tier, place name, dates, school names), because a permanent history page must never need the current world
+to reconstruct what it said years ago. `playStatus` is an extensible string, `NotPlayed` at S97, so S98 can
+add a word without a format break.
+
+★ **THE RECORD BINDS TO THE CAREER, NOT THE WORLD.** A record cannot both survive world edits and be
+rejected whenever the world changes. `formatVersion`, `historyId` and the embedded `seasonId` are
+validated; **`worldFingerprint` is written as provenance and never checked**. Old records are historical
+truth — a school, place or event that no longer exists simply never matches a qualifier, which is the
+seating layer's own membership validation doing the work. Every failure is a **hole**: missing, malformed,
+wrong career, wrong season. A hole contributes zero facts and never disables its neighbours.
+
+A pre-existing file for the pending season **refuses the schedule commit before reservation** — a stale
+record left standing is worse than a hole, because next season would read its fields as history that never
+happened. Publication itself is a no-overwrite atomic move.
+
+### The stock pool
+
+29 authored events across 7 tiers — 5 eight-team, 24 four-team — each in its own city, every window in
+November. Seventeen neutral sites were already authored and tagged in S92 (Lahaina, Nassau, George Town,
+Charlotte Amalie, Cancún, Montego Bay, San Juan, Anchorage, plus nine domestic); five towns were invented
+(Freeport, Myrtle Beach, Niceville, Estero, Naples) taking the map to 315 places. Expected active =
+Σ persistence = **23.10**, expected seats **111** — about a third of D1, the ruled density.
+
+★ **THE LADDER IS COMPRESSED, TOP TO BOTTOM** (Emmett, 2026-08-03). Each field is tight and the tiers span
+the country, rather than each field spanning the country. Mean spread inside a field is **22 points**; the
+first authored version was 78. Maui reads 94 / 92 / 83 / 80 / 66 / 64 / 60 / 58 — two 90s, four
+power-conference schools, and a weakest team who is a real one. The worst tournament in the pool sits
+entirely inside 0–25. Slot two carries no `power` requirement, so a strong mid-major can headline beside a
+blue blood: *if the tournament is good enough to get a power conference school, there should be at least
+one other one in there, or a mid-major with a high enough prestige.*
+
+**There is no events csv.** The three spreadsheets author the map; the pool lives in the world file and
+`world rewrite` carries it. A reconversion therefore **drops the pool** — named in the converter's source
+and asserted positively by Phase 83 A7, deliberately not fixed.
+
+### Still open here
+
+**The pool's own data file** — until one exists, rebuilding the world from the spreadsheets wipes every
+authored tournament. **The small events' persistence** (0.50–0.78) leaves the bottom of the country thin
+in a given year. **Campus events** — a school that misses the brackets hosting its own three-team event,
+the floor of the market in the design brief — are unbuilt and belong to neither S97 nor S98.

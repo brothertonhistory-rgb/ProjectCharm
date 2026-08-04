@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 4,
   "metadata": {
     "kind": "authored",
-    "eraLabel": "fixture-memory",
+    "eraLabel": "fixture-tiny",
     "division": "D1"
   },
   "tiers": [
@@ -10,29 +10,25 @@
       "id": "power",
       "floor": 40,
       "equilibrium": 75,
-      "pullbackIntensity": 0.25,
-      "eventScope": "power"
+      "pullbackIntensity": 0.25
     },
     {
       "id": "highMid",
       "floor": 20,
       "equilibrium": 55,
-      "pullbackIntensity": 0.45,
-      "eventScope": "mid"
+      "pullbackIntensity": 0.45
     },
     {
       "id": "lowMid",
       "floor": 8,
       "equilibrium": 35,
-      "pullbackIntensity": 0.65,
-      "eventScope": "mid"
+      "pullbackIntensity": 0.65
     },
     {
       "id": "low",
       "floor": 0,
       "equilibrium": 18,
-      "pullbackIntensity": 0.85,
-      "eventScope": "mid"
+      "pullbackIntensity": 0.85
     }
   ],
   "conferences": [
@@ -41,14 +37,14 @@
       "name": "Granite Coast Conference",
       "shortName": "Granite",
       "tierId": "power",
-      "games": 6,
+      "games": 16,
       "skip": 0,
       "nights": [
         "sat",
         "wed",
         "mon"
       ],
-      "weeks": 5,
+      "weeks": 9,
       "tourneyOffsetDays": 4
     },
     {
@@ -56,14 +52,14 @@
       "name": "River Valley League",
       "shortName": "River Valley",
       "tierId": "highMid",
-      "games": 6,
+      "games": 16,
       "skip": 0,
       "nights": [
         "sat",
         "wed",
         "mon"
       ],
-      "weeks": 5,
+      "weeks": 9,
       "tourneyOffsetDays": 8
     },
     {
@@ -71,14 +67,14 @@
       "name": "Prairie Athletic Association",
       "shortName": "Prairie",
       "tierId": "lowMid",
-      "games": 6,
+      "games": 16,
       "skip": 0,
       "nights": [
         "sat",
         "wed",
         "mon"
       ],
-      "weeks": 5,
+      "weeks": 9,
       "tourneyOffsetDays": 11
     },
     {
@@ -86,14 +82,14 @@
       "name": "Timberline Conference",
       "shortName": "Timberline",
       "tierId": "low",
-      "games": 6,
+      "games": 16,
       "skip": 0,
       "nights": [
         "sat",
         "wed",
         "mon"
       ],
-      "weeks": 5,
+      "weeks": 9,
       "tourneyOffsetDays": 4
     }
   ],
@@ -531,6 +527,5 @@
       "historicalPrestige": 2,
       "rivalId": null
     }
-  ],
-  "events": []
+  ]
 }

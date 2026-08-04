@@ -81,6 +81,12 @@
          twice, twenty pairs across the world meet an odd number of times, every school is
          owed exactly one residual, and a whole season is sixty games. Derived from
          fixture-tiny and written through `world rewrite`, so it is canonical bytes. -->
+    <None Include="..\..\worlds\fixture-mte.world.json" Link="worlds\fixture-mte.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\..\worlds\fixture-v4-retired.world.json" Link="worlds\fixture-v4-retired.world.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="..\..\worlds\fixture-memory.world.json" Link="worlds\fixture-memory.world.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

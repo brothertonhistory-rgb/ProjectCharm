@@ -95,6 +95,17 @@
       ],
       "weeks": 5,
       "tourneyOffsetDays": 4
+    },
+    {
+      "id": 5,
+      "name": "Independent",
+      "shortName": "Ind",
+      "tierId": "low",
+      "games": 0,
+      "skip": 0,
+      "nights": [],
+      "weeks": 0,
+      "tourneyOffsetDays": null
     }
   ],
   "places": [
@@ -287,6 +298,104 @@
       "long": -156.6825,
       "tags": [
         "exotic"
+      ]
+    },
+    {
+      "placeId": 22,
+      "name": "Ashford",
+      "subdivision": "VT",
+      "country": "US",
+      "lat": 44.1,
+      "long": -72.6,
+      "tags": []
+    },
+    {
+      "placeId": 23,
+      "name": "Belmar",
+      "subdivision": "NJ",
+      "country": "US",
+      "lat": 40.18,
+      "long": -74.02,
+      "tags": []
+    },
+    {
+      "placeId": 24,
+      "name": "Cortez",
+      "subdivision": "CO",
+      "country": "US",
+      "lat": 37.35,
+      "long": -108.58,
+      "tags": []
+    },
+    {
+      "placeId": 25,
+      "name": "Dunmore",
+      "subdivision": "PA",
+      "country": "US",
+      "lat": 41.42,
+      "long": -75.63,
+      "tags": []
+    },
+    {
+      "placeId": 26,
+      "name": "Elko",
+      "subdivision": "NV",
+      "country": "US",
+      "lat": 40.83,
+      "long": -115.76,
+      "tags": []
+    },
+    {
+      "placeId": 27,
+      "name": "Fairhope",
+      "subdivision": "AL",
+      "country": "US",
+      "lat": 30.52,
+      "long": -87.9,
+      "tags": []
+    },
+    {
+      "placeId": 28,
+      "name": "Palm Cay",
+      "subdivision": "FL",
+      "country": "US",
+      "lat": 26.12,
+      "long": -80.14,
+      "tags": [
+        "exotic"
+      ]
+    },
+    {
+      "placeId": 29,
+      "name": "Cedar Rapids",
+      "subdivision": "IA",
+      "country": "US",
+      "lat": 41.98,
+      "long": -91.67,
+      "tags": [
+        "domestic"
+      ]
+    },
+    {
+      "placeId": 30,
+      "name": "Rock Springs",
+      "subdivision": "WY",
+      "country": "US",
+      "lat": 41.59,
+      "long": -109.2,
+      "tags": [
+        "domestic"
+      ]
+    },
+    {
+      "placeId": 31,
+      "name": "Twin Falls",
+      "subdivision": "ID",
+      "country": "US",
+      "lat": 42.56,
+      "long": -114.46,
+      "tags": [
+        "domestic"
       ]
     }
   ],
@@ -530,7 +639,272 @@
       "currentPrestige": 2,
       "historicalPrestige": 2,
       "rivalId": null
+    },
+    {
+      "id": 21,
+      "name": "Ashford College",
+      "abbr": "ASH",
+      "color": "#334455",
+      "placeId": 22,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 12,
+      "historicalPrestige": 12,
+      "rivalId": null
+    },
+    {
+      "id": 22,
+      "name": "Belmar College",
+      "abbr": "BEL",
+      "color": "#334455",
+      "placeId": 23,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 26,
+      "historicalPrestige": 26,
+      "rivalId": null
+    },
+    {
+      "id": 23,
+      "name": "Cortez College",
+      "abbr": "COR",
+      "color": "#334455",
+      "placeId": 24,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 38,
+      "historicalPrestige": 38,
+      "rivalId": null
+    },
+    {
+      "id": 24,
+      "name": "Dunmore College",
+      "abbr": "DUN",
+      "color": "#334455",
+      "placeId": 25,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 52,
+      "historicalPrestige": 52,
+      "rivalId": null
+    },
+    {
+      "id": 25,
+      "name": "Elko College",
+      "abbr": "ELK",
+      "color": "#334455",
+      "placeId": 26,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 66,
+      "historicalPrestige": 66,
+      "rivalId": null
+    },
+    {
+      "id": 26,
+      "name": "Fairhope College",
+      "abbr": "FAI",
+      "color": "#334455",
+      "placeId": 27,
+      "conferenceId": 5,
+      "division": "D1",
+      "currentPrestige": 80,
+      "historicalPrestige": 80,
+      "rivalId": null
     }
   ],
-  "events": []
+  "events": [
+    {
+      "id": 10,
+      "name": "Palm Cay Invitational",
+      "tier": 1,
+      "placeId": 28,
+      "firstDay": "11-24",
+      "lastDay": "11-26",
+      "fieldSize": 8,
+      "slots": [
+        {
+          "band": [
+            70,
+            99
+          ],
+          "scope": "power"
+        },
+        {
+          "band": [
+            40,
+            99
+          ],
+          "scope": "power"
+        },
+        {
+          "band": [
+            30,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            20,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            10,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 1,
+      "forcedActive": null
+    },
+    {
+      "id": 11,
+      "name": "Cedar Rapids Classic",
+      "tier": 2,
+      "placeId": 29,
+      "firstDay": "11-20",
+      "lastDay": "11-21",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            40,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            20,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.5,
+      "forcedActive": null
+    },
+    {
+      "id": 12,
+      "name": "Rock Springs Never",
+      "tier": 3,
+      "placeId": 30,
+      "firstDay": "11-20",
+      "lastDay": "11-21",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0,
+      "forcedActive": null
+    },
+    {
+      "id": 13,
+      "name": "Twin Falls Always",
+      "tier": 3,
+      "placeId": 31,
+      "firstDay": "11-20",
+      "lastDay": "11-21",
+      "fieldSize": 4,
+      "slots": [
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            0,
+            99
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 1,
+      "forcedActive": null
+    }
+  ]
 }

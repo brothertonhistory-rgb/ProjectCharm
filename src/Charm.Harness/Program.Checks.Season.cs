@@ -217,7 +217,11 @@ internal static partial class Program
                 var moved = movedIdx.ToHashSet();
                 return new WorldFile
                 {
-                    SchemaVersion = 4, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
+                    // ★ S97 — the CONSTANT, not a literal. This rig existed to prove the
+                    //   preflight rejects a one-school league; hardcoding the version meant
+                    //   that the day v4 retired, the check went red saying the world was
+                    //   old rather than saying the league was impossible.
+                    SchemaVersion = WorldSchemaVersion, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
                     Division = tiny.Division, WorldSeed = tiny.WorldSeed, Tiers = tiny.Tiers,
                     Places = tiny.Places,
                     Conferences = tiny.Conferences

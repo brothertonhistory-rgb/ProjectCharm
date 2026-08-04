@@ -1,4 +1,4 @@
- 310 
+ 315 
 PlaceId,Name,Subdivision,Country,Lat,Long,Tags
 1,Colorado Springs,CO,US,38.86,-104.79,
 2,Akron,OH,US,41.07,-81.52,
@@ -310,3 +310,8 @@ PlaceId,Name,Subdivision,Country,Lat,Long,Tags
 308,Montego Bay,,JM,18.4762,-77.8939,exotic
 309,San Juan,,PR,18.4655,-66.1057,exotic
 310,Anchorage,AK,US,61.2181,-149.9003,exotic
+311,Freeport,,BS,26.5333,-78.6957,exotic
+312,Myrtle Beach,SC,US,33.6891,-78.8867,domestic
+313,Niceville,FL,US,30.5163,-86.4822,domestic
+314,Estero,FL,US,26.4381,-81.8067,domestic
+315,Naples,FL,US,26.142,-81.7948,domestic

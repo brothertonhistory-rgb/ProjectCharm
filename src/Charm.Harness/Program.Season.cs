@@ -128,6 +128,10 @@ internal static partial class Program
         /// <summary>★ S96 — what host memory did this season. Page-facing; the suite reads
         /// the parts it asserts from the schedule itself, never from these counters.</summary>
         public SeasonMemoryOutcome Memory { get; init; } = SeasonMemoryOutcome.None;
+        /// <summary>★ S97 — which tournaments ran, who is in them, and what happened to the
+        /// permanent record. Page-facing; the suite reads what it asserts from the seating
+        /// result itself, never from a printed line.</summary>
+        public EventSeasonOutcome Events { get; init; } = EventSeasonOutcome.None;
     }
 
     /// <summary>Everything the two accumulators need to turn a stamped player id back into a
@@ -757,6 +761,27 @@ internal static partial class Program
     private static List<SeasonGame> BuildSeasonSchedule(
         WorldFile world, long seasonSeed, HistoryStore? history,
         out SeasonMemoryOutcome memoryOutcome)
+        => BuildSeasonSchedule(world, seasonSeed, history, deferNumbering: false, out memoryOutcome);
+
+    /// <summary>★ S97 — the numbering may now be DEFERRED, and only the production season
+    /// runner defers it.
+    ///
+    /// <para>Why: the season used to take its official number the instant the league slates
+    /// were legal, which was before the calendar had been laid over them. That was fine while
+    /// nothing after the slate could refuse a season. It stopped being fine this session — a
+    /// school seated in a tournament cannot also have a league game inside that window, and
+    /// nothing knows what night a game is on until dating has run. A refusal that fires after
+    /// the number is spent burns a season id permanently for a world that was simply authored
+    /// wrong.</para>
+    ///
+    /// <para>So the production path builds unnumbered, dates, checks the tournament windows,
+    /// checks no record already claims the pending season, and only THEN spends the number.
+    /// Every other caller keeps the pre-S97 behaviour exactly, which is why this is a flag on
+    /// a private overload rather than a change to the shape everyone uses. The season/game
+    /// counters are independent of the person counter, so deferring moves no identity.</para></summary>
+    private static List<SeasonGame> BuildSeasonSchedule(
+        WorldFile world, long seasonSeed, HistoryStore? history, bool deferNumbering,
+        out SeasonMemoryOutcome memoryOutcome)
     {
         SeasonPreflight(world);
         var schools = world.Schools.OrderBy(s => s.Id).ToList();
@@ -799,14 +824,35 @@ internal static partial class Program
             residualsFlipped, leaguesFlipped);
 
         if (history is null) return games;   // legacy mode: the fixtures stay unnumbered
+        if (deferNumbering) return games;    // S97: the caller spends the number itself, later
 
-        // The count is known and the slate is legal, so one season number and one block of
-        // game numbers are reserved together and written once.
+        NumberSeasonSchedule(games, history);
+        return games;
+    }
+
+    /// <summary>★ S97 — THE COMMIT. After this returns, the season id is spent whatever
+    /// happens next: the reservation is durable and a season that then fails burns it
+    /// permanently. That is S89's rule unchanged; all this session did was move the moment
+    /// later, so that everything capable of refusing a season now runs before it.
+    ///
+    /// <para>One season number and one contiguous block of game numbers, reserved together
+    /// and stamped in schedule order.</para></summary>
+    private static long NumberSeasonSchedule(List<SeasonGame> games, HistoryStore history)
+    {
+        // ★ The peek's contract, asserted rather than assumed: while this run holds the
+        //   lock, the value the peek returns IS the value the reservation hands back, and the
+        //   counter moves by exactly one. `SeasonId`'s raw value is deliberately not public,
+        //   so the counter is what proves it — which is the honest check anyway.
+        var expected = history.PeekNextSeasonId;
         var seasonId = history.ReserveSeason();
+        if (history.PeekNextSeasonId != expected + 1)
+            throw new InvalidOperationException(
+                $"SEASON INVARIANT VIOLATED: peeked season {expected} but the counter did not advance "
+                + "by exactly one across the reservation.");
         var gameIds = history.ReserveGames(games.Count);
         for (var g = 0; g < games.Count; g++)
             games[g] = games[g] with { SeasonId = seasonId, GameId = gameIds[g] };
-        return games;
+        return expected;
     }
 
     /// <summary>★ S89 note — this hashes the four pre-S89 fields BY NAME (index, kind, home,
@@ -893,11 +939,59 @@ internal static partial class Program
         HistoryStore? history = null, bool retainGameLog = false,
         int? roadShaveOverride = null)
     {
-        var schedule = BuildSeasonSchedule(world, seasonSeed, history, out var memoryOutcome);
+        // ══════════════════════════════════════════════════════════════════════════
+        //  ★ S97 — THE SEASON PIPELINE, IN THIS ORDER, AND THE ORDER IS THE CONTRACT.
+        //
+        //    1. peek the season about to be scheduled   (a read; nothing is spent)
+        //    2. read the last four seasons' event records
+        //    3. draw activation and seat every active field
+        //    4. build the conference slate                        (unchanged)
+        //    5. date it                                           (unchanged)
+        //    6. refuse a seated school double-booked in its window
+        //    7. refuse a record already claiming the pending season
+        //    8. SPEND the season and game numbers                 ← the commit
+        //    9. publish the permanent record
+        //
+        //    Anything that fails at 1-7 leaves NO season id spent and NO file written.
+        //    Past 8 the season is committed: a record write that then fails does not
+        //    invalidate the basketball, it leaves a deliberate hole in event history.
+        // ══════════════════════════════════════════════════════════════════════════
+        var pendingSeasonId = history?.PeekNextSeasonId ?? 0;
+        var eventHistory = MteReadHistory(history, pendingSeasonId);
+        var seating = MteSeatSeason(world, seasonSeed, eventHistory);
+
+        var schedule = BuildSeasonSchedule(
+            world, seasonSeed, history, deferNumbering: true, out var memoryOutcome);
         var fingerprint = ScheduleFingerprint(schedule);
         // ★ S94 — every game gains its night. Purely additive: the structural fingerprint
         //   above is computed from the four named fields and cannot see the date.
         var datedFingerprint = SeasonDateSchedule(world, schedule, SeasonDefaultStartYear);
+
+        MteRefuseOverlap(world, seating, schedule);
+        MteRefuseExistingRecord(history, pendingSeasonId);
+
+        var recordStatus = EventRecordStatus.NotApplicable;
+        string? recordDiagnostic = null;
+        if (history is not null)
+        {
+            var reserved = NumberSeasonSchedule(schedule, history);
+            if (reserved != pendingSeasonId)
+                throw new InvalidOperationException(
+                    $"SEASON INVARIANT VIOLATED: peeked season {pendingSeasonId} but reserved {reserved}.");
+            try
+            {
+                MtePublishRecord(history, reserved, seasonSeed, world, seating);
+                recordStatus = EventRecordStatus.Written;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                recordStatus = EventRecordStatus.WriteFailed;
+                recordDiagnostic = ex.GetType().Name;
+            }
+        }
+        var eventOutcome = new EventSeasonOutcome(
+            seating, recordStatus, recordDiagnostic, eventHistory.Diagnostics);
+
         var divvy = RunDivvyDraft(world, seasonSeed, history);
 
         // ★ S89 — history mode's contract, validated ONCE, here. Past this line every
@@ -1063,6 +1157,7 @@ internal static partial class Program
             RoadShave = roadShave,
             DatedFingerprint = datedFingerprint,
             Memory = memoryOutcome,
+            Events = eventOutcome,
         };
     }
 
@@ -1206,6 +1301,19 @@ internal static partial class Program
             var memoryLine = HostMemoryPageLine(run.Memory);
             if (memoryLine is not null) Console.WriteLine(memoryLine);
             Console.WriteLine();
+        }
+
+        // ★ S97 — the tournament block. PAGE-ONLY: no field composition is ever asserted by
+        //   the suite. When the world authors no events this prints NOTHING — not a heading,
+        //   not a blank line — which is what makes the zero-path byte-identity claim honest.
+        {
+            var eventLines = MtePageLines(run.Events);
+            if (eventLines.Count > 0)
+            {
+                Console.WriteLine("--- EARLY-SEASON EVENTS (fields only; no tournament game is played yet) ---");
+                foreach (var line in eventLines) Console.WriteLine(line);
+                Console.WriteLine();
+            }
         }
 
         // ★ S95 — the home-court readout. PAGE-ONLY, NEVER ASSERTED: the ratified 59%

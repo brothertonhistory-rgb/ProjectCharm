@@ -43,7 +43,11 @@ internal static partial class Program
             ValidateWorld(stock);
             Check("stock world converts and validates", true);
             Check("stock school count 347", stock.Schools.Count == 347, $"got {stock.Schools.Count}");
-            Check("stock place count 310", stock.Places.Count == 310, $"got {stock.Places.Count}");
+            // ★ S97 — 310 → 315: five towns were added as event homes (Freeport, Myrtle
+            //   Beach, Niceville, Estero, Naples). The number stays PINNED rather than
+            //   derived; it is a tripwire whose whole job is to make somebody look when the
+            //   map grows, and it did exactly that this session.
+            Check("stock place count 315", stock.Places.Count == 315, $"got {stock.Places.Count}");
             Check("stock conference count 32", stock.Conferences.Count == 32, $"got {stock.Conferences.Count}");
             Check("every school division matches metadata (D1)",
                 stock.Division == "D1" && stock.Schools.All(s => s.Division == "D1"));
@@ -135,9 +139,10 @@ internal static partial class Program
                 1, 2, "D1", lowPrestige, lowPrestige));
         return new WorldFile
         {
-            SchemaVersion = 4, Kind = "authored", EraLabel = "synthetic", Division = "D1", WorldSeed = null,
+            SchemaVersion = WorldSchemaVersion, Kind = "authored", EraLabel = "synthetic", Division = "D1", WorldSeed = null,
             Places = places,
-            Tiers = WorldTierDefaults.Select(t => new WorldTier(t.Id, t.Floor, t.Equilibrium, t.Pullback)).ToList(),
+            Tiers = WorldTierDefaults
+                .Select(t => new WorldTier(t.Id, t.Floor, t.Equilibrium, t.Pullback, t.EventScope)).ToList(),
             Conferences = new List<WorldConference>
             {
                 new(1, "Synthetic Power", "SP", "power", 16, 0, new[] { "sat", "wed", "mon" }, 9, 4),

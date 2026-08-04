@@ -321,12 +321,12 @@ internal static partial class Program
             }
             Check("A5 NEGATIVE CONTROL: a US-shaped validator REJECTS every exotic place — "
                   + "so one could never have shipped in front of this list",
-                  exoticPlaces.Count == 8 && missedByBothArms.Count == 0,
+                  exoticPlaces.Count == 9 && missedByBothArms.Count == 0,
                   missedByBothArms.Count == 0
                     ? $"{exoticPlaces.Count} exotic places; box catches [{string.Join(", ", caughtByBox)}]; "
                       + $"non-US country catches [{string.Join(", ", caughtByCountry)}]"
                     : "a US-shaped validator would have ACCEPTED: " + string.Join(", ", missedByBothArms));
-            Check("A5 the real validator accepts all 310 places, including every one a "
+            Check($"A5 the real validator accepts all {stock.Places.Count} places, including every one a "
                   + "US-shaped check would have thrown out",
                   stock.Places.All(p => GeoCoordinate.IsValid(
                       p.Coordinate.LatitudeDegrees, p.Coordinate.LongitudeDegrees)));
@@ -425,10 +425,33 @@ internal static partial class Program
                   v3Refused && v3Msg.Contains("schemaVersion 3", StringComparison.Ordinal)
                     && v3Msg.Contains("WHEN", StringComparison.Ordinal), v3Msg);
 
+            // ★ S97 — the SAME negative-control pattern, one version up again: a v4 document
+            //   must be refused for the v4 reason (no events array, no tier eventScope — it
+            //   cannot say WHICH TOURNAMENTS EXIST), never the generic message.
+            var v4Path = Path.Combine(Path.GetTempPath(), $"charm_v4_retired_{Guid.NewGuid():N}.json");
+            var v4Refused = false; var v4Msg = "";
+            try
+            {
+                File.WriteAllText(v4Path,
+                    File.ReadAllText(v1Path).Replace("\"schemaVersion\": 1", "\"schemaVersion\": 4",
+                                                     StringComparison.Ordinal));
+                try { LoadWorld(v4Path); }
+                catch (InvalidOperationException ex) { v4Refused = true; v4Msg = ex.Message; }
+            }
+            finally { if (File.Exists(v4Path)) File.Delete(v4Path); }
+            Check("A7 ★ a schemaVersion 4 world is REFUSED by name, for the v4 reason "
+                  + "(no events, no tier eventScope — it cannot say WHICH TOURNAMENTS EXIST)",
+                  v4Refused && v4Msg.Contains("schemaVersion 4", StringComparison.Ordinal)
+                    && v4Msg.Contains("TOURNAMENTS", StringComparison.Ordinal), v4Msg);
+
             var tiny = LoadWorld(tinyPath);
             var format = LoadWorld(formatPath);
-            Check("A7 all three migrated world files are schemaVersion 4 and validate",
-                  stock.SchemaVersion == 4 && tiny.SchemaVersion == 4 && format.SchemaVersion == 4);
+            // ★ S97 — the CONSTANT, not the literal the version happened to be when this was
+            //   written. Spelling it out meant that the day the schema moved, this went red
+            //   saying the FILES were wrong when the only thing wrong was this sentence.
+            Check($"A7 all three migrated world files are schemaVersion {WorldSchemaVersion} and validate",
+                  stock.SchemaVersion == WorldSchemaVersion && tiny.SchemaVersion == WorldSchemaVersion
+                  && format.SchemaVersion == WorldSchemaVersion);
 
             // ★ CANONICAL BYTES COMPARED, NEVER DECODED OBJECT EQUALITY. Object equality
             //   would pass while the key order, the indent or a number's spelling drifted,
@@ -459,9 +482,33 @@ internal static partial class Program
                   && !formatText.Contains("-0,", StringComparison.Ordinal));
 
             var converted = ConvertWorld(teamsCsv, confCsv, placesCsv);
-            Check("A7 ConvertWorld round-trips places: the converter's canonical bytes equal "
-                  + "the committed stock world",
-                  CanonicalWorldBytes(converted).AsSpan().SequenceEqual(File.ReadAllBytes(stockPath)));
+            // ★ S97 — THIS CHECK WAS SPLIT, AND THE SPLIT IS THE POINT. It used to compare
+            //   the converter's whole canonical output against the committed world. That
+            //   stopped being true this session for ONE reason: the three csvs author the
+            //   MAP — schools, leagues, towns — and there is no events csv, so the
+            //   tournament pool lives in the world file and a reconversion produces none.
+            //
+            //   The full-strength half is kept: everything the csvs DO author must still
+            //   round-trip byte for byte, so the spreadsheets remain the source of truth for
+            //   the map. The divergence is then asserted POSITIVELY rather than papered
+            //   over — if a future session teaches the converter about events, the second
+            //   check goes red and says so instead of the property quietly disappearing.
+            var convertedWithPool = new WorldFile
+            {
+                SchemaVersion = converted.SchemaVersion, Kind = converted.Kind,
+                EraLabel = converted.EraLabel, Division = converted.Division,
+                WorldSeed = converted.WorldSeed, Tiers = converted.Tiers,
+                Conferences = converted.Conferences, Places = converted.Places,
+                Schools = converted.Schools, Events = stock.Events,
+            };
+            Check("A7 ConvertWorld round-trips the MAP: with the committed pool put back, the "
+                  + "converter's canonical bytes equal the committed stock world exactly",
+                  CanonicalWorldBytes(convertedWithPool).AsSpan()
+                      .SequenceEqual(File.ReadAllBytes(stockPath)));
+            Check("A7 ★ and the converter authors NO events — deliberate, and asserted so a "
+                  + "reconversion silently wiping the tournament pool can never be a surprise",
+                  converted.Events.Count == 0 && stock.Events.Count > 0,
+                  $"converter {converted.Events.Count}, committed world {stock.Events.Count}");
 
             var seeded = SeedWorld(stock, 20260802);
             Check("A7 SeedWorld carries the place table through unchanged",
