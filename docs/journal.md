@@ -1,3 +1,63 @@
+## Session 102 — THE MATCHING. Every school's November now pairs: who plays whom, who hosts, which games are neutral. No site, no night, no game record — that is arc session 3. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 93 PASS at 17 assertions, all four fingerprints unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`, `6abd62b0…`).** On the stock world **1,958 games pair** — 1,667 at a host's gym, 111 neutral, 177 where the bottom hosts the bottom, 3 terminal repairs — with **330 of 333 schools exactly on target**, three one game over, and **nobody short**. ★ **THE FINDING: THE RULED TILT INVERTS AT THE BOTTOM.** C-40 says a power school flies and a small school buses; measured on the trips schools actually take, Marquee is 175 miles at the median, Solid 145, Working 121, and **Selling 249 with a p90 of 873**. Surfaced at the check-in and **RULED TO STAND as measured** (Emmett) — printed by class on the page, never tuned. **O-92 session 2 of 4 ships.** (2026-08-05)
+
+**Register:** build, under `PROMPT-nonconference-matching-s102-r2.1` (ChatGPT-cleared to the gate). Oracle first, then four C# files and three edits. `Charm.Engine` and `Charm.History` UNTOUCHED. No world file change, no schema bump — the bucket mixes ship as named constants at one seam (R8).
+
+### What shipped
+
+`tools/matching_oracle.py` — NEW, and written and locked **before any C# existed**. Its docstring is the specification; the C# is its port. `tools/matching_golden.json` — NEW, the ordered pairing list plus the full ledger plus the S101 report it was built from. `src/Charm.Harness/Program.Season.Matching.cs` — NEW (the matcher and the page block). `src/Charm.Harness/Program.Checks.Matching.cs` — NEW (Phase 93). `Program.Season.cs`, `Program.cs`, **`Charm.Harness.csproj`** — EDIT.
+
+★ **THE PROJECT FILE WAS NOT IN THE PROMPT'S FILE LIST, AND THE SUITE WOULD HAVE FAILED ON WINDOWS WITHOUT IT.** Phase 93 reads the golden at run time, so it needs the copy-to-output line every other golden has. This is the fifth session running that a file outside the explicit list had to move; caught here by building before delivering, and flagged in the delivery rather than slipped in.
+
+### The rules this implements (Emmett's rulings, 2026-08-05)
+
+A home request names the **kind of opponent** wanted, by that opponent's **prestige** — Easy under 25, Working 25–54, Decent 55–79, Name 80+, plus Selling's unrestricted ANY. Class carries S101's conference-tier floor; a bucket does not, which is why Northwestern at prestige 53 *schedules* like a Marquee school and *fills* somebody else's Working bucket. The ruled mixes: **Marquee 5E/2W/1D, Solid 3E/2W/1D, Working 2E/2W, Selling all ANY**, split into game counts by largest remainder with ties going to the lower bucket.
+
+Four phases, in order. **(1) The top picks first and everyone else adapts** (R4) — Marquee, then Solid, Working, Selling; inside a class by prestige, inside a school Easy first. Each request takes the nearest legal school with a road game left, and a request that finds nobody **spills up one rung at a time and never down** ("25–54 is fine, not everyone gets what they want"). **(2) Showcases pair by closest prestige**, and a token that finds no partner becomes an ordinary home game rather than being discarded. **(3) Bottom hosts bottom** (C-37): whatever road games are left pair off and the lower school eats the home date — its site mix moves, its game count does not. **(4) Terminal repair**: anything still short is closed by one bounded extra game whose partner hosts, prefers a Selling school, and is used at most once.
+
+### ★ THE COUNTRY CLOSES TO ZERO, AND THE LEDGER IS HOW WE KNOW
+
+3,913 request tokens (1,666 home + 223 neutral + 2,024 road) dispose exactly: `2×1,667 hosted + 2×111 neutral + 2×177 filler + 3 terminal short + 0 unrepaired = 3,913`. And participation, which is a **different** identity because the three terminal partners play a game no request ever asked for: `2×1,958 pairs = 3,916 = 3,913 − 0 + 3`. Both are asserted nationally (C10), every pairing appears on exactly two ledgers in its two roles, and each school reconciles to its own request. Hawaii is the school that strands — an island runs out of unpaired neighbours — and its three road games are picked up by Cal Poly, UC Davis and Sacramento State.
+
+**164 spills is arithmetic, not a soft number.** The ruled mixes ask the country for **923 easy home games and only 759 easy road games exist**; at minimum 164 requests must move up a rung. Exactly 164 do, which also says legality never forced an extra one. Measured at the check-in gate before a line was built, and it is the number to watch if a future ruling moves the mixes.
+
+### ★ THE TILT FINDING — a green suite would have hidden it
+
+The national visitor trip reads a healthy **median 148 miles, p90 598**. Split by who is actually on the bus, it reads Marquee 175 / Solid 145 / Working 121 / **Selling 249**. The bottom of the country travels furthest by a wide margin, which is the reverse of C-40's "a power school flies, a small school buses."
+
+Two mechanisms, both structural rather than buggy. In the fill, the **host** picks its nearest opponent and the visitor has no say at all, so a Selling school's ten road games go wherever it is wanted rather than wherever it would like to go. Then bottom-hosts-bottom pairs the hardest-to-place leftovers off at a median of 356 miles, and 637 of the 1,847 non-neutral road trips belong to Selling schools.
+
+Emmett ruled it stands as measured and ruled the by-class line onto the page, so it stays visible instead of hiding inside the national number. This is the S81 lesson recurring exactly: **build the check that discriminates on the axis the change is about**. The national median looked right under a policy that inverts the ruling it implements, and the per-school ledger looked right too.
+
+### ★ THE GATE FOUND THREE THINGS IN A CLEARED PROMPT
+
+**(1) The prompt's own distance measurement was wrong.** It claimed the closest any school pair comes to a half-mile rounding boundary is 0.0000111 miles at Fairfield↔Oakland (516.500011 mi). Re-measured over the same 40,186 town pairs against the committed S92 ruler: the true worst is **0.0000306 miles at Colorado↔San Francisco, 935.500031 mi** — and Fairfield↔Oakland is 516.4950, five thousandths off the line rather than eleven millionths. The conclusion survives (still ~7 orders of magnitude of daylight over the ~1e-12 mi agreement the Python haversine shows against the S92 golden), but the figure and the school names would have gone into the docs as fact. **The S81.3 lesson verbatim: a plausible table in a build prompt is the most dangerous artifact in it, because it looks like evidence and therefore escapes the audit every code claim gets.** The oracle now re-measures this margin on every run rather than quoting it.
+
+**(2) The prompt told the golden to copy `schedule_oracle.py`'s provenance block. That oracle writes no golden file at all** — it prints fingerprints. The real pattern is `block_help_oracle.py`, and the world's own canonical fingerprint would have been genuine work to mirror in Python; hashing the committed world file gets the same guarantee for free.
+
+**(3) The pair count was right and worth confirming**: 40,186 is the pairs among the 284 towns the 333 *targeted* schools live in — the Independents correctly excluded, since A5 holds them out of every phase.
+
+The gate also ran the whole §4 algorithm as a scratch model and reproduced the draft's figures independently — 1,958 pairs, 164 spills, 1 converted neutral, Hawaii stranding, the same three Californian hosts. Two figures moved by a mile or two (median 148 not 147, p90 598 not 596) because §7's own whole-mile rule quantizes before the percentile.
+
+### Oracle-first, and what the two halves prove
+
+The oracle proves itself before it emits: its haversine matches the S92 golden table to a trillionth of a mile, both conservation identities close, the filler host rule holds, no request lands below the bucket it asked for, the spill count equals the requests filled above origin, and a second run reproduces the first exactly **without touching the input**.
+
+★ **DISTANCE ORDERING IS QUANTIZED, AND THAT IS THE CROSS-LANGUAGE VERSION OF THE S81.3 LESSON.** Every tie-break here runs on distance, and Python's and C#'s trig differ by ULPs, so two nearly-equal distances could sort differently in the two languages and break parity for a reason that has nothing to do with the policy. All ordering uses `floor(miles + 0.5)` — an integer, that exact formula in both languages. **Neither language's default rounding is used**: `round()` and `Math.Round()` are both ties-to-even, which is the wrong function and a trap for a future session. Whole-mile quantization makes parity robust rather than certain, and the margin above is the measured proof for this world; C14 is the standing tripwire for any other.
+
+**C14 proves the port; C1–C13 prove the policy — neither substitutes for the other.** A faithful port of a wrong policy passes C14, and a coherent policy implemented differently in the two languages passes C1–C13. C14a is the piece that keeps a failure legible: the golden carries the S101 report it was built from, asserted field-for-field against the live one, so a red C14 always means "the port is wrong" and never "the input moved."
+
+### Two calls made by Claude and marked
+
+**(a) Phase 93 plays a stock season (~30s of suite time), same cost and same reason as Phase 92's.** The check wants the report the season *actually built* rather than one it built for itself, which is what makes C1 a wiring assertion. Flagged at delivery with an offer to cut it to the cheap half; Emmett left it.
+
+**(b) The mutated-report discriminator for C1.** Reading the ledger's requested columns would pass under a matcher that recomputed the requests itself, so C1 also runs a synthetic report the world would never produce: hosted games move 1,667 → 1,349. Without that arm C1 is decorative — the S101 tie-break lesson applied one session later.
+
+### What this deliberately does not do
+
+No date, no city, no `SeasonGame`, no possession, no home-court effect — every one of those is arc session 3, and the neutral brief's crowd model is still waiting. Nothing downstream reads the matching; it rides out on the outcome like Memory, Rotation, Events and the S101 report, which is what keeps the second wall (nothing moves a game) provable by construction rather than by hope. The Independents still play nothing. No basketball value is asserted anywhere — not a distance, not a spill count, not a class trip median.
+
+---
+
 ## Session 101 — CLASSES AND REQUESTS. Every school now gets a class — read from prestige every season, with its conference tier as a floor at every tier — and a target November in games: home set by the class band, neutral allowed, road the remainder. Nothing is scheduled. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 92 PASS at 11 assertions, every fingerprint unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`).** The finding the session exists to print: the country wants to host 1,666 ordinary non-conference games and travel to 2,024 — **a gap of 358, meaning ~179 games must be hosted by schools that wanted the road**, landing on the 60 Selling schools at roughly three extra home games each. **O-92 opens (the non-conference arc, session 1 of 4 shipped).** (2026-08-05)
 
 **Register:** design conversation AND build in one session — the arc's rulings were made in the same conversation that then ran the build, under `PROMPT-nonconference-classes-s101-r2` (ChatGPT-reviewed; see the adjudication below). Two new files, two edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED. No world file changes, no schema bump — per R8 the numbers ship as named constants at one seam.

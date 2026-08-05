@@ -109,6 +109,17 @@
     <None Include="..\..\tools\geo_distance_golden.json" Link="tools\geo_distance_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+
+    <!-- S102 matching golden (emitted by tools/matching_oracle.py, whose docstring is the
+         specification). The ordered pairing list AND the full ledger for the stock world
+         under seed 20260720's seating, plus a provenance block naming the world file hash,
+         the S101 report fingerprint, the DistanceKey formula and the oracle's own hash, so
+         a regenerated golden can never silently change its input basis. Every value in it
+         is an integer or a string — no float is asserted anywhere — which is why Phase 93
+         C14 demands LITERAL equality rather than a ULP bound. -->
+    <None Include="..\..\tools\matching_golden.json" Link="tools\matching_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <ItemGroup>

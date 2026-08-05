@@ -10,7 +10,30 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 101** (2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 92 PASS at 11
+Last updated: **Session 102** (2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 93 PASS at 17
+assertions**, all four fingerprints unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`, `6abd62b0…`). **THE MATCHING — every
+school's November pairs (arc session 2 of 4).** Who plays whom, who hosts, which games are neutral. **No site, no night,
+no game record** — that is session 3. A home request names the KIND of opponent by that opponent's PRESTIGE (Easy <25,
+Working 25–54, Decent 55–79, Name 80+, plus Selling's unrestricted ANY) at Emmett's ruled mixes; unfillable requests
+**spill UP one rung at a time, never down**. Four phases: top-down fill (R4 as a pick order), neutral pairing with
+leftovers converting to home games, **bottom hosts bottom** (C-37), and a bounded +1 terminal repair whose partner hosts
+and is used at most once. Stock world: **1,958 games pair** — 1,667 hosted / 111 neutral / 177 filler / 3 terminal —
+**330 of 333 schools exactly on target**, three one game over (Cal Poly, Sacramento State, UC Davis, all covering
+Hawaii's island dead-end), **0 short**. Both conservation identities close: `3,913 = 2×1,667 + 2×111 + 2×177 + 3 + 0`
+and `2×1,958 = 3,913 − 0 + 3`. ★ **THE FINDING: THE RULED TILT INVERTS AT THE BOTTOM** — C-40 says a small school buses,
+but measured on trips actually taken it reads Marquee 175 / Solid 145 / Working 121 / **Selling 249 (p90 873)**. The
+host picks its nearest opponent and the visitor has no say; filler then pairs the leftovers at a 356-mile median.
+**Ruled to stand as measured (C-41)** and printed by class on the page — a healthy national median of 148 was hiding it.
+★ **164 spills is arithmetic, not tuning**: the mixes ask for 923 easy home games and only 759 exist. ★ Oracle-first —
+`tools/matching_oracle.py` locked before any C# existed, golden parity pair-for-pair IN ORDER. ★ **THE GATE CAUGHT THE
+CLEARED PROMPT'S OWN MEASUREMENT**: its half-mile margin figure and named pair were both wrong (true worst 0.0000306 mi
+at Colorado↔San Francisco, not 0.0000111 at Fairfield↔Oakland) — the S81.3 lesson recurring; the oracle now re-measures
+it every run. Its provenance instruction also named an oracle that emits no golden at all. ★ **THE FIFTH SESSION RUNNING
+THAT A FILE OUTSIDE THE PROMPT'S LIST HAD TO MOVE** — `Charm.Harness.csproj` needed the golden's copy-to-output line or
+Windows would have gone red. Suite +~30s (Phase 93 plays a stock season, same reason as Phase 92 — flagged and
+accepted). **O-92 session 2 of 4 ships; records C-41.**)
+
+*(Previous board entry, S101 — 2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 92 PASS at 11
 assertions**, every fingerprint unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`). **CLASSES AND REQUESTS — the
 non-conference arc opens (session 1 of 4).** Every school gets a class — prestige every season, conference tier as a
 floor at EVERY tier (Emmett's ruling) — and a target November in GAMES: home from the class band by prestige rank,
@@ -27,7 +50,7 @@ prediction compared against the superseded power-only rule. ★ A decorative tie
 made discriminating (the S81.3 lesson). ★ C4b spec-corrected: seating follows the seed by design, so seed-independence
 is the full report on an eventless world and classes-only on stock. Pure seam: `(world, seating)` in `RunSeasonCore`
 between seating and the schedule build, nothing downstream reads it. Suite +~30s (Phase 92 plays a stock season for
-the zero path — flagged and accepted). **Opens O-92.**)
+the zero path — flagged and accepted). **Opens O-92.**)*
 
 *(Previous board entry, S100 — 2026-08-04; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 91 PASS at 19
 assertions**, Phase 90 back to 40. **WHO IS OWED THE HOME GAME.** The alternation stops looking one year back and counts
@@ -339,6 +362,16 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S102 — THE MATCHING (non-conference arc, session 2 of 4).** Every school's November pairs: who plays
+  whom, who hosts, which games are neutral. NO site, NO night, NO `SeasonGame`. Home requests name the
+  opponent's PRESTIGE bucket (Easy/Working/Decent/Name, plus Selling's ANY) at Emmett's ruled mixes and
+  **spill UP only**; four phases — top-down fill, neutral pairing with leftovers converting, bottom-hosts-
+  bottom (C-37), bounded +1 terminal repair. Distance ordering **quantized to whole miles in both languages**
+  so cross-language parity survives ULPs. Oracle-first (`tools/matching_oracle.py` locked before any C#;
+  `tools/matching_golden.json` carries the pairs, the ledger and the S101 report it was built from). Stock:
+  1,958 pairs, 330/333 exactly on target, 0 short, both conservation identities closing. Phase 93,
+  17 assertions, full-bundle zero path against pre-S102 goldens. Advances **O-92**; records **C-41**.
 
 - **★ S101 — CLASSES AND REQUESTS (non-conference arc, session 1 of 4).** Every school gets a class
   (max of conference tier floor and prestige band, `CurrentPrestige` every season) and a request in GAMES:
@@ -730,14 +763,15 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-92 — ★ THE NON-CONFERENCE ARC, SESSIONS 2–4 (opened S101; session 1 shipped).** The brief is
-  `docs/nonconference-design-brief.md` (r3). Remaining: **(2) the matching** — who plays whom and who hosts,
-  the geographic tilt (C-40) as a pairing cost, bottom-hosts-bottom (C-37) as the terminal filler, R4's
-  dictate-and-adapt as an order; **(3) sites and nights** — R9–R12, the neutral brief's crowd model wired at
+- **O-92 — ★ THE NON-CONFERENCE ARC, SESSIONS 3–4 (opened S101; sessions 1 and 2 shipped).** The brief is
+  `docs/nonconference-design-brief.md` (r3 — **R17's tilt now needs an r4 amendment, see C-41**). Remaining:
+  **(3) sites and nights** — R9–R12, every paired game gains a place, the neutral brief's crowd model wired at
   last, dates around conference play and the tournament windows; **(4) the Independents' November and their
-  gap-filling role** (R13). The class curve (brief §8.1) and R10's distance/quality shape stay open for
-  Emmett to rule off the S101 page — the 358-gap balance line is the number to rule against. Blocks **O-78**
-  (a national ranking has no honest basis while leagues share no opponents).
+  gap-filling role** (R13, and the same-conference legality test must EXEMPT their shared container — they are
+  fourteen strangers in one bucket, not league-mates). The class curve (brief §8.1) and R10's distance/quality
+  shape stay open for Emmett to rule off the page — and S102 added a second page number to rule against: the
+  trips-by-class table. Blocks **O-78** (a national ranking has no honest basis while leagues share no
+  opponents).
 
 - **O-91 — A DAMAGED SEASON N−1 EMPTIES THE HOST DEBT, RATHER THAN LEAVING A HOLE IN IT (opened S100).** S96's
   fail-closed rule was written for a one-hop question that genuinely needed N−1 specifically. The windowed rule does
@@ -1501,6 +1535,16 @@ chart is PROVISIONAL pending O-6.
   the country) and YIELDS when options run out: the Independent evidence (Chicago State to Utah in January)
   is the exception proving it — distance cannot constrain what has no alternative. Not 100%, a general
   trend. S92's map and distance math make this input free.
+- **C-41 — ★ THE TILT'S INVERSION AT THE BOTTOM STANDS AS MEASURED (Emmett's ruling, S102 check-in,
+  2026-08-05).** C-40 says a power school flies and a small school buses. S102's matching produces the
+  opposite at the bottom: trips actually taken read Marquee 175 mi median / Solid 145 / Working 121 /
+  **Selling 249, p90 873**. Two structural mechanisms — in the top-down fill the HOST picks its nearest
+  opponent and the visitor has no say at all, and bottom-hosts-bottom then pairs the hardest-to-place
+  leftovers at a 356-mile median. Surfaced at the gate with the alternative (weight the visitor's cost by
+  class) named; Emmett ruled the behaviour STANDS and ruled the by-class trip line onto the season page so it
+  cannot hide inside a healthy national median of 148. **Wrong-looking output is a finding to print, never
+  something to tune away.** Whoever revisits this changes the pick key, not the page — and the brief's R17
+  needs an r4 line saying the tilt is a per-pairing preference that the PICK ORDER can override.
 - **C-33 — AN OFFENSIVE FOUL COUNTS TOWARD THE MAN'S FIVE, AND NEVER TOUCHES THE TEAM (Emmett's ruling,
   S87 check-in).** The cleared prompt accounted for only ONE offensive foul — the loose-ball shove in the
   rebound scrum, 0.38/game — and planned a new Discipline-alone draw for it. The check-in found three more
@@ -1617,13 +1661,18 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**O-92 session 2 — THE MATCHING** is the natural next step: S101 shipped the requests and printed the
-imbalance, and the arc's remaining sessions are sequenced (matching → sites and nights → Independents).
-Session 2's design inputs are all ruled: the geographic tilt (C-40) as the pairing cost, bottom-hosts-bottom
-(C-37) as the terminal filler, R4's dictate-and-adapt as the order, C-38's series shapes. What is NOT yet
-ruled and should be settled off the S101 page before or at session 2's design conversation: the class curve
-(brief §8.1 — the 358-gap line is the number to rule against) and R10's distance/quality shape.
+**O-92 session 3 — SITES AND NIGHTS** is the natural next step: S102 paired the whole country and every one of
+those 1,958 games is currently a matchup with no place and no date. Session 3 gives each one a site (R9–R12:
+the relocated home game, the alternating series, off-campus is off-campus) and a night around conference play
+and the tournament windows, and it is where `neutral-sites-design-brief.md` — ruled and waiting since S95 —
+finally gets wired, along with the `hasHost` seam `ApplyRoadShave` already takes. **This is the session where
+the second wall comes down on purpose**: giving games sites and dates changes what plays, so the fingerprint
+bundle moves by design and that must be stated up front rather than discovered.
+
+Two things to settle before or at its design conversation: **the class curve** (brief §8.1) and **R10's
+distance/quality shape** — both still open, and both now have two pages to rule against rather than one.
+A third, smaller: whether the brief takes an **r4** for C-41's amendment to R17.
 
 Still ready if Emmett prefers a change of layer: **O-91** (the damaged-year host-debt page question, small),
 **O-88** (season totals blend conference and tournament games), **O-84's realignment guards**, and the
-**calibration queue**. The schedule layer has now had six consecutive sessions (S96–S101).
+**calibration queue**. The schedule layer has now had seven consecutive sessions (S96–S102).

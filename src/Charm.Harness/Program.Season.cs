@@ -164,6 +164,11 @@ internal static partial class Program
         /// and Rotation above: computed once in RunSeasonCore, read by the page block
         /// and Phase 92, consumed by nothing that plays basketball.</summary>
         public NonConferenceReport NonConference { get; init; } = NonConferenceReport.Empty;
+        /// <summary>★ S102 — who plays whom and who hosts. Page-only cargo on exactly the
+        /// same terms as NonConference above: computed once in RunSeasonCore from the S101
+        /// report, read by the page block and Phase 93, consumed by nothing that plays
+        /// basketball. No game is emitted and no site is named — that is arc session 3.</summary>
+        public MatchingReport Matching { get; init; } = MatchingReport.Empty;
         /// <summary>★ S98 — every game that PLAYED, in fixture-ordinal order. See
         /// PlayedSeasonGame: index i is the fixture ordinal, and Results[i] /
         /// PossessionCounts[i] describe the same game.</summary>
@@ -1495,6 +1500,13 @@ internal static partial class Program
         //   the S101 zero-path byte-identity claim provable by construction.
         var nonConference = BuildNonConferenceRequests(world, seating);
 
+        // ★ S102 — the matching. Pure by signature (the world and S101's report, nothing
+        //   else): the requests are CONSUMED here, never recomputed, and the report object
+        //   is read rather than written. Nothing downstream reads the result — it rides
+        //   out on the outcome and reaches the page and Phase 93, which is what keeps the
+        //   zero-path byte-identity claim provable by construction.
+        var matching = BuildNonConferenceMatching(world, nonConference);
+
         var schedule = BuildSeasonSchedule(
             world, seasonSeed, history, deferNumbering: true,
             out var memoryOutcome, out var rotationOutcome, debtWindowOverride);
@@ -1773,6 +1785,7 @@ internal static partial class Program
             Rotation = rotationOutcome,
             Events = eventOutcome,
             NonConference = nonConference,
+            Matching = matching,
             PlayedGames = playedGames,
             ConferenceGameCount = schedule.Count,
             TournamentGameCount = brackets.GameCount,
@@ -2012,6 +2025,18 @@ internal static partial class Program
         //   it by reading this page.
         {
             foreach (var line in NonConferencePageLines(run.NonConference))
+                Console.WriteLine(line);
+            Console.WriteLine();
+        }
+
+        // ★ S102 — the matching block, immediately after S101's. PAGE-ONLY on the same
+        //   terms: every number derives from the report the run carried out, and Phase 93
+        //   asserts the report OBJECT rather than rendered prose. The filler list is long
+        //   on purpose — it is the surface C-37 is judged from. The trips-by-class line is
+        //   the geographic tilt made visible: a healthy national median can hide the
+        //   bottom of the country flying, and on the stock world it does.
+        {
+            foreach (var line in MatchingPageLines(run.Matching))
                 Console.WriteLine(line);
             Console.WriteLine();
         }
