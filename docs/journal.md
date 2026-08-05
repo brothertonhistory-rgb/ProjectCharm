@@ -1,3 +1,55 @@
+## Session 101 — CLASSES AND REQUESTS. Every school now gets a class — read from prestige every season, with its conference tier as a floor at every tier — and a target November in games: home set by the class band, neutral allowed, road the remainder. Nothing is scheduled. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 92 PASS at 11 assertions, every fingerprint unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`).** The finding the session exists to print: the country wants to host 1,666 ordinary non-conference games and travel to 2,024 — **a gap of 358, meaning ~179 games must be hosted by schools that wanted the road**, landing on the 60 Selling schools at roughly three extra home games each. **O-92 opens (the non-conference arc, session 1 of 4 shipped).** (2026-08-05)
+
+**Register:** design conversation AND build in one session — the arc's rulings were made in the same conversation that then ran the build, under `PROMPT-nonconference-classes-s101-r2` (ChatGPT-reviewed; see the adjudication below). Two new files, two edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED. No world file changes, no schema bump — per R8 the numbers ship as named constants at one seam.
+
+### The rulings (Emmett, 2026-08-04/05) — five, all recorded on the board as C-36..C-40
+
+1. **Non-D1 opponents are NOT built now.** They arrive with the D2/D3 layer, where the lowest teams pay local schools to visit. Until then the bottom's home games come from ruling 2.
+2. **When the country runs out of gyms, the bottom hosts the bottom.** Two schools that both wanted the road pair off and one eats the home date. Never the middle absorbing it, never a short slate — R3 stays a hard line because the shortfall has a designated landing place.
+3. **Off-campus series carry no forward debt.** A one-off neutral game is complete when played; a two-year series (Detroit this year, Charlotte next) is agreed as two games up front. Nothing is ever owed into a season that might not be able to pay it — the exact trap S100 dug conference play out of. 2-for-1 and 3-for-1 trades (Oklahoma State twice in Stillwater per once in Tulsa) are named for the future multi-year layer.
+4. **Class is read from prestige EVERY SEASON, with the conference tier as a floor AT EVERY TIER.** Emmett: *"even the absolute worst power conference team gets the easy home games in non con if they want them"* — and the same holds one tier down: the 21-prestige Atlantic 10 school schedules like a Solid program, not like Pine Bluff. Prestige lifts; the floor never drops. This also closed the brief's §8.4 (constant-as-spread) for free: prestige is already varied and already moves, so 83 Marquee schools stop being 83 identical requests without any drawn spread.
+5. **★ GEOGRAPHIC TILT (ruled mid-session, governs arc session 2 — the matching).** Distance is a cost on every pairing and the tilt is a preference, not a wall: near beats far at equal value, so Oklahoma State lands Oral Roberts or Tulsa most seasons with no memory needed — recurrence falls out of proximity for free. The tilt strengthens down the classes (a power school flies; a small school buses; Maine has fifty candidates before it ever crosses the country) and **yields when options run out** — the Independent evidence (Chicago State to Utah in January) is the exception proving it: distance cannot constrain what has no alternative. S92's map means session 2 gets this input free.
+
+### What shipped
+
+`src/Charm.Harness/Program.Season.NonConference.cs` — NEW (the report). `src/Charm.Harness/Program.Checks.NonConference.cs` — NEW (Phase 92). `Program.Season.cs`, `Program.cs` — EDIT (the call after `MteSeatSeason`, a carrier field on the outcome following the Memory/Rotation/Events pattern, the page block, the registration).
+
+The seam is pure by signature — `BuildNonConferenceRequests(WorldFile, EventSeatingOutcome)`, no seed, no RNG, no history — called in `RunSeasonCore` between seating and the schedule build, read by nothing downstream. That construction is what made the second wall (nothing moves a game) provable rather than hoped: with the new block removed, the season page is line-for-line identical to the pre-S101 run.
+
+The arithmetic, ordered and clamped, all in GAMES (the word "date" appears nowhere — the outside review's best catch): a seated school's season really is **31 games** (R2 literally), everyone else 29; OPEN = season − conference − event games; HOME from the class band positioned by prestige rank within the FINAL class (floor-promoted schools rank at the bottom of the class they landed in); NEUTRAL capped by the showcase allowance; ROAD the remainder — never a band, so §3's acceptance measure (a power school plays 0–2 true road games) stays a measurement instead of an input. Rank spread in exact integer arithmetic (`(2a+b)/(2b)` is round-half-up), so no floating-point midpoint can tip a school's home count on another machine.
+
+### ★ THE 31-NOT-29 FINDING — brief A1 settled, and the plausible reading was wrong
+
+Reading R2 as "subtract three from a flat 29" hands **six schools an impossible slate** — Purdue, Notre Dame, Georgetown, Villanova, Pittsburgh, Syracuse: Big East, 18 conference games, seated, asked for more home games than they had open ones. Emmett's literal *"seeded reaches 31"* removes all six: the total itself moves. Asserted forever by C6 — if it goes red on stock, the flat-29 reading has crept back.
+
+### ★ THE OUTSIDE REVIEW, ADJUDICATED — its best catch folded, its headline objection rejected by measurement
+
+Folded: the games-not-dates vocabulary (genuinely dangerous — the exemption exists because three games share one date), the exact rank formula with its own check, ranking after floor promotion stated outright, the exemption as binary set membership, tier refusal verified to already live in the world loader, the three-point monotonicity check, and a real catch on C8 — the one-school fixture's only school is an Independent, so it proved nothing; swapped for two fixtures that actually produce a lopsided country.
+
+Rejected: the review called the ~179 figure a factor-of-two error, reading 358 excess road requests as 358 *missing games*. Its own toy (10 road wants, 6 hosts → 6 games, 4 schools just don't play) is a country where **R3 is broken**. Under ruling 2 the four leftover road-wanters pair into two more games — every slate full, two unwilling hosts, zero missing games. Each bottom-hosts-bottom game consumes TWO road requests, which is where the halving comes from: `1,666 + x = 2,024 − x` → x = 179 conversions. The reasoning is recorded in the prompt itself so no build session re-litigates it. Partial credit where due: the r1 sentence ("~180 games with nobody willing to host") was ambiguous enough to invite the misreading — the number was right, the wording wasn't.
+
+### ★ ONE PREDICTION MISSED, AND THE PAGE IS RIGHT
+
+"Lifted by floor" reads **83, not the predicted 42**. The draft measured schools the new ruling moved *versus the old power-only rule*; the page measures schools whose class sits above what prestige alone gives — which rightly includes the 41 power-league schools under 80 prestige. 42 + 41 = 83. A prediction that compares against a rule that no longer exists is not a fact about the design; the page's number is. Every other predicted number — census, seated 108, the four road averages, the balance, all eight named schools, both fingerprints — landed exactly.
+
+### ★ A DECORATIVE ASSERTION CAUGHT MID-BUILD — the S81.3 lesson applied to my own check
+
+C11's tie-break assertion originally placed the equal-prestige pair at ranks whose spread values were EQUAL (both home 4), so a backwards tie-break would still have passed — a bar that could not fail is not a bar. Moved the pair to ranks producing different values (4 vs 5) and made the assertion strict, with the fixture arithmetic recorded in the comment so the discrimination is checkable by reading.
+
+### ★ ONE SPEC CORRECTION, FLAGGED RATHER THAN TAKEN SILENTLY
+
+The cleared prompt's C4b said three seeds give an identical report on stock. False by design: seating follows the seed, and R2's exemption follows the seating. As built, C4b asserts the full report identical across seeds on an eventless world, and the CLASSES identical across seeds on stock. The purity claim rides on the signature plus C4a plus C9 — the stronger form.
+
+### Mechanics worth not re-learning
+
+The third golden (results+possessions) is printed nowhere, so it was captured with one temporary print line, run once, reverted — verified harmless because the other two fingerprints matched the committed page on the same run. Phase 92 plays a full stock season to prove the zero path (~30 seconds added to the suite; flagged at the gate and accepted). The suite's first complete green run and the season page's byte-identity were both proven in-sandbox before delivery; Emmett's run is the verification of record, and all nine watchable numbers on it matched.
+
+### What the arc still owes (sessions 2–4, all under O-92)
+
+The matching (who plays whom, who hosts, the geographic tilt, bottom-hosts-bottom as the terminal filler); sites and nights (R9–R12, the neutral brief finally wired, dates around conference play); the Independents and their November. The class curve stays open (brief §8.1) — settled by Emmett reading this page, and the 358-gap line is the number he'll rule against.
+
+---
+
 ## Session 100 — WHO IS OWED THE HOME GAME. The alternation stops looking one year back and starts counting residual home games across the same window the rotation already reads, so a home-and-home year no longer wipes the debt. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 91 PASS at 19 assertions, Phase 90 back to 40.** Twelve seasons of the sixteen-school rig: the worst pair finishes **three home games apart, on 3 of 130 pairs**, against a one-hop control on the same world that finishes **six apart on twelve pairs**. On the five-school rig, where the old rule was totally degenerate, **every one of 40 pairs goes from six apart to two**. **O-89 closes; O-90 closes by measurement.** (2026-08-04)
 
 **Register:** build, under `PROMPT-host-debt-s100-r2` (ChatGPT-reviewed). One new file, five edited, none deleted. `Charm.Engine` and `Charm.History` UNTOUCHED. No new world file.

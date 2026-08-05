@@ -160,6 +160,10 @@ internal static partial class Program
         /// permanent record. Page-facing; the suite reads what it asserts from the seating
         /// result itself, never from a printed line.</summary>
         public EventSeasonOutcome Events { get; init; } = EventSeasonOutcome.None;
+        /// <summary>★ S101 — classes and requests. Page-only cargo, exactly like Memory
+        /// and Rotation above: computed once in RunSeasonCore, read by the page block
+        /// and Phase 92, consumed by nothing that plays basketball.</summary>
+        public NonConferenceReport NonConference { get; init; } = NonConferenceReport.Empty;
         /// <summary>★ S98 — every game that PLAYED, in fixture-ordinal order. See
         /// PlayedSeasonGame: index i is the fixture ordinal, and Results[i] /
         /// PossessionCounts[i] describe the same game.</summary>
@@ -1484,6 +1488,13 @@ internal static partial class Program
         var eventHistory = MteReadHistory(history, pendingSeasonId);
         var seating = MteSeatSeason(world, seasonSeed, eventHistory);
 
+        // ★ S101 — classes and requests. Pure by signature (world + seating, nothing
+        //   else), computed here because the event exemption needs the seating and the
+        //   seating exists only past this line. Nothing downstream reads it — it rides
+        //   out on the outcome and reaches the page and Phase 92, which is what makes
+        //   the S101 zero-path byte-identity claim provable by construction.
+        var nonConference = BuildNonConferenceRequests(world, seating);
+
         var schedule = BuildSeasonSchedule(
             world, seasonSeed, history, deferNumbering: true,
             out var memoryOutcome, out var rotationOutcome, debtWindowOverride);
@@ -1761,6 +1772,7 @@ internal static partial class Program
             Memory = memoryOutcome,
             Rotation = rotationOutcome,
             Events = eventOutcome,
+            NonConference = nonConference,
             PlayedGames = playedGames,
             ConferenceGameCount = schedule.Count,
             TournamentGameCount = brackets.GameCount,
@@ -1989,6 +2001,18 @@ internal static partial class Program
             //   is a different fact from a legacy run that prints no line at all.
             var rotationLine = RotationPageLine(run.Rotation);
             if (rotationLine is not null) Console.WriteLine(rotationLine);
+            Console.WriteLine();
+        }
+
+        // ★ S101 — the non-conference request block. PAGE-ONLY: every number derives from
+        //   the report the run carried out; nothing here is ever suite-asserted (Phase 92
+        //   asserts the report OBJECT — wiring and arithmetic, never rendered prose, never
+        //   a basketball calibration value). The balance line is the finding this session
+        //   exists to print: the class curve stays open (brief §8.1) until Emmett settles
+        //   it by reading this page.
+        {
+            foreach (var line in NonConferencePageLines(run.NonConference))
+                Console.WriteLine(line);
             Console.WriteLine();
         }
 

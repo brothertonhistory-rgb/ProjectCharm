@@ -10,7 +10,26 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 100** (2026-08-04; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 91 PASS at 19
+Last updated: **Session 101** (2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 92 PASS at 11
+assertions**, every fingerprint unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`). **CLASSES AND REQUESTS — the
+non-conference arc opens (session 1 of 4).** Every school gets a class — prestige every season, conference tier as a
+floor at EVERY tier (Emmett's ruling) — and a target November in GAMES: home from the class band by prestige rank,
+neutral allowed, **road the remainder, never a band**, so the acceptance measure stays a measurement. Nothing is
+scheduled. Census 83 Marquee / 70 Solid / 120 Working / 60 Selling / 14 Independent; seated schools really play **31
+games** (R2 literally — flat-29-minus-3 hands six Big East schools an impossible slate, the brief's A1 settled).
+★ **THE FINDING: THE COUNTRY DOES NOT BALANCE** — home 1,666 vs road 2,024, gap +358, ~179 games hosted by schools
+that wanted the road, ~3 extra home games per Selling school under bottom-hosts-bottom. Printed and stopped: the class
+curve stays open for Emmett to rule by reading the page. ★ Five rulings recorded (C-36..C-40) including the
+**geographic tilt** that governs session 2. ★ The outside review's headline objection (a claimed factor-of-two)
+**rejected by measurement** — its model breaks R3; each bottom-hosts-bottom game consumes TWO road requests. Its best
+catch (games-not-dates vocabulary) folded. ★ One prediction missed and owned: floor-lifted reads 83 not 42 — the
+prediction compared against the superseded power-only rule. ★ A decorative tie-break assertion caught mid-build and
+made discriminating (the S81.3 lesson). ★ C4b spec-corrected: seating follows the seed by design, so seed-independence
+is the full report on an eventless world and classes-only on stock. Pure seam: `(world, seating)` in `RunSeasonCore`
+between seating and the schedule build, nothing downstream reads it. Suite +~30s (Phase 92 plays a stock season for
+the zero path — flagged and accepted). **Opens O-92.**)
+
+*(Previous board entry, S100 — 2026-08-04; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 91 PASS at 19
 assertions**, Phase 90 back to 40. **WHO IS OWED THE HOME GAME.** The alternation stops looking one year back and counts
 residual home games across the same window the rotation already reads, so a home-and-home year no longer erases the
 debt; whoever is behind hosts the next single meeting. Twelve seasons of the sixteen-school rig, measured from the games
@@ -28,7 +47,7 @@ S81.3 lesson recurring. ★ **A DAMAGED N−1 EMPTIES THE DEBT** (Claude's call,
 years supply 59 venues while the page said `Unreadable`, and Phase 90 C5a caught it — reverted because the page reports
 N−1's status beside the applied count and the page was outside the wall. Opens **O-91**. ★ **THE FOURTH SESSION RUNNING
 THAT A CHECK OUTSIDE THE FILE LIST HAD TO MOVE** — §0.5 named that exact pattern, catalogued six Phase 87 assertions,
-and omitted Phase 90 entirely; the first delivery shipped five files and failed to build on Windows.)
+and omitted Phase 90 entirely; the first delivery shipped five files and failed to build on Windows.)*
 
 *(Previous board entry, S97 — 2026-08-03; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 88 PASS at 61
 assertions**, pre-S97 zero-path goldens `51c8e88c202e9eb6…`/`2c521c9f8f2ee203…` and `eee5e256b0c6fc87…`/`bbff75ce74cf9363…`
@@ -320,6 +339,13 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S101 — CLASSES AND REQUESTS (non-conference arc, session 1 of 4).** Every school gets a class
+  (max of conference tier floor and prestige band, `CurrentPrestige` every season) and a request in GAMES:
+  home from the class band by prestige rank within the FINAL class, neutral capped by the showcase allowance,
+  road the remainder. Seated schools play 31 (R2 literal); nothing scheduled; pure seam `(world, seating)` in
+  `RunSeasonCore`; page-only balance readout (stock: home 1,666 / road 2,024, gap +358). Phase 92, 11 assertions,
+  full-bundle zero path against pre-S101 goldens. Opens **O-92**; records **C-36..C-40**.
 
 - **★ S99 — WHO YOU PLAY TWICE. The extra meeting rotates by whose turn it is.** The set of opponents a
   school plays twice is no longer fixed by the world file for the life of a career: every non-rivalry pair
@@ -703,6 +729,15 @@ be run against a league with a real rotation, though the minute VALUES remain pl
 chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
+
+- **O-92 — ★ THE NON-CONFERENCE ARC, SESSIONS 2–4 (opened S101; session 1 shipped).** The brief is
+  `docs/nonconference-design-brief.md` (r3). Remaining: **(2) the matching** — who plays whom and who hosts,
+  the geographic tilt (C-40) as a pairing cost, bottom-hosts-bottom (C-37) as the terminal filler, R4's
+  dictate-and-adapt as an order; **(3) sites and nights** — R9–R12, the neutral brief's crowd model wired at
+  last, dates around conference play and the tournament windows; **(4) the Independents' November and their
+  gap-filling role** (R13). The class curve (brief §8.1) and R10's distance/quality shape stay open for
+  Emmett to rule off the S101 page — the 358-gap balance line is the number to rule against. Blocks **O-78**
+  (a national ranking has no honest basis while leagues share no opponents).
 
 - **O-91 — A DAMAGED SEASON N−1 EMPTIES THE HOST DEBT, RATHER THAN LEAVING A HOLE IN IT (opened S100).** S96's
   fail-closed rule was written for a one-hop question that genuinely needed N−1 specifically. The windowed rule does
@@ -1436,6 +1471,36 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-36 — NON-D1 OPPONENTS ARE NOT BUILT NOW (Emmett's ruling, S101 design conversation, 2026-08-04).**
+  They arrive with the D2/D3 layer, where the lowest teams pay local schools to visit. Do NOT conjure a
+  generic non-D1 pool or fake schools to give the bottom home games — that job belongs to C-37 until the
+  lower divisions exist. The brief's §4 evidence (Savannah State hosting Brewton-Parker etc.) is the record
+  of what this will eventually model.
+- **C-37 — WHEN THE COUNTRY RUNS OUT OF GYMS, THE BOTTOM HOSTS THE BOTTOM (Emmett's ruling, S101,
+  2026-08-04).** Two schools that both wanted the road pair off and one eats the home date — never the
+  middle absorbing the shortfall, never a short slate. This is R3's terminal filler and the designated
+  landing place for the S101 balance gap (+358 on stock, ~179 conversions, ~3 extra home games per Selling
+  school). A Selling school yields on venue, never on "did I get a game."
+- **C-38 — OFF-CAMPUS SERIES CARRY NO FORWARD DEBT (Emmett's ruling, S101, 2026-08-04).** A one-off neutral
+  game (Duke–Michigan State in Detroit, done) is complete when played; a two-year series (Detroit, then
+  Charlotte) is agreed as two games up front. Which of the two shapes a series takes is a draw, not a rule —
+  Emmett: "sometimes it just goes two years." Nothing is ever owed into a season that might not be able to
+  pay it. 2-for-1 / 3-for-1 trades (Oklahoma State twice home per once at Tulsa) are FUTURE multi-year
+  structure, named and parked — they are the honest third source of a Marquee school's 0–2 road games.
+- **C-39 — CLASS IS PRESTIGE EVERY SEASON WITH THE CONFERENCE TIER AS A FLOOR AT EVERY TIER (Emmett's
+  ruling, S101, 2026-08-04).** "Even the absolute worst power conference team gets the easy home games in
+  non con if they want them" — and the same one tier down: the 21-prestige A-10 school schedules Solid.
+  Prestige lifts (Gonzaga at 85 is Marquee from the WCC); the floor never drops. This also closed the
+  brief's §8.4 (constant-as-spread) for free: prestige is already varied and already moves, so no drawn
+  spread is needed to differentiate the 83 Marquee requests.
+- **C-40 — ★ THE GEOGRAPHIC TILT (Emmett's ruling, S101, 2026-08-05; governs arc session 2).** Distance is
+  a cost on every pairing and the tilt is a PREFERENCE, NOT A WALL: near beats far at equal value, so
+  Oklahoma State lands Oral Roberts or Tulsa most seasons with no series memory needed — recurrence falls
+  out of proximity for free. Texas schools pick up a low-level Texas school most years. The tilt strengthens
+  down the classes (a power school flies, a small school buses — Maine has fifty candidates before crossing
+  the country) and YIELDS when options run out: the Independent evidence (Chicago State to Utah in January)
+  is the exception proving it — distance cannot constrain what has no alternative. Not 100%, a general
+  trend. S92's map and distance math make this input free.
 - **C-33 — AN OFFENSIVE FOUL COUNTS TOWARD THE MAN'S FIVE, AND NEVER TOUCHES THE TEAM (Emmett's ruling,
   S87 check-in).** The cleared prompt accounted for only ONE offensive foul — the loose-ball shove in the
   rebound scrum, 0.38/game — and planned a new Discipline-alone draw for it. The check-in found three more
@@ -1552,16 +1617,13 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**Not yet ruled.** S100 closed the host-fairness arc that S96 opened and S99 made incomplete, so the next scope is
-Emmett's call. What is genuinely ready:
+**O-92 session 2 — THE MATCHING** is the natural next step: S101 shipped the requests and printed the
+imbalance, and the arc's remaining sessions are sequenced (matching → sites and nights → Independents).
+Session 2's design inputs are all ruled: the geographic tilt (C-40) as the pairing cost, bottom-hosts-bottom
+(C-37) as the terminal filler, R4's dictate-and-adapt as the order, C-38's series shapes. What is NOT yet
+ruled and should be settled off the S101 page before or at session 2's design conversation: the class curve
+(brief §8.1 — the 358-gap line is the number to rule against) and R10's distance/quality shape.
 
-- **O-91 — should a damaged last year empty the debt or just leave a hole in it.** Small, and it is really a
-  question about what the host line on the page should say. Cheap either way and asserted today, so there is no
-  drift risk in leaving it.
-- **O-88 — a season's totals blend conference and tournament games with no way to cut them apart.** Opened S98
-  and untouched since.
-- **O-84's realignment guards**, still shipped dormant, and the **calibration queue**, untouched since the
-  population arc settled.
-
-The schedule layer has now had five consecutive sessions (S96–S100). Worth Emmett's judgement whether the next
-one belongs somewhere else entirely.
+Still ready if Emmett prefers a change of layer: **O-91** (the damaged-year host-debt page question, small),
+**O-88** (season totals blend conference and tournament games), **O-84's realignment guards**, and the
+**calibration queue**. The schedule layer has now had six consecutive sessions (S96–S101).

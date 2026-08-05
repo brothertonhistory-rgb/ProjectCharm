@@ -1,16 +1,23 @@
-# Design Brief — Non-Conference Scheduling
+# Design Brief — Non-Conference Scheduling (r3)
 
-**Status: RULED, NOT BUILT.** This is the scheduling half of a pair. Its sibling,
-`neutral-sites-design-brief.md`, is the *effect* half — what a neutral or pseudo-home game does
-to the two teams once it exists — and has been ruled and waiting since S95. Neither can ship
-without the other: that brief says plainly that *"the session that builds non-conference
-scheduling is the session that makes this buildable."*
+**Status: ARC SESSION 1 SHIPPED (S101); SESSIONS 2–4 RULED AND WAITING.** This is the scheduling
+half of a pair. Its sibling, `neutral-sites-design-brief.md`, is the *effect* half — what a
+neutral or pseudo-home game does to the two teams once it exists — and has been ruled and waiting
+since S95. It becomes buildable at arc session 3.
 
-**Owner of the rulings:** Emmett, 2026-08-04, in the design conversation following S100.
-**Board:** O-92. Non-conference was deleted at S93 and never boarded until now.
+**Owner of the rulings:** Emmett — 2026-08-04 (the design conversation following S100) and
+2026-08-05 (the S101 session, including the geographic tilt).
+**Board:** O-92 (the arc); rulings recorded as C-36..C-40.
 **Depends on:** S91's calendar, S92's map and places, S93's conference slate, S94's dating,
 S95's road shave, S97/S98's tournaments, S96/S99/S100's career memory.
 **Blocks:** O-78 — a national ranking has no honest basis while leagues share no opponents.
+
+> **★ r3 — SESSION 1 IS REAL AND FOUR RULINGS LANDED.** S101 shipped classes and requests
+> (Phase 92; page-only). New rulings folded below: **R14** non-D1 deferred to D2/D3, **R15**
+> bottom hosts bottom, **R16** no forward debt on off-campus series, **R17** the geographic
+> tilt. R5 is amended (the floor holds at EVERY tier). §8's opens 3 and 4 are closed. A1 is
+> settled (31 is literal — the flat-29 reading produces six impossible Big East slates). §1's
+> unreproducible date figures are replaced by S101's measured game balance.
 
 > **★ r2 — THE MONEY MODEL IS GONE.** r1 ruled a per-school price and a per-school budget, with
 > hosting as the expense. Emmett struck it: *"we're getting too in the weeds with this financial
@@ -25,25 +32,32 @@ S95's road shave, S97/S98's tournaments, S96/S99/S100's career memory.
 
 ## 1. Where this stands today, verified against the pull
 
-Non-conference play was **deleted, not amended** at S93 — *"we don't care about a 'season' right
-now, we care about games being scheduled."* The 14-regular ring circulant, the conflict queue,
-the double-edge repair, the 20-attempt retry and the whole RNG stream that fed them are gone.
-Nothing partial survives to be resumed.
+Non-conference play was **deleted, not amended** at S93. **S101 opened the real arc**: every
+school now carries a class and a request — home, neutral and road counts of ordinary
+non-conference games — printed on the season page. No game is scheduled yet; a school still
+plays only its league season (plus S98's 128 tournament games), and the fourteen Independents
+play nothing.
 
-A school today plays its league season and nothing else: 14 games in the Ivy, 20 in the Atlantic
-Sun, 16 or 18 for most, and **zero for the fourteen Independents**. The only cross-conference
-basketball anywhere is S98's 128 tournament games across 88 seated schools.
-
-| Measured off the stock world | |
+| Measured on the stock world, S101's page | |
 |---|---|
-| Open non-conference dates, whole country | **5,121** |
-| Games that implies | **2,560 a season** |
-| Power leagues (ACC, SEC, Big East, Big 12, Big Ten, Pac-10) | 73 schools, 14.0 dates each |
-| Everyone else | 274 schools, 15.0 dates each |
+| Classes | 83 Marquee / 70 Solid / 120 Working / 60 Selling / 14 Independent |
+| Seated in an event (play 31 games; everyone else 29) | 108 |
+| Home games the country wants to host | **1,666** |
+| Neutral games requested | 223 |
+| Road games the country wants to play | **2,024** |
+| ★ **The gap** | **+358 — ~179 games must be hosted by schools that wanted the road** |
 
-★ **This roughly doubles the season** — 2,818 conference games become ~5,378. A real run-time
-cost for every check that plays a season, and it should be sized in the arc's first session
-rather than discovered in the suite.
+> **★ r3 — the r2 figures "5,121 open dates / 2,560 games" are WITHDRAWN.** They could not be
+> reproduced against the calendar (conference play opens 12-07 to 01-11 depending on the
+> league) and the method was never recorded — the S81.3/S100 lesson: a plausible inherited
+> measurement is the most dangerous artifact in a brief. The balance above is the arc's real
+> sizing, measured live on the page every season. The run-time worry also died at S101: playing
+> the whole country takes ~26 seconds and the check suite never plays the stock season for
+> basketball, so roughly doubling the season costs ~half a minute on one command.
+
+★ **Under R15, the +358 gap lands on the 60 Selling schools at ~3 extra home games each** —
+which takes Selling from 1.0 home toward 4.0, outside its own §3 row. That tension is the class
+curve question (§8.1), deliberately left for Emmett to rule off the page.
 
 ---
 
@@ -66,12 +80,15 @@ have the money and influence."* A Marquee school states a request each season an
 country fills in around it. **This is the most important structural ruling in the document** — it
 is why the bottom's November looks the way it does without anyone deciding it should.
 
-**R5 — ★ CLASS IS CONFERENCE TIER BY DEFAULT, WITH PRESTIGE OVERRIDING IN BOTH DIRECTIONS.**
-Power-conference budgets are assumed adequate; mid-major and lower are assumed not to be. But
-*"the Gonzagas of the world who do supersede lower conference prestige levels might have things
-similar"* — and it breaks downward too. **Northwestern (53) schedules like a Big Ten school
-because it is in the Big Ten. Gonzaga (85) schedules like a power school because it is Gonzaga.**
-Both exceptions are real basketball, not tolerance for error.
+**R5 — ★ CLASS IS PRESTIGE EVERY SEASON, WITH THE CONFERENCE TIER AS A FLOOR AT EVERY TIER**
+*(amended at r3 — Emmett, 2026-08-04/05, now C-39).* Class = the higher of the conference tier's
+floor and the prestige band, read from `CurrentPrestige` each season. *"Even the absolute worst
+power conference team gets the easy home games in non con if they want them"* — and the same one
+tier down: the 21-prestige Atlantic 10 school schedules like a Solid program, not like Pine
+Bluff. Prestige lifts in both directions' spirit — **Northwestern (53) schedules Big Ten because
+it is in the Big Ten; Gonzaga (85) schedules Marquee because it is Gonzaga** — and the floor
+never drops. Corroboration from the evidence table itself: Drake (50, MVC) reads 7 home / 1 road
+/ 3 neutral, a Solid November the floor produces and a prestige-only rule would not.
 
 **R6 — ★ MONEY IS ASSUMED, NEVER MODELLED.** No price list, no budget number, no ledger, no
 accounting anywhere. See §11.
@@ -116,6 +133,36 @@ else's conference season, and gaps found inside conference play. They also **fil
 conference teams** — that is what makes them useful to everybody else. Already toggleable: the
 stock world carries all fourteen at `games = 0`, tier `low`, so a world without Independents
 simply has nobody in that conference.
+
+**R14 — ★ NON-D1 OPPONENTS ARE NOT BUILT NOW** *(r3; Emmett, 2026-08-04; C-36).* They arrive
+with the D2/D3 layer, where the lowest teams pay local schools to visit. Until then the bottom's
+home games come from R15. §4's evidence (Savannah State hosting four non-D1 schools; Pine
+Bluff's only two home games) is the record of what this will eventually model — do not conjure
+a generic pool in the meantime.
+
+**R15 — ★ WHEN THE COUNTRY RUNS OUT OF GYMS, THE BOTTOM HOSTS THE BOTTOM** *(r3; Emmett,
+2026-08-04; C-37).* Two schools that both wanted the road pair off and one eats the home date —
+never the middle absorbing the shortfall, never a short slate. This is R3's terminal filler:
+the +358 gap has a designated landing place, so R3 can be a hard line rather than a hope, and a
+Selling school yields on venue, never on "did I get a game" (§6's prediction, confirmed).
+
+**R16 — ★ OFF-CAMPUS SERIES CARRY NO FORWARD DEBT** *(r3; Emmett, 2026-08-04; C-38).* A one-off
+neutral game is complete when played; a two-year series (Detroit this year, Charlotte next) is
+agreed as two games up front. Which shape a series takes is a draw, not a rule — *"sometimes it
+just goes two years."* Nothing is ever owed into a season that might not be able to pay it (the
+trap S100 dug conference play out of). **2-for-1 / 3-for-1 trades** (Oklahoma State twice home
+per once at Tulsa) are future multi-year structure, parked — and they are the honest third
+source of a Marquee school's 0–2 true road games, alongside a rival and a return leg.
+
+**R17 — ★ THE GEOGRAPHIC TILT** *(r3; Emmett, 2026-08-05; C-40; governs arc session 2).*
+Distance is a cost on every pairing and the tilt is a **preference, not a wall**: near beats far
+at equal value, so Oklahoma State lands Oral Roberts or Tulsa most seasons with no series memory
+needed — recurrence falls out of proximity for free. Texas schools pick up a low-level Texas
+school most years. The tilt **strengthens down the classes** — a power school flies, a small
+school buses; Maine has fifty candidates before it ever crosses the country — and **yields when
+options run out**: §4's Independent evidence (Chicago State to Utah in January) is the exception
+proving it, because distance cannot constrain what has no alternative. Not 100%, a general
+trend. S92's map and distance math make this input free.
 
 ---
 
@@ -201,17 +248,11 @@ Worse, the board records it as *"a PLACEHOLDER label decorating `Arrival`"* with
 population-structure question unowned. **The engine cannot tell a team of freshmen from a team of
 seniors.**
 
-Per R8 the request ships with constants. Two readings of "constant" were considered:
-
-- A single shared value — every Marquee school asks for the same November. All 83 identical,
-  distinguished only by which cupcakes were still available. Lifeless, and hard to judge by
-  reading a season.
-- **A fixed spread** — Marquee schools draw from a distribution, deterministic from the seed.
-  Some take two road games, some none. The country looks varied immediately, the variation means
-  nothing until R7's inputs land, and **the later rewire tilts the draw instead of replacing the
-  machinery.**
-
-Claude recommended the spread; Emmett did not rule on it directly. Listed in §10.
+Per R8 the request ships with constants. ★ *r3:* the single-value-vs-fixed-spread question this
+section used to carry is **closed by R5 as amended** — prestige is already varied and already
+moves season to season, so the 83 Marquee requests differ without any drawn spread, and R7's
+future inputs (maturity, temperament) arrive as a **tilt on an already-varied request**, which
+is exactly the rewire R8 wanted. No RNG reaches the request; S101 asserts that.
 
 ---
 
@@ -266,12 +307,14 @@ one a single step away from a model that ruled size out, and a later session wou
 ## 8. Open — for Emmett to rule
 
 1. **The class curve.** §3's rows are shapes to interpolate between; the interpolation is
-   unruled. Probably best settled by reading a generated season, not in advance.
+   unruled. ★ *r3:* the season to read now exists — the S101 page, whose balance line
+   (**+358, ~3 extra home games per Selling school under R15**) is the number to rule against.
 2. **The distance/quality curve of R10.** Two anchors: ~65 miles takes anybody, "hundreds of
-   miles" needs two 75/80+ teams. The shape between is unruled.
-3. **Non-D1 opponents.** §4 shows they are structural, and the world has no such object. Are they
-   schools with no conference, a generic pool, or something the scheduler conjures?
-4. **The constant-as-spread recommendation** (§5).
+   miles" needs two 75/80+ teams. The shape between is unruled. R17 now supplies the pairing
+   side of the same principle; this open is the site side.
+
+★ *r3:* opens 3 (non-D1 opponents) and 4 (constant-as-spread) are **closed** — by R14 and by
+R5-as-amended respectively.
 
 ---
 
@@ -288,18 +331,22 @@ one a single step away from a model that ruled size out, and a later session wou
 
 ## 10. ★ Assumptions Claude made rather than heard — strike freely
 
-- **A1.** R2's arithmetic — that a tournament costing one date and buying three is what makes "31
-  for some teams" true. Emmett said the games come out of the allowance; the one-date reading is
-  Claude's.
+- **A1.** ★ *r3 — SETTLED, and the cautious reading was wrong.* "Seeded reaches 31" is
+  **literal**: a seated school's season is 31 actual games and the three event games come out of
+  the higher total. The flat-29-minus-3 reading hands six Big East schools (18 conference games,
+  seated) an impossible slate — more home games requested than open games held. Asserted forever
+  by Phase 92 C6.
 - **A2.** The class boundaries in §3 (80 / 55 / 25) and their counts. Emmett named "75/80+" for
-  showcases only.
+  showcases only. ★ *r3:* shipped as S101's constants (R8 seam) — standing, but still Claude's
+  numbers, and the §8.1 ruling may move them.
 - **A3.** That a pseudo-home site is drawn from the **tagged** place list rather than from all 315
   by distance.
 - **A4.** That non-conference reuses the shared eight-season career window for alternating an R11
-  series rather than getting its own depth.
+  series rather than getting its own depth. ★ *r3:* R16 narrows this — a two-year series is
+  agreed up front, so no long memory is needed for the alternation itself; the window question
+  survives only for avoiding immediate rematches, if that is even wanted.
 - **A5.** That the plan in R4 is a per-school target of counts and quality, not a list of named
-  opponents.
-- **A6.** The spread reading of R8 (§5).
+  opponents. ★ *r3:* S101 shipped the counts half; quality-within-class is session 2's.
 
 ---
 
@@ -325,11 +372,13 @@ November is already known. The one thing genuinely lost is Missouri-versus-Texas
 
 An **arc, not a session**:
 
-1. **Classes and requests** — every school's class and target November. No games scheduled.
-   Provable alone: the country's total home demand against total road supply. **Size the run-time
-   cost of doubling the season here.**
+1. **Classes and requests** — ★ **SHIPPED at S101** (Phase 92). The balance proved the country
+   does not balance (+358), the run-time cost proved negligible (~half a minute), and the class
+   curve now has a page to be ruled from.
 2. **The matching** — who plays whom, who hosts, and the yield order when a request cannot be met.
-   Where R3 becomes a hard line and R4 becomes an order.
+   Where R3 becomes a hard line, R4 becomes an order, R17's tilt prices every pairing, and R15
+   fills the last gyms. All of its design inputs are ruled except §8's two opens.
 3. **Sites and nights** — games gain a place, the neutral brief's model is wired at last, and dates
    land around conference play and the tournament windows. R9–R12 live here.
-4. **The Independents and the non-D1 pool**, if they have not fallen out of 1–3 naturally.
+4. **The Independents** — their November and their gap-filling role (R13). ★ *r3:* the non-D1
+   pool is out of the arc entirely (R14 — it arrives with D2/D3).
