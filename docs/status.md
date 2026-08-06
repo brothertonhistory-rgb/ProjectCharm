@@ -794,13 +794,32 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-92 — ★ THE NON-CONFERENCE ARC (opened S101; sessions 1–3 shipped: classes, the matching, contracts).
+- **O-93 — ★ SUITE RUNTIME. Four phases each replay the SAME stock season from scratch** (same world, seed
+  20260720, same config), and every arc session has added one. Emmett raised it at S104: *"eventually every
+  test will take an hour or two at this pace."* **Step one is MEASUREMENT** — what fraction of suite time is
+  season replay versus the observation run and the sweeps — because three sessions running logged "+~30s,
+  flagged and accepted" without asking what the 30 seconds was of. Then a cached season run keyed on
+  (world, seed, config), which collapses four to two (Phase 95's showcase-free world is genuinely a second
+  world) and makes future arc sessions free on this axis. **Audit every consumer for mutation of the shared
+  outcome before wiring it** — that is the §2a shared-state bug class. Then decide about a fast/full split;
+  the commit gate stays the full run. Offered as micro-session **S104.1**.
+
+- **O-94 — DO EVENT MEETINGS COUNT AGAINST A REPEAT CEILING?** The pairing log records contracted legs and
+  matched pairs; it has never recorded tournament or showcase games. The repeat-ceiling session is its first
+  consumer, so it inherits the decision. Claude's read: a Jimmy V matchup is a real non-conference meeting and
+  should count. **Needs Emmett's ruling BEFORE that session is scoped**, not during it.
+
+- **O-95 — EVENT DATES ARE FIXED IN THE WORLD FILE**, so the Jimmy V falls on December 3rd every season
+  forever. Events drifting a few days year to year is real and cheap. **Belongs with the living-pool session**
+  (event birth and death), not smuggled into the repeat ceiling.
+
+- **O-92 — ★ THE NON-CONFERENCE ARC (opened S101; sessions 1–4 shipped: classes, the matching, contracts,
+  showcases).
   ★ THE ARC REORDERED AT S103 (Emmett, contracts brief r3 §0, superseding C-42b's sequencing): contracts moved to
   the FRONT** — the layer that carries state across seasons had to exist before the layers that consume it. The
   briefs are `docs/nonconference-design-brief.md` (r3 — **R17's tilt still needs an r4 amendment, see C-41**) and
   `docs/contracts-design-brief.md` (r3, committed at the S103 gate — it was on disk but never pushed). Remaining,
-  in the brief's order: **(4) the showcase/event pool** — exercised contract legs already attach at the
-  fixed-obligation seam event seats will use; **(5) the shelf and the odds** — the buy-game shelf is still keyed
+  in the brief's order: **(5) the shelf and the odds** — the buy-game shelf is still keyed
   on prestige, Northwestern still schedules like Duke, C-41's inversion unresolved (knowingly left standing:
   visible and harmless; rebuilding the scheduler around inherited obligations later would be neither); **(6) sites
   and nights** — R9–R12, the crowd model, dates around conference play, ★ and the SEMI-HOME ruling (a third site
@@ -1545,6 +1564,21 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-44 (Emmett, 2026-08-06) — SHOWCASES.**
+  **(a) One event per place per DAY**, retiring S97's one-event-per-place. Two events may share a town, never
+  a night. **(b) Events are independent** — nothing coordinates them; Maui and an MSG showcase run side by
+  side. **(c) A school already committed to a night is not eligible for an overlapping event**: *"teams have
+  to make choices."* (d) **R26** — a showcase game is one of the games the school already had, charged
+  neutral → road → home after any contract charge; season totals never move. (e) **R30** — a showcase that
+  cannot fill releases its whole field, consuming nobody and burning no four-year clock.
+  ★ **Consequence, ruled and not a defect: existing tournament fields MOVE.** Every tournament seating before
+  the first showcase overlap is byte-identical; after it, fields change by exclusion plus cascade. Do not
+  "restore" them.
+  ★ **Showcases play AFTER every bracket, not interleaved** — the fixture ordinal is the engine seed, so
+  interleaving would re-roll every tournament result. This departs from the cleared S104 prompt, deliberately.
+  ★ **A tournament may not author a radius** — `draw` is on the shared shape so a later ruling costs no
+  migration, but a regional tournament is an unmade design decision. The refusal is intentional.
+
 - **C-43 — ★ A CONTRACTED GAME IS ONE OF THE GAMES THE SCHOOL ALREADY WANTED, NOT AN EXTRA (Emmett's rulings,
   S103, 2026-08-05).** Two rulings from one conversation. **(a)** An exercised contract leg is charged against its
   OWN request bucket, after the ordinary S101 split: a hosted leg out of home, an away leg out of road, a neutral
@@ -1727,26 +1761,21 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**O-92 session 4 — THE SHOWCASE/EVENT POOL** is the next step per the reordered arc (contracts brief r3 §0:
-contracts → the showcase/event pool → the shelf and the odds → sites and nights → the Independents). S103 built
-the seam it needs: an exercised contract leg already attaches at the fixed-obligation point event seats will use,
-which is exactly what the request builder's `EventGames` term documents. The session's design conversation should
-settle what a "showcase seat" costs and buys relative to an MTE seat, and whether S102's neutral-token phase is
-the pool's consumer or its sibling.
+**THE REPEAT CEILING AND THE RECENCY DEMOTION** — a small session, and the arc's next step now that showcases
+have shipped. The S103 pairing log is the persisted fact both read: per-season pair, site, and the
+Matched/Contracted source word (a Contracted rematch must never be demoted; a contract FORCES recurrence). The
+schedule-breathes dials (demotion in front of S102's §4 ordering keys, the proximity-weakened cooldown, the
+reach grab, all on a portable integer hash of season/school/request — no seed, so C4/C5/C14 parity survives)
+slot in with no persistence work left to do. Its acceptance instrument is a **20-year rig** with four numbers:
+how often Tulsa recurs, the repeat-ceiling table, the distinct-opponent count against the stateless baseline,
+and the reach list.
 
-★ **A small session is also ready whenever Emmett prefers it: THE REPEAT CEILING AND THE RECENCY DEMOTION.** The
-S103 pairing log is the persisted fact both read — per-season pair, site, and the Matched/Contracted source word
-(a Contracted rematch must never be demoted; a contract FORCES recurrence). The schedule-breathes dials
-(demotion in front of S102's §4 ordering keys, the proximity-weakened cooldown, the reach grab, all on a
-portable integer hash of season/school/request — no seed, so C4/C5/C14 parity survives) slot in with no
-persistence work left to do. Its acceptance instrument is a **20-year rig** with four numbers: how often Tulsa
-recurs, the repeat-ceiling table, the distinct-opponent count against the stateless baseline, and the reach
-list. ★ **The draft rig's figures (nine identical home opponents 20-of-20, Tulsa and Oral Roberts 10-of-20, 64
-distinct opponents versus 15) are UNVERIFIED — re-measure them at build time rather than inheriting them.** The
-S81.3 lesson applies exactly.
+★ **BLOCKED ON ONE RULING FIRST — O-94.** The pairing log has never recorded tournament or showcase meetings,
+so as written the ceiling cannot see that two schools met at the Jimmy V. That decision is Emmett's and belongs
+to the design conversation, not the build.
 
-Still ready if Emmett prefers a change of layer: **O-91** (the damaged-year host-debt page question, small),
-**O-88** (season totals blend conference and tournament games), **O-84's realignment guards** — ★ now with a
-second consumer: S103's contract termination wall assumes conference alignment is settled before season
-scheduling, which is true today by construction and must gain an assertion the day realignment arrives — and the
-**calibration queue**. The schedule layer has now had eight consecutive sessions (S96–S103).
+★ **AND CHECK C-41 AGAINST THE PAGE BEFORE SCOPING.** Twelve regional showcases now pull bottom-tier schools to
+nearby cities instead of wherever the filler sent them, so the "small schools take the longest trips" inversion
+may have shifted. It was ruled to stand as measured; re-read it rather than assuming the old shape.
+
+★ **S104.1 (O-93 — suite runtime) is offered as a micro-session** and can run before or after. Emmett's call.

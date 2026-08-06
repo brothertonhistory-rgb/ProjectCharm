@@ -10999,14 +10999,30 @@ in November and the earliest conference night in the stock world is **December 7
 
 A top-level `events` array, which may be empty — a world with no tournaments is legal and every step
 downstream is a no-op, which is what makes the zero path provable byte for byte against the pre-S97 tree.
-Per event: a permanent `id`, a `name`, a `tier` (1 seats first — this is *how good the tournament is*, not
-the conference tier and sharing no vocabulary with it), a `placeId` (**one event per place**), a
-`firstDay`/`lastDay` window, a `fieldSize` of exactly 8 or 4, one authored `slot` per seat, a
-`persistence` in [0,1], and a nullable `forcedActive` that overrides the draw either way.
+Per event: a permanent `id`, a `name`, a `tier` (1 seats first — this is *how good the event is*, not
+the conference tier and sharing no vocabulary with it), a `placeId`, a `firstDay`/`lastDay` window, a
+`fieldSize`, one authored `slot` per seat, a `persistence` in [0,1], a nullable `forcedActive` that
+overrides the draw either way, and — since S104 — a `kind` and a `draw`.
 
-**The window is EXACTLY the playing days** — three for an eight-team field, two for a four-team — as a
-hard equality, not a bound, because S98's rounds are back-to-back. A rest day inside an event is a
-different design and would be authored as a different shape.
+**`kind` is `tournament` or `showcase`, defaulting to `tournament`. `draw` is `null` for National or a
+positive radius in miles, defaulting to `null`.** Both are optional, which is why S104 needed **no schema
+bump**: a v5 file that never heard of kinds still means exactly what it always meant. Both are ALWAYS
+written by the canonical writer, so one world has exactly one spelling and the fingerprint stays honest.
+`draw` lives on the shared shape rather than on showcases alone so that a future ruling on radius-drawn
+tournaments costs no migration — but authoring one **today is refused**, because nothing has designed what
+a regional tournament means.
+
+**One event per place per DAY** (Emmett, 2026-08-06 — retiring S97's one-event-per-place). Two events may
+share a town; they may not share a night. The old rule said something false about basketball: the Garden
+holds the Holiday Festival one week and the Jimmy V the next.
+
+**A tournament's `fieldSize` is exactly 8 or 4; a showcase's is exactly 4.** These are different facts
+reached through different words — a four-team bracket and a showcase are not interchangeable, and nothing
+downstream may infer the kind from the size.
+
+**The window is EXACTLY the playing days** — three for an eight-team field, two for a four-team, **one for
+a showcase** — as a hard equality, not a bound, because rounds are back-to-back. A rest day inside an event
+is a different design and would be authored as a different shape.
 
 A **slot** asks two questions that are deliberately never fused: a prestige `band` and a `scope` of
 `power` / `mid` / `any`. Fusing them into one quality number would make it impossible to author what a top
@@ -11367,3 +11383,83 @@ does not pass through S97 seating, because the conference cap key forbids exactl
 omission. **Campus events** are still unbuilt (O-87). **A game still does not know WHERE it is played**, only
 whether somebody hosts it, so the distance half of the crowd model remains blocked. And **a player's season
 totals now blend conference and tournament games with no split anywhere** (O-88).
+
+---
+
+## Showcases — the pool's second kind (Session 104, 2026-08-06)
+
+A **showcase** invites four schools out for **two stand-alone games in one day**. No bracket, no
+advancement, no placement, no champion, no seeding. Seats 1-2 are the headliner and seats 3-4 the
+undercard, and those roles come from the **stored seat numbers** — never list position, never prestige,
+never re-derived from a result. An upset does not relabel which game was the nightcap.
+
+### Two walls, one per kind
+
+A school may sit in **one tournament AND one showcase** in a season, and never two of either. On top of
+that, a school committed to a night is **excluded from any event whose window contains it** — nobody is in
+two places at once. Seating order, `(tier, id)`, is the deterministic priority: whoever seats first keeps
+the school, and the later event looks elsewhere. Emmett's ruling: *teams have to make choices.*
+
+### The draw — how far an event reaches
+
+A National event considers the whole country. A radius event measures from its own home city with the same
+quantised ruler the matcher uses (`floor(miles + 0.5)`, inclusive at the boundary) and widens in authored
+steps: **authored → +200 → +400, then it seats short. It never goes national** — locality survives a bad
+year, and the bad year is visible instead of Arizona playing in Brooklyn.
+
+**The band exhausts inside each radius step before the next opens.** A local showcase invites a weaker
+neighbour before it ever reaches further out. Each seat runs its own ladder from the authored radius, so
+one seat widening never retroactively widens a seat that already filled, and the seat that needed the reach
+is the seat that records it. Fallback level and radius step are stored as **two independent words**,
+because they are two independent facts.
+
+### A short showcase releases its field
+
+A tournament that cannot fill keeps its partial field and its schools stay consumed (S97 behaviour,
+unchanged). **A showcase that cannot fill releases everything** — no school consumed, no wall spent, no
+four-year clock burned. This is what makes a standby showcase a real replacement rather than decoration.
+Seating is therefore provisional for a showcase and committed only on completion.
+
+### The charge — a showcase costs a game you already had
+
+**Season totals never move.** 31 games with a tournament seat (three of them in the event), 29 without —
+regardless of showcases. A showcase game is charged **neutral → road → home**, after any contract charge.
+A school in both plays 31 with 3 in its tournament and spends one of its remaining open games on the
+showcase: a net +2 over staying home, never a 32nd game.
+
+The road step matters: an invited bottom school has no neutral allowance, so it pays a **road** game — it
+gave up a road trip to attend a sponsored event, which is exactly right, and is why the Selling class's
+neutral allowance stays 0 rather than sending sixty schools shopping for neutral games they never wanted.
+
+The pairing is **materialized the moment the field completes at seating**, long before anything plays,
+because the fixed obligation must exist before requests are built. The contract phase's capacity gate sees
+it as already spoken for.
+
+### Playing
+
+Two games on the event's single night, neutral floor, nobody hosting; the lower stored seat is the nominal
+home side, a box-score ordering only. Each is an ordinary regular-season non-conference game.
+
+**Showcases play AFTER every bracket, not interleaved.** The fixture ordinal is the engine seed, so
+appending the new kind is what leaves every tournament game on the seed it has always had. Play order and
+calendar order are already different things here.
+
+The record **completes with two results and no placement**: `finishBySeat` stays null forever, because
+nobody wins a showcase. "Played" is carried by the seats-played map rather than inferred from the presence
+of finishes — a season whose only events were showcases must still close its record.
+
+### What moved when the stock world gained sixteen showcases
+
+Twelve seat and play 24 games. **The conference schedule and its dates did not move an inch.** The
+event-games and results fingerprints did, because the feature is the movement. Existing **tournament
+fields**: every tournament seating before the first showcase overlap is byte-identical; after that point
+they are free to move, because a tournament that loses a candidate changes what is left for every later
+one. The isolation proof is that the same world with its showcases removed reproduces the pre-S104
+event-games fingerprint exactly.
+
+### Still open here
+
+**The pairing log does not record event meetings** — showcase or tournament — so a future repeat ceiling
+cannot see that two schools met in November. **Event dates are fixed in the world file**, so a showcase
+falls on the same date every season. **An Independent seated in a showcase is charged nothing**, because
+its November is unbuilt.

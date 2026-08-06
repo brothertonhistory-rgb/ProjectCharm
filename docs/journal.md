@@ -1,3 +1,53 @@
+## Session 104 — SHOWCASES: THE EVENT POOL LEARNS A SECOND KIND. A world may now author a **showcase** — four schools, two stand-alone games, one night, no bracket and no advancement and no placement and no champion. `kind` and `draw` join the shared event shape as optional defaulted keys, so **every pre-S104 world loads unchanged and there is no schema bump**. A school may take one tournament AND one showcase in a season, never two of either, and is excluded from anything whose window it is already committed to. A showcase reaches a **radius** rather than the country, widening authored → +200 → +400 and never going national. A showcase game is **charged out of the season the school already had**, never added to it. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 95 PASS at 42 assertions.** Conference and dated fingerprints unmoved (`6f79d663…`, `7515df7d…`); event-games and results recaptured (`7c1a41c1…`, `898d9fe8…`); matching golden regenerated 1,958 → 1,934 pairs. ★ Every delivery prediction landed, including both moved fingerprints across platforms. **O-92 session 4 ships; records C-44; retires the one-event-per-place rule.** (2026-08-06)
+
+**Register:** build, under `PROMPT-showcases-s104-r2` (ChatGPT-cleared) against `docs/showcase-design-brief.md` as the design authority. Two new production files, one new check file, ten surgical edits, the stock world, and the matching oracle + golden. `Charm.Engine` and `Charm.History` UNTOUCHED.
+
+### What shipped
+
+`src/Charm.Harness/Program.Season.Showcases.cs` — NEW (the play path, the game factory, the charge chain). `src/Charm.Harness/Program.Checks.Showcases.cs` — NEW (Phase 95). EDITS: `Program.World.cs` (the two keys, the kind/draw walls, one-event-per-place-per-**day**, the canonical writer), `Program.Season.Events.cs` (per-kind walls, the window exclusion, the radius ladder, provisional seating, the record and the page), `Program.Season.Brackets.cs` (kind-guarded route lookup, the tournaments-first play order), `Program.Season.NonConference.cs` + `Program.Season.Contracts.cs` (the tournament-only exemption at **both** sites), `Program.Season.cs` (spine, outcome carrier, `IsTournament` → `IsEventGame`), `Program.cs`, `Program.Checks.Mte.cs` (C2d given a negative control), `Program.Checks.NonConference.cs` + `Program.Checks.Matching.cs` (the extended identity, the filtered set, two recaptured fingerprints), `Program.Checks.Brackets.cs` (rename only), `worlds/stock-d1.world.json` (sixteen showcases), `tools/matching_oracle.py` + `tools/matching_golden.json`.
+
+### The rulings this session records (Emmett, 2026-08-06 — C-44)
+
+**ONE EVENT PER PLACE PER DAY, retiring one event per place.** The old rule said something false: the Garden holds the Holiday Festival one week and the Jimmy V the next, and Indianapolis holds two showcases a month apart. What cannot happen is two fields in one building on one night, and that is now exactly what is refused. Without this the authored slate could not load at all — three collisions, one of them against the existing Legends Classic.
+
+**EVENTS ARE INDEPENDENT.** *"The Maui tournament could be going on at the exact same time a showcase in MSG is happening, and two random low majors could be playing on one's home court."* Nothing coordinates events; the calendar is not a scheduler.
+
+**A SCHOOL IN A TOURNAMENT THAT WEEK IS NOT ELIGIBLE FOR AN OVERLAPPING SHOWCASE.** *"There should be enough teams that it isn't a big deal, teams have to 'make choices'."* Seating order — (tier, id) — is the deterministic priority: whoever seats first keeps the school.
+
+**R26 — a showcase game is one of the games the school already had.** Charged neutral → road → home, after any contract charge. Season totals never move: 31 with a tournament, 29 without, regardless of showcases. **R30 — a showcase that cannot fill releases its whole field**, consuming nobody and burning no four-year clock, which is what makes a standby showcase a real replacement rather than decoration.
+
+### What the gate caught — three prompt claims wrong against live source
+
+**(1) The slate could not load.** Three place collisions against a rule the prompt never mentioned. Resolved by Emmett's per-day ruling.
+
+**(2) ★ A6 WAS FALSE, AND IT WAS THE PROMPT'S OWN "VERIFIED" MEASUREMENT.** The prompt stated that no higher-tier showcase day falls inside any lower-tier tournament window. Re-measured against the actual dates: **eight collisions**. Sunset Showdown alone (tier 3, Nov 22) sits inside four later-seating tournament windows. This is the S81.3 lesson recurring exactly — a plausible table in a build prompt looks like evidence and is therefore exempted from the audit every code claim gets. It was caught by re-measuring rather than quoting.
+
+**(3) A1 had a second home the prompt did not name.** `RunContractSeason` builds its own seated set and feeds it to the capacity gate, which runs *before* the request builder. Sixth session running that a file outside the prompt's list had to move.
+
+### ★ The cascade — a wall claimed at the gate, then corrected by measurement
+
+At the gate I proposed asserting that tournament fields move *only where a showcase overlap explains it*. Measured, that was **half right**: eight tournaments seat before the first collision and are byte-identical, but from Hall of Fame Series onward whole fields change, not single schools. The reason is cascade — a tournament that loses a candidate takes someone else, which changes what is left for every tournament after it. Nine of the twelve changes had no direct overlap of their own. The wall shipped is the true one: **identical up to the first collision, free to move after it**, asserted as C9e. Worth recording because the first analysis script only tested direct overlap and reported nine "unexplained" failures — the instrument was wrong, not the engine.
+
+### The one place the build departed from a cleared prompt
+
+The prompt specified showcase games play in the existing canonical (tier, id, game-index) order, interleaved with tournaments. **This was not implementable and the prompt was internally inconsistent.** The fixture ordinal is also the engine seed, so interleaving slides every tournament game's ordinal and re-rolls every tournament result in the country — which §3.3's own byte-identity wall forbids. Showcases are appended after every bracket instead. Flagged in delivery, not buried.
+
+### The isolation proof
+
+The stock world **with its showcases removed** reproduces the pre-S104 event-games fingerprint `26f2b8ff…` exactly, on Windows. So the per-kind walls, the packed draw key, the provisional commit and the changed play order moved nothing on their own, and everything that did move was moved by showcases. This is C9a, and it is the check the session's whole isolation claim rests on. The draw key packs the radius step into the level slot as `level + 4*step`, and National is step 0 — so the pre-S104 key **is** `level`, by construction rather than by luck.
+
+### Misses, honestly
+
+**C6d proved nothing on its first build and passed.** It seated a real tournament and a real showcase and looked for a school in both — four seats out of 347 schools finding eight, so it found nobody, reported "no school in both", and the check looked thorough while asserting nothing. Caught only because it went red for the *right* reason. Rebuilt as a constructed seating that exercises the arithmetic directly. This is the S81 lesson again: the per-case table that looks right is the one that agrees with a wrong sign.
+
+**C2d had gone decorative and nobody noticed.** The existing two-events-in-one-town check passed under the retired rule *and* the new per-day rule, because the refusal message changed but still contained the old substring. Given a negative control — same town, different week, must LOAD — without which it discriminates nothing.
+
+**The suite is getting slow and I let it drift.** Emmett raised it: *"eventually every test will take an hour or two at this pace."* He is right and it is my lane. Four phases now each replay the same stock season from scratch — same world, same seed, same config — and every arc session has added one. Three sessions running I logged "+~30s, flagged and accepted" without ever asking what the 30 seconds was *of*. Logged as **O-93** and offered as micro-session S104.1: measure where suite time actually goes first, then cache the shared season run, then decide about a fast/full split.
+
+### Still open here
+
+**The pairing log does not record event meetings** — not showcases, and not tournaments either, which has always been true. The repeat-ceiling session is the first consumer, so it inherits the decision; a Jimmy V matchup is a real non-conference meeting and probably should count against a ceiling. Named for Emmett's ruling before that session is scoped. **An event's dates are fixed in the world file**, so the Jimmy V lands on December 3rd every season forever; parked with the living-pool session (event birth and death) rather than absorbed here. **Independents can be seated in a showcase and their charge goes nowhere**, because their November is unbuilt — the same hole their tournament seat already has.
+
 ## Session 103 — CONTRACTS AND THE NON-CONFERENCE LOG. The engine keeps promises it cannot yet make: a home-and-home, 2-for-1, five-in-eight or neutral series is now a persisted object — two schools, an explicit executor, an ordered leg list with stable ids, a window — that survives into the next season, is exercised before anything else touches a school's slate, and dies by two rules that both fail closed. The season record bumps to **format v2** and gains the **pairing log** (every non-conference pairing, per season — the persisted fact the repeat ceiling and recency demotion will read). **Nothing in the engine signs a contract**; fixture-authored contracts prove the honouring. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 94 PASS at 35 assertions, all four fingerprints unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`, `6abd62b0…`), the stock page line-for-line unchanged.** ★ All nine delivery predictions landed exactly, including the three per-check detail lines. **O-92 session 3 ships (the arc reordered per the brief: contracts moved to the front); records C-43; C-38 superseded by R22.** (2026-08-05)
 
 **Register:** build, under `PROMPT-contracts-s103-r1` (r2 header; ChatGPT-cleared) against `docs/contracts-design-brief.md` (r3) as the design authority. Oracle first, then one new production file, one new check file, six surgical edits delivered as complete files. `Charm.Engine` and `Charm.History` UNTOUCHED. The world file, its schema, and every S101/S102 constant unmoved.
