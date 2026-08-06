@@ -169,6 +169,11 @@ internal static partial class Program
         /// report, read by the page block and Phase 93, consumed by nothing that plays
         /// basketball. No game is emitted and no site is named — that is arc session 3.</summary>
         public MatchingReport Matching { get; init; } = MatchingReport.Empty;
+        /// <summary>★ S103 — what the contract phase decided: exercised legs, deaths,
+        /// declines, and the survivors written forward. Page-facing on the same terms
+        /// as Matching above; Phase 94 asserts the outcome object and the record on
+        /// disk, never rendered prose.</summary>
+        public ContractSeasonOutcome Contracts { get; init; } = ContractSeasonOutcome.None;
         /// <summary>★ S98 — every game that PLAYED, in fixture-ordinal order. See
         /// PlayedSeasonGame: index i is the fixture ordinal, and Results[i] /
         /// PossessionCounts[i] describe the same game.</summary>
@@ -1470,7 +1475,8 @@ internal static partial class Program
     private static SeasonRunOutcome RunSeasonCore(
         WorldFile world, long seasonSeed, string engineConfigPath, bool verbose,
         HistoryStore? history = null, bool retainGameLog = false,
-        int? roadShaveOverride = null, int? debtWindowOverride = null)
+        int? roadShaveOverride = null, int? debtWindowOverride = null,
+        IReadOnlyDictionary<int, int>? contractChoiceOverride = null)
     {
         // ══════════════════════════════════════════════════════════════════════════
         //  ★ S97 — THE SEASON PIPELINE, IN THIS ORDER, AND THE ORDER IS THE CONTRACT.
@@ -1491,21 +1497,28 @@ internal static partial class Program
         // ══════════════════════════════════════════════════════════════════════════
         var pendingSeasonId = history?.PeekNextSeasonId ?? 0;
         var eventHistory = MteReadHistory(history, pendingSeasonId);
+        // ★ S103 — last season's promises, read from EXACTLY season N-1's record.
+        var contractLoad = ReadLiveContracts(history, pendingSeasonId);
         var seating = MteSeatSeason(world, seasonSeed, eventHistory);
+        // ★ S103 — the contract phase, ONCE, before anything else touches a school's
+        //   slate (R23): terminate → discover → reserve → validate globally → commit.
+        //   The step itself is pure over supplied state, so phase ownership is a
+        //   property of this spine rather than a discipline the step must trust.
+        var contracts = RunContractSeason(world, contractLoad, seating, contractChoiceOverride);
 
         // ★ S101 — classes and requests. Pure by signature (world + seating, nothing
         //   else), computed here because the event exemption needs the seating and the
         //   seating exists only past this line. Nothing downstream reads it — it rides
         //   out on the outcome and reaches the page and Phase 92, which is what makes
         //   the S101 zero-path byte-identity claim provable by construction.
-        var nonConference = BuildNonConferenceRequests(world, seating);
+        var nonConference = BuildNonConferenceRequests(world, seating, contracts.Charges);
 
         // ★ S102 — the matching. Pure by signature (the world and S101's report, nothing
         //   else): the requests are CONSUMED here, never recomputed, and the report object
         //   is read rather than written. Nothing downstream reads the result — it rides
         //   out on the outcome and reaches the page and Phase 93, which is what keeps the
         //   zero-path byte-identity claim provable by construction.
-        var matching = BuildNonConferenceMatching(world, nonConference);
+        var matching = BuildNonConferenceMatching(world, nonConference, contracts.UsedPairs);
 
         var schedule = BuildSeasonSchedule(
             world, seasonSeed, history, deferNumbering: true,
@@ -1538,7 +1551,8 @@ internal static partial class Program
             seasonIdOfRun = numbering.SeasonId;
             try
             {
-                MtePublishRecord(history, numbering.SeasonNumber, seasonSeed, world, seating);
+                MtePublishRecord(history, numbering.SeasonNumber, seasonSeed, world, seating,
+                                 contracts.Survivors, BuildPairingLog(contracts, matching));
                 recordStatus = EventRecordStatus.Written;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -1786,6 +1800,7 @@ internal static partial class Program
             Events = eventOutcome,
             NonConference = nonConference,
             Matching = matching,
+            Contracts = contracts,
             PlayedGames = playedGames,
             ConferenceGameCount = schedule.Count,
             TournamentGameCount = brackets.GameCount,
@@ -2039,6 +2054,21 @@ internal static partial class Program
             foreach (var line in MatchingPageLines(run.Matching))
                 Console.WriteLine(line);
             Console.WriteLine();
+        }
+
+        // ★ S103 — the contract block. SILENT unless contracts existed, the collection
+        //   was lost, or forced obligations exceeded capacity — the zero paths (legacy
+        //   mode, a first season, an empty collection) print nothing at all, which is
+        //   what keeps every existing byte-identity claim honest. Neither death is
+        //   silent (R24).
+        {
+            var contractLines = ContractPageLines(run.Contracts, world);
+            if (contractLines.Count > 0)
+            {
+                foreach (var line in contractLines)
+                    Console.WriteLine(line);
+                Console.WriteLine();
+            }
         }
 
         // ★ S97 — the tournament block. PAGE-ONLY: no field composition is ever asserted by

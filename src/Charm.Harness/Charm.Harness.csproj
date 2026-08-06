@@ -117,6 +117,14 @@
          a regenerated golden can never silently change its input basis. Every value in it
          is an integer or a string — no float is asserted anywhere — which is why Phase 93
          C14 demands LITERAL equality rather than a ULP bound. -->
+    <!-- S103 contracts golden (emitted by tools/contracts_oracle.py, whose docstring is
+         the window state machine's specification). Phase 94 C1 replays it through the
+         pure C# core at run time, so it needs the same copy-to-output line every other
+         golden has - the recurring missed file, included in the prompt's own list this
+         time. All integers: parity is exact, never ULP-bounded. -->
+    <None Include="..\..\tools\contracts_golden.json" Link="tools\contracts_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Include="..\..\tools\matching_golden.json" Link="tools\matching_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

@@ -189,7 +189,8 @@ internal static partial class Program
     /// BuildNonConferenceRequests; the result rides out on SeasonRunOutcome and reaches
     /// nothing but the page and Phase 93.</summary>
     private static MatchingReport BuildNonConferenceMatching(
-        WorldFile world, NonConferenceReport report)
+        WorldFile world, NonConferenceReport report,
+        IReadOnlyList<(int Lo, int Hi)>? contractedPairs = null)
     {
         var schoolById = world.Schools.ToDictionary(s => s.Id);
         var placeById = world.Places.ToDictionary(p => p.PlaceId);
@@ -224,6 +225,15 @@ internal static partial class Program
         var road = ids.ToDictionary(i => i, i => reqById[i].Road);
         var neutral = ids.ToDictionary(i => i, i => reqById[i].Neutral);
         var usedPairs = new HashSet<(int, int)>();
+        // ★ S103 — a contracted pairing joins the used set BEFORE any phase runs, so
+        //   the five legality tests refuse a rematch of that pair everywhere, in every
+        //   phase, without the matcher learning what a contract is. The pairs are not
+        //   tokens: they appear in no ledger, no conservation identity, and no report
+        //   — the report's counts are already post-charge, so the request arithmetic
+        //   and the used set agree by construction.
+        if (contractedPairs is not null)
+            foreach (var (lo, hi) in contractedPairs)
+                usedPairs.Add((Math.Min(lo, hi), Math.Max(lo, hi)));
 
         var pairs = new List<MatchPair>();
         var ledger = ids.ToDictionary(i => i, i => new MatchLedgerRow

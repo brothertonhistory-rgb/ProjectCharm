@@ -140,7 +140,8 @@ internal static partial class Program
     /// immediately after MteSeatSeason and before BuildSeasonSchedule; the result rides
     /// out on SeasonRunOutcome and reaches nothing but the page and Phase 92.</summary>
     private static NonConferenceReport BuildNonConferenceRequests(
-        WorldFile world, EventSeatingOutcome seating)
+        WorldFile world, EventSeatingOutcome seating,
+        IReadOnlyDictionary<int, ContractChargeSet>? contractCharges = null)
     {
         // Seating exemption is BINARY SET MEMBERSHIP — seated in an event this season,
         // yes or no. Never a per-seat count: a malformed seating carrying a duplicate
@@ -212,6 +213,18 @@ internal static partial class Program
                     if (home > open) { home = open; compressed = true; }
                     neutral = Math.Min(NonConShowcaseAllowance[cls], open - home);
                     road = open - home - neutral;
+                    // ★ S103 — a contracted game is one of the games the school already
+                    //   wanted, not an eleventh home date. Each exercised leg is charged
+                    //   against the bucket it belongs to (Emmett's ruling), AFTER the
+                    //   ordinary split, so a contract year keeps the shape of a normal
+                    //   year and the road-less power school pays a HOME date for its
+                    //   away leg. The counts the matcher then reads are post-charge,
+                    //   which is what keeps a contracted pairing out of the request
+                    //   pool by arithmetic rather than by exception.
+                    if (contractCharges is not null
+                        && contractCharges.TryGetValue(s.Id, out var charge)
+                        && charge.Total > 0)
+                        (home, neutral, road) = ApplyContractCharges(home, neutral, road, charge);
                 }
                 requests[s.Id] = new NonConSchoolRequest(
                     s.Id, s.Name, NonConClassNames[cls], conf.Games, isSeated,

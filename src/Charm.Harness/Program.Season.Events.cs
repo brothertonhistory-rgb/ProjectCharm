@@ -428,7 +428,15 @@ internal static partial class Program
 
     // ── The permanent record ─────────────────────────────────────────────────────
 
-    private const int MteRecordFormatVersion = 1;
+    /// <summary>★ S103 — v2 adds two collections: the live contracts (forward state)
+    /// and the non-conference pairing log (played... paired facts). The reader accepts
+    /// BOTH versions: a v1 file is a pre-contract career, and bumping the constant
+    /// without widening the read would silently erase every existing career's
+    /// tournament memory — the four-year rule would stop working with every check
+    /// green. A v1 record contributes its events exactly as before and reads as an
+    /// EMPTY contract collection, never as unknown.</summary>
+    private const int MteRecordFormatVersion = 2;
+    private static readonly int[] MteSupportedRecordVersions = { 1, 2 };
 
     /// <summary>The folder is named for the history FILE, exactly as the game log's is, so two
     /// careers side by side cannot share a record directory and collide on season-1.</summary>
@@ -472,7 +480,7 @@ internal static partial class Program
 
                 if (!root.TryGetProperty("formatVersion", out var fv) || !fv.TryGetInt32(out var version))
                 { result.Diagnostics.Add($"season {seasonId}: malformed"); continue; }
-                if (version != MteRecordFormatVersion)
+                if (!MteSupportedRecordVersions.Contains(version))
                 { result.Diagnostics.Add($"season {seasonId}: unsupported record version {version}"); continue; }
 
                 if (!root.TryGetProperty("historyId", out var hid) || hid.ValueKind != JsonValueKind.String
@@ -529,14 +537,17 @@ internal static partial class Program
     /// classified as an ordinary write failure.</summary>
     private static void MtePublishRecord(
         HistoryStore history, long seasonId, long seasonSeed,
-        WorldFile world, EventSeatingOutcome seating)
+        WorldFile world, EventSeatingOutcome seating,
+        IReadOnlyList<LiveContract> survivingContracts,
+        IReadOnlyList<NonConPairingEntry> nonConferencePairings)
     {
         var folder = MteRecordFolderFor(history.Path);
         Directory.CreateDirectory(folder);
         var final = MteRecordPathFor(history.Path, seasonId);
         var temp = Path.Combine(folder, $".charm-events-{Guid.NewGuid():N}.tmp");
 
-        var bytes = MteRecordBytes(history, seasonId, seasonSeed, world, seating);
+        var bytes = MteRecordBytes(history, seasonId, seasonSeed, world, seating,
+                                   survivingContracts, nonConferencePairings);
         File.WriteAllBytes(temp, bytes);
         try
         {
@@ -555,7 +566,9 @@ internal static partial class Program
 
     private static byte[] MteRecordBytes(
         HistoryStore history, long seasonId, long seasonSeed,
-        WorldFile world, EventSeatingOutcome seating)
+        WorldFile world, EventSeatingOutcome seating,
+        IReadOnlyList<LiveContract> survivingContracts,
+        IReadOnlyList<NonConPairingEntry> nonConferencePairings)
     {
         using var stream = new MemoryStream();
         using (var w = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, NewLine = "\n" }))
@@ -567,6 +580,12 @@ internal static partial class Program
             w.WriteString("worldFingerprint", history.WorldFingerprint);
             w.WriteNumber("seasonId", seasonId);
             w.WriteNumber("seasonSeed", seasonSeed);
+
+            // ★ S103 — the two v2 collections, ALWAYS written even when empty: the
+            //   contract reader treats a missing array as damage, never as "no
+            //   contracts", so absence can never be mistaken for emptiness (A2).
+            WriteLiveContracts(w, survivingContracts);
+            WriteNonConferencePairings(w, nonConferencePairings);
 
             w.WriteStartArray("dormantEvents");
             foreach (var d in seating.Dormant.OrderBy(x => x.EventId))

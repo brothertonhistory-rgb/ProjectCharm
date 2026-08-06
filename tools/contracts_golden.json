@@ -1,0 +1,5337 @@
+{
+  "provenance": {
+    "session": "S103",
+    "spec": "tools/contracts_oracle.py \u2014 the docstring is the specification",
+    "convention": "window includes the current season; forced iff games==window; decrement at rollover, after the decision"
+  },
+  "trajectories": [
+    {
+      "name": "three-in-four-decline",
+      "games": 3,
+      "window": 4,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "three-in-four-exercise-s1",
+      "games": 3,
+      "window": 4,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "five-in-eight-decline",
+      "games": 5,
+      "window": 8,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 8,
+          "rollGames": 5,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 5,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 7,
+          "rollGames": 5,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 5,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 6,
+          "rollGames": 5,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 5,
+          "startWindow": 5,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "five-in-eight-exercise-s1",
+      "games": 5,
+      "window": 8,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 4,
+          "afterWindow": 8,
+          "rollGames": 4,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 7,
+          "rollGames": 4,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 6,
+          "rollGames": 4,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "home-and-home",
+      "games": 2,
+      "window": 2,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "two-for-one-in-three",
+      "games": 3,
+      "window": 3,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "neutral-series-4-in-6",
+      "games": 4,
+      "window": 6,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 3,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in1-always",
+      "games": 1,
+      "window": 1,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in1-decline",
+      "games": 1,
+      "window": 1,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in1-exercise-season-1",
+      "games": 1,
+      "window": 1,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in2-always",
+      "games": 1,
+      "window": 2,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 2,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in2-decline",
+      "games": 1,
+      "window": 2,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in2-exercise-season-1",
+      "games": 1,
+      "window": 2,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 2,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in3-always",
+      "games": 1,
+      "window": 3,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 3,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in3-decline",
+      "games": 1,
+      "window": 3,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in3-exercise-season-1",
+      "games": 1,
+      "window": 3,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 3,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in4-always",
+      "games": 1,
+      "window": 4,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 4,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in4-decline",
+      "games": 1,
+      "window": 4,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in4-exercise-season-1",
+      "games": 1,
+      "window": 4,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 4,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in5-always",
+      "games": 1,
+      "window": 5,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 5,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in5-decline",
+      "games": 1,
+      "window": 5,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in5-exercise-season-1",
+      "games": 1,
+      "window": 5,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 5,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in6-always",
+      "games": 1,
+      "window": 6,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 6,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in6-decline",
+      "games": 1,
+      "window": 6,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in6-exercise-season-1",
+      "games": 1,
+      "window": 6,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 6,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in7-always",
+      "games": 1,
+      "window": 7,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 7,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in7-decline",
+      "games": 1,
+      "window": 7,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 7,
+          "rollGames": 1,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in7-exercise-season-1",
+      "games": 1,
+      "window": 7,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 7,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in8-always",
+      "games": 1,
+      "window": 8,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 8,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in8-decline",
+      "games": 1,
+      "window": 8,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 8,
+          "rollGames": 1,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 7,
+          "rollGames": 1,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-1in8-exercise-season-1",
+      "games": 1,
+      "window": 8,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 1,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 8,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in2-always",
+      "games": 2,
+      "window": 2,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in2-decline",
+      "games": 2,
+      "window": 2,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in2-exercise-season-1",
+      "games": 2,
+      "window": 2,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in3-always",
+      "games": 2,
+      "window": 3,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 2,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in3-decline",
+      "games": 2,
+      "window": 3,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in3-exercise-season-1",
+      "games": 2,
+      "window": 3,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in4-always",
+      "games": 2,
+      "window": 4,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 3,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in4-decline",
+      "games": 2,
+      "window": 4,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in4-exercise-season-1",
+      "games": 2,
+      "window": 4,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in5-always",
+      "games": 2,
+      "window": 5,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 4,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in5-decline",
+      "games": 2,
+      "window": 5,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in5-exercise-season-1",
+      "games": 2,
+      "window": 5,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in6-always",
+      "games": 2,
+      "window": 6,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 5,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in6-decline",
+      "games": 2,
+      "window": 6,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in6-exercise-season-1",
+      "games": 2,
+      "window": 6,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in7-always",
+      "games": 2,
+      "window": 7,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 7,
+          "rollGames": 1,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 6,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in7-decline",
+      "games": 2,
+      "window": 7,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 7,
+          "rollGames": 2,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in7-exercise-season-1",
+      "games": 2,
+      "window": 7,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 7,
+          "rollGames": 1,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in8-always",
+      "games": 2,
+      "window": 8,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 8,
+          "rollGames": 1,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 7,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in8-decline",
+      "games": 2,
+      "window": 8,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 8,
+          "rollGames": 2,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 7,
+          "rollGames": 2,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-2in8-exercise-season-1",
+      "games": 2,
+      "window": 8,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 2,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 8,
+          "rollGames": 1,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 1,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 7,
+          "rollGames": 1,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in3-always",
+      "games": 3,
+      "window": 3,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in3-decline",
+      "games": 3,
+      "window": 3,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in3-exercise-season-1",
+      "games": 3,
+      "window": 3,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in4-always",
+      "games": 3,
+      "window": 4,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 2,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in4-decline",
+      "games": 3,
+      "window": 4,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in4-exercise-season-1",
+      "games": 3,
+      "window": 4,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in5-always",
+      "games": 3,
+      "window": 5,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 3,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in5-decline",
+      "games": 3,
+      "window": 5,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in5-exercise-season-1",
+      "games": 3,
+      "window": 5,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in6-always",
+      "games": 3,
+      "window": 6,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 4,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in6-decline",
+      "games": 3,
+      "window": 6,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in6-exercise-season-1",
+      "games": 3,
+      "window": 6,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in7-always",
+      "games": 3,
+      "window": 7,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 7,
+          "rollGames": 2,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 5,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in7-decline",
+      "games": 3,
+      "window": 7,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 7,
+          "rollGames": 3,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in7-exercise-season-1",
+      "games": 3,
+      "window": 7,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 7,
+          "rollGames": 2,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in8-always",
+      "games": 3,
+      "window": 8,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 8,
+          "rollGames": 2,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 7,
+          "rollGames": 1,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 1,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 6,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in8-decline",
+      "games": 3,
+      "window": 8,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 8,
+          "rollGames": 3,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 7,
+          "rollGames": 3,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-3in8-exercise-season-1",
+      "games": 3,
+      "window": 8,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 3,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 8,
+          "rollGames": 2,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 2,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 7,
+          "rollGames": 2,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in4-always",
+      "games": 4,
+      "window": 4,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in4-decline",
+      "games": 4,
+      "window": 4,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in4-exercise-season-1",
+      "games": 4,
+      "window": 4,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in5-always",
+      "games": 4,
+      "window": 5,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 2,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in5-decline",
+      "games": 4,
+      "window": 5,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in5-exercise-season-1",
+      "games": 4,
+      "window": 5,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in6-always",
+      "games": 4,
+      "window": 6,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 3,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in6-decline",
+      "games": 4,
+      "window": 6,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 6,
+          "rollGames": 4,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in6-exercise-season-1",
+      "games": 4,
+      "window": 6,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in7-always",
+      "games": 4,
+      "window": 7,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 7,
+          "rollGames": 3,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 4,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in7-decline",
+      "games": 4,
+      "window": 7,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 7,
+          "rollGames": 4,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 6,
+          "rollGames": 4,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in7-exercise-season-1",
+      "games": 4,
+      "window": 7,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 7,
+          "rollGames": 3,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in8-always",
+      "games": 4,
+      "window": 8,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 8,
+          "rollGames": 3,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 7,
+          "rollGames": 2,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 2,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 6,
+          "rollGames": 1,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 1,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 5,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in8-decline",
+      "games": 4,
+      "window": 8,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 8,
+          "rollGames": 4,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 7,
+          "rollGames": 4,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 6,
+          "rollGames": 4,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-4in8-exercise-season-1",
+      "games": 4,
+      "window": 8,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 4,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 8,
+          "rollGames": 3,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 3,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 7,
+          "rollGames": 3,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in5-always",
+      "games": 5,
+      "window": 5,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 5,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in5-decline",
+      "games": 5,
+      "window": 5,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 5,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in5-exercise-season-1",
+      "games": 5,
+      "window": 5,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 5,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in6-always",
+      "games": 5,
+      "window": 6,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 4,
+          "afterWindow": 6,
+          "rollGames": 4,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 5,
+          "rollGames": 3,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 4,
+          "rollGames": 2,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 3,
+          "rollGames": 1,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 2,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 2,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in6-decline",
+      "games": 5,
+      "window": 6,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 6,
+          "rollGames": 5,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 5,
+          "startWindow": 5,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in6-exercise-season-1",
+      "games": 5,
+      "window": 6,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 4,
+          "afterWindow": 6,
+          "rollGames": 4,
+          "rollWindow": 5
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 3,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 4,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 5,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 6,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in7-always",
+      "games": 5,
+      "window": 7,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 4,
+          "afterWindow": 7,
+          "rollGames": 4,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 6,
+          "rollGames": 3,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 5,
+          "rollGames": 2,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 4,
+          "rollGames": 1,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 3,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 3,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in7-decline",
+      "games": 5,
+      "window": 7,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 7,
+          "rollGames": 5,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 5,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 6,
+          "rollGames": 5,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 5,
+          "startWindow": 5,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in7-exercise-season-1",
+      "games": 5,
+      "window": 7,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 4,
+          "afterWindow": 7,
+          "rollGames": 4,
+          "rollWindow": 6
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 6,
+          "rollGames": 4,
+          "rollWindow": 5
+        },
+        {
+          "season": 3,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 4,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 5,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 6,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 7,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in8-always",
+      "games": 5,
+      "window": 8,
+      "policy": "always",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 4,
+          "afterWindow": 8,
+          "rollGames": 4,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 3,
+          "afterWindow": 7,
+          "rollGames": 3,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 3,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 2,
+          "afterWindow": 6,
+          "rollGames": 2,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 2,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 1,
+          "afterWindow": 5,
+          "rollGames": 1,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 1,
+          "startWindow": 4,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 0,
+          "afterWindow": 4,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in8-decline",
+      "games": 5,
+      "window": 8,
+      "policy": "decline",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 8,
+          "rollGames": 5,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 5,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 7,
+          "rollGames": 5,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 5,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 5,
+          "afterWindow": 6,
+          "rollGames": 5,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 5,
+          "startWindow": 5,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    },
+    {
+      "name": "grid-5in8-exercise-season-1",
+      "games": 5,
+      "window": 8,
+      "policy": "exercise-season-1",
+      "verdict": "complete",
+      "seasons": [
+        {
+          "season": 1,
+          "startGames": 5,
+          "startWindow": 8,
+          "forced": false,
+          "decision": "exercise",
+          "afterGames": 4,
+          "afterWindow": 8,
+          "rollGames": 4,
+          "rollWindow": 7
+        },
+        {
+          "season": 2,
+          "startGames": 4,
+          "startWindow": 7,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 7,
+          "rollGames": 4,
+          "rollWindow": 6
+        },
+        {
+          "season": 3,
+          "startGames": 4,
+          "startWindow": 6,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 6,
+          "rollGames": 4,
+          "rollWindow": 5
+        },
+        {
+          "season": 4,
+          "startGames": 4,
+          "startWindow": 5,
+          "forced": false,
+          "decision": "decline",
+          "afterGames": 4,
+          "afterWindow": 5,
+          "rollGames": 4,
+          "rollWindow": 4
+        },
+        {
+          "season": 5,
+          "startGames": 4,
+          "startWindow": 4,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 3,
+          "afterWindow": 4,
+          "rollGames": 3,
+          "rollWindow": 3
+        },
+        {
+          "season": 6,
+          "startGames": 3,
+          "startWindow": 3,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 2,
+          "afterWindow": 3,
+          "rollGames": 2,
+          "rollWindow": 2
+        },
+        {
+          "season": 7,
+          "startGames": 2,
+          "startWindow": 2,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 1,
+          "afterWindow": 2,
+          "rollGames": 1,
+          "rollWindow": 1
+        },
+        {
+          "season": 8,
+          "startGames": 1,
+          "startWindow": 1,
+          "forced": true,
+          "decision": "forced",
+          "afterGames": 0,
+          "afterWindow": 1,
+          "rollGames": 0,
+          "rollWindow": null
+        }
+      ]
+    }
+  ]
+}

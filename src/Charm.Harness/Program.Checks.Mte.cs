@@ -493,8 +493,11 @@ internal static partial class Program
                   ReadCount(good.Replace("\"historyId\":", "\"historyId\": \"not-this-career\", \"ignored\":")) == 0);
             Check("C6e: a record naming a DIFFERENT SEASON is a hole",
                   ReadCount(good.Replace("\"seasonId\": 1", "\"seasonId\": 77")) == 0);
-            Check("C6f: an unsupported record version is a hole",
-                  ReadCount(good.Replace("\"formatVersion\": 1", "\"formatVersion\": 99")) == 0);
+            Check("C6f: an unsupported record version is a hole — and v1 is NOT one: a "
+                  + "pre-contract record keeps its whole tournament memory (the S103 widening "
+                  + "this check would have silently missed)",
+                  ReadCount(good.Replace("\"formatVersion\": 2", "\"formatVersion\": 99")) == 0
+                  && ReadCount(good.Replace("\"formatVersion\": 2", "\"formatVersion\": 1")) == wholeYear);
             Check("C6g: malformed JSON is a hole",
                   ReadCount("{ this is not json") == 0);
             Check("C6h: ★ A CHANGED WORLD FINGERPRINT IS *ACCEPTED* — the record binds to the CAREER, " +

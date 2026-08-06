@@ -10,7 +10,29 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 102** (2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 93 PASS at 17
+Last updated: **Session 103** (2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 94 PASS at 35
+assertions**, all four fingerprints unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`, `6abd62b0…`), the stock page
+line-for-line unchanged. **CONTRACTS AND THE NON-CONFERENCE LOG — the engine keeps promises it cannot yet make (arc
+session 3; the arc REORDERED per the brief: contracts moved to the front).** A contract — home-and-home, 2-for-1,
+five-in-eight, neutral series — is two schools, an EXPLICIT executor, an ordered leg list with stable ids, and a
+window; it persists in the season record (**format v2; the reader accepts {1,2}**, so no existing career loses its
+tournament memory), is exercised before anything else touches a school's slate (terminate → discover → reserve →
+validate globally → commit → optionals in ascending ContractId), and dies by two rules that both fail closed: same
+conference terminates BEFORE exercise, a damaged record drops the collection and reports a COLLECTION-level loss
+naming no pairing. Forced iff outstanding == window; decrement at ROLLOVER after the decision; oracle-first
+(`tools/contracts_oracle.py` locked before any C#, 97 integer trajectories replayed through the pure step, parity
+exact). ★ **RECORDS C-43**: an exercised leg is charged to its OWN bucket after the split — and a road-less school
+(21 of 333 on stock, all Marquee) pays a HOME date for its away leg. The **pairing log** ships beside the contracts:
+every non-conference pairing per season with site, host and a Matched/Contracted source word — the persisted fact
+that makes the repeat-ceiling/recency session SMALL. ★ **C-38 SUPERSEDED by R22, not dropped** — ruled for an engine
+that could not remember; wrong for one that can. NOTHING signs a contract; fixture-authored contracts prove the
+honouring, so the stock world shows nothing (pre-agreed). ★ The gate caught the cleared prompt again: the brief
+itself was uncommitted, its §7.5 guess inverted, its games≤window justification self-contradictory, A2's real hazard
+OPPOSITE to the one named (the naive version bump silently erases every career's four-year rule), and the
+completion-cannot-discriminate claim half wrong (exact-window contracts are INFEASIBLE under decrement-first). ★ All
+nine delivery predictions landed exactly. **O-92 session 3 ships.**)
+
+*(Previous board entry, S102 — 2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 93 PASS at 17
 assertions**, all four fingerprints unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`, `6abd62b0…`). **THE MATCHING — every
 school's November pairs (arc session 2 of 4).** Who plays whom, who hosts, which games are neutral. **No site, no night,
 no game record** — that is session 3. A home request names the KIND of opponent by that opponent's PRESTIGE (Easy <25,
@@ -31,7 +53,7 @@ at Colorado↔San Francisco, not 0.0000111 at Fairfield↔Oakland) — the S81.3
 it every run. Its provenance instruction also named an oracle that emits no golden at all. ★ **THE FIFTH SESSION RUNNING
 THAT A FILE OUTSIDE THE PROMPT'S LIST HAD TO MOVE** — `Charm.Harness.csproj` needed the golden's copy-to-output line or
 Windows would have gone red. Suite +~30s (Phase 93 plays a stock season, same reason as Phase 92 — flagged and
-accepted). **O-92 session 2 of 4 ships; records C-41.**)
+accepted). **O-92 session 2 ships; records C-41.**)*
 
 *(Previous board entry, S101 — 2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 92 PASS at 11
 assertions**, every fingerprint unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`). **CLASSES AND REQUESTS — the
@@ -362,6 +384,15 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S103 — CONTRACTS AND THE NON-CONFERENCE LOG (non-conference arc, session 3; the arc reordered — contracts
+  first).** The persisted contract object (executor, stable legs, window; `gamesRemaining` DERIVED, never stored),
+  exercised before anything else touches a slate, both deaths failing closed, the season record at **format v2 with
+  the reader accepting {1,2}**, the pairing log (pair + site + host + Matched/Contracted source word, per season),
+  charges by ruled bucket with the road-less-pays-home fallback, and the matcher's used set seeded so a contracted
+  pair can never rematch — ledger and both conservation identities untouched. Oracle-first
+  (`tools/contracts_oracle.py` + 97-trajectory integer golden). Phase 94, 35 assertions; stock page unchanged;
+  fingerprints unmoved. Advances **O-92**; records **C-43**; supersedes **C-38** by R22.
 
 - **★ S102 — THE MATCHING (non-conference arc, session 2 of 4).** Every school's November pairs: who plays
   whom, who hosts, which games are neutral. NO site, NO night, NO `SeasonGame`. Home requests name the
@@ -763,24 +794,24 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-92 — ★ THE NON-CONFERENCE ARC, SESSIONS 3–5 (opened S101; sessions 1 and 2 shipped).
-  ★ THE ARC GREW FROM FOUR SESSIONS TO FIVE (Emmett, 2026-08-05)** — see C-42. The brief is
-  `docs/nonconference-design-brief.md` (r3 — **R17's tilt now needs an r4 amendment, see C-41**). Remaining:
-  **(3) THE SCHEDULE BREATHES** — S102's matcher is stateless, so with static prestige it reproduces
-  near-identical schedules season over season; session 3 adds the recency memory (a played opponent DEMOTES
-  behind fresh candidates — preference, never prohibition, on the S96 host-log pattern), the
-  proximity-weakened cooldown (a neighbour inside ~100 mi sits out one season, everyone else two), and the
-  reach grab (roughly one buy game in eight takes a hash-picked fresh school from the whole national bucket).
-  ★ **All three are keyed on a PORTABLE INTEGER HASH of (season, school, request), not a seed** — determinism
-  becomes "nothing random beyond the season's own identity" and oracle parity survives intact. The demotion
-  tier slots in FRONT of S102's §4 ordering keys and touches nothing else. **(4) sites and nights** — R9–R12,
-  every paired game gains a place, the neutral brief's crowd model wired at last, dates around conference play
-  and the tournament windows. **(5) the Independents' November and their gap-filling role** (R13, and the
-  same-conference legality test must EXEMPT their shared container — they are fourteen strangers in one
-  bucket, not league-mates). The class curve (brief §8.1) and R10's distance/quality shape stay open for
-  Emmett to rule off the page — S102 added two page numbers to rule against: the trips-by-class table and the
-  zero-road acceptance read. Blocks **O-78** (a national ranking has no honest basis while leagues share no
-  opponents).
+- **O-92 — ★ THE NON-CONFERENCE ARC (opened S101; sessions 1–3 shipped: classes, the matching, contracts).
+  ★ THE ARC REORDERED AT S103 (Emmett, contracts brief r3 §0, superseding C-42b's sequencing): contracts moved to
+  the FRONT** — the layer that carries state across seasons had to exist before the layers that consume it. The
+  briefs are `docs/nonconference-design-brief.md` (r3 — **R17's tilt still needs an r4 amendment, see C-41**) and
+  `docs/contracts-design-brief.md` (r3, committed at the S103 gate — it was on disk but never pushed). Remaining,
+  in the brief's order: **(4) the showcase/event pool** — exercised contract legs already attach at the
+  fixed-obligation seam event seats will use; **(5) the shelf and the odds** — the buy-game shelf is still keyed
+  on prestige, Northwestern still schedules like Duke, C-41's inversion unresolved (knowingly left standing:
+  visible and harmless; rebuilding the scheduler around inherited obligations later would be neither); **(6) sites
+  and nights** — R9–R12, the crowd model, dates around conference play, ★ and the SEMI-HOME ruling (a third site
+  category — host keeps the advantage, does not play on campus; the leg format's site WORD is ready for it);
+  **(7) the Independents' November** (R13; the same-conference test must EXEMPT their shared container — S103's
+  contract wall already rules that two Independents are not league-mates). ★ **The repeat ceiling and the recency
+  demotion are now a SMALL session** — the S103 pairing log is the persisted fact they read (per-season pair +
+  site + source word; a Contracted pairing must not be demoted), and the schedule-breathes dials (demotion in
+  front of S102's §4 keys, proximity-weakened cooldown, reach grab, all on a portable integer hash) slot in
+  whenever Emmett orders it. The class curve (brief §8.1) and R10's shape stay open for Emmett to rule off the
+  page. Blocks **O-78**.
 
 - **O-91 — A DAMAGED SEASON N−1 EMPTIES THE HOST DEBT, RATHER THAN LEAVING A HOLE IN IT (opened S100).** S96's
   fail-closed rule was written for a one-hop question that genuinely needed N−1 specifically. The windowed rule does
@@ -1514,6 +1545,16 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-43 — ★ A CONTRACTED GAME IS ONE OF THE GAMES THE SCHOOL ALREADY WANTED, NOT AN EXTRA (Emmett's rulings,
+  S103, 2026-08-05).** Two rulings from one conversation. **(a)** An exercised contract leg is charged against its
+  OWN request bucket, after the ordinary S101 split: a hosted leg out of home, an away leg out of road, a neutral
+  leg out of neutral — so a contract year keeps the shape of a normal year and the host never gains an eleventh
+  home date. **(b)** When the school has no road games, the away leg costs a **HOME date** — the date was spent
+  traveling instead of hosting. Measured at the ruling: 21 of 333 stock schools have zero road games, all Marquee,
+  all in 18/20-game leagues — the schools that need home-and-homes most. Chain tails beyond the ruled steps are a
+  flagged Claude call (hosted → road → neutral; away → home → neutral; neutral → road → home). Emmett's placement
+  question ("shouldn't the owed trip fill first?") is answered by R23 — it does; the ruling decides which REQUEST
+  bucket shrinks, which placement order alone cannot.
 - **C-36 — NON-D1 OPPONENTS ARE NOT BUILT NOW (Emmett's ruling, S101 design conversation, 2026-08-04).**
   They arrive with the D2/D3 layer, where the lowest teams pay local schools to visit. Do NOT conjure a
   generic non-D1 pool or fake schools to give the bottom home games — that job belongs to C-37 until the
@@ -1524,7 +1565,10 @@ chart is PROVISIONAL pending O-6.
   middle absorbing the shortfall, never a short slate. This is R3's terminal filler and the designated
   landing place for the S101 balance gap (+358 on stock, ~179 conversions, ~3 extra home games per Selling
   school). A Selling school yields on venue, never on "did I get a game."
-- **C-38 — OFF-CAMPUS SERIES CARRY NO FORWARD DEBT (Emmett's ruling, S101, 2026-08-04).** A one-off neutral
+- **C-38 — OFF-CAMPUS SERIES CARRY NO FORWARD DEBT (Emmett's ruling, S101, 2026-08-04). ★ SUPERSEDED BY R22 AT
+  S103, NOT QUIETLY DROPPED** — ruled for an engine that could not remember anything; the wrong call for one that
+  can, because a contract is precisely a forward debt. Kept as history; the live rule is the contracts brief's
+  R22.** A one-off neutral
   game (Duke–Michigan State in Detroit, done) is complete when played; a two-year series (Detroit, then
   Charlotte) is agreed as two games up front. Which of the two shapes a series takes is a draw, not a rule —
   Emmett: "sometimes it just goes two years." Nothing is ever owed into a season that might not be able to
@@ -1683,29 +1727,26 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**O-92 session 3 — THE SCHEDULE BREATHES** is the next step, and it is now session 3 of five rather than the
-sites session (C-42b). S102's matcher is stateless: the map never moves and the ordering keys are fixed, so
-with static prestige a school plays very nearly the same November every year forever — Oklahoma State draws
-Oral Roberts and Tulsa every season and never meets UC Davis once. That is the placeholder talking, and
-session 3 replaces it with three dials at the R8 seam: **recency demotion** (a played opponent falls behind
-every fresh candidate — preference, never prohibition, persisted in the career file on the S96 host-log
-pattern), a **proximity-weakened cooldown** (a neighbour inside ~100 mi sits out one season, everyone else
-two, so genuine regional rivalries still recur while distant one-offs do not), and the **reach grab** (about
-one buy game in eight takes a hash-picked fresh school from the whole national bucket, which is what puts a
-Vermont or a Portland State on somebody's slate).
+**O-92 session 4 — THE SHOWCASE/EVENT POOL** is the next step per the reordered arc (contracts brief r3 §0:
+contracts → the showcase/event pool → the shelf and the odds → sites and nights → the Independents). S103 built
+the seam it needs: an exercised contract leg already attaches at the fixed-obligation point event seats will use,
+which is exactly what the request builder's `EventGames` term documents. The session's design conversation should
+settle what a "showcase seat" costs and buys relative to an MTE seat, and whether S102's neutral-token phase is
+the pool's consumer or its sibling.
 
-★ **It needs no seed.** All three key on a portable integer hash of (season, school, request), so the matcher
-stays deterministic in the only sense that matters — same inputs, same answer, on any machine in either
-language — and C4, C5 and C14's oracle parity survive unchanged. This is a better answer than the seeded
-weighted draw Claude was steering toward in the S102 design conversation, and it is recorded as such.
-
-Its acceptance instrument is a **20-year rig** with four numbers: how often Tulsa recurs, the repeat ceiling
-table, the distinct-opponent count against the stateless baseline, and the reach list. ★ **The draft rig's
-figures (nine identical home opponents 20-of-20, Tulsa and Oral Roberts 10-of-20, 64 distinct opponents
-versus 15) are UNVERIFIED — re-measure them at build time rather than inheriting them.** The S81.3 lesson
-applies exactly: a plausible table in a prompt is the artifact that escapes the audit every code claim gets,
-and S102's own prompt shipped a wrong distance figure that way.
+★ **A small session is also ready whenever Emmett prefers it: THE REPEAT CEILING AND THE RECENCY DEMOTION.** The
+S103 pairing log is the persisted fact both read — per-season pair, site, and the Matched/Contracted source word
+(a Contracted rematch must never be demoted; a contract FORCES recurrence). The schedule-breathes dials
+(demotion in front of S102's §4 ordering keys, the proximity-weakened cooldown, the reach grab, all on a
+portable integer hash of season/school/request — no seed, so C4/C5/C14 parity survives) slot in with no
+persistence work left to do. Its acceptance instrument is a **20-year rig** with four numbers: how often Tulsa
+recurs, the repeat-ceiling table, the distinct-opponent count against the stateless baseline, and the reach
+list. ★ **The draft rig's figures (nine identical home opponents 20-of-20, Tulsa and Oral Roberts 10-of-20, 64
+distinct opponents versus 15) are UNVERIFIED — re-measure them at build time rather than inheriting them.** The
+S81.3 lesson applies exactly.
 
 Still ready if Emmett prefers a change of layer: **O-91** (the damaged-year host-debt page question, small),
-**O-88** (season totals blend conference and tournament games), **O-84's realignment guards**, and the
-**calibration queue**. The schedule layer has now had seven consecutive sessions (S96–S102).
+**O-88** (season totals blend conference and tournament games), **O-84's realignment guards** — ★ now with a
+second consumer: S103's contract termination wall assumes conference alignment is settled before season
+scheduling, which is true today by construction and must gain an assertion the day realignment arrives — and the
+**calibration queue**. The schedule layer has now had eight consecutive sessions (S96–S103).

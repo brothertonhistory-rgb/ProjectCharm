@@ -8609,7 +8609,7 @@ The arc's second pass: a full season played through the real engine on divvied r
 
 ### The schedule contract — THE CONFERENCE SLATE (rewritten at S93; mirrored by `tools/schedule_oracle.py`, whose docstring is the authoritative spec)
 
-★ **S93 — A SEASON IS THE CONFERENCE SLATE AND NOTHING ELSE** (Emmett, 2026-08-02: *"we don't care about a 'season' right now, we care about games being scheduled"*). The pre-S93 contract — 30 games as a flat 16 conference plus 14 non-conference, exactly 15 home and 15 away — is **gone, not amended**. Every non-conference construction that served it (the 14-regular ring circulant, the conflict queue, the double-edge repair, the 20-attempt retry, and the entire RNG stream that existed to feed them) is **deleted**. The old graph was a placeholder with no dates, no geography and no opinion about who plays whom, so there was nothing in it worth preserving. ★ **S101 opened the real non-conference arc** — classes and requests shipped (see "Non-conference — classes and requests" below); the matching (S102), the schedule's season-to-season memory, the sites and the dates are arc sessions 2–5 (O-92).
+★ **S93 — A SEASON IS THE CONFERENCE SLATE AND NOTHING ELSE** (Emmett, 2026-08-02: *"we don't care about a 'season' right now, we care about games being scheduled"*). The pre-S93 contract — 30 games as a flat 16 conference plus 14 non-conference, exactly 15 home and 15 away — is **gone, not amended**. Every non-conference construction that served it (the 14-regular ring circulant, the conflict queue, the double-edge repair, the 20-attempt retry, and the entire RNG stream that existed to feed them) is **deleted**. The old graph was a placeholder with no dates, no geography and no opinion about who plays whom, so there was nothing in it worth preserving. ★ **S101 opened the real non-conference arc** — classes and requests (S101), the matching (S102), and contracts with the pairing log (S103) have shipped (see the three "Non-conference" sections below); the showcase/event pool, the shelf and the odds, sites and nights, and the Independents complete the arc (O-92), with the repeat ceiling and the recency demotion a small session reading the S103 log.
 
 Three consequences follow, all honest, none of them defects:
 
@@ -8640,7 +8640,7 @@ Three consequences follow, all honest, none of them defects:
 - **Fingerprint:** `gameIndex|kind|homeId|awayId` per line in schedule order (never re-sorted), UTF-8, SHA-256 lowercase hex — printed on the page, asserted by Phase 55 and Phase 84 against the oracle export. `kind` is always `conf` today; the field stays because Session 94 will add to it. Everything compared is an integer or a string, so parity is **exact** with no tolerance: "close" has no meaning for who hosts, and S81.3's ULP lesson is about floating point, which this surface has none of.
 - **Engine seeds:** `base = unchecked((int)seasonSeed)`; game g gets resolver `base + 2g`, governor `base + 2g + 1`. The stride-2 fan-out keeps the resolver and governor seed sets disjoint (the committed gen runner's stride-1 shape lets game i's governor seed equal game i+1's resolver seed — the season does not inherit that wrinkle; `gen` is untouched).
 
-### Non-conference — classes and requests (S101; arc session 1 of 5, O-92)
+### Non-conference — classes and requests (S101; arc session 1, O-92)
 
 ★ **EVERY SCHOOL GETS A CLASS AND A REQUEST; NOTHING IS SCHEDULED.** The request is three counts of ordinary non-conference **games** to arrange — home, neutral, road — computed by `BuildNonConferenceRequests(WorldFile, EventSeatingOutcome)` in `Program.Season.NonConference.cs`. The seam is **pure by signature** (no seed, no RNG, no history), called in `RunSeasonCore` between `MteSeatSeason` and `BuildSeasonSchedule`, and read by nothing downstream — it rides out on the outcome like Memory/Rotation/Events and reaches only the page and Phase 92. That construction is what makes the zero path free: the season is byte-identical to pre-S101 with the page block removed (Phase 92 C9 asserts the full bundle, including the results+possessions fingerprint, against pre-S101 goldens).
 
@@ -8650,9 +8650,9 @@ Three consequences follow, all honest, none of them defects:
 
 ★ **THE STANDING FINDING THE PAGE PRINTS: THE COUNTRY DOES NOT BALANCE.** Stock world: home 1,666, neutral 223, road 2,024 — `HostGap = +358`. Every hosted game needs one host and one traveler, so ~179 games must be hosted by schools that wanted the road; under the bottom-hosts-bottom ruling those land on the 60 Selling schools at ~3 extra home games each. **This is output, not defect** — the class curve is deliberately open (brief §8.1) for Emmett to settle by reading this page, and no build may tune the bands to close the gap. Phase 92 asserts wiring and arithmetic on the report object only; no class count, average, or gap value is ever suite-asserted.
 
-★ **RULINGS GOVERNING ARC SESSIONS 3–5** (all on the board, C-36..C-40): non-D1 opponents deferred to the D2/D3 layer; off-campus series carry no forward debt — a series is one game or two agreed up front, never an obligation into an unguaranteed future. Bottom-hosts-bottom (C-37) and the geographic tilt (C-40) were **consumed by S102** — see the section below.
+★ **RULINGS GOVERNING THE REST OF THE ARC** (all on the board, C-36..C-40): non-D1 opponents deferred to the D2/D3 layer. Bottom-hosts-bottom (C-37) and the geographic tilt (C-40) were **consumed by S102**. ★ **C-38 ("off-campus series carry no forward debt") IS SUPERSEDED BY R22, not quietly dropped** — it was ruled for an engine that could not remember anything, and it is the wrong call for one that can; a contract is precisely a forward debt (S103, the contracts section below).
 
-### Non-conference — the matching (S102; arc session 2 of 5, O-92)
+### Non-conference — the matching (S102; arc session 2, O-92)
 
 ★ **EVERY SCHOOL'S NOVEMBER PAIRS; NO SITE AND NO NIGHT.** `BuildNonConferenceMatching(WorldFile, NonConferenceReport)` in `Program.Season.Matching.cs` turns S101's counts into named opponents: who plays whom, who hosts, which games are neutral. No date, no city, no `SeasonGame`, no possession — arc session 4. The seam is **pure and total** — the world and the report in, a matching out, no seed, no RNG, no clock, no config — called in `RunSeasonCore` immediately after `BuildNonConferenceRequests` and read by nothing downstream, so the zero path stays free by construction (Phase 93 C9 asserts conference, dated, tournament-games and results+possessions fingerprints against pre-S102 goldens).
 
@@ -8662,7 +8662,7 @@ Three consequences follow, all honest, none of them defects:
 
 ★ **THE FOUR PHASES, IN ORDER.** **(1) Top-down fill** — R4 as a pick order: Marquee → Solid → Working → Selling, inside a class by prestige then id, inside a school Easy first (buy-game demand claims scarce cupcake road capacity before showcase requests do). Each request takes the minimum by `(DistanceKey, prestige, id)`. **(2) Neutral pairing** — closest prestige first, then distance; a token with no partner (odd national parity or a legality dead end) **converts to an unrestricted home request and re-enters phase 1 immediately** rather than being discarded. **(3) Bottom hosts bottom** (C-37) — leftover road games pair off and **the lower-prestige school hosts; equal prestige, the lower id.** Both sides spend a road token, so **a filler host's site mix moves and its game count does not**: it is on target, never over. **(4) Terminal repair** — anything still short is closed by a bounded **+1** game whose partner **hosts**, is preferred Selling then up the ladder, and is **used at most once**. No minimum-terminal claim is made.
 
-★ **LEGALITY, THE SAME FIVE TESTS EVERYWHERE:** different school, different conference, the unordered pair unused, the candidate holds the needed capacity, and the candidate has an S101 request. **The Independents are absent from every phase including the terminal partner pool** — a school with no target cannot be handed an over-target game. *Recorded for arc session 5: when they join, the different-conference test must EXEMPT their shared container — R13 says they are fourteen strangers in one bucket, not league-mates.*
+★ **LEGALITY, THE SAME FIVE TESTS EVERYWHERE:** different school, different conference, the unordered pair unused, the candidate holds the needed capacity, and the candidate has an S101 request. **The Independents are absent from every phase including the terminal partner pool** — a school with no target cannot be handed an over-target game. *Recorded for the Independents session: when they join, the different-conference test must EXEMPT their shared container — R13 says they are fourteen strangers in one bucket, not league-mates. S103's contract wall already rules this way: two Independents are NOT conference mates for termination.*
 
 ★ **COMPLETES OR REPORTS; INFEASIBILITY NEVER THROWS.** The result carries the completed pairing list, every unrepaired token with its owner, and the ledger — a structured shortfall (C13 constructs a world where no legal pair exists at all and asserts the page still renders).
 
@@ -8688,11 +8688,103 @@ two sets genuinely differ (Phase 93 C15 asserts exactly that, plus that the page
 
 ★ **THE MATCHER IS STATELESS, AND THAT IS A PLACEHOLDER RATHER THAN A PROPERTY.** The map never moves and
 the ordering keys are fixed, so with static prestige a school plays very nearly the same November every year
-— Oklahoma State draws Oral Roberts and Tulsa every season and never meets UC Davis once. **Arc session 3
-("the schedule breathes") replaces this**, with recency demotion slotting in FRONT of the §4 ordering keys
-and touching nothing else, a proximity-weakened cooldown, and a reach grab — all keyed on a **portable
-integer hash of (season, school, request) rather than a seed**, so determinism becomes "nothing random beyond
-the season's own identity" and this section's parity guarantees survive intact.
+— Oklahoma State draws Oral Roberts and Tulsa every season and never meets UC Davis once. **The schedule-
+breathes session replaces this** — recency demotion slotting in FRONT of the §4 ordering keys and touching
+nothing else, a proximity-weakened cooldown, and a reach grab, all keyed on a **portable integer hash of
+(season, school, request) rather than a seed**, so determinism becomes "nothing random beyond the season's
+own identity" and this section's parity guarantees survive intact. ★ **S103 built the memory it reads**: the
+pairing log now persists every non-conference pairing per season (see the contracts section below), which is
+what turns that session from a persistence build into a small ordering change.
+
+### Non-conference — contracts and the pairing log (S103; arc session 3, O-92)
+
+★ **THE ENGINE KEEPS PROMISES IT CANNOT YET MAKE.** A contract — home-and-home, 2-for-1, five-in-eight,
+neutral series — is **two schools, an explicit executor, an ordered list of legs, and a window** (R22, one
+general shape for every form). It persists in the season record, is exercised before anything else touches a
+school's slate (R23), and dies by exactly two rules that both fail closed (R24). **Nothing in the engine
+signs a contract** — negotiation is a future, coach-adjacent session; fixture-authored contracts prove the
+honouring. The design authority is `docs/contracts-design-brief.md` (r3). Code: `Program.Season.Contracts.cs`
+(the object, the validator, the pure season step, the rollover, serialization, the page); Phase 94.
+
+★ **WHY THIS CAME BEFORE THE REST OF THE SCHEDULER** (brief §0, Emmett's re-order): a home-and-home is a
+season-N decision that binds season N+1, and a scheduler built against a world where nothing is inherited
+hands Duke a clean slate every year. The layer that carries state across seasons must exist before the layer
+that consumes it. One persisted change also serves three features — contracts, the repeat ceiling, the
+recency demotion.
+
+★ **THE LEG LIST PERSISTS; `gamesRemaining` IS DERIVED, NEVER STORED** (r3 correction). A stored count and a
+leg list can disagree, and the disagreement surfaces seasons later — the executor chooses WHICH leg, so only
+the list can say which legs survive. Each leg carries a stable id (unique within its contract), the authored
+order **stored explicitly** (it is the choice tie-breaker, and array position silently changes the rule the
+day something sorts the list), the site **as a word** — `Home` with a named host, or `Neutral` with no host
+field at all, so "nobody hosts" can never be confused with "somebody forgot to write it" — and a status word
+`Outstanding`/`Completed`. Completed legs stay in the list while the contract lives: they are how the page
+says "two of five played, one in Tulsa."
+
+★ **THE WINDOW MACHINE — spec `tools/contracts_oracle.py`, its docstring the authority, golden replayed by
+Phase 94 C1.** The window includes the current season and decrements at ROLLOVER, after the decision, never
+before it (the other convention forces season one of a three-in-four and makes every exact-window contract
+infeasible). **Forced iff outstanding legs == window remaining**; decline freely below the diagonal. This
+guarantees every contract completes inside its window under every policy, forcing follows the LIVE ratio
+(five-in-eight declining forces in season 4; exercise once early and it forces in season 5), and **no
+surviving contract is ever written forward with window < 1** — a zero on disk is damage, not a state. All
+integers; parity is exact, never ULP-bounded.
+
+★ **THE SEASON, IN ORDER (R23a): terminate → discover → reserve → validate globally → commit → optionals.**
+Same-conference termination runs BEFORE any exercise, so an equality-forced contract is never exercised
+through the wall (two Independents are NOT league-mates — the games==0 conference dictates nothing). Forced
+legs are never placed before the engine knows they ALL fit: place-then-validate produces an order-dependent
+partial schedule, so every forced leg is reserved against BOTH schools and validated against total open games
+— the only hard bound, since S101's split is derived, not a cap. **On overload: ONE hard world-state failure,
+nothing committed, and the transition FREEZES** — no decrement, or the broken world would also manufacture a
+corrupt record. Optionals evaluate after, in ascending `ContractId` — a canonical order, because two options
+wanting one last opening cannot resolve order-independently. Three distinct diagnostics, never collapsed:
+forced-over-capacity (hard failure), option capacity-blocked (stays live, still rolls), option
+policy-declined. The step is **pure over supplied state**, so phase ownership is a property of the spine.
+
+★ **LEG CHOICE applies to every exercised contract — forced decides WHETHER, never HOW**: injected explicit
+choice (the seam a human-run program uses later; an injection selects the leg AND exercises) → the executor's
+home leg → neutral → the away leg, authored order breaking ties. The away leg drifts to the end under the
+placeholder — accepted as realistic (r3). The optional policy ships as an R8 constant (decline until forced)
+that coach temperament inherits.
+
+★ **WHAT A CONTRACTED GAME COSTS — Emmett's rulings, 2026-08-05.** A contracted game is one of the games the
+school already wanted, not an eleventh home date: **each exercised leg is charged against the bucket it
+belongs to, after the ordinary S101 split** — a hosted leg out of home, an away leg out of road, a neutral
+leg out of neutral. ★ **And when the school has no road games — 21 of 333 on stock, all Marquee in 18/20-game
+leagues — the away leg costs a HOME date**: that date was spent traveling instead of hosting. Chain tails
+beyond the ruled steps (a Claude call, flagged at delivery): hosted → road → neutral; away → home → neutral;
+neutral → road → home. The counts the matcher reads are post-charge, so a contracted pairing stays out of the
+request pool by arithmetic; the pair also seeds the matcher's used set before any phase runs, so **the
+matcher cannot rematch, reject or drop a guaranteed game** while its four phases, five legality tests, ledger
+and both conservation identities stay untouched — the contracted pairs are not tokens and appear in no
+identity.
+
+★ **THE RECORD IS FORMAT v2, AND THE READER ACCEPTS {1, 2}.** Two collections, never one: the **live-contract
+collection** (mutable forward state — season N+1's record carries its own complete state; executing a season
+never reopens an earlier record, proven with the older record deleted) and the **pairing log** (append-only
+paired facts: the normalised pair, the site word, the host when hosted, and a source word
+`Matched`/`Contracted` so a future repeat ceiling cannot demote a pair a contract forces — a Claude call,
+flagged). Honest naming: these are games as PAIRED; non-conference games do not yet play. Both arrays are
+written even when empty — **absence is damage, never emptiness** — and a v1 record is a pre-contract career
+that reads as EMPTY, never as unknown, keeping its whole tournament memory. "Archive" means removal: completed
+and dead contracts are simply omitted from the survivors; no third collection exists.
+
+★ **BOTH DEATHS FAIL CLOSED (R24), AND NEITHER IS SILENT.** Conference mates terminate hard — remaining legs
+void, reported once, the contract not written forward. A damaged record drops the collection and reports a
+**collection-level loss, never a named pairing it could not read** — naming one would require the partial
+salvage that failing closed forbids. Terminated contracts are reported by the season that killed them, then
+gone (the journal keeps them; the record does not carry state the engine must remember to ignore).
+
+★ **THE PAGE** speaks for exactly three reasons — contracts existed, the collection was lost, or forced
+obligations exceeded capacity — and is otherwise silent, which is what keeps every zero-path byte-identity
+claim honest: legacy runs, first seasons and empty collections print nothing, and the stock world (which
+authors no contracts) is line-for-line unchanged.
+
+★ **STILL OPEN HERE:** anything that CREATES a contract (behavioural, coach-adjacent); the repeat ceiling and
+recency demotion (now a small session — the log they read exists); the semi-home (a third site word the
+format is ready for — the sites session's ruling); and the shelf/odds inversion C-41 names, knowingly left
+standing two more sessions.
 
 ### The engine-game path: one construction site, two callers
 
@@ -8714,7 +8806,7 @@ Identity block (world, seed, **schedule fingerprint**, and a schedule line that 
 
 ### Deferred out of this pass
 
-Home-court advantage **SHIPPED IN S95** — see "Home court — the road penalty" below; what remains deferred there is the crowd model itself (prestige and distance, R4) and the per-team emergent magnitude (R7); real scheduling texture — **non-conference play, arc OPENED at S101 and matching SHIPPED at S102** (classes and requests, then who plays whom and who hosts — see the two "Non-conference" sections above; the schedule's season-to-season memory, sites and nights, and the Independents are arc sessions 3–5 under O-92), dates and travel (S95), the stored memory of who hosted last time (**SHIPPED IN S96** — see "Host memory" below), buy games, and conference tournaments; the postseason (Pass 2 ends at the regular-season table); persistence of results (a season is recomputed, never saved — the save-format discipline arrives with the career layer per the standing note); the prestige dynamics reading these standings (Pass 3, next per the arc map); and calibration tuning itself — whose measuring stick Session 31 built (the section below) and whose standing precondition, a living varied population, this pass satisfies. **Per-player season statistics were deferred out of this pass and SHIPPED IN S77** — see "The season stat layer" below; what remains deferred there is per-GAME retention (game logs, splits, streaks).
+Home-court advantage **SHIPPED IN S95** — see "Home court — the road penalty" below; what remains deferred there is the crowd model itself (prestige and distance, R4) and the per-team emergent magnitude (R7); real scheduling texture — **non-conference play, arc OPENED at S101; matching SHIPPED at S102, contracts and the pairing log at S103** (see the three "Non-conference" sections above; the showcase/event pool, the shelf and the odds, sites and nights, and the Independents remain under O-92), dates and travel (S95), the stored memory of who hosted last time (**SHIPPED IN S96** — see "Host memory" below), buy games, and conference tournaments; the postseason (Pass 2 ends at the regular-season table); persistence of results (a season is recomputed, never saved — the save-format discipline arrives with the career layer per the standing note); the prestige dynamics reading these standings (Pass 3, next per the arc map); and calibration tuning itself — whose measuring stick Session 31 built (the section below) and whose standing precondition, a living varied population, this pass satisfies. **Per-player season statistics were deferred out of this pass and SHIPPED IN S77** — see "The season stat layer" below; what remains deferred there is per-GAME retention (game logs, splits, streaks).
 
 # The season stat layer — per-player season records, keyed by the person (Session 77, 2026-07-26)
 
@@ -11004,6 +11096,11 @@ no enumeration, written only when a career is attached. Every display fact is **
 tier, place name, dates, school names), because a permanent history page must never need the current world
 to reconstruct what it said years ago. `playStatus` is an extensible string — `NotPlayed` at S97,
 and **S98 added `Completed` with no format break**, exactly as the extensibility was there for.
+★ **S103 bumped the record to format v2** — two new collections, `liveContracts` (mutable forward state) and
+`nonConferencePairings` (this season's paired facts), always written even when empty. **The reader accepts
+BOTH versions {1, 2}**: a v1 record is a pre-contract career that keeps its whole tournament memory and reads
+as an empty contract collection — bumping the constant without widening the read would have silently erased
+every existing career's four-year rule with every check green (Phase 88 C6f now asserts the v1 arm directly).
 
 ★ **THE RECORD BINDS TO THE CAREER, NOT THE WORLD.** A record cannot both survive world edits and be
 rejected whenever the world changes. `formatVersion`, `historyId` and the embedded `seasonId` are
