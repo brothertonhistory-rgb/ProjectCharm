@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using Charm.Engine;
 using Charm.History;
 
 namespace Charm.Harness;
@@ -151,6 +152,68 @@ internal static partial class Program
         _ => null,
     };
 
+    /// <summary>★ S104 — HOW FAR THIS SEAT HAD TO REACH, and it is an ORTHOGONAL dimension to
+    /// the fallback above rather than four more fallback words.
+    ///
+    /// <para>Fusing them would multiply the vocabulary combinatorially (Band-at-Plus200,
+    /// BandAndScope-at-Plus400, …) and — worse — would make the existing lenient
+    /// <see cref="MteFallbackFromWord"/> silently read every one of the new compound words as
+    /// <c>None</c>. Two independent facts, stored as two independent words.</para>
+    ///
+    /// <para><c>National</c> is what every tournament and every National-drawn showcase
+    /// records: the seat had no radius to widen, which is a different fact from "the seat
+    /// found somebody at the authored radius".</para></summary>
+    private enum EventSeatRadiusStep
+    {
+        National = 0,
+        Base = 1,
+        Plus200 = 2,
+        Plus400 = 3,
+    }
+
+    /// <summary>★ R28(c) — the radius widens in AUTHORED STEPS and never goes national.
+    /// Offsets in miles from the event's authored draw.</summary>
+    private static readonly int[] MteRadiusStepOffsets = { 0, 200, 400 };
+
+    private static string MteRadiusStepWord(EventSeatRadiusStep s) => s switch
+    {
+        EventSeatRadiusStep.Base => "Base",
+        EventSeatRadiusStep.Plus200 => "Plus200",
+        EventSeatRadiusStep.Plus400 => "Plus400",
+        _ => "National",
+    };
+
+    /// <summary>★ STRICT, unlike <see cref="MteFallbackFromWord"/> — and the asymmetry is
+    /// deliberate rather than an inconsistency. The fallback reader is lenient because it
+    /// must keep reading pre-S104 records that legitimately predate several of its words; the
+    /// radius reader is new, so every value it will ever see was written by this code, and an
+    /// unrecognised word there means the file is damaged. Absence is NOT damage: a pre-S104
+    /// record has no radius field and its seats were National, which is what it says.</summary>
+    private static EventSeatRadiusStep MteRadiusStepFromWord(string? w) => w switch
+    {
+        null => EventSeatRadiusStep.National,
+        "National" => EventSeatRadiusStep.National,
+        "Base" => EventSeatRadiusStep.Base,
+        "Plus200" => EventSeatRadiusStep.Plus200,
+        "Plus400" => EventSeatRadiusStep.Plus400,
+        _ => throw new InvalidOperationException($"unknown radius step word '{w}'"),
+    };
+
+    /// <summary>The page's word for a seat that had to widen. Silent at the authored radius
+    /// and silent for National — a note exists to say something happened.</summary>
+    private static string? MteRadiusStepPageNote(EventSeatRadiusStep s) => s switch
+    {
+        EventSeatRadiusStep.Plus200 => "+200mi",
+        EventSeatRadiusStep.Plus400 => "+400mi",
+        _ => null,
+    };
+
+    /// <summary>★ The same quantisation the matcher uses (<c>MatchDistanceKey</c>): floor of
+    /// miles plus a half, NOT <c>Math.Round</c>, which is ties-to-even. One ruler for the
+    /// whole engine, so a school 300.4 miles out is inside a 300-mile draw here exactly as it
+    /// would be anywhere else.</summary>
+    private static int MteDistanceKey(double miles) => (int)Math.Floor(miles + 0.5);
+
     private enum EventSeatingStatus { Complete, SeatedShort }
 
     /// <summary>★ Whether the field has PLAYED, which is a different question from whether it
@@ -160,12 +223,74 @@ internal static partial class Program
     private const string MtePlayStatusNotPlayed = "NotPlayed";
 
     private sealed record EventSeat(
-        int Seat, int SchoolId, string SchoolName, int SlotIndex, EventSeatFallback Fallback);
+        int Seat, int SchoolId, string SchoolName, int SlotIndex, EventSeatFallback Fallback,
+        EventSeatRadiusStep RadiusStep = EventSeatRadiusStep.National);
 
+    /// <summary>★ S104 — <c>Kind</c> travels with the seated event because every downstream
+    /// consumer needs it and NONE of them may infer it. A four-seat field is a showcase or a
+    /// four-team bracket depending on this word and on nothing else; inferring it from
+    /// <c>FieldSize</c> is precisely the bug A3 exists to prevent.</summary>
     private sealed record SeatedEvent(
         int EventId, string Name, int Tier, int PlaceId, string PlaceName,
         string FirstDay, string LastDay, int FieldSize,
-        EventSeatingStatus SeatingStatus, IReadOnlyList<EventSeat> Seats);
+        EventSeatingStatus SeatingStatus, IReadOnlyList<EventSeat> Seats,
+        string Kind = WorldEventKindTournament, int? Draw = null)
+    {
+        public bool IsShowcase => string.Equals(Kind, WorldEventKindShowcase, StringComparison.Ordinal);
+    }
+
+    /// <summary>★ S104 — ONE OF A SHOWCASE'S TWO GAMES, MATERIALIZED AT SEATING and long
+    /// before anything plays. This is the whole point of separating materialization from
+    /// simulation: the fixed obligation must EXIST before requests are built, because it is
+    /// what a school's November is charged for.
+    ///
+    /// <para>★ R27 — the roles come from the STORED SEAT NUMBERS. Game 0 is seats 1 and 2,
+    /// the headliner; game 1 is seats 3 and 4, the undercard. Never list position, never
+    /// prestige-sorting, and never re-derived from a result — an upset must not relabel which
+    /// game was authored as the nightcap.</para></summary>
+    private sealed record ShowcasePairing(
+        int EventId, int GameIndex, int SeatA, int SeatB, int SchoolAId, int SchoolBId);
+
+    /// <summary>The two pairings a COMPLETE showcase owes, read off the stored seats. A short
+    /// showcase owes none at all (R30), which is why this is only ever called on a field that
+    /// completed.</summary>
+    private static IReadOnlyList<ShowcasePairing> MteShowcasePairingsOf(SeatedEvent e)
+    {
+        if (!e.IsShowcase || e.SeatingStatus != EventSeatingStatus.Complete)
+            return Array.Empty<ShowcasePairing>();
+        var bySeat = e.Seats.ToDictionary(s => s.Seat);
+        if (!bySeat.ContainsKey(1) || !bySeat.ContainsKey(2)
+            || !bySeat.ContainsKey(3) || !bySeat.ContainsKey(4))
+            throw new InvalidOperationException(
+                $"SHOWCASE INVARIANT VIOLATED: {e.Name} is complete but does not hold seats 1-4; " +
+                "the two games are named by stored seat number and cannot be assembled.");
+        return new[]
+        {
+            new ShowcasePairing(e.EventId, 0, 1, 2, bySeat[1].SchoolId, bySeat[2].SchoolId),
+            new ShowcasePairing(e.EventId, 1, 3, 4, bySeat[3].SchoolId, bySeat[4].SchoolId),
+        };
+    }
+
+    /// <summary>Every showcase pairing this season owes, in the canonical (tier, id, game)
+    /// order. The one place anything downstream asks "what did the showcases commit to".</summary>
+    private static IReadOnlyList<ShowcasePairing> MteAllShowcasePairings(EventSeatingOutcome seating)
+        => seating.Active.OrderBy(e => e.Tier).ThenBy(e => e.EventId)
+                  .SelectMany(MteShowcasePairingsOf).ToList();
+
+    /// <summary>★ How many showcase games each school owes this season — 0 or 1, because R25
+    /// caps a school at one showcase. Read by the contract phase (so its capacity gate sees a
+    /// fixed obligation that already exists) and by the request builder (so the game is
+    /// charged rather than added).</summary>
+    private static IReadOnlyDictionary<int, int> MteShowcaseObligations(EventSeatingOutcome seating)
+    {
+        var obligations = new Dictionary<int, int>();
+        foreach (var p in MteAllShowcasePairings(seating))
+        {
+            obligations[p.SchoolAId] = obligations.GetValueOrDefault(p.SchoolAId, 0) + 1;
+            obligations[p.SchoolBId] = obligations.GetValueOrDefault(p.SchoolBId, 0) + 1;
+        }
+        return obligations;
+    }
 
     private sealed record DormantEvent(int EventId, string Name);
 
@@ -272,6 +397,20 @@ internal static partial class Program
         var capKeyOf = pool.ToDictionary(s => s.Id, s => MteConferenceCapKey(s, confById[s.ConferenceId]));
         var scopeOf = pool.ToDictionary(s => s.Id, s => tierById[confById[s.ConferenceId].TierId].EventScope);
 
+        // ★ S104 — HAS THIS SCHOOL GOT A GAME TO GIVE? A showcase invitation costs one of the
+        //   school's own games (R26), so a school with no open game cannot accept one. The
+        //   floor is computed PESSIMISTICALLY — as if the school will also take a tournament
+        //   seat — because seating order means a showcase can be offered before we know
+        //   whether a later tournament will claim the same school, and a capacity answer that
+        //   changes depending on what happens next is not an answer.
+        //
+        //   (28 − conference games) is that floor: a tournament-seated school plays 31 and
+        //   spends 3 in its event, which is one FEWER open game than staying home with 29.
+        //   No committed world comes near zero; this is the guard, not a live constraint.
+        var openFloorOf = pool.ToDictionary(
+            s => s.Id,
+            s => NonConSeasonGamesSeated - NonConEventGames - confById[s.ConferenceId].Games);
+
         var active = new List<WorldEvent>();
         var dormant = new List<DormantEvent>();
         foreach (var e in world.Events.OrderBy(e => e.Id))
@@ -287,85 +426,186 @@ internal static partial class Program
             else dormant.Add(new DormantEvent(e.Id, e.Name));
         }
 
-        var seatedThisSeason = new HashSet<int>();
+        // ★ S104 / R25 — TWO WALLS, ONE PER KIND. A school may play one tournament AND one
+        //   showcase in the same season; it may never play two of either.
+        var seatedByKind = new Dictionary<string, HashSet<int>>(StringComparer.Ordinal)
+        {
+            [WorldEventKindTournament] = new(),
+            [WorldEventKindShowcase] = new(),
+        };
+        // ★ THE DOUBLE-BOOKING EXCLUSION, newly possible because of R25. A school's
+        //   tournament window and its showcase day can now collide, and nobody is in two
+        //   places on one night. Seating order — (tier, id) — is the deterministic priority:
+        //   whoever seats first keeps the school, and the later event looks elsewhere.
+        //   Emmett's ruling (2026-08-06): "teams have to make choices."
+        var seatedWindows = new Dictionary<int, List<(DateOnly First, DateOnly Last)>>();
         var seatedEvents = new List<SeatedEvent>();
 
         foreach (var e in active.OrderBy(x => x.Tier).ThenBy(x => x.Id))
         {
+            var eventFirst = MteWindowDate(e.FirstDay);
+            var eventLast = MteWindowDate(e.LastDay);
+            var wall = seatedByKind[e.Kind];
+
+            // ★ THE DRAW, resolved once per event. National events compute nothing at all,
+            //   which is what keeps every pre-S104 world's seating byte-identical: no
+            //   distance is measured, so no distance can round differently.
+            Dictionary<int, int>? distanceKey = null;
+            if (e.Draw is not null)
+            {
+                var home = placeById[e.PlaceId].Coordinate;
+                distanceKey = pool.ToDictionary(
+                    s => s.Id,
+                    s => MteDistanceKey(GeoDistance.DistanceMiles(home, placeById[s.PlaceId].Coordinate)));
+            }
+
+            // ★ R28(c) — the radius steps, in order. A National event has exactly ONE step
+            //   and it filters nothing; a radius event runs authored → +200 → +400 and then
+            //   seats short. It never goes national: locality survives a bad year, and the
+            //   bad year is visible instead of Arizona playing in Brooklyn.
+            var radiusSteps = e.Draw is { } authored
+                ? MteRadiusStepOffsets
+                    .Select((off, i) => ((EventSeatRadiusStep)(i + 1), authored + off)).ToArray()
+                : new[] { (EventSeatRadiusStep.National, int.MaxValue) };
+
             var seats = new List<EventSeat>();
             var capKeysInField = new HashSet<long>();
+            // ★ R30 — PROVISIONAL. Seats accumulate here and reach the season-wide wall only
+            //   when the field completes. For a TOURNAMENT the commit below is unconditional,
+            //   which reproduces S97's per-seat immediate add exactly: within one field this
+            //   set stands in for those adds, and across fields the commit happens before the
+            //   next event begins. For a SHOWCASE a short field releases everything.
+            var pending = new HashSet<int>();
 
             for (var slotIndex = 0; slotIndex < e.Slots.Count; slotIndex++)
             {
                 var slot = e.Slots[slotIndex];
                 EventSeat? filled = null;
 
-                for (var level = 0; level <= 3 && filled is null; level++)
+                // ★ EACH SEAT RUNS ITS OWN LADDER FROM THE AUTHORED RADIUS. One seat widening
+                //   never retroactively widens a seat that already filled — the seat that
+                //   needed the reach is the seat that records it.
+                foreach (var (stepWord, radius) in radiusSteps)
                 {
-                    var applyBand = level < 1;
-                    var applyScope = level < 2;
-                    var applyFourYear = level < 3;
-
-                    // ★ RECOMPUTED FROM THE FULL POOL AT EVERY LEVEL, never narrowed down
-                    //   from the previous level's survivors. Relaxing the band must be able
-                    //   to admit a school the band excluded, which a progressive filter
-                    //   could never do.
-                    var qualifiers = new List<WorldSchool>();
-                    foreach (var s in pool)
+                    // ★ THE BAND EXHAUSTS INSIDE EACH RADIUS STEP BEFORE THE NEXT OPENS
+                    //   (R28c): a local showcase invites a weaker neighbour before it ever
+                    //   reaches further. R31 — the full ladder runs to the floor, four-year
+                    //   rule included, before the radius widens.
+                    for (var level = 0; level <= 3 && filled is null; level++)
                     {
-                        if (seatedThisSeason.Contains(s.Id)) continue;             // absolute 1
-                        if (capKeysInField.Contains(capKeyOf[s.Id])) continue;     // absolute 2
-                        if (applyFourYear && history.SeatedInEvent.Contains((e.Id, s.Id))) continue;
-                        if (applyScope && slot.Scope != "any" && scopeOf[s.Id] != slot.Scope) continue;
-                        if (applyBand && (s.CurrentPrestige < slot.BandLo || s.CurrentPrestige > slot.BandHi)) continue;
-                        qualifiers.Add(s);
-                    }
-                    if (qualifiers.Count == 0) continue;
+                        var applyBand = level < 1;
+                        var applyScope = level < 2;
+                        var applyFourYear = level < 3;
 
-                    // ★ THE SOFT PREFERENCE, APPLIED AT EVERY LEVEL INCLUDING THE LAST.
-                    //   Fewest recent appearances wins outright, and the pull below only
-                    //   chooses among schools who are equally overdue. Emmett's ruling
-                    //   (2026-08-03): this stays. An MTE is something a programme does every
-                    //   few years rather than annually, and the national turn-taking is what
-                    //   expresses that. When it produced too few good teams in later seasons
-                    //   the cause was the EVENTS ASKING TOO HIGH — hoovering up every elite
-                    //   programme in one year and starving the next — not the rule.
-                    var fewest = qualifiers.Min(s => history.Appearances.GetValueOrDefault(s.Id, 0));
-                    var preferred = qualifiers
-                        .Where(s => history.Appearances.GetValueOrDefault(s.Id, 0) == fewest)
-                        .ToList();
-
-                    // ★ THE PULL. Draw MteSeatPull times and seat the strongest drawn — an
-                    //   event reaching for the best team it is allowed to take, without ever
-                    //   being guaranteed it.
-                    var pick = preferred[0];
-                    if (preferred.Count > 1)
-                    {
-                        var best = -1;
-                        for (var k = 0; k < seatPull; k++)
+                        // ★ RECOMPUTED FROM THE FULL POOL AT EVERY LEVEL, never narrowed down
+                        //   from the previous level's survivors. Relaxing the band must be able
+                        //   to admit a school the band excluded, which a progressive filter
+                        //   could never do.
+                        var qualifiers = new List<WorldSchool>();
+                        foreach (var s in pool)
                         {
-                            var idx = (int)(MteHash64(seasonSeed, MteSeatDomain, e.Id, slotIndex, level, k)
-                                            % (ulong)preferred.Count);
-                            if (best < 0 || MteStronger(preferred[idx], preferred[best])) best = idx;
-                        }
-                        pick = preferred[best];
-                    }
+                            // ── THE HARD CONSTRAINTS. None of these gives at any radius step
+                            //    or any fallback level.
+                            if (wall.Contains(s.Id) || pending.Contains(s.Id)) continue;  // absolute 1, per kind
+                            if (capKeysInField.Contains(capKeyOf[s.Id])) continue;        // absolute 2
+                            if (MteWindowTaken(seatedWindows, s.Id, eventFirst, eventLast)) continue;
+                            // ★ Open-game capacity — HARD, and it gives at no radius step and
+                            //   no fallback level. A school with nothing to spend cannot be
+                            //   invited to spend it.
+                            if (e.IsShowcase && openFloorOf[s.Id] < 1) continue;
+                            // ★ Geography must be PRESENT: an event that measures distance
+                            //   cannot seat a school it cannot locate. The world validator
+                            //   guarantees every school's place exists, so a miss here is an
+                            //   invariant failure rather than a case.
+                            if (distanceKey is not null && distanceKey[s.Id] > radius) continue;
 
-                    filled = new EventSeat(
-                        seats.Count + 1, pick.Id, pick.Name, slotIndex, (EventSeatFallback)level);
-                    seatedThisSeason.Add(pick.Id);
-                    capKeysInField.Add(capKeyOf[pick.Id]);
+                            // ── THE SOFT LADDER, in the ruled order.
+                            if (applyFourYear && history.SeatedInEvent.Contains((e.Id, s.Id))) continue;
+                            if (applyScope && slot.Scope != "any" && scopeOf[s.Id] != slot.Scope) continue;
+                            if (applyBand && (s.CurrentPrestige < slot.BandLo || s.CurrentPrestige > slot.BandHi)) continue;
+                            qualifiers.Add(s);
+                        }
+                        if (qualifiers.Count == 0) continue;
+
+                        // ★ THE SOFT PREFERENCE, APPLIED AT EVERY LEVEL INCLUDING THE LAST.
+                        //   Fewest recent appearances wins outright, and the pull below only
+                        //   chooses among schools who are equally overdue. Emmett's ruling
+                        //   (2026-08-03): this stays. An MTE is something a programme does every
+                        //   few years rather than annually, and the national turn-taking is what
+                        //   expresses that. When it produced too few good teams in later seasons
+                        //   the cause was the EVENTS ASKING TOO HIGH — hoovering up every elite
+                        //   programme in one year and starving the next — not the rule.
+                        var fewest = qualifiers.Min(s => history.Appearances.GetValueOrDefault(s.Id, 0));
+                        var preferred = qualifiers
+                            .Where(s => history.Appearances.GetValueOrDefault(s.Id, 0) == fewest)
+                            .ToList();
+
+                        // ★ THE PULL. Draw MteSeatPull times and seat the strongest drawn — an
+                        //   event reaching for the best team it is allowed to take, without ever
+                        //   being guaranteed it.
+                        //
+                        //   ★ THE KEY CARRIES THE RADIUS STEP, packed into the level slot as
+                        //   `level + 4*step`. The hash takes four payload fields and all four
+                        //   were already spent, so packing is how a widened seat gets its own
+                        //   stream instead of replaying the draw it just failed. National is
+                        //   step 0, so `level + 0` IS the pre-S104 key — every existing
+                        //   tournament's draw is bit-identical by construction, not by luck.
+                        var drawKey = level + 4 * (int)stepWord;
+                        var pick = preferred[0];
+                        if (preferred.Count > 1)
+                        {
+                            var best = -1;
+                            for (var k = 0; k < seatPull; k++)
+                            {
+                                var idx = (int)(MteHash64(seasonSeed, MteSeatDomain, e.Id, slotIndex, drawKey, k)
+                                                % (ulong)preferred.Count);
+                                if (best < 0 || MteStronger(preferred[idx], preferred[best])) best = idx;
+                            }
+                            pick = preferred[best];
+                        }
+
+                        filled = new EventSeat(
+                            seats.Count + 1, pick.Id, pick.Name, slotIndex,
+                            (EventSeatFallback)level, stepWord);
+                        pending.Add(pick.Id);
+                        capKeysInField.Add(capKeyOf[pick.Id]);
+                    }
+                    if (filled is not null) break;   // this seat is done; the next starts at Base
                 }
 
                 if (filled is not null) seats.Add(filled);
             }
 
             var place = placeById[e.PlaceId];
+            var status = seats.Count == e.FieldSize
+                ? EventSeatingStatus.Complete
+                : EventSeatingStatus.SeatedShort;
+
+            // ★ R30 — THE COMMIT POINT, AND IT IS THE DESIGN.
+            //   A tournament commits unconditionally: S97's behaviour, where a short field
+            //   keeps its partial seating and its schools stay consumed, is untouched.
+            //   A SHOWCASE that could not fill releases EVERYTHING — no school is consumed,
+            //   no wall spent, no four-year clock burned — which is what makes the standby
+            //   showcases real replacements rather than decoration. The record and the page
+            //   still carry the attempted seating as diagnostics; the schools keep their
+            //   season.
+            var commits = !e.IsShowcase || status == EventSeatingStatus.Complete;
+            if (commits)
+            {
+                foreach (var id in pending)
+                {
+                    wall.Add(id);
+                    if (!seatedWindows.TryGetValue(id, out var windows))
+                        seatedWindows[id] = windows = new List<(DateOnly, DateOnly)>();
+                    windows.Add((eventFirst, eventLast));
+                }
+            }
+
             seatedEvents.Add(new SeatedEvent(
                 e.Id, e.Name, e.Tier, e.PlaceId, place.Name,
                 e.FirstDay, e.LastDay, e.FieldSize,
-                seats.Count == e.FieldSize ? EventSeatingStatus.Complete : EventSeatingStatus.SeatedShort,
-                seats));
+                status, commits ? seats : Array.Empty<EventSeat>(),
+                e.Kind, e.Draw));
         }
 
         return new EventSeatingOutcome
@@ -373,6 +613,24 @@ internal static partial class Program
             Active = seatedEvents.OrderBy(x => x.Tier).ThenBy(x => x.EventId).ToList(),
             Dormant = dormant,
         };
+    }
+
+    /// <summary>★ Is this school already committed to a night inside this window? Closed
+    /// intervals, so a one-day showcase collides with a tournament exactly when its day sits
+    /// inside that tournament's window.
+    ///
+    /// <para>Only ever true ACROSS kinds in practice — the per-kind wall has already removed
+    /// same-kind repeats — but it is written generally rather than assuming that, because an
+    /// assumption about which pairs can reach here is exactly the kind of thing a later
+    /// session invalidates silently.</para></summary>
+    private static bool MteWindowTaken(
+        IReadOnlyDictionary<int, List<(DateOnly First, DateOnly Last)>> seatedWindows,
+        int schoolId, DateOnly first, DateOnly last)
+    {
+        if (!seatedWindows.TryGetValue(schoolId, out var windows)) return false;
+        foreach (var (f, l) in windows)
+            if (!(last < f || first > l)) return true;
+        return false;
     }
 
     // ── The overlap refusal ──────────────────────────────────────────────────────
@@ -664,10 +922,17 @@ internal static partial class Program
     /// force a failure at the rename without reaching for file permissions, an invalid path,
     /// OS locking or a global mutable switch — every one of which would prove something about
     /// the filesystem rather than about this method.</para></summary>
+    /// <param name="showcaseResults">★ S104 — the showcase half. A showcase COMPLETES with two
+    /// results and NO PLACEMENT: its <c>finishBySeat</c> stays null forever, which is the
+    /// honest record of an event nobody wins. The alternative the review named — synthesising
+    /// a fake placement of winner-1/loser-2 twice — passes the existing validator and quietly
+    /// invents a champion, so "played" is carried by <paramref name="seatsPlayedByEvent"/>
+    /// rather than by the presence of finishes.</param>
     private static void MteReplaceRecordWithFinishes(
         HistoryStore history, long seasonId,
         IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> finishBySeatByEvent,
         IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> seatsPlayedByEvent,
+        IReadOnlyList<ShowcaseResult>? showcaseResults = null,
         Action<string, string>? replace = null)
     {
         var final = MteRecordPathFor(history.Path, seasonId);
@@ -727,8 +992,12 @@ internal static partial class Program
         foreach (var eventId in finishBySeatByEvent.Keys)
             if (!seen.Contains(eventId))
                 Refuse($"carries no event {eventId.ToString(CultureInfo.InvariantCulture)} to finish");
+        foreach (var eventId in seatsPlayedByEvent.Keys)
+            if (!seen.Contains(eventId))
+                Refuse($"carries no event {eventId.ToString(CultureInfo.InvariantCulture)} that played");
 
-        var bytes = MteRecordBytesWithFinishes(root, finishBySeatByEvent);
+        var bytes = MteRecordBytesWithFinishes(
+            root, finishBySeatByEvent, seatsPlayedByEvent, showcaseResults);
 
         var folder = MteRecordFolderFor(history.Path);
         var temp = Path.Combine(folder, $".charm-events-{Guid.NewGuid():N}.tmp");
@@ -754,8 +1023,15 @@ internal static partial class Program
     /// session did not decide can change — including the world fingerprint, which stays
     /// provenance and stays unvalidated.</summary>
     private static byte[] MteRecordBytesWithFinishes(
-        JsonElement root, IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> finishBySeatByEvent)
+        JsonElement root,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> finishBySeatByEvent,
+        IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> seatsPlayedByEvent,
+        IReadOnlyList<ShowcaseResult>? showcaseResults)
     {
+        var resultsByEvent = (showcaseResults ?? Array.Empty<ShowcaseResult>())
+            .GroupBy(r => r.EventId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(r => r.GameIndex).ToList());
+
         using var stream = new MemoryStream();
         using (var w = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, NewLine = "\n" }))
         {
@@ -772,17 +1048,45 @@ internal static partial class Program
                 {
                     var eventId = ev.GetProperty("eventId").GetInt32();
                     finishBySeatByEvent.TryGetValue(eventId, out var finishes);
+                    // ★ PLAYED IS ITS OWN FACT, carried by the seats-played map rather than
+                    //   inferred from the presence of a placement — which is exactly how a
+                    //   showcase records "this happened, and nobody won it".
+                    var played = seatsPlayedByEvent.ContainsKey(eventId);
+                    resultsByEvent.TryGetValue(eventId, out var games);
                     w.WriteStartObject();
                     foreach (var f in ev.EnumerateObject())
                     {
                         if (string.Equals(f.Name, "playStatus", StringComparison.Ordinal))
                         {
                             w.WriteString("playStatus",
-                                finishes is null ? MtePlayStatusNotPlayed : MtePlayStatusCompleted);
+                                played ? MtePlayStatusCompleted : MtePlayStatusNotPlayed);
                         }
                         else if (string.Equals(f.Name, "finishBySeat", StringComparison.Ordinal))
                         {
-                            if (finishes is null) { w.WriteNull("finishBySeat"); continue; }
+                            if (finishes is null)
+                            {
+                                w.WriteNull("finishBySeat");
+                                // ★ The showcase's two results ride BESIDE the null placement,
+                                //   never in place of it. A reader that wants "who won the
+                                //   event" gets null and is right; a reader that wants "what
+                                //   happened that night" gets both games.
+                                if (games is not null)
+                                {
+                                    w.WriteStartArray("games");
+                                    foreach (var g in games)
+                                    {
+                                        w.WriteStartObject();
+                                        w.WriteNumber("game", g.GameIndex);
+                                        w.WriteNumber("seatA", g.SeatA);
+                                        w.WriteNumber("seatB", g.SeatB);
+                                        w.WriteNumber("scoreA", g.ScoreA);
+                                        w.WriteNumber("scoreB", g.ScoreB);
+                                        w.WriteEndObject();
+                                    }
+                                    w.WriteEndArray();
+                                }
+                                continue;
+                            }
                             // ★ An ARRAY of seat/place pairs ordered by seat, not an object with
                             //   numeric keys: the seats above are an array of objects and this is
                             //   the same fact keyed the same way, so the file stays one shape.
@@ -817,24 +1121,49 @@ internal static partial class Program
     /// <para>Page-only throughout. No field composition is ever suite-asserted.</para></summary>
     private static IReadOnlyList<string> MtePageLines(
         EventSeasonOutcome outcome,
-        IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>>? finishes = null)
+        IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>>? finishes = null,
+        IReadOnlyList<ShowcaseResult>? showcaseResults = null)
     {
         var seating = outcome.Seating;
         if (seating.PoolIsEmpty) return Array.Empty<string>();
+
+        var resultsByEvent = (showcaseResults ?? Array.Empty<ShowcaseResult>())
+            .GroupBy(r => r.EventId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(r => r.GameIndex).ToList());
 
         var lines = new List<string>();
         foreach (var e in seating.Active)
         {
             var sb = new StringBuilder();
-            sb.Append($"  {e.Name} (tier {e.Tier}, {e.PlaceName}, {e.FirstDay}..{e.LastDay}): ");
-            // ★ S98 — once a field has PLAYED the page stops listing a seating order nobody
-            //   cares about and prints the result: the field in FINISH order with its places.
-            //   The seating line survives untouched for a field that did not play, which is
-            //   what keeps a dormant or short event reading exactly as it did in S97.
+            // ★ S104 — the kind is SAID OUT LOUD, and the draw with it. A reader must never
+            //   have to count seats to work out whether they are looking at a four-team
+            //   bracket or a showcase.
+            var kindNote = e.IsShowcase
+                ? (e.Draw is { } r
+                    ? $"showcase, {r.ToString(CultureInfo.InvariantCulture)}mi"
+                    : "showcase, national")
+                : $"tier {e.Tier}";
+            sb.Append($"  {e.Name} ({kindNote}, {e.PlaceName}, ");
+            sb.Append(e.IsShowcase ? $"{e.FirstDay}): " : $"{e.FirstDay}..{e.LastDay}): ");
+
             IReadOnlyDictionary<int, int>? placeBySeat = null;
             finishes?.TryGetValue(e.EventId, out placeBySeat);
-            if (placeBySeat is { Count: > 0 })
+
+            if (e.IsShowcase && resultsByEvent.TryGetValue(e.EventId, out var games))
             {
+                // ★ PLAYED. Roles from the STORED SEATS (R27), never from the scores: the
+                //   headliner is the headliner even when the undercard was the better game.
+                var nameOf = e.Seats.ToDictionary(s => s.Seat, s => s.SchoolName);
+                sb.Append(string.Join("; ", games.Select(g =>
+                {
+                    var label = g.GameIndex == 0 ? "headliner" : "undercard";
+                    return $"{label} {nameOf[g.SeatA]} {g.ScoreA.ToString(CultureInfo.InvariantCulture)}" +
+                           $"-{g.ScoreB.ToString(CultureInfo.InvariantCulture)} {nameOf[g.SeatB]}";
+                })));
+            }
+            else if (placeBySeat is { Count: > 0 })
+            {
+                // ★ S98 — once a bracket has PLAYED the page prints the finish order.
                 sb.Append(string.Join(", ", e.Seats
                     .Where(s => placeBySeat.ContainsKey(s.Seat))
                     .OrderBy(s => placeBySeat[s.Seat])
@@ -846,12 +1175,22 @@ internal static partial class Program
                     ? "no field"
                     : string.Join(", ", e.Seats.Select(s =>
                     {
-                        var note = MteFallbackPageNote(s.Fallback);
-                        return note is null ? s.SchoolName : $"{s.SchoolName} [{note}]";
+                        // ★ TWO INDEPENDENT NOTES, because they are two independent facts:
+                        //   how far the standards dropped, and how far the map widened.
+                        var notes = new[] { MteFallbackPageNote(s.Fallback), MteRadiusStepPageNote(s.RadiusStep) }
+                            .Where(n => n is not null).ToList();
+                        return notes.Count == 0
+                            ? s.SchoolName
+                            : $"{s.SchoolName} [{string.Join(", ", notes)}]";
                     })));
             }
+
             if (e.SeatingStatus == EventSeatingStatus.SeatedShort)
-                sb.Append($" — SHORT ({e.Seats.Count}/{e.FieldSize}) — NOT PLAYED");
+                sb.Append(e.IsShowcase
+                    // ★ R30 — a short showcase says so AND says what it cost, which is
+                    //   nothing. That distinction is the whole ruling and the page carries it.
+                    ? $" — SHORT — NOT PLAYED, field released (nobody consumed)"
+                    : $" — SHORT ({e.Seats.Count}/{e.FieldSize}) — NOT PLAYED");
             lines.Add(sb.ToString());
         }
         if (seating.Dormant.Count > 0)

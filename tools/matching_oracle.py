@@ -283,15 +283,25 @@ SHOWCASE_ALLOWANCE = [0, 0, 1, 2]
 CLASS_NAMES = ["Selling", "Working", "Solid", "Marquee"]
 TIER_FLOOR = {"power": 3, "highMid": 2, "lowMid": 1, "low": 0}
 
-# Read from the committed harness's own season run at seed 20260720. 108 schools.
+# ★ S104 — TOURNAMENT seats only, read from the committed harness's own season run at
+# seed 20260720. A SHOWCASE seat is deliberately NOT here: it does not buy the 31-game
+# season, it spends one of the games the school already had (R26). 108 schools.
 STOCK_SEATED_20260720 = [
-    8, 12, 17, 18, 20, 21, 25, 28, 31, 37, 38, 39, 41, 43, 47, 50, 54, 55, 56, 60,
-    63, 64, 68, 70, 71, 77, 87, 94, 95, 103, 105, 107, 109, 114, 115, 116, 117, 119,
-    120, 124, 129, 130, 132, 135, 140, 145, 147, 150, 153, 157, 158, 161, 162, 164,
-    176, 177, 180, 182, 192, 193, 195, 196, 197, 201, 202, 203, 205, 206, 207, 209,
-    211, 214, 215, 218, 223, 227, 228, 230, 235, 238, 239, 240, 243, 246, 249, 261,
-    268, 269, 270, 271, 272, 279, 285, 294, 296, 297, 299, 300, 302, 303, 304, 308,
-    309, 313, 315, 317, 320, 323,
+    2, 9, 12, 17, 18, 20, 21, 25, 27, 29, 38, 39, 41, 43, 47, 50, 51, 54, 55, 56, 60,
+    63, 64, 68, 70, 71, 82, 87, 89, 90, 94, 95, 97, 99, 103, 105, 107, 109, 114, 115,
+    116, 117, 118, 119, 129, 130, 135, 139, 145, 150, 153, 157, 158, 161, 164, 168, 170,
+    176, 177, 180, 182, 189, 192, 193, 195, 196, 197, 201, 202, 203, 205, 206, 209, 215,
+    218, 221, 223, 227, 234, 235, 238, 239, 243, 246, 249, 254, 258, 261, 268, 269, 271,
+    272, 279, 280, 287, 294, 297, 299, 300, 302, 303, 304, 305, 309, 313, 315, 319, 320,
+]
+
+# ★ S104 — schools owing ONE showcase game this season. Charged neutral -> road -> home
+# AFTER the ordinary split and after any contract charge, per the ruled priority.
+# 48 schools, 24 of them also in a tournament.
+STOCK_SHOWCASE_20260720 = [
+    10, 18, 21, 29, 33, 34, 38, 46, 50, 58, 68, 84, 93, 96, 99, 114, 115, 119, 122, 129,
+    130, 142, 149, 158, 164, 174, 180, 187, 196, 197, 206, 207, 215, 222, 223, 226, 236,
+    257, 261, 268, 286, 296, 301, 302, 310, 313, 314, 318,
 ]
 
 # ─── S102's constants — the R8 seam. Every tunable number of this session is here ──
@@ -339,9 +349,10 @@ def home_spread(lo, hi, n):
     return out
 
 
-def build_requests(world, seated_ids):
-    """S101's report. Returns a list of dicts in school-id order."""
+def build_requests(world, seated_ids, showcase_ids=()):
+    """S101's report, with S104's showcase charge applied. School-id order."""
     seated = set(seated_ids)
+    showcase = set(showcase_ids)
     conf_by_id = {c["id"]: c for c in world["conferences"]}
     by_class = {0: [], 1: [], 2: [], 3: []}
     out = {}
@@ -373,6 +384,18 @@ def build_requests(world, seated_ids):
                 home = min(spread[i], open_games)
                 neutral = min(SHOWCASE_ALLOWANCE[cls], open_games - home)
                 road = open_games - home - neutral
+                # ★ S104 / R26 — a showcase costs one of your games, charged
+                #   neutral -> road -> home. Season totals never change.
+                if s["id"] in showcase:
+                    if neutral > 0:
+                        neutral -= 1
+                    elif road > 0:
+                        road -= 1
+                    elif home > 0:
+                        home -= 1
+                    else:
+                        raise AssertionError(
+                            "showcase charge with nothing to spend: school %d" % s["id"])
             out[s["id"]] = {
                 "schoolId": s["id"], "schoolName": s["name"], "className": CLASS_NAMES[cls],
                 "isIndependent": False, "home": home, "neutral": neutral, "road": road,
@@ -754,7 +777,7 @@ if __name__ == "__main__":
     print(f"S92 ruler: {len(golden['rows'])} golden rows, worst error {worst:.3e} mi")
 
     world = json.load(open(f"{root}/worlds/stock-d1.world.json"))
-    report = build_requests(world, STOCK_SEATED_20260720)
+    report = build_requests(world, STOCK_SEATED_20260720, STOCK_SHOWCASE_20260720)
     targeted = [r for r in report if not r["isIndependent"]]
 
     home = sum(r["home"] for r in targeted)

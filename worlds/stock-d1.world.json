@@ -7573,6 +7573,8 @@
       "firstDay": "11-24",
       "lastDay": "11-26",
       "fieldSize": 8,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -7642,6 +7644,8 @@
       "firstDay": "11-25",
       "lastDay": "11-27",
       "fieldSize": 8,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -7711,6 +7715,8 @@
       "firstDay": "11-27",
       "lastDay": "11-29",
       "fieldSize": 8,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -7780,6 +7786,8 @@
       "firstDay": "11-20",
       "lastDay": "11-22",
       "fieldSize": 8,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -7849,6 +7857,8 @@
       "firstDay": "11-23",
       "lastDay": "11-25",
       "fieldSize": 8,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -7918,6 +7928,8 @@
       "firstDay": "11-26",
       "lastDay": "11-27",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -7959,6 +7971,8 @@
       "firstDay": "11-20",
       "lastDay": "11-21",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8000,6 +8014,8 @@
       "firstDay": "11-19",
       "lastDay": "11-20",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8041,6 +8057,8 @@
       "firstDay": "11-21",
       "lastDay": "11-22",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8082,6 +8100,8 @@
       "firstDay": "11-27",
       "lastDay": "11-28",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8123,6 +8143,8 @@
       "firstDay": "11-23",
       "lastDay": "11-24",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8164,6 +8186,8 @@
       "firstDay": "11-26",
       "lastDay": "11-27",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8205,6 +8229,8 @@
       "firstDay": "11-24",
       "lastDay": "11-25",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8246,6 +8272,8 @@
       "firstDay": "11-20",
       "lastDay": "11-21",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8287,6 +8315,8 @@
       "firstDay": "11-23",
       "lastDay": "11-24",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8328,6 +8358,8 @@
       "firstDay": "11-19",
       "lastDay": "11-20",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8369,6 +8401,8 @@
       "firstDay": "11-21",
       "lastDay": "11-22",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8410,6 +8444,8 @@
       "firstDay": "11-26",
       "lastDay": "11-27",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8451,6 +8487,8 @@
       "firstDay": "11-14",
       "lastDay": "11-15",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8492,6 +8530,8 @@
       "firstDay": "11-27",
       "lastDay": "11-28",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8533,6 +8573,8 @@
       "firstDay": "11-23",
       "lastDay": "11-24",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8574,6 +8616,8 @@
       "firstDay": "11-24",
       "lastDay": "11-25",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8615,6 +8659,8 @@
       "firstDay": "11-21",
       "lastDay": "11-22",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8656,6 +8702,8 @@
       "firstDay": "11-14",
       "lastDay": "11-15",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8697,6 +8745,8 @@
       "firstDay": "11-20",
       "lastDay": "11-21",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8738,6 +8788,8 @@
       "firstDay": "11-26",
       "lastDay": "11-27",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8779,6 +8831,8 @@
       "firstDay": "11-22",
       "lastDay": "11-23",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8820,6 +8874,8 @@
       "firstDay": "11-25",
       "lastDay": "11-26",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8861,6 +8917,8 @@
       "firstDay": "11-19",
       "lastDay": "11-20",
       "fieldSize": 4,
+      "kind": "tournament",
+      "draw": null,
       "slots": [
         {
           "band": [
@@ -8887,6 +8945,694 @@
           "band": [
             0,
             11
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.5,
+      "forcedActive": null
+    },
+    {
+      "id": 30,
+      "name": "Champions Classic",
+      "tier": 1,
+      "placeId": 33,
+      "firstDay": "11-12",
+      "lastDay": "11-12",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": null,
+      "slots": [
+        {
+          "band": [
+            84,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            84,
+            99
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            80,
+            94
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            80,
+            94
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.98,
+      "forcedActive": null
+    },
+    {
+      "id": 31,
+      "name": "Jimmy V Classic",
+      "tier": 1,
+      "placeId": 55,
+      "firstDay": "12-03",
+      "lastDay": "12-03",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": null,
+      "slots": [
+        {
+          "band": [
+            80,
+            95
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            80,
+            95
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            68,
+            85
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            68,
+            85
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.96,
+      "forcedActive": null
+    },
+    {
+      "id": 32,
+      "name": "CBS Sports Classic",
+      "tier": 2,
+      "placeId": 91,
+      "firstDay": "12-05",
+      "lastDay": "12-05",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": null,
+      "slots": [
+        {
+          "band": [
+            78,
+            92
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            78,
+            92
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            65,
+            82
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            65,
+            82
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.9,
+      "forcedActive": null
+    },
+    {
+      "id": 33,
+      "name": "Hoophall Showcase",
+      "tier": 2,
+      "placeId": 47,
+      "firstDay": "11-29",
+      "lastDay": "11-29",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": null,
+      "slots": [
+        {
+          "band": [
+            74,
+            90
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            74,
+            90
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            62,
+            80
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            62,
+            80
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.88,
+      "forcedActive": null
+    },
+    {
+      "id": 34,
+      "name": "Lone Star Shootout",
+      "tier": 3,
+      "placeId": 216,
+      "firstDay": "12-04",
+      "lastDay": "12-04",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 900,
+      "slots": [
+        {
+          "band": [
+            70,
+            88
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            70,
+            88
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            58,
+            76
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            58,
+            76
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.82,
+      "forcedActive": null
+    },
+    {
+      "id": 35,
+      "name": "Sunset Showdown",
+      "tier": 3,
+      "placeId": 129,
+      "firstDay": "11-22",
+      "lastDay": "11-22",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 900,
+      "slots": [
+        {
+          "band": [
+            70,
+            88
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            70,
+            88
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            55,
+            75
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            55,
+            75
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.8,
+      "forcedActive": null
+    },
+    {
+      "id": 36,
+      "name": "Crossroads Classic",
+      "tier": 4,
+      "placeId": 33,
+      "firstDay": "12-06",
+      "lastDay": "12-06",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 500,
+      "slots": [
+        {
+          "band": [
+            60,
+            80
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            60,
+            80
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            45,
+            68
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            45,
+            68
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.75,
+      "forcedActive": null
+    },
+    {
+      "id": 37,
+      "name": "Holiday Festival",
+      "tier": 4,
+      "placeId": 55,
+      "firstDay": "12-01",
+      "lastDay": "12-01",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 500,
+      "slots": [
+        {
+          "band": [
+            68,
+            84
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            68,
+            84
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            55,
+            75
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            55,
+            75
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.72,
+      "forcedActive": null
+    },
+    {
+      "id": 38,
+      "name": "Music City Showcase",
+      "tier": 5,
+      "placeId": 21,
+      "firstDay": "11-21",
+      "lastDay": "11-21",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 400,
+      "slots": [
+        {
+          "band": [
+            55,
+            75
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            55,
+            75
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            62
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            42,
+            62
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.7,
+      "forcedActive": null
+    },
+    {
+      "id": 39,
+      "name": "Queen City Clash",
+      "tier": 5,
+      "placeId": 45,
+      "firstDay": "11-30",
+      "lastDay": "11-30",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 400,
+      "slots": [
+        {
+          "band": [
+            52,
+            72
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            52,
+            72
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            60
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            40,
+            60
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.65,
+      "forcedActive": null
+    },
+    {
+      "id": 40,
+      "name": "Gateway Classic",
+      "tier": 6,
+      "placeId": 200,
+      "firstDay": "11-28",
+      "lastDay": "11-28",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 400,
+      "slots": [
+        {
+          "band": [
+            48,
+            68
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            48,
+            68
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            35,
+            55
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            35,
+            55
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.62,
+      "forcedActive": null
+    },
+    {
+      "id": 41,
+      "name": "Heartland Showcase",
+      "tier": 6,
+      "placeId": 248,
+      "firstDay": "11-20",
+      "lastDay": "11-20",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 350,
+      "slots": [
+        {
+          "band": [
+            45,
+            65
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            45,
+            65
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            32,
+            52
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            32,
+            52
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.6,
+      "forcedActive": null
+    },
+    {
+      "id": 42,
+      "name": "River City Rumble",
+      "tier": 6,
+      "placeId": 128,
+      "firstDay": "11-25",
+      "lastDay": "11-25",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 350,
+      "slots": [
+        {
+          "band": [
+            44,
+            64
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            44,
+            64
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            32,
+            52
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            32,
+            52
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.58,
+      "forcedActive": null
+    },
+    {
+      "id": 43,
+      "name": "Harbor Classic",
+      "tier": 7,
+      "placeId": 297,
+      "firstDay": "11-19",
+      "lastDay": "11-19",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 300,
+      "slots": [
+        {
+          "band": [
+            38,
+            58
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            38,
+            58
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            25,
+            45
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            25,
+            45
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.55,
+      "forcedActive": null
+    },
+    {
+      "id": 44,
+      "name": "Steel City Showcase",
+      "tier": 7,
+      "placeId": 70,
+      "firstDay": "12-02",
+      "lastDay": "12-02",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 300,
+      "slots": [
+        {
+          "band": [
+            36,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            36,
+            56
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            24,
+            44
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            24,
+            44
+          ],
+          "scope": "any"
+        }
+      ],
+      "persistence": 0.55,
+      "forcedActive": null
+    },
+    {
+      "id": 45,
+      "name": "Delta Classic",
+      "tier": 7,
+      "placeId": 139,
+      "firstDay": "11-26",
+      "lastDay": "11-26",
+      "fieldSize": 4,
+      "kind": "showcase",
+      "draw": 300,
+      "slots": [
+        {
+          "band": [
+            35,
+            55
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            35,
+            55
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            42
+          ],
+          "scope": "any"
+        },
+        {
+          "band": [
+            22,
+            42
           ],
           "scope": "any"
         }

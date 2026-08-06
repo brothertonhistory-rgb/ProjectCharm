@@ -148,8 +148,22 @@ internal static partial class Program
 
             var dupPlace = Refusal(() => ValidateWorld(WithEvents(
                 okEvent, okEvent with { Id = 999, Name = "Second Event Same Town" })));
-            Check("C2d: two events in one town refused by name (one event per place)",
-                  dupPlace is not null && dupPlace.Contains("One event per place"));
+            Check("C2d: two events in one town ON THE SAME NIGHTS refused by name",
+                  dupPlace is not null && dupPlace.Contains("One event per place per day"));
+
+            // ★ S104 — THE NEGATIVE CONTROL, and without it C2d is decorative: the refusal
+            //   above fires under the OLD one-event-per-place rule and the NEW per-day rule
+            //   alike, so on its own it cannot tell whether the dates are being read at all.
+            //   Emmett's ruling (2026-08-06): the Garden holds the Holiday Festival one week
+            //   and the Jimmy V the next, and that must LOAD.
+            var sameTownDifferentWeek = Refusal(() => ValidateWorld(WithEvents(
+                okEvent,
+                okEvent with { Id = 998, Name = "Same Town, Another Week",
+                               FirstDay = "12-01", LastDay = "12-03" })));
+            Check("C2d-bis: ★ two events in one town on DIFFERENT nights are ACCEPTED — the " +
+                  "discriminator, without which C2d passes under the retired rule too",
+                  sameTownDifferentWeek is null,
+                  sameTownDifferentWeek ?? "");
 
             var dupId = Refusal(() => ValidateWorld(WithEvents(okEvent, okEvent with { Name = "Clone" })));
             Check("C2e: duplicate event ids refused by name",

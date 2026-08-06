@@ -83,10 +83,14 @@ internal static partial class Program
     /// school has open (clamped down; zero on every committed world). <c>Impossible</c> =
     /// the school has more conference games than its season total (OPEN below zero; zero on
     /// every committed world; reported, never a throw).</summary>
+    /// <para>★ S104 — <c>Seated</c> means seated in a TOURNAMENT and nothing else, because it
+    /// is the flag that buys the 31-game season. <c>ShowcaseGames</c> is the separate fact: 0
+    /// or 1, a game already spent rather than a game added.</para>
     private sealed record NonConSchoolRequest(
         int SchoolId, string SchoolName, string ClassName, int ConferenceGames, bool Seated,
         int Open, int Home, int Neutral, int Road,
-        bool IsIndependent, bool LiftedByFloor, bool Compressed, bool Impossible);
+        bool IsIndependent, bool LiftedByFloor, bool Compressed, bool Impossible,
+        int ShowcaseGames = 0);
 
     /// <summary>Everything S101 decides, in one object. Page-only: the page renders what
     /// this contains and nothing else; Phase 92 asserts wiring and arithmetic on this
@@ -146,8 +150,21 @@ internal static partial class Program
         // Seating exemption is BINARY SET MEMBERSHIP — seated in an event this season,
         // yes or no. Never a per-seat count: a malformed seating carrying a duplicate
         // must not hand a school a six-game exemption.
+        //
+        // ★ S104 / A1 — TOURNAMENT SEATS ONLY. R26 is the whole point: a tournament seat
+        //   makes the season genuinely BIGGER (31 games, three of them in the event); a
+        //   showcase seat does not — "it just counts as one of your games". Left
+        //   unfiltered, a showcase seat would hand its school a 31-game season and three
+        //   phantom event games, which is the exact opposite of the ruling. The failure
+        //   would have HIDDEN: on schools whose home band absorbs the difference the
+        //   totals still reconcile and every conservation check stays green.
         var seated = seating.Active
+            .Where(e => !e.IsShowcase)
             .SelectMany(e => e.Seats).Select(s => s.SchoolId).ToHashSet();
+
+        // ★ The other half of the same fact: a showcase seat is a fixed obligation that
+        //   already exists, and it is CHARGED against the games this school already had.
+        var showcaseGamesOf = MteShowcaseObligations(seating);
 
         var confById = world.Conferences.ToDictionary(c => c.Id);
         var requests = new Dictionary<int, NonConSchoolRequest>();
@@ -164,7 +181,8 @@ internal static partial class Program
                 requests[s.Id] = new NonConSchoolRequest(
                     s.Id, s.Name, NonConIndependent, 0, seated.Contains(s.Id),
                     0, 0, 0, 0, IsIndependent: true,
-                    LiftedByFloor: false, Compressed: false, Impossible: false);
+                    LiftedByFloor: false, Compressed: false, Impossible: false,
+                    ShowcaseGames: showcaseGamesOf.GetValueOrDefault(s.Id, 0));
                 continue;
             }
             var floor = NonConTierFloor(conf.TierId);
@@ -225,12 +243,22 @@ internal static partial class Program
                         && contractCharges.TryGetValue(s.Id, out var charge)
                         && charge.Total > 0)
                         (home, neutral, road) = ApplyContractCharges(home, neutral, road, charge);
+
+                    // ★ S104 / R26 — the showcase charge, SECOND. The ruled priority
+                    //   (extending R23's order): contracted games charge first, showcase
+                    //   games second. Order matters because it decides which obligation
+                    //   ate the neutral bucket, and that must never be settled by the
+                    //   arbitrary order a collection happened to enumerate in.
+                    if (showcaseGamesOf.TryGetValue(s.Id, out var showcaseGames) && showcaseGames > 0)
+                        (home, neutral, road) =
+                            ApplyShowcaseCharges(home, neutral, road, showcaseGames);
                 }
                 requests[s.Id] = new NonConSchoolRequest(
                     s.Id, s.Name, NonConClassNames[cls], conf.Games, isSeated,
                     open, home, neutral, road, IsIndependent: false,
                     LiftedByFloor: NonConPrestigeClass(s.CurrentPrestige) < cls,
-                    Compressed: compressed, Impossible: impossible);
+                    Compressed: compressed, Impossible: impossible,
+                    ShowcaseGames: showcaseGamesOf.GetValueOrDefault(s.Id, 0));
             }
         }
 

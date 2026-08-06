@@ -57,10 +57,25 @@ internal static partial class Program
         "6f79d6636e291866d51387f93979d817011f7903ddc64e67d4ebcebf087cb5c3";
     private const string MatchGoldenDatedFp =
         "7515df7d72f801f49d264ff52d6472911ac87d0996d44269d113b0ef83cb632a";
+    /// <summary>★ S104 — RECAPTURED. The season now plays 24 showcase games on top of its
+    /// tournaments, and seven tournaments seat different fields because a showcase took a
+    /// school on an overlapping night (and because a tournament that loses a candidate
+    /// changes what is left for every later one). So the results half of the season is
+    /// deliberately a different season. The pre-S104 value was 6abd62b0…, and it is NOT
+    /// recoverable by subtraction the way the event-games hash is — this fingerprint covers
+    /// the conference games too, and those are byte-identical; what moved is the event half
+    /// inside the same hash. Emmett's machine is the commit-of-record for this value.</summary>
     private const string MatchGoldenResultsFp =
-        "6abd62b0fa59aafa94638d975d7c579fd3e3e0e59a05928b58119071f97b709c";
+        "898d9fe8e75a353bca1fa89296d96f8cceafb72e66c2a6718eb6eb0b2553742b";
+    /// <summary>★ S104 — RECAPTURED, because the feature IS the movement. The stock world
+    /// now authors sixteen showcases; twelve of them seat and play twenty-four games, so the
+    /// event-games half of the season is deliberately a different season. Captured from the
+    /// S104 build's verified run; Emmett's machine is the commit-of-record for this value.
+    /// The pre-S104 value was 26f2b8ff…, and it is still reproduced EXACTLY by the
+    /// showcase-free zero path (Phase 95 C-Z), which is what proves this move was caused by
+    /// the showcases and by nothing else in the session.</summary>
     private const string MatchGoldenEventGamesFp =
-        "26f2b8ff16ba169403aa741bb93ee9d5426d656fef38a83cf884c27a005c2c4b";
+        "7c1a41c18824934c61d782f41eabd472602d4fe8234ab757e154f255e44a1cd3";
 
     private const long MatchStockSeed = 20260720;
 

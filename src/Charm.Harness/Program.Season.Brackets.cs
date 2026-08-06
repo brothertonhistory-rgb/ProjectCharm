@@ -142,21 +142,56 @@ internal static partial class Program
     private static bool MteEventPlays(SeatedEvent e)
         => e.SeatingStatus == EventSeatingStatus.Complete && e.Seats.Count == e.FieldSize;
 
+    /// <summary>★ S104 — HOW MANY GAMES A COMPLETE FIELD OWES, DISPATCHED ON THE KIND AND
+    /// NEVER ON THE FIELD SIZE. A showcase plays two stand-alone games; a bracket plays what
+    /// its route table says. Both fields hold four schools, and that coincidence is exactly
+    /// the trap A3 names: routing a showcase's four into <c>BracketRoutes4</c> produces a
+    /// plausible three-game bracket with a champion, and every structural check stays
+    /// green.</summary>
+    private static int MteEventGameCount(SeatedEvent e)
+        => e.IsShowcase ? MteShowcaseGamesPerEvent : BracketGameCount(e.FieldSize);
+
+    /// <summary>★ THE KIND OWNS THE PLAY PATH. A showcase reaching a bracket route table is
+    /// impossible by construction rather than by convention: this is the only door, and it is
+    /// shut by name.</summary>
+    private static BracketRoute[] MteBracketRoutesFor(SeatedEvent e)
+    {
+        if (e.IsShowcase)
+            throw new InvalidOperationException(
+                $"BRACKET: '{e.Name}' is a SHOWCASE and has no bracket. It plays two stand-alone " +
+                "games from its stored seats — no advancement, no placement, no champion. A showcase " +
+                "reaching a route table is a dispatch failure, never a four-team field.");
+        return BracketRoutesFor(e.FieldSize);
+    }
+
     /// <summary>★ THE CANONICAL ORDER, DEFINED ONCE. Event by (tier, id), then bracket game
     /// index. Assigning reservations, running games, building the fingerprint and comparing in
     /// the determinism check all walk THIS, so none of them leans on a dictionary's enumeration
     /// order.</summary>
+    /// <para>★ S104 — TOURNAMENTS FIRST, THEN SHOWCASES, and this ordering is load-bearing
+    /// enough to be worth a paragraph. The reservation index and the fixture ordinal are the
+    /// same walk, and the fixture ordinal feeds the ENGINE SEED. Interleaving showcases into
+    /// (tier, id) order would slide every tournament game's ordinal along and re-roll every
+    /// tournament result in the country — which is precisely the byte-identity §3.3 exists to
+    /// protect. Appending the new kind keeps every pre-S104 tournament game on the seed it
+    /// has always had. Play order and calendar order are already different things here (see
+    /// this file's header); this is the same trick applied to a second kind.</para>
     private static List<BracketSlotKey> MteExpectedBracketSlots(EventSeatingOutcome seating)
     {
         var slots = new List<BracketSlotKey>();
-        foreach (var e in seating.Active.OrderBy(x => x.Tier).ThenBy(x => x.EventId))
-        {
-            if (!MteEventPlays(e)) continue;
-            for (var i = 0; i < BracketGameCount(e.FieldSize); i++)
+        foreach (var e in MteEventPlayOrder(seating))
+            for (var i = 0; i < MteEventGameCount(e); i++)
                 slots.Add(new BracketSlotKey(e.Tier, e.EventId, i));
-        }
         return slots;
     }
+
+    /// <summary>★ THE CANONICAL PLAY ORDER, DEFINED ONCE AND WALKED BY EVERYTHING —
+    /// reservations, play, and the fingerprint. Tournaments in (tier, id), then showcases in
+    /// (tier, id).</summary>
+    private static IEnumerable<SeatedEvent> MteEventPlayOrder(EventSeatingOutcome seating)
+        => seating.Active.Where(MteEventPlays)
+                  .OrderBy(e => e.IsShowcase ? 1 : 0)
+                  .ThenBy(e => e.Tier).ThenBy(e => e.EventId);
 
     // ── Seeding ──────────────────────────────────────────────────────────────────
 
@@ -287,12 +322,13 @@ internal static partial class Program
         var seatsPlayed = new Dictionary<int, IReadOnlyDictionary<int, int>>();
         var eventGameOrdinal = 0;
 
-        foreach (var e in seating.Active.OrderBy(x => x.Tier).ThenBy(x => x.EventId))
+        // ★ S104 — TOURNAMENTS ONLY, and the filter is on the KIND. Showcases are played by
+        //   MtePlayShowcases afterwards, which is what keeps every tournament fixture ordinal
+        //   (and therefore every tournament engine seed) exactly where it was.
+        foreach (var e in MteEventPlayOrder(seating).Where(x => !x.IsShowcase))
         {
-            if (!MteEventPlays(e)) continue;
-
             var plan = MteSeedField(e, prestige);
-            var routes = BracketRoutesFor(plan.FieldSize);
+            var routes = MteBracketRoutesFor(e);
             var occupancy = new int[routes.Length][];
             for (var i = 0; i < routes.Length; i++) occupancy[i] = new[] { 0, 0 };
 
@@ -377,7 +413,7 @@ internal static partial class Program
         IReadOnlyList<SeasonGameResult> results,
         IReadOnlyList<int> possessionCounts)
     {
-        var rows = playedGames.Where(p => p.IsTournament)
+        var rows = playedGames.Where(p => p.IsEventGame)
                               .OrderBy(p => p.EventTier).ThenBy(p => p.EventId)
                               .ThenBy(p => p.BracketGameIndex)
                               .ToList();

@@ -555,7 +555,19 @@ internal static partial class Program
     {
         var confById = world.Conferences.ToDictionary(c => c.Id);
         var schoolById = world.Schools.ToDictionary(s => s.Id);
-        var seated = seating.Active.SelectMany(e => e.Seats).Select(s => s.SchoolId).ToHashSet();
+        // ★ S104 / A1 — THE SECOND HOME OF THE EXEMPTION, and it is easy to miss. This set
+        //   feeds OpenGamesOf below, which is the contract phase's only hard bound. Filtered
+        //   to TOURNAMENT seats for exactly the reason the request builder is: a showcase
+        //   does not buy a 31-game season, so counting one here would let a contract overdraw
+        //   a November that was never that big.
+        var seated = seating.Active
+            .Where(e => !e.IsShowcase)
+            .SelectMany(e => e.Seats).Select(s => s.SchoolId).ToHashSet();
+        // ★ A showcase pairing is materialized at seating — BEFORE this phase runs — so it is
+        //   a fixed obligation the capacity gate must already see. Subtracting it here is what
+        //   keeps "contracts charge first" a statement about BUCKETS rather than about who
+        //   gets to overdraw whom.
+        var showcaseGamesOf = MteShowcaseObligations(seating);
 
         bool SameLeague(int a, int b)
         {
@@ -577,7 +589,8 @@ internal static partial class Program
             var isSeated = seated.Contains(schoolId);
             var seasonGames = isSeated ? NonConSeasonGamesSeated : NonConSeasonGamesUnseated;
             var eventGames = isSeated ? NonConEventGames : 0;
-            return seasonGames - confById[s.ConferenceId].Games - eventGames;
+            return seasonGames - confById[s.ConferenceId].Games - eventGames
+                   - showcaseGamesOf.GetValueOrDefault(schoolId, 0);
         }
 
         return ContractSeasonStep(load, SameLeague, OpenGamesOf, choiceOverride,

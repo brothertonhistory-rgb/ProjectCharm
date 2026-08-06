@@ -110,7 +110,11 @@ internal static partial class Program
         int? EventTier = null, int? EventId = null, int? BracketGameIndex = null,
         int? HomeOriginalSeed = null, int? AwayOriginalSeed = null)
     {
-        public bool IsTournament => EventId is not null;
+        /// <summary>★ S104 — RENAMED from IsTournament, because after this session the old
+        /// name is a lie: a showcase game carries an EventId too. Every existing caller wants
+        /// "is this an event game rather than a conference game", which is what it always
+        /// computed — only the word was wrong.</summary>
+        public bool IsEventGame => EventId is not null;
     }
 
     private sealed record SeasonGameResult(
@@ -186,6 +190,16 @@ internal static partial class Program
         /// <summary>★ S98 — how many bracket games were played. Zero on every world that
         /// authors no events, which is what keeps the zero path a zero path.</summary>
         public int TournamentGameCount { get; init; }
+
+        /// <summary>★ S104 — how many of <see cref="TournamentGameCount"/> were showcase
+        /// games. Carried separately because the page distinguishes the two kinds and
+        /// nothing should have to subtract to find out.</summary>
+        public int ShowcaseGameCount { get; init; }
+
+        /// <summary>★ S104 — the showcase results, in canonical order. Page cargo: what
+        /// happened on each showcase's night, with roles from stored seats.</summary>
+        public IReadOnlyList<ShowcaseResult> ShowcaseResults { get; init; } =
+            Array.Empty<ShowcaseResult>();
         /// <summary>★ S98 — the tournament games' own fingerprint. The schedule fingerprint
         /// stays CONFERENCE-ONLY and after this session no longer describes the whole season;
         /// this is the other half, and the page says so in both labels.</summary>
@@ -1749,12 +1763,30 @@ internal static partial class Program
         if (verbose && brackets.GameCount > 0)
             Console.WriteLine($"  ... {brackets.GameCount} tournament games played");
 
+        // ★ S104 — THE SHOWCASES, APPENDED AFTER EVERY BRACKET. Their ordinals start where
+        //   the brackets stopped, which is what leaves every tournament game on the engine
+        //   seed it has always had (see MteExpectedBracketSlots — the reservation walk and
+        //   this walk are the same order, and they must stay that way).
+        var showcases = MtePlayShowcases(
+            seating, reservations, seasonIdOfRun, schedule.Count + brackets.GameCount,
+            pg => PlayOneGame(pg));
+        if (verbose && showcases.GameCount > 0)
+            Console.WriteLine($"  ... {showcases.GameCount} showcase games played");
+
+        // ★ ONE played-fact map across both kinds. The record's seat-identity round-trip is a
+        //   single code path, so a showcase's seats are validated exactly as rigorously as a
+        //   bracket's rather than through a second, softer route.
+        var seatsPlayedAll = new Dictionary<int, IReadOnlyDictionary<int, int>>();
+        foreach (var kv in brackets.SeatsPlayed) seatsPlayedAll[kv.Key] = kv.Value;
+        foreach (var kv in showcases.SeatsPlayed) seatsPlayedAll[kv.Key] = kv.Value;
+        var eventGameCount = brackets.GameCount + showcases.GameCount;
+
         //  One block per fixture PLAYED and no other — conference plus tournament. The
         //  writer refuses to publish a partial season rather than leaving a
         //  plausible-looking short file behind.
         if (gameLog is not null)
         {
-            gameLog.Finalize(schedule.Count + brackets.GameCount);
+            gameLog.Finalize(schedule.Count + eventGameCount);
             gameLog.Dispose();
         }
 
@@ -1767,13 +1799,18 @@ internal static partial class Program
         //  valid and played, and no retry inside the run.
         var finishStatus = EventRecordStatus.NotApplicable;
         string? finishDiagnostic = null;
+        //  ★ S104 — the gate is "did ANY event play", not "are there finishes". A season whose
+        //  only events were showcases produces no placement at all and still must have its
+        //  record completed — keying on the finishes would have left those events reading
+        //  NotPlayed forever, with every check green.
         if (history is not null && recordStatus == EventRecordStatus.Written
-            && brackets.FinishBySeat.Count > 0)
+            && seatsPlayedAll.Count > 0)
         {
             try
             {
                 MteReplaceRecordWithFinishes(
-                    history, pendingSeasonId, brackets.FinishBySeat, brackets.SeatsPlayed);
+                    history, pendingSeasonId, brackets.FinishBySeat, seatsPlayedAll,
+                    showcases.Results);
                 finishStatus = EventRecordStatus.Written;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -1803,7 +1840,9 @@ internal static partial class Program
             Contracts = contracts,
             PlayedGames = playedGames,
             ConferenceGameCount = schedule.Count,
-            TournamentGameCount = brackets.GameCount,
+            TournamentGameCount = eventGameCount,
+            ShowcaseGameCount = showcases.GameCount,
+            ShowcaseResults = showcases.Results,
             EventGamesFingerprint =
                 MteEventGamesFingerprint(playedGames, results, possessionCounts),
             EventFinishes = brackets.FinishBySeat,
@@ -2075,7 +2114,7 @@ internal static partial class Program
         //   the suite. When the world authors no events this prints NOTHING — not a heading,
         //   not a blank line — which is what makes the zero-path byte-identity claim honest.
         {
-            var eventLines = MtePageLines(run.Events, run.EventFinishes);
+            var eventLines = MtePageLines(run.Events, run.EventFinishes, run.ShowcaseResults);
             if (eventLines.Count > 0)
             {
                 Console.WriteLine("--- EARLY-SEASON EVENTS (played out to a full placement; " +

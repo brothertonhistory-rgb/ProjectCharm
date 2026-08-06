@@ -52,8 +52,16 @@ internal static partial class Program
         "6f79d6636e291866d51387f93979d817011f7903ddc64e67d4ebcebf087cb5c3";
     private const string NonConGoldenDatedFp =
         "7515df7d72f801f49d264ff52d6472911ac87d0996d44269d113b0ef83cb632a";
+    /// <summary>★ S104 — RECAPTURED. The season now plays 24 showcase games on top of its
+    /// tournaments, and seven tournaments seat different fields because a showcase took a
+    /// school on an overlapping night (and because a tournament that loses a candidate
+    /// changes what is left for every later one). So the results half of the season is
+    /// deliberately a different season. The pre-S104 value was 6abd62b0…, and it is NOT
+    /// recoverable by subtraction the way the event-games hash is — this fingerprint covers
+    /// the conference games too, and those are byte-identical; what moved is the event half
+    /// inside the same hash. Emmett's machine is the commit-of-record for this value.</summary>
     private const string NonConGoldenResultsFp =
-        "6abd62b0fa59aafa94638d975d7c579fd3e3e0e59a05928b58119071f97b709c";
+        "898d9fe8e75a353bca1fa89296d96f8cceafb72e66c2a6718eb6eb0b2553742b";
 
     private const long NonConStockSeed = 20260720;
 
@@ -262,7 +270,13 @@ internal static partial class Program
                             committedClean = false; culprit = $"{name}/{s.SchoolName} impossible";
                             continue;
                         }
-                        if (s.Home + s.Neutral + s.Road != s.Open)
+                        // ★ S104 — the identity gains its third term. A showcase game is one
+                        //   of the school's OWN games, charged away rather than added (R26), so
+                        //   the tokens still to arrange are OPEN minus what is already spoken
+                        //   for. Written as a sum rather than folded into OPEN on purpose:
+                        //   OPEN is what the season holds, and the charge is what has already
+                        //   been promised out of it.
+                        if (s.Home + s.Neutral + s.Road + s.ShowcaseGames != s.Open)
                         { conserve = false; culprit = $"{name}/{s.SchoolName}"; }
                         var confGames = confById.Values
                             .Single(c => c.Id == world.Schools.Single(x => x.Id == s.SchoolId).ConferenceId).Games;
@@ -272,14 +286,15 @@ internal static partial class Program
                         if (!(s.Open == expectedOpen
                               && s.Home >= 0 && s.Home <= s.Open
                               && s.Neutral >= 0 && s.Neutral <= s.Open - s.Home
-                              && s.Road >= 0))
+                              && s.Road >= 0
+                              && s.ShowcaseGames >= 0 && s.ShowcaseGames <= 1))
                         { valid = false; culprit = $"{name}/{s.SchoolName}"; }
                         if (s.Compressed)
                         { committedClean = false; culprit = $"{name}/{s.SchoolName} compressed"; }
                     }
                 }
-                Check("C5: HOME + NEUTRAL + ROAD == OPEN, exactly, for every targeted school " +
-                      "on every world", conserve, conserve ? "" : culprit);
+                Check("C5: HOME + NEUTRAL + ROAD + SHOWCASE GAMES == OPEN, exactly, for every " +
+                      "targeted school on every world", conserve, conserve ? "" : culprit);
                 Check("C6: the clamp chain's invariants hold everywhere, OPEN is the exact " +
                       "remainder, and no committed world holds a compressed or impossible " +
                       "school", valid && committedClean, (valid && committedClean) ? "" : culprit);
@@ -289,7 +304,13 @@ internal static partial class Program
             //  C7 — THE EXEMPTION IS EXACTLY THE SEATED SET, BOTH DIRECTIONS.
             // ════════════════════════════════════════════════════════════════════
             {
+                // ★ S104 — TOURNAMENT seats only. The exemption this check is about is the one
+                //   that buys a 31-game season, and a showcase seat does not buy it. Reading
+                //   every seat here would compare the report's tournament set against a set
+                //   that also holds 48 showcase schools and go red for the right reason with
+                //   the wrong explanation.
                 var seatedFromSeating = stockRun.Events.Seating.Active
+                    .Where(e => !e.IsShowcase)
                     .SelectMany(e => e.Seats).Select(s => s.SchoolId).ToHashSet();
                 var seatedFromReport = stockReport.Targeted
                     .Where(s => s.Seated).Select(s => s.SchoolId).ToHashSet();
@@ -298,9 +319,14 @@ internal static partial class Program
                               - s.ConferenceGames - NonConEventGames);
                 var plain29 = stockReport.Targeted.Where(s => !s.Seated)
                     .All(s => s.Open == NonConSeasonGamesUnseated - s.ConferenceGames);
+                // ★ THE DISCRIMINATOR: the stock world really does seat showcases, so the
+                //   filter above is doing work rather than being a no-op on a slate that has
+                //   no showcases to exclude.
+                var showcaseSeatsExist = stockRun.Events.Seating.Active.Any(e => e.IsShowcase && e.Seats.Count > 0);
                 Check("C7: the 31-with-3-exempt pair applies to exactly the schools the " +
                       "seating seated, both directions, as set membership",
-                      seatedFromSeating.SetEquals(seatedFromReport) && exempted31 && plain29,
+                      seatedFromSeating.SetEquals(seatedFromReport) && exempted31 && plain29
+                      && showcaseSeatsExist,
                       $"{seatedFromReport.Count} seated (read from the seating outcome, " +
                       "never a constant)");
             }

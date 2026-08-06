@@ -98,10 +98,10 @@ internal static partial class Program
                   "game sits at exactly the conference game count",
                   on.Results.Count >= on.ConferenceGameCount
                   && on.PossessionCounts.Count >= on.ConferenceGameCount
-                  && on.PlayedGames.Where(p => p.IsTournament).Select(p => p.FixtureOrdinal).DefaultIfEmpty(-1)
+                  && on.PlayedGames.Where(p => p.IsEventGame).Select(p => p.FixtureOrdinal).DefaultIfEmpty(-1)
                        .Min() == on.ConferenceGameCount,
                   $"first tournament ordinal " +
-                  $"{on.PlayedGames.First(p => p.IsTournament).FixtureOrdinal}");
+                  $"{on.PlayedGames.First(p => p.IsEventGame).FixtureOrdinal}");
 
             //  ★ ONE helper, not a second serialization. SeasonFingerprint's own note says it
             //    is the single definition used by both the golden capture and Phase 86,
@@ -249,14 +249,14 @@ internal static partial class Program
 
             Check("C3f: ★ ORIGINAL SEEDS TRAVEL — in every game the LOWER original seed number is the " +
                   "nominal home side, including late-round games whose teams arrived down different paths",
-                  on.PlayedGames.Where(p => p.IsTournament)
+                  on.PlayedGames.Where(p => p.IsEventGame)
                     .All(p => p.HomeOriginalSeed < p.AwayOriginalSeed));
 
             // ════════════════════════════════════════════════════════════════════
             //  C4 — DATES. Exact equalities, because the window length is validated.
             // ════════════════════════════════════════════════════════════════════
             {
-                var byEvent = on.PlayedGames.Where(p => p.IsTournament).GroupBy(p => p.EventId!.Value);
+                var byEvent = on.PlayedGames.Where(p => p.IsEventGame).GroupBy(p => p.EventId!.Value);
                 var seatedById = on.Events.Seating.Active.ToDictionary(e => e.EventId);
                 var datesOk = true;
                 var checkedEvents = 0;
@@ -283,22 +283,22 @@ internal static partial class Program
                       datesOk && checkedEvents == 4, $"{checkedEvents} events dated");
                 Check("C4b: ★ THE DATES SAY NOVEMBER while the play order says last — the two really " +
                       "do differ, which is the whole point of executing last and dating first",
-                      on.PlayedGames.Where(p => p.IsTournament).All(p => p.Game.Date is { Month: 11 })
-                      && on.PlayedGames.Where(p => p.IsTournament).All(p => p.FixtureOrdinal >= on.ConferenceGameCount));
+                      on.PlayedGames.Where(p => p.IsEventGame).All(p => p.Game.Date is { Month: 11 })
+                      && on.PlayedGames.Where(p => p.IsEventGame).All(p => p.FixtureOrdinal >= on.ConferenceGameCount));
             }
 
             // ════════════════════════════════════════════════════════════════════
             //  C5 — THE FACTORY'S WHOLE CONTRACT, so a failure names itself.
             // ════════════════════════════════════════════════════════════════════
             {
-                var tourney = on.PlayedGames.Where(p => p.IsTournament).ToList();
+                var tourney = on.PlayedGames.Where(p => p.IsEventGame).ToList();
                 Check("C5a: ★ every tournament fixture says Kind == \"mte\" EXACTLY — \"anything except " +
                       "conf\" must not become the contract",
                       tourney.All(p => string.Equals(p.Game.Kind, "mte", StringComparison.Ordinal))
                       && tourney.Count == 24);
                 Check("C5b: ★ and every one of them HAS NO HOST, while every conference game does",
                       tourney.All(p => !p.Game.HasHost)
-                      && on.PlayedGames.Where(p => !p.IsTournament).All(p => p.Game.HasHost));
+                      && on.PlayedGames.Where(p => !p.IsEventGame).All(p => p.Game.HasHost));
                 Check("C5c: the nominal home side is the better ORIGINAL seed's school, and the away " +
                       "side the other — a box-score ordering, never a venue",
                       tourney.All(p => p.Game.HomeId != p.Game.AwayId));
@@ -421,12 +421,12 @@ internal static partial class Program
                 //  The game object and the block byte asserted SEPARATELY, because the claim is
                 //  that a non-conf Kind derives the byte with no production change (S97's writer
                 //  already computes it) — one assertion covering both would prove neither.
-                var tourneyOrdinals = career.PlayedGames.Where(p => p.IsTournament)
+                var tourneyOrdinals = career.PlayedGames.Where(p => p.IsEventGame)
                                             .Select(p => p.FixtureOrdinal).ToHashSet();
                 Check("C6b: conference blocks carry the conference flag and tournament blocks do not",
                       log.Blocks.All(b => b.Facts.IsConferenceGame != tourneyOrdinals.Contains(b.Facts.FixtureOrdinal)));
                 Check("C6c: every tournament GameId appears exactly once in the log",
-                      career.PlayedGames.Where(p => p.IsTournament)
+                      career.PlayedGames.Where(p => p.IsEventGame)
                             .All(p => log.Blocks.Count(b => b.Facts.GameId.Equals(p.Game.GameId!.Value)) == 1));
             }
 

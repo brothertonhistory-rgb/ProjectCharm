@@ -76,6 +76,19 @@ internal static partial class Program
     /// <summary>The fixed vocabulary for an event SLOT's scope. Includes `any`.</summary>
     private static readonly string[] WorldEventSlotScopeVocabulary = { "power", "mid", "any" };
 
+    /// <summary>★ S104 — the fixed vocabulary for an event's KIND, and the default when a
+    /// world does not say. `tournament`, deliberately, and NOT `bracket`: the one-of-each
+    /// rule R25 is tournament-versus-showcase, and a bracket is the implementation shape a
+    /// tournament happens to use, not a basketball entity a world author names.
+    ///
+    /// <para>Optional-with-a-default is what lets every pre-S104 world file load unchanged —
+    /// there is no schema bump, because a v5 file that never heard of kinds still means
+    /// exactly what it always meant.</para></summary>
+    private static readonly string[] WorldEventKindVocabulary = { "tournament", "showcase" };
+
+    private const string WorldEventKindTournament = "tournament";
+    private const string WorldEventKindShowcase = "showcase";
+
     private const double WorldStationJitter = 30.0;  // triangular +/-30 around tier equilibrium
 
     // ── Schema types ────────────────────────────────────────────────────────────────────
@@ -185,13 +198,33 @@ internal static partial class Program
     /// picks from the pool first, and the whole top-down draft falls out of it.</para>
     ///
     /// <para>★ The window is EXACTLY the playing days — three for an eight-team field, two
-    /// for a four-team field — because S98's rounds are back-to-back. A rest day inside an
-    /// event is a different design and would be authored as a different shape, not as a
-    /// looser window here.</para></summary>
+    /// for a four-team field, ONE for a showcase — because S98's rounds are back-to-back. A
+    /// rest day inside an event is a different design and would be authored as a different
+    /// shape, not as a looser window here.</para>
+    ///
+    /// <para>★ S104 — <c>Kind</c> is the second citizen of the pool. A `showcase` invites four
+    /// schools out for two stand-alone games in one day: no bracket, no advancement, no
+    /// placement, no champion. It defaults to `tournament`, which is why every pre-S104 world
+    /// keeps meaning what it meant.</para>
+    ///
+    /// <para>★ S104 — <c>Draw</c> is HOW FAR THIS EVENT REACHES, and it lives on the SHARED
+    /// event shape rather than on showcases alone. <c>null</c> is National — Maui flies
+    /// everyone, and every authored tournament inherits it — and a positive value is a radius
+    /// in miles from the event's own home city. The shared location is deliberate: it is what
+    /// keeps a future ruling on radius-drawn tournaments from being a schema migration. THIS
+    /// SESSION validation still requires a tournament to be National.</para></summary>
     private sealed record WorldEvent(
         int Id, string Name, int Tier, int PlaceId,
         string FirstDay, string LastDay, int FieldSize,
-        IReadOnlyList<WorldEventSlot> Slots, double Persistence, bool? ForcedActive);
+        IReadOnlyList<WorldEventSlot> Slots, double Persistence, bool? ForcedActive,
+        string Kind = WorldEventKindTournament, int? Draw = null)
+    {
+        public bool IsShowcase => string.Equals(Kind, WorldEventKindShowcase, StringComparison.Ordinal);
+
+        /// <summary>How many nights this event occupies. The window validator holds this to
+        /// an equality, so it is a fact rather than a hope.</summary>
+        public int PlayingDays => IsShowcase ? 1 : (FieldSize == 8 ? 3 : 2);
+    }
 
     private sealed class WorldFile
     {
@@ -480,7 +513,10 @@ internal static partial class Program
             {
                 RejectUnknownOrDuplicateKeys(el, "events[]",
                     "id", "name", "tier", "placeId", "firstDay", "lastDay",
-                    "fieldSize", "slots", "persistence", "forcedActive");
+                    "fieldSize", "slots", "persistence", "forcedActive",
+                    // ★ S104 — OPTIONAL, with defaults. A pre-S104 file writes neither and
+                    //   loads as a National tournament, which is what it always was.
+                    "kind", "draw");
                 var evName = WorldRequireString(el, "name", "events[]");
                 var ectx = $"event '{evName}'";
 
@@ -523,6 +559,30 @@ internal static partial class Program
                     forced = forcedEl.ValueKind == JsonValueKind.True;
                 }
 
+                // ★ S104 — kind. Absent means `tournament`; present must be a STRING, and an
+                //   unrecognised word is refused by the validator rather than silently
+                //   defaulted. A typo in a hand-authored pool must say which event it is in.
+                var evKind = WorldEventKindTournament;
+                if (el.TryGetProperty("kind", out var kindEl))
+                {
+                    if (kindEl.ValueKind != JsonValueKind.String)
+                        throw new InvalidOperationException($"{ectx} kind must be a string.");
+                    evKind = kindEl.GetString() ?? "";
+                }
+
+                // ★ S104 — draw. Absent OR explicit null means National; a number is a radius
+                //   in miles. Null is spelled explicitly on the way out (see the canonical
+                //   writer) so one world has exactly one spelling, the same discipline
+                //   `forcedActive` already follows.
+                int? draw = null;
+                if (el.TryGetProperty("draw", out var drawEl) && drawEl.ValueKind != JsonValueKind.Null)
+                {
+                    if (drawEl.ValueKind != JsonValueKind.Number || !drawEl.TryGetInt32(out var dv))
+                        throw new InvalidOperationException(
+                            $"{ectx} draw must be a whole number of miles, or null for National.");
+                    draw = dv;
+                }
+
                 events.Add(new WorldEvent(
                     RequireIntProperty(el, "id", ectx),
                     evName,
@@ -533,7 +593,9 @@ internal static partial class Program
                     RequireIntProperty(el, "fieldSize", ectx),
                     slots,
                     WorldRequireDouble(el, "persistence", ectx),
-                    forced));
+                    forced,
+                    evKind,
+                    draw));
             }
 
             return new WorldFile
@@ -782,7 +844,13 @@ internal static partial class Program
     private static void WorldValidateEvents(WorldFile w, Dictionary<int, WorldPlace> placeById)
     {
         var eventById = new Dictionary<int, WorldEvent>();
-        var eventByPlace = new Dictionary<int, WorldEvent>();
+        // ★ S104 — ONE EVENT PER PLACE PER *DAY* (Emmett's ruling, 2026-08-06), replacing
+        //   S97's one-event-per-place. The old rule was a scheduling convenience that said
+        //   something false about basketball: the Garden hosts the Holiday Festival one week
+        //   and the Jimmy V the next, and Indianapolis holds two different showcases a month
+        //   apart. What genuinely cannot happen is two fields in one building on one night,
+        //   and that is now exactly what is refused.
+        var occupiedNights = new List<(int PlaceId, DateOnly First, DateOnly Last, WorldEvent Ev)>();
         foreach (var e in w.Events)
         {
             if (e.Id <= 0)
@@ -800,24 +868,46 @@ internal static partial class Program
                 throw new InvalidOperationException(
                     $"event '{e.Name}' tier {e.Tier} must be 1 or greater (1 seats first).");
 
+            if (!WorldEventKindVocabulary.Contains(e.Kind, StringComparer.Ordinal))
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' kind '{e.Kind}' is not in the vocabulary " +
+                    $"[{string.Join(", ", WorldEventKindVocabulary)}].");
+
             if (!placeById.TryGetValue(e.PlaceId, out var place))
                 throw new InvalidOperationException(
                     $"event '{e.Name}' points at unknown placeId {e.PlaceId}.");
-            // ★ ONE EVENT PER PLACE. Two tournaments in one town in one November is a
-            //   scheduling collision nobody wants to discover at seating time, and the
-            //   place is how a field's home is named on every page and in every record.
-            if (!eventByPlace.TryAdd(e.PlaceId, e))
-                throw new InvalidOperationException(
-                    $"two events share placeId {e.PlaceId} ('{place.Descriptor}'): '{eventByPlace[e.PlaceId].Name}' " +
-                    $"and '{e.Name}'. One event per place.");
 
-            if (e.FieldSize is not (8 or 4))
+            // ★ A showcase is EXACTLY four schools. The bracket sizes are untouched: 8 and 4
+            //   remain the only authorable tournament fields, and a showcase's 4 is a
+            //   different fact reached through a different word, never a four-team bracket.
+            if (e.IsShowcase)
+            {
+                if (e.FieldSize != 4)
+                    throw new InvalidOperationException(
+                        $"event '{e.Name}' is a showcase with fieldSize {e.FieldSize}; a showcase seats " +
+                        "EXACTLY 4 — two games, seats 1-2 the headliner and 3-4 the undercard.");
+            }
+            else if (e.FieldSize is not (8 or 4))
                 throw new InvalidOperationException(
                     $"event '{e.Name}' fieldSize {e.FieldSize} must be exactly 8 or 4.");
             if (e.Slots.Count != e.FieldSize)
                 throw new InvalidOperationException(
                     $"event '{e.Name}' has {e.Slots.Count} slot(s) for a field of {e.FieldSize}; " +
                     "every seat is authored.");
+
+            // ★ THE DRAW. A radius must be a real distance; National is spelled as null and
+            //   never as zero, so "reaches everywhere" and "reaches nowhere" cannot collide.
+            if (e.Draw is { } radius && radius <= 0)
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' draw {radius} must be a positive number of miles; " +
+                    "National is null, never zero.");
+            // ★ THIS SESSION ONLY. Draw lives on the shared shape so a later ruling on
+            //   radius-drawn tournaments costs no migration, but nothing has designed what a
+            //   regional tournament means, so authoring one is refused rather than guessed.
+            if (!e.IsShowcase && e.Draw is not null)
+                throw new InvalidOperationException(
+                    $"event '{e.Name}' is a tournament with a radius draw; tournaments are National " +
+                    "(draw null) — a radius-drawn tournament is an unmade design decision, not a shape.");
 
             for (var i = 0; i < e.Slots.Count; i++)
             {
@@ -839,7 +929,22 @@ internal static partial class Program
                 throw new InvalidOperationException(
                     $"event '{e.Name}' persistence {e.Persistence} must be a finite number in [0, 1].");
 
-            WorldValidateEventWindow(e);
+            var (first, last) = WorldValidateEventWindow(e);
+
+            // ★ The night collision, checked against every event already accepted. Windows
+            //   are closed intervals of playing days, so two events collide exactly when
+            //   their intervals intersect — which for a one-day showcase is "its day sits
+            //   inside the other event's window".
+            foreach (var (pid, f, l, other) in occupiedNights)
+            {
+                if (pid != e.PlaceId) continue;
+                if (last < f || first > l) continue;
+                throw new InvalidOperationException(
+                    $"two events share placeId {e.PlaceId} ('{place.Descriptor}') on the same night(s): " +
+                    $"'{other.Name}' ({other.FirstDay}..{other.LastDay}) and '{e.Name}' " +
+                    $"({e.FirstDay}..{e.LastDay}). One event per place per day.");
+            }
+            occupiedNights.Add((e.PlaceId, first, last, e));
         }
     }
 
@@ -852,7 +957,7 @@ internal static partial class Program
     /// silently supported: every real event is a few days in November, and a window that
     /// straddles New Year would have to answer questions about which season it belongs to
     /// that nothing in v5 asks.</para></summary>
-    private static void WorldValidateEventWindow(WorldEvent e)
+    private static (DateOnly First, DateOnly Last) WorldValidateEventWindow(WorldEvent e)
     {
         var first = WorldParseSpineDay(e.FirstDay, e, nameof(e.FirstDay));
         var last = WorldParseSpineDay(e.LastDay, e, nameof(e.LastDay));
@@ -866,11 +971,14 @@ internal static partial class Program
                 $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} runs backwards in season order.");
 
         var days = last.DayNumber - first.DayNumber + 1;
-        var want = e.FieldSize == 8 ? 3 : 2;
+        var want = e.PlayingDays;
         if (days != want)
-            throw new InvalidOperationException(
-                $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} is {days} day(s); a field of " +
-                $"{e.FieldSize} plays on EXACTLY {want} (rounds are back-to-back).");
+            throw new InvalidOperationException(e.IsShowcase
+                ? $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} is {days} day(s); a showcase " +
+                  "plays on EXACTLY 1 (both its games are one night's programme)."
+                : $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} is {days} day(s); a field of " +
+                  $"{e.FieldSize} plays on EXACTLY {want} (rounds are back-to-back).");
+        return (first, last);
     }
 
     /// <summary>Month/day to a real date on the season spine. Refuses anything that is not a
@@ -1505,6 +1613,13 @@ internal static partial class Program
                 writer.WriteString("firstDay", e.FirstDay);
                 writer.WriteString("lastDay", e.LastDay);
                 writer.WriteNumber("fieldSize", e.FieldSize);
+                // ★ S104 — ALWAYS WRITTEN, exactly like rivalId and forcedActive above, and
+                //   for the same reason: the fingerprint hashes bytes, so a world that omits
+                //   a defaulted key and one that spells it out must not be two worlds. Draw
+                //   is an explicit null for National.
+                writer.WriteString("kind", e.Kind);
+                if (e.Draw is { } radius) writer.WriteNumber("draw", radius);
+                else writer.WriteNull("draw");
                 writer.WriteStartArray("slots");
                 foreach (var s in e.Slots)
                 {
