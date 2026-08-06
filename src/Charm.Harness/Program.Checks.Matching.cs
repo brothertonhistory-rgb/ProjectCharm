@@ -446,6 +446,43 @@ internal static partial class Program
             }
 
             // ════════════════════════════════════════════════════════════════════
+            //  C15 — ★ THE ACCEPTANCE READ IS WELL-FORMED (it is NOT a basketball target).
+            // ════════════════════════════════════════════════════════════════════
+            {
+                // ★ WHAT IS ASSERTED: that the flag is the WORLD'S conference tier and not a
+                //   guess from class, that "no true road game" means exactly zero games this
+                //   school travelled to, and that the page renders the count. ★ WHAT IS NOT
+                //   ASSERTED: the count itself. 27 of 73 is a reading, and page-only
+                //   calibration means no number on that line is ever a pass condition.
+                var tierById = stock.Conferences.ToDictionary(c => c.Id, c => c.TierId);
+                var flagCorrect = m.Ledger.All(l =>
+                    l.IsPowerConference == (tierById[schoolById[l.SchoolId].ConferenceId] == "power"));
+                var powerRows = m.Ledger.Where(l => l.IsPowerConference).ToList();
+                var stayHome = powerRows.Where(l => l.MatchedRoadAsVisitor == 0).ToList();
+
+                // ★ A class-derived flag would NOT reproduce this — the discriminator that
+                //   keeps the tier read honest. Marquee carries the tier FLOOR, so mid-majors
+                //   that earned the class sit in it, and the two sets must differ.
+                var classDerived = m.Ledger.Count(l => l.ClassName == "Marquee");
+                var differs = classDerived != powerRows.Count;
+
+                // A school that never travelled also hosted every game it was matched into.
+                var consistent = stayHome.All(l =>
+                    l.MatchedHome + l.MatchedNeutral + l.FillerHosted + l.TerminalExtra
+                    == l.PairedTotal);
+                var rendered = MatchingPageLines(m)
+                    .Any(x => x.Contains("NO true road game", StringComparison.Ordinal));
+
+                Check("C15: the power-conference flag is the WORLD'S tier and not a guess from " +
+                      "class (the two sets differ), a school reading zero true road games " +
+                      "travelled to nothing, and the page prints the count — the COUNT is the " +
+                      "acceptance read and is never asserted to a value",
+                      flagCorrect && differs && consistent && rendered,
+                      $"{stayHome.Count} of {powerRows.Count} power-conference schools never " +
+                      $"leave home; {classDerived} Marquee-class schools for contrast");
+            }
+
+            // ════════════════════════════════════════════════════════════════════
             //  C14 — ★ ORACLE PARITY.
             // ════════════════════════════════════════════════════════════════════
             {

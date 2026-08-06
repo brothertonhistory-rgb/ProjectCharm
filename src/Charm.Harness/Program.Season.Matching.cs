@@ -129,6 +129,12 @@ internal static partial class Program
         public int ConvertedNeutralToHome { get; set; }
         public int SpilledRequests { get; set; }
 
+        /// <summary>★ Set from the world's conference tier, NOT inferred from class — a Marquee
+        /// school can be a mid-major that earned the floor, and the acceptance read below is
+        /// specifically about POWER-conference programs. Carried on the ledger so the page stays a
+        /// pure function of the report (§7) and Phase 93 can assert the count without the world.</summary>
+        public required bool IsPowerConference { get; init; }
+
         public int PairedTotal => MatchedHome + MatchedNeutral + MatchedRoadAsVisitor
                                 + FillerHosted + TerminalExtra;
     }
@@ -197,6 +203,8 @@ internal static partial class Program
         var prestige = ids.ToDictionary(i => i, i => schoolById[i].CurrentPrestige);
         var conference = ids.ToDictionary(i => i, i => schoolById[i].ConferenceId);
         var classOf = ids.ToDictionary(i => i, i => reqById[i].ClassName);
+        var conferenceTierById = world.Conferences.ToDictionary(c => c.Id, c => c.TierId);
+        var conferenceTier = ids.ToDictionary(i => i, i => conferenceTierById[schoolById[i].ConferenceId]);
 
         // DistanceKey for every ordered pair, computed once against the S92 ruler.
         var dk = new Dictionary<(int, int), int>();
@@ -223,6 +231,7 @@ internal static partial class Program
             SchoolId = i,
             SchoolName = reqById[i].SchoolName,
             ClassName = reqById[i].ClassName,
+            IsPowerConference = conferenceTier[i] == "power",
             RequestedHome = reqById[i].Home,
             RequestedNeutral = reqById[i].Neutral,
             RequestedRoad = reqById[i].Road,
@@ -532,6 +541,37 @@ internal static partial class Program
             v.Sort();
             lines.Add(string.Format(inv, "    {0,-9}{1,4} trip(s)   median {2,5} mi   p90 {3,6} mi",
                 cls, v.Count, MatchMedian(v), MatchPercentile(v, 0.9)));
+        }
+
+        // ── ★ THE ACCEPTANCE READ (Emmett's ruling, 2026-08-05) ────────────────────
+        //    THE COUNT IS THE MEASURE, NOT ANY ONE PROGRAM. A power-conference school that
+        //    never leaves home all November is the thing worth watching; Duke's slate is a
+        //    window onto the mechanism, not the archetype — the top of the ladder correctly
+        //    gets the toughest November the table produces. Read on TRUE ROAD GAMES: an
+        //    event or a neutral site is not a road trip, and a filler game is HOSTED.
+        //    ★ These schools did not FAIL to get a road game — most never requested one.
+        //    That is an S101 output surfacing on the S102 page, which is why it is printed
+        //    rather than asserted to a target.
+        var powerRows = m.Ledger.Where(l => l.IsPowerConference).ToList();
+        if (powerRows.Count > 0)
+        {
+            var stayHome = powerRows.Where(l => l.MatchedRoadAsVisitor == 0)
+                .OrderBy(l => l.SchoolId).ToList();
+            lines.Add($"  ★ power-conference schools with NO true road game: {stayHome.Count} " +
+                      $"of {powerRows.Count} — the number this matching is judged by:");
+            if (stayHome.Count == 0)
+            {
+                lines.Add("      none — every power-conference school leaves home at least once.");
+            }
+            else
+            {
+                foreach (var l in stayHome.Take(3))
+                    lines.Add(string.Format(inv,
+                        "      {0,-22} {1,2} home, {2} neutral, {3} filler-hosted — never a true road game",
+                        l.SchoolName, l.MatchedHome, l.MatchedNeutral, l.FillerHosted));
+                if (stayHome.Count > 3)
+                    lines.Add($"      … and {stayHome.Count - 3} more.");
+            }
         }
 
         // ── (3) The named eight's full Novembers ───────────────────────────────────

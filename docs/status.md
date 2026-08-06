@@ -763,14 +763,23 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-92 — ★ THE NON-CONFERENCE ARC, SESSIONS 3–4 (opened S101; sessions 1 and 2 shipped).** The brief is
+- **O-92 — ★ THE NON-CONFERENCE ARC, SESSIONS 3–5 (opened S101; sessions 1 and 2 shipped).
+  ★ THE ARC GREW FROM FOUR SESSIONS TO FIVE (Emmett, 2026-08-05)** — see C-42. The brief is
   `docs/nonconference-design-brief.md` (r3 — **R17's tilt now needs an r4 amendment, see C-41**). Remaining:
-  **(3) sites and nights** — R9–R12, every paired game gains a place, the neutral brief's crowd model wired at
-  last, dates around conference play and the tournament windows; **(4) the Independents' November and their
-  gap-filling role** (R13, and the same-conference legality test must EXEMPT their shared container — they are
-  fourteen strangers in one bucket, not league-mates). The class curve (brief §8.1) and R10's distance/quality
-  shape stay open for Emmett to rule off the page — and S102 added a second page number to rule against: the
-  trips-by-class table. Blocks **O-78** (a national ranking has no honest basis while leagues share no
+  **(3) THE SCHEDULE BREATHES** — S102's matcher is stateless, so with static prestige it reproduces
+  near-identical schedules season over season; session 3 adds the recency memory (a played opponent DEMOTES
+  behind fresh candidates — preference, never prohibition, on the S96 host-log pattern), the
+  proximity-weakened cooldown (a neighbour inside ~100 mi sits out one season, everyone else two), and the
+  reach grab (roughly one buy game in eight takes a hash-picked fresh school from the whole national bucket).
+  ★ **All three are keyed on a PORTABLE INTEGER HASH of (season, school, request), not a seed** — determinism
+  becomes "nothing random beyond the season's own identity" and oracle parity survives intact. The demotion
+  tier slots in FRONT of S102's §4 ordering keys and touches nothing else. **(4) sites and nights** — R9–R12,
+  every paired game gains a place, the neutral brief's crowd model wired at last, dates around conference play
+  and the tournament windows. **(5) the Independents' November and their gap-filling role** (R13, and the
+  same-conference legality test must EXEMPT their shared container — they are fourteen strangers in one
+  bucket, not league-mates). The class curve (brief §8.1) and R10's distance/quality shape stay open for
+  Emmett to rule off the page — S102 added two page numbers to rule against: the trips-by-class table and the
+  zero-road acceptance read. Blocks **O-78** (a national ranking has no honest basis while leagues share no
   opponents).
 
 - **O-91 — A DAMAGED SEASON N−1 EMPTIES THE HOST DEBT, RATHER THAN LEAVING A HOLE IN IT (opened S100).** S96's
@@ -1545,6 +1554,19 @@ chart is PROVISIONAL pending O-6.
   cannot hide inside a healthy national median of 148. **Wrong-looking output is a finding to print, never
   something to tune away.** Whoever revisits this changes the pick key, not the page — and the brief's R17
   needs an r4 line saying the tilt is a per-pairing preference that the PICK ORDER can override.
+- **C-42 — ★ THE ACCEPTANCE READ IS A COUNT, NOT A PROGRAM; AND THE ARC IS FIVE SESSIONS
+  (Emmett's ruling, 2026-08-05).** Two rulings from the same conversation. **(a)** The matching is judged by
+  **the number of POWER-CONFERENCE schools sitting at exactly zero true road games** — 27 of 73 on the stock
+  world (Arizona, California, Cincinnati, Connecticut, Georgetown, Illinois, Kentucky, Michigan State and
+  nineteen more), printed on the page with three named examples and their away composition. **Duke is a page
+  window, not the archetype** — the top of the ladder correctly gets the toughest November the table produces,
+  and the mixes are NOT to be reshaped around one program's slate. This closed a live proposal to make the
+  Marquee road count a scheduling target rather than the remainder (three options costed at 152 / 220 / 244
+  schools hosting games they did not want); the ruling is **surface the number first**. ★ Note what the count
+  actually reads: those schools did not FAIL to get a road game, they never REQUESTED one — an S101 output
+  surfacing on the S102 page, which is why C15 asserts the read is well-formed and never asserts its value.
+  **(b)** The arc grows to five sessions, with the schedule-breathes memory inserted as session 3 and sites
+  and the Independents renumbered to 4 and 5.
 - **C-33 — AN OFFENSIVE FOUL COUNTS TOWARD THE MAN'S FIVE, AND NEVER TOUCHES THE TEAM (Emmett's ruling,
   S87 check-in).** The cleared prompt accounted for only ONE offensive foul — the loose-ball shove in the
   rebound scrum, 0.38/game — and planned a new Discipline-alone draw for it. The check-in found three more
@@ -1661,17 +1683,28 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**O-92 session 3 — SITES AND NIGHTS** is the natural next step: S102 paired the whole country and every one of
-those 1,958 games is currently a matchup with no place and no date. Session 3 gives each one a site (R9–R12:
-the relocated home game, the alternating series, off-campus is off-campus) and a night around conference play
-and the tournament windows, and it is where `neutral-sites-design-brief.md` — ruled and waiting since S95 —
-finally gets wired, along with the `hasHost` seam `ApplyRoadShave` already takes. **This is the session where
-the second wall comes down on purpose**: giving games sites and dates changes what plays, so the fingerprint
-bundle moves by design and that must be stated up front rather than discovered.
+**O-92 session 3 — THE SCHEDULE BREATHES** is the next step, and it is now session 3 of five rather than the
+sites session (C-42b). S102's matcher is stateless: the map never moves and the ordering keys are fixed, so
+with static prestige a school plays very nearly the same November every year forever — Oklahoma State draws
+Oral Roberts and Tulsa every season and never meets UC Davis once. That is the placeholder talking, and
+session 3 replaces it with three dials at the R8 seam: **recency demotion** (a played opponent falls behind
+every fresh candidate — preference, never prohibition, persisted in the career file on the S96 host-log
+pattern), a **proximity-weakened cooldown** (a neighbour inside ~100 mi sits out one season, everyone else
+two, so genuine regional rivalries still recur while distant one-offs do not), and the **reach grab** (about
+one buy game in eight takes a hash-picked fresh school from the whole national bucket, which is what puts a
+Vermont or a Portland State on somebody's slate).
 
-Two things to settle before or at its design conversation: **the class curve** (brief §8.1) and **R10's
-distance/quality shape** — both still open, and both now have two pages to rule against rather than one.
-A third, smaller: whether the brief takes an **r4** for C-41's amendment to R17.
+★ **It needs no seed.** All three key on a portable integer hash of (season, school, request), so the matcher
+stays deterministic in the only sense that matters — same inputs, same answer, on any machine in either
+language — and C4, C5 and C14's oracle parity survive unchanged. This is a better answer than the seeded
+weighted draw Claude was steering toward in the S102 design conversation, and it is recorded as such.
+
+Its acceptance instrument is a **20-year rig** with four numbers: how often Tulsa recurs, the repeat ceiling
+table, the distinct-opponent count against the stateless baseline, and the reach list. ★ **The draft rig's
+figures (nine identical home opponents 20-of-20, Tulsa and Oral Roberts 10-of-20, 64 distinct opponents
+versus 15) are UNVERIFIED — re-measure them at build time rather than inheriting them.** The S81.3 lesson
+applies exactly: a plausible table in a prompt is the artifact that escapes the audit every code claim gets,
+and S102's own prompt shipped a wrong distance figure that way.
 
 Still ready if Emmett prefers a change of layer: **O-91** (the damaged-year host-debt page question, small),
 **O-88** (season totals blend conference and tournament games), **O-84's realignment guards**, and the
