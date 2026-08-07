@@ -794,15 +794,18 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-93 — ★ SUITE RUNTIME. Four phases each replay the SAME stock season from scratch** (same world, seed
-  20260720, same config), and every arc session has added one. Emmett raised it at S104: *"eventually every
-  test will take an hour or two at this pace."* **Step one is MEASUREMENT** — what fraction of suite time is
-  season replay versus the observation run and the sweeps — because three sessions running logged "+~30s,
-  flagged and accepted" without asking what the 30 seconds was of. Then a cached season run keyed on
-  (world, seed, config), which collapses four to two (Phase 95's showcase-free world is genuinely a second
-  world) and makes future arc sessions free on this axis. **Audit every consumer for mutation of the shared
-  outcome before wiring it** — that is the §2a shared-state bug class. Then decide about a fast/full split;
-  the commit gate stays the full run. Offered as micro-session **S104.1**.
+- **O-96 — ★ A SCHEDULE-ONLY SEASON MODE. 46% of the suite pays for basketball nothing reads.**
+  Phases 91, 90 and 87 (host debt, rotation, season memory) are 207s of 446s and all three are
+  multi-season career rigs. Verified against source in S104.1: `ReadSeasonLog` consumes exactly
+  HomeSchoolId, AwaySchoolId and IsConferenceGame — never a score, an overtime count or a
+  possession count. Add the stock-season phases (95, 93, 92 — another 29%, testing seating and
+  pairing rather than basketball) and roughly three quarters of the run is in scope.
+  ★ **TWO HAZARDS, NAMED AT OPEN TIME.** (1) The fingerprint checks genuinely need real games —
+  identify them PRECISELY rather than assuming which. (2) A schedule-only season must produce a
+  **byte-identical schedule** to a played one; if skipping games perturbs a seed stream or an
+  ordering, the corruption is SILENT. The proof is S104's C9a shape: run both, assert the schedule
+  fingerprints match. **Touches the season spine — wants a design pass and its own prompt, not a
+  bolt-on.** This is S104.2.
 
 - **O-94 — DO EVENT MEETINGS COUNT AGAINST A REPEAT CEILING?** The pairing log records contracted legs and
   matched pairs; it has never recorded tournament or showcase games. The repeat-ceiling session is its first
@@ -1563,6 +1566,13 @@ chart is PROVISIONAL pending O-6.
   Player data layer at 21k+ actives; moddability. (working-with-emmett §7)
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
+
+- **C-45 (S104.1, measured not ruled) — O-93 IS CLOSED, AND THE CACHE IT PROPOSED IS NOT THE FIX.**
+  O-93 theorised that four duplicated stock-season replays were the compounding suite cost. Measured:
+  they are 29%, while three multi-season career rigs are 46%, and a shared-season cache cannot touch
+  those. A second guess made at the same gate — that the 5,000-game observation and stress runs were
+  expensive — was also wrong; they are 4.7% combined. **Do not build the season cache.** The real
+  target is O-96. Suite timing is now permanent, so this is re-checkable rather than re-arguable.
 
 - **C-44 (Emmett, 2026-08-06) — SHOWCASES.**
   **(a) One event per place per DAY**, retiring S97's one-event-per-place. Two events may share a town, never

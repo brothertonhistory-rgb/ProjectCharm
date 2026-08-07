@@ -1,3 +1,48 @@
+## Session 104.1 — SUITE TIMING: THE HUNCH WAS WRONG, AND THE NUMBER SAYS SO. Every phase and both tail runs are now wall-clock timed, with a ranked table printed after the verdict. **Verified on Emmett's machine: ALL CHECKS PASSED, 446.3s across 74 timed sections.** ★ **This session exists because Emmett flagged suite time and Claude's proposed fix was aimed at the wrong target.** O-93 was opened on the theory that four duplicated stock-season replays were the compounding cost; the table shows they are 29%, while three multi-season CAREER RIGS — host debt, rotation, season memory — are 46%, and a cache cannot touch them. The tail runs Claude also suspected (5,000 simulated games) are 4.7%. **Closes O-93 by measurement; opens O-96.** One file. (2026-08-06)
+
+**Register:** micro-session, no design brief. Emmett raised it conversationally after S104: *"eventually every test will take an hour or two at this pace."*
+
+### What shipped
+
+`src/Charm.Harness/Program.cs` — the only file. A `SuiteTimed` wrapper around all 72 phase calls plus `ObservationRunV1` and `StressTestArchetypeRosters`, and a `SuiteTimingReport` printing the top 15 by cost with a cumulative column. The wrapper returns each phase's verdict untouched and re-throws in a `finally`, so a failing phase still fails and a throwing phase still takes the run down.
+
+**Permanent, not scaffolding.** The useful moment is the session AFTER a phase gets expensive, not this one.
+
+### The measurement (Emmett's machine, the record)
+
+```
+Phase 91 host debt        96.9s  21.7%
+Phase 90 rotation         88.2s  19.8%
+Phase 95 showcases        69.6s  15.6%
+Phase 93 matching         34.7s   7.8%
+Phase 92 non-conference   26.2s   5.9%
+Phase 87 season memory    21.9s   4.9%
+stress test               14.7s   3.3%
+observation run            6.3s   1.4%
+59 other sections         34.5s   7.7%
+```
+
+Claude's sandbox run was 719.7s with the SAME ranking and the same top-three share (57%), so the shape is portable even though the absolute times are not.
+
+### ★ What the number killed
+
+**The cache was the wrong fix and would have shipped.** O-93 proposed collapsing four duplicated stock-season replays; Claude had already reasoned it through and was ready to build it. Those phases (92, 93, 95) are 29% and a cache would have halved *part* of that — maybe 15% of the run — while leaving the actual top two untouched, because **Phases 90 and 91 are not stock-season replays at all.** They are twelve-season career rigs on fixture worlds.
+
+**The tail runs were a second wrong guess, made at the gate this session.** Claude flagged 5,000 games of simulation as a likely cost. They are 4.7% combined.
+
+Two wrong theories in one session, both plausible, both killed by one table. This is the S59.2 lesson in a different costume: a convenient assumption about where cost lives is an assumption, not neutrality.
+
+### ★ The real target (O-96)
+
+Phases 90, 91 and 87 are **207s, 46% of the run**, and all three are multi-season career rigs. Every season they run plays every game — hundreds of thousands of possessions — to check SCHEDULING.
+
+Verified against source this session: `ReadSeasonLog` consumes exactly `HomeSchoolId`, `AwaySchoolId`, `IsConferenceGame` from each logged game. It never reads `HomeScore`, `AwayScore`, `OvertimePeriods` or `PossessionCount`. design.md's own heading says so — *schedule facts only, enforced by what the code can see.* **So 46% of the suite is paying for basketball nothing reads**, and the stock-season phases (29%) are testing seating and pairing rather than basketball too.
+
+Opened as **O-96 — a schedule-only season mode**, and deliberately NOT built here. It touches the season spine. Two hazards named at open time: the fingerprint checks genuinely need real games and must be identified precisely rather than assumed; and a schedule-only season must produce a **byte-identical schedule** to a played one, or the corruption is silent. The proof has the same shape as S104's C9a — run both, assert the schedule fingerprints match.
+
+### Miss
+
+**Claude let this drift for three sessions.** Each arc session added a stock-season replay and each was logged "+~30s, flagged and accepted" without ever asking what the 30 seconds was *of*. Nothing in the harness had ever timed itself, so the cost was never a number and the hunch was never tested. Emmett raised it; Claude should have. Phase 95 — third most expensive in the suite at 69.6s — was built by Claude in S104 and shipped without a single question about its cost.
 ## Session 104 — SHOWCASES: THE EVENT POOL LEARNS A SECOND KIND. A world may now author a **showcase** — four schools, two stand-alone games, one night, no bracket and no advancement and no placement and no champion. `kind` and `draw` join the shared event shape as optional defaulted keys, so **every pre-S104 world loads unchanged and there is no schema bump**. A school may take one tournament AND one showcase in a season, never two of either, and is excluded from anything whose window it is already committed to. A showcase reaches a **radius** rather than the country, widening authored → +200 → +400 and never going national. A showcase game is **charged out of the season the school already had**, never added to it. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 95 PASS at 42 assertions.** Conference and dated fingerprints unmoved (`6f79d663…`, `7515df7d…`); event-games and results recaptured (`7c1a41c1…`, `898d9fe8…`); matching golden regenerated 1,958 → 1,934 pairs. ★ Every delivery prediction landed, including both moved fingerprints across platforms. **O-92 session 4 ships; records C-44; retires the one-event-per-place rule.** (2026-08-06)
 
 **Register:** build, under `PROMPT-showcases-s104-r2` (ChatGPT-cleared) against `docs/showcase-design-brief.md` as the design authority. Two new production files, one new check file, ten surgical edits, the stock world, and the matching oracle + golden. `Charm.Engine` and `Charm.History` UNTOUCHED.
