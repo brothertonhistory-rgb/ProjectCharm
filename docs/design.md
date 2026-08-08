@@ -11596,8 +11596,11 @@ the ledger carries requested and matched separately by category so a shortfall n
 - **The Selling home band and the fill order** — the real cause of low schools never hosting low
   schools. Its own session; the class curve has been deliberately open since S101 for Emmett to settle
   by reading the page.
-- **Event pairings are still not in `usedPairs`.** Two schools can meet in a tournament *and* in
-  November. Pre-existing, not opened by S105, and the reason the no-third-meeting check proves its
-  contract arm by **constructing** the collision rather than reading a set.
+- ★ **Event pairings are not in `usedPairs`, and that is now RULED FINE (C-44, Emmett, 2026-08-07).**
+  Two schools can meet in a tournament *and* in an ordinary November game. Surfaced at the S105 gate;
+  Emmett ruled it stands — *"it would be a rare occurence."* **Not an oversight; do not "fix" it.** It
+  remains the reason the no-third-meeting check proves its contract arm by **constructing** the
+  collision rather than reading a set, which is the right shape either way. O-94 — whether an event
+  meeting counts against a repeat *ceiling* — is a separate question and is still open.
 - **Dates** (R35/R36 are date-shaped and belong to the calendar session), the D2/D3 layer (C-36), the
   recurrence curve, and the showcase slate.

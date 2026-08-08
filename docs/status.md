@@ -1615,6 +1615,15 @@ chart is PROVISIONAL pending O-6.
   flagged Claude call (hosted → road → neutral; away → home → neutral; neutral → road → home). Emmett's placement
   question ("shouldn't the owed trip fill first?") is answered by R23 — it does; the ruling decides which REQUEST
   bucket shrinks, which placement order alone cannot.
+- **C-44 — A TOURNAMENT MEETING DOES NOT BLOCK A NOVEMBER MEETING (Emmett's ruling, 2026-08-07).** Event pairings
+  are not seeded into the matcher's used-pair set — only contracts are — so two schools can meet at the Jimmy V and
+  again in an ordinary non-conference game. Surfaced at the S105 gate as a gap; Emmett ruled it **fine as it stands**:
+  *"it would be a rare occurence."* ★ **This is a ruling, not an oversight — do not "fix" it.** Two consequences worth
+  keeping straight: the S105 no-third-meeting check proves its contract arm by **constructing** the collision rather
+  than reading the event set, which is the right shape regardless; and **O-94 still stands separately**, because
+  whether an event meeting counts against a REPEAT CEILING is a different question from whether it blocks a second
+  game in the same season. Answering C-44 does not answer O-94.
+
 - **C-36 — NON-D1 OPPONENTS ARE NOT BUILT NOW (Emmett's ruling, S101 design conversation, 2026-08-04).**
   They arrive with the D2/D3 layer, where the lowest teams pay local schools to visit. Do NOT conjure a
   generic non-D1 pool or fake schools to give the bottom home games — that job belongs to C-37 until the
@@ -1787,31 +1796,24 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-**THE REPEAT CEILING AND THE RECENCY DEMOTION** — a small session, and the arc's next step now that showcases
-have shipped. The S103 pairing log is the persisted fact both read: per-season pair, site, and the
-Matched/Contracted source word (a Contracted rematch must never be demoted; a contract FORCES recurrence). The
-schedule-breathes dials (demotion in front of S102's §4 ordering keys, the proximity-weakened cooldown, the
-reach grab, all on a portable integer hash of season/school/request — no seed, so C4/C5/C14 parity survives)
-slot in with no persistence work left to do. Its acceptance instrument is a **20-year rig** with four numbers:
-how often Tulsa recurs, the repeat-ceiling table, the distinct-opponent count against the stateless baseline,
-and the reach list.
+★ **SITES AND NIGHTS — FINISH A SCHEDULE (O-92 session 6).** Emmett's direction, 2026-08-07: *"I'd like to see some
+schedules finished before I make any more tweaks."* Every non-conference pairing has an opponent and a host and
+**still has no date and no city**; the conference season has been dated since S94. This session joins them, so a
+school's year can be read start to finish for the first time. Scope belongs to the design conversation, but the
+material already parked for it is R9–R12, dates around conference play, the crowd model, ★ and the **SEMI-HOME**
+ruling — a third site category where the host keeps the advantage without playing on campus (the leg format's site
+WORD is already ready for it).
 
-★ **BLOCKED ON ONE RULING FIRST — O-94.** The pairing log has never recorded tournament or showcase meetings,
-so as written the ceiling cannot see that two schools met at the Jimmy V. That decision is Emmett's and belongs
-to the design conversation, not the build.
+★ **THE TWEAKS ARE EXPLICITLY DEFERRED BEHIND IT, NOT DROPPED.** Both of the following were offered at the S105 docs
+step and Emmett deferred both in favour of seeing a finished schedule. Neither may fade from this board:
 
-★ **AND CHECK C-41 AGAINST THE PAGE BEFORE SCOPING.** Twelve regional showcases now pull bottom-tier schools to
-nearby cities instead of wherever the filler sent them, so the "small schools take the longest trips" inversion
-may have shifted. It was ruled to stand as measured; re-read it rather than assuming the old shape.
-
-★ **S104.1 (O-93 — suite runtime) SHIPPED.** ★ **New since S105, and it competes for this slot:** the **Selling home
-band and the fill order** — the cause Emmett named directly (*"there just aren't enough low schools hosting low
-schools"*) and the one thing S105 measured sharply and deliberately did not fix. Sixty Selling schools hosting 1.05
-games each and busing 10.62 times, with every bottom-hosts-bottom game hosted by a *Working* school. Emmett's call
-which runs first.
-
-★ **ALSO NEW FROM S105 — event pairings are still absent from `usedPairs`**, so two schools can meet in a tournament
-AND in November. Pre-existing rather than opened by S105, and it overlaps O-94 directly: the same fact both need.
+- **The Selling home band and the fill order** — the cause Emmett named directly (*"there just aren't enough low
+  schools hosting low schools"*) and the one thing S105 measured sharply and deliberately did not fix: sixty Selling
+  schools hosting 1.05 games each and busing 10.62 times, with every bottom-hosts-bottom game hosted by a *Working*
+  school because the top-down fill sells the bottom out before the filler opens. The class curve has been open for
+  Emmett to rule off the page since S101.
+- **The repeat ceiling and the recency demotion** — still a small session, still reading the S103 pairing log, still
+  blocked on O-94's ruling. It was the approved candidate before S105 and it keeps its place in the queue.
 
 ★ **AND THE TIMING BOARD IS UNEXPLAINED.** S105's run reads 166.9s against S104.1's 446.3s baseline. It may be a
 different measurement rather than a real speedup. **Not guessed at** — check it before quoting either number.
