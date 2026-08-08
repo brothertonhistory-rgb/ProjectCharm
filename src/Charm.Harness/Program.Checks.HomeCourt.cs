@@ -62,9 +62,14 @@ internal static partial class Program
     //  hash" and "23 games" are completely different failures and should not arrive
     //  wearing the same face.
     private const long GoldenSeed = 20260703;
-    private const int GoldenGameCount = 160;
+    // ★ S105.2 recapture: Emmett's ruling took the tiny world's leagues from 16 to
+    //   12 conference games, so the zero-shave season is 120 games now and the hash
+    //   was re-emitted by the SAME SeasonFingerprint helper on the new world. The
+    //   pre-S95 provenance above is history for the 160-game shape; the ASSERTION —
+    //   zero shave reproduces one fixed season, byte for byte — is unchanged.
+    private const int GoldenGameCount = 120;
     private const string GoldenZeroSha256 =
-        "c853b3698ae28b31eec3ff302e877743f5cd3cb3f8e7fee7f1da7f3d3cc38e32";
+        "7b5b21d0906ff690e51f7a95393693640436c453ae3527561f108211807ff3ce";
 
     /// <summary>The SEVENTEEN exempt ratings, spelled out here INDEPENDENTLY of
     /// production. B3 derives the expected shaved set as (live public int surface −

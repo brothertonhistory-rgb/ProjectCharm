@@ -41,7 +41,7 @@
       "name": "Granite Coast Conference",
       "shortName": "Granite",
       "tierId": "power",
-      "games": 16,
+      "games": 12,
       "skip": 0,
       "nights": [
         "sat",
@@ -56,7 +56,7 @@
       "name": "River Valley League",
       "shortName": "River Valley",
       "tierId": "highMid",
-      "games": 16,
+      "games": 12,
       "skip": 0,
       "nights": [
         "sat",
@@ -71,7 +71,7 @@
       "name": "Prairie Athletic Association",
       "shortName": "Prairie",
       "tierId": "lowMid",
-      "games": 16,
+      "games": 12,
       "skip": 0,
       "nights": [
         "sat",
@@ -86,7 +86,7 @@
       "name": "Timberline Conference",
       "shortName": "Timberline",
       "tierId": "low",
-      "games": 16,
+      "games": 12,
       "skip": 0,
       "nights": [
         "sat",

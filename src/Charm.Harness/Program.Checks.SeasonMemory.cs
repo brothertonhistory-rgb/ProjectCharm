@@ -63,13 +63,15 @@ internal static partial class Program
     //  wrong hash" and "23 games" are different failures and should not arrive
     //  wearing the same face.
     private const long MemoryGoldenSeed = 20260703;
-    private const int MemoryGoldenGameCount = 160;
+    private const int MemoryGoldenGameCount = 120;
     private const string MemoryGoldenScheduleSha256 =
-        "51c8e88c202e9eb663f69dd2d317ca5d213a3faf98623496598a8e7e06684f54";
+        "6fc122dd3bc4f48a6f7c8b3787dcc236603536d4d610bf53ad0934480b189981";
 
     /// <summary>The world identity the golden was taken against, recorded beside the hash so a
-    /// future session can tell "the fixture changed" from "the engine changed".</summary>
-    private const string MemoryGoldenWorldNote = "fixture-tiny: 20 schools, 4 leagues of 5, 16 games, skip 0";
+    /// future session can tell "the fixture changed" from "the engine changed".
+    /// ★ S105.2: the fixture changed — Emmett's ruling took the five-team leagues
+    /// from 16 conference games to 12, so this golden was recaptured then.</summary>
+    private const string MemoryGoldenWorldNote = "fixture-tiny: 20 schools, 4 leagues of 5, 12 games, skip 0";
 
     private static bool Phase87SeasonMemoryCheck(string configPath)
     {
@@ -161,30 +163,44 @@ internal static partial class Program
             }
 
             // ── The loaded-zero-residual source: a REAL career on a world whose pairs all
-            //    meet an even number of times. "Loaded" must mean "a valid source log", not
-            //    "at least one residual was found".
+            //    meet an even number of times. ★ S105.2: tiny no longer qualifies — the
+            //    12-game ruling makes every tiny pair meet THREE times (all odd) — so the
+            //    even world is RIGGED from tiny here: same 20 schools, same four leagues,
+            //    8 games apiece (a clean double round robin, every pair meets exactly 2).
+            var evenWorld = new WorldFile
+            {
+                SchemaVersion = WorldSchemaVersion, Kind = tiny.Kind, EraLabel = tiny.EraLabel,
+                Division = tiny.Division, WorldSeed = tiny.WorldSeed, Tiers = tiny.Tiers,
+                Places = tiny.Places,
+                Conferences = tiny.Conferences.Select(c => c with { Games = 8 }).ToList(),
+                Schools = tiny.Schools,
+            };
+            var evenGameCount = evenWorld.Conferences.Sum(
+                c => evenWorld.Schools.Count(s => s.ConferenceId == c.Id) * c.Games / 2);
             var evenPath = Path.Combine(scratch, "even", "career.history.json");
-            var even1 = PlayRetainedSeason(tiny, MemoryGoldenSeed, evenPath, configPath);
+            var even1 = PlayRetainedSeason(evenWorld, MemoryGoldenSeed, evenPath, configPath);
             HostMemory evenMemory;
             List<SeasonGame> even2;
             SeasonMemoryOutcome even2Outcome;
-            using (var store = HistoryStore.Open(evenPath, WorldFingerprint(tiny)))
+            using (var store = HistoryStore.Open(evenPath, WorldFingerprint(evenWorld)))
             {
                 evenMemory = ReadHostMemory(store);
-                even2 = BuildSeasonSchedule(tiny, MemoryGoldenSeed, store, out even2Outcome);
+                even2 = BuildSeasonSchedule(evenWorld, MemoryGoldenSeed, store, out even2Outcome);
             }
-            Check("C2f: a valid source with only even-split pairs LOADS and remembers nothing",
+            Check("C2f: a valid source with only even-split pairs LOADS and remembers nothing "
+                  + "(rigged 8-game double round robin — S105.2 made tiny all-odd)",
                   evenMemory.Status == HostMemoryStatus.Loaded && evenMemory.SourceSeasonId == 1
                   && evenMemory.AttemptedSeasonId == 1 && evenMemory.Problem == HostMemoryProblem.None
                   && evenMemory.ResidualPairsRemembered == 0
-                  && evenMemory.ConferenceGamesRead == MemoryGoldenGameCount,
+                  && evenMemory.ConferenceGamesRead == evenGameCount,
                   $"{evenMemory.Status}, {evenMemory.ResidualPairsRemembered} residuals, " +
                   $"{evenMemory.ConferenceGamesRead} games read");
-            Check("C2g: loaded-but-inapplicable leaves the schedule exactly as it was (C8 iv)",
+            Check("C2g: loaded-but-inapplicable leaves the schedule exactly as it was (C8 iv) — "
+                  + "the with-memory build is byte-identical to the same world and seed's "
+                  + "no-memory build",
                   even2Outcome.Status == HostMemoryStatus.Loaded && even2Outcome.SourceSeasonId == 1
                   && even2Outcome.ResidualsFlipped == 0
-                  && ScheduleFingerprint(even2) == MemoryGoldenScheduleSha256
-                  && ScheduleFingerprint(even1.Schedule) == MemoryGoldenScheduleSha256,
+                  && ScheduleFingerprint(even2) == ScheduleFingerprint(even1.Schedule),
                   $"{even2Outcome.ResidualsFlipped} flipped");
 
             // ════════════════════════════════════════════════════════════════════
@@ -406,17 +422,19 @@ internal static partial class Program
             });
             var evenMeetings = new Dictionary<(int Lo, int Hi), int> { [evenPair] = 2 };
             var dropped = ResidualsToFlip(evenPairDebt, evenMeetings, memLeague);
-            var tinyLeague = LeagueMembers(tiny, 1);
-            var tinyConf = tiny.Conferences.Single(c => c.Id == 1);
-            var tinySlate = BuildConferenceSlate(
-                tinyLeague, tinyConf.Games, tinyConf.Skip, new List<(int, int)>(), "c6 ",
-                debt: OneSeasonDebt(tinyLeague.SelectMany(
-                    a => tinyLeague.Where(b => b > a).Select(b => ((Lo: a, Hi: b), a)))
+            // ★ S105.2 — the real-league half reads the RIGGED even world (see C2f): tiny's
+            //   own pairs meet three times now, so a tiny slate WOULD fix hosts, correctly.
+            var evenLeague = LeagueMembers(evenWorld, 1);
+            var evenConf = evenWorld.Conferences.Single(c => c.Id == 1);
+            var evenSlate = BuildConferenceSlate(
+                evenLeague, evenConf.Games, evenConf.Skip, new List<(int, int)>(), "c6 ",
+                debt: OneSeasonDebt(evenLeague.SelectMany(
+                    a => evenLeague.Where(b => b > a).Select(b => ((Lo: a, Hi: b), a)))
                     .ToDictionary(x => x.Item1, x => x.Item2)));
             Check("C6a: EMISSION — a pair even THIS season gets no venue, and the league still builds",
-                  dropped.Count == 0 && tinySlate.Verdict == SlateVerdict.Feasible
-                  && tinySlate.MemoryFixedHosts == 0,
-                  $"{dropped.Count} venues, {tinySlate.Verdict}");
+                  dropped.Count == 0 && evenSlate.Verdict == SlateVerdict.Feasible
+                  && evenSlate.MemoryFixedHosts == 0,
+                  $"{dropped.Count} venues, {evenSlate.Verdict}");
 
             //  ★ MEMORY. The same pair, the same balance, read through a window in which the
             //    MOST RECENT year is the even one. The balance must survive it untouched, and
@@ -441,6 +459,7 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             //  C7 — foreign, malformed and self-referential memory.
             // ════════════════════════════════════════════════════════════════════
+            var tinyLeague = LeagueMembers(tiny, 1);   // real schools, other league (C7a)
             var foreign = ResidualsToFlip(
                 OneSeasonDebt(new Dictionary<(int Lo, int Hi), int>
                 {

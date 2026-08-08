@@ -5,14 +5,18 @@ namespace Charm.Harness;
 // ============================================================================
 //  Phase 85 — CONFERENCE DATES (Session 94)
 //
-//  ★ C2 IS THE ONE THAT MATTERS: no team plays three conference games in any
-//  Monday-to-Sunday week — Emmett, twice, the second time as an absolute:
-//  "any instance of that is abject failure, zero exceptions." Everything else
-//  in this file should be read in its shadow, and C2 carries TWO negative
-//  controls: one proving the checker rejects a constructed violation, and one
-//  proving it ACCEPTS the real UConn pattern (Sun/Wed/Sat — three games in
-//  seven rolling days, never three in a calendar week), so a later session
-//  cannot quietly restore r8's rolling-window reading and stay green.
+//  ★ C2 IS THE ONE THAT MATTERS — S105.2 rewrote it to DISCRIMINATE: in any
+//  Monday-to-Sunday week a team plays at most ONE weekday (Mon-Fri) game and
+//  at most ONE weekend (Sat-Sun) game — Emmett's "strict weekday game/weekend
+//  game/weekday game process". Two ceilings of one subsume the original
+//  never-three-in-a-week absolute ("any instance of that is abject failure,
+//  zero exceptions"), whose standalone test is deleted as sediment, not kept
+//  beside the new one. C2 carries a battery of controls: constructed weekday
+//  and weekend doubles REJECTED, the Mon/Wed/Sat triple still rejected, the
+//  real UConn Sun/Wed/Sat rolling pattern ACCEPTED, the Ivy/Big Sky
+//  Friday+Saturday pair ACCEPTED (A1: Friday is a weekday), a Sunday-then-
+//  Monday consecutive pair ACCEPTED (different weeks), and the weekend
+//  definition itself asserted over all seven days on both sides.
 //
 //  Golden parity: the oracle's dated fingerprints are asserted EXACTLY —
 //  integers and dates, no tolerance, no platform hazard (nothing here touches
@@ -23,9 +27,9 @@ internal static partial class Program
 {
     // tools/schedule_oracle.py exports (functions of the WORLD + START YEAR alone).
     private const string DatesOracleStockFp =
-        "7515df7d72f801f49d264ff52d6472911ac87d0996d44269d113b0ef83cb632a";
+        "46d89bf88e4a33c8bc388886c179cc0bf4e4bba0fe5674748d07e2243caf646a";
     private const string DatesOracleTinyFp =
-        "2c521c9f8f2ee203c6de55e1018ade3c7bec173680463e401c4ad5349602f2d3";
+        "93e27e5b663c87483e28aa67359123f1cf0421e206dc60bc62b72739e6f7fcf0";
 
     private static bool Phase85ConferenceDatesCheck(string configPath)
     {
@@ -78,7 +82,7 @@ internal static partial class Program
                 l.Add(i);
             }
 
-            var maxWeekLoad = 0;
+            var maxWdLoad = 0; var maxWeLoad = 0;
             var windowBad = 0; var nightBad = 0; var totalsBad = 0; var xmasBad = 0;
             var edgeBad = 0; var wallWeekBad = 0; var capBad = 0; var idleBad = 0;
             var adjBad = 0; var quarterBad = 0; var budgetBad = 0; var decOutside20AndRuled = 0;
@@ -94,6 +98,7 @@ internal static partial class Program
                 var xmas = SeasonMonday(new DateOnly(year, 12, 25));
                 var wkCount = new Dictionary<DateOnly, int>();
                 var teamWeek = new Dictionary<(int, DateOnly), int>();
+                var teamHalf = new Dictionary<(int, DateOnly, bool), int>();
                 var byDate = new Dictionary<DateOnly, int>();
                 var teamGames = members.ToDictionary(t => t, _ => new List<(DateOnly D, int I)>());
                 foreach (var i in idxs)
@@ -105,8 +110,11 @@ internal static partial class Program
                     if (wm == xmas) xmasBad++;
                     wkCount[wm] = wkCount.GetValueOrDefault(wm) + 1;
                     byDate[d] = byDate.GetValueOrDefault(d) + 1;
+                    var half = SeasonIsWeekend(d);
                     teamWeek[(games[i].HomeId, wm)] = teamWeek.GetValueOrDefault((games[i].HomeId, wm)) + 1;
                     teamWeek[(games[i].AwayId, wm)] = teamWeek.GetValueOrDefault((games[i].AwayId, wm)) + 1;
+                    teamHalf[(games[i].HomeId, wm, half)] = teamHalf.GetValueOrDefault((games[i].HomeId, wm, half)) + 1;
+                    teamHalf[(games[i].AwayId, wm, half)] = teamHalf.GetValueOrDefault((games[i].AwayId, wm, half)) + 1;
                     teamGames[games[i].HomeId].Add((d, i));
                     teamGames[games[i].AwayId].Add((d, i));
                 }
@@ -116,7 +124,9 @@ internal static partial class Program
                     || wkCount.GetValueOrDefault(window[^1]) == 0) edgeBad++;
                 var wallWeek = SeasonMonday(wall);
                 if (wallWeek != window[^1] && wkCount.GetValueOrDefault(wallWeek) != 0) wallWeekBad++;
-                foreach (var v in teamWeek.Values) maxWeekLoad = Math.Max(maxWeekLoad, v);
+                foreach (var ((_, _, hf), v) in teamHalf)
+                    if (hf) maxWeLoad = Math.Max(maxWeLoad, v);
+                    else maxWdLoad = Math.Max(maxWdLoad, v);
                 foreach (var v in byDate.Values) if (v > n / 2) capBad++;
                 var idle = 2 * c.Weeks - c.Games;
                 foreach (var t in members)
@@ -143,9 +153,11 @@ internal static partial class Program
                     }
                 }
             }
-            Check("C2 ★ NO TEAM PLAYS THREE CONFERENCE GAMES IN ANY MONDAY-TO-SUNDAY WEEK "
-                  + "— every team, every game, across the December boundary",
-                  maxWeekLoad == 2, $"max observed {maxWeekLoad}");
+            Check("C2 ★ AT MOST ONE WEEKDAY (Mon-Fri) AND ONE WEEKEND (Sat-Sun) CONFERENCE "
+                  + "GAME PER TEAM PER MONDAY-TO-SUNDAY WEEK — every team, every game "
+                  + "(S105.2; subsumes and replaces the never-three-in-a-week test)",
+                  maxWdLoad <= 1 && maxWeLoad <= 1,
+                  $"max weekday {maxWdLoad}, max weekend {maxWeLoad}");
             Check("C3 every game inside its league's window, on or before the wall, "
                   + "on an active authored night", windowBad == 0 && nightBad == 0);
             Check("C4 the schedule USES the whole window: exact weekly totals (heavier "
@@ -162,27 +174,53 @@ internal static partial class Program
                   + "ZERO same-quarter collisions — the whole stock world",
                   adjBad == 0 && quarterBad == 0, $"adjacent {adjBad} sameQuarter {quarterBad}");
 
-            // ── C2's negative controls — the checker itself is what is under test ──
-            static int MaxMonSunLoad(IEnumerable<DateOnly> ds)
+            // ── C2's controls — the checker itself is what is under test. The rule
+            //    checker mirrors C2 exactly: per Mon-Sun week, per half, at most one. ──
+            static bool BreaksWeekdayWeekendRule(IEnumerable<DateOnly> ds)
             {
-                var byWk = new Dictionary<DateOnly, int>();
+                var byHalf = new Dictionary<(DateOnly, bool), int>();
                 foreach (var d in ds)
                 {
-                    var wm = SeasonMonday(d);
-                    byWk[wm] = byWk.GetValueOrDefault(wm) + 1;
+                    var k = (SeasonMonday(d), SeasonIsWeekend(d));
+                    byHalf[k] = byHalf.GetValueOrDefault(k) + 1;
                 }
-                return byWk.Count == 0 ? 0 : byWk.Values.Max();
+                return byHalf.Values.Any(v => v > 1);
             }
+            var wdDouble = new[] { new DateOnly(2027, 1, 5), new DateOnly(2027, 1, 6) };
+            Check("C2 ★ negative control (§4.2): a constructed Tuesday+Wednesday week — "
+                  + "two weekday games, legal under the OLD rule — is REJECTED",
+                  BreaksWeekdayWeekendRule(wdDouble));
+            var weDouble = new[] { new DateOnly(2027, 1, 9), new DateOnly(2027, 1, 10) };
+            Check("C2 ★ negative control (§4.3): a Saturday+Sunday pair — the weekend "
+                  + "double Emmett ruled out by name — is REJECTED",
+                  BreaksWeekdayWeekendRule(weDouble));
             var violation = new[] { new DateOnly(2027, 1, 4), new DateOnly(2027, 1, 6),
                                     new DateOnly(2027, 1, 9) };            // Mon/Wed/Sat: one week
+            Check("C2 negative control: the Mon/Wed/Sat triple in ONE calendar week is "
+                  + "still rejected — now for a second reason (two weekday games) on top "
+                  + "of its three-game total", BreaksWeekdayWeekendRule(violation));
             var uconn = new[] { new DateOnly(2026, 1, 4), new DateOnly(2026, 1, 7),
                                 new DateOnly(2026, 1, 10) };               // Sun/Wed/Sat: real, legal
-            Check("C2 negative control: a constructed Mon/Wed/Sat triple in ONE calendar "
-                  + "week is rejected", MaxMonSunLoad(violation) == 3);
-            Check("C2 ★ acceptance control: the real UConn Sun-Jan-4 / Wed-Jan-7 / "
-                  + "Sat-Jan-10 pattern — three in seven ROLLING days — is ACCEPTED, so the "
-                  + "rolling-window reading cannot quietly return",
-                  MaxMonSunLoad(uconn) == 2);
+            Check("C2 ★ acceptance control (§4.4): the real UConn Sun-Jan-4 / Wed-Jan-7 / "
+                  + "Sat-Jan-10 pattern — three in seven ROLLING days, the Sunday in the "
+                  + "week before — is ACCEPTED, so the rolling-window reading cannot return",
+                  !BreaksWeekdayWeekendRule(uconn));
+            var ivyPair = new[] { new DateOnly(2027, 1, 8), new DateOnly(2027, 1, 9) };
+            Check("C2 ★ acceptance control (§4.5): the Ivy League and Big Sky "
+                  + "Friday+Saturday pair is LEGAL — A1: Friday is the weekday game",
+                  !BreaksWeekdayWeekendRule(ivyPair));
+            var sunMon = new[] { new DateOnly(2027, 1, 10), new DateOnly(2027, 1, 11) };
+            Check("C2 acceptance control (§4.7): a Sunday-then-Monday consecutive pair is "
+                  + "ACCEPTED — different Mon-Sun weeks, one weekend then one weekday game "
+                  + "(the Ivy's one-day turnaround wearing the other order; synthetic, no "
+                  + "stock league authors both nights — flagged as a consequence of the "
+                  + "rule, not a decision)", !BreaksWeekdayWeekendRule(sunMon));
+            var wk0 = new DateOnly(2027, 1, 4);                            // a Monday
+            Check("C16 ★ THE WEEKEND DEFINITION OVER ALL SEVEN DAYS (§4.6) — Mon-Fri "
+                  + "false, Sat/Sun true; the oracle asserts the same seven, so A1 is one "
+                  + "line to change on each side and the two sides cannot drift apart",
+                  Enumerable.Range(0, 7).All(i =>
+                      SeasonIsWeekend(wk0.AddDays(i)) == i >= 5));
 
             // ── C4's negative control: empty an edge week, the checker must reject ──
             {

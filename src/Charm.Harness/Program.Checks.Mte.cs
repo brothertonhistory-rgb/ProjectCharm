@@ -24,12 +24,18 @@ namespace Charm.Harness;
 
 internal static partial class Program
 {
-    /// <summary>★ Captured from the PRISTINE v4 tree, before any S97 code or fixture change.
-    /// These are the genuine pre-S97 artifacts and they are the authority for C1.</summary>
-    private const string MtePreS97TinyScheduleSha =
-        "51c8e88c202e9eb663f69dd2d317ca5d213a3faf98623496598a8e7e06684f54";
-    private const string MtePreS97TinyDatedSha =
-        "2c521c9f8f2ee203c6de55e1018ade3c7bec173680463e401c4ad5349602f2d3";
+    /// <summary>★ fixture-tiny RECAPTURED at S105.2 (Emmett's ruling: its five-team
+    /// leagues play 12 conference games, not 16 — 16 could not obey the new
+    /// weekday/weekend rule; 30 league games over 9 weeks sits exactly on the
+    /// 2·floor(n/2)=4 ceiling). These are no longer the pre-S97 pristine artifacts
+    /// for tiny; they remain the fixed authority C1 pins the zero path to.
+    /// The MEMORY pair is still the genuine pre-S97 capture — its dates are
+    /// untouched by the rule, which is itself evidence the rule changed nothing
+    /// it did not need to.</summary>
+    private const string MteTinyScheduleSha =
+        "6fc122dd3bc4f48a6f7c8b3787dcc236603536d4d610bf53ad0934480b189981";
+    private const string MteTinyDatedSha =
+        "93e27e5b663c87483e28aa67359123f1cf0421e206dc60bc62b72739e6f7fcf0";
     private const string MtePreS97MemoryScheduleSha =
         "eee5e256b0c6fc871d565b8c27c2925824e3b3ba8e76a717a3fdae4c6c0b36dc";
     private const string MtePreS97MemoryDatedSha =
@@ -78,9 +84,9 @@ internal static partial class Program
             var tinySched = BuildSeasonSchedule(tiny, MteCheckSeed);
             var tinyFp = ScheduleFingerprint(tinySched);
             var tinyDated = SeasonDateSchedule(tiny, tinySched, SeasonDefaultStartYear);
-            Check("C1b: ★ fixture-tiny's schedule matches the PRE-S97 golden — the schema move " +
-                  "changed no basketball",
-                  tinyFp == MtePreS97TinyScheduleSha && tinyDated == MtePreS97TinyDatedSha,
+            Check("C1b: ★ fixture-tiny's schedule matches its fixed golden (recaptured at " +
+                  "S105.2: the 12-game ruling plus the weekday/weekend rule)",
+                  tinyFp == MteTinyScheduleSha && tinyDated == MteTinyDatedSha,
                   tinyFp[..16] + "… / " + tinyDated[..16] + "…");
 
             var memSched = BuildSeasonSchedule(mem, MteCheckSeed);

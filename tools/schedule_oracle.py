@@ -586,6 +586,13 @@ def _monday(d):
     return d - _dt.timedelta(days=d.weekday())
 
 
+def is_weekend(d):
+    """★ S105.2 — THE definition of the weekend, once (A1): Saturday and Sunday.
+    Friday is a weekday — Emmett, on the Ivy pair: the Friday/Saturday back-to-back
+    is legal BECAUSE Friday is the weekday game. One line to change, here only."""
+    return d.weekday() >= 5
+
+
 def parse_nights(nights, n, conf_label):
     """Case-normalised, validated: distinct recognised weekdays; even leagues use the
     first two, odd leagues all three. Returns the ACTIVE ordered night list."""
@@ -664,7 +671,8 @@ def _quarter_of(seq_index, g):
 
 
 def date_conference(members, g, weeks, offset_days, nights, oriented_games,
-                    start_year, conf_label="", budget=DATE_SEARCH_BUDGET):
+                    start_year, conf_label="", budget=DATE_SEARCH_BUDGET,
+                    feasibility=None):
     """The heart of S94: partition the S93 oriented games (emission order) into dated
     rounds. Returns (dates, window, wall): dates[i] dates oriented_games[i].
 
@@ -769,6 +777,10 @@ def date_conference(members, g, weeks, offset_days, nights, oriented_games,
         def build(w):
             if w == len(window):
                 return all(used)
+            if feasibility is not None:
+                feasibility.setdefault("week_entries", {})
+                feasibility["week_entries"][w] = \
+                    feasibility["week_entries"].get(w, 0) + 1
             target = targets[w]
             dts = [window[w] + _dt.timedelta(days=_WD[a]) for a in active]
             weeks_left = len(window) - w
@@ -785,6 +797,12 @@ def date_conference(members, g, weeks, offset_days, nights, oriented_games,
             order = sorted((sp for sp in range(len(stream)) if not used[sp]),
                            key=lambda sp: (-urgency(stream[sp]), sp))
             played_wk = {s2: 0 for s2 in members}
+            # ★ S105.2 — the weekday/weekend rule, PRUNED not validated (r2 §2b-bis):
+            #   per-team occupancy of each half of the week, kept beside played_wk,
+            #   incremented on take and unwound on backtrack in the same places.
+            wd_wk = {s2: 0 for s2 in members}
+            we_wk = {s2: 0 for s2 in members}
+            date_is_weekend = [is_weekend(d) for d in dts]
             pairs_wk = set()
             on_date = [set() for _ in dts]
             chosen = []
@@ -853,14 +871,22 @@ def date_conference(members, g, weeks, offset_days, nights, oriented_games,
                             continue
                         if len(on_date[di]) >= 2 * cap:
                             continue
+                        # ★ S105.2 — at most one weekday and one weekend game a week:
+                        #   a date whose half is already occupied by EITHER team is
+                        #   rejected here, before it is ever taken.
+                        occ = we_wk if date_is_weekend[di] else wd_wk
+                        if occ[h2] >= 1 or occ[a2] >= 1:
+                            continue
                         on_date[di].add(h2); on_date[di].add(a2)
                         played_wk[h2] += 1; played_wk[a2] += 1
+                        occ[h2] += 1; occ[a2] += 1
                         pairs_wk.add(key)
                         chosen.append((sp, gi, di))
                         if pick(pos + 1, count + 1):
                             return True
                         chosen.pop()
                         pairs_wk.discard(key)
+                        occ[h2] -= 1; occ[a2] -= 1
                         played_wk[h2] -= 1; played_wk[a2] -= 1
                         on_date[di].discard(h2); on_date[di].discard(a2)
                         break        # date choice is priority-forced, not branched
@@ -942,6 +968,7 @@ def prove_dates(schools, conferences, games, dates, start_year, meta, tag):
         xmas = _monday(_dt.date(start_year, 12, 25))
         wk_count = {}
         team_week = {}
+        team_half = {}
         team_games = {s: [] for s in members}
         by_date = {}
         for i in idxs:
@@ -958,12 +985,19 @@ def prove_dates(schools, conferences, games, dates, start_year, meta, tag):
             _, h, a = games[i]
             for t in (h, a):
                 team_week[(t, wm)] = team_week.get((t, wm), 0) + 1
+                half = "we" if is_weekend(d) else "wd"
+                team_half[(t, wm, half)] = team_half.get((t, wm, half), 0) + 1
                 team_games[t].append((d, i))
         for wi, wm in enumerate(window):
             assert wk_count.get(wm, 0) == targets[wi], \
                 f"{tag}: week {wm} holds {wk_count.get(wm, 0)}, target {targets[wi]}"
-        for (t, wm), c in team_week.items():
-            assert c <= 2, f"{tag}: team {t} plays {c} in week {wm} — ABJECT FAILURE"
+        # ★ S105.2 — THE RULE (replaces the old <=2-a-week assert, which two ceilings
+        #   of one subsume; leaving it would be a dead line reading as protection):
+        #   at most ONE Mon-Fri game and ONE Sat-Sun game per team per week.
+        for (t, wm, half), c in team_half.items():
+            assert c <= 1, (f"{tag}: team {t} plays {c} "
+                            f"{'weekend' if half == 'we' else 'weekday'} games "
+                            f"in week {wm} — ABJECT FAILURE")
         for d, c in by_date.items():
             assert c <= n // 2, f"{tag}: {d} seats {c} games, cap {n // 2}"
         for t in members:
@@ -1046,6 +1080,63 @@ if __name__ == "__main__":
         dec = sum(1 for d in dates if d and d.month == 12)
         print(f"  {label:18s} dated {sum(1 for d in dates if d):5d}  "
               f"December games {dec:3d}  dated fingerprint {dfp}")
+
+    # ═══ S105.2 — THE FEASIBILITY REPORT (r2 §2d): every league whose heaviest
+    #     week sits EXACTLY on the 2·floor(n/2) ceiling, solved and shown BEFORE
+    #     the C# port. Self-selecting, not a hardcoded list of nine. ═══
+    # ★ S105.2 §4.6 — the weekend definition over ALL SEVEN DAYS (A1 is the session):
+    #   Mon 2027-01-04 .. Sun 2027-01-10; Mon-Fri false, Sat/Sun true.
+    _wk0 = _dt.date(2027, 1, 4)
+    assert [is_weekend(_wk0 + _dt.timedelta(days=i)) for i in range(7)] == \
+        [False, False, False, False, False, True, True], \
+        "the weekend definition drifted — A1"
+
+    print()
+    print("S105.2 FEASIBILITY — leagues at the weekday/weekend ceiling (heaviest week"
+          " == 2*floor(n/2)):")
+    schools, confs, rivals = load_world(f"{root}/worlds/stock-d1.world.json")
+    games, _fp = build_schedule(schools, confs, rivals)
+    meta = _meta(f"{root}/worlds/stock-d1.world.json")
+    conf_of = dict(schools)
+    by_conf = {}
+    for sid, cid in schools:
+        by_conf.setdefault(cid, []).append(sid)
+    at_ceiling = 0
+    for cid in sorted(by_conf):
+        members = sorted(by_conf[cid])
+        name, g, k = confs[cid]
+        if g == 0:
+            continue
+        n = len(members)
+        nights, weeks, off = meta[cid]
+        targets = weekly_targets(n, g, weeks, f"'{name}' ")
+        heaviest = max(targets)
+        if heaviest != 2 * (n // 2):
+            continue
+        at_ceiling += 1
+        idxs = [i for i, (kk, h, a) in enumerate(games) if conf_of[h] == cid]
+        feas = {}
+        ds, window, wall = date_conference(
+            members, g, weeks, off, nights, [games[i] for i in idxs],
+            START_YEAR, f"'{name}' ", feasibility=feas)
+        hw = max(range(len(targets)), key=lambda w: targets[w])
+        hw_monday = window[hw]
+        wd_teams, we_teams, placed_wd, placed_we = set(), set(), 0, 0
+        for gi, d in zip(idxs, ds):
+            if _monday(d) != hw_monday:
+                continue
+            _, h, a = games[gi]
+            if is_weekend(d):
+                placed_we += 1; we_teams.update((h, a))
+            else:
+                placed_wd += 1; wd_teams.update((h, a))
+        bye_wd = sorted(set(members) - wd_teams)
+        bye_we = sorted(set(members) - we_teams)
+        reentered = feas.get("week_entries", {}).get(hw, 0) > 1
+        print(f"  {name:34s} n={n:2d} heaviest wk {hw_monday} needs {targets[hw]:2d}: "
+              f"weekday {placed_wd} (bye {bye_wd}), weekend {placed_we} (bye {bye_we}), "
+              f"{'RE-ENTERED by backtracking' if reentered else 'solved first pass'}")
+    print(f"  {at_ceiling} leagues sit exactly at the ceiling; all solved.")
 
     schools, confs, rivals = load_world(f"{root}/worlds/fixture-schedule.world.json")
     games, _fp = build_schedule(schools, confs, rivals)

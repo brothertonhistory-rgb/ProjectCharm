@@ -55,8 +55,10 @@ internal static partial class Program
     /// its result. If any of these four moves, S102's second wall is breached.</summary>
     private const string MatchGoldenConferenceFp =
         "6f79d6636e291866d51387f93979d817011f7903ddc64e67d4ebcebf087cb5c3";
+    // ★ S105.2 — dated HALF recaptured (the weekday/weekend rule moved dates only);
+    //   conference and results halves are untouched, which is the wall holding.
     private const string MatchGoldenDatedFp =
-        "7515df7d72f801f49d264ff52d6472911ac87d0996d44269d113b0ef83cb632a";
+        "46d89bf88e4a33c8bc388886c179cc0bf4e4bba0fe5674748d07e2243caf646a";
     /// <summary>★ S104 — RECAPTURED. The season now plays 24 showcase games on top of its
     /// tournaments, and seven tournaments seat different fields because a showcase took a
     /// school on an overlapping night (and because a tournament that loses a candidate

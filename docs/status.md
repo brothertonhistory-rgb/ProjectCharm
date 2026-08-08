@@ -10,7 +10,31 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 105.1** (2026-08-07; verified on Emmett's machine — ALL CHECKS PASSED, **no new phase**.
+Last updated: **Session 105.2** (2026-08-08; verified on Emmett's machine — ALL CHECKS PASSED, **no new phase**.
+**THE WEEKDAY GAME AND THE WEEKEND GAME.** In any Monday-to-Sunday week a team plays at most **one Mon–Fri game and one
+Sat–Sun game** — two ceilings of one that subsume and RETIRE the never-three-in-a-week absolute. **Friday is a weekday,
+by ruling** — the Ivy/Big Sky Friday+Saturday back-to-back is legal because the Friday game IS the weekday game; the
+weekend has ONE definition per language and Phase 85's new **C16** pins both over all seven days. The search prunes,
+never validates: per-half occupancy rides beside the played-count and rejects a date the moment it is considered.
+★ **THE GATE STOPPED THE BUILD**: the practice world's five-team leagues at 16 games over 9 weeks need a five-game week
+and the rule seats **four** (2·⌊n/2⌋ — arithmetic, not search budget; the un-probed symptom is a five-million-node
+budget exhaustion wearing the wedge's face). Emmett's ruling: **five-team leagues play 12, not 16** (**C-46**) — the
+heaviest week lands exactly on the ceiling, solves instantly, and keeps the repeat meetings that world exists to
+stress. ★ **The ruling's semantic ripple: every practice-world pair now meets THREE times** — all 40 pairs carry host
+residue where none did — so the "even split, remembers nothing" checks (Phase 87 C2f/C2g/C6a) re-sourced to a **rigged
+genuinely-even world** (tiny at 8 games, every pair meeting twice) rather than being quietly weakened. ★ **The prompt's
+A4 undercounted its own sweep: six hardcoded dated fingerprints, not four, plus a fifth read site** — caught by grep at
+the gate. C2 rewritten to assert the rule with six controls (Tue+Wed rejected, Sat+Sun rejected, Mon/Wed/Sat still
+rejected, UConn accepted, Ivy/Big Sky accepted by name, Sun→Mon accepted). Oracle re-locked first; its feasibility
+report prints every league at the ceiling, self-selecting — **nine leagues, all solved**, with live vindication of both
+r2 cuts: MEAC's heaviest week rests the SAME team in both halves (the cut "different bye" clause would have forbidden a
+chosen legal solution) and Sun Belt alone genuinely backtracked. Stock dated `7515df7d…` → **`46d89bf8…`** at all four
+constant sites; practice-world goldens recaptured (structural **`6fc122dd…`**, dated **`93e27e5b…`**, zero-shave season,
+memory golden 120 games). **Unmoved:** conference `6f79d663…`, results `898d9fe8…` — dates moved, basketball did not —
+plus `matching_golden.json` and `contracts_golden.json`, verified at the gate to derive from stock only. December 63 →
+63 (predicted to move; did not). fixture-memory's fingerprints untouched entirely.)
+
+*(Previous board entry, S105.1 — 2026-08-07; verified on Emmett's machine — ALL CHECKS PASSED, **no new phase**.
 **A FOUR-TEAM TOURNAMENT IS TWO GAMES, NOT THREE.** A four-team event is two rounds and every team plays both; the
 engine charged every tournament-seated school **three**. So a school in a four-team field had three games struck off
 the November it had to arrange, was guaranteed two, and **played 30 inside a season the engine believed was 31** —
@@ -411,6 +435,13 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S105.2 — THE WEEKDAY/WEEKEND RULE.** At most one Mon–Fri and one Sat–Sun conference game per team per
+  Mon–Sun week, pruned inside both date searches (oracle + `Program.Season.Dates.cs`), one weekend definition per
+  language pinned by the new C16, Phase 85 C2 rewritten to assert the rule with six controls, the old three-in-a-week
+  test retired as subsumed. Practice world re-authored to 12 games under **C-46** with every derived golden recaptured
+  and the even-split memory checks re-sourced to a rigged even world. Stock dated fp `46d89bf8…` at four sites; games,
+  results and both JSON goldens unmoved. No new phase.
 
 - **★ S105.1 — THE EVENT EXEMPTION READS THE FIELD SIZE.** `NonConEventGames = 3` split into
   `MaxTournamentGamesPerTeam` (3, the worst case, read only by the showcase seating floor and the contract capacity
@@ -1622,6 +1653,14 @@ chart is PROVISIONAL pending O-6.
   Player data layer at 21k+ actives; moddability. (working-with-emmett §7)
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
+
+- **C-46 (S105.2, Emmett's ruling, 2026-08-08) — THE FIVE-TEAM PRACTICE LEAGUES PLAY 12 CONFERENCE GAMES, NOT 16.**
+  *"A 5 team league should be playing 8 or 12 conference games anyways."* Ruled when the weekday/weekend rule proved
+  16-over-9-weeks arithmetically impossible for a five-team league (heaviest week 5 against a 2·⌊n/2⌋ = 4 ceiling).
+  12 sits exactly ON the ceiling — the sterner of his two numbers — and keeps repeat meetings. Consequences accepted
+  with the ruling: the practice world's basketball re-rolled (every derived golden recaptured), and every pair now
+  meets an odd number of times, so tiny is no longer anyone's "even split" fixture — the even world is rigged in code
+  where needed. Do not "restore" 16, and do not flatten the all-odd character; both are now load-bearing.
 
 - **C-45 (S104.1, measured not ruled) — O-93 IS CLOSED, AND THE CACHE IT PROPOSED IS NOT THE FIX.**
   O-93 theorised that four duplicated stock-season replays were the compounding suite cost. Measured:

@@ -84,7 +84,7 @@ internal static partial class Program
             // ★ S93 — the oracle exports. The schedule consumes no randomness, so these are
             //   a function of the WORLD alone and the seed no longer enters them.
             const string stockOracleFp   = "6f79d6636e291866d51387f93979d817011f7903ddc64e67d4ebcebf087cb5c3";
-            const string fixtureOracleFp = "51c8e88c202e9eb663f69dd2d317ca5d213a3faf98623496598a8e7e06684f54";
+            const string fixtureOracleFp = "6fc122dd3bc4f48a6f7c8b3787dcc236603536d4d610bf53ad0934480b189981";   // S105.2: the 12-game ruling
 
             // What the world itself says the season is. ★ Generic checks DERIVE their totals
             // from the loaded world so a fixture can never inherit a stock constant; the exact
@@ -292,9 +292,9 @@ internal static partial class Program
 
             // ── §3.5 Fixture season: conservation + the attribution replay. ──────────
             //     ★ S93 — the counts are DERIVED from the fixture, not written down. The tiny
-            //     world's four five-team leagues each play 16, so it is 160 games of 16 apiece
-            //     rather than the old 300 of 30 — and a fixture whose composition changes must
-            //     not need this file edited to stay honest.
+            //     world's four five-team leagues each play 12 (S105.2's ruling; 16 before),
+            //     so it is 120 games of 12 apiece rather than the old 300 of 30 — and a
+            //     fixture whose composition changes must not need this file edited to stay honest.
             var tinyGames = ExpectedGames(tiny);
             var tinyPerTeam = tiny.Schools.ToDictionary(
                 s => s.Id, s => tiny.Conferences.Single(c => c.Id == s.ConferenceId).Games);

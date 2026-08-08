@@ -16,7 +16,10 @@ namespace Charm.Harness;
 //    * Three authored numbers a league: games, weeks, and the day its tournament
 //      opens (days before Selection Sunday; null = none, walling at Selection
 //      Sunday itself). wall = SelectionSunday - offset - 1.
-//    * The week is MONDAY TO SUNDAY. A team never plays three in one. BAR NONE.
+//    * The week is MONDAY TO SUNDAY. ★ S105.2: a team plays AT MOST ONE weekday
+//      (Mon-Fri) game and AT MOST ONE weekend (Sat-Sun) game in it — two ceilings
+//      of one, which subsume the original never-three-in-a-week rule. A ceiling,
+//      not a quota: zero of either is legal.
 //    * The window's final week is the LATEST week ALL of whose active nights
 //      fall on or before the wall — the real Big East finished Sat Mar 7
 //      against a Tue Mar 10 wall, resting into its tournament; never a partial
@@ -66,6 +69,13 @@ internal static partial class Program
 
     private static DateOnly SeasonMonday(DateOnly d)
         => d.AddDays(-(((int)d.DayOfWeek + 6) % 7));   // DayOfWeek: Sunday = 0
+
+    /// <summary>★ S105.2 — THE definition of the weekend, once (A1): Saturday and
+    /// Sunday. Friday is a weekday — the Ivy Friday/Saturday pair is legal BECAUSE
+    /// Friday is the weekday game. One line to change, here only; the oracle's
+    /// is_weekend is its counterpart and Phase 85 C16 pins the two together.</summary>
+    private static bool SeasonIsWeekend(DateOnly d)
+        => d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday;
 
     private static DateOnly SeasonNightDate(DateOnly weekMonday, int weekday)
         => weekMonday.AddDays(weekday);
@@ -254,6 +264,12 @@ internal static partial class Program
                 .OrderByDescending(sp => Urgency(stream[sp])).ThenBy(sp => sp).ToArray();
 
             var playedWk = members.ToDictionary(s => s, _ => 0);
+            // ★ S105.2 — the weekday/weekend rule, PRUNED not validated: per-team
+            //   occupancy of each half of the week, kept beside playedWk,
+            //   incremented on take and unwound on backtrack in the same places.
+            var wdWk = members.ToDictionary(s => s, _ => 0);
+            var weWk = members.ToDictionary(s => s, _ => 0);
+            var dateIsWeekend = dts.Select(SeasonIsWeekend).ToArray();
             var pairsWk = new HashSet<(int, int)>();
             var onDate = dts.Select(_ => new HashSet<int>()).ToArray();
             var chosen = new List<(int Sp, int Gi, int Di)>();
@@ -321,13 +337,20 @@ internal static partial class Program
                     {
                         if (onDate[di].Contains(h) || onDate[di].Contains(a)) continue;
                         if (onDate[di].Count >= 2 * cap) continue;
+                        // ★ S105.2 — at most one weekday and one weekend game a week:
+                        //   a date whose half is already occupied by EITHER team is
+                        //   rejected here, before it is ever taken.
+                        var occ = dateIsWeekend[di] ? weWk : wdWk;
+                        if (occ[h] >= 1 || occ[a] >= 1) continue;
                         onDate[di].Add(h); onDate[di].Add(a);
                         playedWk[h]++; playedWk[a]++;
+                        occ[h]++; occ[a]++;
                         pairsWk.Add(key);
                         chosen.Add((sp, gi, di));
                         if (Pick(pos + 1, count + 1)) return true;
                         chosen.RemoveAt(chosen.Count - 1);
                         pairsWk.Remove(key);
+                        occ[h]--; occ[a]--;
                         playedWk[h]--; playedWk[a]--;
                         onDate[di].Remove(h); onDate[di].Remove(a);
                         break;      // the date choice is priority-forced, not branched
