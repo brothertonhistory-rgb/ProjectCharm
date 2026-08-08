@@ -10,27 +10,31 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 103** (2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 94 PASS at 35
-assertions**, all four fingerprints unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`, `6abd62b0…`), the stock page
-line-for-line unchanged. **CONTRACTS AND THE NON-CONFERENCE LOG — the engine keeps promises it cannot yet make (arc
-session 3; the arc REORDERED per the brief: contracts moved to the front).** A contract — home-and-home, 2-for-1,
-five-in-eight, neutral series — is two schools, an EXPLICIT executor, an ordered leg list with stable ids, and a
-window; it persists in the season record (**format v2; the reader accepts {1,2}**, so no existing career loses its
-tournament memory), is exercised before anything else touches a school's slate (terminate → discover → reserve →
-validate globally → commit → optionals in ascending ContractId), and dies by two rules that both fail closed: same
-conference terminates BEFORE exercise, a damaged record drops the collection and reports a COLLECTION-level loss
-naming no pairing. Forced iff outstanding == window; decrement at ROLLOVER after the decision; oracle-first
-(`tools/contracts_oracle.py` locked before any C#, 97 integer trajectories replayed through the pure step, parity
-exact). ★ **RECORDS C-43**: an exercised leg is charged to its OWN bucket after the split — and a road-less school
-(21 of 333 on stock, all Marquee) pays a HOME date for its away leg. The **pairing log** ships beside the contracts:
-every non-conference pairing per season with site, host and a Matched/Contracted source word — the persisted fact
-that makes the repeat-ceiling/recency session SMALL. ★ **C-38 SUPERSEDED by R22, not dropped** — ruled for an engine
-that could not remember; wrong for one that can. NOTHING signs a contract; fixture-authored contracts prove the
-honouring, so the stock world shows nothing (pre-agreed). ★ The gate caught the cleared prompt again: the brief
-itself was uncommitted, its §7.5 guess inverted, its games≤window justification self-contradictory, A2's real hazard
-OPPOSITE to the one named (the naive version bump silently erases every career's four-year rule), and the
-completion-cannot-discriminate claim half wrong (exact-window contracts are INFEASIBLE under decrement-first). ★ All
-nine delivery predictions landed exactly. **O-92 session 3 ships.**)
+Last updated: **Session 105** (2026-08-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 96 PASS at 11
+assertions**, **Phase 93 PASS with full oracle parity**. **THE INDEPENDENTS GET A NOVEMBER, AND THE MATCHER LEARNS THE
+SAME-SEASON HOME-AND-HOME (O-92 session 5).** Fourteen schools that played ZERO non-conference games now play a full
+29 (31 if seated): **R-a** a full season with road as the REMAINDER, never a fixed count — *"teams should only fall
+under the 29-31 range if forced to"*; **R-b** home read STRAIGHT OFF PRESTIGE (7→13 over 0→80), not spread across the
+current field, because high-prestige independents are rare and a rank spread would invent a marquee independent out of
+a field that has none; **R-c** ZERO neutral — the allowance is a privilege of class and they have no league to lift
+them; **R-d** they class as low majors, own prestige, no floor. Two schools who can each pay TWO ROAD GAMES may play
+each other twice, once each way, **capped at three per school** (one ceiling for everyone, ruled off a measured sweep).
+★ **The class decides what KIND of opponent, the prestige curve decides HOW MANY** — and nothing downstream branches:
+both charge chains run unchanged, the conservation identity holds with no exception, and a live hole closed on its own
+(an Independent's contracted game used to be FREE). ★ **The gate corrected the cleared prompt on six points**, chiefly
+its central design claim: the eligibility test it specified needs a home slot, and the matcher carries **no
+home-remaining quantity at all** — exactly THREE home requests in the country fail, so built literally the feature
+would have fired three times nationally. The currency is road. ★ **`docs/independents-design-brief.md` DOES NOT EXIST
+in the repo** — R35–R41 appear nowhere; second session running for that pattern. ★ **Two of Claude's gate claims were
+wrong and are recorded as wrong**: the shape does NOT help small schools host each other (it moves forced hosting UP
+the ladder — conventional Selling hosts 1.05 → 1.68 with Independents present and the shape OFF, back down to 1.38
+with it on) and does NOT shorten trips. ★ **Two of Claude's own checks were decorative and were rebuilt to be able to
+fail** — a tautological neutrality test, and a contract wall reading an always-empty set. ★ **THE INDEPENDENTS FIX THE
+SPILL SHORTAGE, 164 → 0**: the country wanted 923 easy home games and had 759; supply is now 1,018 against 933.
+Stock: home 1,773 / neutral 183 / road 2,315, gap **+542** (~271 forced hosts, up from 176); **2,137 games paired** —
+1,774 hosted, 91 neutral, 81 filler, 3 terminal, 94 home-and-homes, 0 short, 0 spills. Fingerprints `6f79d663…`,
+`7515df7d…`, `7c1a41c1…` and `contracts_golden.json` unmoved. Seven of eight delivery predictions landed exactly;
+the miss was Phase 96's runtime in seconds, not its share.)
 
 *(Previous board entry, S102 — 2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 93 PASS at 17
 assertions**, all four fingerprints unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`, `6abd62b0…`). **THE MATCHING — every
@@ -384,6 +388,15 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S105 — THE INDEPENDENTS' NOVEMBER AND THE SAME-SEASON HOME-AND-HOME (non-conference arc, session 5).** The
+  Independent request (full season, prestige-read home curve, zero neutral, remainder road, low-major class); the
+  matcher pool opened to every school; legality test 2 changed from same-conference-id to **league-mates** so two
+  Independents may meet (identical to `RunContractSeason.SameLeague`, so the layers cannot drift); phase **3a**, the
+  atomic capped home-and-home, ahead of the ordinary filler; the `ExchangeHosted` ledger column; `Targeted` renamed
+  **`Conventional`** so all 22 consumers surfaced as compile errors; Phase 93 C3 **inverted** (it asserted the two
+  things this session makes false); Phase 96 new at 11 checks. Oracle locked before any C#; golden regenerated at
+  schema `s105-matching-v1` carrying the cap in its provenance so the two languages cannot drift.
 
 - **★ S103 — CONTRACTS AND THE NON-CONFERENCE LOG (non-conference arc, session 3; the arc reordered — contracts
   first).** The persisted contract object (executor, stable legs, window; `gamesRemaining` DERIVED, never stored),
@@ -816,8 +829,8 @@ chart is PROVISIONAL pending O-6.
   forever. Events drifting a few days year to year is real and cheap. **Belongs with the living-pool session**
   (event birth and death), not smuggled into the repeat ceiling.
 
-- **O-92 — ★ THE NON-CONFERENCE ARC (opened S101; sessions 1–4 shipped: classes, the matching, contracts,
-  showcases).
+- **O-92 — ★ THE NON-CONFERENCE ARC (opened S101; shipped: classes S101, the matching S102, contracts S103,
+  showcases S104, ★ THE INDEPENDENTS S105).
   ★ THE ARC REORDERED AT S103 (Emmett, contracts brief r3 §0, superseding C-42b's sequencing): contracts moved to
   the FRONT** — the layer that carries state across seasons had to exist before the layers that consume it. The
   briefs are `docs/nonconference-design-brief.md` (r3 — **R17's tilt still needs an r4 amendment, see C-41**) and
@@ -827,8 +840,11 @@ chart is PROVISIONAL pending O-6.
   visible and harmless; rebuilding the scheduler around inherited obligations later would be neither); **(6) sites
   and nights** — R9–R12, the crowd model, dates around conference play, ★ and the SEMI-HOME ruling (a third site
   category — host keeps the advantage, does not play on campus; the leg format's site WORD is ready for it);
-  **(7) the Independents' November** (R13; the same-conference test must EXEMPT their shared container — S103's
-  contract wall already rules that two Independents are not league-mates). ★ **The repeat ceiling and the recency
+  ~~**(7) the Independents' November**~~ — **SHIPPED S105**, and the league-mate exemption it needed shipped with
+  it. What S105 did NOT touch and explicitly left open: **the Selling home band and the fill order**, which are the
+  real cause of low schools never hosting low schools (sixty Selling schools, not one ever hosted another before
+  S105; the top-down fill sells the bottom out before the filler opens). That is its own session and the class curve
+  has been open for Emmett to rule off the page since S101. ★ **The repeat ceiling and the recency
   demotion are now a SMALL session** — the S103 pairing log is the persisted fact they read (per-season pair +
   site + source word; a Contracted pairing must not be demoted), and the schedule-breathes dials (demotion in
   front of S102's §4 keys, proximity-weakened cooldown, reach grab, all on a portable integer hash) slot in
@@ -1788,4 +1804,14 @@ to the design conversation, not the build.
 nearby cities instead of wherever the filler sent them, so the "small schools take the longest trips" inversion
 may have shifted. It was ruled to stand as measured; re-read it rather than assuming the old shape.
 
-★ **S104.1 (O-93 — suite runtime) is offered as a micro-session** and can run before or after. Emmett's call.
+★ **S104.1 (O-93 — suite runtime) SHIPPED.** ★ **New since S105, and it competes for this slot:** the **Selling home
+band and the fill order** — the cause Emmett named directly (*"there just aren't enough low schools hosting low
+schools"*) and the one thing S105 measured sharply and deliberately did not fix. Sixty Selling schools hosting 1.05
+games each and busing 10.62 times, with every bottom-hosts-bottom game hosted by a *Working* school. Emmett's call
+which runs first.
+
+★ **ALSO NEW FROM S105 — event pairings are still absent from `usedPairs`**, so two schools can meet in a tournament
+AND in November. Pre-existing rather than opened by S105, and it overlaps O-94 directly: the same fact both need.
+
+★ **AND THE TIMING BOARD IS UNEXPLAINED.** S105's run reads 166.9s against S104.1's 446.3s baseline. It may be a
+different measurement rather than a real speedup. **Not guessed at** — check it before quoting either number.

@@ -57,6 +57,25 @@ internal static partial class Program
     /// <summary>The kinds that have no bucket at all: Neutral, Filler, Terminal.</summary>
     private const string MatchBucketNone = "";
 
+    /// <summary>★ S105 — the kind both legs of a same-season home-and-home carry. Provenance,
+    /// not inference: a deliberate exchange must be distinguishable from an accidental
+    /// duplicate without reading the two hosts off each other.</summary>
+    private const string MatchKindExchange = "Exchange";
+
+    /// <summary>★ S105 — how many same-season home-and-homes ONE SCHOOL may sign (Emmett,
+    /// 2026-08-07). Ruled at 3 off a measured sweep of 1 / 2 / 3 / 4 / uncapped, with a single
+    /// ceiling for everyone rather than one that bends for isolated schools. The sweep is the
+    /// reason the number is not lower: capping TIGHTER does not stop an isolated school hosting
+    /// too much, it makes it worse — at a cap of 1 Seattle hosts 24 of its 29 games, because
+    /// C-37 dumps forced home dates on the lowest-prestige school in an empty corner of the map
+    /// and the exchange is the only thing that pulls it back toward the slate it asked for.
+    /// Uncapped, Seattle signs 8 and its road trips stretch to a 946-mile median. At 3 the
+    /// long-trip outlier never appears, 94 exchanges still form nationally alongside ordinary
+    /// filler games, and three home-and-homes is a number a real athletic director could
+    /// arrange in one November. ★ The national trip median is 142 at EVERY setting — this
+    /// number moves outliers only, which is why no suite check asserts it.</summary>
+    private const int MatchExchangeCapPerSchool = 3;
+
     /// <summary>★ EMMETT'S RULING (2026-08-05). Shares of a school's home games by
     /// bucket — (Easy, Working, Decent). Selling sends every home game to ANY and has
     /// no mix. Nothing here is a game count: §0's largest-remainder split turns shares
@@ -124,6 +143,12 @@ internal static partial class Program
         /// <summary>★ Site-mix conversions. A filler host is ON TARGET, never over it:
         /// the game was already one of its road tokens.</summary>
         public int FillerHosted { get; set; }
+        /// <summary>★ S105 — home legs of a same-season home-and-home. Also a site-mix
+        /// conversion and also ON TARGET: the exchange spent TWO road tokens and returned one
+        /// home game and one road game, so the school's GAME COUNT never moved. This is also
+        /// exactly the number of exchanges the school signed, because every exchange gives it
+        /// precisely one home leg — which is what the cap is asserted against.</summary>
+        public int ExchangeHosted { get; set; }
         public int TerminalExtra { get; set; }
         public int ShortUnrepaired { get; set; }
         public int ConvertedNeutralToHome { get; set; }
@@ -136,7 +161,7 @@ internal static partial class Program
         public required bool IsPowerConference { get; init; }
 
         public int PairedTotal => MatchedHome + MatchedNeutral + MatchedRoadAsVisitor
-                                + FillerHosted + TerminalExtra;
+                                + FillerHosted + ExchangeHosted + TerminalExtra;
     }
 
     /// <summary>Everything S102 decides, in one object. Page-only cargo: the page renders
@@ -188,21 +213,36 @@ internal static partial class Program
     /// rather than written. Called from RunSeasonCore immediately after
     /// BuildNonConferenceRequests; the result rides out on SeasonRunOutcome and reaches
     /// nothing but the page and Phase 93.</summary>
+    /// <param name="allowExchange">★ S105 — exists ONLY so Phase 96's negative control can
+    /// build the same world with the same-season home-and-home switched off and prove it
+    /// produces ZERO repeated pairs. Without that control, "every repeat is an exchange"
+    /// passes trivially on a run that made no exchanges at all. Nothing in production passes
+    /// it.</param>
     private static MatchingReport BuildNonConferenceMatching(
         WorldFile world, NonConferenceReport report,
-        IReadOnlyList<(int Lo, int Hi)>? contractedPairs = null)
+        IReadOnlyList<(int Lo, int Hi)>? contractedPairs = null,
+        bool allowExchange = true)
     {
         var schoolById = world.Schools.ToDictionary(s => s.Id);
         var placeById = world.Places.ToDictionary(p => p.PlaceId);
         var reqById = report.Schools.ToDictionary(r => r.SchoolId);
 
-        // The pool: every school with an S101 request. The Independents are not here
-        // and therefore cannot be picked, cannot host, and cannot be a terminal partner.
-        var ids = report.Targeted.Select(r => r.SchoolId).OrderBy(i => i).ToList();
+        // ★ S105 — THE POOL IS EVERY SCHOOL WITH A REQUEST, INDEPENDENTS INCLUDED. S102
+        //   read the conventional-only view here, and that single expression was the whole
+        //   reason an Independent could not be picked, could not host, and could not be a
+        //   terminal partner. A school whose request is all zeros (the Impossible arm) stays
+        //   in the pool exactly as it did before: it can never be PICKED for want of
+        //   capacity, but it may still be a terminal partner.
+        var ids = report.Schools.Select(r => r.SchoolId).OrderBy(i => i).ToList();
         if (ids.Count == 0) return MatchingReport.Empty;
 
         var prestige = ids.ToDictionary(i => i, i => schoolById[i].CurrentPrestige);
         var conference = ids.ToDictionary(i => i, i => schoolById[i].ConferenceId);
+        // ★ S105 — whether a school's conference is a LEAGUE at all. Read once here so the
+        //   legality test stays a cheap lookup in the innermost loop of every phase.
+        var conferenceGamesById = world.Conferences.ToDictionary(c => c.Id, c => c.Games);
+        var inALeague = ids.ToDictionary(
+            i => i, i => conferenceGamesById[schoolById[i].ConferenceId] > 0);
         var classOf = ids.ToDictionary(i => i, i => reqById[i].ClassName);
         var conferenceTierById = world.Conferences.ToDictionary(c => c.Id, c => c.TierId);
         var conferenceTier = ids.ToDictionary(i => i, i => conferenceTierById[schoolById[i].ConferenceId]);
@@ -252,9 +292,14 @@ internal static partial class Program
         var convertedNeutrals = 0;
 
         // ── The five legality tests, in every phase ────────────────────────────────
+        // ★ S105 — TEST 2 IS "LEAGUE-MATES", NOT "SAME CONFERENCE ID". Two Independents
+        //   share one games == 0 container and are strangers, not league-mates: the wall
+        //   exists because a league dictates its members' meetings, and that container
+        //   dictates nothing. Identical to RunContractSeason's SameLeague, deliberately,
+        //   so the two layers cannot drift apart.
         bool Legal(int a, int b) =>
             a != b
-            && conference[a] != conference[b]
+            && !(conference[a] == conference[b] && inALeague[a])
             && !usedPairs.Contains((Math.Min(a, b), Math.Max(a, b)));
 
         void Take(int host, int visitor, string kind, string origin, string filled,
@@ -374,7 +419,10 @@ internal static partial class Program
             }
         }
 
-        // ══ 3. BOTTOM HOSTS BOTTOM (C-37) ═════════════════════════════════════════
+        // ══ 3. BOTTOM HOSTS BOTTOM (C-37), EXCHANGE FIRST ═════════════════════════
+        // ★ Same-season home-and-homes each school has signed, for the cap. Incremented
+        //   inside the atomic commit, so it can never count a half exchange.
+        var signed = new Dictionary<int, int>();
         while (true)
         {
             var pool = ids.Where(i => road[i] > 0)
@@ -382,6 +430,65 @@ internal static partial class Program
             if (pool.Count == 0) break;
             var a = pool[0];
 
+            // ── ★ 3a. THE SAME-SEASON HOME-AND-HOME (S105, R41/R39) ───────────────
+            //    Tried FIRST, and only when `a` can pay TWO road games and is under the
+            //    cap. The currency is TWO ROAD TOKENS ON BOTH SIDES, not "a home slot and
+            //    a road slot": this matcher carries no home-remaining quantity at all —
+            //    home requests are issued and resolved in phase 1, and exactly three in
+            //    the country fail — so an eligibility test written on home residue would
+            //    fire three times nationally and the shape would be decorative.
+            //
+            //    Available to ANY two schools that fit (R39), not Independents only; the
+            //    oracle proves this by forming 68 exchanges on a world with zero
+            //    Independents.
+            //
+            //    The partner search reuses phase 3's OWN ordering key. NO SECOND DISTANCE
+            //    RULE is invented here.
+            if (allowExchange && road[a] >= 2
+                && signed.GetValueOrDefault(a, 0) < MatchExchangeCapPerSchool)
+            {
+                int? partner = null;
+                (int, int, int) partnerKey = default;
+                foreach (var c in ids)
+                {
+                    if (signed.GetValueOrDefault(c, 0) >= MatchExchangeCapPerSchool) continue;
+                    if (road[c] < 2 || !Legal(a, c)) continue;
+                    var pkey = (dk[(a, c)], prestige[c], c);
+                    if (partner is null || pkey.CompareTo(partnerKey) < 0)
+                    { partnerKey = pkey; partner = c; }
+                }
+                if (partner is not null)
+                {
+                    // ★ ATOMIC. Capacity on both sides, the cap on both sides and legality
+                    //   are all established above, so nothing between here and the second
+                    //   Take can fail; the unordered pair enters usedPairs exactly ONCE, on
+                    //   the first leg. A PARTIAL EXCHANGE THEREFORE CANNOT EXIST by
+                    //   construction rather than by discipline — one leg possible and the
+                    //   reverse impossible is not a half exchange, it is NO exchange, and
+                    //   `a` falls through to the ordinary filler below.
+                    var pb = partner.Value;
+                    var (loId, hiId) = a < pb ? (a, pb) : (pb, a);
+                    road[a] -= 2;
+                    road[pb] -= 2;
+                    signed[a] = signed.GetValueOrDefault(a, 0) + 1;
+                    signed[pb] = signed.GetValueOrDefault(pb, 0) + 1;
+                    // ★ BOTH SCHOOLS HOST, so C-37's lower-prestige-hosts rule does NOT
+                    //   apply here and must not be asserted against these pairs. Leg order
+                    //   is fixed by ID: the LOWER ID HOSTS THE FIRST LEG. Both legs carry
+                    //   the "Exchange" kind, which is what makes a deliberate exchange
+                    //   distinguishable from an accidental duplicate BY PROVENANCE rather
+                    //   than by inferring it from opposite hosts.
+                    Take(loId, hiId, MatchKindExchange, MatchBucketNone, MatchBucketNone, false, false);
+                    Take(hiId, loId, MatchKindExchange, MatchBucketNone, MatchBucketNone, false, false);
+                    ledger[loId].ExchangeHosted++;
+                    ledger[hiId].ExchangeHosted++;
+                    ledger[loId].MatchedRoadAsVisitor++;
+                    ledger[hiId].MatchedRoadAsVisitor++;
+                    continue;
+                }
+            }
+
+            // ── 3b. THE ORDINARY FILLER, unchanged ────────────────────────────────
             int? best = null;
             (int, int, int) bestKey = default;
             foreach (var c in ids)

@@ -45,12 +45,56 @@ internal static partial class Program
         { (0, 2), (3, 5), (5, 7), (7, 10) };                  // Selling, Working, Solid, Marquee
     private static readonly int[] NonConShowcaseAllowance = { 0, 0, 1, 2 };
 
+    // ── ★ S105: the Independent seam. Emmett's rulings, 2026-08-07. ─────────────────
+    //
+    //    R-a  An Independent plays a FULL SEASON — 29 games, 31 if a tournament seats it.
+    //         "Teams should only fall under the 29-31 range if forced to. It shouldn't be
+    //         the norm." So OPEN uses the shared rule (their conference games are zero)
+    //         and ROAD IS THE REMAINDER, never a fixed number.
+    //    R-b  HOME is read STRAIGHT OFF PRESTIGE, not spread across whoever happens to be
+    //         independent that season — a rank spread would hand the top of a field of
+    //         nobodies the ceiling purely by rank, and would move a school's home count
+    //         because some OTHER school became independent.
+    //    R-c  ZERO neutral games. The neutral allowance is a privilege of CLASS and an
+    //         Independent has no league to lift it; events are its only neutral floor.
+    //    R-d  An Independent classes as a LOW MAJOR — its own prestige, NO TIER FLOOR.
+    //
+    //    ★ THE FORK: the CLASS decides what KIND of opponent the home requests shop for;
+    //      the CURVE decides HOW MANY. An Independent never uses NonConHomeBands and never
+    //      uses NonConShowcaseAllowance. Those two lines are the whole difference.
+    private const int NonConIndependentHomeLo = 7;
+    private const int NonConIndependentHomeHi = 13;
+    private const int NonConIndependentHomeAnchor = 80;
+    private const int NonConIndependentNeutral = 0;
+
+    /// <summary>★ R-b. <c>lo</c> at prestige 0 rising to <c>hi</c> at the anchor, round-half-up
+    /// in EXACT integer arithmetic — <c>(2·a + b) / (2·b)</c> — the same guard
+    /// <see cref="NonConHomeSpread"/> uses, so no floating-point midpoint can tip a school's
+    /// home count differently on another machine. Monotone non-decreasing in prestige and
+    /// clamped to [lo, hi] by construction: prestige is capped at the anchor first, and a
+    /// negative prestige (which world load refuses) is floored so the function stays total.</summary>
+    private static int NonConIndependentHome(int prestige)
+    {
+        var p = prestige < 0 ? 0
+              : prestige > NonConIndependentHomeAnchor ? NonConIndependentHomeAnchor
+              : prestige;
+        var a = p * (NonConIndependentHomeHi - NonConIndependentHomeLo);
+        var b = NonConIndependentHomeAnchor;
+        return NonConIndependentHomeLo + (2 * a + b) / (2 * b);
+    }
+
     // ── Class — the order is DEFINED HERE, centrally, and asserted by Phase 92 C2. ──
     //    Selling(0) < Working(1) < Solid(2) < Marquee(3). Independent is separate,
     //    neither above nor below: it is a different situation, not a rung.
 
     private static readonly string[] NonConClassNames = { "Selling", "Working", "Solid", "Marquee" };
-    private const string NonConIndependent = "Independent";
+    /// <summary>★ S105 — RETIRED AS A CLASS NAME. "Independent" was never a rung on the
+    /// ladder, and once Independents entered the matcher's class traversal it would have
+    /// been a lookup miss. Being independent is a fact about a school's LEAGUE, carried by
+    /// <c>IsIndependent</c>; its CLASS is now its own prestige band with no floor (R-d).
+    /// The constant survives only so Phase 92 C2 can assert the name is GONE from every
+    /// emitted class.</summary>
+    private const string NonConRetiredIndependentClassName = "Independent";
 
     /// <summary>★ The tier floor — the ruling's second half: the WORST school in a league
     /// still schedules like its league (Emmett: "even the absolute worst power conference
@@ -106,7 +150,12 @@ internal static partial class Program
         public int HostGap => RoadTotal - HomeTotal;
         public required int SeatedCount { get; init; }
 
-        public IEnumerable<NonConSchoolRequest> Targeted => Schools.Where(s => !s.IsIndependent);
+        /// <summary>★ S105 — schools that are IN A LEAGUE. Formerly <c>Targeted</c>, which
+        /// meant "has a request"; after S105 every school has one, so the old name named
+        /// nothing. Renamed deliberately so every consumer had to be re-decided rather than
+        /// silently inheriting the wrong domain.</summary>
+        public IEnumerable<NonConSchoolRequest> Conventional => Schools.Where(s => !s.IsIndependent);
+        public int IndependentCount => Schools.Count(s => s.IsIndependent);
         public int CountOf(string className) => Schools.Count(s => s.ClassName == className);
 
         public static readonly NonConferenceReport Empty = new()
@@ -170,24 +219,71 @@ internal static partial class Program
         var requests = new Dictionary<int, NonConSchoolRequest>();
         var byClass = new Dictionary<int, List<WorldSchool>>
             { [0] = new(), [1] = new(), [2] = new(), [3] = new() };
+        var independents = new List<WorldSchool>();
 
         foreach (var s in world.Schools)
         {
             var conf = confById[s.ConferenceId];
             if (conf.Games == 0)
             {
-                // ★ Games == 0 is the authoritative Independent marker — recorded
-                //   convention (WorldConference's own R14 note), not an inference.
-                requests[s.Id] = new NonConSchoolRequest(
-                    s.Id, s.Name, NonConIndependent, 0, seated.Contains(s.Id),
-                    0, 0, 0, 0, IsIndependent: true,
-                    LiftedByFloor: false, Compressed: false, Impossible: false,
-                    ShowcaseGames: showcaseGamesOf.GetValueOrDefault(s.Id, 0));
+                // ★ Games == 0 is still the authoritative Independent marker — recorded
+                //   convention (WorldConference's own R14 note), not an inference. What
+                //   changed in S105 is that it no longer means "no request". Held aside
+                //   because the class arms RANK inside their class and this arm does not
+                //   rank at all: it reads prestige directly (R-b).
+                independents.Add(s);
                 continue;
             }
             var floor = NonConTierFloor(conf.TierId);
             var cls = Math.Max(floor, NonConPrestigeClass(s.CurrentPrestige));
             byClass[cls].Add(s);
+        }
+
+        // ── ★ S105 — THE INDEPENDENT ARM ────────────────────────────────────────────
+        //    The SAME open rule as everyone else (conference games are zero), the prestige
+        //    curve for home (R-b), zero neutral (R-c), road the remainder — so the total is
+        //    a FULL SEASON (R-a). Class is the prestige band with NO FLOOR (R-d).
+        //
+        //    ★ Both charge chains run UNCHANGED. ApplyShowcaseCharges already falls
+        //      neutral → road → home and ApplyContractCharges already falls through to road
+        //      when the neutral bucket is empty, so a zero neutral bucket needed no new rule
+        //      at either site. That is also what closes a live hole: before S105 the contract
+        //      layer would exercise a contract with an Independent and charge it to nothing,
+        //      because this branch returned before the charge ran.
+        foreach (var s in independents)
+        {
+            var isSeated = seated.Contains(s.Id);
+            var seasonGames = isSeated ? NonConSeasonGamesSeated : NonConSeasonGamesUnseated;
+            var eventGames = isSeated ? NonConEventGames : 0;
+            var open = seasonGames - 0 - eventGames;
+            var cls = NonConPrestigeClass(s.CurrentPrestige);
+
+            int home, neutral, road;
+            bool compressed = false, impossible = false;
+            if (open < 0)
+            {
+                impossible = true;
+                home = neutral = road = 0;
+            }
+            else
+            {
+                home = NonConIndependentHome(s.CurrentPrestige);
+                if (home > open) { home = open; compressed = true; }
+                neutral = Math.Min(NonConIndependentNeutral, open - home);
+                road = open - home - neutral;
+                if (contractCharges is not null
+                    && contractCharges.TryGetValue(s.Id, out var icharge)
+                    && icharge.Total > 0)
+                    (home, neutral, road) = ApplyContractCharges(home, neutral, road, icharge);
+                if (showcaseGamesOf.TryGetValue(s.Id, out var ishowcase) && ishowcase > 0)
+                    (home, neutral, road) =
+                        ApplyShowcaseCharges(home, neutral, road, ishowcase);
+            }
+            requests[s.Id] = new NonConSchoolRequest(
+                s.Id, s.Name, NonConClassNames[cls], 0, isSeated,
+                open, home, neutral, road, IsIndependent: true,
+                LiftedByFloor: false, Compressed: compressed, Impossible: impossible,
+                ShowcaseGames: showcaseGamesOf.GetValueOrDefault(s.Id, 0));
         }
 
         // ★ Ranking happens AFTER final class assignment: a floor-promoted school ranks
@@ -303,12 +399,12 @@ internal static partial class Program
         lines.Add(
             $"  Classes: {r.CountOf("Marquee")} Marquee / {r.CountOf("Solid")} Solid / " +
             $"{r.CountOf("Working")} Working / {r.CountOf("Selling")} Selling / " +
-            $"{r.CountOf(NonConIndependent)} Independent — {lifted} lifted by their league's floor" +
+            $"{r.IndependentCount} of them Independent — {lifted} lifted by their league's floor" +
             (compressed > 0 ? $", {compressed} compressed to their open games" : "") +
             (impossible > 0 ? $", {impossible} IMPOSSIBLE (more conference games than the season holds)" : "") +
             ".");
 
-        var targeted = r.Targeted.ToList();
+        var targeted = r.Conventional.ToList();
         if (targeted.Count > 0)
         {
             lines.Add($"  Seated in an early-season event: {r.SeatedCount} school(s) — " +
@@ -356,11 +452,24 @@ internal static partial class Program
                     s.Seated ? " +event" : "       ", s.Open, s.Home, s.Neutral, s.Road));
         }
 
+        // ★ S105 — the Independents now carry a real request, so the page prints the
+        //   arithmetic rather than a placeholder. Requested H/N/R and total per school;
+        //   what they actually got is the MATCHING page's job, not this one's.
         var independents = r.Schools.Where(s => s.IsIndependent).ToList();
         if (independents.Count > 0)
-            lines.Add($"  Independents ({independents.Count}, no request yet — their November " +
-                      $"is its own session): " +
-                      string.Join(", ", independents.Select(s => s.SchoolName)) + ".");
+        {
+            lines.Add($"  Independents ({independents.Count}) — no conference, so the whole " +
+                      $"season is arranged here. Home reads off prestige; neutral is zero " +
+                      $"(no league to lift them); road is the remainder, so the total is a " +
+                      $"full season unless the market fails.");
+            lines.Add("    school                class     open   home  neutral   road   total");
+            foreach (var s in independents
+                         .OrderBy(s => s.Home).ThenBy(s => s.SchoolId))
+                lines.Add(string.Format(inv,
+                    "    {0,-22}{1,-9}{2,5}{3,7}{4,9}{5,7}{6,8}",
+                    s.SchoolName, s.ClassName, s.Open, s.Home, s.Neutral, s.Road,
+                    s.Home + s.Neutral + s.Road));
+        }
         return lines;
     }
 }

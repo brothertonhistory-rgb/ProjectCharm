@@ -1,3 +1,76 @@
+## Session 105 — THE INDEPENDENTS GET A NOVEMBER, AND THE MATCHER LEARNS THE SAME-SEASON HOME-AND-HOME. Fourteen schools that played **zero** non-conference games now play a full 29 (31 if seated), and two schools who can each pay two road games may play each other twice, once each way, capped at three per school. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 96 PASS at 11 assertions, Phase 93 PASS with full oracle parity.** ★ **Four rulings taken conversationally, and one — the cap — ruled off a measured sweep after Emmett asked for "a mix of both".** ★ **The gate corrected the cleared prompt on six points**, including its central design claim: the eligibility test it specified ("a home slot AND a road slot") describes a situation that exists **three times in the country**, because the matcher carries no home-remaining quantity at all. ★ **Two of Claude's own gate claims were wrong and are recorded as wrong**: the shape does NOT help small schools host each other (it moves forced hosting *up* the ladder) and does NOT shorten trips. ★ **Two of Claude's own checks were decorative and had to be rebuilt to be able to fail.** ★ **The Independents fix a problem nobody was solving: spills 164 → 0.** **O-92 session 5 ships.** (2026-08-07)
+
+**Register:** build session against `PROMPT-independents-s105-r2.md` (ChatGPT-cleared). ★ **`docs/independents-design-brief.md`, named by the prompt as design authority, DOES NOT EXIST in the repo** — R35–R41 appear nowhere in the tree and the committed briefs stop at R29. Second session running for this pattern (S103's brief was also uncommitted). The prompt's restatement was the only design statement available; everything actually built rests on rulings Emmett gave in this conversation.
+
+### Emmett's rulings
+
+- **R-a — AN INDEPENDENT PLAYS A FULL SEASON.** 29 games, 31 if a tournament seats it. *"Teams should only fall under the 29-31 range if forced to. It shouldn't be the norm."* This **superseded the prompt**, which specified a fixed 16 road games and totals of ~25–31 "NOT forced to 29". `OPEN` now uses the shared rule with conference games at zero and **road is the remainder**, exactly as for every other school.
+- **R-b — HOME READS STRAIGHT OFF PRESTIGE.** 7 at prestige 0 rising to 13 at 80, not spread across the current field. Emmett's reasoning was better than Claude's: high-prestige independents *"would be pretty rare, there will be mechanisms to add them into conferences added far down the line"* — so a rank spread would hand the top of a fourteen-school field of nobodies the ceiling **purely by rank**, inventing a marquee independent out of a field that has none.
+- **R-c — ZERO NEUTRAL GAMES.** The allowance is a privilege of class and they have no league to lift them. Shown the game a neutral request would actually have produced — NJIT vs a floor-lifted Youngstown State — Emmett: *"that game would simply be at Youngstown state."*
+- **R-d — AN INDEPENDENT CLASSES AS A LOW MAJOR.** Own prestige, no tier floor. Twelve Selling, two Working on stock.
+- **THE CAP IS THREE, ONE CEILING FOR EVERYONE.** Ruled off the sweep below after Emmett asked whether the capped and uncapped options could be mixed; offered a single middling ceiling or one that bends for isolated schools, he took the recommendation.
+
+### The gate — six corrections to a cleared prompt
+
+1. ★ **The eligibility test was pointed at the wrong quantity.** The prompt required both schools to hold a home slot **and** a road slot. **The matcher carries no home-remaining quantity at all**: home requests are issued and resolved inside phase 1, and exactly **three** in the whole country fail. Built literally, the feature would have fired three times nationally. The currency is **two road tokens on both sides** — a Claude call, flagged as one, made against measured source.
+2. **The national side effect was understated.** The prompt said the gap would widen to ~470 with ~235 forced hosts. Measured live before any edit: **352 today**, and after the rulings **542 with ~271 forced**.
+3. **Phase 93 C3 had to be INVERTED, not widened.** It asserted that no unordered pair ever repeats *and* that Independents appear nowhere — the two things this session makes false.
+4. ★ **§4.5's third check source does not exist.** Event pairings are not in `usedPairs`; only contracts are. Two schools can already meet in a tournament *and* in November. Pre-existing, not opened here.
+5. **A live hole in the contract layer.** The contract phase already sized an Independent's season at 29 games and would exercise a contract with one — but the request builder returned before the charge ran, so **an Independent's contracted game was free**. R-a closed it with no code written for the case.
+6. **`Targeted` stopped meaning anything.** It meant "has a request"; after S105 everyone has one. Renamed to `Conventional` so all 22 consumers surfaced as compile errors and had to be re-decided rather than silently inheriting the wrong domain.
+
+### What shipped
+
+Oracle-first per the standing discipline. `tools/matching_oracle.py` extended and **locked green before a line of C#**, `tools/matching_golden.json` regenerated from it (schema `s105-matching-v1`), then the port proved pair-for-pair and ledger-field-for-ledger-field by Phase 93 C14.
+
+- **`Program.Season.NonConference.cs`** — the Independent arm. ★ **The fork a port will get wrong if it is not said out loud:** the **class** decides what KIND of opponent the home requests shop for; the **prestige curve** decides HOW MANY. An Independent never uses the class home band and never uses the class neutral allowance. Those two lines are the whole difference — **nothing downstream branches.** Both charge chains run unchanged, and the conservation identity holds with no exception written for them. `"Independent"` retired as a class name (it was never a rung on the ladder and would have missed the matcher's class traversal).
+- **`Program.Season.Matching.cs`** — the pool becomes every school in the report; legality test 2 becomes **league-mates** rather than same-conference-id (two Independents share a `Games == 0` container and are strangers — identical to `RunContractSeason.SameLeague`, word for word, so the layers cannot drift); phase **3a**, the atomic capped home-and-home, ahead of the ordinary filler; the `ExchangeHosted` ledger column.
+- **`Program.Checks.Independents.cs`** — new, Phase 96, 11 checks.
+- **`Program.Checks.Matching.cs`** — C3 inverted, C1's mutation control extended to Independents, C2's kind list, C10's identity term, C11's cap, C13/C14/C15.
+- **`Program.Checks.NonConference.cs`**, **`Program.cs`** — the rename's consumers and the phase registration. No `.csproj` change needed; checked deliberately, since a file outside the obvious set has had to move six sessions running.
+
+### ★ The cap sweep — it runs the opposite way from intuition
+
+| cap | exchanges | signing | Seattle's slate | Seattle's road trips | conv. Selling hosts each |
+|---|---|---|---|---|---|
+| 1 | 39 | 78 | 24 home / 5 away | 394 mi | 1.55 |
+| 2 | 74 | 93 | 23 / 6 | 394 mi | 1.47 |
+| **3** | **94** | **99** | **23 / 6** | **394 mi** | **1.42** |
+| 4 | 105 | 103 | 22 / 7 | 551 mi | 1.38 |
+| none | 109 | 102 | 18 / 11 | 946 mi | 1.38 |
+
+**Capping tighter does not stop an isolated school hosting too much — it makes it worse.** At a cap of 1 Seattle hosts **24 of its 29 games**, because C-37 dumps forced home dates on the lowest-prestige school in an empty corner of the map and the exchange is the only thing pulling it back toward the slate it asked for. The **national trip median is 142 at every setting**; this number moves outliers only, which is why nothing asserts it.
+
+### ★ Claude was wrong twice at the gate, and the measurements say so
+
+- **"The exchange is by construction a low-school-hosts-low-school generator."** It is not. Emmett's read going in — *"there just aren't enough low schools hosting low schools"* — was correct and sharper than he put it: **sixty Selling schools and not one ever hosted another**, each hosting 1.05 games and busing 10.62 times, with all 174 bottom-hosts-bottom games hosted by *Working* schools because the top-down fill sells the bottom out before the filler opens. After S105: conventional Selling hosts **1.05 → 1.68** with the Independents present and the shape **off**, and back **down to 1.38** with it on. In a forced filler game the lower school eats the home date; in an exchange **both** host, so half those home games move **up** the ladder.
+- **"It will shorten trips."** It does not. Conventional Selling median 149 → 150, p90 458 → 442. The improvement on the page comes from fourteen new nearby opponents, not the shape.
+
+Both were caught by measuring the axis the change is about (the S81 rule) rather than by any check going red.
+
+### ★ Two of Claude's own checks were decorative
+
+- **Neutrality, twice wrong.** The first version compared `road − home` across the same report object — a **tautology** that passes under any matcher alive, because the gap is a property of the requests. The second asserted an identical forced-host count with the shape on and off; it went red (268 vs 270), which looked like a leak and was the opposite. What is exactly conserved is the **road budget reaching the filler**: phases 1 and 2 identical (1,774 hosted, 91 neutral either way) and `2·Filler + 2·Exchange + Terminal + Unrepaired` matching to the token — **541 both ways**. The old filler converts 536 and strands 5; the exchange converts 540 and strands 1. The two extra forced hosts are leftovers the greedy filler used to strand at a dead end. **Asserting equal conversions would have forbidden the shape from working.**
+- **The contract wall read an empty set.** C4 originally asserted that none of `run.Contracts.UsedPairs` was exchanged — vacuous on any single-season run, because contracts need a career history. Replaced with a **constructed** collision: take a pair this world actually exchanged, hand it to the matcher as contracted, prove the two schools then meet **zero** times.
+
+### ★ The Independents fix the spill shortage — 164 to zero
+
+S102 shipped 164 home requests settling above the bucket they asked for and called it arithmetic rather than tuning: the ruled mixes wanted **923** Easy home games and only **759** Easy road games existed. Twelve of the fourteen Independents *are* Easy opponents, each bringing ~21 road games. Supply is now **1,018 against 933 wanted** and the spill count is **0**. The oracle asserts the *relationship* between the two sides of that market, not the number, so a future world that re-creates the shortage re-creates the spills honestly.
+
+### The numbers (Emmett's machine, the record)
+
+Requests: home **1,773**, neutral **183**, road **2,315**, gap **+542**, ~271 forced hosts. Matching: **2,137 games paired — 1,774 hosted, 91 neutral, 81 filler, 3 terminal**, 94 home-and-homes, max signed 3, 0 short nationally, 0 spills. Phase 96 runs 43.2s, 25.9% of the timed suite — it builds four extra full seasons for its controls.
+
+**Delivery predictions:** seven of eight landed exactly (94 and max 3; 0 → 94 on the negative control; 1,774/91 and 541 both ways; 268 → 269 forced hosts; 347 ledger rows and 0 short; 1,934 pairs on the zero path; the page's 1,773/183/2,315/542). **The miss:** Phase 96 was predicted at ~80s and ran 43.2s — sandbox seconds quoted without converting; the *share* quoted (about a quarter) was right.
+
+### Still open
+
+- **The Selling home band and the fill order** — the real cause of low schools never hosting low schools, and untouched here. Its own session.
+- Event pairings still absent from `usedPairs`.
+- The timing board reads 166.9s against S104.1's 446.3s baseline. Unexplained; may be a different measurement rather than a real speedup. **Not guessed at.**
+
+---
+
 ## Session 104.1 — SUITE TIMING: THE HUNCH WAS WRONG, AND THE NUMBER SAYS SO. Every phase and both tail runs are now wall-clock timed, with a ranked table printed after the verdict. **Verified on Emmett's machine: ALL CHECKS PASSED, 446.3s across 74 timed sections.** ★ **This session exists because Emmett flagged suite time and Claude's proposed fix was aimed at the wrong target.** O-93 was opened on the theory that four duplicated stock-season replays were the compounding cost; the table shows they are 29%, while three multi-season CAREER RIGS — host debt, rotation, season memory — are 46%, and a cache cannot touch them. The tail runs Claude also suspected (5,000 simulated games) are 4.7%. **Closes O-93 by measurement; opens O-96.** One file. (2026-08-06)
 
 **Register:** micro-session, no design brief. Emmett raised it conversationally after S104: *"eventually every test will take an hour or two at this pace."*

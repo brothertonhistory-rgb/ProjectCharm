@@ -116,7 +116,7 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             {
                 var ok = true; var detail = "";
-                var legal = new[] { "Selling", "Working", "Solid", "Marquee", NonConIndependent };
+                var legal = new[] { "Selling", "Working", "Solid", "Marquee" };
                 foreach (var (name, world, report) in allWorlds)
                 {
                     var ids = report.Schools.Select(s => s.SchoolId).ToList();
@@ -263,7 +263,7 @@ internal static partial class Program
                 foreach (var (name, world, report) in allWorlds)
                 {
                     var confById = world.Conferences.ToDictionary(c => c.Id);
-                    foreach (var s in report.Targeted)
+                    foreach (var s in report.Conventional)
                     {
                         if (s.Impossible)
                         {
@@ -312,12 +312,12 @@ internal static partial class Program
                 var seatedFromSeating = stockRun.Events.Seating.Active
                     .Where(e => !e.IsShowcase)
                     .SelectMany(e => e.Seats).Select(s => s.SchoolId).ToHashSet();
-                var seatedFromReport = stockReport.Targeted
+                var seatedFromReport = stockReport.Conventional
                     .Where(s => s.Seated).Select(s => s.SchoolId).ToHashSet();
-                var exempted31 = stockReport.Targeted.Where(s => s.Seated)
+                var exempted31 = stockReport.Conventional.Where(s => s.Seated)
                     .All(s => s.Open == NonConSeasonGamesSeated
                               - s.ConferenceGames - NonConEventGames);
-                var plain29 = stockReport.Targeted.Where(s => !s.Seated)
+                var plain29 = stockReport.Conventional.Where(s => !s.Seated)
                     .All(s => s.Open == NonConSeasonGamesUnseated - s.ConferenceGames);
                 // ★ THE DISCRIMINATOR: the stock world really does seat showcases, so the
                 //   filter above is doing work rather than being a no-op on a slate that has
@@ -342,9 +342,9 @@ internal static partial class Program
                 // above was built without an exception. The rest: the two worlds that can
                 // hold a market are lopsided and say so; their gap is MEASURED and printed
                 // here, never asserted to a value (page-only calibration).
-                var ok = tinyReport.HostGap != 0 && tinyReport.Targeted.Any()
-                      && schedReport.HostGap != 0 && schedReport.Targeted.Any()
-                      && !formatReport.Targeted.Any()
+                var ok = tinyReport.HostGap != 0 && tinyReport.Conventional.Any()
+                      && schedReport.HostGap != 0 && schedReport.Conventional.Any()
+                      && !formatReport.Conventional.Any()
                       && formatReport.Schools.Count == 1
                       && formatReport.Schools[0].IsIndependent;
                 Check("C8: worlds too small to balance produce a complete report and no " +

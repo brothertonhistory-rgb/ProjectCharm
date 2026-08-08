@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Project Charm — Session 102 matching oracle (THE MATCHING).
+Project Charm — Session 105 matching oracle (THE MATCHING + THE INDEPENDENTS).
 
 ★ THIS DOCSTRING IS THE SPECIFICATION. The C# port in
 `src/Charm.Harness/Program.Season.Matching.cs` is written against THIS file and is
@@ -24,9 +24,62 @@ assert the live report is field-for-field identical to the golden's before it
 believes a single pair (C14a). If S101's math ever moves, that assertion goes red
 immediately rather than the parity check failing for a mysterious reason.
 
-★ THE INDEPENDENTS ARE ABSENT FROM EVERY PHASE, including the terminal partner pool.
-A school with no S101 request has no target, and a school with no target cannot be
-handed an over-target game. On the stock world that is fourteen schools.
+═══════════════════════════════════════════════════════════════════════════════════
+★ S105 — THE INDEPENDENTS GET A NOVEMBER (Emmett's rulings, 2026-08-07)
+═══════════════════════════════════════════════════════════════════════════════════
+
+S102 held the Independents out of every phase because they had no request. They have
+one now, and it is an ORDINARY one. Four rulings, and between them they mean the
+Independent stops being a special case in the accounting entirely:
+
+  R-a  AN INDEPENDENT PLAYS A FULL SEASON — 29 games, 31 if a tournament seats it.
+       Emmett: "teams should only fall under the 29-31 range if forced to. It
+       shouldn't be the norm." So OPEN is computed by the SAME rule as everyone
+       else's (their conference games are zero), and ROAD IS THE REMAINDER, never a
+       fixed number. Coming up short is the market failing, never the design.
+
+  R-b  HOME COUNT IS READ STRAIGHT OFF PRESTIGE — 7 at prestige 0 rising to 13 at
+       prestige 80 — and NOT spread across whoever happens to be independent that
+       season. Emmett: independents with real prestige "would be pretty rare, there
+       will be mechanisms to add them into conferences added far down the line." The
+       rank spread the classes use would hand the top of a fourteen-school field of
+       nobodies 13 home games purely by rank — inventing a marquee independent out of
+       a field that has none. Reading prestige directly is stable across a career.
+
+  R-c  ZERO NEUTRAL GAMES. The neutral allowance is a privilege of CLASS, and an
+       Independent has no league to lift it; by prestige alone every one of them is a
+       Selling or Working school, and those get none. Their only neutral floor is an
+       event. Emmett, on the game a neutral request would actually have produced:
+       "that game would simply be at Youngstown State."
+
+  R-d  AN INDEPENDENT CLASSES AS A LOW MAJOR — its own prestige, NO TIER FLOOR. On
+       the stock world that is twelve Selling and two Working (South Dakota 32,
+       Seattle 38).
+
+★ THE FORK A PORT WILL GET WRONG IF IT IS NOT SAID OUT LOUD. For an Independent the
+CLASS decides what KIND of opponent the home request shops for (R-d), and the PRESTIGE
+CURVE decides HOW MANY (R-b). An Independent never uses the class HOME BAND and never
+uses the class NEUTRAL ALLOWANCE. Those two are the only places its arithmetic differs
+from a conventional school's; everything downstream is shared code.
+
+★ className IS NOW THE REAL CLASS, and `isIndependent` is the flag (a Claude call,
+flagged). S102 wrote className "Independent", which is not a rung on the ladder and
+would KeyError the class traversal the moment they entered the pool. Being independent
+is a fact about your LEAGUE, not about your class, so the flag carries it and the page
+counts the flag. This is what lets them drop into the existing machinery with no new
+code path.
+
+★ TEST 2 NOW EXEMPTS THE INDEPENDENTS' SHARED CONTAINER — the change S102's own note
+parked for this session. Two Independents sit in one games==0 conference and are NOT
+league-mates: fourteen strangers in one bucket, and R13 says they play each other
+constantly. Same conference AND that conference plays games -> illegal. This is the
+rule `RunContractSeason.SameLeague` already uses, word for word, so the two layers
+cannot drift.
+
+★ WHAT AN INDEPENDENT IS STILL NOT. It is not exempt from a contract, not exempt from
+a showcase charge, and not exempt from an event seat — all three already reach it, and
+under R-a all three finally have a bucket to charge against. It may finish SHORT (R38);
+the shortfall is reported by category and is never assumed away.
 
 ═══════════════════════════════════════════════════════════════════════════════════
 ★ THE DISTANCE KEY IS QUANTIZED, BECAUSE FLOAT ORDERING IS NOT PORTABLE
@@ -93,14 +146,15 @@ CANDIDATE LEGALITY — the same five tests in every phase
 ═══════════════════════════════════════════════════════════════════════════════════
 
     1. different school
-    2. different conference
+    2. ★ not LEAGUE-MATES — same conference AND that conference plays games. Two
+       Independents share a games==0 container and are not league-mates (S105).
     3. the unordered pair has not already been used
-    4. the candidate holds the capacity the phase needs (road, or neutral tokens)
-    5. the candidate has an S101 request (the Independents fail this)
-
-★ RECORDED FOR ARC SESSION 4, NOT ACTED ON NOW: when the Independents join, test 2 must
-EXEMPT their shared container. They are fourteen strangers in one bucket, not
-league-mates, and R13 says they play each other constantly.
+    4. the candidate holds the capacity the phase needs (road tokens, neutral tokens,
+       or — for the exchange — TWO road tokens)
+    5. the candidate has an S101 request. ★ S105: EVERY school now does, so this test
+       no longer excludes anybody on a committed world. It is kept because a report
+       may legitimately omit a school (the Impossible arm), and because a pool that
+       silently loses a member is exactly the failure it exists to catch.
 
 ═══════════════════════════════════════════════════════════════════════════════════
 THE ALGORITHM — four phases, total, deterministic, no randomness anywhere
@@ -139,10 +193,59 @@ dictionary order, insertion order, or anything else the two languages might disa
        step 1's pick immediately (counted: ConvertedNeutral). If that pick also fails,
        it becomes a short token. Nothing is discarded.
 
-3. BOTTOM HOSTS BOTTOM (C-37). Whatever road games are left over belong to schools that
-   all wanted to travel, so they pair off and one of them eats the home game.
-       loop: among schools with ROAD remaining take the (prestige ASC, id ASC)-first
-       school a; partner = legal school with ROAD remaining, minimum by
+3. BOTTOM HOSTS BOTTOM (C-37), WITH THE SAME-SEASON HOME-AND-HOME FIRST (S105, R41/R39).
+
+   ★ 3a. THE EXCHANGE — TWO SCHOOLS WHO CAN EACH PAY TWO ROAD GAMES PLAY EACH OTHER
+   TWICE, ONCE EACH WAY. Available to ANY two schools that fit (R39), not Independents
+   only.
+
+       ★ THE CURRENCY IS TWO ROAD TOKENS ON BOTH SIDES, not "a home slot and a road
+       slot." The matcher carries NO home-remaining quantity: home requests are issued
+       and resolved inside phase 1, and on the stock world exactly THREE in the country
+       fail. An eligibility test written on home residue would fire three times
+       nationally and the whole shape would be decorative. Road residue is what is
+       actually plentiful and two-sided at the bottom, and it is the quantity C-37 is
+       already about. (Emmett ruled the shape; the currency is a Claude call made at
+       the S105 gate against the measured source, and flagged as one.)
+
+       ARITHMETIC, EXACTLY: each side spends TWO road tokens and receives ONE home game
+       and ONE genuine road game. Nationally this is NEUTRAL — an exchange consumes two
+       road tokens per pair, precisely as an ordinary filler game does, so `road - home`
+       moves by ZERO. Nothing here repairs the national gap and no check may claim it
+       does; only C-37 moves that number.
+
+       WHY HERE AND NOWHERE ELSE. Earlier than phase 3, road capacity is still being
+       spent filling ordinary home requests, so firing sooner takes road games a
+       Marquee school's request needs and crowds out ordinary matching. Later is phase
+       4, which is three games nationally and runs after every road token is gone.
+
+       loop, inside phase 3 and BEFORE the ordinary filler pick: a is the
+       (prestige ASC, id ASC)-first school with ROAD remaining. If road[a] >= 2, the
+       partner is the legal school b with road[b] >= 2, minimum by the SAME key phase 3
+       already uses — (DistanceKey ASC, prestige ASC, id ASC). NO SECOND DISTANCE RULE.
+       Found -> the exchange is ATOMIC: verify two road on both sides, verify legality
+       once, spend 2 from each, emit BOTH legs, add the unordered pair to the used set
+       ONCE. Not found, or road[a] < 2 -> fall through to the ordinary filler below.
+
+       ★ BOTH SCHOOLS HOST, so C-37's lower-prestige-hosts rule does not apply and must
+       not be asserted here. Leg order is fixed by id: THE LOWER ID HOSTS THE FIRST LEG.
+       Both legs carry kind "Exchange", which is what makes a deliberate exchange
+       distinguishable from an accidental duplicate BY PROVENANCE rather than by
+       inferring it from opposite hosts.
+
+       ★ THE CAP: no school signs more than EXCHANGE_CAP_PER_SCHOOL (3) in a season,
+       and the ceiling is the SAME for everyone — Emmett ruled a single ceiling over a
+       bending one. Both sides of a candidate exchange are tested against it, so the
+       cap can never be exceeded by being the partner rather than the initiator.
+
+       ★ A PARTIAL EXCHANGE MUST NOT EXIST. One leg possible and the reverse impossible
+       is not a half-exchange, it is NO exchange: neither leg commits, no counter moves,
+       the pair stays unused, and a fell through to the ordinary filler.
+
+   3b. THE ORDINARY FILLER, unchanged. Whatever road games are left over belong to
+   schools that all wanted to travel, so they pair off and one of them eats the home
+   game.
+       partner = legal school with ROAD remaining, minimum by
        (DistanceKey ASC, prestige ASC, id ASC); A HOSTS.
        ★ THE HOST RULE, NAMED: the LOWER PRESTIGE school hosts; EQUAL prestige, the
        LOWER ID hosts. (a satisfies both by how the pool is ordered, but the rule is the
@@ -183,6 +286,10 @@ Per targeted school:
     MatchedRoadAsVisitor     games it travelled to and did not host — hosted, filler and
                              terminal visits alike
     FillerHosted             site-mix conversions; on target, never over
+    ExchangeHosted           ★ S105 — home legs of a same-season home-and-home. Also a
+                             site-mix conversion and also on target: each exchange
+                             spends TWO road tokens and returns one home game and one
+                             road game, so the school's GAME COUNT is untouched.
     TerminalExtra            0 or 1
     ShortUnrepaired          tokens that found nobody
     ConvertedNeutralToHome   ANNOTATION
@@ -195,22 +302,29 @@ annotation into the total would double-count it, which is why the formula names 
 terms explicitly:
 
     PairedTotal = MatchedHome + MatchedNeutral + MatchedRoadAsVisitor
-                + FillerHosted + TerminalExtra
+                + FillerHosted + ExchangeHosted + TerminalExtra
                 (annotations NOT added again; ShortUnrepaired never counted)
 
 Nationally, BOTH of these hold and Phase 93 C10 asserts both:
 
     (i)  request disposition
-         TotalTokens = 2*Hosted + 2*Neutral + 2*Filler + TerminalRepaired + Unrepaired
+         TotalTokens = 2*Hosted + 2*Neutral + 2*Filler + 2*Exchange
+                     + TerminalRepaired + Unrepaired
          where TotalTokens = home + neutral + road requests from S101
+
+         ★ THE EXCHANGE TERM IS 2 PER PAIR, THE SAME AS A FILLER — which is the whole
+         reason the shape is nationally neutral. An exchange is two PAIRS costing four
+         road tokens, i.e. two tokens per pair, exactly like two filler games. The
+         identity did not need a special case; it needed a term.
 
     (ii) actual participation
          2 * Pairs = TotalTokens - Unrepaired + TerminalExtra
          the terminal partners' extra games are real participations that no S101 request
          ever demanded, which is exactly why the two identities are not the same identity
+         — and the exchange, which demands nothing extra, does NOT appear here.
 
-On the stock world: 3,913 tokens = 2*1667 + 2*111 + 2*177 + 3 + 0, and
-2*1958 = 3916 = 3913 - 0 + 3.
+The stock numbers move this session and are printed by the run rather than quoted here;
+the pre-S105 world read 3,913 tokens = 2*1667 + 2*111 + 2*177 + 3 + 0.
 
 ═══════════════════════════════════════════════════════════════════════════════════
 ★ A MEASURED FINDING THIS ORACLE PRINTS AND DOES NOT TUNE AWAY
@@ -231,7 +345,19 @@ S101, REPRODUCED HERE ONLY TO PRODUCE THE GOLDEN'S INPUT
 
 Class = max(conference tier floor, prestige band), read from currentPrestige. Home comes
 from the class band positioned by prestige rank; neutral is the class allowance capped
-by what is left; road is the remainder. The seated set is BINARY SET MEMBERSHIP and is
+by what is left; road is the remainder.
+
+★ S105, THE INDEPENDENT ARM. Class = the prestige band ALONE, no floor (R-d). Home = the
+prestige curve, not the band and not the rank spread (R-b). Neutral = 0 (R-c). Road = the
+remainder, so the total is a full season (R-a). OPEN uses the shared rule with conference
+games at zero: 29 unseated, 28 plus three event games when tournament-seated. The
+contract and showcase charges then run UNCHANGED — the showcase chain already falls
+neutral -> road -> home and the contract chains already fall through to road when neutral
+is empty, so a zero neutral bucket needs no new rule at either site. That is the strongest
+evidence R-a is the right shape: the Independent arm adds two lines of arithmetic and no
+new branch anywhere downstream.
+
+The seated set is BINARY SET MEMBERSHIP and is
 authored below as a constant, read from the committed harness's own run
 (`dotnet run -- season worlds/stock-d1.world.json 20260720`) — this file does not
 reimplement the tournament seating draw, and the golden's embedded report is asserted
@@ -243,6 +369,7 @@ import itertools
 import json
 import math
 import os
+import random
 import sys
 
 # ─── S92's ruler, reproduced exactly (verified against the golden in main) ────────
@@ -282,6 +409,49 @@ HOME_BANDS = [(0, 2), (3, 5), (5, 7), (7, 10)]      # Selling, Working, Solid, M
 SHOWCASE_ALLOWANCE = [0, 0, 1, 2]
 CLASS_NAMES = ["Selling", "Working", "Solid", "Marquee"]
 TIER_FLOOR = {"power": 3, "highMid": 2, "lowMid": 1, "low": 0}
+
+# ─── S105's constants — the Independent seam. R8 applies here too: one block ──────
+#
+# ★ R-b, the home curve. NOT a band and NOT the rank spread: prestige is read straight,
+#   so a school's home count does not move because some OTHER school became independent.
+#   The anchor is the national prestige ceiling, so the top of the curve is reachable in
+#   principle and simply never reached on a world whose Independents top out at 38.
+#   ★ R-c: neutral is ZERO, so there is no allowance constant to tune.
+INDEPENDENT_HOME_LO = 7
+INDEPENDENT_HOME_HI = 13
+INDEPENDENT_HOME_ANCHOR = 80
+INDEPENDENT_NEUTRAL = 0
+
+# ★ S105 — HOW MANY SAME-SEASON HOME-AND-HOMES ONE SCHOOL MAY SIGN (Emmett, 2026-08-07).
+#   Ruled at 3 off a measured sweep of 1 / 2 / 3 / 4 / uncapped, and the sweep is the
+#   reason the number is not lower. Capping TIGHTER does not stop an isolated school
+#   hosting too much — it makes it worse: at a cap of 1, Seattle hosts 24 of its 29
+#   games, because C-37 dumps forced home dates on the lowest-prestige school in an
+#   empty corner of the map and the exchange is the only thing that pulls it back
+#   toward the slate it asked for. Uncapped, Seattle signs 8 and its road trips stretch
+#   to a 946-mile median. Three is where the long-trip outlier never appears, 94
+#   exchanges still form nationally alongside ordinary filler games, and three
+#   home-and-homes is a number a real athletic director could arrange in one November.
+#   The national trip median is 142 at EVERY setting — this number moves outliers only.
+EXCHANGE_CAP_PER_SCHOOL = 3
+
+
+def independent_home(prestige):
+    """★ R-b. lo at prestige 0 rising to hi at the anchor, round-half-up in EXACT
+    integer arithmetic — (2a + b) // (2b) — so no float midpoint can tip a school's
+    home count differently on another machine, the same guard home_spread uses.
+
+    Monotone non-decreasing in prestige, and clamped to [lo, hi] by construction: the
+    prestige is capped at the anchor first, and a negative prestige cannot exist (world
+    load refuses it) but is floored here anyway so the function is total."""
+    p = prestige
+    if p < 0:
+        p = 0
+    if p > INDEPENDENT_HOME_ANCHOR:
+        p = INDEPENDENT_HOME_ANCHOR
+    a = p * (INDEPENDENT_HOME_HI - INDEPENDENT_HOME_LO)
+    b = INDEPENDENT_HOME_ANCHOR
+    return INDEPENDENT_HOME_LO + (2 * a + b) // (2 * b)
 
 # ★ S104 — TOURNAMENT seats only, read from the committed harness's own season run at
 # seed 20260720. A SHOWCASE seat is deliberately NOT here: it does not buy the 31-game
@@ -357,16 +527,51 @@ def build_requests(world, seated_ids, showcase_ids=()):
     by_class = {0: [], 1: [], 2: [], 3: []}
     out = {}
 
+    independents = []
     for s in world["schools"]:
         conf = conf_by_id[s["conferenceId"]]
         if conf["games"] == 0:
-            out[s["id"]] = {
-                "schoolId": s["id"], "schoolName": s["name"], "className": "Independent",
-                "isIndependent": True, "home": 0, "neutral": 0, "road": 0,
-            }
+            # ★ S105 — games == 0 is still the authoritative Independent marker, but it
+            #   no longer means "no request". Held aside and built below, because the
+            #   class arms rank inside their class and this arm does not rank at all.
+            independents.append(s)
             continue
         cls = max(TIER_FLOOR[conf["tierId"]], prestige_class(s["currentPrestige"]))
         by_class[cls].append(s)
+
+    # ── ★ S105 — THE INDEPENDENT ARM ─────────────────────────────────────────────
+    #    Same OPEN rule as everybody (conference games are zero), R-b's curve for home,
+    #    zero neutral, road the remainder — so the total is a FULL SEASON (R-a). The
+    #    class is the prestige band with NO FLOOR (R-d) and decides only what KIND of
+    #    opponent the home requests shop for; it never sets the count.
+    for s in independents:
+        is_seated = s["id"] in seated
+        season_games = SEASON_GAMES_SEATED if is_seated else SEASON_GAMES_UNSEATED
+        event_games = EVENT_GAMES if is_seated else 0
+        open_games = season_games - 0 - event_games
+        cls = prestige_class(s["currentPrestige"])
+        if open_games < 0:
+            home = neutral = road = 0
+        else:
+            home = min(independent_home(s["currentPrestige"]), open_games)
+            neutral = min(INDEPENDENT_NEUTRAL, open_games - home)
+            road = open_games - home - neutral
+            # ★ The showcase charge, UNCHANGED — neutral -> road -> home. With neutral
+            #   at zero it simply lands on road, which is why R-c needed no new rule.
+            if s["id"] in showcase:
+                if neutral > 0:
+                    neutral -= 1
+                elif road > 0:
+                    road -= 1
+                elif home > 0:
+                    home -= 1
+                else:
+                    raise AssertionError(
+                        "showcase charge with nothing to spend: school %d" % s["id"])
+        out[s["id"]] = {
+            "schoolId": s["id"], "schoolName": s["name"], "className": CLASS_NAMES[cls],
+            "isIndependent": True, "home": home, "neutral": neutral, "road": road,
+        }
 
     for cls in sorted(by_class):
         members = sorted(by_class[cls], key=lambda s: (s["currentPrestige"], s["id"]))
@@ -429,22 +634,37 @@ class Matching:
         self.spills = 0
 
 
-def match(world, report):
+def match(world, report, allow_exchange=True):
     """★ PURE AND TOTAL. (world, report) in, matching out. No randomness, no clock, no
-    config, and the report is never written to."""
+    config, and the report is never written to.
+
+    allow_exchange exists ONLY so the negative control can construct the same world
+    with the S105 shape switched off and prove it produces ZERO repeated pairs. Nothing
+    in production passes it — the same seam MteSeatSeason's `pull` uses."""
     school_by_id = {s["id"]: s for s in world["schools"]}
     place_by_id = {p["placeId"]: p for p in world["places"]}
     req_by_id = {r["schoolId"]: r for r in report}
+    conf_by_id = {c["id"]: c for c in world["conferences"]}
 
-    # The pool: every school with an S101 request. The Independents are not here, and
-    # therefore cannot be picked, cannot host, and cannot be a terminal partner (A5).
-    ids = sorted(r["schoolId"] for r in report if not r["isIndependent"])
+    # ★ S105 — THE POOL IS EVERY SCHOOL WITH A REQUEST, INDEPENDENTS INCLUDED. S102 read
+    #   `not isIndependent` here; that was the whole reason they could not be picked,
+    #   could not host and could not be a terminal partner. The flag is now a fact about
+    #   a school's LEAGUE and decides nothing in this file except legality test 2.
+    #   Every school in the report is in the pool — including one whose request is all
+    #   zeros (the Impossible arm), exactly as S102 already admitted such a school. A
+    #   zero request can never be PICKED (no capacity) but may still be a terminal
+    #   partner, and narrowing the pool to nonzero requests would have silently retired
+    #   that.
+    ids = sorted(r["schoolId"] for r in report)
     if not ids:
         m = Matching()
         return m
 
     prestige = {i: school_by_id[i]["currentPrestige"] for i in ids}
     conference = {i: school_by_id[i]["conferenceId"] for i in ids}
+    # ★ Whether a school's conference is a LEAGUE at all. A games==0 container holds
+    #   strangers, not league-mates — legality test 2 reads this, not the id alone.
+    in_a_league = {i: conf_by_id[school_by_id[i]["conferenceId"]]["games"] > 0 for i in ids}
     class_of = {i: req_by_id[i]["className"] for i in ids}
 
     # DistanceKey for every ordered pair, computed once.
@@ -467,20 +687,26 @@ def match(world, report):
             "requestedHome": r["home"], "requestedNeutral": r["neutral"],
             "requestedRoad": r["road"],
             "matchedHome": 0, "matchedNeutral": 0, "matchedRoadAsVisitor": 0,
-            "fillerHosted": 0, "terminalExtra": 0, "shortUnrepaired": 0,
+            "fillerHosted": 0, "exchangeHosted": 0, "terminalExtra": 0,
+            "shortUnrepaired": 0,
             "convertedNeutralToHome": 0, "spilledRequests": 0,
+            "isIndependent": bool(r["isIndependent"]),
         }
 
-    def legal(a, b, need_road=False, need_neutral=False):
+    def legal(a, b, need_road=0, need_neutral=0):
         if a == b:
             return False
-        if conference[a] == conference[b]:
+        # ★ S105 — TEST 2 IS "LEAGUE-MATES", NOT "SAME CONFERENCE ID". Two Independents
+        #   share a games==0 container and are strangers, not league-mates; the wall
+        #   exists because a league dictates its members' meetings, and that conference
+        #   dictates nothing. Identical to RunContractSeason.SameLeague, deliberately.
+        if conference[a] == conference[b] and in_a_league[a]:
             return False
         if (min(a, b), max(a, b)) in used_pairs:
             return False
-        if need_road and road[b] <= 0:
+        if need_road and road[b] < need_road:
             return False
-        if need_neutral and neutral[b] <= 0:
+        if need_neutral and neutral[b] < need_neutral:
             return False
         return True
 
@@ -489,7 +715,7 @@ def match(world, report):
         best = None
         best_key = None
         for c in ids:
-            if road[c] <= 0 or not legal(host, c, need_road=True):
+            if road[c] <= 0 or not legal(host, c, need_road=1):
                 continue
             if band is not None and prestige_band(prestige[c]) != band:
                 continue
@@ -535,6 +761,9 @@ def match(world, report):
         return False
 
     short_tokens = []
+    # ★ Same-season home-and-homes each school has signed, for the cap. Incremented
+    #   inside the atomic commit so it can never count a half exchange.
+    signed = {}
 
     # ── 1. TOP-DOWN HOME FILL ────────────────────────────────────────────────────
     class_rank = {name: i for i, name in enumerate(CLASS_TRAVERSAL)}
@@ -560,7 +789,7 @@ def match(world, report):
             best = None
             best_key = None
             for c in ids:
-                if neutral[c] <= 0 or not legal(a, c, need_neutral=True):
+                if neutral[c] <= 0 or not legal(a, c, need_neutral=1):
                     continue
                 key = (abs(prestige[c] - prestige[a]), dk[(a, c)], c)
                 if best_key is None or key < best_key:
@@ -584,16 +813,58 @@ def match(world, report):
                 assert len(m.pairs) == before
                 short_tokens.append(a)
 
-    # ── 3. BOTTOM HOSTS BOTTOM ───────────────────────────────────────────────────
+    # ── 3. BOTTOM HOSTS BOTTOM, EXCHANGE FIRST ───────────────────────────────────
     while True:
         pool = sorted((i for i in ids if road[i] > 0), key=lambda i: (prestige[i], i))
         if not pool:
             break
         a = pool[0]
+
+        # ── ★ 3a. THE SAME-SEASON HOME-AND-HOME (S105) ───────────────────────────
+        #    Tried FIRST, and only when a can pay TWO road games AND is under the
+        #    per-school cap. The partner search uses phase 3's own key — no second
+        #    distance rule — restricted to schools that can also pay two and are also
+        #    under the cap.
+        if (allow_exchange and road[a] >= 2
+                and signed.get(a, 0) < EXCHANGE_CAP_PER_SCHOOL):
+            partner = None
+            partner_key = None
+            for c in ids:
+                if signed.get(c, 0) >= EXCHANGE_CAP_PER_SCHOOL:
+                    continue
+                if road[c] < 2 or not legal(a, c, need_road=2):
+                    continue
+                key = (dk[(a, c)], prestige[c], c)
+                if partner_key is None or key < partner_key:
+                    partner_key, partner = key, c
+            if partner is not None:
+                # ★ ATOMIC. Capacity on both sides and legality are established above,
+                #   so nothing between here and the second `take` can fail; the pair
+                #   enters the used set exactly ONCE, on the first leg. A partial
+                #   exchange therefore cannot exist by construction rather than by
+                #   discipline. Re-asserted so a later edit cannot quietly break it.
+                assert road[a] >= 2 and road[partner] >= 2, "exchange without capacity"
+                assert (min(a, partner), max(a, partner)) not in used_pairs
+                lo_id, hi_id = (a, partner) if a < partner else (partner, a)
+                road[a] -= 2
+                road[partner] -= 2
+                signed[a] = signed.get(a, 0) + 1
+                signed[partner] = signed.get(partner, 0) + 1
+                # ★ BOTH SCHOOLS HOST, so C-37's lower-prestige rule does not apply.
+                #   Leg order is fixed by ID: the lower id hosts the first leg.
+                take(lo_id, hi_id, "Exchange", BUCKET_NONE, BUCKET_NONE, False, False)
+                take(hi_id, lo_id, "Exchange", BUCKET_NONE, BUCKET_NONE, False, False)
+                m.ledger[lo_id]["exchangeHosted"] += 1
+                m.ledger[hi_id]["exchangeHosted"] += 1
+                m.ledger[lo_id]["matchedRoadAsVisitor"] += 1
+                m.ledger[hi_id]["matchedRoadAsVisitor"] += 1
+                continue
+
+        # ── 3b. THE ORDINARY FILLER, unchanged ───────────────────────────────────
         best = None
         best_key = None
         for c in ids:
-            if road[c] <= 0 or not legal(a, c, need_road=True):
+            if road[c] <= 0 or not legal(a, c, need_road=1):
                 continue
             key = (dk[(a, c)], prestige[c], c)
             if best_key is None or key < best_key:
@@ -646,28 +917,50 @@ def match(world, report):
 # ═══ The proofs this file runs on itself before it emits anything ═════════════════
 
 def prove(world, report, m, label):
-    ids = sorted(r["schoolId"] for r in report if not r["isIndependent"])
-    targeted = [r for r in report if not r["isIndependent"]]
+    ids = sorted(r["schoolId"] for r in report)
+    targeted = list(report)
     conf_of = {s["id"]: s["conferenceId"] for s in world["schools"]}
+    conf_games = {c["id"]: c["games"] for c in world["conferences"]}
 
     tokens = sum(r["home"] + r["neutral"] + r["road"] for r in targeted)
     hosted = sum(1 for p in m.pairs if p["kind"] == "Hosted")
     neutral = sum(1 for p in m.pairs if p["kind"] == "Neutral")
     filler = sum(1 for p in m.pairs if p["kind"] == "Filler")
+    exchange = sum(1 for p in m.pairs if p["kind"] == "Exchange")
     terminal = sum(1 for p in m.pairs if p["kind"] == "Terminal")
     unrepaired = len(m.unrepaired)
 
     # structure and legality
-    seen = set()
+    seen = {}
     for p in m.pairs:
         a, b = p["hostSchoolId"], p["visitorSchoolId"]
         assert a != b, f"{label}: self pair"
         assert a in ids and b in ids, f"{label}: a pair names a school with no request"
-        assert conf_of[a] != conf_of[b], f"{label}: same-conference pair"
+        # ★ S105 — LEAGUE-MATES, not same conference id. Two Independents share a
+        #   games==0 container and may legally meet.
+        assert not (conf_of[a] == conf_of[b] and conf_games[conf_of[a]] > 0), \
+            f"{label}: two league-mates paired"
         key = (min(a, b), max(a, b))
-        assert key not in seen, f"{label}: duplicate unordered pair {key}"
-        seen.add(key)
-        assert p["kind"] in ("Hosted", "Neutral", "Filler", "Terminal")
+        seen.setdefault(key, []).append(p)
+        assert p["kind"] in ("Hosted", "Neutral", "Filler", "Exchange", "Terminal")
+
+    # ★ S105 — THE ONLY REPEATED PAIR IS AN EXCHANGE, and it is exactly two games with
+    #   one in each direction. This is the assertion that replaces S102's flat
+    #   "no duplicate unordered pair", and it must DISCRIMINATE: a pair meeting three
+    #   times, a pair meeting twice at the same gym, and an ordinary accidental
+    #   duplicate all have to fail it.
+    for key, group in seen.items():
+        if len(group) == 1:
+            assert group[0]["kind"] != "Exchange", \
+                f"{label}: a half exchange survived at {key}"
+            continue
+        assert len(group) == 2, f"{label}: pair {key} meets {len(group)} times"
+        assert all(g["kind"] == "Exchange" for g in group), \
+            f"{label}: pair {key} repeats and is not an exchange"
+        hosts = sorted(g["hostSchoolId"] for g in group)
+        assert hosts == list(key), \
+            f"{label}: exchange {key} does not host once each way (hosts {hosts})"
+    assert exchange % 2 == 0, f"{label}: an odd number of exchange legs"
 
     # the host rule, in the words C11 uses
     for p in m.pairs:
@@ -678,8 +971,10 @@ def prove(world, report, m, label):
         pv = world_prestige(world, v)
         assert (ph, h) < (pv, v), f"{label}: a filler game is hosted by the higher school"
 
-    # identity (i) — request disposition
-    lhs = 2 * hosted + 2 * neutral + 2 * filler + terminal + unrepaired
+    # identity (i) — request disposition. ★ The exchange term is 2 PER PAIR, the same
+    # as a filler: two pairs costing four road tokens. That equality is why the shape
+    # is nationally neutral, and it is asserted separately below.
+    lhs = 2 * hosted + 2 * neutral + 2 * filler + 2 * exchange + terminal + unrepaired
     assert lhs == tokens, f"{label}: disposition {lhs} != {tokens} tokens"
 
     # identity (ii) — actual participation
@@ -694,13 +989,22 @@ def prove(world, report, m, label):
     for i in ids:
         l = m.ledger[i]
         total = (l["matchedHome"] + l["matchedNeutral"] + l["matchedRoadAsVisitor"]
-                 + l["fillerHosted"] + l["terminalExtra"])
+                 + l["fillerHosted"] + l["exchangeHosted"] + l["terminalExtra"])
         assert total == roles[i], f"{label}: {l['schoolName']} ledger {total} != {roles[i]}"
         assert total == (l["requestedHome"] + l["requestedNeutral"] + l["requestedRoad"]
                          + l["terminalExtra"] - l["shortUnrepaired"]), \
             f"{label}: {l['schoolName']} does not reconcile to its request"
         assert l["terminalExtra"] in (0, 1), f"{label}: a terminal partner used twice"
-        assert l["fillerHosted"] <= l["requestedRoad"], f"{label}: filler exceeded a target"
+        # ★ An exchange host is ON TARGET exactly as a filler host is: it spent two road
+        #   tokens and got one home game and one road game back, so its GAME COUNT never
+        #   moved. Both conversions are bounded by the road the school actually asked for.
+        assert l["fillerHosted"] + l["exchangeHosted"] <= l["requestedRoad"], \
+            f"{label}: {l['schoolName']} site-mix conversions exceeded its road request"
+        # ★ THE CAP. exchangeHosted is exactly the number of home-and-homes the school
+        #   signed, because every exchange gives it exactly one home leg.
+        assert l["exchangeHosted"] <= EXCHANGE_CAP_PER_SCHOOL, \
+            f"{label}: {l['schoolName']} signed {l['exchangeHosted']} home-and-homes, " \
+            f"over the cap of {EXCHANGE_CAP_PER_SCHOOL}"
 
     # spills never go down, and the count is per request filled above its origin
     counted = 0
@@ -716,7 +1020,7 @@ def prove(world, report, m, label):
     assert counted == m.spills, f"{label}: spill count {m.spills} != {counted}"
 
     print(f"  {label}: proved — {len(m.pairs)} pairs, both identities hold, "
-          f"{unrepaired} unrepaired")
+          f"{exchange // 2} exchange(s), {unrepaired} unrepaired")
 
 
 _PRESTIGE_CACHE = {}
@@ -738,8 +1042,8 @@ def ledger_checksum(m):
         h.update(("|".join(str(l[k]) for k in (
             "schoolId", "requestedHome", "requestedNeutral", "requestedRoad",
             "matchedHome", "matchedNeutral", "matchedRoadAsVisitor", "fillerHosted",
-            "terminalExtra", "shortUnrepaired", "convertedNeutralToHome",
-            "spilledRequests")) + "\n").encode("utf-8"))
+            "exchangeHosted", "terminalExtra", "shortUnrepaired",
+            "convertedNeutralToHome", "spilledRequests")) + "\n").encode("utf-8"))
     return h.hexdigest()
 
 
@@ -778,18 +1082,47 @@ if __name__ == "__main__":
 
     world = json.load(open(f"{root}/worlds/stock-d1.world.json"))
     report = build_requests(world, STOCK_SEATED_20260720, STOCK_SHOWCASE_20260720)
-    targeted = [r for r in report if not r["isIndependent"]]
+    targeted = list(report)
+    conventional = [r for r in report if not r["isIndependent"]]
+    inds = [r for r in report if r["isIndependent"]]
 
     home = sum(r["home"] for r in targeted)
     neu = sum(r["neutral"] for r in targeted)
     rd = sum(r["road"] for r in targeted)
-    print(f"S101 input: {len(targeted)} targeted schools, home {home}, neutral {neu}, "
-          f"road {rd}, tokens {home + neu + rd}")
+    print(f"S101 input: {len(targeted)} schools with a request "
+          f"({len(conventional)} conventional, {len(inds)} independent), "
+          f"home {home}, neutral {neu}, road {rd}, tokens {home + neu + rd}")
+    print(f"  national balance: road - home = {rd - home} "
+          f"(pre-S105 conventional-only: "
+          f"{sum(r['road'] for r in conventional) - sum(r['home'] for r in conventional)})")
+
+    # ── ★ THE INDEPENDENT ARM, printed for Emmett's page-only read ──────────────
+    pres = {s["id"]: s["currentPrestige"] for s in world["schools"]}
+    print("  ★ the Independents (R-a full season, R-b prestige curve, R-c no neutral, "
+          "R-d low-major class):")
+    for r in sorted(inds, key=lambda r: (pres[r["schoolId"]], r["schoolId"])):
+        tot = r["home"] + r["neutral"] + r["road"]
+        print(f"      {r['schoolName']:<24} prestige {pres[r['schoolId']]:>3}  "
+              f"{r['className']:<8} {r['home']:>3} home /{r['neutral']:>2} neutral /"
+              f"{r['road']:>3} road  = {tot} to arrange")
+    # ★ R-a asserted, not eyeballed: every Independent's request is a FULL season once
+    #   its event and showcase obligations are added back.
+    for r in inds:
+        seat = 3 if r["schoolId"] in set(STOCK_SEATED_20260720) else 0
+        show = 1 if r["schoolId"] in set(STOCK_SHOWCASE_20260720) else 0
+        season = r["home"] + r["neutral"] + r["road"] + seat + show
+        expect = SEASON_GAMES_SEATED if seat else SEASON_GAMES_UNSEATED
+        assert season == expect, \
+            f"R-a violated: {r['schoolName']} reaches {season}, not {expect}"
+    print(f"      R-a proved: all {len(inds)} reach a full season before matching")
 
     # ── ★ The quantization margin, RE-MEASURED, never quoted ────────────────────
     place_by_id = {p["placeId"]: p for p in world["places"]}
     school_by_id = {s["id"]: s for s in world["schools"]}
-    towns = sorted({school_by_id[r["schoolId"]]["placeId"] for r in targeted})
+    # ★ Every school in the pool, Independents included — S102 scanned only the 333
+    #   conventional towns, and the fourteen new ones are exactly the pairs that were
+    #   never measured before.
+    towns = sorted({school_by_id[r["schoolId"]]["placeId"] for r in report})
     worst_margin = None
     for a, b in itertools.combinations(towns, 2):
         pa, pb = place_by_id[a], place_by_id[b]
@@ -811,6 +1144,134 @@ if __name__ == "__main__":
     assert json.dumps(report, sort_keys=True) == before, "the matcher MUTATED its input"
     assert m2.pairs == m.pairs and m2.ledger == m.ledger, "not deterministic"
     print("  determinism: a second run reproduces the pairing exactly, input untouched")
+
+    # ── ★ shuffled enumeration reproduces the identical set of exchanges ─────────
+    #    The pool is built by sorting, so a shuffled `schools` list must not move a
+    #    single pair. This is the check that catches a dict-order dependence, which is
+    #    the bug class most likely to make the C# port disagree for no policy reason.
+    shuffled_world = dict(world)
+    shuffled = list(world["schools"])
+    random.Random(4242).shuffle(shuffled)
+    shuffled_world["schools"] = shuffled
+    m_shuf = match(shuffled_world, build_requests(
+        shuffled_world, STOCK_SEATED_20260720, STOCK_SHOWCASE_20260720))
+    assert m_shuf.pairs == m.pairs, "source enumeration order changed the pairing"
+    print("  enumeration: a shuffled school list reproduces every pair in order")
+
+    # ══ ★ THE CONTROLS THAT MAKE S105 PROVABLE RATHER THAN MERELY PRESENT ═══════
+    def repeats_of(mm):
+        c = {}
+        for p in mm.pairs:
+            k = (min(p["hostSchoolId"], p["visitorSchoolId"]),
+                 max(p["hostSchoolId"], p["visitorSchoolId"]))
+            c[k] = c.get(k, 0) + 1
+        return sorted(k for k, v in c.items() if v > 1)
+
+    # (1) NEGATIVE CONTROL — the same world with the shape switched off produces ZERO
+    #     repeated pairs. Without this, "every repeat is an exchange" passes trivially
+    #     on a run that made no exchanges at all.
+    m_off = match(world, report, allow_exchange=False)
+    prove(world, report, m_off, "stock-d1 / exchange OFF")
+    assert repeats_of(m_off) == [], "the negative control produced a repeated pair"
+    n_ex = sum(1 for p in m.pairs if p["kind"] == "Exchange") // 2
+    assert n_ex > 0, "the shape fired zero times — the positive case is untested"
+    print(f"  negative control: shape off -> 0 repeated pairs; shape on -> {n_ex}")
+
+    # (2) ★ NATIONAL NEUTRALITY, asserted as neutrality and NEVER as gap repair.
+    #
+    #     ★ THE FIRST VERSION OF THIS CHECK WAS DECORATIVE and is recorded so it is not
+    #     rewritten: it asserted `sum(road) - sum(home) == rd - home` over the SAME
+    #     report object, which is a tautology and passes under any matcher whatsoever.
+    #     The gap is a property of the REQUESTS, so re-reading the requests can never
+    #     say anything about the MATCHER.
+    #
+    #     ★ THE SECOND VERSION WAS ALSO WRONG, and this one is recorded too because the
+    #     way it failed is the finding. It asserted that the number of FORCED HOSTS is
+    #     identical with the shape on and off. It is not: 268 off, 270 on. That looked
+    #     like a leak and is the opposite — see below.
+    #
+    #     What is EXACTLY conserved is the ROAD BUDGET REACHING PHASE 3. Phases 1 and 2
+    #     are untouched by the shape, so the hosted and neutral counts must be identical;
+    #     everything left over is `2*Filler + 2*Exchange + Terminal + Unrepaired`, and
+    #     THAT total must match to the token. It does: 541 either way. The shape converts
+    #     540 of those tokens into games and strands 1; the old filler converted 536 and
+    #     stranded 5. So the two extra forced hosts are not tokens the shape invented —
+    #     they are tokens the greedy filler used to STRAND at a dead end, and a two-way
+    #     exchange is simply an extra legal move available there. That is the shape doing
+    #     its job, and asserting equal conversions would have forbidden it.
+    def phase3_budget(mm):
+        f = sum(1 for p in mm.pairs if p["kind"] == "Filler")
+        e = sum(1 for p in mm.pairs if p["kind"] == "Exchange")
+        t = sum(1 for p in mm.pairs if p["kind"] == "Terminal")
+        u = sum(l["shortUnrepaired"] for l in mm.ledger.values())
+        return 2 * f + 2 * e + t + u
+
+    def kinds(mm):
+        return (sum(1 for p in mm.pairs if p["kind"] == "Hosted"),
+                sum(1 for p in mm.pairs if p["kind"] == "Neutral"))
+
+    assert kinds(m) == kinds(m_off), (
+        f"THE SHAPE REACHED BACK INTO PHASE 1 OR 2: hosted/neutral {kinds(m_off)} "
+        f"without it, {kinds(m)} with it. It must fire only on leftover road.")
+    assert phase3_budget(m) == phase3_budget(m_off), (
+        f"NOT NEUTRAL: {phase3_budget(m_off)} road tokens reached the filler without "
+        f"the shape, {phase3_budget(m)} with it")
+    conv_on = sum(l["fillerHosted"] + l["exchangeHosted"] for l in m.ledger.values())
+    conv_off = sum(l["fillerHosted"] + l["exchangeHosted"] for l in m_off.ledger.values())
+    print(f"  ★ neutrality: phases 1 and 2 identical ({kinds(m)[0]} hosted, "
+          f"{kinds(m)[1]} neutral), and the same {phase3_budget(m)} road tokens reach "
+          f"the filler either way. The shape moves road-home by ZERO — the gap "
+          f"({rd - home}) belongs to the REQUESTS and only C-37 touches it.")
+    print(f"      forced hosts {conv_off} -> {conv_on}: the shape STRANDS FEWER "
+          f"leftovers ({sum(1 for p in m_off.pairs if p['kind'] == 'Terminal')} terminal "
+          f"repairs -> {sum(1 for p in m.pairs if p['kind'] == 'Terminal')}), it does "
+          f"not create games.")
+
+    # (3) ★ CONVENTIONAL-ONLY POSITIVE CONTROL — R39. A world with NO Independents in
+    #     which two ordinary schools still form a legal exchange. This is what proves
+    #     the shape is general rather than an accidentally Independents-only feature.
+    conf_games_by_id = {c["id"]: c["games"] for c in world["conferences"]}
+    no_ind_world = dict(world)
+    no_ind_world["schools"] = [s for s in world["schools"]
+                               if conf_games_by_id[s["conferenceId"]] > 0]
+    no_ind_report = build_requests(no_ind_world, STOCK_SEATED_20260720,
+                                   STOCK_SHOWCASE_20260720)
+    assert not any(r["isIndependent"] for r in no_ind_report), "control still has one"
+    m_conv = match(no_ind_world, no_ind_report)
+    prove(no_ind_world, no_ind_report, m_conv, "no-independents (R39 control)")
+    conv_ex = [p for p in m_conv.pairs if p["kind"] == "Exchange"]
+    assert conv_ex, "R39 FAILED: no exchange forms without Independents"
+    print(f"  R39 control: {len(conv_ex) // 2} exchange(s) between ordinary schools on a "
+          f"world with zero Independents")
+
+    # (4) ★ ONE INDEPENDENT AND FIFTY — A3. The count is fluid and nothing may assume
+    #     fourteen, assume non-empty, or assume a second Independent exists to pair with.
+    for label, keep in (("one independent", 1), ("fifty independents", 50)):
+        w = dict(world)
+        ind_ids = [s["id"] for s in world["schools"]
+                   if conf_games_by_id[s["conferenceId"]] == 0]
+        if keep == 1:
+            drop = set(ind_ids[1:])
+            w["schools"] = [s for s in world["schools"] if s["id"] not in drop]
+        else:
+            # Promote the 36 lowest-prestige conventional schools into the independents'
+            # container, so fifty schools share one games==0 conference.
+            container = conf_games_by_id and next(
+                c["id"] for c in world["conferences"] if c["games"] == 0)
+            pool = sorted((s for s in world["schools"]
+                           if conf_games_by_id[s["conferenceId"]] > 0),
+                          key=lambda s: (s["currentPrestige"], s["id"]))[:36]
+            promote = {s["id"] for s in pool}
+            w["schools"] = [dict(s, conferenceId=container) if s["id"] in promote else s
+                            for s in world["schools"]]
+        r_w = build_requests(w, STOCK_SEATED_20260720, STOCK_SHOWCASE_20260720)
+        n_ind = sum(1 for r in r_w if r["isIndependent"])
+        m_w = match(w, r_w)
+        prove(w, r_w, m_w, label)
+        short = sum(l["shortUnrepaired"] for l in m_w.ledger.values())
+        ex = sum(1 for p in m_w.pairs if p["kind"] == "Exchange") // 2
+        print(f"  {label}: {n_ind} independent(s), {len(m_w.pairs)} pairs, "
+              f"{ex} exchange(s), {short} token(s) short — legal either way")
 
     hosted = sum(1 for p in m.pairs if p["kind"] == "Hosted")
     neutral = sum(1 for p in m.pairs if p["kind"] == "Neutral")
@@ -840,14 +1301,36 @@ if __name__ == "__main__":
             for i in sorted(m.ledger) if m.ledger[i]["terminalExtra"] > 0]
     print(f"  over target by exactly one: {over}")
 
+    # ── ★ THE SPILL COLLAPSE, MEASURED RATHER THAN NOTICED ──────────────────────
+    #    S102 shipped 164 spills and called them arithmetic, not tuning: the ruled
+    #    mixes asked for 923 Easy home games and only 759 Easy road games existed. The
+    #    Independents are prestige 0-38, so twelve of the fourteen ARE Easy opponents
+    #    and each brings ~21 road games. If the shortage is gone the spill count should
+    #    be zero for a reason, and that reason is checked here rather than assumed.
+    easy_wanted = 0
+    for r in report:
+        if r["className"] == "Selling":
+            continue
+        counts = allocate_buckets(r["home"], list(BUCKET_MIX[r["className"]]))
+        easy_wanted += counts[0]
+    easy_supply = sum(r["road"] for r in report
+                      if prestige_band(pres[r["schoolId"]]) == 0)
+    print(f"  ★ the Easy market: {easy_wanted} easy home games wanted, "
+          f"{easy_supply} easy road games available -> {m.spills} spill(s). "
+          f"(S102: 923 wanted, 759 available, 164 spills.)")
+    if easy_supply >= easy_wanted:
+        assert m.spills == 0, "easy supply covers demand but requests still spilled"
+    else:
+        assert m.spills >= easy_wanted - easy_supply, "fewer spills than arithmetic forces"
+
     with open(f"{root}/worlds/stock-d1.world.json", "rb") as f:
         world_sha = hashlib.sha256(f.read()).hexdigest()
     with open(os.path.abspath(__file__), "rb") as f:
         oracle_sha = hashlib.sha256(f.read()).hexdigest()
 
     payload = {
-        "schema": "s102-matching-v1",
-        "note": "S102 matching golden. The pairing list is ORDERED and the order is part "
+        "schema": "s105-matching-v1",
+        "note": "S105 matching golden (S102 shape, extended with the Independent request and the same-season home-and-home). The pairing list is ORDERED and the order is part "
                 "of the artifact; the C# port reproduces it pair for pair and ledger field "
                 "for ledger field (Phase 93 C14). Same-platform integer artifact — every "
                 "value is an integer or a string, no float is asserted, so literal "
@@ -859,6 +1342,11 @@ if __name__ == "__main__":
             "oracleSha256": oracle_sha,
             "distanceKeyFormula": "floor(GeoDistance.DistanceMiles(a,b) + 0.5)",
             "seatedCount": len(STOCK_SEATED_20260720),
+            # ★ S105 — the cap travels WITH the golden. If the C# constant and this ever
+            #   drift, parity would fail for a mysterious reason spread over hundreds of
+            #   pairs; asserting the number itself names the cause in one line.
+            "exchangeCapPerSchool": EXCHANGE_CAP_PER_SCHOOL,
+            "exchangePairs": sum(1 for p in m.pairs if p["kind"] == "Exchange") // 2,
             "inputReportFingerprint": report_fingerprint(report),
             "inputTokens": home + neu + rd,
             "pairCount": len(m.pairs),

@@ -114,8 +114,13 @@ internal static partial class Program
             var m = stockRun.Matching;
 
             var schoolById = stock.Schools.ToDictionary(s => s.Id);
-            var targeted = report.Targeted.ToList();
+            // ★ S105 — the matcher's domain is now EVERY school with a request, so these
+            //   two views are the pool, not the conventional-only subset. Reading
+            //   `Conventional` here is what made C1's ledger count and C3's membership test
+            //   silently wrong the moment the Independents entered.
+            var targeted = report.Schools.ToList();
             var targetedIds = targeted.Select(r => r.SchoolId).ToHashSet();
+            var conventionalIds = report.Conventional.Select(r => r.SchoolId).ToHashSet();
             int Prestige(int id) => schoolById[id].CurrentPrestige;
 
             // ════════════════════════════════════════════════════════════════════
@@ -136,8 +141,11 @@ internal static partial class Program
                 //     of reading would ignore the change and land on the same pairing.
                 var mutated = new NonConferenceReport
                 {
-                    Schools = report.Schools.Select(s => s.IsIndependent ? s
-                        : s with { Home = Math.Max(0, s.Home - 1), Road = s.Road + 1 }).ToList(),
+                    // ★ S105 — the Independents are perturbed too. Skipping them was right
+                    //   when they had no request; leaving the skip in place would have left
+                    //   fourteen full seasons untouched by the discriminator.
+                    Schools = report.Schools.Select(s =>
+                        s with { Home = Math.Max(0, s.Home - 1), Road = s.Road + 1 }).ToList(),
                     HomeTotal = report.HomeTotal, NeutralTotal = report.NeutralTotal,
                     RoadTotal = report.RoadTotal, SeatedCount = report.SeatedCount,
                 };
@@ -167,7 +175,7 @@ internal static partial class Program
             //  C2 — PAIR STRUCTURE.
             // ════════════════════════════════════════════════════════════════════
             {
-                var kinds = new[] { "Hosted", "Neutral", "Filler", "Terminal" };
+                var kinds = new[] { "Hosted", "Neutral", "Filler", "Exchange", "Terminal" };
                 var kindOk = m.Pairs.All(p => kinds.Contains(p.Kind));
                 var noSelf = m.Pairs.All(p => p.HostSchoolId != p.VisitorSchoolId);
                 // A neutral pair has no host, so its two ids are normalised lower-first
@@ -185,32 +193,67 @@ internal static partial class Program
             //  C3 — HARD LEGALITY.
             // ════════════════════════════════════════════════════════════════════
             {
-                var seen = new HashSet<(int, int)>();
-                var dupes = 0; var sameConf = 0; var unknown = 0; var noRequest = 0;
+                var seen = new Dictionary<(int, int), List<MatchPair>>();
+                var sameLeague = 0; var unknown = 0; var noRequest = 0;
+                var confGames = stock.Conferences.ToDictionary(c => c.Id, c => c.Games);
                 foreach (var p in m.Pairs)
                 {
                     var a = p.HostSchoolId; var b = p.VisitorSchoolId;
                     if (!schoolById.ContainsKey(a) || !schoolById.ContainsKey(b)) { unknown++; continue; }
                     if (!targetedIds.Contains(a) || !targetedIds.Contains(b)) noRequest++;
-                    if (schoolById[a].ConferenceId == schoolById[b].ConferenceId) sameConf++;
-                    if (!seen.Add((Math.Min(a, b), Math.Max(a, b)))) dupes++;
+                    // ★ S105 — LEAGUE-MATES, not same conference id. Two Independents share
+                    //   one games == 0 container and are strangers, so they may meet.
+                    if (schoolById[a].ConferenceId == schoolById[b].ConferenceId
+                        && confGames[schoolById[a].ConferenceId] > 0) sameLeague++;
+                    var key = (Math.Min(a, b), Math.Max(a, b));
+                    if (!seen.TryGetValue(key, out var group)) seen[key] = group = new List<MatchPair>();
+                    group.Add(p);
                 }
-                // ★ A5 — the Independents are absent from EVERY phase, the terminal
-                //   partner pool included. Asserted as a set, both directions.
+
+                // ★ S105 — THIS IS THE INVERSION, and it is the session's central check
+                //   work. S102's C3 asserted two things that S105 makes false: that NO
+                //   unordered pair ever repeats, and that Independents appear NOWHERE. Both
+                //   are now wrong, and neither could be widened — they had to be replaced by
+                //   an assertion that DISCRIMINATES.
+                //
+                //   The replacement: the only repeated pair is a same-season home-and-home,
+                //   and it is exactly two games with one in each direction. Three meetings
+                //   fails it. Two meetings at the same gym fails it. An ordinary accidental
+                //   duplicate fails it. A half exchange fails it.
+                var badRepeat = 0; var halfExchange = 0;
+                foreach (var (key, group) in seen)
+                {
+                    if (group.Count == 1)
+                    {
+                        if (group[0].Kind == "Exchange") halfExchange++;
+                        continue;
+                    }
+                    if (group.Count != 2
+                        || group.Any(g => g.Kind != "Exchange")
+                        || group.Select(g => g.HostSchoolId).OrderBy(x => x).ToList()
+                               is not [var h1, var h2]
+                        || h1 != key.Item1 || h2 != key.Item2)
+                        badRepeat++;
+                }
+
+                // ★ And the Independents are now REQUIRED to appear, which is the assertion
+                //   that would have caught the whole feature silently doing nothing.
                 var independents = report.Schools.Where(s => s.IsIndependent)
                     .Select(s => s.SchoolId).ToHashSet();
-                var appear = m.Pairs.Any(p => independents.Contains(p.HostSchoolId)
-                                           || independents.Contains(p.VisitorSchoolId))
-                          || m.Ledger.Any(l => independents.Contains(l.SchoolId));
-                Check("C3: different conferences, no duplicate unordered pair, every id " +
-                      "exists, and no-request schools appear NOWHERE — not in a pair, not " +
-                      "on a ledger, not as a terminal partner",
-                      dupes == 0 && sameConf == 0 && unknown == 0 && noRequest == 0 && !appear,
-                      $"{independents.Count} schools with no request held out of " +
-                      $"{m.Pairs.Count} pairs");
+                var indPaired = independents.Count == 0 || independents.All(i =>
+                    m.Pairs.Any(p => p.HostSchoolId == i || p.VisitorSchoolId == i));
+                var indLedgered = independents.All(i => m.Ledger.Any(l => l.SchoolId == i));
+
+                Check("C3: league-mates never pair, every id exists, every school in the " +
+                      "pool is on a ledger, and THE ONLY REPEATED PAIR IS A HOME-AND-HOME — " +
+                      "exactly two games, one each way, never three and never a half",
+                      badRepeat == 0 && halfExchange == 0 && sameLeague == 0 && unknown == 0
+                      && noRequest == 0 && indPaired && indLedgered,
+                      $"{independents.Count} independent(s) all paired and ledgered; " +
+                      $"{seen.Count(kv => kv.Value.Count > 1)} repeated pair(s), " +
+                      $"{badRepeat} malformed, {halfExchange} half");
             }
 
-            // ════════════════════════════════════════════════════════════════════
             //  C4 — DETERMINISM.
             // ════════════════════════════════════════════════════════════════════
             {
@@ -348,12 +391,16 @@ internal static partial class Program
                 var hosted = m.CountOfKind("Hosted");
                 var neutral = m.CountOfKind("Neutral");
                 var filler = m.CountOfKind("Filler");
+                // ★ S105 — the exchange term is 2 PER PAIR, the same as a filler: two pairs
+                //   costing four road tokens. That equality is precisely why the shape is
+                //   nationally neutral, and the identity needed a term, not a special case.
+                var exchange = m.CountOfKind("Exchange");
                 var terminal = m.CountOfKind("Terminal");
                 var unrepaired = m.Unrepaired.Count;
                 var extra = m.Ledger.Sum(l => l.TerminalExtra);
 
                 // (i) request disposition — every token is spent exactly once
-                var disposition = 2 * hosted + 2 * neutral + 2 * filler + terminal + unrepaired == tokens;
+                var disposition = 2 * hosted + 2 * neutral + 2 * filler + 2 * exchange + terminal + unrepaired == tokens;
                 // (ii) actual participation — and the two are NOT the same identity
                 var participation = 2 * m.Pairs.Count == tokens - unrepaired + extra;
 
@@ -388,18 +435,30 @@ internal static partial class Program
                 // ★ A filler host is ON TARGET, never over it: the game was already one of
                 //   its own road tokens, so its site mix moved and its game count did not.
                 var onTarget = m.Ledger.All(l =>
-                    l.FillerHosted <= l.RequestedRoad
-                    && l.MatchedRoadAsVisitor + l.FillerHosted
+                    l.FillerHosted + l.ExchangeHosted <= l.RequestedRoad
+                    && l.MatchedRoadAsVisitor + l.FillerHosted + l.ExchangeHosted
                        <= l.RequestedRoad + l.TerminalExtra);
                 // both sides spend a road token: the ledger's two columns account for every
                 // filler pair twice over
                 var fillerPairs = m.CountOfKind("Filler");
                 var hostedSide = m.Ledger.Sum(l => l.FillerHosted);
+                // ★ S105 — an exchange has NO host rule: BOTH schools host, so C-37's
+                //   lower-prestige rule must not be asserted against these pairs (hostRule
+                //   above already reads Filler only). What IS asserted is the cap and the
+                //   two-sided accounting: every exchange gives each school exactly one home
+                //   leg, so the ledger column IS the number signed.
+                var exchangePairs = m.CountOfKind("Exchange");
+                var exchangeSide = m.Ledger.Sum(l => l.ExchangeHosted);
+                var capHeld = m.Ledger.All(l => l.ExchangeHosted <= MatchExchangeCapPerSchool);
                 Check("C11: a filler game is hosted by the lower-prestige school (equal " +
-                      "prestige, the lower id), both road tokens are spent, and NO filler " +
-                      "host exceeds its own game target",
-                      hostRule && onTarget && hostedSide == fillerPairs,
-                      $"{fillerPairs} filler games, {hostedSide} hosted sides");
+                      "prestige, the lower id), both road tokens are spent, NO site-mix host " +
+                      "exceeds its own game target, and no school signs more home-and-homes " +
+                      "than the cap",
+                      hostRule && onTarget && hostedSide == fillerPairs
+                      && exchangeSide == exchangePairs && capHeld,
+                      $"{fillerPairs} filler games, {hostedSide} hosted sides; " +
+                      $"{exchangePairs / 2} home-and-home(s), cap {MatchExchangeCapPerSchool}, " +
+                      $"max signed {(m.Ledger.Count == 0 ? 0 : m.Ledger.Max(l => l.ExchangeHosted))}");
             }
 
             // ════════════════════════════════════════════════════════════════════
@@ -443,7 +502,7 @@ internal static partial class Program
                 };
                 var stranded = BuildNonConferenceRequests(oneLeague, EventSeatingOutcome.Empty);
                 var strandedMatch = BuildNonConferenceMatching(oneLeague, stranded);
-                var tokens = stranded.Targeted.Sum(r => r.Home + r.Neutral + r.Road);
+                var tokens = stranded.Schools.Sum(r => r.Home + r.Neutral + r.Road);
                 // Reaching this line at all is the no-throw half. The rest: nothing paired,
                 // every token reported, and the ledger still reconciles.
                 var ok = strandedMatch.Pairs.Count == 0
@@ -483,8 +542,8 @@ internal static partial class Program
 
                 // A school that never travelled also hosted every game it was matched into.
                 var consistent = stayHome.All(l =>
-                    l.MatchedHome + l.MatchedNeutral + l.FillerHosted + l.TerminalExtra
-                    == l.PairedTotal);
+                    l.MatchedHome + l.MatchedNeutral + l.FillerHosted + l.ExchangeHosted
+                    + l.TerminalExtra == l.PairedTotal);
                 var rendered = MatchingPageLines(m)
                     .Any(x => x.Contains("NO true road game", StringComparison.Ordinal));
 
@@ -508,8 +567,16 @@ internal static partial class Program
 
                 Check("C14 provenance: the golden names its own input basis — world file, " +
                       "seed, S101 report fingerprint, DistanceKey formula, oracle hash, pair " +
-                      "count and ledger checksum — so a regeneration cannot silently change it",
-                      root.GetProperty("schema").GetString() == "s102-matching-v1"
+                      "count, ledger checksum and the exchange cap — so a regeneration cannot " +
+                      "silently change it",
+                      root.GetProperty("schema").GetString() == "s105-matching-v1"
+                      // ★ S105 — the exchange cap is part of the golden's basis. A drift
+                      //   between the oracle's number and the C# constant would otherwise
+                      //   surface as an unexplained pair-for-pair failure.
+                      && prov.GetProperty("exchangeCapPerSchool").GetInt32()
+                         == MatchExchangeCapPerSchool
+                      && prov.GetProperty("exchangePairs").GetInt32()
+                         == m.CountOfKind("Exchange") / 2
                       && prov.GetProperty("seed").GetInt64() == MatchStockSeed
                       && prov.GetProperty("distanceKeyFormula").GetString()
                          == "floor(GeoDistance.DistanceMiles(a,b) + 0.5)"
@@ -593,6 +660,7 @@ internal static partial class Program
                             && g.GetProperty("matchedNeutral").GetInt32() == l.MatchedNeutral
                             && g.GetProperty("matchedRoadAsVisitor").GetInt32() == l.MatchedRoadAsVisitor
                             && g.GetProperty("fillerHosted").GetInt32() == l.FillerHosted
+                            && g.GetProperty("exchangeHosted").GetInt32() == l.ExchangeHosted
                             && g.GetProperty("terminalExtra").GetInt32() == l.TerminalExtra
                             && g.GetProperty("shortUnrepaired").GetInt32() == l.ShortUnrepaired
                             && g.GetProperty("convertedNeutralToHome").GetInt32() == l.ConvertedNeutralToHome
@@ -621,6 +689,7 @@ internal static partial class Program
         && a.RequestedNeutral == b.RequestedNeutral && a.RequestedRoad == b.RequestedRoad
         && a.MatchedHome == b.MatchedHome && a.MatchedNeutral == b.MatchedNeutral
         && a.MatchedRoadAsVisitor == b.MatchedRoadAsVisitor && a.FillerHosted == b.FillerHosted
+        && a.ExchangeHosted == b.ExchangeHosted
         && a.TerminalExtra == b.TerminalExtra && a.ShortUnrepaired == b.ShortUnrepaired
         && a.ConvertedNeutralToHome == b.ConvertedNeutralToHome
         && a.SpilledRequests == b.SpilledRequests;

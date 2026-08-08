@@ -8644,11 +8644,15 @@ Three consequences follow, all honest, none of them defects:
 
 ★ **EVERY SCHOOL GETS A CLASS AND A REQUEST; NOTHING IS SCHEDULED.** The request is three counts of ordinary non-conference **games** to arrange — home, neutral, road — computed by `BuildNonConferenceRequests(WorldFile, EventSeatingOutcome)` in `Program.Season.NonConference.cs`. The seam is **pure by signature** (no seed, no RNG, no history), called in `RunSeasonCore` between `MteSeatSeason` and `BuildSeasonSchedule`, and read by nothing downstream — it rides out on the outcome like Memory/Rotation/Events and reaches only the page and Phase 92. That construction is what makes the zero path free: the season is byte-identical to pre-S101 with the page block removed (Phase 92 C9 asserts the full bundle, including the results+possessions fingerprint, against pre-S101 goldens).
 
-★ **CLASS = max(conference tier floor, prestige band), read from `CurrentPrestige` EVERY SEASON** (Emmett's ruling, 2026-08-04: the floor holds at every tier — the worst power school still gets its cupcakes, and the 21-prestige A-10 school schedules like a Solid program). Order: Selling < Working < Solid < Marquee; Independent (`Games == 0`, the recorded R14 convention) is separate and takes **no request** — its November is arc session 5. Bands: 80+/55/25; floors: power→Marquee, highMid→Solid, lowMid→Working, low→Selling. Unknown tier ids never reach the classifier — the world loader refuses them by name.
+★ **CLASS = max(conference tier floor, prestige band), read from `CurrentPrestige` EVERY SEASON** (Emmett's ruling, 2026-08-04: the floor holds at every tier — the worst power school still gets its cupcakes, and the 21-prestige A-10 school schedules like a Solid program). Order: Selling < Working < Solid < Marquee. ★ **S105 RETIRED "Independent" AS A CLASS NAME** — it was never a rung on the ladder, and the moment Independents entered the matcher's class traversal it would have been a lookup miss. Being independent is a fact about a school's **league**, carried by `IsIndependent` (`Games == 0`, the recorded R14 convention); its **class is its own prestige band with NO tier floor** (R-d), because it has no league to lift it. Bands: 80+/55/25; floors: power→Marquee, highMid→Solid, lowMid→Working, low→Selling. Unknown tier ids never reach the classifier — the world loader refuses them by name.
 
 ★ **THE REQUEST, ORDERED AND CLAMPED, ALL IN GAMES.** A school seated in an early-season event really plays **31 games** (R2 literally — "seeded reaches 31"; reading it as flat-29-minus-3 hands six Big East schools an impossible slate), everyone else 29. `OPEN = season − conference − (3 if seated)`; HOME from the class band (Marquee 7–10, Solid 5–7, Working 3–5, Selling 0–2), positioned by prestige rank **within the final class** in exact integer round-half-up arithmetic, clamped to OPEN; NEUTRAL capped by the showcase allowance (2/1/0/0); **ROAD is the remainder, never a band** — so the acceptance measure (a power school plays 0–2 true road games; page-only, never asserted) stays a measurement. Exemption is binary set membership against the seating. All constants live in one block at the top of the file (R8: ship with constants, rewire later — roster maturity and coach temperament are the future inputs).
 
-★ **THE STANDING FINDING THE PAGE PRINTS: THE COUNTRY DOES NOT BALANCE.** Stock world: home 1,666, neutral 223, road 2,024 — `HostGap = +358`. Every hosted game needs one host and one traveler, so ~179 games must be hosted by schools that wanted the road; under the bottom-hosts-bottom ruling those land on the 60 Selling schools at ~3 extra home games each. **This is output, not defect** — the class curve is deliberately open (brief §8.1) for Emmett to settle by reading this page, and no build may tune the bands to close the gap. Phase 92 asserts wiring and arithmetic on the report object only; no class count, average, or gap value is ever suite-asserted.
+★ **THE INDEPENDENT ARM (S105; Emmett's rulings, 2026-08-07).** Fourteen schools used to get `0,0,0,0`. They now take an **ordinary** request. **R-a — a full season**: 29 games, 31 if a tournament seats it. Emmett: *"teams should only fall under the 29-31 range if forced to. It shouldn't be the norm."* `OPEN` uses the shared rule with conference games at zero, and **ROAD IS THE REMAINDER**, never a fixed count — coming up short is the market failing, never the design. **R-b — HOME reads STRAIGHT OFF PRESTIGE** (7 at 0 rising to 13 at 80, exact integer round-half-up), *not* the rank spread the classes use: a rank spread would hand the top of a fourteen-school field of nobodies the ceiling purely by rank, inventing a marquee independent out of a field that has none, and would move a school's home count because some *other* school went independent. Emmett: high-prestige independents *"would be pretty rare, there will be mechanisms to add them into conferences added far down the line."* **R-c — ZERO neutral**: the allowance is a privilege of class and they have no league to lift them; by prestige alone every one is Selling or Working, and those get none. Their only neutral floor is an event. **R-d — class is the prestige band, no floor.**
+
+★ **THE FORK, SAID OUT LOUD BECAUSE A PORT WILL GET IT WRONG:** for an Independent the **class decides what KIND of opponent** the home requests shop for, and the **prestige curve decides HOW MANY**. It never uses the class home band and never uses the class neutral allowance. Those two lines are the entire difference — and *nothing downstream branches*. Both charge chains run unchanged (the showcase chain already falls neutral→road→home; the contract chains already fall through to road when neutral is empty), the conservation identity holds with no exception written for them, and **a live hole closed on its own**: before S105 the contract layer would exercise a contract with an Independent and charge it to nothing, because this branch returned before the charge ran.
+
+★ **THE STANDING FINDING THE PAGE PRINTS: THE COUNTRY DOES NOT BALANCE, AND S105 WIDENED IT.** Stock world **after S105**: home 1,773, neutral 183, road 2,315 — `HostGap = +542`, so ~271 games must be hosted by schools that wanted the road (pre-S105: 1,666 / 223 / 2,024, gap +352, ~176 forced). **The Independents widened it by design and the arithmetic is not subtle**: filling them to a real season means asking for ~298 road games against ~108 home, and R-c pushed another 28 out of the neutral column into road. ★ **NO S105 CHECK MAY CLAIM THE HOME-AND-HOME REPAIRS THIS.** The gap is a property of the **requests**; only C-37 moves it. **This is output, not defect** — the class curve is deliberately open (brief §8.1) for Emmett to settle by reading this page, and no build may tune the bands to close the gap. Phase 92 asserts wiring and arithmetic on the report object only; no class count, average, or gap value is ever suite-asserted.
 
 ★ **RULINGS GOVERNING THE REST OF THE ARC** (all on the board, C-36..C-40): non-D1 opponents deferred to the D2/D3 layer. Bottom-hosts-bottom (C-37) and the geographic tilt (C-40) were **consumed by S102**. ★ **C-38 ("off-campus series carry no forward debt") IS SUPERSEDED BY R22, not quietly dropped** — it was ruled for an engine that could not remember anything, and it is the wrong call for one that can; a contract is precisely a forward debt (S103, the contracts section below).
 
@@ -8660,13 +8664,15 @@ Three consequences follow, all honest, none of them defects:
 
 ★ **A BUCKET IS THE OPPONENT'S PRESTIGE, NOT ITS CLASS.** Easy (<25), Working (25–54), Decent (55–79), Name (80+), plus **ANY**, which every Selling home game uses and which never spills. Class carries S101's conference-tier floor and a bucket does not — which is why Northwestern at prestige 53 *schedules* like a Marquee school and *fills* somebody else's Working bucket. Mixes (Emmett's ruling, 2026-08-05; R8 constants at one seam): **Marquee 5E/2W/1D · Solid 3E/2W/1D · Working 2E/2W · Selling all ANY**, split into game counts by largest remainder with **ties to the lower bucket** (Marquee home 9 → 6/2/1; home 6 → 4/1/1, because Easy and Decent tie at .75). **The spill ladder runs up only**: E→W→D→N, one tier at a time, never down, N nowhere. A request whose whole ladder holds nothing legal becomes a short token.
 
-★ **THE FOUR PHASES, IN ORDER.** **(1) Top-down fill** — R4 as a pick order: Marquee → Solid → Working → Selling, inside a class by prestige then id, inside a school Easy first (buy-game demand claims scarce cupcake road capacity before showcase requests do). Each request takes the minimum by `(DistanceKey, prestige, id)`. **(2) Neutral pairing** — closest prestige first, then distance; a token with no partner (odd national parity or a legality dead end) **converts to an unrestricted home request and re-enters phase 1 immediately** rather than being discarded. **(3) Bottom hosts bottom** (C-37) — leftover road games pair off and **the lower-prestige school hosts; equal prestige, the lower id.** Both sides spend a road token, so **a filler host's site mix moves and its game count does not**: it is on target, never over. **(4) Terminal repair** — anything still short is closed by a bounded **+1** game whose partner **hosts**, is preferred Selling then up the ladder, and is **used at most once**. No minimum-terminal claim is made.
+★ **THE FOUR PHASES, IN ORDER.** **(1) Top-down fill** — R4 as a pick order: Marquee → Solid → Working → Selling, inside a class by prestige then id, inside a school Easy first (buy-game demand claims scarce cupcake road capacity before showcase requests do). Each request takes the minimum by `(DistanceKey, prestige, id)`. **(2) Neutral pairing** — closest prestige first, then distance; a token with no partner (odd national parity or a legality dead end) **converts to an unrestricted home request and re-enters phase 1 immediately** rather than being discarded. **(3a) The same-season home-and-home** (S105, R41/R39) — tried first when a school comes up. **(3b) Bottom hosts bottom** (C-37) — leftover road games pair off and **the lower-prestige school hosts; equal prestige, the lower id.** Both sides spend a road token, so **a filler host's site mix moves and its game count does not**: it is on target, never over. **(4) Terminal repair** — anything still short is closed by a bounded **+1** game whose partner **hosts**, is preferred Selling then up the ladder, and is **used at most once**. No minimum-terminal claim is made.
 
-★ **LEGALITY, THE SAME FIVE TESTS EVERYWHERE:** different school, different conference, the unordered pair unused, the candidate holds the needed capacity, and the candidate has an S101 request. **The Independents are absent from every phase including the terminal partner pool** — a school with no target cannot be handed an over-target game. *Recorded for the Independents session: when they join, the different-conference test must EXEMPT their shared container — R13 says they are fourteen strangers in one bucket, not league-mates. S103's contract wall already rules this way: two Independents are NOT conference mates for termination.*
+★ **LEGALITY, THE SAME FIVE TESTS EVERYWHERE:** different school; **not league-mates**; the unordered pair unused; the candidate holds the needed capacity (road tokens, neutral tokens, or — for the home-and-home — **two** road tokens); and the candidate has an S101 request.
+
+★ **S105 CHANGED TWO OF THE FIVE, AND BOTH WERE PARKED HERE BY S102 ITSELF.** Test 2 was *"different conference"* and is now *"not league-mates"*: two Independents share one `Games == 0` container and are **strangers, not league-mates** — R13 says they play each other constantly, and the wall exists because a league dictates its members' meetings while that container dictates nothing. This is `RunContractSeason.SameLeague` word for word, deliberately, so the two layers cannot drift. Test 5 no longer excludes anybody on a committed world (every school has a request now); it survives because a report may legitimately omit a school, and because a pool that silently loses a member is exactly the failure it exists to catch. **The pool is now every school in the report** — S102 read the conventional-only view here, and that single expression was the whole reason an Independent could not be picked, could not host, and could not be a terminal partner.
 
 ★ **COMPLETES OR REPORTS; INFEASIBILITY NEVER THROWS.** The result carries the completed pairing list, every unrepaired token with its owner, and the ledger — a structured shortfall (C13 constructs a world where no legal pair exists at all and asserts the page still renders).
 
-★ **BOTH CONSERVATION IDENTITIES, AND THEY ARE NOT THE SAME IDENTITY.** *Request disposition*: `tokens = 2·Hosted + 2·Neutral + 2·Filler + TerminalShort + Unrepaired`. *Actual participation*: `2·Pairs = tokens − Unrepaired + TerminalExtra`, because the terminal partners play games no request ever demanded. Stock: `3,913 = 2×1,667 + 2×111 + 2×177 + 3 + 0` and `2×1,958 = 3,916 = 3,913 − 0 + 3`. The ledger's **annotations record provenance and never replace a role count** — a converted neutral that fills as a home game increments both `MatchedHome` and `ConvertedNeutralToHome`, and adding an annotation into `PairedTotal` would double-count it.
+★ **BOTH CONSERVATION IDENTITIES, AND THEY ARE NOT THE SAME IDENTITY.** *Request disposition*: `tokens = 2·Hosted + 2·Neutral + 2·Filler + 2·Exchange + TerminalShort + Unrepaired`. *Actual participation*: `2·Pairs = tokens − Unrepaired + TerminalExtra`, because the terminal partners play games no request ever demanded — and the home-and-home, which demands nothing extra, does **not** appear there. ★ **The exchange term is 2 PER PAIR, exactly as a filler is** — two pairs costing four road tokens — which is precisely why the shape is nationally neutral; the identity needed a *term*, not a special case. Stock after S105: `4,271 = 2×1,774 + 2×91 + 2×81 + 2×188 + 3 + 0` and `2×2,137 = 4,274 = 4,271 − 0 + 3`. The ledger's **annotations record provenance and never replace a role count** — a converted neutral that fills as a home game increments both `MatchedHome` and `ConvertedNeutralToHome`, and adding an annotation into `PairedTotal` would double-count it.
 
 ★ **THE DISTANCE KEY IS QUANTIZED — the cross-language S81.3 lesson.** Every ordering breaks ties on distance and the two languages' trig differs by ULPs, so all ordering uses `floor(DistanceMiles + 0.5)`, an integer, **that exact formula in both languages**. `round()` and `Math.Round()` are ties-to-even and must never be used here. Measured, not assumed: across the 40,186 pairs of the 284 towns the targeted schools live in, the closest any pair comes to a half-mile boundary is **0.0000306 mi** (Colorado↔San Francisco, 935.500031), ~7 orders of magnitude above the ~1e-12 mi agreement the oracle's haversine shows against the S92 golden. The oracle re-measures this every run; C14 parity is the tripwire for future worlds.
 
@@ -11463,3 +11469,135 @@ event-games fingerprint exactly.
 cannot see that two schools met in November. **Event dates are fixed in the world file**, so a showcase
 falls on the same date every season. **An Independent seated in a showcase is charged nothing**, because
 its November is unbuilt.
+
+
+## The Independents get a November, and the matcher learns one new shape (Session 105, 2026-08-07)
+
+Fourteen schools with no conference used to get `0,0,0,0` and play **zero** non-conference games
+while everyone else was filled exactly. They now carry an ordinary request, and the matcher can
+pair two schools **twice in one season, once each way**. Design authority: Emmett's rulings of
+2026-08-07 (R-a..R-d and the cap), taken conversationally. ★ **The `docs/independents-design-brief.md`
+named by the build prompt does not exist in the repo and R35–R41 appear nowhere in the tree** — the
+committed briefs stop at R29. This section and the oracle docstring are the record.
+
+The request arithmetic lives in the S101 section above. What follows is the matcher's half.
+
+### The same-season home-and-home — the currency is ROAD, not home
+
+★ **THE SHAPE:** two schools who can each pay **two road games** play each other twice, once at each
+place. Available to **any** two schools that fit (R39), not Independents only — proved by 67
+home-and-homes forming on a world with zero Independents.
+
+★ **THE ELIGIBILITY TEST IS TWO ROAD TOKENS ON BOTH SIDES, NOT "a home slot and a road slot", and this
+is a Claude call made at the gate against measured source, flagged as one.** The matcher carries **no
+home-remaining quantity at all**: home requests are issued and resolved inside phase 1, and on the
+stock world exactly **three** in the entire country fail. An eligibility test written on home residue
+would have fired three times nationally and the whole shape would have been decorative. Road residue
+is what is actually plentiful and two-sided at the bottom, and it is the quantity C-37 is already
+about.
+
+★ **THE ARITHMETIC:** each side spends **two** road tokens and receives **one home game and one
+genuine road game**. Its game count never moves — an exchange host is on target exactly as a filler
+host is.
+
+★ **WHERE IT SITS, AND WHY NOWHERE ELSE.** Inside phase 3, tried before the ordinary filler pick.
+Earlier, road capacity is still being spent filling ordinary home requests, so firing sooner takes
+road games a Marquee school's request needs and crowds out ordinary matching. Later is phase 4, which
+is three games nationally and runs after every road token is gone. The partner search reuses phase 3's
+**own** ordering key — `(DistanceKey, prestige, id)` — restricted to schools that can also pay two.
+**No second distance rule was invented.**
+
+★ **ATOMIC BY CONSTRUCTION, NOT BY DISCIPLINE.** Capacity on both sides, the cap on both sides and
+legality are all established before the first leg, so nothing between the two commits can fail; the
+unordered pair enters `usedPairs` exactly **once**. One leg possible and the reverse impossible is not
+a half exchange — it is **no** exchange, and the school falls through to the ordinary filler.
+
+★ **BOTH SCHOOLS HOST**, so C-37's lower-prestige-hosts rule does not apply and is never asserted
+against these pairs. Leg order is fixed by id: the lower id hosts first. Both legs carry the kind
+`Exchange`, so a deliberate exchange is distinguishable from an accidental duplicate **by provenance**
+rather than by inferring it from opposite hosts.
+
+★ **THE CAP IS THREE PER SCHOOL, ONE CEILING FOR EVERYONE** (Emmett, 2026-08-07, ruled off a measured
+sweep after asking for "a mix of both"). **The sweep is the reason the number is not lower, and it runs
+the opposite way from intuition:** capping *tighter* does not stop an isolated school hosting too much,
+it makes it worse.
+
+| cap | exchanges | schools signing | Seattle's slate | Seattle's road trips | conv. Selling hosts each |
+|---|---|---|---|---|---|
+| 1 | 39 | 78 | 24 home / 5 away | 394 mi | 1.55 |
+| 2 | 74 | 93 | 23 / 6 | 394 mi | 1.47 |
+| **3** | **94** | **99** | **23 / 6** | **394 mi** | **1.42** |
+| 4 | 105 | 103 | 22 / 7 | 551 mi | 1.38 |
+| none | 109 | 102 | 18 / 11 | 946 mi | 1.38 |
+
+At a cap of 1 Seattle hosts **24 of its 29 games**, because C-37 dumps forced home dates on the
+lowest-prestige school in an empty corner of the map and the exchange is the only thing pulling it back
+toward the slate it asked for. Uncapped it signs 8 and its road trips stretch to a 946-mile median. The
+**national trip median is 142 at every setting** — this number moves outliers only, which is why no
+suite check asserts it. On stock: 94 home-and-homes, 99 schools signing, distribution 39/31/29.
+
+### National neutrality — and the two wrong ways to state it
+
+★ **THE SHAPE MOVES `road − home` BY ZERO, AND NO CHECK MAY CLAIM IT REPAIRS THE +542 GAP.** Only C-37
+touches that number. Two earlier versions of this check are recorded because how they failed *is* the
+finding:
+
+1. **Tautology.** The first compared `road − home` across the same report object — which passes under
+   any matcher alive, because the gap is a property of the **requests**. Re-reading the requests can
+   never say anything about the matcher.
+2. **Over-strict.** The second asserted an identical forced-host count with the shape on and off. It
+   went red — 268 off, 270 on — which looked like a leak and was the opposite.
+
+★ **WHAT IS EXACTLY CONSERVED IS THE ROAD BUDGET REACHING THE FILLER.** The shape fires only on
+leftover road, so phases 1 and 2 must be untouched (identical hosted and neutral counts — 1,774 and 91
+either way), and everything left over is `2·Filler + 2·Exchange + Terminal + Unrepaired`, which matches
+to the token: **541 both ways**. The old filler converts 536 of those and strands 5; the exchange
+converts 540 and strands 1. **The two extra forced hosts are not tokens the shape invented — they are
+leftovers the greedy filler used to strand at a dead end**, and a two-way exchange is simply an extra
+legal move available there. Asserting equal conversions would have forbidden the shape from working.
+
+### Three measured findings, printed and not tuned
+
+★ **THE INDEPENDENTS FIX THE SPILL SHORTAGE — 164 spills to ZERO.** S102 shipped 164 home requests
+settling above the bucket they asked for, and called it arithmetic rather than tuning: the ruled mixes
+wanted **923** Easy home games and only **759** Easy road games existed. Twelve of the fourteen
+Independents *are* Easy opponents and each brings ~21 road games. Supply is now **1,018 against 933
+wanted**, and the spill count is **0**. The oracle re-measures both sides of that market every run and
+asserts the relationship rather than the number, so a future world that re-creates the shortage
+re-creates the spills honestly.
+
+★ **THE EXCHANGE REDISTRIBUTES FORCED HOSTING *UPWARD*, WHICH IS THE OPPOSITE OF WHAT CLAUDE CLAIMED AT
+THE GATE.** Emmett's read going in was that *"there just aren't enough low schools hosting low
+schools"* — correct, and sharper than stated: **sixty Selling schools and not one ever hosted another**,
+each hosting 1.05 games and busing 10.62 times, with all 174 bottom-hosts-bottom games hosted by
+*Working* schools because the top-down fill sells the bottom out before the filler opens. Measured after
+S105: conventional Selling hosts **1.05 → 1.68** with the Independents present and the shape off, and
+**back down to 1.38** with it on. The mechanism is clean — in a forced filler game the lower school
+always eats the home date, but in an exchange **both** schools host, so half those home games move up
+the ladder. **Almost all the improvement is the Independents existing; the exchange gives some of it
+back.** The underlying cause — the Selling home band and the fill order — is untouched and is its own
+session.
+
+★ **THE EXCHANGE DOES NOT SHORTEN TRIPS.** Conventional Selling median 149 → 150, p90 458 → 442. The
+improvement visible on the page against pre-S105 (249 → ~150) comes entirely from fourteen new nearby
+opponents, not from the shape. C-41's inverted tilt is *diluted*, not repaired.
+
+### What an Independent's November actually looks like
+
+Stock, after matching: NJIT (prestige 0) asks 7 home / 22 road, gets exactly that, signs **zero**
+exchanges — its 22 road games are all eaten in the top-down fill, because everyone wants a cheap
+opponent nearby. Seattle (prestige 38) asks 10 / 19 and ends at 23 hosted / 6 travelled with 3
+exchanges and 10 filler hosts — nobody wants to fly there, so C-37 hands it home dates it never asked
+for. **Nobody comes up short on stock**, which is R-a working, not a guarantee: R38 permits short and
+the ledger carries requested and matched separately by category so a shortfall names its bucket.
+
+### Still open here
+
+- **The Selling home band and the fill order** — the real cause of low schools never hosting low
+  schools. Its own session; the class curve has been deliberately open since S101 for Emmett to settle
+  by reading the page.
+- **Event pairings are still not in `usedPairs`.** Two schools can meet in a tournament *and* in
+  November. Pre-existing, not opened by S105, and the reason the no-third-meeting check proves its
+  contract arm by **constructing** the collision rather than reading a set.
+- **Dates** (R35/R36 are date-shaped and belong to the calendar session), the D2/D3 layer (C-36), the
+  recurrence curve, and the showcase slate.
