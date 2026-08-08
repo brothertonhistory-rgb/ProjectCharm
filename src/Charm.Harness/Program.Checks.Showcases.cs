@@ -326,26 +326,36 @@ internal static partial class Program
                           r => $"{r.SchoolName} {r.Home}/{r.Neutral}/{r.Road} of {r.Open}")));
 
                 // ★ THE WORKED NOVEMBER (§3.4), asserted rather than described: a school in a
-                //   tournament AND a showcase plays 31, three of them in its tournament, and
-                //   the showcase eats one of the remaining open games — never a 32nd.
+                //   tournament AND a showcase plays 31, its tournament accounting for what its
+                //   bracket guarantees, and the showcase eating one of the remaining open
+                //   games — never a 32nd.
                 //
                 //   ★ CONSTRUCTED, NOT DRAWN. An earlier version of this check seated a real
                 //   tournament and a real showcase and looked for a school in both — which is
                 //   four seats out of 347 schools finding eight, so it found nobody and the
                 //   check proved nothing while looking thorough. The arithmetic is what is
                 //   under test, so the seating that exercises it is built directly.
+                //
+                //   ★ S105.1 — RUN AT BOTH TOURNAMENT SIZES, because three concepts collide in
+                //   this one school and all three must stay separate: how big the tournament
+                //   is (4 or 8), what the tournament is charged (2 or 3, and it MOVES with the
+                //   size), and what the showcase is worth (always one charged game, always
+                //   zero exemption, and it does NOT move). The old single case ran at field 4
+                //   and expected three — the bug, hardcoded into the check that was supposed
+                //   to police it. RECOMPUTED, never relaxed.
                 var subject = stock.Schools.First(s =>
                     stock.Conferences.First(c => c.Id == s.ConferenceId).Games > 0);
                 var subjectConfGames = stock.Conferences.First(c => c.Id == subject.ConferenceId).Games;
 
                 EventSeat Seat(int n) => new(n, subject.Id, subject.Name, n - 1, EventSeatFallback.None);
-                var constructed = new EventSeatingOutcome
+
+                EventSeatingOutcome ConstructBoth(int tournamentField) => new()
                 {
                     Active = new[]
                     {
-                        new SeatedEvent(1, "Constructed Tournament", 1, stock.Places[0].PlaceId,
-                            stock.Places[0].Name, "11-24", "11-25", 4,
-                            EventSeatingStatus.Complete, new[] { Seat(1) }),
+                        new SeatedEvent(1, $"Constructed Tournament {tournamentField}", 1,
+                            stock.Places[0].PlaceId, stock.Places[0].Name, "11-24", "11-25",
+                            tournamentField, EventSeatingStatus.Complete, new[] { Seat(1) }),
                         new SeatedEvent(2, "Constructed Showcase", 1, stock.Places[1].PlaceId,
                             stock.Places[1].Name, "12-05", "12-05", 4,
                             EventSeatingStatus.Complete,
@@ -360,20 +370,30 @@ internal static partial class Program
                     },
                     Dormant = Array.Empty<DormantEvent>(),
                 };
-                var bothReport = BuildNonConferenceRequests(stock, constructed);
-                var r = bothReport.Schools.First(x => x.SchoolId == subject.Id);
-                var expectedOpen = NonConSeasonGamesSeated - subjectConfGames - NonConEventGames;
 
-                Check("C6d: ★ THE WORKED NOVEMBER — a school in BOTH plays 31 with 3 in its " +
-                      "tournament, and the showcase spends one of its remaining open games: " +
-                      "OPEN = 31 − conference − 3, and home+neutral+road = OPEN − 1. A net +2 " +
-                      "over the unseated 29, never a 32nd game",
-                      r.Seated
-                      && r.Open == expectedOpen
-                      && r.ShowcaseGames == 1
-                      && r.Home + r.Neutral + r.Road == expectedOpen - 1,
-                      $"{r.SchoolName} conf {r.ConferenceGames} open {r.Open} (expected {expectedOpen}) " +
-                      $"-> {r.Home}/{r.Neutral}/{r.Road}, showcase {r.ShowcaseGames}");
+                var matrixOk = true; var matrixDetail = new List<string>();
+                foreach (var (field, exemption) in new[] { (4, 2), (8, 3) })
+                {
+                    var bothReport = BuildNonConferenceRequests(stock, ConstructBoth(field));
+                    var r = bothReport.Schools.First(x => x.SchoolId == subject.Id);
+                    var expectedOpen = NonConSeasonGamesSeated - subjectConfGames - exemption;
+                    var ok = r.Seated
+                             && r.Open == expectedOpen
+                             && r.ShowcaseGames == 1
+                             && r.Home + r.Neutral + r.Road == expectedOpen - 1;
+                    matrixOk = matrixOk && ok;
+                    matrixDetail.Add($"field {field}: open {r.Open} (expected {expectedOpen}) " +
+                                     $"-> {r.Home}/{r.Neutral}/{r.Road}, showcase {r.ShowcaseGames}");
+                }
+
+                Check("C6d: ★ THE WORKED NOVEMBER, AT BOTH TOURNAMENT SIZES — a school in a " +
+                      "tournament AND a showcase plays 31; its tournament accounts for what " +
+                      "its bracket guarantees (2 at a field of four, 3 at a field of eight) " +
+                      "and its showcase spends one of the remaining open games either way. " +
+                      "The showcase's four-school field buys NO exemption, so a bigger " +
+                      "tournament moves OPEN and the showcase never does",
+                      matrixOk, $"{subject.Name} conf {subjectConfGames} — " +
+                                string.Join("; ", matrixDetail));
             }
 
             // ════════════════════════════════════════════════════════════════════

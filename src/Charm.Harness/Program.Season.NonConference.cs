@@ -32,12 +32,42 @@ internal static partial class Program
 
     /// <summary>★ R2, literally — "seeded reaches 31; stayed home lands near 29." A school
     /// seated in an early-season event REALLY PLAYS 31 regular-season games; everyone else
-    /// plays 29. The three event games come out of the higher total — reading R2 as
+    /// plays 29. The event games come out of the higher total — reading R2 as
     /// "subtract three from a flat 29" hands six Big East schools an impossible slate
     /// (18 conference games + a seat leaves them fewer open games than their home band).</summary>
     private const int NonConSeasonGamesSeated = 31;
     private const int NonConSeasonGamesUnseated = 29;
-    private const int NonConEventGames = 3;
+
+    /// <summary>★ S105.1 — THE MOST GAMES ANY TOURNAMENT CAN COST A TEAM, and deliberately
+    /// NOT the number a given school is charged. Used only by the two CAPACITY GUARDS that
+    /// run BEFORE any request exists — the showcase seating floor and the contract gate —
+    /// where the question is "could this school afford the worst case?" and the seat it will
+    /// eventually take is not yet known. Assuming the worst case there is what keeps the
+    /// seating draw byte-identical to the pre-S105.1 world.
+    /// <para>The exact per-school charge is <see cref="TournamentGamesFor"/> and lives
+    /// downstream, where the field size IS known. Two names because they are two different
+    /// questions; one name is how the flat three survived S101 and S104.</para></summary>
+    private const int MaxTournamentGamesPerTeam = 3;
+
+    /// <summary>★ S105.1 — HOW MANY GAMES A FIELD OF THIS SIZE GUARANTEES EACH TEAM IN IT.
+    /// Eight teams is three rounds, four teams is two, and every team plays every round —
+    /// the rule the route tables in <c>Program.Season.Brackets.cs</c> encode literally.
+    /// <para>★ THIS IS A GUARANTEE, NEVER AN OUTCOME. It is read while the request is being
+    /// built, before a single tournament game has been played, because it is an accounting
+    /// fact about the bracket and not a fact about anybody's November.</para>
+    /// <para>★ IT REFUSES WHAT IT DOES NOT KNOW, matching <c>BracketRoutesFor</c>'s own
+    /// philosophy. <c>fieldSize == 4 ? 2 : 3</c> is forbidden here: a future field of six
+    /// would silently take three, which is precisely the bug this method exists to end,
+    /// reintroduced one layer up.</para></summary>
+    private static int TournamentGamesFor(int fieldSize) => fieldSize switch
+    {
+        8 => 3,
+        4 => 2,
+        _ => throw new InvalidOperationException(
+                 $"TOURNAMENT EXEMPTION: no guaranteed-game count for a field of " +
+                 $"{fieldSize.ToString(System.Globalization.CultureInfo.InvariantCulture)}; " +
+                 "only 8 and 4 are authorable."),
+    };
 
     /// <summary>Class home bands and showcase allowances (brief §3, ruled shapes). Indexed
     /// by class ordinal — see <see cref="NonConClassNames"/>.</summary>
@@ -201,15 +231,20 @@ internal static partial class Program
         // must not hand a school a six-game exemption.
         //
         // ★ S104 / A1 — TOURNAMENT SEATS ONLY. R26 is the whole point: a tournament seat
-        //   makes the season genuinely BIGGER (31 games, three of them in the event); a
+        //   makes the season genuinely BIGGER (31 games, its event's games among them); a
         //   showcase seat does not — "it just counts as one of your games". Left
-        //   unfiltered, a showcase seat would hand its school a 31-game season and three
-        //   phantom event games, which is the exact opposite of the ruling. The failure
-        //   would have HIDDEN: on schools whose home band absorbs the difference the
-        //   totals still reconcile and every conservation check stays green.
-        var seated = seating.Active
-            .Where(e => !e.IsShowcase)
-            .SelectMany(e => e.Seats).Select(s => s.SchoolId).ToHashSet();
+        //   unfiltered, a showcase seat would hand its school a 31-game season and a
+        //   handful of phantom event games, which is the exact opposite of the ruling. The
+        //   failure would have HIDDEN: on schools whose home band absorbs the difference
+        //   the totals still reconcile and every conservation check stays green.
+        //
+        // ★ S105.1 — AND HOW MANY GAMES THE SEAT ACTUALLY BUYS DEPENDS ON THE FIELD. Eight
+        //   teams is three rounds and four teams is two, so a flat three charged a four-team
+        //   school for a game its bracket never guaranteed: it removed three from what the
+        //   school had to arrange while the bracket promised two, and the school played 30
+        //   inside a season the engine believed was 31. Membership in this map is exactly
+        //   what `Seated` used to mean; the value is what the seat is worth.
+        var seatFieldOf = MteTournamentFieldSizes(seating);
 
         // ★ The other half of the same fact: a showcase seat is a fixed obligation that
         //   already exists, and it is CHARGED against the games this school already had.
@@ -252,9 +287,9 @@ internal static partial class Program
         //      because this branch returned before the charge ran.
         foreach (var s in independents)
         {
-            var isSeated = seated.Contains(s.Id);
+            var isSeated = seatFieldOf.TryGetValue(s.Id, out var indFieldSize);
             var seasonGames = isSeated ? NonConSeasonGamesSeated : NonConSeasonGamesUnseated;
-            var eventGames = isSeated ? NonConEventGames : 0;
+            var eventGames = isSeated ? TournamentGamesFor(indFieldSize) : 0;
             var open = seasonGames - 0 - eventGames;
             var cls = NonConPrestigeClass(s.CurrentPrestige);
 
@@ -289,7 +324,7 @@ internal static partial class Program
         // ★ Ranking happens AFTER final class assignment: a floor-promoted school ranks
         //   inside the class it landed in, and lands at its bottom because it sorts by
         //   prestige. Ordered, clamped, in games (prompt §4.3):
-        //     OPEN    = SEASON_GAMES − conference games − EVENT_GAMES
+        //     OPEN    = SEASON_GAMES − conference games − the games its field guarantees
         //     HOME    = band position, clamped to OPEN         (clamp counted: Compressed)
         //     NEUTRAL = min(allowance, OPEN − HOME)
         //     ROAD    = the remainder — never a band, so the acceptance measure stays a
@@ -307,9 +342,9 @@ internal static partial class Program
             {
                 var s = members[i];
                 var conf = confById[s.ConferenceId];
-                var isSeated = seated.Contains(s.Id);
+                var isSeated = seatFieldOf.TryGetValue(s.Id, out var fieldSize);
                 var seasonGames = isSeated ? NonConSeasonGamesSeated : NonConSeasonGamesUnseated;
-                var eventGames = isSeated ? NonConEventGames : 0;
+                var eventGames = isSeated ? TournamentGamesFor(fieldSize) : 0;
                 var open = seasonGames - conf.Games - eventGames;
 
                 int home, neutral, road;
@@ -408,8 +443,9 @@ internal static partial class Program
         if (targeted.Count > 0)
         {
             lines.Add($"  Seated in an early-season event: {r.SeatedCount} school(s) — " +
-                      $"a seated school plays {NonConSeasonGamesSeated} games, " +
-                      $"{NonConEventGames} of them in its event; everyone else plays " +
+                      $"a seated school plays {NonConSeasonGamesSeated} games, and its event " +
+                      "accounts for as many as its bracket guarantees: three in a field of " +
+                      "eight, two in a field of four. Everyone else plays " +
                       $"{NonConSeasonGamesUnseated}.");
             lines.Add("  class      n    home  neutral  road   (average requested games; road is the remainder, never a quota)");
             foreach (var name in new[] { "Marquee", "Solid", "Working", "Selling" })

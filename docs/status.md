@@ -10,7 +10,30 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 105** (2026-08-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 96 PASS at 11
+Last updated: **Session 105.1** (2026-08-07; verified on Emmett's machine — ALL CHECKS PASSED, **no new phase**.
+**A FOUR-TEAM TOURNAMENT IS TWO GAMES, NOT THREE.** A four-team event is two rounds and every team plays both; the
+engine charged every tournament-seated school **three**. So a school in a four-team field had three games struck off
+the November it had to arrange, was guaranteed two, and **played 30 inside a season the engine believed was 31** —
+**68 of the country's 108 seated schools**. The request-side exemption now reads the field size: **8 → 3, 4 → 2**.
+★ **A CORRECTION, NOT A FEATURE** — no ruling implemented, no basketball question opened. ★ **It survived S101 AND
+S104, a session explicitly about this arithmetic, because nothing in the suite had ever compared what a school is
+CHARGED against what its bracket GUARANTEES** — every conservation identity reconciled the report against itself and
+stayed green throughout. That comparison now exists (Phase 92 C7b), with a **negative control that constructs the
+flat-three implementation** and proves the check rejects it (*Akron in Wooden Legacy, field 4, charged 3 for a 2-game
+bracket*), a **showcase companion** so it can never be widened into "every seated school", **named schools of each
+field size** so no flat value satisfies both, and a **Phase 89 tie between the helper and the route tables** so the
+two cannot drift. ★ **Two names, deliberately asymmetric**: `TournamentGamesFor(fieldSize)` is the exact downstream
+charge and **throws** on any size but 8 and 4; `MaxTournamentGamesPerTeam` (3) is the worst case, read only by the two
+capacity guards that run before a seat exists. The seating floor turns out to be **unreachable on every committed
+world**, so "the draw cannot move" is a proof rather than a judgement. ★ **The prediction landed cell for cell**,
+including the single neutral game and the school it belongs to (Notre Dame, capped by `open − home` rather than by its
+allowance). Stock: home **1,773** / neutral **184** / road **2,382**, gap **+609** (~304 forced hosts); **2,171 games
+paired**, 107 home-and-homes, 0 short, 0 spills. **All five must-not-move fingerprints held** — `6f79d663…`,
+`7515df7d…`, `7c1a41c1…`, `898d9fe8…`, `contracts_golden.json`. Oracle authors **field size, never the exemption**, and
+takes the 8→3 / 4→2 step itself so both sides cannot carry the same mistake. Golden regenerated, never patched.
+**Ran BEFORE dating on purpose.**)
+
+*(Previous board entry, S105 — 2026-08-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 96 PASS at 11
 assertions**, **Phase 93 PASS with full oracle parity**. **THE INDEPENDENTS GET A NOVEMBER, AND THE MATCHER LEARNS THE
 SAME-SEASON HOME-AND-HOME (O-92 session 5).** Fourteen schools that played ZERO non-conference games now play a full
 29 (31 if seated): **R-a** a full season with road as the REMAINDER, never a fixed count — *"teams should only fall
@@ -34,7 +57,7 @@ SPILL SHORTAGE, 164 → 0**: the country wanted 923 easy home games and had 759;
 Stock: home 1,773 / neutral 183 / road 2,315, gap **+542** (~271 forced hosts, up from 176); **2,137 games paired** —
 1,774 hosted, 91 neutral, 81 filler, 3 terminal, 94 home-and-homes, 0 short, 0 spills. Fingerprints `6f79d663…`,
 `7515df7d…`, `7c1a41c1…` and `contracts_golden.json` unmoved. Seven of eight delivery predictions landed exactly;
-the miss was Phase 96's runtime in seconds, not its share.)
+the miss was Phase 96's runtime in seconds, not its share.)*
 
 *(Previous board entry, S102 — 2026-08-05; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 93 PASS at 17
 assertions**, all four fingerprints unmoved (`6f79d663…`, `7515df7d…`, `26f2b8ff…`, `6abd62b0…`). **THE MATCHING — every
@@ -388,6 +411,16 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S105.1 — THE EVENT EXEMPTION READS THE FIELD SIZE.** `NonConEventGames = 3` split into
+  `MaxTournamentGamesPerTeam` (3, the worst case, read only by the showcase seating floor and the contract capacity
+  gate — both of which run *before* a seat exists) and `TournamentGamesFor(fieldSize)` (8 → 3, 4 → 2, exact,
+  downstream, and it **throws** on any other size). `MteTournamentFieldSizes` added as the sibling of
+  `MteShowcaseObligations`: showcases filtered at the door, one seat per school preserved. Four new discriminating
+  checks in Phase 92 (C7b/C7c/C7d/C7e), two in Phase 89 (C0a/C0b), and Phase 95's worked November rebuilt as a
+  **matrix at both tournament sizes** — the old single case ran at a field of four and expected three, the bug
+  hardcoded into the check written to police it. Oracle's authored constant became **school → field size**; golden
+  regenerated. No new phase, no game moved.
 
 - **★ S105 — THE INDEPENDENTS' NOVEMBER AND THE SAME-SEASON HOME-AND-HOME (non-conference arc, session 5).** The
   Independent request (full season, prestige-read home curve, zero neutral, remainder road, low-major class); the
@@ -806,6 +839,13 @@ be run against a league with a real rotation, though the minute VALUES remain pl
 chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
+
+- **O-97 — Phase 93 C10's DETAIL STRING omits the exchange term (cosmetic, noticed in S105.1).** The
+  assertion is correct and complete — `2·Hosted + 2·Neutral + 2·Filler + 2·Exchange + Terminal +
+  Unrepaired` is what the boolean tests — but the printed line reads `4339 tokens = 2×1773 + 2×92 +
+  2×89 + 3 + 0`, which does not add up on the page and invites exactly the wrong conclusion when
+  somebody checks the arithmetic by hand. One format string. **Not fixed in S105.1: it is outside
+  that session's scope wall and touches nothing the session was correcting.**
 
 - **O-96 — ★ A SCHEDULE-ONLY SEASON MODE. 46% of the suite pays for basketball nothing reads.**
   Phases 91, 90 and 87 (host debt, rotation, season memory) are 207s of 446s and all three are

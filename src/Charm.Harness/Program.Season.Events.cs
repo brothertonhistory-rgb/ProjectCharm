@@ -292,6 +292,27 @@ internal static partial class Program
         return obligations;
     }
 
+    /// <summary>★ S105.1 — WHICH SIZE OF FIELD EACH TOURNAMENT-SEATED SCHOOL SITS IN, and
+    /// nothing else. The one place anything downstream asks "how big is this school's event",
+    /// so the request builder and the contract phase cannot answer it two different ways.
+    /// <para>★ SHOWCASES ARE FILTERED OUT AT THE DOOR (S104's distinction, A3). A showcase
+    /// field also holds four schools and buys no exemption at all; a school seated in one
+    /// must not appear here, or it would take a four-team tournament's two games on top of
+    /// the showcase obligation it already carries.</para>
+    /// <para>★ STILL BINARY PER SCHOOL. The pre-S105.1 set could not hand a school a
+    /// six-game exemption from a duplicated seat, and neither can this: the first seat in
+    /// canonical (tier, id) order wins and a second is ignored. The value changed from
+    /// "yes/no" to "how big"; the one-per-school property did not.</para></summary>
+    private static IReadOnlyDictionary<int, int> MteTournamentFieldSizes(EventSeatingOutcome seating)
+    {
+        var fields = new Dictionary<int, int>();
+        foreach (var e in seating.Active.Where(e => !e.IsShowcase)
+                                 .OrderBy(e => e.Tier).ThenBy(e => e.EventId))
+            foreach (var seat in e.Seats)
+                fields.TryAdd(seat.SchoolId, e.FieldSize);
+        return fields;
+    }
+
     private sealed record DormantEvent(int EventId, string Name);
 
     /// <summary>Everything this season's draw decided. <c>PoolIsEmpty</c> is the zero path:
@@ -405,11 +426,20 @@ internal static partial class Program
         //   changes depending on what happens next is not an answer.
         //
         //   (28 − conference games) is that floor: a tournament-seated school plays 31 and
-        //   spends 3 in its event, which is one FEWER open game than staying home with 29.
-        //   No committed world comes near zero; this is the guard, not a live constraint.
+        //   spends at most 3 in its event, which is one FEWER open game than staying home
+        //   with 29. No committed world comes near zero; this is the guard, not a live
+        //   constraint.
+        //
+        // ★ S105.1 — DELIBERATELY THE WORST CASE, NOT THE EXACT CHARGE. The request builder
+        //   now charges a four-team school two rather than three, but this guard runs BEFORE
+        //   any seat is taken and cannot know which size of field the school will land in.
+        //   Assuming three may refuse a school that could in fact have afforded a four-team
+        //   seat — which is exactly the pre-S105.1 behaviour, and exactly what keeps the
+        //   seating draw byte-identical. The constant's NAME carries that asymmetry so it is
+        //   visible here rather than buried: MaxTournamentGamesPerTeam, never "the" number.
         var openFloorOf = pool.ToDictionary(
             s => s.Id,
-            s => NonConSeasonGamesSeated - NonConEventGames - confById[s.ConferenceId].Games);
+            s => NonConSeasonGamesSeated - MaxTournamentGamesPerTeam - confById[s.ConferenceId].Games);
 
         var active = new List<WorldEvent>();
         var dormant = new List<DormantEvent>();

@@ -81,6 +81,50 @@ internal static partial class Program
             var allOff = Swap(mte.Events.Select(e => e with { ForcedActive = false }).ToList());
 
             // ════════════════════════════════════════════════════════════════════
+            //  C0 — ★ S105.1: THE EXEMPTION AND THE BRACKET CANNOT DRIFT.
+            //
+            //  The request side answers "how many games does a seat buy?" from a cheap
+            //  lookup, because production code should not be walking route tables to
+            //  price a request. The STRUCTURAL GUARANTEE that the lookup is right lives
+            //  here instead: for every authorable field size, the helper's answer equals
+            //  the number of distinct rounds its route table runs — which is the number
+            //  of games each team is guaranteed, because every team plays every round.
+            //
+            //  ★ THE POINT IS THE FUTURE. Edit a route table without touching the helper,
+            //    or the reverse, and this goes red the same day rather than surfacing as
+            //    a country full of schools playing one game more or less than the engine
+            //    believes. That is exactly how the flat three survived S101 and S104.
+            // ════════════════════════════════════════════════════════════════════
+            {
+                var tie = true; var tieDetail = new List<string>();
+                foreach (var size in new[] { 4, 8 })
+                {
+                    var table = BracketRoutesFor(size);
+                    var rounds = table.Select(r => r.Round).Distinct().Count();
+                    // Every seed really does appear in round one exactly once — the fact
+                    // that makes "distinct rounds" the per-team game count rather than a
+                    // property of the table's shape.
+                    var round1Seeds = table.Where(r => r.Round == 0)
+                        .SelectMany(r => new[] { r.SeedA, r.SeedB }).OrderBy(x => x).ToList();
+                    var seedsClean = round1Seeds.SequenceEqual(Enumerable.Range(1, size));
+                    var ok = TournamentGamesFor(size) == rounds && seedsClean;
+                    tie = tie && ok;
+                    tieDetail.Add($"field {size}: {table.Length} games, {rounds} rounds, " +
+                                  $"exemption {TournamentGamesFor(size)}");
+                }
+                Check("C0a: ★ the request-side exemption equals what the route table " +
+                      "GUARANTEES each team — distinct rounds, with every seed placed exactly " +
+                      "once in round one — at every authorable field size",
+                      tie, string.Join("; ", tieDetail));
+
+                Check("C0b: ★ and the exemption REFUSES a size it has no bracket for, by name, " +
+                      "rather than quietly handing a field of six the eight-team answer",
+                      Refusal(() => TournamentGamesFor(6)) is { } msg
+                      && msg.Contains("only 8 and 4", StringComparison.Ordinal),
+                      Refusal(() => TournamentGamesFor(6)) ?? "no refusal");
+            }
+
+            // ════════════════════════════════════════════════════════════════════
             //  C1 — PRESERVATION. The conference half is the pre-S98 season, exactly.
             // ════════════════════════════════════════════════════════════════════
             var on = RunSeasonCore(allOn, MteCheckSeed, configPath, verbose: false);

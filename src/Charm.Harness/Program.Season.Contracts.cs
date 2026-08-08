@@ -545,8 +545,9 @@ internal static partial class Program
     /// <summary>The spine's single entry point. Derives the two supplied facts —
     /// league walls and open games — from the world and the seating, then runs the
     /// pure step. Open games is S101's own arithmetic: 31 seated / 29 not, minus
-    /// conference games, minus the three event games — the existing seam, no new
-    /// event abstraction. An Independent (league games 0) opens at the full unseated
+    /// conference games, minus the MOST a tournament can cost (three — see the note at
+    /// the subtraction) — the existing seam, no new event abstraction. An Independent
+    /// (league games 0) opens at the full unseated
     /// season: its November belongs to a later arc session, but a contracted game
     /// bypasses matching entirely, so an Independent can honour one today.</summary>
     private static ContractSeasonOutcome RunContractSeason(
@@ -588,7 +589,14 @@ internal static partial class Program
             var s = schoolById[schoolId];
             var isSeated = seated.Contains(schoolId);
             var seasonGames = isSeated ? NonConSeasonGamesSeated : NonConSeasonGamesUnseated;
-            var eventGames = isSeated ? NonConEventGames : 0;
+            // ★ S105.1 — THE WORST CASE ON PURPOSE. The request builder charges a four-team
+            //   school two, but this gate is the contract phase's only hard bound and it
+            //   answers "can this school afford another obligation?" — a question better
+            //   answered pessimistically. Assuming three understates a four-team school's
+            //   open games by one, so the gate refuses at the margin rather than letting a
+            //   contract overdraw a November. That is the pre-S105.1 answer, which is what
+            //   keeps contracts_golden.json unmoved.
+            var eventGames = isSeated ? MaxTournamentGamesPerTeam : 0;
             return seasonGames - confById[s.ConferenceId].Games - eventGames
                    - showcaseGamesOf.GetValueOrDefault(schoolId, 0);
         }

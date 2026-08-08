@@ -88,15 +88,21 @@ internal static partial class Program
             //
             //  ★ The discriminator is that the request is checked against the SEASON, not
             //    against itself. "29 to arrange" would also be produced by a rule that
-            //    happened to add up while ignoring a tournament seat, so the seat's three
-            //    games and the showcase's one are added back explicitly.
+            //    happened to add up while ignoring a tournament seat, so the seat's games
+            //    and the showcase's one are added back explicitly.
+            //
+            //  ★ S105.1 — and the seat's games are read off the school's OWN FIELD. A flat
+            //    three added back here would balance a flat three charged upstream, and the
+            //    check would confirm the bug instead of catching it.
             // ════════════════════════════════════════════════════════════════════════
             {
+                var indFieldOf = MteTournamentFieldSizes(run.Events.Seating);
                 var allFull = true; var firstBad = "";
                 foreach (var s in independents)
                 {
                     var season = s.Home + s.Neutral + s.Road
-                               + (s.Seated ? NonConEventGames : 0) + s.ShowcaseGames;
+                               + (s.Seated ? TournamentGamesFor(indFieldOf[s.SchoolId]) : 0)
+                               + s.ShowcaseGames;
                     var expect = s.Seated ? NonConSeasonGamesSeated : NonConSeasonGamesUnseated;
                     if (season == expect) continue;
                     allFull = false; firstBad = $"{s.SchoolName} reaches {season}, not {expect}";

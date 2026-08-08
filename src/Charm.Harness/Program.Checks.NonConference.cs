@@ -105,11 +105,18 @@ internal static partial class Program
             var stockRun = RunSeasonCore(stock, NonConStockSeed, configPath, verbose: false);
             var stockReport = stockRun.NonConference;
 
+            // ★ S105.1 — THE SEATING TRAVELS WITH THE REPORT. The exemption is no longer a
+            //   constant a check can quote, so every check that re-derives OPEN needs the
+            //   seating that produced the report in order to ask how big each school's field
+            //   was. The fixtures are all seated EMPTY, which is why they were fine before
+            //   and are still fine now.
             var eventless = fixtures.Select(f => (f.Item1, f.Item2,
-                Report: BuildNonConferenceRequests(f.Item2, EventSeatingOutcome.Empty))).ToList();
+                Report: BuildNonConferenceRequests(f.Item2, EventSeatingOutcome.Empty),
+                Seating: EventSeatingOutcome.Empty)).ToList();
             var allWorlds = eventless
-                .Select(e => (Name: e.Item1, World: e.Item2, e.Report))
-                .Append((Name: "stock", World: stock, Report: stockReport)).ToList();
+                .Select(e => (Name: e.Item1, World: e.Item2, e.Report, e.Seating))
+                .Append((Name: "stock", World: stock, Report: stockReport,
+                         Seating: stockRun.Events.Seating)).ToList();
 
             // ════════════════════════════════════════════════════════════════════
             //  C1 — PARTITION. Exactly one class per school, five classes total.
@@ -117,7 +124,7 @@ internal static partial class Program
             {
                 var ok = true; var detail = "";
                 var legal = new[] { "Selling", "Working", "Solid", "Marquee" };
-                foreach (var (name, world, report) in allWorlds)
+                foreach (var (name, world, report, _) in allWorlds)
                 {
                     var ids = report.Schools.Select(s => s.SchoolId).ToList();
                     var covers = ids.Count == world.Schools.Count
@@ -149,7 +156,7 @@ internal static partial class Program
                          && NonConPrestigeClass(55) == 2 && NonConPrestigeClass(79) == 2
                          && NonConPrestigeClass(80) == 3 && NonConPrestigeClass(99) == 3;
                 var floorHeld = true; var culprit = "";
-                foreach (var (name, world, report) in allWorlds)
+                foreach (var (name, world, report, _) in allWorlds)
                 {
                     var confById = world.Conferences.ToDictionary(c => c.Id);
                     foreach (var s in world.Schools)
@@ -260,9 +267,10 @@ internal static partial class Program
             {
                 var conserve = true; var valid = true;
                 var committedClean = true; var culprit = "";
-                foreach (var (name, world, report) in allWorlds)
+                foreach (var (name, world, report, seating) in allWorlds)
                 {
                     var confById = world.Conferences.ToDictionary(c => c.Id);
+                    var fieldOf = MteTournamentFieldSizes(seating);
                     foreach (var s in report.Conventional)
                     {
                         if (s.Impossible)
@@ -280,9 +288,13 @@ internal static partial class Program
                         { conserve = false; culprit = $"{name}/{s.SchoolName}"; }
                         var confGames = confById.Values
                             .Single(c => c.Id == world.Schools.Single(x => x.Id == s.SchoolId).ConferenceId).Games;
+                        // ★ S105.1 — the exemption is read from the school's OWN field, not
+                        //   from a constant. A check that quotes a flat three is a check that
+                        //   agrees with the bug it is supposed to catch.
                         var expectedOpen =
                             (s.Seated ? NonConSeasonGamesSeated : NonConSeasonGamesUnseated)
-                            - confGames - (s.Seated ? NonConEventGames : 0);
+                            - confGames
+                            - (s.Seated ? TournamentGamesFor(fieldOf[s.SchoolId]) : 0);
                         if (!(s.Open == expectedOpen
                               && s.Home >= 0 && s.Home <= s.Open
                               && s.Neutral >= 0 && s.Neutral <= s.Open - s.Home
@@ -314,21 +326,137 @@ internal static partial class Program
                     .SelectMany(e => e.Seats).Select(s => s.SchoolId).ToHashSet();
                 var seatedFromReport = stockReport.Conventional
                     .Where(s => s.Seated).Select(s => s.SchoolId).ToHashSet();
+                var fieldOf = MteTournamentFieldSizes(stockRun.Events.Seating);
                 var exempted31 = stockReport.Conventional.Where(s => s.Seated)
                     .All(s => s.Open == NonConSeasonGamesSeated
-                              - s.ConferenceGames - NonConEventGames);
+                              - s.ConferenceGames - TournamentGamesFor(fieldOf[s.SchoolId]));
                 var plain29 = stockReport.Conventional.Where(s => !s.Seated)
                     .All(s => s.Open == NonConSeasonGamesUnseated - s.ConferenceGames);
                 // ★ THE DISCRIMINATOR: the stock world really does seat showcases, so the
                 //   filter above is doing work rather than being a no-op on a slate that has
                 //   no showcases to exclude.
                 var showcaseSeatsExist = stockRun.Events.Seating.Active.Any(e => e.IsShowcase && e.Seats.Count > 0);
-                Check("C7: the 31-with-3-exempt pair applies to exactly the schools the " +
-                      "seating seated, both directions, as set membership",
+                Check("C7: the 31-game season applies to exactly the schools the seating " +
+                      "seated, both directions, as set membership",
                       seatedFromSeating.SetEquals(seatedFromReport) && exempted31 && plain29
                       && showcaseSeatsExist,
                       $"{seatedFromReport.Count} seated (read from the seating outcome, " +
                       "never a constant)");
+
+                // ════════════════════════════════════════════════════════════════
+                //  C7b — ★ S105.1: THE CHECK THAT SHOULD HAVE EXISTED.
+                //
+                //  What a school is charged for its event equals what its event's
+                //  BRACKET GUARANTEES it. Two halves of the same fact that nothing in
+                //  this suite has ever compared — which is why a four-team school was
+                //  charged three games for a two-game tournament through S101 and
+                //  through S104, a session explicitly about this arithmetic, with
+                //  every conservation identity green the whole time.
+                //
+                //  ★ GUARANTEED, NEVER PLAYED. The count comes off the route table, not
+                //    off the results: the charge is made while the request is built and
+                //    no game exists yet.
+                // ════════════════════════════════════════════════════════════════
+                {
+                    var eventOf = new Dictionary<int, SeatedEvent>();
+                    foreach (var e in stockRun.Events.Seating.Active.Where(e => !e.IsShowcase))
+                        foreach (var seat in e.Seats)
+                            eventOf.TryAdd(seat.SchoolId, e);
+
+                    var matched = true; var firstBad = "";
+                    foreach (var s in stockReport.Schools.Where(s => s.Seated))
+                    {
+                        var e = eventOf[s.SchoolId];
+                        var guaranteed = BracketRoutesFor(e.FieldSize)
+                            .Select(r => r.Round).Distinct().Count();
+                        var charged = (s.IsIndependent
+                                       ? NonConSeasonGamesSeated
+                                       : NonConSeasonGamesSeated - s.ConferenceGames)
+                                      - s.Open;
+                        if (charged == guaranteed) continue;
+                        matched = false;
+                        firstBad = $"{s.SchoolName} in {e.Name} (field {e.FieldSize}): " +
+                                   $"charged {charged}, bracket guarantees {guaranteed}";
+                        break;
+                    }
+                    var bothSizes = stockReport.Schools.Where(s => s.Seated)
+                        .Select(s => eventOf[s.SchoolId].FieldSize).Distinct().OrderBy(x => x).ToList();
+                    Check("C7b: ★ every tournament-seated school is charged EXACTLY the games " +
+                          "its own bracket guarantees it — three rounds in a field of eight, " +
+                          "two in a field of four — and the stock slate really runs both sizes",
+                          matched && bothSizes.SequenceEqual(new[] { 4, 8 }),
+                          matched
+                            ? $"{stockReport.SeatedCount} seated across fields of " +
+                              string.Join(" and ", bothSizes)
+                            : firstBad);
+
+                    // ── C7c — ★ AND ITS SHOWCASE COMPANION (A3). ─────────────────
+                    //    A showcase seat takes ZERO tournament exemption and carries its
+                    //    obligation in ShowcaseGames instead. Asserted here so C7b can
+                    //    never be widened into "every seated school" and quietly undo
+                    //    S104's central distinction — the two halves are separate
+                    //    concepts that happen to share a four-school field.
+                    var showcaseOnly = MteShowcaseObligations(stockRun.Events.Seating).Keys
+                        .Where(id => !eventOf.ContainsKey(id)).ToHashSet();
+                    var showcaseRows = stockReport.Schools
+                        .Where(s => showcaseOnly.Contains(s.SchoolId)).ToList();
+                    var showcaseClean = showcaseRows.All(s =>
+                        !s.Seated
+                        && s.ShowcaseGames == 1
+                        && s.Open == (s.IsIndependent
+                                        ? NonConSeasonGamesUnseated
+                                        : NonConSeasonGamesUnseated - s.ConferenceGames));
+                    Check("C7c: ★ a showcase-seated school takes NO tournament exemption at " +
+                          "all — it plays 29, carries its one showcase game as a charge, and " +
+                          "its four-school field buys it nothing",
+                          showcaseClean && showcaseRows.Count > 0,
+                          $"{showcaseRows.Count} showcase-only school(s)");
+
+                    // ── C7d — ★ NEGATIVE CONTROL: THE WRONG RULE, IMPLEMENTED. ───
+                    //    Not a malformed event record — a flat-three implementation, which
+                    //    is the actual bug. Run C7b's comparison against it and it must
+                    //    FAIL on the four-team fields. A control that only rejects an
+                    //    impossible record tests a failure mode nobody ever shipped.
+                    {
+                        var flatThreeSurvives = true; var flatVictim = "";
+                        foreach (var s in stockReport.Schools.Where(s => s.Seated))
+                        {
+                            var e = eventOf[s.SchoolId];
+                            var guaranteed = BracketRoutesFor(e.FieldSize)
+                                .Select(r => r.Round).Distinct().Count();
+                            if (MaxTournamentGamesPerTeam == guaranteed) continue;
+                            flatThreeSurvives = false;
+                            flatVictim = $"{s.SchoolName} in {e.Name} (field {e.FieldSize}) " +
+                                         $"would be charged {MaxTournamentGamesPerTeam} for a " +
+                                         $"{guaranteed}-game bracket";
+                            break;
+                        }
+                        Check("C7d: ★ NEGATIVE CONTROL — a flat-three exemption FAILS C7b's " +
+                              "comparison on this very slate, so C7b is a real bar and not a " +
+                              "restatement of whatever the code happens to do",
+                              !flatThreeSurvives, flatVictim);
+                    }
+
+                    // ── C7e — ★ NAMED, ONE OF EACH SIZE. ────────────────────────
+                    //    Phase 92's open-games identity now expects a per-school number, so
+                    //    it is asserted on a four-team-seated and an eight-team-seated
+                    //    school BY NAME: no single flat value can satisfy both, which is
+                    //    exactly the property the old check lacked.
+                    {
+                        var four = stockReport.Schools.First(s =>
+                            s.Seated && eventOf[s.SchoolId].FieldSize == 4 && !s.IsIndependent);
+                        var eight = stockReport.Schools.First(s =>
+                            s.Seated && eventOf[s.SchoolId].FieldSize == 8 && !s.IsIndependent);
+                        var fourOk = four.Open == NonConSeasonGamesSeated - four.ConferenceGames - 2;
+                        var eightOk = eight.Open == NonConSeasonGamesSeated - eight.ConferenceGames - 3;
+                        Check("C7e: ★ named schools, one per field size — the four-team seat " +
+                              "removes TWO games from the November it must arrange and the " +
+                              "eight-team seat removes THREE",
+                              fourOk && eightOk,
+                              $"{four.SchoolName} (field 4) conf {four.ConferenceGames} open {four.Open}; " +
+                              $"{eight.SchoolName} (field 8) conf {eight.ConferenceGames} open {eight.Open}");
+                    }
+                }
             }
 
             // ════════════════════════════════════════════════════════════════════
@@ -374,7 +502,7 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             {
                 var ok = true; var culprit = "";
-                foreach (var (name, _, report) in allWorlds)
+                foreach (var (name, _, report, _) in allWorlds)
                 {
                     if (report.HomeTotal != report.Schools.Sum(s => s.Home)
                         || report.NeutralTotal != report.Schools.Sum(s => s.Neutral)

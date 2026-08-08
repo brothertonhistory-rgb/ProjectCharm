@@ -1,3 +1,67 @@
+## Session 105.1 — A FOUR-TEAM TOURNAMENT IS TWO GAMES, NOT THREE. Every school seated in a four-team event was charged three games against its November for a bracket that guarantees it two — so 68 of the country's 108 seated schools played 30 games inside a season the engine believed was 31. The exemption now reads the field size. **Verified on Emmett's machine: ALL CHECKS PASSED.** ★ **A CORRECTION, NOT A FEATURE — no ruling implemented, no basketball question opened.** ★ **The bug survived S101 AND S104, a session explicitly about this arithmetic, because nothing in the suite had ever compared what a school is CHARGED against what its bracket GUARANTEES.** ★ **§6's prediction landed cell for cell, including the single neutral game and the school it belongs to.** ★ **Every must-not-move fingerprint held.** Micro-session, no new phase. (2026-08-07)
+
+**Register:** micro-session build against `PROMPT-event-games-s105-1-r2.md` (outside-reviewed, r2). Ran **before** dating on purpose: dating is a search with backtracking, and its first run must not also be the first run of changed request numbers.
+
+### The bug, in basketball
+
+An eight-team tournament is three rounds and every team plays all three. A four-team tournament is two rounds and every team plays both — a semifinal and then either the final or the third-place game. The engine charged **three** either way. A school in a four-team field therefore had three games struck off the November it had to arrange, was guaranteed two, and came up one game short of the 31-game season a seat is supposed to buy. On the stock slate that is **17 four-team tournaments — 68 schools — against 5 eight-team ones.**
+
+### The gate
+
+All five load-bearing assumptions held; the audit table named every consumer and missed none — ten references to the flat constant, all eight rows accounted for. Three additions were folded before building:
+
+1. **The oracle had a THIRD site**, not the two the prompt named: its own full-season proof re-asserted a flat three when adding the seat's games back. Left alone, the Independents check would have balanced a wrong charge against a wrong credit and passed.
+2. **§5 undersold the golden.** Not just the report fingerprint — `inputTokens`, `oracleSha256`, `pairCount`, `ledgerChecksum` and `exchangePairs` all move.
+3. **Phase 95's worked November was ALREADY a four-team case** and expected three. The bug was hardcoded into the check written to police it.
+
+★ **One correction in the prompt's favour.** The prompt called the seating floor "conservative". It is stronger than that: its only consumer is the showcase invitation gate, which fires when a school has fewer than one open game, and every committed world tops out at 20 conference games. **The guard is unreachable.** So "the seating draw cannot move" is a proof here, not a judgement call.
+
+### What shipped
+
+- **`Program.Season.NonConference.cs`** — the flat constant split into two names that say what they are. `MaxTournamentGamesPerTeam` (3) for the capacity guards that run *before* a request exists and cannot know which field a school will land in; `TournamentGamesFor(fieldSize)` (8 → 3, 4 → 2) for the exact downstream charge. ★ **The helper THROWS on any other size**, matching `BracketRoutesFor`'s own philosophy in the same codebase: `fieldSize == 4 ? 2 : 3` would hand a future field of six the eight-team answer, which is this bug reintroduced one layer up.
+- **`Program.Season.Events.cs`** — `MteTournamentFieldSizes`, the sibling of `MteShowcaseObligations`: showcases filtered at the door, one seat per school preserved (first in canonical order wins), and the value is the field size rather than a yes/no. ★ **The binary property that stops a duplicated seat buying a six-game exemption survives intact** — only the value changed.
+- **`Program.Season.Contracts.cs`, `Program.Season.Events.cs`** — the two upstream guards keep the worst case, now under a name that says so. The asymmetry is deliberate and is visible in the naming rather than buried in a comment.
+- **`tools/matching_oracle.py`** — the authored constant becomes **school → field size**, read off the committed harness's own season page; the oracle applies 8 → 3 / 4 → 2 **itself**. ★ **It must never learn this answer from the code under correction**, or both sides carry the same mistake and parity proves nothing. It also refuses to run if the slate does not contain both field sizes.
+- **`tools/matching_golden.json`** — regenerated from the oracle, never patched. Provenance gains the field-size split.
+
+### ★ The check that should have existed
+
+Four assertions in Phase 92 and two in Phase 89, and the point of all six is that they can **fail**:
+
+- **C7b** — for every tournament-seated school, what it is charged equals what its event's bracket guarantees, read off the route table. This compares the two halves nothing had ever compared. ★ **Guaranteed, never played:** the count comes from the table, not from results, because the charge is made before a single tournament game exists.
+- **C7c** — its showcase companion. A showcase seat takes **zero** tournament exemption and carries its obligation separately, asserted so C7b can never be widened into "every seated school" and quietly undo S104's central distinction. Both fields hold four schools; that coincidence is the whole trap.
+- **C7d — the negative control simulates the WRONG RULE, not a malformed record.** A flat-three implementation must fail C7b on this slate, and it does: *Akron in Wooden Legacy (field 4) would be charged 3 for a 2-game bracket.* A control that only rejects an impossible event record tests a failure mode nobody ever shipped.
+- **C7e** — a four-team and an eight-team school **by name**, so no single flat value can satisfy both. Akron (field 4) conf 16 open 13; Arkansas (field 8) conf 16 open 12.
+- **C0a/C0b (Phase 89)** — the helper's answer equals the distinct-round count of its route table at both sizes, and the refusal fires by name on a field of six. ★ **Production stays a cheap lookup; the structural guarantee lives in the check.** Edit a route table without the helper and this goes red the same day.
+- **Phase 95 C6d** — the worked November now runs as a **matrix at both tournament sizes**, proving three concepts stay separate: tournament size, tournament exemption (moves, 2 or 3), showcase obligation (never moves, always one charged game and zero exemption). Recomputed, not relaxed.
+
+### The numbers — §6's prediction, cell for cell
+
+| | home | neutral | road | gap | tokens |
+|---|---|---|---|---|---|
+| before | 1,773 | 183 | 2,315 | +542 | 4,271 |
+| **after** | **1,773** | **184** | **2,382** | **+609** | **4,339** |
+| delta | +0 | +1 | +67 | +67 | +68 |
+
+**68 school-game request slots enter the ledger — 68 schools × 1 — which is roughly +34 games, not +68.** Two slots make one game.
+
+★ **Home does not move at all, and the reason is the split's order.** `home` comes from the class band clamped to open, and no stock school is compressed, so a larger `open` leaves home untouched. `neutral` is capped by the class allowance, already reached almost everywhere. **`road` is the remainder, so it absorbs the slots.** The single neutral game is the one school whose neutral was capped by `open − home` rather than by its allowance — predicted before the run and confirmed as **Notre Dame**, Marquee, seated in the four-team ESPN Events Invitational. Matching: **2,171 pairs** (was 2,137), 107 home-and-homes, 0 unrepaired.
+
+★ **These were a prediction, not a target.** Derived at the gate by re-running S101's arithmetic against the corrected exemption; the model reproduced the live pre-change line exactly first, which is what made the after-line trustworthy. Nothing was tuned toward the table and the balance was not tuned back toward +542.
+
+### Fingerprints
+
+**Unmoved, all five:** conference `6f79d663…`, dated `7515df7d…`, event-games `7c1a41c1…`, results `898d9fe8…`, `contracts_golden.json`. **No game that actually plays changed** — the exemption is accounting for games a school has already committed to, and it neither creates nor destroys one. **Moved, expected:** `tools/matching_golden.json` and every derived value in its provenance.
+
+### Still open
+
+- **Noticed and NOT fixed (O-97):** Phase 93 C10's printed detail omits the exchange term — the assertion tests all six terms and is correct, but the line reads `4339 tokens = 2×1773 + 2×92 + 2×89 + 3 + 0`, which does not add up on the page. One format string, outside this session's scope wall, logged rather than absorbed.
+- The four-team/eight-team split is **authored**, read off the harness's page, exactly as the seated set has been since S104. The oracle still does not reimplement the seating draw and should not.
+- **Dates and sites** — the next arc session, and the reason this one ran first.
+- The Selling home band and fill order, the repeat ceiling, and the showcase slate tuning are all untouched here.
+
+---
+
 ## Session 105 — THE INDEPENDENTS GET A NOVEMBER, AND THE MATCHER LEARNS THE SAME-SEASON HOME-AND-HOME. Fourteen schools that played **zero** non-conference games now play a full 29 (31 if seated), and two schools who can each pay two road games may play each other twice, once each way, capped at three per school. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 96 PASS at 11 assertions, Phase 93 PASS with full oracle parity.** ★ **Four rulings taken conversationally, and one — the cap — ruled off a measured sweep after Emmett asked for "a mix of both".** ★ **The gate corrected the cleared prompt on six points**, including its central design claim: the eligibility test it specified ("a home slot AND a road slot") describes a situation that exists **three times in the country**, because the matcher carries no home-remaining quantity at all. ★ **Two of Claude's own gate claims were wrong and are recorded as wrong**: the shape does NOT help small schools host each other (it moves forced hosting *up* the ladder) and does NOT shorten trips. ★ **Two of Claude's own checks were decorative and had to be rebuilt to be able to fail.** ★ **The Independents fix a problem nobody was solving: spills 164 → 0.** **O-92 session 5 ships.** (2026-08-07)
 
 **Register:** build session against `PROMPT-independents-s105-r2.md` (ChatGPT-cleared). ★ **`docs/independents-design-brief.md`, named by the prompt as design authority, DOES NOT EXIST in the repo** — R35–R41 appear nowhere in the tree and the committed briefs stop at R29. Second session running for this pattern (S103's brief was also uncommitted). The prompt's restatement was the only design statement available; everything actually built rests on rulings Emmett gave in this conversation.

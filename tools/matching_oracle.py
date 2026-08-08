@@ -350,18 +350,22 @@ by what is left; road is the remainder.
 ★ S105, THE INDEPENDENT ARM. Class = the prestige band ALONE, no floor (R-d). Home = the
 prestige curve, not the band and not the rank spread (R-b). Neutral = 0 (R-c). Road = the
 remainder, so the total is a full season (R-a). OPEN uses the shared rule with conference
-games at zero: 29 unseated, 28 plus three event games when tournament-seated. The
+games at zero: 29 unseated, and when tournament-seated, 31 less whatever its own bracket
+guarantees it — three games in a field of eight, two in a field of four (S105.1). The
 contract and showcase charges then run UNCHANGED — the showcase chain already falls
 neutral -> road -> home and the contract chains already fall through to road when neutral
 is empty, so a zero neutral bucket needs no new rule at either site. That is the strongest
 evidence R-a is the right shape: the Independent arm adds two lines of arithmetic and no
 new branch anywhere downstream.
 
-The seated set is BINARY SET MEMBERSHIP and is
-authored below as a constant, read from the committed harness's own run
+The seated set is still ONE SEAT PER SCHOOL, and is authored below as a constant mapping
+each seated school to the SIZE OF ITS FIELD, read from the committed harness's own run
 (`dotnet run -- season worlds/stock-d1.world.json 20260720`) — this file does not
 reimplement the tournament seating draw, and the golden's embedded report is asserted
-against the live one by C14a, so a drift cannot pass silently.
+against the live one by C14a, so a drift cannot pass silently. What the constant records
+is the field size and never the exemption: the 8 -> 3 / 4 -> 2 step is taken here, so a
+wrong answer in the engine cannot be mirrored by the same wrong answer in the oracle and
+survive parity.
 """
 
 import hashlib
@@ -404,7 +408,26 @@ def distance_key(miles):
 
 SEASON_GAMES_SEATED = 31
 SEASON_GAMES_UNSEATED = 29
-EVENT_GAMES = 3
+
+
+def tournament_games_for(field_size):
+    """★ S105.1 — how many games a field of this size GUARANTEES each team in it.
+
+    Eight teams is three rounds, four teams is two, and every team plays every round.
+    Derived here rather than imported, so that a wrong answer in the C# cannot be
+    mirrored by a wrong answer here and pass parity.
+
+    Refuses anything else by name, exactly as BracketRoutesFor does: `2 if n == 4 else 3`
+    would silently hand a future field of six the eight-team answer, which is this very
+    bug reintroduced one layer up.
+    """
+    if field_size == 8:
+        return 3
+    if field_size == 4:
+        return 2
+    raise AssertionError(
+        "TOURNAMENT EXEMPTION: no guaranteed-game count for a field of %r; "
+        "only 8 and 4 are authorable." % (field_size,))
 HOME_BANDS = [(0, 2), (3, 5), (5, 7), (7, 10)]      # Selling, Working, Solid, Marquee
 SHOWCASE_ALLOWANCE = [0, 0, 1, 2]
 CLASS_NAMES = ["Selling", "Working", "Solid", "Marquee"]
@@ -456,14 +479,27 @@ def independent_home(prestige):
 # ★ S104 — TOURNAMENT seats only, read from the committed harness's own season run at
 # seed 20260720. A SHOWCASE seat is deliberately NOT here: it does not buy the 31-game
 # season, it spends one of the games the school already had (R26). 108 schools.
-STOCK_SEATED_20260720 = [
-    2, 9, 12, 17, 18, 20, 21, 25, 27, 29, 38, 39, 41, 43, 47, 50, 51, 54, 55, 56, 60,
-    63, 64, 68, 70, 71, 82, 87, 89, 90, 94, 95, 97, 99, 103, 105, 107, 109, 114, 115,
-    116, 117, 118, 119, 129, 130, 135, 139, 145, 150, 153, 157, 158, 161, 164, 168, 170,
-    176, 177, 180, 182, 189, 192, 193, 195, 196, 197, 201, 202, 203, 205, 206, 209, 215,
-    218, 221, 223, 227, 234, 235, 238, 239, 243, 246, 249, 254, 258, 261, 268, 269, 271,
-    272, 279, 280, 287, 294, 297, 299, 300, 302, 303, 304, 305, 309, 313, 315, 319, 320,
-]
+#
+# ★ S105.1 — WHAT IS AUTHORED IS THE FIELD SIZE, NOT THE EXEMPTION. The value is how big
+#   the school's tournament is (8 or 4), read straight off the same season page; the
+#   oracle then applies 8 -> 3 / 4 -> 2 ITSELF, in tournament_games_for below. Importing
+#   the finished exemption number from the code under correction would let both sides
+#   carry the same mistake and parity would prove nothing. 68 schools sit in a field of
+#   four, 40 in a field of eight — 17 four-team tournaments and 5 eight-team ones, which
+#   the page's own "128 tournament games played" confirms independently (17x4 + 5x12).
+STOCK_SEAT_FIELDS_20260720 = {
+    2: 4, 9: 4, 12: 8, 17: 8, 18: 4, 20: 8, 21: 4, 25: 8, 27: 4, 29: 4, 38: 8, 39: 4,
+    41: 4, 43: 4, 47: 4, 50: 8, 51: 4, 54: 8, 55: 4, 56: 4, 60: 4, 63: 8, 64: 8, 68: 4,
+    70: 4, 71: 4, 82: 4, 87: 4, 89: 4, 90: 4, 94: 8, 95: 8, 97: 4, 99: 4, 103: 4, 105: 4,
+    107: 4, 109: 4, 114: 8, 115: 4, 116: 4, 117: 4, 118: 4, 119: 4, 129: 8, 130: 8,
+    135: 4, 139: 4, 145: 4, 150: 8, 153: 4, 157: 4, 158: 8, 161: 8, 164: 8, 168: 4,
+    170: 4, 176: 8, 177: 8, 180: 4, 182: 8, 189: 4, 192: 4, 193: 4, 195: 4, 196: 4,
+    197: 4, 201: 8, 202: 4, 203: 8, 205: 8, 206: 4, 209: 8, 215: 8, 218: 4, 221: 4,
+    223: 4, 227: 4, 234: 4, 235: 8, 238: 4, 239: 4, 243: 8, 246: 4, 249: 8, 254: 4,
+    258: 4, 261: 8, 268: 8, 269: 8, 271: 4, 272: 4, 279: 4, 280: 4, 287: 4, 294: 8,
+    297: 4, 299: 8, 300: 8, 302: 8, 303: 8, 304: 4, 305: 4, 309: 8, 313: 4, 315: 8,
+    319: 4, 320: 8,
+}
 
 # ★ S104 — schools owing ONE showcase game this season. Charged neutral -> road -> home
 # AFTER the ordinary split and after any contract charge, per the ruled priority.
@@ -519,9 +555,14 @@ def home_spread(lo, hi, n):
     return out
 
 
-def build_requests(world, seated_ids, showcase_ids=()):
-    """S101's report, with S104's showcase charge applied. School-id order."""
-    seated = set(seated_ids)
+def build_requests(world, seat_fields, showcase_ids=()):
+    """S101's report, with S104's showcase charge applied. School-id order.
+
+    ★ S105.1 — `seat_fields` maps a TOURNAMENT-seated school to the SIZE of its field,
+    not to a number of games. Membership is exactly what "seated" used to mean; the
+    value is new, and this function turns it into an exemption itself.
+    """
+    seated = dict(seat_fields)
     showcase = set(showcase_ids)
     conf_by_id = {c["id"]: c for c in world["conferences"]}
     by_class = {0: [], 1: [], 2: [], 3: []}
@@ -547,7 +588,7 @@ def build_requests(world, seated_ids, showcase_ids=()):
     for s in independents:
         is_seated = s["id"] in seated
         season_games = SEASON_GAMES_SEATED if is_seated else SEASON_GAMES_UNSEATED
-        event_games = EVENT_GAMES if is_seated else 0
+        event_games = tournament_games_for(seated[s["id"]]) if is_seated else 0
         open_games = season_games - 0 - event_games
         cls = prestige_class(s["currentPrestige"])
         if open_games < 0:
@@ -581,7 +622,7 @@ def build_requests(world, seated_ids, showcase_ids=()):
             conf = conf_by_id[s["conferenceId"]]
             is_seated = s["id"] in seated
             season_games = SEASON_GAMES_SEATED if is_seated else SEASON_GAMES_UNSEATED
-            event_games = EVENT_GAMES if is_seated else 0
+            event_games = tournament_games_for(seated[s["id"]]) if is_seated else 0
             open_games = season_games - conf["games"] - event_games
             if open_games < 0:
                 home = neutral = road = 0
@@ -1081,7 +1122,7 @@ if __name__ == "__main__":
     print(f"S92 ruler: {len(golden['rows'])} golden rows, worst error {worst:.3e} mi")
 
     world = json.load(open(f"{root}/worlds/stock-d1.world.json"))
-    report = build_requests(world, STOCK_SEATED_20260720, STOCK_SHOWCASE_20260720)
+    report = build_requests(world, STOCK_SEAT_FIELDS_20260720, STOCK_SHOWCASE_20260720)
     targeted = list(report)
     conventional = [r for r in report if not r["isIndependent"]]
     inds = [r for r in report if r["isIndependent"]]
@@ -1096,6 +1137,18 @@ if __name__ == "__main__":
           f"(pre-S105 conventional-only: "
           f"{sum(r['road'] for r in conventional) - sum(r['home'] for r in conventional)})")
 
+    # ── ★ S105.1 — THE EXEMPTION SPLIT, printed and asserted ────────────────────
+    #    Both field sizes must actually be present, or the whole correction is a rule
+    #    about an empty set on this slate and the golden proves nothing about it.
+    small = sum(1 for v in STOCK_SEAT_FIELDS_20260720.values() if v == 4)
+    big = sum(1 for v in STOCK_SEAT_FIELDS_20260720.values() if v == 8)
+    assert small > 0 and big > 0 and small + big == len(STOCK_SEAT_FIELDS_20260720), \
+        "the stock slate must run BOTH field sizes for the exemption split to be tested"
+    print(f"  ★ S105.1 exemption: {small} school(s) in a field of four take "
+          f"{tournament_games_for(4)} games, {big} in a field of eight take "
+          f"{tournament_games_for(8)} — {small} slot(s) returned to the request pool "
+          f"that the flat three used to swallow")
+
     # ── ★ THE INDEPENDENT ARM, printed for Emmett's page-only read ──────────────
     pres = {s["id"]: s["currentPrestige"] for s in world["schools"]}
     print("  ★ the Independents (R-a full season, R-b prestige curve, R-c no neutral, "
@@ -1108,7 +1161,8 @@ if __name__ == "__main__":
     # ★ R-a asserted, not eyeballed: every Independent's request is a FULL season once
     #   its event and showcase obligations are added back.
     for r in inds:
-        seat = 3 if r["schoolId"] in set(STOCK_SEATED_20260720) else 0
+        seat = (tournament_games_for(STOCK_SEAT_FIELDS_20260720[r["schoolId"]])
+                if r["schoolId"] in STOCK_SEAT_FIELDS_20260720 else 0)
         show = 1 if r["schoolId"] in set(STOCK_SHOWCASE_20260720) else 0
         season = r["home"] + r["neutral"] + r["road"] + seat + show
         expect = SEASON_GAMES_SEATED if seat else SEASON_GAMES_UNSEATED
@@ -1154,7 +1208,7 @@ if __name__ == "__main__":
     random.Random(4242).shuffle(shuffled)
     shuffled_world["schools"] = shuffled
     m_shuf = match(shuffled_world, build_requests(
-        shuffled_world, STOCK_SEATED_20260720, STOCK_SHOWCASE_20260720))
+        shuffled_world, STOCK_SEAT_FIELDS_20260720, STOCK_SHOWCASE_20260720))
     assert m_shuf.pairs == m.pairs, "source enumeration order changed the pairing"
     print("  enumeration: a shuffled school list reproduces every pair in order")
 
@@ -1234,7 +1288,7 @@ if __name__ == "__main__":
     no_ind_world = dict(world)
     no_ind_world["schools"] = [s for s in world["schools"]
                                if conf_games_by_id[s["conferenceId"]] > 0]
-    no_ind_report = build_requests(no_ind_world, STOCK_SEATED_20260720,
+    no_ind_report = build_requests(no_ind_world, STOCK_SEAT_FIELDS_20260720,
                                    STOCK_SHOWCASE_20260720)
     assert not any(r["isIndependent"] for r in no_ind_report), "control still has one"
     m_conv = match(no_ind_world, no_ind_report)
@@ -1264,7 +1318,7 @@ if __name__ == "__main__":
             promote = {s["id"] for s in pool}
             w["schools"] = [dict(s, conferenceId=container) if s["id"] in promote else s
                             for s in world["schools"]]
-        r_w = build_requests(w, STOCK_SEATED_20260720, STOCK_SHOWCASE_20260720)
+        r_w = build_requests(w, STOCK_SEAT_FIELDS_20260720, STOCK_SHOWCASE_20260720)
         n_ind = sum(1 for r in r_w if r["isIndependent"])
         m_w = match(w, r_w)
         prove(w, r_w, m_w, label)
@@ -1341,7 +1395,12 @@ if __name__ == "__main__":
             "seed": 20260720,
             "oracleSha256": oracle_sha,
             "distanceKeyFormula": "floor(GeoDistance.DistanceMiles(a,b) + 0.5)",
-            "seatedCount": len(STOCK_SEATED_20260720),
+            "seatedCount": len(STOCK_SEAT_FIELDS_20260720),
+            # ★ S105.1 — the SPLIT travels with the golden too. The exemption is no longer
+            #   one number, so the golden records how many schools sit in each size of
+            #   field; a regeneration that silently reseated the country would move these.
+            "seatedInFieldOf4": sum(1 for v in STOCK_SEAT_FIELDS_20260720.values() if v == 4),
+            "seatedInFieldOf8": sum(1 for v in STOCK_SEAT_FIELDS_20260720.values() if v == 8),
             # ★ S105 — the cap travels WITH the golden. If the C# constant and this ever
             #   drift, parity would fail for a mysterious reason spread over hundreds of
             #   pairs; asserting the number itself names the cause in one line.
