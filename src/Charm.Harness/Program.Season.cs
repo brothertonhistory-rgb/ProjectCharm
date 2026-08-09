@@ -173,6 +173,13 @@ internal static partial class Program
         /// report, read by the page block and Phase 93, consumed by nothing that plays
         /// basketball. No game is emitted and no site is named — that is arc session 3.</summary>
         public MatchingReport Matching { get; init; } = MatchingReport.Empty;
+
+        /// <summary>★ S106 — every non-conference game's night. Page-facing cargo on
+        /// exactly the same terms as Matching above: computed once in RunSeasonCore from
+        /// the dated league slate, the seating and S102's report, read by the page block
+        /// and Phase 97, and consumed by nothing that plays basketball. No site is named —
+        /// that is S107.</summary>
+        public NonConDateReport NonConferenceDates { get; init; } = NonConDateReport.Empty;
         /// <summary>★ S103 — what the contract phase decided: exercised legs, deaths,
         /// declines, and the survivors written forward. Page-facing on the same terms
         /// as Matching above; Phase 94 asserts the outcome object and the record on
@@ -1542,6 +1549,15 @@ internal static partial class Program
         //   above is computed from the four named fields and cannot see the date.
         var datedFingerprint = SeasonDateSchedule(world, schedule, SeasonDefaultStartYear);
 
+        // ★ S106 — every non-conference pairing gains its night. It runs HERE, after the
+        //   league slate is dated, because the buy-game calendar is carved out of the
+        //   league one: nothing knows which nights a school has free until the conference
+        //   dater has spoken. Purely additive — it reads the dated schedule, the seating
+        //   and the matching report and writes only its own page cargo, so no earlier
+        //   fingerprint can move because of it.
+        var nonConferenceDates = DateNonConferenceGames(
+            world, matching, contracts, seating, schedule, SeasonDefaultStartYear);
+
         MteRefuseOverlap(world, seating, schedule);
         MteRefuseExistingRecord(history, pendingSeasonId);
 
@@ -1837,6 +1853,7 @@ internal static partial class Program
             Events = eventOutcome,
             NonConference = nonConference,
             Matching = matching,
+            NonConferenceDates = nonConferenceDates,
             Contracts = contracts,
             PlayedGames = playedGames,
             ConferenceGameCount = schedule.Count,
@@ -2061,6 +2078,33 @@ internal static partial class Program
             //   that produced it; no measured league constant appears here, and a category
             //   word is printed where a raw exception message must never be. Legacy mode
             //   prints nothing at all — there is no career for the line to be about.
+            // ★ S106 — the non-conference year, PAGE-ONLY. Every number here is runtime-
+            //   derived from the run that produced it and NONE is asserted anywhere: the
+            //   two bends are the calibration Emmett tunes the curve against, and a target
+            //   in a red line is exactly what the page-only principle forbids. The month
+            //   split is printed because the curve's whole purpose is the shape of the
+            //   year, and a shape is not legible as a single number.
+            var ncd = run.NonConferenceDates;
+            if (ncd.Games.Count > 0)
+            {
+                var nov = ncd.Games.Count(g => g.Date.Month == 11);
+                var dec = ncd.Games.Count(g => g.Date.Month == 12);
+                var jan = ncd.Games.Count(g => g.Date.Month == 1);
+                var later = ncd.Games.Count - nov - dec - jan;
+                Console.WriteLine(
+                    $"Non-conference nights: {ncd.Games.Count} dated " +
+                    $"(Nov {nov}, Dec {dec}, Jan {jan}, later {later}), " +
+                    $"Christmas week 0, {ncd.Unseated.Count} unseated");
+                Console.WriteLine(
+                    $"  curve bend: allocation {ncd.AllocationBend:F1} quota units, " +
+                    $"seating {ncd.SeatingBend} week-steps " +
+                    $"[{string.Join("/", ncd.BendHistogram)} slid 0/1/2/3]");
+                foreach (var short_ in ncd.AllocationShortfalls)
+                    Console.WriteLine($"  ★ {short_.SchoolId} short {short_.Short} — " +
+                                      "capacity cannot hold the games owed");
+                foreach (var u in ncd.Unseated)
+                    Console.WriteLine($"  ★ UNSEATED {u.HostId} vs {u.VisitorId}: {u.Class}");
+            }
             var memoryLine = HostMemoryPageLine(run.Memory);
             if (memoryLine is not null) Console.WriteLine(memoryLine);
             // ★ S99 — beside it, on the same terms, and printed even when every number is

@@ -11617,3 +11617,160 @@ the ledger carries requested and matched separately by category so a shortfall n
   meeting counts against a repeat *ceiling* — is a separate question and is still open.
 - **Dates** (R35/R36 are date-shaped and belong to the calendar session), the D2/D3 layer (C-36), the
   recurrence curve, and the showcase slate.
+
+## Non-conference nights — every buy game gets a date (Session 106, 2026-08-08)
+
+**The spec is `tools/nonconference_dates_oracle.py`.** Its docstring is the authority;
+`Program.Season.NonConferenceDates.cs` is the port and Phase 97 proves it row for row
+against `tools/nonconference_dates_golden.json`. Where the two disagree the oracle is right.
+
+### What this layer is for
+
+Conference play has been dated since S94 and every event owns its window. Everything else
+— matched pairs, contract legs, both legs of every home-and-home, the Independents' games —
+carried an opponent and a host and nothing else. This layer joins them, so a school's year
+reads start to finish.
+
+It changes **when**, as hard as it needs to, and **never who, never where, never a result.**
+Sites and cities are S107; a neutral game gets a date and no city.
+
+**It consumes pairings and never creates, dissolves or re-hosts one.** There are no
+cancellations. A pairing that cannot be seated is reported with its failure class — of the
+four classes only *search defect* indicts this file, and under all four cancellation and
+re-pairing stay forbidden.
+
+**It is purely additive by construction.** It reads the dated schedule, the seating and the
+matching report, and writes only its own page cargo onto the outcome. Nothing it does can
+move `6f79d663…`, `46d89bf8…`, `7c1a41c1…` or `898d9fe8…`, and that is a property of the
+structure rather than a promise.
+
+### The rules
+
+- **R-n1 — weekly load.** At most **three** games in a Mon–Sun week, counting all of a
+  team's non-event games, conference and non-conference together. Event games do not count.
+  The conference weekday/weekend rule still binds the league games inside the same week;
+  this sits on top as a total ceiling.
+- **R-n2 — spacing.** One clear day either side of an ordinary non-conference game — a gap
+  of at least two calendar days — whatever kind of game is adjacent. Saturday league game
+  then Monday buy game is legal; then Sunday is not. **League-vs-league adjacency is not
+  governed here.** The conference dater owns it and the Ivy Friday/Saturday pair stays legal.
+  This layer never compares two conference games to each other, which makes the exemption
+  structural rather than a special case somebody could delete.
+- **R-n3 — event travel buffers, symmetric.** Two clear days either side of an event window.
+  Exact arithmetic rather than an estimate: every seated team plays every round and the final
+  round is asserted onto the window's last day, so a window's last night genuinely is its last.
+  Inside its own window an event is exempt from R-n1 and R-n2 entirely.
+- **R-n4 — the curve is authored as weights and allocated as exact quotas.** One national
+  calendar shape; a pinned allocator turns it into each school's per-week quotas at any slate
+  size. **Superseded in part by R-n8** — quotas are hard by default and bend on failure.
+- **R-n5 — the conference opener is a soft boundary.** A non-conference game after a team's
+  league opener is legal wherever the calendar allows; the curve simply runs light.
+- **R-n6 — Independents are flexible supply**, with no curve of their own: the
+  conference-member endpoint supplies the quota slot and the Independent supplies availability
+  only. **Two Independents may not meet before January 1** — those schools play each other
+  during everyone else's conference season, never in November or December.
+- **R-n7 — contract legs and both legs of a home-and-home are ordinary games** for dating. No
+  priority, no authored separation beyond R-n2, each counting against both weeks.
+- **R-n8 — the seating bend.** A pairing whose quota week holds no night both calendars share
+  slides to the nearest week that does: 0, +1, −1, +2, −2, +3, −3, Christmas always skipped,
+  never further.
+
+### The curve, and why its tail is load-bearing
+
+| Week of | Weight | |
+|---|---|---|
+| Nov 2 | 10 | opening week |
+| Nov 9 | 13 | the heaviest stretch |
+| Nov 16 | 13 | |
+| Nov 23 | 11 | Thanksgiving — the events absorb a third of the country |
+| Nov 30 | 11 | |
+| Dec 7 | 8 | league play opens; the buy games continue |
+| Dec 14 | 5 | the exam dip |
+| **Dec 21** | **0** | **Christmas — forced to zero regardless** |
+| Dec 28 | 6 | the post-Christmas buy-game bump |
+| Jan 4 → Feb 1 | 5, 4, 4, 3, 3 | the tail |
+
+**★ A light weight is decoration, not a light week.** The tail was first drafted at 1–2,
+which is exactly the "light hand-off past each opener" the rule asks for, and it produced
+**zero games**: a school owing twelve gets 0.30 of a game in a weight-2 week, the allocator
+floors it, and the remainder goes to a heavier week. All three January weeks came out empty
+and the country collapsed into eight weeks. Below roughly weight 7 on this 81-weight curve a
+week is one you wrote down and will not get.
+
+That emptiness was the proximate cause of the session's real failure. **Do not thin this tail
+without re-running the Independents.**
+
+### ★ Why the Independents are the hard customer
+
+A conference school owes about twelve non-conference games. An Independent owes **29**. Under
+R-n6 it draws its nights from the member's quota, and the member's quota lives where the curve
+is — November. At the national shape an Independent's busiest week wanted **5.5 games against a
+ceiling of 3**, and all fourteen were undatable, short by 2–5 games apiece.
+
+This is arithmetic, not search: an optimistic test giving each Independent its pick of every
+opponent's weeks, ignoring competition from that opponent's other games, still failed. The cure
+is the January tail, which puts member quota across eleven weeks instead of eight.
+
+### ★ Why the week has to bend
+
+Once league play starts, a school playing two conference games in a week — Wednesday and
+Saturday — has Tuesday through Thursday and Friday through Sunday closed by R-n2. That leaves
+Monday. **One night.** Measured nationally: 291 cases where a school owes a non-conference game
+in a week with exactly one available night, and 279 more with two. Pair two such schools into
+one week and their calendars can hold no night in common — 46 such pairings on the stock world.
+
+Hard quotas fail those games and nothing here may move them, so the week bends instead. The
+front-fill cure R-n4 was written for survives, measured: **1,935 of 2,171 games sit exactly where
+their quota put them**, 191 move one week, 34 two, 11 three, and the produced national shape is
+the authored one.
+
+### The allocator, pinned
+
+Oracle/C# parity cannot be allowed to fail on a tie, so: (1) drop zero-capacity weeks; (2) force
+the Christmas week to 0; (3) normalize the positive weights over what remains; (4) floor the
+proportional shares; (5) hand out the remainder by fractional part descending, then earliest week
+first; (6) a week at capacity spills its excess by the same rule over remaining capacity,
+repeating until placed; (7) report a shortfall when capacity cannot hold the games owed.
+
+Per-week capacity is **never a raw count of free nights** — three open nights in a row seat one
+game, not three.
+
+### ★ Two bends, deliberately not sharing a name
+
+- **`allocationBend`** — how far a school's quotas were pushed off the pure curve by its own
+  calendar's capacity: ½·Σ|capacityAware − pureWeights|.
+- **`seatingBend`** — how many week-steps games had to slide under R-n8.
+
+They measure different failures at different stages and reading one for the other is a real
+misdiagnosis. **"Pure weights" means the curve alone** — capacity ignored entirely, summed over
+*every* week, because a week the curve wanted and the calendar could not give is exactly the
+displacement the number exists to report. Both print on the season page; **neither is asserted
+anywhere**, and the golden omits them on purpose so a tuning number can never become a red line.
+
+### No RNG, and why that mattered
+
+Every ordering is total and every tie-break explicit. The scratch solver that explored the design
+used simulated annealing and stranded a game; the deterministic oracle seats all 2,171 in 0.17
+seconds. A spec that anneals is not a spec, and a port of one cannot be proved.
+
+### The fingerprint's sort key, locked
+
+`(date, canonical source RANK, ordered school ids, host designation, event identity with a fixed
+empty token)`. The source rank is an **internal ordering and never a display string**, so a later
+session renaming what the page prints cannot reorder the hash. **Site data is excluded**: S107
+adds cities as enrichment and must not be able to reorder this.
+
+### Current state
+
+Stock: **2,171 of 2,171 dated, nothing unseated.** November 1,181 / December 633 / January 347 /
+later 10. Christmas week 0. Allocation bend 69.0, seating bend 292 week-steps. Dated fingerprint
+`b75754bc…`.
+
+### Known gaps
+
+- **No practice world authors an event or a contract**, so R-n3's buffers are proven on the stock
+  world alone and R-n7's contract legs are proven by nothing. The contract arm of this layer is
+  live code with no fixture behind it.
+- **Event windows resolve against a hardcoded season year** while the conference dater reads the
+  year it is handed. Invisible at one season; at two, every window sits a year away from every
+  league game. This is the first layer that reads both together.

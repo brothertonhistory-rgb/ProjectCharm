@@ -1,3 +1,97 @@
+## Session 106 — NIGHTS: EVERY NON-CONFERENCE GAME GETS A DATE. Until now a non-conference pairing carried an opponent and a host and nothing else — *"NO DATE, NO CITY, NO SeasonGame."* All 2,171 of them now have a night, so a school's year reads start to finish for the first time. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 97 new.** ★ **THE GATE FOUND AN ARITHMETIC WALL, NOT A SEARCH PROBLEM: all fourteen Independents were undatable under the curve as first drafted** — an Independent owes 29 games where a member owes 12 and draws its nights from the same November-heavy pool, so its busiest week wanted 5.5 games against a ceiling of 3. Proven by an optimistic test that gave each Independent its pick of every opponent's weeks and still failed by 2–5 games apiece. ★ **THE CAUSE WAS A ROUNDING FACT NOBODY HAD NAMED: a light weight is decoration.** January authored at weight 1–2 produced ZERO games — 0.30 of a game floors to nothing — so the whole country collapsed into eight weeks. Emmett ruled a real January tail; all fourteen fit. ★ **EMMETT SUPERSEDED PART OF HIS OWN R-n4**: quotas were ruled hard as the anti-front-fill cure, and are now hard-by-default and bendable-on-failure (**R-n8**), because 46 pairings shared a week in which their two calendars held no night in common. ★ **The measured front held anyway** — the authored shape is the shape produced. ★ **The parity test caught a bug in the SPEC, not the port**: the fingerprint matched on the first run and the allocation bend did not. (2026-08-08)
+
+**Register:** arc session against `PROMPT-nonconference-nights-s106-r3.md` (outside-reviewed, r3). Oracle-first. Gate held: every read, every §0 attack and the whole §3 sequence ran before a file was touched.
+
+### What the layer does, and what it refuses to do
+
+It takes a pairing set that already exists — who plays whom, who hosts, which games are neutral — and gives every one of those games a night. It changes **when**, as hard as it needs to, and never who, never where, never a result. Sites and cities are S107; a neutral game gets a date and no city.
+
+**A2 held by construction.** The layer consumes pairings and never creates, dissolves or re-hosts one. Phase 97's C2c is the discriminator that makes that a claim rather than a hope: a dating layer that quietly re-hosted a game to find a night would satisfy every date rule and fail only there.
+
+### ★ The gate finding that became a ruling
+
+The proposed curve — busy November, Thanksgiving held down because a third of the country is at an event, an exam dip, zero on Christmas, and a light hand-off past each opener — passed A1a and A1b cleanly. Every school could physically fit its games with a median 29 games of spare capacity, and every school's exact quotas fit inside those capacities.
+
+Then the complete solve failed, and it failed **completely for one class of school**: all fourteen Independents, 56 games with no legal night. The distinguishing test was an *optimistic* one — give each Independent its choice of every member opponent's quota weeks, ignore competition from that opponent's other games — and it still failed. That rules out search quality and leaves arithmetic. Per A2's own classification this is **quota incompatibility**, a design finding rather than an implementation bug.
+
+The mechanism, in basketball: a conference school owes about twelve non-conference games and an Independent owes twenty-nine, but under R-n6 the Independent draws its nights from the *member's* quota, and the member's quota lives where the curve is. Its opponents' calendars are shaped for a twelve-game slate and it is trying to push twenty-nine games through them.
+
+**Two cures were measured, each independently sufficient.** Unbinding Independent games from the member's quota worked but cost R-n6 its meaning. A real January tail worked and cost nothing — member quota then exists across eleven weeks instead of eight. Emmett took the tail. It is also the truer basketball: R13 already says these schools play in January while everyone else is in league play.
+
+### ★ A light weight is decoration — the rounding fact
+
+The first tail was weight 2, 1, 1 for the three January weeks, which is exactly the "light hand-off past each opener" R-n4 asks for. **It produced zero games.** A school owing twelve games gets 12 × 2/81 = 0.30 of a game in a weight-2 week; the allocator floors it and hands the remainder to a heavier week. All three January weeks came out empty.
+
+This is not an allocator bug — it is the pinned R-n4 rule working exactly as ruled. It is a fact about what a weight can *mean*: below roughly weight 7 on an 81-weight curve, a week is one you wrote down and will not get. Recorded because it governs every future curve Emmett authors, and because the empty tail was the proximate cause of the Independent failure above.
+
+### ★ R-n8, and the ruling that superseded R-n4 in part
+
+R-n4 made quotas **hard**, and named that hardness as the cure for front-filling. The complete solve then surfaced a second wall: **46 pairings whose two schools shared a week in which their calendars held no night in common.** Once league play starts, a school playing two conference games in a week — Wednesday and Saturday, say — has Tuesday through Thursday and Friday through Sunday closed by spacing. That leaves Monday. One night. Measured across the country: **291 cases where a school owes a non-conference game in a week with exactly one available night, and 279 more with two.** Pair two such schools and the game has nowhere to go, and nothing in this layer may move it.
+
+Emmett's ruling: **the week bends.** A pairing whose quota week holds no shared night slides to the nearest week that does — 0, +1, −1, +2, −2, +3, −3, Christmas always skipped, never further.
+
+**His R-n4 worry was the right one and it survives, measured.** 1,935 of 2,171 games sat exactly where their quota put them; 191 moved a week, 34 two, 11 three. The produced shape is the authored shape — the peak where he put it, Thanksgiving dipping because the events absorb a third of the country, December thinning, January handing off. The bend is too small and too local to front-load anything; it only rescues games the calendar physically could not seat.
+
+### ★ Two bends, deliberately not sharing a name
+
+`allocationBend` is how far a school's quotas were pushed off the pure curve by its own calendar's capacity. `seatingBend` is how many week-steps games had to slide under R-n8. They measure different failures at different stages, and reading one for the other would be a real misdiagnosis. Both print on the season page; **neither is asserted anywhere** — page-only calibration holds, and the golden deliberately omits them so a tuning number can never become a red line.
+
+### The oracle, and why determinism was worth insisting on
+
+The scratch solver that explored the design used simulated annealing and left one game stranded. A spec that anneals is not a spec and a port of one cannot be proved, so the locked oracle is fully deterministic — no RNG, every ordering total, every tie-break written down. It **seats all 2,171 in 0.17 seconds**, better and faster than the random search it replaced.
+
+### ★ The parity test caught a bug in the spec, not the port
+
+The dated fingerprint matched on the first comparison. The **allocation bend did not** — oracle 56.0, port 64.5. "Pure weights" had been written into R-n4 without being pinned, and each side had guessed differently: the oracle compared against a shape the calendars had already edited, the port summed only over weeks that survived capacity. Both were wrong in the same direction, and both flattered the calendars. Pinned on both sides — pure means the curve alone, summed over **every** week, because a week the curve wanted and the calendar could not give is exactly the displacement the number exists to report. True figure **69.0**.
+
+Worth recording plainly: **the fingerprint agreeing is precisely the check that would have let this through.** It took comparing a second number to find it.
+
+### ★ The first set of negative controls was thrown out
+
+Six mutations, all rejected, all green — and **four were rejected by the wrong rule.** The mutations double-booked a school, R-n1 tripped first, and R-n2, R-n3 and R-n6 were never exercised at all. A control that fires the wrong assertion is a control testing nothing, and it looks identical to one that works.
+
+Rebuilt isolated, and then rebuilt again in C#: the controls now run hand-built calendars through the **same auditor** that checks the live season, so each objects on its own rule alone. Saturday league game → Sunday buy game rejected, → Monday accepted, on calendars differing by one day. Three days after an event accepted, two days rejected. Two Independents refused in November and accepted in January. Four games in a week rejected on R-n1 with spacing silent; three accepted.
+
+### Fingerprints and the prediction
+
+**New:** dated non-conference `b75754bc…`, row-for-row parity with the oracle across all 2,171 rows. **Unmoved, asserted:** `6f79d663…`, `46d89bf8…`, `7c1a41c1…`, `898d9fe8…`, plus `matching_golden.json` and `contracts_golden.json`. The layer is purely additive by construction — it reads the dated schedule, the seating and the matching report and writes only its own page cargo — so conservation is structural rather than promised.
+
+Every predicted number landed: 2,171 rows and 0 mismatched, the fingerprint, **111 league back-to-backs surviving** (the Ivy Friday/Saturday pair — non-zero is the assertion; zero would mean spacing had been applied one stage too widely and would have looked like success), 7 Independent-vs-Independent games with the earliest on January 6, bend 69.0 / 292, histogram [1935, 191, 34, 11].
+
+The produced year: **November 1,181 / December 633 / January 347 / later 10, Christmas week 0, nothing unseated.**
+
+### Rulings taken this session
+
+- **R-n8 — the seating bend**, superseding R-n4's hardness in part.
+- **The January tail**, weight 5/4/4/3/3 through February 1 — load-bearing, not decoration.
+- **Independents do not play each other before January 1.** Verified free: all fourteen still fit with those games barred from November and December.
+- **Independents play their near neighbours home-and-home as quasi-conference games; the odds fall with distance; and when a school has few Independents within reach it plays them anyway** — a *matcher* ruling, logged, not built here.
+
+### ★ The Independent supply problem, ruled but not built
+
+Emmett's instinct that Independents should fill January with each other is right and the world does not currently support it: **there are seven Independent-vs-Independent games in the entire country, and six of the fourteen schools play none at all.** The Carolinas hold a real cluster — Winston-Salem, North Carolina Central and Longwood at 76, 95 and 133 miles — while Utah Valley's nearest Independent is 525 miles and Seattle's is 731. Median distance between two Independents nationally is **1,141 miles**; only 7 of 91 pairings are under 300.
+
+The ruling's refinement, confirmed by Emmett: **scarcity is regional, not national.** Fourteen is not scarce, but Seattle's world is three. A rule reading national supply gives the Carolinas a quasi-conference and leaves the West with nothing.
+
+Measured for safety: giving every Independent home-and-homes with its two nearest neighbours produces 18 pairings and 36 games, and **every Independent still dates cleanly.** Better than neutral — those games sit in January where the calendar is empty, so each Independent needs fewer November games from the member pool, relieving the exact congestion that nearly sank this session. **S106's design survives the change; only its input moves.**
+
+### Emmett's wider observation, measured
+
+*"The west in general plays by different rules altogether scheduling wise just by virtue of the geography."* True in the existing pairings: a western school's median road trip is **326 miles** against an eastern school's **117**, and the Plains schools take the long hauls — **16% of their trips cross a thousand miles**, which an eastern school essentially never does.
+
+### Honest misses
+
+- **The first negative-control battery was decoration** — five of its assertions were arithmetic tautologies (one literally asserted 4 > 3) and four of six fired the wrong rule. Caught and rebuilt, but it shipped green in the sandbox first, and it is the second time this project has learned that a green control can be testing nothing.
+- **"Pure weights" went into the spec unpinned**, and the two sides guessed differently. The ambiguity was mine and the golden would not have caught it.
+- **The throwaway solver was reported as leaving 80 games unplaced without classifying them.** The classification — 102 contention, 46 structural — came a turn later and was the actually load-bearing finding.
+
+### Still open
+
+- **The Independent supply question is a matcher session**, ruled and unbuilt. See the board.
+- **No practice world authors an event or a contract**, so R-n3's travel buffers rest on the stock world alone and R-n7's contract legs rest on nothing. Flagged at the gate, unchanged, and now with real code depending on it.
+- **Event windows resolve against a hardcoded season year** while the conference dater reads whatever year it is handed. Invisible at one season; the first multi-season run puts every window a year away from every league game. S106 is the first layer that reads both together.
+- **Phase 96 is 41.7% of the suite on its own (505s) and Phase 97 adds 108s**, with the whole run at ~20 minutes. O-96 was opened at 46% for career rigs; a single check is now at 42%.
+
 ## Session 105.2 — THE WEEKDAY GAME AND THE WEEKEND GAME. In any Monday-to-Sunday week a team now plays at most ONE Mon–Fri game and at most ONE Sat–Sun game — Emmett's "strict weekday game/weekend game/weekday game process", two ceilings of one that subsume and RETIRE the old never-three-in-a-week absolute. **Verified on Emmett's machine: ALL CHECKS PASSED.** ★ **THE GATE STOPPED THE BUILD: the practice world could not obey the rule** — five-team leagues playing 16 over 9 weeks need a five-game week and the rule seats four. Emmett's ruling: **no real 5-team league plays 16 — they play 12** (C-46), which lands the heaviest week exactly on the ceiling and re-rolls the practice world's basketball. ★ **The ruling has a SEMANTIC ripple: every practice-world pair now meets an odd number of times**, so the "even split, remembers nothing" host-memory checks were re-sourced to a rigged genuinely-even world rather than quietly weakened. ★ **The prompt's A4 undercounted its own fingerprint sweep — six hardcoded dated fingerprints, not four, plus a fifth read site of one constant** — found by grep at the gate, the missed-consumer pattern one file further out than the prompt looked. ★ **Friday is a weekday, by ruling (A1)** — the Ivy/Big Sky Friday+Saturday back-to-back is legal BECAUSE the Friday game is the weekday game; the weekend has ONE definition per language and Phase 85's new C16 pins both over all seven days. Oracle re-locked first; nine ceiling leagues solved with live vindication of both r2 cuts. (2026-08-08)
 
 **Register:** correction session against `PROMPT-conference-nights-s105-2-r2.md` (outside-reviewed, r2), widened at the gate by the C-46 ruling. Oracle-first throughout.

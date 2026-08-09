@@ -10,7 +10,39 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 105.2** (2026-08-08; verified on Emmett's machine — ALL CHECKS PASSED, **no new phase**.
+Last updated: **Session 106** (2026-08-08; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 97 new**.
+**NIGHTS — EVERY NON-CONFERENCE GAME GETS A DATE.** All **2,171** pairings now have a night, so a school's year reads
+start to finish for the first time. S106 changes **when**, never who, never where, never a result — sites and cities
+are S107. **November 1,181 / December 633 / January 347 / later 10; Christmas week 0; nothing unseated.**
+★ **THE GATE FOUND AN ARITHMETIC WALL, NOT A SEARCH PROBLEM: all fourteen Independents were undatable** under the
+curve as first drafted. An Independent owes **29** games where a member owes **12** and draws its nights from the same
+November-heavy pool, so its busiest week wanted **5.5 games against a ceiling of 3**. Proven by an optimistic test that
+gave each Independent its pick of every opponent's weeks and still failed by 2–5 games apiece — quota incompatibility,
+a design finding, not a bug. ★ **THE CAUSE WAS A ROUNDING FACT NOBODY HAD NAMED: a light weight is decoration.**
+January authored at weight 1–2 produced **zero** games (0.30 of a game floors to nothing), every January week came out
+empty, and the country collapsed into eight weeks. Emmett ruled a **real January tail** (5/4/4/3/3 through Feb 1) —
+all fourteen fit, and it is the truer basketball, since R13 already says these schools play while everyone else is in
+league play. **Do not thin the tail without re-running the Independents.** ★ **EMMETT SUPERSEDED PART OF HIS OWN
+R-n4** (**R-n8**): quotas were ruled hard as the anti-front-fill cure and are now **hard-by-default, bendable-on-
+failure** — once league play starts a school with two league games in a week has one night left (**291 such cases
+nationally, 279 more with two**), and **46 pairings shared a week in which their calendars held no night in common**.
+★ **The front held anyway, measured**: 1,935 of 2,171 games sat exactly where their quota put them; 191 slid a week,
+34 two, 11 three; the authored shape is the produced shape. ★ **TWO BENDS, DELIBERATELY NOT SHARING A NAME** —
+`allocationBend` (quotas pushed off the pure curve by capacity) **69.0** and `seatingBend` (games slid under R-n8)
+**292 week-steps**; both on the page, **neither asserted**, and the golden omits them so a tuning number can never
+become a red line. ★ **THE PARITY TEST CAUGHT A BUG IN THE SPEC, NOT THE PORT**: the fingerprint matched on the first
+run and the allocation bend did not (56.0 vs 64.5) — "pure weights" had gone into R-n4 unpinned and both sides guessed
+differently, both flattering the calendars. **The fingerprint agreeing is precisely the check that would have let it
+through.** ★ **The first negative-control battery was thrown out** — six mutations, all rejected, all green, and
+**four fired the wrong rule** because they double-booked a school and R-n1 tripped first; R-n2, R-n3 and R-n6 were
+never exercised. Rebuilt so controls run hand-built calendars through the **same auditor** as the live season.
+Oracle is **fully deterministic — no RNG** (the scratch annealer stranded a game; the oracle seats all 2,171 in
+0.17s). New dated fingerprint **`b75754bc…`**, row-for-row parity across all 2,171 rows. **Unmoved:** `6f79d663…`,
+`46d89bf8…`, `7c1a41c1…`, `898d9fe8…`, `matching_golden.json`, `contracts_golden.json` — additive by construction.
+**111 league back-to-backs survive** (the Ivy Friday/Saturday pair; non-zero is the assertion). Records **C-47**,
+**C-48**, **C-49**; opens **O-97**, **O-98**, **O-99**.)
+
+*(Previous board entry, S105.2 — verified on Emmett's machine — ALL CHECKS PASSED, **no new phase**.
 **THE WEEKDAY GAME AND THE WEEKEND GAME.** In any Monday-to-Sunday week a team plays at most **one Mon–Fri game and one
 Sat–Sun game** — two ceilings of one that subsume and RETIRE the never-three-in-a-week absolute. **Friday is a weekday,
 by ruling** — the Ivy/Big Sky Friday+Saturday back-to-back is legal because the Friday game IS the weekday game; the
@@ -32,8 +64,7 @@ chosen legal solution) and Sun Belt alone genuinely backtracked. Stock dated `75
 constant sites; practice-world goldens recaptured (structural **`6fc122dd…`**, dated **`93e27e5b…`**, zero-shave season,
 memory golden 120 games). **Unmoved:** conference `6f79d663…`, results `898d9fe8…` — dates moved, basketball did not —
 plus `matching_golden.json` and `contracts_golden.json`, verified at the gate to derive from stock only. December 63 →
-63 (predicted to move; did not). fixture-memory's fingerprints untouched entirely.)
-
+63 (predicted to move; did not). fixture-memory's fingerprints untouched entirely.))*
 *(Previous board entry, S105.1 — 2026-08-07; verified on Emmett's machine — ALL CHECKS PASSED, **no new phase**.
 **A FOUR-TEAM TOURNAMENT IS TWO GAMES, NOT THREE.** A four-team event is two rounds and every team plays both; the
 engine charged every tournament-seated school **three**. So a school in a four-team field had three games struck off
@@ -896,6 +927,52 @@ chart is PROVISIONAL pending O-6.
   consumer, so it inherits the decision. Claude's read: a Jimmy V matchup is a real non-conference meeting and
   should count. **Needs Emmett's ruling BEFORE that session is scoped**, not during it.
 
+- **O-100 — ★ THE R4 ADDENDUM WAS RULED, WRITTEN, AND LOST — AND THE SHIPPED MATCHER STILL RUNS WHAT IT WITHDRAWS
+  (opened S106, 2026-08-08).** On 2026-08-05 Emmett ruled the whole shelf-and-odds model — **the schedule is two
+  weighted draws** — and it was written up as an addendum that **never landed in the repo**. The brief stayed at r3,
+  **R18–R22 existed nowhere**, and S103 through S106 were all built against r3. Recovered and committed at S106 as
+  `docs/nonconference-design-brief-r4-addendum.md`, with every measured number re-measured against the live world
+  rather than carried over. **Quality** keys on a school's prestige gap against its **own league's median** (a
+  gradient, never buckets; the coach owns it later, and the ~10% tail is load-bearing because it stops every soft
+  coach producing the same slate and lets the odds ration supply instead of a quota). **Distance** keys on
+  **conference tier** as a proxy for the cheque book, as **ranked-shelf bands 5/15/40/100/rest**, tapered across
+  ranks (**no cliff** — 11 miles currently swings frequency 3.5×), flattening further with prestige so the biggest
+  schools have the furthest reach. **Withdrawn by it and still live in shipped code: R8's fixed bucket mixes and the
+  reach grab** — which is why Northwestern (Marquee by conference floor at 53, facing a Big Ten median of 73) asks
+  for Duke's slate, and why **62% of what a power school hosts is prestige 0–24 and only 15% is 40–60**. ★ **The
+  blocker before any prompt: the quality curve has NO NUMBERS.** It needs the gap-to-odds archetype table — named
+  schools, their gap, the odds each draws — which is Emmett's to rule. ★ **This is a documentation failure worth
+  keeping visible**: the status board carried the reminder ("R17's tilt still needs an r4 amendment") for three
+  sessions while the document itself was gone. **A ruling that lives only in a chat log is a ruling that will be
+  re-derived wrong.**
+
+- **O-97 — ★ INDEPENDENTS SHOULD PLAY THEIR NEIGHBOURS, AND THE WORLD BARELY LETS THEM (opened S106; RULED,
+  UNBUILT — a MATCHER session, not a dating one).** Emmett's ruling, 2026-08-08: *close Independents play each other
+  twice, home-and-home, as quasi-conference games; the further apart, the lower the odds; and a school with few
+  Independents within reach plays them anyway* — **scarcity is REGIONAL, not national** (fourteen is not scarce, but
+  Seattle's world is three). Today there are **seven Independent-vs-Independent games in the entire country and six of
+  the fourteen schools play none at all**: the Carolinas hold a real cluster (Winston-Salem / NC Central / Longwood at
+  76, 95, 133 miles) while Utah Valley's nearest is 525 and Seattle's is 731; the national median between two
+  Independents is **1,141 miles** and only 7 of 91 pairings are under 300. **Measured safe for dating**: two
+  home-and-homes each gives 18 pairings / 36 games and every Independent still dates cleanly — better than neutral,
+  because those games sit in January and relieve the November congestion that nearly sank S106. ★ **Collision to rule
+  with it**: a home-and-home is an exchange and S105 capped a school at **three**; NC Central would spend its whole cap
+  on quasi-conference games. Either they sit outside that count or the cap needs a second look. Emmett's wider
+  observation, measured and worth carrying into the same session: **the West schedules by different rules** — a western
+  school's median road trip is **326 miles** against an eastern school's **117**, and Plains schools cross a thousand
+  miles on **16%** of trips where eastern schools essentially never do.
+
+- **O-98 — NO PRACTICE WORLD AUTHORS AN EVENT OR A CONTRACT (opened S106, flagged at the gate).** So R-n3's travel
+  buffers are proven on the **stock world alone** and R-n7's contract legs are proven by **nothing** — the contract arm
+  of the dating layer is live code with no fixture behind it, and it passes by being vacuous. Wants a small rigged world
+  with a couple of events and a contract in it, readable game by game. Not urgent; genuinely load-bearing.
+
+- **O-99 — EVENT WINDOWS RESOLVE AGAINST A HARDCODED SEASON YEAR (opened S106).** `MteWindowDate` pins the year while
+  the conference dater reads whatever start year it is handed. Invisible at one season; at two, every league game moves
+  to the new year and every event window stays in the old one, so every buffer and conflict check compares dates a year
+  apart. **S106 is the first layer that reads both together**, which is why it surfaced here. Belongs with the career
+  layer, not with sites.
+
 - **O-95 — EVENT DATES ARE FIXED IN THE WORLD FILE**, so the Jimmy V falls on December 3rd every season
   forever. Events drifting a few days year to year is real and cheap. **Belongs with the living-pool session**
   (event birth and death), not smuggled into the repeat ceiling.
@@ -908,9 +985,10 @@ chart is PROVISIONAL pending O-6.
   `docs/contracts-design-brief.md` (r3, committed at the S103 gate — it was on disk but never pushed). Remaining,
   in the brief's order: **(5) the shelf and the odds** — the buy-game shelf is still keyed
   on prestige, Northwestern still schedules like Duke, C-41's inversion unresolved (knowingly left standing:
-  visible and harmless; rebuilding the scheduler around inherited obligations later would be neither); **(6) sites
-  and nights** — R9–R12, the crowd model, dates around conference play, ★ and the SEMI-HOME ruling (a third site
-  category — host keeps the advantage, does not play on campus; the leg format's site WORD is ready for it);
+  visible and harmless; rebuilding the scheduler around inherited obligations later would be neither); ~~**(6a) nights**~~ — **SHIPPED S106**: every pairing dated, the curve ruled, R-n1..R-n8 closed. **(6b) sites**
+  remains — R9–R12, the crowd model, ★ and the SEMI-HOME ruling (a third site category — host keeps the advantage,
+  does not play on campus; the leg format's site WORD is ready for it). S107 adds cities as ENRICHMENT and must not
+  be able to reorder S106's dated fingerprint;
   ~~**(7) the Independents' November**~~ — **SHIPPED S105**, and the league-mate exemption it needed shipped with
   it. What S105 did NOT touch and explicitly left open: **the Selling home band and the fill order**, which are the
   real cause of low schools never hosting low schools (sixty Selling schools, not one ever hosted another before
@@ -1653,6 +1731,29 @@ chart is PROVISIONAL pending O-6.
   Player data layer at 21k+ actives; moddability. (working-with-emmett §7)
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
+
+- **C-49 (S106, Emmett's ruling, 2026-08-08) — TWO INDEPENDENTS MAY NOT MEET BEFORE JANUARY 1.**   Those schools
+  play each other during everyone else's conference season, never in November or December. **Verified free**: with
+  those games barred from Nov/Dec all fourteen Independents still date their full 29-game slates. Note the ruling
+  governs **when**, not **how many** — supply is O-97's question and the dating layer may not invent a pairing.
+
+- **C-48 (S106, Emmett's ruling, 2026-08-08) — THE WEEK BENDS WHEN TWO CALENDARS HOLD NO NIGHT IN COMMON (R-n8),
+  SUPERSEDING R-n4's HARDNESS IN PART.**   Quotas were ruled hard as the cure for front-filling. They stay hard **by
+  default** and now bend **on failure**: a pairing whose quota week holds no shared night slides to the nearest week
+  that does — 0, +1, −1, +2, −2, +3, −3, Christmas skipped, never further. **The cause was measured before the rule was
+  made**: once league play starts a school with two league games in a week has its week closed by spacing except for
+  one night (291 such cases nationally, 279 more with two), and 46 stock pairings shared a week with no common night.
+  **The front-fill cure survives** — 1,935 of 2,171 games sat where their quota put them and the authored shape is the
+  produced shape. Emmett chose this over pushing games earlier (which costs the January the Independents need) and over
+  letting a pairing fail visibly (which breaks "no cancellations").
+
+- **C-47 (S106, Emmett's ruling, 2026-08-08) — THE CURVE GETS A REAL JANUARY TAIL, AND A LIGHT WEIGHT IS
+  DECORATION.**   The authored "light hand-off past each opener" at weight 1–2 produced **zero games** — a school owing
+  twelve gets 0.30 of a game in a weight-2 week, the allocator floors it, the remainder goes elsewhere — so every
+  January week came out empty and **all fourteen Independents became undatable**. Ruled: 5/4/4/3/3 through February 1.
+  ★ **The general fact this closes**: below roughly weight 7 on an 81-weight curve a week is one you wrote down and
+  will not get. Every future curve is authored knowing that, and **the tail is not thinned without re-running the
+  Independents**.
 
 - **C-46 (S105.2, Emmett's ruling, 2026-08-08) — THE FIVE-TEAM PRACTICE LEAGUES PLAY 12 CONFERENCE GAMES, NOT 16.**
   *"A 5 team league should be playing 8 or 12 conference games anyways."* Ruled when the weekday/weekend rule proved
