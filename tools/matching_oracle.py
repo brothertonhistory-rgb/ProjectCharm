@@ -142,6 +142,54 @@ requests MUST move up a rung. On the stock world exactly 164 do, which means leg
 never forced a spill beyond the structural one.
 
 ═══════════════════════════════════════════════════════════════════════════════════
+★ S108 — REACH: A HOST PAYS, IN MILES, TO REACH FURTHER DOWN THE LADDER
+═══════════════════════════════════════════════════════════════════════════════════
+
+Emmett, 2026-08-09, reading Oklahoma State's first finished schedule: "Essentially I
+just want it to be not so geographically centered, but still an obvious theme. And not
+so gung ho to only schedule the dregs."
+
+Phase 1's pick used to be the plain nearest legal candidate. It now sorts on an
+EFFECTIVE distance: the real distance plus a flat penalty for every tier of separation
+BELOW the host beyond the first.
+
+    sort_key = DistanceKey + TIER_PENALTY_MILES * max(0, rank(candidate) - rank(host) - 1)
+    rank: power 0, highMid 1, lowMid 2, low 3   (the S101 tier floor, inverted)
+
+★ THE UNIT IS A REAL MILE. distance_key is floor(miles + 0.5) — one key unit per mile —
+so "two tiers down costs you two hundred miles of preference" is literally true.
+
+★ IT IS A PREFERENCE, NEVER A WALL. It reorders the candidates considered and nothing
+else. A host with no closer option still takes the dreg, which is why the pairing set
+stays whole (2,171 +/- 1 across the whole sweep, zero short tokens) and why R17's
+"yields when options run out" survives untouched.
+
+★ IT IS ASYMMETRIC AND TOP-HEAVY, BY CONSTRUCTION. It charges for reaching DOWN and
+never rewards reaching UP. One tier down is free. So a POWER host pays for lowMid (x1)
+and low (x2); a HIGHMID host pays only for low (x1); a LOWMID or LOW host pays NOTHING,
+because low is one tier down and one tier down is free. This is a correction at the top
+of the market, not a national change — measured, VCU's home slate is byte-identical at
+every setting from 0 to 600.
+
+★ WHAT IT DOES NOT DO, MEASURED AT THE S108 GATE AND RECORDED SO IT IS NOT RE-CLAIMED.
+It does not touch the "dregs" half of Emmett's sentence. A power school's home slate by
+the visitor's PRESTIGE is 62.4% / 25.7% / 11.9% / 0.0% (bands 0-24 / 25-54 / 55-79 /
+80+) and is IDENTICAL to the tenth of a percent at penalties 0, 100, 200, 300, 400 and
+600. The reason is the bucket mix above: a Marquee school with nine home games is TOLD
+to book six opponents under prestige 25 before any opponent is considered, so this
+ordering can only decide WHICH sub-25 school comes. Oklahoma State hosts exactly six
+under-25 opponents at every setting. The prestige mix belongs to R8's constants, which
+the r4 addendum withdraws (R18/R20) and which are still live — that is O-100's session,
+not this one.
+
+TIER_PENALTY_MILES = 200 (Emmett, 2026-08-09) is the knee of a 0/100/200/300/400/600
+sweep: the median road trip goes 140 -> 167 miles, trips over 500 miles 10.2% -> 12.1%,
+and a power host's three-tiers-down share 62.5% -> 46.6%. Past 300 the tier mix stops
+moving and only the miles grow, because the country holds 302 highMid and 453 lowMid
+road tokens against 614 power home requests — there are not enough mid-major road games
+in existence for power schools to stop buying low ones.
+
+═══════════════════════════════════════════════════════════════════════════════════
 CANDIDATE LEGALITY — the same five tests in every phase
 ═══════════════════════════════════════════════════════════════════════════════════
 
@@ -179,7 +227,14 @@ dictionary order, insertion order, or anything else the two languages might disa
        for each request: walk the spill ladder from its original bucket; at each tier
        the candidates are the legal schools with ROAD remaining whose prestige sits in
        that tier (every band, for ANY); take the minimum by
-                  (DistanceKey ASC, prestige ASC, id ASC)
+                  (sort_key ASC, prestige ASC, id ASC)      <- S108
+       where sort_key is the S108 effective distance above. ★ THE WEAK-FIRST TIE-BREAK
+       SURVIVES: among candidates at equal EFFECTIVE distance the matcher still takes
+       the lower-prestige school. S108 fixes the cross-tier half of "gung ho for the
+       dregs" and deliberately leaves the within-tier half alone. Measured at 200: a tie
+       on the minimum decides 4.4% of picks and prestige settles 4.3% of them.
+       ★ THIS IS PHASE 1 ONLY. Phases 2, 3a, 3b and 4 are untouched — see the note at
+       the head of phase 3.
        the host spends one home request (by iteration), the candidate spends one ROAD.
        Ladder exhausted with nothing legal anywhere -> SHORT TOKEN.
 
@@ -194,6 +249,17 @@ dictionary order, insertion order, or anything else the two languages might disa
        it becomes a short token. Nothing is discarded.
 
 3. BOTTOM HOSTS BOTTOM (C-37), WITH THE SAME-SEASON HOME-AND-HOME FIRST (S105, R41/R39).
+
+   ★ S108's TIER PENALTY DOES NOT APPLY HERE, OR IN PHASE 4, AND THAT IS A RULING RATHER
+   THAN AN OVERSIGHT. Phases 3a, 3b and 4 use the same (DistanceKey, prestige, id) key
+   as phase 1 did, so a future session that "makes the change consistently" would be
+   changing something else entirely. The penalty is about a HOST REACHING DOWN for a
+   visitor to bring in. Phase 3 runs bottom-up — its seeker is the LOWEST-prestige
+   school with road left, so the penalty computes to zero for nearly every school that
+   reaches it — and the host is not even decided until AFTER the pick, by prestige.
+   Phase 4's partner HOSTS the short-token owner, so the roles are reversed. Applying a
+   host-reaches-down penalty at any of the three would be a different rule wearing this
+   one's name.
 
    ★ 3a. THE EXCHANGE — TWO SCHOOLS WHO CAN EACH PAY TWO ROAD GAMES PLAY EACH OTHER
    TWICE, ONCE EACH WAY. Available to ANY two schools that fit (R39), not Independents
@@ -458,6 +524,20 @@ INDEPENDENT_NEUTRAL = 0
 #   The national trip median is 142 at EVERY setting — this number moves outliers only.
 EXCHANGE_CAP_PER_SCHOOL = 3
 
+# ★ S108 — WHAT A HOST PAYS, IN MILES OF PREFERENCE, PER TIER OF SEPARATION BEYOND THE
+#   FIRST (Emmett, 2026-08-09). See the S108 section of this file's docstring for the
+#   ruling, the sweep and — importantly — what this number does NOT buy.
+TIER_PENALTY_MILES = 200
+
+# ★ S108 — the tier ladder as a RANK, nearest the top first. Deliberately derived from
+#   TIER_FLOOR rather than authored a second time: one mapper over this vocabulary
+#   cannot drift from itself, and TIER_FLOOR already runs one stage earlier (it is what
+#   build_requests reads), so a world carrying an unknown tier has already been refused
+#   before a single candidate is ordered. A future `elite` tier therefore lands on
+#   TIER_FLOOR's KeyError, which is the intended forced reconsideration.
+def tier_rank(tier_id):
+    return 3 - TIER_FLOOR[tier_id]
+
 
 def independent_home(prestige):
     """★ R-b. lo at prestige 0 rising to hi at the anchor, round-half-up in EXACT
@@ -675,7 +755,7 @@ class Matching:
         self.spills = 0
 
 
-def match(world, report, allow_exchange=True):
+def match(world, report, allow_exchange=True, tier_penalty=None):
     """★ PURE AND TOTAL. (world, report) in, matching out. No randomness, no clock, no
     config, and the report is never written to.
 
@@ -707,6 +787,9 @@ def match(world, report, allow_exchange=True):
     #   strangers, not league-mates — legality test 2 reads this, not the id alone.
     in_a_league = {i: conf_by_id[school_by_id[i]["conferenceId"]]["games"] > 0 for i in ids}
     class_of = {i: req_by_id[i]["className"] for i in ids}
+    # ★ S108 — the school's conference tier, read once here so the ordering key in the
+    #   innermost loop of phase 1 stays a cheap lookup.
+    tier_of = {i: conf_by_id[school_by_id[i]["conferenceId"]]["tierId"] for i in ids}
 
     # DistanceKey for every ordered pair, computed once.
     dk = {}
@@ -751,8 +834,19 @@ def match(world, report, allow_exchange=True):
             return False
         return True
 
-    def pick_road_candidate(host, band):
-        """band None means ANY. Minimum by (DistanceKey, prestige, id)."""
+    def pick_road_candidate(host, band, penalty=None):
+        """band None means ANY. Minimum by (sort_key, prestige, id), where sort_key is
+        S108's effective distance: the real DistanceKey plus TIER_PENALTY_MILES for each
+        tier of separation BELOW the host beyond the first.
+
+        ★ THE PENALTY IS A PREFERENCE, NEVER A WALL — it reorders the candidates and
+        removes none of them, so a host with nothing closer still takes the dreg.
+
+        `penalty` exists ONLY so the zero-path control can rebuild this world with S108
+        switched off and prove the pairing is byte-identical to the pre-S108 golden.
+        Nothing in production passes it — the same seam allow_exchange uses."""
+        p = TIER_PENALTY_MILES if penalty is None else penalty
+        host_rank = tier_rank(tier_of[host])
         best = None
         best_key = None
         for c in ids:
@@ -760,7 +854,9 @@ def match(world, report, allow_exchange=True):
                 continue
             if band is not None and prestige_band(prestige[c]) != band:
                 continue
-            key = (dk[(host, c)], prestige[c], c)
+            steps = tier_rank(tier_of[c]) - host_rank - 1
+            sort_key = dk[(host, c)] + p * (steps if steps > 0 else 0)
+            key = (sort_key, prestige[c], c)
             if best_key is None or key < best_key:
                 best_key, best = key, c
         return best
@@ -784,7 +880,7 @@ def match(world, report, allow_exchange=True):
         filled; False makes it a short token."""
         ladder = [None] if origin_band is None else list(range(origin_band, 4))
         for band in ladder:
-            c = pick_road_candidate(host, band)
+            c = pick_road_candidate(host, band, tier_penalty)
             if c is None:
                 continue
             road[c] -= 1
@@ -1088,6 +1184,18 @@ def ledger_checksum(m):
     return h.hexdigest()
 
 
+def pairs_fingerprint(pairs):
+    """★ S108 — a stable digest of an ORDERED pairing list. Deliberately covers only the
+    four fields that make a pairing what it is (kind, host, visitor, distance) and not the
+    bucket provenance, so the digest means "the same games in the same order" and cannot
+    go red for a labelling change. Both languages hash the same string."""
+    h = hashlib.sha256()
+    for p in pairs:
+        h.update(f"{p['kind']}|{p['hostSchoolId']}|{p['visitorSchoolId']}|"
+                 f"{p['distanceKey']}\n".encode("utf-8"))
+    return h.hexdigest()
+
+
 def report_fingerprint(report):
     h = hashlib.sha256()
     for r in report:
@@ -1220,6 +1328,32 @@ if __name__ == "__main__":
                  max(p["hostSchoolId"], p["visitorSchoolId"]))
             c[k] = c.get(k, 0) + 1
         return sorted(k for k, v in c.items() if v > 1)
+
+    # ══ ★ S108 — THE ZERO PATH, RUN BEFORE THE PENALTY IS BELIEVED ══════════════
+    #    At TIER_PENALTY_MILES = 0 the new key structure must reproduce the PRE-S108
+    #    pairing exactly. That proves the added arithmetic changed no traversal order,
+    #    no tie-break, no legality and no enumeration — so any difference at 200 is the
+    #    PENALTY's effect and not the refactor's. Same shape as S105 C11 and S104 C9a.
+    #    The comparison is against the committed golden's own pairs, so it is a real
+    #    external bar rather than this run agreeing with itself.
+    m_zero = match(world, report, tier_penalty=0)
+    prove(world, report, m_zero, "stock-d1 / S108 penalty ZERO")
+    try:
+        pre = json.load(open(f"{root}/tools/matching_golden.json"))["pairs"]
+        same = (len(pre) == len(m_zero.pairs)
+                and all(a == b for a, b in zip(pre, m_zero.pairs)))
+        print(f"  ★ S108 zero path: {'IDENTICAL' if same else 'DIVERGED'} to the "
+              f"committed golden across {len(m_zero.pairs)} pairs "
+              f"({'this is the structural control' if same else 'THE REFACTOR MOVED SOMETHING'})")
+        assert same, "the zero path did NOT reproduce the pre-S108 pairing"
+    except FileNotFoundError:
+        print("  ★ S108 zero path: no committed golden on disk to compare against")
+    print(f"  ★ S108 zero-path fingerprint {pairs_fingerprint(m_zero.pairs)[:16]}… "
+          f"(carried into the golden; Phase 93 C16 holds the C# to it)")
+    n_moved = sum(1 for a, b in zip(m_zero.pairs, m.pairs) if a != b)
+    assert n_moved > 0, "the penalty moved nothing — the positive case is untested"
+    print(f"  ★ S108 penalty {TIER_PENALTY_MILES} mi: {n_moved} pairing row(s) differ "
+          f"from the zero path")
 
     # (1) NEGATIVE CONTROL — the same world with the shape switched off produces ZERO
     #     repeated pairs. Without this, "every repeat is an exchange" passes trivially
@@ -1405,6 +1539,19 @@ if __name__ == "__main__":
             #   drift, parity would fail for a mysterious reason spread over hundreds of
             #   pairs; asserting the number itself names the cause in one line.
             "exchangeCapPerSchool": EXCHANGE_CAP_PER_SCHOOL,
+            # ★ S108 — same reasoning as the cap above: the penalty travels WITH the
+            #   golden, so a C#/oracle drift on this constant is named in one line
+            #   instead of surfacing as hundreds of mismatched pairs.
+            "tierPenaltyMiles": TIER_PENALTY_MILES,
+            # ★ S108 — THE ZERO PATH, MADE PERMANENT. A hash of the pairing this same
+            #   oracle produces at TIER_PENALTY_MILES = 0. Verified at emit time (see the
+            #   zero-path control in main) to be the hash of the PRE-S108 committed
+            #   pairing, byte for byte across all 2,171 pairs — so this value carries that
+            #   proof forward as a standing red line rather than leaving it a claim in the
+            #   journal. Phase 93 C16 asserts the C# reproduces it with the penalty
+            #   switched off, which is what separates "the penalty did this" from "the
+            #   refactor did this" for every future session.
+            "zeroPathFingerprint": pairs_fingerprint(m_zero.pairs),
             "exchangePairs": sum(1 for p in m.pairs if p["kind"] == "Exchange") // 2,
             "inputReportFingerprint": report_fingerprint(report),
             "inputTokens": home + neu + rd,

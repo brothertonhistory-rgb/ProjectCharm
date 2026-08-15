@@ -76,6 +76,37 @@ internal static partial class Program
     /// number moves outliers only, which is why no suite check asserts it.</summary>
     private const int MatchExchangeCapPerSchool = 3;
 
+    /// <summary>★ S108 — WHAT A HOST PAYS, IN MILES OF PREFERENCE, FOR EACH TIER OF
+    /// SEPARATION BELOW IT BEYOND THE FIRST (Emmett, 2026-08-09): <em>"Essentially I just
+    /// want it to be not so geographically centered, but still an obvious theme. And not
+    /// so gung ho to only schedule the dregs."</em>
+    /// <para>The unit is a REAL MILE — <see cref="MatchDistanceKey"/> is one key unit per
+    /// mile — so "two tiers down costs you two hundred miles of preference" is literally
+    /// true. Ruled at 200 off a measured 0/100/200/300/400/600 sweep: the median road trip
+    /// goes 140 → 167 miles, trips over 500 miles 10.2% → 12.1%, and a power host's
+    /// three-tiers-down share 62.5% → 46.6%. Past 300 the tier mix stops moving and only
+    /// the miles grow, because the country holds 302 highMid and 453 lowMid road tokens
+    /// against 614 power home requests — there are not enough mid-major road games in
+    /// existence for power schools to stop buying low ones. The full sweep is in the
+    /// journal; this comment carries the ruling and its reason, not the table.</para>
+    /// <para>★ WHAT IT DOES NOT BUY, MEASURED AT THE GATE AND RECORDED SO IT IS NOT
+    /// RE-CLAIMED: it does not move the "dregs" half of that sentence at all. A power
+    /// school's home slate by the visitor's PRESTIGE is 62.4 / 25.7 / 11.9 / 0.0% and is
+    /// identical to the tenth of a percent at every setting from 0 to 600, because
+    /// <see cref="MatchBucketMix"/> tells a Marquee school to book six opponents under
+    /// prestige 25 before any opponent is considered. That mix is O-100's session.</para></summary>
+    private const int MatchTierPenaltyMiles = 200;
+
+    /// <summary>★ S108 — the tier ladder as a RANK, top of the country first: power 0,
+    /// highMid 1, lowMid 2, low 3. Deliberately DERIVED from <see cref="NonConTierFloor"/>
+    /// rather than authored a second time — one mapper over this vocabulary cannot drift
+    /// from itself, and that mapper already runs a stage earlier in S101, so a world
+    /// carrying an unknown tier is refused before a single candidate is ordered here. A
+    /// future <c>elite</c> tier therefore lands on that method's throw, which is the
+    /// intended forced reconsideration rather than a silent filing under power (the same
+    /// precedent as S104's radius vocabulary, Phase 95 C8d).</summary>
+    private static int MatchTierRank(string tierId) => 3 - NonConTierFloor(tierId);
+
     /// <summary>★ EMMETT'S RULING (2026-08-05). Shares of a school's home games by
     /// bucket — (Easy, Working, Decent). Selling sends every home game to ANY and has
     /// no mix. Nothing here is a game count: §0's largest-remainder split turns shares
@@ -218,10 +249,15 @@ internal static partial class Program
     /// produces ZERO repeated pairs. Without that control, "every repeat is an exchange"
     /// passes trivially on a run that made no exchanges at all. Nothing in production passes
     /// it.</param>
+    /// <param name="tierPenalty">★ S108 — exists ONLY so Phase 93's controls can rebuild
+    /// the same world with the tier penalty switched off (proving the zero path) or set to
+    /// a chosen value (proving the step is linear). Nothing in production passes it; null
+    /// means <see cref="MatchTierPenaltyMiles"/>.</param>
     private static MatchingReport BuildNonConferenceMatching(
         WorldFile world, NonConferenceReport report,
         IReadOnlyList<(int Lo, int Hi)>? contractedPairs = null,
-        bool allowExchange = true)
+        bool allowExchange = true,
+        int? tierPenalty = null)
     {
         var schoolById = world.Schools.ToDictionary(s => s.Id);
         var placeById = world.Places.ToDictionary(p => p.PlaceId);
@@ -315,15 +351,48 @@ internal static partial class Program
                                     wasSpill, wasConvertedNeutral));
         }
 
-        int? PickRoadCandidate(int host, int? band)
+        // ★ S108 — THE ONLY SITE THE TIER PENALTY TOUCHES, and that is a ruling rather
+        //   than an oversight. Four loops in this file order candidates on the very same
+        //   (distance, prestige, id) key — the exchange partner search, the ordinary
+        //   filler and the terminal repair are the other three — so a future session that
+        //   "applies the change consistently" would be changing something else entirely.
+        //   The penalty is about A HOST REACHING DOWN for a visitor to bring in. Phase 3
+        //   runs bottom-up: its seeker is the LOWEST-prestige school with road left, so
+        //   the penalty computes to zero for nearly every school that reaches it, and the
+        //   host is not even decided until AFTER the pick, by prestige. Phase 4's partner
+        //   HOSTS the short-token owner, so the roles are reversed there.
+        //
+        //   ★ THE PENALTY IS A PREFERENCE, NEVER A WALL. It reorders the candidates and
+        //   removes none of them, so a host with nothing closer still takes the dreg —
+        //   which is what keeps the pairing set whole (2,171 ± 1 across the whole sweep,
+        //   zero short tokens at every setting) and honours R17's "yields when options
+        //   run out."
+        //
+        //   ★ THE WEAK-FIRST TIE-BREAK SURVIVES. The key still ends (…, prestige, id), so
+        //   among candidates at equal EFFECTIVE distance the matcher still takes the
+        //   weaker school. S108 fixes the cross-tier half of "gung ho for the dregs" and
+        //   deliberately leaves the within-tier half alone; at 200 a tie on the minimum
+        //   decides 4.4% of picks and prestige settles 4.3% of them.
+        //
+        //   `tierPenalty` exists ONLY so Phase 93's zero-path control can rebuild the same
+        //   world with S108 switched off and prove the pairing is byte-identical to the
+        //   pre-S108 golden. Nothing in production passes it — the same seam
+        //   `allowExchange` uses.
+        int? PickRoadCandidate(int host, int? band, int? tierPenalty = null)
         {
+            var penalty = tierPenalty ?? MatchTierPenaltyMiles;
+            var hostRank = MatchTierRank(conferenceTier[host]);
             int? best = null;
             (int, int, int) bestKey = default;
             foreach (var c in ids)
             {
                 if (road[c] <= 0 || !Legal(host, c)) continue;
                 if (band is int b && MatchPrestigeBand(prestige[c]) != b) continue;
-                var key = (dk[(host, c)], prestige[c], c);
+                var steps = MatchTierRank(conferenceTier[c]) - hostRank - 1;
+                // ★ int throughout — the key is an int tuple and no implicit conversion
+                //   may enter it.
+                var sortKey = dk[(host, c)] + penalty * (steps > 0 ? steps : 0);
+                var key = (sortKey, prestige[c], c);
                 if (best is null || key.CompareTo(bestKey) < 0) { bestKey = key; best = c; }
             }
             return best;
@@ -339,7 +408,7 @@ internal static partial class Program
                             .Select(b => (int?)b).ToArray();
             foreach (var band in ladder)
             {
-                var c = PickRoadCandidate(host, band);
+                var c = PickRoadCandidate(host, band, tierPenalty);
                 if (c is null) continue;
                 road[c.Value]--;
                 var spilled = originBand is not null && band != originBand;

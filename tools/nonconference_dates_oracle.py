@@ -598,6 +598,7 @@ if __name__ == "__main__":
     print("S106 ORACLE: ALL ASSERTIONS PASSED")
 
 
+
 def emit_golden(inputs, result, curve, world_path):
     """★ The golden Phase 97 replays. Every value is an INTEGER or a STRING — no float is
     asserted anywhere — so parity is LITERAL equality and never a ULP bound. The two bend
@@ -638,3 +639,23 @@ def emit_golden(inputs, result, curve, world_path):
         "games": rows,
         "unseated": [{"pairIndex": gi, "class": cls} for gi, cls in result["failures"]],
     }
+
+
+if __name__ == "__main__":
+    # ★ S108 — EMIT THE GOLDEN FROM HERE, not by hand. emit_golden has existed since S106
+    #   and nothing ever called it: the golden was written out in a scratch session and the
+    #   recipe left with the session, so the first time the matching moved (S108) the file
+    #   could not be regenerated at all. Together with the harness's `dates-input` mode the
+    #   whole round trip is now two committed commands. The path is optional so the plain
+    #   run stays a pure assertion pass.
+    if len(sys.argv) > 2:
+        world_path = sys.argv[3] if len(sys.argv) > 3 else "worlds/stock-d1.world.json"
+        curve_rows = [(d.month, d.day, w) for d, w in sorted(CURVE.items())]
+        payload = emit_golden(inputs, res, curve_rows, world_path)
+        with open(sys.argv[2], "w") as f:
+            json.dump(payload, f, indent=1)
+            f.write("\n")
+        print(f"GOLDEN EMITTED: {sys.argv[2]}")
+        print(f"  {len(payload['games'])} dated row(s), "
+              f"{len(payload['unseated'])} unseated, "
+              f"fingerprint {payload['datedFingerprint'][:16]}…")

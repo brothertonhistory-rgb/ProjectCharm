@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Charm.Engine;                 // ★ S108 — GeoCoordinate, for the hand-built control bench.
 
 namespace Charm.Harness;
 
@@ -519,6 +520,207 @@ internal static partial class Program
                       "still reconciling — without an exception, and the page renders it",
                       ok && lines.Count > 0,
                       $"{tokens} tokens, {strandedMatch.Unrepaired.Count} reported unrepaired");
+            }
+
+            // ════════════════════════════════════════════════════════════════════
+            //  C16 — ★ S108: THE TIER PENALTY, AND THE STEP SHAPE IT ACTUALLY HAS.
+            //
+            //  ★ WHY FOUR CONTROLS AND NOT ONE. The S106 lesson: a battery where four of
+            //  six mutations fired the WRONG rule looked identical to one that worked. A
+            //  single check reading "the penalty changed something" would pass under any
+            //  monotone penalty whatsoever, under a penalty with no `-1` term, and under a
+            //  penalty applied to the wrong side of the comparison. Each control below is
+            //  built so that exactly one thing can satisfy it, and each carries its own
+            //  zero-penalty half so it cannot be satisfied by "the further school won
+            //  anyway."
+            //
+            //  ★ NOTHING HERE ASSERTS A BASKETBALL VALUE. The trip medians, the tier split
+            //  and the sweep live on the page and in the journal. What is asserted is the
+            //  SHAPE of the arithmetic.
+            // ════════════════════════════════════════════════════════════════════
+            {
+                // ── C16a — THE ZERO PATH, against the oracle's carried fingerprint. ──
+                //    Proves the new key structure changed no traversal order, no tie-break,
+                //    no legality and no enumeration — so any difference at the ruled value
+                //    is the PENALTY's effect and not the refactor's. The oracle verified at
+                //    emit time that this fingerprint is the PRE-S108 pairing's, so this is
+                //    a real external bar and not the run agreeing with itself.
+                {
+                    var goldenPath = Path.Combine(AppContext.BaseDirectory, "tools",
+                                                  "matching_golden.json");
+                    using var doc = JsonDocument.Parse(File.ReadAllText(goldenPath));
+                    var prov = doc.RootElement.GetProperty("provenance");
+
+                    var zero = BuildNonConferenceMatching(
+                        stock, report, stockRun.Contracts.UsedPairs, tierPenalty: 0);
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var p in zero.Pairs)
+                        sb.Append(p.Kind).Append('|').Append(p.HostSchoolId).Append('|')
+                          .Append(p.VisitorSchoolId).Append('|').Append(p.DistanceKey)
+                          .Append('\n');
+                    var fp = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                        System.Text.Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
+
+                    // ★ And the constant itself travels with the golden, so a C#/oracle
+                    //   drift on the ruled value names its own cause in one line instead of
+                    //   surfacing as hundreds of mismatched pairs in C14b.
+                    var constantAgrees =
+                        prov.GetProperty("tierPenaltyMiles").GetInt32() == MatchTierPenaltyMiles;
+
+                    Check("C16a: ★ THE ZERO PATH — with the tier penalty switched off the " +
+                          "matcher reproduces the pre-S108 pairing exactly, so the new key " +
+                          "structure moved nothing on its own; and the ruled constant agrees " +
+                          "with the golden's",
+                          fp == prov.GetProperty("zeroPathFingerprint").GetString()
+                          && constantAgrees,
+                          $"{zero.Pairs.Count} pairs, {fp[..12]}…, penalty {MatchTierPenaltyMiles} mi");
+                }
+
+                // ── The bench: a hand-built world where every distance is chosen. ────
+                //    Four schools on one meridian so a mileage is a latitude offset, one
+                //    conference per school so legality never interferes, and a hand-built
+                //    report so the home/road counts are exactly what each control needs
+                //    rather than whatever the class bands would hand out.
+                const double MilesPerDegreeLat = 69.0932;
+                WorldPlace PlaceAt(int id, double milesNorth) => new(
+                    id, $"P{id}", "", "US",
+                    GeoCoordinate.Create(35.0 + milesNorth / MilesPerDegreeLat, -97.0),
+                    Array.Empty<string>());
+
+                // ★ The tier table must carry all four ids, because MatchTierRank refuses
+                //   what it does not recognise — which is the point of it.
+                var benchTiers = new List<WorldTier>
+                {
+                    new("power", 0, 70, 0.0, "any"), new("highMid", 0, 50, 0.0, "any"),
+                    new("lowMid", 0, 30, 0.0, "any"), new("low", 0, 10, 0.0, "any"),
+                };
+
+                WorldFile Bench(IReadOnlyList<(int Id, string Tier, int Prestige, double Miles)> spec)
+                {
+                    var confs = spec.Select((s, i) => new WorldConference(
+                        i + 1, $"C{i + 1}", $"C{i + 1}", s.Tier, 0, 0,
+                        new[] { "mon" }, 1, null)).ToList();
+                    var places = spec.Select((s, i) => PlaceAt(i + 1, s.Miles)).ToList();
+                    var schools = spec.Select((s, i) => new WorldSchool(
+                        s.Id, $"S{s.Id}", $"S{s.Id}", "000000", i + 1, i + 1, "D1",
+                        s.Prestige, s.Prestige)).ToList();
+                    return new WorldFile
+                    {
+                        SchemaVersion = stock.SchemaVersion, Kind = "authored",
+                        EraLabel = "s108-control", Division = "D1",
+                        Tiers = benchTiers, Conferences = confs,
+                        Places = places, Schools = schools, Events = new List<WorldEvent>(),
+                    };
+                }
+
+                NonConferenceReport BenchReport(
+                    IReadOnlyList<(int Id, string Tier, int Prestige, double Miles)> spec,
+                    int hostId, int hostHome)
+                {
+                    var rows = spec.Select(s => new NonConSchoolRequest(
+                        s.Id, $"S{s.Id}", "Selling", 0, false, 29,
+                        s.Id == hostId ? hostHome : 0, 0, s.Id == hostId ? 0 : 1,
+                        false, false, false, false)).ToList();
+                    return new NonConferenceReport
+                    {
+                        Schools = rows,
+                        HomeTotal = rows.Sum(r => r.Home), NeutralTotal = 0,
+                        RoadTotal = rows.Sum(r => r.Road), SeatedCount = 0,
+                    };
+                }
+
+                // ★ Every host below is Selling class, so its home requests are ANY and no
+                //   prestige bucket can decide the pick for the penalty. That matters: with
+                //   a bucketed class the candidates would already be filtered by prestige
+                //   and a control could pass for the wrong reason entirely.
+
+                // ── C16b — THE PENALTY BITES, AND IT IS THE PENALTY THAT BIT. ───────
+                //    A power host whose NEAREST legal candidate is three tiers down at 120
+                //    miles and whose next is one tier down at 200. Nearest-first takes the
+                //    low school; at 200 miles a tier the low school's effective distance is
+                //    120 + 400 = 520 and the highMid wins. The zero half is what separates
+                //    "the penalty works" from "the further school won anyway."
+                {
+                    var spec = new[]
+                    {
+                        (1, "power",   90, 0.0),
+                        (2, "low",      5, 120.0),
+                        (3, "highMid", 60, 200.0),
+                    };
+                    var w = Bench(spec);
+                    var r = BenchReport(spec, hostId: 1, hostHome: 1);
+                    var on = BuildNonConferenceMatching(w, r);
+                    var off = BuildNonConferenceMatching(w, r, tierPenalty: 0);
+                    // ★ Read the HOST'S OWN hosted pick, not the world's pair count: the
+                    //   candidate the host does not take still holds a road token, and
+                    //   phase 3 pairs that leftover off afterwards. Asserting a count of
+                    //   one here failed for a reason that had nothing to do with S108.
+                    int? Picked(MatchingReport mm) => mm.Pairs
+                        .Where(p => p.Kind == "Hosted" && p.HostSchoolId == 1)
+                        .Select(p => (int?)p.VisitorSchoolId).SingleOrDefault();
+                    Check("C16b: ★ the penalty BITES, and the zero half proves it was the " +
+                          "penalty — a power host whose nearest option is three tiers down " +
+                          "at 120 mi takes the one-tier-down school at 200 mi instead, and " +
+                          "takes the nearer one again with the penalty off",
+                          Picked(on) == 3 && Picked(off) == 2,
+                          $"penalty on -> S{Picked(on)}, off -> S{Picked(off)}");
+                }
+
+                // ── C16c — ONE TIER DOWN IS FREE. ──────────────────────────────────
+                //    Power host, highMid candidate at 110 miles, power candidate at 120.
+                //    Nothing is charged for one step, so the nearer school wins on plain
+                //    distance. A penalty missing its `-1` term would charge the highMid 200
+                //    and hand this to the power school — this is the control that catches it.
+                {
+                    var spec = new[]
+                    {
+                        (1, "power",   90, 0.0),
+                        (2, "highMid", 60, 110.0),
+                        (3, "power",   75, 120.0),
+                    };
+                    var w = Bench(spec);
+                    var r = BenchReport(spec, hostId: 1, hostHome: 1);
+                    var on = BuildNonConferenceMatching(w, r);
+                    var picked = on.Pairs
+                        .Where(p => p.Kind == "Hosted" && p.HostSchoolId == 1)
+                        .Select(p => (int?)p.VisitorSchoolId).SingleOrDefault();
+                    Check("C16c: ★ ONE TIER DOWN IS FREE — a power host takes the highMid " +
+                          "school 110 mi away over the power school at 120; nothing is " +
+                          "charged for the first step down",
+                          picked == 2,
+                          $"picked S{picked} (2 = the highMid at 110 mi)");
+                }
+
+                // ── C16d — THE STEP IS LINEAR: ONE PENALTY PER EXTRA TIER. ──────────
+                //    A power host with three candidates all at exactly 100 miles — highMid,
+                //    lowMid, low — must see effective distances 100, 100+P and 100+2P, so
+                //    filling three home requests takes them in exactly that order. This is
+                //    what separates the real formula from ANY monotone penalty: a flat "one
+                //    charge for anything below one tier" would tie lowMid and low at 100+P
+                //    and let ascending prestige order them, which puts the low school
+                //    (prestige 5) SECOND rather than third.
+                {
+                    var spec = new[]
+                    {
+                        (1, "power",   90, 0.0),
+                        (2, "highMid", 60, 100.0),
+                        (3, "lowMid",  30, -100.0),
+                        (4, "low",      5, 100.0000001),
+                    };
+                    var w = Bench(spec);
+                    var r = BenchReport(spec, hostId: 1, hostHome: 3);
+                    var on = BuildNonConferenceMatching(w, r);
+                    var order = on.Pairs.Where(p => p.HostSchoolId == 1)
+                        .Select(p => p.VisitorSchoolId).ToList();
+                    var equidistant = on.Pairs.All(p => p.DistanceKey == 100);
+                    Check("C16d: ★ THE STEP IS LINEAR — three candidates at exactly 100 mi " +
+                          "(highMid, lowMid, low) come off the shelf in effective order " +
+                          "100, 100+P, 100+2P; a penalty with no per-tier multiplier would " +
+                          "let prestige reorder the bottom two",
+                          equidistant && order.SequenceEqual(new[] { 2, 3, 4 }),
+                          $"order {string.Join(" -> ", order.Select(i => $"S{i}"))}, " +
+                          $"all at {(equidistant ? "100" : "mixed")} mi");
+                }
             }
 
             // ════════════════════════════════════════════════════════════════════

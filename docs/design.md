@@ -8668,7 +8668,7 @@ Three consequences follow, all honest, none of them defects:
 
 ★ **A BUCKET IS THE OPPONENT'S PRESTIGE, NOT ITS CLASS.** Easy (<25), Working (25–54), Decent (55–79), Name (80+), plus **ANY**, which every Selling home game uses and which never spills. Class carries S101's conference-tier floor and a bucket does not — which is why Northwestern at prestige 53 *schedules* like a Marquee school and *fills* somebody else's Working bucket. Mixes (Emmett's ruling, 2026-08-05; R8 constants at one seam): **Marquee 5E/2W/1D · Solid 3E/2W/1D · Working 2E/2W · Selling all ANY**, split into game counts by largest remainder with **ties to the lower bucket** (Marquee home 9 → 6/2/1; home 6 → 4/1/1, because Easy and Decent tie at .75). **The spill ladder runs up only**: E→W→D→N, one tier at a time, never down, N nowhere. A request whose whole ladder holds nothing legal becomes a short token.
 
-★ **THE FOUR PHASES, IN ORDER.** **(1) Top-down fill** — R4 as a pick order: Marquee → Solid → Working → Selling, inside a class by prestige then id, inside a school Easy first (buy-game demand claims scarce cupcake road capacity before showcase requests do). Each request takes the minimum by `(DistanceKey, prestige, id)`. **(2) Neutral pairing** — closest prestige first, then distance; a token with no partner (odd national parity or a legality dead end) **converts to an unrestricted home request and re-enters phase 1 immediately** rather than being discarded. **(3a) The same-season home-and-home** (S105, R41/R39) — tried first when a school comes up. **(3b) Bottom hosts bottom** (C-37) — leftover road games pair off and **the lower-prestige school hosts; equal prestige, the lower id.** Both sides spend a road token, so **a filler host's site mix moves and its game count does not**: it is on target, never over. **(4) Terminal repair** — anything still short is closed by a bounded **+1** game whose partner **hosts**, is preferred Selling then up the ladder, and is **used at most once**. No minimum-terminal claim is made.
+★ **THE FOUR PHASES, IN ORDER.** **(1) Top-down fill** — R4 as a pick order: Marquee → Solid → Working → Selling, inside a class by prestige then id, inside a school Easy first (buy-game demand claims scarce cupcake road capacity before showcase requests do). Each request takes the minimum by **`(effective distance, prestige, id)`** — where S108's tier penalty rides on the distance (below); before S108 the key was the plain `DistanceKey`. **(2) Neutral pairing** — closest prestige first, then distance; a token with no partner (odd national parity or a legality dead end) **converts to an unrestricted home request and re-enters phase 1 immediately** rather than being discarded. **(3a) The same-season home-and-home** (S105, R41/R39) — tried first when a school comes up. **(3b) Bottom hosts bottom** (C-37) — leftover road games pair off and **the lower-prestige school hosts; equal prestige, the lower id.** Both sides spend a road token, so **a filler host's site mix moves and its game count does not**: it is on target, never over. **(4) Terminal repair** — anything still short is closed by a bounded **+1** game whose partner **hosts**, is preferred Selling then up the ladder, and is **used at most once**. No minimum-terminal claim is made.
 
 ★ **LEGALITY, THE SAME FIVE TESTS EVERYWHERE:** different school; **not league-mates**; the unordered pair unused; the candidate holds the needed capacity (road tokens, neutral tokens, or — for the home-and-home — **two** road tokens); and the candidate has an S101 request.
 
@@ -8682,7 +8682,7 @@ Three consequences follow, all honest, none of them defects:
 
 ★ **ORACLE-FIRST, AND THE TWO PROOFS ARE DIFFERENT PROOFS.** `tools/matching_oracle.py` is the specification (its docstring is the authority) and was locked before any C# existed; `tools/matching_golden.json` carries the ordered pairing list, the full ledger, the S101 report it was built from, and a provenance block (world file hash, seed, report fingerprint, DistanceKey formula, oracle hash, pair count, ledger checksum). **C14 proves port fidelity; C1–C13 prove the policy's invariants; neither substitutes for the other** — a faithful port of a wrong policy passes C14, and a coherent policy implemented differently in the two languages passes C1–C13. C14a asserts the golden's embedded report against the live one, so a red C14 always means "the port is wrong" and never "the input moved." Every value in the golden is an integer or a string, which is why literal equality is the right bar.
 
-★ **THE STANDING FINDING: THE RULED TILT INVERTS AT THE BOTTOM, AND IT IS PRINTED, NOT TUNED.** C-40 says a power school flies and a small school buses. Measured on the trips schools actually take (stock): **Marquee 175 mi median / Solid 145 / Working 121 / Selling 249, p90 873.** Two structural mechanisms — in phase 1 the *host* picks its nearest opponent and the visitor has no say, and phase 3 then pairs the hardest-to-place leftovers at a 356-mile median. **Emmett ruled it stands as measured (2026-08-05, C-41)** and ruled the by-class line onto the page, so it cannot hide inside a healthy-looking national median of 148. Whoever revisits the tilt changes the pick key, not the page.
+★ **THE RULED TILT INVERTS AT THE BOTTOM — MEASURED, PRINTED, AND SINCE S108 PARTLY ADDRESSED.** C-40 says a power school flies and a small school buses. Measured on the trips schools actually take, **pre-S108** (stock): **Marquee 175 mi median / Solid 145 / Working 121 / Selling 249, p90 873.** Two structural mechanisms — in phase 1 the *host* picks its nearest opponent and the visitor has no say, and phase 3 then pairs the hardest-to-place leftovers at a 356-mile median. **Emmett ruled it stands as measured (2026-08-05, C-41)** and ruled the by-class line onto the page, so it cannot hide inside a healthy-looking national median of 148. ★ **S108 did what that ruling said the fix would be — it changed the pick key, not the page** (see the reach section below): the national median trip is now 167 mi and 12.1% of trips clear 500. **The bottom half of the tilt is untouched by design** — S108 charges nothing below the mid-major line, so phase 3's leftovers still travel farthest and C-41 stands as the standing read.
 
 ★ **THE PAGE.** Derived entirely from the report and valid on any world: the matched country by kind, spills and conversions, on-target / over-target named / unrepaired; the visitor trip median and p90 with filler separately and **neutrals excluded** (no site exists until the sites session, so there is no trip to measure); the trips-by-class table; the named eight's full Novembers; and **every filler pair with its mileage grouped by host — 177 lines on stock, deliberately**, because that is the surface C-37 is judged from. Percentiles are defined once and shared with the oracle: p90 is nearest-rank (`⌈0.9n⌉−1`), the median is the lower middle of an even sample, an empty sample renders `n/a`. Vocabulary: games, requests, tokens. Never "dates."
 
@@ -8704,7 +8704,10 @@ nothing else, a proximity-weakened cooldown, and a reach grab, all keyed on a **
 (season, school, request) rather than a seed**, so determinism becomes "nothing random beyond the season's
 own identity" and this section's parity guarantees survive intact. ★ **S103 built the memory it reads**: the
 pairing log now persists every non-conference pairing per season (see the contracts section below), which is
-what turns that session from a persistence build into a small ordering change.
+what turns that session from a persistence build into a small ordering change. ★ **S108 did not change this.**
+The tier penalty is a fixed function of two conference tiers, so it moves *which* opponent a host reaches for
+and not *whether the answer differs next season* — Oklahoma State now draws SMU and TCU every year instead of
+North Texas and Oral Roberts every year.
 
 ### Non-conference — contracts and the pairing log (S103; arc session 3, O-92)
 
@@ -11774,3 +11777,150 @@ later 10. Christmas week 0. Allocation bend 69.0, seating bend 292 week-steps. D
 - **Event windows resolve against a hardcoded season year** while the conference dater reads the
   year it is handed. Invisible at one season; at two, every window sits a year away from every
   league game. This is the first layer that reads both together.
+
+## Non-conference reach — a host pays in miles to schedule down (Session 108, 2026-08-09)
+
+**The spec is `tools/matching_oracle.py`** (its S108 docstring section is the authority);
+`PickRoadCandidate` in `Program.Season.Matching.cs` is the port, and Phase 93 C14b proves the
+two agree pair for pair.
+
+### The complaint, and the exact half of it this answers
+
+Emmett, reading Oklahoma State's first finished schedule (2026-08-09): *"Essentially I just want
+it to be not so geographically centered, but still an obvious theme. And not so gung ho to only
+schedule the dregs."* Two complaints in one sentence. **This layer answers the first and provably
+does not touch the second** — see the wall below, which is recorded here precisely so a future
+session does not re-claim it.
+
+### The rule
+
+Phase 1's pick used to take the plain nearest legal candidate. It now sorts on an **effective
+distance**: the real distance plus a flat penalty for every tier of separation **below** the host
+**beyond the first**.
+
+    sort_key = DistanceKey + MatchTierPenaltyMiles × max(0, rank(candidate) − rank(host) − 1)
+    rank: power 0, highMid 1, lowMid 2, low 3   (the S101 tier floor, inverted)
+
+★ **THE UNIT IS A REAL MILE.** `DistanceKey` is `floor(miles + 0.5)` — one key unit per mile — so
+"two tiers down costs you two hundred miles of preference" is literally true.
+
+★ **IT IS A PREFERENCE, NEVER A WALL.** It reorders the candidate list and removes nobody, so a
+host with nothing closer still takes the dreg. That is what keeps the pairing set whole (2,171 ± 1
+across the whole 0–600 sweep, **zero short tokens at every setting**) and what preserves R17's
+"yields when options run out."
+
+★ **IT IS ASYMMETRIC AND TOP-HEAVY BY CONSTRUCTION.** It charges for reaching **down** and never
+rewards reaching up; **one tier down is free**. So a power host pays for lowMid (×1) and low (×2);
+a highMid host pays only for low (×1); **a lowMid or low host pays nothing at all**, because low is
+one tier down. Measured: VCU's home slate is byte-identical at every setting from 0 to 600. This is
+a correction at the top of the market, not a national change.
+
+★ **THE WEAK-FIRST TIE-BREAK SURVIVES.** The key still ends `(…, prestige, id)`, so among candidates
+at equal *effective* distance the matcher still takes the weaker school. S108 fixes the cross-tier
+half of "gung ho for the dregs" and deliberately leaves the within-tier half alone. At 200 a tie on
+the minimum decides 4.4% of picks and prestige settles 4.3% of them.
+
+### ★ PHASE 1 ONLY — a ruling, not an oversight
+
+Four loops in `Program.Season.Matching.cs` order candidates on the same `(distance, prestige, id)`
+key. **Only `PickRoadCandidate` was changed**, and a future session that "applies the change
+consistently" would be changing something else entirely:
+
+- **Phase 3a (exchange partner) and 3b (filler)** run **bottom-up** — the seeker is the
+  lowest-prestige school with road left, so the penalty computes to zero for nearly every school
+  that reaches them, and the **host is not decided until after the pick**, by prestige.
+- **Phase 4 (terminal repair)**: the partner **hosts** the short-token owner, so the roles are
+  reversed.
+
+The penalty is about *a host reaching down for a visitor to bring in*. Nowhere else has that shape.
+
+### The constant, and why 200
+
+`MatchTierPenaltyMiles = 200` (Emmett's ruling, 2026-08-09), the knee of a measured
+0/100/200/300/400/600 sweep:
+
+| penalty | power hosts 3 tiers down | median road trip | trips > 500 mi | picks overridden | median extra miles |
+|---|---|---|---|---|---|
+| 0 | 62.5% | 140 | 10.2% | — | — |
+| 100 | 50.2% | 156 | 11.2% | 14.0% | 54 |
+| **200** | **46.6%** | **167** | **12.1%** | **17.8%** | **106** |
+| 300 | 46.6% | 174 | 12.9% | 19.2% | 134 |
+| 600 | 44.0% | 184 | 15.6% | 20.3% | 162 |
+
+★ **PAST 300 THE TIER MIX STOPS MOVING AND ONLY THE MILES GROW, AND THAT IS A SUPPLY FACT.** The
+country holds **302 highMid and 453 lowMid road tokens against 614 power home requests**. There are
+not enough mid-major road games in existence for power schools to stop buying low ones; the
+three-tiers-down share will not reach a third at any price. Raising the constant buys travel, not
+opponents.
+
+### ★ THE WALL — what this does NOT buy, measured and recorded so it is not re-claimed
+
+A power school's home slate **by the visitor's prestige** is **62.4 / 25.7 / 11.9 / 0.0%** (bands
+0–24 / 25–54 / 55–79 / 80+) and is **identical to the tenth of a percent at penalties 0, 100, 200,
+300, 400 and 600.**
+
+The reason is the bucket mix above: a Marquee school with nine home games is **told** to book six
+opponents under prestige 25 before any opponent is considered, so this ordering can only decide
+*which* sub-25 school comes. Oklahoma State hosts exactly six under-25 opponents at every setting —
+Grambling State, Central Arkansas and Pine Bluff survive all of them; what moved was the middle of
+the slate, from two lowMid to two highMid (North Texas and Oral Roberts → SMU and TCU), and the
+miles. **The prestige mix belongs to R8's constants, which the r4 addendum withdraws (R18/R20) and
+which are still live. That is O-100's session, not this one.**
+
+### The controls, and why four rather than one
+
+★ **A single check reading "the penalty changed something" would pass under any monotone penalty
+whatsoever, under a penalty with no `−1` term, and under one applied to the wrong side of the
+comparison.** Each Phase 93 control is built so exactly one thing satisfies it, and each carries
+its own zero-penalty half so it cannot be satisfied by *"the further school won anyway."*
+
+- **C16a — the zero path.** With the penalty switched off the matcher reproduces the **pre-S108
+  pairing exactly** (fingerprint carried in the golden's provenance and verified at emit time
+  against the committed pre-S108 pairs), so the new key structure moved no traversal order, no
+  tie-break, no legality and no enumeration. Everything that moves at 200 is the penalty. The ruled
+  constant is asserted against the golden's copy in the same check, so a C#/oracle drift names its
+  own cause instead of surfacing as hundreds of mismatched pairs in C14b.
+- **C16b — it bites, and the off-half proves it was the penalty.**
+- **C16c — one tier down is free.** A penalty missing its `−1` term fails here and nowhere else.
+- **C16d — the step is linear.** Three candidates at exactly 100 mi come off the shelf in tier
+  order; a flat "one charge for anything below one tier" would tie the bottom two and let prestige
+  reorder them.
+
+**Nothing here asserts a basketball value.** The trip medians, the tier split and the sweep are
+page and journal material; what is asserted is the *shape of the arithmetic*. Page-only calibration
+holds.
+
+### The calendar cost, ruled and accepted
+
+The new pairing is marginally harder to date. **One game in the country now finds no night:
+Lipscomb at Florida A&M**, classed by the dating layer as *search contention* — the game is legal,
+both schools want it, and their two calendars never have a free night in common (Florida A&M owes
+16 league games and 13 non-conference; Lipscomb 20 and 9). Games sliding off their intended week
+went 292 → 311 week-steps and those landing exactly on the curve's week 1,935 → 1,918.
+
+**Emmett ruled: accept it (2026-08-09, R-n9).** S106's "nothing unseated" was a ruled outcome and
+this unrules it deliberately — a November where one matchup genuinely cannot find a date is truer
+than one where every game always fits, and the layer already reports a shortfall rather than
+throwing. Phase 97 C2a asserts the arithmetic (2,170 dated + 1 reported = 2,171), never the value.
+
+### ★ THE ORACLE ROUND TRIP, CLOSED (the S106 debt this session paid)
+
+`tools/nonconference_dates_oracle.py` reads its world from a JSON file and **nothing in the repo
+produced that file** — S106 built it in a scratch session and the recipe left with the session, so
+the first time the matching moved the dating golden could not be regenerated at all. Likewise
+`emit_golden` had existed since S106 and was never called. Both are now committed:
+
+    dotnet run --project src\Charm.Harness\Charm.Harness.csproj -- dates-input worlds\stock-d1.world.json 20260720 tools\s106-in.json
+    python tools\nonconference_dates_oracle.py tools\s106-in.json tools\nonconference_dates_golden.json worlds\stock-d1.world.json
+
+★ **THE EMITTER IS NOT AN ORACLE AND MUST NEVER BECOME ONE.** It computes nothing — every field is
+copied out of a season run (the dated league slate, the seated event windows, the matcher's pairs in
+**the matcher's own emission order**, which the oracle indexes by position). The Python side still
+derives every date independently, which is what keeps C1c a real comparison between two
+implementations rather than the engine agreeing with itself. Authored event MM-DD is passed through
+**unresolved**; resolving it onto the season spine stays the oracle's (O-99's) job.
+
+**Proven before it was trusted:** with the penalty dialled to zero the whole round trip reproduces
+S106's hand-built golden **row for row, all 2,171 games, same dated fingerprint** — only the
+oracle's own file hash differs, because the file was edited.
+

@@ -1,3 +1,71 @@
+## Session 108 — REACH: A HOST PAYS IN MILES TO SCHEDULE DOWN. Emmett, reading Oklahoma State's first finished schedule: *"Essentially I just want it to be not so geographically centered, but still an obvious theme. And not so gung ho to only schedule the dregs."* Phase 1's pick now sorts on an **effective distance** — the real miles plus 200 for every tier of separation below the host **beyond the first** — so a power school pays to reach the low-majors, a high-major pays only for the bottom rung, and everyone from the mid-majors down pays nothing. National median road trip **140 → 167 mi**, trips over 500 **10.2% → 12.1%**, a power host's three-tiers-down share **62.5% → 46.6%**. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 93 C16a–d new.** ★ **THE GATE KILLED HALF THE SESSION'S PREMISE BEFORE A FILE WAS TOUCHED: the penalty cannot move the "dregs" half of that sentence at all, and this was measured rather than argued** — a power school's home slate by visitor *prestige* is 62.4/25.7/11.9/0.0% and is identical to the tenth of a percent at 0, 100, 200, 300, 400 and 600, because R8's bucket mix tells a Marquee school to book six sub-25 opponents before any opponent is considered. ★ **TWO OF THE PROMPT'S LOAD-BEARING ASSUMPTIONS WERE FALSE** — A1 ("the change lands in one ordering site") missed four inline minimum-loops sharing the identical key, and A3 ("matching reaches nothing but the page and Phase 93") missed `BuildPairingLog`. ★ **THE SATURATION IS A SUPPLY FACT, NOT A TUNING FAILURE**: 302 highMid + 453 lowMid road tokens against 614 power home requests, so past 300 only the miles grow. ★ **S106'S ORACLE ROUND TRIP WAS UNCLOSABLE AND IS NOW CLOSED** — the dating oracle's input file had no producer in the repo and `emit_golden` had never been called. ★ **Emmett unruled his own S106 "nothing unseated"** (R-n9). (2026-08-09)
+
+**Register:** arc session against `PROMPT-reach-s108-r3.md` (outside-reviewed, r3). Oracle-first. Gate held: full pull, every required read, all six assumptions attacked against live source, gate report delivered and **three calls returned by Emmett before a file was touched**.
+
+### ★ The gate finding that reshaped the session
+
+The prompt's mandate was Emmett's one sentence, and the sweep was run against the shipped matcher before anything was written. The geography half moved exactly as hoped. The dregs half did not move **at all**:
+
+| penalty | 0–24 | 25–54 | 55–79 | 80+ |
+|---|---|---|---|---|
+| 0 | 62.4% | 25.7% | 11.9% | 0.0% |
+| 100 / 200 / 300 / 400 / 600 | 62.4% | 25.7% | 11.9% | 0.0% |
+
+Not "roughly stable" — structurally frozen. **A Marquee school with nine home games is told by rule to book six opponents under prestige 25, two 25–54 and one 55–79 before any opponent is considered.** The distance sort can only decide *which* sub-25 school comes. Oklahoma State hosts exactly six under-25 opponents at every setting; Grambling State, Central Arkansas and Pine Bluff survive all of them. What moved was the middle of the slate (North Texas and Oral Roberts → SMU and TCU) and the miles.
+
+That mix is R8's constant — the thing the r4 addendum withdraws (R18/R20) and which is **still live in shipped code**. The prompt described the tier/prestige mismatch as "a deliberate simplification." It is not a simplification; it is a different lever. Emmett's ruling: **ship the geography half at 200, board the prestige half as O-100.**
+
+### The three calls Emmett returned at the gate
+
+1. **The constant** — 200, the knee of the curve.
+2. **Scope** — `PickRoadCandidate` only, not all four sites.
+3. **The dregs half** — accept that S108 does not move it; board it separately.
+
+### ★ Two false assumptions, both caught against live source
+
+**A1 was false.** The draft grepped `OrderBy` and found one site. There are **five** ordering loops, and **four share the byte-identical `(distance, prestige, id)` key** — the phase-1 pick, the same-season home-and-home partner search, the ordinary filler, and terminal repair. (The neutral pairing sorts on prestige gap first, a different rule.) So "the change lands in one place" became a **choice** rather than a fact, and it was surfaced as a choice. The reasoning for phase-1-only is now recorded in both languages beside the code: phases 3a/3b run **bottom-up** — the seeker is the lowest-prestige school with road left, so the penalty computes to zero for nearly everyone reaching them, and the host is not decided until *after* the pick — while phase 4's partner **hosts**, reversing the roles. A future session "applying the change consistently" would be building a different rule under this one's name.
+
+**A3 was incomplete.** `BuildPairingLog(contracts, matching)` is a fifth consumer of the matching. Nothing reads it back yet (O-94's future consumer) and the contract checks compare counts relationally on a tiny world, so no fingerprint moved — but the source comment claiming matching "reaches nothing but the page and Phase 93" was stale and is now corrected.
+
+**A2, A6 verified and one better than claimed.** Zero RNG in the matcher. The four tier words are the only ones authored in any world file, the Independent container is `low`, and **`NonConTierFloor` already maps exactly these four and already throws** — one stage earlier, in S101. So `MatchTierRank` was derived from it rather than authored a second time: a mapper over this vocabulary cannot drift from itself, and an unknown tier is refused before a single candidate is ordered. **Zero new crash surface**, where the prompt had budgeted for some.
+
+### The saturation is arithmetic
+
+Past 300 the tier mix stops moving and only the miles grow. The country holds **302 highMid and 453 lowMid road tokens against 614 power home requests**. There are not enough mid-major road games in existence for power schools to stop buying low ones — the three-tiers-down share will not reach a third at any price. Raising the constant buys travel, not opponents. Recorded because it is the number that stops a future session from "just turning it up."
+
+### Four controls, because one would have been decoration
+
+The S106 lesson (four of six mutations firing the wrong rule looked identical to a battery that worked) drove the shape here. **A single check reading "the penalty changed something" passes under any monotone penalty whatsoever, under a penalty with no `−1` term, and under one applied to the wrong side of the comparison.** So each control admits exactly one thing, and each carries its own zero-penalty half so it cannot be satisfied by *"the further school won anyway"*:
+
+- **C16a — the zero path**, against a fingerprint carried in the golden's provenance and verified **at emit time** against the committed pre-S108 pairs. 2,171 pairs identical. This is what separates "the penalty did this" from "the refactor did this," permanently, for every future session. The ruled constant is asserted against the golden's copy in the same check.
+- **C16b** — it bites, with the off-half as discriminator.
+- **C16c** — one tier down is free. A penalty missing its `−1` fails here and nowhere else.
+- **C16d** — the step is linear: three candidates at exactly 100 mi come off the shelf in tier order. A flat "one charge for anything below one tier" ties the bottom two and lets prestige reorder them.
+
+### ★ The S106 debt, found and paid
+
+`tools/nonconference_dates_oracle.py` reads its world from a JSON file and **nothing in the repo produced that file.** S106 built it in a scratch session and the recipe left with the session. `emit_golden` had existed since S106 and had **never been called.** The consequence was invisible until the first time the matching moved: the dating golden could not be regenerated at all without re-deriving the export from scratch. This is the same failure mode as the lost r4 addendum — *a step that lives only in a chat log is a step that will be redone wrong.*
+
+Both are now committed: a `dates-input` harness mode and an optional output path on the oracle. ★ **The emitter computes nothing and must never start** — every field is copied out of a season run, and the pairs are written in the matcher's own emission order because the oracle indexes by position. Authored event MM-DD is passed through **unresolved**; resolving it stays O-99's job. **Proven before it was trusted:** with the penalty dialled to zero the whole round trip reproduces S106's hand-built golden **row for row, all 2,171 games, same dated fingerprint**.
+
+### The calendar cost, and Emmett unruling his own ruling
+
+One game in the country now finds no night: **Lipscomb at Florida A&M**, classed *search contention* — legal, wanted, and their two calendars never share a free night (Florida A&M owes 16 league games and 13 non-conference; Lipscomb 20 and 9). Slides went 292 → 311 week-steps; games landing exactly on the curve's week 1,935 → 1,918.
+
+S106's "nothing unseated" was a **ruled** outcome, so this was put to Emmett as a ruling rather than absorbed as a side effect. **Emmett: "accept it" (R-n9).** A November where one matchup genuinely cannot find a date is truer than one where every game always fits, and the layer already reports a shortfall rather than throwing.
+
+### Errors this session, recorded as errors
+
+- **Two controls were over-asserted and went red on the first full run.** C16b and C16c asserted the *world's* pair count as 1, but the candidate the host declines still holds a road token and phase 3 pairs it off afterwards — so the bench legitimately made more than one game. The controls were reading the right thing for the wrong reason; fixed to read **the host's own hosted pick**. Caught by the sandbox run, before delivery. The underlying lesson is the flat-baseline one in another costume: *a hand-built bench is a simplification, and a simplification is an assumption.*
+- **Two prompt numbers were slightly off and one definition was unpinned**, corrected at the gate: trips over 500 mi is **10.2%** not ~9%; the three-tiers-down share is **62.5** not 62.7; and "dregs hosting dregs = 79" only reproduces at prestige **≤25** on both sides (<25 gives 62).
+- **The delivery was staged but not handed over**, and the session claimed files were ready when they were not reachable. Caught by Emmett continuing rather than by Claude.
+
+### What is deliberately NOT here
+
+The prestige/bucket mix (O-100) — the actual "dregs" lever. Conference challenges. Any change to phases 2, 3a, 3b or 4. Sites and sums. The `CoachProfile.ScheduleDifficultyBias` socket, which is the natural home for a school that *wants* a hard November and is still parked.
+
+---
+
 ## Session 106 — NIGHTS: EVERY NON-CONFERENCE GAME GETS A DATE. Until now a non-conference pairing carried an opponent and a host and nothing else — *"NO DATE, NO CITY, NO SeasonGame."* All 2,171 of them now have a night, so a school's year reads start to finish for the first time. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 97 new.** ★ **THE GATE FOUND AN ARITHMETIC WALL, NOT A SEARCH PROBLEM: all fourteen Independents were undatable under the curve as first drafted** — an Independent owes 29 games where a member owes 12 and draws its nights from the same November-heavy pool, so its busiest week wanted 5.5 games against a ceiling of 3. Proven by an optimistic test that gave each Independent its pick of every opponent's weeks and still failed by 2–5 games apiece. ★ **THE CAUSE WAS A ROUNDING FACT NOBODY HAD NAMED: a light weight is decoration.** January authored at weight 1–2 produced ZERO games — 0.30 of a game floors to nothing — so the whole country collapsed into eight weeks. Emmett ruled a real January tail; all fourteen fit. ★ **EMMETT SUPERSEDED PART OF HIS OWN R-n4**: quotas were ruled hard as the anti-front-fill cure, and are now hard-by-default and bendable-on-failure (**R-n8**), because 46 pairings shared a week in which their two calendars held no night in common. ★ **The measured front held anyway** — the authored shape is the shape produced. ★ **The parity test caught a bug in the SPEC, not the port**: the fingerprint matched on the first run and the allocation bend did not. (2026-08-08)
 
 **Register:** arc session against `PROMPT-nonconference-nights-s106-r3.md` (outside-reviewed, r3). Oracle-first. Gate held: every read, every §0 attack and the whole §3 sequence ran before a file was touched.
