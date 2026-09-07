@@ -155,7 +155,8 @@ internal static partial class Program
             seasonId,
             gameId,
             day,
-            HasHost: false);
+            HasHost: false,
+            PlaceId: e.PlaceId);   // ★ S109 — a showcase game is played in its event's city
     }
 
     // ── The charge ───────────────────────────────────────────────────────────────

@@ -11176,6 +11176,10 @@ prestige, played out to a full placement on the window's own nights, logged as a
 game, and its finishes written into the permanent record. The neutral floor arrives with it — a tournament
 game is hosted by nobody.
 
+> **S109.** These are CONSOLATION brackets — every team plays every round. The single-elimination
+> primitive (lose and go home, N−1 games) is a separate, dormant thing; see *The knockout primitive and
+> the city on the game* below. Nothing here reads it. A bracket game is played in its event's city.
+
 Four rulings from Emmett govern everything below:
 
 1. **The standings rank by win PERCENTAGE, not raw wins.** Schedules stop being uniform this session; a raw
@@ -11924,3 +11928,75 @@ implementations rather than the engine agreeing with itself. Authored event MM-D
 S106's hand-built golden **row for row, all 2,171 games, same dated fingerprint** — only the
 oracle's own file hash differs, because the file was edited.
 
+## The knockout primitive and the city on the game (Session 109, 2026-09-07)
+
+Session A of the conference-tournament arc. Two pieces of machinery, neither touching basketball.
+
+### The single-elimination bracket — dormant
+
+A bracket for a field of **2, 4, 8, 16, 32 or 64** — lose and go home, N−1 games, one champion, no
+consolation, no reseeding, no byes. **Nothing plays it.** The November tournaments still run the
+consolation tables above, and Phase 98 proves the dormancy on the stock season: every active four-team
+event plays 4, every eight-team 12, and the event-games fingerprint is unmoved. Session B (seed and run
+the conference tournaments) is the first consumer.
+
+**The pipeline is five separate steps and must stay so:** participants → entry round → initial bracket
+position → advancement → reseeding. Today the entry round is a constant (everyone enters round one), the
+position is the canonical seed line, advancement is the fold of that line, and reseeding holds the line.
+Each is its own small method because pods, protected seeds, divisional seeding, byes and stepladders each
+vary exactly one step. Two scope walls are written into the code: a build that can construct a field where
+seeds enter at different rounds has left scope, and so has reseeding between rounds.
+
+**The seed line is the contract, literally.** `line(2) = [1,2]`; `line(2k)` emits, for each seed `s` in
+`line(k)`, `s` then `2k+1−s`. So `line(8) = [1,8,4,5,2,7,3,6]`: opening games are consecutive pairs, and
+the tree folds them so 1 and 2 can meet only in the final, 1 and 4 sit in different semifinal regions.
+Two outside reviews each defeated a property-based contract ("1 and 2 on opposite sides", "top four in
+different quarters") with a legal-but-wrong bracket; the line is asserted verbatim and the fold with it.
+
+**Seeds are positional.** The caller hands in a seed order — index 0 is seed 1. Participant identities
+ride at their positions; the line works on seed numbers.
+
+**Refusals, by name, before any topology exists:** a field outside the closed set; a null, empty,
+short, long or duplicated seed order.
+
+**Closure by type.** One side of a game is a closed union of exactly two shapes — a seed, or the winner
+of an earlier game — with a private constructor. A game has exactly two sides and no loser destination.
+A loser edge and a three-input node are therefore unconstructible, and Phase 98 demonstrates that by
+reflection rather than trusting a comment.
+
+**Twelve invariants, each a named check, at every size** (Phase 98 C1): stable identity; two distinct
+inputs; inputs are seeds or earlier winners; no forward references; every non-final winner one
+destination; exactly one final; **no eliminated team re-enters**; no team on two live branches; every
+seed enters once at round one; one champion path of the right length; N−1 games; the canonical line and
+its fold. The validator runs over a **test-only raw topology** (any input count, any input kind) so the
+invariants closure already discharges can still be exercised — and it reports **every** rule that
+fires, never the first, so each negative control asserts the rule it names and that nothing lower
+tripped. The three named topology controls (1v2/3v4, the region swap, 1-and-2-in-a-semifinal) are
+rejected by rule 12 alone; the consolation table above is rejected by rule 7 in its own words.
+
+### The city on the game
+
+`SeasonGame` carries `PlaceId`, the city the game is played in, matching the world's school and event
+cities. It is deliberately not called a site or a venue so nobody later writes an arena into it.
+
+**Resolved at construction, at all three creation sites.** A league game: the home school's city. A
+bracket game: the event's city, threaded through the bracket plan. A showcase game: the event's city.
+There is no default and no repair.
+
+**Nullable in flight only.** The field is an optional parameter so the two existing `with` copies
+(identity stamping, dating) and every caller survive untouched — but a game may not rest unresolved. A
+named helper proves every game placed at exactly two structural boundaries: the assembled league
+schedule (before any tip, since bracket games are built during play and cannot be listed earlier) and
+the completed season result. Each refuses by boundary name; Phase 98 C6 drives an unresolved game
+through both.
+
+**Invisible to every hash.** All five fingerprints hash named fields; Phase 98 C7 asserts all five
+unmoved on a run carrying the field, and proves the invisibility by construction — the same schedule
+with every city rewritten hashes identically.
+
+**Page-only additions:** the non-conference dated fingerprint now prints beside the other four, and a
+`Cities:` line reads the count of placed games and distinct cities. Nothing is asserted from either.
+
+**Not here, by the wall:** non-conference pairings carry no city (they are not season games yet — the
+bridge session's); the bye question for the 19 leagues whose tournament fields are not powers of two is
+unruled and the primitive refuses those sizes rather than guessing.

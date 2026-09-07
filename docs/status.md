@@ -10,7 +10,17 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 108** (2026-08-09; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 93 C16a–d new**.
+Last updated: **Session 109** (2026-09-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 98 new, 133
+assertions**. **THE KNOCKOUT PRIMITIVE, DORMANT, AND THE CITY ON THE GAME** — Session A of the conference-tournament
+arc. A single-elimination bracket for fields of 2/4/8/16/32/64 (lose and go home, N−1 games), twelve invariants each a
+named check at every size, the seed line `[1,8,4,5,2,7,3,6]` asserted literally, a negative control per hole each
+proven to fire the rule it names, closure by reflection — and **nothing plays it yet**: every active four-team event
+still plays 4, every eight-team 12. Every played game now carries its city, proven at both structural boundaries.
+★ **ALL FIVE FINGERPRINTS UNMOVED**, asserted — `6f79d663…`, `46d89bf8…`, `7c1a41c1…`, `898d9fe8…`, `7ace22ed…`.
+★ **THIS BOARD'S FIFTH HASH WAS STALE** — `b75754bc…` below is S106's value; S108 moved it and the S109 prompt
+transcribed the stale line. Corrected in place. Journal S109 has the detail.)
+
+Previous: **Session 108** (2026-08-09; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 93 C16a–d new**.
 **REACH — A HOST PAYS IN MILES TO SCHEDULE DOWN.** Phase 1's pick now sorts on an **effective distance**: the real
 miles plus **200 for every tier of separation below the host beyond the first** (`MatchTierPenaltyMiles`). One tier
 down is free, so a power host pays for lowMid (×1) and low (×2), a highMid host pays only for low, and **a lowMid or
@@ -73,7 +83,7 @@ through.** ★ **The first negative-control battery was thrown out** — six mut
 **four fired the wrong rule** because they double-booked a school and R-n1 tripped first; R-n2, R-n3 and R-n6 were
 never exercised. Rebuilt so controls run hand-built calendars through the **same auditor** as the live season.
 Oracle is **fully deterministic — no RNG** (the scratch annealer stranded a game; the oracle seats all 2,171 in
-0.17s). New dated fingerprint **`b75754bc…`**, row-for-row parity across all 2,171 rows. **Unmoved:** `6f79d663…`,
+0.17s). New dated fingerprint **`b75754bc…`** *(S106's value — S108 moved it to `7ace22ed…`, the current stock value; see S109)*, row-for-row parity across all 2,171 rows. **Unmoved:** `6f79d663…`,
 `46d89bf8…`, `7c1a41c1…`, `898d9fe8…`, `matching_golden.json`, `contracts_golden.json` — additive by construction.
 **111 league back-to-backs survive** (the Ivy Friday/Saturday pair; non-zero is the assertion). Records **C-47**,
 **C-48**, **C-49**; opens **O-97**, **O-98**, **O-99**.))*
@@ -504,6 +514,14 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S109 — THE KNOCKOUT PRIMITIVE, DORMANT, AND THE CITY ON THE GAME (conference-tournament arc, Session A).**
+  `Program.Season.Knockout.cs` (new): single-elimination bracket for 2/4/8/16/32/64, five separated steps (entry
+  round and reseeding are named scope walls), seed line literal, every refusal by name. `PlaceId` on `SeasonGame`,
+  resolved at all three creation sites, proven at two boundaries by `AssertEveryGamePlaced`. Phase 98 (new): twelve
+  invariants × six sizes, controls per hole through a test-only raw topology with an all-rules validator, closure by
+  reflection, dormancy by event game counts, ★ all five fingerprints asserted unmoved. Page: non-conference dated
+  fingerprint and a `Cities:` line, both read-only. Nothing recaptured. Opens **O-102..O-105**.
 
 - **★ S105.2 — THE WEEKDAY/WEEKEND RULE.** At most one Mon–Fri and one Sat–Sun conference game per team per
   Mon–Sun week, pruned inside both date searches (oracle + `Program.Season.Dates.cs`), one weekend definition per
@@ -952,6 +970,24 @@ be run against a league with a real rotation, though the minute VALUES remain pl
 chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
+
+- **O-102 — ★ THE BYE RULING BLOCKS SESSION B (opened S109 planning, still unruled 2026-09-07).** `conf.csv`
+  gives 19 of 30 conferences tournament fields that are not powers of two (12, 6, 9…). The primitive refuses those
+  sizes by name. Emmett has not ruled between a temporary 8-team bracket for every league and bringing byes
+  (staggered entry) into this arc. **Session B's prompt cannot be drafted until he does.**
+- **O-103 — THE IVY ROW IS A DATA CONTRADICTION (S109 gate finding).** `conf.csv` authors the Ivy League at 0
+  tournament teams with an 11-day tournament offset. Unfixed, unruled, and it will surface the moment Session B
+  reads the field sizes.
+- **O-104 — NON-CONFERENCE PAIRINGS CARRY NO CITY.** `NonConDatedGame` is not a `SeasonGame`, so S109's place
+  field never reaches the 2,171 buy games. They get one when the bridge session makes them season games — not
+  before, and not by a second field on a record that is going away.
+- **O-105 — FOUR STALE "S107" FORWARD-REFERENCES IN HARNESS COMMENTS (cosmetic).** S107 was never a session
+  under that number; the comments point at work that landed under other names. Grep `S107` in `src/Charm.Harness`.
+  Fix when a session is already in those files.
+- **(unnumbered, from the S109 planning conversation)** the country still schedules too close to home — the r4
+  addendum's ranked shelves and prestige-scaled reach are **O-100's**, not a new item; and the same-season
+  home-and-home is filler shape, not a two-year series — nothing signs a contract. Both recorded here so they do
+  not fade; neither is a session yet.
 
 - **O-97 — Phase 93 C10's DETAIL STRING omits the exchange term (cosmetic, noticed in S105.1).** The
   assertion is correct and complete — `2·Hosted + 2·Neutral + 2·Filler + 2·Exchange + Terminal +
@@ -2057,24 +2093,17 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-★ **SITES AND NIGHTS — FINISH A SCHEDULE (O-92 session 6).** Emmett's direction, 2026-08-07: *"I'd like to see some
-schedules finished before I make any more tweaks."* Every non-conference pairing has an opponent and a host and
-**still has no date and no city**; the conference season has been dated since S94. This session joins them, so a
-school's year can be read start to finish for the first time. Scope belongs to the design conversation, but the
-material already parked for it is R9–R12, dates around conference play, the crowd model, ★ and the **SEMI-HOME**
-ruling — a third site category where the host keeps the advantage without playing on campus (the leg format's site
-WORD is already ready for it).
+★ **CONFERENCE TOURNAMENTS, SESSION B — SEED AND RUN THEM, CROWN THE CHAMPIONS.** Emmett confirmed the postseason
+order: conference tournaments → bridge session (make the 2,171 non-conference games simulate) → rankings → national
+bracket → stacked seasons. Session A (S109) shipped the dormant knockout primitive and the city on the game. Session B
+wires it: seed every league's field from the standings under the tiebreak ladder already ruled (head-to-head reverting
+to two-team procedure; tied blocks as single positions; deterministic draw keyed on season seed + canonicalized tied
+identities, never the running RNG; ranking slotted ahead of the draw once it exists), play the brackets on the calendar,
+crown the champions, record them.
 
-★ **THE TWEAKS ARE EXPLICITLY DEFERRED BEHIND IT, NOT DROPPED.** Both of the following were offered at the S105 docs
-step and Emmett deferred both in favour of seeing a finished schedule. Neither may fade from this board:
+★ **BLOCKED ON O-102.** Nineteen leagues need fields the primitive refuses. Emmett rules first — 8-team everywhere for
+now, or byes in this arc — and the Session B prompt is drafted against that ruling, through the usual §6 audit and
+outside review. Also to carry into that draft: O-103 (the Ivy row) will trip the moment field sizes are read.
 
-- **The Selling home band and the fill order** — the cause Emmett named directly (*"there just aren't enough low
-  schools hosting low schools"*) and the one thing S105 measured sharply and deliberately did not fix: sixty Selling
-  schools hosting 1.05 games each and busing 10.62 times, with every bottom-hosts-bottom game hosted by a *Working*
-  school because the top-down fill sells the bottom out before the filler opens. The class curve has been open for
-  Emmett to rule off the page since S101.
-- **The repeat ceiling and the recency demotion** — still a small session, still reading the S103 pairing log, still
-  blocked on O-94's ruling. It was the approved candidate before S105 and it keeps its place in the queue.
-
-★ **AND THE TIMING BOARD IS UNEXPLAINED.** S105's run reads 166.9s against S104.1's 446.3s baseline. It may be a
-different measurement rather than a real speedup. **Not guessed at** — check it before quoting either number.
+★ **DEFERRED BEHIND THE ARC, NOT DROPPED** — the Selling home band and fill order, the repeat ceiling and recency
+demotion (blocked on O-94), and O-100's ranked shelves. Each keeps its place in the queue.

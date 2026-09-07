@@ -204,6 +204,7 @@ internal static partial class Program
     private sealed record BracketPlan(
         int EventTier, int EventId, string EventName, int FieldSize,
         DateOnly FirstDay, DateOnly LastDay,
+        int PlaceId,                       // ★ S109 — the event's city, threaded so the factory can resolve it
         IReadOnlyList<int> SchoolBySeed,   // index 0 is seed 1
         IReadOnlyList<int> SeatBySeed);    // index 0 is seed 1
 
@@ -223,6 +224,7 @@ internal static partial class Program
         return new BracketPlan(
             e.Tier, e.EventId, e.Name, e.FieldSize,
             MteWindowDate(e.FirstDay), MteWindowDate(e.LastDay),
+            e.PlaceId,
             order.Select(s => s.SchoolId).ToList(),
             order.Select(s => s.Seat).ToList());
     }
@@ -288,7 +290,8 @@ internal static partial class Program
             seasonId,
             gameId,
             MteRoundDate(plan, route.Round, BracketRoutesFor(plan.FieldSize).Max(r => r.Round) + 1),
-            HasHost: false);
+            HasHost: false,
+            PlaceId: plan.PlaceId);   // ★ S109 — a neutral game is played in its event's city
     }
 
     // ── Playing them ─────────────────────────────────────────────────────────────

@@ -91,9 +91,18 @@ internal static partial class Program
     /// the safe-for-existing-code value and deliberately the DANGEROUS one for new code — a
     /// forgotten <c>false</c> would silently host a neutral game — which is why every
     /// tournament fixture is built in exactly one factory (MteBuildTournamentGame).</summary>
+    /// <remarks>★ S109 — <c>PlaceId</c> is the CITY the game is played in, matching
+    /// <c>WorldSchool.PlaceId</c> and <c>WorldEvent.PlaceId</c>; it is deliberately not
+    /// called a site or a venue so nobody later writes an arena into it. A hosted game is
+    /// played in its home school's city; an event game in its event's city. The field is
+    /// nullable IN FLIGHT only — so every existing <c>with</c> copy and this optional-
+    /// parameter shape survive — but a game may not REST unresolved: all three creation
+    /// sites resolve it at construction, and <c>AssertEveryGamePlaced</c> proves it at the
+    /// two structural boundaries. No fingerprint can see it (all five hash named fields).</remarks>
     private sealed record SeasonGame(string Kind, int HomeId, int AwayId,
                                      SeasonId? SeasonId = null, GameId? GameId = null,
-                                     DateOnly? Date = null, bool HasHost = true);
+                                     DateOnly? Date = null, bool HasHost = true,
+                                     int? PlaceId = null);
 
     /// <summary>★ S98 — ONE ORDERED PLAYED-GAME LIST, AND ITS INDEX IS THE FIXTURE ORDINAL.
     /// <c>PlayedGames[i]</c> is aligned one-to-one with <c>Results[i]</c> and
@@ -1277,6 +1286,9 @@ internal static partial class Program
         SeasonPreflight(world);
         var schools = world.Schools.OrderBy(s => s.Id).ToList();
         var rivals = schools.ToDictionary(s => s.Id, s => s.RivalId);
+        // ★ S109 — a hosted league game is played in its home school's city. Resolved here,
+        //   at construction, so no conference fixture ever exists without one.
+        var placeOfSchool = schools.ToDictionary(s => s.Id, s => s.PlaceId);
         var byConf = new Dictionary<int, List<int>>();
         foreach (var s in schools)
         {
@@ -1335,7 +1347,7 @@ internal static partial class Program
                 else terminalFallbacks++;
             }
             foreach (var (home, away) in slate.Games)
-                games.Add(new SeasonGame("conf", home, away));
+                games.Add(new SeasonGame("conf", home, away, PlaceId: placeOfSchool[home]));
         }
 
         memoryOutcome = new SeasonMemoryOutcome(
@@ -1344,6 +1356,10 @@ internal static partial class Program
         rotationOutcome = new SeasonRotationOutcome(
             history is not null, preferredHeld, rotatingLeagues, fellToFeasibility, terminalFallbacks,
             venuesGivenUp);
+
+        // ★ S109 — BOUNDARY ONE. The league schedule is complete here and nothing has tipped
+        //   off, so this is the pre-play guarantee: no game leaves this builder without a city.
+        AssertEveryGamePlaced(games, "BuildSeasonSchedule");
 
         if (history is null) return games;   // legacy mode: the fixtures stay unnumbered
         if (deferNumbering) return games;    // S97: the caller spends the number itself, later
@@ -1430,6 +1446,26 @@ internal static partial class Program
               .Append(games[i].AwayId.ToString(CultureInfo.InvariantCulture)).Append('\n');
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(sb.ToString()));
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    /// <summary>★ S109 — a constructed game may not REST with an unresolved city. Called at
+    /// exactly two structural boundaries (the assembled league schedule, and the completed
+    /// season result) as a PROOF of what the three creation sites already guarantee — it is
+    /// not a repair and never defaults. The boundary is named in the refusal so a leak
+    /// names its half of the season.</summary>
+    private static void AssertEveryGamePlaced(IEnumerable<SeasonGame> games, string boundary)
+    {
+        var i = 0;
+        foreach (var g in games)
+        {
+            if (g.PlaceId is null || g.PlaceId <= 0)
+                throw new InvalidOperationException(
+                    $"SEASON INVARIANT VIOLATED at {boundary}: game {i.ToString(CultureInfo.InvariantCulture)} " +
+                    $"({g.Kind} {g.HomeId.ToString(CultureInfo.InvariantCulture)} v " +
+                    $"{g.AwayId.ToString(CultureInfo.InvariantCulture)}) has no city. Every game carries a " +
+                    "PlaceId, resolved at construction; nothing may default it.");
+            i++;
+        }
     }
 
     // ── Season preparation: divvied rosters -> per-school depth rows, built once ──
@@ -1840,6 +1876,11 @@ internal static partial class Program
             seating, recordStatus, recordDiagnostic, eventHistory.Diagnostics,
             finishStatus, finishDiagnostic);
 
+        // ★ S109 — BOUNDARY TWO. Bracket games are built round by round DURING play, so no
+        //   complete played-game list exists before the first tip; the event half can only be
+        //   proven here, once. Every game that played carries a city.
+        AssertEveryGamePlaced(playedGames.Select(p => p.Game), "SeasonRunOutcome");
+
         return new SeasonRunOutcome
         {
             Schedule = schedule, Fingerprint = fingerprint, Results = results,
@@ -2074,6 +2115,18 @@ internal static partial class Program
                                   $"({run.TournamentGameCount} games)");
             Console.WriteLine($"Dated: season {SeasonDefaultStartYear}-{SeasonDefaultStartYear + 1}, " +
                               $"{decemberGames} December games, dated fingerprint {run.DatedFingerprint}");
+            if (run.NonConferenceDates.Games.Count > 0)
+                Console.WriteLine($"Non-conference dated fingerprint: {run.NonConferenceDates.DatedFingerprint} " +
+                                  $"({run.NonConferenceDates.Games.Count} pairings)");
+            // ★ S109 — PAGE-ONLY. Every played game carries a city; this line shows it.
+            //   Nothing here is asserted and no fingerprint can see the field.
+            {
+                var placed = run.PlayedGames.Select(p => p.Game.PlaceId).ToList();
+                Console.WriteLine($"Cities: every one of the {placed.Count} played games carries a city " +
+                                  $"— {placed.Distinct().Count()} distinct cities " +
+                                  $"({run.PlayedGames.Count(p => p.Game.HasHost)} hosted, " +
+                                  $"{run.PlayedGames.Count(p => !p.Game.HasHost)} neutral)");
+            }
             // ★ PAGE-ONLY AND RUNTIME-DERIVED. Every number on this line comes from the run
             //   that produced it; no measured league constant appears here, and a category
             //   word is printed where a raw exception message must never be. Legacy mode
