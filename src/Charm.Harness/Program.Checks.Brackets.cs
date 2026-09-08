@@ -340,9 +340,15 @@ internal static partial class Program
                       "conf\" must not become the contract",
                       tourney.All(p => string.Equals(p.Game.Kind, "mte", StringComparison.Ordinal))
                       && tourney.Count == 24);
-                Check("C5b: ★ and every one of them HAS NO HOST, while every conference game does",
+                //  ★ S110 — "not an event game" stopped meaning "a league game". A conference
+                //  tournament game carries no EventId and has no host, so the old `!IsEventGame`
+                //  form would have read a neutral-floor game as a hosted league fixture and gone
+                //  red for the right reason with the wrong name. IsLeagueGame states the
+                //  three-way split once.
+                Check("C5b: ★ and every one of them HAS NO HOST, while every LEAGUE game does " +
+                      "(neither an event game nor a conference tournament game)",
                       tourney.All(p => !p.Game.HasHost)
-                      && on.PlayedGames.Where(p => !p.IsEventGame).All(p => p.Game.HasHost));
+                      && on.PlayedGames.Where(p => p.IsLeagueGame).All(p => p.Game.HasHost));
                 Check("C5c: the nominal home side is the better ORIGINAL seed's school, and the away " +
                       "side the other — a box-score ordering, never a venue",
                       tourney.All(p => p.Game.HomeId != p.Game.AwayId));
@@ -401,13 +407,21 @@ internal static partial class Program
             using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
                 spentAfter = RawGameNumber(store.ReserveGames(1)[0]);
 
-            Check("C10b: ★ THE LEDGER SPENT EXACTLY conference count + reservation count, and every " +
-                  "reservation was consumed once — no unreserved id was used and no id was wasted",
+            //  ★ S110 — a THREE-term sum. The two-term form was a statement about a two-way
+            //    split; conference tournaments reserve their own block at the same commit, so
+            //    leaving the term out would let seven ids a league go unaccounted while the
+            //    check stayed green on this world (whose leagues are all too small to seat
+            //    eight, which is precisely why the omission would have hidden).
+            Check("C10b: ★ THE LEDGER SPENT EXACTLY conference count + event reservations + conference " +
+                  "tournament reservations, and every reservation was consumed once — no unreserved id " +
+                  "was used and no id was wasted",
                   spentAfter - spentBefore - 1 == ledger.ConferenceGameCount + ledger.TournamentGameCount
+                                                  + ledger.ConferenceTournamentGameCount
                   && ledger.PlayedGames.Select(p => p.Game.GameId!.Value.ToString()).Distinct().Count()
                      == ledger.PlayedGames.Count,
                   $"ledger advanced {spentAfter - spentBefore - 1} for " +
-                  $"{ledger.ConferenceGameCount}+{ledger.TournamentGameCount}");
+                  $"{ledger.ConferenceGameCount}+{ledger.TournamentGameCount}" +
+                  $"+{ledger.ConferenceTournamentGameCount}");
 
             //  ★ THE CAREER THE RECORD AND THE LOG ARE READ FROM USES THE WORLD AS AUTHORED,
             //    NOT every event forced on — because the record C8 round-trips must be MIXED,
@@ -457,18 +471,27 @@ internal static partial class Program
                 var log = GameLogReader.ReadFinalized(
                     logPath, new GameLogBindings(careerHistoryId, careerWorldFp, careerSeason,
                                                  career.Fingerprint));
+                //  ★ S110 — three terms, not two. See C10b: the omitted term would hide on this
+                //  world, whose leagues cannot seat eight.
                 Check("C6a: ★ the reader ACCEPTS the file — a season log with non-conference blocks in " +
                       "it is a legal log, and the ordinals are contiguous from zero",
                       log.Blocks.Count == career.ConferenceGameCount + career.TournamentGameCount
+                                          + career.ConferenceTournamentGameCount
                       && log.Blocks.Select((b, i) => b.Facts.FixtureOrdinal == i).All(x => x),
                       $"{log.Blocks.Count} blocks");
                 //  The game object and the block byte asserted SEPARATELY, because the claim is
                 //  that a non-conf Kind derives the byte with no production change (S97's writer
                 //  already computes it) — one assertion covering both would prove neither.
-                var tourneyOrdinals = career.PlayedGames.Where(p => p.IsEventGame)
-                                            .Select(p => p.FixtureOrdinal).ToHashSet();
-                Check("C6b: conference blocks carry the conference flag and tournament blocks do not",
-                      log.Blocks.All(b => b.Facts.IsConferenceGame != tourneyOrdinals.Contains(b.Facts.FixtureOrdinal)));
+                //  ★ S110 — the flag means "a LEAGUE game", so the complement is every game that
+                //  is not one: event games and conference tournament games alike. Written as the
+                //  league-ordinal set rather than the tournament one, because "not conference"
+                //  is now two things and the old two-way phrasing would silently start meaning
+                //  "conference OR conference tournament".
+                var leagueOrdinals = career.PlayedGames.Where(p => p.IsLeagueGame)
+                                           .Select(p => p.FixtureOrdinal).ToHashSet();
+                Check("C6b: LEAGUE blocks carry the conference flag and nothing else does — neither an " +
+                      "event game nor a conference tournament game",
+                      log.Blocks.All(b => b.Facts.IsConferenceGame == leagueOrdinals.Contains(b.Facts.FixtureOrdinal)));
                 Check("C6c: every tournament GameId appears exactly once in the log",
                       career.PlayedGames.Where(p => p.IsEventGame)
                             .All(p => log.Blocks.Count(b => b.Facts.GameId.Equals(p.Game.GameId!.Value)) == 1));

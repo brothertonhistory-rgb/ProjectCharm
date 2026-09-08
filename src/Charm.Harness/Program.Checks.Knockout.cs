@@ -531,15 +531,29 @@ internal static partial class Program
             //  C7 — ★ THE FINGERPRINT WALL, ALL FIVE, ASSERTED RATHER THAN TRUSTED.
             // ════════════════════════════════════════════════════════════════════
             {
-                var resultsFp = SeasonFingerprint(stockRun.Results, stockRun.PossessionCounts);
+                //  ★ S110 — the results hash over the league-plus-event PREFIX. S110 appends 217
+                //  conference tournament games after the last showcase; the prefix is the same
+                //  season S109 hashed, so this golden stays UNMOVED rather than being recaptured.
+                //  See the note on Phase 93 C9. C7g below is the discriminator that keeps the
+                //  slice honest.
+                var prefix = stockRun.ConferenceGameCount + stockRun.TournamentGameCount;
+                var resultsFp = SeasonFingerprint(
+                    stockRun.Results.Take(prefix).ToList(),
+                    stockRun.PossessionCounts.Take(prefix).ToList());
                 Check("C7a: #1 the conference schedule fingerprint is unmoved", stockRun.Fingerprint == MatchGoldenConferenceFp, stockRun.Fingerprint[..8] + "…");
                 Check("C7b: #2 the conference DATED fingerprint is unmoved (the one the brief missed)", stockRun.DatedFingerprint == MatchGoldenDatedFp, stockRun.DatedFingerprint[..8] + "…");
                 Check("C7c: #3 the event-games fingerprint is unmoved", stockRun.EventGamesFingerprint == MatchGoldenEventGamesFp, stockRun.EventGamesFingerprint[..8] + "…");
-                Check("C7d: #4 the results+possessions fingerprint is unmoved", resultsFp == MatchGoldenResultsFp, resultsFp[..8] + "…");
+                Check("C7d: #4 the results+possessions fingerprint is unmoved over the league-plus-event prefix", resultsFp == MatchGoldenResultsFp, resultsFp[..8] + "…");
                 Check("C7e: #5 the non-conference DATED fingerprint is unmoved", stockRun.NonConferenceDates.DatedFingerprint == KnockoutGoldenNonConDatedFp,
                       stockRun.NonConferenceDates.DatedFingerprint[..8] + "…");
                 Check("C7f: ★ and the place field is invisible to every hash BY CONSTRUCTION — the same schedule with every city rewritten hashes identically",
                       ScheduleFingerprint(stockRun.Schedule.Select(g => g with { PlaceId = 999999 }).ToList()) == stockRun.Fingerprint);
+                Check("C7g: ★ the discriminator for C7d — the season really did play past the slice, so " +
+                      "C7d is a PREFIX of something longer rather than the whole list wearing a Take()",
+                      stockRun.Results.Count > prefix
+                      && stockRun.Results.Count == prefix + stockRun.ConferenceTournamentGameCount,
+                      $"{stockRun.Results.Count} results = {prefix} prefix + " +
+                      $"{stockRun.ConferenceTournamentGameCount} conference tournament");
             }
 
             // ════════════════════════════════════════════════════════════════════

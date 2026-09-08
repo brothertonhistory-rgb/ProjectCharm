@@ -10,7 +10,21 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 109** (2026-09-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 98 new, 133
+Last updated: **Session 110** (2026-09-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 99 new, 43
+assertions; Phase 98 now 134**. **THE CONFERENCE TOURNAMENTS — 31 LEAGUES, 31 CHAMPIONS**, Session B of the arc and the
+S109 primitive's first consumer. Emmett ruled **eight everywhere** (`TourneyTeams` stays authored and unread), so 217
+games play on the nights each league's authored `TourneyOffsetDays` already implied, seeded from the **league record
+only** — never the whole-season record, which already includes MTE games. ★ **ALL FIVE PRIOR FINGERPRINTS UNMOVED AND
+NOTHING RECAPTURED**: the results hash was **narrowed to the league-plus-event prefix** rather than recaptured, which
+keeps the pre-S102 golden alive as proof instead of destroying it, and a **sixth** hash `7291ee18…` is born for the
+tournaments alone. ★ **THIS BOARD'S "TIEBREAK LADDER ALREADY RULED" WAS A FICTION** — head-to-head, tied blocks and the
+deterministic draw appeared in exactly one line of the whole repo, the old Next-candidate block below, written from a
+session summary; **nothing in journal.md or design.md corroborated any of it**. Corrected in place and demoted to a
+ruled placeholder with a named successor (O-107). ★ **A HARD "EVERY LEAGUE SEATS EIGHT" ASSERT WOULD HAVE KILLED THE
+SUITE** — every fixture world has leagues of five and six — so a short league holds **no** tournament, counted and
+reported. Journal S110 has the detail.)
+
+Previous: **Session 109** (2026-09-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 98 new, 133
 assertions**. **THE KNOCKOUT PRIMITIVE, DORMANT, AND THE CITY ON THE GAME** — Session A of the conference-tournament
 arc. A single-elimination bracket for fields of 2/4/8/16/32/64 (lose and go home, N−1 games), twelve invariants each a
 named check at every size, the seed line `[1,8,4,5,2,7,3,6]` asserted literally, a negative control per hole each
@@ -515,6 +529,22 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S110 — THE CONFERENCE TOURNAMENTS: 31 LEAGUES, 31 CHAMPIONS (arc, Session B).**
+  `Program.Season.ConferenceTournaments.cs` (new): eight-team fields in every league that can seat one, seeded on the
+  **conference record derived from the schedule** (never `run.Wins`, which includes MTE games; never
+  `ConferenceId == ConferenceId`, which would classify the tournament as league play), handed to the S109 primitive,
+  played last after the showcases so no existing engine seed moves. Ids reserved by **count** at the same commit, seven
+  per seating league. Kind `"ctourney"` — a third kind of played game, so `PlayedSeasonGame` gained
+  `IsConferenceTournamentGame`/`IsLeagueGame` and three existing checks were taught the three-way split. Champions are
+  first-class state. `Program.Checks.ConferenceTournaments.cs` (new, Phase 99): the MTE-blindness discriminator (28 of
+  31 leagues seed differently under the whole-season record), non-contamination, the exact elimination distribution,
+  participant conservation (124/62/62, 434 team-games), id-walk identity, both placeholders asserted as ruled.
+  ★ Five fingerprints unmoved, **the results hash narrowed to a prefix at all three sites rather than recaptured**, a
+  sixth born (`7291ee18…`) and proven to see both venue and night. Closes **O-102** and **O-103** by ruling; opens
+  **O-106**, **O-107**, **O-108**. ★ Two reds during the build, both authoring errors on a correct engine: a fifth
+  results-hash assertion site the audit missed (grep the *function*, not the constants), and a check comparing against
+  games-per-league where it needed games-per-team.
+
 - **★ S109 — THE KNOCKOUT PRIMITIVE, DORMANT, AND THE CITY ON THE GAME (conference-tournament arc, Session A).**
   `Program.Season.Knockout.cs` (new): single-elimination bracket for 2/4/8/16/32/64, five separated steps (entry
   round and reseeding are named scope walls), seed line literal, every refusal by name. `PlaceId` on `SeasonGame`,
@@ -971,13 +1001,20 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-102 — ★ THE BYE RULING BLOCKS SESSION B (opened S109 planning, still unruled 2026-09-07).** `conf.csv`
-  gives 19 of 30 conferences tournament fields that are not powers of two (12, 6, 9…). The primitive refuses those
-  sizes by name. Emmett has not ruled between a temporary 8-team bracket for every league and bringing byes
-  (staggered entry) into this arc. **Session B's prompt cannot be drafted until he does.**
-- **O-103 — THE IVY ROW IS A DATA CONTRADICTION (S109 gate finding).** `conf.csv` authors the Ivy League at 0
-  tournament teams with an 11-day tournament offset. Unfixed, unruled, and it will surface the moment Session B
-  reads the field sizes.
+- **O-106 — ★ CONFERENCE TOURNAMENTS HAVE NO REAL NEUTRAL SITE (S110 placeholder, ruled temporary).** R1 puts all
+  seven of a league's games in the **original No. 1 seed's city**, frozen, nobody hosting. Emmett: *"we will add in
+  neutral locations later."* `WorldConference` carries no place at all, so the successor is authored per-conference
+  venues in the world file. **Recorded as a placeholder on purpose** — it must not fade into architecture.
+- **O-107 — ★ CONFERENCE TIEBREAKING IS UNRULED AND NEEDS ITS OWN DESIGN OBJECT (S110 gate finding).** R2 seeds on
+  conference win percentage then lower school id — deterministic, canonical, and **an acknowledged placeholder**.
+  ★ The head-to-head ladder this board previously described as "already ruled" **was never ruled**: it appeared in
+  exactly one line of the repo, written from a session summary, with nothing in journal.md or design.md behind it.
+  The real object is two-way vs multi-way ties, unbalanced schedules, partial separation of a tied block, and what
+  happens when head-to-head cannot resolve — ruled against a page full of real ties. Ranking slots ahead of any draw
+  once rankings exist.
+- **O-108 — TWO SUITE SECTIONS RUN UNGATED (S110 gate finding, cosmetic-ish).** `ObservationRunV1` and
+  `StressTestArchetypeRosters` are `SuiteTimed(…)` calls **without** `ok &=`, so their verdict is discarded. Both
+  lambdas return an unconditional `true`, so folding them in is a behavioural no-op. S110.1 does it.
 - **O-104 — NON-CONFERENCE PAIRINGS CARRY NO CITY.** `NonConDatedGame` is not a `SeasonGame`, so S109's place
   field never reaches the 2,171 buy games. They get one when the bridge session makes them season games — not
   before, and not by a second field on a record that is going away.
@@ -1836,6 +1873,19 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-51 (S110, Emmett's ruling, 2026-09-07) — EIGHT TEAMS IN EVERY CONFERENCE TOURNAMENT. Closes O-102.**
+  *"All I want is eight everywhere. We will deal with byes and all the complicated conference tournaments later."*
+  So **`TourneyTeams` is authored and unread**, exactly as `TDay1..5` are; nineteen leagues author a
+  non-power-of-two field and all of them play eight. **Byes stay out of scope and the primitive still refuses
+  non-power-of-two fields by name** — unconstructible, not merely unused. Do not weaken that refusal or add a
+  staggered-entry path without a fresh ruling.
+
+- **C-52 (S110, consequence of C-51, 2026-09-07) — THE IVY ROW IS DORMANT, NOT FIXED. Closes O-103.**
+  `conf.csv` still authors the Ivy League at 0 tournament teams with an 11-day offset, and that contradiction is
+  still there. It is harmless **only because nothing reads the field size** — the Ivy plays eight like everyone
+  else. ★ It comes back the day a session reads `TourneyTeams`. Also: **Independent is identified by `Games == 0`,
+  never by `TourneyTeams == 0`** — that test would catch the Ivy row too and silently drop a real league.
+
 - **C-49 (S106, Emmett's ruling, 2026-08-08) — TWO INDEPENDENTS MAY NOT MEET BEFORE JANUARY 1.**   Those schools
   play each other during everyone else's conference season, never in November or December. **Verified free**: with
   those games barred from Nov/Dec all fourteen Independents still date their full 29-game slates. Note the ruling
@@ -2093,17 +2143,33 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-★ **CONFERENCE TOURNAMENTS, SESSION B — SEED AND RUN THEM, CROWN THE CHAMPIONS.** Emmett confirmed the postseason
-order: conference tournaments → bridge session (make the 2,171 non-conference games simulate) → rankings → national
-bracket → stacked seasons. Session A (S109) shipped the dormant knockout primitive and the city on the game. Session B
-wires it: seed every league's field from the standings under the tiebreak ladder already ruled (head-to-head reverting
-to two-team procedure; tied blocks as single positions; deterministic draw keyed on season seed + canonicalized tied
-identities, never the running RNG; ranking slotted ahead of the draw once it exists), play the brackets on the calendar,
-crown the champions, record them.
+★ **THE BRIDGE SESSION — MAKE THE 2,171 NON-CONFERENCE GAMES SIMULATE.** Emmett's postseason order:
+conference tournaments (✅ S110) → **bridge** → rankings → national bracket → stacked seasons. Every non-conference
+pairing is matched, hosted, contracted and dated, and **not one of them is ever played**: they exist only as
+`NonConDatedGame` records. Until they do, a school's record is its league slate plus whatever event it drew, which is
+why the top of the standings reads flat (Kansas 6-10 at prestige 97; Duke 6-10 at 98, having played sixteen ACC games
+and nothing else, and therefore missing its own tournament). **That is the missing bridge, not a prestige bug** — do
+not go hunting for one. Rankings cannot be meaningful before this lands, so it sits ahead of them in the order.
 
-★ **BLOCKED ON O-102.** Nineteen leagues need fields the primitive refuses. Emmett rules first — 8-team everywhere for
-now, or byes in this arc — and the Session B prompt is drafted against that ruling, through the usual §6 audit and
-outside review. Also to carry into that draft: O-103 (the Ivy row) will trip the moment field sizes are read.
+Carry into that draft: **O-104** (those pairings get a `PlaceId` when they become season games — not before, and not
+by a second field on a record that is going away), and the S110 precedent for where new games sit in the fixture
+order and how their ids are reserved.
+
+★ **A CORRECTION THIS BOARD OWES ITSELF (S110 gate finding).** The block that stood here claimed the conference
+tiebreak ladder was "already ruled" — head-to-head reverting to a two-team procedure, tied blocks as single
+positions, a deterministic draw keyed on the season seed. **None of that was ever ruled.** It appeared in this one
+line, written during S109's own docs step from a session summary, and nothing in journal.md or design.md
+corroborated any of it. S110 shipped the deterministic placeholder instead and boarded the real thing as **O-107**.
+The lesson is S81.3's in a new costume: **a hypothesis written onto the board reads like a ruling one session
+later.** When this block asserts that something is settled, it must name where the ruling is recorded.
+
+★ **A MICRO-SESSION IS QUEUED AHEAD OF IT — S110.1, THE PHASE SELECTOR.** The suite is all-or-nothing, so any
+re-check costs a full pass; S110 spent four of them. `-- checks 99` should cost the 57s that phase costs. One
+canonical registry driving both the full walk and any selection, a partial run structurally incapable of printing
+`ALL CHECKS PASSED`, and Phase 100 guarding the registry by reflection in both directions — because a *missing*
+phase makes the suite faster and greener, which is exactly the S88 bug (Phase 79 shipped unregistered and never
+executed once). Also closes **O-108**. Prompt drafted and outside-reviewed; ~10 min saved per re-check on Emmett's
+machine, which is ~1.75× faster than the sandbox.
 
 ★ **DEFERRED BEHIND THE ARC, NOT DROPPED** — the Selling home band and fill order, the repeat ceiling and recency
 demotion (blocked on O-94), and O-100's ranked shelves. Each keeps its place in the queue.

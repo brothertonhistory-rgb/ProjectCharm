@@ -12000,3 +12000,139 @@ with every city rewritten hashes identically.
 **Not here, by the wall:** non-conference pairings carry no city (they are not season games yet — the
 bridge session's); the bye question for the 19 leagues whose tournament fields are not powers of two is
 unruled and the primitive refuses those sizes rather than guessing.
+
+## Conference tournaments — thirty-one leagues, thirty-one champions (Session 110, 2026-09-07)
+
+Session B of the arc, and the knockout primitive's first consumer. Every league that can seat eight
+seeds a field, plays it out, and crowns a champion. 217 games on the stock world.
+
+### The field: eight everywhere
+
+**Emmett's ruling (2026-09-07):** *"All I want is eight everywhere. We will deal with byes and all the
+complicated conference tournaments later."* So **`TourneyTeams` is authored and unread**, exactly as
+`TDay1..5` are — nineteen leagues author a non-power-of-two field and all of them play eight. Byes stay
+out of scope, and the primitive still **refuses** non-power-of-two fields by name: unconstructible, not
+merely unused. This dissolves the Ivy contradiction (O-103) without fixing it — nothing reads the field
+size, so the Ivy plays eight.
+
+**Independent is identified by `Games == 0`**, the way the season already does it everywhere else.
+Deliberately **not** by `TourneyTeams == 0`, which would also catch the Ivy row and silently drop a real
+league.
+
+**A league with fewer than eight members holds NO tournament**, and the count of such leagues is carried
+out on the run outcome rather than vanishing. This is not a weakening of "seat exactly eight": the gate is
+checked before the take, the take is asserted after it, and a short field handed straight to the seater is
+refused by name. It exists because every fixture world in the tree has leagues of five and six, and those
+worlds run full seasons across dozens of phases — a hard assert would take the suite down and would also
+break the fixture zero paths that several phases depend on.
+
+### The record that seeds is the LEAGUE record
+
+`run.Wins`/`run.Losses` are **whole-season** and already include MTE games, so seeding off the standings
+would let a Maui run move ACC seeding. Seeding therefore runs on records derived from the season's own
+conference schedule and the results aligned to it.
+
+★ **Derived from the SCHEDULE, never from "both schools share a conference."** That test would classify
+the tournament's own games as league play the moment they are played, and the non-contamination check
+would then be comparing a contaminated number to itself. The source-derived slate is authoritative and the
+tournament games are simply not in it. The schedule/results alignment is **asserted**, not assumed — it is
+the one premise the layer rests on.
+
+Order is by conference win percentage, **integer cross-multiplication** widened to `long` (never a float,
+so the ordering is exact and platform-independent), ties to the **lower school id**. The order is handed
+to `BuildKnockoutBracket(8, …)` and the canonical line is **not re-derived** — round one is 1v8, 4v5, 2v7,
+3v6, folding so seeds 1 and 2 can meet only in the final.
+
+### Two ruled placeholders, both temporary by explicit intent
+
+Emmett, 2026-09-07: *"Those are fine with me for now, we will add in neutral locations and tiebreakers
+later."* Both are recorded as placeholders with named successors so neither fades into architecture.
+
+- **R1 — the venue.** The **original No. 1 seed's city, resolved once per conference and frozen**: all
+  seven games carry that one `PlaceId`. Not the higher seed per matchup, not the highest survivor per
+  round — a conference tournament does not travel. Nobody hosts (`HasHost: false`), so no home-court
+  advantage and no hosted-game accounting; the shave counter still equals the league slate exactly.
+  `WorldConference` carries no place, which is why the No. 1 seed's school supplies it.
+  **Successor: real neutral sites, authored per conference (O-106).**
+- **R2 — seeding ties.** Conference win percentage, then the lower school id — deterministic and already
+  this codebase's canonical tie-break. ★ **An acknowledged placeholder:** the head-to-head ladder that
+  `status.md` once described as "already ruled" is in no ruling. It appeared in exactly one line of the
+  whole repo, written from a session summary; nothing in journal.md or design.md corroborates any
+  head-to-head procedure, tied-block handling or deterministic draw.
+  **Successor: real conference tiebreaking as its own design object (O-107).**
+
+Neither may be quietly widened. A city that varies by round, or a tie broken by anything other than school
+id, is out of scope even if it looks more realistic.
+
+### The nights were not invented
+
+`TourneyOffsetDays` is live: the conference dater already walls each league's last league game at
+`SelectionSunday − offset − 1`. So **`tournamentOpen = SelectionSunday − offset`**, and the league's last
+legal game is the day before it **by construction** rather than by a check. Rounds are consecutive: open,
+open + 1, open + 2. `TDay1..5` stay unread. Leagues stagger deliberately (13 at 11 days, 12 at 4, 6 at 8 on
+stock — three distinct opens) and overlap freely; they are on separate floors. A league that plays a slate
+but authors no tournament day is refused by name rather than given an invented one.
+
+### Where they sit in the season
+
+★ **Executed LAST, after the showcases.** The fixture ordinal is both the engine seed input and the
+retention log's ordinal, so conference games hold 0..N−1, event games append after them, and these append
+after those. Slotting them anywhere earlier would slide every event game's ordinal along and re-roll every
+tournament result in the country. Ids are reserved by **count** at the same commit (seven per seating
+league, after the MTE slots), because the pairings are unknown then — round two is round one's result — so
+an id belongs to a **position**, not a team. The reservation walk and the play walk are the same walk:
+ascending conference id, then topology game index 0→6.
+
+★ **A third kind of played game.** `Kind` is `"ctourney"`. The retention log's conference flag keys on the
+literal `"conf"`, and `"mte"` is asserted by name to mean an event fixture. Consequently **"not an event
+game" stopped meaning "a league game"**: `PlayedSeasonGame` gained `IsConferenceTournamentGame` and
+`IsLeagueGame`, and three existing checks were taught the three-way split (the hostless assertion, the id
+ledger, the retention block count — the last two were two-term sums and are now three).
+
+★ **§2g — a conference tournament game is an ordinary played season game.** It counts in the overall
+record, results, possession counts and every player and team statistic, exactly as an MTE game already
+does. It is excluded from **one** thing only: the conference-only record above. Asserted as arithmetic —
+every school's overall record equals league + event + tournament games.
+
+**Champions are first-class state**, held on the run outcome and read by the page. Nothing reconstructs a
+champion by inspecting seven games.
+
+### The sixth fingerprint
+
+★ **The conference tournaments got their own hash and did not land inside anybody else's.** The
+event-games hash covers the world event pool and S104's zero-path-by-subtraction proof depends on it
+meaning exactly that; if these games landed in it, that proof would quietly stop meaning anything while
+every check stayed green.
+
+★ **The same argument applies to the results+possessions hash, so it was NARROWED rather than recaptured.**
+All three sites that assert it now do so over the **league-plus-event prefix**, where it still reproduces
+the value captured from trees that predate this session. Recapturing would have destroyed the golden it
+exists to be. Each site carries a discriminator proving the slice really is a prefix of something longer —
+without that, the check is a season compared to itself.
+
+The new hash's canonical row is `conferenceId, round, gameIndex, date, placeId, seedA, seedB, schoolA,
+schoolB, winner`. A hash of results alone would not catch a venue or a date regression, and the checks
+prove it sees both by moving one city and one night. It hashes only integers and dates, so unlike S81.3's
+fixture it is **portable by construction** and reproduces across platforms.
+
+### What Phase 99 discriminates on
+
+Every completeness and conservation check passes whether the seeding read the league record or the
+whole-season record. So the seeding rule is defended directly: the two orders are computed side by side
+and **28 of 31 leagues seed differently** under the whole-season record. Non-contamination is proven by
+recomputing the conference record after all 217 games and getting the records used before them.
+
+★ **The exact elimination distribution** — one team 3 games / 3 wins, one 3/2, two 2/1, four 1/0, in every
+league — simultaneously proves nobody was replayed, nobody skipped a round, every advancement link fired
+and exactly seven results fed the bracket. A per-league game count proves none of that.
+**Participant conservation:** 124 schools +1, 62 +2, 62 +3, everyone else untouched — 434 team-games.
+**Id identity:** a mismatched walk still spends 217 ids and plays 217 games, so only comparing positions
+catches it.
+
+*Page-only calibration holds — no champion, seed or win total is asserted as a target anywhere.*
+
+### Not here, by the wall
+
+Byes, auto-bids, rankings, the national bracket, making the 2,171 non-conference games simulate,
+`TourneyType`/`SeedDiv`/divisional seeding, authored conference venues. **A champion is crowned, recorded,
+and feeds nothing.**

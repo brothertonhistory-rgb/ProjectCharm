@@ -117,13 +117,27 @@ internal static partial class Program
     private sealed record PlayedSeasonGame(
         SeasonGame Game, int FixtureOrdinal,
         int? EventTier = null, int? EventId = null, int? BracketGameIndex = null,
-        int? HomeOriginalSeed = null, int? AwayOriginalSeed = null)
+        int? HomeOriginalSeed = null, int? AwayOriginalSeed = null,
+        int? ConferenceTournamentId = null, int? ConfTourneyGameIndex = null)
     {
         /// <summary>★ S104 — RENAMED from IsTournament, because after this session the old
         /// name is a lie: a showcase game carries an EventId too. Every existing caller wants
         /// "is this an event game rather than a conference game", which is what it always
         /// computed — only the word was wrong.</summary>
         public bool IsEventGame => EventId is not null;
+
+        /// <summary>★ S110 — THE THIRD KIND. Before this session "not an event game" meant "a
+        /// conference game", and three checks were written on that two-way split. A conference
+        /// tournament game is neither: it carries no EventId, and it is hostless. Any test of
+        /// the form <c>!IsEventGame</c> that means "an ordinary hosted league fixture" must
+        /// exclude this one too — the alternative is a check that reads a neutral-floor game as
+        /// a league game and stays green while saying something false.</summary>
+        public bool IsConferenceTournamentGame => ConferenceTournamentId is not null;
+
+        /// <summary>The plain league slate: neither an event game nor a conference tournament
+        /// game. Named once so the three-way split is stated in one place rather than
+        /// reconstructed by each caller.</summary>
+        public bool IsLeagueGame => !IsEventGame && !IsConferenceTournamentGame;
     }
 
     private sealed record SeasonGameResult(
@@ -224,6 +238,26 @@ internal static partial class Program
         /// by seed, never by school). Empty when nothing played.</summary>
         public IReadOnlyDictionary<int, IReadOnlyDictionary<int, int>> EventFinishes { get; init; }
             = new Dictionary<int, IReadOnlyDictionary<int, int>>();
+
+        /// <summary>★ S110 — the conference tournaments: who was seeded, who was crowned, and
+        /// every game's canonical row. The champions are FIRST-CLASS STATE — the page reads
+        /// this, it does not reconstruct a champion by inspecting seven games.</summary>
+        public ConfTourneySeasonOutcome ConferenceTournaments { get; init; }
+            = ConfTourneySeasonOutcome.None;
+
+        /// <summary>★ S110 — how many conference tournament games were played. Carried as its
+        /// own count, alongside <see cref="TournamentGameCount"/> rather than folded into it,
+        /// because every existing two-term sum (the id ledger, the retention block count) is a
+        /// statement about a two-way split that is now three-way. Zero on every world whose
+        /// leagues are all shorter than eight, which is what keeps the fixture zero paths
+        /// zero.</summary>
+        public int ConferenceTournamentGameCount { get; init; }
+
+        /// <summary>★ S110 — THE SIXTH FINGERPRINT. Its own hash, deliberately not folded into
+        /// the event-games hash (which covers the world event pool, and whose meaning S104's
+        /// zero-path-by-subtraction proof depends on) nor into the results hash (which stays
+        /// assertable over its pre-S110 prefix).</summary>
+        public string ConferenceTournamentFingerprint { get; init; } = "";
     }
 
     /// <summary>Everything the two accumulators need to turn a stamped player id back into a
@@ -1383,7 +1417,8 @@ internal static partial class Program
     /// else.</summary>
     private sealed record SeasonNumbering(
         long SeasonNumber, SeasonId SeasonId,
-        IReadOnlyDictionary<BracketSlotKey, GameId> Reservations);
+        IReadOnlyDictionary<BracketSlotKey, GameId> Reservations,
+        IReadOnlyDictionary<ConfTourneySlotKey, GameId> ConfTourneyReservations);
 
     /// <summary>★ S98 — THE TOURNAMENT GAME NUMBERS ARE TAKEN HERE, AND THIS IS FORCED RATHER
     /// THAN PREFERRED. <c>CloseReservations()</c> runs before the first tip, so nothing can
@@ -1398,8 +1433,13 @@ internal static partial class Program
     ///
     /// <para>So the table is keyed by bracket POSITION and never by team: an id belongs to a
     /// slot rather than to whoever happens to win it.</para></summary>
+    /// <param name="confTourneySlots">★ S110 — the conference tournament positions, seven per
+    /// seating league, in the canonical walk order. They are spent AFTER the MTE slots and never
+    /// interleaved with them: the reservation walk and the play walk are the same order, and
+    /// slotting a third kind into the middle would move every showcase id.</param>
     private static SeasonNumbering NumberSeasonSchedule(
-        List<SeasonGame> games, HistoryStore history, EventSeatingOutcome? seating)
+        List<SeasonGame> games, HistoryStore history, EventSeatingOutcome? seating,
+        IReadOnlyList<ConfTourneySlotKey>? confTourneySlots = null)
     {
         // ★ The peek's contract, asserted rather than assumed: while this run holds the
         //   lock, the value the peek returns IS the value the reservation hands back, and the
@@ -1413,7 +1453,8 @@ internal static partial class Program
                 + "by exactly one across the reservation.");
 
         var slots = seating is null ? new List<BracketSlotKey>() : MteExpectedBracketSlots(seating);
-        var gameIds = history.ReserveGames(games.Count + slots.Count);
+        var confSlots = confTourneySlots ?? (IReadOnlyList<ConfTourneySlotKey>)Array.Empty<ConfTourneySlotKey>();
+        var gameIds = history.ReserveGames(games.Count + slots.Count + confSlots.Count);
         for (var g = 0; g < games.Count; g++)
             games[g] = games[g] with { SeasonId = seasonId, GameId = gameIds[g] };
 
@@ -1427,7 +1468,18 @@ internal static partial class Program
                 $"SEASON INVARIANT VIOLATED: {slots.Count} bracket slots produced "
                 + $"{reservations.Count} distinct reservations; a bracket position is unique.");
 
-        return new SeasonNumbering(expected, seasonId, reservations);
+        // ★ S110 — the third block, taken from the SAME contiguous reservation and appended
+        //   after the MTE slots, so every pre-S110 conference and event id is the id it has
+        //   always had.
+        var confReservations = new Dictionary<ConfTourneySlotKey, GameId>(confSlots.Count);
+        for (var i = 0; i < confSlots.Count; i++)
+            confReservations[confSlots[i]] = gameIds[games.Count + slots.Count + i];
+        if (confReservations.Count != confSlots.Count)
+            throw new InvalidOperationException(
+                $"SEASON INVARIANT VIOLATED: {confSlots.Count} conference tournament slots produced "
+                + $"{confReservations.Count} distinct reservations; a tournament position is unique.");
+
+        return new SeasonNumbering(expected, seasonId, reservations, confReservations);
     }
 
     /// <summary>★ S89 note — this hashes the four pre-S89 fields BY NAME (index, kind, home,
@@ -1605,15 +1657,22 @@ internal static partial class Program
         //   id only when there is a season to hang it on.
         IReadOnlyDictionary<BracketSlotKey, GameId> reservations =
             new Dictionary<BracketSlotKey, GameId>();
+        // ★ S110 — the conference tournaments' own reservation table, on exactly the same terms:
+        //   the pairings are unknown at the commit (round two is round one's result), so ids are
+        //   reserved by COUNT and belong to a POSITION rather than to whoever wins it.
+        IReadOnlyDictionary<ConfTourneySlotKey, GameId> confTourneyReservations =
+            new Dictionary<ConfTourneySlotKey, GameId>();
         SeasonId? seasonIdOfRun = null;
         if (history is not null)
         {
-            var numbering = NumberSeasonSchedule(schedule, history, seating);
+            var numbering = NumberSeasonSchedule(
+                schedule, history, seating, ConfTourneyExpectedSlots(world));
             if (numbering.SeasonNumber != pendingSeasonId)
                 throw new InvalidOperationException(
                     $"SEASON INVARIANT VIOLATED: peeked season {pendingSeasonId} but reserved " +
                     $"{numbering.SeasonNumber}.");
             reservations = numbering.Reservations;
+            confTourneyReservations = numbering.ConfTourneyReservations;
             seasonIdOfRun = numbering.SeasonId;
             try
             {
@@ -1833,12 +1892,34 @@ internal static partial class Program
         foreach (var kv in showcases.SeatsPlayed) seatsPlayedAll[kv.Key] = kv.Value;
         var eventGameCount = brackets.GameCount + showcases.GameCount;
 
-        //  One block per fixture PLAYED and no other — conference plus tournament. The
-        //  writer refuses to publish a partial season rather than leaving a
-        //  plausible-looking short file behind.
+        // ══════════════════════════════════════════════════════════════════════════
+        //  ★ S110 — THE CONFERENCE TOURNAMENTS, APPENDED AFTER EVERY EVENT GAME.
+        //
+        //  Their ordinals start where the showcases stopped, which is what leaves every
+        //  conference game AND every event game on the engine seed it has always had.
+        //  The reservation walk (ConfTourneyExpectedSlots) and this walk are the same
+        //  order — ascending conference id, then topology game index 0..6 — and they
+        //  must stay that way.
+        //
+        //  The records that seed the fields are derived from `schedule` and the first
+        //  `schedule.Count` results, both of which are complete and frozen by now and
+        //  neither of which these games can ever enter. That is what makes "a tournament
+        //  win does not become a league win" true by construction rather than by care.
+        // ══════════════════════════════════════════════════════════════════════════
+        var confTourneys = ConfTourneyPlaySeason(
+            world, SeasonDefaultStartYear, schedule, results,
+            confTourneyReservations, seasonIdOfRun, schedule.Count + eventGameCount,
+            pg => PlayOneGame(pg));
+        if (verbose && confTourneys.GameCount > 0)
+            Console.WriteLine($"  ... {confTourneys.GameCount} conference tournament games played " +
+                              $"({confTourneys.LeaguesPlayed} leagues)");
+
+        //  One block per fixture PLAYED and no other — league, event and conference
+        //  tournament. The writer refuses to publish a partial season rather than leaving
+        //  a plausible-looking short file behind.
         if (gameLog is not null)
         {
-            gameLog.Finalize(schedule.Count + eventGameCount);
+            gameLog.Finalize(schedule.Count + eventGameCount + confTourneys.GameCount);
             gameLog.Dispose();
         }
 
@@ -1904,6 +1985,9 @@ internal static partial class Program
             EventGamesFingerprint =
                 MteEventGamesFingerprint(playedGames, results, possessionCounts),
             EventFinishes = brackets.FinishBySeat,
+            ConferenceTournaments = confTourneys,
+            ConferenceTournamentGameCount = confTourneys.GameCount,
+            ConferenceTournamentFingerprint = ConfTourneyFingerprint(confTourneys.Rows),
         };
     }
 
@@ -2347,6 +2431,27 @@ internal static partial class Program
                               (leaked.Count > 0 ? "leaks: " + string.Join("; ", leaked)
                                                 : "no top-decile players (overperformed without a leaked star)"));
         }
+        Console.WriteLine();
+
+        // (iii-b) ★ S110 — the conference champions. Read from first-class state on the run,
+        //         never reconstructed by inspecting seven games. Page-only: no champion, no
+        //         seed and no basketball value is asserted anywhere in the suite.
+        var ct = run.ConferenceTournaments;
+        Console.WriteLine($"--- CONFERENCE CHAMPIONS ({ct.LeaguesPlayed} leagues, " +
+                          $"{ct.GameCount} games; eight-team fields seeded on the LEAGUE record only" +
+                          (ct.LeaguesTooSmall > 0
+                               ? $"; {ct.LeaguesTooSmall} league(s) too small to seat eight, no tournament"
+                               : "") + ") ---");
+        foreach (var champ in ct.Champions)
+        {
+            var seedOf = champ.SchoolBySeed.Select((id, i) => (id, seed: i + 1))
+                              .ToDictionary(t => t.id, t => t.seed);
+            Console.WriteLine(
+                $"  {confShort[champ.ConferenceId],-16}{names[champ.Champion] + " (" + abbrs[champ.Champion] + ")",-26}" +
+                $"#{seedOf[champ.Champion]}   beat {names[champ.RunnerUp]} (#{seedOf[champ.RunnerUp]})");
+        }
+        if (ct.GameCount > 0)
+            Console.WriteLine($"  conference-tournament fingerprint: {run.ConferenceTournamentFingerprint}");
         Console.WriteLine();
 
         // (iv) the OT / scoring sanity pulse.

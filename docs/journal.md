@@ -1,3 +1,76 @@
+## Session 110 — THE CONFERENCE TOURNAMENTS: THIRTY-ONE LEAGUES, THIRTY-ONE CHAMPIONS. Session B of the arc. S109's bracket had no consumer; now every league that can seat eight seeds a field **from its own league record**, plays it out on the nights its authored tournament offset already implied, and crowns a champion. **217 new games, 31 leagues, 434 team-games.** **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 99 new (43 assertions), Phase 98 now 134.** ★ **ALL FIVE PRIOR FINGERPRINTS UNMOVED AND NOTHING RECAPTURED** — the results+possessions hash was **narrowed to a prefix rather than recaptured**, which keeps the pre-S102 golden alive as proof instead of destroying it; a **sixth** hash (`7291ee18…`) is born for the tournaments alone, proven to see both the venue and the night. ★ **THE STATUS BOARD'S "TIEBREAK LADDER ALREADY RULED" WAS A FICTION** — head-to-head, tied blocks and the deterministic draw appear in **exactly one place in the repo**, a "Next approved candidate" line written from a session summary; nothing in journal.md or design.md corroborates any of it. Demoted to a ruled placeholder with a named successor. ★ **A HARD "EVERY LEAGUE SEATS EIGHT" ASSERT WOULD HAVE KILLED THE SUITE**: every fixture world has leagues of five and six, so a short league now holds **no** tournament, counted and reported — which is also what keeps every fixture zero-path a zero path. ★ **THE AUDIT MISSED A FIFTH ASSERTION SITE AND THE SUITE FOUND IT**: Phase 92 holds its own copy of the results golden under a different constant name; grepping the constants found four of five, grepping `SeasonFingerprint(` finds all sixteen. (2026-09-07)
+
+**Register:** arc session against `PROMPT-S110-conference-tournaments-r3.md` (outside-reviewed, both gate rulings locked by Emmett before the build). Gate held: full pull, every named read, every load-bearing claim opened against source, findings reported, "Continue" returned before a file was touched. Sandbox: SDK installed, tree built clean, four full suite passes (one lost to a rebuild under a running baseline, two to the reds below, the fourth green). Emmett's run is the verification of record.
+
+### Emmett's ruling, and the wall it drew
+
+*"All I want is eight everywhere. We will deal with byes and all the complicated conference tournaments later."* So **`TourneyTeams` is authored and unread**, exactly as `TDay1..5` are. Nineteen leagues author a non-power-of-two field and all of them play eight. Byes stay out of scope and the primitive still **refuses** non-power-of-two fields by name — unconstructible, not merely unused (Phase 99 C1g). This dissolves the Ivy contradiction (O-103) without fixing it: nothing reads the field size, so the Ivy plays eight like everyone else.
+
+**Independent is identified by `Games == 0`**, the way the season already does it — deliberately **not** by `TourneyTeams == 0`, which would also catch the Ivy row and silently drop a real league. Corroborated by its being the only league authoring `none` for its tournament offset.
+
+### What was built
+
+**The record that seeds is the LEAGUE record.** `run.Wins`/`run.Losses` are whole-season and already include MTE games, so seeding off the standings would let a Maui run move ACC seeding. Records are derived from the season's own conference schedule and the results aligned to it — and derived from the **schedule**, never from "both schools share a conference", which would classify the tournament's own games as league play the moment they were played. The alignment is asserted, not assumed: it is the one premise the whole layer rests on.
+
+**Eight per league, seeded by conference win percentage** — integer cross-multiplication widened to `long`, never a float — **ties to the lower school id**. Handed to `BuildKnockoutBracket(8, …)`; the canonical line is the contract and is not re-derived. Round one is 1v8, 4v5, 2v7, 3v6 in all 31 leagues.
+
+**The nights were not invented.** `TourneyOffsetDays` is live: the conference dater already walls each league's last league game at `SelectionSunday − offset − 1`. So the tournament opens at `SelectionSunday − offset` and the wall holds **by construction**. Rounds are consecutive. Leagues stagger deliberately — three distinct opens on stock (13 leagues at 11 days, 12 at 4, 6 at 8) — and overlap freely.
+
+**Executed LAST, after the showcases.** The fixture ordinal is both the engine seed input and the retention log's ordinal, so slotting these games anywhere earlier would have re-rolled every event result in the country. First tournament ordinal is 2,970, exactly where the event half ends.
+
+**Champions are first-class state**, held on the run outcome and read by the page — never reconstructed by inspecting seven games.
+
+### The two ruled placeholders, and why they are recorded as placeholders
+
+Emmett: *"Those are fine with me for now, we will add in neutral locations and tiebreakers later."*
+
+- **R1 — the venue.** The original No. 1 seed's city, resolved **once per conference and frozen** for all seven games: a conference tournament does not travel. Nobody hosts (`HasHost: false`), so no home-court advantage and no hosted-game accounting — the shave counter still reads 2818/2818. **Successor: real neutral sites, authored per conference.** Boarded as O-106.
+- **R2 — seeding ties.** Conference win percentage, then lower school id. **Successor: real conference tiebreaking as its own design object.** Boarded as O-107.
+
+Neither may be quietly widened: a city that varies by round, or a tie broken by anything else, is out of scope even if it looks more realistic.
+
+### The gate, and what it found
+
+**The tiebreak ladder was never ruled.** The prompt's A4 said so and the pull confirmed it exactly: `status.md:2099` is the only mention anywhere in the repo. It described a head-to-head procedure, tied-block handling and a deterministic draw keyed on the season seed as *already decided*. It was written during S109's own docs step from a session summary. An unproven hypothesis had hardened into a "ruling" in one hop — the S81.3 lesson in a new costume, and the reason R2 is now written down as a placeholder with a successor rather than as architecture.
+
+**A3 as written would have taken the suite down.** Every fixture world has leagues too small to seat eight — `fixture-tiny` and `fixture-memory` are four leagues of five, `fixture-mte` four of five plus a six, `fixture-rotation` a five and a sixteen — and those worlds run full seasons across dozens of phases. A hard assert throws on the first one. So a league with fewer than eight members holds **no** tournament, counted and carried out on the outcome. This is not the failure A3 names: `.Take(8)` can never yield seven, because the gate is checked before the take and the take is asserted after it, and a short field handed straight to the seater is **refused by name** (C1f).
+
+**Phase 57's `GameState` parameter is dead** — noticed while auditing shared state, recorded for S110.1, not touched here.
+
+### Two reds, both mine, both instructive
+
+**Phase 92 went red on a correct engine.** It is a **fifth** site asserting the results+possessions hash, holding its own golden under `NonConGoldenResultsFp`. The audit grepped the four golden constant *names* and found four of five. Grepping `SeasonFingerprint(` finds all sixteen call sites — five golden-anchored, the rest determinism comparisons or fixture worlds. **Grep the function, not the constants.**
+
+**Phase 99 C2c went red on a correct engine too** — a check authored wrong. It compared against `ConfTourneyGamesPerLeague`, which is **seven**, the games a *league* plays, where the bound needed was the games one *team* plays, at most three. The comparison could never fire. Rewritten into the stronger check it should have been: every school's overall record reconciles to league + event + tournament, which asserts the §2g contract that a tournament win counts. 347 schools reconcile.
+
+### The fingerprint call — narrowed, not recaptured
+
+The prompt expected `898d9fe8…` to move and be recaptured. It was **narrowed to a prefix instead**, at all three sites, and it still reproduces. The argument is the prompt's own §4 applied one hash over: it insisted conference tournaments must not land inside the event-games hash or S104's zero-path-by-subtraction proof quietly stops meaning anything. The identical thing is true of the results hash. Each site got a discriminator proving the slice is a prefix of something longer rather than the whole list wearing a `Take()` — without that, the check is a season compared to itself.
+
+**The sixth hash** covers `conferenceId, round, gameIndex, date, placeId, seedA, seedB, schoolA, schoolB, winner`. A hash of results alone would not catch a venue or a date regression, and C7g/C7h prove it sees both. It hashes only integers and dates — no floats — so unlike S81.3's fixture it is portable by construction, and it reproduced byte-for-byte on Windows.
+
+### What Phase 99 discriminates on
+
+Every completeness and conservation check passes whether the seeding read the league record or the whole-season record, so the seeding rule needed its own defence: the two orders are computed side by side and **28 of 31 leagues seed differently** under the whole-season record. Non-contamination is proven by recomputing the conference record after all 217 games and getting the records used before them, school for school. The **exact elimination distribution** — one team 3/3, one 3/2, two 2/1, four 1/0 — simultaneously proves nobody was replayed, nobody skipped a round, every advancement link fired and exactly seven results fed each bracket; a per-league game count proves none of that. **Participant conservation:** 124 schools +1, 62 +2, 62 +3, 99 untouched, 434 team-games. **Id identity:** a mismatched reservation walk still spends 217 ids and plays 217 games, so the played positions are asserted against the reserved positions in fixture order.
+
+### Calls Claude made
+
+- **A third Kind string, `"ctourney"`.** The retention log's conference flag keys on the literal `"conf"` and Phase 89 asserts `"mte"` means an event fixture. A third kind of played game gets a third word.
+- **Three existing checks taught the three-way split.** "Not an event game" stopped meaning "a league game": Phase 89's hostless check now reads `IsLeagueGame`, and the id ledger and retention block count became three-term sums. All three would have hidden on `fixture-mte`, whose leagues cannot seat eight.
+- **The two ungated `SuiteTimed` rows are still ungated.** Noticed, not touched — S110.1's.
+
+### Not done, by the wall
+
+Byes, auto-bids, rankings, the national bracket, making the 2,171 non-conference games simulate, `TourneyType`/`SeedDiv`/divisional seeding, authored conference venues. **A champion is crowned, recorded, and feeds nothing.**
+
+### The standings look flat at the top, and that is the missing bridge session
+
+Kansas 6-10 at prestige 97, Duke 6-10 at 98, Michigan State 8-11 at 94. Nobody plays a non-conference schedule yet: all 2,171 pairings are matched, dated and contracted, and none are ever played. A blue blood's record is league play plus whatever event it drew, and Duke drew nothing — sixteen ACC games was its whole season, so it missed its own tournament. The proof table still separates (prestige 80-99 at 57.0% against 0-19 at 34.0%), but thinly. **This is the bridge session showing up in the standings, not a prestige bug.** Recorded so no future session goes hunting for one.
+
+### Fingerprints
+
+**Unmoved, all five asserted in Phase 99 C7 and Phase 98 C7:** `6f79d663…` (conference), `46d89bf8…` (conference dated), `7c1a41c1…` (event games), `898d9fe8…` (results + possessions, over the league-plus-event prefix), `7ace22ed…` (non-conference dated). **New: `7291ee18784a4c7c5b0c1551e20e5888787b6df0614d6ab4b75c5257130844a8`** (conference tournaments). Nothing recaptured. Suite 587.7s on Emmett's machine against 1027.6s in the sandbox — his box is ~1.75× faster, which halves S110.1's headline win without changing its shape.
+
 ## Session 109 — THE KNOCKOUT PRIMITIVE, DORMANT, AND THE CITY ON THE GAME. Session A of the conference-tournament arc. The engine now owns a single-elimination bracket for any field of 2, 4, 8, 16, 32 or 64 — **lose and go home, N−1 games, one champion** — and nothing plays it yet: the same tables that ran the November tournaments still run them. Every game the season plays now carries the city it is played in (a hosted game its home school's, an event game its event's), proven at the two structural boundaries. **Verified on Emmett's machine: ALL CHECKS PASSED, Phase 98 new (133 assertions).** ★ **ALL FIVE FINGERPRINTS UNMOVED** on a run carrying the new field — `6f79d663…`, `46d89bf8…`, `7c1a41c1…`, `898d9fe8…`, `7ace22ed…` — conference games 2,818, event games 152 (128 tournament + 24 showcase), the season page identical to its pre-S109 self but for two read-only lines. ★ **THE PROMPT'S FIFTH HASH WAS STALE**: the brief carried `b75754bc…` off the status board; that was S106's value, S108's REACH moved the pairings, and the live value re-derived from the pristine tree is `7ace22ed…` — the S81.3 lesson (re-derive, never transcribe) landing again, and caught at the gate before it could go into a red line. ★ **The seed line is asserted LITERALLY, not by property** — `line(8) = [1,8,4,5,2,7,3,6]`, folding so 1 and 2 can only meet in the final — because two outside reviews each produced a legal-but-wrong bracket that a property-based contract accepted. (2026-09-07)
 
 **Register:** arc session against `PROMPT-S109-bracket-primitive.md` (outside-reviewed, cleared to build). Gate held: full pull, every required read, every load-bearing claim opened against source, pre-edit baseline run in-sandbox, gate report delivered, "Continue" returned before a file was touched. Sandbox: .NET SDK installed, full suite green, Phase 98 green in isolation first, season page diffed against the pre-edit page (one added line). Emmett's run is the verification of record.

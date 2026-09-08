@@ -374,16 +374,42 @@ internal static partial class Program
             //  C9 — ★ ZERO-PATH IDENTITY ON THE FULL STOCK BUNDLE.
             // ════════════════════════════════════════════════════════════════════
             {
-                var resultsFp = SeasonFingerprint(stockRun.Results, stockRun.PossessionCounts);
+                //  ★ S110 — THE RESULTS HASH IS NOW ASSERTED OVER ITS PRE-S110 PREFIX, AND THIS
+                //  IS STRICTLY STRONGER THAN RECAPTURING IT. Conference tournaments append 217
+                //  games after the last showcase, so hashing the whole list would have moved
+                //  this value and destroyed the pre-S102 golden — the very proof it exists to
+                //  be. The league half and the event half are byte-identical, so the prefix
+                //  still reproduces the value captured from a tree that predates this session,
+                //  and the new games get their OWN hash instead of hiding inside somebody
+                //  else's. Same argument, one hash over, as the one that keeps conference
+                //  tournaments out of the event-games fingerprint.
+                //
+                //  ★ The slice is valid because these games APPEND: league games hold ordinals
+                //  0..N-1, event games N..N+M-1, and nothing else occupies either range.
+                var prefix = stockRun.ConferenceGameCount + stockRun.TournamentGameCount;
+                var resultsFp = SeasonFingerprint(
+                    stockRun.Results.Take(prefix).ToList(),
+                    stockRun.PossessionCounts.Take(prefix).ToList());
                 Check("C9: the stock season reproduces the pre-S102 tree exactly — conference " +
                       "fingerprint, dated fingerprint, tournament-games fingerprint, and the " +
-                      "results+possessions fingerprint. Nothing this session added moved a game",
+                      "results+possessions fingerprint over the league-plus-event prefix. Nothing " +
+                      "this session added moved a game",
                       stockRun.Fingerprint == MatchGoldenConferenceFp
                       && stockRun.DatedFingerprint == MatchGoldenDatedFp
                       && stockRun.EventGamesFingerprint == MatchGoldenEventGamesFp
                       && resultsFp == MatchGoldenResultsFp,
                       $"conf {stockRun.Fingerprint[..8]}…, dated {stockRun.DatedFingerprint[..8]}…, " +
                       $"events {stockRun.EventGamesFingerprint[..8]}…, results {resultsFp[..8]}…");
+
+                //  ★ THE DISCRIMINATOR. Without this the prefix check is a whole season compared
+                //  to itself: it must be a PREFIX of something longer, or the slice above proves
+                //  nothing about the games it excludes.
+                Check("C9b: ★ and it really is a PREFIX — the season played more games than the slice " +
+                      "covers, so C9 is not the whole list wearing a Take()",
+                      stockRun.Results.Count > prefix
+                      && stockRun.Results.Count == prefix + stockRun.ConferenceTournamentGameCount,
+                      $"{stockRun.Results.Count} results = {prefix} prefix + " +
+                      $"{stockRun.ConferenceTournamentGameCount} conference tournament");
             }
 
             // ════════════════════════════════════════════════════════════════════

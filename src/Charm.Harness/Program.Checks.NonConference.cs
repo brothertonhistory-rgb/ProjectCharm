@@ -488,15 +488,40 @@ internal static partial class Program
             //  C9 — ★ ZERO-PATH IDENTITY ON THE FULL STOCK BUNDLE.
             // ════════════════════════════════════════════════════════════════════
             {
-                var resultsFp = SeasonFingerprint(stockRun.Results, stockRun.PossessionCounts);
+                //  ★ S110 — THE PREFIX, for the same reason as Phase 93 C9 and Phase 98 C7d.
+                //  Conference tournaments append 217 games after the last showcase, so hashing
+                //  the whole list would have moved this value and destroyed the pre-S101 golden
+                //  it exists to be. The league half and the event half are byte-identical, so
+                //  the prefix still reproduces a value captured from a tree that predates this
+                //  session — which is strictly stronger than recapturing.
+                //
+                //  ★ This was the site the S110 audit MISSED. The other four assertions of this
+                //  hash were found by grepping the golden CONSTANT names; this one holds its own
+                //  constant under a different name and only turned up when the suite went red.
+                //  The lesson is recorded in the journal: grep the FUNCTION, not the constants —
+                //  `SeasonFingerprint(` finds every site, a constant name finds only the sites
+                //  that share it.
+                var prefix = stockRun.ConferenceGameCount + stockRun.TournamentGameCount;
+                var resultsFp = SeasonFingerprint(
+                    stockRun.Results.Take(prefix).ToList(),
+                    stockRun.PossessionCounts.Take(prefix).ToList());
                 Check("C9: the stock season reproduces the pre-S101 tree exactly — " +
                       "conference fingerprint, dated fingerprint, and the results+" +
-                      "possessions fingerprint",
+                      "possessions fingerprint over the league-plus-event prefix",
                       stockRun.Fingerprint == NonConGoldenConferenceFp
                       && stockRun.DatedFingerprint == NonConGoldenDatedFp
                       && resultsFp == NonConGoldenResultsFp,
                       $"conf {stockRun.Fingerprint[..8]}…, dated {stockRun.DatedFingerprint[..8]}…, " +
                       $"results {resultsFp[..8]}…");
+
+                //  ★ THE DISCRIMINATOR. Without it the slice above is a whole season compared to
+                //  itself and proves nothing about the games it excludes.
+                Check("C9b: ★ and it really is a PREFIX — the season played past the slice, so C9 is " +
+                      "not the whole list wearing a Take()",
+                      stockRun.Results.Count > prefix
+                      && stockRun.Results.Count == prefix + stockRun.ConferenceTournamentGameCount,
+                      $"{stockRun.Results.Count} results = {prefix} prefix + " +
+                      $"{stockRun.ConferenceTournamentGameCount} conference tournament");
             }
 
             // ════════════════════════════════════════════════════════════════════
