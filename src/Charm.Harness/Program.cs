@@ -98,214 +98,332 @@ internal static partial class Program
         // is no home-court advantage at the end of S92.
         if (args.Length > 0 && args[0] == "geography") { return RunGeography(args); }
 
-        var cfg = RollAConfig.Load(configPath);
-        var cfgB = RollBConfig.Load(configPath);
-        var cfgC = RollCConfig.Load(configPath);
-        var cfgD = RollDConfig.Load(configPath);
-        var cfgE = RollEConfig.Load(configPath);
-        var cfgF = RollFConfig.Load(configPath);
-        var cfgG = RollGConfig.Load(configPath);
-        var cfgH = RollHConfig.Load(configPath);
-        var cfgI = RollIConfig.Load(configPath);
-        var cfgJ = RollJConfig.Load(configPath);
-        var cfgK = RollKConfig.Load(configPath);
-        var cfgL = RollLConfig.Load(configPath);
-        var cfgM = RollMConfig.Load(configPath);
-        var cfgOffFoul = RollOffensiveFoulConfig.Load(configPath);
-        var cfgGov = GovernorConfig.Load(configPath);
-        var cfgClock = RollClockConfig.Load(configPath);
-        var cfgEndOfHalf = EndOfHalfConfig.Load(configPath);
+        // dotnet run -- checks <selector ...>   S110.1: run PART of the validation suite.
+        //   `checks 99`        one phase by number
+        //   `checks 92-99`     an inclusive range of numbers (gaps are legal, reversed is refused)
+        //   `checks knockout`  every row whose name contains the text
+        //   `checks list`      print the registry in execution order and exit
+        // ★ THIS IS A DEVELOPMENT AID, NOT THE DELIVERY GATE. A selector run can never print
+        //   ALL CHECKS PASSED, and it is reported as partial even when the selector happens to
+        //   name every row — there must be exactly one spelling of the gate, and it is the
+        //   no-argument command below.
+        if (args.Length > 0 && args[0] == "checks") return RunSelectedChecks(configPath, args.Skip(1).ToArray());
 
-        var rng = new SystemRng(cfg.Seed);
-        // Roll A generator constructed below after SeatStartersFromConfig (Phase 14).
-        // Roll B generator constructed below after SeatStartersFromConfig (Phase 13).
-        var rollCGenerator = new RollCGenerator(cfgC);
-        var rollDGenerator = new RollDGenerator(cfgD);
-        // Roll E generator constructed below after game is created (Phase 15: needs GameState).
-        // Roll F generator constructed below after SeatStartersFromConfig (Phase 12).
-        // RollHGenerator, RollGGenerator, and RollIGenerator constructed below,
-        // after game and cfgMatchup (need GameState and MatchupConfig).
-        // RollKGenerator constructed below after SeatStartersFromConfig (Phase 32: needs game + cfgMatchup).
-        var offensiveFoulGenerator = new RollOffensiveFoulGenerator(cfgOffFoul);
-
-        // The half's foul tracker carries the config-driven bonus thresholds.
-        var fouls = new FoulTracker(cfgD.BonusThreshold, cfgD.DoubleBonusThreshold);
-        var game = new GameState(fouls);  // arrow starts Off — first jump ball is the tip
-        var cfgMatchup = MatchupConfig.Load(configPath);
-        SeatStartersFromConfig(game, configPath);       // v2 fix: seat real rosters before generators
-        var rollGGenerator = new RollGGenerator(cfgG, cfgMatchup, game);   // Phase 9: matchup-aware location
-        var rollJGenerator = new RollJGenerator(cfgJ, cfgMatchup, game);   // Phase 28: real transition run decision
-        var rollHGenerator = new RollHGenerator(cfgH, cfgMatchup, game);
-        var rollIGenerator = new RollIGenerator(cfgI, cfgMatchup, game);   // Phase 10: matchup-aware rebounding
-        var rollMGenerator = new RollMGenerator(cfgM, cfgMatchup, game);   // Phase 11: matchup-aware FT rebounding
-        var rollLGenerator = new RollLGenerator(cfgL, game);               // Phase 18: attribute-driven FT make%
-        var rollFGenerator = new RollFGenerator(cfgF, cfgMatchup, game);   // Phase 12: pressure-aware disruption
-        var rollBGenerator = new RollBGenerator(cfgB, cfgMatchup, game);   // Phase 13: team-aggregate disruption
-        var rollKGenerator = new RollKGenerator(cfgK, cfgMatchup, game);   // Phase 32: putback attempt rate
-        var rollAGenerator = new RollAGenerator(cfg, cfgMatchup, game);    // Phase 14: full-court press disruption
-        var rollEGenerator = new RollEGenerator(cfgE, game);               // Phase 15: attribute-driven halfcourt selection
-        var cfgAttention   = AttentionConfig.Load(configPath);
-        var attentionGenerator = new AttentionGenerator(cfgAttention, game); // Phase 27: defensive attention pie
-
-        var resolver = new Resolver(
-            rollAGenerator,
-            cfg,
-            rollBGenerator,
-            rollCGenerator,
-            cfgC,
-            rollDGenerator,
-            rollEGenerator,
-            attentionGenerator,
-            rollFGenerator,
-            rollGGenerator,
-            rollHGenerator,
-            rollIGenerator,
-            rollJGenerator,
-            rollKGenerator,
-            rollLGenerator,
-            rollMGenerator,
-            offensiveFoulGenerator,
-            cfgMatchup,
-            game,
-            rng);
-
-        var state = new PossessionState(
-            PossessionNumber: 1,
-            Offense: TeamSide.Home,
-            Defense: TeamSide.Away,
-            Entry: EntryType.DeadBallInbound);
-
-        Console.WriteLine("=== Project Charm :: Roll A -> B -> C -> D -> E -> F -> G -> H -> I -> J -> K Chain ===\n");
-
-        ShowSamples(cfg, cfgE, rollAGenerator, rollEGenerator, resolver, game, state, rng);
-        var ok = BatchCheck(cfg, cfgB, new StubPieGenerator(cfg), new RollBStubPieGenerator(cfgB), resolver, state);
-        ok &= RollCBatchCheck(cfg, cfgC, rollCGenerator, state);
-        ok &= RollDFlavorBatchCheck(cfg, cfgD, rollDGenerator, state);
-        ok &= RollDBonusRoutingCheck(cfgD, rollDGenerator, state);
-        ok &= DefensiveFoulChargeCheck(cfgD, state);
-        ok &= PhysicalitySignalCheck(cfgB, new RollBStubPieGenerator(cfgB), state);
-        ok &= JumpBallCheck(cfg);
-        ok &= SlotLayerCheck(game);
-        ok &= RollESelectionBatchCheck(cfg, cfgE, cfgD, rollEGenerator, game, state);
-        ok &= RollFActionBatchCheck(cfg, cfgF, new RollFStubPieGenerator(cfgF), state);
-        ok &= RollFHandoffCheck(cfg, game, state);
-        ok &= RollGLocationBatchCheck(cfg, cfgG, state);
-        ok &= RollGHandoffCheck(cfg, state);
-        ok &= RollHResolutionBatchCheck(cfg, cfgH, rollHGenerator, state);
-        ok &= RollHHandoffCheck(cfg, state);
-        ok &= RollIReboundBatchCheck(cfg, cfgI, new RollIStubPieGenerator(cfgI), game, state);
-        ok &= RollIBonusForkCheck(cfg, cfgD, cfgI, new RollIStubPieGenerator(cfgI), state);
-        ok &= RollIBlockReboundBatchCheck(cfg, cfgI, new RollIStubPieGenerator(cfgI), state);
-        ok &= RollIBlockContextSelectionCheck(cfg, cfgI, state);
-        ok &= RollJBatchCheck(cfg, cfgD, cfgJ, rollJGenerator, state);
-        ok &= RollJBonusForkCheck(cfg, cfgD, cfgJ, state);
-        ok &= RollJStealBatchCheck(cfg, cfgD, cfgJ, rollJGenerator, state);
-        ok &= RollKReboundBatchCheck(cfg, cfgK, rollKGenerator, game, state);
-        ok &= RollKPutbackPieCheck(cfg, cfgH, state);
-        ok &= RollKBonusForkCheck(cfg, cfgD, cfgK, rollKGenerator, state);
-        ok &= RollLFreeThrowCheck(cfg, state);
-        ok &= ShootingFoulFeedsBonusCheck(cfg, state);
-        ok &= RollMReboundBatchCheck(cfg, cfgM, new RollMStubPieGenerator(cfgM), game, state);
-        ok &= RollMContextSelectionCheck(cfg, cfgK, cfgJ, rollJGenerator, state);
-        ok &= OffensiveReboundConvergenceCheck(cfg, state);
-        ok &= RollCContextCheck(cfg, cfgC, rollCGenerator, state);
-        ok &= RollCExpansionCheck(cfg, cfgC, rollCGenerator, state);
-        ok &= EndOfHalfIntentBatchCheck(cfg, cfgEndOfHalf);
-        ok &= GovernorLoopCheck(cfg, cfgD, cfgGov, cfgClock, cfgEndOfHalf);
-        ok &= GameBoundaryCheck(configPath);
-        ok &= SuiteTimed("Phase1RosterCheck", () => Phase1RosterCheck(configPath));
-        ok &= SuiteTimed("Phase2AttributeWiringCheck", () => Phase2AttributeWiringCheck(configPath));
-        ok &= SuiteTimed("Phase6MatchupWiringCheck", () => Phase6MatchupWiringCheck(configPath));
-        ok &= SuiteTimed("Phase7BlockDoorCheck", () => Phase7BlockDoorCheck(configPath));
-        ok &= SuiteTimed("Phase8FoulDoorCheck", () => Phase8FoulDoorCheck(configPath));
-        ok &= SuiteTimed("Phase9LocationDoorCheck", () => Phase9LocationDoorCheck(configPath));
-        ok &= SuiteTimed("Phase10ReboundDoorCheck", () => Phase10ReboundDoorCheck(configPath));
-        ok &= SuiteTimed("Phase11FreeThrowReboundDoorCheck", () => Phase11FreeThrowReboundDoorCheck(configPath));
-        ok &= SuiteTimed("Phase12DisruptionDoorCheck", () => Phase12DisruptionDoorCheck(configPath));
-        ok &= SuiteTimed("Phase13TeamDisruptionDoorCheckRollB", () => Phase13TeamDisruptionDoorCheckRollB(configPath));
-        ok &= SuiteTimed("Phase15PressFrequencyStandardCheck", () => Phase15PressFrequencyStandardCheck(configPath));
-        ok &= SuiteTimed("Phase16PressBreakFastBreakCheck", () => Phase16PressBreakFastBreakCheck(configPath));
-        ok &= SuiteTimed("Phase17UsageEfficiencyCheck", () => Phase17UsageEfficiencyCheck(configPath));
-        ok &= AttributionSanityCheck(configPath);            // Phase 24
-        ok &= SuiteTimed("Phase25ShootingFoulAttributionCheck", () => Phase25ShootingFoulAttributionCheck(configPath)); // Phase 25
-        ok &= SuiteTimed("Phase29HierarchyBiasCheck", () => Phase29HierarchyBiasCheck(configPath));           // Phase 29
-        ok &= SuiteTimed("Phase30CoachingLayer2Check", () => Phase30CoachingLayer2Check(configPath));          // Phase 30
-        ok &= SuiteTimed("Phase31RebounderPickerCheck", () => Phase31RebounderPickerCheck(configPath));         // Phase 31
-        ok &= SuiteTimed("Phase32PutbackAttemptRateCheck", () => Phase32PutbackAttemptRateCheck(configPath));     // Phase 32
-        ok &= SuiteTimed("Phase33TurnoverCommitterCheck", () => Phase33TurnoverCommitterCheck(configPath));      // Phase 33
-        ok &= SuiteTimed("Phase34TurnoverAttributionCheck", () => Phase34TurnoverAttributionCheck(configPath));    // Phase 34
-        ok &= SuiteTimed("Phase35DefensiveReboundCheck", () => Phase35DefensiveReboundCheck(configPath));       // Phase 35
-        ok &= SuiteTimed("Phase36BlockerCheck", () => Phase36BlockerCheck(configPath));                 // Phase 36
-        ok &= SuiteTimed("Phase39AssistCheck", () => Phase39AssistCheck(configPath));                  // Phase 39
-        ok &= SuiteTimed("Phase41HelpDefenseCheck", () => Phase41HelpDefenseCheck(configPath));             // Phase 41
-        ok &= SuiteTimed("Phase42ScreeningCheck", () => Phase42ScreeningCheck(configPath));               // Phase 42
-        ok &= SuiteTimed("Phase43ReboundPhysicalWeightsCheck", () => Phase43ReboundPhysicalWeightsCheck(configPath));  // Phase 43
-        ok &= SuiteTimed("Phase44OffBallDefenseCheck", () => Phase44OffBallDefenseCheck(configPath));          // Phase 44
-        ok &= SuiteTimed("Phase45HustleCheck", () => Phase45HustleCheck(configPath));                  // Phase 45
-        ok &= SuiteTimed("Phase46IndividualDenialCheck", () => Phase46IndividualDenialCheck(configPath));        // Phase 46
-        ok &= PassingCompoundCheck(configPath);                // Phase 47
-        ok &= FatigueMeterCheck(configPath);                   // Phase 48
-        ok &= FatigueAthleticismCheck(configPath);             // Phase 49
-        ok &= SuiteTimed("Phase50BasketballIqCheck", () => Phase50BasketballIqCheck(configPath));            // Phase 50
-        ok &= FreeThrowFoulDrawCheck(configPath);              // Phase 51
-        ok &= SuiteTimed("Phase52SubstitutionsCheck", () => Phase52SubstitutionsCheck(configPath));           // Phase 52
-        ok &= SuiteTimed("Phase53WorldStructureCheck", () => Phase53WorldStructureCheck());                    // Phase 53
-        ok &= SuiteTimed("Phase54DivvyCheck", () => Phase54DivvyCheck());                             // Phase 54
-        ok &= SuiteTimed("Phase55SeasonCheck", () => Phase55SeasonCheck(configPath));                  // Phase 55
-        ok &= SuiteTimed("Phase56DisplacementCheck", () => Phase56DisplacementCheck(configPath));            // Phase 56
-        ok &= SuiteTimed("Phase57TurnoverClockCheck", () => Phase57TurnoverClockCheck(configPath, cfgC, game, state)); // Phase 57
-        ok &= SuiteTimed("Phase58FastBreakDietCheck", () => Phase58FastBreakDietCheck(configPath));            // Phase 58
-        ok &= SuiteTimed("Phase61HeightOverDefenderCheck", () => Phase61HeightOverDefenderCheck(configPath));       // Phase 61 (S55: height-over-defender make term, golden parity)
-        ok &= SuiteTimed("Phase62UnforcedTurnoverCheck", () => Phase62UnforcedTurnoverCheck(configPath));         // Phase 62 (S56: unforced-turnover handling curve, golden parity)
-        ok &= SuiteTimed("Phase63PostMovesInteriorCheck", () => Phase63PostMovesInteriorCheck(configPath));        // Phase 63 (S57: PostMoves interior self-creation — diet tilt + resistance + assist discount)
-        ok &= SuiteTimed("Phase64StealFloorCheck", () => Phase64StealFloorCheck(configPath));               // Phase 64 (S58: live steal-forcing floor — athleticism mismatch + perimeter wingspan, golden parity)
-        ok &= SuiteTimed("Phase65DriveGateCheck", () => Phase65DriveGateCheck(configPath));                // Phase 65 (S59: perimeter-defense drive gate — per-man rim-access wall in Roll G, golden parity)
-        ok &= SuiteTimed("Phase66UsageReliefCheck", () => Phase66UsageReliefCheck(configPath));             // Phase 66 (S60: usage-relief bonus — the low-usage half of the usage↔efficiency curve, golden parity)
-        ok &= SuiteTimed("Phase67DisciplineShaveCheck", () => Phase67DisciplineShaveCheck(configPath));          // Phase 67 (S61: Discipline make-% shave — small absolute per-man defensive-restraint reduction, golden parity)
-        ok &= SuiteTimed("Phase68NonShootingFoulCheck", () => Phase68NonShootingFoulCheck(configPath));           // Phase 68 (S62: per-man non-shooting reach-in foul model — rate + committer, golden parity)
-        ok &= SuiteTimed("Phase69GenPass3ReplayParityCheck", () => Phase69GenPass3ReplayParityCheck());                // Phase 69 (S69: Pass-3 two-plane budget generator port — fixture replay parity, STANDALONE)
-        ok &= SuiteTimed("Phase70GenPass3LiveCheck", () => Phase70GenPass3LiveCheck());                        // Phase 70 (S69: Pass-3 live generator — sampler moments + exact invariants + ruled bands, STANDALONE)
-        ok &= SuiteTimed("Phase71ConfigKeyNameParityCheck", () => Phase71ConfigKeyNameParityCheck(configPath));       // Phase 71 (S74: config KEY-NAME parity — registry completeness, bidirectional names, token kind, RollE binding; NOT value/semantic correctness)
-        ok &= SuiteTimed("Phase72MinutesAllocatorCheck", () => Phase72MinutesAllocatorCheck(configPath));           // Phase 72 (S76: minutes allocator — per-position depth charts, residual control, bounded cascades)
-        ok &= SuiteTimed("Phase73SeasonStatsCheck", () => Phase73SeasonStatsCheck(configPath));                // Phase 73 (S77: per-player season roll-up — conservation, two-path identity, minutes reconciliation, games played)
-        ok &= SuiteTimed("Phase74BlockHelpCheck", () => Phase74BlockHelpCheck(configPath));                 // Phase 74 (S79: block help arm + contribution-based credit — golden parity, rate invariants, config guards)
-        ok &= SuiteTimed("Phase75VerticalCheck", () => Phase75VerticalCheck(configPath));                  // Phase 75 (S81.2: the leap — isolation sweep, reach composite, three neutral points, picker strictness, config guards)
-        ok &= SuiteTimed("Phase76TransitionReadoutCheck", () => Phase76TransitionReadoutCheck(configPath));         // Phase 76 (S85: the fast-break readout — entry/arm partition, three-way shot partition, nesting chains, event-scoping, press-born source)
-        ok &= SuiteTimed("Phase77TransitionOpportunityCheck", () => Phase77TransitionOpportunityCheck(configPath));      // Phase 77 (S86: the transition opportunity score + coach bar — golden parity, neutral rule, conservation, monotonicity, overlap ruling, config guards)
-        ok &= SuiteTimed("Phase78RealFoulsCheck", () => Phase78RealFoulsCheck(configPath));                 // Phase 78 (S87: real fouls — committer parity vs S62, totality, seat conservation, reset-proof reconciliation, five-and-out, escape hatch, negative control, config guards)
-        ok &= SuiteTimed("Phase79TransitionDefenseCheck", () => Phase79TransitionDefenseCheck(configPath));         // Phase 79 (S88: who got back — the per-man transition-defence model; oracle parity, block credit/rate pairing, slot-number pairing, negative control, config guards). REGISTERED AT S89.1: S88 shipped this file but never wired it into the runner, so it had never executed once.
-        ok &= SuiteTimed("Phase80IdentityCheck", () => Phase80IdentityCheck(configPath));                  // Phase 80 (S89: permanent identity + the history file — non-reuse across reload, type-surface enforcement, deterministic issuance, transport bijection, two-episode fixtures, domain guards, behavioural isolation with negative control, PoolId untouched, file lifecycle, legacy mode)
-        ok &= SuiteTimed("Phase81GameLogCheck", () => Phase81GameLogCheck(configPath));                  // Phase 81 (S90: per-game retention — conservation from disk, the 26-man mutation bound with a real negative control, strict reader, writer state machine, roster round-trip including men who never played, v1->v2 migration through the production writer)
-        ok &= SuiteTimed("Phase82CalendarCheck", () => Phase82CalendarCheck());                           // Phase 82 (S91: the calendar — proleptic Gregorian civil dates across 0001-9999 against independently-sourced weekdays, the exact leap rule, Selection Sunday and the ten D1 tournament dates as REFERENCE DATA, one continuous legal span from Nov 1 to championship Monday with a no-gaps walk and a negative control that rebuilds r3's gated version, overlapping periods, the three-way season lookup at both year edges, wall-clock and culture purity, renderer invariance). STANDALONE — no config, no world, no basketball.
-        ok &= SuiteTimed("Phase83GeographyCheck", () => Phase83GeographyCheck());                          // Phase 83 (S92: the map — places, great-circle miles against a golden table whose MODEL is pinned, the metric properties, schema v2 with canonical BYTES, hosting as an explicit tagged value, worldwide coordinate bounds, and a planar negative control that must FAIL the long trips). STANDALONE — no config and no basketball.
-        ok &= SuiteTimed("Phase84ConferenceSlateCheck", () => Phase84ConferenceSlateCheck(configPath));          // Phase 84 (S93: the conference slate — the authored game count, the k/q/r histogram per school, rivalry placement, both dormancy kinds, the zero-game league, exactly even home/away by construction, the four verdicts kept apart, and ★ A9: pre-fixed venues honoured by the flow, which a Eulerian walk cannot do)
-        ok &= SuiteTimed("Phase85ConferenceDatesCheck", () => Phase85ConferenceDatesCheck(configPath));          // Phase 85 (S94: conference dates — loose windows from three authored numbers, the Mon-Sun week cap with both negative controls, exact weekly totals heavier-latest, the complete-week wall rule, rotation-spaced rematches at zero same-quarter collisions, the atomic-week discriminator, the year as a dial, seven named refusals, oracle golden parity EXACT)
-        ok &= SuiteTimed("Phase86HomeCourtCheck", () => Phase86HomeCourtCheck(configPath));                // Phase 86 (S95: home court — the road penalty. Zero-path identity against a golden captured from the pre-S95 tree, neutral isolation, independently-derived 23/17 classification, an exhaustive clone sweep with Athleticism pinned EXACTLY equal (skills, not bodies), bench-inclusive side transformation with non-accumulation, the home-passthrough/away-transform asymmetry, determinism plus a discriminator that the dial does something, coverage, and the retirement of the dead road free-throw seam). The 59% is NEVER asserted — page-only calibration.
-        ok &= SuiteTimed("Phase87SeasonMemoryCheck", () => Phase87SeasonMemoryCheck(configPath));            // Phase 87 (S96: host memory — a season reads season N-1's retained log, found by arithmetic and never by enumeration, and inverts every single-meeting host. Zero-path identity against a pre-S96 golden, the five statuses asserted as VALUES with their state table, the flip proven at four separated layers each with a control, R3 intact, the d/2 theorem over every playing league, parity change dropped rather than refused, the career lifecycle on real disk where an unlogged or damaged year must NOT reach an older log, the peek proven honest against a real reservation, and isolation proven behaviourally — two careers that played different basketball remember identical hosts)
-        ok &= SuiteTimed("Phase88MteCheck", () => Phase88MteCheck(configPath));                     // Phase 88 (S97: the MTE pool — a world may author bracketed early-season tournaments; each season draws activation, seats every active field in tier order, and records it permanently. Zero-path identity against PRE-S97 goldens, load refusals by name including retired v4, the two absolutes held at every fallback level, four-year arithmetic at both boundaries, tier order beating id order, authored slot order load-bearing, a bounded 64-seed determinism sweep with the persistence endpoints, isolation on the COMPLETE per-game results, and the transaction proven negatively at both refusals). NO field composition is ever asserted — page-only calibration.
-
-        ok &= SuiteTimed("Phase89BracketsCheck", () => Phase89BracketsCheck(configPath));                // Phase 89 (S98: the brackets play — each active complete field seeded by prestige with the id tie-break, played to a full placement on the window's own nights, EXECUTED LAST AND DATED FIRST so every conference game keeps its seed. The pre-S98 conference golden reproduced WITH the brackets on (the discriminating arm), the route tables walked literally down all 4,096 result paths, every team playing every round, the neutral floor asserted on the PREPARED sides with a hosted discriminator, the reservation ledger with dormant and short events holding nothing, the log's kind byte on the block and the Kind on the game asserted separately, host memory's blindness with a CONSTRUCTED leak that would otherwise close a live residual, the record's three refusals plus atomicity through an injected rename, and win percentage with a 3-1 over 4-2 discriminator). Page-only calibration holds — no field, finish or basketball value is ever asserted.
-
-        ok &= SuiteTimed("Phase90RotationCheck", () => Phase90RotationCheck(configPath));                // Phase 90 (S99: who you play twice — the extra meeting rotates by whose turn it is, read from up to eight seasons of retained logs. Zero-path identity against PRE-S97 goldens on all three ways of having no facts, the pair ages asserted as arithmetic including a hole that must not compress time, twelve-season opponent coverage on a compact rig and on the Big East's shape against constants set by an independent oracle, the frozen-schedule negative control that the coverage predicate must REJECT, the two consumers failing differently on one damaged career, the relaxation loop proven to have run through its own instrumentation, rivalries surviving relaxation to an empty preferred set, coexistence with both sources of venue truth, and determinism over a bundle that includes the page line). Page-only calibration holds — no basketball value and no measured league constant is asserted.
-
-        ok &= SuiteTimed("Phase91HostDebtCheck", () => Phase91HostDebtCheck(configPath));                // Phase 91 (S100: who is owed the home game — the alternation stops looking one year back and counts residual home games across the same window the rotation already reads, so a home-and-home year no longer erases the debt. Zero-path identity on all three states against the PRE-S98 goldens, ★ the single/home-and-home/single discriminator with the pre-S100 one-hop rule run as a negative control on the SAME two logs, the balance as arithmetic including a hole that must not compress time and 2-0 across both a hole and a doubled year, R3 over twelve seasons, ★ surrender priority asserted directly with the weakest claim proven to be the one that pays, ★ long-run balance measured from the games that PLAYED against an isolating rotation-on/window-1 control, ★ the debt proven to be read from what happened rather than what was intended, determinism over a bundle including both page lines, the rotation's coverage undisturbed, and O-90 measured and reported). Page-only calibration holds — the imbalance bound is measured from the fixture and reported beside its control, and no basketball value is asserted.
-
-        ok &= SuiteTimed("Phase92NonConferenceCheck", () => Phase92NonConferenceCheck(configPath));           // Phase 92 (S101: classes and requests — every school gets a class read from prestige every season with its conference tier as a floor at EVERY tier, and a target November in games: home set by the class band positioned by prestige rank, neutral allowed, road the REMAINDER so the acceptance measure stays a measurement. Nothing is scheduled. Partition across stock and all six fixtures, the floor table and class order asserted directly, three-point synthetic monotonicity with the floor's negative control, seed-independence on an eventless world plus classes-only on stock, exact conservation, the clamp chain's invariants with zero compressed/impossible on committed worlds, the 31/3 exemption as set membership against the seating both directions, lopsided worlds reporting instead of throwing, ★ full-bundle zero-path identity against pre-S101 goldens including the results+possessions fingerprint, total reconciliation, and the rank formula asserted to exact sequences with the id tie-break). Page-only calibration holds — no class count, average, or gap value is asserted; the national balance is measured and printed, and the class curve stays open for Emmett to settle by reading the page.
-
-        ok &= SuiteTimed("Phase93MatchingCheck", () => Phase93MatchingCheck(configPath));                // Phase 93 (S102: the matching — every school's November pairs. Who plays whom, who hosts, which pairs are neutral; NO site and NO night, which is arc session 3. A home request names the kind of opponent it wants by that opponent's PRESTIGE (Easy under 25, Working 25-54, Decent 55-79, Name 80+, plus Selling's unrestricted ANY) at Emmett's ruled mixes, and a request that finds nobody spills UP one tier at a time and never down. The top of the country picks first and everyone else adapts around it (R4); leftover neutral tokens convert to ordinary home games; whatever road games remain pair off with the lower school hosting (C-37, bottom hosts bottom); and any token still short is closed by one bounded +1 game whose partner hosts and is used at most once. Input identity AND immutability against the season's own S101 report with a mutated-report discriminator, pair structure, hard legality with the no-request schools held out of every phase including the terminal pool, determinism, constructed seed-independence, the allocation sequences literally including the lower-bucket tie, spill direction and count, neutral conversion accounting, ★ full-bundle zero-path identity against the pre-S102 goldens including tournament games and results+possessions, ★ BOTH conservation identities nationally with every pairing on exactly two ledgers, the filler host rule asserted in its own words with no filler host over target, terminal bounds, completes-or-reports on a constructed unmatchable world, and ★ pair-for-pair ORDERED oracle parity against tools/matching_golden.json with the golden's embedded S101 report asserted to be the live one). Page-only calibration holds — no distance, spill, pair count or class trip median is asserted to a basketball value anywhere; the geographic tilt is measured and printed by the travelling school's class, and the bottom's long trips are a printed finding, not a tuned one.
-
-        ok &= SuiteTimed("Phase94ContractsCheck", () => Phase94ContractsCheck(configPath));               // Phase 94 (S103: contracts and the non-conference log — the engine keeps promises it cannot yet make. A contract is two schools, an EXPLICIT executor, an ordered leg list with stable ids, and a window; it persists in the season record (format v2, with the reader still accepting v1 so no existing career loses its tournament memory), is exercised before anything else touches a school's slate, and dies by exactly two rules that both fail closed. Oracle parity on the window state machine (tools/contracts_golden.json, 97 trajectories, all integers, exact — forced iff games==window, decrement at ROLLOVER after the decision), the specific-leg choice proven as a PERSISTENCE test through the real record, cross-season inheritance at the real reader/writer boundary with the older record deleted, nine authoring refusals by name plus the word-level parse refusals, the neutral fixture (an executor with no host at all) and the equal-host executor round-trip, discover/reserve/validate/commit with forced-over-optional priority and the canonical ascending-ContractId order proven enumeration-independent, forced overload as ONE hard failure with the collection frozen un-decremented, conference mates terminating BEFORE exercise, a damaged record reported as a COLLECTION-level loss naming no pairing, v1-reads-as-empty migration, the ruled charging chains including the road-less power school paying a HOME date, and the pairing log carried beside the contracts — Contracted and Matched entries both, normalised. NOTHING in the engine signs a contract; every contract here is fixture-authored). Page-only calibration holds — no contract count, split or distance is ever asserted.
-        ok &= SuiteTimed("Phase95ShowcasesCheck", () => Phase95ShowcasesCheck(configPath));               // Phase 95 (S104: showcases — the event pool learns a second kind. A showcase invites four schools out for TWO STAND-ALONE GAMES IN ONE DAY: no bracket, no advancement, no placement, no champion. The authored shape and its refusals by name, the two per-kind walls (R25 — one tournament AND one showcase, never two of either), ★ the OVERLAPPING-WINDOW fixture with its non-overlapping negative control, ★ the R30 RELEASE fixture (a short showcase creates zero pairings, consumes nobody, burns no four-year clock, and its stranded invitees seat in a later showcase the same season), the kind owning the play path so a field of four can never route into BracketRoutes4, roles from STORED SEAT NUMBERS with a reversed-list control, ★ A1's tournament-only exemption with the worked tournament-plus-showcase November asserted, the neutral→road→home charge and its priority against a contract leg, the radius ladder with its exact inclusive boundary and orthogonal provenance words, and ★ THE ZERO PATH BY SUBTRACTION — the stock world with its showcases removed reproducing the pre-S104 event-games fingerprint exactly, which is what proves everything that moved was moved by showcases). Page-only calibration holds — no active count, seat quality, fallback or radius rate, distance or participation count is asserted anywhere.
-        ok &= SuiteTimed("Phase96IndependentsCheck", () => Phase96IndependentsCheck(configPath));       // Phase 96 (S105: the Independents get a November and the matcher learns the same-season home-and-home. The full-season request with its prestige-read home curve, zero neutral and remainder road; the exact two-road charge and the cap of three; the no-third-meeting wall from ordinary, contract and exchange sources with no half exchange; the negative control that proves the shape is live rather than absent; national neutrality asserted as neutrality and NEVER as gap repair; the conventional-only positive control that proves R39; one Independent and fifty; the request-only control that separates the request from the matcher action; typed shortfall; and the zero path. Page-only calibration holds — no home count, shortfall size, exchange count or partner choice is asserted anywhere).
-        ok &= SuiteTimed("Phase97NonConferenceDatesCheck", () => RunPhase97NonConferenceDatesCheck(configPath));   // Phase 97 (S106: every non-conference game gets a night. Row-for-row oracle parity with provenance asserted first; the pairing set consumed and never created, dissolved or re-hosted; and each of the six rules checked BOTH ways - a legal case accepted and an illegal one rejected - because a golden stays green when a rule is deleted from both sides. Both bend numbers are printed and neither is asserted: page-only calibration holds.)
-        ok &= SuiteTimed("Phase98KnockoutCheck", () => Phase98KnockoutCheck(configPath));   // Phase 98 (S109: the single-elimination bracket primitive, DORMANT, and the city on the game record. Twelve invariants each as a named check across every supported size 2..64; the canonical seed line asserted LITERALLY (line(8) == [1,8,4,5,2,7,3,6]) with the recursion at 16/32/64; a negative control per hole each proven to fire the rule it names — 1v2/3v4, the region swap, 1-and-2-in-a-semi, and the existing consolation table as the loser-re-entry control; closure of the production types demonstrated by reflection; every field-size and seed-order refusal by name including null; both place boundaries with a control each; the dormancy proof (every active four-team event still plays 4, every eight-team 12); and ★ ALL FIVE FINGERPRINTS UNMOVED on a run carrying PlaceId. Page-only calibration holds — nothing about basketball is asserted.)
-        ok &= SuiteTimed("Phase99ConferenceTournamentsCheck", () => Phase99ConferenceTournamentsCheck(configPath));   // Phase 99 (S110: the conference tournaments. Every league that can seat eight seeds a field from its OWN league record — never the whole-season record, which already includes MTE games — hands it to the S109 knockout primitive, and plays it out on the nights the authored tournament offset already implies. The discriminators: the whole-season seed order really does disagree with the league-only one on this world; the tournament does not contaminate the record that seeded it; the exact elimination distribution per league (3/3, 3/2, two 2/1, four 1/0) proves advancement rather than counting games; participant-game conservation nationally; the reservation walk and the play walk are the same walk, which a game count cannot catch. R1 (the No.1 seed's city, frozen, nobody hosts) and R2 (league win pct, then lower school id) are ruled PLACEHOLDERS with named successors. Five prior fingerprints UNMOVED — the results hash asserted over its league-plus-event prefix rather than recaptured — and a sixth born, proven to see both the venue and the night. Page-only calibration holds: no champion, seed or win total is asserted as a target.)
-        SuiteTimed("ObservationRunV1", () => { ObservationRunV1(configPath); return true; });
-        SuiteTimed("StressTestArchetypeRosters", () => { StressTestArchetypeRosters(configPath); return true; });
-        SuiteTimingReport();
-        Console.WriteLine(ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
-        return ok ? 0 : 1;
+        return RunFullSuite(configPath);
     }
+
+    // ── The check registry (S110.1) ─────────────────────────────────────────────────
+    //  ★ ONE TABLE, BOTH PATHS. The full suite walks this table; a selector run walks a
+    //  subset of it. There is no second list anywhere, because two lists drift — and the
+    //  drift is not hypothetical here: S88 shipped Phase79TransitionDefenseCheck and never
+    //  wired it into the runner, so it never executed once until S89.1 found it. A dropped
+    //  row makes the suite FASTER AND GREENER, which is why nothing in the old design could
+    //  notice. Phase 100 now can.
+    //
+    //  ★ WHAT COUNTS AS A ROW: every check the suite GATES ON — not every SuiteTimed call.
+    //  Before S110.1 the block below mixed three shapes, and only the first was obvious:
+    //    - 76 `ok &= SuiteTimed(...)` phases  — timed and gated
+    //    -  5 `ok &= SomeCheck(...)` phases   — gated but UNTIMED and unnumbered in the table
+    //                                          (Phases 24, 47, 48, 49, 51). A build prompt that
+    //                                          defined the table as "the SuiteTimed calls" would
+    //                                          have dropped these five, and the suite would have
+    //                                          gone green and fast with five phases not running.
+    //    -  2 `SuiteTimed(...)` calls         — timed but their verdict DISCARDED (no `ok &=`)
+    //  Plus row 0 (the legacy chain block, previously invisible) and row 100 (this session).
+    //  85 rows.
+    //
+    //  ★ THE NUMBERS ARE HOLED AND ARE NOT POSITIONS. 1, 2, 6-13, 15-17, 24, 25, 29-36, 39,
+    //  41-51, 52-58, 61-100, plus 0 — and two rows have no number at all. A selector matches
+    //  Number, never index.
+
+    /// <summary>One row of the suite. <paramref name="Method"/> is carried explicitly rather
+    /// than derived from <paramref name="Name"/>: two rows make any name-pattern rule wrong —
+    /// Phase 97's method is <c>RunPhase97NonConferenceDatesCheck</c> (prefix), and
+    /// <c>Phase13TeamDisruptionDoorCheckRollB</c> does not end in "Check" (suffix).</summary>
+    internal sealed record CheckRow(int? Number, string Name, string Method, Func<bool> Run);
+
+    internal static List<CheckRow> BuildRegistry(string configPath) => new()
+    {
+            // ── Row 0: the legacy chain block, wrapped where it always ran (S110.1). It builds
+            //    its own setup lazily, so a selector that does not choose it pays nothing for
+            //    seventeen configs and fourteen generators. See Program.Checks.ChainPrelude.cs.
+            new(0, "Phase0ChainChecks", nameof(Phase0ChainChecks), () => Phase0ChainChecks(configPath)),
+
+            new(1, "Phase1RosterCheck", nameof(Phase1RosterCheck), () => Phase1RosterCheck(configPath)),
+            new(2, "Phase2AttributeWiringCheck", nameof(Phase2AttributeWiringCheck), () => Phase2AttributeWiringCheck(configPath)),
+            new(6, "Phase6MatchupWiringCheck", nameof(Phase6MatchupWiringCheck), () => Phase6MatchupWiringCheck(configPath)),
+            new(7, "Phase7BlockDoorCheck", nameof(Phase7BlockDoorCheck), () => Phase7BlockDoorCheck(configPath)),
+            new(8, "Phase8FoulDoorCheck", nameof(Phase8FoulDoorCheck), () => Phase8FoulDoorCheck(configPath)),
+            new(9, "Phase9LocationDoorCheck", nameof(Phase9LocationDoorCheck), () => Phase9LocationDoorCheck(configPath)),
+            new(10, "Phase10ReboundDoorCheck", nameof(Phase10ReboundDoorCheck), () => Phase10ReboundDoorCheck(configPath)),
+            new(11, "Phase11FreeThrowReboundDoorCheck", nameof(Phase11FreeThrowReboundDoorCheck), () => Phase11FreeThrowReboundDoorCheck(configPath)),
+            new(12, "Phase12DisruptionDoorCheck", nameof(Phase12DisruptionDoorCheck), () => Phase12DisruptionDoorCheck(configPath)),
+            new(13, "Phase13TeamDisruptionDoorCheckRollB", nameof(Phase13TeamDisruptionDoorCheckRollB), () => Phase13TeamDisruptionDoorCheckRollB(configPath)),
+            new(15, "Phase15PressFrequencyStandardCheck", nameof(Phase15PressFrequencyStandardCheck), () => Phase15PressFrequencyStandardCheck(configPath)),
+            new(16, "Phase16PressBreakFastBreakCheck", nameof(Phase16PressBreakFastBreakCheck), () => Phase16PressBreakFastBreakCheck(configPath)),
+            new(17, "Phase17UsageEfficiencyCheck", nameof(Phase17UsageEfficiencyCheck), () => Phase17UsageEfficiencyCheck(configPath)),
+            // ★ S110.1 — was an UNTIMED `ok &= AttributionSanityCheck(...)` line. It is a gated phase and always
+            //   ran; it simply had no timer and no number in the table. Folding it in changes
+            //   nothing about what it asserts and makes it selectable and timed for the first time.
+            new(24, "AttributionSanityCheck", nameof(AttributionSanityCheck), () => AttributionSanityCheck(configPath)),            // Phase 24
+            new(25, "Phase25ShootingFoulAttributionCheck", nameof(Phase25ShootingFoulAttributionCheck), () => Phase25ShootingFoulAttributionCheck(configPath)), // Phase 25
+            new(29, "Phase29HierarchyBiasCheck", nameof(Phase29HierarchyBiasCheck), () => Phase29HierarchyBiasCheck(configPath)),           // Phase 29
+            new(30, "Phase30CoachingLayer2Check", nameof(Phase30CoachingLayer2Check), () => Phase30CoachingLayer2Check(configPath)),          // Phase 30
+            new(31, "Phase31RebounderPickerCheck", nameof(Phase31RebounderPickerCheck), () => Phase31RebounderPickerCheck(configPath)),         // Phase 31
+            new(32, "Phase32PutbackAttemptRateCheck", nameof(Phase32PutbackAttemptRateCheck), () => Phase32PutbackAttemptRateCheck(configPath)),     // Phase 32
+            new(33, "Phase33TurnoverCommitterCheck", nameof(Phase33TurnoverCommitterCheck), () => Phase33TurnoverCommitterCheck(configPath)),      // Phase 33
+            new(34, "Phase34TurnoverAttributionCheck", nameof(Phase34TurnoverAttributionCheck), () => Phase34TurnoverAttributionCheck(configPath)),    // Phase 34
+            new(35, "Phase35DefensiveReboundCheck", nameof(Phase35DefensiveReboundCheck), () => Phase35DefensiveReboundCheck(configPath)),       // Phase 35
+            new(36, "Phase36BlockerCheck", nameof(Phase36BlockerCheck), () => Phase36BlockerCheck(configPath)),                 // Phase 36
+            new(39, "Phase39AssistCheck", nameof(Phase39AssistCheck), () => Phase39AssistCheck(configPath)),                  // Phase 39
+            new(41, "Phase41HelpDefenseCheck", nameof(Phase41HelpDefenseCheck), () => Phase41HelpDefenseCheck(configPath)),             // Phase 41
+            new(42, "Phase42ScreeningCheck", nameof(Phase42ScreeningCheck), () => Phase42ScreeningCheck(configPath)),               // Phase 42
+            new(43, "Phase43ReboundPhysicalWeightsCheck", nameof(Phase43ReboundPhysicalWeightsCheck), () => Phase43ReboundPhysicalWeightsCheck(configPath)),  // Phase 43
+            new(44, "Phase44OffBallDefenseCheck", nameof(Phase44OffBallDefenseCheck), () => Phase44OffBallDefenseCheck(configPath)),          // Phase 44
+            new(45, "Phase45HustleCheck", nameof(Phase45HustleCheck), () => Phase45HustleCheck(configPath)),                  // Phase 45
+            new(46, "Phase46IndividualDenialCheck", nameof(Phase46IndividualDenialCheck), () => Phase46IndividualDenialCheck(configPath)),        // Phase 46
+            // ★ S110.1 — was an UNTIMED `ok &= PassingCompoundCheck(...)` line. It is a gated phase and always
+            //   ran; it simply had no timer and no number in the table. Folding it in changes
+            //   nothing about what it asserts and makes it selectable and timed for the first time.
+            new(47, "PassingCompoundCheck", nameof(PassingCompoundCheck), () => PassingCompoundCheck(configPath)),                // Phase 47
+            // ★ S110.1 — was an UNTIMED `ok &= FatigueMeterCheck(...)` line. It is a gated phase and always
+            //   ran; it simply had no timer and no number in the table. Folding it in changes
+            //   nothing about what it asserts and makes it selectable and timed for the first time.
+            new(48, "FatigueMeterCheck", nameof(FatigueMeterCheck), () => FatigueMeterCheck(configPath)),                   // Phase 48
+            // ★ S110.1 — was an UNTIMED `ok &= FatigueAthleticismCheck(...)` line. It is a gated phase and always
+            //   ran; it simply had no timer and no number in the table. Folding it in changes
+            //   nothing about what it asserts and makes it selectable and timed for the first time.
+            new(49, "FatigueAthleticismCheck", nameof(FatigueAthleticismCheck), () => FatigueAthleticismCheck(configPath)),             // Phase 49
+            new(50, "Phase50BasketballIqCheck", nameof(Phase50BasketballIqCheck), () => Phase50BasketballIqCheck(configPath)),            // Phase 50
+            // ★ S110.1 — was an UNTIMED `ok &= FreeThrowFoulDrawCheck(...)` line. It is a gated phase and always
+            //   ran; it simply had no timer and no number in the table. Folding it in changes
+            //   nothing about what it asserts and makes it selectable and timed for the first time.
+            new(51, "FreeThrowFoulDrawCheck", nameof(FreeThrowFoulDrawCheck), () => FreeThrowFoulDrawCheck(configPath)),              // Phase 51
+            new(52, "Phase52SubstitutionsCheck", nameof(Phase52SubstitutionsCheck), () => Phase52SubstitutionsCheck(configPath)),           // Phase 52
+            new(53, "Phase53WorldStructureCheck", nameof(Phase53WorldStructureCheck), () => Phase53WorldStructureCheck()),                    // Phase 53
+            new(54, "Phase54DivvyCheck", nameof(Phase54DivvyCheck), () => Phase54DivvyCheck()),                             // Phase 54
+            new(55, "Phase55SeasonCheck", nameof(Phase55SeasonCheck), () => Phase55SeasonCheck(configPath)),                  // Phase 55
+            new(56, "Phase56DisplacementCheck", nameof(Phase56DisplacementCheck), () => Phase56DisplacementCheck(configPath)),            // Phase 56
+            // ★ S110.1 — Phase 57 BUILDS ITS OWN INPUTS. It used to be handed the accumulated
+            //   GameState and the base PossessionState from the prelude, and it was the only row
+            //   in the whole suite that took anything shared. The GameState parameter is NOT
+            //   dead (an earlier draft of the build prompt said it was): TurnoverClock:120 passes
+            //   it straight into RollK.Execute. But RollK reads GameState on exactly ONE arm —
+            //   DefensiveFoul, which charges the team foul — and this phase drives only
+            //   OffensiveFoul / DeadBallTurnover / LiveBallTurnover, three arms that touch it not
+            //   at all. So a fresh state is provably equivalent, and the parameter stays because
+            //   the call requires it. PossessionState is a record and was never reassigned in the
+            //   prelude, so the fresh one is identical to the old one.
+            //   ★ IF A FOURTH OUTCOME IS EVER ADDED to this phase's kOutcomes list, re-derive
+            //   this: an arm routing through DefensiveFoulCharge would make isolation lie.
+            new(57, "Phase57TurnoverClockCheck", nameof(Phase57TurnoverClockCheck), () =>
+            {
+                var c57 = RollCConfig.Load(configPath);
+                var d57 = RollDConfig.Load(configPath);
+                var game57 = new GameState(new FoulTracker(d57.BonusThreshold, d57.DoubleBonusThreshold));
+                var state57 = new PossessionState(
+                    PossessionNumber: 1,
+                    Offense: TeamSide.Home,
+                    Defense: TeamSide.Away,
+                    Entry: EntryType.DeadBallInbound);
+                return Phase57TurnoverClockCheck(configPath, c57, game57, state57);
+            }),
+            new(58, "Phase58FastBreakDietCheck", nameof(Phase58FastBreakDietCheck), () => Phase58FastBreakDietCheck(configPath)),            // Phase 58
+            new(61, "Phase61HeightOverDefenderCheck", nameof(Phase61HeightOverDefenderCheck), () => Phase61HeightOverDefenderCheck(configPath)),       // Phase 61 (S55: height-over-defender make term, golden parity)
+            new(62, "Phase62UnforcedTurnoverCheck", nameof(Phase62UnforcedTurnoverCheck), () => Phase62UnforcedTurnoverCheck(configPath)),         // Phase 62 (S56: unforced-turnover handling curve, golden parity)
+            new(63, "Phase63PostMovesInteriorCheck", nameof(Phase63PostMovesInteriorCheck), () => Phase63PostMovesInteriorCheck(configPath)),        // Phase 63 (S57: PostMoves interior self-creation — diet tilt + resistance + assist discount)
+            new(64, "Phase64StealFloorCheck", nameof(Phase64StealFloorCheck), () => Phase64StealFloorCheck(configPath)),               // Phase 64 (S58: live steal-forcing floor — athleticism mismatch + perimeter wingspan, golden parity)
+            new(65, "Phase65DriveGateCheck", nameof(Phase65DriveGateCheck), () => Phase65DriveGateCheck(configPath)),                // Phase 65 (S59: perimeter-defense drive gate — per-man rim-access wall in Roll G, golden parity)
+            new(66, "Phase66UsageReliefCheck", nameof(Phase66UsageReliefCheck), () => Phase66UsageReliefCheck(configPath)),             // Phase 66 (S60: usage-relief bonus — the low-usage half of the usage↔efficiency curve, golden parity)
+            new(67, "Phase67DisciplineShaveCheck", nameof(Phase67DisciplineShaveCheck), () => Phase67DisciplineShaveCheck(configPath)),          // Phase 67 (S61: Discipline make-% shave — small absolute per-man defensive-restraint reduction, golden parity)
+            new(68, "Phase68NonShootingFoulCheck", nameof(Phase68NonShootingFoulCheck), () => Phase68NonShootingFoulCheck(configPath)),           // Phase 68 (S62: per-man non-shooting reach-in foul model — rate + committer, golden parity)
+            new(69, "Phase69GenPass3ReplayParityCheck", nameof(Phase69GenPass3ReplayParityCheck), () => Phase69GenPass3ReplayParityCheck()),                // Phase 69 (S69: Pass-3 two-plane budget generator port — fixture replay parity, STANDALONE)
+            new(70, "Phase70GenPass3LiveCheck", nameof(Phase70GenPass3LiveCheck), () => Phase70GenPass3LiveCheck()),                        // Phase 70 (S69: Pass-3 live generator — sampler moments + exact invariants + ruled bands, STANDALONE)
+            new(71, "Phase71ConfigKeyNameParityCheck", nameof(Phase71ConfigKeyNameParityCheck), () => Phase71ConfigKeyNameParityCheck(configPath)),       // Phase 71 (S74: config KEY-NAME parity — registry completeness, bidirectional names, token kind, RollE binding; NOT value/semantic correctness)
+            new(72, "Phase72MinutesAllocatorCheck", nameof(Phase72MinutesAllocatorCheck), () => Phase72MinutesAllocatorCheck(configPath)),           // Phase 72 (S76: minutes allocator — per-position depth charts, residual control, bounded cascades)
+            new(73, "Phase73SeasonStatsCheck", nameof(Phase73SeasonStatsCheck), () => Phase73SeasonStatsCheck(configPath)),                // Phase 73 (S77: per-player season roll-up — conservation, two-path identity, minutes reconciliation, games played)
+            new(74, "Phase74BlockHelpCheck", nameof(Phase74BlockHelpCheck), () => Phase74BlockHelpCheck(configPath)),                 // Phase 74 (S79: block help arm + contribution-based credit — golden parity, rate invariants, config guards)
+            new(75, "Phase75VerticalCheck", nameof(Phase75VerticalCheck), () => Phase75VerticalCheck(configPath)),                  // Phase 75 (S81.2: the leap — isolation sweep, reach composite, three neutral points, picker strictness, config guards)
+            new(76, "Phase76TransitionReadoutCheck", nameof(Phase76TransitionReadoutCheck), () => Phase76TransitionReadoutCheck(configPath)),         // Phase 76 (S85: the fast-break readout — entry/arm partition, three-way shot partition, nesting chains, event-scoping, press-born source)
+            new(77, "Phase77TransitionOpportunityCheck", nameof(Phase77TransitionOpportunityCheck), () => Phase77TransitionOpportunityCheck(configPath)),      // Phase 77 (S86: the transition opportunity score + coach bar — golden parity, neutral rule, conservation, monotonicity, overlap ruling, config guards)
+            new(78, "Phase78RealFoulsCheck", nameof(Phase78RealFoulsCheck), () => Phase78RealFoulsCheck(configPath)),                 // Phase 78 (S87: real fouls — committer parity vs S62, totality, seat conservation, reset-proof reconciliation, five-and-out, escape hatch, negative control, config guards)
+            new(79, "Phase79TransitionDefenseCheck", nameof(Phase79TransitionDefenseCheck), () => Phase79TransitionDefenseCheck(configPath)),         // Phase 79 (S88: who got back — the per-man transition-defence model; oracle parity, block credit/rate pairing, slot-number pairing, negative control, config guards). REGISTERED AT S89.1: S88 shipped this file but never wired it into the runner, so it had never executed once.
+            new(80, "Phase80IdentityCheck", nameof(Phase80IdentityCheck), () => Phase80IdentityCheck(configPath)),                  // Phase 80 (S89: permanent identity + the history file — non-reuse across reload, type-surface enforcement, deterministic issuance, transport bijection, two-episode fixtures, domain guards, behavioural isolation with negative control, PoolId untouched, file lifecycle, legacy mode)
+            new(81, "Phase81GameLogCheck", nameof(Phase81GameLogCheck), () => Phase81GameLogCheck(configPath)),                  // Phase 81 (S90: per-game retention — conservation from disk, the 26-man mutation bound with a real negative control, strict reader, writer state machine, roster round-trip including men who never played, v1->v2 migration through the production writer)
+            new(82, "Phase82CalendarCheck", nameof(Phase82CalendarCheck), () => Phase82CalendarCheck()),                           // Phase 82 (S91: the calendar — proleptic Gregorian civil dates across 0001-9999 against independently-sourced weekdays, the exact leap rule, Selection Sunday and the ten D1 tournament dates as REFERENCE DATA, one continuous legal span from Nov 1 to championship Monday with a no-gaps walk and a negative control that rebuilds r3's gated version, overlapping periods, the three-way season lookup at both year edges, wall-clock and culture purity, renderer invariance). STANDALONE — no config, no world, no basketball.
+            new(83, "Phase83GeographyCheck", nameof(Phase83GeographyCheck), () => Phase83GeographyCheck()),                          // Phase 83 (S92: the map — places, great-circle miles against a golden table whose MODEL is pinned, the metric properties, schema v2 with canonical BYTES, hosting as an explicit tagged value, worldwide coordinate bounds, and a planar negative control that must FAIL the long trips). STANDALONE — no config and no basketball.
+            new(84, "Phase84ConferenceSlateCheck", nameof(Phase84ConferenceSlateCheck), () => Phase84ConferenceSlateCheck(configPath)),          // Phase 84 (S93: the conference slate — the authored game count, the k/q/r histogram per school, rivalry placement, both dormancy kinds, the zero-game league, exactly even home/away by construction, the four verdicts kept apart, and ★ A9: pre-fixed venues honoured by the flow, which a Eulerian walk cannot do)
+            new(85, "Phase85ConferenceDatesCheck", nameof(Phase85ConferenceDatesCheck), () => Phase85ConferenceDatesCheck(configPath)),          // Phase 85 (S94: conference dates — loose windows from three authored numbers, the Mon-Sun week cap with both negative controls, exact weekly totals heavier-latest, the complete-week wall rule, rotation-spaced rematches at zero same-quarter collisions, the atomic-week discriminator, the year as a dial, seven named refusals, oracle golden parity EXACT)
+            new(86, "Phase86HomeCourtCheck", nameof(Phase86HomeCourtCheck), () => Phase86HomeCourtCheck(configPath)),                // Phase 86 (S95: home court — the road penalty. Zero-path identity against a golden captured from the pre-S95 tree, neutral isolation, independently-derived 23/17 classification, an exhaustive clone sweep with Athleticism pinned EXACTLY equal (skills, not bodies), bench-inclusive side transformation with non-accumulation, the home-passthrough/away-transform asymmetry, determinism plus a discriminator that the dial does something, coverage, and the retirement of the dead road free-throw seam). The 59% is NEVER asserted — page-only calibration.
+            new(87, "Phase87SeasonMemoryCheck", nameof(Phase87SeasonMemoryCheck), () => Phase87SeasonMemoryCheck(configPath)),            // Phase 87 (S96: host memory — a season reads season N-1's retained log, found by arithmetic and never by enumeration, and inverts every single-meeting host. Zero-path identity against a pre-S96 golden, the five statuses asserted as VALUES with their state table, the flip proven at four separated layers each with a control, R3 intact, the d/2 theorem over every playing league, parity change dropped rather than refused, the career lifecycle on real disk where an unlogged or damaged year must NOT reach an older log, the peek proven honest against a real reservation, and isolation proven behaviourally — two careers that played different basketball remember identical hosts)
+            new(88, "Phase88MteCheck", nameof(Phase88MteCheck), () => Phase88MteCheck(configPath)),                     // Phase 88 (S97: the MTE pool — a world may author bracketed early-season tournaments; each season draws activation, seats every active field in tier order, and records it permanently. Zero-path identity against PRE-S97 goldens, load refusals by name including retired v4, the two absolutes held at every fallback level, four-year arithmetic at both boundaries, tier order beating id order, authored slot order load-bearing, a bounded 64-seed determinism sweep with the persistence endpoints, isolation on the COMPLETE per-game results, and the transaction proven negatively at both refusals). NO field composition is ever asserted — page-only calibration.
+
+            new(89, "Phase89BracketsCheck", nameof(Phase89BracketsCheck), () => Phase89BracketsCheck(configPath)),                // Phase 89 (S98: the brackets play — each active complete field seeded by prestige with the id tie-break, played to a full placement on the window's own nights, EXECUTED LAST AND DATED FIRST so every conference game keeps its seed. The pre-S98 conference golden reproduced WITH the brackets on (the discriminating arm), the route tables walked literally down all 4,096 result paths, every team playing every round, the neutral floor asserted on the PREPARED sides with a hosted discriminator, the reservation ledger with dormant and short events holding nothing, the log's kind byte on the block and the Kind on the game asserted separately, host memory's blindness with a CONSTRUCTED leak that would otherwise close a live residual, the record's three refusals plus atomicity through an injected rename, and win percentage with a 3-1 over 4-2 discriminator). Page-only calibration holds — no field, finish or basketball value is ever asserted.
+
+            new(90, "Phase90RotationCheck", nameof(Phase90RotationCheck), () => Phase90RotationCheck(configPath)),                // Phase 90 (S99: who you play twice — the extra meeting rotates by whose turn it is, read from up to eight seasons of retained logs. Zero-path identity against PRE-S97 goldens on all three ways of having no facts, the pair ages asserted as arithmetic including a hole that must not compress time, twelve-season opponent coverage on a compact rig and on the Big East's shape against constants set by an independent oracle, the frozen-schedule negative control that the coverage predicate must REJECT, the two consumers failing differently on one damaged career, the relaxation loop proven to have run through its own instrumentation, rivalries surviving relaxation to an empty preferred set, coexistence with both sources of venue truth, and determinism over a bundle that includes the page line). Page-only calibration holds — no basketball value and no measured league constant is asserted.
+
+            new(91, "Phase91HostDebtCheck", nameof(Phase91HostDebtCheck), () => Phase91HostDebtCheck(configPath)),                // Phase 91 (S100: who is owed the home game — the alternation stops looking one year back and counts residual home games across the same window the rotation already reads, so a home-and-home year no longer erases the debt. Zero-path identity on all three states against the PRE-S98 goldens, ★ the single/home-and-home/single discriminator with the pre-S100 one-hop rule run as a negative control on the SAME two logs, the balance as arithmetic including a hole that must not compress time and 2-0 across both a hole and a doubled year, R3 over twelve seasons, ★ surrender priority asserted directly with the weakest claim proven to be the one that pays, ★ long-run balance measured from the games that PLAYED against an isolating rotation-on/window-1 control, ★ the debt proven to be read from what happened rather than what was intended, determinism over a bundle including both page lines, the rotation's coverage undisturbed, and O-90 measured and reported). Page-only calibration holds — the imbalance bound is measured from the fixture and reported beside its control, and no basketball value is asserted.
+
+            new(92, "Phase92NonConferenceCheck", nameof(Phase92NonConferenceCheck), () => Phase92NonConferenceCheck(configPath)),           // Phase 92 (S101: classes and requests — every school gets a class read from prestige every season with its conference tier as a floor at EVERY tier, and a target November in games: home set by the class band positioned by prestige rank, neutral allowed, road the REMAINDER so the acceptance measure stays a measurement. Nothing is scheduled. Partition across stock and all six fixtures, the floor table and class order asserted directly, three-point synthetic monotonicity with the floor's negative control, seed-independence on an eventless world plus classes-only on stock, exact conservation, the clamp chain's invariants with zero compressed/impossible on committed worlds, the 31/3 exemption as set membership against the seating both directions, lopsided worlds reporting instead of throwing, ★ full-bundle zero-path identity against pre-S101 goldens including the results+possessions fingerprint, total reconciliation, and the rank formula asserted to exact sequences with the id tie-break). Page-only calibration holds — no class count, average, or gap value is asserted; the national balance is measured and printed, and the class curve stays open for Emmett to settle by reading the page.
+
+            new(93, "Phase93MatchingCheck", nameof(Phase93MatchingCheck), () => Phase93MatchingCheck(configPath)),                // Phase 93 (S102: the matching — every school's November pairs. Who plays whom, who hosts, which pairs are neutral; NO site and NO night, which is arc session 3. A home request names the kind of opponent it wants by that opponent's PRESTIGE (Easy under 25, Working 25-54, Decent 55-79, Name 80+, plus Selling's unrestricted ANY) at Emmett's ruled mixes, and a request that finds nobody spills UP one tier at a time and never down. The top of the country picks first and everyone else adapts around it (R4); leftover neutral tokens convert to ordinary home games; whatever road games remain pair off with the lower school hosting (C-37, bottom hosts bottom); and any token still short is closed by one bounded +1 game whose partner hosts and is used at most once. Input identity AND immutability against the season's own S101 report with a mutated-report discriminator, pair structure, hard legality with the no-request schools held out of every phase including the terminal pool, determinism, constructed seed-independence, the allocation sequences literally including the lower-bucket tie, spill direction and count, neutral conversion accounting, ★ full-bundle zero-path identity against the pre-S102 goldens including tournament games and results+possessions, ★ BOTH conservation identities nationally with every pairing on exactly two ledgers, the filler host rule asserted in its own words with no filler host over target, terminal bounds, completes-or-reports on a constructed unmatchable world, and ★ pair-for-pair ORDERED oracle parity against tools/matching_golden.json with the golden's embedded S101 report asserted to be the live one). Page-only calibration holds — no distance, spill, pair count or class trip median is asserted to a basketball value anywhere; the geographic tilt is measured and printed by the travelling school's class, and the bottom's long trips are a printed finding, not a tuned one.
+
+            new(94, "Phase94ContractsCheck", nameof(Phase94ContractsCheck), () => Phase94ContractsCheck(configPath)),               // Phase 94 (S103: contracts and the non-conference log — the engine keeps promises it cannot yet make. A contract is two schools, an EXPLICIT executor, an ordered leg list with stable ids, and a window; it persists in the season record (format v2, with the reader still accepting v1 so no existing career loses its tournament memory), is exercised before anything else touches a school's slate, and dies by exactly two rules that both fail closed. Oracle parity on the window state machine (tools/contracts_golden.json, 97 trajectories, all integers, exact — forced iff games==window, decrement at ROLLOVER after the decision), the specific-leg choice proven as a PERSISTENCE test through the real record, cross-season inheritance at the real reader/writer boundary with the older record deleted, nine authoring refusals by name plus the word-level parse refusals, the neutral fixture (an executor with no host at all) and the equal-host executor round-trip, discover/reserve/validate/commit with forced-over-optional priority and the canonical ascending-ContractId order proven enumeration-independent, forced overload as ONE hard failure with the collection frozen un-decremented, conference mates terminating BEFORE exercise, a damaged record reported as a COLLECTION-level loss naming no pairing, v1-reads-as-empty migration, the ruled charging chains including the road-less power school paying a HOME date, and the pairing log carried beside the contracts — Contracted and Matched entries both, normalised. NOTHING in the engine signs a contract; every contract here is fixture-authored). Page-only calibration holds — no contract count, split or distance is ever asserted.
+            new(95, "Phase95ShowcasesCheck", nameof(Phase95ShowcasesCheck), () => Phase95ShowcasesCheck(configPath)),               // Phase 95 (S104: showcases — the event pool learns a second kind. A showcase invites four schools out for TWO STAND-ALONE GAMES IN ONE DAY: no bracket, no advancement, no placement, no champion. The authored shape and its refusals by name, the two per-kind walls (R25 — one tournament AND one showcase, never two of either), ★ the OVERLAPPING-WINDOW fixture with its non-overlapping negative control, ★ the R30 RELEASE fixture (a short showcase creates zero pairings, consumes nobody, burns no four-year clock, and its stranded invitees seat in a later showcase the same season), the kind owning the play path so a field of four can never route into BracketRoutes4, roles from STORED SEAT NUMBERS with a reversed-list control, ★ A1's tournament-only exemption with the worked tournament-plus-showcase November asserted, the neutral→road→home charge and its priority against a contract leg, the radius ladder with its exact inclusive boundary and orthogonal provenance words, and ★ THE ZERO PATH BY SUBTRACTION — the stock world with its showcases removed reproducing the pre-S104 event-games fingerprint exactly, which is what proves everything that moved was moved by showcases). Page-only calibration holds — no active count, seat quality, fallback or radius rate, distance or participation count is asserted anywhere.
+            new(96, "Phase96IndependentsCheck", nameof(Phase96IndependentsCheck), () => Phase96IndependentsCheck(configPath)),       // Phase 96 (S105: the Independents get a November and the matcher learns the same-season home-and-home. The full-season request with its prestige-read home curve, zero neutral and remainder road; the exact two-road charge and the cap of three; the no-third-meeting wall from ordinary, contract and exchange sources with no half exchange; the negative control that proves the shape is live rather than absent; national neutrality asserted as neutrality and NEVER as gap repair; the conventional-only positive control that proves R39; one Independent and fifty; the request-only control that separates the request from the matcher action; typed shortfall; and the zero path. Page-only calibration holds — no home count, shortfall size, exchange count or partner choice is asserted anywhere).
+            new(97, "Phase97NonConferenceDatesCheck", nameof(RunPhase97NonConferenceDatesCheck), () => RunPhase97NonConferenceDatesCheck(configPath)),   // Phase 97 (S106: every non-conference game gets a night. Row-for-row oracle parity with provenance asserted first; the pairing set consumed and never created, dissolved or re-hosted; and each of the six rules checked BOTH ways - a legal case accepted and an illegal one rejected - because a golden stays green when a rule is deleted from both sides. Both bend numbers are printed and neither is asserted: page-only calibration holds.)
+            new(98, "Phase98KnockoutCheck", nameof(Phase98KnockoutCheck), () => Phase98KnockoutCheck(configPath)),   // Phase 98 (S109: the single-elimination bracket primitive, DORMANT, and the city on the game record. Twelve invariants each as a named check across every supported size 2..64; the canonical seed line asserted LITERALLY (line(8) == [1,8,4,5,2,7,3,6]) with the recursion at 16/32/64; a negative control per hole each proven to fire the rule it names — 1v2/3v4, the region swap, 1-and-2-in-a-semi, and the existing consolation table as the loser-re-entry control; closure of the production types demonstrated by reflection; every field-size and seed-order refusal by name including null; both place boundaries with a control each; the dormancy proof (every active four-team event still plays 4, every eight-team 12); and ★ ALL FIVE FINGERPRINTS UNMOVED on a run carrying PlaceId. Page-only calibration holds — nothing about basketball is asserted.)
+            new(99, "Phase99ConferenceTournamentsCheck", nameof(Phase99ConferenceTournamentsCheck), () => Phase99ConferenceTournamentsCheck(configPath)),   // Phase 99 (S110: the conference tournaments. Every league that can seat eight seeds a field from its OWN league record — never the whole-season record, which already includes MTE games — hands it to the S109 knockout primitive, and plays it out on the nights the authored tournament offset already implies. The discriminators: the whole-season seed order really does disagree with the league-only one on this world; the tournament does not contaminate the record that seeded it; the exact elimination distribution per league (3/3, 3/2, two 2/1, four 1/0) proves advancement rather than counting games; participant-game conservation nationally; the reservation walk and the play walk are the same walk, which a game count cannot catch. R1 (the No.1 seed's city, frozen, nobody hosts) and R2 (league win pct, then lower school id) are ruled PLACEHOLDERS with named successors. Five prior fingerprints UNMOVED — the results hash asserted over its league-plus-event prefix rather than recaptured — and a sixth born, proven to see both the venue and the night. Page-only calibration holds: no champion, seed or win total is asserted as a target.)
+
+            // ── Row 100: the registry guards itself (S110.1). Placed here so the numbers stay
+            //    strictly ascending; the two number-less rows below have always run last.
+            new(100, "Phase100RegistryCheck", nameof(Phase100RegistryCheck), () => Phase100RegistryCheck(configPath)),
+
+            // ★ S110.1 — was a `SuiteTimed(...)` call with NO `ok &=`: timed, but its verdict
+            //   discarded. The lambda returns an unconditional true and SuiteTimed has no catch,
+            //   so gating it is provably a behavioural no-op. Number is null — it has no phase
+            //   number to invent, so it is selectable by name only.
+            new(null, "ObservationRunV1", nameof(ObservationRunV1), () => { ObservationRunV1(configPath); return true; }),
+            // ★ S110.1 — was a `SuiteTimed(...)` call with NO `ok &=`: timed, but its verdict
+            //   discarded. The lambda returns an unconditional true and SuiteTimed has no catch,
+            //   so gating it is provably a behavioural no-op. Number is null — it has no phase
+            //   number to invent, so it is selectable by name only.
+            new(null, "StressTestArchetypeRosters", nameof(StressTestArchetypeRosters), () => { StressTestArchetypeRosters(configPath); return true; }),    };
+
+    private const string ChecksUsage =
+        "usage: dotnet run --project src\\Charm.Harness\\Charm.Harness.csproj -- checks <selector ...>\n" +
+        "  <n>        one row by phase NUMBER      e.g. checks 99\n" +
+        "  <lo>-<hi>  an inclusive number range    e.g. checks 92-99   (gaps legal; reversed refused)\n" +
+        "  <text>     every row whose name contains the text, case-insensitive\n" +
+        "  list       print the registry in execution order (cannot be combined)\n" +
+        "The full suite is the NO-ARGUMENT command and remains the delivery gate.";
+
+    // ── Selection (S110.1) ──────────────────────────────────────────────────────────
+    //  Every selector resolves BEFORE a single check runs. If any one is malformed or
+    //  matches nothing, the run is refused by name and NOTHING executes — never partway
+    //  through, and never as a silently empty run that would look like a pass.
+
+    internal sealed record SelectionResult(
+        IReadOnlyList<CheckRow> Selected, IReadOnlyList<string> Refusals, bool ListOnly);
+
+    internal static SelectionResult SelectRows(IReadOnlyList<CheckRow> rows, IReadOnlyList<string> selectors)
+    {
+        var refusals = new List<string>();
+        var none = Array.Empty<CheckRow>();
+
+        if (selectors.Count == 0)
+        {
+            refusals.Add("no selector given — `checks` on its own runs nothing");
+            return new SelectionResult(none, refusals, false);
+        }
+
+        if (selectors.Any(s => s.Equals("list", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (selectors.Count == 1) return new SelectionResult(none, refusals, true);
+            refusals.Add("'list' is exclusive and cannot be combined with another selector");
+            return new SelectionResult(none, refusals, false);
+        }
+
+        var picked = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var sel in selectors)
+        {
+            List<CheckRow> hits;
+            var dash = sel.IndexOf('-');
+            if (dash > 0 && dash < sel.Length - 1
+                && sel[..dash].All(char.IsAsciiDigit) && sel[(dash + 1)..].All(char.IsAsciiDigit))
+            {
+                if (!int.TryParse(sel[..dash], out var lo) || !int.TryParse(sel[(dash + 1)..], out var hi))
+                { refusals.Add($"'{sel}' is not a range of whole numbers"); continue; }
+                // A reversed range is REFUSED, never normalised: "99-92" is a typo, and
+                // silently running it as 92-99 teaches the selector to guess.
+                if (lo > hi) { refusals.Add($"'{sel}' is a reversed range — ranges are never normalised"); continue; }
+                hits = rows.Where(r => r.Number is { } n && n >= lo && n <= hi).ToList();
+            }
+            else if (sel.Length > 0 && sel.All(char.IsAsciiDigit))
+            {
+                if (!int.TryParse(sel, out var n)) { refusals.Add($"'{sel}' is not a whole number"); continue; }
+                hits = rows.Where(r => r.Number == n).ToList();
+            }
+            else
+            {
+                // A substring may match one row or many, and MANY IS NOT AN ERROR — matching
+                // several rows is how a subsystem is re-checked ("checks transition").
+                hits = rows.Where(r => r.Name.Contains(sel, StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+
+            if (hits.Count == 0) { refusals.Add($"'{sel}' matched no registered check"); continue; }
+            foreach (var h in hits) picked.Add(h.Name);
+        }
+
+        // Any refusal at all means nothing runs — resolve-then-execute, never interleaved.
+        IReadOnlyList<CheckRow> selected =
+            refusals.Count > 0 ? none : rows.Where(r => picked.Contains(r.Name)).ToList();
+        return new SelectionResult(selected, refusals, false);
+    }
+
+    // ── Running, and the two summaries (S110.1) ─────────────────────────────────────
+
+    internal sealed record SuiteSummary(int Executed, int Total, bool IsPartial, bool Ok);
+
+    /// <summary>A full walk of the table. Never partial, by construction.</summary>
+    internal static SuiteSummary FullWalkSummary(int total, bool ok) => new(total, total, false, ok);
+
+    /// <summary>A selector run. ★ ALWAYS partial — including when the selector happens to name
+    /// every row. `checks 0-100` selects all 85 and is still NOT a suite pass; the gate has
+    /// exactly one spelling and it is the no-argument command.</summary>
+    internal static SuiteSummary PartialSummary(int total, int executed, bool ok) => new(executed, total, true, ok);
+
+    private static int RunFullSuite(string configPath)
+    {
+        var registry = BuildRegistry(configPath);
+        var ok = true;
+        foreach (var row in registry) ok &= SuiteTimed(row.Name, row.Run);
+        return Report(FullWalkSummary(registry.Count, ok));
+    }
+
+    private static int RunSelectedChecks(string configPath, string[] selectors)
+    {
+        var registry = BuildRegistry(configPath);
+        var result = SelectRows(registry, selectors);
+
+        if (result.Refusals.Count > 0)
+        {
+            Console.WriteLine("CHECK SELECTOR REFUSED — nothing was run.");
+            foreach (var r in result.Refusals) Console.WriteLine($"  {r}");
+            Console.WriteLine();
+            Console.WriteLine(ChecksUsage);
+            return 1;
+        }
+
+        if (result.ListOnly)
+        {
+            Console.WriteLine($"=== CHECK REGISTRY — {registry.Count} rows, in execution order ===");
+            foreach (var row in registry)
+                Console.WriteLine($"  {(row.Number is { } n ? n.ToString() : "-"),4}  {row.Name}");
+            return 0;
+        }
+
+        var ok = true;
+        foreach (var row in result.Selected) ok &= SuiteTimed(row.Name, row.Run);
+        return Report(PartialSummary(registry.Count, result.Selected.Count, ok));
+    }
+
+    /// <summary>The timing table and the verdict line. ★ A partial run can NEVER print
+    /// the suite verdict "ALL CHECKS PASSED." — that string (with its terminating period)
+    /// exists at exactly one site, below, behind IsPartial. Two OTHER files print a similar
+    /// line for their own internal purposes — Phase 97's own summary and ObservationRunV1 —
+    /// neither with the period and neither as the suite's verdict; do not confuse them.</summary>
+    private static int Report(SuiteSummary s)
+    {
+        SuiteTimingReport();
+        if (s.IsPartial)
+            Console.WriteLine($"\nPARTIAL CHECK RUN — {s.Executed} of {s.Total} sections. NOT a suite pass."
+                              + (s.Ok ? "" : " CHECKS FAILED."));
+        else
+            Console.WriteLine(s.Ok ? "\nALL CHECKS PASSED." : "\nCHECKS FAILED.");
+        return s.Ok ? 0 : 1;
+    }
+
 
 
     // ── Suite timing (S104.1) ───────────────────────────────────────────────────────

@@ -9883,6 +9883,17 @@ date), identity holds 80. **A new suite phase is not registered until it appears
 `Program.cs`'s registration block AND any fixture it reads is added to
 `Charm.Harness.csproj`.** S88 did neither; S89 did the second but collided on the first.
 
+★ **S110.1 — this is now enforced rather than relied upon.** The registration block is a single
+canonical registry that the full suite *walks*, so there is no longer a second list to drift from,
+and **Phase 100** closes it in both directions by reflection: every `^(Run)?Phase\d+` method in the
+assembly appears in the table exactly once, and every numbered row resolves to a real method. The
+S88 failure — a phase that exists, is never called, and makes the suite *faster and greener* — goes
+red now instead of going unnoticed for a session. One limit, stated in the check itself: five
+legacy-named gated phases (`AttributionSanityCheck`, `PassingCompoundCheck`, `FatigueMeterCheck`,
+`FatigueAthleticismCheck`, `FreeThrowFoulDrawCheck`) carry no `PhaseNN` prefix and are invisible to
+the reflection arm; they are covered by Phase 100's frozen execution order and by nothing else. Do
+not widen the pattern to reach them — it would sweep in every helper in the harness.
+
 ### One check that had to change first
 
 Phase 55's determinism replay asserted `outcome2.Results.SequenceEqual(outcome.Results)` — the record's generated equality, which silently absorbs any field ever added to `SeasonGameResult`. Two runs against one career MUST issue different numbers, so that form would have gone red with nothing wrong the first time it saw history mode. It is now field-explicit, and asserts something sharper than before: **the basketball is a pure function of (world, seed, config); the numbering deliberately is not.**

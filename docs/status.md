@@ -10,7 +10,21 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 110** (2026-09-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 99 new, 43
+Last updated: **Session 110.1** (2026-09-16; verified on Emmett's machine — ALL CHECKS PASSED, **85 timed sections,
+622.7s, Phase 100 new (38 assertions)**. **THE PHASE SELECTOR** — `-- checks 99` now costs the 56s that phase costs
+instead of a full pass. **One canonical registry of 85 rows drives both the full walk and any selection**; there is no
+second list. ★ **THE CLEARED PROMPT WOULD HAVE SILENTLY STOPPED FIVE LIVE PHASES** — 24, 47, 48, 49 and 51 are gated
+`ok &=` lines with no timer, so defining the table as "the `SuiteTimed` calls" would have dropped them, and reflection
+could not have caught it because none carries a `PhaseNN` prefix. The denominator moved 80 → 85 at the gate.
+★ **A2 WAS FALSE AND ITS CONCLUSION SURVIVED ON OTHER EVIDENCE** — Phase 57's `GameState` parameter is live
+(`TurnoverClock.cs:120` → `RollK.Execute`), but `RollK` reads it on exactly one arm and Phase 57 drives three others,
+proven byte-identical isolated vs in-suite. ★ **THE PROMPT'S §0 BLAMED THE PRELUDE FOR A GAP IT CANNOT EXPLAIN** —
+the chain block is **7.6s, 1.2%** — and its 1027.6s / 101s headline figures were **sandbox** numbers, not Emmett's;
+S110's journal already held 587.7s and the ~1.75× factor. True saving **~9.5 min per re-check**. ★ **Five negative
+controls added beyond the brief**, because the frozen-order check is the only thing that can catch a dropped
+legacy-named phase. No engine change, no fingerprint touched. **Closes O-108.** Journal S110.1 has the detail.)
+
+Previous: **Session 110** (2026-09-07; verified on Emmett's machine — ALL CHECKS PASSED, **Phase 99 new, 43
 assertions; Phase 98 now 134**. **THE CONFERENCE TOURNAMENTS — 31 LEAGUES, 31 CHAMPIONS**, Session B of the arc and the
 S109 primitive's first consumer. Emmett ruled **eight everywhere** (`TourneyTeams` stays authored and unread), so 217
 games play on the nights each league's authored `TourneyOffsetDays` already implied, seeded from the **league record
@@ -1012,9 +1026,6 @@ chart is PROVISIONAL pending O-6.
   The real object is two-way vs multi-way ties, unbalanced schedules, partial separation of a tied block, and what
   happens when head-to-head cannot resolve — ruled against a page full of real ties. Ranking slots ahead of any draw
   once rankings exist.
-- **O-108 — TWO SUITE SECTIONS RUN UNGATED (S110 gate finding, cosmetic-ish).** `ObservationRunV1` and
-  `StressTestArchetypeRosters` are `SuiteTimed(…)` calls **without** `ok &=`, so their verdict is discarded. Both
-  lambdas return an unconditional `true`, so folding them in is a behavioural no-op. S110.1 does it.
 - **O-104 — NON-CONFERENCE PAIRINGS CARRY NO CITY.** `NonConDatedGame` is not a `SeasonGame`, so S109's place
   field never reaches the 2,171 buy games. They get one when the bridge session makes them season games — not
   before, and not by a second field on a record that is going away.
@@ -1033,8 +1044,12 @@ chart is PROVISIONAL pending O-6.
   somebody checks the arithmetic by hand. One format string. **Not fixed in S105.1: it is outside
   that session's scope wall and touches nothing the session was correcting.**
 
-- **O-96 — ★ A SCHEDULE-ONLY SEASON MODE. 46% of the suite pays for basketball nothing reads.**
-  Phases 91, 90 and 87 (host debt, rotation, season memory) are 207s of 446s and all three are
+- **O-96 — ★ A SCHEDULE-ONLY SEASON MODE. A large share of the suite pays for basketball nothing reads.**
+  ★ **Figures refreshed at S110.1, the first run whose timing report is COMPLETE (85 sections, 622.7s on Emmett's
+  machine — the old 446s covered 74 sections and the prelude was invisible).** The ranking moved: the single largest
+  cost is now **Phase 96 Independents at 140.0s (22.5%)**, ahead of all three career rigs; 91 + 90 + 87 are 160.0s
+  (25.7%); the top five sections are 55% of the run. Re-derive against a fresh run before scoping, not from this line.
+  Phases 91, 90 and 87 (host debt, rotation, season memory) were 207s of 446s and all three are
   multi-season career rigs. Verified against source in S104.1: `ReadSeasonLog` consumes exactly
   HomeSchoolId, AwaySchoolId and IsConferenceGame — never a score, an overtime count or a
   possession count. Add the stock-season phases (95, 93, 92 — another 29%, testing seating and
@@ -2163,13 +2178,11 @@ corroborated any of it. S110 shipped the deterministic placeholder instead and b
 The lesson is S81.3's in a new costume: **a hypothesis written onto the board reads like a ruling one session
 later.** When this block asserts that something is settled, it must name where the ruling is recorded.
 
-★ **A MICRO-SESSION IS QUEUED AHEAD OF IT — S110.1, THE PHASE SELECTOR.** The suite is all-or-nothing, so any
-re-check costs a full pass; S110 spent four of them. `-- checks 99` should cost the 57s that phase costs. One
-canonical registry driving both the full walk and any selection, a partial run structurally incapable of printing
-`ALL CHECKS PASSED`, and Phase 100 guarding the registry by reflection in both directions — because a *missing*
-phase makes the suite faster and greener, which is exactly the S88 bug (Phase 79 shipped unregistered and never
-executed once). Also closes **O-108**. Prompt drafted and outside-reviewed; ~10 min saved per re-check on Emmett's
-machine, which is ~1.75× faster than the sandbox.
+★ **THE QUEUED MICRO-SESSION SHIPPED — S110.1, THE PHASE SELECTOR (2026-09-16).** `-- checks 99` costs 56.3s
+against a 622.7s full pass. Nothing is queued ahead of the bridge any more. Two things it leaves behind for whoever
+drafts next: **the suite's cost is now fully measured** (see O-96's refreshed figures — Phase 96 alone is 22.5%),
+and **`-- checks <n>` is a development aid only**. The full-suite command remains the delivery gate and the
+paste-back of record; a selector run cannot print `ALL CHECKS PASSED.` even when it names every row.
 
 ★ **DEFERRED BEHIND THE ARC, NOT DROPPED** — the Selling home band and fill order, the repeat ceiling and recency
 demotion (blocked on O-94), and O-100's ranked shelves. Each keeps its place in the queue.
