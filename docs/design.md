@@ -11996,10 +11996,17 @@ There is no default and no repair.
 
 **Nullable in flight only.** The field is an optional parameter so the two existing `with` copies
 (identity stamping, dating) and every caller survive untouched — but a game may not rest unresolved. A
-named helper proves every game placed at exactly two structural boundaries: the assembled league
-schedule (before any tip, since bracket games are built during play and cannot be listed earlier) and
-the completed season result. Each refuses by boundary name; Phase 98 C6 drives an unresolved game
-through both.
+named helper proves every game carries **the place it was ruled to have** at exactly two structural
+boundaries: the assembled league schedule (before any tip, since bracket games are built during play and
+cannot be listed earlier) and the completed season result. Each refuses by boundary name; Phase 98 C6
+drives an unresolved game through both.
+
+★ **S111 moved this rule, by ruling, and it now reads in BOTH directions.** "Every game carries a city"
+held until the buy games played: Emmett ruled that a **neutral** buy game carries **none**, because no
+venue is recorded for a one-off neutral pairing anywhere in the tree and inventing one is a basketball
+decision nobody has made. So the boundary refuses a hosted game with no city *and* refuses a neutral buy
+game that has one. Everything else is unchanged: a league game takes its home school's city, a bracket or
+showcase game its event's.
 
 **Invisible to every hash.** All five fingerprints hash named fields; Phase 98 C7 asserts all five
 unmoved on a run carrying the field, and proves the invisibility by construction — the same schedule
@@ -12009,7 +12016,8 @@ with every city rewritten hashes identically.
 `Cities:` line reads the count of placed games and distinct cities. Nothing is asserted from either.
 
 **Not here, by the wall:** non-conference pairings carry no city (they are not season games yet — the
-bridge session's); the bye question for the 19 leagues whose tournament fields are not powers of two is
+bridge session's; ★ **S111 shipped this**: hosted buy games take their host's city, neutral ones carry
+none by ruling); the bye question for the 19 leagues whose tournament fields are not powers of two is
 unruled and the primitive refuses those sizes rather than guessing.
 
 ## Conference tournaments — thirty-one leagues, thirty-one champions (Session 110, 2026-09-07)
@@ -12147,3 +12155,112 @@ catches it.
 Byes, auto-bids, rankings, the national bracket, making the 2,171 non-conference games simulate,
 `TourneyType`/`SeedDiv`/divisional seeding, authored conference venues. **A champion is crowned, recorded,
 and feeds nothing.**
+
+## The buy games play — every non-conference pairing becomes a season game (Session 111, 2026-09-16)
+
+The bridge. S102 paired them, S103 contracted them, S106 dated them, S108 moved who travels how far —
+and none of them was ever played. **2,170 now play** (2,078 hosted, 92 neutral), appended after the
+conference tournaments, taking the stock season from 3,187 to 5,357 games and every school to 29–34.
+`Program.Season.BuyGames.cs` holds the conversion; nothing here decides *which* games exist, who hosts,
+or what night — the matcher, the contract layer and the dater are finished and are not reopened.
+
+### Where they sit, and why it must stay that way
+
+Appended last, at fixture ordinals starting where the conference tournaments stopped. **The ordinal is
+the engine seed input**, so appending is the only move that leaves every earlier game on the seed it has
+always had; reordering re-rolls the season. November games therefore play after March ones in fixture
+order, which is a known and deliberate property of the season loop (S104, S110, now S111).
+
+Conference tournaments are seeded from the **league record** before this block runs, so nothing a buy
+game does can reach a field or a champion — proven, not reasoned (Phase 101 C6).
+
+### The site fact — from the pairing's kind, never from a host id
+
+The matcher emits **five** pair kinds and the contract layer injects a sixth label:
+
+| pair kind | hosts? |
+|---|---|
+| `Hosted`, `Filler`, `Terminal`, `Exchange` | the named host |
+| `Neutral` | **nobody** — the two ids are normalised lower-first, so the field named `HostSchoolId` is NOT a host |
+| `Contract` | read from the exercised leg's `IsNeutral` — the label says nothing about the site |
+
+Any other kind word **refuses by name** rather than defaulting. Home/Away on a neutral game is a
+box-score ordering only, never a venue (S110 C4e's ruling, applied again).
+
+**The city (Emmett's ruling, S111).** A hosted buy game takes its host's city. **A neutral buy game
+carries none** — asserted as the ruled outcome, never as an absence that happens to pass. See the S109
+section above, whose "every game carries a city" rule this supersedes. **O-104 closes for hosted buy
+games only**; a real neutral-venue rule is its own session and its own basketball question (O-109).
+
+### Identity — carried, never reconstructed
+
+Each played buy game carries its **pairing index**. It is never rebuilt from the two school ids, because
+S105 ships the same-season home-and-home: 108 school pairs meet twice on the stock season, and a
+schools-only key would accept the two legs being swapped, duplicated or dropped against each other. The
+carried index is also what marks the game as a buy game, which is what keeps `IsLeagueGame` honest.
+
+### The fourth category
+
+`Kind == "nonconf"` — a new word, never a repurposed one. The played-game vocabulary is
+`conf | mte | ctourney | nonconf`, deliberately NOT the same vocabulary as the matcher's pair kinds: a
+pair kind says how a pairing was produced, a game kind says what sort of game was played.
+
+`IsLeagueGame` is now a **four**-way split. A buy game carries no event id and no tournament id, so
+before this line learned the fourth kind every buy game read as a league game — the same trap S110 hit
+when it added the third. Every sum that was three-way is now four-way (reservations, the log's finalize
+count, and about a dozen checks across ten files).
+
+### Ids, and one walk
+
+`ReserveGames` is a four-term sum at the single existing call; the buy block is spent **last**, in the
+dater's pairing order, which is the order the games play. The undated pairing consumes no id. The
+reservation walk and the play walk are proven to be one walk position for position — a count cannot
+establish that, and two games holding each other's reserved ids is caught (Phase 101 C8d, C10m).
+
+### Two home-court denominators
+
+- `LeagueRoadSidesShaved` — the league slate (2,818). What Phase 99 C4c, Phase 86 B8 and Phase 89 C5f
+  always meant, and what they now read.
+- `HostedRoadSidesShaved` — every hosted game that played (4,896 = 2,818 + 2,078).
+
+One counter cannot serve both consumers. The failure this split prevents is not a changed number; it is a
+conference-only consumer silently receiving a full-season total — **a green check reading the wrong
+population**.
+
+### The seventh fingerprint
+
+Its own hash, not folded into any other. One row per played buy game — **pairing, date, host-or-neutral,
+city, both schools, the winner** — sorted by pairing, never by collection order. The undated pairing never
+appears. Stock value `bcb4b5d8…`.
+
+**Scope, stated accurately:** winner in, scores out (S110's sixth-hash precedent). It therefore sees a
+venue change, a date change and a winner change, and does **not** respond to a score-only change. Score
+integrity is the results fingerprint's job and Phase 101's per-fixture comparison's job.
+
+### The zero path is a switch, because no world authors one
+
+Non-conference requests are **derived for every world**, not authored, so every fixture world plays buy
+games (fixture-mte went 80 → 391). A test-only `buyGamesOffForTest` therefore exists: it is what lets
+Phase 101 hold the pre-edit season beside the new one, and what preserves Phase 89's construction of a
+school that plays nobody. Nothing but checks sets it.
+
+### The retention log
+
+One block per played game, buy games included, each marked **non-conference** — which is what keeps them
+out of next season's host memory, since the aggregator reads conference blocks only. `Finalize` counts
+all four categories or refuses to publish the season.
+
+### How Phase 101 proves it (the shape worth reusing)
+
+The pre-edit season — all 3,187 fixtures with ordinal, kind, both schools, both scores and every
+possession count — was **captured before a line of the session was written** and digested into the check.
+The zero-path run is proven equal to that digest FIRST; everything else compares against the zero-path
+run. That ordering is what makes it a comparison against the season as it stood rather than the new code
+grading its own output.
+
+Then: counts re-derived (never transcribed), **fixture preservation one game at a time** (per-school
+totals cannot see a win flipping while another flips back), **bijection on the carried pairing** (a count
+of 2,170 cannot see one omission plus one duplication), site and the ruled city, per-category
+reconciliation, the tournaments untouched, six hashes unmoved and the seventh proven non-decorative, id
+uniqueness and the walk on a career run, the zero path, and **fifteen negative controls each shown firing
+the rule it names**.

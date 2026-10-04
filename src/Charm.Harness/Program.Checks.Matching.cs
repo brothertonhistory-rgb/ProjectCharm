@@ -407,9 +407,11 @@ internal static partial class Program
                 Check("C9b: ★ and it really is a PREFIX — the season played more games than the slice " +
                       "covers, so C9 is not the whole list wearing a Take()",
                       stockRun.Results.Count > prefix
-                      && stockRun.Results.Count == prefix + stockRun.ConferenceTournamentGameCount,
+                      && stockRun.Results.Count == prefix + stockRun.ConferenceTournamentGameCount
+                                                   + stockRun.BuyGameCount,   // ★ S111 — four terms
                       $"{stockRun.Results.Count} results = {prefix} prefix + " +
-                      $"{stockRun.ConferenceTournamentGameCount} conference tournament");
+                      $"{stockRun.ConferenceTournamentGameCount} conference tournament + " +
+                      $"{stockRun.BuyGameCount} non-conference");
             }
 
             // ════════════════════════════════════════════════════════════════════

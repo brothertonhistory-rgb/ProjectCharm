@@ -510,8 +510,14 @@ internal static partial class Program
                       stockRun.Schedule.All(g => g.PlaceId is > 0), $"{stockRun.Schedule.Count} games");
                 Check("C6b: and it is the HOME school's city on every hosted game",
                       stockRun.Schedule.All(g => g.HasHost && g.PlaceId == placeOf[g.HomeId]));
-                Check("C6c: boundary two — every game in the completed season result carries a city",
-                      stockRun.PlayedGames.All(p => p.Game.PlaceId is > 0), $"{stockRun.PlayedGames.Count} games");
+                //  ★ S111 — "every game" became "every game except a neutral buy game", which carries
+                //  none by Emmett's ruling. Phase 101 C4 asserts that half as the ruled outcome.
+                Check("C6c: boundary two — every game in the completed season result carries its ruled place " +
+                      "(a city, except a neutral non-conference game, which carries none)",
+                      stockRun.PlayedGames.All(p => p.IsBuyGame && !p.Game.HasHost
+                                                    ? p.Game.PlaceId is null
+                                                    : p.Game.PlaceId is > 0),
+                      $"{stockRun.PlayedGames.Count} games");
                 Check("C6d: and every event game carries its EVENT's city, never a school's",
                       stockRun.PlayedGames.Where(p => p.IsEventGame).All(p => !p.Game.HasHost && p.Game.PlaceId == eventPlace[p.EventId!.Value]),
                       $"{stockRun.PlayedGames.Count(p => p.IsEventGame)} event games");
@@ -551,9 +557,11 @@ internal static partial class Program
                 Check("C7g: ★ the discriminator for C7d — the season really did play past the slice, so " +
                       "C7d is a PREFIX of something longer rather than the whole list wearing a Take()",
                       stockRun.Results.Count > prefix
-                      && stockRun.Results.Count == prefix + stockRun.ConferenceTournamentGameCount,
+                      && stockRun.Results.Count == prefix + stockRun.ConferenceTournamentGameCount
+                                                   + stockRun.BuyGameCount,   // ★ S111 — four terms
                       $"{stockRun.Results.Count} results = {prefix} prefix + " +
-                      $"{stockRun.ConferenceTournamentGameCount} conference tournament");
+                      $"{stockRun.ConferenceTournamentGameCount} conference tournament + " +
+                      $"{stockRun.BuyGameCount} non-conference");
             }
 
             // ════════════════════════════════════════════════════════════════════

@@ -118,7 +118,8 @@ internal static partial class Program
         SeasonGame Game, int FixtureOrdinal,
         int? EventTier = null, int? EventId = null, int? BracketGameIndex = null,
         int? HomeOriginalSeed = null, int? AwayOriginalSeed = null,
-        int? ConferenceTournamentId = null, int? ConfTourneyGameIndex = null)
+        int? ConferenceTournamentId = null, int? ConfTourneyGameIndex = null,
+        int? BuyPairIndex = null)
     {
         /// <summary>★ S104 — RENAMED from IsTournament, because after this session the old
         /// name is a lie: a showcase game carries an EventId too. Every existing caller wants
@@ -134,10 +135,17 @@ internal static partial class Program
         /// a league game and stays green while saying something false.</summary>
         public bool IsConferenceTournamentGame => ConferenceTournamentId is not null;
 
-        /// <summary>The plain league slate: neither an event game nor a conference tournament
-        /// game. Named once so the three-way split is stated in one place rather than
-        /// reconstructed by each caller.</summary>
-        public bool IsLeagueGame => !IsEventGame && !IsConferenceTournamentGame;
+        /// <summary>★ S111 — THE FOURTH KIND: a buy game. <c>BuyPairIndex</c> is the pairing it
+        /// was converted from — the dater's own index, CARRIED rather than reconstructed from the
+        /// two schools, because a same-season home-and-home puts the same two schools on the
+        /// floor twice and a schools-only key cannot tell the legs apart.</summary>
+        public bool IsBuyGame => BuyPairIndex is not null;
+
+        /// <summary>The plain league slate: none of the other three kinds. Named once so the
+        /// four-way split is stated in one place rather than reconstructed by each caller.
+        /// ★ S111 — a buy game carries no EventId and no tournament id, so before this line
+        /// learned the fourth kind it would have read every buy game as a league game.</summary>
+        public bool IsLeagueGame => !IsEventGame && !IsConferenceTournamentGame && !IsBuyGame;
     }
 
     private sealed record SeasonGameResult(
@@ -258,6 +266,25 @@ internal static partial class Program
         /// zero-path-by-subtraction proof depends on) nor into the results hash (which stays
         /// assertable over its pre-S110 prefix).</summary>
         public string ConferenceTournamentFingerprint { get; init; } = "";
+
+        /// <summary>★ S111 — how many buy games were played. Its own count, the fourth term of
+        /// every sum that used to be three-way.</summary>
+        public int BuyGameCount { get; init; }
+
+        /// <summary>★ S111 — every played buy game's canonical row, in pairing order.</summary>
+        public IReadOnlyList<BuyGameRow> BuyGames { get; init; } = Array.Empty<BuyGameRow>();
+
+        /// <summary>★ S111 — THE SEVENTH FINGERPRINT. Its own hash: pairing, date, site, city,
+        /// both schools and the winner. Winner in, scores out — S110's precedent. Score integrity
+        /// belongs to the results fingerprint and Phase 101's per-fixture comparison.</summary>
+        public string BuyGamesFingerprint { get; init; } = "";
+
+        /// <summary>★ S111 — the road sides shaved in LEAGUE games only. <see
+        /// cref="HostedRoadSidesShaved"/> counts every hosted game that played, which now includes
+        /// hosted buy games; a check that means "the league slate" reads this one. Two values
+        /// because one counter cannot serve both populations without one of them silently
+        /// receiving the other's total.</summary>
+        public int LeagueRoadSidesShaved { get; init; }
     }
 
     /// <summary>Everything the two accumulators need to turn a stamped player id back into a
@@ -1418,7 +1445,8 @@ internal static partial class Program
     private sealed record SeasonNumbering(
         long SeasonNumber, SeasonId SeasonId,
         IReadOnlyDictionary<BracketSlotKey, GameId> Reservations,
-        IReadOnlyDictionary<ConfTourneySlotKey, GameId> ConfTourneyReservations);
+        IReadOnlyDictionary<ConfTourneySlotKey, GameId> ConfTourneyReservations,
+        IReadOnlyList<GameId> BuyReservations);
 
     /// <summary>★ S98 — THE TOURNAMENT GAME NUMBERS ARE TAKEN HERE, AND THIS IS FORCED RATHER
     /// THAN PREFERRED. <c>CloseReservations()</c> runs before the first tip, so nothing can
@@ -1439,7 +1467,7 @@ internal static partial class Program
     /// slotting a third kind into the middle would move every showcase id.</param>
     private static SeasonNumbering NumberSeasonSchedule(
         List<SeasonGame> games, HistoryStore history, EventSeatingOutcome? seating,
-        IReadOnlyList<ConfTourneySlotKey>? confTourneySlots = null)
+        IReadOnlyList<ConfTourneySlotKey>? confTourneySlots = null, int buyGameCount = 0)
     {
         // ★ The peek's contract, asserted rather than assumed: while this run holds the
         //   lock, the value the peek returns IS the value the reservation hands back, and the
@@ -1454,7 +1482,9 @@ internal static partial class Program
 
         var slots = seating is null ? new List<BracketSlotKey>() : MteExpectedBracketSlots(seating);
         var confSlots = confTourneySlots ?? (IReadOnlyList<ConfTourneySlotKey>)Array.Empty<ConfTourneySlotKey>();
-        var gameIds = history.ReserveGames(games.Count + slots.Count + confSlots.Count);
+        // ★ S111 — a FOUR-term sum. Buy games are spent last, in the dater's pairing order,
+        //   which is the order they play in; every earlier id is the id it has always been.
+        var gameIds = history.ReserveGames(games.Count + slots.Count + confSlots.Count + buyGameCount);
         for (var g = 0; g < games.Count; g++)
             games[g] = games[g] with { SeasonId = seasonId, GameId = gameIds[g] };
 
@@ -1479,7 +1509,10 @@ internal static partial class Program
                 $"SEASON INVARIANT VIOLATED: {confSlots.Count} conference tournament slots produced "
                 + $"{confReservations.Count} distinct reservations; a tournament position is unique.");
 
-        return new SeasonNumbering(expected, seasonId, reservations, confReservations);
+        var buyReservations = new GameId[buyGameCount];
+        Array.Copy(gameIds, games.Count + slots.Count + confSlots.Count, buyReservations, 0, buyGameCount);
+
+        return new SeasonNumbering(expected, seasonId, reservations, confReservations, buyReservations);
     }
 
     /// <summary>★ S89 note — this hashes the four pre-S89 fields BY NAME (index, kind, home,
@@ -1510,6 +1543,23 @@ internal static partial class Program
         var i = 0;
         foreach (var g in games)
         {
+            // ★ S111 — EMMETT'S RULING: a NEUTRAL BUY GAME CARRIES NO CITY. No venue is recorded
+            //   for a one-off neutral pairing anywhere, and inventing one is a basketball decision
+            //   nobody has made. So the rule is now "every game carries the place it was ruled to
+            //   have" — and it is enforced in BOTH directions: a city on a neutral buy game is a
+            //   failure, not a tidier result.
+            if (string.Equals(g.Kind, BuyGameKind, StringComparison.Ordinal) && !g.HasHost)
+            {
+                if (g.PlaceId is not null)
+                    throw new InvalidOperationException(
+                        $"SEASON INVARIANT VIOLATED at {boundary}: game {i.ToString(CultureInfo.InvariantCulture)} " +
+                        $"({g.Kind} {g.HomeId.ToString(CultureInfo.InvariantCulture)} v " +
+                        $"{g.AwayId.ToString(CultureInfo.InvariantCulture)}) is a neutral non-conference game " +
+                        $"carrying city {g.PlaceId.Value.ToString(CultureInfo.InvariantCulture)}. The ruling is " +
+                        "that it carries none.");
+                i++;
+                continue;
+            }
             if (g.PlaceId is null || g.PlaceId <= 0)
                 throw new InvalidOperationException(
                     $"SEASON INVARIANT VIOLATED at {boundary}: game {i.ToString(CultureInfo.InvariantCulture)} " +
@@ -1585,7 +1635,8 @@ internal static partial class Program
         WorldFile world, long seasonSeed, string engineConfigPath, bool verbose,
         HistoryStore? history = null, bool retainGameLog = false,
         int? roadShaveOverride = null, int? debtWindowOverride = null,
-        IReadOnlyDictionary<int, int>? contractChoiceOverride = null)
+        IReadOnlyDictionary<int, int>? contractChoiceOverride = null,
+        bool buyGamesOffForTest = false)
     {
         // ══════════════════════════════════════════════════════════════════════════
         //  ★ S97 — THE SEASON PIPELINE, IN THIS ORDER, AND THE ORDER IS THE CONTRACT.
@@ -1646,6 +1697,16 @@ internal static partial class Program
         var nonConferenceDates = DateNonConferenceGames(
             world, matching, contracts, seating, schedule, SeasonDefaultStartYear);
 
+        // ★ S111 — every dated pairing becomes a game here, BEFORE the commit, because its id
+        //   must be reserved at the commit. Nothing here changes which games, who hosts or what
+        //   night: the site comes from the pairing's own kind (or its contract leg), never from
+        //   whether a host id happens to be present — a Neutral pairing's "host" field is only
+        //   the lower school id.
+        //   `buyGamesOffForTest` is Phase 101's zero-path switch and nothing else sets it.
+        var buyPlans = buyGamesOffForTest
+            ? (IReadOnlyList<BuyGamePlan>)Array.Empty<BuyGamePlan>()
+            : BuyBuildPlans(world, nonConferenceDates, matching, contracts);
+
         MteRefuseOverlap(world, seating, schedule);
         MteRefuseExistingRecord(history, pendingSeasonId);
 
@@ -1662,17 +1723,19 @@ internal static partial class Program
         //   reserved by COUNT and belong to a POSITION rather than to whoever wins it.
         IReadOnlyDictionary<ConfTourneySlotKey, GameId> confTourneyReservations =
             new Dictionary<ConfTourneySlotKey, GameId>();
+        IReadOnlyList<GameId> buyReservations = Array.Empty<GameId>();
         SeasonId? seasonIdOfRun = null;
         if (history is not null)
         {
             var numbering = NumberSeasonSchedule(
-                schedule, history, seating, ConfTourneyExpectedSlots(world));
+                schedule, history, seating, ConfTourneyExpectedSlots(world), buyPlans.Count);
             if (numbering.SeasonNumber != pendingSeasonId)
                 throw new InvalidOperationException(
                     $"SEASON INVARIANT VIOLATED: peeked season {pendingSeasonId} but reserved " +
                     $"{numbering.SeasonNumber}.");
             reservations = numbering.Reservations;
             confTourneyReservations = numbering.ConfTourneyReservations;
+            buyReservations = numbering.BuyReservations;
             seasonIdOfRun = numbering.SeasonId;
             try
             {
@@ -1720,6 +1783,7 @@ internal static partial class Program
         var results = new List<SeasonGameResult>(schedule.Count);
         var possessionCounts = new List<int>(schedule.Count);
         var hostedRoadSidesShaved = 0;
+        var leagueRoadSidesShaved = 0;
         var ties = 0;
         var league = new SeasonLeagueStats();
         // ★ S89 — the map goes to the accumulator ONCE, before the loop, rather than being
@@ -1776,7 +1840,11 @@ internal static partial class Program
             //   has none, and the shave path returns both sides untouched for the latter.
             var (sideHome, sideAway, awayShaved) =
                 PrepareSeasonGameSides(seatedHome, seatedAway, roadShave, hasHost: sg.HasHost);
-            if (awayShaved) hostedRoadSidesShaved++;
+            if (awayShaved)
+            {
+                hostedRoadSidesShaved++;
+                if (pg.IsLeagueGame) leagueRoadSidesShaved++;
+            }
             // Everything below — the engine, the identity bundle, the occupancy walk —
             // reads the PREPARED sides, so the men who are attributed are the men who
             // played. Name and PlayerId survive the shave untouched, which is what keeps
@@ -1914,12 +1982,31 @@ internal static partial class Program
             Console.WriteLine($"  ... {confTourneys.GameCount} conference tournament games played " +
                               $"({confTourneys.LeaguesPlayed} leagues)");
 
-        //  One block per fixture PLAYED and no other — league, event and conference
-        //  tournament. The writer refuses to publish a partial season rather than leaving
+        // ══════════════════════════════════════════════════════════════════════════
+        //  ★ S111 — THE BUY GAMES, APPENDED AFTER EVERY CONFERENCE TOURNAMENT GAME.
+        //
+        //  November games playing after March ones, for the reason stated above the league
+        //  loop: the ordinal is the engine seed, so appending is the only move that leaves
+        //  every earlier game on the seed it has always had. They play in the dater's pairing
+        //  order, which is also the reservation order.
+        //
+        //  Records only: the conference tournament fields were seeded before this line from
+        //  league results alone, so nothing a buy game does can reach them.
+        // ══════════════════════════════════════════════════════════════════════════
+        var buyGames = BuyPlaySeason(
+            buyPlans, buyReservations, seasonIdOfRun,
+            schedule.Count + eventGameCount + confTourneys.GameCount,
+            pg => PlayOneGame(pg));
+        if (verbose && buyGames.GameCount > 0)
+            Console.WriteLine($"  ... {buyGames.GameCount} non-conference games played");
+
+        //  One block per fixture PLAYED and no other — league, event, conference tournament
+        //  and buy game. The writer refuses to publish a partial season rather than leaving
         //  a plausible-looking short file behind.
         if (gameLog is not null)
         {
-            gameLog.Finalize(schedule.Count + eventGameCount + confTourneys.GameCount);
+            gameLog.Finalize(schedule.Count + eventGameCount + confTourneys.GameCount
+                             + buyGames.GameCount);
             gameLog.Dispose();
         }
 
@@ -1959,7 +2046,8 @@ internal static partial class Program
 
         // ★ S109 — BOUNDARY TWO. Bracket games are built round by round DURING play, so no
         //   complete played-game list exists before the first tip; the event half can only be
-        //   proven here, once. Every game that played carries a city.
+        //   proven here, once. Every game that played carries the place it was ruled to have
+        //   (S111: a neutral buy game carries none).
         AssertEveryGamePlaced(playedGames.Select(p => p.Game), "SeasonRunOutcome");
 
         return new SeasonRunOutcome
@@ -1988,6 +2076,10 @@ internal static partial class Program
             ConferenceTournaments = confTourneys,
             ConferenceTournamentGameCount = confTourneys.GameCount,
             ConferenceTournamentFingerprint = ConfTourneyFingerprint(confTourneys.Rows),
+            BuyGameCount = buyGames.GameCount,
+            BuyGames = buyGames.Rows,
+            BuyGamesFingerprint = BuyGamesFingerprint(buyGames.Rows),
+            LeagueRoadSidesShaved = leagueRoadSidesShaved,
         };
     }
 
@@ -2202,12 +2294,16 @@ internal static partial class Program
             if (run.NonConferenceDates.Games.Count > 0)
                 Console.WriteLine($"Non-conference dated fingerprint: {run.NonConferenceDates.DatedFingerprint} " +
                                   $"({run.NonConferenceDates.Games.Count} pairings)");
-            // ★ S109 — PAGE-ONLY. Every played game carries a city; this line shows it.
-            //   Nothing here is asserted and no fingerprint can see the field.
+            // ★ S109 — PAGE-ONLY. Every played game carries its ruled place; this line shows it.
+            //   ★ S111 — a neutral buy game carries none, by ruling, and the line says so rather
+            //   than claiming "every one".
             {
-                var placed = run.PlayedGames.Select(p => p.Game.PlaceId).ToList();
-                Console.WriteLine($"Cities: every one of the {placed.Count} played games carries a city " +
-                                  $"— {placed.Distinct().Count()} distinct cities " +
+                var placed = run.PlayedGames.Where(p => p.Game.PlaceId is not null)
+                                            .Select(p => p.Game.PlaceId).ToList();
+                var cityless = run.PlayedGames.Count - placed.Count;
+                Console.WriteLine($"Cities: {placed.Count} of {run.PlayedGames.Count} played games carry a city" +
+                                  (cityless > 0 ? $"; {cityless} neutral non-conference games deliberately carry none" : "") +
+                                  $" — {placed.Distinct().Count()} distinct cities " +
                                   $"({run.PlayedGames.Count(p => p.Game.HasHost)} hosted, " +
                                   $"{run.PlayedGames.Count(p => !p.Game.HasHost)} neutral)");
             }
@@ -2453,6 +2549,17 @@ internal static partial class Program
         if (ct.GameCount > 0)
             Console.WriteLine($"  conference-tournament fingerprint: {run.ConferenceTournamentFingerprint}");
         Console.WriteLine();
+
+        // (iii-c) ★ S111 — the buy games. Page-only: counts and the seventh hash, nothing asserted.
+        if (run.BuyGameCount > 0)
+        {
+            var neutralBuys = run.BuyGames.Count(r => !r.HasHost);
+            Console.WriteLine($"--- NON-CONFERENCE GAMES: {run.BuyGameCount} played " +
+                              $"({run.BuyGameCount - neutralBuys} hosted, {neutralBuys} neutral; " +
+                              $"{run.NonConferenceDates.Unseated.Count} pairing(s) found no night and did not play) ---");
+            Console.WriteLine($"  non-conference games fingerprint: {run.BuyGamesFingerprint}");
+            Console.WriteLine();
+        }
 
         // (iv) the OT / scoring sanity pulse.
         var otGames = run.Results.Count(r => r.OvertimePeriods > 0);

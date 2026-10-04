@@ -203,6 +203,11 @@ internal static partial class Program
                 { evGames[p.Game.HomeId]++; evGames[p.Game.AwayId]++; }
                 foreach (var p in tourneyGames)
                 { ctGames[p.Game.HomeId]++; ctGames[p.Game.AwayId]++; }
+                //  ★ S111 — the fourth category. Without it C2c goes red on a correct engine and C2d
+                //  becomes trivially true (buy games alone would satisfy it).
+                var buyGames = stock.Schools.ToDictionary(s => s.Id, _ => 0);
+                foreach (var p in run.PlayedGames.Where(p => p.IsBuyGame))
+                { buyGames[p.Game.HomeId]++; buyGames[p.Game.AwayId]++; }
 
                 //  ★ §2g, ASSERTED RATHER THAN ASSUMED: a conference tournament game is an
                 //  ORDINARY played season game. It counts in the overall record exactly as an MTE
@@ -214,7 +219,8 @@ internal static partial class Program
                       "event games plus its conference tournament games. A tournament win counts, the " +
                       "same way an MTE win already does",
                       stock.Schools.All(s => run.Wins[s.Id] + run.Losses[s.Id]
-                                             == leagueRec[s.Id].Played + evGames[s.Id] + ctGames[s.Id]),
+                                             == leagueRec[s.Id].Played + evGames[s.Id] + ctGames[s.Id]
+                                                + buyGames[s.Id]),
                       $"{stock.Schools.Count} schools reconcile");
 
                 //  ★ THE DISCRIMINATOR FOR C2b. If the season record differed from the league
@@ -231,7 +237,7 @@ internal static partial class Program
                       "tournament games this session added — otherwise C2b's disagreement would have " +
                       "some other cause",
                       stock.Schools.Any(s => run.Wins[s.Id] + run.Losses[s.Id]
-                                             > leagueRec[s.Id].Played + ctGames[s.Id]),
+                                             > leagueRec[s.Id].Played + ctGames[s.Id] + buyGames[s.Id]),
                       $"{stock.Schools.Count(s => evGames[s.Id] > 0)} schools played an event game; " +
                       $"most event games by one school: {evGames.Values.Max()}");
 
@@ -361,10 +367,12 @@ internal static partial class Program
                       "exactly as an MTE game",
                       tourneyGames.All(p => !p.Game.HasHost));
 
-                Check("C4c: ★ and the hosted-road-side counter is untouched by them — it still equals the " +
+                //  ★ S111 — the LEAGUE counter. The full-season one now also counts hosted buy games
+                //  (Phase 101 C5d); this check always meant the league slate.
+                Check("C4c: ★ and the league road-side counter is untouched by them — it still equals the " +
                       "league slate exactly, so 217 neutral games shaved nobody",
-                      run.HostedRoadSidesShaved == run.ConferenceGameCount,
-                      $"{run.HostedRoadSidesShaved} shaved / {run.ConferenceGameCount} league games");
+                      run.LeagueRoadSidesShaved == run.ConferenceGameCount,
+                      $"{run.LeagueRoadSidesShaved} shaved / {run.ConferenceGameCount} league games");
 
                 Check("C4d: every tournament fixture says Kind == \"ctourney\" EXACTLY — a third kind of " +
                       "played game gets a third word, so \"anything except conf\" never becomes the " +
@@ -381,8 +389,10 @@ internal static partial class Program
                                                && p.Game.HomeId != p.Game.AwayId));
 
                 Check("C4f: every tournament game carries a city at the second structural boundary — the " +
-                      "whole played season, not just the league half",
-                      run.PlayedGames.All(p => p.Game.PlaceId is > 0),
+                      "whole played season, not just the league half (★ S111: except a neutral " +
+                      "non-conference game, which carries none by ruling)",
+                      tourneyGames.All(p => p.Game.PlaceId is > 0)
+                      && run.PlayedGames.Where(p => !(p.IsBuyGame && !p.Game.HasHost)).All(p => p.Game.PlaceId is > 0),
                       $"{run.PlayedGames.Count} games");
             }
 
@@ -467,7 +477,7 @@ internal static partial class Program
                       && tourneyGames.Select(p => p.FixtureOrdinal).Min()
                          == run.ConferenceGameCount + run.TournamentGameCount
                       && run.Results.Count == run.ConferenceGameCount + run.TournamentGameCount
-                                              + run.ConferenceTournamentGameCount,
+                                              + run.ConferenceTournamentGameCount + run.BuyGameCount,
                       $"first tournament ordinal {tourneyGames.Min(p => p.FixtureOrdinal)}, " +
                       $"{run.Results.Count} results");
             }

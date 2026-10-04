@@ -144,8 +144,13 @@ internal static partial class Program
             Check("A2 no duplicate (person, game) anywhere in the file, and no person twice in a block",
                   !dupPair);
             Check("A2 fixture ordinals are exactly 0..n-1, contiguous", ordinalsContiguous && !dupGame);
-            Check("A2 one block per scheduled fixture and no other",
-                  log.Blocks.Count == scheduleGames, $"{log.Blocks.Count} of {scheduleGames}");
+            //  ★ S111 — one block per PLAYED fixture: the league slate plus the buy games this
+            //  world now plays. The league half is still exactly the schedule.
+            Check("A2 one block per played fixture and no other (league slate + non-conference games)",
+                  log.Blocks.Count == scheduleGames + outcome.BuyGameCount
+                  && log.Blocks.Count == outcome.PlayedGames.Count
+                  && log.Blocks.Count(b => b.Facts.IsConferenceGame) == scheduleGames,
+                  $"{log.Blocks.Count} of {scheduleGames} + {outcome.BuyGameCount}");
             Check("A2 every row's school is one of the two teams in that game", !dupPair);
 
             // ── A12 — THE ROSTER SECTION, FROM DISK ──────────────────────────

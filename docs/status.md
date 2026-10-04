@@ -10,7 +10,26 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 110.1** (2026-09-16; verified on Emmett's machine — ALL CHECKS PASSED, **85 timed sections,
+Last updated: **Session 111** (2026-09-16; verified on Emmett's machine — ALL CHECKS PASSED, **86 timed sections,
+2,732.4s, Phase 101 new (70 assertions)**. **THE BUY GAMES PLAY** — 2,170 non-conference games join the season
+(2,078 hosted, 92 neutral), appended after the conference tournaments; the stock season goes **3,187 → 5,357 games**
+and every school plays **29–34**. The bridge is in: a school's record is finally its whole year. ★ **ALL 3,187
+PRE-EXISTING FIXTURES IDENTICAL**, compared one at a time against a capture taken before the session began — ordinal,
+identity, kind, site, night, final score, possession count — and the conference tournaments untouched (same seed order,
+same 31 champions, same 217 games, sixth hash `7291ee18…`). Six fingerprints unmoved; a **seventh** born,
+`bcb4b5d8…` (winner in, scores out). ★ **ON A NEUTRAL PAIRING THE FIELD NAMED `HostSchoolId` IS NOT A HOST** — the
+matcher normalises lower-first — so `HasHost` derives from the pair KIND; reading the field would have played 92 games
+in a town nobody was in. ★ **THE PROMPT'S KIND VOCABULARY WAS STALE AND ITS CONTRACT CLAIM WRONG**: five matcher kinds,
+not four (`Exchange`, 216 legs), and a contract leg can be **neutral** while the dater labels it `"Contract"` with
+school A in the host field. ★ **EMMETT'S CITY RULING SUPERSEDED S109'S OWN INVARIANT** — "every played game carries a
+city" becomes "every game carries the place it was RULED to have", enforced both ways. ★ **BUY GAMES WOULD HAVE READ AS
+LEAGUE GAMES** (no event id, no tournament id) — the S110 trap, one session later, same line. ★ **EVERY WORLD DERIVES
+BUY GAMES**, so there is no natural zero path and ~a dozen older checks across ten files had to be re-scoped to the
+population each actually meant. ★ **THE SUITE INFLATED 4.4× FOR 68% MORE BASKETBALL** — 622.7s → 2,732.4s; Phase 96
+140.0 → 745.8s, Phase 99 56.3 → 420.4s on the same machine. **Unexplained; measure before tuning** (O-110).
+**Closes O-104 for hosted buy games**; opens **O-109**, **O-110**. Journal S111 has the detail.)
+
+Previous: **Session 110.1** (2026-09-16; verified on Emmett's machine — ALL CHECKS PASSED, **85 timed sections,
 622.7s, Phase 100 new (38 assertions)**. **THE PHASE SELECTOR** — `-- checks 99` now costs the 56s that phase costs
 instead of a full pass. **One canonical registry of 85 rows drives both the full walk and any selection**; there is no
 second list. ★ **THE CLEARED PROMPT WOULD HAVE SILENTLY STOPPED FIVE LIVE PHASES** — 24, 47, 48, 49 and 51 are gated
@@ -543,6 +562,21 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S111 — THE BUY GAMES PLAY (the bridge).** `Program.Season.BuyGames.cs` (new): every dated pairing converts to a
+  `SeasonGame` before the commit (its id is reserved there) and plays appended after the conference tournaments, so no
+  existing engine seed moves. Site from the **pair kind** (`Hosted|Filler|Terminal|Exchange` host, `Neutral` does not,
+  `Contract` read from the exercised leg), city from the ruling (host's city, or **none** when neutral). New kind word
+  `"nonconf"`; `IsLeagueGame` becomes a four-way split and every three-term sum a four-term one. The pairing index is
+  **carried** on the played game, never rebuilt from the two schools (108 same-season rematches). `ReserveGames` is
+  four-way and the buy block is spent last, in play order. Two home-court denominators —
+  `LeagueRoadSidesShaved` (2,818) and `HostedRoadSidesShaved` (4,896). A **seventh** fingerprint, `bcb4b5d8…`.
+  `buyGamesOffForTest` is a test-only zero path, needed because every world DERIVES its non-conference requests.
+  `Program.Checks.BuyGames.cs` (new, Phase 101, 70 assertions): the pre-edit season captured before the build and
+  digested, fixture preservation **one game at a time**, bijection on the carried pairing, site and the ruled city,
+  per-category reconciliation, tournaments untouched, ids and the walk on a career run, and **fifteen negative controls
+  each shown firing the rule it names**. Ten older check files re-scoped (Phases 55, 73, 81, 86, 88, 89, 92, 93, 98, 99,
+  100). **Closes O-104 for hosted buy games; opens O-109, O-110.**
+
 - **★ S110 — THE CONFERENCE TOURNAMENTS: 31 LEAGUES, 31 CHAMPIONS (arc, Session B).**
   `Program.Season.ConferenceTournaments.cs` (new): eight-team fields in every league that can seat one, seeded on the
   **conference record derived from the schedule** (never `run.Wins`, which includes MTE games; never
@@ -1026,9 +1060,14 @@ chart is PROVISIONAL pending O-6.
   The real object is two-way vs multi-way ties, unbalanced schedules, partial separation of a tied block, and what
   happens when head-to-head cannot resolve — ruled against a page full of real ties. Ranking slots ahead of any draw
   once rankings exist.
-- **O-104 — NON-CONFERENCE PAIRINGS CARRY NO CITY.** `NonConDatedGame` is not a `SeasonGame`, so S109's place
-  field never reaches the 2,171 buy games. They get one when the bridge session makes them season games — not
-  before, and not by a second field on a record that is going away.
+- **O-109 — ★ A NEUTRAL BUY GAME HAS NO VENUE (S111 ruling's named successor).** Emmett ruled that a neutral
+  non-conference game carries **no city**, because nothing in the tree records a venue for a one-off neutral pairing
+  and S109's rule (an event game takes its *event's* city) does not reach a game with no event. 92 games on the stock
+  season. The successor is a real neutral-venue object — who owns it, whether it is authored per-pairing, per-region
+  or per-school, and whether it shares anything with O-106's conference-tournament venues (the two should be ruled
+  together, or at least in sight of each other). **Recorded as a ruled placeholder on purpose** — it must not fade
+  into architecture. *(O-104 — "non-conference pairings carry no city" — **CLOSED by S111 for hosted buy games**: they
+  take their host's city, proven at both structural boundaries.)*
 - **O-105 — FOUR STALE "S107" FORWARD-REFERENCES IN HARNESS COMMENTS (cosmetic).** S107 was never a session
   under that number; the comments point at work that landed under other names. Grep `S107` in `src/Charm.Harness`.
   Fix when a session is already in those files.
@@ -1044,7 +1083,24 @@ chart is PROVISIONAL pending O-6.
   somebody checks the arithmetic by hand. One format string. **Not fixed in S105.1: it is outside
   that session's scope wall and touches nothing the session was correcting.**
 
+- **O-110 — ★ THE SUITE INFLATED 4.4× FOR 68% MORE BASKETBALL, AND NOBODY KNOWS WHY YET (opened S111).**
+  622.7s (85 sections, S110.1) → **2,732.4s (86 sections, S111)**, both on Emmett's machine. The season grew
+  3,187 → 5,357 games, which is 1.68×. The per-section growth is far larger and is **not uniform**:
+  **Phase 96 Independents 140.0 → 745.8s (5.3×)**, **Phase 99 conference tournaments 56.3 → 420.4s (7.5×)**,
+  Phase 95 showcases → 252.2s, Phase 97 → 175.1s. Phase 101 (373.3s) is new and partly explained — it replays a
+  full unchanged season every run purely to own a baseline, which should be a committed digest instead.
+  ★ **MEASURE BEFORE TUNING — this is S104.1's lesson verbatim** (the hunch was wrong and the number said so).
+  Candidate explanations to test rather than assume: a phase that runs N seasons now carries N×2,170 extra games;
+  something super-linear in a per-season structure the buy games enlarge; or the growth is exactly linear and the
+  old 140.0/56.3 figures were measured against something smaller than remembered. **This is the first step of the
+  speed session, ahead of O-96's design work, because it decides what O-96 should even target.**
+
 - **O-96 — ★ A SCHEDULE-ONLY SEASON MODE. A large share of the suite pays for basketball nothing reads.**
+  ★ **S111 note: the figures below are the S110.1 run's and are now stale — see O-110 for the current ones and
+  re-derive before scoping.** The shape of the finding survives: the top five sections are ~72% of the run
+  (96, 99, 101, 95, 97), and most of what they test is seating, pairing and bookkeeping rather than basketball.
+  ★ **S111 adds a third hazard to the two named below:** the fingerprint phases are not the only ones that need
+  real games — Phase 101's own baseline comparison does, unless the baseline becomes a committed digest first.
   ★ **Figures refreshed at S110.1, the first run whose timing report is COMPLETE (85 sections, 622.7s on Emmett's
   machine — the old 446s covered 74 sections and the prelude was invisible).** The ranking moved: the single largest
   cost is now **Phase 96 Independents at 140.0s (22.5%)**, ahead of all three career rigs; 91 + 90 + 87 are 160.0s
@@ -2158,17 +2214,27 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-★ **THE BRIDGE SESSION — MAKE THE 2,171 NON-CONFERENCE GAMES SIMULATE.** Emmett's postseason order:
-conference tournaments (✅ S110) → **bridge** → rankings → national bracket → stacked seasons. Every non-conference
-pairing is matched, hosted, contracted and dated, and **not one of them is ever played**: they exist only as
-`NonConDatedGame` records. Until they do, a school's record is its league slate plus whatever event it drew, which is
-why the top of the standings reads flat (Kansas 6-10 at prestige 97; Duke 6-10 at 98, having played sixteen ACC games
-and nothing else, and therefore missing its own tournament). **That is the missing bridge, not a prestige bug** — do
-not go hunting for one. Rankings cannot be meaningful before this lands, so it sits ahead of them in the order.
+★ **THE BRIDGE SHIPPED — S111 (2026-09-16).** Conference tournaments (✅ S110) → **bridge (✅ S111)** → rankings →
+national bracket → stacked seasons. 2,170 buy games play; a school's record is its whole year for the first time;
+every pre-existing fixture is byte-identical. The flat top of the standings was the missing bridge, as this board
+said — **do not go hunting for a prestige bug.** Whether the standings now read *right* is a basketball question
+nobody has asked yet, and it is the first thing worth looking at on the page.
 
-Carry into that draft: **O-104** (those pairings get a `PlaceId` when they become season games — not before, and not
-by a second field on a record that is going away), and the S110 precedent for where new games sit in the fixture
-order and how their ids are reserved.
+★ **THE NEXT ONE IS A JUDGEMENT CALL BETWEEN TWO, AND EMMETT RULES IT.**
+
+1. **RANKINGS** — the next step in the stated order, and the first session in a long while whose output is something
+   he can read as basketball rather than as plumbing. It needs the records S111 just produced.
+2. **THE SPEED SESSION (O-110 then O-96)** — the suite is now **45.5 minutes** on his machine, up from 10.4. Every
+   session from here pays that at the gate, twice if anything comes back red. It is boarded and its first step is
+   measurement, not design.
+
+Claude's recommendation: **O-110's measurement pass first, as a micro-session** (it is an afternoon, it is the kind
+of finding that reshapes O-96's scope, and a 45-minute gate makes every subsequent session worse), **then rankings.**
+But if the project needs to feel like basketball again — a real consideration after twenty sessions of scheduling
+plumbing — rankings first is the defensible call and the speed cost is survivable.
+
+Carry into whichever draft: the S110/S111 precedent for where new games sit in the fixture order and how their ids are
+reserved; and, for rankings, that the season now holds **four** categories of game, not three.
 
 ★ **A CORRECTION THIS BOARD OWES ITSELF (S110 gate finding).** The block that stood here claimed the conference
 tiebreak ladder was "already ruled" — head-to-head reverting to a two-team procedure, tied blocks as single

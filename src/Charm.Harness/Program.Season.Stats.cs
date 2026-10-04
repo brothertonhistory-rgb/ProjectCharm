@@ -521,10 +521,15 @@ internal static partial class Program
             //  yields a full slate for everybody and CONCEALS the DNPs this page exists to expose.
             //  ★ S93 — the bound is the league's AUTHORED game count, not a flat 30: the tiny
             //  fixture's four leagues play 16 apiece and a team can never exceed its own slate.
-            var teamGames = tiny.Conferences.Max(c => c.Games);
-            var maxGp     = all.Count == 0 ? 0 : all.Max(r => r.GamesPlayed);
+            //  ★ S111 — and since buy games play, a school's team-game count is no longer its
+            //  league's authored slate. The bound is now read per player from HIS OWN school's
+            //  games played this season, which is what the check's name always said.
+            var teamGamesOf = tiny.Schools.ToDictionary(x => x.Id, x => (long)(run.Wins[x.Id] + run.Losses[x.Id]));
+            var over = all.Count(r => r.GamesPlayed > teamGamesOf[r.SchoolId]);
+            var maxGp = all.Count == 0 ? 0 : all.Max(r => r.GamesPlayed);
             Check("games played: no player exceeds his school's team-game count",
-                  maxGp <= teamGames, $"max {maxGp} of {teamGames}");
+                  over == 0 && all.Count > 0,
+                  $"{over} over; max {maxGp} (largest school slate {teamGamesOf.Values.Max()})");
             Check("games played: a man with zero credit has zero games played",
                   all.All(r => r.Credits > 0 || r.GamesPlayed == 0),
                   $"{all.Count(r => r.Credits == 0 && r.GamesPlayed > 0)} violations");

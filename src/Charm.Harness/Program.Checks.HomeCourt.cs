@@ -319,13 +319,18 @@ internal static partial class Program
             // ════════════════════════════════════════════════════════════════════
             var zeroRun = RunSeasonCore(tiny, GoldenSeed, configPath, verbose: false,
                                         roadShaveOverride: 0);
-            Check($"B1: the zero-shave season is the recorded shape ({GoldenGameCount} games) — " +
+            //  ★ S111 — buy games now play after the league slate on this world, so the golden (a
+            //  pre-S95 LEAGUE season) is a prefix. The shape check says so: the league half is the
+            //  recorded length and the whole season is exactly league + buy.
+            Check($"B1: the zero-shave season's league half is the recorded shape ({GoldenGameCount} games) — " +
                   "asserted BEFORE the hash, so a mismatch names itself",
-                  zeroRun.Results.Count == GoldenGameCount
-                    && zeroRun.PossessionCounts.Count == GoldenGameCount,
-                  $"{zeroRun.Results.Count} results, {zeroRun.PossessionCounts.Count} possession counts");
+                  zeroRun.ConferenceGameCount == GoldenGameCount
+                    && zeroRun.Results.Count == GoldenGameCount + zeroRun.BuyGameCount
+                    && zeroRun.PossessionCounts.Count == zeroRun.Results.Count,
+                  $"{zeroRun.ConferenceGameCount} league + {zeroRun.BuyGameCount} non-conference results");
 
-            var zeroFp = SeasonFingerprint(zeroRun.Results, zeroRun.PossessionCounts);
+            var zeroFp = SeasonFingerprint(zeroRun.Results.Take(GoldenGameCount).ToList(),
+                                           zeroRun.PossessionCounts.Take(GoldenGameCount).ToList());
             Check("B1: ★ ZERO IS THE OLD ENGINE — every score and every possession count " +
                   "reproduces a fingerprint captured from the pre-S95 tree",
                   zeroFp == GoldenZeroSha256,
@@ -348,14 +353,20 @@ internal static partial class Program
 
             // The discriminating half: a change that did nothing at all would also produce
             // two identical fingerprints. This says the shave MOVED the basketball.
+            //  ★ S111 — compared over the SAME league prefix, or the two differ merely by length.
+            var fpALeague = SeasonFingerprint(onA.Results.Take(GoldenGameCount).ToList(),
+                                              onA.PossessionCounts.Take(GoldenGameCount).ToList());
             Check("B7: ★ and the shave-on season is NOT the zero season — the dial does something",
-                  fpA != zeroFp,
-                  $"shave-on {fpA[..16]}… vs zero {zeroFp[..16]}…");
+                  fpALeague != zeroFp,
+                  $"shave-on {fpALeague[..16]}… vs zero {zeroFp[..16]}…");
 
             Check("B8: every hosted game had its road side shaved — one assertion, one source " +
                   "of truth (the tournament layer replaces the expectation with its site fact)",
-                  onA.HostedRoadSidesShaved == onA.Schedule.Count,
-                  $"{onA.HostedRoadSidesShaved} shaved / {onA.Schedule.Count} scheduled");
+                  onA.LeagueRoadSidesShaved == onA.Schedule.Count
+                  && onA.HostedRoadSidesShaved
+                     == onA.Schedule.Count + onA.PlayedGames.Count(p => p.IsBuyGame && p.Game.HasHost),
+                  $"{onA.LeagueRoadSidesShaved} league shaved / {onA.Schedule.Count} scheduled; " +
+                  $"{onA.HostedRoadSidesShaved} across every hosted game");
 
             // ════════════════════════════════════════════════════════════════════
             //  B9 — retirement hygiene and the dial's guards.

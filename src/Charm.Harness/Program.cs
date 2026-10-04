@@ -278,6 +278,7 @@ internal static partial class Program
             // ── Row 100: the registry guards itself (S110.1). Placed here so the numbers stay
             //    strictly ascending; the two number-less rows below have always run last.
             new(100, "Phase100RegistryCheck", nameof(Phase100RegistryCheck), () => Phase100RegistryCheck(configPath)),
+            new(101, "Phase101BuyGamesCheck", nameof(Phase101BuyGamesCheck), () => Phase101BuyGamesCheck(configPath)),   // Phase 101 (S111: the buy games play — every dated non-conference pairing played after the conference tournaments; fixture preservation game by game against the pre-edit season, bijection on the carried pairing, site from the pairing kind and the ruled city (neutral: none), per-category reconciliation, the conference tournaments untouched, six fingerprints unmoved and a seventh born, ids and ordinals as one walk, the zero path, and a negative control per rule. Page-only calibration holds.)
 
             // ★ S110.1 — was a `SuiteTimed(...)` call with NO `ok &=`: timed, but its verdict
             //   discarded. The lambda returns an unconditional true and SuiteTimed has no catch,

@@ -573,7 +573,11 @@ internal static partial class Program
             var confOn = SeasonFingerprint(
                 withEvents.Results.Take(withEvents.ConferenceGameCount).ToList(),
                 withEvents.PossessionCounts.Take(withEvents.ConferenceGameCount).ToList());
-            var fpOff = SeasonFingerprint(without.Results, without.PossessionCounts);
+            //  ★ S111 — the dormant run plays buy games too (and a DIFFERENT set of them: seating
+            //  changes who needs non-conference games), so its league half is also a prefix now.
+            var fpOff = SeasonFingerprint(
+                without.Results.Take(without.ConferenceGameCount).ToList(),
+                without.PossessionCounts.Take(without.ConferenceGameCount).ToList());
             Check("C8a: ★ every event active vs every event dormant, same seed — the COMPLETE per-game " +
                   "CONFERENCE results and possession counts are identical. Not win totals: a seed " +
                   "perturbation could preserve winners while moving every box score",
@@ -591,8 +595,10 @@ internal static partial class Program
                   "nothing, so the prefix in C8a is a prefix of something longer",
                   withEvents.TournamentGameCount > 0
                   && withEvents.Results.Count == withEvents.ConferenceGameCount + withEvents.TournamentGameCount
+                                                 + withEvents.ConferenceTournamentGameCount + withEvents.BuyGameCount
                   && without.TournamentGameCount == 0
-                  && without.Results.Count == without.ConferenceGameCount,
+                  && without.Results.Count == without.ConferenceGameCount
+                                              + without.ConferenceTournamentGameCount + without.BuyGameCount,
                   $"{withEvents.TournamentGameCount} tournament games on, {without.TournamentGameCount} off");
 
             // ════════════════════════════════════════════════════════════════════

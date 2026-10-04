@@ -299,17 +299,31 @@ internal static partial class Program
             var tinyPerTeam = tiny.Schools.ToDictionary(
                 s => s.Id, s => tiny.Conferences.Single(c => c.Id == s.ConferenceId).Games);
             var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false);
+            //  ★ S111 — buy games now play on this world too, so "the season" is league games
+            //  plus buy games. The LEAGUE claims below read the league games (IsLeagueGame);
+            //  conservation reads the whole season against its own derived total. The league
+            //  count is still asserted to be the oracle's.
+            var tinyTotal = tinyGames + outcome.BuyGameCount;
+            var leagueGp = tiny.Schools.ToDictionary(s => s.Id, _ => 0);
+            for (var gi = 0; gi < outcome.PlayedGames.Count; gi++)
+                if (outcome.PlayedGames[gi].IsLeagueGame)
+                {
+                    leagueGp[outcome.Results[gi].HomeId]++;
+                    leagueGp[outcome.Results[gi].AwayId]++;
+                }
             Check($"fixture: schedule fingerprint matches the oracle ({tiny.Schools.Count} schools, " +
-                  $"{tinyGames} games)",
-                  outcome.Fingerprint == fixtureOracleFp && outcome.Results.Count == tinyGames,
+                  $"{tinyGames} league games)",
+                  outcome.Fingerprint == fixtureOracleFp && outcome.ConferenceGameCount == tinyGames
+                  && outcome.Results.Count == tinyTotal,
                   outcome.Fingerprint == fixtureOracleFp
-                    ? $"{outcome.Results.Count} games" : $"got {outcome.Fingerprint}");
-            Check("fixture: every team has exactly its league's authored number of results (W+L)",
-                  tiny.Schools.All(s => outcome.Wins[s.Id] + outcome.Losses[s.Id] == tinyPerTeam[s.Id]));
-            Check($"fixture: results conserve — total wins == total losses == {tinyGames}, zero ties",
-                  outcome.Wins.Values.Sum() == tinyGames && outcome.Losses.Values.Sum() == tinyGames
+                    ? $"{outcome.ConferenceGameCount} league + {outcome.BuyGameCount} non-conference = {outcome.Results.Count}"
+                    : $"got {outcome.Fingerprint}");
+            Check("fixture: every team has exactly its league's authored number of LEAGUE results (W+L)",
+                  tiny.Schools.All(s => leagueGp[s.Id] == tinyPerTeam[s.Id]));
+            Check($"fixture: results conserve — total wins == total losses == every game played, zero ties",
+                  outcome.Wins.Values.Sum() == tinyTotal && outcome.Losses.Values.Sum() == tinyTotal
                     && outcome.Ties == 0,
-                  $"W {outcome.Wins.Values.Sum()}, L {outcome.Losses.Values.Sum()}, ties {outcome.Ties}");
+                  $"W {outcome.Wins.Values.Sum()}, L {outcome.Losses.Values.Sum()}, games {tinyTotal}, ties {outcome.Ties}");
             Check("fixture: every game has a strict winner (assumption 1: the OT loop never " +
                   "lets a tie survive)",
                   outcome.Results.All(r => r.HomeScore != r.AwayScore));

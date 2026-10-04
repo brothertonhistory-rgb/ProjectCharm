@@ -166,13 +166,18 @@ internal static partial class Program
                   "something longer rather than a whole season compared to itself",
                   on.TournamentGameCount == 24
                   && on.Results.Count == on.ConferenceGameCount + on.TournamentGameCount
+                                         + on.ConferenceTournamentGameCount + on.BuyGameCount
                   && off.TournamentGameCount == 0,
                   $"{on.TournamentGameCount} tournament games on, {off.TournamentGameCount} off");
 
-            var confOff = SeasonFingerprint(off.Results, off.PossessionCounts);
+            //  ★ S111 — the dormant run plays buy games after its league slate, so "the whole season"
+            //  became "the league half, and nothing but buy games after it".
+            var confOff = SeasonFingerprint(off.Results.Take(off.ConferenceGameCount).ToList(),
+                                            off.PossessionCounts.Take(off.ConferenceGameCount).ToList());
             Check("C1e: and with every event dormant the whole season is that same golden — a dormant " +
                   "pool spends nothing, plays nothing and appends nothing",
                   confOff == BracketsPreS98ConferenceResultsSha
+                  && off.Results.Count == off.ConferenceGameCount + off.BuyGameCount
                   && off.EventGamesFingerprint == MteEventGamesFingerprint(
                          new List<PlayedSeasonGame>(), off.Results, off.PossessionCounts));
 
@@ -367,13 +372,17 @@ internal static partial class Program
                       ReferenceEquals(hHome, probeHome) && !ReferenceEquals(hAway, probeAway) && hShaved);
 
                 //  Together these two prove neutral games were played and did not touch the
-                //  hosted wire. Phase 86 B8 compares against Schedule.Count, which stays
-                //  conference-only, so it survives this session untouched.
-                Check("C5f: ★ the hosted counter equals the CONFERENCE game count and the results list " +
-                      "equals conference plus tournament — neutral games played, hosted wire untouched",
-                      on.HostedRoadSidesShaved == on.ConferenceGameCount
-                      && on.Results.Count == on.ConferenceGameCount + on.TournamentGameCount,
-                      $"{on.HostedRoadSidesShaved} shaved / {on.ConferenceGameCount} conference, " +
+                //  hosted wire. ★ S111 — the LEAGUE counter equals the conference count; the
+                //  full-season counter adds exactly the hosted buy games (Phase 86 B8 now says the same).
+                Check("C5f: ★ the league counter equals the CONFERENCE game count, the full-season counter adds " +
+                      "only hosted non-conference games, and the results list is the four categories — neutral " +
+                      "games played, hosted wire untouched",
+                      on.LeagueRoadSidesShaved == on.ConferenceGameCount
+                      && on.HostedRoadSidesShaved
+                         == on.ConferenceGameCount + on.PlayedGames.Count(p => p.IsBuyGame && p.Game.HasHost)
+                      && on.Results.Count == on.ConferenceGameCount + on.TournamentGameCount
+                                             + on.ConferenceTournamentGameCount + on.BuyGameCount,
+                      $"{on.LeagueRoadSidesShaved} league shaved / {on.ConferenceGameCount} conference, " +
                       $"{on.Results.Count} results");
             }
 
@@ -417,11 +426,12 @@ internal static partial class Program
                   "was used and no id was wasted",
                   spentAfter - spentBefore - 1 == ledger.ConferenceGameCount + ledger.TournamentGameCount
                                                   + ledger.ConferenceTournamentGameCount
+                                                  + ledger.BuyGameCount   // ★ S111 — four terms
                   && ledger.PlayedGames.Select(p => p.Game.GameId!.Value.ToString()).Distinct().Count()
                      == ledger.PlayedGames.Count,
                   $"ledger advanced {spentAfter - spentBefore - 1} for " +
                   $"{ledger.ConferenceGameCount}+{ledger.TournamentGameCount}" +
-                  $"+{ledger.ConferenceTournamentGameCount}");
+                  $"+{ledger.ConferenceTournamentGameCount}+{ledger.BuyGameCount}");
 
             //  ★ THE CAREER THE RECORD AND THE LOG ARE READ FROM USES THE WORLD AS AUTHORED,
             //    NOT every event forced on — because the record C8 round-trips must be MIXED,
@@ -476,7 +486,7 @@ internal static partial class Program
                 Check("C6a: ★ the reader ACCEPTS the file — a season log with non-conference blocks in " +
                       "it is a legal log, and the ordinals are contiguous from zero",
                       log.Blocks.Count == career.ConferenceGameCount + career.TournamentGameCount
-                                          + career.ConferenceTournamentGameCount
+                                          + career.ConferenceTournamentGameCount + career.BuyGameCount
                       && log.Blocks.Select((b, i) => b.Facts.FixtureOrdinal == i).All(x => x),
                       $"{log.Blocks.Count} blocks");
                 //  The game object and the block byte asserted SEPARATELY, because the claim is
@@ -690,8 +700,14 @@ internal static partial class Program
 
                 //  ★ Emmett's ruling, asserted as MECHANISM: who is inside the denominator. The
                 //    band VALUE is page-only and is never asserted.
-                var band = SeasonBandWinPct(mte, on, out var counts);
-                var playedSchools = mte.Schools.Count(s => SeasonGamesPlayed(on, s.Id) > 0);
+                //  ★ S111 — every school now plays buy games, so a school that played nothing no
+                //  longer occurs naturally on this world. The ruling still governs such a school, so
+                //  the mechanism is exercised on the same world with buy games switched off — the
+                //  one construction in which the independent really does sit out the season.
+                var idle = RunSeasonCore(allOn, MteCheckSeed, configPath, verbose: false,
+                                         buyGamesOffForTest: true);
+                var band = SeasonBandWinPct(mte, idle, out var counts);
+                var playedSchools = mte.Schools.Count(s => SeasonGamesPlayed(idle, s.Id) > 0);
                 Check("C9e: ★ a school that never played is OUT of the band averages entirely (Emmett's " +
                       "ruling) — the counted population is exactly the schools that played",
                       counts.Values.Sum() == playedSchools
@@ -699,7 +715,7 @@ internal static partial class Program
                       $"{counts.Values.Sum()} counted of {mte.Schools.Count} schools");
                 Check("C9f: and the discriminator — this world really does contain a school with no " +
                       "games, so C9e is not a rule about an empty set",
-                      mte.Schools.Any(s => SeasonGamesPlayed(on, s.Id) == 0) && band.Count > 0);
+                      mte.Schools.Any(s => SeasonGamesPlayed(idle, s.Id) == 0) && band.Count > 0);
             }
 
             // ════════════════════════════════════════════════════════════════════
