@@ -8047,10 +8047,16 @@ asserted — bands test *shape*, which is what a statistical port can honestly p
 ### The dormant Player seats (S44)
 
 `Player` now carries `LatentSkills` / `CurrentSkills` / `Runway` (keyed maps, default empty),
-`Arrival` ([0,1], the ruled mechanism behind class/age), and `PlayerClass` (the S42.1
-placeholder label). None enter `Validate()` (they are not 0–99 authored ratings) and nothing
-reads them — the same proven-occupied-seat discipline as Endurance/Gravity/Spacing, waiting on
-the development/season layer.
+`Arrival` ([0,1] — how much of a player's ceiling is already showing), and `PlayerClass`.
+None enter `Validate()` (they are not 0–99 authored ratings) and nothing reads them — the same
+proven-occupied-seat discipline as Endurance/Gravity/Spacing, waiting on the development/season layer.
+
+**Class is NOT carried here (S113).** S42.1 called the generator's class label a placeholder on
+`Arrival` and handed the real population structure to the season layer. Emmett ruled that structure
+at S113 (an even random split, independent of talent — C-56), and the live class lives on the
+**pool row** (see *The pool*), because every game re-copies players through `StampPlayerId`, which
+drops these seats. `Arrival` and class are now independent: the reconciliation of the two rulings,
+not a conflict between them. `Player.PlayerClass` stays `""`, asserted by Phase 103 C6.
 
 ### The bridge, resolved (S63 → S66 → S70)
 
@@ -8545,6 +8551,7 @@ The rank-11 residue of 0.1 minutes is the **A7 collision made visible**: the ope
 - **Positions by EXACT COUNT in DEFENSIVE-PLANE rank (Emmett ruling 2026-07-24 — position is who the player can GUARD; supersedes the S63 orientation-rank form, same exact-count shape).** Sort on `Pass3Result.DPlane` (0 pure perimeter .. 1 pure post) ascending, cohort index as the deterministic tiebreak. The **4n most perimeter defenders are Guards, the 3n most interior are Bigs, the middle 3n are Wings** — 1,388/1,041/1,041 at stock. Height gets no vote and the offensive role rides along as flavor — **the 6'5" Guard and the 6'2" Big are ruled-correct output, not defects** (Phase 54 prints the extremes and the tall-guard/short-big counts on every run as the standing guard against a later system quietly assuming Guards are short; stock at the check's seed: 47 guards over 6'3", 116 bigs under 6'5"). The fixed `DCat` bucketing (0.35/0.65) is page flavor only — it lands 38/38/23 and can never hit the exact-count quota; position ranks the continuous plane. Phase 54 asserts the plane boundaries monotone (every B ≥ every W ≥ every G, non-strict for straddling ties).
 - **Roles at the OLD pool's density, quota as a FLOOR (ruling 0.2, unchanged through the swap).** `DivvyLeadRoleTarget`/`DivvyTdwRoleTarget` reproduce the old expected density exactly — stock **903 leads / 729 wing defenders**, floor 417 each. Protected roles by rank within position (leads: BallHandling+Playmaking composite; ThreeAndDWing: PerimeterDefense), deterministic tiebreak. Non-protected roles are **labels only** (mechanically inert — traced end-to-end S63) and stamp deterministically from each player's own card. `ValidateDivvyPool` still asserts the floor loudly before pick one.
 - **Card → Player (S70):** a COPY of the 33-key `Result.Card` (the generator's canonical card, assembled by `PlayerGenPass3.BuildCard` and set-asserted at generation; never mutated by the bridge) → the committed golden-proven `DeriveAndStampTendencies` (reads 13 keys, none of them rebounding — the card shift cannot ripple into the diet, verified S70) → `GenMapToPlayer` → `Player.Validate()`. HierarchyRank stays at its default. **The provenance shift:** OffensiveRebounding/DefensiveRebounding on the card are now current-expressed SPENDABLE skills (Pass 2's body stamps retired); same key names, changed meaning — the S70 page diff is the recorded consequence.
+- **Class (S113, Emmett's rulings 2026-10-04):** every pool row carries `Class` — a `ClassYear` enum, Fr/So/Jr/Sr — drawn by `InitialPlayerClass(divvySeed, poolId)`: an even random split, **independent of talent by construction** (the draw reads no rating, position or rank). Reason recorded so nobody "fixes" it: with no development, talent-correlated seniors would make every turnover remove the best quarter and the league would decline each season. It is the **bootstrap draw only** — from the turnover on, returning players advance a year and every newcomer is a Freshman. It lives on the pool row, not `Player` (see *The dormant Player seats*); a Phase 54 `with`-clone carrying the same class is correct. Stock: Fr 1082 / So 1134 / Jr 1120 / Sr 1175; seniors per team 0–10, printed on the page and never asserted. Phase 103 owns the proofs.
 - **Retired with the old builder (S63), renamed at the swap (S70):** the S29 apportionment machinery stays retired; pool rows carry **`DefensivePlane`** (was `Oaxis` — the sort key changed meaning with the ruling) and **`OffensiveRole`** (was `Weapon` — now the Pass-3 Role: Creator/Shooter/Slasher/PostScorer/Connector) for the page and the boundary guards. No stale name survives on a changed meaning.
 
 ### The scout rank (the quarantined exception to the no-scalar wall)
@@ -8564,7 +8571,7 @@ The rank-11 residue of 0.1 minutes is the **A7 collision made visible**: the ope
 
 ### The RNG contract (Session 63)
 
-The pool draws on its own derived stream (`BuildRecruitedCohort` over `BuildCohort`, seeded `divvySeed ^ DivvyCohortSeedXor`; the 40-slot per-player draw order is the Phase-59 contract; prefix stability makes the S66 growth rule invisible to the accepted pool). The sequential `WorldRng(divvySeed)` feeds **only Phase D** (one winner draw per pick) — the S29 Phases A–C are retired with the old builder. The board noise rides its own per-pair streams, random-access by design. Reproducibility is guarded by Phase 54's byte-identical-pool determinism check (every position, role, rating, orientation, and rank identical under the same seed), not by a Python pool mirror.
+The pool draws on its own derived stream (`BuildRecruitedCohort` over `BuildCohort`, seeded `divvySeed ^ DivvyCohortSeedXor`; the 40-slot per-player draw order is the Phase-59 contract; prefix stability makes the S66 growth rule invisible to the accepted pool). The sequential `WorldRng(divvySeed)` feeds **only Phase D** (one winner draw per pick) — the S29 Phases A–C are retired with the old builder. The board noise rides its own per-pair streams, random-access by design. **The class draw (S113)** rides its own per-player stream: a fresh SplitMix64 seeded from (divvySeed ^ `ClassDrawSalt`) ^ (poolId+1)·`ClassDrawMix` — its own salt and prime, never the board-noise primes — keeping the top two bits of one integer draw. It consumes nothing from the winner draws or the cohort, so it moves no roster and no game (Phase 103 C7: every stock game identical), and being all-integer it is bit-identical across platforms. Reproducibility is guarded by Phase 54's byte-identical-pool determinism check (every position, role, rating, orientation, and rank identical under the same seed), not by a Python pool mirror.
 
 ### The readout (`divvy <world.json> <seed> [idA idB]`) and Phase 54
 

@@ -95,6 +95,13 @@ internal static partial class Program
     private const ulong DivvyMixP1 = 0xC2B2AE3D27D4EB4FUL;   // school mix prime
     private const ulong DivvyMixP2 = 0x165667B19E3779F9UL;   // player mix prime
 
+    // ── ★ S113 — the class draw's own stream (Emmett's ruling, 2026-10-04) ─────────
+    // Its OWN salt and its OWN mix prime, deliberately NOT DivvyMixP1/P2: a class stream
+    // that equalled the board-noise stream for some id would be a correlation waiting to
+    // happen. Neither constant is read anywhere else.
+    private const ulong ClassDrawSalt = 0xC1A55EEDC1A55EEDUL;
+    private const ulong ClassDrawMix  = 0x27D4EB2F165667C5UL;
+
     // ── Scout rank (quarantined to the divvy; never on a Player, never a sort) ──
     // rank = L1 + 0.9*L2 + 0.4*L3 + 0.045*max(0, L3-30)^2 over the three leg means
     // (holes excluded, SIZE normalized to the generic scale; since 29.1 the SKILL
@@ -134,9 +141,35 @@ internal static partial class Program
     // per Emmett's 2026-07-24 ruling) and Weapon → OffensiveRole (the Pass-3 Role:
     // Creator / Shooter / Slasher / PostScorer / Connector — flavor, never a sort key).
     // Both ride along for the page and the Phase 54 boundary guards.
+    // ★ S113: Class (Fr/So/Jr/Sr) is a fact about the PERSON, so it lives on the pool row.
+    // It is NOT put on Player.PlayerClass: every game re-copies every player through
+    // StampPlayerId, which does not carry that seat, so a class on Player would be dropped
+    // before the first tip. Unlike the S89 person number, class is SAFE to ride through
+    // Phase 54's `with`-clones — a clone with the same class is correct, not a duplicate.
     private sealed record PoolPlayer(
         int PoolId, string Pos, string Role, double DefensivePlane, string OffensiveRole,
-        Dictionary<string, int> Ratings, Player Player, double ScoutRank);
+        Dictionary<string, int> Ratings, Player Player, double ScoutRank, ClassYear Class);
+
+    /// <summary>★ S113 — a player's year in school. An enum, not a string, so a misspelled
+    /// class cannot exist. Order is the draw's index: 0 Fr .. 3 Sr.</summary>
+    internal enum ClassYear { Fr = 0, So = 1, Jr = 2, Sr = 3 }
+
+    /// <summary>★ S113 — the BOOTSTRAP class draw. Classes the starting universe and nothing
+    /// else: from the turnover on, a returning player advances his existing class and every
+    /// new entrant is a Freshman by construction. Never route a new player through this.
+    ///
+    /// <para>Reads (seed, pool id) and nothing more — no rating, no position, no rank — so
+    /// class is independent of talent BY CONSTRUCTION (ruling 2). A fresh SplitMix per
+    /// player, so it consumes nothing from the draft's dice or the cohort's stream (A1).
+    /// The top two bits of one integer draw: exact, and identical on Windows and Linux
+    /// (no floating point anywhere — the S81.3 lesson).</para></summary>
+    private static ClassYear InitialPlayerClass(long divvySeed, int poolId)
+    {
+        var seed = unchecked((ulong)divvySeed) ^ ClassDrawSalt;
+        seed ^= unchecked((ulong)(poolId + 1) * ClassDrawMix);
+        var r = new WorldRng(unchecked((long)seed));
+        return (ClassYear)(int)(r.NextU64() >> 62);
+    }
 
     // The season/smoke row adapters still construct the gen lab's GenPlayerRow, whose
     // ctor carries LegCount + PlusLegs. Both are mechanically DEAD on those paths
@@ -232,7 +265,8 @@ internal static partial class Program
 
             pool.Add(new PoolPlayer(pid, pos[pid], role,
                 cohort[order[pid]].Result.DPlane, cohort[order[pid]].Result.Role,
-                v, players[pid], DivvyScoutRank(v, pos[pid])));
+                v, players[pid], DivvyScoutRank(v, pos[pid]),
+                InitialPlayerClass(divvySeed, pid)));   // ★ S113 — the one place a class is drawn
         }
 
         // ★ S89 — ONE reservation for the whole cohort, made durable before a single

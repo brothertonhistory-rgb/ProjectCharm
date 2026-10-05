@@ -1528,5 +1528,32 @@ internal static partial class Program
             if (ranks.Count == 0) continue;
             Console.WriteLine(Inv($"    prestige {lo,2}-{hi,-2}  {ranks.Average(),6:F1}  [{ranks.Min(),6:F1} .. {ranks.Max(),6:F1}]  (n={ranks.Count})"));
         }
+
+        PrintS113ClassCensus(res);
+    }
+
+    // ── ★ S113: classes. Page-only, never asserted (A5). Seniors per team is printed because
+    //    it is exactly the size of each school's turnover next session — and "random" means
+    //    some schools carry many and some none, by ruling. ─────────────────────────────────
+    private static void PrintS113ClassCensus(DivvyResult res)
+    {
+        static string Inv(FormattableString f) => FormattableString.Invariant(f);
+        var pool = res.Pool;
+        var classes = new[] { ClassYear.Fr, ClassYear.So, ClassYear.Jr, ClassYear.Sr };
+        string Split(IReadOnlyCollection<PoolPlayer> ps, bool pct) => string.Join("  ", classes.Select(c =>
+        {
+            var k = ps.Count(p => p.Class == c);
+            return pct ? Inv($"{c} {k} ({100.0 * k / ps.Count:F1}%)") : Inv($"{c} {k}");
+        }));
+        Console.WriteLine(Inv($"  classes (S113; pool of {pool.Count}): ") + Split(pool, pct: true));
+        foreach (var q in new[] { PositionalEligibility.Guard, PositionalEligibility.Wing, PositionalEligibility.Big })
+        {
+            var sub = pool.Where(p => p.Pos == q).ToList();
+            Console.WriteLine(Inv($"    {q} (n={sub.Count}): ") + Split(sub, pct: false));
+        }
+        var srs = res.Rosters.Values.Select(r => r.Count(pid => pool[pid].Class == ClassYear.Sr)).ToList();
+        if (srs.Count == 0) return;
+        Console.WriteLine(Inv($"  seniors per team: mean {srs.Average():F2}  min {srs.Min()}  max {srs.Max()}"));
+        Console.WriteLine(Inv($"    teams with 0: {srs.Count(x => x == 0)}   1-2: {srs.Count(x => x is >= 1 and <= 2)}   3-4: {srs.Count(x => x is >= 3 and <= 4)}   5-6: {srs.Count(x => x is >= 5 and <= 6)}   7+: {srs.Count(x => x >= 7)}"));
     }
 }

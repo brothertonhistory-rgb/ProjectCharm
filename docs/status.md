@@ -10,7 +10,18 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 112** (2026-10-04; verified on Emmett's machine — ALL CHECKS PASSED, **87 timed sections,
+Last updated: **Session 113** (2026-10-04; verified on Emmett's machine — ALL CHECKS PASSED, **88 timed sections,
+1,355.9s (release), Phase 103 new (22 assertions, 17.1s)**, every Phase 103 number identical to the sandbox. **EVERY
+PLAYER GETS A CLASS** — the first session of the stacked-seasons arc. All 4,511 pool players are Fr/So/Jr/Sr: an even
+random split, **independent of talent by ruling (C-56)**, shown on the season page with seniors per team (0–10 on the
+stock seed; ten is legitimate, Emmett ruled). ★ Class lives on the **pool row**, not `Player`, because every game's
+player copy drops the development seats; Phase 103 asserts both halves of that call. ★ Its own integer stream:
+**nothing moved** — seven fingerprints and all 5,357 games identical. ★ S42.1's "class decorates Arrival" is
+reconciled, not contradicted: Arrival keeps its meaning, class is independent. Suite time 1,355.9s vs S112's 505.9s
+sits inside S112's own unexplained release spread (1,293.6 → 505.9); Phase 103 is 17.1s of it. Touches **O-72**,
+**P-8**; ruling **C-56**. Journal S113 has the detail.)
+
+Previous: **Session 112** (2026-10-04; verified on Emmett's machine — ALL CHECKS PASSED, **87 timed sections,
 505.9s (release build), Phase 102 new (46 assertions)**. **THE SEASON RECORD AND THE FIRST RATING** — every school's
 whole year as one record (opponent, site, category, date, points, **each side's own possessions**, overtime), and one
 **predictive** rating on it: adjusted offense/defense/net, adjusted tempo, strength of schedule, all 347 on the page.
@@ -469,6 +480,11 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S113 MOVED NO BASKETBALL.** Every game, score and possession count is identical to S112 (Phase 103 C7 against the
+pre-S112 capture). The season page gained the class census at the end of the roster census: class totals, the same by
+position, and seniors per team. Stock seed: Fr 1082 / So 1134 / Jr 1120 / Sr 1175; seniors per team mean 3.39, range
+0–10. That spread is the size of each school's turnover next session.
+
 **★ S98 MOVED NO CONFERENCE BASKETBALL AND ADDED 128 GAMES ON TOP OF IT.** The 2,818-game conference season is
 byte-identical to its pre-S98 self — same scores, same possession counts, same fingerprints — because the brackets
 are EXECUTED LAST and therefore change no conference game's seed. What changed is that the season is now **2,946
@@ -573,6 +589,14 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S113 — EVERY PLAYER GETS A CLASS.** `Program.Divvy.cs`: `ClassYear` (Fr/So/Jr/Sr) on `PoolPlayer`, drawn once at
+  the single construction site by `InitialPlayerClass(divvySeed, poolId)` on its own salted integer stream (bootstrap
+  only — never for a new player). `Program.Season.Calibration.cs`: the class census on the page. 
+  `Program.Checks.PlayerClasses.cs` (new, Phase 103, 22 assertions): one class each, even over 100k synthetic ids,
+  independent of talent with a rank-quartile negative control, deterministic and seed-responsive, reads only
+  (seed, id), the `Player` seat stays dormant and the per-game copy drops it, seven fingerprints and every game
+  unmoved. Registry 87 → 88.
 
 - **★ S112 — THE SEASON RECORD AND THE FIRST RATING.** `Program.Season.Ratings.cs` (new): the record (two entries per
   game, win/loss derived, reconciliation), the home-court fit from every same-season home-and-home, the equal-weight
@@ -1378,7 +1402,11 @@ chart is PROVISIONAL pending O-6.
   that will become live, and a season written without it could never get it back — but it is currently a
   constant occupying a column. Whoever designs usage hierarchy owns this.
 
-- **O-72 — CLASS YEAR IS COMPUTED AND DISCARDED, AND THE ARCHIVE DOES NOT KEEP IT (opened S90 chores).**
+- **O-72 — CLASS YEAR IS NOT IN THE ARCHIVE (opened S90 chores; HALF SHIPPED S113).** ★ **S113: every pool player
+  now HAS a class** (on the pool row, ruled even and talent-independent, C-56), so the "computed and discarded" half
+  below is superseded. **Still open: the archive does not keep it** — that is the stacked-seasons arc's session 3
+  (saving the league), whose save format is designed before its code. The original text, kept for the record:
+  *CLASS YEAR IS COMPUTED AND DISCARDED, AND THE ARCHIVE DOES NOT KEEP IT.*
   `Player.PlayerClass` (Fr/So/Jr/Sr) exists and the generator produces it, but `GenMapToPlayer`
   (`Program.Gen.cs:821`) never assigns it, so every season player carries an empty string and S90's
   roster section has nothing to store. Emmett ruled the archive is a historical record and class year
@@ -1940,7 +1968,8 @@ chart is PROVISIONAL pending O-6.
 - **P-5 — Endurance's temporal shape → a time-sliced bench (S50).**
 - **P-6 — Wingspan's jump-ball tip → a first-possession counter (S50).**
 - **P-7 — PostDefense-as-size coupling → the synthesis pass (S52).**
-- **P-8 — Age/class population structure → the season/recruiting layer (S42.1 ruling).**
+- **P-8 — Age population structure → the season/recruiting layer (S42.1 ruling; CLASS HALF SHIPPED S113).** Class
+  was ruled and shipped (C-56). What stays parked: AGE, redshirts, fifth years, walk-ons.
 - **P-9 — Roll G lineup-context bend (teammate spacing/gravity as selection) → its own
   design conversation; the attributes are carried on Player, unread.**
 - **P-10 — Shooting-foul rate dial (bridge #3) → no longer urgent post-S40; a page question.**
@@ -1962,6 +1991,13 @@ chart is PROVISIONAL pending O-6.
   simulated season of an openly-uncalibrated league is not a data set for a universal exponent.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
+
+- **C-56 (S113, Emmett's ruling, 2026-10-04) — CLASS IS AN EVEN RANDOM SPLIT, INDEPENDENT OF TALENT.** *"For now even
+  is fine, easily changed later."* A senior is no better on average than a freshman, deliberately: with no
+  development, talent-correlated seniors would make every turnover remove the league's best quarter and the league
+  would decline each season. Age and talent will correlate **through development** when it exists, never through the
+  draw. Seniors per team is random too — one stock team carries ten, and that stands (*"10 seniors is the way it is
+  sometimes"*). Do not balance it.
 
 - **C-53 (S112, Emmett's ruling, 2026-10-04) — NO RECENCY WEIGHTING IN ANY RATING.** Rosters are static: nobody
   develops, nobody is hurt, so a late game says nothing an early one does not. A **deliberate divergence from
@@ -2243,6 +2279,18 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **CLASSES SHIPPED — S113 (2026-10-04). NEXT: THE TURNOVER, IN MEMORY (stacked-seasons arc, session 2).** Emmett
+ruled 2026-10-04 that the postseason (selection metric, national bracket) **waits until seasons repeat**, so the quad
+metric named in the S112 block below is **no longer next** — it is deferred behind the arc, not dropped. The arc, one
+bite each: (1) classes ✅ S113; (2) **play season one, roll the year — seniors leave, everyone advances a class,
+freshmen arrive — play season two in the same run, nothing saved**; (3) saving the league (the save format is
+designed before its code; closes O-72's open half); (4) development, recruiting, prestige movement, transfers, one at
+a time. **Carry into the session-2 draft, ruled (Emmett, 2026-10-04):** departures are replaced **position for
+position** — a school losing three guards and two bigs receives three freshman guards and two freshman bigs — from a
+**national freshman pool handed out by prestige the same way the divvy builds rosters today**; no roster is ever short.
+Every newcomer is a Freshman by construction; `InitialPlayerClass` is the bootstrap draw and must never class a new
+player. Seniors per team on the stock seed runs 0–10, so one school replaces ten of thirteen.
 
 ★ **THE FIRST RATING SHIPPED — S112 (2026-10-04).** Conference tournaments (✅ S110) → bridge (✅ S111) → **record +
 efficiency rating (✅ S112)** → **quad / selection metric (next)** → national bracket → stacked seasons. The quad
