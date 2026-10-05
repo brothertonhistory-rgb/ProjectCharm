@@ -12264,3 +12264,75 @@ of 2,170 cannot see one omission plus one duplication), site and the ruled city,
 reconciliation, the tournaments untouched, six hashes unmoved and the seventh proven non-decorative, id
 uniqueness and the walk on a career run, the zero path, and **fifteen negative controls each shown firing
 the rule it names**.
+
+## The season record and the first rating (Session 112, 2026-10-04)
+
+### Two layers, kept apart
+
+**The record** is the substrate every ranking reads: for every school, every game it played — opponent, site
+(Home / Away / Neutral, from `HasHost`; on a neutral floor home/away is box-score order only), category (league,
+event, conference tournament, buy), date, points for and against, **each side's own possessions**, overtime periods.
+It computes no basketball and decides nothing. **Win/loss is derived from the points, never stored**, so a later
+selection metric cannot disagree with the standings. A school that played nothing is present with an empty list.
+
+**The rating** is one reader of it. The next ranking (the quad metric) is another reader of the same record — a new
+file, not a new layer.
+
+### The possession split is a count
+
+Each possession record names who had the ball, so each side's possessions are counted where the game is recorded
+(`SidePossessions`, parallel to `PossessionCounts`). The two sides differ in most games (3,332 of 5,357 on the stock
+season), so halving the total is wrong. The split is a separate list because `PossessionCounts` feeds the season
+fingerprint.
+
+### What the rating is
+
+**Predictive, not an award.** A 33-1 team can sit below an 18-13 team; that is the system working. **It must never
+seed the national bracket** (C-54) — at-large selection belongs to the quad metric. Emmett's rulings: **no recency
+weighting** — rosters are static, nobody develops or is hurt, so this is a deliberate divergence from Pomeroy, not an
+omission (C-53); **every game counts**, all four categories; **margin uncapped**.
+
+### Home court is measured from the engine, from the home-and-homes
+
+`h = sqrt( (home points ÷ home possessions) ÷ (road points ÷ road possessions) )`, summed over every pair of schools
+whose **hosted** meetings are equal at each gym — the same two schools in both buildings in one season, so the
+opponent cancels. On the stock world that is **1,254 pairs: 1,146 conference rematches** (R3 splits every doubled
+pair one-and-one by construction) **and 108 non-conference home-and-homes**. A neutral meeting never makes a pair.
+A home performance is divided by `h`, a road one multiplied by it, a neutral one untouched — before the opponent
+adjustment, so the opponent loop only sees neutral-site numbers.
+
+**Why not home-vs-road over all games:** most buy games put the stronger school in its own gym (the host is the
+higher-prestige school in 1,558 of 2,078 hosted buy games), so the naive split credits the venue with the opponent
+gap — **6.3% fair vs 11.0% naive** on the stock season. The naive figure is printed as a diagnostic only.
+
+**Why not a real-life figure:** the rating must strip out the home court that actually happened in our games
+(C-55). Whether our engine's home court is realistic is the road-shave dial's question (O-111); when that dial
+moves, the rating follows with no change.
+
+### The adjustment
+
+- Raw offensive efficiency = 100 × points ÷ own possessions; defensive = 100 × points allowed ÷ opponent's possessions.
+- Per game, site-neutralized, then `raw × national ÷ opponent's adjusted figure on the other side of the ball`.
+- **Each game is one equal vote** — never possession-weighted (consistent with no recency weighting).
+- **Renormalized every round** so the rated schools' mean AdjO and mean AdjD equal national efficiency (total points ÷
+  total possessions).
+- **Converged** when no school's AdjO or AdjD moves more than 1e-9; **refused by name at 1,000 rounds** — a
+  half-settled table is never returned. Stock: 233 rounds.
+- Net = AdjO − AdjD.
+- **Tempo** — possessions per 40 minutes using the game's actual length (each overtime 5 minutes), adjusted the same
+  multiplicative way in its own loop; a page column, never an input to net. Stock: 226 rounds.
+- **SOS** — the mean of opponents' adjusted net, one entry per game played (a team met twice counts twice), at neutral.
+- Every sum walks schools by id and games by fixture ordinal, so input order cannot move a bit.
+
+### What refuses rather than guesses
+
+- **A split schedule** — two groups that never played each other — produces no ratings at all; the page prints why
+  (`RATING-DISCONNECTED`). Cross-group ranks would mean nothing.
+- **No home-and-home anywhere** — home court cannot be measured, so nothing is rated (`RATING-NO-HOME-PAIRS`).
+- **A school with no games** is listed by name as not rated — never rated 0.0 and ranked last.
+- **A record that does not reconcile** (a game seen once, sides that do not mirror) or a side with zero possessions.
+
+### Not built, on purpose
+
+**Pythagorean win expectancy** — fitting an exponent to one simulated season of a league whose calibration is openly
+off (turnovers, rim rate) would be fitting noise. It waits for a calibration session with many seasons (P-15).

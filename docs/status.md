@@ -10,7 +10,19 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 111** (2026-09-16; verified on Emmett's machine — ALL CHECKS PASSED, **86 timed sections,
+Last updated: **Session 112** (2026-10-04; verified on Emmett's machine — ALL CHECKS PASSED, **87 timed sections,
+505.9s (release build), Phase 102 new (46 assertions)**. **THE SEASON RECORD AND THE FIRST RATING** — every school's
+whole year as one record (opponent, site, category, date, points, **each side's own possessions**, overtime), and one
+**predictive** rating on it: adjusted offense/defense/net, adjusted tempo, strength of schedule, all 347 on the page.
+★ **HOME COURT FROM 1,254 SAME-SEASON HOME-AND-HOMES** (1,146 conference rematches + 108 non-conference — Emmett ruled
+both in; the prompt had only the 108): **6.3% fair vs 11.0% naive**. ★ The prompt's "2,078 stronger hosts" was the
+hosted count; the higher-prestige school hosted **1,558**. ★ The sides' possessions differ in **3,332 of 5,357
+games** — halving would have been wrong invisibly. ★ **THE SUITE WAS 87 MINUTES BECAUSE IT RAN THE DEBUG BUILD** —
+Emmett refused the "busy machine" premise and was right: Phase 102 was 46s alone and 282s in-suite on Debug;
+**release: 1,293.6s, then 505.9s**, results identical. `-c Release` is now the standing command (CONVENTIONS §5a).
+**Closes O-110**; opens **O-111**, **P-15**; rulings **C-53–C-55**. Journal S112 has the detail.)
+
+Previous: **Session 111** (2026-09-16; verified on Emmett's machine — ALL CHECKS PASSED, **86 timed sections,
 2,732.4s, Phase 101 new (70 assertions)**. **THE BUY GAMES PLAY** — 2,170 non-conference games join the season
 (2,078 hosted, 92 neutral), appended after the conference tournaments; the stock season goes **3,187 → 5,357 games**
 and every school plays **29–34**. The bridge is in: a school's record is finally its whole year. ★ **ALL 3,187
@@ -562,6 +574,15 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S112 — THE SEASON RECORD AND THE FIRST RATING.** `Program.Season.Ratings.cs` (new): the record (two entries per
+  game, win/loss derived, reconciliation), the home-court fit from every same-season home-and-home, the equal-weight
+  opponent adjustment renormalized every round and refused by name at 1,000 rounds, adjusted tempo in its own loop,
+  SOS, the page section. `Program.Season.cs`: `SidePossessions`, a count by side at the one recording site, separate
+  from the fingerprinted `PossessionCounts`. `Program.Checks.Ratings.cs` (new, Phase 102, 46 assertions): against a
+  pre-edit capture of every game and every side split, a synthetic league with a known truth, and a negative control
+  per rule. Registry 86 → 87. **Closes O-110**: the slow suite was the Debug build
+  (journal S112; CONVENTIONS §5a).
+
 - **★ S111 — THE BUY GAMES PLAY (the bridge).** `Program.Season.BuyGames.cs` (new): every dated pairing converts to a
   `SeasonGame` before the commit (its id is reserved there) and plays appended after the conference tournaments, so no
   existing engine seed moves. Site from the **pair kind** (`Hosted|Filler|Terminal|Exchange` host, `Neutral` does not,
@@ -1083,19 +1104,15 @@ chart is PROVISIONAL pending O-6.
   somebody checks the arithmetic by hand. One format string. **Not fixed in S105.1: it is outside
   that session's scope wall and touches nothing the session was correcting.**
 
-- **O-110 — ★ THE SUITE INFLATED 4.4× FOR 68% MORE BASKETBALL, AND NOBODY KNOWS WHY YET (opened S111).**
-  622.7s (85 sections, S110.1) → **2,732.4s (86 sections, S111)**, both on Emmett's machine. The season grew
-  3,187 → 5,357 games, which is 1.68×. The per-section growth is far larger and is **not uniform**:
-  **Phase 96 Independents 140.0 → 745.8s (5.3×)**, **Phase 99 conference tournaments 56.3 → 420.4s (7.5×)**,
-  Phase 95 showcases → 252.2s, Phase 97 → 175.1s. Phase 101 (373.3s) is new and partly explained — it replays a
-  full unchanged season every run purely to own a baseline, which should be a committed digest instead.
-  ★ **MEASURE BEFORE TUNING — this is S104.1's lesson verbatim** (the hunch was wrong and the number said so).
-  Candidate explanations to test rather than assume: a phase that runs N seasons now carries N×2,170 extra games;
-  something super-linear in a per-season structure the buy games enlarge; or the growth is exactly linear and the
-  old 140.0/56.3 figures were measured against something smaller than remembered. **This is the first step of the
-  speed session, ahead of O-96's design work, because it decides what O-96 should even target.**
+- **O-111 — OUR HOME COURT MAY RUN HOT (S112, Emmett: "on the board").** The rating measures **~4.2 points**
+  (6.3% efficiency, 1,254 home-and-homes, stock world); real D1 is roughly **3–3.5** — Claude's recollection, **not
+  verified; look it up first**. If it matters, it is an engine-tuning question for the S95 road-shave dial, never a
+  rating change: the rating measures whatever the engine does (C-55).
 
 - **O-96 — ★ A SCHEDULE-ONLY SEASON MODE. A large share of the suite pays for basketball nothing reads.**
+  ★ **S112 note: O-110 closed — the 87-minute suite was the DEBUG build. Release: 505.9s for the whole suite, Phase 96
+  72.5s.** Every figure below was measured on Debug and overstates the cost several-fold; re-derive on release before
+  deciding this is still worth building.
   ★ **S111 note: the figures below are the S110.1 run's and are now stale — see O-110 for the current ones and
   re-derive before scoping.** The shape of the finding survives: the top five sections are ~72% of the run
   (96, 99, 101, 95, 97), and most of what they test is seating, pairing and bookkeeping rather than basketball.
@@ -1941,8 +1958,21 @@ chart is PROVISIONAL pending O-6.
 - **P-14 — Long-term watches (design before the relevant layer ships, not now):** save-file
   schema versioning; end-to-end RNG/determinism review before the full season layer; the
   Player data layer at 21k+ actives; moddability. (working-with-emmett §7)
+- **P-15 — Pythagorean win expectancy → a calibration session with many seasons behind it (S112 §3h, cut).** One
+  simulated season of an openly-uncalibrated league is not a data set for a universal exponent.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
+
+- **C-53 (S112, Emmett's ruling, 2026-10-04) — NO RECENCY WEIGHTING IN ANY RATING.** Rosters are static: nobody
+  develops, nobody is hurt, so a late game says nothing an early one does not. A **deliberate divergence from
+  Pomeroy**, not an omission. Every game is one equal vote; margin uncapped; all four categories count. Revisit only
+  when player development or injuries exist.
+- **C-54 (S112) — THE EFFICIENCY RATING NEVER SEEDS THE NATIONAL BRACKET.** It is predictive, not an award (a 33-1
+  team can sit below an 18-13 one). At-large selection belongs to the quad metric.
+- **C-55 (S112, Emmett's ruling, 2026-10-04) — THE RATING'S HOME COURT IS MEASURED FROM OUR GAMES, NOT BORROWED FROM
+  REAL LIFE.** It must strip out the home court that actually happened, so it is fitted from every same-season
+  home-and-home (conference rematches included, by ruling). Realism is the engine dial's job (O-111). Do not hard-code
+  a real-world constant into the rating.
 
 - **C-51 (S110, Emmett's ruling, 2026-09-07) — EIGHT TEAMS IN EVERY CONFERENCE TOURNAMENT. Closes O-102.**
   *"All I want is eight everywhere. We will deal with byes and all the complicated conference tournaments later."*
@@ -2214,27 +2244,19 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
+★ **THE FIRST RATING SHIPPED — S112 (2026-10-04).** Conference tournaments (✅ S110) → bridge (✅ S111) → **record +
+efficiency rating (✅ S112)** → **quad / selection metric (next)** → national bracket → stacked seasons. The quad
+metric is a second reader of the S112 record — a new file, not a new layer. Carry into the draft: the record's four
+categories and three sites; win/loss is derived from points; the efficiency rating is predictive and must not select
+(C-54); a quad needs opponent quality, and the adjusted net is the obvious input — say so as a choice, not a given.
+★ **The suite is 505.9s on release** (O-110 closed), so the speed session is no longer the competing candidate it was.
+Every delivery uses `-c Release` (CONVENTIONS §5a).
+
 ★ **THE BRIDGE SHIPPED — S111 (2026-09-16).** Conference tournaments (✅ S110) → **bridge (✅ S111)** → rankings →
 national bracket → stacked seasons. 2,170 buy games play; a school's record is its whole year for the first time;
 every pre-existing fixture is byte-identical. The flat top of the standings was the missing bridge, as this board
 said — **do not go hunting for a prestige bug.** Whether the standings now read *right* is a basketball question
 nobody has asked yet, and it is the first thing worth looking at on the page.
-
-★ **THE NEXT ONE IS A JUDGEMENT CALL BETWEEN TWO, AND EMMETT RULES IT.**
-
-1. **RANKINGS** — the next step in the stated order, and the first session in a long while whose output is something
-   he can read as basketball rather than as plumbing. It needs the records S111 just produced.
-2. **THE SPEED SESSION (O-110 then O-96)** — the suite is now **45.5 minutes** on his machine, up from 10.4. Every
-   session from here pays that at the gate, twice if anything comes back red. It is boarded and its first step is
-   measurement, not design.
-
-Claude's recommendation: **O-110's measurement pass first, as a micro-session** (it is an afternoon, it is the kind
-of finding that reshapes O-96's scope, and a 45-minute gate makes every subsequent session worse), **then rankings.**
-But if the project needs to feel like basketball again — a real consideration after twenty sessions of scheduling
-plumbing — rankings first is the defensible call and the speed cost is survivable.
-
-Carry into whichever draft: the S110/S111 precedent for where new games sit in the fixture order and how their ids are
-reserved; and, for rankings, that the season now holds **four** categories of game, not three.
 
 ★ **A CORRECTION THIS BOARD OWES ITSELF (S110 gate finding).** The block that stood here claimed the conference
 tiebreak ladder was "already ruled" — head-to-head reverting to a two-team procedure, tied blocks as single

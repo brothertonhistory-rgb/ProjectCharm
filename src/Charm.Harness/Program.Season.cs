@@ -148,6 +148,10 @@ internal static partial class Program
         public bool IsLeagueGame => !IsEventGame && !IsConferenceTournamentGame && !IsBuyGame;
     }
 
+    /// <summary>★ S112 — one game's possessions, by side. Home and Away are box-score orderings;
+    /// on a neutral floor neither is a venue.</summary>
+    private sealed record SidePossessionCount(int Home, int Away);
+
     private sealed record SeasonGameResult(
         int HomeId, int AwayId, int HomeScore, int AwayScore, int OvertimePeriods,
         SeasonId? SeasonId = null, GameId? GameId = null);
@@ -170,6 +174,11 @@ internal static partial class Program
         /// Phase 86's zero-path identity check. Observation only; nothing simulates from
         /// it.</summary>
         public List<int> PossessionCounts { get; init; } = new();
+        /// <summary>★ S112 — each side's OWN possessions, aligned with <see cref="PossessionCounts"/>
+        /// index for index. Efficiency is per team, and the two sides of one game differ by one in
+        /// most games, so halving the total is wrong invisibly. Deliberately a SEPARATE list: the
+        /// season fingerprint hashes PossessionCounts, and this must not be able to move it.</summary>
+        public List<SidePossessionCount> SidePossessions { get; init; } = new();
         /// <summary>★ S95 — how many games actually had a road side transformed. The
         /// counter increments only when the PREPARED away side is the shaved one, so it
         /// counts what played rather than what was intended. Phase 86 B8 reads it from
@@ -1782,6 +1791,8 @@ internal static partial class Program
         var losses = world.Schools.ToDictionary(s => s.Id, _ => 0);
         var results = new List<SeasonGameResult>(schedule.Count);
         var possessionCounts = new List<int>(schedule.Count);
+        // ★ S112 — each side's own possessions, carried rather than halved (see SidePossessions).
+        var sidePossessions = new List<SidePossessionCount>(schedule.Count);
         var hostedRoadSidesShaved = 0;
         var leagueRoadSidesShaved = 0;
         var ties = 0;
@@ -1907,6 +1918,11 @@ internal static partial class Program
                 sg.HomeId, sg.AwayId, game.HomeScore, game.AwayScore, result.OvertimePeriods,
                 sg.SeasonId, sg.GameId));
             possessionCounts.Add(result.Possessions.Count);
+            // ★ S112 — every possession record already names who had the ball, so the split is a
+            //   COUNT, never total/2. The record builder asserts the two sides sum to the total.
+            sidePossessions.Add(new SidePossessionCount(
+                result.Possessions.Count(r => r.Offense == TeamSide.Home),
+                result.Possessions.Count(r => r.Offense == TeamSide.Away)));
             playedGames.Add(pg);
             if (game.HomeScore > game.AwayScore) { wins[sg.HomeId]++; losses[sg.AwayId]++; }
             else if (game.AwayScore > game.HomeScore) { wins[sg.AwayId]++; losses[sg.HomeId]++; }
@@ -2055,6 +2071,7 @@ internal static partial class Program
             Schedule = schedule, Fingerprint = fingerprint, Results = results,
             Wins = wins, Losses = losses, Divvy = divvy, League = league, Ties = ties,
             PossessionCounts = possessionCounts,
+            SidePossessions = sidePossessions,
             HostedRoadSidesShaved = hostedRoadSidesShaved,
             RoadShave = roadShave,
             DatedFingerprint = datedFingerprint,
@@ -2584,5 +2601,10 @@ internal static partial class Program
         // (vii) Session 77: the season stat page. Appended AFTER every pre-existing section,
         // so the S76.1 reference page is byte-identical above this line.
         PrintSeasonStatPage(run.League, world, minuteFloor);
+
+        // (viii) ★ S112 — the first rating. Appended after every pre-existing section, so the page
+        //   above this line is byte-identical. Page-only: no rating value is asserted anywhere.
+        Console.WriteLine();
+        PrintSeasonRatingsPage(run, world);
     }
 }

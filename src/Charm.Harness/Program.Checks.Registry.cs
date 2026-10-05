@@ -32,7 +32,7 @@ namespace Charm.Harness;
 
 internal static partial class Program
 {
-    /// <summary>★ THE EXECUTION ORDER, FROZEN. All 86 rows in the order the suite walks them.
+    /// <summary>★ THE EXECUTION ORDER, FROZEN. All 87 rows in the order the suite walks them.
     /// Derived mechanically from the pre-S110.1 source block (Program.cs:181-304 as it stood at
     /// S110) rather than typed out: Phase 0 is the chain block that always ran first, rows 1-99
     /// are the gated phases in their authored order with the five formerly-untimed phases sitting
@@ -72,6 +72,7 @@ internal static partial class Program
         "Phase96IndependentsCheck", "Phase97NonConferenceDatesCheck", "Phase98KnockoutCheck",
         "Phase99ConferenceTournamentsCheck", "Phase100RegistryCheck",
         "Phase101BuyGamesCheck",         // ★ S111 — the suite deliberately gained a check
+        "Phase102RatingsCheck",          // ★ S112 — the suite deliberately gained a check
         "ObservationRunV1",
         "StressTestArchetypeRosters",    };
 
@@ -106,7 +107,7 @@ internal static partial class Program
             var reg = BuildRegistry(configPath);
 
             // ── C1: the shape of the table ─────────────────────────────────────────
-            Check("C1a: the registry holds exactly 86 rows", reg.Count == 86, $"{reg.Count}");
+            Check("C1a: the registry holds exactly 87 rows", reg.Count == 87, $"{reg.Count}");
 
             var names = reg.Select(r => r.Name).ToList();
             Check("C1b: every row name is distinct",
@@ -184,19 +185,21 @@ internal static partial class Program
             // ── C3: ★ the frozen execution order ───────────────────────────────────
             //  The only check that can catch a dropped legacy-named phase, a reorder, or a
             //  rename. Asserted as a whole sequence, not a set.
-            Check("C3a: the frozen order oracle itself holds 86 names", FrozenCheckOrder.Length == 86,
+            Check("C3a: the frozen order oracle itself holds 87 names", FrozenCheckOrder.Length == 87,
                   $"{FrozenCheckOrder.Length}");
             var firstDiff = FirstOrderDivergence(FrozenCheckOrder, names);
             Check("C3b: ★ EXECUTION ORDER is identical to the frozen pre-S110.1 sequence",
                   firstDiff < 0,
-                  firstDiff < 0 ? "86 of 86 in order"
+                  firstDiff < 0 ? "87 of 87 in order"
                                 : $"first divergence at index {firstDiff}: frozen '{FrozenCheckOrder.ElementAtOrDefault(firstDiff)}' "
                                   + $"vs table '{names.ElementAtOrDefault(firstDiff)}'");
             //  ★ S111 — Phase 101 is a third row added since the pre-S110.1 order; excluded on the
-            //    same terms, so the 83 still means "the pre-S110.1 order, exactly".
+            //    same terms, so the 83 still means "the pre-S110.1 order, exactly". ★ S112 — Phase 102
+            //    is a fourth, on the same terms.
             Check("C3c: dropping the rows added since S110.1 leaves the pre-S110.1 order exactly",
                   names.Count(n => n is not "Phase0ChainChecks" and not "Phase100RegistryCheck"
-                                        and not "Phase101BuyGamesCheck") == 83);
+                                        and not "Phase101BuyGamesCheck"
+                                        and not "Phase102RatingsCheck") == 83);
 
             //  ── The negative controls for C3b. This is the ONLY check standing between the
             //     suite and a silently dropped phase, so it has to be shown firing rather than
