@@ -10,9 +10,9 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 114** (2026-10-05; verified on Emmett's machine — **Phase 104 new (51 assertions, PASS), every
-predicted number identical to the sandbox**; the suite green in two pieces — Phases 0–101 before the machine slept
-mid-Phase 102, `checks 102 103 104` after, same build — accepted under **C-57**. **THE TURNOVER, IN MEMORY** — session 2
+Last updated: **Session 114** (2026-10-05; verified on Emmett's machine — **ALL CHECKS PASSED, 89 timed sections,
+1,957.8s, Phase 104 new (51 assertions), every predicted number identical to the sandbox**; an earlier attempt was
+interrupted by sleep at Phase 102 and finished as `checks 102 103 104`, which prompted **C-57**. **THE TURNOVER, IN MEMORY** — session 2
 of the stacked-seasons arc, and the first time a season has followed another: `seasons <world> <seed>` plays season one,
 every senior leaves, everyone else advances a class, a freshman class exactly the size of the departures arrives
 **position for position** by prestige through the divvy's own draft loop (now one loop started from different numbers),
@@ -21,7 +21,8 @@ and season two plays at seed + 1. Nothing saved; `--history` refused. ★ Season
 negative control (a class drawn at R_LINE + 5) **could not fire** — a raised scholarship line is a better crop by the
 generator's budget score and not by scout rank for guards (R_LINE + 20: guards **+0.0 SE**); the control that ships is a
 class hand-picked by rank, and the finding is boarded (**O-112**). ★ Emmett's machine ran ~5× slower than the day
-before on identical code (Phase 103: 93.5s vs 17.1s) — third sighting of the unexplained spread (**O-114**). Ruling
+before on identical code (Phase 103: 88.3s vs 17.1s; suite 1,957.8s vs 505.9) — third sighting of the unexplained
+spread (**O-114**). Ruling
 **C-57** (targeted checks for isolated changes; full suite when there is bleed-over). Opens **O-112, O-113, O-114**.
 Journal S114 has the detail.)
 
@@ -2050,8 +2051,8 @@ chart is PROVISIONAL pending O-6.
   BLEED-OVER.** *"As long as we are touching something isolated, we should only test that. If there is bleed over
   then we can always revert back to a full run."* A session that adds a self-contained check or touches one subsystem
   runs its own phase plus the fingerprint-wall phases; a session that touches something shared (the draft loop, the
-  season runner, the engine) runs the full suite. CONVENTIONS §2 carries the rule. S114's own suite — Phases 0–101
-  before a sleep interruption, 102–104 after, same build — was accepted under it. Phase 100 C5c's line that a selector
+  season runner, the engine) runs the full suite. CONVENTIONS §2 carries the rule. S114 ran the full suite in the end (1,957.8s, green); the two-piece
+  run that preceded it (0–101 before a sleep interruption, 102–104 after, same build) is the case the rule covers. Phase 100 C5c's line that a selector
   run is never the delivery gate still holds as a *mechanical* fact (it cannot print ALL CHECKS PASSED); the gate is
   now what this ruling says it is.
 
