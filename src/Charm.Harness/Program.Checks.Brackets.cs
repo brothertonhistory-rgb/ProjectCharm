@@ -412,7 +412,7 @@ internal static partial class Program
             using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
                 spentBefore = RawGameNumber(store.ReserveGames(1)[0]);
             using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
-                ledger = RunSeasonCore(allOn, MteCheckSeed, configPath, verbose: false, store);
+                ledger = RunSeasonCore(allOn, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
             using (var store = HistoryStore.Open(ledgerPath, WorldFingerprint(allOn)))
                 spentAfter = RawGameNumber(store.ReserveGames(1)[0]);
 
@@ -565,7 +565,7 @@ internal static partial class Program
                 using (var store = HistoryStore.Open(freshPath, WorldFingerprint(mte)))
                 {
                     var freshSeason = store.PeekNextSeasonId;
-                    RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store);
+                    RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
                     var freshRec = MteRecordPathFor(freshPath, freshSeason);
                     // That run completed it; rewrite the file back to NotPlayed to attack it.
                     File.WriteAllText(freshRec, File.ReadAllText(freshRec)

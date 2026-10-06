@@ -10,7 +10,19 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 114** (2026-10-05; verified on Emmett's machine — **ALL CHECKS PASSED, 89 timed sections,
+Last updated: **Session 115** (2026-10-06; verified on Emmett's machine — **ALL CHECKS PASSED, 90 timed sections,
+739.8s, Phase 105 new (50 assertions, 56.0s), every predicted number identical to the sandbox**. **THE PEOPLE SURVIVE** —
+session 3a of the stacked-seasons arc: a career goes **year to year with the same men**. `season <world> <seed> --history
+<career>` run twice: the second season reads the people off the log the first wrote, runs the S114 turnover, numbers
+each freshman once, plays, records. **No new file — the chain of season logs IS the save** (Emmett's ruling 3): roster
+schema v2 (class, plane, offensive role; 216 → 256-byte entries), the read-back with nine refusals by name, the career
+turnover, the retained log mandatory on a career. ★ The gate finding: the design conversation assumed a new store; the
+source had S89's allocator and S90's roster section already — only class, the reverse mapping and a season that looks
+for last season's log were missing. ★ Stock: season one `c43c32d2…` under numbers 1–4,511; season two Fr 1175 / So 1082 /
+Jr 1134 / Sr 1120, 3,336 returned / 1,175 arrived / 1,175 departed, counter 4,512 → 5,687. ★ The first career stat line
+exists on disk — `person:2: 4 games, then 29` — 3b's spine. Closes **O-72**. Journal S115 has the detail.)
+
+Previous: **Session 114** (2026-10-05; verified on Emmett's machine — **ALL CHECKS PASSED, 89 timed sections,
 1,957.8s, Phase 104 new (51 assertions), every predicted number identical to the sandbox**; an earlier attempt was
 interrupted by sleep at Phase 102 and finished as `checks 102 103 104`, which prompted **C-57**. **THE TURNOVER, IN MEMORY** — session 2
 of the stacked-seasons arc, and the first time a season has followed another: `seasons <world> <seed>` plays season one,
@@ -496,6 +508,15 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S115 MOVED NO LEGACY BASKETBALL AND GAVE A CAREER A SECOND YEAR WITH THE SAME MEN.** The legacy season is unmoved on
+all seven fingerprints and the pre-S112 digest (Phase 105 C8); a career's season one is the legacy season game for game
+under the numbers it always issued (C2, C8j). A career's season two: 3,336 returners under their own numbers one class
+on, 1,175 seniors gone (numbers never reissued), 1,175 freshmen numbered 4,512–5,686 and named `Pool_s2_<k>`; census
+Fr 1175 / So 1082 / Jr 1134 / Sr 1120; digest `8fce3b37…` (it differs from the stacked command's season two because a
+career's schedule reads host memory). The career page gains one line (`People: …`); the legacy page is byte-identical.
+Every season log from S115 on is roster schema 2; a pre-S115 career cannot continue (refused by name) — free today,
+since no career exists outside the repo.
+
 **S114 MOVED NO SEASON-ONE BASKETBALL AND PLAYED A SEASON TWO.** Every season-one game, score and possession count is
 identical to S112 (Phase 104 C8h against the pre-S112 capture); the `season` command's page is byte-identical (1,422
 lines, zero diff). The `seasons` command adds the turnover report between two full pages: stock seed 20260720 → 20260721
@@ -615,6 +636,18 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S115 — THE PEOPLE SURVIVE.** `Charm.History`: `RosterEntryV2` (v1 + class byte, defensive plane, offensive role;
+  256 bytes, `RosterSchemaVersion` 2, `MaxClassOrdinal` 3), the writer emits v2, one decoder reads v1 and v2 and
+  `GameLogV1.RosterV2()` refuses a v1 roster by name. `Program.Season.People.cs` (new): `ReadCareerPeople` (season N−1
+  by arithmetic, missing/v1/damaged refused), `PoolRowsFromRoster` (the read-back: dense in school/acquisition order,
+  card from the 38 by name, nine structural refusals), `CareerTurnover` (S114's `RunTurnover` on the read-back,
+  returners keep their numbers via the preserved `Player` object, freshmen numbered in one reservation at the draft
+  site). `RunSeasonCore`: the read at step 1 before any number is spent; the three ways to get a season's people
+  (rosters in hand / the career turnover / the bootstrap); the retained log mandatory on a career unless a check says
+  `bootstrapPeopleForTest` (16 suite sites, Phases 80/87/88/89/94/101); the S114 refusal of rosters-in-hand-on-a-career
+  deleted; the `People:` page line; the command catches `GameLogException`. `RunTurnover` takes a freshman-name hook;
+  `GenMapToPlayer` takes a hierarchy rank. `BuildRetentionRoster` writes v2 off the pool row. Phase 81's 216 → 256.
+  **Phase 105 (50 assertions)**, registry 90, frozen order, C3c exclusion. Journal S115.
 - **★ S114 — THE TURNOVER, IN MEMORY.** `Program.Divvy.cs`: the draft loop lifted into `RunDraftLoop` (caps, coverage
   needs, rosters and pool as inputs; roster entries and noise keyed on the row's `PoolId`); `DivvyWinnerWeight`;
   `DivvyRoleFor`. `Program.Turnover.cs` (new): `RunTurnover` (departures, returners `with` class advanced and a dense
@@ -1178,7 +1211,8 @@ chart is PROVISIONAL pending O-6.
 - **O-113 — THE SEASON YEAR LABEL IS A CONSTANT (S114).** Season two of a stacked run prints "season 2026-2027" like
   season one; `SeasonDefaultStartYear` is not advanced. Cosmetic until something reads the year. Session 3 (saving)
   will need the season to know its own number anyway.
-- **O-114 — THE RUN-TO-RUN SPEED SPREAD, THIRD SIGHTING (S114).** Phase 103 ran **93.5s** on Emmett's machine against
+- **O-114 — THE RUN-TO-RUN SPEED SPREAD, THIRD SIGHTING (S114; fourth at S115: suite 739.8s against S114's 1,957.8s on
+  one more check, and the sandbox 938.9s — the spread now runs both ways).** Phase 103 ran **93.5s** on Emmett's machine against
   17.1s the day before on identical code and the same `-c Release`; Phase 104 255.9s against a sandbox-ratio prediction
   of ~50s. S112: 1,293.6 → 505.9; S113: 1,355.9. All release. **First thing to check:** the Windows power plan after a
   wake (balanced / power saver throttles the CPU); then one phase timed alone vs in-suite (the S112 split). Do not
@@ -1457,19 +1491,6 @@ chart is PROVISIONAL pending O-6.
   that will become live, and a season written without it could never get it back — but it is currently a
   constant occupying a column. Whoever designs usage hierarchy owns this.
 
-- **O-72 — CLASS YEAR IS NOT IN THE ARCHIVE (opened S90 chores; HALF SHIPPED S113).** ★ **S113: every pool player
-  now HAS a class** (on the pool row, ruled even and talent-independent, C-56), so the "computed and discarded" half
-  below is superseded. **Still open: the archive does not keep it** — that is the stacked-seasons arc's session 3
-  (saving the league), whose save format is designed before its code. The original text, kept for the record:
-  *CLASS YEAR IS COMPUTED AND DISCARDED, AND THE ARCHIVE DOES NOT KEEP IT.*
-  `Player.PlayerClass` (Fr/So/Jr/Sr) exists and the generator produces it, but `GenMapToPlayer`
-  (`Program.Gen.cs:821`) never assigns it, so every season player carries an empty string and S90's
-  roster section has nothing to store. Emmett ruled the archive is a historical record and class year
-  is plainly historical — but he did not name it, so S90 did NOT fold it and it is opened here rather
-  than assumed. One field through one mapping plus one byte on the roster entry; folding it later is a
-  roster schema version bump, and seasons written before it will not have it (S90 R2). Note it is a
-  PLACEHOLDER label decorating `Arrival` per the S42.1 ruling — the real population-structure question
-  is still unowned.
 - **O-73 — THE DEVELOPMENT CEILING IS COMPUTED FOR EVERY PLAYER AND THROWN AWAY (opened S90 chores).**
   `PlayerGenPass3.BuildFromDraws` computes `Latent`, `Current`, `Runway` and `Arrival` for all 4,511
   men every time a world is built; `GenMapToPlayer` copies the 33-key current card into the 38 ratings
@@ -2047,6 +2068,11 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **O-72 — CLOSED BY SHIPPING (S115).** Class year is in the archive: roster schema 2 carries it (with the plane and
+  the offensive role), and it is what the next season advances. Seasons written before S115 do not have it and cannot
+  seed a career (refused by name); no such career exists outside the repo. Original item, for the record:
+  *CLASS YEAR IS NOT IN THE ARCHIVE (opened S90 chores; half shipped S113 — every pool player has a class, on the pool
+  row; the archive did not keep it).*
 - **C-57 (S114, Emmett's ruling, 2026-10-05) — TARGETED CHECKS FOR ISOLATED CHANGES; THE FULL SUITE WHEN THERE IS
   BLEED-OVER.** *"As long as we are touching something isolated, we should only test that. If there is bleed over
   then we can always revert back to a full run."* A session that adds a self-contained check or touches one subsystem
@@ -2344,7 +2370,17 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-★ **THE TURNOVER SHIPPED — S114 (2026-10-05). NEXT: SAVING THE LEAGUE (stacked-seasons arc, session 3).** The arc:
+★ **THE PEOPLE SURVIVE — S115 (2026-10-06). NEXT: 3b — THE STATS SURVIVE UNDER HIS NUMBER (stacked-seasons arc,
+session 3b).** The spine is proven on disk (Phase 105 C5: one man, two season logs, one number). 3b reads it back: a
+man's line across seasons from the logs, by person number, never by name or seat. **Carry into the 3b draft:** the
+roster section is schema 2 from S115 on; the career's people live only in the season logs (ruling 3 — there is no
+other roster record, do not add one); `PersonId` compares for equality and hashes, nothing else, and the harness
+cannot see its number (S89's seam — the read-back and Phase 105 live with that and so must the reader); the season
+year label still does not move (O-113). What a card eventually is (Emmett): every season's stats, a game log, career
+highs, his ratings — sports-reference for this league, forever. Names are placeholders until a names session.
+
+★ **THE TURNOVER SHIPPED — S114 (2026-10-05). THEN: SAVING THE LEAGUE (stacked-seasons arc, session 3a) — ✅ S115,
+as the read-back and the career turnover on the store that already existed, no new file.** The arc:
 (1) classes ✅ S113; (2) the turnover in memory ✅ S114; (3) **saving the league — the save format is designed before
 its code** (working-with-emmett §7: schema versioning is FM's biggest historical pain and we have four divisions of
 it); closes O-72's open half; gives the season its own number (O-113); decides what a person IS across seasons (today a

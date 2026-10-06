@@ -456,7 +456,7 @@ internal static partial class Program
             {
                 peekedBefore = store.PeekNextSeasonId;
                 clashMsg = Refusal(() =>
-                    RunSeasonCore(clashWorld, MteCheckSeed, configPath, verbose: false, store));
+                    RunSeasonCore(clashWorld, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true));
                 peekedAfter = store.PeekNextSeasonId;
             }
             Check("C5a: ★ a seated school double-booked inside its window refuses BY NAME, naming the " +
@@ -476,9 +476,9 @@ internal static partial class Program
             var careerPath = Path.Combine(scratch, "career.json");
             EventSeasonOutcome s1, s2;
             using (var store = HistoryStore.Open(careerPath, WorldFingerprint(mte)))
-                s1 = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store).Events;
+                s1 = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true).Events;
             using (var store = HistoryStore.Open(careerPath, WorldFingerprint(mte)))
-                s2 = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store).Events;
+                s2 = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true).Events;
 
             Check("C6a: a career-bound season writes its record, empty pool or not",
                   s1.RecordStatus == EventRecordStatus.Written
@@ -548,7 +548,7 @@ internal static partial class Program
             using (var store = HistoryStore.Open(failPath, WorldFingerprint(mte)))
             {
                 spentBefore = store.PeekNextSeasonId;
-                failed = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store).Events;
+                failed = RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true).Events;
                 spentAfter = store.PeekNextSeasonId;
             }
             Check("C7a: ★ a record write that fails AFTER the commit does not invalidate the season — " +
@@ -616,7 +616,7 @@ internal static partial class Program
                 File.WriteAllText(planted, "{ \"planted\": true }");
                 plantedBefore = File.ReadAllBytes(planted);
                 collideMsg = Refusal(() =>
-                    RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store));
+                    RunSeasonCore(mte, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true));
                 cAfter = store.PeekNextSeasonId;
                 plantedAfter = File.ReadAllBytes(planted);
             }

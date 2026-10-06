@@ -664,7 +664,7 @@ internal static partial class Program
                 var mteCareer = Path.Combine(scratch, "ids.json");
                 SeasonRunOutcome idRun;
                 using (var store = HistoryStore.Open(mteCareer, WorldFingerprint(mte)))
-                    idRun = RunSeasonCore(mte, BuyCheckSeed, configPath, verbose: false, store);
+                    idRun = RunSeasonCore(mte, BuyCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
                 var idBuys = idRun.PlayedGames.Where(p => p.IsBuyGame).ToList();
                 var clashed = idRun.PlayedGames.Select(p => p == idBuys[3]
                     ? p with { Game = p.Game with { GameId = idRun.PlayedGames[0].Game.GameId } } : p).ToList();

@@ -185,9 +185,10 @@ internal static partial class Program
             // ── A9 — STRUCTURAL SIZE, EXACT ──────────────────────────────────
             var finalPath = GameLogWriter.FinalPathFor(p, seasonId);
             var actual = new FileInfo(finalPath).Length;
-            long expected = 128 + (32 + (long)log.Roster.Count * 216 + 8) + 64;
+            // ★ S115 — roster schema 2: a 256-byte entry (v1's 216 + class, plane, offensive role, padded).
+            long expected = 128 + (32 + (long)log.Roster.Count * 256 + 8) + 64;
             foreach (var b in log.Blocks) expected += 48 + (long)b.Rows.Count * 188 + 8;
-            Check("A9 file size is exactly 128 + (32 + entries*216 + 8) + SUM(48 + rows*188 + 8) + 64",
+            Check("A9 file size is exactly 128 + (32 + entries*256 + 8) + SUM(48 + rows*188 + 8) + 64 (roster schema 2, S115)",
                   actual == expected, $"{actual:N0} B, formula {expected:N0} B");
 
             // ── A3's SISTER: the true row count, REPORTED ────────────────────
@@ -301,7 +302,7 @@ internal static partial class Program
             var sid2 = h2.ReserveSeason();
             Check("A10 an empty roster refuses — a season with nobody in it is not a season",
                   LogErrorOf(() => GameLogWriter.Create(p2, h2.HistoryId, tinyFp, outcome.Fingerprint,
-                      sid2, new List<RosterEntryV1>())) == GameLogError.InvalidRosterEntry);
+                      sid2, new List<RosterEntryV2>())) == GameLogError.InvalidRosterEntry);
 
             // ★ Overflow REFUSES BEFORE THE FILE EXISTS, and the folder is proven empty
             // afterwards. Truncating a name in an archive whose whole purpose is being the
@@ -371,7 +372,7 @@ internal static partial class Program
             // The header is written once and never rewritten: completion lives in the
             // footer and the filename, which is what makes the prefix property exact.
             var headerHash = Convert.ToHexString(SHA256.HashData(bytes[..128]));
-            var rosterEnd = 128 + 32 + log.Roster.Count * 216 + 8;
+            var rosterEnd = 128 + 32 + log.Roster.Count * 256 + 8;   // S115: v2 entries
             var prefixHash = Convert.ToHexString(SHA256.HashData(bytes[..rosterEnd]));
             Check("A7 header and roster section occupy a fixed, computable prefix",
                   rosterEnd < bytes.Length, $"{rosterEnd:N0} B prefix of {bytes.Length:N0}");
@@ -471,7 +472,7 @@ internal static partial class Program
     private static int log_RosterBytes(byte[] file)
     {
         var count = BitConverter.ToInt32(file, 128 + 8);
-        return count * 216;
+        return count * 256;   // S115: v2 entries
     }
 
     private static GameLogV1 ReadBack(string historyPath, HistoryStore h, SeasonRunOutcome o, out long seasonId)
@@ -486,9 +487,9 @@ internal static partial class Program
     //  The suite physically cannot construct a PersonId — S89 made the raw accessor
     //  internal with no InternalsVisibleTo, and that seam holds against the tests too,
     //  which is the point of it. So a fixture borrows numbers from a live history.
-    private static List<RosterEntryV1> MinimalRoster(HistoryStore h, string name = "Solo")
-        => new() { new RosterEntryV1(h.ReservePersons(1)[0], 1, 0, 1, name, "", RosterPosition.Guard,
-                                     true, 5, 1.0, new short[38]) };
+    private static List<RosterEntryV2> MinimalRoster(HistoryStore h, string name = "Solo")
+        => new() { new RosterEntryV2(h.ReservePersons(1)[0], 1, 0, 1, name, "", RosterPosition.Guard,
+                                     true, 5, 1.0, new short[38], 0, 0.0, "") };
 
     private static GameBlockFactsV1 MinimalFacts(HistoryStore h)
         => new(h.ReserveGames(1)[0], 0, 1, 2, true, 70, 68, 0, 140);

@@ -188,7 +188,7 @@ internal static partial class Program
             {
                 var p = Fresh("b4");
                 using var h = HistoryStore.Open(p, tinyFp);
-                var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false, h);
+                var outcome = RunSeasonCore(tiny, seed, configPath, verbose: false, h, bootstrapPeopleForTest: true);
                 var recs = outcome.League.PlayerSeasons;
 
                 Check("B4 every admitted person carries an identity in the season roll-up",
@@ -211,9 +211,9 @@ internal static partial class Program
                 var p = Fresh("b5");
                 List<SeasonGameResult> a, b;
                 using (var h = HistoryStore.Open(p, tinyFp))
-                    a = RunSeasonCore(tiny, seed, configPath, verbose: false, h).Results;
+                    a = RunSeasonCore(tiny, seed, configPath, verbose: false, h, bootstrapPeopleForTest: true).Results;
                 using (var h = HistoryStore.Open(p, tinyFp))
-                    b = RunSeasonCore(tiny, seed, configPath, verbose: false, h).Results;
+                    b = RunSeasonCore(tiny, seed, configPath, verbose: false, h, bootstrapPeopleForTest: true).Results;
 
                 var seasonsA = a.Select(r => r.SeasonId!.Value).Distinct().ToList();
                 var seasonsB = b.Select(r => r.SeasonId!.Value).Distinct().ToList();
@@ -319,7 +319,7 @@ internal static partial class Program
                 var p = Fresh("b8");
                 SeasonRunOutcome hist;
                 using (var h = HistoryStore.Open(p, tinyFp))
-                    hist = RunSeasonCore(tiny, seed, configPath, verbose: false, h);
+                    hist = RunSeasonCore(tiny, seed, configPath, verbose: false, h, bootstrapPeopleForTest: true);
 
                 string Surface(SeasonRunOutcome o)
                 {

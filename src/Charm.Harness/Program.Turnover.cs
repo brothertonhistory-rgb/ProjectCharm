@@ -89,7 +89,14 @@ internal static partial class Program
     }
 
     /// <summary>★ 3a — the turnover. A pure function of (world, season one's rosters, season-two seed).</summary>
-    private static TurnoverResult RunTurnover(WorldFile world, DivvyResult seasonOne, long seasonTwoSeed)
+    ///
+    /// <para>★ S115 — <paramref name="freshmanName"/>: how a freshman is labelled. Null — the
+    /// stacked command — keeps S114's `Pool_&lt;P+k&gt;`. A career passes a name keyed on the
+    /// season he arrived in, because `Pool_&lt;P+k&gt;` would collide with the previous
+    /// season's freshmen the second time it was used. Reads <see cref="DivvyResult.PersonIds"/>
+    /// never: identity is the caller's business, supplied after.</para>
+    private static TurnoverResult RunTurnover(WorldFile world, DivvyResult seasonOne, long seasonTwoSeed,
+                                              Func<int, string>? freshmanName = null)
     {
         var n = world.Schools.Count;
         var pool1 = seasonOne.Pool;
@@ -157,7 +164,7 @@ internal static partial class Program
             // names ("Pool_<old id>"), so a freshman is numbered PAST the whole season-one pool —
             // otherwise a freshman named for his new index would collide with a returner who
             // held that index last season, and the S77 same-name guard refuses a school with two.
-            players[k] = GenMapToPlayer(v, $"Pool_{pool1.Count + k}");
+            players[k] = GenMapToPlayer(v, freshmanName is null ? $"Pool_{pool1.Count + k}" : freshmanName(k));
             var errs = players[k].Validate();
             if (errs.Count > 0)
                 throw new InvalidOperationException(

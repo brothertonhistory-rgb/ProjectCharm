@@ -818,8 +818,11 @@ internal static partial class Program
     // Typed object initializer reading every field from the value map. Mirrors the
     // shape of BenchSpecToPlayer / StampPlayerId. PlayerId is intentionally NOT set —
     // it is stamped by logical team at the sim seam.
-    private static Player GenMapToPlayer(Dictionary<string, int> v, string name) => new Player(name)
+    // ★ S115: `hierarchyRank` defaults to the seat's own default (5) so every existing caller is
+    // untouched; the career read-back passes the rank the archive recorded for the man.
+    private static Player GenMapToPlayer(Dictionary<string, int> v, string name, int hierarchyRank = 5) => new Player(name)
     {
+        HierarchyRank       = hierarchyRank,
         Close               = v["Close"],
         Mid                 = v["Mid"],
         Outside             = v["Outside"],
@@ -858,7 +861,7 @@ internal static partial class Program
         Hustle              = v["Hustle"],
         BasketballIQ        = v["BasketballIQ"],
         Discipline          = v["Discipline"],
-        // HierarchyRank left at its default (5) unless a role needs otherwise (A0.7).
+        // HierarchyRank is the seat default (5) unless a caller says otherwise (A0.7; S115).
     };
 
     // ============================================================================

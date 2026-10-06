@@ -8567,7 +8567,7 @@ The rank-11 residue of 0.1 minutes is the **A7 collision made visible**: the ope
 - **Coverage is a hard constraint, two layers:** (i) the per-school **last-slot rule**; (ii) the **global protected-supply rule** — slack never negative, asserted per pick and on live drafts. With roles at old-pool density the floor sits far from binding (stock excess headroom 486 leads / 312 TDW).
 - **Ties** break to the lowest pool id; the winner draw is searchsorted-right on cumulative weights.
 - **The opening five** is the earliest five acquired seating ≥1 B / ≥2 G / ≥1 W (29.1 + 30.1), a greedy walk of the immutable acquisition order, deterministic and rank-blind by signature; equals the raw first five wherever raw already qualifies. Unchanged by S63.
-- **Rosters are not persisted:** deterministic from world + seed; the season regenerates every run.
+- **Rosters are not persisted in legacy mode:** deterministic from world + seed; a legacy season regenerates every run. **On a career (S115) the bootstrap divvy runs ONCE** — season one — and every later season takes its people off the previous season's log and turns them over (see *The career goes year to year*, below).
 
 ### The RNG contract (Session 63)
 
@@ -8832,7 +8832,7 @@ Home-court advantage **SHIPPED IN S95** — see "Home court — the road penalty
 
 **Harness-only** (`src/Charm.Harness/Program.Season.Stats.cs` plus surgical edits to the season runner, the calibration accumulator, and the three `GenPlayerRow` producers). Every stat a basketball person reads already existed *per game* — `PlayerBoxTotals` has carried points, shooting splits, boards, assists, steals, blocks, turnovers and both foul types for every player in every game since Phase 52. Nothing added them up across a season and attached them to a person. Until S76 that gap did not matter: five men took ~88% of the floor, so a leaderboard would have been fiction. S76 fixed the rotation; S77 is the first session in which a season's individual statistics mean anything.
 
-**★ THE KEY IS THE PERSON, NOT THE SEAT — Emmett's ruling, 2026-07-26** (*"do whatever you think is the best for having a long term save… NO short cuts and set up for flexibility down the line"*). Records are keyed by **pool id**, never by `(schoolId, acquisitionIndex)`. A seat-shaped key is correct for exactly one season: next season school 200's seventh pick is a different human being, and a transferring player's record would stay behind with the seat rather than moving with him. The school rides **on** the record as data, which is the shape a career row wants anyway. The pool id was already in scope at `BuildSeasonRows` and discarded one line early — the same shape as `ScoutRank` before S76 grabbed it — so `GenPlayerRow` gained a `PoolId` field across all three producers, the two-program gen demo passing a named `GenNoPoolId` sentinel because it invents its players rather than drafting them. **What this does NOT buy:** career totals. Nothing persists between seasons today; the world is rebuilt from `(world, seed)` on every run. What it buys is that the stat layer will not need rewriting when persistence arrives.
+**★ THE KEY IS THE PERSON, NOT THE SEAT — Emmett's ruling, 2026-07-26** (*"do whatever you think is the best for having a long term save… NO short cuts and set up for flexibility down the line"*). Records are keyed by **pool id**, never by `(schoolId, acquisitionIndex)`. A seat-shaped key is correct for exactly one season: next season school 200's seventh pick is a different human being, and a transferring player's record would stay behind with the seat rather than moving with him. The school rides **on** the record as data, which is the shape a career row wants anyway. The pool id was already in scope at `BuildSeasonRows` and discarded one line early — the same shape as `ScoutRank` before S76 grabbed it — so `GenPlayerRow` gained a `PoolId` field across all three producers, the two-program gen demo passing a named `GenNoPoolId` sentinel because it invents its players rather than drafting them. **What this bought, two sessions later (S115):** a returner's rows in two season logs share one person number, so the career stat line already exists on disk (Phase 105 C5); building the reader is 3b. In legacy mode nothing persists and the world is rebuilt from `(world, seed)` on every run.
 
 ### The identity seam
 
@@ -8972,7 +8972,7 @@ might have** — see "What is deliberately absent" below.
 
 | section | what it holds |
 |---|---|
-| **roster** (written once, before game one) | one entry per man per season: name, school, seat, position, archetype, starter flag, hierarchy rank, recruiting rank, and all **38 authored ratings** |
+| **roster** (written once, before game one) | one entry per man per season: name, school, seat, position, archetype, starter flag, hierarchy rank, recruiting rank, all **38 authored ratings**, and — **roster schema 2, S115** — his class (0 Fr .. 3 Sr), his defensive plane and his offensive role. 256 bytes; the v1 layout (216) is its byte-identical prefix. The writer emits v2; one decoder reads both; a v1 roster can feed host memory but not a turnover (refused by name — it kept no class) |
 | **game blocks** (one per fixture) | the game's own facts, then one **row per man who played**: 21 counters plus his identity and season context |
 
 The roster section is not decoration. Game rows say what a man *did* and nothing about him,
@@ -9007,7 +9007,7 @@ player; `GenMapToPlayer` drops all five fields before the season sees them. Emme
 out of the archive: *"No, 10 years down the line, it doesn't matter. It should maintain a
 historical record."* A ceiling is a scouting opinion about a future that did not occur.
 **Arrival goes with it** — it is a fraction *of* the ceiling and is uninterpretable stored
-alone. The engine gap is separate and real: see O-73. Class year is O-72.
+alone. The engine gap is separate and real: see O-73. Class year was O-72 — closed at S115: it is in the roster entry (schema 2) and is what the next season advances.
 
 Two facts worth not re-deriving: the generator's *current* card is fully redundant with the
 stored 38 (the card that becomes those ratings is built from it), and runway is exactly
@@ -12343,3 +12343,46 @@ moves, the rating follows with no change.
 
 **Pythagorean win expectancy** — fitting an exponent to one simulated season of a league whose calibration is openly
 off (turnovers, rim rate) would be fitting noise. It waits for a calibration session with many seasons (P-15).
+
+## The career goes year to year — the turnover and the people who survive (Sessions 114–115, 2026-10-05/06)
+
+### The two commands
+
+- **`seasons <world> <seed>`** (S114) — legacy only, nothing saved: season one at `<seed>`, the turnover in memory, season two at `<seed>+1` on the result. Season one is the standalone season bit for bit (Phase 104 C8). `--history` is refused by name.
+- **`season <world> <seed> --history <career>`** (S115) — a career season. The first run is the bootstrap (the divvy, as it always was). Every later run: **read last season's people off its log → turn them over → number the freshmen → play → record.** The log the season writes is what the next run starts from. **There is no separate roster file and no end-of-season snapshot** (Emmett's ruling 3, 2026-10-05): the chain of season logs is the save.
+
+### The turnover (S114 — a pure function of world, last season's rosters, and this season's seed)
+
+Every senior leaves; everyone else advances one class and keeps his place in his school's acquisition order; a freshman class **exactly the size of the departures, position for position** (ruling 1 — no roster is ever short) is generated from the same crop at the same scholarship line (ruling 2), given its protected roles by rank within position at the bootstrap density, and handed out by prestige through **the same draft loop the bootstrap divvy uses, started from each school's vacancies** (one loop, different starting numbers — the bootstrap passes empty rosters and every seat open). Freshmen play if they are better: minutes are owned by rank within position, the tipoff five stays the rank-blind walk (ruling 4, O-6). Prestige is frozen between seasons (ruling 5). Nothing here reads a rating to decide who leaves or arrives (C-56). The turnover's own contract refuses by name — a kept senior, a freshman not Fr, a short roster, a class without the lead guards or wing defenders the vacancies demand — and Phase 104 feeds each refusal its defect.
+
+The in-memory and the career turnover are **one function**: it reads a season's pool and rosters and never its identity map (its output carries none; identity is supplied after). Phase 105 C4 proves the log-read season one and the in-memory season one produce the same rosters man for man.
+
+### What the file knows about a man at rest (ruling 2, 2026-10-05)
+
+His number, his ratings as they stand, his position, his role, his class, his school. Nothing else yet; later layers **add** fields to a new roster schema version, never redefine these. The eventual shape, so nothing here fights it: *a player's card with every season's stats, a game log, career highs, his ratings — sports-reference for this league, forever.* Names stay placeholders (ruling 1): the number is the identity.
+
+### The read-back is contextual validation
+
+The archive format deliberately knows nothing about this league (GameLogReader's header). So the harness does the checking the format cannot, and refuses by name: last season kept no log; the log predates S115 (schema 1, no class); a school with other than 13 men; other than 5 G / 4 W / 4 B; two men at one acquisition place or a place nobody holds (the opening five still walks acquisition order, so an ambiguous order would reorder a tipoff — and a count of 13 cannot see a duplicate); an unknown school; a man on two schools; a number used twice. The pool comes back dense, school by school in acquisition order — **a different layout from the bootstrap pool (draft order), so the man is the key, never the index** (the first draft of Phase 105 C1 compared by index and was wrong). The card is rebuilt from the 38 by name in the pinned order and the `Player` through the same `GenMapToPlayer` every generated man passes through; the shot-diet numbers are among the 38, stored not re-derived, so a man does not drift a point a season (C1, key by key).
+
+### Identity across the turnover
+
+- A **returner keeps the number he was written with.** The turnover preserves exactly one object per man — his `Player` — and `with`-clones carry it by reference, so the number is found through it. Matched in every check **by person number, never by name.**
+- **Freshmen are numbered in one reservation**, durable before a number is handed out (S89), at the draft site under the lock, in generation order — which is their order in the season-two pool. The counter moves by exactly the class size; a departed senior's number is gone from the roster section and is never reissued (Phase 105 C3).
+- **A freshman is named `Pool_s<season>_<k>`** — the season he arrived in and his place in the class. The prompt wrote `Pool_p<number>`; the number is walled off from the harness by design (S89's seam) and a label is no reason to open it. Unique against every returner and every past season by construction; the stacked command keeps S114's `Pool_<P+k>`.
+
+### Everything refuses before a number is spent
+
+The read of last season's people and every refusal above run at **step 1 of the S97 pipeline** (the peek), so a career that stops here has burned no season id, no game id and no person id (Phase 105 C6a asserts the three counters unmoved). The S115 contract: **the retained log is mandatory on a career.** A history-bound season that kept no log is refused by name — it would be a year the career cannot continue from. The `season` command has passed the log flag unconditionally since S90; the only callers that bind a history without a log are suite checks about schedules, events, contracts and memory, which say so with `bootstrapPeopleForTest` (fresh people this season, as every season did before S115). The command never sets it. The S114 refusal of rosters-in-hand-on-a-career is retired; the S89 identity contract guards that pair.
+
+### The page
+
+One line on a career season, and nothing else moves: `People: 3336 returned, 1175 arrived, 1175 departed (from season 1)` or `People: first season — the bootstrap pool`. Legacy prints nothing (Phase 105 C8i); the career's season one is the legacy season game for game (C8j, C2a).
+
+### Stock numbers (seeds 20260720 → 20260721)
+
+Season one `c43c32d2…`, numbers 1–4,511. Season two: Fr 1175 / So 1082 / Jr 1134 / Sr 1120 — season one's Fr/So/Jr counts shifted one class, the Sr count replaced by the arrivals; counter 4,512 → 5,687; digest `8fce3b37…`. Printed, never asserted. The season year label still does not move (O-113).
+
+### How Phase 105 proves it
+
+The round-trip key by key with a perturbed-rating control; season one is the pre-S112 capture under the numbers it always issued; season two on fixture-mte and on stock — same numbers, seniors absent, freshmen new, classes advanced, the roster section equal to the turnover's rosters; the career turnover equals the in-memory one; the first two-season stat line; nine refusals each by name, including a log **downgraded to schema 1 in the check** (the only way a pre-S115 log can exist now that the writer emits v2); two careers agree two seasons deep; the legacy season unmoved.

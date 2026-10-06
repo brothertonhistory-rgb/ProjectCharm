@@ -164,6 +164,9 @@ internal static partial class Program
         public required Dictionary<int, int> Wins { get; init; }
         public required Dictionary<int, int> Losses { get; init; }
         public required DivvyResult Divvy { get; init; }
+        /// <summary>★ S115 — what the season printed about its people: the bootstrap pool, or
+        /// how many returned / arrived / departed and from which season. Null in legacy mode.</summary>
+        public PeopleSummary? People { get; init; }
         // Session 31: the calibration instrument's league-wide accumulator — fed once
         // per game inside RunSeasonCore; read by the page readout and Phase 55 §3.8.
         public required SeasonLeagueStats League { get; init; }
@@ -1646,16 +1649,27 @@ internal static partial class Program
         int? roadShaveOverride = null, int? debtWindowOverride = null,
         IReadOnlyDictionary<int, int>? contractChoiceOverride = null,
         bool buyGamesOffForTest = false,
-        DivvyResult? rostersInHand = null)
+        DivvyResult? rostersInHand = null,
+        bool bootstrapPeopleForTest = false)
     {
         // ★ S114 — rosters handed in (the turnover's season two) skip the draft and nothing
         //   else: every consumer below reads Pool / Rosters / PersonIds and the pool by index,
         //   and the turnover hands over a dense pool. Omitted — every existing caller — the
-        //   method is the method it was (Phase 104 C10). A career cannot take rosters in hand
-        //   until the save format exists (arc session 3), so the pair is refused by name.
-        if (rostersInHand is not null && history is not null)
+        //   method is the method it was (Phase 104 C10). ★ S115 retired the S114 refusal of
+        //   (rosters in hand + history): rosters handed in on a career must simply carry their
+        //   identity map, which the S89 contract check below enforces.
+        //
+        // ★ S115 — THE RETAINED LOG IS MANDATORY ON A CAREER. A career's people live in its
+        //   season logs, so a history-bound season that kept no log would be a year the career
+        //   cannot continue from. The `season` command has passed retainGameLog: true since S90;
+        //   the only callers that bind a history without a log are suite checks about schedules,
+        //   events, contracts and memory, which say so by name with `bootstrapPeopleForTest` — and
+        //   that flag also means "build fresh people this season, as every season did before
+        //   S115", so those checks keep their exact behaviour. The command never sets it.
+        if (history is not null && !retainGameLog && !bootstrapPeopleForTest)
             throw new InvalidOperationException(
-                "S114: rosters in hand cannot be played on a career — saving a season two is the next session's design.");
+                "S115: a career season keeps its people in its season log; history mode requires the retained log. " +
+                "(A suite check that wants fresh people every season says so with bootstrapPeopleForTest.)");
         // ══════════════════════════════════════════════════════════════════════════
         //  ★ S97 — THE SEASON PIPELINE, IN THIS ORDER, AND THE ORDER IS THE CONTRACT.
         //
@@ -1674,6 +1688,12 @@ internal static partial class Program
         //    invalidate the basketball, it leaves a deliberate hole in event history.
         // ══════════════════════════════════════════════════════════════════════════
         var pendingSeasonId = history?.PeekNextSeasonId ?? 0;
+        // ★ S115 — LAST SEASON'S PEOPLE, read here at step 1 so every refusal (no log, a pre-S115
+        //   log, a damaged roster) stops the run before a single number is spent. prev == 0 is the
+        //   first season of a career: the bootstrap pool, as today.
+        CareerPeople? careerPeople = null;
+        if (history is not null && rostersInHand is null && !bootstrapPeopleForTest && pendingSeasonId - 1 >= 1)
+            careerPeople = ReadCareerPeople(history, world, pendingSeasonId - 1);
         var eventHistory = MteReadHistory(history, pendingSeasonId);
         // ★ S103 — last season's promises, read from EXACTLY season N-1's record.
         var contractLoad = ReadLiveContracts(history, pendingSeasonId);
@@ -1768,7 +1788,25 @@ internal static partial class Program
             }
         }
 
-        var divvy = rostersInHand ?? RunDivvyDraft(world, seasonSeed, history);
+        // ★ S115 — three ways to get this season's people, in this order: rosters handed in
+        //   (the stacked command), the career turnover (season two onward of a career), the
+        //   bootstrap draft (legacy mode, a career's first season, and the test flag).
+        DivvyResult divvy;
+        PeopleSummary? people = null;
+        if (rostersInHand is not null)
+        {
+            divvy = rostersInHand;
+        }
+        else if (careerPeople is not null)
+        {
+            (divvy, people) = CareerTurnover(world, careerPeople, seasonSeed, pendingSeasonId, history!);
+        }
+        else
+        {
+            divvy = RunDivvyDraft(world, seasonSeed, history);
+            if (history is not null) people = PeopleSummary.Bootstrap;
+        }
+        if (verbose && people is not null) Console.WriteLine(people.Line);
 
         // ★ S89 — history mode's contract, validated ONCE, here. Past this line every
         // history-backed path may assume identities are present; none of them re-check.
@@ -1823,7 +1861,7 @@ internal static partial class Program
         GameLogWriter? gameLog = null;
         if (retainGameLog && history is not null)
         {
-            var roster = BuildRetentionRoster(rowsBySchool, divvy.PersonIds!);
+            var roster = BuildRetentionRoster(rowsBySchool, divvy);
             gameLog = GameLogWriter.Create(
                 history.Path, history.HistoryId, history.WorldFingerprint, fingerprint,
                 schedule[0].SeasonId!.Value, roster);
@@ -2079,6 +2117,7 @@ internal static partial class Program
         {
             Schedule = schedule, Fingerprint = fingerprint, Results = results,
             Wins = wins, Losses = losses, Divvy = divvy, League = league, Ties = ties,
+            People = people,
             PossessionCounts = possessionCounts,
             SidePossessions = sidePossessions,
             HostedRoadSidesShaved = hostedRoadSidesShaved,
@@ -2249,6 +2288,14 @@ internal static partial class Program
         catch (HistoryException hx)
         {
             Console.WriteLine($"SEASON ERROR [{hx.Error}]: {hx.Message}");
+            history?.Dispose();
+            return;
+        }
+        catch (GameLogException gx)
+        {
+            // ★ S115 — last season's log refused (pre-S115 roster, damaged, wrong lineage): a
+            //   named line, not a stack trace.
+            Console.WriteLine($"SEASON ERROR [{gx.Error}]: {gx.Message}");
             history?.Dispose();
             return;
         }
@@ -2640,9 +2687,9 @@ internal static partial class Program
     // ── ★ S114 — the stacked command: two seasons in one run, nothing saved ──────────
     //    seasons <world.json> <seed> [minutes-floor]. Season one is the standalone season
     //    at <seed> (Phase 104 C8 holds it to the digest); the turnover follows; season two
-    //    plays on the rosters it produced at seed + 1. Legacy mode only — a second season
-    //    on a career is the saving problem the next session designs first — so --history
-    //    is refused by name.
+    //    plays on the rosters it produced at seed + 1. Legacy mode only, still: a career's
+    //    second season is the `season --history` command itself since S115 (last season's
+    //    people are read off its log), so --history here stays refused by name.
 
     /// <summary>The season-two seed rule (A1): season-one seed + 1, computed checked so a seed at
     /// the type's ceiling refuses rather than wraps.</summary>
@@ -2659,8 +2706,9 @@ internal static partial class Program
     /// <summary>★ A6 — refused by name, before anything runs.</summary>
     private static string? SeasonsRefuseHistory(string[] args)
         => args.Any(a => string.Equals(a, "--history", StringComparison.Ordinal))
-            ? "SEASONS ERROR: --history is not accepted by the stacked command. Nothing is saved across the " +
-              "turnover this session; a second season on a career is the save-format session's design."
+            ? "SEASONS ERROR: --history is not accepted by the stacked command, which saves nothing. " +
+              "A career goes year to year with `season <world> <seed> --history <career>` (S115): each run reads " +
+              "last season's people off its log, turns them over and plays."
             : null;
 
     private static void RunSeasons(string engineConfigPath, string[] args)

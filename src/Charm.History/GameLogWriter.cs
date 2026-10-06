@@ -118,7 +118,7 @@ public sealed class GameLogWriter : IDisposable
         string worldFingerprint,
         string scheduleFingerprint,
         SeasonId seasonId,
-        IReadOnlyList<RosterEntryV1> roster)
+        IReadOnlyList<RosterEntryV2> roster)
     {
         IdentityGuardSeason(seasonId);
 
@@ -247,11 +247,14 @@ public sealed class GameLogWriter : IDisposable
 
     // ── The roster section ──────────────────────────────────────────────────
 
-    private static byte[] SerializeRosterSection(IReadOnlyList<RosterEntryV1> roster, out List<long> persons)
+    /// <summary>★ S115 — emits ROSTER SCHEMA 2 (256-byte entries). The v1 layout is the first
+    /// 204 bytes of every entry, byte for byte; the three new fields follow it, then 11
+    /// reserved-zero bytes. A v1 section is never written again.</summary>
+    private static byte[] SerializeRosterSection(IReadOnlyList<RosterEntryV2> roster, out List<long> persons)
     {
         persons = new List<long>(roster.Count);
         var total = GameLogSchemaV1.RosterHeaderSize
-                  + roster.Count * GameLogSchemaV1.RosterEntrySize
+                  + roster.Count * GameLogSchemaV1.RosterEntrySizeV2
                   + GameLogSchemaV1.RosterTrailerSize;
         var buf = new byte[total];
         var s = buf.AsSpan();
@@ -259,7 +262,7 @@ public sealed class GameLogWriter : IDisposable
         var o = 0;
         GameLogSchemaV1.RosterMarker.CopyTo(s[o..]); o += 4;
         GameLogSchemaV1.W16(s, ref o, GameLogSchemaV1.RosterSchemaVersion);
-        GameLogSchemaV1.W16(s, ref o, (short)GameLogSchemaV1.RosterEntrySize);
+        GameLogSchemaV1.W16(s, ref o, (short)GameLogSchemaV1.RosterEntrySizeV2);
         GameLogSchemaV1.W32(s, ref o, roster.Count);
         GameLogSchemaV1.W16(s, ref o, GameLogSchemaV1.RatingCount);
         o = GameLogSchemaV1.RosterHeaderSize;   // remaining 18 bytes reserved-zero
@@ -290,6 +293,9 @@ public sealed class GameLogWriter : IDisposable
             if (e.Ratings is null || e.Ratings.Count != GameLogSchemaV1.RatingCount)
                 throw new GameLogException(GameLogError.InvalidRosterEntry,
                     $"roster entry {i} carries {e.Ratings?.Count ?? 0} ratings; the schema pins {GameLogSchemaV1.RatingCount}.");
+            if (e.Class > GameLogSchemaV1.MaxClassOrdinal)
+                throw new GameLogException(GameLogError.InvalidRosterEntry,
+                    $"roster entry {i} has class ordinal {e.Class}; the format defines 0..{GameLogSchemaV1.MaxClassOrdinal} (Fr..Sr).");
 
             var entryStart = o;
             GameLogSchemaV1.W64(s, ref o, raw);
@@ -315,7 +321,12 @@ public sealed class GameLogWriter : IDisposable
                         $"roster entry {i} rating slot {r} is {v}, outside the authored 0..99 scale.");
                 GameLogSchemaV1.W16(s, ref o, v);
             }
-            o = entryStart + GameLogSchemaV1.RosterEntrySize;   // 12 reserved bytes stay zero
+            // ── ★ S115: the v2 tail. Everything above is the v1 layout unchanged. ──
+            GameLogSchemaV1.W8(s, ref o, e.Class);
+            GameLogSchemaV1.WDouble(s, ref o, e.DefensivePlane, $"roster entry {i} defensivePlane");
+            GameLogSchemaV1.WriteFixedString(e.OffensiveRole, s.Slice(o, GameLogSchemaV1.OffensiveRoleBytes), $"roster entry {i} offensiveRole");
+            o += GameLogSchemaV1.OffensiveRoleBytes;
+            o = entryStart + GameLogSchemaV1.RosterEntrySizeV2;   // 11 reserved bytes stay zero
         }
 
         GameLogSchemaV1.Checksum8(s[..o], s.Slice(o, GameLogSchemaV1.RosterTrailerSize));

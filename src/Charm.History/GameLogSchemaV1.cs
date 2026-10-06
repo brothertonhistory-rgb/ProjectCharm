@@ -99,7 +99,7 @@ public enum RosterPosition : byte
 /// a man might have become, and this is a record of what happened. Arrival goes
 /// with it, being a fraction OF that ceiling and meaningless without it. See
 /// O-73: the engine gap is real and separate.</para></summary>
-public sealed record RosterEntryV1(
+public record RosterEntryV1(
     PersonId PersonId,
     int SchoolId,
     int PoolId,
@@ -111,6 +111,39 @@ public sealed record RosterEntryV1(
     short HierarchyRank,
     double ScoutRank,
     IReadOnlyList<short> Ratings);
+
+/// <summary>★ S115 — ROSTER SCHEMA v2: everything v1 said about a man, plus the three facts
+/// the next season needs to take him back off the file. Emmett's ruling 2 (2026-10-05): what
+/// the file knows about a player at rest is his number, his ratings as they stand, his
+/// position, his role, his class and his school — later layers ADD fields, never redefine
+/// these.
+///
+/// <para>`Class` is his year in school as an ordinal (0 Fr, 1 So, 2 Jr, 3 Sr) — the format
+/// pins the order and refuses any other value. `DefensivePlane` and `OffensiveRole` are the
+/// generator's two labels that the season page and the divvy read; without them a man read
+/// back from the file would be a different row from the one that was written.</para>
+///
+/// <para>The entry grows from 216 to 256 bytes. The writer emits v2 from S115 on; the
+/// reader still accepts v1 (so host memory can read any season's game facts) and returns
+/// a plain <see cref="RosterEntryV1"/> for it — which is exactly what lets the turnover
+/// refuse a v1 roster by name: it has no class to advance.</para></summary>
+public sealed record RosterEntryV2(
+    PersonId PersonId,
+    int SchoolId,
+    int PoolId,
+    int AcquisitionIndex,
+    string Name,
+    string Role,
+    RosterPosition Position,
+    bool IsStarter,
+    short HierarchyRank,
+    double ScoutRank,
+    IReadOnlyList<short> Ratings,
+    byte Class,
+    double DefensivePlane,
+    string OffensiveRole)
+    : RosterEntryV1(PersonId, SchoolId, PoolId, AcquisitionIndex, Name, Role, Position,
+                    IsStarter, HierarchyRank, ScoutRank, Ratings);
 
 /// <summary>The game-level facts the engine actually produces, carried on the block
 /// header so a future reader reconstructs everything attributed.
@@ -135,7 +168,10 @@ internal static class GameLogSchemaV1
     // ── Fixed sizes. Every one of these is asserted by Phase 81's A9. ────────
     internal const int FileHeaderSize   = 128;
     internal const int RosterHeaderSize = 32;
-    internal const int RosterEntrySize  = 216;
+    internal const int RosterEntrySize  = 216;   // roster schema 1 (read-only since S115)
+    /// <summary>★ S115 — roster schema 2: the 204 bytes v1 used, plus class (1), defensive
+    /// plane (8) and offensive role (32) = 245, padded to 256 (11 reserved-zero bytes).</summary>
+    internal const int RosterEntrySizeV2 = 256;
     internal const int RosterTrailerSize = 8;
     internal const int BlockHeaderSize  = 48;
     internal const int RowSize          = 188;
@@ -147,9 +183,14 @@ internal static class GameLogSchemaV1
 
     internal const int NameBytes = 64;
     internal const int RoleBytes = 32;
+    internal const int OffensiveRoleBytes = 32;   // S115, same encoding as Role
 
     internal const short FileFormatVersion   = 1;
-    internal const short RosterSchemaVersion = 1;
+    internal const short RosterSchemaVersionV1 = 1;
+    /// <summary>★ S115 — what the writer emits. The reader accepts both.</summary>
+    internal const short RosterSchemaVersion = 2;
+    /// <summary>★ S115 — the largest class ordinal the format defines (0 Fr .. 3 Sr).</summary>
+    internal const byte MaxClassOrdinal = 3;
     internal const short BlockSchemaVersion  = 1;
     internal const short RowSchemaVersion    = 1;
 

@@ -148,13 +148,20 @@ internal static partial class Program
     /// game loop plays from. Ratings are stamped at the START of the season (ruled) — which
     /// is free here, because these rows are built before the first tip and never rebuilt, so
     /// the start-of-season card is the only version that exists at write time.</summary>
-    private static List<RosterEntryV1> BuildRetentionRoster(
-        Dictionary<int, List<GenPlayerRow>> rowsBySchool, PersonIdentityMap personIds)
+    ///
+    /// <para>★ S115 — ROSTER SCHEMA v2: class and the two generator labels come off the POOL
+    /// ROW (where S113 put the class), looked up by the row's pool id; the season row does not
+    /// carry them. These three are what lets next season's run take the man back off the file.</para>
+    private static List<RosterEntryV2> BuildRetentionRoster(
+        Dictionary<int, List<GenPlayerRow>> rowsBySchool, DivvyResult divvy)
     {
-        var entries = new List<RosterEntryV1>();
+        var personIds = divvy.PersonIds!;
+        var entries = new List<RosterEntryV2>();
         foreach (var (schoolId, rows) in rowsBySchool.OrderBy(kv => kv.Key))
             foreach (var row in rows)
-                entries.Add(new RosterEntryV1(
+            {
+                var pool = divvy.Pool[row.PoolId];
+                entries.Add(new RosterEntryV2(
                     personIds[row.PoolId],
                     schoolId,
                     row.PoolId,
@@ -165,9 +172,21 @@ internal static partial class Program
                     row.Starter,
                     (short)row.Player.HierarchyRank,
                     row.ScoutRank,
-                    RatingsOf(row.Player)));
+                    RatingsOf(row.Player),
+                    (byte)pool.Class,
+                    pool.DefensivePlane,
+                    pool.OffensiveRole));
+            }
         return entries;
     }
+
+    private static string PosOf(RosterPosition p) => p switch
+    {
+        RosterPosition.Guard => "G",
+        RosterPosition.Wing  => "W",
+        RosterPosition.Big   => "B",
+        _ => throw new GameLogException(GameLogError.InvalidPosition, $"position byte {(byte)p} is not one the archive defines."),
+    };
 
     private static RosterPosition PositionOf(string pos) => pos switch
     {

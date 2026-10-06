@@ -818,6 +818,10 @@ internal static partial class Program
         WorldFile world, long seed, string historyPath, string configPath)
     {
         using var store = HistoryStore.Open(historyPath, WorldFingerprint(world));
-        return RunSeasonCore(world, seed, configPath, verbose: false, store, retainGameLog: false);
+        // ★ S115 — a career season that keeps no log is now refused unless a check says so by
+        //   name; this one does, and it builds fresh people (the pre-S115 behaviour) for the
+        //   gap season, which is all T1 ever needed from it.
+        return RunSeasonCore(world, seed, configPath, verbose: false, store, retainGameLog: false,
+                             bootstrapPeopleForTest: true);
     }
 }

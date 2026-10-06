@@ -44,12 +44,27 @@ public enum GameLogPrefixStatus
 
 public sealed record GameLogBlockV1(GameBlockFactsV1 Facts, IReadOnlyList<PerGameStatRowV1> Rows);
 
+/// <summary>One decoded season. ★ S115: <see cref="RosterSchemaVersion"/> says which roster
+/// schema the file carried. Under version 2 every element of <see cref="Roster"/> is a
+/// <see cref="RosterEntryV2"/>; under version 1 they are plain v1 entries, which carry no
+/// class — a reader that needs one checks the version by name rather than casting and hoping.</summary>
 public sealed record GameLogV1(
     long SeasonId,
     IReadOnlyList<RosterEntryV1> Roster,
-    IReadOnlyList<GameLogBlockV1> Blocks)
+    IReadOnlyList<GameLogBlockV1> Blocks,
+    short RosterSchemaVersion = GameLogSchemaV1.RosterSchemaVersion)
 {
     public long TotalRowCount => Blocks.Sum(b => (long)b.Rows.Count);
+
+    /// <summary>The roster as v2 entries, or a refusal BY NAME when the file predates S115.</summary>
+    public IReadOnlyList<RosterEntryV2> RosterV2()
+    {
+        if (RosterSchemaVersion != GameLogSchemaV1.RosterSchemaVersion)
+            throw new GameLogException(GameLogError.UnsupportedLogVersion,
+                $"this season's roster section is schema {RosterSchemaVersion}; it kept no class and no generator " +
+                "labels (it predates S115) and cannot seed another season.");
+        return Roster.Cast<RosterEntryV2>().ToList();
+    }
 }
 
 public sealed record GameLogPrefixV1(GameLogV1 Log, GameLogPrefixStatus Status);
@@ -119,7 +134,7 @@ public static class GameLogReader
         var payloadStart = GameLogSchemaV1.FileHeaderSize;
         var o = payloadStart;
 
-        var roster = DecodeRosterSection(s, ref o, out var rosterPersons);
+        var roster = DecodeRosterSection(s, ref o, out var rosterPersons, out var rosterVersion);
 
         var blocks = new List<GameLogBlockV1>();
         var seenGames = new HashSet<long>();
@@ -166,7 +181,7 @@ public static class GameLogReader
         }
 
         if (requireFooter && footer is null)
-            return (new GameLogV1(seasonId, roster, blocks), o, null);
+            return (new GameLogV1(seasonId, roster, blocks, rosterVersion), o, null);
 
         if (footer is not null)
         {
@@ -187,7 +202,7 @@ public static class GameLogReader
                     "the season footer's payload digest does not match the file's payload.");
         }
 
-        return (new GameLogV1(seasonId, roster, blocks), o, footer);
+        return (new GameLogV1(seasonId, roster, blocks, rosterVersion), o, footer);
 
         static GameLogException Incomplete(string what)
             => new(GameLogError.IncompleteTail, $"the file ends partway through {what}.");
@@ -244,8 +259,11 @@ public static class GameLogReader
         return seasonId;
     }
 
+    /// <summary>★ S115 — ONE decoder for both roster schemas. The header names the version and
+    /// the entry size; the pair must be one of the two the format defines. A v1 entry decodes
+    /// to a v1 record; a v2 entry decodes the identical 204-byte prefix and then its tail.</summary>
     private static IReadOnlyList<RosterEntryV1> DecodeRosterSection(
-        ReadOnlySpan<byte> s, ref int o, out HashSet<long> persons)
+        ReadOnlySpan<byte> s, ref int o, out HashSet<long> persons, out short version)
     {
         var sectionStart = o;
         if (s.Length - o < GameLogSchemaV1.RosterHeaderSize)
@@ -257,10 +275,14 @@ public static class GameLogReader
         var entrySize = GameLogSchemaV1.R16(s, ref p);
         var count     = GameLogSchemaV1.R32(s, ref p);
         var ratings   = GameLogSchemaV1.R16(s, ref p);
-        if (schemaV != GameLogSchemaV1.RosterSchemaVersion || entrySize != GameLogSchemaV1.RosterEntrySize
-            || ratings != GameLogSchemaV1.RatingCount)
+        var isV2 = schemaV == GameLogSchemaV1.RosterSchemaVersion && entrySize == GameLogSchemaV1.RosterEntrySizeV2;
+        var isV1 = schemaV == GameLogSchemaV1.RosterSchemaVersionV1 && entrySize == GameLogSchemaV1.RosterEntrySize;
+        if (!(isV1 || isV2) || ratings != GameLogSchemaV1.RatingCount)
             throw new GameLogException(GameLogError.UnsupportedLogVersion,
-                $"unsupported roster schema (version {schemaV}, entry {entrySize}, ratings {ratings}).");
+                $"unsupported roster schema (version {schemaV}, entry {entrySize}, ratings {ratings}); " +
+                $"this build reads 1 ({GameLogSchemaV1.RosterEntrySize}) and 2 ({GameLogSchemaV1.RosterEntrySizeV2}).");
+        version = schemaV;
+        var entryBytes = isV2 ? GameLogSchemaV1.RosterEntrySizeV2 : GameLogSchemaV1.RosterEntrySize;
         if (count <= 0 || count > GameLogSchemaV1.MaxEntryCount)
             throw new GameLogException(GameLogError.DomainViolation,
                 $"roster entry count {count} is outside 1..{GameLogSchemaV1.MaxEntryCount}.");
@@ -273,7 +295,7 @@ public static class GameLogReader
         try
         {
             need = checked(GameLogSchemaV1.RosterHeaderSize
-                         + (long)count * GameLogSchemaV1.RosterEntrySize
+                         + (long)count * entryBytes
                          + GameLogSchemaV1.RosterTrailerSize);
         }
         catch (OverflowException ex)
@@ -285,7 +307,7 @@ public static class GameLogReader
                 "the file ends inside the roster section.");
 
         var entriesStart = sectionStart + GameLogSchemaV1.RosterHeaderSize;
-        var trailerAt = entriesStart + count * GameLogSchemaV1.RosterEntrySize;
+        var trailerAt = entriesStart + count * entryBytes;
         Span<byte> expect = stackalloc byte[8];
         GameLogSchemaV1.Checksum8(s[sectionStart..trailerAt], expect);
         if (!s.Slice(trailerAt, 8).SequenceEqual(expect))
@@ -298,7 +320,7 @@ public static class GameLogReader
         long previous = 0;
         for (var i = 0; i < count; i++)
         {
-            var q = entriesStart + i * GameLogSchemaV1.RosterEntrySize;
+            var q = entriesStart + i * entryBytes;
             var start = q;
             var raw = GameLogSchemaV1.R64(s, ref q);
             if (raw < 1)
@@ -344,10 +366,25 @@ public static class GameLogReader
                     throw new GameLogException(GameLogError.DomainViolation,
                         $"roster entry {i} rating slot {r} is {vals[r]}, outside the authored 0..99 scale.");
             }
-            GameLogSchemaV1.RequireZero(s, ref q, start + GameLogSchemaV1.RosterEntrySize - q, $"roster entry {i}");
-
-            list.Add(new RosterEntryV1(PersonId.FromRaw(raw), schoolId, poolId, acq, name, role,
-                                       (RosterPosition)posByte, starter == 1, rank, scout, vals));
+            if (!isV2)
+            {
+                GameLogSchemaV1.RequireZero(s, ref q, start + entryBytes - q, $"roster entry {i}");
+                list.Add(new RosterEntryV1(PersonId.FromRaw(raw), schoolId, poolId, acq, name, role,
+                                           (RosterPosition)posByte, starter == 1, rank, scout, vals));
+                continue;
+            }
+            // ── ★ S115: the v2 tail. ──
+            var cls = GameLogSchemaV1.R8(s, ref q);
+            if (cls > GameLogSchemaV1.MaxClassOrdinal)
+                throw new GameLogException(GameLogError.DomainViolation,
+                    $"roster entry {i} has class ordinal {cls}; the format defines 0..{GameLogSchemaV1.MaxClassOrdinal}.");
+            var plane = GameLogSchemaV1.RDouble(s, ref q, $"roster entry {i} defensivePlane");
+            var offRole = GameLogSchemaV1.ReadFixedString(s.Slice(q, GameLogSchemaV1.OffensiveRoleBytes), $"roster entry {i} offensiveRole");
+            q += GameLogSchemaV1.OffensiveRoleBytes;
+            GameLogSchemaV1.RequireZero(s, ref q, start + entryBytes - q, $"roster entry {i}");
+            list.Add(new RosterEntryV2(PersonId.FromRaw(raw), schoolId, poolId, acq, name, role,
+                                       (RosterPosition)posByte, starter == 1, rank, scout, vals,
+                                       cls, plane, offRole));
         }
 
         o = trailerAt + GameLogSchemaV1.RosterTrailerSize;

@@ -224,7 +224,7 @@ internal static partial class Program
 
             SeasonRunOutcome season1;
             using (var store = HistoryStore.Open(careerPath, tinyFp))
-                season1 = RunSeasonCore(tiny, MteCheckSeed, configPath, verbose: false, store);
+                season1 = RunSeasonCore(tiny, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
             var rec1 = MteRecordPathFor(careerPath, 1);
             var rec1Text = File.ReadAllText(rec1);
             Check("C12a: a v2 record carries BOTH collections even when empty — absence can never " +
@@ -248,7 +248,8 @@ internal static partial class Program
             SeasonRunOutcome season2;
             using (var store = HistoryStore.Open(careerPath, tinyFp))
                 season2 = RunSeasonCore(tiny, MteCheckSeed, configPath, verbose: false, store,
-                                        contractChoiceOverride: new Dictionary<int, int> { [7] = 2 });
+                                        contractChoiceOverride: new Dictionary<int, int> { [7] = 2 },
+                                        bootstrapPeopleForTest: true);
             {
                 var o = season2.Contracts;
                 var g = o.Exercised.SingleOrDefault();
@@ -365,7 +366,7 @@ internal static partial class Program
             File.Delete(rec1);
             SeasonRunOutcome season3;
             using (var store = HistoryStore.Open(careerPath, tinyFp))
-                season3 = RunSeasonCore(tiny, MteCheckSeed, configPath, verbose: false, store);
+                season3 = RunSeasonCore(tiny, MteCheckSeed, configPath, verbose: false, store, bootstrapPeopleForTest: true);
             Check("C4: ★ season 3 inherits the exact surviving state from season 2's record with " +
                   "season 1's record GONE — the boundary is the real reader/writer pair and the " +
                   "read never opens an earlier season",
