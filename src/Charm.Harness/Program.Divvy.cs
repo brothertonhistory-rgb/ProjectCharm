@@ -88,6 +88,11 @@ internal static partial class Program
     private const double DivvyOddsBase = 10.0;
     private const double DivvyOddsK    = 2.0;
 
+    /// <summary>★ S114 — the pick weight a school carries into every draw, named so the
+    /// freshman draft and the bootstrap divvy provably use the same odds (Phase 104 C6a).</summary>
+    private static double DivvyWinnerWeight(int currentPrestige)
+        => Math.Pow(currentPrestige + DivvyOddsBase, DivvyOddsK);
+
     // ── Board noise: sd = 8% of the pool's rank range (placeholder) ─────────────
     // Triangular (sum of two uniforms), like the world seeder's jitter — no
     // transcendentals, so the oracle mirrors it bit-for-bit.
@@ -251,17 +256,9 @@ internal static partial class Program
             // protected tags must come from those constants). Non-protected roles
             // are labels only (mechanically inert — S63 A3/A6) and are picked
             // deterministically from the player's own card.
-            var role = pos[pid] switch
-            {
-                "G" when leadSet.Contains(pid) =>
-                    v["Playmaking"] >= v["Passing"] ? GenLeadRoles[0] : GenLeadRoles[1],   // FloorGeneral / PassFirstGuard
-                "G" => v["Outside"] >= v["SelfCreation"] ? GenGuardRoles[2] : GenGuardRoles[3],   // PerimeterShooter / Slasher
-                "W" when tdwSet.Contains(pid) => GenWingDefenderRole,
-                "W" => GenWingRoles[1],                                                    // WingScorer
-                _ => v["PostMoves"] >= v["Finishing"] && v["PostMoves"] >= v["Vertical"]
-                        ? GenBigRoles[0]                                                   // PostScorer
-                        : v["Finishing"] >= v["Vertical"] ? GenBigRoles[1] : GenBigRoles[2],   // RimRunner / AthleticBig
-            };
+            // ★ S114 — the role switch moved into DivvyRoleFor so the freshman class is
+            // tagged by the identical rule; same inputs, same string, bit for bit.
+            var role = DivvyRoleFor(pos[pid], leadSet.Contains(pid), tdwSet.Contains(pid), v);
 
             pool.Add(new PoolPlayer(pid, pos[pid], role,
                 cohort[order[pid]].Result.DPlane, cohort[order[pid]].Result.Role,
@@ -292,6 +289,21 @@ internal static partial class Program
 
         return (pool, ids);
     }
+
+    /// <summary>The role string for one pool row. Protected tags come from the committed
+    /// constants (Phase 54's coverage checks read membership); non-protected roles are labels
+    /// only, picked deterministically from the player's own card.</summary>
+    private static string DivvyRoleFor(string pos, bool lead, bool tdw, Dictionary<string, int> v) => pos switch
+    {
+        "G" when lead =>
+            v["Playmaking"] >= v["Passing"] ? GenLeadRoles[0] : GenLeadRoles[1],   // FloorGeneral / PassFirstGuard
+        "G" => v["Outside"] >= v["SelfCreation"] ? GenGuardRoles[2] : GenGuardRoles[3],   // PerimeterShooter / Slasher
+        "W" when tdw => GenWingDefenderRole,
+        "W" => GenWingRoles[1],                                                    // WingScorer
+        _ => v["PostMoves"] >= v["Finishing"] && v["PostMoves"] >= v["Vertical"]
+                ? GenBigRoles[0]                                                   // PostScorer
+                : v["Finishing"] >= v["Vertical"] ? GenBigRoles[1] : GenBigRoles[2],   // RimRunner / AthleticBig
+    };
 
     // ── The recruiting line at the bridge (Session 66 ruling, standing; Session 70:
     //    the stream is the Pass-3 budget generator, its own R_LINE = 17.0) ─────────
@@ -411,13 +423,50 @@ internal static partial class Program
     private static DivvyResult RunDivvyDraft(WorldFile world, long divvySeed, HistoryStore? history = null)
     {
         var n = world.Schools.Count;
-        var rng = new WorldRng(divvySeed);   // consumed ONLY by Phase D (winner draws)
         var (pool, personIds) = BuildDivvyPool(n, divvySeed, history);
         ValidateDivvyPool(pool, n);
 
+        // S75: per-school positional capacity, derived from RosterShape rather than
+        // restated. This literal (4/3/3) was the site that made the divvy stall at the
+        // OLD pool size when the pool grew — the pool and the caps must agree or the
+        // draft runs out of legal seats before it runs out of players.
+        // ★ S114 — the bootstrap divvy is the FULL draft: every seat open, every school
+        //   still needing its lead guard and its wing defender. The freshman draft starts
+        //   the same loop from each school's vacancies instead (Program.Turnover.cs).
+        var caps = world.Schools.ToDictionary(s => s.Id, _ => new Dictionary<string, int>
+        {
+            [PositionalEligibility.Guard] = RosterShape.Guards,
+            [PositionalEligibility.Wing]  = RosterShape.Wings,
+            [PositionalEligibility.Big]   = RosterShape.Bigs,
+        });
+        var needLead = world.Schools.ToDictionary(s => s.Id, _ => true);
+        var needTdw = world.Schools.ToDictionary(s => s.Id, _ => true);
+        var rosters = world.Schools.ToDictionary(s => s.Id, _ => new List<int>());
+        return RunDraftLoop(world, pool, divvySeed, caps, needLead, needTdw, rosters, personIds);
+    }
+
+    /// <summary>★ S114 — THE DRAFT LOOP, generalized. The bootstrap divvy and the freshman
+    /// draft are the same loop started from different numbers: <paramref name="caps"/> is each
+    /// school's open seats by position, <paramref name="needLead"/> / <paramref name="needTdw"/>
+    /// whether the school still lacks its lead guard / wing defender, and <paramref name="rosters"/>
+    /// is appended to in pick order (the bootstrap passes empty lists; the turnover passes the
+    /// returners). Every row of <paramref name="pool"/> is draftable and the loop runs exactly
+    /// <c>pool.Count</c> picks, so the caller guarantees open seats == pool rows by position.
+    /// List index is the draw's working index; what lands on a roster is the row's own
+    /// <c>PoolId</c>, and board noise is keyed on it — on the bootstrap pool the two are the same
+    /// number, which is what keeps the full draft byte-identical (Phase 104 C8, Phase 54).</summary>
+    private static DivvyResult RunDraftLoop(
+        WorldFile world, List<PoolPlayer> pool, long divvySeed,
+        Dictionary<int, Dictionary<string, int>> caps,
+        Dictionary<int, bool> needLead, Dictionary<int, bool> needTdw,
+        Dictionary<int, List<int>> rosters, PersonIdentityMap? personIds)
+    {
+        var n = world.Schools.Count;
+        var rng = new WorldRng(divvySeed);   // consumed ONLY by Phase D (winner draws)
+
         var P = pool.Count;
         var ranks = pool.Select(p => p.ScoutRank).ToArray();
-        var sigma = DivvyNoiseSigmaFrac * (ranks.Max() - ranks.Min());
+        var sigma = P == 0 ? 0.0 : DivvyNoiseSigmaFrac * (ranks.Max() - ranks.Min());
         var scale = sigma * Math.Sqrt(6.0);   // triangular sd = scale / sqrt(6)
 
         var isLead = pool.Select(p => GenLeadRoles.Contains(p.Role)).ToArray();
@@ -432,32 +481,19 @@ internal static partial class Program
         {
             var board = new double[P];
             for (var pid = 0; pid < P; pid++)
-                board[pid] = ranks[pid] + DivvyNoiseU(divvySeed, s.Id, pid) * scale;
+                board[pid] = ranks[pid] + DivvyNoiseU(divvySeed, s.Id, pool[pid].PoolId) * scale;
             perceived[s.Id] = board;
         }
 
-        // S75: per-school positional capacity, derived from RosterShape rather than
-        // restated. This literal (4/3/3) was the site that made the divvy stall at the
-        // OLD pool size when the pool grew — the pool and the caps must agree or the
-        // draft runs out of legal seats before it runs out of players.
-        var caps = world.Schools.ToDictionary(s => s.Id, _ => new Dictionary<string, int>
-        {
-            [PositionalEligibility.Guard] = RosterShape.Guards,
-            [PositionalEligibility.Wing]  = RosterShape.Wings,
-            [PositionalEligibility.Big]   = RosterShape.Bigs,
-        });
-        var needLead = world.Schools.ToDictionary(s => s.Id, _ => true);
-        var needTdw = world.Schools.ToDictionary(s => s.Id, _ => true);
-        var rosters = world.Schools.ToDictionary(s => s.Id, _ => new List<int>());
-        var weights = world.Schools.ToDictionary(s => s.Id, s => Math.Pow(s.CurrentPrestige + DivvyOddsBase, DivvyOddsK));
+        var weights = world.Schools.ToDictionary(s => s.Id, s => DivvyWinnerWeight(s.CurrentPrestige));
         var rem = new Dictionary<string, int>
         {
             ["G"] = pool.Count(p => p.Pos == "G"),
             ["W"] = pool.Count(p => p.Pos == "W"),
             ["B"] = pool.Count(p => p.Pos == "B"),
         };
-        var supplyLead = isLead.Count(x => x); var obligLead = n;
-        var supplyTdw = isTdw.Count(x => x); var obligTdw = n;
+        var supplyLead = isLead.Count(x => x); var obligLead = needLead.Count(kv => kv.Value);
+        var supplyTdw = isTdw.Count(x => x); var obligTdw = needTdw.Count(kv => kv.Value);
         var result = new DivvyResult
         {
             Pool = pool, Rosters = rosters, Picks = new List<DivvyPick>(P), NoiseScale = scale,
@@ -551,7 +587,7 @@ internal static partial class Program
                 throw new InvalidOperationException($"DIVVY STALL: winner {winner} had no legal candidate at pick {pick}.");
 
             remaining[best] = false;
-            rosters[winner].Add(best);
+            rosters[winner].Add(pool[best].PoolId);
             caps[winner][pool[best].Pos] -= 1;
             rem[pool[best].Pos] -= 1;
             if (isLead[best])
@@ -566,7 +602,7 @@ internal static partial class Program
             }
             result.MinSlackLead = Math.Min(result.MinSlackLead, supplyLead - obligLead);
             result.MinSlackTdw = Math.Min(result.MinSlackTdw, supplyTdw - obligTdw);
-            result.Picks.Add(new DivvyPick(pick, winner, best, bestVal));
+            result.Picks.Add(new DivvyPick(pick, winner, pool[best].PoolId, bestVal));
         }
 
         return result;

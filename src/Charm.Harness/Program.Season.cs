@@ -1645,8 +1645,17 @@ internal static partial class Program
         HistoryStore? history = null, bool retainGameLog = false,
         int? roadShaveOverride = null, int? debtWindowOverride = null,
         IReadOnlyDictionary<int, int>? contractChoiceOverride = null,
-        bool buyGamesOffForTest = false)
+        bool buyGamesOffForTest = false,
+        DivvyResult? rostersInHand = null)
     {
+        // ★ S114 — rosters handed in (the turnover's season two) skip the draft and nothing
+        //   else: every consumer below reads Pool / Rosters / PersonIds and the pool by index,
+        //   and the turnover hands over a dense pool. Omitted — every existing caller — the
+        //   method is the method it was (Phase 104 C10). A career cannot take rosters in hand
+        //   until the save format exists (arc session 3), so the pair is refused by name.
+        if (rostersInHand is not null && history is not null)
+            throw new InvalidOperationException(
+                "S114: rosters in hand cannot be played on a career — saving a season two is the next session's design.");
         // ══════════════════════════════════════════════════════════════════════════
         //  ★ S97 — THE SEASON PIPELINE, IN THIS ORDER, AND THE ORDER IS THE CONTRACT.
         //
@@ -1759,7 +1768,7 @@ internal static partial class Program
             }
         }
 
-        var divvy = RunDivvyDraft(world, seasonSeed, history);
+        var divvy = rostersInHand ?? RunDivvyDraft(world, seasonSeed, history);
 
         // ★ S89 — history mode's contract, validated ONCE, here. Past this line every
         // history-backed path may assume identities are present; none of them re-check.
@@ -2230,47 +2239,7 @@ internal static partial class Program
             // Preflight only — deliberately UNNUMBERED. RunSeasonCore builds the real
             // schedule; numbering here as well would burn a season number every run.
             schedule = BuildSeasonSchedule(world, seed);   // preflight + build (fails loudly)
-            Console.WriteLine("=== Project Charm :: Season (Pass 2: minimal season loop) ===");
-            Console.WriteLine($"World: {args[1]} ({world.Schools.Count} schools, {world.Conferences.Count} conferences)");
-            Console.WriteLine($"Season seed: {seed}");
-            // ★ S96 — the two fingerprint lines USED TO PRINT HERE, off this preflight
-            //   schedule. That was safe only while a schedule was a pure function of the
-            //   world: host memory can now move a venue, so the preflight (which is built
-            //   with no career attached and therefore no memory) and the schedule that
-            //   actually plays are two different schedules. Both lines moved below the run,
-            //   where they describe the games that happened. See the block after the loop.
-            // ★ S93 — the banner reads the WORLD rather than restating a constant. The old
-            //   line said "16 conference + 14 non-conference per team, 15 home / 15 away" and
-            //   would have kept saying it while every one of those numbers was false.
-            var slateCounts = world.Conferences
-                .Select(c => (c.Games, N: world.Schools.Count(s => s.ConferenceId == c.Id)))
-                .Where(x => x.N > 0).ToList();
-            var idleSchools = slateCounts.Where(x => x.Games == 0).Sum(x => x.N);
-            var playedRange = slateCounts.Where(x => x.Games > 0).Select(x => x.Games).ToList();
-            Console.WriteLine(
-                $"Schedule: {schedule.Count} games — conference play only. Each team plays its own " +
-                $"league's number ({(playedRange.Count == 0 ? "none" : $"{playedRange.Min()}–{playedRange.Max()}")}), " +
-                $"exactly half of them at home." +
-                (idleSchools > 0
-                    ? $" {idleSchools} school(s) sit in a league authored at zero games and play none."
-                    : ""));
-            // ★ S95 — the second clause used to read "Neutral floors throughout (the road
-            //   seam is 0)". That stopped being true this session. The S93 lesson applies:
-            //   a banner that restates a constant keeps saying it long after it is false,
-            //   so this now says what the schedule IS and the measured line below says
-            //   what the dial DID.
-            // ★ S98 — this line said "every game on this schedule is a real home game;
-            //   neutral floors arrive with the tournament layer". They arrived. The S93
-            //   lesson applies again: a banner that restates a constant keeps saying it long
-            //   after it is false, so it now says what the CONFERENCE schedule is and leaves
-            //   the tournament count to the block below, which knows it.
-            Console.WriteLine(
-                "  General non-conference scheduling does not exist yet — it is its own session. " +
-                "Every game on the conference slate is a real home game; the early-season " +
-                "tournaments play on neutral floors and are counted after it.");
-            Console.WriteLine();
-            Console.WriteLine($"Regenerating divvied rosters (world + seed; nothing persisted) and playing " +
-                              $"{schedule.Count} real engine games ...");
+            PrintSeasonBanner(world, args[1], seed, schedule.Count);
             // S90: the season page retains a per-game log whenever it is bound to a career.
             // The page itself gains NO output — the log is a file beside the history, and the
             // printed season is byte-identical to its pre-S90 self (Phase 81 A3).
@@ -2290,6 +2259,66 @@ internal static partial class Program
             return;
         }
         finally { history?.Dispose(); }
+        PrintSeasonPage(run, world, history, minuteFloor);
+    }
+
+    /// <summary>★ S114 — the run preamble, lifted whole from RunSeason so the stacked command
+    /// prints season one and season two the way the season command always has. Byte-identical
+    /// output; the only edits are the two names it used to read from the caller's scope.</summary>
+    private static void PrintSeasonBanner(WorldFile world, string worldPath, long seed, int scheduleCount,
+                                          bool rostersInHand = false)
+    {
+        Console.WriteLine("=== Project Charm :: Season (Pass 2: minimal season loop) ===");
+        Console.WriteLine($"World: {worldPath} ({world.Schools.Count} schools, {world.Conferences.Count} conferences)");
+        Console.WriteLine($"Season seed: {seed}");
+        // ★ S96 — the two fingerprint lines USED TO PRINT HERE, off this preflight
+        //   schedule. That was safe only while a schedule was a pure function of the
+        //   world: host memory can now move a venue, so the preflight (which is built
+        //   with no career attached and therefore no memory) and the schedule that
+        //   actually plays are two different schedules. Both lines moved below the run,
+        //   where they describe the games that happened. See the block after the loop.
+        // ★ S93 — the banner reads the WORLD rather than restating a constant. The old
+        //   line said "16 conference + 14 non-conference per team, 15 home / 15 away" and
+        //   would have kept saying it while every one of those numbers was false.
+        var slateCounts = world.Conferences
+            .Select(c => (c.Games, N: world.Schools.Count(s => s.ConferenceId == c.Id)))
+            .Where(x => x.N > 0).ToList();
+        var idleSchools = slateCounts.Where(x => x.Games == 0).Sum(x => x.N);
+        var playedRange = slateCounts.Where(x => x.Games > 0).Select(x => x.Games).ToList();
+        Console.WriteLine(
+            $"Schedule: {scheduleCount} games — conference play only. Each team plays its own " +
+            $"league's number ({(playedRange.Count == 0 ? "none" : $"{playedRange.Min()}–{playedRange.Max()}")}), " +
+            $"exactly half of them at home." +
+            (idleSchools > 0
+                ? $" {idleSchools} school(s) sit in a league authored at zero games and play none."
+                : ""));
+        // ★ S95 — the second clause used to read "Neutral floors throughout (the road
+        //   seam is 0)". That stopped being true this session. The S93 lesson applies:
+        //   a banner that restates a constant keeps saying it long after it is false,
+        //   so this now says what the schedule IS and the measured line below says
+        //   what the dial DID.
+        // ★ S98 — this line said "every game on this schedule is a real home game;
+        //   neutral floors arrive with the tournament layer". They arrived. The S93
+        //   lesson applies again: a banner that restates a constant keeps saying it long
+        //   after it is false, so it now says what the CONFERENCE schedule is and leaves
+        //   the tournament count to the block below, which knows it.
+        Console.WriteLine(
+            "  General non-conference scheduling does not exist yet — it is its own session. " +
+            "Every game on the conference slate is a real home game; the early-season " +
+            "tournaments play on neutral floors and are counted after it.");
+        Console.WriteLine();
+        Console.WriteLine((rostersInHand
+                               ? "Playing on the turned-over rosters (nothing persisted) and playing "
+                               : "Regenerating divvied rosters (world + seed; nothing persisted) and playing ") +
+                          $"{scheduleCount} real engine games ...");
+    }
+
+    /// <summary>★ S114 — THE SEASON PAGE, lifted whole from RunSeason: everything the season
+    /// command printed after the run, unchanged, so one page body serves both the season
+    /// command and the stacked command (two copies would drift). `history` is the career the
+    /// run was bound to, or null in legacy mode; the page prints its path exactly as before.</summary>
+    private static void PrintSeasonPage(SeasonRunOutcome run, WorldFile world, HistoryStore? history, int minuteFloor)
+    {
         Console.WriteLine();
 
         // ★ S96 — the schedule that PLAYED, described after the fact. The dated line keeps
@@ -2606,5 +2635,101 @@ internal static partial class Program
         //   above this line is byte-identical. Page-only: no rating value is asserted anywhere.
         Console.WriteLine();
         PrintSeasonRatingsPage(run, world);
+    }
+
+    // ── ★ S114 — the stacked command: two seasons in one run, nothing saved ──────────
+    //    seasons <world.json> <seed> [minutes-floor]. Season one is the standalone season
+    //    at <seed> (Phase 104 C8 holds it to the digest); the turnover follows; season two
+    //    plays on the rosters it produced at seed + 1. Legacy mode only — a second season
+    //    on a career is the saving problem the next session designs first — so --history
+    //    is refused by name.
+
+    /// <summary>The season-two seed rule (A1): season-one seed + 1, computed checked so a seed at
+    /// the type's ceiling refuses rather than wraps.</summary>
+    private static long SeasonTwoSeed(long seasonOneSeed)
+    {
+        try { return checked(seasonOneSeed + 1); }
+        catch (OverflowException)
+        {
+            throw new InvalidOperationException(
+                $"SEASONS: season-one seed {seasonOneSeed} is the type's ceiling; season two's seed (+1) cannot exist.");
+        }
+    }
+
+    /// <summary>★ A6 — refused by name, before anything runs.</summary>
+    private static string? SeasonsRefuseHistory(string[] args)
+        => args.Any(a => string.Equals(a, "--history", StringComparison.Ordinal))
+            ? "SEASONS ERROR: --history is not accepted by the stacked command. Nothing is saved across the " +
+              "turnover this session; a second season on a career is the save-format session's design."
+            : null;
+
+    private static void RunSeasons(string engineConfigPath, string[] args)
+    {
+        if (args.Length < 3)
+        {
+            Console.WriteLine("usage: seasons <world.json> <seed> [minutes-floor: 100|250|500|900]");
+            Console.WriteLine("  Plays season one at <seed>, turns the rosters over (seniors leave, classes advance, " +
+                              "freshmen arrive position for position), then plays season two at <seed>+1 on those rosters. " +
+                              "Nothing is saved; --history is refused.");
+            return;
+        }
+        var refusal = SeasonsRefuseHistory(args);
+        if (refusal is not null) { Console.WriteLine(refusal); return; }
+        var minuteFloor = SeasonDefaultMinuteFloor;
+        for (var i = 3; i < args.Length; i++)
+        {
+            if (!int.TryParse(args[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out minuteFloor)
+                || !SeasonMinuteTiers.Contains(minuteFloor))
+            {
+                Console.WriteLine($"SEASONS ERROR: minutes floor '{args[i]}' must be one of " +
+                                  string.Join(", ", SeasonMinuteTiers) + ".");
+                return;
+            }
+        }
+        if (!long.TryParse(args[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out var seed))
+        {
+            Console.WriteLine($"SEASONS ERROR: seed '{args[2]}' is not a valid integer.");
+            return;
+        }
+        WorldFile world;
+        long seedTwo;
+        try
+        {
+            world = LoadWorld(args[1]);
+            seedTwo = SeasonTwoSeed(seed);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            Console.WriteLine($"SEASONS ERROR: {ex.Message}");
+            return;
+        }
+
+        Console.WriteLine("=== Project Charm :: Stacked seasons (S114: season one, the turnover, season two; nothing saved) ===");
+        Console.WriteLine($"Season-one seed: {seed}   Season-two seed: {seedTwo} (season-one seed + 1)");
+        Console.WriteLine();
+        try
+        {
+            var schedule = BuildSeasonSchedule(world, seed);
+            Console.WriteLine("=== SEASON ONE ===");
+            PrintSeasonBanner(world, args[1], seed, schedule.Count);
+            var one = RunSeasonCore(world, seed, engineConfigPath, verbose: true);
+            PrintSeasonPage(one, world, history: null, minuteFloor);
+            Console.WriteLine();
+
+            // ★ Freshmen are generated only after season one has finished (A1).
+            var turnover = RunTurnover(world, one.Divvy, seedTwo);
+            PrintTurnoverReport(world, one.Divvy, turnover);
+
+            var scheduleTwo = BuildSeasonSchedule(world, seedTwo);
+            Console.WriteLine("=== SEASON TWO (on the turned-over rosters; prestige frozen; a fresh schedule draw — " +
+                              "host memory reads a career and there is none) ===");
+            PrintSeasonBanner(world, args[1], seedTwo, scheduleTwo.Count, rostersInHand: true);
+            var two = RunSeasonCore(world, seedTwo, engineConfigPath, verbose: true, rostersInHand: turnover.SeasonTwo);
+            PrintSeasonPage(two, world, history: null, minuteFloor);
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.WriteLine($"SEASONS ERROR: {ex.Message}");
+        }
     }
 }

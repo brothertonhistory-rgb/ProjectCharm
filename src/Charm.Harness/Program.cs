@@ -76,6 +76,12 @@ internal static partial class Program
         // in-memory). configPath is the engine config.json (for the games).
         if (args.Length > 0 && args[0] == "season") { RunSeason(configPath, args); return 0; }
 
+        // dotnet run -- seasons <world.json> <seed> [minutes-floor]  ★ S114: two seasons in one
+        // run. Season one at <seed> (the standalone season, bit for bit), the turnover (seniors
+        // leave, classes advance, freshmen arrive position for position), season two at <seed>+1
+        // on those rosters. Nothing is saved; --history is refused by name. Phase 104 proves it.
+        if (args.Length > 0 && args[0] == "seasons") { RunSeasons(configPath, args); return 0; }
+
         // dotnet run -- calendar [year ...]  S91's printed year: a complete civil year with
         // correct weekdays and leap years, the season boundaries marked, Selection Sunday and
         // championship day named. With no arguments it prints the five years the design asks
@@ -281,6 +287,7 @@ internal static partial class Program
             new(101, "Phase101BuyGamesCheck", nameof(Phase101BuyGamesCheck), () => Phase101BuyGamesCheck(configPath)),   // Phase 101 (S111: the buy games play — every dated non-conference pairing played after the conference tournaments; fixture preservation game by game against the pre-edit season, bijection on the carried pairing, site from the pairing kind and the ruled city (neutral: none), per-category reconciliation, the conference tournaments untouched, six fingerprints unmoved and a seventh born, ids and ordinals as one walk, the zero path, and a negative control per rule. Page-only calibration holds.)
             new(102, "Phase102RatingsCheck", nameof(Phase102RatingsCheck), () => Phase102RatingsCheck(configPath)),   // Phase 102 (S112: the season record and the first rating — the record reconciles, the possession split is counted not halved, home court fitted from every same-season home-and-home and shown to differ from the naive home-vs-road figure, neutral is neutral, convergence owned and refused when capped, order invariance bit for bit, the adjustment adjusts against a known truth, connectivity and the empty school, identity, seven fingerprints and every game unmoved, and a negative control per rule. Page-only: no rating value is asserted.)
             new(103, "Phase103PlayerClassesCheck", nameof(Phase103PlayerClassesCheck), () => Phase103PlayerClassesCheck(configPath)),   // Phase 103 (S113: every player gets a class — one class each, an even draw over 100k synthetic ids, independent of talent with a rank-quartile negative control, deterministic and seed-responsive, the draw reads only (seed, pool id), the Player seat stays dormant, seven fingerprints and every game unmoved. Page-only: the stock split and seniors per team are printed, never asserted.)
+            new(104, "Phase104TurnoverCheck", nameof(Phase104TurnoverCheck), () => Phase104TurnoverCheck(configPath)),   // Phase 104 (S114: the turnover in memory — every senior left and nobody else did, every returner is the same man one class on, freshmen are exactly the vacancies position for position, classes rolled without a draw, the freshman class is the same crop with a negative control, handed out by prestige (the mechanism, the outcome at 4 SE, and an equal-weight control), deterministic and seed-responsive, THE FINGERPRINT WALL — season one inside the stacked run is the standalone season and the bootstrap divvy is byte-identical through the generalized loop, season two plays and reconciles, the runner without rosters in hand is unchanged, and a negative control per rule. Page-only: the turnover report and the by-band table are printed, never asserted.)
 
             // ★ S110.1 — was a `SuiteTimed(...)` call with NO `ok &=`: timed, but its verdict
             //   discarded. The lambda returns an unconditional true and SuiteTimed has no catch,

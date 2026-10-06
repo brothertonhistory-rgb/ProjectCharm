@@ -10,7 +10,22 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 113** (2026-10-04; verified on Emmett's machine — ALL CHECKS PASSED, **88 timed sections,
+Last updated: **Session 114** (2026-10-05; verified on Emmett's machine — **Phase 104 new (51 assertions, PASS), every
+predicted number identical to the sandbox**; the suite green in two pieces — Phases 0–101 before the machine slept
+mid-Phase 102, `checks 102 103 104` after, same build — accepted under **C-57**. **THE TURNOVER, IN MEMORY** — session 2
+of the stacked-seasons arc, and the first time a season has followed another: `seasons <world> <seed>` plays season one,
+every senior leaves, everyone else advances a class, a freshman class exactly the size of the departures arrives
+**position for position** by prestige through the divvy's own draft loop (now one loop started from different numbers),
+and season two plays at seed + 1. Nothing saved; `--history` refused. ★ Season one is the standalone season bit for bit
+(`c43c32d2…`, seven fingerprints, the bootstrap draft roster-identical through the generalized loop). ★ The prompt's
+negative control (a class drawn at R_LINE + 5) **could not fire** — a raised scholarship line is a better crop by the
+generator's budget score and not by scout rank for guards (R_LINE + 20: guards **+0.0 SE**); the control that ships is a
+class hand-picked by rank, and the finding is boarded (**O-112**). ★ Emmett's machine ran ~5× slower than the day
+before on identical code (Phase 103: 93.5s vs 17.1s) — third sighting of the unexplained spread (**O-114**). Ruling
+**C-57** (targeted checks for isolated changes; full suite when there is bleed-over). Opens **O-112, O-113, O-114**.
+Journal S114 has the detail.)
+
+Previous: **Session 113** (2026-10-04; verified on Emmett's machine — ALL CHECKS PASSED, **88 timed sections,
 1,355.9s (release), Phase 103 new (22 assertions, 17.1s)**, every Phase 103 number identical to the sandbox. **EVERY
 PLAYER GETS A CLASS** — the first session of the stacked-seasons arc. All 4,511 pool players are Fr/So/Jr/Sr: an even
 random split, **independent of talent by ruling (C-56)**, shown on the season page with seniors per team (0–10 on the
@@ -480,6 +495,15 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S114 MOVED NO SEASON-ONE BASKETBALL AND PLAYED A SEASON TWO.** Every season-one game, score and possession count is
+identical to S112 (Phase 104 C8h against the pre-S112 capture); the `season` command's page is byte-identical (1,422
+lines, zero diff). The `seasons` command adds the turnover report between two full pages: stock seed 20260720 → 20260721
+turns over 1,175 seniors (459 G / 346 W / 370 B) for 1,175 freshmen at those numbers; 5 schools lose nobody, the
+busiest loses 10 of 13; season-two census Fr 1175 / So 1082 / Jr 1134 / Sr 1120; season two plays 5,358 games (home
+court 65.1% / +6.9, rating home factor 1.0308). Season two's conference schedule and dates equal season one's — legacy
+mode holds no memory and the conference slate is a pure function of the world; events, tournaments and buy games are
+a fresh draw. The year label still prints 2026-2027 on both (O-113).
+
 **S113 MOVED NO BASKETBALL.** Every game, score and possession count is identical to S112 (Phase 103 C7 against the
 pre-S112 capture). The season page gained the class census at the end of the roster census: class totals, the same by
 position, and seniors per team. Stock seed: Fr 1082 / So 1134 / Jr 1120 / Sr 1175; seniors per team mean 3.39, range
@@ -589,6 +613,19 @@ the one calibrated dial (S72); the settings file and the config classes are name
 (S74) — `config.json` SHA-256 `5094367e…`.
 
 ## Shipped since the last board update
+
+- **★ S114 — THE TURNOVER, IN MEMORY.** `Program.Divvy.cs`: the draft loop lifted into `RunDraftLoop` (caps, coverage
+  needs, rosters and pool as inputs; roster entries and noise keyed on the row's `PoolId`); `DivvyWinnerWeight`;
+  `DivvyRoleFor`. `Program.Turnover.cs` (new): `RunTurnover` (departures, returners `with` class advanced and a dense
+  re-index, the freshman class cut to the vacancies by the same generator and line, positions by plane rank, protected
+  roles by rank at bootstrap density, `Class = Fr` by construction, the preflight, the draft from the vacancies, the
+  contract `ValidateTurnover`, the report). `Program.Season.cs`: `RunSeasonCore(..., rostersInHand:)`; the page and
+  banner lifted into `PrintSeasonPage` / `PrintSeasonBanner`; `SeasonTwoSeed`; `RunSeasons`.
+  `Program.Checks.Turnover.cs` (new, Phase 104, 51 assertions): departures, returners, freshmen = vacancies, classes
+  rolled with no draw, same crop at 3.5 SE / ±10% with a hand-picked control and the R_LINE movement printed, the
+  odds (mechanism, 20 SE outcome, flat-odds control at 3.1), determinism and seed response, the fingerprint wall plus
+  generalized-loop identity, season two plays and rates, the runner unchanged, seven negative controls.
+  Registry 88 → 89.
 
 - **★ S113 — EVERY PLAYER GETS A CLASS.** `Program.Divvy.cs`: `ClassYear` (Fr/So/Jr/Sr) on `PoolPlayer`, drawn once at
   the single construction site by `InitialPlayerClass(divvySeed, poolId)` on its own salted integer stream (bootstrap
@@ -1128,6 +1165,23 @@ chart is PROVISIONAL pending O-6.
   somebody checks the arithmetic by hand. One format string. **Not fixed in S105.1: it is outside
   that session's scope wall and touches nothing the session was correcting.**
 
+- **O-112 — THE FRESHMAN DRAFT'S TWO SMALL CALLS, AND THE LINE-VS-RANK FINDING (S114).** (a) Board noise for the
+  freshman draft is scaled to the **freshman class's own rank range**, not the bootstrap pool's — the loop scales from
+  whatever pool it is handed; reversible in one line if the odds should feel identical across the two drafts.
+  (b) Freshmen are named `Pool_<P+k>`, numbered past the season-one pool — labels only; identity across seasons is
+  session 3's. (c) **A raised scholarship line is not a better crop by scout rank for guards**: R_LINE + 5 moves the
+  class +1.7 / +1.5 / +2.9 SE (G/W/B), R_LINE + 20 moves guards **+0.0** while bigs move +8.1. The generator's budget
+  score and the scout rank disagree for guards. Nothing is wrong today — the freshman class is drawn at the standing
+  line, same as the pool — but any future "recruit better players" dial that raises the line will buy bigs and not
+  guards. Phase 104 prints the movement; O-6's rank modernization is the natural home.
+- **O-113 — THE SEASON YEAR LABEL IS A CONSTANT (S114).** Season two of a stacked run prints "season 2026-2027" like
+  season one; `SeasonDefaultStartYear` is not advanced. Cosmetic until something reads the year. Session 3 (saving)
+  will need the season to know its own number anyway.
+- **O-114 — THE RUN-TO-RUN SPEED SPREAD, THIRD SIGHTING (S114).** Phase 103 ran **93.5s** on Emmett's machine against
+  17.1s the day before on identical code and the same `-c Release`; Phase 104 255.9s against a sandbox-ratio prediction
+  of ~50s. S112: 1,293.6 → 505.9; S113: 1,355.9. All release. **First thing to check:** the Windows power plan after a
+  wake (balanced / power saver throttles the CPU); then one phase timed alone vs in-suite (the S112 split). Do not
+  tune code against it.
 - **O-111 — OUR HOME COURT MAY RUN HOT (S112, Emmett: "on the board").** The rating measures **~4.2 points**
   (6.3% efficiency, 1,254 home-and-homes, stock world); real D1 is roughly **3–3.5** — Claude's recollection, **not
   verified; look it up first**. If it matters, it is an engine-tuning question for the S95 road-shave dial, never a
@@ -1992,6 +2046,15 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-57 (S114, Emmett's ruling, 2026-10-05) — TARGETED CHECKS FOR ISOLATED CHANGES; THE FULL SUITE WHEN THERE IS
+  BLEED-OVER.** *"As long as we are touching something isolated, we should only test that. If there is bleed over
+  then we can always revert back to a full run."* A session that adds a self-contained check or touches one subsystem
+  runs its own phase plus the fingerprint-wall phases; a session that touches something shared (the draft loop, the
+  season runner, the engine) runs the full suite. CONVENTIONS §2 carries the rule. S114's own suite — Phases 0–101
+  before a sleep interruption, 102–104 after, same build — was accepted under it. Phase 100 C5c's line that a selector
+  run is never the delivery gate still holds as a *mechanical* fact (it cannot print ALL CHECKS PASSED); the gate is
+  now what this ruling says it is.
+
 - **C-56 (S113, Emmett's ruling, 2026-10-04) — CLASS IS AN EVEN RANDOM SPLIT, INDEPENDENT OF TALENT.** *"For now even
   is fine, easily changed later."* A senior is no better on average than a freshman, deliberately: with no
   development, talent-correlated seniors would make every turnover remove the league's best quarter and the league
@@ -2280,7 +2343,18 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
-★ **CLASSES SHIPPED — S113 (2026-10-04). NEXT: THE TURNOVER, IN MEMORY (stacked-seasons arc, session 2).** Emmett
+★ **THE TURNOVER SHIPPED — S114 (2026-10-05). NEXT: SAVING THE LEAGUE (stacked-seasons arc, session 3).** The arc:
+(1) classes ✅ S113; (2) the turnover in memory ✅ S114; (3) **saving the league — the save format is designed before
+its code** (working-with-emmett §7: schema versioning is FM's biggest historical pain and we have four divisions of
+it); closes O-72's open half; gives the season its own number (O-113); decides what a person IS across seasons (today a
+returner is the same `Player` object and a freshman is a label — neither survives a file); (4) development, recruiting,
+prestige movement, transfers, one at a time. **Carry into the session-3 draft:** the turnover is a pure function of
+(world, season-one rosters, season-two seed) and `RunSeasonCore` takes rosters in hand — so a saved league is "the
+rosters after the turnover, plus whatever history the next season reads"; `--history` and `rostersInHand` are refused
+together today by name, and session 3 is where that refusal is replaced by a design. The S89 person number exists only
+in history mode. Prestige is frozen between seasons by ruling until the prestige-movement session.
+
+★ **CLASSES SHIPPED — S113 (2026-10-04). THEN: THE TURNOVER, IN MEMORY (stacked-seasons arc, session 2) — ✅ S114.** Emmett
 ruled 2026-10-04 that the postseason (selection metric, national bracket) **waits until seasons repeat**, so the quad
 metric named in the S112 block below is **no longer next** — it is deferred behind the arc, not dropped. The arc, one
 bite each: (1) classes ✅ S113; (2) **play season one, roll the year — seniors leave, everyone advances a class,
