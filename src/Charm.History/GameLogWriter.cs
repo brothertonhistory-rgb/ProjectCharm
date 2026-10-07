@@ -346,6 +346,13 @@ public sealed class GameLogWriter : IDisposable
         if (rows.Count > GameLogSchemaV1.MaxRowCount)
             throw new GameLogException(GameLogError.DomainViolation,
                 $"{rows.Count} rows exceeds the {GameLogSchemaV1.MaxRowCount} a block holds.");
+        if (facts.Date is null || facts.HasHost is null)
+            throw new GameLogException(GameLogError.DomainViolation,
+                $"game {facts.FixtureOrdinal} has no {(facts.Date is null ? "date" : "site")}; from S116 every game in the log " +
+                "records its date and whether it had a host.");
+        if (facts.IsConferenceGame && facts.IsConferenceTournamentGame)
+            throw new GameLogException(GameLogError.DomainViolation,
+                "a game cannot be both a league game and a conference tournament game.");
         if (facts.FixtureOrdinal != _nextOrdinal)
             throw new GameLogException(GameLogError.BlockOutOfOrder,
                 $"expected fixture ordinal {_nextOrdinal}, got {facts.FixtureOrdinal}. " +
@@ -394,7 +401,9 @@ public sealed class GameLogWriter : IDisposable
         GameLogSchemaV1.W32(s, ref o, facts.FixtureOrdinal);
         GameLogSchemaV1.W32(s, ref o, facts.HomeSchoolId);
         GameLogSchemaV1.W32(s, ref o, facts.AwaySchoolId);
-        GameLogSchemaV1.W8(s, ref o, facts.IsConferenceGame ? (byte)0 : (byte)1);
+        // ★ S116 — block schema 2: 0 league, 2 conference tournament, 1 anything else.
+        GameLogSchemaV1.W8(s, ref o, facts.IsConferenceGame ? (byte)0
+                                   : facts.IsConferenceTournamentGame ? (byte)2 : (byte)1);
         GameLogSchemaV1.Skip(ref o, 1);                       // reserved
         GameLogSchemaV1.WU16(s, ref o, (ushort)rows.Count);
         GameLogSchemaV1.W32(s, ref o, facts.HomeScore);
@@ -402,6 +411,10 @@ public sealed class GameLogWriter : IDisposable
         GameLogSchemaV1.W16(s, ref o, facts.OvertimePeriods);
         GameLogSchemaV1.Skip(ref o, 2);                       // reserved
         GameLogSchemaV1.W64(s, ref o, facts.PossessionCount);
+        // ★ S116 — block schema 2's tail: date, site, reserved.
+        GameLogSchemaV1.W32(s, ref o, facts.Date!.Value.DayNumber);
+        GameLogSchemaV1.W8(s, ref o, facts.HasHost!.Value ? (byte)0 : (byte)1);
+        GameLogSchemaV1.Skip(ref o, 3);                       // reserved
         if (o != GameLogSchemaV1.BlockHeaderSize)
             throw new GameLogException(GameLogError.DomainViolation, "block header layout arithmetic is wrong.");
 
@@ -438,6 +451,8 @@ public sealed class GameLogWriter : IDisposable
                     $"person {r.PersonId.Raw} has a negative counter at slot {i}; a game delta is never negative.");
             GameLogSchemaV1.W64(s, ref o, c[i]);
         }
+        // ★ S116 — row schema 2: who tipped, one long after the counters (0 or 1).
+        GameLogSchemaV1.W64(s, ref o, r.Started ? 1L : 0L);
         if (o - start != GameLogSchemaV1.RowSize)
             throw new GameLogException(GameLogError.DomainViolation, "row layout arithmetic is wrong.");
     }

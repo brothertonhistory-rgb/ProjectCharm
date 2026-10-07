@@ -49,7 +49,13 @@ namespace Charm.History;
 ///
 /// <para>★ No rates, no percentages, no points. Every one of those is computed at
 /// read time from these primitives (the counters-only ruling). A stored rate is a
-/// stored rounding error, and it freezes a formula that will be improved.</para></summary>
+/// stored rounding error, and it freezes a formula that will be improved.</para>
+///
+/// <para>★ S116 — ROW SCHEMA v2 adds `Started`: he was one of the five who tipped this
+/// game. It is a FACT about the game, not a counter, so it is never summed into anything
+/// but GS. On disk it is one more long after the 21 counters (0 or 1; the format refuses any
+/// other value), so the row stays all-longs: 196 bytes, 26 fields. A v1 row (188 / 25) reads
+/// back with `Started = false` — honestly false: v1 never recorded it.</para></summary>
 public sealed record PerGameStatRowV1(
     PersonId PersonId,
     int SchoolId,
@@ -66,7 +72,8 @@ public sealed record PerGameStatRowV1(
     long FbBlk,
     long OpponentTwoPaOnFloor,
     long SecuredBoardsOnFloor,
-    long OffensiveTeamFgmOnFloor);
+    long OffensiveTeamFgmOnFloor,
+    bool Started);
 
 /// <summary>Where a man was listed on the floor. One byte on disk; the format
 /// defines the three values and refuses any other.</summary>
@@ -151,7 +158,23 @@ public sealed record RosterEntryV2(
 /// <para>★ `PossessionCount` is load-bearing and not decoration: it is the
 /// DENOMINATOR for a man's minutes in this game (`credits x 40 / possessionCount`).
 /// The season page's league-level conversion has no per-game equivalent, so without
-/// this number a stored row cannot say how long anybody played.</para></summary>
+/// this number a stored row cannot say how long anybody played.</para>
+///
+/// <para>★ S116 — BLOCK SCHEMA v2: what kind of game this was, three ways. The kind byte is
+/// 0 a LEAGUE game (the conference slate), 2 a CONFERENCE TOURNAMENT game, 1 anything else
+/// (holiday events, buy games). `IsConferenceGame` keeps its exact pre-S116 meaning — the
+/// league slate only — because host memory and the standings rest on it; a conference
+/// tournament game is NOT a league game (Emmett's ruling, 2026-10-06: it counts as a
+/// conference game for the player, never toward the conference standings). A block-schema-1
+/// file wrote kind 1 for a tournament game too; it reads back with
+/// `IsConferenceTournamentGame = false`, and `GameLogV1.RecordsConferenceTournaments` says so.</para>
+///
+/// <para>★ S116 — BLOCK SCHEMA v2 also carries the game's DATE and whether it had a HOST
+/// (Emmett, 2026-10-06: the game log needs the date and home / away / neutral). Both were
+/// already known when the game was played and simply not written. With a host, the home
+/// school was home (H) and the visitor away (A); with no host, both were neutral (N) and the
+/// home/away ids are a box-score ordering only. The writer refuses a game with no date. A
+/// block-schema-1 file reads both back as null — unknown, never guessed.</para></summary>
 public sealed record GameBlockFactsV1(
     GameId GameId,
     int FixtureOrdinal,
@@ -161,7 +184,10 @@ public sealed record GameBlockFactsV1(
     int HomeScore,
     int AwayScore,
     short OvertimePeriods,
-    long PossessionCount);
+    long PossessionCount,
+    bool IsConferenceTournamentGame = false,
+    DateOnly? Date = null,
+    bool? HasHost = null);
 
 internal static class GameLogSchemaV1
 {
@@ -173,12 +199,18 @@ internal static class GameLogSchemaV1
     /// plane (8) and offensive role (32) = 245, padded to 256 (11 reserved-zero bytes).</summary>
     internal const int RosterEntrySizeV2 = 256;
     internal const int RosterTrailerSize = 8;
-    internal const int BlockHeaderSize  = 48;
-    internal const int RowSize          = 188;
+    internal const int BlockHeaderSizeV1 = 48;   // block schema 1 (read-only since S116)
+    /// <summary>★ S116 — block schema 2: v1's 48 bytes unchanged, then the date as a day number
+    /// (int32), the site (1 byte: 0 hosted, 1 neutral) and 3 reserved-zero bytes = 56.</summary>
+    internal const int BlockHeaderSize  = 56;
+    /// <summary>★ S116 — row schema 2: 4 ids (20 bytes) + 21 counters + started, all longs = 196.</summary>
+    internal const int RowSize          = 196;
+    internal const int RowSizeV1        = 188;   // row schema 1 (read-only since S116)
     internal const int BlockTrailerSize = 8;
     internal const int FooterSize       = 64;
 
-    internal const int RowFieldCount = 25;   // 4 ids + 21 counters
+    internal const int RowFieldCount   = 26;   // 4 ids + 21 counters + started (row schema 2)
+    internal const int RowFieldCountV1 = 25;   // 4 ids + 21 counters (row schema 1)
     internal const int RatingCount   = 38;
 
     internal const int NameBytes = 64;
@@ -191,8 +223,12 @@ internal static class GameLogSchemaV1
     internal const short RosterSchemaVersion = 2;
     /// <summary>★ S115 — the largest class ordinal the format defines (0 Fr .. 3 Sr).</summary>
     internal const byte MaxClassOrdinal = 3;
-    internal const short BlockSchemaVersion  = 1;
-    internal const short RowSchemaVersion    = 1;
+    internal const short BlockSchemaVersionV1 = 1;
+    /// <summary>★ S116 — what the writer emits: kind 0 league / 1 other / 2 conference tournament.</summary>
+    internal const short BlockSchemaVersion  = 2;
+    internal const short RowSchemaVersionV1  = 1;
+    /// <summary>★ S116 — what the writer emits. The reader accepts both.</summary>
+    internal const short RowSchemaVersion    = 2;
 
     internal static ReadOnlySpan<byte> Magic       => "CHRMGLOG"u8;
     internal static ReadOnlySpan<byte> RosterMarker => "RSTR"u8;

@@ -85,7 +85,7 @@ internal static partial class Program
             before[victimPool] = RetentionSnapshot.Of(outcome.League.PlayerSeasons[victimPool]);
             var intruder = outcome.League.PlayerSeasons[otherPool];
             before[otherPool] = RetentionSnapshot.Of(intruder) with { Fga = intruder.Fga - 1 };
-            var caught = LogErrorOf(() => RetentionRowsAfter(outcome.League, before, -1));
+            var caught = LogErrorOf(() => RetentionRowsAfter(outcome.League, new RetentionBefore(before, new HashSet<int>()), -1));
             Check("A11 NEGATIVE CONTROL: a counter moving for a man who did not play is rejected",
                   caught == GameLogError.InvalidRow, caught?.ToString() ?? "no throw");
 
@@ -187,8 +187,10 @@ internal static partial class Program
             var actual = new FileInfo(finalPath).Length;
             // ★ S115 — roster schema 2: a 256-byte entry (v1's 216 + class, plane, offensive role, padded).
             long expected = 128 + (32 + (long)log.Roster.Count * 256 + 8) + 64;
-            foreach (var b in log.Blocks) expected += 48 + (long)b.Rows.Count * 188 + 8;
-            Check("A9 file size is exactly 128 + (32 + entries*256 + 8) + SUM(48 + rows*188 + 8) + 64 (roster schema 2, S115)",
+            // ★ S116 — row schema 2: a 196-byte row (v1's 188 + the started long).
+            // ★ S116 — block schema 2: a 56-byte block header (v1's 48 + date, site, reserved).
+            foreach (var b in log.Blocks) expected += 56 + (long)b.Rows.Count * 196 + 8;
+            Check("A9 file size is exactly 128 + (32 + entries*256 + 8) + SUM(56 + rows*196 + 8) + 64 (roster schema 2 S115, row and block schema 2 S116)",
                   actual == expected, $"{actual:N0} B, formula {expected:N0} B");
 
             // ── A3's SISTER: the true row count, REPORTED ────────────────────
@@ -492,9 +494,10 @@ internal static partial class Program
                                      true, 5, 1.0, new short[38], 0, 0.0, "") };
 
     private static GameBlockFactsV1 MinimalFacts(HistoryStore h)
-        => new(h.ReserveGames(1)[0], 0, 1, 2, true, 70, 68, 0, 140);
+        => new(h.ReserveGames(1)[0], 0, 1, 2, true, 70, 68, 0, 140,
+               Date: new DateOnly(2026, 11, 10), HasHost: true);
 
     private static List<PerGameStatRowV1> MinimalRows(PersonId who)
         => new() { new PerGameStatRowV1(who, 1, 0, 1, 40, 20,
-                                        5, 2, 1, 0, 2, 2, 1, 3, 1, 1, 0, 2, 1, 1, 0, 0, 12, 20, 9) };
+                                        5, 2, 1, 0, 2, 2, 1, 3, 1, 1, 0, 2, 1, 1, 0, 0, 12, 20, 9, Started: true) };
 }

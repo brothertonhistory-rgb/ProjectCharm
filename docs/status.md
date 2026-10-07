@@ -10,7 +10,17 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 115** (2026-10-06; verified on Emmett's machine — **ALL CHECKS PASSED, 90 timed sections,
+Last updated: **Session 116** (2026-10-06; verified on Emmett's machine — **the twelve log-reading phases, the registry and
+the fingerprint wall all PASS (81 87 89 90 91 100 101 102 103 104 105 106, C-57 as sharpened this session), 857.2s,
+Phase 106 new (47 assertions), every predicted number identical to the sandbox**. **THE STATS SURVIVE UNDER HIS NUMBER**
+— session 3b of the stacked-seasons arc: `player <world> <number> --history <career>` prints a career's page (per game
+and totals, all games and conference games, a row per season, Career) off the season logs; `people` lists the numbers.
+Row schema 2 records **GS**; block schema 2 records each game's **kind** (league / conference tournament / other),
+**date** and **site** (H / A / N per man) — the last three folded in mid-session by Emmett's rulings. Conference tables
+count the tournament; the standings never do. ★ Stock: GS 53,570 = 10 × 5,357; 217 tournament / 2,818 league games; 461
+neutral; dates 2026-11-02 .. 2027-03-19. Journal S116 has the detail.)
+
+Previous: **Session 115** (2026-10-06; verified on Emmett's machine — **ALL CHECKS PASSED, 90 timed sections,
 739.8s, Phase 105 new (50 assertions, 56.0s), every predicted number identical to the sandbox**. **THE PEOPLE SURVIVE** —
 session 3a of the stacked-seasons arc: a career goes **year to year with the same men**. `season <world> <seed> --history
 <career>` run twice: the second season reads the people off the log the first wrote, runs the S114 turnover, numbers
@@ -508,6 +518,12 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S116 MOVED NO BASKETBALL AND GAVE A CAREER ITS FIRST PLAYER PAGE.** The legacy season is unmoved on all seven
+fingerprints and the pre-S112 digest (Phase 106 C8); the career's season one is the legacy season game for game. Every
+season log from S116 on is row schema 2 (GS) and block schema 2 (kind, date, site): 196-byte lines, 56-byte game
+headers; the stock career's season one is 22,854,252 bytes. Older logs still read; the page prints GS blank and counts
+league games only for them, and says so. The `season` page is byte-identical (sandbox diff, old build vs new).
+
 **S115 MOVED NO LEGACY BASKETBALL AND GAVE A CAREER A SECOND YEAR WITH THE SAME MEN.** The legacy season is unmoved on
 all seven fingerprints and the pre-S112 digest (Phase 105 C8); a career's season one is the legacy season game for game
 under the numbers it always issued (C2, C8j). A career's season two: 3,336 returners under their own numbers one class
@@ -636,6 +652,15 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S116 — THE STATS SURVIVE UNDER HIS NUMBER.** `Charm.History`: row schema 2 (`PerGameStatRowV1.Started`, 196 bytes,
+  26 fields), block schema 2 (`GameBlockFactsV1.IsConferenceTournamentGame`, `Date`, `HasHost`; kind byte 0/1/2; 56-byte
+  header), the writer emits both and refuses a game with no date or site or marked both league and tournament, one
+  reader accepts v1 and v2 of each (`RecordsStarters`, `RecordsConferenceTournaments`, `RecordsDateAndSite`), and the
+  lookup door `GameLogV1.PersonNumbered`. Retention: the starters captured off the sides handed to the engine at the
+  same boundary as the snapshot, a starter with no line refused. Season loop: the tournament kind, the date and the site
+  handed to the log. `Program.Career.cs` (new): the reader (the three states, `Career*`), the page, `CareerSite`
+  (H / A / N), the `player` and `people` commands. Phase 81's size pins 188 → 196 and 48 → 56. **Phase 106 (47
+  assertions)**, registry 91, frozen order, C3c exclusion. Journal S116.
 - **★ S115 — THE PEOPLE SURVIVE.** `Charm.History`: `RosterEntryV2` (v1 + class byte, defensive plane, offensive role;
   256 bytes, `RosterSchemaVersion` 2, `MaxClassOrdinal` 3), the writer emits v2, one decoder reads v1 and v2 and
   `GameLogV1.RosterV2()` refuses a v1 roster by name. `Program.Season.People.cs` (new): `ReadCareerPeople` (season N−1
@@ -1212,7 +1237,8 @@ chart is PROVISIONAL pending O-6.
   season one; `SeasonDefaultStartYear` is not advanced. Cosmetic until something reads the year. Session 3 (saving)
   will need the season to know its own number anyway.
 - **O-114 — THE RUN-TO-RUN SPEED SPREAD, THIRD SIGHTING (S114; fourth at S115: suite 739.8s against S114's 1,957.8s on
-  one more check, and the sandbox 938.9s — the spread now runs both ways).** Phase 103 ran **93.5s** on Emmett's machine against
+  one more check, and the sandbox 938.9s — the spread now runs both ways; fifth at S116: Phase 105 168.2s and 138.7s on
+  two targeted runs against 56.0s at S115, identical code — a twelve-phase run took longer than S115's full suite).** Phase 103 ran **93.5s** on Emmett's machine against
   17.1s the day before on identical code and the same `-c Release`; Phase 104 255.9s against a sandbox-ratio prediction
   of ~50s. S112: 1,293.6 → 505.9; S113: 1,355.9. All release. **First thing to check:** the Windows power plan after a
   wake (balanced / power saver throttles the CPU); then one phase timed alone vs in-suite (the S112 split). Do not
@@ -2063,11 +2089,22 @@ chart is PROVISIONAL pending O-6.
 - **P-14 — Long-term watches (design before the relevant layer ships, not now):** save-file
   schema versioning; end-to-end RNG/determinism review before the full season layer; the
   Player data layer at 21k+ actives; moddability. (working-with-emmett §7)
+- **P-16 — A SEASON'S CONFERENCE IS READ FROM THE WORLD → realignment (S116).** The player page's Conference column is
+  the school's conference in the world file. The fingerprint binding makes that the world the season was played in
+  today (a log refuses any other world); realignment is the session that breaks that binding, and it persists each
+  season's conference with the binding redesign. Outside review (ChatGPT) asked for it now; pushed back and parked.
 - **P-15 — Pythagorean win expectancy → a calibration session with many seasons behind it (S112 §3h, cut).** One
   simulated season of an openly-uncalibrated league is not a data set for a universal exponent.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-58 (S116, Emmett's ruling, 2026-10-06) — A CONFERENCE TOURNAMENT GAME IS A CONFERENCE GAME FOR THE PLAYER, NEVER
+  FOR THE STANDINGS.** *"It counts as a conference game for the player, but does not count towards conference
+  standings."* The log marks it as its own kind; the league flag (standings, host memory) means the league slate only.
+  Do not fold the tournament into the league flag, and do not infer it from two same-conference schools.
+- **C-59 (S116, Emmett's rulings, 2026-10-06) — THE GAME LOG RECORDS THE DATE AND HOME / AWAY / NEUTRAL; GS IS RECORDED
+  NOW.** GS is on every line before anything changes who starts (it equals G for a starter until then). Date and site
+  went into the same format change as the tournament kind ("fold") rather than three versions over three sessions.
 - **O-72 — CLOSED BY SHIPPING (S115).** Class year is in the archive: roster schema 2 carries it (with the plane and
   the offensive role), and it is what the next season advances. Seasons written before S115 do not have it and cannot
   seed a career (refused by name); no such career exists outside the repo. Original item, for the record:
@@ -2077,7 +2114,9 @@ chart is PROVISIONAL pending O-6.
   BLEED-OVER.** *"As long as we are touching something isolated, we should only test that. If there is bleed over
   then we can always revert back to a full run."* A session that adds a self-contained check or touches one subsystem
   runs its own phase plus the fingerprint-wall phases; a session that touches something shared (the draft loop, the
-  season runner, the engine) runs the full suite. CONVENTIONS §2 carries the rule. S114 ran the full suite in the end (1,957.8s, green); the two-piece
+  season runner, the engine) runs the full suite. CONVENTIONS §2 carries the rule. ★ **Sharpened S116 (Emmett, "yes"):**
+  a change in a shared file that only ADDS something nothing else reads is isolated — run every check that writes or
+  reads the changed thing, plus the registry and the fingerprint wall (S116: twelve phases, not 91). S114 ran the full suite in the end (1,957.8s, green); the two-piece
   run that preceded it (0–101 before a sleep interruption, 102–104 after, same build) is the case the rule covers. Phase 100 C5c's line that a selector
   run is never the delivery gate still holds as a *mechanical* fact (it cannot print ALL CHECKS PASSED); the gate is
   now what this ruling says it is.
@@ -2369,6 +2408,15 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **THE STATS SURVIVE — S116 (2026-10-06). NEXT: 3c — THE GAME LOG AND CAREER HIGHS (stacked-seasons arc).** The
+same lines as the player page, laid out per game: sports-reference's game log (Emmett's screenshot, 2026-10-06 — Rk,
+career game number, team game number, date, team, H/A/N, opponent, type, result with OT, GS, the box). **Carry into the
+3c draft:** everything it needs is on the log from S116 — date, site (`CareerSite` gives H / A / N), kind (league,
+conference tournament, other; the postseason rounds will extend the same byte when the postseason arrives — the
+screenshot shows ROUND-64 / ROUND-32 as their own types), both scores, overtimes, per-man started; career and team game
+numbers are counts. A log older than S116 has none of the three new facts and must say so, not guess. Career highs are
+maxima over the same lines (decide what a tie prints). Names are still placeholders.
 
 ★ **THE PEOPLE SURVIVE — S115 (2026-10-06). NEXT: 3b — THE STATS SURVIVE UNDER HIS NUMBER (stacked-seasons arc,
 session 3b).** The spine is proven on disk (Phase 105 C5: one man, two season logs, one number). 3b reads it back: a

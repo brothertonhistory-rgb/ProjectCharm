@@ -52,8 +52,22 @@ public sealed record GameLogV1(
     long SeasonId,
     IReadOnlyList<RosterEntryV1> Roster,
     IReadOnlyList<GameLogBlockV1> Blocks,
-    short RosterSchemaVersion = GameLogSchemaV1.RosterSchemaVersion)
+    short RosterSchemaVersion = GameLogSchemaV1.RosterSchemaVersion,
+    short RowSchemaVersion = GameLogSchemaV1.RowSchemaVersion,
+    short BlockSchemaVersion = GameLogSchemaV1.BlockSchemaVersion)
 {
+    /// <summary>★ S116 — whether this file's games say which were conference tournament games.
+    /// Block schema 1 filed them with every other non-league game.</summary>
+    public bool RecordsConferenceTournaments => BlockSchemaVersion >= 2;
+
+    /// <summary>★ S116 — whether this file's games carry their date and site (block schema 2).</summary>
+    public bool RecordsDateAndSite => BlockSchemaVersion >= 2;
+
+    /// <summary>★ S116 — whether this file's rows say who started. Row schema 1 never recorded it,
+    /// so its rows read `Started = false` — a reader that prints GS checks this rather than
+    /// printing a zero the file never claimed.</summary>
+    public bool RecordsStarters => RowSchemaVersion >= 2;
+
     public long TotalRowCount => Blocks.Sum(b => (long)b.Rows.Count);
 
     /// <summary>The roster as v2 entries, or a refusal BY NAME when the file predates S115.</summary>
@@ -64,6 +78,24 @@ public sealed record GameLogV1(
                 $"this season's roster section is schema {RosterSchemaVersion}; it kept no class and no generator " +
                 "labels (it predates S115) and cannot seed another season.");
         return Roster.Cast<RosterEntryV2>().ToList();
+    }
+
+    /// <summary>★ S116 — THE LOOKUP DOOR. The identity this season's roster section lists under
+    /// <paramref name="number"/>, or null if it lists nobody under it.
+    ///
+    /// <para>Why this lives here and not in the harness: turning a number into a `PersonId` is
+    /// S89's seam (`FromRaw` is internal; `ToString` is deliberately not a parse format). This
+    /// door does not open that seam — it MINTS nothing. It can only hand back an identity that
+    /// was issued by the allocator and then written into a finalized roster, so a number that
+    /// was never issued, or was issued and never rostered this season, resolves to null. The
+    /// rejected alternative was matching `ToString()` text in the harness, which would have made
+    /// a display string a declared format by use.</para></summary>
+    public PersonId? PersonNumbered(long number)
+    {
+        if (number < 1) return null;
+        foreach (var e in Roster)
+            if (e.PersonId.Raw == number) return e.PersonId;
+        return null;
     }
 }
 
@@ -128,7 +160,8 @@ public static class GameLogReader
             throw new GameLogException(GameLogError.IncompleteTail,
                 "the file is shorter than a retention log header.");
 
-        var seasonId = DecodeFileHeader(s, bindings);
+        var (seasonId, rowBytes, blockVersion) = DecodeFileHeader(s, bindings);
+        var rowVersion = rowBytes == GameLogSchemaV1.RowSize ? GameLogSchemaV1.RowSchemaVersion : GameLogSchemaV1.RowSchemaVersionV1;
 
         // Everything after the header is the digest's payload region.
         var payloadStart = GameLogSchemaV1.FileHeaderSize;
@@ -169,11 +202,12 @@ public static class GameLogReader
                 throw new GameLogException(GameLogError.MalformedStructure,
                     $"expected a game block or the season footer at byte {o}.");
 
-            if (s.Length - o < GameLogSchemaV1.BlockHeaderSize)
+            if (s.Length - o < (blockVersion >= GameLogSchemaV1.BlockSchemaVersion
+                                    ? GameLogSchemaV1.BlockHeaderSize : GameLogSchemaV1.BlockHeaderSizeV1))
                 { if (requireFooter) throw Incomplete("a game block header"); break; }
 
             var probe = o;
-            var block = DecodeBlock(s, ref probe, rosterPersons, expectedOrdinal, seenGames, requireFooter);
+            var block = DecodeBlock(s, ref probe, rosterPersons, expectedOrdinal, seenGames, requireFooter, rowBytes, blockVersion);
             if (block is null) break;                       // physical tail in .inprogress
             o = probe;
             blocks.Add(block);
@@ -181,7 +215,7 @@ public static class GameLogReader
         }
 
         if (requireFooter && footer is null)
-            return (new GameLogV1(seasonId, roster, blocks, rosterVersion), o, null);
+            return (new GameLogV1(seasonId, roster, blocks, rosterVersion, rowVersion, blockVersion), o, null);
 
         if (footer is not null)
         {
@@ -202,13 +236,16 @@ public static class GameLogReader
                     "the season footer's payload digest does not match the file's payload.");
         }
 
-        return (new GameLogV1(seasonId, roster, blocks, rosterVersion), o, footer);
+        return (new GameLogV1(seasonId, roster, blocks, rosterVersion, rowVersion, blockVersion), o, footer);
 
         static GameLogException Incomplete(string what)
             => new(GameLogError.IncompleteTail, $"the file ends partway through {what}.");
     }
 
-    private static long DecodeFileHeader(ReadOnlySpan<byte> s, GameLogBindings b)
+    /// <summary>★ S116 — returns the season AND the row width the file declares. The row schema is
+    /// a per-FILE fact: the header names it once and every block in the file is that width. The
+    /// declared (version, size, fields) triple must be exactly one of the two the format defines.</summary>
+    private static (long SeasonId, int RowBytes, short BlockVersion) DecodeFileHeader(ReadOnlySpan<byte> s, GameLogBindings b)
     {
         var o = 0;
         if (!s[..8].SequenceEqual(GameLogSchemaV1.Magic))
@@ -218,8 +255,10 @@ public static class GameLogReader
         var blockV  = GameLogSchemaV1.R16(s, ref o);
         var rowV    = GameLogSchemaV1.R16(s, ref o);
         var hdrSize = GameLogSchemaV1.R16(s, ref o);
-        if (fileV != GameLogSchemaV1.FileFormatVersion || blockV != GameLogSchemaV1.BlockSchemaVersion
-            || rowV != GameLogSchemaV1.RowSchemaVersion || hdrSize != GameLogSchemaV1.FileHeaderSize)
+        if (fileV != GameLogSchemaV1.FileFormatVersion
+            || (blockV != GameLogSchemaV1.BlockSchemaVersion && blockV != GameLogSchemaV1.BlockSchemaVersionV1)
+            || (rowV != GameLogSchemaV1.RowSchemaVersion && rowV != GameLogSchemaV1.RowSchemaVersionV1)
+            || hdrSize != GameLogSchemaV1.FileHeaderSize)
             throw new GameLogException(GameLogError.UnsupportedLogVersion,
                 $"unsupported log versions (file {fileV}, block {blockV}, row {rowV}, header {hdrSize}).");
 
@@ -251,12 +290,17 @@ public static class GameLogReader
 
         var rowSize = GameLogSchemaV1.R32(s, ref o);
         var fields  = GameLogSchemaV1.R32(s, ref o);
-        if (rowSize != GameLogSchemaV1.RowSize || fields != GameLogSchemaV1.RowFieldCount)
+        var isRowV2 = rowV == GameLogSchemaV1.RowSchemaVersion
+                      && rowSize == GameLogSchemaV1.RowSize && fields == GameLogSchemaV1.RowFieldCount;
+        var isRowV1 = rowV == GameLogSchemaV1.RowSchemaVersionV1
+                      && rowSize == GameLogSchemaV1.RowSizeV1 && fields == GameLogSchemaV1.RowFieldCountV1;
+        if (!(isRowV1 || isRowV2))
             throw new GameLogException(GameLogError.UnsupportedLogVersion,
-                $"the header declares a {rowSize}-byte row of {fields} fields; this build writes " +
-                $"{GameLogSchemaV1.RowSize} of {GameLogSchemaV1.RowFieldCount}.");
+                $"the header declares row schema {rowV}, a {rowSize}-byte row of {fields} fields; this build reads " +
+                $"1 ({GameLogSchemaV1.RowSizeV1} of {GameLogSchemaV1.RowFieldCountV1}) and " +
+                $"2 ({GameLogSchemaV1.RowSize} of {GameLogSchemaV1.RowFieldCount}).");
         GameLogSchemaV1.RequireZero(s, ref o, 16, "the file header");
-        return seasonId;
+        return (seasonId, isRowV2 ? GameLogSchemaV1.RowSize : GameLogSchemaV1.RowSizeV1, blockV);
     }
 
     /// <summary>★ S115 — ONE decoder for both roster schemas. The header names the version and
@@ -393,7 +437,7 @@ public static class GameLogReader
 
     private static GameLogBlockV1? DecodeBlock(
         ReadOnlySpan<byte> s, ref int o, HashSet<long> rosterPersons,
-        int expectedOrdinal, HashSet<long> seenGames, bool requireFooter)
+        int expectedOrdinal, HashSet<long> seenGames, bool requireFooter, int rowBytes, short blockVersion)
     {
         var blockStart = o;
         var p = o + 4;                              // marker already matched
@@ -409,11 +453,29 @@ public static class GameLogReader
         var ot      = GameLogSchemaV1.R16(s, ref p);
         GameLogSchemaV1.RequireZero(s, ref p, 2, "a game block header");
         var poss    = GameLogSchemaV1.R64(s, ref p);
+        // ★ S116 — block schema 2: the date and the site. A v1 block knows neither.
+        var headerBytes = GameLogSchemaV1.BlockHeaderSizeV1;
+        DateOnly? date = null;
+        bool? hasHost = null;
+        if (blockVersion >= GameLogSchemaV1.BlockSchemaVersion)
+        {
+            headerBytes = GameLogSchemaV1.BlockHeaderSize;
+            var day  = GameLogSchemaV1.R32(s, ref p);
+            var site = GameLogSchemaV1.R8(s, ref p);
+            GameLogSchemaV1.RequireZero(s, ref p, 3, "a game block header");
+            if (day < 0 || day > DateOnly.MaxValue.DayNumber)
+                throw new GameLogException(GameLogError.DomainViolation, $"block {ordinal} has day number {day}.");
+            if (site > 1)
+                throw new GameLogException(GameLogError.DomainViolation, $"block {ordinal} has site {site}; the format defines 0 hosted and 1 neutral.");
+            date = DateOnly.FromDayNumber(day);
+            hasHost = site == 0;
+        }
 
         // Domain first, and only then any length arithmetic.
         if (gameId < 1)
             throw new GameLogException(GameLogError.DomainViolation, $"block {ordinal} has game id {gameId}.");
-        if (kind > 1)
+        // ★ S116 — kind 2 (conference tournament) exists from block schema 2 on; a v1 file holding it is malformed.
+        if (kind > (blockVersion >= GameLogSchemaV1.BlockSchemaVersion ? 2 : 1))
             throw new GameLogException(GameLogError.DomainViolation, $"block {ordinal} has fixture kind {kind}.");
         if (rowCount == 0)
             throw new GameLogException(GameLogError.DomainViolation,
@@ -430,8 +492,8 @@ public static class GameLogReader
         long need;
         try
         {
-            need = checked(GameLogSchemaV1.BlockHeaderSize
-                         + (long)rowCount * GameLogSchemaV1.RowSize
+            need = checked(headerBytes
+                         + (long)rowCount * rowBytes
                          + GameLogSchemaV1.BlockTrailerSize);
         }
         catch (OverflowException ex)
@@ -448,8 +510,8 @@ public static class GameLogReader
             return null;
         }
 
-        var rowsAt = blockStart + GameLogSchemaV1.BlockHeaderSize;
-        var trailerAt = rowsAt + rowCount * GameLogSchemaV1.RowSize;
+        var rowsAt = blockStart + headerBytes;
+        var trailerAt = rowsAt + rowCount * rowBytes;
         Span<byte> expect = stackalloc byte[8];
         GameLogSchemaV1.Checksum8(s[blockStart..trailerAt], expect);
         if (!s.Slice(trailerAt, 8).SequenceEqual(expect))
@@ -462,7 +524,7 @@ public static class GameLogReader
         var seenPersons = new HashSet<long>(rowCount);
         for (var i = 0; i < rowCount; i++)
         {
-            var q = rowsAt + i * GameLogSchemaV1.RowSize;
+            var q = rowsAt + i * rowBytes;
             var raw = GameLogSchemaV1.R64(s, ref q);
             if (raw < 1)
                 throw new GameLogException(GameLogError.DomainViolation, $"a row in block {ordinal} has person id {raw}.");
@@ -489,15 +551,26 @@ public static class GameLogReader
             if (c[0] <= 0)
                 throw new GameLogException(GameLogError.InvalidRow,
                     $"person {raw} has a row in block {ordinal} with no floor credit.");
+            // ★ S116 — row schema 2 carries who tipped. A v1 row never recorded it and reads false.
+            var started = false;
+            if (rowBytes == GameLogSchemaV1.RowSize)
+            {
+                var st = GameLogSchemaV1.R64(s, ref q);
+                if (st is not (0 or 1))
+                    throw new GameLogException(GameLogError.InvalidRow,
+                        $"person {raw} has a row in block {ordinal} with started value {st}; the format defines 0 and 1.");
+                started = st == 1;
+            }
             rows.Add(new PerGameStatRowV1(PersonId.FromRaw(raw), schoolId, poolId, acq,
                 c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7], c[8], c[9], c[10],
-                c[11], c[12], c[13], c[14], c[15], c[16], c[17], c[18], c[19], c[20]));
+                c[11], c[12], c[13], c[14], c[15], c[16], c[17], c[18], c[19], c[20], started));
         }
 
         o = trailerAt + GameLogSchemaV1.BlockTrailerSize;
         return new GameLogBlockV1(
             new GameBlockFactsV1(GameId.FromRaw(gameId), ordinal, home, away, kind == 0,
-                                 hScore, aScore, ot, poss),
+                                 hScore, aScore, ot, poss, IsConferenceTournamentGame: kind == 2,
+                                 Date: date, HasHost: hasHost),
             rows);
     }
 

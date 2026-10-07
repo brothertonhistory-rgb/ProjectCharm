@@ -56,10 +56,22 @@ internal static partial class Program
             r.OpponentTwoPaOnFloor, r.SecuredBoardsOnFloor, r.OffensiveTeamFgmOnFloor);
     }
 
+    /// <summary>★ S116 — what the boundary captures before the accumulators run: every man's
+    /// counters, and which of them TIPPED. Same boundary, so a man's row and his GS can never
+    /// come from two different moments.</summary>
+    private sealed record RetentionBefore(
+        Dictionary<int, RetentionSnapshot> Counters, HashSet<int> StartedPools);
+
     /// <summary>The men whose season records this game is allowed to touch, captured
     /// before the accumulators run. Keyed by pool id, which is what the record is keyed
-    /// by; a man with no record yet snapshots as all-zero, which is the truth.</summary>
-    private static Dictionary<int, RetentionSnapshot> RetentionSnapshotBefore(
+    /// by; a man with no record yet snapshots as all-zero, which is the truth.
+    ///
+    /// <para>★ S116 — GS. The starters are read off the SIDES actually handed to the engine
+    /// (`identity.HomeSide/AwaySide.Starters`, the post-shave copies), resolved to their season
+    /// row through the same `Resolve` the stat layer uses — not off the season sheet's `Starter`
+    /// flag. Today the two agree by construction (the sides are built from that flag and nothing
+    /// rewrites who starts); reading the side is what keeps GS true the day something does.</para></summary>
+    private static RetentionBefore RetentionSnapshotBefore(
         SeasonLeagueStats league, SeasonGameIdentity identity)
     {
         var before = new Dictionary<int, RetentionSnapshot>(2 * RosterShape.Size);
@@ -71,14 +83,30 @@ internal static partial class Program
                     ? RetentionSnapshot.Of(rec)
                     : RetentionSnapshot.Zero;
             }
-        return before;
+
+        var started = new HashSet<int>(2 * Lineup.Size);
+        foreach (var side in new[] { identity.HomeSide, identity.AwaySide })
+        {
+            if (side.Starters.Length != Lineup.Size)
+                throw new GameLogException(GameLogError.InvalidRow,
+                    $"a side tipped with {side.Starters.Length} starters; a lineup is {Lineup.Size}.");
+            foreach (var p in side.Starters)
+            {
+                var poolId = identity.Resolve(p.PlayerId).Row.PoolId;
+                if (!before.ContainsKey(poolId) || !started.Add(poolId))
+                    throw new GameLogException(GameLogError.InvalidRow,
+                        $"starter pool {poolId} is not one of this game's rostered men, or starts twice.");
+            }
+        }
+        return new RetentionBefore(before, started);
     }
 
     /// <summary>The delta for every man the game could have touched, turned into rows.
     /// Emits exactly where games played moved by one.</summary>
     private static List<PerGameStatRowV1> RetentionRowsAfter(
-        SeasonLeagueStats league, Dictionary<int, RetentionSnapshot> before, int gameIndex)
+        SeasonLeagueStats league, RetentionBefore boundary, int gameIndex)
     {
+        var before = boundary.Counters;
         var rows = new List<PerGameStatRowV1>(2 * RosterShape.Size);
         foreach (var (poolId, b) in before)
         {
@@ -121,8 +149,15 @@ internal static partial class Program
                 d.Fga, d.Fgm, d.Tpa, d.Tpm, d.Fta, d.Ftm,
                 d.OReb, d.DReb, d.Ast, d.Stl, d.Blk, d.To,
                 d.ShFoul, d.NsFoul, d.OffFoul, d.FbBlk,
-                d.OpponentTwoPaOnFloor, d.SecuredBoardsOnFloor, d.OffensiveTeamFgmOnFloor));
+                d.OpponentTwoPaOnFloor, d.SecuredBoardsOnFloor, d.OffensiveTeamFgmOnFloor,
+                Started: boundary.StartedPools.Contains(poolId)));
         }
+        // ★ S116 — a man who tipped was on the floor, so he played. If a starter has no row the
+        //   participation predicate and the lineup disagree, and GS would silently undercount.
+        var emitted = rows.Count(r => r.Started);
+        if (emitted != boundary.StartedPools.Count)
+            throw new GameLogException(GameLogError.InvalidRow,
+                $"game {gameIndex}: {boundary.StartedPools.Count} men started but {emitted} starters have a row.");
         return rows;
     }
 
