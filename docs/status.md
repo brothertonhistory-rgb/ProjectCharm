@@ -10,7 +10,20 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 116** (2026-10-06; verified on Emmett's machine — **the twelve log-reading phases, the registry and
+Last updated: **Session 117** (2026-10-07; verified on Emmett's machine — **the thirteen log-reading phases, the registry
+and the fingerprint wall all PASS (81 87 89 90 91 100 101 102 103 104 105 106 107), 1,022.5s, Phase 107 new (42
+assertions), every predicted number identical to the sandbox**. **THE GAME LOG, THE BOX SCORE, CAREER HIGHS** — session
+3c of the stacked-seasons arc: `gamelog <world> <number> <season> --history <career>` (every team game, DNPs included,
+date order grouped by phase, Gtm / Gcar, minutes:seconds, his totals and his team's record), `box <world> <season>
+<ref> --history <career>` (visitor first, the line score by half, starters / reserves / did not play / team totals),
+and **Single-game highs** on the player page (ties on the printed number). Block schema 3 records **the score by
+period**. ★ **C-60: the game is the product, not its save files** — any older log is refused by name ("saved by an older
+version of the game — start a new career"); every older-format reader retired. ★ Finding: in **686 of 5,357** stock
+games the final holds points no man is credited with (the bonus-trip putback names no shooter) — the box score prints an
+**Uncredited** line, and the engine fix is boarded (**O-115**). Stock: log 22,940,788 bytes; 30,321 DNP lines; 657 men
+with no line all season. Journal S117 has the detail.)
+
+Previous: **Session 116** (2026-10-06; verified on Emmett's machine — **the twelve log-reading phases, the registry and
 the fingerprint wall all PASS (81 87 89 90 91 100 101 102 103 104 105 106, C-57 as sharpened this session), 857.2s,
 Phase 106 new (47 assertions), every predicted number identical to the sandbox**. **THE STATS SURVIVE UNDER HIS NUMBER**
 — session 3b of the stacked-seasons arc: `player <world> <number> --history <career>` prints a career's page (per game
@@ -518,11 +531,19 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S117 MOVED NO BASKETBALL AND LAID THE GAME LINES OUT THREE MORE WAYS.** The legacy season is unmoved on all seven
+fingerprints and the pre-S112 digest (Phase 107 C7); the career's season one is the legacy season game for game. Every
+season log from S117 on is **block schema 3** — the S116 header plus the score by period (2 + OT entries, 8 bytes each);
+the stock career's season one is **22,940,788 bytes**. **The reader accepts block 3 / row 2 / roster 2 and nothing
+else (C-60)**: an older career is refused by name at the reader, the turnover and every page. Pages: `player` (now with
+Single-game highs), `people`, `gamelog`, `box`. The box score shows an `Uncredited` line in 686 of 5,357 stock games
+(713 sides, 1,513 points) — points the scoreboard holds and no man is credited with (O-115).
+
 **S116 MOVED NO BASKETBALL AND GAVE A CAREER ITS FIRST PLAYER PAGE.** The legacy season is unmoved on all seven
 fingerprints and the pre-S112 digest (Phase 106 C8); the career's season one is the legacy season game for game. Every
 season log from S116 on is row schema 2 (GS) and block schema 2 (kind, date, site): 196-byte lines, 56-byte game
-headers; the stock career's season one is 22,854,252 bytes. Older logs still read; the page prints GS blank and counts
-league games only for them, and says so. The `season` page is byte-identical (sandbox diff, old build vs new).
+headers; the stock career's season one was 22,854,252 bytes. (Older logs read with GS blank and league-only conference
+rows until S117, which refuses them — C-60.) The `season` page is byte-identical (sandbox diff, old build vs new).
 
 **S115 MOVED NO LEGACY BASKETBALL AND GAVE A CAREER A SECOND YEAR WITH THE SAME MEN.** The legacy season is unmoved on
 all seven fingerprints and the pre-S112 digest (Phase 105 C8); a career's season one is the legacy season game for game
@@ -652,6 +673,15 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S117 — THE GAME LOG, THE BOX SCORE, CAREER HIGHS.** `Charm.History`: block schema 3 (`GameBlockFactsV1.Periods`,
+  `PeriodScoreV1`; the writer refuses a wrong length, a negative entry or a list not summing to the final; the reader
+  re-checks after the seal); the reader accepts block 3 / row 2 / roster 2 only, one refusal sentence for anything
+  older (C-60); every v1/v2 branch, `Records*` flag and version property deleted. Season loop: `ScoreByPeriod` off the
+  possessions. `Program.Career.cs`: old-format fallbacks deleted, an older career refused, minutes:seconds,
+  **Single-game highs**. `Program.GameLogPage.cs` (new): `gamelog` and `box`, the Uncredited line. **Phase 107 (42
+  assertions)**; Phase 106 47 → 42 (five old-format checks retired); Phase 105's roster-v1 pair asserts the refusal;
+  Phase 81's size formula `+ (2 + OT) × 8`; hand-built test games in Phases 81, 89 and 106 carry a line score; registry
+  92, frozen order, C3c exclusion. Journal S117.
 - **★ S116 — THE STATS SURVIVE UNDER HIS NUMBER.** `Charm.History`: row schema 2 (`PerGameStatRowV1.Started`, 196 bytes,
   26 fields), block schema 2 (`GameBlockFactsV1.IsConferenceTournamentGame`, `Date`, `HasHost`; kind byte 0/1/2; 56-byte
   header), the writer emits both and refuses a game with no date or site or marked both league and tournament, one
@@ -1190,6 +1220,18 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
+- **O-115 — ★ UNCREDITED POINTS: THE BONUS-TRIP PUTBACK NAMES NO SHOOTER (S117 finding).** In **686 of 5,357** stock games
+  (713 sides, **1,513 points**) the final holds points no man is credited with — usually a 2: a team in the bonus misses
+  the last free throw, rebounds, and puts it back with no shooter selected (`SlotUnattributedFgm`, design.md's
+  attribution chokepoint); a few are free throws. Every player page has been missing these points since the archive
+  began; the box score shows them as `Uncredited: N points`. The fix is in the engine (name the shooter on that path),
+  so its own session, with its own fingerprint question (whether naming him moves any game is not yet known).
+  **Before-number: Phase 107 C4b, 686 games — it should read 0 after.** Supersedes P-13's "FT unattributed bonus-trip
+  fallback (~0 volume)" line, which measured free throws, not the putback.
+- **O-116 — RETIRE THE REMAINING OLD-FORMAT READERS (C-60's follow-through, S117).** S117 retired every older reader
+  of the season log. What is left of the same kind: the career file's v1 → v2 upgrade (`HistorySchemaV1` read and
+  migrated by `HistoryStore.Open`; Phase 81 A6 proves it, and `UseFixedHistoryIdForTests` exists only for its golden).
+  Under C-60 an older career file is refused by name, not upgraded. Small, and touches Phase 81.
 - **O-106 — ★ CONFERENCE TOURNAMENTS HAVE NO REAL NEUTRAL SITE (S110 placeholder, ruled temporary).** R1 puts all
   seven of a league's games in the **original No. 1 seed's city**, frozen, nobody hosting. Emmett: *"we will add in
   neutral locations later."* `WorldConference` carries no place at all, so the successor is authored per-conference
@@ -2084,10 +2126,10 @@ chart is PROVISIONAL pending O-6.
   (S33); press-frequency sentinels; length-in-make% defender term (S17/S40-era); per-zone
   location-blend weights + corner-three split (P9); reference-card pinning + multi-seed
   (S31/32); EqualShare centralization (P28); opening-five/lineup logic; FT unattributed
-  bonus-trip fallback (~0 volume on populated rosters); displacement "advantaged" bin (S36);
+  bonus-trip fallback (~0 volume on populated rosters — but its PUTBACK half is live: 686 stock games, open as O-115); displacement "advantaged" bin (S36);
   code hygiene (WeightedAggregate duplication, Mk consolidation, RollE stub double-build).
 - **P-14 — Long-term watches (design before the relevant layer ships, not now):** save-file
-  schema versioning; end-to-end RNG/determinism review before the full season layer; the
+  schema versioning (S117: ruled for now by **C-60** — a version stamp refuses, it never migrates); end-to-end RNG/determinism review before the full season layer; the
   Player data layer at 21k+ actives; moddability. (working-with-emmett §7)
 - **P-16 — A SEASON'S CONFERENCE IS READ FROM THE WORLD → realignment (S116).** The player page's Conference column is
   the school's conference in the world file. The fingerprint binding makes that the world the season was played in
@@ -2098,6 +2140,12 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-60 (S117, Emmett's ruling 6, 2026-10-06) — THE GAME IS THE PRODUCT, NOT ITS SAVE FILES.** *"We are building the
+  game, not the files within it. A save file for version 1.4 won't work for version 3.6."* A log saved by an older
+  format is **refused by name** ("this career was saved by an older version of the game — start a new career"), never
+  read half-blind, never with an "unknown" filled in. **No new compatibility code**: a format change bumps the version
+  and retires the old reader in the same session (S117 retired block 1/2, row 1 and roster 1 — Emmett, "retire"). The
+  career file's own old-version upgrade is boarded (O-116). Do not write a reader that tolerates an older format.
 - **C-58 (S116, Emmett's ruling, 2026-10-06) — A CONFERENCE TOURNAMENT GAME IS A CONFERENCE GAME FOR THE PLAYER, NEVER
   FOR THE STANDINGS.** *"It counts as a conference game for the player, but does not count towards conference
   standings."* The log marks it as its own kind; the league flag (standings, host memory) means the league slate only.
@@ -2409,13 +2457,24 @@ chart is PROVISIONAL pending O-6.
 
 ## Next approved candidate — exactly ONE
 
+★ **THE GAME LOG, THE BOX SCORE, CAREER HIGHS — S117 (2026-10-07). NEXT: NOT YET CHOSEN.** 3c closes the card's
+reading side: every season's stats, a game log, a box score, career highs, under one number. The arc's step 4 —
+development, recruiting, prestige movement, transfers, one at a time — is where the plan goes next, and two smaller
+items surfaced this session sit beside it: **O-115** (the uncredited putback — an engine session with a measured
+before-number) and **O-116** (the career file's old-version upgrade, C-60's follow-through). Which one is next is
+Emmett's call at the next-prompt pass (CONVENTIONS §6), not this board's. **Carry into any draft that touches the log:**
+C-60 — a format change bumps the version and retires the old reader in the same session; search the suite for every
+construction of the changed type by **type name** (S117 missed a `=> new(…)` that a search for `new TypeName(` cannot
+see).
+
 ★ **THE STATS SURVIVE — S116 (2026-10-06). NEXT: 3c — THE GAME LOG AND CAREER HIGHS (stacked-seasons arc).** The
 same lines as the player page, laid out per game: sports-reference's game log (Emmett's screenshot, 2026-10-06 — Rk,
 career game number, team game number, date, team, H/A/N, opponent, type, result with OT, GS, the box). **Carry into the
 3c draft:** everything it needs is on the log from S116 — date, site (`CareerSite` gives H / A / N), kind (league,
 conference tournament, other; the postseason rounds will extend the same byte when the postseason arrives — the
 screenshot shows ROUND-64 / ROUND-32 as their own types), both scores, overtimes, per-man started; career and team game
-numbers are counts. A log older than S116 has none of the three new facts and must say so, not guess. Career highs are
+numbers are counts. ~~A log older than S116 has none of the three new facts and must say so, not guess.~~ Superseded
+by C-60 (S117): a log older than the current format is refused by name, never read. Career highs are
 maxima over the same lines (decide what a tie prints). Names are still placeholders.
 
 ★ **THE PEOPLE SURVIVE — S115 (2026-10-06). NEXT: 3b — THE STATS SURVIVE UNDER HIS NUMBER (stacked-seasons arc,

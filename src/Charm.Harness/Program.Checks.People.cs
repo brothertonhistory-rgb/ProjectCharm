@@ -295,17 +295,21 @@ internal static partial class Program
                       RefusedWith(exNoRetain, "requires the retained log"), Blame(exNoRetain));
                 // (iii) previous log is v1: season one's log rewritten to roster schema 1 (every v1 byte of each entry kept,
                 //       the v2 tail dropped, the roster checksum and the payload digest recomputed), then season two.
+                //       ★ S117 — C-60: the reader no longer reads roster schema 1 at all; an older career is refused
+                //       whole, by the standing sentence, at the reader and so at the turnover.
                 var v1Path = Path.Combine(scratch, "v1", "career.json");
                 Career(mte, PeopleCheckSeed, v1Path);
                 var v1Log = GameLogWriter.FinalPathFor(v1Path, 1);
                 File.WriteAllBytes(v1Log, DowngradeRosterToV1(File.ReadAllBytes(v1Log)));
-                Check("C6c-pre: the downgraded log still reads as a valid finalized log, as schema 1, for host memory",
-                      Refusal(() => { var l = ReadLog(mte, v1Path, 1); if (l.RosterSchemaVersion != 1) throw new InvalidOperationException("not v1"); }) is null);
+                var readV1 = Refusal(() => ReadLog(mte, v1Path, 1));
+                Check("C6c-pre: ★ S117 — a roster-schema-1 log is refused by the READER, by the standing sentence (C-60)",
+                      readV1 is GameLogException { Error: GameLogError.UnsupportedLogVersion }
+                      && RefusedWith(readV1, "saved by an older version of the game — start a new career"), Blame(readV1));
                 Exception? exV1;
                 using (var store = HistoryStore.Open(v1Path, WorldFingerprint(mte)))
                     exV1 = Refusal(() => RunSeasonCore(mte, seedTwo, configPath, verbose: false, store, retainGameLog: true));
-                Check("C6c: previous log is roster schema 1 (pre-S115, no class) -> refused by name",
-                      RefusedWith(exV1, "predates S115"), Blame(exV1));
+                Check("C6c: previous log is roster schema 1 (pre-S115, no class) -> the next season is refused by the same sentence",
+                      RefusedWith(exV1, "saved by an older version of the game — start a new career"), Blame(exV1));
                 // (iv)..(ix): structural refusals on the roster section, fed to the read-back directly.
                 var good = rA1.ToList();
                 var s0 = mte.Schools.OrderBy(s => s.Id).First().Id;

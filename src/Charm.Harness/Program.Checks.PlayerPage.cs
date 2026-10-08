@@ -9,9 +9,8 @@ namespace Charm.Harness;
 //
 //  What must be proven (page-only; no basketball value is asserted):
 //    C1 row schema v2 round-trips Started both ways; a started value of 2 is
-//       refused by the format; a v1 file (the check downgrades a real log's rows
-//       to 188 bytes) still reads, every row Started false, counters unchanged,
-//       and says it does not record starters.
+//       refused by the format. (★ S117 — the row-schema-1 reading checks C1c/C1d
+//       retired with that reader, C-60; Phase 107 C2 proves the refusal.)
 //    C2 GS is the lineup that started: on the stock season one log, every block
 //       has exactly five started rows per side and they are that school's five
 //       starters; a starter who did not play is refused at write time (control).
@@ -28,14 +27,14 @@ namespace Charm.Harness;
 //    C7 the three states: a missing season and an unreadable season each print a
 //       "no record" line and star the career; a freshman has no row before he
 //       arrived; a departed senior none after he left; a full career has no star.
-//    C9 the conference tournament is its own kind of game (block schema 2): every
-//       tournament game marked and no other; the league flag still means the league
-//       slate only (what the standings and host memory read); the player's conference
-//       table counts both; a block-schema-1 file still reads, says it cannot tell,
-//       and the page says so; kind 2 in a v1 file and a game marked both ways are refused.
-//    C10 every game carries its date and site (block schema 2): equal to the fixture
-//       that was played, game by game; H / A / N read off it; a v1 file knows neither
-//       and says so; the writer refuses a game with no date.
+//    C9 the conference tournament is its own kind of game: every tournament game
+//       marked and no other; the league flag still means the league slate only (what
+//       the standings and host memory read); the player's conference table counts
+//       both; a game marked both ways is refused. (★ S117 — C9c/C9d, the
+//       block-schema-1 checks, retired with that reader, C-60.)
+//    C10 every game carries its date and site: equal to the fixture that was played,
+//       game by game; H / A / N read off it; the writer refuses a game with no date.
+//       (★ S117 — C10c retired with the block-schema-1 reader.)
 //    C8 the fingerprint wall: the career season one is the pre-S112 capture game
 //       for game; the legacy season's seven fingerprints and every game unmoved.
 // ============================================================================
@@ -93,11 +92,6 @@ internal static partial class Program
                 using var store = HistoryStore.Open(path, WorldFingerprint(w));
                 return RunSeasonCore(w, seed, configPath, verbose: false, store, retainGameLog: true);
             }
-            GameLogV1 ReadAt(WorldFile w, string careerPath, string file)
-            {
-                using var store = HistoryStore.Open(careerPath, WorldFingerprint(w));
-                return GameLogReader.ReadFinalized(file, new GameLogBindings(store.HistoryId, store.WorldFingerprint, 1));
-            }
             GameLogV1 ReadLog(WorldFile w, string path, long season)
             {
                 using var store = HistoryStore.Open(path, WorldFingerprint(w));
@@ -124,7 +118,8 @@ internal static partial class Program
                 var roster = people.Select((who, i) => new RosterEntryV2(who, 1, i, i + 1, $"C1_{i}", "", RosterPosition.Guard,
                                                                           i == 0, 5, 1.0, new short[38], 0, 0.0, "")).ToList();
                 var facts = new GameBlockFactsV1(h.ReserveGames(1)[0], 0, 1, 2, true, 70, 68, 0, 140,
-                                                 Date: new DateOnly(2026, 11, 10), HasHost: true);
+                                                 Date: new DateOnly(2026, 11, 10), HasHost: true,
+                                                 Periods: new PeriodScoreV1[] { new(35, 34), new(35, 34) });   // ★ S117
                 var rows = new List<PerGameStatRowV1>
                 {
                     new(people[0], 1, 0, 1, 140, 70, 5, 2, 1, 0, 2, 2, 1, 3, 1, 1, 0, 2, 1, 1, 0, 0, 12, 20, 9, Started: true),
@@ -142,12 +137,12 @@ internal static partial class Program
                 Check("C1a: a row with Started true and one with false round-trip — all fields identical (record equality over the 26)",
                       back.Blocks.Count == 1 && back.Blocks[0].Rows.Count == 2
                       && back.Blocks[0].Rows[0] == rows[0] && back.Blocks[0].Rows[1] == rows[1]
-                      && back.Blocks[0].Rows[0].Started && !back.Blocks[0].Rows[1].Started && back.RecordsStarters);
+                      && back.Blocks[0].Rows[0].Started && !back.Blocks[0].Rows[1].Started);
 
                 // A started value of 2: patch the first row's started long, re-seal the block and the digest.
                 var bytes = File.ReadAllBytes(finalPath);
                 var blockStart = 128 + 32 + roster.Count * 256 + 8;
-                BitConverter.GetBytes(2L).CopyTo(bytes, blockStart + 56 + 188);
+                BitConverter.GetBytes(2L).CopyTo(bytes, blockStart + 56 + 2 * 8 + 188);   // ★ S117: past the two halves
                 ResealCheckLog(bytes, blockStart, rows.Count, 196);
                 var badPath = Path.Combine(scratch, "c1", "bad.log");
                 File.WriteAllBytes(badPath, bytes);
@@ -155,30 +150,6 @@ internal static partial class Program
                 Check("C1b: a started value of 2 is refused by the FORMAT (re-sealed, so only the value can be at fault)",
                       two is GameLogException { Error: GameLogError.InvalidRow } && two.Message.Contains("started value 2", StringComparison.Ordinal),
                       Blame(two));
-
-                // A v1 file: season one of the mte career, rows cut back to 188 bytes.
-                var v1Path = Path.Combine(scratch, "c1", "v1.log");
-                File.WriteAllBytes(v1Path, DowngradeRowsToV1(File.ReadAllBytes(GameLogWriter.FinalPathFor(mtePath, 1))));
-                GameLogV1? v1 = null;
-                var v1Err = Refusal(() =>
-                {
-                    using var store = HistoryStore.Open(mtePath, mteFp);
-                    v1 = GameLogReader.ReadFinalized(v1Path, new GameLogBindings(store.HistoryId, store.WorldFingerprint, 1));
-                });
-                var v2 = mteLogs[0];
-                var sameCounters = v1 is not null && v1.Blocks.Count == v2.Blocks.Count
-                    && v1.Blocks.Zip(v2.Blocks).All(z => z.First.Rows.Count == z.Second.Rows.Count
-                         && z.First.Rows.Zip(z.Second.Rows).All(r => r.First == r.Second with { Started = false }));
-                Check("C1c: ★ a row-schema-1 file still reads: every row Started false, every other field the v2 file's, " +
-                      "and it says it does not record starters",
-                      v1Err is null && sameCounters && !v1!.RecordsStarters && v1.Blocks.SelectMany(b => b.Rows).All(r => !r.Started)
-                      && v2.Blocks.SelectMany(b => b.Rows).Any(r => r.Started),
-                      v1Err is null ? $"{v1!.TotalRowCount} rows" : Blame(v1Err));
-                // The page prints GS blank for a v1 season, never a zero the file never claimed.
-                var v1Line = new CareerLine();
-                foreach (var b in v1!.Blocks.Take(3)) foreach (var r in b.Rows.Take(1)) v1Line.AddGame(r, 1.0, v1.RecordsStarters);
-                Check("C1d: a season read from a row-schema-1 file prints GS blank, not 0",
-                      CareerCells(v1Line, perGame: false)[1] == "" && v1Line.G == 3);
             }
 
             // ── C2 + C4 (stock) + C8a: the stock career's season one ──────────────
@@ -199,7 +170,7 @@ internal static partial class Program
                         if (started.Count != 5 || !started.SetEquals(starters[school])) badBlocks++;
                     }
                 Check("C2a: ★ every block, every side: exactly five rows marked started, and they are that school's five starters",
-                      badBlocks == 0 && log.RecordsStarters, $"{log.Blocks.Count} games, {badBlocks} sides wrong");
+                      badBlocks == 0, $"{log.Blocks.Count} games, {badBlocks} sides wrong");
                 var benchStarts = log.Blocks.Sum(b => b.Rows.Count(r => r.Started && !starters[r.SchoolId].Contains(r.PersonId)));
                 Check("C2b: no reserve is ever marked started", benchStarts == 0);
                 Console.WriteLine(Inv($"  (page) stock season one: {log.TotalRowCount:N0} rows, {log.TotalRowCount * 8:N0} bytes more than row schema 1 would have written; GS {log.Blocks.Sum(b => b.Rows.Count(r => r.Started)):N0} = 10 x {log.Blocks.Count:N0} games"));
@@ -240,8 +211,7 @@ internal static partial class Program
                 var league = log.Blocks.Count(b => b.Facts.IsConferenceGame);
                 Check("C9a: ★ every conference tournament game is marked as one and nothing else is — and the league flag still " +
                       "marks exactly the league slate (what the standings and next season's host memory read)",
-                      log.RecordsConferenceTournaments
-                      && tourney.Count == stockOne.ConferenceTournamentGameCount && league == stockOne.ConferenceGameCount
+                      tourney.Count == stockOne.ConferenceTournamentGameCount && league == stockOne.ConferenceGameCount
                       && !log.Blocks.Any(b => b.Facts.IsConferenceGame && b.Facts.IsConferenceTournamentGame)
                       && tourney.All(b => schoolConf[b.Facts.HomeSchoolId] == schoolConf[b.Facts.AwaySchoolId]),
                       $"{tourney.Count} tournament games, {league} league games");
@@ -251,34 +221,9 @@ internal static partial class Program
                 var leagueRows = log.Blocks.Where(b => b.Facts.IsConferenceGame).Count(b => b.Rows.Any(r => r.PersonId == tourneyMan));
                 var tourneyRows = tourney.Count(b => b.Rows.Any(r => r.PersonId == tourneyMan));
                 Check("C9b: ★ the player's conference table counts his league games AND his conference tournament games",
-                      tourneyRows > 0 && tPage.Seasons[0].Conf.G == leagueRows + tourneyRows && tPage.Seasons[0].ConfIncludesTournament,
+                      tourneyRows > 0 && tPage.Seasons[0].Conf.G == leagueRows + tourneyRows,
                       $"{tPage.Person}: {leagueRows} league + {tourneyRows} tournament = {tPage.Seasons[0].Conf.G}");
 
-                var v1Blocks = DowngradeBlocksToV1(File.ReadAllBytes(GameLogWriter.FinalPathFor(path, 1)));
-                var v1BlockPath = Path.Combine(scratch, "stock", "blocks-v1.log");
-                File.WriteAllBytes(v1BlockPath, v1Blocks);
-                GameLogV1? old = null;
-                var oldErr = Refusal(() => old = ReadAt(stock, path, v1BlockPath));
-                var oldPage = old is null ? null
-                    : ReadPlayerCareer(new List<(long, GameLogV1?, string?)> { (1L, old, null) }, stock,
-                                       l => l.Roster.Any(e => e.PersonId == tourneyMan) ? tourneyMan : null, "x");
-                Check("C9c: a block-schema-1 file still reads — no game marked as a tournament, the league games unchanged — and " +
-                      "the page counts league games only for that season and says so",
-                      oldErr is null && old is not null && !old.RecordsConferenceTournaments
-                      && !old.Blocks.Any(b => b.Facts.IsConferenceTournamentGame)
-                      && old.Blocks.Count(b => b.Facts.IsConferenceGame) == league
-                      && oldPage is not null && oldPage.Seasons[0].Conf.G == leagueRows && !oldPage.Seasons[0].ConfIncludesTournament
-                      && RenderPlayerPage(oldPage, "x").Contains("count league games only", StringComparison.Ordinal),
-                      oldErr is null ? $"{oldPage?.Seasons[0].Conf.G} conference games on the old file" : Blame(oldErr));
-                // Kind 2 inside a v1 file is malformed: re-mark the original's tournament blocks under a v1 header.
-                var firstTourney = log.Blocks.Select((b, i) => (b, i)).First(x => x.b.Facts.IsConferenceTournamentGame).i;
-                var forged = DowngradeBlocksToV1(File.ReadAllBytes(GameLogWriter.FinalPathFor(path, 1)), keepKindTwoAt: firstTourney);
-                var forgedPath = Path.Combine(scratch, "stock", "forged.log");
-                File.WriteAllBytes(forgedPath, forged);
-                var forgedErr = Refusal(() => ReadAt(stock, path, forgedPath));
-                Check("C9d: a conference tournament kind inside a block-schema-1 file is refused by the format",
-                      forgedErr is GameLogException { Error: GameLogError.DomainViolation } && forgedErr.Message.Contains("fixture kind 2", StringComparison.Ordinal),
-                      Blame(forgedErr));
                 var both = Refusal(() =>
                 {
                     var p2 = Path.Combine(scratch, "both", "career.json");
@@ -288,7 +233,8 @@ internal static partial class Program
                     var ros = new List<RosterEntryV2> { new(who2[0], 1, 0, 1, "B", "", RosterPosition.Guard, true, 5, 1.0, new short[38], 0, 0.0, "") };
                     using var w2 = GameLogWriter.Create(p2, h2.HistoryId, mteFp, new string('d', 64), sid2, ros);
                     w2.AppendGame(new GameBlockFactsV1(h2.ReserveGames(1)[0], 0, 1, 2, true, 70, 68, 0, 140, IsConferenceTournamentGame: true,
-                                                         Date: new DateOnly(2026, 11, 10), HasHost: true),
+                                                         Date: new DateOnly(2026, 11, 10), HasHost: true,
+                                                         Periods: new PeriodScoreV1[] { new(35, 34), new(35, 34) }),   // ★ S117
                                   new List<PerGameStatRowV1> { new(who2[0], 1, 0, 1, 40, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Started: true) });
                 });
                 Check("C9e: NEGATIVE CONTROL — a game marked both league and conference tournament is refused at write time",
@@ -305,7 +251,7 @@ internal static partial class Program
                 }
                 var neutralGames = log.Blocks.Count(b => b.Facts.HasHost == false);
                 Check("C10a: ★ every game in the log carries the date and the site of the fixture that was played, game by game",
-                      log.RecordsDateAndSite && log.Blocks.Count == played.Count && dateWrong == 0 && siteWrong == 0,
+                      log.Blocks.Count == played.Count && dateWrong == 0 && siteWrong == 0,
                       Inv($"{log.Blocks.Count} games, {neutralGames} neutral; {log.Blocks.Min(b => b.Facts.Date):yyyy-MM-dd} .. {log.Blocks.Max(b => b.Facts.Date):yyyy-MM-dd}"));
                 var hanWrong = 0; var h = 0; var a = 0; var n = 0;
                 foreach (var b in log.Blocks)
@@ -318,9 +264,6 @@ internal static partial class Program
                     }
                 Check("C10b: H / A / N per man per game — hosted: the home school H and the visitor A; no host: both N",
                       hanWrong == 0 && h > 0 && a > 0 && n > 0, Inv($"{h:N0} H / {a:N0} A / {n:N0} N rows"));
-                Check("C10c: a block-schema-1 file reads every date and site as unknown, and H / A / N as \"?\" — never guessed",
-                      old is not null && !old.RecordsDateAndSite && old.Blocks.All(b => b.Facts.Date is null && b.Facts.HasHost is null)
-                      && CareerSite(old.Blocks[0].Rows[0], old.Blocks[0].Facts) == "?");
                 var noDate = Refusal(() =>
                 {
                     var p3 = Path.Combine(scratch, "nodate", "career.json");
@@ -329,7 +272,8 @@ internal static partial class Program
                     var who3 = h3.ReservePersons(1);
                     var ros = new List<RosterEntryV2> { new(who3[0], 1, 0, 1, "D", "", RosterPosition.Guard, true, 5, 1.0, new short[38], 0, 0.0, "") };
                     using var w3 = GameLogWriter.Create(p3, h3.HistoryId, mteFp, new string('d', 64), sid3, ros);
-                    w3.AppendGame(new GameBlockFactsV1(h3.ReserveGames(1)[0], 0, 1, 2, true, 70, 68, 0, 140, HasHost: true),
+                    w3.AppendGame(new GameBlockFactsV1(h3.ReserveGames(1)[0], 0, 1, 2, true, 70, 68, 0, 140, HasHost: true,
+                                                       Periods: new PeriodScoreV1[] { new(35, 34), new(35, 34) }),   // ★ S117
                                   new List<PerGameStatRowV1> { new(who3[0], 1, 0, 1, 40, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, Started: true) });
                 });
                 Check("C10d: NEGATIVE CONTROL — a game with no date is refused at write time, by name",
@@ -483,7 +427,9 @@ internal static partial class Program
                 var s2Path = GameLogWriter.FinalPathFor(mtePath, 2);
                 var original = File.ReadAllBytes(s2Path);
                 var flipped = (byte[])original.Clone();
-                var at = 128 + 32 + r2.Count * 256 + 8 + 48 + 40;   // inside the first row of the first block
+                var firstBlock = 128 + 32 + r2.Count * 256 + 8;
+                // ★ S117 — past the 56-byte header and the period list (two halves + any overtimes): inside the first row.
+                var at = firstBlock + 56 + (2 + BitConverter.ToInt16(original, firstBlock + 36)) * 8 + 40;
                 flipped[at] ^= 0x01;
                 File.WriteAllBytes(s2Path, flipped);
                 PlayerCareer Live(PersonId who)
@@ -553,77 +499,10 @@ internal static partial class Program
     private static void ResealCheckLog(byte[] file, int blockStart, int rowCount, int rowBytes)
     {
         const int header = 128, footer = 64;
-        var blockHeader = BitConverter.ToInt16(file, 10) >= 2 ? 56 : 48;   // S116: block schema 2 headers are 56
+        // ★ S117 — block schema 3: the 56-byte header, then two halves plus one entry per overtime.
+        var blockHeader = 56 + (2 + BitConverter.ToInt16(file, blockStart + 36)) * 8;
         var trailerAt = blockStart + blockHeader + rowCount * rowBytes;
         SHA256.HashData(file.AsSpan(blockStart, trailerAt - blockStart))[..8].CopyTo(file, trailerAt);
         SHA256.HashData(file.AsSpan(header, file.Length - footer - header)).CopyTo(file, file.Length - footer + 16);
-    }
-
-    /// <summary>Rewrite a finalized log's game blocks from schema 2 to schema 1: the header's block
-    /// version moves to 1, every block header loses its 8-byte date-and-site tail (56 → 48), and every
-    /// conference tournament block (kind 2) is re-marked kind 1, which is what a pre-S116 writer put
-    /// there. Every block checksum and the footer digest are recomputed; rows and roster are carried
-    /// unchanged. The ONLY way a block-schema-1 log can exist in the suite now that the writer emits
-    /// block schema 2. <paramref name="keepKindTwoAt"/> leaves ONE block marked 2, to forge a malformed file.</summary>
-    private static byte[] DowngradeBlocksToV1(byte[] file, int keepKindTwoAt = -1)
-    {
-        const int header = 128, rosterHeader = 32, trailer = 8, footer = 64, v2Header = 56, v1Header = 48;
-        var rowBytes = BitConverter.ToInt32(file, 104);
-        var entrySize = BitConverter.ToInt16(file, header + 6);
-        var count = BitConverter.ToInt32(file, header + 8);
-        var rosterEnd = header + rosterHeader + count * entrySize + trailer;
-        var head = file.AsSpan(0, rosterEnd).ToArray();
-        BitConverter.GetBytes((short)1).CopyTo(head, 10);                // block schema version
-        var output = new List<byte>(head);
-        var p = rosterEnd;
-        var index = 0;
-        while (p < file.Length - footer)
-        {
-            var rows = BitConverter.ToUInt16(file, p + 26);
-            var block = file.AsSpan(p, v1Header).ToArray().Concat(file.AsSpan(p + v2Header, rows * rowBytes).ToArray()).ToArray();
-            if (block[24] == 2 && index != keepKindTwoAt) block[24] = 1;
-            output.AddRange(block);
-            output.AddRange(SHA256.HashData(block)[..8]);
-            p += v2Header + rows * rowBytes + trailer;
-            index++;
-        }
-        output.AddRange(file.AsSpan(file.Length - footer, footer).ToArray());
-        var result = output.ToArray();
-        SHA256.HashData(result.AsSpan(header, result.Length - footer - header)).CopyTo(result, result.Length - footer + 16);
-        return result;
-    }
-
-    /// <summary>Rewrite a finalized log's rows from schema 2 (196 bytes) to schema 1 (188): the
-    /// header's row version, size and field count move; each row keeps its first 188 bytes (the
-    /// v1 layout) and drops the started long; every block checksum and the footer digest are
-    /// recomputed. The roster section is carried unchanged. The ONLY way a pre-S116 log can exist
-    /// in the suite now that the writer emits row schema 2.</summary>
-    private static byte[] DowngradeRowsToV1(byte[] file)
-    {
-        const int header = 128, rosterHeader = 32, trailer = 8, footer = 64, v2 = 196, v1 = 188;
-        var blockHeader = BitConverter.ToInt16(file, 10) >= 2 ? 56 : 48;   // S116: block schema 2 headers are 56
-        var entrySize = BitConverter.ToInt16(file, header + 6);
-        var count = BitConverter.ToInt32(file, header + 8);
-        var rosterEnd = header + rosterHeader + count * entrySize + trailer;
-        var head = file.AsSpan(0, rosterEnd).ToArray();
-        BitConverter.GetBytes((short)1).CopyTo(head, 12);     // row schema version
-        BitConverter.GetBytes(v1).CopyTo(head, 104);          // row size
-        BitConverter.GetBytes(25).CopyTo(head, 108);          // field count
-        var output = new List<byte>(head);
-        var p = rosterEnd;
-        while (p < file.Length - footer)
-        {
-            var rows = BitConverter.ToUInt16(file, p + 26);
-            var block = new List<byte>(file.AsSpan(p, blockHeader).ToArray());
-            for (var i = 0; i < rows; i++) block.AddRange(file.AsSpan(p + blockHeader + i * v2, v1).ToArray());
-            var b = block.ToArray();
-            output.AddRange(b);
-            output.AddRange(SHA256.HashData(b)[..8]);
-            p += blockHeader + rows * v2 + trailer;
-        }
-        output.AddRange(file.AsSpan(file.Length - footer, footer).ToArray());
-        var result = output.ToArray();
-        SHA256.HashData(result.AsSpan(header, result.Length - footer - header)).CopyTo(result, result.Length - footer + 16);
-        return result;
     }
 }

@@ -188,9 +188,10 @@ internal static partial class Program
             // ★ S115 — roster schema 2: a 256-byte entry (v1's 216 + class, plane, offensive role, padded).
             long expected = 128 + (32 + (long)log.Roster.Count * 256 + 8) + 64;
             // ★ S116 — row schema 2: a 196-byte row (v1's 188 + the started long).
-            // ★ S116 — block schema 2: a 56-byte block header (v1's 48 + date, site, reserved).
-            foreach (var b in log.Blocks) expected += 56 + (long)b.Rows.Count * 196 + 8;
-            Check("A9 file size is exactly 128 + (32 + entries*256 + 8) + SUM(56 + rows*196 + 8) + 64 (roster schema 2 S115, row and block schema 2 S116)",
+            // ★ S116 — a 56-byte block header (v1's 48 + date, site, reserved).
+            // ★ S117 — block schema 3: then the score by period, (2 + overtimes) x 8 bytes.
+            foreach (var b in log.Blocks) expected += 56 + (2L + b.Facts.OvertimePeriods) * 8 + (long)b.Rows.Count * 196 + 8;
+            Check("A9 file size is exactly 128 + (32 + entries*256 + 8) + SUM(56 + (2 + OT)*8 + rows*196 + 8) + 64 (roster schema 2 S115, row schema 2 S116, block schema 3 S117)",
                   actual == expected, $"{actual:N0} B, formula {expected:N0} B");
 
             // ── A3's SISTER: the true row count, REPORTED ────────────────────
@@ -278,6 +279,9 @@ internal static partial class Program
             // ★ The block-checksum distinction: a COMPLETE block with a bad checksum is
             // corruption and fatal even in an .inprogress file. Only PHYSICAL truncation
             // is ever tolerated, and only there.
+            // ★ S117 — byte 60 of the first block now falls in its line score (the first half's away
+            // points). The reader checks a block's seal before any value inside it, so this still reads
+            // as corruption — and a sealed wrong score would read as a wrong score (Phase 107 C1).
             var blockByte = 128 + 32 + log_RosterBytes(original) + 8 + 60;
             Check("A5 a complete block with a bad checksum is corruption, not a tail",
                   ReadOf(Corrupt("blk", b => b[blockByte] ^= 0x01)) == GameLogError.BlockChecksumMismatch);
@@ -495,7 +499,8 @@ internal static partial class Program
 
     private static GameBlockFactsV1 MinimalFacts(HistoryStore h)
         => new(h.ReserveGames(1)[0], 0, 1, 2, true, 70, 68, 0, 140,
-               Date: new DateOnly(2026, 11, 10), HasHost: true);
+               Date: new DateOnly(2026, 11, 10), HasHost: true,
+               Periods: new PeriodScoreV1[] { new(35, 34), new(35, 34) });   // ★ S117
 
     private static List<PerGameStatRowV1> MinimalRows(PersonId who)
         => new() { new PerGameStatRowV1(who, 1, 0, 1, 40, 20,

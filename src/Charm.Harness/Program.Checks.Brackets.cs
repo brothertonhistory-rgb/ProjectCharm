@@ -640,9 +640,11 @@ internal static partial class Program
                     var w = GameLogWriter.Create(leakPath, store.HistoryId, fp, new string('e', 64),
                                                  sid, roster);
                     var ids = store.ReserveGames(2);
-                    w.AppendGame(new GameBlockFactsV1(ids[0], 0, 1, 2, true, 70, 68, 0, 140, Date: new DateOnly(2026, 11, 10), HasHost: true),
+                    w.AppendGame(new GameBlockFactsV1(ids[0], 0, 1, 2, true, 70, 68, 0, 140, Date: new DateOnly(2026, 11, 10), HasHost: true,
+                                                      Periods: new PeriodScoreV1[] { new(35, 34), new(35, 34) }),   // ★ S117
                                  MinimalRows(roster[0].PersonId));
-                    w.AppendGame(new GameBlockFactsV1(ids[1], 1, 2, 1, false, 71, 69, 0, 141, Date: new DateOnly(2026, 11, 11), HasHost: false),
+                    w.AppendGame(new GameBlockFactsV1(ids[1], 1, 2, 1, false, 71, 69, 0, 141, Date: new DateOnly(2026, 11, 11), HasHost: false,
+                                                      Periods: new PeriodScoreV1[] { new(36, 35), new(35, 34) }),   // ★ S117
                                  MinimalRows(roster[0].PersonId));
                     w.Finalize(2);
                     w.Dispose();

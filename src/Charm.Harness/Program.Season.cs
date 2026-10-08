@@ -1961,7 +1961,11 @@ internal static partial class Program
                         IsConferenceTournamentGame: string.Equals(sg.Kind, "ctourney", StringComparison.Ordinal),
                         // ★ S116 — the date and the site, as the fixture already carries them. The
                         //   writer refuses a game with no date rather than filing one without it.
-                        Date: sg.Date, HasHost: sg.HasHost),
+                        Date: sg.Date, HasHost: sg.HasHost,
+                        // ★ S117 — the score by half and overtime, summed off this game's possessions.
+                        //   The writer refuses it unless it sums to the final above.
+                        Periods: ScoreByPeriod(result.Possessions.Select(r => (r.Half, r.Offense == TeamSide.Home, r.Points)),
+                                               result.OvertimePeriods)),
                     RetentionRowsAfter(league, retentionBefore, g));
 
             // GameState.HomeScore is credited to HomeSchool, AwayScore to AwaySchool,

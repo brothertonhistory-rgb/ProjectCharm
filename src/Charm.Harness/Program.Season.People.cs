@@ -21,8 +21,9 @@ namespace Charm.Harness;
 //
 //  ★ THE PREVIOUS SEASON IS FOUND BY ARITHMETIC, NEVER BY LOOKING AROUND —
 //  the same rule host memory follows (Program.Season.Memory.cs). Season N−1's
-//  log is at one computable path. If it is missing, or it predates S115 (a v1
-//  roster, no class), the career cannot continue and the run REFUSES BY NAME.
+//  log is at one computable path. If it is missing, or it was saved by an older
+//  version of the game (S117, C-60), the career cannot continue and the run
+//  REFUSES BY NAME.
 //  There is no fallback to a fresh pool: that would be a career that silently
 //  forgot everybody, which is exactly what this session exists to end.
 //
@@ -75,8 +76,8 @@ internal static partial class Program
         var bindings = new GameLogBindings(history.HistoryId, history.WorldFingerprint, prev,
                                            ScheduleFingerprint: null);
         // A GameLogException here is already a classified refusal by name (damaged, truncated,
-        // wrong lineage, wrong world); it is let through untouched. RosterV2() is where a
-        // pre-S115 roster (schema 1, no class) refuses.
+        // wrong lineage, wrong world, or — S117, C-60 — saved by an older version of the game);
+        // it is let through untouched.
         var log = GameLogReader.ReadFinalized(path, bindings);
         var roster = log.RosterV2();
         return new CareerPeople(PoolRowsFromRoster(roster, world), prev);

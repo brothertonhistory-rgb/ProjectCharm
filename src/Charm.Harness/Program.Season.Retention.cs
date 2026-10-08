@@ -101,6 +101,29 @@ internal static partial class Program
         return new RetentionBefore(before, started);
     }
 
+    /// <summary>★ S117 — THE SCORE BY PERIOD, read off the possessions the game already recorded.
+    /// The score moves in exactly one place in the engine (the possession tail adds that
+    /// possession's points to the side that had the ball), and every possession record carries
+    /// those same points, the side, and the period it was played in — 1 and 2 for the halves,
+    /// 2 + k for overtime k. So the per-period sums ARE the score, not a second account of it.
+    /// Every period from 1 to 2 + overtimes is listed, a scoreless one as 0-0; a possession
+    /// stamped outside that range is refused by name rather than filed somewhere.</summary>
+    private static List<PeriodScoreV1> ScoreByPeriod(
+        IEnumerable<(int Period, bool HomeHadBall, int Points)> possessions, int overtimes)
+    {
+        var count = 2 + overtimes;
+        var home = new int[count];
+        var away = new int[count];
+        foreach (var (period, homeHadBall, points) in possessions)
+        {
+            if (period < 1 || period > count)
+                throw new InvalidOperationException(
+                    $"a possession is stamped period {period}; a game with {overtimes} overtime(s) has periods 1..{count}.");
+            if (homeHadBall) home[period - 1] += points; else away[period - 1] += points;
+        }
+        return Enumerable.Range(0, count).Select(k => new PeriodScoreV1(home[k], away[k])).ToList();
+    }
+
     /// <summary>The delta for every man the game could have touched, turned into rows.
     /// Emits exactly where games played moved by one.</summary>
     private static List<PerGameStatRowV1> RetentionRowsAfter(

@@ -91,6 +91,16 @@ internal static partial class Program
         if (args.Length > 0 && args[0] == "player") { return RunPlayer(args); }
         if (args.Length > 0 && args[0] == "people") { return RunPeople(args); }
 
+        // dotnet run -- gamelog <world.json> <number> <season> --history <career.json>  ★ S117: one
+        // man's season, one line per game his team played (a DNP line for a game he did not get
+        // into), in date order, grouped by phase, with each game's Ref.
+        // dotnet run -- box <world.json> <season> <ref> --history <career.json>  one game's box
+        // score: the line score by half and overtime, then each team's starters, reserves, the men
+        // who did not play, and team totals. Both read only; both refuse without --history.
+        // Phase 107 proves them.
+        if (args.Length > 0 && args[0] == "gamelog") { return RunGameLog(args); }
+        if (args.Length > 0 && args[0] == "box") { return RunBox(args); }
+
         // dotnet run -- calendar [year ...]  S91's printed year: a complete civil year with
         // correct weekdays and leap years, the season boundaries marked, Selection Sunday and
         // championship day named. With no arguments it prints the five years the design asks
@@ -299,6 +309,7 @@ internal static partial class Program
             new(104, "Phase104TurnoverCheck", nameof(Phase104TurnoverCheck), () => Phase104TurnoverCheck(configPath)),   // Phase 104 (S114: the turnover in memory — every senior left and nobody else did, every returner is the same man one class on, freshmen are exactly the vacancies position for position, classes rolled without a draw, the freshman class is the same crop with a negative control, handed out by prestige (the mechanism, the outcome at 4 SE, and an equal-weight control), deterministic and seed-responsive, THE FINGERPRINT WALL — season one inside the stacked run is the standalone season and the bootstrap divvy is byte-identical through the generalized loop, season two plays and reconciles, the runner without rosters in hand is unchanged, and a negative control per rule. Page-only: the turnover report and the by-band table are printed, never asserted.)
             new(105, "Phase105PeopleCheck", nameof(Phase105PeopleCheck), () => Phase105PeopleCheck(configPath)),   // Phase 105 (S115: the people survive — roster schema v2 round-trips every stock pool row with a perturbed-rating control, a career's first season is the pre-S112 capture under the numbers it always issued, season two on a career carries every returner under his own number one class on with every senior gone and every freshman numbered past the high-water, the career turnover equals the in-memory turnover, the first two-season stat line exists, nine refusals by name, two careers agree two seasons deep, the legacy season unmoved. Page-only: the season-two census and high-water are printed, never asserted.)
             new(106, "Phase106PlayerPageCheck", nameof(Phase106PlayerPageCheck), () => Phase106PlayerPageCheck(configPath)),   // Phase 106 (S116: the stats survive — row schema v2 records who started and round-trips both ways, a started value of 2 refused by the format, a row-schema-1 file still reads with GS blank; every side of every stock game has its five starters marked and no one else, with a write-time control; the player page is the log's arithmetic for every man of a three-season career (counters, G, GS, conference split, per-game rounding, Career); minutes bounded and balanced and exactly 40/45/50 at a full game; the two-season man and the departed senior; the lookup door resolves only rostered numbers and cannot mint; the commands refuse by name; the three states of the walk (missing, unreadable, not on the roster) with the Career* star and its control; the legacy season unmoved. Page-only: the stock GS count, the busiest man's share and one player table are printed, never asserted.)
+            new(107, "Phase107GameLogPageCheck", nameof(Phase107GameLogPageCheck), () => Phase107GameLogPageCheck(configPath)),   // Phase 107 (S117: the game log, the box score, career highs — block schema 3 records the score by period and an older log is refused by name, every man's game log is his team's schedule in date order grouped by phase, every box score is its game, every high is the maximum over his games, the commands refuse by name, and the legacy season is unmoved)
 
             // ★ S110.1 — was a `SuiteTimed(...)` call with NO `ok &=`: timed, but its verdict
             //   discarded. The lambda returns an unconditional true and SuiteTimed has no catch,

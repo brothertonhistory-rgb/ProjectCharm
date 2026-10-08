@@ -54,8 +54,9 @@ namespace Charm.History;
 /// <para>★ S116 — ROW SCHEMA v2 adds `Started`: he was one of the five who tipped this
 /// game. It is a FACT about the game, not a counter, so it is never summed into anything
 /// but GS. On disk it is one more long after the 21 counters (0 or 1; the format refuses any
-/// other value), so the row stays all-longs: 196 bytes, 26 fields. A v1 row (188 / 25) reads
-/// back with `Started = false` — honestly false: v1 never recorded it.</para></summary>
+/// other value), so the row stays all-longs: 196 bytes, 26 fields. ★ S117 — row schema 2 is
+/// the only row schema this build reads; an older one is refused with the rest of an older
+/// career (C-60).</para></summary>
 public sealed record PerGameStatRowV1(
     PersonId PersonId,
     int SchoolId,
@@ -130,10 +131,10 @@ public record RosterEntryV1(
 /// generator's two labels that the season page and the divvy read; without them a man read
 /// back from the file would be a different row from the one that was written.</para>
 ///
-/// <para>The entry grows from 216 to 256 bytes. The writer emits v2 from S115 on; the
-/// reader still accepts v1 (so host memory can read any season's game facts) and returns
-/// a plain <see cref="RosterEntryV1"/> for it — which is exactly what lets the turnover
-/// refuse a v1 roster by name: it has no class to advance.</para></summary>
+/// <para>The entry grows from 216 to 256 bytes. ★ S117 — v2 is the only roster schema this
+/// build reads: every entry the reader returns is a <see cref="RosterEntryV2"/>, and a v1
+/// roster is refused with the rest of an older career (C-60). <see cref="RosterEntryV1"/>
+/// survives only as the shared shape v2 extends.</para></summary>
 public sealed record RosterEntryV2(
     PersonId PersonId,
     int SchoolId,
@@ -165,16 +166,23 @@ public sealed record RosterEntryV2(
 /// (holiday events, buy games). `IsConferenceGame` keeps its exact pre-S116 meaning — the
 /// league slate only — because host memory and the standings rest on it; a conference
 /// tournament game is NOT a league game (Emmett's ruling, 2026-10-06: it counts as a
-/// conference game for the player, never toward the conference standings). A block-schema-1
-/// file wrote kind 1 for a tournament game too; it reads back with
-/// `IsConferenceTournamentGame = false`, and `GameLogV1.RecordsConferenceTournaments` says so.</para>
+/// conference game for the player, never toward the conference standings).</para>
 ///
 /// <para>★ S116 — BLOCK SCHEMA v2 also carries the game's DATE and whether it had a HOST
 /// (Emmett, 2026-10-06: the game log needs the date and home / away / neutral). Both were
 /// already known when the game was played and simply not written. With a host, the home
 /// school was home (H) and the visitor away (A); with no host, both were neutral (N) and the
-/// home/away ids are a box-score ordering only. The writer refuses a game with no date. A
-/// block-schema-1 file reads both back as null — unknown, never guessed.</para></summary>
+/// home/away ids are a box-score ordering only. The writer refuses a game with no date.
+/// Both are nullable only so a caller can leave them out and be refused by name; every game the
+/// reader returns carries both.</para>
+///
+/// <para>★ S117 — BLOCK SCHEMA v3: the SCORE BY PERIOD (Emmett, 2026-10-06: the box score has a
+/// line score). `Periods` lists first half, second half, then each overtime — always
+/// 2 + `OvertimePeriods` entries, a period nobody scored in included as 0-0, never skipped. The
+/// writer refuses a list of the wrong length, a negative entry, or one whose sums are not the
+/// final score; the reader re-checks all three. On disk the list follows the 56-byte block
+/// header, two int32s (home, away) per period, so a block's length still follows from its own
+/// header. Nullable for the same reason as the date.</para></summary>
 public sealed record GameBlockFactsV1(
     GameId GameId,
     int FixtureOrdinal,
@@ -187,30 +195,36 @@ public sealed record GameBlockFactsV1(
     long PossessionCount,
     bool IsConferenceTournamentGame = false,
     DateOnly? Date = null,
-    bool? HasHost = null);
+    bool? HasHost = null,
+    IReadOnlyList<PeriodScoreV1>? Periods = null);
+
+/// <summary>★ S117 — one period of a game's line score: the points the home school and the
+/// away school scored in it.</summary>
+public readonly record struct PeriodScoreV1(int Home, int Away);
 
 internal static class GameLogSchemaV1
 {
     // ── Fixed sizes. Every one of these is asserted by Phase 81's A9. ────────
     internal const int FileHeaderSize   = 128;
     internal const int RosterHeaderSize = 32;
-    internal const int RosterEntrySize  = 216;   // roster schema 1 (read-only since S115)
     /// <summary>★ S115 — roster schema 2: the 204 bytes v1 used, plus class (1), defensive
     /// plane (8) and offensive role (32) = 245, padded to 256 (11 reserved-zero bytes).</summary>
     internal const int RosterEntrySizeV2 = 256;
     internal const int RosterTrailerSize = 8;
-    internal const int BlockHeaderSizeV1 = 48;   // block schema 1 (read-only since S116)
-    /// <summary>★ S116 — block schema 2: v1's 48 bytes unchanged, then the date as a day number
-    /// (int32), the site (1 byte: 0 hosted, 1 neutral) and 3 reserved-zero bytes = 56.</summary>
+    /// <summary>★ S116 — the block header: 48 bytes of game facts, then the date as a day number
+    /// (int32), the site (1 byte: 0 hosted, 1 neutral) and 3 reserved-zero bytes = 56. Unchanged
+    /// by block schema 3, which appends the period list after it.</summary>
     internal const int BlockHeaderSize  = 56;
+    /// <summary>★ S117 — block schema 3: one period of the line score, home then away, int32 each.</summary>
+    internal const int PeriodEntrySize  = 8;
+    /// <summary>★ S117 — the format pins two halves of regulation; overtimes follow them.</summary>
+    internal const int RegulationPeriods = 2;
     /// <summary>★ S116 — row schema 2: 4 ids (20 bytes) + 21 counters + started, all longs = 196.</summary>
     internal const int RowSize          = 196;
-    internal const int RowSizeV1        = 188;   // row schema 1 (read-only since S116)
     internal const int BlockTrailerSize = 8;
     internal const int FooterSize       = 64;
 
     internal const int RowFieldCount   = 26;   // 4 ids + 21 counters + started (row schema 2)
-    internal const int RowFieldCountV1 = 25;   // 4 ids + 21 counters (row schema 1)
     internal const int RatingCount   = 38;
 
     internal const int NameBytes = 64;
@@ -218,17 +232,21 @@ internal static class GameLogSchemaV1
     internal const int OffensiveRoleBytes = 32;   // S115, same encoding as Role
 
     internal const short FileFormatVersion   = 1;
-    internal const short RosterSchemaVersionV1 = 1;
-    /// <summary>★ S115 — what the writer emits. The reader accepts both.</summary>
+    /// <summary>★ S115 — what the writer emits; ★ S117 — the only one the reader accepts.</summary>
     internal const short RosterSchemaVersion = 2;
     /// <summary>★ S115 — the largest class ordinal the format defines (0 Fr .. 3 Sr).</summary>
     internal const byte MaxClassOrdinal = 3;
-    internal const short BlockSchemaVersionV1 = 1;
-    /// <summary>★ S116 — what the writer emits: kind 0 league / 1 other / 2 conference tournament.</summary>
-    internal const short BlockSchemaVersion  = 2;
-    internal const short RowSchemaVersionV1  = 1;
-    /// <summary>★ S116 — what the writer emits. The reader accepts both.</summary>
+    /// <summary>★ S117 — block schema 3 (kind 0 league / 1 other / 2 conference tournament, the date
+    /// and site, then the score by period). What the writer emits and the only one the reader accepts.</summary>
+    internal const short BlockSchemaVersion  = 3;
+    /// <summary>★ S116 — what the writer emits; ★ S117 — the only one the reader accepts.</summary>
     internal const short RowSchemaVersion    = 2;
+
+    /// <summary>★ S117 — THE STANDING RULE (Emmett's ruling 6, C-60): the game is the product, not its
+    /// save files. A log saved by any other format is refused with this sentence — never read
+    /// half-blind, never with an "unknown" filled in.</summary>
+    internal const string OlderVersionSentence =
+        "this career was saved by an older version of the game — start a new career";
 
     internal static ReadOnlySpan<byte> Magic       => "CHRMGLOG"u8;
     internal static ReadOnlySpan<byte> RosterMarker => "RSTR"u8;

@@ -38,10 +38,23 @@ namespace Charm.Harness;
 //
 //  ★ THE CONFERENCE TABLES COUNT LEAGUE GAMES AND CONFERENCE TOURNAMENT GAMES
 //  (Emmett, 2026-10-06: a tournament game is a conference game for the player,
-//  never toward the standings). The log marks the two kinds separately (block
-//  schema 2), so the standings' meaning of "conference game" never moves. A log
-//  older than block schema 2 cannot tell a tournament game from any other, so
-//  that season's conference row counts league games only and the page says so.
+//  never toward the standings). The log marks the two kinds separately, so the
+//  standings' meaning of "conference game" never moves.
+//
+//  ★ S117 — ONE FORMAT, AND AN OLDER CAREER IS REFUSED (C-60: the game is the
+//  product, not its save files). A season log saved by an older version is not a
+//  "no record" season — it means the whole career predates this build, and every
+//  page refuses it by name rather than reading it half-blind. A damaged or missing
+//  log is still state 1 (S116), unchanged.
+//
+//  ★ S117 — SINGLE-GAME HIGHS, after the four tables: his best game in points,
+//  rebounds, assists, steals, blocks, made threes, made field goals, made free
+//  throws and minutes, how many times, and every game it happened in with the
+//  reference `box` opens. Minutes are compared as printed — minutes:seconds, his
+//  share of the game's possessions worked to the second (Emmett, 2026-10-06) — so a
+//  tie on the page is a tie in the section. A high of 0 prints — and lists nothing.
+//  With a season off record the section is starred like the Career row: these are
+//  the highs on record, not a claim about the whole career.
 //
 //  ★ THE CONFERENCE COLUMN IS READ FROM THE WORLD, and that is provably the world
 //  the season was played in: every log is bound to its world's fingerprint and
@@ -65,16 +78,12 @@ internal static partial class Program
     {
         public long G;
         public long Gs;
-        /// <summary>False when any game in this line came from a pre-S116 log (row schema 1),
-        /// which never recorded who started: GS then prints blank, never a zero.</summary>
-        public bool GsKnown = true;
         public double Minutes;
         public readonly long[] Counters = new long[CareerCounterCount];
 
-        public void AddGame(PerGameStatRowV1 r, double minutes, bool startersRecorded)
+        public void AddGame(PerGameStatRowV1 r, double minutes)
         {
             G++;
-            GsKnown &= startersRecorded;
             if (r.Started) Gs++;
             Minutes += minutes;
             var c = CareerCountersOf(r);
@@ -85,7 +94,6 @@ internal static partial class Program
         {
             G += other.G;
             Gs += other.Gs;
-            GsKnown &= other.GsKnown;
             Minutes += other.Minutes;
             for (var i = 0; i < CareerCounterCount; i++) Counters[i] += other.Counters[i];
         }
@@ -106,20 +114,34 @@ internal static partial class Program
         => (double)r.Credits / f.PossessionCount * CareerGameLength(f);
 
     /// <summary>★ S116 — where HE played this game: H at home, A away, N on a neutral floor (no host
-    /// — the home/away ids are then a box-score ordering only), or "?" for a pre-S116 log, which
-    /// never recorded the site. The game log page (3c) prints it; this session proves it.</summary>
-    private static string CareerSite(PerGameStatRowV1 r, GameBlockFactsV1 f)
-        => f.HasHost switch
-        {
-            null => "?",
-            false => "N",
-            true => r.SchoolId == f.HomeSchoolId ? "H" : "A",
-        };
+    /// — the home/away ids are then a box-score ordering only).</summary>
+    private static string CareerSite(PerGameStatRowV1 r, GameBlockFactsV1 f) => CareerSite(r.SchoolId, f);
+
+    /// <summary>★ S117 — the same, for a school (a man who did not play still has a site).</summary>
+    private static string CareerSite(int schoolId, GameBlockFactsV1 f)
+        => f.HasHost!.Value ? (schoolId == f.HomeSchoolId ? "H" : "A") : "N";
+
+    /// <summary>★ S117 — his seconds on the floor in one game, worked exactly in whole numbers:
+    /// credits × the game's length in seconds ÷ the possession count, rounded half up. Integer
+    /// arithmetic so the same game reads the same second on every machine.</summary>
+    private static long CareerGameSeconds(PerGameStatRowV1 r, GameBlockFactsV1 f)
+    {
+        var num = r.Credits * CareerGameLength(f) * 60L;
+        var q = num / f.PossessionCount;
+        return 2 * (num % f.PossessionCount) >= f.PossessionCount ? q + 1 : q;
+    }
+
+    /// <summary>★ S117 — minutes:seconds, the way a single game's minutes print (Emmett, 2026-10-06).</summary>
+    private static string GameClock(long seconds)
+        => (seconds / 60).ToString(CultureInfo.InvariantCulture) + ":" + (seconds % 60).ToString("00", CultureInfo.InvariantCulture);
 
     /// <summary>One season he was on a roster (state 3).</summary>
     private sealed record CareerSeasonRow(
         long SeasonId, int SchoolId, string School, string Conference, string Class, string Pos,
-        CareerLine All, CareerLine Conf, bool ConfIncludesTournament = true);
+        CareerLine All, CareerLine Conf);
+
+    /// <summary>★ S117 — one game he played, with what the highs section prints beside it.</summary>
+    private sealed record CareerGame(long SeasonId, GameBlockFactsV1 Facts, PerGameStatRowV1 Row, string Opponent);
 
     /// <summary>A conference game for the PLAYER: the league slate or the conference tournament.</summary>
     private static bool CareerCountsAsConference(GameBlockFactsV1 f)
@@ -132,28 +154,37 @@ internal static partial class Program
     /// <summary>A man's whole career page, read off the files.</summary>
     private sealed record PlayerCareer(
         PersonId Person, string Name, CareerSeasonRow Latest,
-        IReadOnlyList<CareerSeasonEntry> Entries, CareerLine CareerAll, CareerLine CareerConf)
+        IReadOnlyList<CareerSeasonEntry> Entries, CareerLine CareerAll, CareerLine CareerConf,
+        IReadOnlyList<CareerGame> Games)
     {
         public IReadOnlyList<CareerSeasonRow> Seasons => Entries.Where(e => e.Row is not null).Select(e => e.Row!).ToList();
         public IReadOnlyList<long> SeasonsWithoutRecord => Entries.Where(e => e.Row is null).Select(e => e.SeasonId).ToList();
         public bool Starred => SeasonsWithoutRecord.Count > 0;
     }
 
+    /// <summary>★ S117 — a page refusing by name: what the command prints after its ERROR label.</summary>
+    private class CareerRefusedException : InvalidOperationException
+    {
+        public CareerRefusedException(string message) : base(message) { }
+    }
+
     /// <summary>The walk's result for a number no readable roster lists.</summary>
-    private sealed class CareerNotFoundException : InvalidOperationException
+    private sealed class CareerNotFoundException : CareerRefusedException
     {
         public CareerNotFoundException(string message) : base(message) { }
     }
 
     private static string CareerClassLabel(RosterEntryV1 e)
-        => e is RosterEntryV2 v2 ? v2.Class switch { 0 => "Fr", 1 => "So", 2 => "Jr", 3 => "Sr", _ => "?" } : "—";
+        => ((RosterEntryV2)e).Class switch { 0 => "Fr", 1 => "So", 2 => "Jr", 3 => "Sr", _ => "?" };
 
     private static string CareerPosLabel(RosterPosition p)
         => p switch { RosterPosition.Guard => "G", RosterPosition.Wing => "W", RosterPosition.Big => "B", _ => "?" };
 
     /// <summary>Read every season of this career, once each, bound to this lineage and world.
     /// No schedule fingerprint: a page cannot know an old season's, and the binding is optional
-    /// by design. Returns, per season, the log or the reader's reason it could not be read.</summary>
+    /// by design. Returns, per season, the log or the reader's reason it could not be read.
+    /// ★ S117 — a log saved by an older version is not a missing season: the career itself is
+    /// older than this build, and the page refuses it by name (C-60).</summary>
     private static List<(long SeasonId, GameLogV1? Log, string? Reason)> ReadCareerLogs(HistoryStore history)
     {
         var logs = new List<(long, GameLogV1?, string?)>();
@@ -166,6 +197,10 @@ internal static partial class Program
                 var log = GameLogReader.ReadFinalized(path,
                     new GameLogBindings(history.HistoryId, history.WorldFingerprint, season, ScheduleFingerprint: null));
                 logs.Add((season, log, null));
+            }
+            catch (GameLogException gx) when (gx.Error == GameLogError.UnsupportedLogVersion)
+            {
+                throw new CareerRefusedException($"season {season.ToString(CultureInfo.InvariantCulture)}: {gx.Message}");
             }
             catch (GameLogException gx)
             {
@@ -197,6 +232,7 @@ internal static partial class Program
         PersonId? person = null;
         RosterEntryV1? latestEntry = null;
         CareerSeasonRow? latestRow = null;
+        var games = new List<CareerGame>();
 
         foreach (var (season, log, reason) in logs)
         {
@@ -215,14 +251,15 @@ internal static partial class Program
                 {
                     if (r.PersonId != who) continue;
                     var minutes = CareerGameMinutes(r, block.Facts);
-                    all.AddGame(r, minutes, log.RecordsStarters);
-                    if (CareerCountsAsConference(block.Facts)) conf.AddGame(r, minutes, log.RecordsStarters);
+                    all.AddGame(r, minutes);
+                    if (CareerCountsAsConference(block.Facts)) conf.AddGame(r, minutes);
+                    var opp = block.Facts.HomeSchoolId == r.SchoolId ? block.Facts.AwaySchoolId : block.Facts.HomeSchoolId;
+                    games.Add(new CareerGame(season, block.Facts, r, schools.TryGetValue(opp, out var os) ? os.Name : $"school {opp}"));
                 }
             var school = schools.TryGetValue(entry.SchoolId, out var ws) ? ws : null;
             var confName = school is not null && conferences.TryGetValue(school.ConferenceId, out var wc) ? wc.ShortName : "—";
             var row = new CareerSeasonRow(season, entry.SchoolId, school?.Name ?? $"school {entry.SchoolId}", confName,
-                                          CareerClassLabel(entry), CareerPosLabel(entry.Position), all, conf,
-                                          ConfIncludesTournament: log.RecordsConferenceTournaments);
+                                          CareerClassLabel(entry), CareerPosLabel(entry.Position), all, conf);
             entries.Add(new CareerSeasonEntry(season, row, null));                                  // state 3
             latestEntry = entry;
             latestRow = row;
@@ -240,7 +277,7 @@ internal static partial class Program
             careerAll.AddLine(e.Row!.All);
             careerConf.AddLine(e.Row!.Conf);
         }
-        return new PlayerCareer(found, latestEntry.Name, latestRow, entries, careerAll, careerConf);
+        return new PlayerCareer(found, latestEntry.Name, latestRow, entries, careerAll, careerConf, games);
     }
 
     // ── Printing ──────────────────────────────────────────────────────────────
@@ -274,7 +311,7 @@ internal static partial class Program
 
         return new[]
         {
-            l.G.ToString(CultureInfo.InvariantCulture), l.GsKnown ? l.Gs.ToString(CultureInfo.InvariantCulture) : "", mp,
+            l.G.ToString(CultureInfo.InvariantCulture), l.Gs.ToString(CultureInfo.InvariantCulture), mp,
             Count(fg), Count(fga), Pct(fg, fga),
             Count(tp), Count(tpa), Pct(tp, tpa),
             Count(twoP), Count(twoPa), Pct(twoP, twoPa),
@@ -339,14 +376,64 @@ internal static partial class Program
             }
             sb.Append(Format(careerLine)).Append('\n');
         }
-        var leagueOnly = career.Seasons.Where(s => !s.ConfIncludesTournament).Select(s => s.SeasonId).ToList();
-        if (leagueOnly.Count > 0)
-            sb.Append('\n').Append("Conference rows for season")
-              .Append(leagueOnly.Count == 1 ? " " : "s ")
-              .Append(string.Join(", ", leagueOnly.Select(s => s.ToString(CultureInfo.InvariantCulture))))
-              .Append(" count league games only: that log predates the conference tournament marking.\n");
         if (career.Starred)
             sb.Append('\n').Append("* Career sums only the seasons on record; no record exists for season")
+              .Append(career.SeasonsWithoutRecord.Count == 1 ? " " : "s ")
+              .Append(string.Join(", ", career.SeasonsWithoutRecord.Select(s => s.ToString(CultureInfo.InvariantCulture))))
+              .Append(".\n");
+        sb.Append(RenderCareerHighs(career));
+        return sb.ToString();
+    }
+
+    /// <summary>★ S117 — the nine single-game highs, in the order Emmett named them. Each reads one
+    /// whole number off a game row; minutes are his seconds on the floor, so they compare as printed.</summary>
+    private static readonly (string Label, Func<CareerGame, long> Value, bool Clock)[] CareerHighStats =
+    {
+        ("PTS", g => 2 * g.Row.Fgm + g.Row.Tpm + g.Row.Ftm, false),
+        ("TRB", g => g.Row.OReb + g.Row.DReb, false),
+        ("AST", g => g.Row.Ast, false),
+        ("STL", g => g.Row.Stl, false),
+        ("BLK", g => g.Row.Blk, false),
+        ("3P",  g => g.Row.Tpm, false),
+        ("FG",  g => g.Row.Fgm, false),
+        ("FT",  g => g.Row.Ftm, false),
+        ("MP",  g => CareerGameSeconds(g.Row, g.Facts), true),
+    };
+
+    /// <summary>★ S117 — one high: the value, and every game that reached it, in date order.</summary>
+    private sealed record CareerHigh(string Label, long Value, bool Clock, IReadOnlyList<CareerGame> Games);
+
+    private static List<CareerHigh> CareerHighsOf(PlayerCareer career)
+        => CareerHighStats.Select(st =>
+        {
+            var best = career.Games.Count == 0 ? 0 : career.Games.Max(st.Value);
+            var at = best == 0 ? new List<CareerGame>()
+                : career.Games.Where(g => st.Value(g) == best)
+                              .OrderBy(g => g.Facts.Date!.Value).ThenBy(g => g.SeasonId).ThenBy(g => g.Facts.FixtureOrdinal).ToList();
+            return new CareerHigh(st.Label, best, st.Clock, at);
+        }).ToList();
+
+    /// <summary>★ S117 — the highs section. Its title never begins "Career", so the page's four
+    /// Career rows stay the only lines that do.</summary>
+    private static string RenderCareerHighs(PlayerCareer career)
+    {
+        var sb = new StringBuilder();
+        sb.Append('\n').Append(career.Starred ? "Single-game highs*" : "Single-game highs").Append('\n');
+        foreach (var h in CareerHighsOf(career))
+        {
+            if (h.Value == 0) { sb.Append(h.Label.PadRight(4)).Append(" —\n"); continue; }
+            var value = h.Clock ? GameClock(h.Value) : h.Value.ToString(CultureInfo.InvariantCulture);
+            var times = h.Games.Count == 1 ? "1 game" : h.Games.Count.ToString(CultureInfo.InvariantCulture) + " games";
+            sb.Append(h.Label.PadRight(4)).Append(' ').Append(value.PadLeft(5)).Append("  ").Append(times).Append('\n');
+            foreach (var g in h.Games)
+            {
+                var site = CareerSite(g.Row, g.Facts) switch { "A" => "@ ", "N" => "N ", _ => "  " };
+                sb.Append(CultureInfo.InvariantCulture,
+                    $"      {g.Facts.Date!.Value:yyyy-MM-dd}  {site}{g.Opponent}  (box: season {g.SeasonId}, game {g.Facts.FixtureOrdinal})\n");
+            }
+        }
+        if (career.Starred)
+            sb.Append("* Highs over the seasons on record only; no record exists for season")
               .Append(career.SeasonsWithoutRecord.Count == 1 ? " " : "s ")
               .Append(string.Join(", ", career.SeasonsWithoutRecord.Select(s => s.ToString(CultureInfo.InvariantCulture))))
               .Append(".\n");
@@ -460,7 +547,7 @@ internal static partial class Program
             Console.Write(RenderPlayerPage(career, number.ToString(CultureInfo.InvariantCulture)));
             return 0;
         }
-        catch (CareerNotFoundException nf)
+        catch (CareerRefusedException nf)
         {
             Console.WriteLine($"PLAYER ERROR: {nf.Message}");
             return 1;
@@ -505,7 +592,7 @@ internal static partial class Program
             Console.Write(RenderPeopleList(history, world, schoolId));
             return 0;
         }
-        catch (CareerNotFoundException nf)
+        catch (CareerRefusedException nf)
         {
             Console.WriteLine($"PEOPLE ERROR: {nf.Message}");
             return 1;

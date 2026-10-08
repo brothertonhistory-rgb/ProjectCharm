@@ -353,6 +353,7 @@ public sealed class GameLogWriter : IDisposable
         if (facts.IsConferenceGame && facts.IsConferenceTournamentGame)
             throw new GameLogException(GameLogError.DomainViolation,
                 "a game cannot be both a league game and a conference tournament game.");
+        RequirePeriods(facts);
         if (facts.FixtureOrdinal != _nextOrdinal)
             throw new GameLogException(GameLogError.BlockOutOfOrder,
                 $"expected fixture ordinal {_nextOrdinal}, got {facts.FixtureOrdinal}. " +
@@ -391,8 +392,8 @@ public sealed class GameLogWriter : IDisposable
                     "predicate emits a row only for positive credit.");
         }
 
-        var size = GameLogSchemaV1.BlockHeaderSize + rows.Count * GameLogSchemaV1.RowSize
-                 + GameLogSchemaV1.BlockTrailerSize;
+        var size = GameLogSchemaV1.BlockHeaderSize + facts.Periods!.Count * GameLogSchemaV1.PeriodEntrySize
+                 + rows.Count * GameLogSchemaV1.RowSize + GameLogSchemaV1.BlockTrailerSize;
         var buf = new byte[size];
         var s = buf.AsSpan();
         var o = 0;
@@ -417,6 +418,12 @@ public sealed class GameLogWriter : IDisposable
         GameLogSchemaV1.Skip(ref o, 3);                       // reserved
         if (o != GameLogSchemaV1.BlockHeaderSize)
             throw new GameLogException(GameLogError.DomainViolation, "block header layout arithmetic is wrong.");
+        // ★ S117 — block schema 3: the score by period, first half, second half, each overtime.
+        foreach (var period in facts.Periods!)
+        {
+            GameLogSchemaV1.W32(s, ref o, period.Home);
+            GameLogSchemaV1.W32(s, ref o, period.Away);
+        }
 
         foreach (var r in rows) WriteRow(s, ref o, r);
 
@@ -427,6 +434,34 @@ public sealed class GameLogWriter : IDisposable
         _nextOrdinal++;
         _blockCount++;
         _rowCount += rows.Count;
+    }
+
+    /// <summary>★ S117 — the score by period, refused by name unless it is the game: exactly two
+    /// halves plus one entry per overtime, none negative, summing to the final score. Checked
+    /// before anything about the game is recorded, so a refused game leaves no trace.</summary>
+    private static void RequirePeriods(GameBlockFactsV1 facts)
+    {
+        var game = facts.FixtureOrdinal;
+        if (facts.OvertimePeriods < 0)
+            throw new GameLogException(GameLogError.DomainViolation, $"game {game} has {facts.OvertimePeriods} overtimes.");
+        if (facts.Periods is null)
+            throw new GameLogException(GameLogError.DomainViolation,
+                $"game {game} has no score by period; from S117 every game in the log records its score by half and overtime.");
+        var want = GameLogSchemaV1.RegulationPeriods + facts.OvertimePeriods;
+        if (facts.Periods.Count != want)
+            throw new GameLogException(GameLogError.DomainViolation,
+                $"game {game} lists {facts.Periods.Count} periods; two halves and {facts.OvertimePeriods} overtime(s) make {want}.");
+        long home = 0, away = 0;
+        foreach (var p in facts.Periods)
+        {
+            if (p.Home < 0 || p.Away < 0)
+                throw new GameLogException(GameLogError.DomainViolation, $"game {game} has a period with a negative score.");
+            home += p.Home;
+            away += p.Away;
+        }
+        if (home != facts.HomeScore || away != facts.AwayScore)
+            throw new GameLogException(GameLogError.DomainViolation,
+                $"game {game}'s periods sum to {home}-{away}, not the final {facts.HomeScore}-{facts.AwayScore}.");
     }
 
     private static void WriteRow(Span<byte> s, ref int o, PerGameStatRowV1 r)

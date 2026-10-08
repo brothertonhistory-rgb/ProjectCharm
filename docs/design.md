@@ -8972,8 +8972,8 @@ might have** — see "What is deliberately absent" below.
 
 | section | what it holds |
 |---|---|
-| **roster** (written once, before game one) | one entry per man per season: name, school, seat, position, archetype, starter flag, hierarchy rank, recruiting rank, all **38 authored ratings**, and — **roster schema 2, S115** — his class (0 Fr .. 3 Sr), his defensive plane and his offensive role. 256 bytes; the v1 layout (216) is its byte-identical prefix. The writer emits v2; one decoder reads both; a v1 roster can feed host memory but not a turnover (refused by name — it kept no class) |
-| **game blocks** (one per fixture) | the game's own facts — teams, score, overtimes, possessions, and from **block schema 2 (S116)** its **kind** (0 league, 2 conference tournament, 1 other), its **date** and its **site** (hosted or neutral); 56-byte header, v1's 48 the byte-identical prefix — then one **row per man who played**: his identity and season context, 21 counters, and from **row schema 2 (S116)** whether he **started**; 196 bytes, v1's 188 the prefix. The writer emits both v2s and refuses a game with no date or site, or one marked both league and tournament; the reader accepts v1 and v2 of each, and a v1 file reads started as false, tournament as other, date and site as unknown — `GameLogV1.RecordsStarters` / `RecordsConferenceTournaments` / `RecordsDateAndSite` say which |
+| **roster** (written once, before game one) | one entry per man per season: name, school, seat, position, archetype, starter flag, hierarchy rank, recruiting rank, all **38 authored ratings**, and — **roster schema 2, S115** — his class (0 Fr .. 3 Sr), his defensive plane and his offensive role. 256 bytes. Written and read as schema 2 only (from S117, C-60: an older roster is refused with the rest of an older career) |
+| **game blocks** (one per fixture) | **block schema 3 (S117).** A 56-byte header: the game's own facts — teams, score, overtimes, possessions, its **kind** (0 league, 2 conference tournament, 1 other), its **date** and its **site** (hosted or neutral) (S116) — then the **score by period** (S117): two int32s (home, away) for the first half, the second half and each overtime, always 2 + OT entries, a scoreless period 0-0. Then one **row per man who played**: his identity and season context, 21 counters, and whether he **started** (row schema 2, S116); 196 bytes. The writer refuses a game with no date or site, one marked both league and tournament, or a period list of the wrong length, with a negative entry, or not summing to the final; the reader re-checks the period list after the block's checksum, so a flipped byte reads as corruption and a sealed wrong score as a wrong score |
 
 The roster section is not decoration. Game rows say what a man *did* and nothing about him,
 and **a man who never got off the bench has no rows at all** — 661 of 4,511 in the stock
@@ -8999,6 +8999,13 @@ already corrupt.
 - **A log binds to a career LINEAGE, not a world** (history schema v2, below).
 - **An existing log is a refusal, never a resume.** The schedule is not persisted, so a second
   process cannot verify that the prefix it found belongs to the season it is about to write.
+- **The game is the product, not its save files (C-60, S117).** Emmett: *"We are building the game,
+  not the files within it. A save file for version 1.4 won't work for version 3.6."* The reader accepts
+  the current block, row and roster schemas and nothing else; any other log is refused whole with
+  *"this career was saved by an older version of the game — start a new career"* — at the reader, so at
+  the turnover and on every page (a page refuses the career; it does not star a season). No reader
+  tolerates an older format and prints "unknown". A format change bumps the version and retires the
+  old reader in the same session. (The career file's own v1 → v2 upgrade predates the ruling; O-116.)
 
 ### What is deliberately absent
 
@@ -9093,12 +9100,12 @@ man's career still means scanning until a future session builds one.
 ### Sizes, measured on the stock season
 
 ```
-fileSize == 128 + (32 + entries x 256 + 8) + SUM(56 + rows x 196 + 8) + 64
+fileSize == 128 + (32 + entries x 256 + 8) + SUM(56 + (2 + OT) x 8 + rows x 196 + 8) + 64
 ```
 
-(roster schema 2 from S115; block and row schema 2 from S116 — Phase 81 A9 asserts it to the byte.) The stock
-career's season one: 4,511 roster entries, 5,357 blocks, **108,961 rows → 22,854,252 bytes (21.8 MiB)**; a
-forty-year career ≈ 870 MiB. The row count is exactly the season page's seat-occupancy figure:
+(roster schema 2 from S115; row schema 2 from S116; block schema 3 from S117 — Phase 81 A9 asserts it to the byte.)
+The stock career's season one: 4,511 roster entries, 5,357 blocks (103 overtime periods), **108,961 rows →
+22,940,788 bytes (21.9 MiB)**; a forty-year career ≈ 875 MiB. The row count is exactly the season page's seat-occupancy figure:
 the two populations coincide, so every man who held a seat played at least one possession.
 
 ### History schema v2 — the career lineage label
@@ -12345,7 +12352,7 @@ moves, the rating follows with no change.
 **Pythagorean win expectancy** — fitting an exponent to one simulated season of a league whose calibration is openly
 off (turnovers, rim rate) would be fitting noise. It waits for a calibration session with many seasons (P-15).
 
-## The career goes year to year — the turnover, the people who survive, and the player page (Sessions 114–116, 2026-10-05/06)
+## The career goes year to year — the turnover, the people who survive, the player page, the game log and the box score (Sessions 114–117, 2026-10-05/07)
 
 ### The two commands
 
@@ -12364,7 +12371,7 @@ His number, his ratings as they stand, his position, his role, his class, his sc
 
 ### The read-back is contextual validation
 
-The archive format deliberately knows nothing about this league (GameLogReader's header). So the harness does the checking the format cannot, and refuses by name: last season kept no log; the log predates S115 (schema 1, no class); a school with other than 13 men; other than 5 G / 4 W / 4 B; two men at one acquisition place or a place nobody holds (the opening five still walks acquisition order, so an ambiguous order would reorder a tipoff — and a count of 13 cannot see a duplicate); an unknown school; a man on two schools; a number used twice. The pool comes back dense, school by school in acquisition order — **a different layout from the bootstrap pool (draft order), so the man is the key, never the index** (the first draft of Phase 105 C1 compared by index and was wrong). The card is rebuilt from the 38 by name in the pinned order and the `Player` through the same `GenMapToPlayer` every generated man passes through; the shot-diet numbers are among the 38, stored not re-derived, so a man does not drift a point a season (C1, key by key).
+The archive format deliberately knows nothing about this league (GameLogReader's header). So the harness does the checking the format cannot, and refuses by name: last season kept no log; the log was saved by an older version of the game (C-60 — the reader refuses it); a school with other than 13 men; other than 5 G / 4 W / 4 B; two men at one acquisition place or a place nobody holds (the opening five still walks acquisition order, so an ambiguous order would reorder a tipoff — and a count of 13 cannot see a duplicate); an unknown school; a man on two schools; a number used twice. The pool comes back dense, school by school in acquisition order — **a different layout from the bootstrap pool (draft order), so the man is the key, never the index** (the first draft of Phase 105 C1 compared by index and was wrong). The card is rebuilt from the 38 by name in the pinned order and the `Player` through the same `GenMapToPlayer` every generated man passes through; the shot-diet numbers are among the 38, stored not re-derived, so a man does not drift a point a season (C1, key by key).
 
 ### Identity across the turnover
 
@@ -12386,7 +12393,7 @@ Season one `c43c32d2…`, numbers 1–4,511. Season two: Fr 1175 / So 1082 / Jr 
 
 ### How Phase 105 proves it
 
-The round-trip key by key with a perturbed-rating control; season one is the pre-S112 capture under the numbers it always issued; season two on fixture-mte and on stock — same numbers, seniors absent, freshmen new, classes advanced, the roster section equal to the turnover's rosters; the career turnover equals the in-memory one; the first two-season stat line; nine refusals each by name, including a log **downgraded to schema 1 in the check** (the only way a pre-S115 log can exist now that the writer emits v2); two careers agree two seasons deep; the legacy season unmoved.
+The round-trip key by key with a perturbed-rating control; season one is the pre-S112 capture under the numbers it always issued; season two on fixture-mte and on stock — same numbers, seniors absent, freshmen new, classes advanced, the roster section equal to the turnover's rosters; the career turnover equals the in-memory one; the first two-season stat line; nine refusals each by name, including a log **downgraded to schema 1 in the check** (the only way a pre-S115 log can exist now that the writer emits v2), which from S117 the reader itself refuses by the standing sentence; two careers agree two seasons deep; the legacy season unmoved.
 
 ### The player page (S116)
 
@@ -12395,8 +12402,7 @@ The round-trip key by key with a perturbed-rating control; season one is the pre
 and a missing career file is refused rather than created. Four tables — **per game** and **totals**, each for **all
 games** and **conference games** — one row per season, columns in sports-reference order (Season School Conf Class Pos
 G GS MP FG FGA FG% 3P 3PA 3P% 2P 2PA 2P% FT FTA FT% ORB DRB TRB AST STL BLK TOV PF, our three foul splits, PTS), a
-**Career** row under each. Positions print as the engine's G / W / B. The game log and career highs are the same lines
-laid out differently and are 3c.
+**Career** row under each. Positions print as the engine's G / W / B. After the four tables, **Single-game highs** (S117, below).
 
 **Nothing on the page is stored** (the S90 counters-only ruling): points = 2·FGM + 3PM + FTM, 2P = FG − 3P, TRB = ORB +
 DRB, PF = the three fouls, G = lines, GS = lines marked started. Per-game values are totals ÷ G to one decimal;
@@ -12408,13 +12414,13 @@ league-level conversion is a different, nominal figure; the player page does not
 
 **Conference games are the league slate plus the conference tournament** (Emmett, 2026-10-06: a tournament game counts
 as a conference game for the player, never toward the standings). The log keeps the two kinds apart so the league flag
-— what the standings and host memory read — never changes meaning. A season from a log older than block schema 2
-counts league games only and the page says so.
+— what the standings and host memory read — never changes meaning.
 
 **The walk** is seasons 1 .. next−1 by arithmetic, each log read once, bound to the career's lineage and world. Three
 states, all visible: the log missing or unreadable → a **no record** line naming why (never fatal, never skipped); the
 log fine and he is not on its roster → **no row** (those years are outside his career); he is on it → a row (G may be
 0). Career sums the rows; if any season had no record the row prints **`Career*`** with a line naming those seasons.
+A log saved by an older version is not a state of the walk: the whole career is refused by name (C-60).
 The Conference column comes from the world, which is provably the world the season was played in — every log is bound
 to its world's fingerprint and refuses any other. Realignment is the session that breaks that binding and persists a
 season's conference (P-16).
@@ -12423,14 +12429,69 @@ season's conference (P-16).
 roster lists under that number, or null. It mints nothing (a hit needs an issued number already in a finalized roster),
 so S89's seam holds. The command accepts `2` or `person:2`; both go through the door.
 
-**What the log knows about a game for the game log (3c):** its date; its site — **H / A / N per man** is hosted → the
-home school H and the visitor A, no host → both N (`CareerSite`); its kind (league, conference tournament, other — the
-postseason rounds will extend the same byte); both scores and overtimes; and per man whether he started. Career game
-number and team game number are counts, not stored.
-
-**How Phase 106 proves it:** row and block v2 round-trips, each new value's domain refused by the format, and real logs
-downgraded in the check to v1 of each still read and say what they cannot know; every side of every stock game has
+**How Phase 106 proves it:** the row round-trip and the started value's domain refused by the format (the checks that
+read logs downgraded to v1 retired with those readers at S117); every side of every stock game has
 exactly its five starters marked; the page's arithmetic for every man of a three-season career against sums taken
 independently; minutes bounded and balanced; the tournament, date and site marked game by game against the fixture
 played; the door bijective and unable to mint; the three states on a real career whose middle season is corrupted,
-deleted and restored; four negative controls; the legacy season unmoved.
+deleted and restored; three negative controls; the legacy season unmoved.
+
+### The game log, the box score and career highs (S117)
+
+`gamelog <world> <number> <season> --history <career>` and `box <world> <season> <ref> --history <career>`, modelled on
+sports-reference (Emmett's game-log screenshot, 2026-10-06). Both read only, both refuse by name without `--history`,
+for a missing career (nothing is created), a season the career does not have, a season with no record, a season he
+was not on a roster for, and an unknown reference. Nothing on either page is stored.
+
+**The game log is his team's schedule.** Every game his school played is a line (ruling 1); a game he did not get
+into prints **Did Not Play** across the stat columns. **Gtm** counts the team's games; **Gcar** counts only the games
+he played (ruling 2) and continues from his earlier seasons only when every earlier season is on record — after a
+season with no record it prints — and the page names the season, never restarting at 1 or inferring through the gap.
+Columns: `Rk Gcar Gtm Date School Site Opp Type Result GS MP FG FGA FG% 3P 3PA 3P% 2P 2PA 2P% FT FTA FT% ORB DRB TRB AST
+STL BLK TOV PF ShF NsF OffF PTS Ref`. Site prints blank at home, `@` away, `N` neutral; Type is `REG (Conf)`,
+`REG (Non-Conf)` or `CTOURN`; Result is `W 76-57`, `L 92-98 (OT)`, `(2OT)`. The bottom line is his season totals over
+the games he played, labelled with his team's final record; its MP is the sum of the printed game minutes and every
+other cell equals his season row on the player page.
+
+**Date order, grouped by phase.** A game's fixture number is not its place in the calendar — tournaments are played
+last and dated first (S98) — so lines sort by **date** and the fixture number is only **Ref**, the box score's
+reference. The regular season (conference and non-conference interleaved by date; the Type column tells them apart)
+comes first, then the conference tournament, with the header repeated between them. Two facts make that order exist,
+and the page checks both rather than assuming them: a school plays at most one game per date, and no regular-season
+game falls on or after its conference tournament's first day. A schedule that broke either is refused by name — the
+page never invents an order or reorders a game to keep a section tidy. (Grouping by *type* would break date order for
+249 of 347 stock schools, which play non-conference games after conference play has begun.)
+
+**Minutes print as minutes:seconds** wherever a single game's minutes appear (Emmett, 2026-10-06): credits × the
+game's length in seconds ÷ the possession count, rounded half up in whole-number arithmetic so the same game reads the
+same second on every machine. Season and career averages stay one decimal.
+
+**The box score** lists the **visitor first and the home school second** (Emmett, 2026-10-06; on a neutral floor the
+fixture's away school first): the date, type and site (`at <home>` or `neutral site`), the final, then the **line
+score** — 1st, 2nd, each OT, Final — read off block schema 3. Each team: **Starters** and **Reserves**, each by minutes
+(most first, roster order on a tie), **Did not play** by name and number, **Team totals** (MP is five times the game's
+length).
+
+**Uncredited points (Emmett, 2026-10-07).** In 686 of 5,357 stock games the final holds points no man is credited
+with — a bonus trip whose last free throw is missed and put back names no shooter (the `SlotUnattributedFgm` path),
+and occasionally a free throw. Team totals stay the sum of the men; a line under them,
+`Uncredited: N points (scored, no player named)`, carries the difference to the final — points only, since the log
+cannot say whether it was a basket or free throws. A game whose men are credited with *more* than the final is refused.
+Chosen as the display that makes the fix easiest: when the engine names that shooter (O-115) the line stops printing
+by itself, and Phase 107 C4b's count is the before-and-after.
+
+**Single-game highs**, after the player page's four tables: points, rebounds, assists, steals, blocks, made threes,
+made field goals, made free throws, minutes — the high, how many times, and every game it happened in (date, site,
+opponent, `box: season S, game R`). **A tie is the same printed number**, which for minutes means the same second. A
+high of 0 prints — and lists nothing. With a season off record the section is titled **Single-game highs\*** with a
+line naming those seasons: the highs on record, not a claim about the whole career. The title never begins "Career",
+so the page's four Career rows stay the only lines that do.
+
+**How Phase 107 proves it:** the period list on every stock game, three writer negative controls and a reader one; a
+genuine S116-layout log built in the check and a row-schema-1 header refused by the reader and by all four page
+commands, the file put back as the control; every one of the stock season's 4,511 game logs against his school's
+schedule, his rows and his team's record, two constructed schedules refused; Gcar across three seasons and across an
+unreadable-then-missing season; the bottom line equal to the player page's row cell for cell; every stock box score
+against its game, the Uncredited line exactly where it belongs, a game whose men exceed the final refused; every high
+recomputed independently for every man of a three-season career, a listed reference opening the box score that holds
+it, the star and its control; the legacy season unmoved.
