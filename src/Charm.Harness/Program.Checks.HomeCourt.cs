@@ -68,8 +68,9 @@ internal static partial class Program
     //   pre-S95 provenance above is history for the 160-game shape; the ASSERTION —
     //   zero shave reproduces one fixed season, byte for byte — is unchanged.
     private const int GoldenGameCount = 120;
+    // ★ S118 — the putback's man (O-115); declared before the build; was 7b5b21d0906ff690e51f7a95393693640436c453ae3527561f108211807ff3ce
     private const string GoldenZeroSha256 =
-        "7b5b21d0906ff690e51f7a95393693640436c453ae3527561f108211807ff3ce";
+        "b453cd1b10f466d6c954aacaa80b58df36120a1cbe536de068f68a6dc4f10966";
 
     /// <summary>The SEVENTEEN exempt ratings, spelled out here INDEPENDENTLY of
     /// production. B3 derives the expected shaved set as (live public int surface −
@@ -332,7 +333,7 @@ internal static partial class Program
             var zeroFp = SeasonFingerprint(zeroRun.Results.Take(GoldenGameCount).ToList(),
                                            zeroRun.PossessionCounts.Take(GoldenGameCount).ToList());
             Check("B1: ★ ZERO IS THE OLD ENGINE — every score and every possession count " +
-                  "reproduces a fingerprint captured from the pre-S95 tree",
+                  "reproduces the S118 capture (O-115 re-played the pre-S95 value)",
                   zeroFp == GoldenZeroSha256,
                   zeroFp == GoldenZeroSha256 ? zeroFp[..16] + "…" : $"got {zeroFp}, want {GoldenZeroSha256}");
 

@@ -233,6 +233,10 @@ public sealed class Resolver
         // three-way shot partition would invite the false reading that two rates exhaust every
         // blocked attempt, so all three are counted.
         var fastBreakBlk = 0; var breakPutbackBlk = 0; var nonBreakBlk = 0;
+        // ★ S118 3c, PAGE-ONLY: fouled-putback free-throw trips whose shooter S118 moved (the
+        // missed shooter, or nobody, was not the rebounder). No RNG; read by nothing in the
+        // engine. Phase 108 sums it per game to prove only those games moved.
+        var putbackFtShooterChanged = 0;
         // Per-slot fast-break blocks — the subset of BlkBySlot taken on a live break that is
         // not a putback. Feeds the "who gets break blocks" concentration board; the harness
         // maps slot -> man through the SAME path ordinary blocks already take, so a man's
@@ -482,7 +486,8 @@ public sealed class Resolver
                           BreakPutbackBlk        = breakPutbackBlk,
                           NonBreakBlk            = nonBreakBlk,
                           FastBreakBlkBySlot     = fastBreakBlkBySlot,
-                          BreakContests          = breakContests };
+                          BreakContests          = breakContests,
+                          PutbackFtShooterChanged = putbackFtShooterChanged };
 
                 case Continue c:
                     // Session 62: harvest any non-shooting foul this continuation carries,
@@ -744,6 +749,28 @@ public sealed class Resolver
                             var contest = BuildTransitionContest(c.State, c.Putback);
                             var pieH = _rollHGenerator.Generate(c.State, c.Putback, contest);
                             result = RollH.Execute(c.State, pieH, _rng);
+                            // ★ S118 — A FOULED PUTBACK GOES TO THE LINE WITH THE MAN WHO TOOK IT
+                            // (O-115, Emmett 2026-10-08). Roll H's MadeAndFouled / MissFouled arms
+                            // return ResolveShootingFreeThrows carrying SelectedSlot — the missed
+                            // shooter, or null after a bonus trip. Stamp the rebounder as this trip's
+                            // shooter, so he shoots it at his own rating, the foul is drawn against
+                            // him, and the attempts are his. Marked HERE, where the putback is
+                            // known, never inferred later from ReboundSlot (which outlives its
+                            // putback across a scrum foul — S118 A3). No RNG. LastShot clears the
+                            // stamp on the trip's only live-ball exit; the made exit is terminal.
+                            if (c.Putback
+                                && result is Continue cPb
+                                && cPb.Next == ContinuationKind.ResolveShootingFreeThrows)
+                            {
+                                // S118 3c, PAGE-ONLY: a trip whose shooter this change moved —
+                                // the missed shooter (or nobody) was not the rebounder.
+                                if (cPb.State.SelectedSlot != cPb.State.ReboundSlot)
+                                    putbackFtShooterChanged++;
+                                result = cPb with
+                                {
+                                    State = cPb.State with { FreeThrowShooterSlot = cPb.State.ReboundSlot }
+                                };
+                            }
                             // FGA/FGM/3PA/3PM counters — the single Roll H chokepoint every
                             // field-goal attempt passes through, including putbacks. Read the
                             // stamped ShotResult and ShotLocation off the returned result's
@@ -751,6 +778,15 @@ public sealed class Resolver
                             {
                                 var shotSt = result is Terminal tH ? tH.State : ((Continue)result).State;
                                 shotResolutions++;
+                                // ★ S118 — THE PUTBACK BELONGS TO THE MAN WHO TOOK IT (O-115, Emmett
+                                // 2026-10-08). Roll H already plays a putback as the REBOUNDER's shot
+                                // (his finishing against his man); the box score now agrees. On a
+                                // putback the credited man is ReboundSlot — set by
+                                // ResolveOffensiveRebound immediately before Roll K's PutBack arm, the
+                                // only emitter of the putback ticket, so it is never a stale board —
+                                // and on every other shot it is the Roll E selection, unchanged. Read
+                                // by the four per-man counters below and nothing else: no game moves.
+                                var creditedSlot = c.Putback ? shotSt.ReboundSlot : shotSt.SelectedSlot;
                                 // S88, PAGE-ONLY: one observation per in-scope break shot,
                                 // recorded on EVERY such shot regardless of how it finished, so
                                 // the page's denominator is attempts rather than a subset. A
@@ -861,43 +897,46 @@ public sealed class Resolver
                                             case ShotLocation.Rim:   rimFgm++;   break;
                                         }
                                         // Per-slot FGM: credit the shooter's slot on a make.
-                                        // Mirrors the per-slot FGA switch; same null-slot handling
-                                        // (bonus-FT putback where Roll E never ran → unattributed).
-                                        switch (shotSt.SelectedSlot?.Number)
+                                        // Mirrors the per-slot FGA switch. ★ S118: the credited
+                                        // man (the rebounder on a putback), so a bonus-trip
+                                        // putback is no longer unattributed; the default arm
+                                        // now fires only with no shooter identity at all.
+                                        switch (creditedSlot?.Number)
                                         {
                                             case 1: slot1Fgm++; break;
                                             case 2: slot2Fgm++; break;
                                             case 3: slot3Fgm++; break;
                                             case 4: slot4Fgm++; break;
                                             case 5: slot5Fgm++; break;
-                                            default: slotUnattributedFgm++; break; // SelectedSlot null — bonus-FT putback make
+                                            default: slotUnattributedFgm++; break; // no shooter identity at all
                                         }
                                         // Phase 23: 3PM per slot — subset of per-slot FGM for three-point makes.
                                         if (shotSt.ShotType == ShotLocation.Three)
                                         {
-                                            var s = shotSt.SelectedSlot?.Number ?? 0;
+                                            var s = creditedSlot?.Number ?? 0;
                                             threePmBySlot = threePmBySlot.WithSlot(s, 1);
                                         }
                                     }
                                     // Per-slot FGA: credit the shooter's slot.
                                     // On a normal possession: SelectedSlot was stamped by Roll E.
-                                    // On a putback: SelectedSlot carries the original Roll E
-                                    // selection untouched (Roll K PutBack arm by design — same-
-                                    // player rebound tilt). Null guard is defensive; should not
-                                    // fire in a fully-routed possession.
-                                    switch (shotSt.SelectedSlot?.Number)
+                                    // ★ S118 — on a putback: the REBOUNDER (creditedSlot above).
+                                    // SelectedSlot still carries the original Roll E selection
+                                    // through the PutBack arm, but it is no longer what the box
+                                    // score credits — the man who went back up took the shot.
+                                    // The default arm fires only with no shooter identity at all.
+                                    switch (creditedSlot?.Number)
                                     {
                                         case 1: slot1Fga++; break;
                                         case 2: slot2Fga++; break;
                                         case 3: slot3Fga++; break;
                                         case 4: slot4Fga++; break;
                                         case 5: slot5Fga++; break;
-                                        default: slotUnattributedFga++; break; // SelectedSlot null — bonus-FT putback (Roll E never ran)
+                                        default: slotUnattributedFga++; break; // no shooter identity at all
                                     }
                                     // Phase 23: 3PA per slot — subset of per-slot FGA for three-point attempts.
                                     if (shotSt.ShotType == ShotLocation.Three)
                                     {
-                                        var s = shotSt.SelectedSlot?.Number ?? 0;
+                                        var s = creditedSlot?.Number ?? 0;
                                         threePaBySlot = threePaBySlot.WithSlot(s, 1);
                                     }
                                     // Phase 36: count blocks and stamp per-slot blocker attribution on-walk.
@@ -1083,16 +1122,20 @@ public sealed class Resolver
                                 points += Scoring.FieldGoalPoints(c.State.ShotType!.Value);
                             // Phase 25: record the shooting-foul event. ShotType is non-null
                             // (Roll G stamped the zone before Roll H resolved the foul).
-                            // SelectedSlot MAY be null on a bonus-FT putback (Roll E never
-                            // ran) — 0 is the "no matched man" sentinel, NOT a throw, because
-                            // a bonus-FT-putback shot is a legitimate game path. The ?? 0
-                            // here matches the existing Phase 23 FTA/FTM slot reads below.
+                            // The shooter is null only with no shooter identity at all (★ S118:
+                            // a bonus-FT putback now carries the rebounder) — 0 is the "no
+                            // matched man" sentinel, NOT a throw. The ?? 0 here matches the
+                            // Phase 23 FTA/FTM slot reads below.
                             // S87: name the man AT THE WHISTLE and charge his fifth. The
                             // draw is the Session 62 weighting moved here unchanged; it
                             // runs on the dedicated foul stream, so the gameplay sequence
                             // below this line is untouched.
+                            // ★ S118: the trip's shooter is FreeThrowShooterSlot ?? SelectedSlot
+                            // — the rebounder on a fouled putback (stamped at Roll H's exit),
+                            // else the Roll E shooter. The foul is drawn against HIM.
+                            var sfShooter = c.State.FreeThrowShooterSlot ?? c.State.SelectedSlot;
                             {
-                                var shooterSlotForFoul = c.State.SelectedSlot?.Number ?? 0;
+                                var shooterSlotForFoul = sfShooter?.Number ?? 0;
                                 var sfCommitter = PickShootingFouler(
                                     c.State.Defense, c.State.ShotType!.Value, shooterSlotForFoul);
                                 _game.PersonalFouls.Increment(sfCommitter.PlayerId);
@@ -1122,18 +1165,21 @@ public sealed class Resolver
                             fta            += shootingFtSpins;   // each spin is one attempt
                             ftm            += shootingFtPoints;  // ftPoints == ftMakes (verified)
                             // Phase 23: FTA/FTM per slot for shooting-foul free throws.
-                            // SelectedSlot is non-null here (shooting foul requires Roll E fired first).
+                            // ★ S118: credited to the trip's shooter (the rebounder on a fouled
+                            // putback) — the same man Roll L just shot them as.
                             {
-                                var ftSlotS = c.State.SelectedSlot?.Number ?? 0;
+                                var ftSlotS = sfShooter?.Number ?? 0;
                                 ftaBySlot = ftaBySlot.WithSlot(ftSlotS, shootingFtSpins);
                                 ftmBySlot = ftmBySlot.WithSlot(ftSlotS, shootingFtPoints);
                             }
                             // Phase 51: FTA-source classification for this shooting-foul trip.
-                            // The foul-draw picker is NOT wired here — a shooting foul with no
-                            // selected shooter is the existing no-slot exception (a post-FT-rebound
-                            // putback, Roll E never ran), which keeps the flat fallback untouched.
-                            if (c.State.SelectedSlot != null) ftaShootingSelected += shootingFtSpins;
-                            else                              ftaShootingNoSlot   += shootingFtSpins;
+                            // The foul-draw picker is NOT wired here. ★ S118 (A4): classify on the
+                            // trip's shooter, the same read as the credit above, so the five
+                            // buckets still reconcile to FTA and Phase 73's conservation holds. A
+                            // fouled putback after a bonus trip now has a shooter (the rebounder),
+                            // so the no-slot bucket fires only with no shooter identity at all.
+                            if (sfShooter != null) ftaShootingSelected += shootingFtSpins;
+                            else                   ftaShootingNoSlot   += shootingFtSpins;
                             continue;
 
                         // OOB off the defender, offense RETAINS (Roll H's

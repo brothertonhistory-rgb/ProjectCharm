@@ -501,7 +501,7 @@ internal static partial class Program
                       run.EventGamesFingerprint == MatchGoldenEventGamesFp,
                       run.EventGamesFingerprint[..8] + "…");
                 Check("C7d: ★ #4 the results+possessions fingerprint is UNMOVED over the league-plus-event " +
-                      "prefix — recapturing it would have destroyed the pre-S102 golden it exists to be",
+                      "prefix — held at the S118 capture; Phase 108 C2 carries the pre-S118 history for every game it did not touch",
                       resultsFp == MatchGoldenResultsFp, resultsFp[..8] + "…");
                 Check("C7e: #5 the non-conference DATED fingerprint is UNMOVED",
                       run.NonConferenceDates.DatedFingerprint == KnockoutGoldenNonConDatedFp,

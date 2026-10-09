@@ -158,7 +158,7 @@ internal static partial class Program
                 Check("C7g: #7 buy games UNMOVED", run.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
                 var games = RatingSha(string.Concat(run.Results.Select((x, i) =>
                     $"{i}|{x.HomeId}|{x.AwayId}|{x.HomeScore}|{x.AwayScore}|{run.PossessionCounts[i]}\n")));
-                Check("C7h: ★ every one of the season's games identical to the pre-S112 capture — teams, scores, " +
+                Check("C7h: ★ every one of the season's games identical to the S118 capture — teams, scores, " +
                       "possessions", games == RatingGoldenPreS112GameDigest, $"{run.PlayedGames.Count} games, {games[..16]}");
             }
         }

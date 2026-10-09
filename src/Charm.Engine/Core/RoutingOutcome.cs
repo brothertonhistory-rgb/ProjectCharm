@@ -200,8 +200,11 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     ///         collapses to ~0 on populated rosters).</item>
     ///   <item><see cref="FtaShootingSelected"/> — shooting-foul trip with the normal
     ///         selected shooter.</item>
-    ///   <item><see cref="FtaShootingNoSlot"/> — shooting-foul trip with no selected
-    ///         slot (the existing post-FT-rebound putback exception, unchanged).</item>
+    ///   <item><see cref="FtaShootingNoSlot"/> — shooting-foul trip with no shooter
+    ///         identity at all. Before S118 this was the post-FT-rebound putback
+    ///         exception; ★ S118 stamps a fouled putback's trip with the rebounder
+    ///         (<see cref="PossessionState.FreeThrowShooterSlot"/>), so on a populated
+    ///         roster it now stays 0.</item>
     /// </list>
     /// </summary>
     public int FtaBonusPicker { get; init; }
@@ -265,10 +268,11 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     // slot on this possession. Accumulated at the Roll H chokepoint (the single
     // path every field-goal attempt passes through, including putbacks).
     //
-    // Putback attribution: on a putback, Roll K's PutBack arm carries SelectedSlot
-    // untouched by design ("same-player rebound tilt" — Roll K comment). So putback
-    // FGAs are credited to the original Roll E selection, which is the correct
-    // behavior for this model. This is slot observability under a fixed-lineup
+    // Putback attribution (★ S118, O-115): a putback is credited to the REBOUNDER
+    // (PossessionState.ReboundSlot) — the man Roll H already plays the shot as. Roll K's
+    // PutBack arm still carries SelectedSlot untouched, but the box score no longer
+    // reads it on a putback. (Before S118 the original Roll E selection was credited.)
+    // This is slot observability under a fixed-lineup
     // assumption; it is NOT durable per-player identity tracking. When substitutions
     // arrive, a slot may be occupied by different players across a game, and this
     // counter will combine all of them — a separate player-ID layer is required then.
@@ -283,15 +287,13 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     public int Slot4Fga { get; init; }
     public int Slot5Fga { get; init; }
     /// <summary>
-    /// FGAs on this possession where <see cref="PossessionState.SelectedSlot"/> was null
-    /// at the Roll H chokepoint — the shooter's slot could not be attributed. Occurs
-    /// exclusively on bonus-free-throw possessions where Roll E was never called (a
-    /// pre-shot foul sent the team to the line before a shooter was selected) and the
-    /// last free throw was missed, producing an offensive rebound (Roll M) and a
-    /// putback (Roll K PutBack arm). Tracked separately so the completeness invariant
-    /// holds: Slot1Fga+…+Slot5Fga+SlotUnattributedFga == Fga (every FGA is accounted
-    /// for even when no slot can be named). When per-player identity tracking lands,
-    /// these will be attributed to whoever took the putback.
+    /// FGAs on this possession whose credited man was null at the Roll H chokepoint —
+    /// the shooter's slot could not be attributed. Before S118 this was every bonus-trip
+    /// putback (Roll E never ran, so SelectedSlot was null); ★ S118 credits a putback to
+    /// the rebounder, so on a populated roster this now stays 0 — it fires only with no
+    /// shooter identity at all. Tracked separately so the completeness invariant holds:
+    /// Slot1Fga+…+Slot5Fga+SlotUnattributedFga == Fga (every FGA is accounted for even
+    /// when no slot can be named).
     /// </summary>
     public int SlotUnattributedFga { get; init; }
 
@@ -302,10 +304,9 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     // the Phase 21 per-slot FGA counters, per-slot FG% = SlotNFgm / SlotNFga.
     //
     // Same attribution model and same fixed-lineup caveat as the FGA counters:
-    // a putback make is credited to the original Roll E shooter's slot (Roll K
-    // carries SelectedSlot untouched). Null-slot makes (bonus-FT putback where
-    // Roll E never ran) land in SlotUnattributedFgm — the make-side analog of
-    // SlotUnattributedFga.
+    // a putback make is credited to the rebounder (★ S118; before it, the original
+    // Roll E shooter). Makes with no shooter identity at all land in
+    // SlotUnattributedFgm — the make-side analog of SlotUnattributedFga.
     //
     // Completeness invariant (harness-asserted): Slot1Fgm+…+Slot5Fgm+
     // SlotUnattributedFgm == Fgm. Subset invariant (ASSERTED in harness):
@@ -439,6 +440,13 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// transition contest each faced. Empty on every possession that took no break shot.
     /// Never asserted; feeds the season page's got-back band and bins.</summary>
     public IReadOnlyList<BreakContestObservation>? BreakContests { get; init; }
+
+    /// <summary>★ S118, PAGE-ONLY — fouled-putback free-throw trips on this possession whose
+    /// shooter S118 moved: the trip is now shot by the rebounder, and the missed shooter (or
+    /// nobody, after a bonus trip) was someone else. Counted at the stamp in the resolver; no
+    /// RNG; read by nothing in the engine. Phase 108 sums it per game to prove that only the
+    /// games containing one moved.</summary>
+    public int PutbackFtShooterChanged { get; init; }
     /// <summary>The offensive slot that committed the turnover. Null for team
     /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
     /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for

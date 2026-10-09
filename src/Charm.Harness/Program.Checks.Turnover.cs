@@ -327,7 +327,7 @@ internal static partial class Program
                 Check("C8f: #6 conference tournaments UNMOVED", one.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp);
                 Check("C8g: #7 buy games UNMOVED", one.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
                 var digest = GamesDigest(one);
-                Check("C8h: ★ every one of season one's games identical to the pre-S112 capture — teams, scores, possessions",
+                Check("C8h: ★ every one of season one's games identical to the S118 capture — teams, scores, possessions",
                       digest == RatingGoldenPreS112GameDigest, $"{one.PlayedGames.Count} games, {digest[..16]}");
                 var standalone = RunDivvyDraft(stock, TurnoverCheckSeed);
                 Check("C8i: ★ the bootstrap divvy through the generalized loop is byte-identical — every roster, every pick, every pool row",
@@ -359,7 +359,7 @@ internal static partial class Program
 
             // ── C10: the runner without rosters in hand is unchanged ────────────
             {
-                Check("C10: RunSeasonCore with the new parameter omitted produces the S112 digest (C8h said the other way)",
+                Check("C10: RunSeasonCore with the new parameter omitted produces the S118 digest (C8h said the other way)",
                       GamesDigest(one) == RatingGoldenPreS112GameDigest);
             }
 

@@ -1531,11 +1531,9 @@ on-walk Stage-2 picker that credits every block, putbacks included, weighted tow
 length). The matched man retains only the **make** contest. No contester work remains; the
 remaining putback doors are the foul/and-1 rate and the same-player rebound tilt.
 
-Note: a putback's made basket is currently credited to the original Roll E shooter's slot
-(`SelectedSlot`, carried untouched on the PutBack arm), while the make rate is driven by the
-REBOUNDER (`ReboundSlot`) and the block rate by the whole defense. That attribution split is
-pre-existing and outside the make/block doors' scope — flagged for the box-score /
-attribution layer.
+Attribution (S118, O-115): a putback is the REBOUNDER's in the box score too — the make rate is
+driven by `ReboundSlot`, and the attempt, the make and any free throws from a foul on it are
+credited to him (see Phase 21's "Putback identity"). The block rate stays the whole defense's.
 
 Both attach at a GENERATOR, exactly like every prior deferred modifier (the height-driven
 tip contest, Roll C's pressure wire, Roll J's rebounder/tempo seams); the rolls themselves
@@ -4913,9 +4911,9 @@ The distribution denominator is **men who occupied a floor seat for at least one
 **The flat fallback is narrow (Phase 51), a named loose end, not a bug.** Phase 51 passed the
 bonus foul-draw shooter through as `FreeThrowShooterSlot`, so most bonus trips are now
 player-attributed; the `config.MakeProbability` (72%) fallback fires only when *both*
-`FreeThrowShooterSlot` and `SelectedSlot` are null — a fully empty roster, or the parked
-putback exception (a shooting foul where Roll E never ran and no picker fired). On populated
-rosters its volume is ~0 (the S71 recalibration read league FT% as a pure generation question
+`FreeThrowShooterSlot` and `SelectedSlot` are null — a fully empty roster. (The putback exception, a
+shooting foul on a putback after a bonus trip, closed in S118: the trip is stamped with the rebounder.) On
+populated rosters its volume is ~0 (the S71 recalibration read league FT% as a pure generation question
 for exactly this reason). The residual path is on the board's parked tail.
 
 **Interface pattern.** `IRollLPieGenerator` follows the same pattern as `IRollMPieGenerator`: single one-arg `Generate(PossessionState state)` method; both the stub and the real generator implement it; the Resolver field is typed to the interface. The stub ignores its state parameter; the real generator reads `SelectedSlot` off it.
@@ -4956,9 +4954,11 @@ for exactly this reason). The residual path is on the board's parked tail.
 
 **Normal-shot identity chain.** Roll E stamps `SelectedSlot` when the shooter is selected. No intermediate routing case (IntoHalfcourtSet, IntoPlayerAction, IntoShotType) clears it. `SelectedSlot` is non-null and correct at IntoShotResolution for normal possessions.
 
-**Putback identity (Roll K carry-through).** On a putback, Roll K's PutBack arm uses `state with { ShotType = ShotLocation.Rim }` — only `ShotType` is modified. `SelectedSlot` is not in the `with` expression and carries through unchanged. Contrast: the `ResetOffense` arm explicitly wipes `SelectedSlot = null` — preserve-vs-wipe is intentional and symmetric. Putback FGAs are credited to the original Roll E shooter's slot.
+**Putback identity (S118, Emmett 2026-10-08: the putback belongs to the man who took it).** Roll K's PutBack arm uses `state with { ShotType = ShotLocation.Rim }` and stamps the putback ticket; `SelectedSlot` rides through unchanged (the `ResetOffense` arm wipes it — preserve-vs-wipe is intentional). The SHOOTER on a putback is the rebounder: `ReboundSlot`, set by `ResolveOffensiveRebound` immediately before Roll K, and the Roll H putback pie already plays the shot as his. The chokepoint credits one man, `c.Putback ? ReboundSlot : SelectedSlot`, at all four per-man sites (FGA, FGM, 3PA, 3PM). The putback ticket has exactly one emitter (Roll K's PutBack arm), so `ReboundSlot` is never stale when the ticket is set — but `ReboundSlot` itself outlives its putback (a scrum foul and an inbound keep it), so nothing may infer "this was a putback" from `ReboundSlot` alone. Moving the field-goal credit moved no game (nothing reads a man's shot counts mid-game). Before S118 the original Roll E selection was credited, and a bonus-trip putback (no Roll E) was credited to nobody.
 
-**The `SlotUnattributedFga` counter.** The slot-binning switch has a `default: slotUnattributedFga++; break;` arm that fires when `SelectedSlot` is null. This scenario is exclusively the bonus-free-throw putback path: a pre-shot foul sends the team to the line before Roll E runs → last FT missed → Roll M offensive rebound → Roll K PutBack → IntoShotResolution with null SelectedSlot. Roll K correctly preserves null; the unattributed counter captures it. The completeness invariant holds: `Slot1Fga+…+Slot5Fga+SlotUnattributedFga == Fga` for every possession. In practice, ~0.2% of FGAs are unattributed.
+**A fouled putback (S118).** Right after `RollH.Execute`, when the ticket is set and Roll H returns `ResolveShootingFreeThrows`, the resolver stamps `FreeThrowShooterSlot = ReboundSlot` on that continuation — no RNG. The shooting-foul case reads `FreeThrowShooterSlot ?? SelectedSlot` for the fouler draw (the foul is drawn against the man guarding the rebounder), the per-man FTA/FTM credit and the FTA-source classification, and Roll L already shoots the trip at that man's FreeThrow. `LastShot` clears the stamp on the trip's only live-ball exit. This half moves games: on the stock season the fixed-pairing games without such a trip are byte-identical to the pre-S118 season (Phase 108 C2: 1,586 of 4,988) and the 3,402 with one moved. A page-only counter (`PutbackFtShooterChanged`, `RoutingOutcome → PossessionRecord`) marks each trip whose shooter this moved; Phase 108 reads it. **Not changed:** a foul in the rebound scrum (Roll K's DefensiveFoul into a bonus trip) is still shot by `SelectedSlot` — who is fouled in a scrum is unruled (status board). **How Phase 108 proves it:** a constructed putback through the real `Resolver.Route`, over the fixed seeds 0–19,999 (refusing its own setup below 1,000 free throws), with the missed shooter at FT 20 and the rebounder at FT 95 — every attempt, make and free throw his, every foul drawn against him, made rate 0.951 — and the same with no missed shooter at all; an ordinary shot with the same two men still credits the shooter; the untouched fixed-pairing games digest to the pre-S118 capture, with the whole set as the control; every side of every stock game's men sum to its final, FGA and FTA; the fingerprint wall at the S118 capture with the three schedule fingerprints at their old values.
+
+**The `SlotUnattributedFga` counter.** The slot-binning switch has a `default: slotUnattributedFga++; break;` arm that fires when the credited man is null. Before S118 that was the bonus-free-throw putback (no Roll E, so no `SelectedSlot`), ~0.2% of FGAs; since S118 a putback is credited to its rebounder, so on populated rosters the arm reads 0 (Phase 108 C3c, Phase 73's conservation line) and fires only with no shooter identity at all. It stays, because the completeness invariant needs it: `Slot1Fga+…+Slot5Fga+SlotUnattributedFga == Fga` for every possession.
 
 **Plumbing layers.**
 - `RoutingOutcome` (Resolver.cs): 6 new init-only fields (`Slot1Fga`–`Slot5Fga`, `SlotUnattributedFga`). All default 0 — same pure-append pattern as every prior observability field. One new local per counter in `Route()`; extended return statement.
@@ -4983,7 +4983,7 @@ for exactly this reason). The residual path is on the board's parked tail.
 - *Make completeness:* `Slot1Fgm+…+Slot5Fgm+SlotUnattributedFgm == Fgm`. Asserted per-game in ObsRun and per-bucket in StressTest.
 - *Subset invariant:* per-slot `SlotNFgm ≤ SlotNFga` and `SlotUnattributedFgm ≤ SlotUnattributedFga`. This is the diagnostic completeness alone misses: a mismatch that nets to the correct global FGM (one slot over-credited, another under) would pass completeness but fail the subset check. Asserted as a hard failure in both harness sections.
 
-**`SlotUnattributedFgm`** is the exact analog of Phase 21's `SlotUnattributedFga` — it fires when a bonus-FT putback (the only null-SelectedSlot path) makes its shot. Without the `default` arm the make completeness invariant fails, identical to the Phase 21 lesson. The arm is present.
+**`SlotUnattributedFgm`** is the exact analog of Phase 21's `SlotUnattributedFga` — it fires when a make has no credited man (before S118, a bonus-FT putback make; since S118, nothing on a populated roster). Without the `default` arm the make completeness invariant fails, identical to the Phase 21 lesson. The arm is present.
 
 **Ceiling note.** Per-slot FG% is the honest ceiling of what this session can deliver. A real box score is per-*player* (points/reb/ast tied to a named person across a whole game, surviving substitutions). Per-slot counters blend all players who occupied a slot — a limitation only the future per-player identity layer resolves.
 
@@ -5035,7 +5035,7 @@ This pattern generalizes to substitutions: whoever constructs the incoming playe
 
 ### SlotGroup
 
-A `readonly record struct` carrying six counters: S1–S5 (the five on-court slots) plus `Unattr` (the unattributed bucket for null-SelectedSlot paths, e.g. bonus-FT putbacks where Roll E never ran). `Total` sums all six. The indexer `this[int slot]` maps 1–5 to S1–S5 and anything else to `Unattr`. `WithSlot(int slot, int delta)` returns a new `SlotGroup` with one bucket incremented — immutable accumulation pattern matching how the existing Phase 21/22 scalar counters work in `Route()`.
+A `readonly record struct` carrying six counters: S1–S5 (the five on-court slots) plus `Unattr` (the unattributed bucket for an event with no man to credit — before S118 the bonus-FT putback; since S118, ~0 on populated rosters). `Total` sums all six. The indexer `this[int slot]` maps 1–5 to S1–S5 and anything else to `Unattr`. `WithSlot(int slot, int delta)` returns a new `SlotGroup` with one bucket incremented — immutable accumulation pattern matching how the existing Phase 21/22 scalar counters work in `Route()`.
 
 ### The completeness invariant
 
@@ -5098,7 +5098,7 @@ Phase 25 wires shooting-foul events from the resolver walk to the attribution pa
 
 `ShootingFoulEvent(ShotLocation Zone, int ShooterSlot)` is a `readonly record struct` appended to the walk's `shootingFouls` list each time the resolver hits `ContinuationKind.ResolveShootingFreeThrows`. One event per `MadeAndFouled` / `MissFouled` resolution.
 
-`ShooterSlot` is 1–5 when Roll E ran (the normal path) and 0 on the rare bonus-FT putback path where Roll E never fired (`PossessionState.SelectedSlot` was null at the edge). The 0 value is the "no matched man" sentinel; `DrawFoulingDefender` routes it to a flat fallback.
+`ShooterSlot` is the trip's shooter, `FreeThrowShooterSlot ?? SelectedSlot` (S118): the rebounder on a fouled putback, else the Roll E shooter. It is 0 only with no shooter identity at all — before S118 that was the bonus-FT putback path; since S118 it does not occur on a populated roster. The 0 value is the "no matched man" sentinel; `DrawFoulingDefender` routes it to a flat fallback.
 
 ### Why a possession can carry more than one event
 
@@ -5109,13 +5109,14 @@ Roll K's PutBack arm routes back to `ContinuationKind.IntoShotResolution` with z
 At `ResolveShootingFreeThrows`:
 
 ```csharp
+var sfShooter = c.State.FreeThrowShooterSlot ?? c.State.SelectedSlot;   // S118
 shootingFouls.Add(new ShootingFoulEvent(
     c.State.ShotType!.Value,          // non-null: Roll G always stamps zone
-    c.State.SelectedSlot?.Number ?? 0 // may be null: bonus-FT putback
+    sfShooter?.Number ?? 0            // 0 only with no shooter identity at all
 ));
 ```
 
-`ShotType` is asserted non-null (`!`) because Roll G stamps the zone before Roll H fires the foul — this is always true on this edge. `SelectedSlot` is null-safe (`?? 0`) because the bonus-FT putback path (Roll K PutBack → `IntoShotResolution`, where Roll E never ran) reaches this edge with `SelectedSlot` null. This is a legitimate game path, not a bug; 0 is the sentinel, not a throw.
+`ShotType` is asserted non-null (`!`) because Roll G stamps the zone before Roll H fires the foul (on a putback, Roll K forces Rim) — this is always true on this edge. The shooter stays null-safe (`?? 0`): since S118 a fouled putback carries the rebounder, so a null here means no shooter identity at all; 0 is the sentinel, not a throw.
 
 This pattern matches the pre-existing Phase 23 FTA/FTM slot reads in the same block.
 
@@ -5148,7 +5149,7 @@ SCALE = 40.0. All zone values and SCALE are calibration placeholders.
 **Direction:** positive `signedK` favors interior defenders on the residual (rim fouls — the help big rotates late); negative `signedK` favors perimeter defenders (three-point fouls — the closeout or switching guard is most likely to foul). Mid is zone-neutral (K=0, flat exponential, equal residual weight).
 
 **Fallbacks (flat distribution over all populated defenders):**
-- `shooterSlot == 0` (bonus-FT putback, no matched man)
+- `shooterSlot == 0` (no shooter identity — before S118 the bonus-FT putback; since S118 not on a populated roster)
 - Matched slot is unpopulated
 
 **Cumulative draw:** same shape as `WeightedDraw` (the existing TO/STL/DReb/OReb/BLK draws), using the separate `seed+3` RNG.
@@ -7786,12 +7787,13 @@ normalized across the populated slots; **one** RNG draw walks the cumulative sum
 
 ### The trip-scoped state field
 
-`PossessionState` gains `FreeThrowShooterSlot` (`Slot?`, default null) — the "who drew the foul" identity. It is **trip-scoped**: valid only while resolving and attributing the current free-throw trip, read by exactly two sites:
+`PossessionState` gains `FreeThrowShooterSlot` (`Slot?`, default null) — the "who drew the foul" identity. It is **trip-scoped**: valid only while resolving and attributing the current free-throw trip. Every reader takes the shooter as `FreeThrowShooterSlot ?? SelectedSlot`:
 
-1. Roll L's make% resolution — the shooter is `FreeThrowShooterSlot ?? SelectedSlot`; only when both are null does Roll L fall to the flat fallback.
-2. The bonus-FT per-slot attribution — the FTA/FTM credit goes to `FreeThrowShooterSlot ?? SelectedSlot`.
+1. Roll L's make% resolution — only when both are null does Roll L fall to the flat fallback.
+2. The bonus-FT per-slot attribution — the FTA/FTM credit.
+3. (S118) The shooting-foul trip — the fouler draw, the FTA/FTM credit and the FTA-source classification.
 
-It must never influence Roll E/K/M, FGA/FGM, or putback attribution. The picker stamps it onto a **local** trip state at the bonus FT edge — the live possession state is never mutated, and the stamp fires only when a draw is actually needed (no shooter selected **and** ≥1 offensive slot populated).
+It is stamped at two places, each onto a trip and never onto a later live ball: the picker at the bonus FT edge (onto a **local** trip state, only when a draw is actually needed — no shooter selected **and** ≥1 offensive slot populated), and (S118) the fouled putback, onto the `ResolveShootingFreeThrows` continuation Roll H returns, with the rebounder. It must never influence Roll E/K/M or the field-goal counters.
 
 **The clear (the one invariant that keeps it trip-scoped).** A free-throw trip has exactly one live-ball exit: `LastShot`'s missed-final-FT arm, which routes to the FT-rebound node. That arm **nulls** `FreeThrowShooterSlot`. Because it is the *sole* live-ball exit, clearing it there guarantees a stamp can never carry past the trip into a later live-ball continuation — specifically the bonus-miss → FT-rebound → putback route, where a second shooting-foul trip would otherwise read a stale stamp. The made-FT exit ends the possession, so its stamp dies with the terminal; no clear is needed there.
 
@@ -7805,7 +7807,7 @@ Every free-throw attempt on a possession is classified into exactly one of five 
 - **FtaBonusSelected** — bonus trip where Roll E had already selected the shooter (a post-Roll-E bonus foul).
 - **FtaBonusUnattributed** — bonus trip with no shooter at all (an empty-roster isolation game — the residual flat fallback, which collapses to ~0 on real rosters).
 - **FtaShootingSelected** — shooting-foul trip with the normal selected shooter.
-- **FtaShootingNoSlot** — shooting-foul trip with no selected slot (the existing post-FT-rebound putback exception, unchanged).
+- **FtaShootingNoSlot** — shooting-foul trip with no shooter identity at all. Before S118 this was the post-FT-rebound putback; S118 stamps that trip with the rebounder, so on populated rosters it reads 0.
 
 The observation run prints these as a `--- FREE-THROW SOURCE ---` report. The design contract is **FtaBonusUnattributed ≈ 0** on populated rosters; the validating run produced literal **0 (0.00%)** over 1,000 games, with 4,302 attempts (15.26%) under FtaBonusPicker.
 
@@ -12472,13 +12474,12 @@ score** — 1st, 2nd, each OT, Final — read off block schema 3. Each team: **S
 (most first, roster order on a tie), **Did not play** by name and number, **Team totals** (MP is five times the game's
 length).
 
-**Uncredited points (Emmett, 2026-10-07).** In 686 of 5,357 stock games the final holds points no man is credited
-with — a bonus trip whose last free throw is missed and put back names no shooter (the `SlotUnattributedFgm` path),
-and occasionally a free throw. Team totals stay the sum of the men; a line under them,
-`Uncredited: N points (scored, no player named)`, carries the difference to the final — points only, since the log
-cannot say whether it was a basket or free throws. A game whose men are credited with *more* than the final is refused.
-Chosen as the display that makes the fix easiest: when the engine names that shooter (O-115) the line stops printing
-by itself, and Phase 107 C4b's count is the before-and-after.
+**Uncredited points (Emmett, 2026-10-07; fixed S118).** Team totals are the sum of the men; when the final holds
+points no man is credited with, a line under them, `Uncredited: N points (scored, no player named)`, carries the
+difference — points only, since the log cannot say whether it was a basket or free throws. A game whose men are
+credited with *more* than the final is refused. Through S117 the line printed in 686 of 5,357 stock games (713 sides,
+1,513 points): a bonus-trip putback named no shooter. S118 credits the putback, and its free throws, to the rebounder,
+so it prints in none; Phase 107 C4b is now a wall at zero. The line's code stays, so a future gap shows on the page.
 
 **Single-game highs**, after the player page's four tables: points, rebounds, assists, steals, blocks, made threes,
 made field goals, made free throws, minutes — the high, how many times, and every game it happened in (date, site,
@@ -12492,6 +12493,6 @@ genuine S116-layout log built in the check and a row-schema-1 header refused by 
 commands, the file put back as the control; every one of the stock season's 4,511 game logs against his school's
 schedule, his rows and his team's record, two constructed schedules refused; Gcar across three seasons and across an
 unreadable-then-missing season; the bottom line equal to the player page's row cell for cell; every stock box score
-against its game, the Uncredited line exactly where it belongs, a game whose men exceed the final refused; every high
+against its game, no Uncredited line on any stock side (S118: a wall at zero), a game whose men exceed the final refused; every high
 recomputed independently for every man of a three-season career, a listed reference opening the box score that holds
 it, the star and its control; the legacy season unmoved.

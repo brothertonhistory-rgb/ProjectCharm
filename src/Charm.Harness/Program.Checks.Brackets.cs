@@ -36,8 +36,9 @@ internal static partial class Program
     /// artifacts that C1 is the authority for.</summary>
     private const string BracketsPreS98ConferenceScheduleSha =
         "eee5e256b0c6fc871d565b8c27c2925824e3b3ba8e76a717a3fdae4c6c0b36dc";
+    // ★ S118 — the putback's man (O-115); declared before the build; was 95038e912bc82c77f378cda9fbfa8e70ad08a952a40375b1471ac7a2539111f4
     private const string BracketsPreS98ConferenceResultsSha =
-        "95038e912bc82c77f378cda9fbfa8e70ad08a952a40375b1471ac7a2539111f4";
+        "b05958174cc8efb7e54c4bf9d17aed3acc2bd62702de8255e68f41ef054fab2f";
     private const int BracketsPreS98ConferenceGameCount = 60;
 
     private static bool Phase89BracketsCheck(string configPath)
@@ -156,7 +157,7 @@ internal static partial class Program
                 on.PossessionCounts.Take(on.ConferenceGameCount).ToList());
             Check("C1c: ★ THE ZERO PATH, WITH THE BRACKETS ON. Twenty-four extra games were played " +
                   "after the conference slate and every conference score and possession count still " +
-                  "reproduces a fingerprint captured from the PRISTINE S97 TREE",
+                  "reproduces the conference results golden at the S118 capture (O-115 re-played the S97-tree value)",
                   confOn == BracketsPreS98ConferenceResultsSha,
                   confOn == BracketsPreS98ConferenceResultsSha
                       ? confOn[..16] + "…"

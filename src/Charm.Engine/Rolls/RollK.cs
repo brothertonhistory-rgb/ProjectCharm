@@ -24,7 +24,7 @@ namespace Charm.Engine;
 ///   FORCED to <see cref="ShotLocation.Rim"/> and the <see cref="Continue.Putback"/>
 ///   ticket set, so Roll H's generator selects its distinct putback pie. The
 ///   selected slot rides through untouched (the deferred same-player rebound tilt
-///   reads it). A missed putback re-enters Roll I on the flat pie — the re-entrant
+///   reads it); the SHOOTER is the rebounder (★ S118 — credit and free throws are his). A missed putback re-enters Roll I on the flat pie — the re-entrant
 ///   scrum that converges probabilistically (proven in the harness).</item>
 ///   <item><b>JumpBall</b> — CONTINUE to the shared jump-ball node.</item>
 ///   <item><b>DefensiveFoul</b> — charge the defense, bonus-fork. The FOURTH feeder
@@ -73,6 +73,9 @@ public static class RollK
             // Force the zone to Rim and stamp the putback ticket so Roll H selects its
             // distinct putback pie. The carried slot rides through untouched (the
             // future same-player rebound tilt reads it); Roll H overwrites Result.
+            // ★ S118: the shot is the REBOUNDER's (state.ReboundSlot, stamped just
+            // before this roll) — Roll H plays it as his, and the resolver credits it
+            // and any free throws from it to him. SelectedSlot is not the shooter here.
             OffensiveReboundOutcome.PutBack =>
                 new Continue(ContinuationKind.IntoShotResolution,
                     state with { ShotType = ShotLocation.Rim })

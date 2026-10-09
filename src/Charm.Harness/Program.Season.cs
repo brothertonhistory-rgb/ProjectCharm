@@ -152,6 +152,16 @@ internal static partial class Program
     /// on a neutral floor neither is a venue.</summary>
     private sealed record SidePossessionCount(int Home, int Away);
 
+    /// <summary>★ S118 -- one game's putback audit, read by Phase 108 only. <c>ShooterChanged</c> is the
+    /// sum of the possession records' page-only counter (fouled-putback free-throw trips whose shooter
+    /// S118 moved to the rebounder); the side totals are each side's team FGA and FTA off its own
+    /// possessions, and the part no slot could name. Nothing in the season reads it.</summary>
+    private sealed record GamePutbackAudit(
+        int ShooterChanged,
+        int HomeFga, int AwayFga, int HomeFta, int AwayFta,
+        int HomeUnattributedFga, int AwayUnattributedFga,
+        int HomeUnattributedFta, int AwayUnattributedFta);
+
     private sealed record SeasonGameResult(
         int HomeId, int AwayId, int HomeScore, int AwayScore, int OvertimePeriods,
         SeasonId? SeasonId = null, GameId? GameId = null);
@@ -182,6 +192,10 @@ internal static partial class Program
         /// most games, so halving the total is wrong invisibly. Deliberately a SEPARATE list: the
         /// season fingerprint hashes PossessionCounts, and this must not be able to move it.</summary>
         public List<SidePossessionCount> SidePossessions { get; init; } = new();
+        /// <summary>★ S118 -- per-game putback audit, index for index with <see cref="PossessionCounts"/>.
+        /// A SEPARATE list for the same reason as SidePossessions: no fingerprint can read it. Phase 108
+        /// is its only reader.</summary>
+        public List<GamePutbackAudit> PutbackAudits { get; init; } = new();
         /// <summary>★ S95 — how many games actually had a road side transformed. The
         /// counter increments only when the PREPARED away side is the shaved one, so it
         /// counts what played rather than what was intended. Phase 86 B8 reads it from
@@ -1840,6 +1854,7 @@ internal static partial class Program
         var possessionCounts = new List<int>(schedule.Count);
         // ★ S112 — each side's own possessions, carried rather than halved (see SidePossessions).
         var sidePossessions = new List<SidePossessionCount>(schedule.Count);
+        var putbackAudits = new List<GamePutbackAudit>(schedule.Count);   // ★ S118, Phase 108 only
         var hostedRoadSidesShaved = 0;
         var leagueRoadSidesShaved = 0;
         var ties = 0;
@@ -1981,6 +1996,17 @@ internal static partial class Program
             sidePossessions.Add(new SidePossessionCount(
                 result.Possessions.Count(r => r.Offense == TeamSide.Home),
                 result.Possessions.Count(r => r.Offense == TeamSide.Away)));
+            // ★ S118 -- the putback audit (Phase 108). Pure arithmetic on records already in hand.
+            {
+                int Sum(TeamSide side, Func<PossessionRecord, int> f) =>
+                    result.Possessions.Where(r => r.Offense == side).Sum(f);
+                putbackAudits.Add(new GamePutbackAudit(
+                    result.Possessions.Sum(r => r.PutbackFtShooterChanged),
+                    Sum(TeamSide.Home, r => r.Fga), Sum(TeamSide.Away, r => r.Fga),
+                    Sum(TeamSide.Home, r => r.Fta), Sum(TeamSide.Away, r => r.Fta),
+                    Sum(TeamSide.Home, r => r.SlotUnattributedFga), Sum(TeamSide.Away, r => r.SlotUnattributedFga),
+                    Sum(TeamSide.Home, r => r.FtaBySlot.Unattr), Sum(TeamSide.Away, r => r.FtaBySlot.Unattr)));
+            }
             playedGames.Add(pg);
             if (game.HomeScore > game.AwayScore) { wins[sg.HomeId]++; losses[sg.AwayId]++; }
             else if (game.AwayScore > game.HomeScore) { wins[sg.AwayId]++; losses[sg.HomeId]++; }
@@ -2131,6 +2157,7 @@ internal static partial class Program
             People = people,
             PossessionCounts = possessionCounts,
             SidePossessions = sidePossessions,
+            PutbackAudits = putbackAudits,
             HostedRoadSidesShaved = hostedRoadSidesShaved,
             RoadShave = roadShave,
             DatedFingerprint = datedFingerprint,

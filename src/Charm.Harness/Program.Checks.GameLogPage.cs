@@ -27,8 +27,8 @@ namespace Charm.Harness;
 //    C4 the box score is the game: for every stock game, each team's lines are its
 //       rows, its starters its five started rows, its DNPs its roster minus its rows,
 //       its totals the sum of its lines, and its points plus its uncredited points
-//       its final — the Uncredited line printed exactly where that is above zero
-//       (the count of such games is the engine fix's before-number, printed).
+//       its final — the Uncredited line printed exactly where that is above zero.
+//       ★ S118: that count is now a wall at zero (O-115 shipped; before: 686 games).
 //    C5 career highs: for every man of a three-season career, each high is the
 //       maximum over his games (recomputed here, minutes in decimal arithmetic), the
 //       count is how many games reach it, the listed games exactly those; a 0 high
@@ -419,9 +419,14 @@ internal static partial class Program
                 Check("C4a: ★ for every stock game: each team's lines are its rows, its starters its five started rows (most minutes first), " +
                       "its DNPs its roster minus its rows, its totals the sum of its lines, its points plus its uncredited points its final",
                       wrong.Count == 0, wrong.Count == 0 ? Inv($"{log.Blocks.Count:N0} games") : string.Join(", ", wrong.Take(6)));
-                Check("C4b: the Uncredited line prints exactly for the sides whose final holds points no man is credited with, and nowhere else",
-                      linesWrong == 0 && uncreditedSides > 0,
-                      Inv($"{uncreditedGames:N0} games ({uncreditedSides:N0} sides, {uncreditedPoints:N0} points) — the engine fix's before-number; it should read 0 after"));
+                //  ★ S118 — O-115 shipped: a putback is the rebounder's, its free throws included, so no
+                //    stock side holds a point no man is credited with. Before S118 this read 686 games
+                //    (713 sides, 1,513 points) and asserted > 0; it is now a wall. The Uncredited line's
+                //    code stays — if points ever go uncredited again the page says so (C4c's control).
+                Check("C4b: ★ no stock side holds a point no man is credited with, and no Uncredited line prints anywhere " +
+                      "(S118: the putback is the rebounder's)",
+                      linesWrong == 0 && uncreditedSides == 0 && uncreditedGames == 0,
+                      Inv($"{uncreditedGames:N0} games ({uncreditedSides:N0} sides, {uncreditedPoints:N0} points); before S118: 686 games (713 sides, 1,513 points)"));
                 var anyBlock = log.Blocks[0];
                 var inflated = log with { Blocks = log.Blocks.Select(b => ReferenceEquals(b, anyBlock)
                     ? b with { Facts = b.Facts with { HomeScore = b.Rows.Where(r => r.SchoolId == b.Facts.HomeSchoolId).Sum(r => (int)(2 * r.Fgm + r.Tpm + r.Ftm)) - 1 } }
@@ -544,7 +549,7 @@ internal static partial class Program
 
             // ── C7: the fingerprint wall — the stock legacy season ────────────────
             {
-                Check("C7a: ★ the career's season one plays the pre-S112 capture game for game (the score by period moved no game)",
+                Check("C7a: ★ the career's season one plays the S118 capture game for game (the score by period moved no game)",
                       GamesDigest(stockOne) == RatingGoldenPreS112GameDigest, $"{stockOne.PlayedGames.Count} games");
                 var legacy = RunSeasonCore(stock, GameLogPageCheckSeed, configPath, verbose: false);
                 var prefix = legacy.ConferenceGameCount + legacy.TournamentGameCount;
@@ -556,7 +561,7 @@ internal static partial class Program
                 Check("C7f: #5 non-conference dated UNMOVED", legacy.NonConferenceDates.DatedFingerprint == KnockoutGoldenNonConDatedFp);
                 Check("C7g: #6 conference tournaments UNMOVED", legacy.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp);
                 Check("C7h: #7 buy games UNMOVED", legacy.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
-                Check("C7i: ★ every legacy game identical to the pre-S112 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest);
+                Check("C7i: ★ every legacy game identical to the S118 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest);
                 Check("C7j: the career's season one and the legacy season are the same games", GamesDigest(stockOne) == GamesDigest(legacy));
             }
         }

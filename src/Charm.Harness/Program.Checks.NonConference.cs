@@ -62,8 +62,9 @@ internal static partial class Program
     /// recoverable by subtraction the way the event-games hash is — this fingerprint covers
     /// the conference games too, and those are byte-identical; what moved is the event half
     /// inside the same hash. Emmett's machine is the commit-of-record for this value.</summary>
+    // ★ S118 — the putback's man (O-115); declared before the build; was 898d9fe8e75a353bca1fa89296d96f8cceafb72e66c2a6718eb6eb0b2553742b
     private const string NonConGoldenResultsFp =
-        "898d9fe8e75a353bca1fa89296d96f8cceafb72e66c2a6718eb6eb0b2553742b";
+        "f865e4fbc0f0ffc7581c02492ad51946315e54a288894cf5c901bd9abf3c2e26";
 
     private const long NonConStockSeed = 20260720;
 
@@ -505,9 +506,9 @@ internal static partial class Program
                 var resultsFp = SeasonFingerprint(
                     stockRun.Results.Take(prefix).ToList(),
                     stockRun.PossessionCounts.Take(prefix).ToList());
-                Check("C9: the stock season reproduces the pre-S101 tree exactly — " +
-                      "conference fingerprint, dated fingerprint, and the results+" +
-                      "possessions fingerprint over the league-plus-event prefix",
+                Check("C9: the stock season reproduces its pins exactly — " +
+                      "conference and dated fingerprints (the pre-S101 tree), and the results+" +
+                      "possessions fingerprint over the league-plus-event prefix (the S118 capture)",
                       stockRun.Fingerprint == NonConGoldenConferenceFp
                       && stockRun.DatedFingerprint == NonConGoldenDatedFp
                       && resultsFp == NonConGoldenResultsFp,

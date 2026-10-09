@@ -29,17 +29,20 @@ internal static partial class Program
 
     /// <summary>★ PRE-EDIT CAPTURE (S112 gate probe, before any S112 code existed): every game of
     /// the stock season, "ordinal|home|away|homeScore|awayScore|possessions\n", SHA-256.</summary>
+    // ★ S118 — the putback's man (O-115); declared before the build; was c43c32d22870afc29bf2620391b8846d4de8f3df1bbbd74424bc4b19c57eed99
     private const string RatingGoldenPreS112GameDigest =
-        "c43c32d22870afc29bf2620391b8846d4de8f3df1bbbd74424bc4b19c57eed99";
+        "d4c356fbc4b6542c759127f785cc6379a9226b2fd6d00a850c347ea326230a5b";
 
     /// <summary>★ PRE-EDIT CAPTURE of each side's possessions, counted independently by the gate
     /// probe: "ordinal|home|away\n", SHA-256. The carried split must equal it.</summary>
+    // ★ S118 — the putback's man (O-115); declared before the build; was 254cc3efc6099b1fb291a3ef3d76dc607f40e5a0dabaeb7b0b36037e1b53dc65
     private const string RatingGoldenPreS112SplitDigest =
-        "254cc3efc6099b1fb291a3ef3d76dc607f40e5a0dabaeb7b0b36037e1b53dc65";
+        "1c31ab849664fc79ed7030966eeb1323faf26478bb698616aff5eacaa41f7979";
 
     /// <summary>The seventh fingerprint as S111 shipped it (journal: bcb4b5d8…), pinned in full.</summary>
+    // ★ S118 — the putback's man (O-115); declared before the build; was bcb4b5d885349d2981ed023b94917814b8da25f88b42d7e8c25fc829921c9fa7
     private const string RatingGoldenBuyGamesFp =
-        "bcb4b5d885349d2981ed023b94917814b8da25f88b42d7e8c25fc829921c9fa7";
+        "f59b6e5910eff99eee22401d4a4611aaf98af24f296074fd5c487a37a64137f9";
 
     private static string RatingSha(string text)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
@@ -168,7 +171,7 @@ internal static partial class Program
                 Check("C2b: ★ the stock season has games where the sides are UNEQUAL, so a /2 shortcut is catchable",
                       unequal > 0, $"{unequal} of {n}");
                 var split = RatingSha(string.Concat(run.SidePossessions.Select((s, i) => $"{i}|{s.Home}|{s.Away}\n")));
-                Check("C2c: the carried split equals the gate probe's independent pre-edit count, game for game",
+                Check("C2c: the carried split equals the S118 capture of each side's possessions, game for game",
                       split == RatingGoldenPreS112SplitDigest, split[..16]);
                 var halved = inputs.Select(g => g with
                 {
@@ -339,7 +342,7 @@ internal static partial class Program
                 Check("C11g: #7 buy games UNMOVED", run.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
                 var games = RatingSha(string.Concat(run.Results.Select((x, i) =>
                     $"{i}|{x.HomeId}|{x.AwayId}|{x.HomeScore}|{x.AwayScore}|{run.PossessionCounts[i]}\n")));
-                Check("C11h: ★ every one of the season's games identical to the pre-edit capture — teams, scores, " +
+                Check("C11h: ★ every one of the season's games identical to the S118 capture — teams, scores, " +
                       "possessions", games == RatingGoldenPreS112GameDigest, $"{n} games, {games[..16]}");
             }
 

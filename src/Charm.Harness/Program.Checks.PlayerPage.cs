@@ -157,7 +157,7 @@ internal static partial class Program
             {
                 var path = Path.Combine(scratch, "stock", "career.json");
                 stockOne = Career(stock, PlayerPageCheckSeed, path);
-                Check("C8a: ★ the career's season one plays the pre-S112 capture game for game (the row change moved no game)",
+                Check("C8a: ★ the career's season one plays the S118 capture game for game (the row change moved no game)",
                       GamesDigest(stockOne) == RatingGoldenPreS112GameDigest, $"{stockOne.PlayedGames.Count} games");
                 var log = ReadLog(stock, path, 1);
                 var starters = log.Roster.Where(e => e.IsStarter).GroupBy(e => e.SchoolId)
@@ -475,7 +475,7 @@ internal static partial class Program
                 Check("C8f: #5 non-conference dated UNMOVED", legacy.NonConferenceDates.DatedFingerprint == KnockoutGoldenNonConDatedFp);
                 Check("C8g: #6 conference tournaments UNMOVED", legacy.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp);
                 Check("C8h: #7 buy games UNMOVED", legacy.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
-                Check("C8i: ★ every legacy game identical to the pre-S112 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest);
+                Check("C8i: ★ every legacy game identical to the S118 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest);
                 Check("C8j: the career's season one and the legacy season are the same games", GamesDigest(stockOne) == GamesDigest(legacy));
             }
         }

@@ -10,7 +10,17 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 117** (2026-10-07; verified on Emmett's machine — **the thirteen log-reading phases, the registry
+Last updated: **Session 118** (2026-10-08; verified on Emmett's machine — **ALL CHECKS PASSED, 93 timed sections,
+1,622.9s, Phase 108 new (26 assertions, 99.1s), every predicted number identical to the sandbox**. **THE PUTBACK BELONGS
+TO THE MAN WHO TOOK IT** (O-115, Emmett 2026-10-08): the man who grabs the offensive board and goes straight back up gets
+the attempt, the make and any free throws from a foul on it — he shoots them at his own rating and the foul is drawn
+against his man. The field-goal half moved no game; the free-throw half moved the games with a fouled putback shot by
+someone else (3,402 of 4,988 fixed-pairing games; the other 1,586 byte-identical to the pre-S118 season). Season points
+730,430 → 729,863. Every point in every stock box score now has its man (Uncredited: 686 games → 0). Twelve pinned
+constants re-captured at values declared before the build. Boarded: who is fouled in the rebound scrum (**O-117**).
+Journal S118 has the detail.)
+
+Previous: **Session 117** (2026-10-07; verified on Emmett's machine — **the thirteen log-reading phases, the registry
 and the fingerprint wall all PASS (81 87 89 90 91 100 101 102 103 104 105 106 107), 1,022.5s, Phase 107 new (42
 assertions), every predicted number identical to the sandbox**. **THE GAME LOG, THE BOX SCORE, CAREER HIGHS** — session
 3c of the stacked-seasons arc: `gamelog <world> <number> <season> --history <career>` (every team game, DNPs included,
@@ -531,13 +541,21 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S118 MOVED THE GAMES THAT HAD A FOULED PUTBACK, AND GAVE EVERY PUTBACK ITS MAN.** A putback's attempt, make and free
+throws are the rebounder's; a fouled putback is shot at his FreeThrow and the foul drawn against his man. The three
+schedule fingerprints are unmoved; the four result fingerprints and every pinned game result are at **the S118 capture**
+(every-game digest `d4c356fb…`; the old values in journal S118). Of the 4,988 fixed-pairing games, the 1,586 without a
+moved free-throw trip are byte-identical to the pre-S118 season (Phase 108 C2). Season points 730,430 → 729,863. Every
+point in every stock box score belongs to a man: 0 uncredited sides, 0 unattributed attempts (Phase 107 C4b, Phase 108
+C3, Phase 73).
+
 **S117 MOVED NO BASKETBALL AND LAID THE GAME LINES OUT THREE MORE WAYS.** The legacy season is unmoved on all seven
 fingerprints and the pre-S112 digest (Phase 107 C7); the career's season one is the legacy season game for game. Every
 season log from S117 on is **block schema 3** — the S116 header plus the score by period (2 + OT entries, 8 bytes each);
 the stock career's season one is **22,940,788 bytes**. **The reader accepts block 3 / row 2 / roster 2 and nothing
 else (C-60)**: an older career is refused by name at the reader, the turnover and every page. Pages: `player` (now with
 Single-game highs), `people`, `gamelog`, `box`. The box score shows an `Uncredited` line in 686 of 5,357 stock games
-(713 sides, 1,513 points) — points the scoreboard holds and no man is credited with (O-115).
+(713 sides, 1,513 points) — points the scoreboard holds and no man is credited with (O-115; fixed S118).
 
 **S116 MOVED NO BASKETBALL AND GAVE A CAREER ITS FIRST PLAYER PAGE.** The legacy season is unmoved on all seven
 fingerprints and the pre-S112 digest (Phase 106 C8); the career's season one is the legacy season game for game. Every
@@ -673,6 +691,13 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S118 — THE PUTBACK BELONGS TO THE MAN WHO TOOK IT (closes O-115).** `Resolver.cs`: one credited man at the
+  field-goal chokepoint (`c.Putback ? ReboundSlot : SelectedSlot`); a fouled putback's trip stamped with the rebounder
+  (`FreeThrowShooterSlot`), read by the fouler draw, the FTA/FTM credit and the FTA-source classification. Page-only
+  counter `PutbackFtShooterChanged` (`RoutingOutcome → PossessionRecord`); the season run keeps a per-game putback audit
+  for Phase 108. Twelve pinned constants at the S118 values declared in the prompt before the build (old values in
+  journal S118); the checks that claimed an older provenance reworded. **Phase 108 (26 assertions)**; Phase 107 C4b now
+  a wall at zero; registry 93, frozen order, C3c exclusion. Journal S118.
 - **★ S117 — THE GAME LOG, THE BOX SCORE, CAREER HIGHS.** `Charm.History`: block schema 3 (`GameBlockFactsV1.Periods`,
   `PeriodScoreV1`; the writer refuses a wrong length, a negative entry or a list not summing to the final; the reader
   re-checks after the seal); the reader accepts block 3 / row 2 / roster 2 only, one refusal sentence for anything
@@ -1220,14 +1245,13 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-115 — ★ UNCREDITED POINTS: THE BONUS-TRIP PUTBACK NAMES NO SHOOTER (S117 finding).** In **686 of 5,357** stock games
-  (713 sides, **1,513 points**) the final holds points no man is credited with — usually a 2: a team in the bonus misses
-  the last free throw, rebounds, and puts it back with no shooter selected (`SlotUnattributedFgm`, design.md's
-  attribution chokepoint); a few are free throws. Every player page has been missing these points since the archive
-  began; the box score shows them as `Uncredited: N points`. The fix is in the engine (name the shooter on that path),
-  so its own session, with its own fingerprint question (whether naming him moves any game is not yet known).
-  **Before-number: Phase 107 C4b, 686 games — it should read 0 after.** Supersedes P-13's "FT unattributed bonus-trip
-  fallback (~0 volume)" line, which measured free throws, not the putback.
+- **O-117 — WHO IS FOULED IN THE REBOUND SCRUM (S118, found at draft time, boarded not built).** A defensive foul in
+  the offensive-rebound scrum (Roll K's DefensiveFoul) that sends the team to the line in the bonus is shot by
+  `SelectedSlot` — the man who missed — because the Phase 51 picker fires only when `SelectedSlot` is null. Who is
+  fouled in a scrum is a ruling first (Emmett's), then a small engine session that will move games. **Note (S118 A3):**
+  `ReboundSlot` outlives its putback — set at every offensive board, cleared only on a reset, so a scrum foul followed
+  by an inbound still carries the old rebounder. S118 never infers a putback from it (the trip is stamped at the
+  putback itself); a fix here must not either.
 - **O-116 — RETIRE THE REMAINING OLD-FORMAT READERS (C-60's follow-through, S117).** S117 retired every older reader
   of the season log. What is left of the same kind: the career file's v1 → v2 upgrade (`HistorySchemaV1` read and
   migrated by `HistoryStore.Open`; Phase 81 A6 proves it, and `UseFixedHistoryIdForTests` exists only for its golden).
@@ -2126,7 +2150,7 @@ chart is PROVISIONAL pending O-6.
   (S33); press-frequency sentinels; length-in-make% defender term (S17/S40-era); per-zone
   location-blend weights + corner-three split (P9); reference-card pinning + multi-seed
   (S31/32); EqualShare centralization (P28); opening-five/lineup logic; FT unattributed
-  bonus-trip fallback (~0 volume on populated rosters — but its PUTBACK half is live: 686 stock games, open as O-115); displacement "advantaged" bin (S36);
+  bonus-trip fallback (~0 volume on populated rosters; its putback half closed by S118, O-115); displacement "advantaged" bin (S36);
   code hygiene (WeightedAggregate duplication, Mk consolidation, RollE stub double-build).
 - **P-14 — Long-term watches (design before the relevant layer ships, not now):** save-file
   schema versioning (S117: ruled for now by **C-60** — a version stamp refuses, it never migrates); end-to-end RNG/determinism review before the full season layer; the
@@ -2456,6 +2480,14 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **THE PUTBACK BELONGS TO THE MAN WHO TOOK IT — S118 (2026-10-08). NEXT: NOT YET CHOSEN.** O-115 shipped. The arc's
+step 4 (development, recruiting, prestige movement, transfers) is where the plan goes next; **O-116** (the career file's
+old-version upgrade) and **O-117** (who is fouled in the scrum — a ruling first) sit beside it. Emmett's call at the
+next-prompt pass (CONVENTIONS §6). **Carry into any draft that changes who an engine event belongs to:** split what is
+only credited (moved no game here — nothing reads a man's counts mid-game) from what is played (the free-throw shooter
+moved games), and measure each. A change that moves game results re-captures its pins by **declaring the values before
+the build** (S118 §3d) and adds a check that carries the old history for the games it did not touch (Phase 108 C2).
 
 ★ **THE GAME LOG, THE BOX SCORE, CAREER HIGHS — S117 (2026-10-07). NEXT: NOT YET CHOSEN.** 3c closes the card's
 reading side: every season's stats, a game log, a box score, career highs, under one number. The arc's step 4 —

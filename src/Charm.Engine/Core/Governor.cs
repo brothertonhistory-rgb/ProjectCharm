@@ -234,7 +234,11 @@ public sealed record PossessionRecord(
     // excluded, press-born included): the team aggregate that shot faced and how it finished.
     // Appended last with a null default so every existing positional construction is
     // unaffected. Never asserted; the season page's got-back band and bins read it.
-    IReadOnlyList<BreakContestObservation>? BreakContests = null);
+    IReadOnlyList<BreakContestObservation>? BreakContests = null,
+    // ★ S118, PAGE-ONLY — fouled-putback free-throw trips whose shooter S118 moved (see
+    // RoutingOutcome.PutbackFtShooterChanged). Appended last with a 0 default (the S62/S84/S85
+    // convention). Never read by the engine; Phase 108 sums it per game.
+    int PutbackFtShooterChanged = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -456,6 +460,7 @@ public sealed class Governor
             var possessionBreakPutbackBlk = 0; var possessionNonBreakBlk     = 0;
             var possessionFastBreakBlkBySlot = new SlotGroup();
             IReadOnlyList<BreakContestObservation>? possessionBreakContests = null;
+            var possessionPutbackFtShooterChanged = 0;   // ★ S118, page-only
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -600,6 +605,7 @@ public sealed class Governor
                 possessionNonBreakBlk         = outcome.NonBreakBlk;
                 possessionFastBreakBlkBySlot  = outcome.FastBreakBlkBySlot;
                 possessionBreakContests       = outcome.BreakContests;
+                possessionPutbackFtShooterChanged = outcome.PutbackFtShooterChanged;
             }
 
             periodRemaining -= applied;
@@ -670,7 +676,8 @@ public sealed class Governor
                 possessionNonBreakBlk,
                 possessionFastBreakBlkBySlot,
                 possessionOffensiveFouls,
-                possessionBreakContests));
+                possessionBreakContests,
+                possessionPutbackFtShooterChanged));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(
