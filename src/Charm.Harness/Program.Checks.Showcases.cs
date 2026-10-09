@@ -44,9 +44,9 @@ internal static partial class Program
     /// this session existed. It is asserted against the stock world with its showcases
     /// REMOVED, which is the only form in which it can still be true — and the only form in
     /// which it proves anything.</summary>
-    // ★ S118 — the putback's man (O-115); declared before the build; was 26f2b8ff16ba169403aa741bb93ee9d5426d656fef38a83cf884c27a005c2c4b
+    // ★ S118.1 — the scramble foul's man (O-117); declared before the build; was a3de5bfec1c2b500a6b73c058fb2bee957410451cbda1bc8625796155641ac9b
     private const string ShowcaseGoldenPreS104EventGamesFp =
-        "a3de5bfec1c2b500a6b73c058fb2bee957410451cbda1bc8625796155641ac9b";
+        "c8d16f15bd97e866486df191f07387314104d311977ebf5b74fe6dbfed26852a";
 
     private static bool Phase95ShowcasesCheck(string configPath)
     {
@@ -493,7 +493,7 @@ internal static partial class Program
                 var run = RunSeasonCore(noShowcases, ShowcaseCheckSeed, configPath, verbose: false);
 
                 Check("C9a: ★ THE STOCK WORLD WITH ITS SHOWCASES REMOVED reproduces the showcase-free " +
-                      "event-games fingerprint (the S118 capture) EXACTLY — so the per-kind walls, the packed draw " +
+                      "event-games fingerprint (the S118.1 capture) EXACTLY — so the per-kind walls, the packed draw " +
                       "key, the provisional commit and the changed play order moved NOTHING on " +
                       "their own, and everything that did move was moved by showcases",
                       run.EventGamesFingerprint == ShowcaseGoldenPreS104EventGamesFp,

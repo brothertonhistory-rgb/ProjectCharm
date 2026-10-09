@@ -137,7 +137,7 @@ internal static partial class Program
                 noCareer.Results.Take(noCareer.ConferenceGameCount).ToList(),
                 noCareer.PossessionCounts.Take(noCareer.ConferenceGameCount).ToList());
             Check("C1b: and every conference score and possession count reproduces the conference results " +
-                  "golden at the S118 capture — the basketball did not move either",
+                  "golden at the S118.1 capture — the basketball did not move either",
                   noCareerResults == BracketsPreS98ConferenceResultsSha,
                   noCareerResults == BracketsPreS98ConferenceResultsSha
                       ? noCareerResults[..16] + "…"

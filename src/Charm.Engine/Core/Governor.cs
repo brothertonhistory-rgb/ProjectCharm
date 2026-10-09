@@ -238,7 +238,11 @@ public sealed record PossessionRecord(
     // ★ S118, PAGE-ONLY — fouled-putback free-throw trips whose shooter S118 moved (see
     // RoutingOutcome.PutbackFtShooterChanged). Appended last with a 0 default (the S62/S84/S85
     // convention). Never read by the engine; Phase 108 sums it per game.
-    int PutbackFtShooterChanged = 0);
+    int PutbackFtShooterChanged = 0,
+    // ★ S118.1, PAGE-ONLY — bonus trips named in the scramble (see
+    // RoutingOutcome.ScrambleFtShooterStamped). Appended last with a 0 default (the
+    // S62/S84/S85 convention). Never read by the engine; Phases 108 and 109 sum it per game.
+    int ScrambleFtShooterStamped = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -461,6 +465,7 @@ public sealed class Governor
             var possessionFastBreakBlkBySlot = new SlotGroup();
             IReadOnlyList<BreakContestObservation>? possessionBreakContests = null;
             var possessionPutbackFtShooterChanged = 0;   // ★ S118, page-only
+            var possessionScrambleFtShooterStamped = 0;  // ★ S118.1, page-only
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -606,6 +611,7 @@ public sealed class Governor
                 possessionFastBreakBlkBySlot  = outcome.FastBreakBlkBySlot;
                 possessionBreakContests       = outcome.BreakContests;
                 possessionPutbackFtShooterChanged = outcome.PutbackFtShooterChanged;
+                possessionScrambleFtShooterStamped = outcome.ScrambleFtShooterStamped;
             }
 
             periodRemaining -= applied;
@@ -677,7 +683,8 @@ public sealed class Governor
                 possessionFastBreakBlkBySlot,
                 possessionOffensiveFouls,
                 possessionBreakContests,
-                possessionPutbackFtShooterChanged));
+                possessionPutbackFtShooterChanged,
+                possessionScrambleFtShooterStamped));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(

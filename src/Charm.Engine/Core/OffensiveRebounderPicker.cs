@@ -69,11 +69,18 @@ public static class OffensiveRebounderPicker
     /// <see cref="MatchupConfig.ReboundWingspanScale"/>). Same config the team battle
     /// uses, so the two layers are definitionally consistent.</param>
     /// <param name="rng">RNG source. Consumes exactly one NextUnitInterval draw.</param>
+    /// <param name="atTheLine">★ S118.1 (O-117, Emmett 2026-10-08) — the man who just shot a
+    /// missed free throw, when this draw names who was fouled on the loose ball that followed.
+    /// He is back at the stripe, so HE takes the shooter nerf, whatever the zone of any earlier
+    /// field goal, and the field-goal shooter rule (<see cref="PossessionState.SelectedSlot"/>
+    /// on a Three / Long / Mid zone) is skipped. Null — every rebound-picking call — leaves the
+    /// method exactly as it was. The same draw, the same single RNG draw.</param>
     public static Slot Pick(
         PossessionState state,
         GameState       game,
         MatchupConfig   matchupCfg,
-        IRng            rng)
+        IRng            rng,
+        Slot?           atTheLine = null)
     {
         var offense  = state.Offense;
         var lineup   = game.LineupFor(offense);
@@ -164,10 +171,21 @@ public static class OffensiveRebounderPicker
 
             var pw         = Matchup.PositionalWeight(postnesses[i], meanPostness, matchupCfg);
             var wm         = Matchup.ReboundWingspanMultiplier(wingspans[i], meanWingspan, matchupCfg);
-            var isShooter  = state.SelectedSlot is { } sel
-                             && sel.Side   == offense
-                             && sel.Number == slot.Number;
-            var shooterNerf = isShooter && nerfZones ? matchupCfg.ReboundShooterNerf : 1.0;
+            // ★ S118.1: with a man at the line, the nerf is his regardless of zone; otherwise
+            // the field-goal shooter rule, unchanged.
+            double shooterNerf;
+            if (atTheLine is { } ftMan)
+            {
+                shooterNerf = ftMan.Side == offense && ftMan.Number == slot.Number
+                    ? matchupCfg.ReboundShooterNerf : 1.0;
+            }
+            else
+            {
+                var isShooter  = state.SelectedSlot is { } sel
+                                 && sel.Side   == offense
+                                 && sel.Number == slot.Number;
+                shooterNerf = isShooter && nerfZones ? matchupCfg.ReboundShooterNerf : 1.0;
+            }
 
             // Phase 45: per-player Hustle tilt (tanh, same shape as the wingspan
             // multiplier). A higher-Hustle player absorbs a larger share of his team's

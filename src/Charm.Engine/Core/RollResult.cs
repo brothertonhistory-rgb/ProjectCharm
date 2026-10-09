@@ -304,4 +304,16 @@ public sealed record Continue(ContinuationKind Next, PossessionState State) : Ro
     /// <see cref="ContinuationKind.ResolveRebound"/>.</para>
     /// </summary>
     public ReboundSource? ReboundSource { get; init; }
+
+    /// <summary>
+    /// ★ S118.1 (O-117) — the man who just missed the last free throw, carried on the
+    /// <see cref="ContinuationKind.ResolveFTRebound"/> continuation into Roll M. The trip
+    /// clears <see cref="PossessionState.FreeThrowShooterSlot"/> on this same exit (the
+    /// trip-scoped invariant), so his name rides HERE, on the one step that needs it, and
+    /// dies with that step — a <see cref="PossessionState"/> field would outlive the trip.
+    /// Read only by the Roll M case, to give him the shooter nerf in the loose-ball draw when
+    /// Roll M fouls the defense in the bonus. Set only by the free-throw driver's live-ball
+    /// exit (<c>FreeThrowShooterSlot ?? SelectedSlot</c> of the trip); null everywhere else.
+    /// </summary>
+    public Slot? MissedFreeThrowShooter { get; init; }
 }

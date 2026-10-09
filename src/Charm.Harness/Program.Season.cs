@@ -155,12 +155,14 @@ internal static partial class Program
     /// <summary>★ S118 -- one game's putback audit, read by Phase 108 only. <c>ShooterChanged</c> is the
     /// sum of the possession records' page-only counter (fouled-putback free-throw trips whose shooter
     /// S118 moved to the rebounder); the side totals are each side's team FGA and FTA off its own
-    /// possessions, and the part no slot could name. Nothing in the season reads it.</summary>
+    /// possessions, and the part no slot could name. ★ S118.1: <c>ScrambleStamped</c> sums the
+    /// scramble-foul counter the same way (Phases 108 and 109). Nothing in the season reads it.</summary>
     private sealed record GamePutbackAudit(
         int ShooterChanged,
         int HomeFga, int AwayFga, int HomeFta, int AwayFta,
         int HomeUnattributedFga, int AwayUnattributedFga,
-        int HomeUnattributedFta, int AwayUnattributedFta);
+        int HomeUnattributedFta, int AwayUnattributedFta,
+        int ScrambleStamped = 0);   // ★ S118.1 -- bonus trips named in the scramble (Phases 108, 109)
 
     private sealed record SeasonGameResult(
         int HomeId, int AwayId, int HomeScore, int AwayScore, int OvertimePeriods,
@@ -2005,7 +2007,8 @@ internal static partial class Program
                     Sum(TeamSide.Home, r => r.Fga), Sum(TeamSide.Away, r => r.Fga),
                     Sum(TeamSide.Home, r => r.Fta), Sum(TeamSide.Away, r => r.Fta),
                     Sum(TeamSide.Home, r => r.SlotUnattributedFga), Sum(TeamSide.Away, r => r.SlotUnattributedFga),
-                    Sum(TeamSide.Home, r => r.FtaBySlot.Unattr), Sum(TeamSide.Away, r => r.FtaBySlot.Unattr)));
+                    Sum(TeamSide.Home, r => r.FtaBySlot.Unattr), Sum(TeamSide.Away, r => r.FtaBySlot.Unattr),
+                    result.Possessions.Sum(r => r.ScrambleFtShooterStamped)));
             }
             playedGames.Add(pg);
             if (game.HomeScore > game.AwayScore) { wins[sg.HomeId]++; losses[sg.AwayId]++; }

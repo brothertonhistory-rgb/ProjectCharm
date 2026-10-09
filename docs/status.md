@@ -10,7 +10,17 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 118** (2026-10-08; verified on Emmett's machine — **ALL CHECKS PASSED, 93 timed sections,
+Last updated: **Session 118.1** (2026-10-08; verified on Emmett's machine — **ALL CHECKS PASSED, 94 timed sections,
+1,893.8s, Phase 109 new (44 assertions, 67.7s), every predicted number identical to the sandbox**. **THE SCRAMBLE FOUL
+GOES TO THE MAN IN THE SCRAMBLE** (O-117, Emmett 2026-10-08): in the bonus, a foul after the offense secures the board
+is shot by the rebounder; a loose-ball foul goes to a man drawn the way the offensive board is drawn — the missed
+jumper's or three's shooter cut to about a third, a missed layup's not, and off a missed free throw the man who just
+missed. 5,011 trips named, 3,161 games; the 2,049 fixed-pairing games without one byte-identical to the S118 season.
+Season points 729,863 → 730,487. Twelve pinned constants re-captured. ★ **C-61: the sandbox runs only what the session
+touched; the full suite runs once, on Emmett's machine; drafts read, never build** (CONVENTIONS v17). Boarded: the
+free-throw lane (**O-118**). Journal S118.1 has the detail.)
+
+Previous: **Session 118** (2026-10-08; verified on Emmett's machine — **ALL CHECKS PASSED, 93 timed sections,
 1,622.9s, Phase 108 new (26 assertions, 99.1s), every predicted number identical to the sandbox**. **THE PUTBACK BELONGS
 TO THE MAN WHO TOOK IT** (O-115, Emmett 2026-10-08): the man who grabs the offensive board and goes straight back up gets
 the attempt, the make and any free throws from a foul on it — he shoots them at his own rating and the foul is drawn
@@ -541,6 +551,14 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S118.1 MOVED THE GAMES THAT HAD A SCRAMBLE FOUL IN THE BONUS.** A foul after the board is shot by the rebounder, a
+loose-ball foul by the man the rebound draw names (the missed jumper's or three's shooter cut; off a missed free throw,
+the man who just missed). The three schedule fingerprints are unmoved; the four result fingerprints and every pinned
+game result are at **the S118.1 capture** (every-game digest `a34fda28…`; the old values in journal S118.1). Of the
+4,988 fixed-pairing games, the 2,049 without a scramble trip are byte-identical to the S118 season (Phase 109 C2), and
+the 655 touched by neither S118 nor S118.1 to the pre-S118 season (Phase 108 C2). Season points 730,487. Still 0
+uncredited sides and 0 unattributed attempts.
+
 **S118 MOVED THE GAMES THAT HAD A FOULED PUTBACK, AND GAVE EVERY PUTBACK ITS MAN.** A putback's attempt, make and free
 throws are the rebounder's; a fouled putback is shot at his FreeThrow and the foul drawn against his man. The three
 schedule fingerprints are unmoved; the four result fingerprints and every pinned game result are at **the S118 capture**
@@ -691,6 +709,13 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S118.1 — THE SCRAMBLE FOUL GOES TO THE MAN IN THE SCRAMBLE (closes O-117).** `Resolver.cs`: a bonus trip from
+  Roll K's `DefensiveFoul` stamped with the rebounder just drawn; from Roll I's or Roll M's `LooseBallFoulOnDefense`,
+  with `OffensiveRebounderPicker.Pick` (Roll M passing the man who missed at the stripe, `atTheLine`); the bonus edge
+  honours a present name. `Continue.MissedFreeThrowShooter` set by `LastShot`. Page-only counter
+  `ScrambleFtShooterStamped` → `GamePutbackAudit.ScrambleStamped`. Twelve pinned constants at the S118.1 values (old in
+  journal S118.1); wall wording to the S118.1 capture. **Phase 109 (44 assertions)**; Phase 108 C2 re-scoped to 655 games
+  untouched by either change; registry 94, frozen order, C3c exclusion. CONVENTIONS v17 (C-61). Journal S118.1.
 - **★ S118 — THE PUTBACK BELONGS TO THE MAN WHO TOOK IT (closes O-115).** `Resolver.cs`: one credited man at the
   field-goal chokepoint (`c.Putback ? ReboundSlot : SelectedSlot`); a fouled putback's trip stamped with the rebounder
   (`FreeThrowShooterSlot`), read by the fouler draw, the FTA/FTM credit and the FTA-source classification. Page-only
@@ -1245,13 +1270,16 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
-- **O-117 — WHO IS FOULED IN THE REBOUND SCRUM (S118, found at draft time, boarded not built).** A defensive foul in
-  the offensive-rebound scrum (Roll K's DefensiveFoul) that sends the team to the line in the bonus is shot by
-  `SelectedSlot` — the man who missed — because the Phase 51 picker fires only when `SelectedSlot` is null. Who is
-  fouled in a scrum is a ruling first (Emmett's), then a small engine session that will move games. **Note (S118 A3):**
-  `ReboundSlot` outlives its putback — set at every offensive board, cleared only on a reset, so a scrum foul followed
-  by an inbound still carries the old rebounder. S118 never infers a putback from it (the trip is stamped at the
-  putback itself); a fix here must not either.
+- **O-118 — THE FREE-THROW LANE (S118.1, Emmett: *"lane design is simply its own separate session, deciding who is
+  on it"*).** Who lines up along the lane on a free throw, and from that picture who grabs a missed free throw and who is
+  fouled on the loose ball. Today Roll M's board uses the rebound draw with the field-goal-shooter rule (it cuts the
+  missed jumper's shooter, never the free-throw shooter, and knows nothing of the lane); S118.1's loose-ball foul uses
+  the same draw cutting the free-throw shooter. Both share one draw, so this session changes both and moves games. Emmett
+  added that the bigs and best rebounders along the lane should be the most likely; the draw already leans that way
+  (the lineup's two best offensive rebounders fouled on 52% of these trips against 40% by chance). **Note (S118.1 A8b):**
+  the defender charged with a non-shooting foul is drawn without regard to who was fouled — not touched, a candidate
+  for the same family of "who" questions. **Note (S118 A3, still true):** `ReboundSlot` outlives its putback; never
+  infer a board or a putback from it later.
 - **O-116 — RETIRE THE REMAINING OLD-FORMAT READERS (C-60's follow-through, S117).** S117 retired every older reader
   of the season log. What is left of the same kind: the career file's v1 → v2 upgrade (`HistorySchemaV1` read and
   migrated by `HistoryStore.Open`; Phase 81 A6 proves it, and `UseFixedHistoryIdForTests` exists only for its golden).
@@ -2164,6 +2192,12 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-61 (S118.1, Emmett, 2026-10-08) — THE SANDBOX RUNS ONLY WHAT THE SESSION TOUCHED.** *"the last 30ish sessions
+  have taken far, far longer than the previous ones. I think it's largely the trial and error you do in the sandbox."*
+  Claude compiles, then runs the new check and the checks that read what changed; **never the full suite in the
+  sandbox** — when C-57 calls for one it runs once, on Emmett's machine. **Drafts read the code and never build the
+  design**; moved pins are captured from the real build, justified by the only-these-games-moved check, old → new in
+  the journal. CONVENTIONS v17 §2. Do not reintroduce draft-time throwaway builds or declared-before-the-build pins.
 - **C-60 (S117, Emmett's ruling 6, 2026-10-06) — THE GAME IS THE PRODUCT, NOT ITS SAVE FILES.** *"We are building the
   game, not the files within it. A save file for version 1.4 won't work for version 3.6."* A log saved by an older
   format is **refused by name** ("this career was saved by an older version of the game — start a new career"), never
@@ -2480,6 +2514,13 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **THE SCRAMBLE FOUL GOES TO THE MAN IN THE SCRAMBLE — S118.1 (2026-10-08). NEXT: NOT YET CHOSEN.** O-117 shipped. The
+arc's step 4 (development, recruiting, prestige movement, transfers) is where the plan goes next; **O-116** (the career
+file's old-version upgrade) and **O-118** (the free-throw lane — its own session) sit beside it. Emmett's call at the
+next-prompt pass (CONVENTIONS §6). **Supersedes S118's carry-forward line below on pins:** under C-61 a change that moves
+game results captures its new pins from the real build — never by declaring them from a draft-time throwaway — and keeps
+a check that carries the old history for the games it did not touch (Phase 108 C2, Phase 109 C2).
 
 ★ **THE PUTBACK BELONGS TO THE MAN WHO TOOK IT — S118 (2026-10-08). NEXT: NOT YET CHOSEN.** O-115 shipped. The arc's
 step 4 (development, recruiting, prestige movement, transfers) is where the plan goes next; **O-116** (the career file's

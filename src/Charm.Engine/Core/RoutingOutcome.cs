@@ -447,6 +447,13 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// RNG; read by nothing in the engine. Phase 108 sums it per game to prove that only the
     /// games containing one moved.</summary>
     public int PutbackFtShooterChanged { get; init; }
+
+    /// <summary>★ S118.1, PAGE-ONLY — bonus free-throw trips on this possession named in the
+    /// scramble (O-117): a foul after the offense secured the board (Roll K, the rebounder) or
+    /// on a loose ball (Roll I / Roll M, the rebound-weighted draw). Every stamped trip counts,
+    /// whether or not the man differs from the old rule's. Counted at the stamp in the
+    /// resolver; no RNG; read by nothing in the engine. Phases 108 and 109 sum it per game.</summary>
+    public int ScrambleFtShooterStamped { get; init; }
     /// <summary>The offensive slot that committed the turnover. Null for team
     /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
     /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for

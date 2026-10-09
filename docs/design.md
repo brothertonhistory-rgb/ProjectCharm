@@ -1672,7 +1672,9 @@ Seven arms, every one routing to an already-existing node (Roll M opens **no new
 - **OffensiveRebound** → continue to the offensive-rebound node (Roll K), stamped with the
   `FreeThrow` source.
 - **LooseBallFoulOnDefense** → the shared charge-and-fork (the fifth feeder after D / I / J / K):
-  charge the defense, then sideline-inbound below the bonus or free throws in it.
+  charge the defense, then sideline-inbound below the bonus or free throws in it. In the bonus the
+  fouled man is drawn by the rebound draw with the man who just missed at the stripe cut (S118.1 —
+  see "The trip-scoped state field").
 - **LooseBallFoulOnOffense** and **OutOfBoundsOffOffense** → terminals, dead ball to the defense at
   Roll A, no foul charged. Same routing, different reason label.
 - **OutOfBoundsOffDefense** → continue to the sideline-inbound node, no charge and **no fork**.
@@ -4897,8 +4899,9 @@ The distribution denominator is **men who occupied a floor seat for at least one
 **FreeThrow is absolute, not relative.** Every other attribute is on a 50 = average relative scale. FreeThrow is literal: a 72-rated shooter makes exactly 72% of free throws. The value is a real-world percentage — 72 = a typical D1 average, 85 = a very good shooter, 55 = a poor one. No calibration pass is needed; the attribute IS the rate.
 
 **The generator is the simplest real generator in the engine.** `RollLGenerator.Generate(state)`:
-1. Resolve the shooter as `state.FreeThrowShooterSlot ?? state.SelectedSlot` (Phase 51: the
-   pre-Roll-E bonus foul-draw pick wins when set, else the Roll E selected shooter).
+1. Resolve the shooter as `state.FreeThrowShooterSlot ?? state.SelectedSlot` — the man named at
+   the whistle wins when set (the Phase 51 foul-draw pick, the rebounder on a fouled putback since
+   S118, the man in the scramble since S118.1), else the Roll E selected shooter.
 2. If BOTH are null → use `config.MakeProbability` (fallback). If the resolved slot's player is
    null (unpopulated slot, isolation-test game) → same fallback.
 3. Otherwise: `makeProbability = player.FreeThrow / 100.0` — a literal 1:1, no curve (re-proven
@@ -5748,10 +5751,14 @@ weight[i] = max(1, OffensiveRebounding[i] × PositionalWeight(Postness[i]) × sh
 Where:
 - `OffensiveRebounding[i]` is the authored player attribute (0–99)
 - `PositionalWeight(Postness[i])` is the existing `Matchup.PositionalWeight` method — weights relative to the lineup's mean Postness, bigs above 1.0 and guards below, exactly 1.0 at the lineup mean. The same method Roll I's matchup math uses.
-- `shooterNerf[i] = ReboundShooterNerf (0.35, from MatchupConfig)` when candidate slot matches the shooter (`state.SelectedSlot?.Number == i`) AND `state.ShotType` is `Three`, `Long`, or `Mid`; 1.0 (no nerf) on `Rim`/`Short` and when `ShotType` is null (bonus FT boards where Roll E never ran)
+- `shooterNerf[i] = ReboundShooterNerf (0.35, from MatchupConfig)` when candidate slot matches the shooter (`state.SelectedSlot?.Number == i`) AND `state.ShotType` is `Three`, `Long`, or `Mid`; 1.0 (no nerf) on `Rim`/`Short` and when `ShotType` is null (bonus FT boards where Roll E never ran). **S118.1:** an optional `atTheLine` slot overrides this rule — when set, the nerf is that man's regardless of zone and the field-goal shooter is not cut; null on every rebound call.
 - Floor of 1 ensures every populated offensive slot has a positive weight — no zero-weight slots
 
 The same `Matchup.Postness` and `Matchup.PositionalWeight` methods used by Roll I are reused directly. No new matchup math; only a new consumer.
+
+### A second use — who is fouled in the scramble (S118.1, O-117)
+
+Emmett's ruling (2026-10-08): a loose-ball foul in the bonus goes to *"any one of the 5 … with the shooter probably being the least likely."* The fouled man is drawn by this same picker — the men who pull hardest for a board are the men most likely to be fouled going for it, and the man who missed a jumper or three is cut to about a third (a missed layup's is not). Off a missed free throw (Roll M), the man who just missed at the stripe takes the cut (`atTheLine`, carried on the `ResolveFTRebound` continuation as `MissedFreeThrowShooter`). A foul after the board is secured (Roll K's `DefensiveFoul`) needs no draw: it goes to the man this picker just named as the rebounder. The free-throw lane — who lines up, and from that who grabs a missed free throw and who is fouled — is its own future session (O-118); today the Roll M board itself still uses the field-goal-shooter rule. Wiring: "The trip-scoped state field" under Phase 51.
 
 ### Conditional-within-side (Option A) architecture — decision and known limitation
 
@@ -7793,9 +7800,15 @@ normalized across the populated slots; **one** RNG draw walks the cumulative sum
 2. The bonus-FT per-slot attribution — the FTA/FTM credit.
 3. (S118) The shooting-foul trip — the fouler draw, the FTA/FTM credit and the FTA-source classification.
 
-It is stamped at two places, each onto a trip and never onto a later live ball: the picker at the bonus FT edge (onto a **local** trip state, only when a draw is actually needed — no shooter selected **and** ≥1 offensive slot populated), and (S118) the fouled putback, onto the `ResolveShootingFreeThrows` continuation Roll H returns, with the rebounder. It must never influence Roll E/K/M or the field-goal counters.
+It is stamped at three kinds of place, each onto a trip and never onto a later live ball:
 
-**The clear (the one invariant that keeps it trip-scoped).** A free-throw trip has exactly one live-ball exit: `LastShot`'s missed-final-FT arm, which routes to the FT-rebound node. That arm **nulls** `FreeThrowShooterSlot`. Because it is the *sole* live-ball exit, clearing it there guarantees a stamp can never carry past the trip into a later live-ball continuation — specifically the bonus-miss → FT-rebound → putback route, where a second shooting-foul trip would otherwise read a stale stamp. The made-FT exit ends the possession, so its stamp dies with the terminal; no clear is needed there.
+- the picker at the bonus FT edge (onto a **local** trip state, only when a draw is actually needed — no name already on the trip, no shooter selected, **and** ≥1 offensive slot populated);
+- (S118) the fouled putback, onto the `ResolveShootingFreeThrows` continuation Roll H returns, with the rebounder;
+- (S118.1, O-117) **the scramble foul**, onto the `ResolveFreeThrows` continuation a scramble roll returns when its defensive foul lands in the bonus (the only way Roll I, K or M reaches that edge, through `DefensiveFoulCharge`): Roll K's `DefensiveFoul` → the rebounder drawn in the same resolver case (`picked31`, no RNG — never `ReboundSlot` read later); Roll I's `LooseBallFoulOnDefense` → `OffensiveRebounderPicker.Pick` on the roll's state (one `_rng` draw); Roll M's → the same draw with `atTheLine = MissedFreeThrowShooter` (one `_rng` draw; after a bonus trip it replaces the Phase 51 picker's draw one for one). The bonus FT edge honours a name already present and never redraws it. Below the bonus nothing is named — the foul goes to a sideline inbound. The defender charged with the foul is still drawn without regard to who was fouled.
+
+It must never influence Roll E/K/M or the field-goal counters.
+
+**The clear (the one invariant that keeps it trip-scoped).** A free-throw trip has exactly one live-ball exit: `LastShot`'s missed-final-FT arm, which routes to the FT-rebound node. That arm **nulls** `FreeThrowShooterSlot`. Because it is the *sole* live-ball exit, clearing it there guarantees a stamp can never carry past the trip into a later live-ball continuation — specifically the bonus-miss → FT-rebound → putback route, where a second shooting-foul trip would otherwise read a stale stamp. The made-FT exit ends the possession, so its stamp dies with the terminal; no clear is needed there. **The man who missed (S118.1)** is still needed one step later — Roll M's loose-ball draw cuts him — so the same exit sets `Continue.MissedFreeThrowShooter` (`FreeThrowShooterSlot ?? SelectedSlot` of the trip) on the `ResolveFTRebound` continuation. It lives on that continuation only and dies with it; there is deliberately no `PossessionState` field for it, which would outlive the trip.
 
 **The empty-roster gate.** An isolation test game with no players seated has zero populated offensive slots. The bonus edge checks `AnyOffensivePlayer` before calling the picker (which throws on zero), so an empty roster falls through to Roll L's flat fallback exactly as before — no regression, and the picker's zero-population throw stays an unreachable loud guard.
 
@@ -7803,8 +7816,8 @@ It is stamped at two places, each onto a trip and never onto a later live ball: 
 
 Every free-throw attempt on a possession is classified into exactly one of five buckets, threaded `RoutingOutcome → Governor → PossessionRecord` and reconciled (per-record **and** aggregate) to `Fta`:
 
-- **FtaBonusPicker** — bonus trip whose shooter the picker named (the Phase 51 path; on populated rosters this is where the old unattributed FTA now lands).
-- **FtaBonusSelected** — bonus trip where Roll E had already selected the shooter (a post-Roll-E bonus foul).
+- **FtaBonusPicker** — bonus trip whose shooter was named at the whistle: by the Phase 51 picker (on populated rosters this is where the old unattributed FTA now lands) or, since S118.1, by the scramble stamp.
+- **FtaBonusSelected** — bonus trip where Roll E had already selected the shooter (a post-Roll-E reach-in; since S118.1 no scramble foul lands here).
 - **FtaBonusUnattributed** — bonus trip with no shooter at all (an empty-roster isolation game — the residual flat fallback, which collapses to ~0 on real rosters).
 - **FtaShootingSelected** — shooting-foul trip with the normal selected shooter.
 - **FtaShootingNoSlot** — shooting-foul trip with no shooter identity at all. Before S118 this was the post-FT-rebound putback; S118 stamps that trip with the rebounder, so on populated rosters it reads 0.

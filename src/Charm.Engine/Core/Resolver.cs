@@ -237,6 +237,7 @@ public sealed class Resolver
         // missed shooter, or nobody, was not the rebounder). No RNG; read by nothing in the
         // engine. Phase 108 sums it per game to prove only those games moved.
         var putbackFtShooterChanged = 0;
+        var scrambleFtShooterStamped = 0;   // ★ S118.1, page-only: bonus trips named in the scramble
         // Per-slot fast-break blocks — the subset of BlkBySlot taken on a live break that is
         // not a putback. Feeds the "who gets break blocks" concentration board; the harness
         // maps slot -> man through the SAME path ordinary blocks already take, so a man's
@@ -487,7 +488,8 @@ public sealed class Resolver
                           NonBreakBlk            = nonBreakBlk,
                           FastBreakBlkBySlot     = fastBreakBlkBySlot,
                           BreakContests          = breakContests,
-                          PutbackFtShooterChanged = putbackFtShooterChanged };
+                          PutbackFtShooterChanged = putbackFtShooterChanged,
+                          ScrambleFtShooterStamped = scrambleFtShooterStamped };
 
                 case Continue c:
                     // Session 62: harvest any non-shooting foul this continuation carries,
@@ -674,8 +676,12 @@ public sealed class Resolver
                             // null AND ≥1 populated offensive slot (an empty-roster
                             // isolation game falls through to the flat fallback, never
                             // throwing).
+                            // ★ S118.1: a scramble foul arrives ALREADY NAMED (the rebounder, or
+                            // the rebound-weighted loose-ball draw) — honour that, never redraw.
+                            // No old path reaches here with a name (the S118.1 A2 proof).
                             var ftState = c.State;
-                            if (ftState.SelectedSlot is null && AnyOffensivePlayer(ftState))
+                            if (ftState.FreeThrowShooterSlot is null
+                                && ftState.SelectedSlot is null && AnyOffensivePlayer(ftState))
                                 ftState = ftState with
                                 {
                                     FreeThrowShooterSlot = FouledPlayerPicker.Pick(ftState, _game, _matchup, _rng)
@@ -1055,6 +1061,16 @@ public sealed class Resolver
                                 c.State,
                                 c.ReboundSource ?? ReboundSource.LiveBall);
                             result = RollI.Execute(c.State, pieI, _game, _rng);
+                            // ★ S118.1 — A LOOSE-BALL FOUL IN THE BONUS GOES TO THE MAN IN THE
+                            // SCRAMBLE (O-117, Emmett 2026-10-08): any of the five, drawn the way
+                            // the engine picks who grabs an offensive board — the missed jumper's
+                            // or three's shooter cut to a third, a missed layup's not. One _rng draw.
+                            if (IsBonusTrip(result, out var cIft) && AnyOffensivePlayer(cIft.State))
+                            {
+                                result = StampFreeThrowShooter(cIft,
+                                    OffensiveRebounderPicker.Pick(c.State, _game, _matchup, _rng));
+                                scrambleFtShooterStamped++;
+                            }
                             // ORB counters — tallied exactly once per Roll I resolution.
                             // Terminal("DefensiveRebound") = board secured by defense.
                             // Continue(ResolveOffensiveRebound) = board secured by offense.
@@ -1102,6 +1118,14 @@ public sealed class Resolver
                                 reboundState31,
                                 c.OffensiveReboundSource ?? OffensiveReboundSource.LiveBall);
                             result = RollK.Execute(reboundState31, pieK, _game, _rng);
+                            // ★ S118.1 — A FOUL AFTER THE BOARD GOES TO THE MAN WHO GRABBED IT
+                            // (O-117). The rebounder drawn just above, in this same case — never
+                            // ReboundSlot read later (S118 A3). No RNG.
+                            if (IsBonusTrip(result, out var cKft))
+                            {
+                                result = StampFreeThrowShooter(cKft, picked31);
+                                scrambleFtShooterStamped++;
+                            }
                             continue;
 
                         // Roll H, shooting foul (and-1 or fouled miss) -> the Roll L FT
@@ -1251,6 +1275,16 @@ public sealed class Resolver
                         case ContinuationKind.ResolveFTRebound:
                             var pieM = _rollMGenerator.Generate(c.State);
                             result = RollM.Execute(c.State, pieM, _game, _rng);
+                            // ★ S118.1 — A LOOSE BALL OFF A MISSED FREE THROW (O-117): the same
+                            // rebound-weighted draw, but the man cut is the one who just missed at
+                            // the stripe (carried on this continuation), not any field-goal shooter.
+                            // One _rng draw; after a bonus trip it replaces the foul-draw picker's.
+                            if (IsBonusTrip(result, out var cMft) && AnyOffensivePlayer(cMft.State))
+                            {
+                                result = StampFreeThrowShooter(cMft,
+                                    OffensiveRebounderPicker.Pick(c.State, _game, _matchup, _rng, c.MissedFreeThrowShooter));
+                                scrambleFtShooterStamped++;
+                            }
                             // ORB counters — same shape as ResolveRebound (Roll I).
                             // Roll M fires once per FT trip; a missed putback off its
                             // offensive board re-enters Roll I, not Roll M, so there is
@@ -1448,10 +1482,32 @@ public sealed class Resolver
     /// bonus-miss → FT-rebound → putback route, where a second shooting-foul trip would
     /// otherwise read the stale stamp). The made-FT exit ends the possession, so its
     /// stamp dies with the terminal — no clear needed there.</para></summary>
+    /// <summary>★ S118.1: true when a scramble roll (I / K / M) just sent the offense to the
+    /// line on a bonus foul — the only way any of them emits <see cref="ContinuationKind.ResolveFreeThrows"/>
+    /// (through <see cref="DefensiveFoulCharge.Resolve"/>). Below the bonus it is a sideline
+    /// throw-in and nothing is named.</summary>
+    private static bool IsBonusTrip(RollResult result, out Continue trip)
+    {
+        if (result is Continue c && c.Next == ContinuationKind.ResolveFreeThrows) { trip = c; return true; }
+        trip = null!;
+        return false;
+    }
+
+    /// <summary>★ S118.1: name the man going to the line on the trip's own state — no new
+    /// routing, every other payload (the bonus, the foul event) carried as is. The bonus case
+    /// honours the name; the trip's live-ball exit clears it, as for every trip.</summary>
+    private static Continue StampFreeThrowShooter(Continue trip, Slot shooter) =>
+        trip with { State = trip.State with { FreeThrowShooterSlot = shooter } };
+
     private static RollResult LastShot(PossessionState state, FreeThrowOutcome outcome) =>
         outcome == FreeThrowOutcome.Make
             ? new Terminal("FreeThrowsMade", state, PossessionConsequence.DeadBallTo(state.Defense))
-            : new Continue(ContinuationKind.ResolveFTRebound, state with { FreeThrowShooterSlot = null });
+            : new Continue(ContinuationKind.ResolveFTRebound, state with { FreeThrowShooterSlot = null })
+              {
+                  // ★ S118.1 (A4): the man who just missed rides the continuation, not the
+                  // possession — the stamp above is cleared on this exit as it always was.
+                  MissedFreeThrowShooter = state.FreeThrowShooterSlot ?? state.SelectedSlot
+              };
 
     /// <summary>Derive the shot count for a SHOOTING foul from the stamped facts —
     /// plain sequencing the conductor reads at the entry edge, never a stamp Roll L
