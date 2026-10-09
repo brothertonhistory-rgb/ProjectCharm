@@ -236,14 +236,12 @@
     <None Include="..\..\tools\gen_pass3_replay_fixture_s78.json" Link="tools\gen_pass3_replay_fixture_s78.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <!-- S89 — the history file's canonical v1 form, pinned. This is a FORMAT fixture, not
+    <!-- S89 / S90 — the history file's canonical form, pinned. This is a FORMAT fixture, not
          a behaviour one: it is what a brand-new history looks like on disk, byte for byte,
-         with a placeholder world fingerprint. It exists so that a later session cannot
-         change the key order, the indent, the encoding or the trailing newline of a save
-         file without the suite saying so out loud. -->
-    <None Include="..\..\tools\history_v1_golden.json" Link="tools\history_v1_golden.json">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
+         with a placeholder world fingerprint and a pinned lineage label. It exists so that a
+         later session cannot change the key order, the indent, the encoding or the trailing
+         newline of a save file without the suite saying so out loud. (S118.2: the v1 golden
+         is retired with the v1 upgrade, C-60.) -->
     <None Include="..\..\tools\history_v2_golden.json" Link="tools\history_v2_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

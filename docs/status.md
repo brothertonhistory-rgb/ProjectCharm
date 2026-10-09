@@ -10,7 +10,16 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 118.1** (2026-10-08; verified on Emmett's machine — **ALL CHECKS PASSED, 94 timed sections,
+Last updated: **Session 118.2** (2026-10-09; verified on Emmett's machine — **`checks 80 81 105 106 107 100 102 103
+104`, all PASS, 642.3s**; Phase 80 78 ok (was 75), Phase 81 49, every predicted count landed). **AN OLDER CAREER IS
+REFUSED BY NAME, NOT UPGRADED** (O-116, C-60): a career saved before S90 gets *"this career was saved by an older version
+of the game — start a new career"* and is left exactly as it was; the v1 career-file code and golden are deleted, and
+Phase 80's hand-built test files moved to the current format. No game moved. **S114's journal entry restored** — it
+existed only in the stale extensionless `docs/journal` (Emmett: "yes"); both stale copies deleted; CONVENTIONS v18 §3
+names `journal.md` / `design.md`. Boarded: the season record's contract reader still tolerates an older record
+(**O-119**). Journal S118.2 has the detail.)
+
+Previous: **Session 118.1** (2026-10-08; verified on Emmett's machine — **ALL CHECKS PASSED, 94 timed sections,
 1,893.8s, Phase 109 new (44 assertions, 67.7s), every predicted number identical to the sandbox**. **THE SCRAMBLE FOUL
 GOES TO THE MAN IN THE SCRAMBLE** (O-117, Emmett 2026-10-08): in the bonus, a foul after the offense secures the board
 is shot by the rebounder; a loose-ball foul goes to a man drawn the way the offensive board is drawn — the missed
@@ -551,6 +560,9 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S118.2 MOVED NO GAME.** Every fingerprint and pinned result stays at the S118.1 capture (Phases 102–104 green). A
+history file is version 2 only; a version-1 career is refused by name.
+
 **S118.1 MOVED THE GAMES THAT HAD A SCRAMBLE FOUL IN THE BONUS.** A foul after the board is shot by the rebounder, a
 loose-ball foul by the man the rebound draw names (the missed jumper's or three's shooter cut; off a missed free throw,
 the man who just missed). The three schedule fingerprints are unmoved; the four result fingerprints and every pinned
@@ -709,6 +721,13 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S118.2 — AN OLDER CAREER IS REFUSED BY NAME (closes O-116).** `HistoryStore.Open`: version 1 throws
+  `UnsupportedVersion` with the standing sentence before any write; `HistorySchemaV1.cs`, `HistoryStateV2.FromV1` and
+  `tools/history_v1_golden.json` deleted; "reads 2". Phase 80: test files in the current format (`CheckHistoryId`), B3
+  written not created, `PeekState` → harness-local `HistoryCounters`, new B10 "older version" case (+3; the version-7
+  refusal must not carry the sentence). Phase 81 A6: the refusal arm (4 for 4). Negative control: the new tests against
+  the old upgrading engine go red on every older-version line. S114's journal entry restored byte for byte; `docs/journal`
+  and `docs/design` deleted; CONVENTIONS v18 §3. Journal S118.2.
 - **★ S118.1 — THE SCRAMBLE FOUL GOES TO THE MAN IN THE SCRAMBLE (closes O-117).** `Resolver.cs`: a bonus trip from
   Roll K's `DefensiveFoul` stamped with the rebounder just drawn; from Roll I's or Roll M's `LooseBallFoulOnDefense`,
   with `OffensiveRebounderPicker.Pick` (Roll M passing the man who missed at the stripe, `atTheLine`); the bonus edge
@@ -1280,10 +1299,11 @@ chart is PROVISIONAL pending O-6.
   the defender charged with a non-shooting foul is drawn without regard to who was fouled — not touched, a candidate
   for the same family of "who" questions. **Note (S118 A3, still true):** `ReboundSlot` outlives its putback; never
   infer a board or a putback from it later.
-- **O-116 — RETIRE THE REMAINING OLD-FORMAT READERS (C-60's follow-through, S117).** S117 retired every older reader
-  of the season log. What is left of the same kind: the career file's v1 → v2 upgrade (`HistorySchemaV1` read and
-  migrated by `HistoryStore.Open`; Phase 81 A6 proves it, and `UseFixedHistoryIdForTests` exists only for its golden).
-  Under C-60 an older career file is refused by name, not upgraded. Small, and touches Phase 81.
+- **O-119 — THE SEASON RECORD'S CONTRACT READER STILL TOLERATES AN OLDER RECORD (S118.2 finding, C-60).**
+  `ReadLiveContracts` (`Program.Season.Contracts.cs`) reads a `formatVersion: 1` season record as `PreContractFormat` —
+  "a career from before contracts", no contracts — instead of refusing it; Phase 94 C10b asserts that. C-60 says an
+  older save is refused by name and no reader tolerates an older format. The last reader of its kind found (S118.2
+  searched the engine, the history assembly and the harness's season, world and career code). Small; touches Phase 94.
 - **O-106 — ★ CONFERENCE TOURNAMENTS HAVE NO REAL NEUTRAL SITE (S110 placeholder, ruled temporary).** R1 puts all
   seven of a league's games in the **original No. 1 seed's city**, frozen, nobody hosting. Emmett: *"we will add in
   neutral locations later."* `WorldConference` carries no place at all, so the successor is authored per-conference
@@ -2203,7 +2223,8 @@ chart is PROVISIONAL pending O-6.
   format is **refused by name** ("this career was saved by an older version of the game — start a new career"), never
   read half-blind, never with an "unknown" filled in. **No new compatibility code**: a format change bumps the version
   and retires the old reader in the same session (S117 retired block 1/2, row 1 and roster 1 — Emmett, "retire"). The
-  career file's own old-version upgrade is boarded (O-116). Do not write a reader that tolerates an older format.
+  career file's own old-version upgrade was retired at S118.2 (O-116); the season record's contract reader is the one
+  tolerance left (O-119). Do not write a reader that tolerates an older format.
 - **C-58 (S116, Emmett's ruling, 2026-10-06) — A CONFERENCE TOURNAMENT GAME IS A CONFERENCE GAME FOR THE PLAYER, NEVER
   FOR THE STANDINGS.** *"It counts as a conference game for the player, but does not count towards conference
   standings."* The log marks it as its own kind; the league flag (standings, host memory) means the league slate only.
@@ -2514,6 +2535,11 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **AN OLDER CAREER IS REFUSED BY NAME — S118.2 (2026-10-09). NEXT: NOT YET CHOSEN.** O-116 shipped. The arc's step 4
+(development, recruiting, prestige movement, transfers) is where the plan goes next; **O-118** (the free-throw lane — its
+own session) and **O-119** (the contract reader's older-record tolerance — small) sit beside it. Emmett's call at the
+next-prompt pass (CONVENTIONS §6).
 
 ★ **THE SCRAMBLE FOUL GOES TO THE MAN IN THE SCRAMBLE — S118.1 (2026-10-08). NEXT: NOT YET CHOSEN.** O-117 shipped. The
 arc's step 4 (development, recruiting, prestige movement, transfers) is where the plan goes next; **O-116** (the career

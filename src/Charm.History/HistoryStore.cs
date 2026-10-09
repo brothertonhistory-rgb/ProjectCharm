@@ -61,27 +61,28 @@ public sealed class HistoryStore : IDisposable
     /// into another that happens to share a world.</summary>
     public string HistoryId => _state.HistoryId;
 
-    // ★ The id source is a seam for ONE reason: the migration golden. Production mints from
+    // ★ The id source is a seam for ONE reason: the born-v2 golden. Production mints from
     // Guid.NewGuid(), which by design produces a different file every run, so the suite could
-    // never pin migration byte-for-byte against a fixture. Injecting a fixed id lets the suite
-    // drive the EXACT production migration writer and compare bytes — rather than the usual
-    // alternative, which is a hand-authored "expected" file that proves only that somebody
-    // typed what they expected.
+    // never pin a newly created history byte-for-byte against a fixture. Injecting a fixed id
+    // lets the suite drive the EXACT production writer and compare bytes — rather than the
+    // usual alternative, which is a hand-authored "expected" file that proves only that
+    // somebody typed what they expected. (S118.2: it was first opened for the v1-to-v2
+    // migration golden; the migration is retired, C-60, and this is what it is for now.)
     private static Func<string> _idSource = HistorySchemaV2.MintHistoryId;
 
     /// <summary>Pin the lineage label for the duration of the returned scope.
     ///
     /// <para>★ PUBLIC, AND THAT IS A DELIBERATE WIDENING WORTH NAMING. Everything else in
     /// this assembly is sealed against the harness on purpose. This one door is open because
-    /// the migration golden has no other honest form: production mints from Guid.NewGuid(),
-    /// so a v1-to-v2 migration produces a different file every run and could never be pinned
+    /// the born-v2 golden has no other honest form: production mints from Guid.NewGuid(),
+    /// so creating a history produces a different file every run and could never be pinned
     /// byte-for-byte. The alternative is a hand-authored "expected" file, which proves only
     /// that somebody typed what they expected — it would not be driving the production
     /// writer at all.</para>
     ///
     /// <para>It carries no raw identity value out, so S89's actual seam is untouched: this
     /// sets a label, it does not expose a number. Nothing on a production path may call it,
-    /// and Phase 81 is the only caller in the tree.</para></summary>
+    /// and Phase 80 B10 (the born-v2 golden) is the only caller in the tree.</para></summary>
     public static IDisposable UseFixedHistoryIdForTests(string id)
     {
         if (!HistorySchemaV2.IsCanonicalHistoryId(id))
@@ -126,16 +127,16 @@ public sealed class HistoryStore : IDisposable
 
     /// <summary>Take the lock, then load-or-create and verify.
     ///
-    /// <para>★ S90 corrected this comment, which used to promise that opening an existing
-    /// history writes nothing. That is true of a **v2** history — validation is read-only, so
-    /// a run that fails before its first reservation leaves the file byte-identical. It is NOT
-    /// true of a **v1** history: opening one performs exactly one atomic migration write to
-    /// give the career its lineage label, and nothing else. A career must have its identity
-    /// before any retention log can bind to it.</para>
+    /// <para>Opening an existing history writes nothing: validation is read-only, so a run
+    /// that fails before its first reservation leaves the file byte-identical.</para>
     ///
-    /// <para>A history CREATED here is born v2. S90 never writes a v1 file at any instant —
-    /// creating one and migrating it on first open would mean two writes and a half-created
-    /// state that no reader has a name for.</para></summary>
+    /// <para>★ S118.2 — a **v1** history (saved before S90) is refused by name, never upgraded
+    /// (Emmett's ruling C-60: the game is the product, not its save files). S90 to S118.1
+    /// upgraded one on open with a single migration write; that code is retired, and the
+    /// refusal happens before any write, so the old file is left exactly as it was.</para>
+    ///
+    /// <para>A history CREATED here is born v2 — the lineage label exists before the first
+    /// number is issued.</para></summary>
     public static HistoryStore Open(string path, string worldFingerprint)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -187,36 +188,29 @@ public sealed class HistoryStore : IDisposable
                 // A parse failure is NEVER treated as "no file". Starting fresh at 1 on top
                 // of a corrupt-but-real history reissues every number in it.
                 //
-                // The version is peeked FIRST so the right parser runs. Handing a v2 file to
-                // the v1 parser would refuse it as "unknown key 'historyId'" — true, and
-                // completely misleading about what is wrong.
+                // The version is peeked FIRST, so an older career is refused for being older
+                // rather than for whatever key the current parser happens to trip on first
+                // (a v1 file would read as "missing key 'historyId'" — true, and completely
+                // misleading about what is wrong).
                 var version = HistorySchemaV2.PeekVersion(bytes);
                 if (version == HistoryStateV2.SchemaVersion)
                 {
                     state = HistorySchemaV2.Parse(bytes);
                 }
-                else if (version == HistoryStateV1.SchemaVersion)
+                else if (version == 1)
                 {
-                    // ── MIGRATION: one way, once, under the lock already held. ──
-                    // Counters cross untouched; only the lineage label is added. A
-                    // migration that moved a counter would reissue numbers already worn.
-                    var v1 = HistorySchemaV1.Parse(bytes);
-                    if (!string.Equals(v1.WorldFingerprint, worldFingerprint, StringComparison.Ordinal))
-                        throw new HistoryException(HistoryError.FingerprintMismatch,
-                            $"this history belongs to a different world. History '{full}' is bound to " +
-                            $"{v1.WorldFingerprint}, the world given is {worldFingerprint}.");
-                    // ★ If minting or the atomic rewrite fails, PublishAtomically throws with
-                    // the v1 file byte-identical and no counter advanced — so the run stops and
-                    // a retry is possible. No log folder is created here, and none can be:
-                    // the writer is constructed later, from a store this line has not returned.
-                    state = HistoryStateV2.FromV1(v1, _idSource());
-                    PublishAtomically(full, state);
+                    // ★ S118.2, C-60 — refused by name, never upgraded. Nothing has been
+                    // written: the file is exactly as it was, and no log folder exists, because
+                    // the writer is constructed later from a store this line never returns.
+                    throw new HistoryException(HistoryError.UnsupportedVersion,
+                        $"{GameLogSchemaV1.OlderVersionSentence} (history '{full}' is schemaVersion 1; " +
+                        "this build reads 2).");
                 }
                 else
                 {
                     throw new HistoryException(HistoryError.UnsupportedVersion,
                         $"unsupported history schemaVersion {version.ToString(CultureInfo.InvariantCulture)} " +
-                        "(this build reads 1 and 2).");
+                        "(this build reads 2).");
                 }
 
                 if (!string.Equals(state.WorldFingerprint, worldFingerprint, StringComparison.Ordinal))

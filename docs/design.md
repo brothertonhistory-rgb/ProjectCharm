@@ -9020,7 +9020,10 @@ already corrupt.
   *"this career was saved by an older version of the game — start a new career"* — at the reader, so at
   the turnover and on every page (a page refuses the career; it does not star a season). No reader
   tolerates an older format and prints "unknown". A format change bumps the version and retires the
-  old reader in the same session. (The career file's own v1 → v2 upgrade predates the ruling; O-116.)
+  old reader in the same session. The career file follows the same rule since S118.2: a pre-S90 (v1)
+  career is refused by the same sentence before anything is written, never upgraded. (One reader still
+  tolerates an older format: the season record's contracts read a `formatVersion: 1` record as
+  "pre-contract", empty — boarded as O-119.)
 
 ### What is deliberately absent
 
@@ -9069,9 +9072,10 @@ surface is DTOs, and the **writer sorts both sections itself**, because `PersonI
 has no ordering and the harness physically cannot hand them over sorted.
 
 One deliberate exception: `HistoryStore.UseFixedHistoryIdForTests` is **public**, because the
-migration golden has no other honest form — production mints from `Guid.NewGuid()`, so
-migration produces a different file every run. It sets a label and hands out no identity value,
-so the real seam is untouched. Phase 81 is its only caller.
+born-v2 golden has no other honest form — production mints from `Guid.NewGuid()`, so creating a
+history produces a different file every run. It sets a label and hands out no identity value,
+so the real seam is untouched. Phase 80 B10 is its only caller (it was opened at S90 for the
+v1 → v2 migration golden; the migration was retired at S118.2).
 
 ### The intrinsic / contextual line
 
@@ -9131,9 +9135,13 @@ every check v1 could make. `historyId` (128 random bits, minted once at creation
 hex) closes it.
 
 - **A history created after S90 is born v2.** No v1 file is ever written at any instant.
-- **A pre-S90 file migrates once**, atomically, under the lock already held, every counter
-  carried across untouched — a migration that moved a counter would reissue numbers already
-  worn.
+- **A pre-S90 (v1) file is refused by name, never upgraded** (C-60, S118.2): *"this career was
+  saved by an older version of the game — start a new career"*, classified `UnsupportedVersion`.
+  The version is peeked first, so the refusal names the real reason rather than the missing
+  `historyId` key, and it comes before any write — the file is left byte-identical and no
+  season-log folder can exist. (S90 to S118.1 upgraded it once on open; that code is deleted.)
+  Phase 80 B10 and Phase 81 A6 prove it, and B10 also proves the sentence belongs to the older
+  career alone — a version-7 file is refused without it.
 - **What it does not prove:** a history *cloned* at the filesystem carries its label, so those
   branches are indistinguishable. That is the same trust boundary S89 already draws, since a
   clone also duplicates every counter. Branch detection is save-branch management.
@@ -9827,12 +9835,13 @@ Everything in the harness — every calibration file, every check — is one ass
 
 **Zero is not a person.** Issuance starts at 1, so `default(PersonId)` is invalid rather than being person zero. A struct cannot forbid `default`, so enforcement lives at construction boundaries (`IdentityGuard`), not in the type. Absence is `PersonId?` being null, never a zero identity.
 
-### The file — three counters and a world binding
+### The file — three counters, a world binding and a lineage label
 
 ```json
 {
   "format": "charm-history",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "historyId": "0123456789abcdef0123456789abcdef",
   "worldFingerprint": "sha256-v1:fa823da9…",
   "nextPersonId": 4512,
   "nextSeasonId": 2,
@@ -9840,7 +9849,7 @@ Everything in the harness — every calibration file, every check — is one ass
 }
 ```
 
-Canonical form is specified once, in `HistorySchemaV1.Serialize`, and pinned by `tools/history_v1_golden.json`: that key order, 2-space indent, `\n` newlines, UTF-8 with **no BOM**, one final newline. The golden is compared against what the store actually writes, never against a second hand-rolled copy of the format.
+Canonical form is specified once, in `HistorySchemaV2.Serialize`, and pinned by `tools/history_v2_golden.json` (written by the real store under a pinned lineage label): that key order, 2-space indent, `\n` newlines, UTF-8 with **no BOM**, one final newline. The golden is compared against what the store actually writes, never against a second hand-rolled copy of the format.
 
 `Next*` means **next unissued**: every value below it is permanently unavailable, and the stored value itself has not been handed out yet.
 

@@ -41,12 +41,6 @@ public sealed record HistoryStateV2(
 
     public static HistoryStateV2 Fresh(string historyId, string worldFingerprint)
         => new(historyId, worldFingerprint, 1, 1, 1);
-
-    /// <summary>A v1 file gains a lineage label and nothing else — every counter is
-    /// carried across untouched, because a migration that moved a counter would be
-    /// reissuing numbers that are already on people.</summary>
-    public static HistoryStateV2 FromV1(HistoryStateV1 v1, string historyId)
-        => new(historyId, v1.WorldFingerprint, v1.NextPersonId, v1.NextSeasonId, v1.NextGameId);
 }
 
 internal static class HistorySchemaV2
@@ -55,9 +49,9 @@ internal static class HistorySchemaV2
         { "format", "schemaVersion", "historyId", "worldFingerprint",
           "nextPersonId", "nextSeasonId", "nextGameId" };
 
-    /// <summary>Read only `schemaVersion`, so the loader can route to the right parser
-    /// instead of a v1 parser rejecting a v2 file as "unknown key historyId" — which is
-    /// a true statement and a completely misleading error.</summary>
+    /// <summary>Read only `schemaVersion`, so the loader can refuse an older career for
+    /// being older (S118.2) instead of letting this parser reject it as "missing key
+    /// historyId" — which is a true statement and a completely misleading error.</summary>
     internal static int PeekVersion(byte[] bytes)
     {
         JsonDocument doc;
@@ -83,8 +77,8 @@ internal static class HistorySchemaV2
     // ── Canonical serialization ─────────────────────────────────────────────
     //  Key order fixed here and pinned by a golden: format, schemaVersion,
     //  historyId, worldFingerprint, then the three counters. 2-space indent,
-    //  "\n" newlines, UTF-8 with no BOM, one final newline — identical
-    //  discipline to v1, so the two goldens differ only where the schema does.
+    //  "\n" newlines, UTF-8 with no BOM, one final newline — the discipline
+    //  S89 set for v1, pinned by `tools/history_v2_golden.json`.
     internal static byte[] Serialize(HistoryStateV2 s)
     {
         using var stream = new MemoryStream();
@@ -134,7 +128,7 @@ internal static class HistorySchemaV2
             if (version != HistoryStateV2.SchemaVersion)
                 throw new HistoryException(HistoryError.UnsupportedVersion,
                     $"unsupported history schemaVersion {version.ToString(CultureInfo.InvariantCulture)} " +
-                    "(this build reads 1 and 2).");
+                    "(this build reads 2).");
 
             var historyId = RequireString(root, "historyId");
             if (!IsCanonicalHistoryId(historyId))

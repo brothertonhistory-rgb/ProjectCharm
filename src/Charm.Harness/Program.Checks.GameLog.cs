@@ -333,30 +333,27 @@ internal static partial class Program
                   GameLogWriter.LogFolderFor("/tmp/career").EndsWith("career.gamelog", StringComparison.Ordinal));
         }
 
-        // ── A6 — BINDING AND MIGRATION ───────────────────────────────────────
+        // ── A6 — BINDING AND THE OLDER-VERSION REFUSAL ───────────────────────
         {
-            // A v1 history migrates to v2 through the PRODUCTION writer with an injected
-            // fixed id, so the golden pins the real migration path rather than a
-            // hand-authored file that only proves somebody typed what they expected.
+            // ★ S118.2 — a v1 career (saved before S90) is REFUSED BY NAME, never upgraded
+            //   (C-60: the game is the product, not its save files). S90 to S118.1 upgraded it
+            //   on open; that arm is retired. The refusal must come before any write: the file
+            //   is left exactly as it was, and no season log can have been started for it.
             var p = Fresh("a6");
-            WriteRawHistoryForCheck(p, tinyFp, 4001, 7, 900);
-            const string fixedId = "0123456789abcdef0123456789abcdef";
-            using (HistoryStore.UseFixedHistoryIdForTests(fixedId))
-            using (var h = HistoryStore.Open(p, tinyFp))
-            {
-                Check("A6 a v1 history migrates to v2 and gains its lineage label",
-                      h.HistoryId == fixedId, h.HistoryId);
-                var text = File.ReadAllText(p);
-                Check("A6 migration carries every counter across untouched — a moved counter "
-                      + "would reissue numbers already worn",
-                      text.Contains("\"nextPersonId\": 4001") && text.Contains("\"nextSeasonId\": 7")
-                      && text.Contains("\"nextGameId\": 900"));
-                Check("A6 a migrated file is v2 and never left as v1",
-                      text.Contains("\"schemaVersion\": 2"));
-                Check("A6 key order is canonical: format, schemaVersion, historyId, worldFingerprint",
-                      text.IndexOf("historyId", StringComparison.Ordinal)
-                        < text.IndexOf("worldFingerprint", StringComparison.Ordinal));
-            }
+            File.WriteAllText(p, RawHistoryV1(tinyFp, 4001, 7, 900));
+            var before = File.ReadAllBytes(p);
+            HistoryException? refusal = null;
+            try { using var h = HistoryStore.Open(p, tinyFp); }
+            catch (HistoryException hx) { refusal = hx; }
+            Check("A6 a v1 career is refused, classified UnsupportedVersion",
+                  refusal?.Error == HistoryError.UnsupportedVersion, refusal?.Error.ToString() ?? "no throw");
+            Check("A6 ...by name: 'this career was saved by an older version of the game — start a new career'",
+                  refusal is not null && refusal.Message.Contains(OlderCareerSentence, StringComparison.Ordinal),
+                  refusal?.Message);
+            Check("A6 the refused file is byte-identical — refused before any write, never upgraded",
+                  File.ReadAllBytes(p).SequenceEqual(before));
+            Check("A6 no season-log folder exists for the refused career",
+                  !Directory.Exists(GameLogWriter.LogFolderFor(p)));
 
             var p2 = Fresh("a6b");
             using (var h = HistoryStore.Open(p2, tinyFp))
