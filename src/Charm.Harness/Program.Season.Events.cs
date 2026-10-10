@@ -717,14 +717,18 @@ internal static partial class Program
     // ── The permanent record ─────────────────────────────────────────────────────
 
     /// <summary>★ S103 — v2 adds two collections: the live contracts (forward state)
-    /// and the non-conference pairing log (played... paired facts). The reader accepts
-    /// BOTH versions: a v1 file is a pre-contract career, and bumping the constant
-    /// without widening the read would silently erase every existing career's
-    /// tournament memory — the four-year rule would stop working with every check
-    /// green. A v1 record contributes its events exactly as before and reads as an
-    /// EMPTY contract collection, never as unknown.</summary>
+    /// and the non-conference pairing log (played... paired facts).
+    ///
+    /// <para>★ C-62 (S118.3) — the readers accept THIS version only. An older record is
+    /// FORGOTTEN, not read: it is a hole like a damaged file, that season contributes no
+    /// tournament memory and no contracts, the career plays on, and the page says why
+    /// ("saved by an older version of the game"). The S103 widening that read v1 is
+    /// retired; do not write a reader that tolerates an older format (C-60).</para></summary>
     private const int MteRecordFormatVersion = 2;
-    private static readonly int[] MteSupportedRecordVersions = { 1, 2 };
+
+    /// <summary>The diagnostic for a record written by the first format (v1), shared by the
+    /// tournament-memory and contract readers so the page says it the same way twice (C-62).</summary>
+    private const string MteOlderRecordNote = "saved by an older version of the game";
 
     /// <summary>The folder is named for the history FILE, exactly as the game log's is, so two
     /// careers side by side cannot share a record directory and collide on season-1.</summary>
@@ -768,7 +772,9 @@ internal static partial class Program
 
                 if (!root.TryGetProperty("formatVersion", out var fv) || !fv.TryGetInt32(out var version))
                 { result.Diagnostics.Add($"season {seasonId}: malformed"); continue; }
-                if (!MteSupportedRecordVersions.Contains(version))
+                if (version == 1)                                   // ★ C-62: forgotten, not read
+                { result.Diagnostics.Add($"season {seasonId}: {MteOlderRecordNote}"); continue; }
+                if (version != MteRecordFormatVersion)
                 { result.Diagnostics.Add($"season {seasonId}: unsupported record version {version}"); continue; }
 
                 if (!root.TryGetProperty("historyId", out var hid) || hid.ValueKind != JsonValueKind.String

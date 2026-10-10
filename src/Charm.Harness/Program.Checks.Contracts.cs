@@ -338,9 +338,11 @@ internal static partial class Program
                       Read().Status == ContractLoadStatus.Loaded && Read().Contracts.Count == 1);
                 File.WriteAllText(rec2, rec2Pristine.Replace("\"formatVersion\": 2", "\"formatVersion\": 1"));
                 var v1 = Read();
-                Check("C10b: ★ a v1 record is a PRE-CONTRACT career and reads as EMPTY, never as " +
-                      "unknown — no debt is ever manufactured from the past",
-                      v1.Status == ContractLoadStatus.PreContractFormat && v1.Contracts.Count == 0);
+                Check("C10b: ★ a v1 record is FORGOTTEN, not read (C-62) — the collection is lost, " +
+                      "no contract survives, and the page says it was saved by an older version of the game",
+                      v1.Status == ContractLoadStatus.CollectionLost && v1.Contracts.Count == 0
+                      && v1.Diagnostic == "saved by an older version of the game",
+                      $"{v1.Status}: {v1.Diagnostic ?? "no diagnostic"}");
                 File.WriteAllText(rec2, rec2Pristine.Replace("\"formatVersion\": 2", "\"formatVersion\": 99"));
                 var future = Read();
                 Check("C10c: an unknown future version is a collection-level loss, per the existing policy",

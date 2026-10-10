@@ -10,7 +10,14 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 118.2** (2026-10-09; verified on Emmett's machine — **`checks 80 81 105 106 107 100 102 103
+Last updated: **Session 118.3** (2026-10-09; verified on Emmett's machine — **`checks 88 94 100 102 103 104`, all
+PASS, 123.8s**; Phase 88 63 ok, Phase 94 35, both unchanged, every predicted count landed). **AN OLDER SEASON RECORD IS
+FORGOTTEN, NOT READ** (O-119, ★ **C-62**, Emmett 2026-10-09: *"I guess forget and keep going"*): a season record saved by
+the first format (before S103) is a hole like a damaged one — no tournament memory and no contracts from that year, the
+career plays on, and the page says *"saved by an older version of the game"*. Both readers fixed (the gate found two;
+the board named one). No game moved. Journal S118.3 has the detail.)
+
+Previous: **Session 118.2** (2026-10-09; verified on Emmett's machine — **`checks 80 81 105 106 107 100 102 103
 104`, all PASS, 642.3s**; Phase 80 78 ok (was 75), Phase 81 49, every predicted count landed). **AN OLDER CAREER IS
 REFUSED BY NAME, NOT UPGRADED** (O-116, C-60): a career saved before S90 gets *"this career was saved by an older version
 of the game — start a new career"* and is left exactly as it was; the v1 career-file code and golden are deleted, and
@@ -560,6 +567,9 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S118.3 MOVED NO GAME.** Every fingerprint and pinned result stays at the S118.1 capture (Phases 102–104 green). The
+season record is version 2 only; a version-1 record is a hole with the note "saved by an older version of the game".
+
 **S118.2 MOVED NO GAME.** Every fingerprint and pinned result stays at the S118.1 capture (Phases 102–104 green). A
 history file is version 2 only; a version-1 career is refused by name.
 
@@ -721,6 +731,13 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S118.3 — AN OLDER SEASON RECORD IS FORGOTTEN, NOT READ (closes O-119, C-62).** `MteReadHistory`: version 1 is a
+  hole with `season N: saved by an older version of the game`; `MteSupportedRecordVersions` deleted, the reader compares
+  against `MteRecordFormatVersion`; one shared `MteOlderRecordNote`. `ReadLiveContracts`: version 1 is `CollectionLost`
+  with the same note (the page prints *"LIVE CONTRACTS LOST — last season's record could not be read (saved by an older
+  version of the game)"*); `ContractLoadStatus.PreContractFormat` deleted. Phase 88 C6f and Phase 94 C10b re-asserted
+  (status, count and the words; same assertion counts). Negative control: both go red against the old readers. Journal
+  S118.3.
 - **★ S118.2 — AN OLDER CAREER IS REFUSED BY NAME (closes O-116).** `HistoryStore.Open`: version 1 throws
   `UnsupportedVersion` with the standing sentence before any write; `HistorySchemaV1.cs`, `HistoryStateV2.FromV1` and
   `tools/history_v1_golden.json` deleted; "reads 2". Phase 80: test files in the current format (`CheckHistoryId`), B3
@@ -1299,11 +1316,6 @@ chart is PROVISIONAL pending O-6.
   the defender charged with a non-shooting foul is drawn without regard to who was fouled — not touched, a candidate
   for the same family of "who" questions. **Note (S118 A3, still true):** `ReboundSlot` outlives its putback; never
   infer a board or a putback from it later.
-- **O-119 — THE SEASON RECORD'S CONTRACT READER STILL TOLERATES AN OLDER RECORD (S118.2 finding, C-60).**
-  `ReadLiveContracts` (`Program.Season.Contracts.cs`) reads a `formatVersion: 1` season record as `PreContractFormat` —
-  "a career from before contracts", no contracts — instead of refusing it; Phase 94 C10b asserts that. C-60 says an
-  older save is refused by name and no reader tolerates an older format. The last reader of its kind found (S118.2
-  searched the engine, the history assembly and the harness's season, world and career code). Small; touches Phase 94.
 - **O-106 — ★ CONFERENCE TOURNAMENTS HAVE NO REAL NEUTRAL SITE (S110 placeholder, ruled temporary).** R1 puts all
   seven of a league's games in the **original No. 1 seed's city**, frozen, nobody hosting. Emmett: *"we will add in
   neutral locations later."* `WorldConference` carries no place at all, so the successor is authored per-conference
@@ -2212,6 +2224,13 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-62 (S118.3, Emmett, 2026-10-09) — AN OLDER SEASON RECORD IS FORGOTTEN, NOT READ, AND THE CAREER PLAYS ON.**
+  *"I guess forget and keep going."* A season record (`<history>.events/season-N.json`) saved by an older format is a
+  **hole**, exactly like a damaged one: that year contributes no tournament memory and no contracts, the other years
+  still read, and the page says *"saved by an older version of the game"* (no "start a new career" — the career goes
+  on). It is not C-60's refusal by name because every untrustworthy season record has always been a hole, never a
+  stopped career; it does not tolerate the old format either — the file is not read at all. Do not restore a v1 read,
+  and do not turn the hole into a refusal.
 - **C-61 (S118.1, Emmett, 2026-10-08) — THE SANDBOX RUNS ONLY WHAT THE SESSION TOUCHED.** *"the last 30ish sessions
   have taken far, far longer than the previous ones. I think it's largely the trial and error you do in the sandbox."*
   Claude compiles, then runs the new check and the checks that read what changed; **never the full suite in the
@@ -2223,8 +2242,8 @@ chart is PROVISIONAL pending O-6.
   format is **refused by name** ("this career was saved by an older version of the game — start a new career"), never
   read half-blind, never with an "unknown" filled in. **No new compatibility code**: a format change bumps the version
   and retires the old reader in the same session (S117 retired block 1/2, row 1 and roster 1 — Emmett, "retire"). The
-  career file's own old-version upgrade was retired at S118.2 (O-116); the season record's contract reader is the one
-  tolerance left (O-119). Do not write a reader that tolerates an older format.
+  career file's own old-version upgrade was retired at S118.2 (O-116); the season record's last tolerance at S118.3
+  (O-119), as a hole rather than a refusal — see **C-62**. Do not write a reader that tolerates an older format.
 - **C-58 (S116, Emmett's ruling, 2026-10-06) — A CONFERENCE TOURNAMENT GAME IS A CONFERENCE GAME FOR THE PLAYER, NEVER
   FOR THE STANDINGS.** *"It counts as a conference game for the player, but does not count towards conference
   standings."* The log marks it as its own kind; the league flag (standings, host memory) means the league slate only.
@@ -2535,6 +2554,11 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **AN OLDER SEASON RECORD IS FORGOTTEN — S118.3 (2026-10-09). NEXT: NOT YET CHOSEN.** O-119 shipped — the last older-format
+tolerance S118.2's search found (C-60, C-62). The arc's step 4 (development, recruiting, prestige movement,
+transfers) is where the plan goes next; **O-118** (the free-throw lane — its own session) sits beside it. Emmett's call
+at the next-prompt pass (CONVENTIONS §6).
 
 ★ **AN OLDER CAREER IS REFUSED BY NAME — S118.2 (2026-10-09). NEXT: NOT YET CHOSEN.** O-116 shipped. The arc's step 4
 (development, recruiting, prestige movement, transfers) is where the plan goes next; **O-118** (the free-throw lane — its

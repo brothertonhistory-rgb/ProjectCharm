@@ -499,13 +499,13 @@ internal static partial class Program
             var recPath = MteRecordPathFor(careerPath, 1);
             var good = File.ReadAllText(recPath);
 
-            long ReadCount(string mutated)
+            MteHistory ReadHistoryOf(string mutated)
             {
                 File.WriteAllText(recPath, mutated);
                 using var store = HistoryStore.Open(careerPath, WorldFingerprint(mte));
-                var h = MteReadHistory(store, 2);
-                return h.SeatedInEvent.Count;
+                return MteReadHistory(store, 2);
             }
+            long ReadCount(string mutated) => ReadHistoryOf(mutated).SeatedInEvent.Count;
             var wholeYear = ReadCount(good);
             Check("C6c: the intact record reads back its whole year",
                   wholeYear > 0, $"{wholeYear} seat facts");
@@ -513,11 +513,13 @@ internal static partial class Program
                   ReadCount(good.Replace("\"historyId\":", "\"historyId\": \"not-this-career\", \"ignored\":")) == 0);
             Check("C6e: a record naming a DIFFERENT SEASON is a hole",
                   ReadCount(good.Replace("\"seasonId\": 1", "\"seasonId\": 77")) == 0);
-            Check("C6f: an unsupported record version is a hole — and v1 is NOT one: a "
-                  + "pre-contract record keeps its whole tournament memory (the S103 widening "
-                  + "this check would have silently missed)",
+            var v1History = ReadHistoryOf(good.Replace("\"formatVersion\": 2", "\"formatVersion\": 1"));
+            Check("C6f: an unsupported record version is a hole — and so is v1 (C-62): a record "
+                  + "saved by an older version of the game is FORGOTTEN, not read, and says so by name",
                   ReadCount(good.Replace("\"formatVersion\": 2", "\"formatVersion\": 99")) == 0
-                  && ReadCount(good.Replace("\"formatVersion\": 2", "\"formatVersion\": 1")) == wholeYear);
+                  && v1History.SeatedInEvent.Count == 0
+                  && v1History.Diagnostics.Any(d => d == "season 1: saved by an older version of the game"),
+                  $"v1: {v1History.SeatedInEvent.Count} seat facts; " + string.Join(" | ", v1History.Diagnostics));
             Check("C6g: malformed JSON is a hole",
                   ReadCount("{ this is not json") == 0);
             Check("C6h: ★ A CHANGED WORLD FINGERPRINT IS *ACCEPTED* — the record binds to the CAREER, " +

@@ -8795,14 +8795,17 @@ matcher cannot rematch, reject or drop a guaranteed game** while its four phases
 and both conservation identities stay untouched — the contracted pairs are not tokens and appear in no
 identity.
 
-★ **THE RECORD IS FORMAT v2, AND THE READER ACCEPTS {1, 2}.** Two collections, never one: the **live-contract
+★ **THE RECORD IS FORMAT v2, AND THE READERS ACCEPT v2 ONLY (C-62, S118.3).** Two collections, never one: the **live-contract
 collection** (mutable forward state — season N+1's record carries its own complete state; executing a season
 never reopens an earlier record, proven with the older record deleted) and the **pairing log** (append-only
 paired facts: the normalised pair, the site word, the host when hosted, and a source word
 `Matched`/`Contracted` so a future repeat ceiling cannot demote a pair a contract forces — a Claude call,
 flagged). Honest naming: these are games as PAIRED; non-conference games do not yet play. Both arrays are
-written even when empty — **absence is damage, never emptiness** — and a v1 record is a pre-contract career
-that reads as EMPTY, never as unknown, keeping its whole tournament memory. "Archive" means removal: completed
+written even when empty — **absence is damage, never emptiness**. A record saved by the first format (v1,
+pre-S103) is **forgotten, not read** (Emmett, 2026-10-09: *"I guess forget and keep going"*): it is a
+collection-level loss like a damaged record, the page says *"LIVE CONTRACTS LOST — last season's record could
+not be read (saved by an older version of the game)"*, and that season's tournament memory is a hole too
+(Phase 94 C10b, Phase 88 C6f). "Archive" means removal: completed
 and dead contracts are simply omitted from the survivors; no third collection exists.
 
 ★ **BOTH DEATHS FAIL CLOSED (R24), AND NEITHER IS SILENT.** Conference mates terminate hard — remaining legs
@@ -9021,9 +9024,8 @@ already corrupt.
   the turnover and on every page (a page refuses the career; it does not star a season). No reader
   tolerates an older format and prints "unknown". A format change bumps the version and retires the
   old reader in the same session. The career file follows the same rule since S118.2: a pre-S90 (v1)
-  career is refused by the same sentence before anything is written, never upgraded. (One reader still
-  tolerates an older format: the season record's contracts read a `formatVersion: 1` record as
-  "pre-contract", empty — boarded as O-119.)
+  career is refused by the same sentence before anything is written, never upgraded. The season record
+  follows it since S118.3, as a hole rather than a refusal (C-62, under the permanent record below).
 
 ### What is deliberately absent
 
@@ -11176,17 +11178,19 @@ tier, place name, dates, school names), because a permanent history page must ne
 to reconstruct what it said years ago. `playStatus` is an extensible string — `NotPlayed` at S97,
 and **S98 added `Completed` with no format break**, exactly as the extensibility was there for.
 ★ **S103 bumped the record to format v2** — two new collections, `liveContracts` (mutable forward state) and
-`nonConferencePairings` (this season's paired facts), always written even when empty. **The reader accepts
-BOTH versions {1, 2}**: a v1 record is a pre-contract career that keeps its whole tournament memory and reads
-as an empty contract collection — bumping the constant without widening the read would have silently erased
-every existing career's four-year rule with every check green (Phase 88 C6f now asserts the v1 arm directly).
+`nonConferencePairings` (this season's paired facts), always written even when empty. S103's reader accepted
+both versions {1, 2} so no career lost its four-year rule; ★ **S118.3 retired that (C-62)**: the readers accept
+the current version only, and a v1 record is **forgotten, not read** — a hole like a damaged one, with the note
+`season N: saved by an older version of the game`. That year contributes no seat facts and no contracts; the
+other years still read and the career plays on (Phase 88 C6f; Phase 94 C10b). It is a hole and not C-60's
+refusal by name, because every untrustworthy season record has always been a hole, never a stopped career.
 
 ★ **THE RECORD BINDS TO THE CAREER, NOT THE WORLD.** A record cannot both survive world edits and be
 rejected whenever the world changes. `formatVersion`, `historyId` and the embedded `seasonId` are
 validated; **`worldFingerprint` is written as provenance and never checked**. Old records are historical
 truth — a school, place or event that no longer exists simply never matches a qualifier, which is the
 seating layer's own membership validation doing the work. Every failure is a **hole**: missing, malformed,
-wrong career, wrong season. A hole contributes zero facts and never disables its neighbours.
+wrong career, wrong season, an older or unknown version. A hole contributes zero facts and never disables its neighbours.
 
 A pre-existing file for the pending season **refuses the schedule commit before reservation** — a stale
 record left standing is worse than a hole, because next season would read its fields as history that never

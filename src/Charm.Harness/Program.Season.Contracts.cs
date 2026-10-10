@@ -126,12 +126,10 @@ internal static partial class Program
         FirstSeason,
         /// <summary>Season N-1 exists as a number but published no record.</summary>
         NoRecord,
-        /// <summary>Season N-1's record is the retired v1 shape — a pre-contract
-        /// career, and it reads as EMPTY, never as unknown (A2).</summary>
-        PreContractFormat,
         /// <summary>★ R24(b): the record was present and could not be trusted. The
         /// COLLECTION is lost; no contract inside it is ever named, because naming one
-        /// would require the partial salvage that failing closed forbids.</summary>
+        /// would require the partial salvage that failing closed forbids. ★ C-62: a record
+        /// saved by an older version of the game lands here too — forgotten, not read.</summary>
         CollectionLost,
         /// <summary>A valid v2 record was read whole. Its collection may legitimately
         /// be empty.</summary>
@@ -165,8 +163,8 @@ internal static partial class Program
                 return ContractLoad.Empty(ContractLoadStatus.CollectionLost, "record is not an object");
             if (!root.TryGetProperty("formatVersion", out var fv) || !fv.TryGetInt32(out var version))
                 return ContractLoad.Empty(ContractLoadStatus.CollectionLost, "record names no format version");
-            if (version == 1)
-                return ContractLoad.Empty(ContractLoadStatus.PreContractFormat);
+            if (version == 1)                                       // ★ C-62: forgotten, not read
+                return ContractLoad.Empty(ContractLoadStatus.CollectionLost, MteOlderRecordNote);
             if (version != MteRecordFormatVersion)
                 return ContractLoad.Empty(ContractLoadStatus.CollectionLost,
                     $"unsupported record version {version.ToString(CultureInfo.InvariantCulture)}");
