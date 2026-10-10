@@ -969,6 +969,15 @@ internal static partial class Program
         if (last < first)
             throw new InvalidOperationException(
                 $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} runs backwards in season order.");
+        // ★ S119 (K5) — a world is played in ANY year, so a window's length must not depend on
+        //   which one. A window that crosses the end of February is one night longer in a leap
+        //   spring than the length checked below, and its bracket would no longer fit its nights.
+        //   No committed world has an event outside November-December; this closes the door.
+        if (first.Month <= 2 && last.Month >= 3)
+            throw new InvalidOperationException(
+                $"event '{e.Name}' window {e.FirstDay}..{e.LastDay} crosses the end of February. A world " +
+                "is played in any year, and in a leap year that window holds one more night than its " +
+                "field plays on.");
 
         var days = last.DayNumber - first.DayNumber + 1;
         var want = e.PlayingDays;
@@ -981,8 +990,15 @@ internal static partial class Program
         return (first, last);
     }
 
-    /// <summary>Month/day to a real date on the season spine. Refuses anything that is not a
-    /// legal calendar day in that spine — February 30 has no night to play on.</summary>
+    /// <summary>★ S119 — the spine a world's month/day windows are validated on: 2026-27, whose
+    /// spring is NOT a leap year. Deliberately its own constant rather than the season default:
+    /// it is a reference for checking a date that must exist in EVERY year, not the season being
+    /// played, and it must stay non-leap whatever the default season becomes.</summary>
+    private const int WorldEventReferenceStartYear = 2026;
+
+    /// <summary>Month/day to a real date on the reference spine. Refuses anything that is not a
+    /// legal calendar day in every year — February 30 has no night to play on, and February 29
+    /// exists only in a leap year, so a world (which is played in any year) cannot use it.</summary>
     private static DateOnly WorldParseSpineDay(string raw, WorldEvent e, string which)
     {
         var parts = raw.Split('-');
@@ -993,7 +1009,11 @@ internal static partial class Program
                 $"event '{e.Name}' {which} '{raw}' must be MM-DD (month/day, year-independent).");
         if (month is < 1 or > 12)
             throw new InvalidOperationException($"event '{e.Name}' {which} '{raw}' has no such month.");
-        var year = month >= 7 ? SeasonDefaultStartYear : SeasonDefaultStartYear + 1;
+        if (month == 2 && day == 29)
+            throw new InvalidOperationException(
+                $"event '{e.Name}' {which} '{raw}' is February 29. A world is played in any year, and " +
+                "most years have no February 29.");
+        var year = month >= 7 ? WorldEventReferenceStartYear : WorldEventReferenceStartYear + 1;
         if (day < 1 || day > DateTime.DaysInMonth(year, month))
             throw new InvalidOperationException(
                 $"event '{e.Name}' {which} '{raw}' is not a real date on the season spine.");

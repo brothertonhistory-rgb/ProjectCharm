@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using Charm.History;
 
@@ -31,6 +32,9 @@ internal static partial class Program
 {
     private const string HistoryArgFlag = "--history";
 
+    /// <summary>★ S119 — the year a career (or a single season with no career) starts in.</summary>
+    private const string YearArgFlag = "--year";
+
     /// <summary>The world's canonical fingerprint, self-describing so a later scheme can
     /// be told apart from this one at a glance rather than by length.</summary>
     private static string WorldFingerprint(WorldFile world)
@@ -56,16 +60,64 @@ internal static partial class Program
         return null;
     }
 
-    /// <summary>True for an argument that belongs to the history flag, so a positional
-    /// scan (the minutes floor) skips over it instead of trying to parse it.</summary>
+    /// <summary>True for an argument that belongs to a named flag (`--history` or `--year`),
+    /// so a positional scan (the minutes floor) skips over it instead of trying to parse it.</summary>
     private static bool IsHistoryArgAt(string[] args, int index)
     {
-        if (string.Equals(args[index], HistoryArgFlag, StringComparison.Ordinal)) return true;
-        return index > 0 && string.Equals(args[index - 1], HistoryArgFlag, StringComparison.Ordinal);
+        foreach (var flag in new[] { HistoryArgFlag, YearArgFlag })
+        {
+            if (string.Equals(args[index], flag, StringComparison.Ordinal)) return true;
+            if (index > 0 && string.Equals(args[index - 1], flag, StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>★ S119 — pull `--year &lt;YYYY&gt;` off a command line, or null when it is left
+    /// off. Named, like `--history`, because `season` spends its fourth slot on the minutes
+    /// floor. A year outside the seasons the calendar holds (1..9998) or one that is not a whole
+    /// number is refused HERE, before any world is loaded or any file is touched.
+    /// <para>`--year` always names a career's FIRST season — never the season about to be played.
+    /// On an existing career it must agree with the file (see <see cref="OpenHistoryFor"/>).</para></summary>
+    private static int? ParseYearArg(string[] args, int firstOptional)
+    {
+        for (var i = firstOptional; i < args.Length; i++)
+        {
+            if (!string.Equals(args[i], YearArgFlag, StringComparison.Ordinal)) continue;
+            if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+                throw new HistoryException(HistoryError.WrongType,
+                    $"{YearArgFlag} needs a year after it — the year the first season opens in, e.g. {YearArgFlag} 1950.");
+            var raw = args[i + 1];
+            if (!int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out var year))
+                throw new HistoryException(HistoryError.WrongType,
+                    $"{YearArgFlag} '{raw}' is not a year — give the year the first season opens in, e.g. 1950.");
+            if (year < SeasonMinStartYear || year > SeasonMaxStartYear)
+                throw new HistoryException(HistoryError.YearOutOfDomain,
+                    $"{YearArgFlag} {raw}: a season can open in {SeasonMinStartYear}.." +
+                    $"{SeasonMaxStartYear} (it ends in the following year, and the calendar " +
+                    "stops at 9999).");
+            return year;
+        }
+        return null;
     }
 
     /// <summary>Open the history for a run, bound to this world. Returns null in legacy
-    /// mode — no file is read, no folder is touched, no allocator exists.</summary>
-    private static HistoryStore? OpenHistoryFor(WorldFile world, string? historyPath)
-        => historyPath is null ? null : HistoryStore.Open(historyPath, WorldFingerprint(world));
+    /// mode — no file is read, no folder is touched, no allocator exists.
+    /// <para>★ S119 — a NEW career is created starting in <paramref name="startYear"/> (2026 when
+    /// none is given). An EXISTING career keeps the year it was created with: naming that same
+    /// year is accepted and changes nothing; naming any other is refused by name, and the file
+    /// is left exactly as it was (opening an existing career writes nothing).</para></summary>
+    private static HistoryStore? OpenHistoryFor(WorldFile world, string? historyPath, int? startYear = null)
+    {
+        if (historyPath is null) return null;
+        var store = HistoryStore.Open(historyPath, WorldFingerprint(world), startYear ?? SeasonDefaultStartYear);
+        if (startYear is { } named && named != store.StartYear)
+        {
+            var started = store.StartYear;
+            store.Dispose();
+            throw new HistoryException(HistoryError.StartYearMismatch,
+                $"this career started in {started.ToString(CultureInfo.InvariantCulture)}; {YearArgFlag} names a " +
+                $"career's first season, not the one about to be played. Leave {YearArgFlag} off to play its next season.");
+        }
+        return store;
+    }
 }

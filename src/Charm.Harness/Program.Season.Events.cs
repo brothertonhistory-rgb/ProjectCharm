@@ -401,8 +401,14 @@ internal static partial class Program
     /// <param name="pull">Defaults to <see cref="MteSeatPull"/>. Overridable ONLY so Phase 88
     /// can run the flat draw as a negative control and prove the pull moves the league —
     /// nothing in production passes it.</param>
+    /// <param name="startYear">★ S119 — the season being seated. Windows here are compared only
+    /// to each other, so the answer cannot depend on it (the world validator refuses a window
+    /// that crosses the end of February, the one place a year could change a window's length);
+    /// it is passed anyway so every production window is resolved onto the season it belongs
+    /// to. Defaults to <see cref="SeasonDefaultStartYear"/> for the suite's direct callers.</param>
     private static EventSeatingOutcome MteSeatSeason(
-        WorldFile world, long seasonSeed, MteHistory history, int? pull = null)
+        WorldFile world, long seasonSeed, MteHistory history, int? pull = null,
+        int startYear = SeasonDefaultStartYear)
     {
         var seatPull = pull ?? MteSeatPull;
         if (world.Events.Count == 0) return EventSeatingOutcome.Empty;
@@ -473,8 +479,8 @@ internal static partial class Program
 
         foreach (var e in active.OrderBy(x => x.Tier).ThenBy(x => x.Id))
         {
-            var eventFirst = MteWindowDate(e.FirstDay);
-            var eventLast = MteWindowDate(e.LastDay);
+            var eventFirst = MteWindowDate(e.FirstDay, startYear);
+            var eventLast = MteWindowDate(e.LastDay, startYear);
             var wall = seatedByKind[e.Kind];
 
             // ★ THE DRAW, resolved once per event. National events compute nothing at all,
@@ -676,7 +682,7 @@ internal static partial class Program
     /// <para>Conference games only, and the scope is deliberate: nothing else is on the
     /// schedule yet. When S98 puts tournament games on the calendar this widens.</para></summary>
     private static void MteRefuseOverlap(
-        WorldFile world, EventSeatingOutcome seating, List<SeasonGame> dated)
+        WorldFile world, EventSeatingOutcome seating, List<SeasonGame> dated, int startYear)
     {
         if (seating.Active.Count == 0) return;
 
@@ -693,8 +699,8 @@ internal static partial class Program
             foreach (var (schoolId, opponentId) in new[] { (g.HomeId, g.AwayId), (g.AwayId, g.HomeId) })
             {
                 if (!seatOf.TryGetValue(schoolId, out var ev)) continue;
-                var first = MteWindowDate(ev.FirstDay);
-                var last = MteWindowDate(ev.LastDay);
+                var first = MteWindowDate(ev.FirstDay, startYear);
+                var last = MteWindowDate(ev.LastDay, startYear);
                 if (date < first || date > last) continue;
                 throw new InvalidOperationException(
                     $"SEASON EVENT OVERLAP: {nameOf[schoolId]} is seated in {ev.Name} " +
@@ -704,13 +710,18 @@ internal static partial class Program
         }
     }
 
-    /// <summary>A window endpoint resolved onto the season spine — the same halves the world
-    /// validator used, so a date that loaded is a date that compares.</summary>
-    private static DateOnly MteWindowDate(string monthDay)
+    /// <summary>A window endpoint resolved onto the season being played — months from July on
+    /// belong to the opening civil year, the rest to the following one, the same halves the
+    /// world validator uses.
+    /// <para>★ S119 (O-99) — the year is REQUIRED. Before S119 this read the 2026 constant, so a
+    /// 2027 season would have dated its tournaments in 2026 and the two collision guards would
+    /// have compared nights a year apart and silently passed. No default: a caller that forgets
+    /// the year does not compile.</para></summary>
+    private static DateOnly MteWindowDate(string monthDay, int startYear)
     {
         var month = int.Parse(monthDay.AsSpan(0, 2), CultureInfo.InvariantCulture);
         var day = int.Parse(monthDay.AsSpan(3, 2), CultureInfo.InvariantCulture);
-        var year = month >= 7 ? SeasonDefaultStartYear : SeasonDefaultStartYear + 1;
+        var year = month >= 7 ? startYear : startYear + 1;
         return new DateOnly(year, month, day);
     }
 

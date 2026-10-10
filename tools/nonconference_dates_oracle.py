@@ -88,6 +88,29 @@ def monday(d):
     return _S._monday(d)
 
 
+def curve_monday(month, day, start_year):
+    """★ S119 (K1) — a curve row resolved onto the season being played: July on is the
+    opening civil year, the rest the following one, then the NEAREST MONDAY (Tue-Thu step
+    back, Fri-Sun step forward). In 2026-27 every row already is a Monday, so the golden does
+    not move; before S119 the row was a plain date, a Monday only in 2026-shaped years, and
+    every other year found no weighted week. Mirrors NonConCurveMonday in the C#."""
+    y = start_year if month >= 7 else start_year + 1
+    return monday(_dt.date(y, month, day) + _dt.timedelta(days=3))
+
+
+# ★ EMMETT'S CURVE (2026-08-08), as authored: (month, day-of-month, weight).
+CURVE_ROWS = [
+    (11, 2, 10), (11, 9, 13), (11, 16, 13), (11, 23, 11), (11, 30, 11), (12, 7, 8),
+    (12, 14, 5), (12, 21, 0), (12, 28, 6), (1, 4, 5), (1, 11, 4), (1, 18, 4),
+    (1, 25, 3), (2, 1, 3),
+]
+
+
+def curve_for(start_year):
+    """The curve keyed by the Monday each row resolves to in this season."""
+    return {curve_monday(m, d, start_year): w for (m, d, w) in CURVE_ROWS}
+
+
 def christmas_week(start_year):
     """★ REUSED, NOT RESTATED — the Mon-Sun week containing December 25."""
     return monday(_dt.date(start_year, 12, 25))
@@ -572,13 +595,7 @@ if __name__ == "__main__":
     inputs = DateInputs.from_json(sys.argv[1] if len(sys.argv) > 1
                                   else "/tmp/s106-in.json")
     Y = inputs.start_year
-    CURVE = {
-        _dt.date(Y, 11, 2): 10, _dt.date(Y, 11, 9): 13, _dt.date(Y, 11, 16): 13,
-        _dt.date(Y, 11, 23): 11, _dt.date(Y, 11, 30): 11, _dt.date(Y, 12, 7): 8,
-        _dt.date(Y, 12, 14): 5, _dt.date(Y, 12, 21): 0, _dt.date(Y, 12, 28): 6,
-        _dt.date(Y + 1, 1, 4): 5, _dt.date(Y + 1, 1, 11): 4, _dt.date(Y + 1, 1, 18): 4,
-        _dt.date(Y + 1, 1, 25): 3, _dt.date(Y + 1, 2, 1): 3,
-    }
+    CURVE = curve_for(Y)
     t0 = time.time()
     res = date_non_conference(inputs, CURVE)
     prove(inputs, res, "stock")
@@ -650,7 +667,7 @@ if __name__ == "__main__":
     #   run stays a pure assertion pass.
     if len(sys.argv) > 2:
         world_path = sys.argv[3] if len(sys.argv) > 3 else "worlds/stock-d1.world.json"
-        curve_rows = [(d.month, d.day, w) for d, w in sorted(CURVE.items())]
+        curve_rows = list(CURVE_ROWS)   # the AUTHORED rows; identical to the resolved ones in 2026
         payload = emit_golden(inputs, res, curve_rows, world_path)
         with open(sys.argv[2], "w") as f:
             json.dump(payload, f, indent=1)

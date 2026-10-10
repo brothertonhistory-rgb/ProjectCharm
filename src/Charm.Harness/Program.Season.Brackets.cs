@@ -215,7 +215,7 @@ internal static partial class Program
     /// bracket. Nothing re-ranks between rounds and no seed is ever recomputed after play
     /// begins, so a late-round game between two teams that arrived down different paths is
     /// still ordered by the numbers they started with.</para></summary>
-    private static BracketPlan MteSeedField(SeatedEvent e, IReadOnlyDictionary<int, int> prestige)
+    private static BracketPlan MteSeedField(SeatedEvent e, IReadOnlyDictionary<int, int> prestige, int startYear)
     {
         var order = e.Seats
             .OrderByDescending(s => prestige[s.SchoolId])
@@ -223,7 +223,7 @@ internal static partial class Program
             .ToList();
         return new BracketPlan(
             e.Tier, e.EventId, e.Name, e.FieldSize,
-            MteWindowDate(e.FirstDay), MteWindowDate(e.LastDay),
+            MteWindowDate(e.FirstDay, startYear), MteWindowDate(e.LastDay, startYear),
             e.PlaceId,
             order.Select(s => s.SchoolId).ToList(),
             order.Select(s => s.Seat).ToList());
@@ -319,6 +319,7 @@ internal static partial class Program
         IReadOnlyDictionary<BracketSlotKey, GameId> reservations,
         SeasonId? seasonId,
         int conferenceGameCount,
+        int startYear,
         Func<PlayedSeasonGame, (int HomeScore, int AwayScore)> play)
     {
         var finishes = new Dictionary<int, IReadOnlyDictionary<int, int>>();
@@ -330,7 +331,7 @@ internal static partial class Program
         //   (and therefore every tournament engine seed) exactly where it was.
         foreach (var e in MteEventPlayOrder(seating).Where(x => !x.IsShowcase))
         {
-            var plan = MteSeedField(e, prestige);
+            var plan = MteSeedField(e, prestige, startYear);
             var routes = MteBracketRoutesFor(e);
             var occupancy = new int[routes.Length][];
             for (var i = 0; i < routes.Length; i++) occupancy[i] = new[] { 0, 0 };

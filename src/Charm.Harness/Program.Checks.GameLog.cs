@@ -339,27 +339,35 @@ internal static partial class Program
             //   (C-60: the game is the product, not its save files). S90 to S118.1 upgraded it
             //   on open; that arm is retired. The refusal must come before any write: the file
             //   is left exactly as it was, and no season log can have been started for it.
-            var p = Fresh("a6");
-            File.WriteAllText(p, RawHistoryV1(tinyFp, 4001, 7, 900));
-            var before = File.ReadAllBytes(p);
-            HistoryException? refusal = null;
-            try { using var h = HistoryStore.Open(p, tinyFp); }
-            catch (HistoryException hx) { refusal = hx; }
-            Check("A6 a v1 career is refused, classified UnsupportedVersion",
-                  refusal?.Error == HistoryError.UnsupportedVersion, refusal?.Error.ToString() ?? "no throw");
-            Check("A6 ...by name: 'this career was saved by an older version of the game — start a new career'",
-                  refusal is not null && refusal.Message.Contains(OlderCareerSentence, StringComparison.Ordinal),
-                  refusal?.Message);
-            Check("A6 the refused file is byte-identical — refused before any write, never upgraded",
-                  File.ReadAllBytes(p).SequenceEqual(before));
-            Check("A6 no season-log folder exists for the refused career",
-                  !Directory.Exists(GameLogWriter.LogFolderFor(p)));
+            // ★ S119 — a v2 career (saved S90..S118, no start year) is refused the same way.
+            foreach (var (label, body) in new[]
+            {
+                ("v1", RawHistoryV1(tinyFp, 4001, 7, 900)),
+                ("v2", RawHistoryV2(tinyFp, 4001, 7, 900)),
+            })
+            {
+                var p = Fresh("a6_" + label);
+                File.WriteAllText(p, body);
+                var before = File.ReadAllBytes(p);
+                HistoryException? refusal = null;
+                try { using var h = HistoryStore.Open(p, tinyFp); }
+                catch (HistoryException hx) { refusal = hx; }
+                Check($"A6 a {label} career is refused, classified UnsupportedVersion",
+                      refusal?.Error == HistoryError.UnsupportedVersion, refusal?.Error.ToString() ?? "no throw");
+                Check($"A6 ...by name ({label}): 'this career was saved by an older version of the game — start a new career'",
+                      refusal is not null && refusal.Message.Contains(OlderCareerSentence, StringComparison.Ordinal),
+                      refusal?.Message);
+                Check($"A6 the refused {label} file is byte-identical — refused before any write, never upgraded",
+                      File.ReadAllBytes(p).SequenceEqual(before));
+                Check($"A6 no season-log folder exists for the refused {label} career",
+                      !Directory.Exists(GameLogWriter.LogFolderFor(p)));
+            }
 
             var p2 = Fresh("a6b");
             using (var h = HistoryStore.Open(p2, tinyFp))
-                Check("A6 a history created fresh is BORN v2 — never written as v1 at any instant",
-                      File.ReadAllText(p2).Contains("\"schemaVersion\": 2")
-                      && HistorySchemaV2_IsCanonical(h.HistoryId));
+                Check("A6 a history created fresh is BORN v3 — never written as v1 or v2 at any instant",
+                      File.ReadAllText(p2).Contains("\"schemaVersion\": 3")
+                      && HistoryIdIsCanonical(h.HistoryId));
         }
 
         // ── A7 — APPEND-ONLY PREFIX ──────────────────────────────────────────
@@ -455,7 +463,7 @@ internal static partial class Program
         return long.Parse(s[(i + 1)..], System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private static bool HistorySchemaV2_IsCanonical(string s)
+    private static bool HistoryIdIsCanonical(string s)
         => s.Length == 32 && s.All(c => (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
 
     private static long[] CountersOf(PerGameStatRowV1 r) => new[]

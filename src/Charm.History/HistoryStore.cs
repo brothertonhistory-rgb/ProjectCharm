@@ -41,10 +41,10 @@ public sealed class HistoryStore : IDisposable
     private readonly string _path;
     private readonly string _lockPath;
     private FileStream? _lockHandle;
-    private HistoryStateV2 _state;
+    private HistoryStateV3 _state;
     private bool _reservationsClosed;
 
-    private HistoryStore(string path, string lockPath, FileStream lockHandle, HistoryStateV2 state)
+    private HistoryStore(string path, string lockPath, FileStream lockHandle, HistoryStateV3 state)
     {
         _path = path;
         _lockPath = lockPath;
@@ -61,20 +61,24 @@ public sealed class HistoryStore : IDisposable
     /// into another that happens to share a world.</summary>
     public string HistoryId => _state.HistoryId;
 
-    // ★ The id source is a seam for ONE reason: the born-v2 golden. Production mints from
+    /// <summary>★ S119 — the civil year this career's FIRST season opens in, fixed at creation
+    /// and read back off the file on every open. Season N is played in StartYear + (N - 1).</summary>
+    public int StartYear => _state.StartYear;
+
+    // ★ The id source is a seam for ONE reason: the born-v3 golden. Production mints from
     // Guid.NewGuid(), which by design produces a different file every run, so the suite could
     // never pin a newly created history byte-for-byte against a fixture. Injecting a fixed id
     // lets the suite drive the EXACT production writer and compare bytes — rather than the
     // usual alternative, which is a hand-authored "expected" file that proves only that
     // somebody typed what they expected. (S118.2: it was first opened for the v1-to-v2
     // migration golden; the migration is retired, C-60, and this is what it is for now.)
-    private static Func<string> _idSource = HistorySchemaV2.MintHistoryId;
+    private static Func<string> _idSource = HistorySchemaV3.MintHistoryId;
 
     /// <summary>Pin the lineage label for the duration of the returned scope.
     ///
     /// <para>★ PUBLIC, AND THAT IS A DELIBERATE WIDENING WORTH NAMING. Everything else in
     /// this assembly is sealed against the harness on purpose. This one door is open because
-    /// the born-v2 golden has no other honest form: production mints from Guid.NewGuid(),
+    /// the born-v3 golden has no other honest form: production mints from Guid.NewGuid(),
     /// so creating a history produces a different file every run and could never be pinned
     /// byte-for-byte. The alternative is a hand-authored "expected" file, which proves only
     /// that somebody typed what they expected — it would not be driving the production
@@ -82,10 +86,10 @@ public sealed class HistoryStore : IDisposable
     ///
     /// <para>It carries no raw identity value out, so S89's actual seam is untouched: this
     /// sets a label, it does not expose a number. Nothing on a production path may call it,
-    /// and Phase 80 B10 (the born-v2 golden) is the only caller in the tree.</para></summary>
+    /// and Phase 80 B10 (the born-v3 golden) is the only caller in the tree.</para></summary>
     public static IDisposable UseFixedHistoryIdForTests(string id)
     {
-        if (!HistorySchemaV2.IsCanonicalHistoryId(id))
+        if (!HistorySchemaV3.IsCanonicalHistoryId(id))
             throw new HistoryException(HistoryError.WrongType,
                 "a test history id must be 32 lowercase hex characters.");
         var previous = _idSource;
@@ -135,10 +139,19 @@ public sealed class HistoryStore : IDisposable
     /// upgraded one on open with a single migration write; that code is retired, and the
     /// refusal happens before any write, so the old file is left exactly as it was.</para>
     ///
-    /// <para>A history CREATED here is born v2 — the lineage label exists before the first
-    /// number is issued.</para></summary>
-    public static HistoryStore Open(string path, string worldFingerprint)
+    /// <para>★ S119 — a **v2** history is refused the same way (it has no start year, and
+    /// guessing one would be a quiet call about somebody's career). A history CREATED here is
+    /// born v3: the lineage label and the first season's year exist before the first number is
+    /// issued. <paramref name="startYearIfNew"/> is read ONLY when the file does not exist yet;
+    /// an existing career's year comes off the file, never from the caller.</para></summary>
+    public static HistoryStore Open(string path, string worldFingerprint,
+                                    int startYearIfNew = HistoryStateV3.DefaultStartYear)
     {
+        if (!HistoryStateV3.IsStartYearInDomain(startYearIfNew))
+            throw new HistoryException(HistoryError.YearOutOfDomain,
+                $"a career cannot start in {startYearIfNew.ToString(CultureInfo.InvariantCulture)} — " +
+                $"a season can start in {HistoryStateV3.MinStartYear}..{HistoryStateV3.MaxStartYear}.");
+
         if (string.IsNullOrWhiteSpace(path))
             throw new HistoryException(HistoryError.PathIsDirectory, "history path is empty.");
 
@@ -175,7 +188,7 @@ public sealed class HistoryStore : IDisposable
 
         try
         {
-            HistoryStateV2 state;
+            HistoryStateV3 state;
             if (File.Exists(full))
             {
                 byte[] bytes;
@@ -192,25 +205,26 @@ public sealed class HistoryStore : IDisposable
                 // rather than for whatever key the current parser happens to trip on first
                 // (a v1 file would read as "missing key 'historyId'" — true, and completely
                 // misleading about what is wrong).
-                var version = HistorySchemaV2.PeekVersion(bytes);
-                if (version == HistoryStateV2.SchemaVersion)
+                var version = HistorySchemaV3.PeekVersion(bytes);
+                if (version == HistoryStateV3.SchemaVersion)
                 {
-                    state = HistorySchemaV2.Parse(bytes);
+                    state = HistorySchemaV3.Parse(bytes);
                 }
-                else if (version == 1)
+                else if (version is 1 or 2)
                 {
-                    // ★ S118.2, C-60 — refused by name, never upgraded. Nothing has been
-                    // written: the file is exactly as it was, and no log folder exists, because
-                    // the writer is constructed later from a store this line never returns.
+                    // ★ S118.2 (v1) and S119 (v2), C-60 — refused by name, never upgraded.
+                    // Nothing has been written: the file is exactly as it was, and no log folder
+                    // exists, because the writer is constructed later from a store this line
+                    // never returns.
                     throw new HistoryException(HistoryError.UnsupportedVersion,
-                        $"{GameLogSchemaV1.OlderVersionSentence} (history '{full}' is schemaVersion 1; " +
-                        "this build reads 2).");
+                        $"{GameLogSchemaV1.OlderVersionSentence} (history '{full}' is schemaVersion " +
+                        $"{version.ToString(CultureInfo.InvariantCulture)}; this build reads 3).");
                 }
                 else
                 {
                     throw new HistoryException(HistoryError.UnsupportedVersion,
                         $"unsupported history schemaVersion {version.ToString(CultureInfo.InvariantCulture)} " +
-                        "(this build reads 2).");
+                        "(this build reads 3).");
                 }
 
                 if (!string.Equals(state.WorldFingerprint, worldFingerprint, StringComparison.Ordinal))
@@ -222,8 +236,9 @@ public sealed class HistoryStore : IDisposable
             {
                 // First creation is an atomic publication too — never streamed straight
                 // to the final path, so a half-written history can never be found there.
-                // Born v2: the lineage label exists before the first number is issued.
-                state = HistoryStateV2.Fresh(_idSource(), worldFingerprint);
+                // Born v3: the lineage label and the first season's year exist before the
+                // first number is issued.
+                state = HistoryStateV3.Fresh(_idSource(), worldFingerprint, startYearIfNew);
                 PublishAtomically(full, state);
             }
 
@@ -341,9 +356,9 @@ public sealed class HistoryStore : IDisposable
     //  Temp-file uniqueness comes from `Guid.NewGuid()`, which is the idiom five
     //  suite files already use. Deliberately NOT any simulation RNG: an allocator
     //  that drew from a game stream would change the basketball by saving.
-    private static void PublishAtomically(string path, HistoryStateV2 state)
+    private static void PublishAtomically(string path, HistoryStateV3 state)
     {
-        var bytes = HistorySchemaV2.Serialize(state);
+        var bytes = HistorySchemaV3.Serialize(state);
         var dir = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path)) ?? ".";
         var temp = System.IO.Path.Combine(dir, $".charm-history-{Guid.NewGuid():N}.tmp");
         try

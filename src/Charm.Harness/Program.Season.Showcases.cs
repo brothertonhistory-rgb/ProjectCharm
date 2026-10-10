@@ -74,6 +74,7 @@ internal static partial class Program
         IReadOnlyDictionary<BracketSlotKey, GameId> reservations,
         SeasonId? seasonId,
         int firstOrdinal,
+        int startYear,
         Func<PlayedSeasonGame, (int HomeScore, int AwayScore)> play)
     {
         var results = new List<ShowcaseResult>();
@@ -82,7 +83,7 @@ internal static partial class Program
 
         foreach (var e in MteEventPlayOrder(seating).Where(x => x.IsShowcase))
         {
-            var day = MteWindowDate(e.FirstDay);
+            var day = MteWindowDate(e.FirstDay, startYear);
             foreach (var pairing in MteShowcasePairingsOf(e))
             {
                 var game = MteBuildShowcaseGame(e, pairing, day, reservations, seasonId);

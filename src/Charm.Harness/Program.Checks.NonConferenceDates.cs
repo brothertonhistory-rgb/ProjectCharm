@@ -100,7 +100,7 @@ internal static partial class Program
                 s => s.Id, _ => new List<(DateOnly First, DateOnly Last)>());
             foreach (var e in run.Events.Seating.Active)
                 foreach (var seat in e.Seats)
-                    windows[seat.SchoolId].Add((MteWindowDate(e.FirstDay), MteWindowDate(e.LastDay)));
+                    windows[seat.SchoolId].Add((MteWindowDate(e.FirstDay, SeasonDefaultStartYear), MteWindowDate(e.LastDay, SeasonDefaultStartYear)));
 
             // ════════════════════════════════════════════════════════════════════
             //  C1 — ORACLE PARITY, ROW FOR ROW.

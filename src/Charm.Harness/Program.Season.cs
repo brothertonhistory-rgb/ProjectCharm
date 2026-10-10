@@ -212,6 +212,10 @@ internal static partial class Program
         /// venue those two are different schedules, and the page must print the one whose
         /// games were actually played.</summary>
         public string DatedFingerprint { get; init; } = "";
+        /// <summary>★ S119 — the civil year this season opens in (it closes in the next one).
+        /// Every date the season carries — league, event, buy game, conference tournament —
+        /// was resolved onto it.</summary>
+        public required int SeasonYear { get; init; }
         /// <summary>★ S96 — what host memory did this season. Page-facing; the suite reads
         /// the parts it asserts from the schedule itself, never from these counters.</summary>
         public SeasonMemoryOutcome Memory { get; init; } = SeasonMemoryOutcome.None;
@@ -1666,7 +1670,8 @@ internal static partial class Program
         IReadOnlyDictionary<int, int>? contractChoiceOverride = null,
         bool buyGamesOffForTest = false,
         DivvyResult? rostersInHand = null,
-        bool bootstrapPeopleForTest = false)
+        bool bootstrapPeopleForTest = false,
+        int? seasonYear = null)
     {
         // ★ S114 — rosters handed in (the turnover's season two) skip the draft and nothing
         //   else: every consumer below reads Pool / Rosters / PersonIds and the pool by index,
@@ -1704,6 +1709,36 @@ internal static partial class Program
         //    invalidate the basketball, it leaves a deliberate hole in event history.
         // ══════════════════════════════════════════════════════════════════════════
         var pendingSeasonId = history?.PeekNextSeasonId ?? 0;
+        // ★ S119 — THE SEASON'S YEAR, resolved ONCE, at step 1, and handed to every dater.
+        //   A career's year is read off its file (startYear + seasons already played), never
+        //   supplied by the caller — so a caller cannot play a career's season in the wrong
+        //   year, and naming one alongside a career is refused here rather than ignored. A
+        //   season with no career plays the year it was given, else the default (2026), which is
+        //   every run before S119. A career whose next season would open past the last season the
+        //   calendar holds is refused HERE, before a single number is spent.
+        int seasonYearOfRun;
+        if (history is not null)
+        {
+            if (seasonYear is not null)
+                throw new InvalidOperationException(
+                    "S119: a career's season year comes off its career file; RunSeasonCore was handed one as well.");
+            var y = (long)history.StartYear + (pendingSeasonId - 1);
+            if (y > SeasonMaxStartYear)
+                throw new HistoryException(HistoryError.YearOutOfDomain,
+                    $"this career started in {history.StartYear.ToString(CultureInfo.InvariantCulture)} and its next " +
+                    $"season would open in {y.ToString(CultureInfo.InvariantCulture)}; the last season the calendar " +
+                    $"holds opens in {SeasonMaxStartYear.ToString(CultureInfo.InvariantCulture)}. " +
+                    "Nothing was played or written.");
+            seasonYearOfRun = (int)y;
+        }
+        else
+        {
+            seasonYearOfRun = seasonYear ?? SeasonDefaultStartYear;
+            if (seasonYearOfRun < SeasonMinStartYear || seasonYearOfRun > SeasonMaxStartYear)
+                throw new InvalidOperationException(
+                    $"S119: season year {seasonYearOfRun.ToString(CultureInfo.InvariantCulture)} is outside " +
+                    $"{SeasonMinStartYear}..{SeasonMaxStartYear}.");
+        }
         // ★ S115 — LAST SEASON'S PEOPLE, read here at step 1 so every refusal (no log, a pre-S115
         //   log, a damaged roster) stops the run before a single number is spent. prev == 0 is the
         //   first season of a career: the bootstrap pool, as today.
@@ -1713,7 +1748,7 @@ internal static partial class Program
         var eventHistory = MteReadHistory(history, pendingSeasonId);
         // ★ S103 — last season's promises, read from EXACTLY season N-1's record.
         var contractLoad = ReadLiveContracts(history, pendingSeasonId);
-        var seating = MteSeatSeason(world, seasonSeed, eventHistory);
+        var seating = MteSeatSeason(world, seasonSeed, eventHistory, startYear: seasonYearOfRun);
         // ★ S103 — the contract phase, ONCE, before anything else touches a school's
         //   slate (R23): terminate → discover → reserve → validate globally → commit.
         //   The step itself is pure over supplied state, so phase ownership is a
@@ -1740,7 +1775,7 @@ internal static partial class Program
         var fingerprint = ScheduleFingerprint(schedule);
         // ★ S94 — every game gains its night. Purely additive: the structural fingerprint
         //   above is computed from the four named fields and cannot see the date.
-        var datedFingerprint = SeasonDateSchedule(world, schedule, SeasonDefaultStartYear);
+        var datedFingerprint = SeasonDateSchedule(world, schedule, seasonYearOfRun);
 
         // ★ S106 — every non-conference pairing gains its night. It runs HERE, after the
         //   league slate is dated, because the buy-game calendar is carved out of the
@@ -1749,7 +1784,7 @@ internal static partial class Program
         //   and the matching report and writes only its own page cargo, so no earlier
         //   fingerprint can move because of it.
         var nonConferenceDates = DateNonConferenceGames(
-            world, matching, contracts, seating, schedule, SeasonDefaultStartYear);
+            world, matching, contracts, seating, schedule, seasonYearOfRun);
 
         // ★ S111 — every dated pairing becomes a game here, BEFORE the commit, because its id
         //   must be reserved at the commit. Nothing here changes which games, who hosts or what
@@ -1761,7 +1796,7 @@ internal static partial class Program
             ? (IReadOnlyList<BuyGamePlan>)Array.Empty<BuyGamePlan>()
             : BuyBuildPlans(world, nonConferenceDates, matching, contracts);
 
-        MteRefuseOverlap(world, seating, schedule);
+        MteRefuseOverlap(world, seating, schedule, seasonYearOfRun);
         MteRefuseExistingRecord(history, pendingSeasonId);
 
         var recordStatus = EventRecordStatus.NotApplicable;
@@ -2040,7 +2075,7 @@ internal static partial class Program
 
         var prestigeById = world.Schools.ToDictionary(s => s.Id, s => s.CurrentPrestige);
         var brackets = MtePlayBrackets(
-            seating, prestigeById, reservations, seasonIdOfRun, schedule.Count,
+            seating, prestigeById, reservations, seasonIdOfRun, schedule.Count, seasonYearOfRun,
             pg => PlayOneGame(pg));
         if (verbose && brackets.GameCount > 0)
             Console.WriteLine($"  ... {brackets.GameCount} tournament games played");
@@ -2050,7 +2085,7 @@ internal static partial class Program
         //   seed it has always had (see MteExpectedBracketSlots — the reservation walk and
         //   this walk are the same order, and they must stay that way).
         var showcases = MtePlayShowcases(
-            seating, reservations, seasonIdOfRun, schedule.Count + brackets.GameCount,
+            seating, reservations, seasonIdOfRun, schedule.Count + brackets.GameCount, seasonYearOfRun,
             pg => PlayOneGame(pg));
         if (verbose && showcases.GameCount > 0)
             Console.WriteLine($"  ... {showcases.GameCount} showcase games played");
@@ -2078,7 +2113,7 @@ internal static partial class Program
         //  win does not become a league win" true by construction rather than by care.
         // ══════════════════════════════════════════════════════════════════════════
         var confTourneys = ConfTourneyPlaySeason(
-            world, SeasonDefaultStartYear, schedule, results,
+            world, seasonYearOfRun, schedule, results,
             confTourneyReservations, seasonIdOfRun, schedule.Count + eventGameCount,
             pg => PlayOneGame(pg));
         if (verbose && confTourneys.GameCount > 0)
@@ -2164,6 +2199,7 @@ internal static partial class Program
             HostedRoadSidesShaved = hostedRoadSidesShaved,
             RoadShave = roadShave,
             DatedFingerprint = datedFingerprint,
+            SeasonYear = seasonYearOfRun,
             Memory = memoryOutcome,
             Rotation = rotationOutcome,
             Events = eventOutcome,
@@ -2261,15 +2297,18 @@ internal static partial class Program
         if (args.Length < 3)
         {
             Console.WriteLine("usage: season <world.json> <seed> [minutes-floor: 100|250|500|900] " +
-                              "[--history <path>]");
+                              "[--history <path>] [--year <YYYY>]");
             Console.WriteLine("  --history binds this season to a named career file. There is NO " +
                               "default: leave it off and the run behaves exactly as it always has.");
+            Console.WriteLine("  --year names the year a career's FIRST season opens in (1..9998; default 2026). " +
+                              "Each later season is the next year. Without --history it is the year this one season is played.");
             return;
         }
         // S89: named, so it does not collide with the positional minutes floor at args[3].
         string? historyPath;
-        try { historyPath = ParseHistoryArg(args, 3); }
-        catch (HistoryException hx) { Console.WriteLine($"SEASON ERROR: {hx.Message}"); return; }
+        int? startYear;
+        try { historyPath = ParseHistoryArg(args, 3); startYear = ParseYearArg(args, 3); }
+        catch (HistoryException hx) { Console.WriteLine($"SEASON ERROR [{hx.Error}]: {hx.Message}"); return; }
         // S77: reporting-only leaderboard filter. Applied after the roll-up is complete; it
         // touches neither simulation nor accumulation, and deliberately does NOT live in
         // config.json (Phase 71 parity-locks that file's key names).
@@ -2305,7 +2344,7 @@ internal static partial class Program
         // career or a corrupt file stops the run instead of stopping it half a page in.
         // Legacy mode (no --history) leaves this null and nothing below touches a file.
         HistoryStore? history = null;
-        try { history = OpenHistoryFor(world, historyPath); }
+        try { history = OpenHistoryFor(world, historyPath, startYear); }
         catch (HistoryException hx)
         {
             Console.WriteLine($"SEASON ERROR [{hx.Error}]: {hx.Message}");
@@ -2323,8 +2362,9 @@ internal static partial class Program
             // S90: the season page retains a per-game log whenever it is bound to a career.
             // The page itself gains NO output — the log is a file beside the history, and the
             // printed season is byte-identical to its pre-S90 self (Phase 81 A3).
+            // ★ S119 — a career's year comes off its file; a season with no career plays --year.
             run = RunSeasonCore(world, seed, engineConfigPath, verbose: true, history,
-                                retainGameLog: true);
+                                retainGameLog: true, seasonYear: history is null ? startYear : null);
         }
         catch (HistoryException hx)
         {
@@ -2423,7 +2463,7 @@ internal static partial class Program
             if (run.TournamentGameCount > 0)
                 Console.WriteLine($"Tournament games fingerprint: {run.EventGamesFingerprint} " +
                                   $"({run.TournamentGameCount} games)");
-            Console.WriteLine($"Dated: season {SeasonDefaultStartYear}-{SeasonDefaultStartYear + 1}, " +
+            Console.WriteLine($"Dated: season {run.SeasonYear}-{run.SeasonYear + 1}, " +
                               $"{decemberGames} December games, dated fingerprint {run.DatedFingerprint}");
             if (run.NonConferenceDates.Games.Count > 0)
                 Console.WriteLine($"Non-conference dated fingerprint: {run.NonConferenceDates.DatedFingerprint} " +
@@ -2756,17 +2796,28 @@ internal static partial class Program
     {
         if (args.Length < 3)
         {
-            Console.WriteLine("usage: seasons <world.json> <seed> [minutes-floor: 100|250|500|900]");
+            Console.WriteLine("usage: seasons <world.json> <seed> [minutes-floor: 100|250|500|900] [--year <YYYY>]");
             Console.WriteLine("  Plays season one at <seed>, turns the rosters over (seniors leave, classes advance, " +
                               "freshmen arrive position for position), then plays season two at <seed>+1 on those rosters. " +
                               "Nothing is saved; --history is refused.");
+            Console.WriteLine("  --year is the year season one opens in (1..9997; default 2026); season two is the next.");
             return;
         }
         var refusal = SeasonsRefuseHistory(args);
         if (refusal is not null) { Console.WriteLine(refusal); return; }
+        int yearOne;
+        try { yearOne = ParseYearArg(args, 3) ?? SeasonDefaultStartYear; }
+        catch (HistoryException hx) { Console.WriteLine($"SEASONS ERROR [{hx.Error}]: {hx.Message}"); return; }
+        if (yearOne >= SeasonMaxStartYear)
+        {
+            Console.WriteLine($"SEASONS ERROR [{HistoryError.YearOutOfDomain}]: --year {yearOne}: season two would open " +
+                              $"in {yearOne + 1}, past the last season the calendar holds ({SeasonMaxStartYear}).");
+            return;
+        }
         var minuteFloor = SeasonDefaultMinuteFloor;
         for (var i = 3; i < args.Length; i++)
         {
+            if (IsHistoryArgAt(args, i)) continue;   // S119: --year and its value are not the floor
             if (!int.TryParse(args[i], NumberStyles.Integer, CultureInfo.InvariantCulture, out minuteFloor)
                 || !SeasonMinuteTiers.Contains(minuteFloor))
             {
@@ -2801,7 +2852,7 @@ internal static partial class Program
             var schedule = BuildSeasonSchedule(world, seed);
             Console.WriteLine("=== SEASON ONE ===");
             PrintSeasonBanner(world, args[1], seed, schedule.Count);
-            var one = RunSeasonCore(world, seed, engineConfigPath, verbose: true);
+            var one = RunSeasonCore(world, seed, engineConfigPath, verbose: true, seasonYear: yearOne);
             PrintSeasonPage(one, world, history: null, minuteFloor);
             Console.WriteLine();
 
@@ -2813,7 +2864,8 @@ internal static partial class Program
             Console.WriteLine("=== SEASON TWO (on the turned-over rosters; prestige frozen; a fresh schedule draw — " +
                               "host memory reads a career and there is none) ===");
             PrintSeasonBanner(world, args[1], seedTwo, scheduleTwo.Count, rostersInHand: true);
-            var two = RunSeasonCore(world, seedTwo, engineConfigPath, verbose: true, rostersInHand: turnover.SeasonTwo);
+            var two = RunSeasonCore(world, seedTwo, engineConfigPath, verbose: true, rostersInHand: turnover.SeasonTwo,
+                                    seasonYear: yearOne + 1);
             PrintSeasonPage(two, world, history: null, minuteFloor);
         }
         catch (InvalidOperationException ex)

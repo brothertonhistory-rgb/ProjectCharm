@@ -418,17 +418,19 @@ internal static partial class Program
                 // ★ The golden is compared against what the STORE ACTUALLY WRITES, never
                 // against a second hand-rolled copy of the same format — that would be a
                 // check comparing this file's opinion of the format to its own opinion.
-                // ★ S90 — THE GOLDEN IS v2, because a history created today is BORN v2.
-                // (S118.2: the v1 golden is retired with the v1 upgrade, C-60; a v1 career is
-                // now refused by name — the 'older version' case below.)
+                // ★ S119 — THE GOLDEN IS v3, because a history created today is BORN v3 (the
+                // year the career starts in sits beside its counters). The v2 golden retires with
+                // the v2 reader, C-60; a v1 or v2 career is refused by name — the 'older version'
+                // cases below. The golden is HAND-WRITTEN at S119, not captured from the writer, so
+                // the comparison is the writer against an independent expectation of the format.
                 // The lineage label is pinned for the comparison, because production mints it
                 // from Guid.NewGuid() and a golden cannot chase a random value.
-                var golden = Path.Combine(AppContext.BaseDirectory, "tools", "history_v2_golden.json");
+                var golden = Path.Combine(AppContext.BaseDirectory, "tools", "history_v3_golden.json");
                 var goldenFp = "sha256-v1:" + new string('0', 64);
                 var pGolden = Fresh("b10_golden");
                 using (HistoryStore.UseFixedHistoryIdForTests("0123456789abcdef0123456789abcdef"))
                 using (HistoryStore.Open(pGolden, goldenFp)) { }
-                Check("B10 canonical output matches the committed golden v2 fixture "
+                Check("B10 canonical output matches the committed golden v3 fixture "
                       + "(key order, 2-space indent, UTF-8 no BOM, final newline)",
                       File.Exists(golden)
                       && File.ReadAllBytes(golden).SequenceEqual(File.ReadAllBytes(pGolden)),
@@ -452,9 +454,11 @@ internal static partial class Program
                 {
                     ("malformed",  "{ not json",                                   HistoryError.MalformedJson),
                     ("unknown",    RawHistory(tinyFp, 1, 1, 1, extra: "\"nope\": 1"), HistoryError.UnknownKey),
-                    ("missing",    "{\"format\":\"charm-history\",\"schemaVersion\":2}", HistoryError.MissingKey),
+                    ("missing",    "{\"format\":\"charm-history\",\"schemaVersion\":3}", HistoryError.MissingKey),
                     ("format",     RawHistory(tinyFp, 1, 1, 1).Replace("charm-history", "other"), HistoryError.WrongFormat),
-                    ("version",    RawHistory(tinyFp, 1, 1, 1).Replace("\"schemaVersion\": 2", "\"schemaVersion\": 7"), HistoryError.UnsupportedVersion),
+                    ("version",    RawHistory(tinyFp, 1, 1, 1).Replace("\"schemaVersion\": 3", "\"schemaVersion\": 7"), HistoryError.UnsupportedVersion),
+                    // ★ S119 — a stored start year outside the calendar's seasons is damage, named.
+                    ("startyear",  RawHistory(tinyFp, 1, 1, 1).Replace("\"startYear\": 2026", "\"startYear\": 0"), HistoryError.YearOutOfDomain),
                     ("wrongtype",  RawHistory(tinyFp, 1, 1, 1).Replace("\"nextGameId\": 1", "\"nextGameId\": \"x\""), HistoryError.WrongType),
                 };
                 foreach (var (name, body, want) in cases)
@@ -473,25 +477,32 @@ internal static partial class Program
                 //   version-7 case above (both are UnsupportedVersion), so the WORDS are
                 //   asserted — and the version-7 refusal is required NOT to carry them, so the
                 //   words cannot pass by being stamped on every unknown version.
+                //   ★ S119 — v2 (saved S90..S118) joins it: it has no start year, and guessing one
+                //   would be a quiet call about somebody's career.
+                foreach (var (label, body) in new[]
+                {
+                    ("v1", RawHistoryV1(tinyFp, 4001, 7, 900)),
+                    ("v2", RawHistoryV2(tinyFp, 4001, 7, 900)),
+                })
                 {
                     static HistoryException? RefusalOf(Action a)
                     {
                         try { a(); return null; }
                         catch (HistoryException hx) { return hx; }
                     }
-                    var fOld = Fresh("b10_older");
-                    File.WriteAllText(fOld, RawHistoryV1(tinyFp, 4001, 7, 900));
+                    var fOld = Fresh("b10_older_" + label);
+                    File.WriteAllText(fOld, body);
                     var oldBefore = File.ReadAllBytes(fOld);
                     var refusal = RefusalOf(() => HistoryStore.Open(fOld, tinyFp).Dispose());
                     var future = RefusalOf(() => HistoryStore.Open(Fresh("b10_version"), tinyFp).Dispose());
-                    Check("B10 rejection 'older version' (a v1 career) stops loudly as UnsupportedVersion",
+                    Check($"B10 rejection 'older version' (a {label} career) stops loudly as UnsupportedVersion",
                           refusal?.Error == HistoryError.UnsupportedVersion, refusal?.Error.ToString() ?? "no throw");
-                    Check("B10 rejection 'older version' says so by name — 'saved by an older version of "
+                    Check($"B10 rejection 'older version' ({label}) says so by name — 'saved by an older version of "
                           + "the game — start a new career' — and the version-7 refusal does not",
                           refusal is not null && refusal.Message.Contains(OlderCareerSentence, StringComparison.Ordinal)
                           && future is not null && !future.Message.Contains(OlderCareerSentence, StringComparison.Ordinal),
                           refusal?.Message);
-                    Check("B10 rejection 'older version' modified nothing — refused, never upgraded",
+                    Check($"B10 rejection 'older version' ({label}) modified nothing — refused, never upgraded",
                           File.ReadAllBytes(fOld).SequenceEqual(oldBefore));
                 }
 
@@ -558,13 +569,28 @@ internal static partial class Program
     private static string RawHistory(string fp, long person, long season, long game, string? extra = null)
         => "{\n"
          + "  \"format\": \"charm-history\",\n"
+         + "  \"schemaVersion\": 3,\n"
+         + $"  \"historyId\": \"{CheckHistoryId}\",\n"
+         + $"  \"worldFingerprint\": \"{fp}\",\n"
+         + "  \"startYear\": 2026,\n"
+         + $"  \"nextPersonId\": {person.ToString(CultureInfo.InvariantCulture)},\n"
+         + $"  \"nextSeasonId\": {season.ToString(CultureInfo.InvariantCulture)},\n"
+         + $"  \"nextGameId\": {game.ToString(CultureInfo.InvariantCulture)}"
+         + (extra is null ? "" : ",\n  " + extra)
+         + "\n}\n";
+
+    /// <summary>★ S119 — a career file in the S90..S118 format (no start year), written ONLY to
+    /// prove it is refused by name and left untouched (Phase 80 B10, Phase 81 A6, Phase 110 C5).
+    /// Nothing in the engine writes this format, and nothing reads it.</summary>
+    private static string RawHistoryV2(string fp, long person, long season, long game)
+        => "{\n"
+         + "  \"format\": \"charm-history\",\n"
          + "  \"schemaVersion\": 2,\n"
          + $"  \"historyId\": \"{CheckHistoryId}\",\n"
          + $"  \"worldFingerprint\": \"{fp}\",\n"
          + $"  \"nextPersonId\": {person.ToString(CultureInfo.InvariantCulture)},\n"
          + $"  \"nextSeasonId\": {season.ToString(CultureInfo.InvariantCulture)},\n"
          + $"  \"nextGameId\": {game.ToString(CultureInfo.InvariantCulture)}"
-         + (extra is null ? "" : ",\n  " + extra)
          + "\n}\n";
 
     /// <summary>★ S118.2 — a career file in the pre-S90 format, written ONLY to prove it is

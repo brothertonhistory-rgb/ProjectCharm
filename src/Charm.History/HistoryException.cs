@@ -49,6 +49,12 @@ public enum HistoryError
     InvalidIdentity,
     /// <summary>History mode is on and something crossed a boundary without an identity.</summary>
     MissingIdentity,
+    /// <summary>★ S119 — a year outside 1..9998: a stored or requested start year, or a
+    /// career whose next season would open past the last season the calendar holds.</summary>
+    YearOutOfDomain,
+    /// <summary>★ S119 — a year was named for an existing career that started in a different
+    /// one. A career's first year is fixed at creation and never moves.</summary>
+    StartYearMismatch,
 }
 
 /// <summary>Every history failure, carrying its classification. Tests assert

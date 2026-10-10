@@ -9129,20 +9129,26 @@ The stock career's season one: 4,511 roster entries, 5,357 blocks (103 overtime 
 22,940,788 bytes (21.9 MiB)**; a forty-year career ≈ 875 MiB. The row count is exactly the season page's seat-occupancy figure:
 the two populations coincide, so every man who held a seat played at least one possession.
 
-### History schema v2 — the career lineage label
+### History schema v3 — the lineage label and the year the career began
 
-A v1 history bound to a **world**, and two careers from one world legally share the world
-fingerprint and both start at person 1, season 1, game 1 — so a log copied between them passed
-every check v1 could make. `historyId` (128 random bits, minted once at creation, 32 lowercase
-hex) closes it.
+Keys, in this order: `format`, `schemaVersion` (3), `historyId`, `worldFingerprint`, **`startYear`**,
+`nextPersonId`, `nextSeasonId`, `nextGameId` — pinned byte for byte by `tools/history_v3_golden.json`
+(Phase 80 B10; hand-written at S119, so the writer is compared with an independent expectation).
 
-- **A history created after S90 is born v2.** No v1 file is ever written at any instant.
-- **A pre-S90 (v1) file is refused by name, never upgraded** (C-60, S118.2): *"this career was
-  saved by an older version of the game — start a new career"*, classified `UnsupportedVersion`.
-  The version is peeked first, so the refusal names the real reason rather than the missing
-  `historyId` key, and it comes before any write — the file is left byte-identical and no
-  season-log folder can exist. (S90 to S118.1 upgraded it once on open; that code is deleted.)
-  Phase 80 B10 and Phase 81 A6 prove it, and B10 also proves the sentence belongs to the older
+- **`historyId` (S90).** A v1 history bound only to a **world**, and two careers from one world
+  legally share the fingerprint and both start at person 1, season 1, game 1 — so a log copied
+  between them passed every check. 128 random bits, minted once at creation, 32 lowercase hex.
+- **`startYear` (S119).** The civil year the career's first season opens in, 1..9998, written once at
+  creation and never again; season N is `startYear + (N − 1)`. A stored year outside 1..9998 is damage
+  (`YearOutOfDomain`). The bounds and the 2026 default are restated in `HistoryStateV3` because the
+  history assembly references nothing; Phase 110 pins both against the calendar and the season default.
+- **A history created today is born v3.** No older version is ever written at any instant.
+- **v1 (pre-S90) and v2 (S90–S118) files are refused by name, never upgraded** (C-60; v1 at S118.2,
+  v2 at S119): *"this career was saved by an older version of the game — start a new career"*,
+  classified `UnsupportedVersion`. A v2 career has no start year, and guessing 2026 would be a quiet
+  call about somebody's career. The version is peeked first, so the refusal names the real reason,
+  and it comes before any write — the file is left byte-identical and no season-log folder can exist.
+  Phase 80 B10 and Phase 81 A6 prove it for both, and B10 also proves the sentence belongs to the older
   career alone — a version-7 file is refused without it.
 - **What it does not prove:** a history *cloned* at the filesystem carries its label, so those
   branches are indistinguishable. That is the same trust boundary S89 already draws, since a
@@ -10045,6 +10051,38 @@ year, the season ending in 2027, or the season beginning in it — three differe
   conference preference is **scheduler data**. S91 stores none and builds no abstraction to
   claim the feature is "supported."
 - **R9 — named periods come LATER, and they OVERLAP.** See below.
+
+### Which year a season is played in (S119, C-63)
+
+*"I'd like the option for the user to be able to start in any year they want ... If they want to
+start in 1950 with whatever slate of teams, they can"* — and *"the scheduling doesn't change."* So
+**the calendar above holds in every year 1..9998**, unchanged; the era lives in the world file the
+player chooses, never in the calendar.
+
+- **A career starts in the year the player names** (`--year <YYYY>`, default **2026**, the season
+  every run played before S119). The year is stored once, in the career file (`startYear`, history
+  schema v3), and **season N is played in `startYear + (N − 1)`**, read back off the file on every
+  open — never carried in memory. `--year` always names the career's **first** season: on an existing
+  career the same year is accepted and changes nothing, any other is refused by name
+  (`StartYearMismatch`), and a career whose next season would open past 9998 is refused at step 1,
+  before anything is spent.
+- **Without a career**, `season --year Y` plays that one season in Y and `seasons --year Y` plays Y then
+  Y + 1 (so it refuses 9998). The default is 2026 in both.
+- **`RunSeasonCore` resolves the year once** and hands it to every dater: the conference slate, the
+  event windows (`MteWindowDate(monthDay, year)` — the year is a required argument, so no site can fall
+  back to 2026), the brackets and showcases, the non-conference dater and the conference tournaments.
+  The page prints it (`Dated: season 1950-1951`). The game log stores dates as day numbers, so every
+  year round-trips.
+- **What the year moves.** In 2026 nothing (the identity — Phase 110 C2 matches the pinned dated
+  fingerprints). In another year, league, event and tournament games move only in date; **buy games can
+  differ**, because which pairings find a night depends on the real shape of the calendar (see the
+  non-conference curve below). A career's season 2 onward is now played in its own year, so its buy
+  games may differ from what the pre-S119 code produced; nothing pinned a season-2+ value.
+- **Proven by Phase 110**: all fourteen calendar shapes (November 1's weekday × a leap spring or not)
+  plus years 1 and 9998 date the whole stock pipeline with no refusal, every date inside its season and
+  no school twice on one night; a 1950 career plays 1950-51 then 1951-52 with its event games in each.
+  No league comes within 30 days of the November 1 floor in any shape (the closest is an early
+  Selection Sunday, March 15).
 
 ### Legal play — ONE continuous span
 
@@ -11089,6 +11127,12 @@ downstream may infer the kind from the size.
 a showcase** — as a hard equality, not a bound, because rounds are back-to-back. A rest day inside an event
 is a different design and would be authored as a different shape.
 
+**A world is played in any year (S119), so a window must mean the same nights in every year.** The
+validator checks `MM-DD` against a fixed non-leap reference spine (2026-27, its own constant, never the
+season being played): **February 29 is refused** (most years have none), and **a window that crosses the
+end of February is refused** (K5) — in a leap spring it would hold one more night than its field plays
+on. No committed world has an event outside November–December.
+
 A **slot** asks two questions that are deliberately never fused: a prestige `band` and a `scope` of
 `power` / `mid` / `any`. Fusing them into one quality number would make it impossible to author what a top
 event actually does — spend everything on one flagship and fill the rest cheap. The power/mid meaning
@@ -11761,6 +11805,26 @@ week is one you wrote down and will not get.
 That emptiness was the proximate cause of the session's real failure. **Do not thin this tail
 without re-running the Independents.**
 
+### The curve in any year (S119)
+
+The rows are authored as month/day against 2026-27, where every one is a Monday. **Each resolves to the
+Monday nearest its date** (`NonConCurveMonday`: Tuesday–Thursday step back, Friday–Sunday step forward),
+the oracle the same way. In 2026 nothing moves; in every year the rows stay exactly a week apart. Before
+S119 a row was looked up as a plain date — a Monday only in a year where November 1 is a Sunday — so every
+other year found no weighted week and crashed on its first pairing.
+
+**Two known drifts, because the rows follow the calendar and not the holidays:** when November 1 is a
+Wednesday (2028, 2051 …) Christmas falls on a Monday and the post-Christmas bump (weight 6) lands in
+Christmas week, where it is zeroed; when November 1 is a Thursday (2029, 2035 …) Thanksgiving week carries
+13 instead of 11. Anchoring the curve to the holidays is O-122.
+
+**Some years seat fewer buy games (C-64).** Stock, seed 20260720: 1 pairing unseated in nine shapes (the
+R-n9 game), but **7–9 in five shapes** — November 1 a Thursday, a Friday, or a Saturday with no leap
+spring (2029, 2030, 2035, 2036, 2047; roughly two years in five) — 14–16 schools each a game short, every
+one classed *search defect*: a night both calendars had free existed within the slide radius but was
+taken by games seated earlier. Emmett accepted it as R-n9's case writ larger (2026-10-09); seating every
+buy game in tight years is O-120. Phase 110 prints the per-shape counts and never asserts them.
+
 ### ★ Why the Independents are the hard customer
 
 A conference school owes about twelve non-conference games. An Independent owes **29**. Under
@@ -11976,7 +12040,10 @@ copied out of a season run (the dated league slate, the seated event windows, th
 **the matcher's own emission order**, which the oracle indexes by position). The Python side still
 derives every date independently, which is what keeps C1c a real comparison between two
 implementations rather than the engine agreeing with itself. Authored event MM-DD is passed through
-**unresolved**; resolving it onto the season spine stays the oracle's (O-99's) job.
+**unresolved**; the C# resolves it onto the season's own year (S119, O-99 closed) and the oracle,
+which reads 2026 inputs only, still takes it as given. The golden's `oracleSha256` names the pre-S119
+oracle file; its rows are identical under S119's and nothing reads that hash, so the golden was not
+re-emitted.
 
 **Proven before it was trusted:** with the penalty dialled to zero the whole round trip reproduces
 S106's hand-built golden **row for row, all 2,171 games, same dated fingerprint** — only the

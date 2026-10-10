@@ -57,6 +57,14 @@ internal static partial class Program
     /// different dates.</summary>
     private const int SeasonDefaultStartYear = 2026;
 
+    /// <summary>★ S119 — the first and last years a season can open in, named HERE, in the date
+    /// layer that already owns the calendar, so the season-page file (Program.Season.cs) never
+    /// names a calendar type itself — Phase 82 A10's isolation guard.</summary>
+    private const int SeasonMinStartYear = CharmCalendar.MinSeasonStartYear;
+
+    /// <inheritdoc cref="SeasonMinStartYear"/>
+    private const int SeasonMaxStartYear = CharmCalendar.MaxSeasonStartYear;
+
     private static readonly string[] SeasonWeekdayNames =
         { "mon", "tue", "wed", "thu", "fri", "sat", "sun" };
 

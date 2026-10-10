@@ -242,7 +242,7 @@
          later session cannot change the key order, the indent, the encoding or the trailing
          newline of a save file without the suite saying so out loud. (S118.2: the v1 golden
          is retired with the v1 upgrade, C-60.) -->
-    <None Include="..\..\tools\history_v2_golden.json" Link="tools\history_v2_golden.json">
+    <None Include="..\..\tools\history_v3_golden.json" Link="tools\history_v3_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <!-- S88's two fixtures. S88 wrote them, and wrote the checks that read them, but never

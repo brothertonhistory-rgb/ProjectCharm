@@ -203,7 +203,7 @@ internal static partial class Program
                 var probe = new SeatedEvent(900, "Probe", 1, 1, "Nowhere", "11-20", "11-21", 4,
                                             EventSeatingStatus.Complete, seats);
                 var prestige = new Dictionary<int, int> { [40] = 10, [30] = 99, [22] = 55, [11] = 55 };
-                var plan = MteSeedField(probe, prestige);
+                var plan = MteSeedField(probe, prestige, SeasonDefaultStartYear);
 
                 Check("C2a: seeds run 1..N by prestige descending",
                       plan.SchoolBySeed[0] == 30 && plan.SchoolBySeed[3] == 40,
@@ -313,8 +313,8 @@ internal static partial class Program
                 foreach (var grp in byEvent)
                 {
                     var e = seatedById[grp.Key];
-                    var first = MteWindowDate(e.FirstDay);
-                    var last = MteWindowDate(e.LastDay);
+                    var first = MteWindowDate(e.FirstDay, SeasonDefaultStartYear);
+                    var last = MteWindowDate(e.LastDay, SeasonDefaultStartYear);
                     var routes = BracketRoutesFor(e.FieldSize);
                     foreach (var p in grp)
                     {
@@ -682,6 +682,7 @@ internal static partial class Program
                     Wins = new Dictionary<int, int> { [1] = 3, [2] = 4, [3] = 1, [4] = 2, [5] = 0, [6] = 0 },
                     Losses = new Dictionary<int, int> { [1] = 1, [2] = 2, [3] = 3, [4] = 6, [5] = 0, [6] = 0 },
                     Divvy = on.Divvy, League = new SeasonLeagueStats(),
+                    SeasonYear = SeasonDefaultStartYear,
                 };
                 var order = SeasonStandingsOrder(probe);
                 var ids = new List<int> { 6, 5, 4, 3, 2, 1 };

@@ -93,8 +93,17 @@ internal static partial class Program
     /// of 3. Below roughly weight 7 on this curve a week is a week you wrote down and
     /// will not get. Do not thin this tail without re-running the Independents.</para>
     ///
-    /// <para>Keyed by MONTH and DAY-OF-MONTH of the week's Monday, resolved onto whatever
-    /// season year is being played — never a hardcoded 2026.</para></summary>
+    /// <para>Keyed by MONTH and DAY-OF-MONTH as authored against 2026-27, where every row is a
+    /// Monday. ★ S119 — in any other year each row lands on the MONDAY NEAREST its date
+    /// (<see cref="NonConCurveMonday"/>). Before S119 the row was looked up as a plain date,
+    /// which is a Monday only in years shaped like 2026 (November 1 a Sunday), so every other
+    /// year found no weighted week and crashed on its first pairing.</para>
+    ///
+    /// <para>★ TWO KNOWN DRIFTS, because the rows follow the calendar and not the holidays:
+    /// when November 1 is a Wednesday (2028, 2051 …) Christmas falls on a Monday and the
+    /// post-Christmas bump (weight 6) lands IN Christmas week, where R-n4 zeroes it; when
+    /// November 1 is a Thursday (2029, 2035 …) Thanksgiving week carries the 13 row instead of
+    /// the 11. Anchoring the curve to the holidays is a possible refinement, not S119's.</para></summary>
     private static readonly (int Month, int Day, int Weight)[] NonConCurve =
     {
         (11,  2, 10),   // opening week
@@ -201,11 +210,14 @@ internal static partial class Program
     private static DateOnly NonConSeasonFloor(int startYear)
         => new(startYear, CharmCalendar.FirstLegalMonth, CharmCalendar.FirstLegalDay);
 
-    /// <summary>A curve entry's Monday resolved onto the season being played: months from
-    /// July on belong to the opening civil year, the rest to the following one — the same
-    /// halving <see cref="MteWindowDate"/> uses, so a window and a weight compare.</summary>
+    /// <summary>A curve entry resolved onto the season being played: months from July on
+    /// belong to the opening civil year, the rest to the following one — the same halving
+    /// <see cref="MteWindowDate"/> uses — and then onto the NEAREST MONDAY (S119, K1): a
+    /// Tuesday-Thursday date steps back to its own week's Monday, a Friday-Sunday date steps
+    /// forward to the next. In 2026-27 every row already is a Monday, so nothing moves there.
+    /// Consecutive rows are seven days apart in every year, so no two land on one week.</summary>
     private static DateOnly NonConCurveMonday(int month, int day, int startYear)
-        => new(month >= 7 ? startYear : startYear + 1, month, day);
+        => SeasonMonday(new DateOnly(month >= 7 ? startYear : startYear + 1, month, day).AddDays(3));
 
     // ── The computation ─────────────────────────────────────────────────────────────
 
@@ -242,7 +254,7 @@ internal static partial class Program
         var windows = schools.ToDictionary(s => s, _ => new List<(DateOnly First, DateOnly Last)>());
         foreach (var e in seating.Active)
             foreach (var seat in e.Seats)
-                windows[seat.SchoolId].Add((MteWindowDate(e.FirstDay), MteWindowDate(e.LastDay)));
+                windows[seat.SchoolId].Add((MteWindowDate(e.FirstDay, startYear), MteWindowDate(e.LastDay, startYear)));
 
         // ── the nights an ordinary game may NOT take, from the immovable calendar alone ──
         var blocked = new Dictionary<int, HashSet<DateOnly>>();

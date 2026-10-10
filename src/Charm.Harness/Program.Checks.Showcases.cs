@@ -526,15 +526,15 @@ internal static partial class Program
                 var bareSeating = MteSeatSeason(noShowcases, ShowcaseCheckSeed, MteHistory.Empty);
                 var fullSeating = MteSeatSeason(stock, ShowcaseCheckSeed, MteHistory.Empty);
                 var showDays = fullSeating.Active.Where(x => x.IsShowcase)
-                    .Select(x => (Key: (x.Tier, x.EventId), Day: MteWindowDate(x.FirstDay))).ToList();
+                    .Select(x => (Key: (x.Tier, x.EventId), Day: MteWindowDate(x.FirstDay, SeasonDefaultStartYear))).ToList();
 
                 var identicalBefore = true;
                 var reachedFirstOverlap = false;
                 foreach (var t in bareSeating.Active.Where(x => !x.IsShowcase)
                                              .OrderBy(x => x.Tier).ThenBy(x => x.EventId))
                 {
-                    var first = MteWindowDate(t.FirstDay);
-                    var last = MteWindowDate(t.LastDay);
+                    var first = MteWindowDate(t.FirstDay, SeasonDefaultStartYear);
+                    var last = MteWindowDate(t.LastDay, SeasonDefaultStartYear);
                     if (showDays.Any(s => s.Key.CompareTo((t.Tier, t.EventId)) < 0
                                           && s.Day >= first && s.Day <= last))
                     { reachedFirstOverlap = true; break; }

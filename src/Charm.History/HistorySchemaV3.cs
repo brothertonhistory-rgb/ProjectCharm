@@ -4,49 +4,67 @@ using System.Text.Json;
 namespace Charm.History;
 
 // ============================================================================
-//  S90 — THE HISTORY FILE, version 2: the same three counters, plus a name for
-//  the career itself.
+//  S119 — THE HISTORY FILE, version 3: v2 plus the year the career began.
 //
-//  ★ WHY v1 WAS NOT ENOUGH, and it is a narrow, real hole. A v1 history binds to
-//  a WORLD. Two careers started from the same world legally share the world
-//  fingerprint AND start at person 1, season 1, game 1 — so a retention log
-//  copied from one into the other passes every check v1 could make, and one
-//  career silently absorbs another's games. The `historyId` closes it: a random
-//  128-bit label minted once, at creation, naming this career lineage.
+//  ★ WHY THE YEAR LIVES HERE. A career can start in any year the player picks
+//  (Emmett, 2026-10-09: "If they want to start in 1950 with whatever slate of
+//  teams, they can"). Season N of a career is played in startYear + (N - 1), and
+//  the only thing that knows N is this file's season counter. So the first year
+//  is stored beside the counter, once, at creation, and is never written again.
+//  It is read back off the file every season — never carried in memory — which
+//  is what makes a career closed in 1950 and reopened later still play 1951.
 //
-//  ★ WHAT IT PROVES, HONESTLY. Two histories created INDEPENDENTLY can never
-//  exchange logs undetected. A history file COPIED at the filesystem carries its
-//  label with it, so the two branches are indistinguishable to S90 and this makes
-//  no claim otherwise — that is the same trust boundary S89 already draws, since
-//  a copied history also duplicates every counter. Telling branches apart needs
-//  identity minted by a controlled clone operation, which is save-branch
-//  management and a different session.
+//  ★ v1 AND v2 ARE REFUSED BY NAME, NEVER UPGRADED (Emmett's ruling C-60: the
+//  game is the product, not its save files). A v2 career has no start year, and
+//  guessing one (2026) would be a quiet call about somebody's career.
 //
-//  ★ IT IS A LABEL, NOT AN IDENTITY. No counter, no ordering, no meaning beyond
-//  "this lineage". It is drawn from Guid.NewGuid() — the idiom five suite files
-//  already use — and explicitly NOT from any simulation RNG: an allocator that
-//  drew from a game stream would change the basketball by saving.
+//  ★ v2's REASONS STILL HOLD, carried forward unchanged: the `historyId` is a
+//  random 128-bit lineage label minted once at creation, so two careers built
+//  independently from one world can never exchange logs undetected. A copied
+//  file carries its label with it — that trust boundary is S89's and S90's, not
+//  a new one. The label is drawn from Guid.NewGuid() and explicitly NOT from any
+//  simulation RNG: an allocator that drew from a game stream would change the
+//  basketball by saving.
 // ============================================================================
 
-/// <summary>The complete persisted state, version 2. `Next*` means NEXT UNISSUED.</summary>
-public sealed record HistoryStateV2(
+/// <summary>The complete persisted state, version 3. `Next*` means NEXT UNISSUED;
+/// <see cref="StartYear"/> is the civil year the career's FIRST season opens in.</summary>
+public sealed record HistoryStateV3(
     string HistoryId,
     string WorldFingerprint,
+    int StartYear,
     long NextPersonId,
     long NextSeasonId,
     long NextGameId)
 {
     public const string FormatTag = "charm-history";
-    public const int SchemaVersion = 2;
+    public const int SchemaVersion = 3;
 
-    public static HistoryStateV2 Fresh(string historyId, string worldFingerprint)
-        => new(historyId, worldFingerprint, 1, 1, 1);
+    /// <summary>★ The year a career starts in when none is named. It is the season every
+    /// run played before S119, so a career created without a year is the career it always
+    /// was. Phase 110 C4 pins it equal to the harness's own default — one number, asserted
+    /// in the one place both sides can see it, because this assembly cannot see the season.</summary>
+    public const int DefaultStartYear = 2026;
+
+    /// <summary>★ The calendar's season bounds, restated because this assembly deliberately
+    /// references nothing (see Charm.History.csproj). A season crosses New Year's, so the last
+    /// one that can exist starts in 9998. Phase 110 C5 pins both against
+    /// <c>CharmCalendar.MinSeasonStartYear</c> / <c>MaxSeasonStartYear</c>.</summary>
+    public const int MinStartYear = 1;
+
+    /// <inheritdoc cref="MinStartYear"/>
+    public const int MaxStartYear = 9998;
+
+    public static bool IsStartYearInDomain(long year) => year >= MinStartYear && year <= MaxStartYear;
+
+    public static HistoryStateV3 Fresh(string historyId, string worldFingerprint, int startYear)
+        => new(historyId, worldFingerprint, startYear, 1, 1, 1);
 }
 
-internal static class HistorySchemaV2
+internal static class HistorySchemaV3
 {
     private static readonly string[] RootKeys =
-        { "format", "schemaVersion", "historyId", "worldFingerprint",
+        { "format", "schemaVersion", "historyId", "worldFingerprint", "startYear",
           "nextPersonId", "nextSeasonId", "nextGameId" };
 
     /// <summary>Read only `schemaVersion`, so the loader can refuse an older career for
@@ -76,19 +94,20 @@ internal static class HistorySchemaV2
 
     // ── Canonical serialization ─────────────────────────────────────────────
     //  Key order fixed here and pinned by a golden: format, schemaVersion,
-    //  historyId, worldFingerprint, then the three counters. 2-space indent,
-    //  "\n" newlines, UTF-8 with no BOM, one final newline — the discipline
-    //  S89 set for v1, pinned by `tools/history_v2_golden.json`.
-    internal static byte[] Serialize(HistoryStateV2 s)
+    //  historyId, worldFingerprint, startYear, then the three counters. 2-space
+    //  indent, "\n" newlines, UTF-8 with no BOM, one final newline — the discipline
+    //  S89 set for v1, pinned by `tools/history_v3_golden.json`.
+    internal static byte[] Serialize(HistoryStateV3 s)
     {
         using var stream = new MemoryStream();
         using (var w = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true, NewLine = "\n" }))
         {
             w.WriteStartObject();
-            w.WriteString("format", HistoryStateV2.FormatTag);
-            w.WriteNumber("schemaVersion", HistoryStateV2.SchemaVersion);
+            w.WriteString("format", HistoryStateV3.FormatTag);
+            w.WriteNumber("schemaVersion", HistoryStateV3.SchemaVersion);
             w.WriteString("historyId", s.HistoryId);
             w.WriteString("worldFingerprint", s.WorldFingerprint);
+            w.WriteNumber("startYear", s.StartYear);
             w.WriteNumber("nextPersonId", s.NextPersonId);
             w.WriteNumber("nextSeasonId", s.NextSeasonId);
             w.WriteNumber("nextGameId", s.NextGameId);
@@ -101,7 +120,7 @@ internal static class HistorySchemaV2
         return out_;
     }
 
-    internal static HistoryStateV2 Parse(byte[] bytes)
+    internal static HistoryStateV3 Parse(byte[] bytes)
     {
         JsonDocument doc;
         try { doc = JsonDocument.Parse(bytes); }
@@ -120,15 +139,15 @@ internal static class HistorySchemaV2
             RejectUnknownOrDuplicateKeys(root);
 
             var format = RequireString(root, "format");
-            if (!string.Equals(format, HistoryStateV2.FormatTag, StringComparison.Ordinal))
+            if (!string.Equals(format, HistoryStateV3.FormatTag, StringComparison.Ordinal))
                 throw new HistoryException(HistoryError.WrongFormat,
-                    $"'format' must be '{HistoryStateV2.FormatTag}' (got '{format}') — this is not a Charm history file.");
+                    $"'format' must be '{HistoryStateV3.FormatTag}' (got '{format}') — this is not a Charm history file.");
 
             var version = RequireLong(root, "schemaVersion");
-            if (version != HistoryStateV2.SchemaVersion)
+            if (version != HistoryStateV3.SchemaVersion)
                 throw new HistoryException(HistoryError.UnsupportedVersion,
                     $"unsupported history schemaVersion {version.ToString(CultureInfo.InvariantCulture)} " +
-                    "(this build reads 2).");
+                    "(this build reads 3).");
 
             var historyId = RequireString(root, "historyId");
             if (!IsCanonicalHistoryId(historyId))
@@ -136,11 +155,16 @@ internal static class HistorySchemaV2
                     "'historyId' must be exactly 32 lowercase hex characters.");
 
             var fingerprint = RequireString(root, "worldFingerprint");
+            var startYear = RequireLong(root, "startYear");
+            if (!HistoryStateV3.IsStartYearInDomain(startYear))
+                throw new HistoryException(HistoryError.YearOutOfDomain,
+                    $"'startYear' is {startYear.ToString(CultureInfo.InvariantCulture)}, outside the years a " +
+                    $"season can start in ({HistoryStateV3.MinStartYear}..{HistoryStateV3.MaxStartYear}).");
             var person = RequireCounter(root, "nextPersonId");
             var season = RequireCounter(root, "nextSeasonId");
             var game   = RequireCounter(root, "nextGameId");
 
-            return new HistoryStateV2(historyId, fingerprint, person, season, game);
+            return new HistoryStateV3(historyId, fingerprint, (int)startYear, person, season, game);
         }
     }
 

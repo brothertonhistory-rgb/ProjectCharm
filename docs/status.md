@@ -10,7 +10,17 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 118.3** (2026-10-09; verified on Emmett's machine — **`checks 88 94 100 102 103 104`, all
+Last updated: **Session 119** (2026-10-09; verified on Emmett's machine — the full suite, **95 timed sections,
+1,654.2s, every phase green but Phase 82 A10** (the S91 isolation guard: the season file named the calendar's year
+bounds); fixed and re-run as **`checks 82 102-104 110`, all PASS** — Phase 82, 102 46, 103 22, 104 51, Phase 110 new,
+74 assertions). **A CAREER CAN START IN ANY YEAR, AND EVERY SEASON KNOWS ITS OWN** (O-99, O-113, ★ **C-63**, Emmett
+2026-10-09: *"If they want to start in 1950 with whatever slate of teams, they can"* / *"the scheduling doesn't
+change"*): `--year` names a career's first season (default 2026); season N is that year + N − 1, stored in career file
+v3 (v1 and v2 refused by name). Every dater takes the season's year; the non-conference curve resolves in any year (it
+crashed in every year not shaped like 2026). No stock game moved. ★ **C-64**: in roughly two years in five, 7–9 buy
+games find no night (2026: 1) — accepted as R-n9 writ larger; O-120 boarded. Journal S119 has the detail.)
+
+Previous: **Session 118.3** (2026-10-09; verified on Emmett's machine — **`checks 88 94 100 102 103 104`, all
 PASS, 123.8s**; Phase 88 63 ok, Phase 94 35, both unchanged, every predicted count landed). **AN OLDER SEASON RECORD IS
 FORGOTTEN, NOT READ** (O-119, ★ **C-62**, Emmett 2026-10-09: *"I guess forget and keep going"*): a season record saved by
 the first format (before S103) is a hole like a damaged one — no tournament memory and no contracts from that year, the
@@ -567,6 +577,12 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S119 MOVED NO STOCK GAME.** Every fingerprint and pinned result stays at the S118.1 capture (Phases 102–104 green);
+2026 is the identity (Phase 110 C2 reproduces the pinned dated fingerprints). A career's season 2 onward is now played
+in its own year (2027, 2028 …), so its dates move and its buy games may differ; nothing pins a season-2+ value. The
+history file is version 3 only (`startYear`). Per calendar shape, stock buy games unseated: 1 in nine shapes, 7–9 in
+five (C-64).
+
 **S118.3 MOVED NO GAME.** Every fingerprint and pinned result stays at the S118.1 capture (Phases 102–104 green). The
 season record is version 2 only; a version-1 record is a hole with the note "saved by an older version of the game".
 
@@ -619,7 +635,7 @@ turns over 1,175 seniors (459 G / 346 W / 370 B) for 1,175 freshmen at those num
 busiest loses 10 of 13; season-two census Fr 1175 / So 1082 / Jr 1134 / Sr 1120; season two plays 5,358 games (home
 court 65.1% / +6.9, rating home factor 1.0308). Season two's conference schedule and dates equal season one's — legacy
 mode holds no memory and the conference slate is a pure function of the world; events, tournaments and buy games are
-a fresh draw. The year label still prints 2026-2027 on both (O-113).
+a fresh draw. The year label still printed 2026-2027 on both (O-113; since S119 season two prints 2027-2028).
 
 **S113 MOVED NO BASKETBALL.** Every game, score and possession count is identical to S112 (Phase 103 C7 against the
 pre-S112 capture). The season page gained the class census at the end of the roster census: class totals, the same by
@@ -731,6 +747,16 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S119 — A CAREER CAN START IN ANY YEAR (closes O-99, O-113; C-63, C-64).** `RunSeasonCore` resolves the season's
+  year once (a career: `startYear + N − 1` off the file; else `--year`, else 2026) and passes it to the conference dater,
+  `MteSeatSeason`, `MteRefuseOverlap`, brackets, showcases, the non-conference dater and the conference tournaments;
+  `MteWindowDate(monthDay, year)` takes the year as a required argument; `SeasonRunOutcome.SeasonYear`; the page prints
+  it. `NonConCurveMonday` resolves to the nearest Monday (C# and oracle). `WorldParseSpineDay` checks a fixed non-leap
+  reference, refuses 29 February, and a window crossing the end of February is refused (K5). Career file v3
+  (`HistorySchemaV3.cs`, `startYear`, `YearOutOfDomain`, `StartYearMismatch`); v2 refused like v1; `HistorySchemaV2.cs`
+  and `history_v2_golden.json` deleted, `history_v3_golden.json` hand-written. `--year` on `season` and `seasons`.
+  Phase 80 +5 (83 ok), Phase 81 +4 (53), Phase 110 new (74); registry 95. Negative controls: the old curve lookup turns
+  C1 red in every shape not shaped like 2026; the old window resolver turns C3 red. Journal S119.
 - **★ S118.3 — AN OLDER SEASON RECORD IS FORGOTTEN, NOT READ (closes O-119, C-62).** `MteReadHistory`: version 1 is a
   hole with `season N: saved by an older version of the game`; `MteSupportedRecordVersions` deleted, the reader compares
   against `MteRecordFormatVersion`; one shared `MteOlderRecordNote`. `ReadLiveContracts`: version 1 is `CollectionLost`
@@ -1306,6 +1332,16 @@ chart is PROVISIONAL pending O-6.
 
 ## Open — next-session candidates
 
+- **O-120 — SEAT EVERY BUY GAME IN TIGHT YEARS (S119, C-64).** In five of the fourteen calendar shapes (November 1 a
+  Thursday, a Friday, or a Saturday with no leap spring — 2029, 2030, 2035, 2036, 2047) the stock world leaves 7–9
+  pairings unseated against 2026's one; 14–16 schools a game short. Every one is *search defect*: a shared free night
+  existed within the slide radius but earlier-seated games took it. A smarter seating pass (or a repair after it) in
+  `DateNonConferenceGames` and the oracle. Phase 110's page lines are the before-numbers.
+- **O-121 — THE PAGES LABEL SEASONS BY NUMBER, NOT YEAR (S119, K4).** The player and people pages still say
+  "Season 2", not "1951-52". A page session; it moves Phase 106/107 text.
+- **O-122 — THE BUY-GAME CURVE FOLLOWS THE CALENDAR, NOT THE HOLIDAYS (S119, K1).** Two drifts: when November 1 is a
+  Wednesday the post-Christmas bump lands in Christmas week and is zeroed; when it is a Thursday Thanksgiving week
+  carries 13 instead of 11. Anchoring the rows to Thanksgiving and Christmas is the refinement. Small; may fold into O-120.
 - **O-118 — THE FREE-THROW LANE (S118.1, Emmett: *"lane design is simply its own separate session, deciding who is
   on it"*).** Who lines up along the lane on a free throw, and from that picture who grabs a missed free throw and who is
   fouled on the loose ball. Today Roll M's board uses the rebound draw with the field-goal-shooter rule (it cuts the
@@ -1359,9 +1395,6 @@ chart is PROVISIONAL pending O-6.
   score and the scout rank disagree for guards. Nothing is wrong today — the freshman class is drawn at the standing
   line, same as the pool — but any future "recruit better players" dial that raises the line will buy bigs and not
   guards. Phase 104 prints the movement; O-6's rank modernization is the natural home.
-- **O-113 — THE SEASON YEAR LABEL IS A CONSTANT (S114).** Season two of a stacked run prints "season 2026-2027" like
-  season one; `SeasonDefaultStartYear` is not advanced. Cosmetic until something reads the year. Session 3 (saving)
-  will need the season to know its own number anyway.
 - **O-114 — THE RUN-TO-RUN SPEED SPREAD, THIRD SIGHTING (S114; fourth at S115: suite 739.8s against S114's 1,957.8s on
   one more check, and the sandbox 938.9s — the spread now runs both ways; fifth at S116: Phase 105 168.2s and 138.7s on
   two targeted runs against 56.0s at S115, identical code — a twelve-phase run took longer than S115's full suite).** Phase 103 ran **93.5s** on Emmett's machine against
@@ -1410,7 +1443,7 @@ chart is PROVISIONAL pending O-6.
   harness mode + an oracle output path, round-trip proven at penalty zero against S106's hand-built golden, row
   for row). **The standing hazard is the emitter drifting into an oracle**: it must keep computing *nothing* —
   every field copied from a season run, pairs in the matcher's own emission order, authored event MM-DD passed
-  through unresolved (that resolution is O-99's). The moment it decides something, Phase 97 C1c stops being a
+  through unresolved (the engine resolves it onto the season's year since S119; the 2026 golden needs nothing more). The moment it decides something, Phase 97 C1c stops being a
   comparison between two implementations and becomes the engine agreeing with itself. **Any session touching it
   re-reads the header comment first.** Same lesson as the lost r4 addendum: *a step that lives only in a chat log
   is a step that will be redone wrong.*
@@ -1458,12 +1491,6 @@ chart is PROVISIONAL pending O-6.
   buffers are proven on the **stock world alone** and R-n7's contract legs are proven by **nothing** — the contract arm
   of the dating layer is live code with no fixture behind it, and it passes by being vacuous. Wants a small rigged world
   with a couple of events and a contract in it, readable game by game. Not urgent; genuinely load-bearing.
-
-- **O-99 — EVENT WINDOWS RESOLVE AGAINST A HARDCODED SEASON YEAR (opened S106).** `MteWindowDate` pins the year while
-  the conference dater reads whatever start year it is handed. Invisible at one season; at two, every league game moves
-  to the new year and every event window stays in the old one, so every buffer and conflict check compares dates a year
-  apart. **S106 is the first layer that reads both together**, which is why it surfaced here. Belongs with the career
-  layer, not with sites.
 
 - **O-95 — EVENT DATES ARE FIXED IN THE WORLD FILE**, so the Jimmy V falls on December 3rd every season
   forever. Events drifting a few days year to year is real and cheap. **Belongs with the living-pool session**
@@ -2224,6 +2251,17 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-64 (S119, Emmett, 2026-10-09) — IN SOME YEARS A FEW MORE BUY GAMES FIND NO NIGHT, AND THAT IS ACCEPTED.** "yes"
+  to: in roughly two years in five, 7–9 buy games of 2,171 find no night and those schools play one game fewer —
+  R-n9's single unseated game (2026) writ larger, same cause. The layer reports, never throws, never cancels or
+  re-pairs. Making every year seat like 2026 is **O-120**, an improvement, not a fix to a broken rule.
+- **C-63 (S119, Emmett, 2026-10-09) — THE YEAR IS THE PLAYER'S; THE CALENDAR IS TODAY'S IN EVERY YEAR.** *"I'd like the
+  option for the user to be able to start in any year they want ... If they want to start in 1950 with whatever slate
+  of teams, they can."* / *"The scheduling doesn't change ... realistic schedules for the era can be a way down the line
+  task, if ever."* November 1 floor, Selection Sunday the third Sunday in March, the Christmas week and the conference
+  tournaments before Selection Sunday hold in every year 1..9998; the era lives in the world file. A year whose
+  calendar cannot fit the stock schedule is brought to Emmett — never fixed by shortening a schedule or loosening a rule.
+  Do not build era calendars without a new ruling.
 - **C-62 (S118.3, Emmett, 2026-10-09) — AN OLDER SEASON RECORD IS FORGOTTEN, NOT READ, AND THE CAREER PLAYS ON.**
   *"I guess forget and keep going."* A season record (`<history>.events/season-N.json`) saved by an older format is a
   **hole**, exactly like a damaged one: that year contributes no tournament memory and no contracts, the other years
@@ -2554,6 +2592,13 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **A CAREER CAN START IN ANY YEAR — S119 (2026-10-09). NEXT: NOT YET CHOSEN.** O-99 and O-113 shipped. The arc's step 4
+(development, recruiting, prestige movement, transfers) is where the plan goes next; **O-118** (the free-throw lane),
+**O-120** (seat every buy game in tight years) and **O-121** (the year on the pages) sit beside it. Emmett's call at the
+next-prompt pass (CONVENTIONS §6). **Carry into any draft that changes a file:** search the suite for checks that read
+the file's *source text*, not only its behaviour — Phase 82 A10 scans five season files for calendar names, and S119's
+sandbox list missed it.
 
 ★ **AN OLDER SEASON RECORD IS FORGOTTEN — S118.3 (2026-10-09). NEXT: NOT YET CHOSEN.** O-119 shipped — the last older-format
 tolerance S118.2's search found (C-60, C-62). The arc's step 4 (development, recruiting, prestige movement,
