@@ -242,7 +242,12 @@ public sealed record PossessionRecord(
     // ★ S118.1, PAGE-ONLY — bonus trips named in the scramble (see
     // RoutingOutcome.ScrambleFtShooterStamped). Appended last with a 0 default (the
     // S62/S84/S85 convention). Never read by the engine; Phases 108 and 109 sum it per game.
-    int ScrambleFtShooterStamped = 0);
+    int ScrambleFtShooterStamped = 0,
+    // ★ S120, PAGE-ONLY — the free-throw lane: one observation per missed last free throw (see
+    // RoutingOutcome.FreeThrowLanes) and the lane-leak count (RoutingOutcome.FreeThrowLaneLeaks).
+    // Appended last with defaults (the S62/S84/S85 convention). Never read by the engine.
+    IReadOnlyList<FreeThrowLaneObservation>? FreeThrowLanes = null,
+    int FreeThrowLaneLeaks = 0);
 
 /// <summary>The result of a Governor run — everything the harness validates and prints.</summary>
 /// <param name="Possessions">Every resolved possession, in order. Count == the cap.</param>
@@ -401,6 +406,10 @@ public sealed class Governor
                     $"Governor safety guard exceeded {_cfg.PossessionCap} possessions — the clock " +
                     "is not draining (check HalfSeconds and possession-time config).");
 
+            // ★ S120: the clock a roll can read — the period and its seconds left, as this
+            // possession starts. No randomness; only the free-throw lane reads it.
+            _game.PublishClock(periodNumber, periodRemaining);
+
             EndOfHalfIntent? intent = periodRemaining < _endOfHalf.HoldThresholdSeconds
                 ? _endOfHalfPie.Roll(_rng.NextUnitInterval())
                 : null;
@@ -466,6 +475,8 @@ public sealed class Governor
             IReadOnlyList<BreakContestObservation>? possessionBreakContests = null;
             var possessionPutbackFtShooterChanged = 0;   // ★ S118, page-only
             var possessionScrambleFtShooterStamped = 0;  // ★ S118.1, page-only
+            IReadOnlyList<FreeThrowLaneObservation>? possessionFreeThrowLanes = null;   // ★ S120, page-only
+            var possessionFreeThrowLaneLeaks = 0;                                       // ★ S120, page-only
 
             if (intent == EndOfHalfIntent.NoShot)
             {
@@ -612,6 +623,8 @@ public sealed class Governor
                 possessionBreakContests       = outcome.BreakContests;
                 possessionPutbackFtShooterChanged = outcome.PutbackFtShooterChanged;
                 possessionScrambleFtShooterStamped = outcome.ScrambleFtShooterStamped;
+                possessionFreeThrowLanes      = outcome.FreeThrowLanes;
+                possessionFreeThrowLaneLeaks  = outcome.FreeThrowLaneLeaks;
             }
 
             periodRemaining -= applied;
@@ -684,7 +697,9 @@ public sealed class Governor
                 possessionOffensiveFouls,
                 possessionBreakContests,
                 possessionPutbackFtShooterChanged,
-                possessionScrambleFtShooterStamped));
+                possessionScrambleFtShooterStamped,
+                possessionFreeThrowLanes,
+                possessionFreeThrowLaneLeaks));
 
             var nextOffense = consequence.NextOffense;
             st = new PossessionState(

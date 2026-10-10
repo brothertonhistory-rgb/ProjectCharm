@@ -82,6 +82,45 @@ public static class OffensiveRebounderPicker
         IRng            rng,
         Slot?           atTheLine = null)
     {
+        var (weights, populated) = Weights(state, game, matchupCfg, atTheLine, onlySlots: null);
+        var lineup = game.LineupFor(state.Offense);
+        var totalWeight = 0.0;
+        for (var i = 0; i < 5; i++)
+            if (populated[i]) totalWeight += weights[i];
+
+        // ── Stage 3: one RNG draw — cumulative walk to chosen slot ───────────────
+        // Same shape as Pie<T>.Roll: walk the cumulative sum, return the first slot
+        // whose cumulative weight exceeds the draw. The final populated slot is the
+        // implicit fallback (absorbs floating-point shortfall).
+        var draw      = rng.NextUnitInterval() * totalWeight;
+        var cumulative = 0.0;
+        var lastPopulated = -1;
+
+        for (var i = 0; i < 5; i++)
+        {
+            if (!populated[i]) continue;
+            lastPopulated = i;
+            cumulative += weights[i];
+            if (draw <= cumulative)
+                return lineup.SlotAt(i + 1);
+        }
+
+        // Fallback: floating-point edge — return the last populated slot.
+        return lineup.SlotAt(lastPopulated + 1);
+    }
+
+    /// <summary>★ S120 — the per-seat pick weights <see cref="Pick"/> walks, with the seat mask the
+    /// free-throw lane needs. <paramref name="onlySlots"/> null is the five-man path, unchanged.
+    /// Given, only those seats count: every lineup mean is taken over them, every other seat is
+    /// left unpopulated, and no shooter nerf applies (the shooter stands at the line, off the lane).
+    /// Returns the weights by seat index (slot − 1) and which seats were counted.</summary>
+    public static (double[] Weights, bool[] Populated) Weights(
+        PossessionState            state,
+        GameState                  game,
+        MatchupConfig              matchupCfg,
+        Slot?                      atTheLine,
+        IReadOnlySet<int>?         onlySlots)
+    {
         var offense  = state.Offense;
         var lineup   = game.LineupFor(offense);
         var roster   = game.RosterFor(offense);
@@ -107,6 +146,7 @@ public static class OffensiveRebounderPicker
             var slot = lineup.SlotAt(i + 1);
             var p    = roster.PlayerAt(slot);
             if (p is null) continue;
+            if (onlySlots is not null && !onlySlots.Contains(i + 1)) continue;   // ★ S120: off the lane
             postnesses[i] = Matchup.Postness(p, matchupCfg);
             wingspans[i]  = p.Wingspan;
             physicals[i]  = Matchup.ReboundPhysical(p, matchupCfg);
@@ -160,7 +200,6 @@ public static class OffensiveRebounderPicker
         // parallel). The nerf multiplies the WHOLE weight — luck and body included —
         // per the S46 ruling: it models reduced availability after shooting.
         var weights   = new double[5];
-        var totalWeight = 0.0;
 
         for (var i = 0; i < 5; i++)
         {
@@ -174,7 +213,11 @@ public static class OffensiveRebounderPicker
             // ★ S118.1: with a man at the line, the nerf is his regardless of zone; otherwise
             // the field-goal shooter rule, unchanged.
             double shooterNerf;
-            if (atTheLine is { } ftMan)
+            if (onlySlots is not null)
+            {
+                shooterNerf = 1.0;   // ★ S120: the lane — the shooter is at the line, not on it
+            }
+            else if (atTheLine is { } ftMan)
             {
                 shooterNerf = ftMan.Side == offense && ftMan.Number == slot.Number
                     ? matchupCfg.ReboundShooterNerf : 1.0;
@@ -218,27 +261,8 @@ public static class OffensiveRebounderPicker
                            + p.OffensiveRebounding * pw * wm * hm * vm
                            + bodyPull
                            + absFloor) * shooterNerf;
-            totalWeight += weights[i];
         }
 
-        // ── Stage 3: one RNG draw — cumulative walk to chosen slot ───────────────
-        // Same shape as Pie<T>.Roll: walk the cumulative sum, return the first slot
-        // whose cumulative weight exceeds the draw. The final populated slot is the
-        // implicit fallback (absorbs floating-point shortfall).
-        var draw      = rng.NextUnitInterval() * totalWeight;
-        var cumulative = 0.0;
-        var lastPopulated = -1;
-
-        for (var i = 0; i < 5; i++)
-        {
-            if (!populated[i]) continue;
-            lastPopulated = i;
-            cumulative += weights[i];
-            if (draw <= cumulative)
-                return lineup.SlotAt(i + 1);
-        }
-
-        // Fallback: floating-point edge — return the last populated slot.
-        return lineup.SlotAt(lastPopulated + 1);
+        return (weights, populated);
     }
 }

@@ -39,20 +39,23 @@ internal static partial class Program
     /// <summary>★ S111 pre-edit capture: 3,187 fixtures, "ordinal|kind|home|away|homeScore|
     /// awayScore|possessions\n" each, SHA-256.</summary>
     // ★ S118.1 — the scramble foul's man (O-117); declared before the build; was 8a957e38e64e0b73c4f3a7b7437c684e19a94230f8134176aac4b3051dec5583
+    // ★ S120 — the free-throw lane (O-118); captured from the S120 build; was 4eda10d8acaa8c6b26d1bfe44e4ba26f16b3f8fd412569b0d6032f87983d5efb
     private const string BuyGoldenPreS111FixtureDigest =
-        "4eda10d8acaa8c6b26d1bfe44e4ba26f16b3f8fd412569b0d6032f87983d5efb";
+        "42b530dad6d079d02990b9e6b81dcdf4abb49e7e76558b304e1616c53480685f";
     private const int BuyGoldenPreS111GameCount = 3187;
 
     /// <summary>★ S111 pre-edit capture: every school's season record, "id|W-L\n" in id order.</summary>
     // ★ S118.1 — the scramble foul's man (O-117); declared before the build; was 2f455aeffd998926080a8fd8632fcc24322fd0d68360ef5760e396dca143863b
+    // ★ S120 — the free-throw lane (O-118); captured from the S120 build; was f664d901a25c9fb942b7eb4b6db0d4844baf38ddb59283e33ad92258d149f5e7
     private const string BuyGoldenPreS111RecordDigest =
-        "f664d901a25c9fb942b7eb4b6db0d4844baf38ddb59283e33ad92258d149f5e7";
+        "5a4ec0bc44a49bf07205769ddae1a81f2f3272e41dacedcdc4227ad371134f74";
 
     /// <summary>★ S111 pre-edit capture of the SIXTH hash. Phase 99 proves it self-consistent;
     /// this pins its value, so "unmoved" means unmoved.</summary>
     // ★ S118.1 — the scramble foul's man (O-117); declared before the build; was d2c5c3df0bb85bb8ce9fdc756c8721c733c57a1def7d7de6a50c1cf9cc0b9cd6
+    // ★ S120 — the free-throw lane (O-118); captured from the S120 build; was 73d19dae8d70fef3f05174c6823d3a1881aec1e040638766158b69480f9a342b
     private const string BuyGoldenConfTourneyFp =
-        "73d19dae8d70fef3f05174c6823d3a1881aec1e040638766158b69480f9a342b";
+        "bc7c8bfa692a5f8267d603c1a89f57c5c3e51a274e2dd030186ce63e521ee9aa";
 
     private static string BuySha(string text)
         => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
@@ -334,11 +337,11 @@ internal static partial class Program
             {
                 Check("C9a: ★ with buy games switched off, the season is the pre-buy-game season game for game — " +
                       "3,187 fixtures, every ordinal, kind, both schools, both scores and every possession count " +
-                      "digest to the S118.1 capture of it",
+                      "digest to the S120 capture of it",
                       off.PlayedGames.Count == BuyGoldenPreS111GameCount
                       && BuyFixtureDigest(off, off.PlayedGames.Count) == BuyGoldenPreS111FixtureDigest,
                       $"{off.PlayedGames.Count} games");
-                Check("C9b: and every school's record is the pre-buy-game record (the S118.1 capture)",
+                Check("C9b: and every school's record is the pre-buy-game record (the S120 capture)",
                       BuyRecordDigest(stock, off.Wins, off.Losses) == BuyGoldenPreS111RecordDigest);
                 Check("C9c: the zero path plays no buy game and holds no buy row",
                       off.BuyGameCount == 0 && off.BuyGames.Count == 0 && !off.PlayedGames.Any(p => p.IsBuyGame));
@@ -500,7 +503,7 @@ internal static partial class Program
                       $"{a.Champions.Count} champions");
                 Check("C6b: same 217 games, same rows",
                       a.GameCount == 217 && b.GameCount == 217 && a.Rows.SequenceEqual(b.Rows));
-                Check("C6c: ★ the sixth hash is the S118.1 capture",
+                Check("C6c: ★ the sixth hash is the S120 capture",
                       run.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp,
                       run.ConferenceTournamentFingerprint[..8] + "…");
                 Check("C6d: and every buy game plays after every conference tournament game",

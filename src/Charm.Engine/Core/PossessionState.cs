@@ -299,4 +299,10 @@ public sealed record PossessionState(
     /// alongside <see cref="UsagePressure"/>/<see cref="UsageResidualPressure"/>
     /// — a reset restarts the shot-diet story from scratch.</para>
     /// </param>
-    double? ShotDisplacementLevel = null);
+    double? ShotDisplacementLevel = null,
+    /// <param name="FreeThrowLane">★ S120 — who stands where on a missed last free throw. Stamped in
+    /// the resolver's <see cref="ContinuationKind.ResolveFTRebound"/> case, read by every consumer of
+    /// that one Roll M resolution, and cleared when the resolution hands the ball back to live play
+    /// (at the offensive-board node before Roll K, and on every other continuation once its foul is
+    /// named). Null everywhere else — a live-ball board never sees one (Phase 111 C4).</param>
+    FreeThrowLane? FreeThrowLane = null);

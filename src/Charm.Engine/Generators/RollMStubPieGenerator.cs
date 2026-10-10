@@ -19,6 +19,9 @@ public sealed class RollMStubPieGenerator : IRollMPieGenerator
 
     public RollMStubPieGenerator(RollMConfig config) => _config = config;
 
+    /// <summary>★ S120 — the free-throw lane reads the same config the flat pie does.</summary>
+    public RollMConfig LaneConfig => _config;
+
     /// <summary>Generate the seven-way free-throw-rebound pie. <paramref name="state"/>
     /// is accepted to satisfy <see cref="IRollMPieGenerator"/> but is intentionally
     /// IGNORED — the stub returns the flat config weights regardless of possession

@@ -1,0 +1,2511 @@
+{
+ "about": "S120 free-throw lane oracle (tools/ft_lane_oracle.py) \u2014 Phase 111 C1 reproduces it",
+ "normal_lane": {
+  "off_body": 185.69113726619568,
+  "def_body": 357.4895729659517,
+  "off_reb": 73.34045056749933,
+  "def_reb": 125.40139239575417,
+  "s0": 0.3418588579606114,
+  "ks": 290.3028310189041,
+  "r0": 0.36902370167242365,
+  "kr": 173.33602192589177
+ },
+ "base_off_share": 0.2185792349726776,
+ "mass": 0.915,
+ "cases": [
+  {
+   "id": 1,
+   "label": "Two identical normal teams, point guard at the line",
+   "approved_board": 0.2,
+   "shooter": 1,
+   "def_fouls": {},
+   "clock": null,
+   "offense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "defense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "lane": {
+    "shooter": 1,
+    "off_lane": [
+     4,
+     5
+    ],
+    "off_back": [
+     2,
+     3
+    ],
+    "def_lane": [
+     2,
+     3,
+     4,
+     5
+    ],
+    "def_back": [
+     1
+    ]
+   },
+   "totals": {
+    "off_body": 231.75,
+    "def_body": 413.6625,
+    "off_reb": 135,
+    "def_reb": 243
+   },
+   "off_share": 0.22333220738883222,
+   "board": 0.20434896976078148,
+   "draws": {
+    "offensive_board": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.03
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4505003631628862
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5094996368371139
+     }
+    ],
+    "defensive_board": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.02
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.13818013434639034
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.2138469282814575
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.2946432912956972
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.3333296460764549
+     }
+    ],
+    "scramble_fouled": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.46692485556986646
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5280751444301336
+     }
+    ],
+    "scramble_offensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4270195864144118
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5679804135855883
+     }
+    ],
+    "scramble_defensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.25
+     }
+    ]
+   }
+  },
+  {
+   "id": 2,
+   "label": "All small and weak (five guards a side)",
+   "approved_board": 0.178,
+   "shooter": 1,
+   "def_fouls": {},
+   "clock": null,
+   "offense": [
+    {
+     "name": "O guard 0",
+     "Height": 51,
+     "Wingspan": 52,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "O guard 1",
+     "Height": 54,
+     "Wingspan": 53,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "O guard 2",
+     "Height": 57,
+     "Wingspan": 54,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "O guard 3",
+     "Height": 59,
+     "Wingspan": 55,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "O guard 4",
+     "Height": 62,
+     "Wingspan": 56,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "defense": [
+    {
+     "name": "D guard 0",
+     "Height": 51,
+     "Wingspan": 52,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "D guard 1",
+     "Height": 54,
+     "Wingspan": 53,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "D guard 2",
+     "Height": 57,
+     "Wingspan": 54,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "D guard 3",
+     "Height": 59,
+     "Wingspan": 55,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "D guard 4",
+     "Height": 62,
+     "Wingspan": 56,
+     "Strength": 42,
+     "Vertical": 60,
+     "PostDefense": 32,
+     "OffensiveRebounding": 25,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "lane": {
+    "shooter": 1,
+    "off_lane": [
+     4,
+     5
+    ],
+    "off_back": [
+     2,
+     3
+    ],
+    "def_lane": [
+     2,
+     3,
+     4,
+     5
+    ],
+    "def_back": [
+     1
+    ]
+   },
+   "totals": {
+    "off_body": 157.2,
+    "def_body": 307.575,
+    "off_reb": 50,
+    "def_reb": 128
+   },
+   "off_share": 0.20991347291333934,
+   "board": 0.1920708277157055,
+   "draws": {
+    "offensive_board": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.03
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.47376610825572435
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.4862338917442755
+     }
+    ],
+    "defensive_board": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.02
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.23754326099079062
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.24166030015544504
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.24635472661712743
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.2544417122366369
+     }
+    ],
+    "scramble_fouled": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4910388309525476
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5039611690474523
+     }
+    ],
+    "scramble_offensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4924121968051713
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5025878031948287
+     }
+    ],
+    "scramble_defensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.25
+     }
+    ]
+   }
+  },
+  {
+   "id": 3,
+   "label": "Offense has one dominant 7'1\" big on the lane",
+   "approved_board": 0.215,
+   "shooter": 1,
+   "def_fouls": {},
+   "clock": null,
+   "offense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Dominant C 7'1\"",
+     "Height": 87,
+     "Wingspan": 90,
+     "Strength": 90,
+     "Vertical": 60,
+     "PostDefense": 85,
+     "OffensiveRebounding": 95,
+     "DefensiveRebounding": 95,
+     "Hustle": 65,
+     "Discipline": 50
+    }
+   ],
+   "defense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "lane": {
+    "shooter": 1,
+    "off_lane": [
+     4,
+     5
+    ],
+    "off_back": [
+     2,
+     3
+    ],
+    "def_lane": [
+     2,
+     3,
+     4,
+     5
+    ],
+    "def_back": [
+     1
+    ]
+   },
+   "totals": {
+    "off_body": 243.4125,
+    "def_body": 413.6625,
+    "off_reb": 160,
+    "def_reb": 243
+   },
+   "off_share": 0.2330822755047375,
+   "board": 0.21327028208683482,
+   "draws": {
+    "offensive_board": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.03
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.30347599367333195
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.6565240063266681
+     }
+    ],
+    "defensive_board": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.02
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.13818013434639034
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.2138469282814575
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.2946432912956972
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.3333296460764549
+     }
+    ],
+    "scramble_fouled": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.31454022260933884
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.6804597773906612
+     }
+    ],
+    "scramble_offensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.3531842444622658
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.6418157555377343
+     }
+    ],
+    "scramble_defensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.25
+     }
+    ]
+   }
+  },
+  {
+   "id": 4,
+   "label": "Defense has the same dominant big",
+   "approved_board": 0.199,
+   "shooter": 1,
+   "def_fouls": {},
+   "clock": null,
+   "offense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "defense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Dominant C 7'1\"",
+     "Height": 87,
+     "Wingspan": 90,
+     "Strength": 90,
+     "Vertical": 60,
+     "PostDefense": 85,
+     "OffensiveRebounding": 95,
+     "DefensiveRebounding": 95,
+     "Hustle": 65,
+     "Discipline": 50
+    }
+   ],
+   "lane": {
+    "shooter": 1,
+    "off_lane": [
+     4,
+     5
+    ],
+    "off_back": [
+     2,
+     3
+    ],
+    "def_lane": [
+     2,
+     3,
+     4,
+     5
+    ],
+    "def_back": [
+     1
+    ]
+   },
+   "totals": {
+    "off_body": 231.75,
+    "def_body": 425.325,
+    "off_reb": 135,
+    "def_reb": 260
+   },
+   "off_share": 0.21890833216471284,
+   "board": 0.20030112393071225,
+   "draws": {
+    "offensive_board": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.03
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4505003631628862
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5094996368371139
+     }
+    ],
+    "defensive_board": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.02
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.11616479019832149
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.17701821948255103
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.23943540921921538
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.44738158109991216
+     }
+    ],
+    "scramble_fouled": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.46692485556986646
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5280751444301336
+     }
+    ],
+    "scramble_offensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4270195864144118
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5679804135855883
+     }
+    ],
+    "scramble_defensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.25
+     }
+    ]
+   }
+  },
+  {
+   "id": 5,
+   "label": "Offense's center is the shooter",
+   "approved_board": 0.188,
+   "shooter": 5,
+   "def_fouls": {},
+   "clock": null,
+   "offense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "defense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "lane": {
+    "shooter": 5,
+    "off_lane": [
+     3,
+     4
+    ],
+    "off_back": [
+     1,
+     2
+    ],
+    "def_lane": [
+     2,
+     3,
+     4,
+     5
+    ],
+    "def_back": [
+     1
+    ]
+   },
+   "totals": {
+    "off_body": 208.0875,
+    "def_body": 413.6625,
+    "off_reb": 110,
+    "def_reb": 243
+   },
+   "off_share": 0.21449396450225747,
+   "board": 0.1962619775195656,
+   "draws": {
+    "offensive_board": [
+     {
+      "slot": 5,
+      "spot": "Shooter",
+      "share": 0.03
+     },
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.3813326586030266
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.5786673413969734
+     }
+    ],
+    "defensive_board": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.02
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.13818013434639034
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.2138469282814575
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.2946432912956972
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.3333296460764549
+     }
+    ],
+    "scramble_fouled": [
+     {
+      "slot": 5,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.395235411781262
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.599764588218738
+     }
+    ],
+    "scramble_offensive_fouler": [
+     {
+      "slot": 5,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.39791844823363137
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.5970815517663686
+     }
+    ],
+    "scramble_defensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.25
+     }
+    ]
+   }
+  },
+  {
+   "id": 6,
+   "label": "Defense's center in foul trouble, stays back",
+   "approved_board": 0.237,
+   "shooter": 1,
+   "def_fouls": {
+    "5": 2
+   },
+   "clock": [
+    1,
+    600.0
+   ],
+   "offense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "defense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "lane": {
+    "shooter": 1,
+    "off_lane": [
+     4,
+     5
+    ],
+    "off_back": [
+     2,
+     3
+    ],
+    "def_lane": [
+     1,
+     2,
+     3,
+     4
+    ],
+    "def_back": [
+     5
+    ]
+   },
+   "totals": {
+    "off_body": 231.75,
+    "def_body": 362.025,
+    "off_reb": 135,
+    "def_reb": 197
+   },
+   "off_share": 0.25349692895056614,
+   "board": 0.23194968998976803,
+   "draws": {
+    "offensive_board": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.03
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4505003631628862
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5094996368371139
+     }
+    ],
+    "defensive_board": [
+     {
+      "slot": 5,
+      "spot": "Back",
+      "share": 0.02
+     },
+     {
+      "slot": 1,
+      "spot": "Lane",
+      "share": 0.13297533598820374
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.17338479756739655
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.2918694524578628
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.3817704139865369
+     }
+    ],
+    "scramble_fouled": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.46692485556986646
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5280751444301336
+     }
+    ],
+    "scramble_offensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4270195864144118
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5679804135855883
+     }
+    ],
+    "scramble_defensive_fouler": [
+     {
+      "slot": 5,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 1,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.25
+     }
+    ]
+   }
+  },
+  {
+   "id": 7,
+   "label": "Defense's 3rd and 4th lane men can't rebound",
+   "approved_board": 0.222,
+   "shooter": 1,
+   "def_fouls": {},
+   "clock": null,
+   "offense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "defense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\" (can't rebound)",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 15,
+     "DefensiveRebounding": 15,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\" (can't rebound)",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 15,
+     "DefensiveRebounding": 15,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\"",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 65,
+     "DefensiveRebounding": 70,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\"",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 70,
+     "DefensiveRebounding": 78,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "lane": {
+    "shooter": 1,
+    "off_lane": [
+     4,
+     5
+    ],
+    "off_back": [
+     2,
+     3
+    ],
+    "def_lane": [
+     1,
+     3,
+     4,
+     5
+    ],
+    "def_back": [
+     2
+    ]
+   },
+   "totals": {
+    "off_body": 231.75,
+    "def_body": 400.2,
+    "off_reb": 135,
+    "def_reb": 195
+   },
+   "off_share": 0.23254290387010806,
+   "board": 0.2127767570411489,
+   "draws": {
+    "offensive_board": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.03
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4505003631628862
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5094996368371139
+     }
+    ],
+    "defensive_board": [
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.02
+     },
+     {
+      "slot": 1,
+      "spot": "Lane",
+      "share": 0.1312021149975208
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.09440603560246476
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.35684009052119736
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.39755175887881716
+     }
+    ],
+    "scramble_fouled": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.46692485556986646
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5280751444301336
+     }
+    ],
+    "scramble_offensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4270195864144118
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5679804135855883
+     }
+    ],
+    "scramble_defensive_fouler": [
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 1,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.25
+     }
+    ]
+   }
+  },
+  {
+   "id": 8,
+   "label": "Two elite offensive bigs against four men who cannot rebound",
+   "approved_board": 0.503,
+   "shooter": 1,
+   "def_fouls": {},
+   "clock": null,
+   "offense": [
+    {
+     "name": "PG 6'0\" (no glass)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 22,
+     "DefensiveRebounding": 32,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\"",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 30,
+     "DefensiveRebounding": 40,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\"",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 45,
+     "DefensiveRebounding": 55,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Elite PF 6'11\"",
+     "Height": 82,
+     "Wingspan": 88,
+     "Strength": 88,
+     "Vertical": 62,
+     "PostDefense": 80,
+     "OffensiveRebounding": 92,
+     "DefensiveRebounding": 90,
+     "Hustle": 65,
+     "Discipline": 50
+    },
+    {
+     "name": "Dominant C 7'1\"",
+     "Height": 87,
+     "Wingspan": 90,
+     "Strength": 90,
+     "Vertical": 60,
+     "PostDefense": 85,
+     "OffensiveRebounding": 95,
+     "DefensiveRebounding": 95,
+     "Hustle": 65,
+     "Discipline": 50
+    }
+   ],
+   "defense": [
+    {
+     "name": "PG 6'0\" (no glass) (can't rebound)",
+     "Height": 51,
+     "Wingspan": 50,
+     "Strength": 40,
+     "Vertical": 60,
+     "PostDefense": 30,
+     "OffensiveRebounding": 15,
+     "DefensiveRebounding": 15,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "SG 6'4\" (can't rebound)",
+     "Height": 62,
+     "Wingspan": 58,
+     "Strength": 48,
+     "Vertical": 58,
+     "PostDefense": 38,
+     "OffensiveRebounding": 15,
+     "DefensiveRebounding": 15,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "Wing 6'7\" (can't rebound)",
+     "Height": 71,
+     "Wingspan": 68,
+     "Strength": 58,
+     "Vertical": 62,
+     "PostDefense": 50,
+     "OffensiveRebounding": 15,
+     "DefensiveRebounding": 15,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "PF 6'9\" (can't rebound)",
+     "Height": 76,
+     "Wingspan": 74,
+     "Strength": 70,
+     "Vertical": 55,
+     "PostDefense": 65,
+     "OffensiveRebounding": 15,
+     "DefensiveRebounding": 15,
+     "Hustle": 55,
+     "Discipline": 50
+    },
+    {
+     "name": "C 7'0\" (can't rebound)",
+     "Height": 84,
+     "Wingspan": 82,
+     "Strength": 78,
+     "Vertical": 45,
+     "PostDefense": 75,
+     "OffensiveRebounding": 15,
+     "DefensiveRebounding": 15,
+     "Hustle": 55,
+     "Discipline": 50
+    }
+   ],
+   "lane": {
+    "shooter": 1,
+    "off_lane": [
+     4,
+     5
+    ],
+    "off_back": [
+     2,
+     3
+    ],
+    "def_lane": [
+     2,
+     3,
+     4,
+     5
+    ],
+    "def_back": [
+     1
+    ]
+   },
+   "totals": {
+    "off_body": 262.6125,
+    "def_body": 413.6625,
+    "off_reb": 187,
+    "def_reb": 60
+   },
+   "off_share": 0.5026453779105278,
+   "board": 0.45992052078813295,
+   "draws": {
+    "offensive_board": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.03
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.005
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.46252913600947027
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.49747086399052975
+     }
+    ],
+    "defensive_board": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.02
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.19735020779918017
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.22521300270782968
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.2605126126023192
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.2969241768906709
+     }
+    ],
+    "scramble_fouled": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4793921774264822
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5156078225735178
+     }
+    ],
+    "scramble_offensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Shooter",
+      "share": 0.005
+     },
+     {
+      "slot": 2,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 3,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.4715866841262305
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.5234133158737695
+     }
+    ],
+    "scramble_defensive_fouler": [
+     {
+      "slot": 1,
+      "spot": "Back",
+      "share": 0.0
+     },
+     {
+      "slot": 2,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 3,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 4,
+      "spot": "Lane",
+      "share": 0.25
+     },
+     {
+      "slot": 5,
+      "spot": "Lane",
+      "share": 0.25
+     }
+    ]
+   }
+  }
+ ],
+ "trouble": [
+  {
+   "label": "first half, C at 2 fouls",
+   "def_fouls": {
+    "5": 2
+   },
+   "clock": [
+    1,
+    900.0
+   ],
+   "def_lane": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "def_back": [
+    5
+   ]
+  },
+  {
+   "label": "first half, C at 1 foul",
+   "def_fouls": {
+    "5": 1
+   },
+   "clock": [
+    1,
+    900.0
+   ],
+   "def_lane": [
+    2,
+    3,
+    4,
+    5
+   ],
+   "def_back": [
+    1
+   ]
+  },
+  {
+   "label": "second half, C at 4 fouls, 301 s left",
+   "def_fouls": {
+    "5": 4
+   },
+   "clock": [
+    2,
+    301.0
+   ],
+   "def_lane": [
+    1,
+    2,
+    3,
+    4
+   ],
+   "def_back": [
+    5
+   ]
+  },
+  {
+   "label": "second half, C at 4 fouls, 300 s left",
+   "def_fouls": {
+    "5": 4
+   },
+   "clock": [
+    2,
+    300.0
+   ],
+   "def_lane": [
+    2,
+    3,
+    4,
+    5
+   ],
+   "def_back": [
+    1
+   ]
+  },
+  {
+   "label": "overtime, C at 4 fouls",
+   "def_fouls": {
+    "5": 4
+   },
+   "clock": [
+    3,
+    200.0
+   ],
+   "def_lane": [
+    2,
+    3,
+    4,
+    5
+   ],
+   "def_back": [
+    1
+   ]
+  },
+  {
+   "label": "no clock, C at 4 fouls",
+   "def_fouls": {
+    "5": 4
+   },
+   "clock": null,
+   "def_lane": [
+    2,
+    3,
+    4,
+    5
+   ],
+   "def_back": [
+    1
+   ]
+  }
+ ]
+}

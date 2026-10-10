@@ -577,14 +577,26 @@
     "Epsilon": 1e-09
   },
   "RollM": {
-    "DefensiveRebound": 0.735,
-    "OffensiveRebound": 0.18,
+    "DefensiveRebound": 0.715,
+    "OffensiveRebound": 0.20,
     "LooseBallFoulOnDefense": 0.02,
     "LooseBallFoulOnOffense": 0.01,
     "OutOfBoundsOffOffense": 0.02,
     "OutOfBoundsOffDefense": 0.03,
     "JumpBall": 0.005,
-    "Epsilon": 1e-09
+    "Epsilon": 1e-09,
+    "LaneShooterBoardShare": 0.03,
+    "LaneOffenseBackBoardShare": 0.005,
+    "LaneDefenseBackBoardShare": 0.02,
+    "LaneShooterScrambleShare": 0.005,
+    "LaneFoulTroubleFirstHalfFouls": 2,
+    "LaneFoulTroubleSecondHalfFouls": 4,
+    "LaneFoulTroubleSecondHalfSeconds": 300.0,
+    "LaneNormalOffenseBody": 185.69113726619568,
+    "LaneNormalDefenseBody": 357.4895729659517,
+    "LaneNormalOffenseRebounding": 73.34045056749933,
+    "LaneNormalDefenseRebounding": 125.40139239575417,
+    "LaneAnchorPoints": 10.0
   },
   "Governor": {
     "PossessionCap": 400,

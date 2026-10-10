@@ -549,7 +549,7 @@ internal static partial class Program
 
             // ── C7: the fingerprint wall — the stock legacy season ────────────────
             {
-                Check("C7a: ★ the career's season one plays the S118.1 capture game for game (the score by period moved no game)",
+                Check("C7a: ★ the career's season one plays the S120 capture game for game (the score by period moved no game)",
                       GamesDigest(stockOne) == RatingGoldenPreS112GameDigest, $"{stockOne.PlayedGames.Count} games");
                 var legacy = RunSeasonCore(stock, GameLogPageCheckSeed, configPath, verbose: false);
                 var prefix = legacy.ConferenceGameCount + legacy.TournamentGameCount;
@@ -561,7 +561,7 @@ internal static partial class Program
                 Check("C7f: #5 non-conference dated UNMOVED", legacy.NonConferenceDates.DatedFingerprint == KnockoutGoldenNonConDatedFp);
                 Check("C7g: #6 conference tournaments UNMOVED", legacy.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp);
                 Check("C7h: #7 buy games UNMOVED", legacy.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
-                Check("C7i: ★ every legacy game identical to the S118.1 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest);
+                Check("C7i: ★ every legacy game identical to the S120 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest);
                 Check("C7j: the career's season one and the legacy season are the same games", GamesDigest(stockOne) == GamesDigest(legacy));
             }
         }

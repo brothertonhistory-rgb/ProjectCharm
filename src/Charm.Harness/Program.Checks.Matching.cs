@@ -69,8 +69,9 @@ internal static partial class Program
     /// the conference games too, and those are byte-identical; what moved is the event half
     /// inside the same hash. Emmett's machine is the commit-of-record for this value.</summary>
     // ★ S118.1 — the scramble foul's man (O-117); declared before the build; was f865e4fbc0f0ffc7581c02492ad51946315e54a288894cf5c901bd9abf3c2e26
+    // ★ S120 — the free-throw lane (O-118); captured from the S120 build; was 238a3c267340ce854ac9940d17368699596cf206bb0f123f889e346d73c807fc
     private const string MatchGoldenResultsFp =
-        "238a3c267340ce854ac9940d17368699596cf206bb0f123f889e346d73c807fc";
+        "784ae0773598de9505bdc85967c5ec3251b7f8cf8e1691333c10d853122f69aa";
     /// <summary>★ S104 — RECAPTURED, because the feature IS the movement. The stock world
     /// now authors sixteen showcases; twelve of them seat and play twenty-four games, so the
     /// event-games half of the season is deliberately a different season. Captured from the
@@ -79,8 +80,9 @@ internal static partial class Program
     /// showcase-free zero path (Phase 95 C-Z), which is what proves this move was caused by
     /// the showcases and by nothing else in the session.</summary>
     // ★ S118.1 — the scramble foul's man (O-117); declared before the build; was 1e32b0aa148e9308ff4e10b00fc5f3839ec5d4a3247f9703c461dc852ba0f4b1
+    // ★ S120 — the free-throw lane (O-118); captured from the S120 build; was 4cfd28c937be4eaee634d99e5f66141dbc56de50da5a948b428711180daf130e
     private const string MatchGoldenEventGamesFp =
-        "4cfd28c937be4eaee634d99e5f66141dbc56de50da5a948b428711180daf130e";
+        "86323977a8baefd4e3c8ae9c6b6b2219749807af11c544ba3c68f7826aa03631";
 
     private const long MatchStockSeed = 20260720;
 

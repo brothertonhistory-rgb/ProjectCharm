@@ -1721,7 +1721,7 @@ internal static partial class Program
 
         // Config baselines.
         var mMass = cfgM.DefensiveRebound + cfgM.OffensiveRebound;
-        var mBase = cfgM.OffensiveRebound / mMass;   // ≈ 0.197
+        var mBase = cfgM.OffensiveRebound / mMass;   // ≈ 0.219 (S120: 0.20 / 0.915)
 
         // Helper: build a player with all attributes at baseline b; override specific ones.
         static Player Mk(int b,
@@ -1775,11 +1775,20 @@ internal static partial class Program
             return pie.Slices.ToDictionary(s => s.Outcome, s => s.Weight);
         }
 
-        // ── (a) Neutral: all-50 teams, no slot → off-share == Roll M baseline ────
-        Console.WriteLine("  (a) Neutral (all-50 teams, no slot): off-share == Roll M baseline:");
+        // ── (a) Neutral — ★ re-scoped at S120 (A5, by ruling): the default stands for a NORMAL
+        //    lane (Emmett: "Yes"), so a lane whose totals ARE the frozen normal lane gives exactly the
+        //    baseline; an all-equal lane — two against four of the same man — gives LESS (the four
+        //    carry two thirds of everything, a bit more than a normal lane's defense does).
+        Console.WriteLine("  (a) Neutral (S120: a normal lane gives the baseline; an all-equal lane gives less):");
         bool aOk;
         try
         {
+            var normal = FreeThrowLane.OffensiveShare(
+                cfgM.LaneNormalOffenseBody, cfgM.LaneNormalDefenseBody,
+                cfgM.LaneNormalOffenseRebounding, cfgM.LaneNormalDefenseRebounding, mBase, cfgM, cfgMatchup);
+            var normalOk = Math.Abs(normal - mBase) < Eps;
+            Console.WriteLine($"    normal-lane totals: off-share={normal:F8}  baseline={mBase:F8}  neutral? {(normalOk ? "OK" : "FAIL")}");
+
             var off5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
             var def5 = new[] { Mk(50), Mk(50), Mk(50), Mk(50), Mk(50) };
             var g  = BuildGame(off5, def5);
@@ -1787,7 +1796,8 @@ internal static partial class Program
             var d  = Split(cfgM, cfgMatchup, g, st);
 
             var offShare  = d[FreeThrowReboundOutcome.OffensiveRebound] / mMass;
-            var isNeutral = Math.Abs(offShare - mBase) < Eps;
+            var isNeutral = normalOk && offShare < mBase;
+            Console.WriteLine($"    all-50 lane: off-share={offShare:F8} < baseline {mBase:F8}? {(offShare < mBase ? "OK" : "FAIL")}");
 
             var flatOk =
                 Math.Abs(d[FreeThrowReboundOutcome.LooseBallFoulOnDefense] - cfgM.LooseBallFoulOnDefense) < Eps &&
@@ -1797,7 +1807,6 @@ internal static partial class Program
                 Math.Abs(d[FreeThrowReboundOutcome.JumpBall]               - cfgM.JumpBall)               < Eps;
 
             aOk = isNeutral && flatOk;
-            Console.WriteLine($"    off-share={offShare:F8}  baseline={mBase:F8}  neutral? {(isNeutral ? "OK" : "FAIL")}");
             Console.WriteLine($"    five flat slivers == config: {(flatOk ? "OK" : "FAIL")}");
         }
         catch (Exception ex) { aOk = false; Console.WriteLine($"  FAIL  (a) threw: {ex.Message}"); }
@@ -1850,7 +1859,9 @@ internal static partial class Program
         // Separate with PostDefense alone. Offense A: concentrate OffReb in high-PostDef
         // player; Offense B: same total OffReb spread flat. Expected: A > B.
         // ⚠ Cleaner than Phase 10 (d) — no shooter slot to choose.
-        Console.WriteLine("  (d) Positional weight isolated (PostDefense only, equal Str/Height, no shooter slot):");
+        // ★ S120: the split no longer weights by position; the concentrated side still wins, now
+        // because its post (OffReb 90) takes a lane spot and the two-man lane total beats two 26s.
+        Console.WriteLine("  (d) Rebounding concentrated in the post beats it spread flat (S120: the post gets on the lane):");
         bool dOk;
         try
         {
@@ -1885,15 +1896,16 @@ internal static partial class Program
             dOk = shareA > shareB;
             Console.WriteLine($"    concentrated (OffReb in post): share={shareA:F6}");
             Console.WriteLine($"    flat spread:                   share={shareB:F6}");
-            Console.WriteLine($"    concentrated > flat: {(dOk ? "OK — positional weight rewards OffReb in bigs on FT glass" : "FAIL")}");
+            Console.WriteLine($"    concentrated > flat: {(dOk ? "OK — the post's rebounding is on the lane" : "FAIL")}");
         }
         catch (Exception ex) { dOk = false; Console.WriteLine($"  FAIL  (d) threw: {ex.Message}"); }
         pass &= dOk;
 
         // ── (e) No-shooter invariance ────────────────────────────────────────────
-        // ⚠ Replaces Phase 10's shooter-nerf sub-check. Prove Roll M is structurally
-        // slot-blind: identical matchup with null slot vs. stamped slot+zone must
-        // produce byte-identical off-shares. Positive proof of Divergences 2 and 3.
+        // ⚠ Replaces Phase 10's shooter-nerf sub-check. The SPLIT never reads the field-goal
+        // shooter or the zone: identical matchup with null slot vs. stamped slot+zone must
+        // produce byte-identical off-shares. (★ S120: the free-throw shooter now matters — he is
+        // off the lane — but he arrives on the lane the resolver stamps, never via SelectedSlot.)
         Console.WriteLine("  (e) No-shooter invariance: null-slot and stamped-slot produce identical off-share:");
         bool eOk;
         try
@@ -1921,7 +1933,7 @@ internal static partial class Program
             eOk = Math.Abs(shareNoSlot - shareWithSlot) < Eps;
             Console.WriteLine($"    null-slot   off-share = {shareNoSlot:F10}");
             Console.WriteLine($"    stamped-slot off-share = {shareWithSlot:F10}");
-            Console.WriteLine($"    identical? {(eOk ? "OK — Roll M is slot-blind" : "FAIL — slot is affecting Roll M (bug)")}");
+            Console.WriteLine($"    identical? {(eOk ? "OK — the split ignores the field-goal shooter" : "FAIL — SelectedSlot is affecting Roll M (bug)")}");
         }
         catch (Exception ex) { eOk = false; Console.WriteLine($"  FAIL  (e) threw: {ex.Message}"); }
         pass &= eOk;

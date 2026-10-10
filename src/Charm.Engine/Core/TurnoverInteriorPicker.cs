@@ -55,6 +55,41 @@ public static class TurnoverInteriorPicker
         MatchupConfig   matchupCfg,
         IRng            rng)
     {
+        var (weights, populated) = Weights(state, game, matchupCfg, onlySlots: null);
+        var lineup = game.LineupFor(state.Offense);
+        var totalWeight = 0.0;
+        for (var i = 0; i < 5; i++)
+            if (populated[i]) totalWeight += weights[i];
+
+        // ── Stage 3: one RNG draw — cumulative walk to chosen slot ───────────────
+        // The final populated slot is the implicit fallback (absorbs floating-point shortfall).
+        var draw          = rng.NextUnitInterval() * totalWeight;
+        var cumulative    = 0.0;
+        var lastPopulated = -1;
+
+        for (var i = 0; i < 5; i++)
+        {
+            if (!populated[i]) continue;
+            lastPopulated = i;
+            cumulative   += weights[i];
+            if (draw <= cumulative)
+                return lineup.SlotAt(i + 1);
+        }
+
+        // Fallback: floating-point edge — return the last populated slot.
+        return lineup.SlotAt(lastPopulated + 1);
+    }
+
+    /// <summary>★ S120 — the per-seat pick weights <see cref="Pick"/> walks, with the seat mask the
+    /// free-throw lane needs. <paramref name="onlySlots"/> null is the five-man path, unchanged; given,
+    /// only those seats count and every lineup mean is taken over them. Returns the weights by seat
+    /// index (slot − 1) and which seats were counted.</summary>
+    public static (double[] Weights, bool[] Populated) Weights(
+        PossessionState    state,
+        GameState          game,
+        MatchupConfig      matchupCfg,
+        IReadOnlySet<int>? onlySlots)
+    {
         var offense = state.Offense;
         var lineup  = game.LineupFor(offense);
         var roster  = game.RosterFor(offense);
@@ -71,6 +106,7 @@ public static class TurnoverInteriorPicker
             var slot = lineup.SlotAt(i + 1);
             var p    = roster.PlayerAt(slot);
             if (p is null) continue;
+            if (onlySlots is not null && !onlySlots.Contains(i + 1)) continue;   // ★ S120: off the lane
             postnesses[i] = Matchup.Postness(p, matchupCfg);
             populated[i]  = true;
             playerCount++;
@@ -96,7 +132,6 @@ public static class TurnoverInteriorPicker
         // The floor of 1 ensures every populated slot has a positive draw probability
         // even for a Strength=0 player or a maximally-suppressed guard.
         var weights     = new double[5];
-        var totalWeight = 0.0;
 
         var guardFloor    = matchupCfg.TurnoverInteriorGuardFloor;
         var postnessScale = matchupCfg.TurnoverInteriorPostnessScale;
@@ -112,27 +147,8 @@ public static class TurnoverInteriorPicker
             var mult = guardFloor + (1.0 - guardFloor) * ((raw + 1.0) / 2.0);
 
             weights[i]   = Math.Max(1.0, p.Strength * mult);
-            totalWeight += weights[i];
         }
 
-        // ── Stage 3: one RNG draw — cumulative walk to chosen slot ───────────────
-        // Same shape as TurnoverCommitterPicker: walk the cumulative sum, return
-        // the first slot whose cumulative weight exceeds the draw. The final
-        // populated slot is the implicit fallback (absorbs floating-point shortfall).
-        var draw          = rng.NextUnitInterval() * totalWeight;
-        var cumulative    = 0.0;
-        var lastPopulated = -1;
-
-        for (var i = 0; i < 5; i++)
-        {
-            if (!populated[i]) continue;
-            lastPopulated = i;
-            cumulative   += weights[i];
-            if (draw <= cumulative)
-                return lineup.SlotAt(i + 1);
-        }
-
-        // Fallback: floating-point edge — return the last populated slot.
-        return lineup.SlotAt(lastPopulated + 1);
+        return (weights, populated);
     }
 }

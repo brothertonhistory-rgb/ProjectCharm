@@ -148,7 +148,7 @@ internal static partial class Program
                 var path = Path.Combine(scratch, "stock", "career.json");
                 stockOne = Career(stock, PeopleCheckSeed, path);
                 var h1 = PeekState(path);
-                Check("C2a: ★ a career's first season plays the S118.1 capture game for game",
+                Check("C2a: ★ a career's first season plays the S120 capture game for game",
                       GamesDigest(stockOne) == RatingGoldenPreS112GameDigest, $"{stockOne.PlayedGames.Count} games");
                 Check("C2b: the person numbers issued are the numbers they were — the high-water after season one is 4,512 (1..4,511 spent)",
                       h1.NextPersonId == 4512 && h1.NextSeasonId == 2, $"nextPersonId {h1.NextPersonId}");
@@ -359,7 +359,7 @@ internal static partial class Program
                 Check("C8e: #5 non-conference dated UNMOVED", legacy.NonConferenceDates.DatedFingerprint == KnockoutGoldenNonConDatedFp);
                 Check("C8f: #6 conference tournaments UNMOVED", legacy.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp);
                 Check("C8g: #7 buy games UNMOVED", legacy.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
-                Check("C8h: ★ every legacy game identical to the S118.1 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest);
+                Check("C8h: ★ every legacy game identical to the S120 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest);
                 Check("C8i: legacy mode prints no people line and carries no identity map",
                       legacy.People is null && legacy.Divvy.PersonIds is null);
                 Check("C8j: the career's season one and the legacy season are the same games (the career path adds nothing to season one)",

@@ -49,4 +49,9 @@ public readonly record struct NonShootingFoulEvent(bool IsReachIn)
     /// harness-only "no one on the floor" sentinel.
     /// </summary>
     public int CommitterPlayerId { get; init; }
+
+    /// <summary>★ S120 — true for the defense's loose-ball foul off a missed last free throw (Roll M):
+    /// its committer is a defender on the lane, never the man back. Set by the resolver on Roll M's
+    /// result; false on every other non-shooting foul.</summary>
+    public bool FromFreeThrowLane { get; init; }
 }

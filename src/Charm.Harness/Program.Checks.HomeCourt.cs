@@ -69,8 +69,9 @@ internal static partial class Program
     //   zero shave reproduces one fixed season, byte for byte — is unchanged.
     private const int GoldenGameCount = 120;
     // ★ S118.1 — the scramble foul's man (O-117); declared before the build; was b453cd1b10f466d6c954aacaa80b58df36120a1cbe536de068f68a6dc4f10966
+    // ★ S120 — the free-throw lane (O-118); captured from the S120 build; was 72ef2fcd1513705fe856b3f74b268c140d1ce33a31c66e35dca057ef81763fc8
     private const string GoldenZeroSha256 =
-        "72ef2fcd1513705fe856b3f74b268c140d1ce33a31c66e35dca057ef81763fc8";
+        "c963835f260e046441148849f3be8de4d6bc4a7fecc1b6ca812aa496bd4b7c14";
 
     /// <summary>The SEVENTEEN exempt ratings, spelled out here INDEPENDENTLY of
     /// production. B3 derives the expected shaved set as (live public int surface −
@@ -333,7 +334,7 @@ internal static partial class Program
             var zeroFp = SeasonFingerprint(zeroRun.Results.Take(GoldenGameCount).ToList(),
                                            zeroRun.PossessionCounts.Take(GoldenGameCount).ToList());
             Check("B1: ★ ZERO IS THE OLD ENGINE — every score and every possession count " +
-                  "reproduces the S118.1 capture (O-115, then O-117, re-played the pre-S95 value)",
+                  "reproduces the S120 capture (O-115, O-117, then O-118, re-played the pre-S95 value)",
                   zeroFp == GoldenZeroSha256,
                   zeroFp == GoldenZeroSha256 ? zeroFp[..16] + "…" : $"got {zeroFp}, want {GoldenZeroSha256}");
 

@@ -343,6 +343,10 @@ internal static partial class Program
         // raised out of reach (the inert mode — no disqualifications, no replacements), run
         // the SAME game twice changing ONLY the foul seed.
         //
+        // ★ S120: a man's personal fouls gained a SECOND consequence — foul trouble keeps him off
+        // the free-throw lane (Emmett's ruling, O-118). So the inert mode now switches that off
+        // too, and a third half shows it is live: with it on, the same seed change moves the game.
+        //
         // ★ The check has two halves and needs both. Everything that existed before S87 must
         // be bit-identical — if the foul stream leaked into gameplay, it would not be. AND
         // the committer columns must DIFFER — otherwise the first half would pass just as
@@ -352,7 +356,7 @@ internal static partial class Program
         {
             const int Inert = 1_000_000;
 
-            (GovernorRunResult R, GameState G) RunWithFoulSeed(int foulSeed)
+            (GovernorRunResult R, GameState G) RunWithFoulSeed(int foulSeed, bool laneTroubleOff = true)
             {
                 var g = NewGame(Inert);
                 var home = Five(1); var away = Five(11);
@@ -362,24 +366,25 @@ internal static partial class Program
                     g.AwayRoster.SetStarter(g.AwayLineup.SlotAt(i + 1), away[i]);
                 }
                 g.SetPossessionArrow(TeamSide.Home);
-                var r = RunGameWithFoulWatch(g, configPath, seed: 31337, foulSeedOverride: foulSeed);
+                var r = RunGameWithFoulWatch(g, configPath, seed: 31337, foulSeedOverride: foulSeed,
+                                             laneFoulTroubleOff: laneTroubleOff);
                 return (r.Result, g);
             }
 
             var (rA, gA) = RunWithFoulSeed(1);
             var (rB, gB) = RunWithFoulSeed(999_983);
 
-            var identical =
-                rA.Possessions.Count == rB.Possessions.Count &&
-                gA.HomeScore == gB.HomeScore && gA.AwayScore == gB.AwayScore &&
-                Math.Abs(rA.TotalSeconds - rB.TotalSeconds) == 0.0 &&
-                rA.OvertimePeriods == rB.OvertimePeriods &&
-                gA.Fouls.FoulsFor(TeamSide.Home) == gB.Fouls.FoulsFor(TeamSide.Home) &&
-                gA.Fouls.FoulsFor(TeamSide.Away) == gB.Fouls.FoulsFor(TeamSide.Away);
-
-            var firstDiff = -1;
-            if (identical)
-                for (var i = 0; i < rA.Possessions.Count; i++)
+            // The first possession where any pre-S87 fact differs between two runs; -1 when none.
+            static int FirstDivergence(GovernorRunResult rA, GameState gA, GovernorRunResult rB, GameState gB)
+            {
+                var same =
+                    rA.Possessions.Count == rB.Possessions.Count &&
+                    gA.HomeScore == gB.HomeScore && gA.AwayScore == gB.AwayScore &&
+                    Math.Abs(rA.TotalSeconds - rB.TotalSeconds) == 0.0 &&
+                    rA.OvertimePeriods == rB.OvertimePeriods &&
+                    gA.Fouls.FoulsFor(TeamSide.Home) == gB.Fouls.FoulsFor(TeamSide.Home) &&
+                    gA.Fouls.FoulsFor(TeamSide.Away) == gB.Fouls.FoulsFor(TeamSide.Away);
+                for (var i = 0; i < Math.Min(rA.Possessions.Count, rB.Possessions.Count); i++)
                 {
                     var a = rA.Possessions[i]; var b = rB.Possessions[i];
                     if (a.EndLabel == b.EndLabel && a.Points == b.Points &&
@@ -391,8 +396,12 @@ internal static partial class Program
                         (a.ShootingFouls?.Count ?? 0) == (b.ShootingFouls?.Count ?? 0) &&
                         (a.NonShootingFouls?.Count ?? 0) == (b.NonShootingFouls?.Count ?? 0) &&
                         (a.OffensiveFouls?.Count ?? 0) == (b.OffensiveFouls?.Count ?? 0)) continue;
-                    firstDiff = i; identical = false; break;
+                    return i;
                 }
+                return same ? -1 : Math.Min(rA.Possessions.Count, rB.Possessions.Count);
+            }
+            var firstDiff = FirstDivergence(rA, gA, rB, gB);
+            var identical = firstDiff < 0;
 
             Check("A7 inert mode — changing ONLY the foul seed leaves every pre-S87 fact bit-identical",
                   identical,
@@ -422,6 +431,15 @@ internal static partial class Program
             foreach (var kv in gA.PersonalFouls.Counts) if (gA.PersonalFouls.IsDisqualified(kv.Key)) anyDq = true;
             Check("A7 the inert mode is genuinely inert — no disqualifications at a huge threshold",
                   !anyDq, $"threshold {Inert:N0}");
+
+            // ★ S120: the lane's foul-trouble rule is live — with it ON, the same foul-seed change
+            // moves the game (who committed the fouls decides who is in foul trouble, and so who
+            // stands on the lane). Without this half the switch above could be hiding nothing.
+            var (rC, gC) = RunWithFoulSeed(1, laneTroubleOff: false);
+            var (rD, gD) = RunWithFoulSeed(999_983, laneTroubleOff: false);
+            var movedAt = FirstDivergence(rC, gC, rD, gD);
+            Check("A7 the free-throw lane's foul-trouble rule is a real consequence — with it on, changing only the foul seed moves the game",
+                  movedAt >= 0, movedAt >= 0 ? $"first divergence at possession index {movedAt}" : "nothing moved");
         }
 
         // ══════════════════════════════════════════════════════════════════════════════
@@ -455,7 +473,8 @@ internal static partial class Program
     /// of how the reset and the Governor's callbacks are ordered.
     /// </summary>
     private static (GovernorRunResult Result, long TeamFoulDeltaTotal) RunGameWithFoulWatch(
-        GameState game, string configPath, int seed, int? foulSeedOverride = null)
+        GameState game, string configPath, int seed, int? foulSeedOverride = null,
+        bool laneFoulTroubleOff = false)
     {
         var cfgA = RollAConfig.Load(configPath);
         var cfgB = RollBConfig.Load(configPath);
@@ -470,6 +489,13 @@ internal static partial class Program
         var cfgK = RollKConfig.Load(configPath);
         var cfgL = RollLConfig.Load(configPath);
         var cfgM = RollMConfig.Load(configPath);
+        if (laneFoulTroubleOff)
+        {
+            // ★ S120: the inert mode's second switch — nobody is ever "in foul trouble" for the
+            // free-throw lane, so who committed a foul cannot move a man off the lane.
+            cfgM.LaneFoulTroubleFirstHalfFouls  = int.MaxValue;
+            cfgM.LaneFoulTroubleSecondHalfFouls = int.MaxValue;
+        }
         var cfgMatchup = MatchupConfig.Load(configPath);
         var cfgOffFoul = RollOffensiveFoulConfig.Load(configPath);
 

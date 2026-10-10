@@ -9,7 +9,8 @@ namespace Charm.Engine;
 /// and continues that also feeds the shared charge-and-fork).
 ///
 /// Roll M is Roll I's shape with two differences — a more DEFENSIVE board population
-/// (everyone lined along the lane off a free throw, no shooter crashing in) and an
+/// (★ S120: the free-throw lane — two offense against four defense, the shooter at the line;
+/// see <see cref="FreeThrowLane"/>, which the resolver stamps on the state it passes in) and an
 /// added OUT-OF-BOUNDS pair — and it opens NO new stub: every arm routes to a node
 /// that already exists. Seven arms (<see cref="FreeThrowReboundOutcome"/>), routed:
 /// <list type="bullet">

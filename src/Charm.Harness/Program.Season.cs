@@ -164,6 +164,31 @@ internal static partial class Program
         int HomeUnattributedFta, int AwayUnattributedFta,
         int ScrambleStamped = 0);   // ★ S118.1 -- bonus trips named in the scramble (Phases 108, 109)
 
+    /// <summary>★ S120 -- one game's free-throw lane audit, read by Phase 111 only. <c>Prefix</c> is the
+    /// SHA-256 of the game's possessions BEFORE its first missed last free throw (every possession when
+    /// it had none) -- the part of the game the lane cannot have touched; <c>PlusOne</c> the same through
+    /// the possession holding that first miss (C6's control). <c>Lanes</c> are the game's
+    /// lane observations in order; <c>Leaks</c> the live-ball resolutions that started with a lane.
+    /// Nothing in the season reads it.</summary>
+    private sealed record GameLaneAudit(string Prefix, int PrefixPossessions,
+                                        IReadOnlyList<FreeThrowLaneObservation> Lanes, int Leaks, string PlusOne);
+
+    /// <summary>★ S120 -- one possession as the C6 prefix digest reads it. Integers and labels only:
+    /// no clock seconds, which are drawn through math functions that are not bit-portable between
+    /// Emmett's machine and the sandbox (CONVENTIONS §2).</summary>
+    private static string LanePrefixLine(PossessionRecord r) => string.Create(CultureInfo.InvariantCulture,
+        $"{r.Number}|{r.Offense}|{r.EndLabel}|{r.Points}|{r.Half}|{r.Fga}|{r.Fgm}|{r.Fta}|{r.Ftm}\n");
+
+    private static GameLaneAudit BuildLaneAudit(IReadOnlyList<PossessionRecord> possessions)
+    {
+        var first = 0;
+        while (first < possessions.Count && (possessions[first].FreeThrowLanes?.Count ?? 0) == 0) first++;
+        var prefix = RatingSha(string.Concat(possessions.Take(first).Select(LanePrefixLine)));
+        var plusOne = RatingSha(string.Concat(possessions.Take(Math.Min(first + 1, possessions.Count)).Select(LanePrefixLine)));
+        var lanes = possessions.SelectMany(r => r.FreeThrowLanes ?? Array.Empty<FreeThrowLaneObservation>()).ToList();
+        return new GameLaneAudit(prefix, first, lanes, possessions.Sum(r => r.FreeThrowLaneLeaks), plusOne);
+    }
+
     private sealed record SeasonGameResult(
         int HomeId, int AwayId, int HomeScore, int AwayScore, int OvertimePeriods,
         SeasonId? SeasonId = null, GameId? GameId = null);
@@ -198,6 +223,9 @@ internal static partial class Program
         /// A SEPARATE list for the same reason as SidePossessions: no fingerprint can read it. Phase 108
         /// is its only reader.</summary>
         public List<GamePutbackAudit> PutbackAudits { get; init; } = new();
+        /// <summary>★ S120 -- per-game free-throw lane audit, index for index with
+        /// <see cref="PossessionCounts"/>. A SEPARATE list: no fingerprint can read it. Phase 111 only.</summary>
+        public List<GameLaneAudit> LaneAudits { get; init; } = new();
         /// <summary>★ S95 — how many games actually had a road side transformed. The
         /// counter increments only when the PREPARED away side is the shaved one, so it
         /// counts what played rather than what was intended. Phase 86 B8 reads it from
@@ -1892,6 +1920,7 @@ internal static partial class Program
         // ★ S112 — each side's own possessions, carried rather than halved (see SidePossessions).
         var sidePossessions = new List<SidePossessionCount>(schedule.Count);
         var putbackAudits = new List<GamePutbackAudit>(schedule.Count);   // ★ S118, Phase 108 only
+        var laneAudits = new List<GameLaneAudit>(schedule.Count);         // ★ S120, Phase 111 only
         var hostedRoadSidesShaved = 0;
         var leagueRoadSidesShaved = 0;
         var ties = 0;
@@ -2045,6 +2074,7 @@ internal static partial class Program
                     Sum(TeamSide.Home, r => r.FtaBySlot.Unattr), Sum(TeamSide.Away, r => r.FtaBySlot.Unattr),
                     result.Possessions.Sum(r => r.ScrambleFtShooterStamped)));
             }
+            laneAudits.Add(BuildLaneAudit(result.Possessions));   // ★ S120 -- Phase 111
             playedGames.Add(pg);
             if (game.HomeScore > game.AwayScore) { wins[sg.HomeId]++; losses[sg.AwayId]++; }
             else if (game.AwayScore > game.HomeScore) { wins[sg.AwayId]++; losses[sg.HomeId]++; }
@@ -2196,6 +2226,7 @@ internal static partial class Program
             PossessionCounts = possessionCounts,
             SidePossessions = sidePossessions,
             PutbackAudits = putbackAudits,
+            LaneAudits = laneAudits,
             HostedRoadSidesShaved = hostedRoadSidesShaved,
             RoadShave = roadShave,
             DatedFingerprint = datedFingerprint,

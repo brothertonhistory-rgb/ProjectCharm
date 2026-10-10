@@ -15,21 +15,23 @@ namespace Charm.Engine;
 /// drive the matchup bend. The stub ignores <paramref name="state"/> and returns
 /// the flat config baseline; the real generator reads both rosters through it.</para>
 ///
-/// <para><b>No shooter, no shot zone.</b> Unlike Roll I, Roll M has no crashing
-/// shooter: off a free throw everyone is lined along the lane in assigned box-out
-/// spots. Implementations always pass <c>shooterIdx = -1</c> and any zone
-/// (conventionally <see cref="ShotLocation.Rim"/>) to
-/// <see cref="Matchup.OffensiveReboundShare"/> — the nerf gate is structurally off.
-/// Implementations must NOT read <see cref="PossessionState.SelectedSlot"/> or
-/// <see cref="PossessionState.ShotType"/> for the matchup math (Divergence 2/3 from
-/// the Roll I template).</para>
+/// <para><b>The lane, not the field-goal shooter (★ S120).</b> Off a free throw the men stand
+/// on the lane: the resolver stamps <see cref="PossessionState.FreeThrowLane"/> before calling
+/// <see cref="Generate"/>, and the real generator reads the lane's totals
+/// (<see cref="FreeThrowLane.OffensiveShare"/>). Implementations must NOT read
+/// <see cref="PossessionState.SelectedSlot"/> or <see cref="PossessionState.ShotType"/> for the
+/// matchup math — the man at the line arrives on the lane.</para>
 /// </summary>
 public interface IRollMPieGenerator
 {
-    /// <param name="state">The carried possession state. The matchup-aware
-    /// implementation reads both rosters via <see cref="GameState.RosterFor"/>;
+    /// <param name="state">The carried possession state, with the free-throw lane stamped on it.
+    /// The matchup-aware implementation reads the lane's men through <see cref="GameState.RosterFor"/>;
     /// it does NOT read <see cref="PossessionState.SelectedSlot"/> or
-    /// <see cref="PossessionState.ShotType"/> (Roll M has no shooter and no shot
-    /// zone). The stub ignores this parameter entirely.</param>
+    /// <see cref="PossessionState.ShotType"/>. The stub ignores this parameter entirely.</param>
     Pie<FreeThrowReboundOutcome> Generate(PossessionState state);
+
+    /// <summary>★ S120 — the Roll M settings the resolver uses to line up the free-throw lane and to
+    /// name who gets the board and the scramble fouls. The stub and the real generator return the
+    /// config they were built with; a test double that carries none gets the class defaults.</summary>
+    RollMConfig LaneConfig => RollMConfig.ClassDefaults;
 }

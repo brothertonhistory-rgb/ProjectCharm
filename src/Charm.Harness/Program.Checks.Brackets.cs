@@ -37,8 +37,9 @@ internal static partial class Program
     private const string BracketsPreS98ConferenceScheduleSha =
         "eee5e256b0c6fc871d565b8c27c2925824e3b3ba8e76a717a3fdae4c6c0b36dc";
     // ★ S118.1 — the scramble foul's man (O-117); declared before the build; was b05958174cc8efb7e54c4bf9d17aed3acc2bd62702de8255e68f41ef054fab2f
+    // ★ S120 — the free-throw lane (O-118); captured from the S120 build; was 2bbde1154f2f81fd9b396afdd82ad55b45d0f6d12a15339627b99771311df6cf
     private const string BracketsPreS98ConferenceResultsSha =
-        "2bbde1154f2f81fd9b396afdd82ad55b45d0f6d12a15339627b99771311df6cf";
+        "243583f5914a6ed6500f3a965c53c48efb082bc6f09a167ba1e6edb2d40b0f0e";
     private const int BracketsPreS98ConferenceGameCount = 60;
 
     private static bool Phase89BracketsCheck(string configPath)
@@ -157,7 +158,7 @@ internal static partial class Program
                 on.PossessionCounts.Take(on.ConferenceGameCount).ToList());
             Check("C1c: ★ THE ZERO PATH, WITH THE BRACKETS ON. Twenty-four extra games were played " +
                   "after the conference slate and every conference score and possession count still " +
-                  "reproduces the conference results golden at the S118.1 capture (O-115, then O-117, re-played the S97-tree value)",
+                  "reproduces the conference results golden at the S120 capture (O-115, O-117, then O-118, re-played the S97-tree value)",
                   confOn == BracketsPreS98ConferenceResultsSha,
                   confOn == BracketsPreS98ConferenceResultsSha
                       ? confOn[..16] + "…"

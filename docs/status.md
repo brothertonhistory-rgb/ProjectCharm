@@ -10,7 +10,18 @@ and update it in the docs step of every session (CONVENTIONS §3). Rules:
   session/phase that owns the detail. The S73 migration ledger (journal S73) maps every
   pre-rebuild item to its home here.
 
-Last updated: **Session 119** (2026-10-09; verified on Emmett's machine — the full suite, **95 timed sections,
+Last updated: **Session 120** (2026-10-10; verified on Emmett's machine — the full suite, **96 timed sections,
+2,474.6s, every phase green but Phase 78 A7** (S87's inert mode: who was charged with a foul now also decides foul
+trouble on the free-throw lane); the check fixed and re-run as **`checks 78`, PASS**; Phase 111 new, 35 assertions).
+**THE FREE-THROW LANE** (O-118, Emmett 2026-10-09: *"In college there are 6 players on the lane. 4 for the defense and
+two for the shooting team, and then the shooter makes 3"*): a missed last free throw is played from the lane — two
+offense against four defense, the shooter at the line, three back — the board decided four against two in totals over a
+normal lane at a 20% default, the shooter and the men back rare, the scramble fouls on the lane, foul trouble keeping a
+man off it. Every stock game with a missed last free throw moved (nearly all); twelve pins re-captured. Stock season:
+21.3% of missed last free throws back to the offense; foul trouble moved a man on 45% of them. Journal S120 has the
+detail.)
+
+Previous: **Session 119** (2026-10-09; verified on Emmett's machine — the full suite, **95 timed sections,
 1,654.2s, every phase green but Phase 82 A10** (the S91 isolation guard: the season file named the calendar's year
 bounds); fixed and re-run as **`checks 82 102-104 110`, all PASS** — Phase 82, 102 46, 103 22, 104 51, Phase 110 new,
 74 assertions). **A CAREER CAN START IN ANY YEAR, AND EVERY SEASON KNOWS ITS OWN** (O-99, O-113, ★ **C-63**, Emmett
@@ -577,6 +588,14 @@ and happens to be exactly 105,830, so the bound was tight and the claim was stil
 
 ## Current baseline
 
+**S120 MOVED EVERY GAME WITH A MISSED LAST FREE THROW (nearly all of them).** The three schedule fingerprints are
+unmoved; the four result fingerprints and every pinned game result are at **the S120 capture** (every-game digest
+`50f297da…`; the old values in journal S120). In the 4,988 fixed-pairing games every possession before a game's first
+missed last free throw is byte-identical to S119 (132,831 possessions; 7 games had none and are whole — Phase 111 C6).
+The S118 / S118.1 "only the touched games moved" halves (Phase 108 C2b, Phase 109 C2b) are retired. Stock season:
+40,865 missed last free throws, 21.26% offensive boards (19.04% before), season points 731,007. The normal lane is
+four frozen config numbers (body 185.691 v 357.490, rebounding 73.340 v 125.401).
+
 **S119 MOVED NO STOCK GAME.** Every fingerprint and pinned result stays at the S118.1 capture (Phases 102–104 green);
 2026 is the identity (Phase 110 C2 reproduces the pinned dated fingerprints). A career's season 2 onward is now played
 in its own year (2027, 2028 …), so its dates move and its buy games may differ; nothing pins a season-2+ value. The
@@ -747,6 +766,17 @@ the one calibrated dial (S72); the settings file and the config classes are name
 
 ## Shipped since the last board update
 
+- **★ S120 — THE FREE-THROW LANE (closes O-118).** `FreeThrowLane` (new): who stands where (lane score half body, half
+  rebounding; foul trouble last; ties by slot), the split in totals over the frozen normal lane
+  (`FreeThrowLane.OffensiveShare`), who gets it (`OffensiveBoard`, `DefensiveBoard`, `ScrambleFouled`,
+  `ScrambleOffensiveFouler`, `ScrambleDefensiveFouler`, one `Draw`). `PeriodClock` (new) on `GameState.Clock`,
+  published by the `Governor` each possession. `PossessionState.FreeThrowLane`; `NonShootingFoulEvent.FromFreeThrowLane`;
+  the three pickers gain `Weights(..., onlySlots)`; `IRollMPieGenerator.LaneConfig`. `RollMGenerator` splits on the lane.
+  `RollM`: `OffensiveRebound` 0.20, `DefensiveRebound` 0.715, twelve `Lane*` keys. Page-only `FreeThrowLanes` /
+  `FreeThrowLaneLeaks` on the routing outcome and possession record; `GameLaneAudit` per game. Oracle
+  `tools/ft_lane_oracle.py` → `ft_lane_golden.json`. Phase 111 new (35); Phase 11 (a) re-scoped, (d)/(e) relabelled;
+  Phase 109 C1-M on the lane, C2b retired (41); Phase 108 C2b/C2c retired (24); Phase 78 A7 inert mode also switches off
+  lane foul trouble, plus a live-rule half; twelve pins re-captured; registry 96. Journal S120.
 - **★ S119 — A CAREER CAN START IN ANY YEAR (closes O-99, O-113; C-63, C-64).** `RunSeasonCore` resolves the season's
   year once (a career: `startYear + N − 1` off the file; else `--year`, else 2026) and passes it to the conference dater,
   `MteSeatSeason`, `MteRefuseOverlap`, brackets, showcases, the non-conference dater and the conference tournaments;
@@ -1342,16 +1372,17 @@ chart is PROVISIONAL pending O-6.
 - **O-122 — THE BUY-GAME CURVE FOLLOWS THE CALENDAR, NOT THE HOLIDAYS (S119, K1).** Two drifts: when November 1 is a
   Wednesday the post-Christmas bump lands in Christmas week and is zeroed; when it is a Thursday Thanksgiving week
   carries 13 instead of 11. Anchoring the rows to Thanksgiving and Christmas is the refinement. Small; may fold into O-120.
-- **O-118 — THE FREE-THROW LANE (S118.1, Emmett: *"lane design is simply its own separate session, deciding who is
-  on it"*).** Who lines up along the lane on a free throw, and from that picture who grabs a missed free throw and who is
-  fouled on the loose ball. Today Roll M's board uses the rebound draw with the field-goal-shooter rule (it cuts the
-  missed jumper's shooter, never the free-throw shooter, and knows nothing of the lane); S118.1's loose-ball foul uses
-  the same draw cutting the free-throw shooter. Both share one draw, so this session changes both and moves games. Emmett
-  added that the bigs and best rebounders along the lane should be the most likely; the draw already leans that way
-  (the lineup's two best offensive rebounders fouled on 52% of these trips against 40% by chance). **Note (S118.1 A8b):**
-  the defender charged with a non-shooting foul is drawn without regard to who was fouled — not touched, a candidate
-  for the same family of "who" questions. **Note (S118 A3, still true):** `ReboundSlot` outlives its putback; never
-  infer a board or a putback from it later.
+- **O-123 — PER-PLAYER AGGRESSION (S120, boarded by Emmett at the lane design).** Low / medium / high, with buffs and
+  nerfs, which would also feed who takes a lane spot (and the nuance foul trouble was ruled too blunt to carry as a
+  score penalty). Its own design conversation.
+- **O-124 — THE LOW BLOCKS AND WHO FOULED WHOM (S120, declined from the outside review as a field nothing reads).**
+  Which defenders hold the two low blocks, if it should matter, is its own ruling. Same family: the defender charged
+  with a non-shooting foul is drawn without regard to who was fouled (S118.1 A8b; off a missed free throw he is now a
+  lane defender). **Note (S118 A3, still true):** `ReboundSlot` outlives its putback; never infer a board or a putback
+  from it later.
+- **O-125 — THE END-OF-PERIOD MISSED FREE THROW (S120 gate, A6).** NCAA scores some missed last free throws at a
+  period's end as a dead-ball team rebound with no lane; the engine plays every one as a live board (the resolver never
+  sees the clock). Small; needs the clock read at the free throw, not the possession's start.
 - **O-106 — ★ CONFERENCE TOURNAMENTS HAVE NO REAL NEUTRAL SITE (S110 placeholder, ruled temporary).** R1 puts all
   seven of a league's games in the **original No. 1 seed's city**, frozen, nobody hosting. Emmett: *"we will add in
   neutral locations later."* `WorldConference` carries no place at all, so the successor is authored per-conference
@@ -2251,6 +2282,17 @@ chart is PROVISIONAL pending O-6.
 
 ## Closed by ruling (looks unfinished — is not; do not "fix")
 
+- **C-65 (S120, Emmett, 2026-10-09) — THE FREE-THROW LANE.** Six on the lane — four defense, two offense — the shooter
+  at the line, one defender and two offense back. Lane spots by size and rebounding (*"the 5'8" point guard who can't
+  rebound at all is very rarely going to be on that lane, if ever"*). Foul trouble keeps a man off: two fouls in the first
+  half, four with more than about five minutes left, never in overtime — a hard rule, not a penalty. The board is the
+  four against the two **in totals**, laid over a default that stands for a **normal lane**; the default is **20%**
+  (*"lets do 20"*). The shooter gets 3% of his team's offensive boards, each offensive man back 0.5%, the defense's man
+  back 2%; the shooter draws and commits 0.5% of the scramble fouls, the men back none (*"works for me"*). The ceiling
+  stays shared with live rebounds (*"if it's truly two legit NBA big men against D2 guys then yeah that might be
+  realistic"*). **Kept at the S120 run:** the stock league lands at 21.3% (a normal lane gives exactly 20%; lanes vary
+  and the ceiling has more room than the floor), and foul trouble moves a man on 45% of missed free throws — both put to
+  Emmett before his run, and run as delivered. Do not recentre the default without a ruling.
 - **C-64 (S119, Emmett, 2026-10-09) — IN SOME YEARS A FEW MORE BUY GAMES FIND NO NIGHT, AND THAT IS ACCEPTED.** "yes"
   to: in roughly two years in five, 7–9 buy games of 2,171 find no night and those schools play one game fewer —
   R-n9's single unseated game (2026) writ larger, same cause. The layer reports, never throws, never cancels or
@@ -2592,6 +2634,12 @@ chart is PROVISIONAL pending O-6.
   considered and rejected: it would force every future dial into two places forever.
 
 ## Next approved candidate — exactly ONE
+
+★ **THE FREE-THROW LANE — S120 (2026-10-10). NEXT: NOT YET CHOSEN.** O-118 shipped. The arc's step 4 (development,
+recruiting, prestige movement, transfers) is where the plan goes next; **O-120** (seat every buy game in tight years) and
+**O-121** (the year on the pages) sit beside it. Emmett's call at the next-prompt pass (CONVENTIONS §6). **Carry into any
+draft that changes what a man's personal fouls do:** Phase 78 A7 proves foul attribution moves nothing except through its
+named consequences (fouling out, lane foul trouble) — S120's sandbox list missed it.
 
 ★ **A CAREER CAN START IN ANY YEAR — S119 (2026-10-09). NEXT: NOT YET CHOSEN.** O-99 and O-113 shipped. The arc's step 4
 (development, recruiting, prestige movement, transfers) is where the plan goes next; **O-118** (the free-throw lane),

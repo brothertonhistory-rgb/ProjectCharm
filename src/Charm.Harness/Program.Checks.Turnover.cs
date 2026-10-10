@@ -327,7 +327,7 @@ internal static partial class Program
                 Check("C8f: #6 conference tournaments UNMOVED", one.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp);
                 Check("C8g: #7 buy games UNMOVED", one.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
                 var digest = GamesDigest(one);
-                Check("C8h: ★ every one of season one's games identical to the S118.1 capture — teams, scores, possessions",
+                Check("C8h: ★ every one of season one's games identical to the S120 capture — teams, scores, possessions",
                       digest == RatingGoldenPreS112GameDigest, $"{one.PlayedGames.Count} games, {digest[..16]}");
                 var standalone = RunDivvyDraft(stock, TurnoverCheckSeed);
                 Check("C8i: ★ the bootstrap divvy through the generalized loop is byte-identical — every roster, every pick, every pool row",

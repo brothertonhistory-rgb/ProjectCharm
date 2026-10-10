@@ -245,6 +245,11 @@
     <None Include="..\..\tools\history_v3_golden.json" Link="tools\history_v3_golden.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <!-- S120 free-throw lane golden (emitted by tools/ft_lane_oracle.py, which reads the frozen
+         normal lane from config.json). Phase 111 C1 reproduces it. -->
+    <None Include="..\..\tools\ft_lane_golden.json" Link="tools\ft_lane_golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <!-- S88's two fixtures. S88 wrote them, and wrote the checks that read them, but never
          added them here — so Phase 79 could not have passed even if it had been registered.
          Added at S89.1 alongside registering the phase itself. -->

@@ -454,6 +454,15 @@ public readonly record struct RoutingOutcome(bool PossessionEnded, string Destin
     /// whether or not the man differs from the old rule's. Counted at the stamp in the
     /// resolver; no RNG; read by nothing in the engine. Phases 108 and 109 sum it per game.</summary>
     public int ScrambleFtShooterStamped { get; init; }
+
+    /// <summary>★ S120, PAGE-ONLY — one observation per missed last free throw on this possession (the
+    /// free-throw lane: its totals, the split, where the board and any scramble foul went). Null when
+    /// the possession had none. Read by nothing in the engine; Phase 111 reads it.</summary>
+    public IReadOnlyList<FreeThrowLaneObservation>? FreeThrowLanes { get; init; }
+
+    /// <summary>★ S120, PAGE-ONLY — Roll I / J / K resolutions on this possession that STARTED with a
+    /// free-throw lane still on the state. Phase 111 C4 asserts zero over a season.</summary>
+    public int FreeThrowLaneLeaks { get; init; }
     /// <summary>The offensive slot that committed the turnover. Null for team
     /// violations (FiveSecondInbound / TenSecondBackcourt / ShotClockViolation —
     /// no individual credit). Set by TurnoverCommitterPicker (Phase 33) for

@@ -15,7 +15,9 @@ namespace Charm.Harness;
 //       the way the engine picks who grabs an offensive board — the missed jumper's or
 //       three's shooter cut to about a third, a missed layup's shooter not cut ("keep it");
 //    3. a loose ball off a missed free throw (Roll M's LooseBallFoulOnDefense): the same
-//       draw, with the man who just missed at the stripe taking the cut.
+//       draw, with the man who just missed at the stripe taking the cut. ★ SUPERSEDED at S120:
+//       that loose ball is now drawn from the free-throw lane (Phase 111) — the shooter at 0.5%,
+//       the two lane men the rest, the men back never — and C1-M below asserts the lane's rule.
 //  Below the bonus nothing changes.
 //
 //  What must be proven:
@@ -25,10 +27,12 @@ namespace Charm.Harness;
 //       FreeThrow (20/40/60/80/95) — asserted before any share is tested. Every band is 4
 //       standard errors computed from the arm's own counts. Negative controls: below the bonus
 //       nothing is named; a reach-in bonus foul is never named in the scramble.
-//    C2 ★ only the scramble games moved: the fixed-pairing games with no stamped trip are the
-//       S118 season byte for byte; the games with one are counted. Control: the whole set differs.
+//    C2 ★ only the scramble games moved — PROVEN AT S118.1, RETIRED AT S120: the free-throw lane
+//       moves almost every game, so the set this compared shrank to nothing it could discriminate.
+//       Its proof stands in the journal; the counts still print. Phase 111 C6 is the live
+//       only-these-possessions-moved check.
 //    C3 the counts: printed, never asserted as targets.
-//    C4 the fingerprint wall at the S118.1 capture; the three schedule fingerprints at their
+//    C4 the fingerprint wall at the S120 capture; the three schedule fingerprints at their
 //       OLD values; the career's season one is the legacy season game for game.
 // ============================================================================
 
@@ -330,8 +334,10 @@ internal static partial class Program
 
             // ── M: slot 2 goes to the line after slot 1's missed three was fouled (a real shooting
             //    trip of three, shot by slot 2 through the S118 stamp), misses the last, and the loose
-            //    ball is fouled. Slot 2 — the man at the stripe — is cut; slot 1 — the plain rebound
-            //    draw's man after a missed three — is NOT. Tells the two rules apart in both directions.
+            //    ball is fouled. ★ S120: the free-throw lane decides it — slot 2 at the line draws it
+            //    at the scramble share (0.5%); the five are identical apart from FreeThrow, so the lane
+            //    is slots 1 and 3 (ties by slot) and they split the rest; slots 4 and 5 are back and
+            //    are never fouled.
             {
                 var all = RunArm(g =>
                     {
@@ -349,7 +355,9 @@ internal static partial class Program
                 if (Setup("C1-M", all, trips, trips.Count))
                 {
                     Credited("C1-M", trips);
-                    Shares("C1-M", trips, new[] { 1, nerf, 1, 1, 1 });
+                    var ftShare = RollMConfig.Load(configPath).LaneShooterScrambleShare;
+                    var laneShare = (1.0 - ftShare) / 2.0;
+                    Shares("C1-M (S120: the lane)", trips, new[] { laneShare, ftShare, laneShare, 0.0, 0.0 });
                     MadeRate("C1-M (trips not shot by slot 2, whose makes cannot be split from his own trip)", trips);
                 }
             }
@@ -395,25 +403,12 @@ internal static partial class Program
                     $"the audit is not index for index with the games: {career.PutbackAudits.Count} audits, " +
                     $"{career.PlayedGames.Count} played, {n} results.");
 
-            // -- C2: only the scramble games moved -------------------------------------------
+            // -- C2: only the scramble games moved — retired at S120 (see the header) -------------
             {
                 var fixedSet = Enumerable.Range(0, n)
                     .Where(i => i < career.ConferenceGameCount || career.PlayedGames[i].IsBuyGame).ToList();
-                var shapeOk = fixedSet.Count == ScrambleFixedPairingGames
-                              && fixedSet.All(i => career.PlayedGames[i].EventId is null
-                                                   && career.PlayedGames[i].ConferenceTournamentId is null);
-                Check(Inv($"C2a: the fixed-pairing games are the league slate plus the buy games, {ScrambleFixedPairingGames:N0} of them, none an event or tournament game"),
-                      shapeOk, Inv($"{fixedSet.Count:N0} ({career.ConferenceGameCount:N0} league + {fixedSet.Count - career.ConferenceGameCount:N0} buy)"));
-                var untouched = fixedSet.Where(i => career.PutbackAudits[i].ScrambleStamped == 0).ToList();
-                var touched = fixedSet.Count - untouched.Count;
-                var digest = RatingSha(string.Concat(untouched.Select(i => Line(career, i))));
-                Check(Inv($"C2b: ★ the {ScrambleGoldenUntouchedGames:N0} fixed-pairing games with no scramble trip are the S118 season, byte for byte; {ScrambleGoldenTouchedGames:N0} have one"),
-                      untouched.Count == ScrambleGoldenUntouchedGames && touched == ScrambleGoldenTouchedGames
-                      && digest == ScrambleGoldenUntouchedDigest,
-                      Inv($"{untouched.Count:N0} untouched, {touched:N0} with a scramble trip, {digest[..16]}…"));
-                var whole = RatingSha(string.Concat(fixedSet.Select(i => Line(career, i))));
-                Check("C2c: NEGATIVE CONTROL — the same digest over every fixed-pairing game differs (the touched games really moved, and the digest can see it)",
-                      whole != ScrambleGoldenUntouchedDigest, whole[..16] + "…");
+                var untouched = fixedSet.Count(i => career.PutbackAudits[i].ScrambleStamped == 0);
+                Console.WriteLine(Inv($"  (page) C2 retired at S120 (proven at S118.1: {ScrambleGoldenUntouchedGames:N0} untouched games byte-identical to the S118 season). This season: {untouched:N0} of {fixedSet.Count:N0} fixed-pairing games hold no scramble trip; Phase 111 C6 is the live proof."));
             }
 
             // -- C3: the counts (printed, never targets) -------------------------------------
@@ -430,7 +425,7 @@ internal static partial class Program
                 Console.WriteLine(Inv($"    season points: {ScrambleS118SeasonPoints:N0} at S118 → {points:N0} ({points - ScrambleS118SeasonPoints:+#,0;-#,0;0}; draft {ScrambleDraftSeasonPoints:N0})"));
             }
 
-            // -- C4: the fingerprint wall, re-pinned at the S118.1 capture ----------------------
+            // -- C4: the fingerprint wall, re-pinned at the S120 capture ----------------------
             {
                 var legacy = RunSeasonCore(stock, ScrambleCheckSeed, configPath, verbose: false);
                 var prefix = legacy.ConferenceGameCount + legacy.TournamentGameCount;
@@ -438,11 +433,11 @@ internal static partial class Program
                 Check("C4a: #1 conference schedule UNMOVED (its pre-S118.1 value)", legacy.Fingerprint == MatchGoldenConferenceFp);
                 Check("C4b: #2 conference dated UNMOVED (its pre-S118.1 value)", legacy.DatedFingerprint == MatchGoldenDatedFp);
                 Check("C4c: #5 non-conference dated UNMOVED (its pre-S118.1 value)", legacy.NonConferenceDates.DatedFingerprint == KnockoutGoldenNonConDatedFp);
-                Check("C4d: #3 event games at the S118.1 capture", legacy.EventGamesFingerprint == MatchGoldenEventGamesFp);
-                Check("C4e: #4 results+possessions at the S118.1 capture over its league-plus-event prefix", resultsFp == MatchGoldenResultsFp);
-                Check("C4f: #6 conference tournaments at the S118.1 capture", legacy.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp);
-                Check("C4g: #7 buy games at the S118.1 capture", legacy.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
-                Check("C4h: ★ every legacy game at the S118.1 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest,
+                Check("C4d: #3 event games at the S120 capture", legacy.EventGamesFingerprint == MatchGoldenEventGamesFp);
+                Check("C4e: #4 results+possessions at the S120 capture over its league-plus-event prefix", resultsFp == MatchGoldenResultsFp);
+                Check("C4f: #6 conference tournaments at the S120 capture", legacy.ConferenceTournamentFingerprint == BuyGoldenConfTourneyFp);
+                Check("C4g: #7 buy games at the S120 capture", legacy.BuyGamesFingerprint == RatingGoldenBuyGamesFp);
+                Check("C4h: ★ every legacy game at the S120 capture", GamesDigest(legacy) == RatingGoldenPreS112GameDigest,
                       Inv($"{legacy.Results.Count:N0} games, {GamesDigest(legacy)[..16]}…"));
                 Check("C4i: the career's season one and the legacy season are the same games", GamesDigest(career) == GamesDigest(legacy));
             }

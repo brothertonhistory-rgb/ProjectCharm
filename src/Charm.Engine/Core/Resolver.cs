@@ -97,6 +97,11 @@ public sealed class Resolver
     /// than derived, so an un-seeded harness check is still reproducible run to run.</summary>
     private const int DefaultFoulStreamSeed = 8787;
 
+    /// <summary>★ S120 — 1 when the possession handed to Roll J at the top of
+    /// <see cref="RunPossession"/> carried a free-throw lane (a leak); read and reset by
+    /// <see cref="Route"/> into its page-only leak count (Phase 111 C4).</summary>
+    private int _rollJLaneLeak;
+
     /// <summary>
     /// Run ONE whole possession from its start <paramref name="start"/>: route the
     /// start state to its ENTRY node, execute that node (the top of the chain), then
@@ -129,6 +134,7 @@ public sealed class Resolver
             // Roll J takes _game because its DefensiveFoul arm charges a team foul (the
             // Roll D / Roll I shape).
             var pieJ = _rollJGenerator.Generate(ctx);
+            _rollJLaneLeak = start.FreeThrowLane is null ? 0 : 1;   // ★ S120: C4's sample
             result = RollJ.Execute(start, pieJ, _game, _rng);
         }
         else if (start.Entry == EntryType.BallAdvanced)
@@ -193,6 +199,14 @@ public sealed class Resolver
         // what makes the outcome-split counters fire only where they should by representation
         // rather than by an entry test the page has to remember to write.
         var transitionArm = result.TransitionArm;
+        // ★ S120, PAGE-ONLY — the free-throw lane. One observation per Roll M resolution (who
+        // stood where, the split, who got it); `currentLane` is the one being filled while its
+        // resolution's consumers run. `laneLeaks` counts Roll I / J / K resolutions that START
+        // with a lane still on the state (Phase 111 C4: zero). No RNG; read by nothing in the engine.
+        List<FreeThrowLaneObservation>? laneObservations = null;
+        FreeThrowLaneObservation? currentLane = null;
+        var laneLeaks = _rollJLaneLeak;
+        _rollJLaneLeak = 0;
         var putbackAttempts = 0;
         var freeThrowSpins = 0;
         var points = 0;
@@ -409,13 +423,36 @@ public sealed class Resolver
                         // The SCRUM foul — the one foul in the game that landed on nobody
                         // before S87. Drawn on the same interior weighting the charge uses,
                         // from the dedicated foul stream.
-                        var lbf = PickLooseBallOffensiveFouler(t.State);
+                        // ★ S120: off a missed free throw the scrum is the lane — the shooter
+                        // exceedingly rarely, the men back never. One _foulRng draw either way.
+                        var lbf = t.State.FreeThrowLane is { } lbfLane
+                            ? LaneOffensiveFouler(lbfLane, t.State)
+                            : PickLooseBallOffensiveFouler(t.State);
+                        if (t.State.FreeThrowLane is not null && currentLane is not null)
+                            currentLane.ScrambleOffensiveFoulerSpot = _laneFoulerSpot;
                         _game.PersonalFouls.Increment(lbf.PlayerId);
                         offensiveFouls.Add(new OffensiveFoulEvent(lbf.Slot, lbf.PlayerId, IsLooseBall: true));
                     }
                     // Phase 35: defensive-rebound attribution — stamp which defender got it.
                     if (t.Reason == "DefensiveRebound")
-                        defensiveRebounderSlot = DefensiveRebounderPicker.Pick(t.State, _game, _matchup, _rng).Number;
+                    {
+                        // ★ S120: off a missed free throw, one of the four on the lane almost
+                        // always; the man back rarely. One _rng draw either way.
+                        if (t.State.FreeThrowLane is { } drbLane)
+                        {
+                            var cands = drbLane.DefensiveBoard(t.State, _game, _matchup, _rollMGenerator.LaneConfig);
+                            var drb   = FreeThrowLane.Draw(cands, _rng);
+                            defensiveRebounderSlot = drb.Number;
+                            if (currentLane is not null)
+                            {
+                                currentLane.BoardToOffense = false;
+                                currentLane.BoardSpot = cands.First(x => x.Slot == drb).Spot;
+                                currentLane.BoardReboundingRank = ReboundingRank(drb, offense: false);
+                            }
+                        }
+                        else
+                            defensiveRebounderSlot = DefensiveRebounderPicker.Pick(t.State, _game, _matchup, _rng).Number;
+                    }
                     // S86: name WHO WON THE BALL on the outgoing transition ticket, so Roll J
                     // can read his legs and his outlet pass one possession later. This is the
                     // only place both facts are in hand: the emitting rolls stamped the ticket
@@ -489,7 +526,9 @@ public sealed class Resolver
                           FastBreakBlkBySlot     = fastBreakBlkBySlot,
                           BreakContests          = breakContests,
                           PutbackFtShooterChanged = putbackFtShooterChanged,
-                          ScrambleFtShooterStamped = scrambleFtShooterStamped };
+                          ScrambleFtShooterStamped = scrambleFtShooterStamped,
+                          FreeThrowLanes = laneObservations,
+                          FreeThrowLaneLeaks = laneLeaks };
 
                 case Continue c:
                     // Session 62: harvest any non-shooting foul this continuation carries,
@@ -502,13 +541,32 @@ public sealed class Resolver
                     // in hand — and the man is charged his fifth.
                     if (c.NonShootingFoul is { } nsf)
                     {
-                        var nsCommitter = PickNonShootingFouler(c.State.Defense, nsf.IsReachIn);
+                        // ★ S120: the defense's loose-ball foul off a missed free throw is a
+                        // lane defender's — never the man back. One _foulRng draw either way.
+                        var nsCommitter = nsf.FromFreeThrowLane
+                            ? LaneDefensiveFouler(c.State.FreeThrowLane
+                                  ?? throw new InvalidOperationException(
+                                         "S120: a free-throw-lane foul arrived without its lane."))
+                            : PickNonShootingFouler(c.State.Defense, nsf.IsReachIn);
+                        if (nsf.FromFreeThrowLane && currentLane is not null)
+                            currentLane.ScrambleDefensiveFoulerSpot = _laneFoulerSpot;
                         _game.PersonalFouls.Increment(nsCommitter.PlayerId);
                         nonShootingFouls.Add(nsf with
                         {
                             CommitterSlot     = nsCommitter.Slot,
                             CommitterPlayerId = nsCommitter.PlayerId
                         });
+                    }
+                    // ★ S120 — THE LANE ENDS HERE. Every consumer of a Roll M resolution that
+                    // a continuation carries has now read it (the committer just above; the man
+                    // fouled was named in the ResolveFTRebound case), except the offensive board,
+                    // which reads it at its own node and clears it there before Roll K. Every
+                    // other continuation — sideline inbound, jump ball, free throws — hands the
+                    // ball back with no lane.
+                    if (c.State.FreeThrowLane is not null && c.Next != ContinuationKind.ResolveOffensiveRebound)
+                    {
+                        c = c with { State = c.State with { FreeThrowLane = null } };
+                        currentLane = null;
                     }
                     switch (c.Next)
                     {
@@ -1060,6 +1118,7 @@ public sealed class Resolver
                             var pieI = _rollIGenerator.Generate(
                                 c.State,
                                 c.ReboundSource ?? ReboundSource.LiveBall);
+                            if (c.State.FreeThrowLane is not null) laneLeaks++;   // ★ S120: C4's sample
                             result = RollI.Execute(c.State, pieI, _game, _rng);
                             // ★ S118.1 — A LOOSE-BALL FOUL IN THE BONUS GOES TO THE MAN IN THE
                             // SCRAMBLE (O-117, Emmett 2026-10-08): any of the five, drawn the way
@@ -1107,9 +1166,26 @@ public sealed class Resolver
                             // Covers both feeders (Roll I, Roll M) at this one shared node.
                             // Does NOT overwrite SelectedSlot (the shooter). Consumes one _rng draw
                             // — stream shifts vs Phase 30 (expected; documented in A5).
-                            var picked31 = OffensiveRebounderPicker.Pick(c.State, _game, _matchup, _rng);
+                            // ★ S120: off a missed free throw the board is the lane's — one of the
+                            // two on it almost always, the shooter and the men back rarely. Same one
+                            // _rng draw. The lane is then cleared: Roll K plays live ball.
+                            Slot picked31;
+                            if (c.State.FreeThrowLane is { } orbLane)
+                            {
+                                var cands = orbLane.OffensiveBoard(c.State, _game, _matchup, _rollMGenerator.LaneConfig);
+                                picked31 = FreeThrowLane.Draw(cands, _rng);
+                                if (currentLane is not null)
+                                {
+                                    currentLane.BoardToOffense = true;
+                                    currentLane.BoardSpot = cands.First(x => x.Slot == picked31).Spot;
+                                    currentLane.BoardReboundingRank = ReboundingRank(picked31, offense: true);
+                                }
+                                currentLane = null;
+                            }
+                            else
+                                picked31 = OffensiveRebounderPicker.Pick(c.State, _game, _matchup, _rng);
                             orbBySlot = orbBySlot.WithSlot(picked31.Number, 1);
-                            var reboundState31 = c.State with { ReboundSlot = picked31 };
+                            var reboundState31 = c.State with { ReboundSlot = picked31, FreeThrowLane = null };
                             // Select Roll K's pie by the source the board arrived with. A
                             // null stamp — every legacy feeder (Roll I) stamps nothing —
                             // reads as LiveBall, so the field-goal path is byte-for-byte
@@ -1117,6 +1193,7 @@ public sealed class Resolver
                             var pieK = _rollKGenerator.Generate(
                                 reboundState31,
                                 c.OffensiveReboundSource ?? OffensiveReboundSource.LiveBall);
+                            if (reboundState31.FreeThrowLane is not null) laneLeaks++;   // ★ S120: C4's sample
                             result = RollK.Execute(reboundState31, pieK, _game, _rng);
                             // ★ S118.1 — A FOUL AFTER THE BOARD GOES TO THE MAN WHO GRABBED IT
                             // (O-117). The rebounder drawn just above, in this same case — never
@@ -1273,16 +1350,53 @@ public sealed class Resolver
                         // off its offensive board re-enters Roll I, not Roll M, so it adds
                         // no new convergence loop.
                         case ContinuationKind.ResolveFTRebound:
-                            var pieM = _rollMGenerator.Generate(c.State);
-                            result = RollM.Execute(c.State, pieM, _game, _rng);
-                            // ★ S118.1 — A LOOSE BALL OFF A MISSED FREE THROW (O-117): the same
-                            // rebound-weighted draw, but the man cut is the one who just missed at
-                            // the stripe (carried on this continuation), not any field-goal shooter.
-                            // One _rng draw; after a bonus trip it replaces the foul-draw picker's.
+                        {
+                            // ★ S120 — THE FREE-THROW LANE (O-118). Line both sides up once, for
+                            // this whole resolution: the shooter at the line, two offense and four
+                            // defense on the lane, the rest back. No randomness. Every consumer of
+                            // this resolution reads this lane; it is cleared when the ball goes back
+                            // to live play.
+                            var laneCfg = _rollMGenerator.LaneConfig;
+                            var lane = FreeThrowLane.Build(_game, c.State, c.MissedFreeThrowShooter, laneCfg, _matchup);
+                            var laneState = c.State with { FreeThrowLane = lane };
+                            var pieM = _rollMGenerator.Generate(laneState);
+                            result = RollM.Execute(laneState, pieM, _game, _rng);
+
+                            var (lob, ldb, lor, ldr) = lane.Totals(_game, _matchup);
+                            currentLane = new FreeThrowLaneObservation
+                            {
+                                Offense = lane.Offense, HadClock = _game.Clock is not null,
+                                ShooterMissing = lane.Shooter is null,
+                                OffBody = lob, DefBody = ldb, OffRebounding = lor, DefRebounding = ldr,
+                                FoulTroubleMoves = lane.FoulTroubleMoves,
+                                OffensiveBoardWeight = pieM.Slices.First(x => x.Outcome == FreeThrowReboundOutcome.OffensiveRebound).Weight,
+                                DefensiveBoardWeight = pieM.Slices.First(x => x.Outcome == FreeThrowReboundOutcome.DefensiveRebound).Weight,
+                                Outcome = result switch
+                                {
+                                    Terminal tr => tr.Reason,
+                                    Continue { NonShootingFoul: not null } => "LooseBallFoulOnDefense",
+                                    Continue { Next: ContinuationKind.ResolveOffensiveRebound } => "OffensiveRebound",
+                                    Continue { Next: ContinuationKind.ResolveSidelineInbound } => "OutOfBoundsOffDefense",
+                                    Continue { Next: ContinuationKind.ResolveJumpBall } => "JumpBall",
+                                    _ => "Other",
+                                },
+                            };
+                            (laneObservations ??= new()).Add(currentLane);
+
+                            // The defense's loose-ball foul is tagged so its committer is drawn
+                            // from the lane where the foul is harvested.
+                            if (result is Continue { NonShootingFoul: { } mFoul } cTag)
+                                result = cTag with { NonShootingFoul = mFoul with { FromFreeThrowLane = true } };
+
+                            // ★ S118.1, now on the lane (S120): in the bonus, the man fouled on the
+                            // loose ball is a lane man — the shooter exceedingly rarely, the men back
+                            // never. One _rng draw; it replaces the foul-draw picker's.
                             if (IsBonusTrip(result, out var cMft) && AnyOffensivePlayer(cMft.State))
                             {
-                                result = StampFreeThrowShooter(cMft,
-                                    OffensiveRebounderPicker.Pick(c.State, _game, _matchup, _rng, c.MissedFreeThrowShooter));
+                                var cands = lane.ScrambleFouled(laneState, _game, _matchup, laneCfg);
+                                var fouled = FreeThrowLane.Draw(cands, _rng);
+                                currentLane.ScrambleFouledSpot = cands.First(x => x.Slot == fouled).Spot;
+                                result = StampFreeThrowShooter(cMft, fouled);
                                 scrambleFtShooterStamped++;
                             }
                             // ORB counters — same shape as ResolveRebound (Roll I).
@@ -1296,6 +1410,7 @@ public sealed class Resolver
                                 { orbChances++; orbWon++; }
                             }
                             continue;
+                        }
 
                         default:
                             throw new InvalidOperationException($"No route for continuation '{c.Next}'.");
@@ -1598,6 +1713,45 @@ public sealed class Resolver
         var slot = TurnoverInteriorPicker.Pick(state, _game, _matchup, _foulRng);
         var p    = _game.RosterFor(state.Offense).PlayerAt(slot);
         return (slot.Number, p?.PlayerId ?? 0);
+    }
+
+    /// <summary>★ S120 — the offensive man who commits a loose-ball foul off a missed free throw: the
+    /// shooter exceedingly rarely, the men back never, a lane man by the interior weight. One
+    /// _foulRng draw, the stream the five-man fouler uses.</summary>
+    private (int Slot, int PlayerId) LaneOffensiveFouler(FreeThrowLane lane, PossessionState state)
+    {
+        var cands = lane.ScrambleOffensiveFouler(state, _game, _matchup, _rollMGenerator.LaneConfig);
+        var slot  = FreeThrowLane.Draw(cands, _foulRng);
+        _laneFoulerSpot = cands.First(x => x.Slot == slot).Spot;
+        return (slot.Number, _game.RosterFor(state.Offense).PlayerAt(slot)?.PlayerId ?? 0);
+    }
+
+    /// <summary>★ S120 — the defender charged with a loose-ball foul off a missed free throw: one of
+    /// the four on the lane, by the situational non-shooting weight. One _foulRng draw.</summary>
+    private (int Slot, int PlayerId) LaneDefensiveFouler(FreeThrowLane lane)
+    {
+        var cands = lane.ScrambleDefensiveFouler(_game, _matchup);
+        var slot  = FreeThrowLane.Draw(cands, _foulRng);
+        _laneFoulerSpot = cands.First(x => x.Slot == slot).Spot;
+        return (slot.Number, _game.RosterFor(lane.Defense).PlayerAt(slot)?.PlayerId ?? 0);
+    }
+
+    /// <summary>★ S120, page-only: where the last lane fouler stood (read into the observation).</summary>
+    private LaneSpot? _laneFoulerSpot;
+
+    /// <summary>★ S120, page-only: the man's rank by his side's rebounding rating among the men on
+    /// his team's floor (1 = the best; ties by slot).</summary>
+    private int ReboundingRank(Slot slot, bool offense)
+    {
+        var (men, slots) = OccupiedSeats(slot.Side);
+        int R(Player p) => offense ? p.OffensiveRebounding : p.DefensiveRebounding;
+        var me = slots.IndexOf(slot.Number);
+        if (me < 0) return 0;
+        var rank = 1;
+        for (var i = 0; i < men.Count; i++)
+            if (i != me && (R(men[i]) > R(men[me]) || (R(men[i]) == R(men[me]) && slots[i] < slots[me])))
+                rank++;
+        return rank;
     }
 
     /// <summary>

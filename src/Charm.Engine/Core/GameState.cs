@@ -75,6 +75,17 @@ public sealed class GameState
         Fatigue     = fatigue ?? new FatigueTracker(new FatigueConfig());
     }
 
+    /// <summary>★ S120 — the period and the seconds left in it at the start of the current
+    /// possession, published by the <see cref="Governor"/>; null until the first possession it
+    /// runs, and null for the whole game on a harness path that drives the resolver directly.
+    /// Read by the free-throw lane's foul-trouble rule only.</summary>
+    public PeriodClock? Clock { get; private set; }
+
+    /// <summary>★ S120 — the <see cref="Governor"/>'s one write to <see cref="Clock"/>, at the top
+    /// of every possession. Takes no randomness and changes nothing else.</summary>
+    public void PublishClock(int period, double secondsLeft) =>
+        Clock = new PeriodClock(period, secondsLeft);
+
     /// <summary>Turn the arrow ON, pointing at <paramref name="team"/>. Used by
     /// the jump-ball node after the opening tip is decided: per NCAA the arrow
     /// points at the team that LOST the tip (they are owed the next award).</summary>
